@@ -4,7 +4,7 @@ import type {
   ConversationStatusData,
   ConversationTurnUser,
 } from '@/types/chat';
-import type { SendRefusal } from '@/v2/runtime/chat-engine';
+import type { SendRefusal, TurnOrigin } from '@/v2/runtime/chat-engine';
 import { statusOf } from '@/v2/runtime/persist/policy';
 
 /**
@@ -113,21 +113,6 @@ export function isOwnTurn(
  *  four seconds, and none while it streams or its tab is hidden (T6). */
 export const SPACE_CHAT_POLL_MS = 4000;
 
-/**
- * The member whose turn is running, when it is someone else's: `null` unless
- * the status is `pending` with a sender who is not the reader. The status
- * keeps the last sender after a turn ends, so `pending` is checked first.
- */
-export function turnHeldBy(
-  status: Pick<ConversationStatusData, 'status' | 'execution_user'> | null,
-  viewerId: number | null,
-): ConversationTurnUser | null {
-  if (status === null || status.status !== 'pending') return null;
-  const sender = status.execution_user ?? null;
-  if (sender === null || sender.id === viewerId) return null;
-  return sender;
-}
-
 /** When a running turn started, as the activity row's clock reads it (epoch
  *  ms), from the status's or the 409's `pending_since`; null when unknown. */
 export function turnStart(pendingSince: string | null | undefined): number | null {
@@ -215,4 +200,61 @@ export function askAgainRefusal(refusal: SendRefusal, viewerId: number | null): 
  *  neither is lost. */
 export function draftWithRefused(current: string, refusedText: string): string {
   return current.trim() === '' ? refusedText : `${current}\n\n${refusedText}`;
+}
+
+/** The activity row's words while whose turn it is is not known yet: the
+ *  status read has not landed. No name, and not "your request". */
+export const UNKNOWN_TURN_LABEL = 'Working on an answer';
+
+/** Whose turn is streaming, as the screen shows it. */
+export type WhoseTurn =
+  /** Nothing streams. */
+  | { kind: 'idle' }
+  /** The reader's own turn; Stop when they may cancel it. */
+  | { kind: 'own'; canStop: boolean }
+  /** A colleague's: Send held, the name (or {@link UNNAMED_ASKER}), no Stop. */
+  | { kind: 'colleague'; name: string; since: number | null }
+  /** Not known yet: Send held, no name, no Stop, until the status read lands. */
+  | { kind: 'unknown'; since: number | null };
+
+/**
+ * Whose running turn this is (Spaces F4). It reads only what the turn itself
+ * carries, never the conversation record, so it answers the same whatever
+ * order the record, the attach and the status read arrive in:
+ *  1. A turn this engine started is the reader's (`origin: 'own'`), with Stop.
+ *  2. A pending status says the rest. `can_cancel` true is the sender reading
+ *     (B4: cancel is the sender's alone), so the reader's own, with Stop. A
+ *     named sender who is not the reader is a colleague; an unnamed one is an
+ *     unnamed colleague. A status with neither field is a server before B4,
+ *     where every turn is the owner's own, as before.
+ *  3. With no status read, a 409's named sender says whose it is.
+ *  4. Otherwise it is not known yet: no Stop, no name.
+ */
+export function whoseTurn(input: {
+  isStreaming: boolean;
+  origin: TurnOrigin;
+  status: Pick<ConversationStatusData, 'status' | 'execution_user' | 'can_cancel' | 'pending_since'> | null;
+  refusal: { by: ConversationTurnUser | null; since: string | null } | null;
+  viewerId: number | null;
+}): WhoseTurn {
+  const { isStreaming, origin, status, refusal, viewerId } = input;
+  if (!isStreaming) return { kind: 'idle' };
+  if (origin === 'own') return { kind: 'own', canStop: true };
+  if (status !== null && status.status === 'pending') {
+    if (status.can_cancel === undefined && status.execution_user === undefined) {
+      return { kind: 'own', canStop: true };
+    }
+    if (status.can_cancel === true) return { kind: 'own', canStop: true };
+    const sender = status.execution_user ?? null;
+    if (sender !== null && sender.id === viewerId) return { kind: 'own', canStop: false };
+    return {
+      kind: 'colleague',
+      name: sender?.name ?? UNNAMED_ASKER,
+      since: turnStart(status.pending_since),
+    };
+  }
+  if (refusal !== null && refusal.by !== null && refusal.by.id !== viewerId) {
+    return { kind: 'colleague', name: refusal.by.name, since: turnStart(refusal.since) };
+  }
+  return { kind: 'unknown', since: turnStart(refusal?.since) };
 }

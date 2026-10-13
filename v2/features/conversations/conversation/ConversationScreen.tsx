@@ -20,7 +20,6 @@ import {
   publishEmbeddedComposer,
   reportFollowUpRefusal,
 } from './embedded-composer';
-import { askingLabel } from './space-turn';
 
 /**
  * ConversationScreen — the v2 `/c/[id]` client root. Mounts the controller (engine
@@ -323,9 +322,7 @@ export function ConversationScreen({
             onScrolledUpChange={setScrolledUp}
             showAuthors={controller.showAuthors}
             viewerId={serverUserId}
-            restingLabel={
-              controller.sendHeldBy !== null ? askingLabel(controller.sendHeldBy) : undefined
-            }
+            restingLabel={controller.turnLabel}
             heldSince={controller.heldSince}
           />
         </DocumentExportScope>

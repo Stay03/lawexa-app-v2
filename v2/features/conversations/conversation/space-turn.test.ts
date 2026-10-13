@@ -28,11 +28,12 @@ import {
   sendRefusal,
   stopsPolling,
   turnChanged,
-  turnHeldBy,
   turnStart,
+  UNKNOWN_TURN_LABEL,
   UNNAMED_ASKER,
   VIEW_ONLY_COPY,
   viewOnlyReason,
+  whoseTurn,
 } from './space-turn';
 
 /**
@@ -199,14 +200,23 @@ const status = (over: Partial<ConversationStatusData> = {}): ConversationStatusD
 });
 
 test('"{name} is asking" names a colleague, only while the turn is pending', () => {
-  assert.deepEqual(turnHeldBy(status({ status: 'pending' }), 7), { id: 41, name: 'Ada Obi' });
-  assert.equal(turnHeldBy(status({ status: 'pending' }), 41), null, 'the reader’s own turn');
-  // The status keeps the last sender after the turn ends (B3 answer).
+  const followed = (s: ConversationStatusData | null, viewerId: number) =>
+    whoseTurn({ isStreaming: true, origin: 'followed', status: s, refusal: null, viewerId });
+  assert.deepEqual(followed(status({ status: 'pending' }), 7), {
+    kind: 'colleague',
+    name: 'Ada Obi',
+    since: Date.parse('2026-10-13T08:59:00Z'),
+  });
+  assert.equal(followed(status({ status: 'pending' }), 41).kind, 'own', 'the reader’s own turn');
+  // The status keeps the last sender after the turn ends (B3 answer): it names
+  // nobody then.
   for (const ended of ['completed', 'failed', 'expired', 'idle'] as const) {
-    assert.equal(turnHeldBy(status({ status: ended }), 7), null, ended);
+    assert.equal(followed(status({ status: ended }), 7).kind, 'unknown', ended);
   }
-  assert.equal(turnHeldBy(status({ status: 'pending', execution_user: null }), 7), null);
-  assert.equal(turnHeldBy(null, 7), null);
+  assert.equal(
+    whoseTurn({ isStreaming: false, origin: null, status: status({ status: 'pending' }), refusal: null, viewerId: 7 }).kind,
+    'idle',
+  );
   assert.equal(askingLabel('Ada'), 'Ada is asking');
 });
 
@@ -245,15 +255,16 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
     /enabled:\s*isSpaceMember &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
   );
   // Recovery settles after the mount flow's own attach, or on any connect.
-  assert.match(controller, /const recovered = await recoverPendingState\(conversationId\)[^\n]*\n\s*if \(cancelled\) return;[\s\S]*?setRecoveredFor\(conversationId\);\s*\}\)\(\);/);
+  assert.match(controller, /await recoverPendingState\(conversationId\)\.catch\(\(\) => \{\}\);\s*if \(cancelled\) return;\s*setRecoveredFor\(conversationId\);\s*\}\)\(\);/);
   // Opened mid-turn: the mount flow attached, so whose turn it is is read once.
-  assert.match(controller, /if \(recovered === 'reconnected' && inSpace\) void queryClient\.prefetchQuery\(statusOptions\);/);
+  // Opened mid-turn: the status the attach reads is kept (onStatusRead).
+  assert.doesNotMatch(controller, /prefetchQuery\(statusOptions\)/);
   assert.match(controller, /onConnected: \(\) => \{\s*\/\/[^\n]*\n[^\n]*\n\s*setRecoveredFor\(conversationId\);/);
   assert.match(
     controller,
-    /await queryClient\.refetchQueries\(\{ queryKey: detailKey, exact: true \}\);\s*if \(!stillWanted\(\)\) return;\s*const fresh = queryClient\.getQueryData\(detailKey\);\s*if \(fresh\) adoptConversationHistory\(fresh\);\s*if \(executionId\) connectToStream\(executionId\);\s*else await recoverPendingState\(conversationId\)/,
+    /await queryClient\.refetchQueries\(\{ queryKey: detailKey, exact: true \}\);\s*if \(!stillWanted\(\)\) return;\s*const fresh = queryClient\.getQueryData\(detailKey\);\s*if \(fresh\) adoptConversationHistory\(fresh\);\s*if \(executionId\) \{\s*connectToStream\(executionId\);\s*if \(readStatus\) void queryClient\.fetchQuery\(statusOptions\)\.catch\(\(\) => \{\}\);\s*\} else \{\s*await recoverPendingState\(conversationId\)/,
   );
-  assert.match(controller, /void followTurn\(statusData\.execution_id, \(\) => !cancelled\);/);
+  assert.match(controller, /void followTurn\(statusData\.execution_id, \(\) => !cancelled, false\);/);
   // A send drops the last status read before it goes.
   assert.match(controller, /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);[\s\S]*?await send\(/);
 });
@@ -261,13 +272,13 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
 test('a colleague’s turn names them in the activity row, holds Send and offers no Stop', () => {
   assert.match(readHere('ActivityStatus.tsx'), /: \(narration \?\? restingLabel \?\? RESTING_LABEL\);/);
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /const ownTurnRunning = isStreaming && sendHeldBy === null;/);
+  assert.match(composer, /const ownTurnRunning = isStreaming && canStop;/);
   assert.match(composer, /\{isStreaming && canStop \? \(/);
-  assert.match(composer, /isStreaming && sendHeldBy !== null \? heldSendLabel\(sendHeldBy\) : 'Send message'/);
+  assert.match(composer, /isStreaming && !canStop \? heldSendLabel\(sendHeldBy \?\? UNNAMED_ASKER\) : 'Send message'/);
   assert.match(composer, /disabled=\{!canSend \|\| isStreaming\}/);
   const screen = readHere('ConversationScreen.tsx');
   assert.match(screen, /sendHeldBy=\{controller\.sendHeldBy\}\s+canStop=\{controller\.canStop\}/);
-  assert.match(screen, /controller\.sendHeldBy !== null \? askingLabel\(controller\.sendHeldBy\) : undefined/);
+  assert.match(screen, /restingLabel=\{controller\.turnLabel\}/);
 });
 
 /* ── Commit 5: a send that meets another turn keeps the message ───────────── */
@@ -310,7 +321,7 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
   );
   assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
   assert.match(controller, /\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
-  assert.match(controller, /const heldBy = statusHeldBy\?\.name \?\? refusedName;/);
+  assert.match(controller, /const heldBy = turn\.kind === 'colleague' \? turn\.name : null;/);
 });
 
 test('the composer gives a refused message back, with its pasted cards and files, and says why', () => {
@@ -456,7 +467,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
   // Both refusals change the screen as a refused send does.
   assert.match(
     controller,
-    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);[\s\S]*?void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId\);\s*\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
+    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);[\s\S]*?void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId, true\);\s*\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
   );
   const screen = readHere('ConversationScreen.tsx');
   assert.match(
@@ -503,9 +514,10 @@ test('the row’s clock runs from the turn’s own start, and the name stays in 
   assert.equal(turnStart(undefined), null);
   assert.equal(turnStart('not a date'), null);
   const controller = readHere('useConversationController.ts');
-  assert.match(
-    controller,
-    /const heldSince = statusHeldBy\s*\? turnStart\(statusData\?\.pending_since\)\s*: refusedName !== null\s*\? turnStart\(refusedTurn\?\.since\)\s*: null;/,
+  assert.match(controller, /const heldSince = turn\.kind === 'colleague' \|\| turn\.kind === 'unknown' \? turn\.since : null;/);
+  assert.deepEqual(
+    whoseTurn({ isStreaming: true, origin: 'followed', status: null, refusal: { by: { id: 41, name: 'Ada' }, since: '2026-10-13T09:00:00Z' }, viewerId: 7 }),
+    { kind: 'colleague', name: 'Ada', since: Date.parse('2026-10-13T09:00:00Z') },
   );
   assert.match(read('v2', 'runtime', 'chat-engine', 'engine.ts'), /since: pendingData\?\.pending_since \?\? null,/);
   const list = readHere('MessageList.tsx');
@@ -543,7 +555,7 @@ test('a send and a re-ask forget the last status as seen, so their own turn is n
 test('only a member of the space reads its status', () => {
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /const isSpaceMember = isSpaceChat && detailData\?\.my_space_role != null;/);
-  assert.match(controller, /inSpace = data\.space != null && data\.my_space_role != null;/);
+  assert.doesNotMatch(controller, /inSpace/);
 });
 
 /* ── A 409's follow does not outlive its screen (re-review R1) ────────────── */
@@ -553,7 +565,7 @@ test('a 409’s follow attaches only while the screen still shows that chat', ()
   assert.match(controller, /useEffect\(\(\) => \{\s*let cancelled = false;\s*liveRef\.current = conversationId;/);
   const clears = controller.match(/cancelled = true;\s*liveRef\.current = null;/g);
   assert.equal(clears?.length, 2, 'both of the mount flow’s cleanups');
-  assert.match(controller, /void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId\);/);
+  assert.match(controller, /void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId, true\);/);
   // followTurn checks before it attaches, after the read.
   assert.match(controller, /if \(!stillWanted\(\)\) return;\s*const fresh = queryClient\.getQueryData\(detailKey\);/);
 });
@@ -565,23 +577,179 @@ test('the turn a refused send met stops naming its sender when it ends', () => {
   assert.match(controller, /onCompleted: \(\) => \{\s*(\/\/[^\n]*\n\s*)*setRefusedTurn\(null\);/);
   assert.match(controller, /onError: \(\) => setRefusedTurn\(null\),\s*onCancelled: \(\) => setRefusedTurn\(null\),/);
   // A pending status outranks the refusal (a turn that ended by polling fires no handler).
-  assert.match(controller, /isStreaming &&\s*statusData\?\.status !== 'pending' &&\s*refusedTurn !== null &&/);
+  assert.equal(
+    whoseTurn({
+      isStreaming: true,
+      origin: 'followed',
+      status: status({ status: 'pending', execution_user: { id: 7, name: 'Me' }, can_cancel: true }),
+      refusal: { by: { id: 41, name: 'Ada' }, since: null },
+      viewerId: 7,
+    }).kind,
+    'own',
+  );
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /resetStreamingBuffers\(\);\s*handlers\.onCancelled\?\.\(\);\s*\}\);/);
 });
 
 /* ── A refusal that names nobody is still a colleague's turn (re-review R5) ── */
 
-test('a held refusal with no sender holds Send, reads "Someone is asking" and offers no Stop', () => {
-  const controller = readHere('useConversationController.ts');
-  assert.match(
-    controller,
-    /refusedTurn !== null &&\s*refusedTurn\.by\?\.id !== serverUserId\s*\? \(refusedTurn\.by\?\.name \?\? UNNAMED_ASKER\)\s*: null;/,
+test('a turn with no named sender is never shown as the reader’s: held, no Stop', () => {
+  // A 409 that names nobody, before any status read: not known yet (no name).
+  assert.deepEqual(
+    whoseTurn({ isStreaming: true, origin: 'followed', status: null, refusal: { by: null, since: null }, viewerId: 7 }),
+    { kind: 'unknown', since: null },
   );
-  // A held name, unnamed or not, means no Stop.
-  assert.match(controller, /const canStop =\s*isStreaming &&\s*heldBy === null &&/);
+  // A pending status with no sender, and the reader may not cancel: an unnamed colleague.
+  assert.deepEqual(
+    whoseTurn({
+      isStreaming: true,
+      origin: 'followed',
+      status: status({ status: 'pending', execution_user: null, can_cancel: false, pending_since: null }),
+      refusal: null,
+      viewerId: 7,
+    }),
+    { kind: 'colleague', name: UNNAMED_ASKER, since: null },
+  );
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /const canStop = turn\.kind === 'own' && turn\.canStop;/);
   assert.match(controller, /sendHeldBy: heldBy,/);
   assert.equal(askingLabel(UNNAMED_ASKER), 'Someone is asking');
   assert.equal(heldSendLabel(UNNAMED_ASKER), 'Wait for the answer');
   assert.equal(heldSendLabel('Ada Obi'), 'Wait for Ada Obi’s answer');
+});
+
+/* ── Whose turn it is never depends on the order the record and the status
+      arrive in (a slow server, F4 run against the real API) ─────────────── */
+
+test('the status the attach reads reaches the screen before the engine attaches', () => {
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  const recover = engine.slice(engine.indexOf('async function recoverPendingState'), engine.indexOf('// ─── Construction seed'));
+  const handedOver = recover.indexOf('handlers.onStatusRead?.(convId, response);');
+  assert.ok(handedOver > 0, 'recoverPendingState hands the status over');
+  assert.ok(handedOver < recover.indexOf('isStreaming: true'), 'before it starts streaming');
+  assert.ok(handedOver < recover.indexOf('connectToStream(status.execution_id)'), 'before it attaches');
+  const controller = readHere('useConversationController.ts');
+  // Kept as the poll's own entry, keyed by the chat it was read for, with no
+  // condition on the record (my_space_role, space) having arrived.
+  assert.match(
+    controller,
+    /onStatusRead: \(id, response\) => \{\s*if \(isConfidentialMark\(id\)\) return;\s*queryClient\.setQueryData\(\s*conversationsQueries\.status\(\{ conversationId: id, viewerId: serverUserId \}\)\.queryKey,\s*response,\s*\);/,
+  );
+});
+
+test('a colleague’s pending turn, the record still on its way: held, named, no Stop', async () => {
+  // The order the slow server gave: the engine read the status and attached;
+  // the record (and so my_space_role) had not arrived. The status alone decides.
+  const pending = status({ status: 'pending', execution_id: 'e1', execution_user: { id: 6, name: 'Ada Obi' }, can_cancel: false });
+  assert.equal(
+    whoseTurn({ isStreaming: true, origin: 'followed', status: pending, refusal: null, viewerId: 2 }).kind,
+    'colleague',
+  );
+  const client = new QueryClient();
+  const key = conversationsQueries.status({ conversationId: 'c1', viewerId: 2 }).queryKey;
+  client.setQueryData(key, { success: true, message: 'OK', data: pending });
+  assert.equal(client.getQueryData(key)?.data.execution_user?.name, 'Ada Obi');
+  client.clear();
+  // Stop needs the turn known to be the reader's: can_cancel on a pending status.
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /const canStop = turn\.kind === 'own' && turn\.canStop;/);
+  // The only gate the record still sets is the poll's, which is off while streaming anyway.
+  assert.match(controller, /enabled:\s*isSpaceMember &&/);
+});
+
+/* ── Whose turn: the techlead's five rules (F4 run against the real API) ──── */
+
+const colleagueStatus = status({
+  status: 'pending',
+  execution_id: 'e1',
+  execution_user: { id: 6, name: 'Ada Obi' },
+  can_cancel: false,
+  pending_since: '2026-10-13T09:00:00Z',
+});
+const ownStatus = status({
+  status: 'pending',
+  execution_id: 'e1',
+  execution_user: { id: 2, name: 'Me' },
+  can_cancel: true,
+});
+
+test('rule 1 and 4: the answer reads no field of the conversation record, so every arrival order agrees', () => {
+  // whoseTurn takes the turn's own facts only; the record (space,
+  // my_space_role) is not an input, so the detail arriving first, after the
+  // attach, or much later cannot change it.
+  const source = readHere('space-turn.ts');
+  const body = source.slice(source.indexOf('export function whoseTurn'));
+  assert.doesNotMatch(body, /my_space_role|can_send|\.space\b/);
+  // The three orders, as the screen sees them for the Owner (id 2) of a chat
+  // whose Contributor (id 6) is asking on a slow server:
+  //  - detail first, then the attach: the attach hands over its status;
+  //  - attach first, detail later: the same status, handed over at the attach;
+  //  - attach, detail much later: still the same; the record never enters.
+  for (const order of ['detail first', 'attach first', 'detail much later']) {
+    assert.deepEqual(
+      whoseTurn({ isStreaming: true, origin: 'followed', status: colleagueStatus, refusal: null, viewerId: 2 }),
+      { kind: 'colleague', name: 'Ada Obi', since: Date.parse('2026-10-13T09:00:00Z') },
+      order,
+    );
+  }
+  // The status the attach reads is the first thing the engine does with it.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(
+    engine,
+    /const response = await chatApi\.getStatus\(convId, \{ withoutMessages: true \}\);\s*\/\/[^\n]*\n\s*handlers\.onStatusRead\?\.\(convId, response\);/,
+  );
+});
+
+test('rule 2: Stop only for a turn this tab started, or one the status says the reader may cancel', () => {
+  assert.deepEqual(whoseTurn({ isStreaming: true, origin: 'own', status: null, refusal: null, viewerId: 2 }), { kind: 'own', canStop: true });
+  assert.deepEqual(whoseTurn({ isStreaming: true, origin: 'followed', status: ownStatus, refusal: null, viewerId: 2 }), { kind: 'own', canStop: true });
+  assert.equal(whoseTurn({ isStreaming: true, origin: 'followed', status: colleagueStatus, refusal: null, viewerId: 2 }).kind, 'colleague');
+  // The reader named but not allowed to cancel: theirs, and no Stop.
+  assert.deepEqual(
+    whoseTurn({ isStreaming: true, origin: 'followed', status: { ...ownStatus, can_cancel: false }, refusal: null, viewerId: 2 }),
+    { kind: 'own', canStop: false },
+  );
+  // The engine marks who started the turn: send, a retry and the handoff are
+  // its own; the recovery attach is followed; a reconnect keeps what it had.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own' \}\)\);/);
+  assert.match(engine, /isStreaming: true, isCancelling: false, error: null, turnOrigin: 'followed' \}\)\);/);
+  assert.match(
+    engine,
+    /turnOrigin: initialMessage\s*\? 'own'\s*: prev\.isStreaming && prev\.turnOrigin !== null\s*\? prev\.turnOrigin\s*: 'followed',/,
+  );
+});
+
+test('rule 3: while whose turn it is is unknown, Send is held with no name, no Stop, a nameless row', () => {
+  const unknown = whoseTurn({ isStreaming: true, origin: 'followed', status: null, refusal: null, viewerId: 2 });
+  assert.deepEqual(unknown, { kind: 'unknown', since: null });
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /turn\.kind === 'unknown'\s*\? UNKNOWN_TURN_LABEL/);
+  assert.equal(UNKNOWN_TURN_LABEL, 'Working on an answer');
+  assert.doesNotMatch(UNKNOWN_TURN_LABEL, /your|is asking/);
+  // The composer holds Send ("Wait for the answer") whenever it may not stop the turn.
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(composer, /const ownTurnRunning = isStreaming && canStop;/);
+  assert.equal(heldSendLabel(UNNAMED_ASKER), 'Wait for the answer');
+  // An attach to a known execution reads the status when none is held, so the
+  // unknown state ends when that read lands.
+  assert.match(controller, /void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId, true\);/);
+});
+
+test('rule 5: a personal chat’s owner keeps Stop on their own turn, with no new status read', () => {
+  // Their send, a retry, or the create handoff: own, Stop, no status needed.
+  assert.deepEqual(whoseTurn({ isStreaming: true, origin: 'own', status: null, refusal: null, viewerId: 2 }), { kind: 'own', canStop: true });
+  // A reload mid-stream: the recovery's own status read (no extra request) says
+  // the owner may cancel; a server before B4 sends neither field: still theirs.
+  assert.deepEqual(whoseTurn({ isStreaming: true, origin: 'followed', status: ownStatus, refusal: null, viewerId: 2 }), { kind: 'own', canStop: true });
+  const before = { status: 'pending' as const, messages: [], execution_id: 'e1', stream_url: null, pending_since: null };
+  assert.deepEqual(whoseTurn({ isStreaming: true, origin: 'followed', status: before, refusal: null, viewerId: 2 }), { kind: 'own', canStop: true });
+  // No new read: the status poll stays a space member's, the mount flow adds
+  // none, and the recovery read is the one it always made.
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /enabled:\s*isSpaceMember &&/);
+  assert.doesNotMatch(controller, /prefetchQuery/);
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  const recover = engine.slice(engine.indexOf('async function recoverPendingState'), engine.indexOf('// ─── Construction seed'));
+  assert.equal((recover.match(/chatApi\.getStatus\(/g) ?? []).length, 1);
 });

@@ -51,7 +51,7 @@ import {
   privateModeOf,
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
-import { draftWithRefused, heldSendLabel, type SendRefused } from './space-turn';
+import { draftWithRefused, heldSendLabel, UNNAMED_ASKER, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
 
 /**
@@ -191,12 +191,15 @@ export interface ConversationComposerProps {
   stageRef?: React.Ref<ConversationComposerHandle>;
   /**
    * The colleague whose turn is running in this space chat (Spaces F4), or
-   * null. While it is set the reader may type the next question, Send waits
-   * for their answer, and there is no Stop: only the sender may stop a turn.
+   * null: Send's held name says whose answer it waits for.
    */
   sendHeldBy?: string | null;
-  /** Whether the running turn may be stopped from here: the reader's own
-   *  turn. Default true (a personal chat's every turn is the reader's). */
+  /**
+   * Whether the running turn may be stopped from here: the reader's own turn.
+   * False while a turn runs means Send is held and there is no Stop (only the
+   * sender may stop a turn): a colleague's turn, or one whose sender is not
+   * known yet. Default true (a host whose every turn is the reader's).
+   */
   canStop?: boolean;
 }
 
@@ -262,9 +265,10 @@ export function ConversationComposer({
   const [errorOpen, setErrorOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // The reader's own turn locks the pill; a colleague's leaves it open to type
-  // the next question, with Send held (`sendHeldBy`).
-  const ownTurnRunning = isStreaming && sendHeldBy === null;
+  // The reader's own turn locks the pill; any other (a colleague's, or one
+  // whose sender is not known yet) leaves it open to type the next question,
+  // with Send held.
+  const ownTurnRunning = isStreaming && canStop;
 
   const showError = (message: string) => {
     setErrorText(message);
@@ -460,7 +464,7 @@ export function ConversationComposer({
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   const sendLabel =
-    isStreaming && sendHeldBy !== null ? heldSendLabel(sendHeldBy) : 'Send message';
+    isStreaming && !canStop ? heldSendLabel(sendHeldBy ?? UNNAMED_ASKER) : 'Send message';
 
   return (
     // Width comes from the CONTAINER (the /c/{id} overlay carries the compact

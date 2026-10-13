@@ -157,6 +157,7 @@ const INITIAL_SNAPSHOT: ChatEngineSnapshot = Object.freeze({
   conversationId: null,
   conversationTitle: null,
   error: null,
+  turnOrigin: null,
 });
 
 /** Boundary parse — returns null on malformed data instead of throwing (a v1
@@ -1077,7 +1078,20 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     turnsAwaitingIds += 1;
 
     // Streaming — no assistant placeholder yet (created on the first text_delta).
-    setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
+    // Its origin: the handoff's message makes it this engine's own turn; a
+    // reconnect, or `send`'s own connect, keeps the origin already set; any
+    // other connect attaches to a turn already running (Spaces F4).
+    setState((prev) => ({
+      ...prev,
+      isStreaming: true,
+      isCancelling: false,
+      error: null,
+      turnOrigin: initialMessage
+        ? 'own'
+        : prev.isStreaming && prev.turnOrigin !== null
+          ? prev.turnOrigin
+          : 'followed',
+    }));
     executionId = execId;
 
     // The login token travels in the Authorization header, never in the address
@@ -1887,7 +1901,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     }
 
     const optimisticMsg = addUserMessage(message, attachmentsList);
-    setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
+    setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own' }));
 
     try {
       streamMode = options.streamMode;
@@ -2033,6 +2047,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       error: null,
       isStreaming: true,
       isCancelling: false,
+      turnOrigin: 'own',
     }));
 
     try {
@@ -2107,9 +2122,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // finished chat the full answer also carried every message (351 KB for
       // a 38-message chat, measured 3 October 2026), so it is asked without.
       const response = await chatApi.getStatus(convId, { withoutMessages: true });
+      // The host learns whose turn this is before the engine attaches to it.
+      handlers.onStatusRead?.(convId, response);
       const status = response.data;
       if (status.status === 'pending') {
-        setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null }));
+        setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'followed' }));
         if (status.execution_id) connectToStream(status.execution_id);
         else pollForCompletion(convId);
         return 'reconnected';

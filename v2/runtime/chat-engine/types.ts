@@ -24,6 +24,7 @@ import type {
   ToolCompleteEvent,
   CompletedEvent,
   ConversationData,
+  ConversationStatusResponse,
   ConversationTurnUser,
 } from '@/types/chat';
 import type { StreamSmoothingConfig } from './stream-smoother';
@@ -92,7 +93,19 @@ export interface ChatEngineSnapshot {
   conversationId: string | null;
   conversationTitle: string | null;
   error: string | null;
+  /**
+   * Who started the turn now streaming, as far as this engine knows (Spaces
+   * F4). `own`: this engine started it (`send`, a retry, or the create
+   * handoff's `connectToStream` with its message). `followed`: it attached to
+   * a turn already running (`recoverPendingState`, or a host's
+   * `connectToStream` with no message): whose it is is the status's to say.
+   * `null` while nothing streams.
+   */
+  turnOrigin: TurnOrigin;
 }
+
+/** See {@link ChatEngineSnapshot.turnOrigin}. */
+export type TurnOrigin = 'own' | 'followed' | null;
 
 // ─── Per-message live text/reasoning subscription (streaming-render policy) ──
 /**
@@ -184,6 +197,14 @@ export interface ChatEngineHandlers {
   onCancelled?: () => void;
   onError?: (error: string) => void;
   onHistoryLoaded?: (data: ConversationData) => void;
+  /**
+   * The status `recoverPendingState` read, handed over BEFORE the engine acts
+   * on it (attaches, polls, or neither). A host that shows whose turn is
+   * running (Spaces F4) keeps it, so the screen knows the turn's sender and
+   * whether this reader may stop it from the moment it attaches, with no
+   * second read that could land seconds later on a slow server.
+   */
+  onStatusRead?: (conversationId: string, response: ConversationStatusResponse) => void;
   /**
    * Fired with inter-phase narration text (and an optional sub-agent slug). The v1
    * "Option A" narration-vs-final heuristic decides what is transient narration

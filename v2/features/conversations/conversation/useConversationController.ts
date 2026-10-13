@@ -26,16 +26,16 @@ import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import {
   askAgainRefusal,
+  askingLabel,
   canSendIn,
   hasSpaceContract,
   isOwnTurn,
   sendRefusal,
   stopsPolling,
   turnChanged,
-  turnHeldBy,
-  turnStart,
-  UNNAMED_ASKER,
+  UNKNOWN_TURN_LABEL,
   viewOnlyReason,
+  whoseTurn,
   type SendRefused,
   type ViewOnlyReason,
 } from './space-turn';
@@ -210,6 +210,10 @@ export interface ConversationController {
   /** When that colleague's turn started (epoch ms, from `pending_since`), for
    *  the activity row's clock; null when unknown or not held. */
   heldSince: number | null;
+  /** The activity row's resting label for a turn that is not the reader's:
+   *  "{name} is asking", or a nameless one while whose it is is not known
+   *  yet; undefined for the reader's own turn (its default label). */
+  turnLabel: string | undefined;
   /** Whether the reader may stop the running turn: their own turn, and the
    *  status does not say otherwise (`can_cancel`). */
   canStop: boolean;
@@ -402,6 +406,18 @@ export function useConversationController(
       if (isConfidentialMark(conversationId)) return;
       void queryClient.invalidateQueries({ queryKey: detailKey, refetchType: 'none' });
     },
+    // The status the engine read to attach (a reload mid-turn, a turn the poll
+    // or a 409 led to, Spaces F4): kept as the status poll's own entry, so whose
+    // turn it is and whether Stop is this reader's are known from the moment it
+    // attaches, whatever order the transcript and the status arrive in. Never
+    // for a confidential chat, whose status the screen does not keep.
+    onStatusRead: (id, response) => {
+      if (isConfidentialMark(id)) return;
+      queryClient.setQueryData(
+        conversationsQueries.status({ conversationId: id, viewerId: serverUserId }).queryKey,
+        response,
+      );
+    },
     onNarration: (text) => {
       const line = truncateNarration(text);
       if (line) setNarration(line);
@@ -429,7 +445,7 @@ export function useConversationController(
     onCancelled: () => setRefusedTurn(null),
   });
 
-  const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle } = stream;
+  const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle, turnOrigin } = stream;
 
   // ── Jurisdiction slot: seed once per conversation, persist on change. ──
   useEffect(() => {
@@ -545,9 +561,6 @@ export function useConversationController(
         return;
       }
 
-      // Whether the reader is a member of the record's space (Spaces F4), for
-      // the status read below.
-      let inSpace = false;
       try {
         // Cache-first history. Resolves from the warm entry with NO request (the
         // revisit case — the engine was already seeded with this exact record at
@@ -555,9 +568,6 @@ export function useConversationController(
         // the single fetch the query layer then owns, dedupes and retains.
         const data = await queryClient.ensureQueryData(detailOptions);
         if (cancelled) return;
-        // A member only: a stranger reading a published space chat is refused
-        // the status (403), so it is not asked.
-        inSpace = data.space != null && data.my_space_role != null;
         adoptConversationHistory(data);
       } catch (err) {
         if (cancelled) return;
@@ -592,12 +602,10 @@ export function useConversationController(
       // so the merge after `completed` does not add it. A cold open reads the
       // transcript first and has neither gap; so does a turn the status poll
       // finds once the screen is open (it reads the transcript before attaching).
-      const recovered = await recoverPendingState(conversationId).catch(() => 'load_history' as const);
+      // The status it reads reaches the screen before it attaches (`onStatusRead`
+      // above), so a colleague's turn is held from its first frame.
+      await recoverPendingState(conversationId).catch(() => {});
       if (cancelled) return;
-      // Attached to a turn already running in a space chat (a colleague's,
-      // perhaps): the poll is off while this screen streams, so whose turn it
-      // is is read once here.
-      if (recovered === 'reconnected' && inSpace) void queryClient.prefetchQuery(statusOptions);
       setRecoveredFor(conversationId);
     })();
 
@@ -617,7 +625,6 @@ export function useConversationController(
     setError,
     recoverPendingState,
     embedded,
-    statusOptions,
   ]);
 
   // ── Bind a NEW confidential transcript to its creator. ──
@@ -816,8 +823,14 @@ export function useConversationController(
   // yet). Two doors lead here, the status poll and a send refused with 409,
   // and they can open together, so one follow runs at a time.
   const followingRef = useRef(false);
+  //
+  // WHOSE TURN IT IS comes with the attach. `recoverPendingState` hands over the
+  // status it reads (`onStatusRead`). An attach to a known execution reads the
+  // status too when the screen does not hold a fresh one (`readStatus`: a 409's
+  // follow; the status poll's own follow already holds it), so the screen is
+  // never left showing the reader's own-turn state for a colleague's turn.
   const followTurn = useCallback(
-    async (executionId: string | null, stillWanted: () => boolean) => {
+    async (executionId: string | null, stillWanted: () => boolean, readStatus: boolean) => {
       if (followingRef.current) return;
       followingRef.current = true;
       try {
@@ -825,13 +838,17 @@ export function useConversationController(
         if (!stillWanted()) return;
         const fresh = queryClient.getQueryData(detailKey);
         if (fresh) adoptConversationHistory(fresh);
-        if (executionId) connectToStream(executionId);
-        else await recoverPendingState(conversationId).catch(() => {});
+        if (executionId) {
+          connectToStream(executionId);
+          if (readStatus) void queryClient.fetchQuery(statusOptions).catch(() => {});
+        } else {
+          await recoverPendingState(conversationId).catch(() => {});
+        }
       } finally {
         followingRef.current = false;
       }
     },
-    [queryClient, detailKey, adoptConversationHistory, connectToStream, recoverPendingState, conversationId],
+    [queryClient, detailKey, adoptConversationHistory, connectToStream, statusOptions, recoverPendingState, conversationId],
   );
 
   // React to each new status read, once. An engine action and query calls,
@@ -852,7 +869,7 @@ export function useConversationController(
       return;
     }
     let cancelled = false;
-    void followTurn(statusData.execution_id, () => !cancelled);
+    void followTurn(statusData.execution_id, () => !cancelled, false);
     return () => {
       cancelled = true;
     };
@@ -868,30 +885,31 @@ export function useConversationController(
   // Whose turn streams, read off the last status, else off the refused send
   // that met it: a colleague's holds Send and names them; the reader's own
   // keeps Stop, unless the status says the reader may not cancel it.
-  const statusHeldBy = isStreaming ? turnHeldBy(statusData, serverUserId) : null;
-  // The refusal names the turn only until a status read says whose it is: a
-  // pending status is the authority (a turn that ended by polling fires no
-  // handler, so a later turn found by the poll may be someone else's). A
-  // refusal that names nobody is still a colleague's turn (UNNAMED_ASKER).
-  const refusedName =
-    isStreaming &&
-    statusData?.status !== 'pending' &&
-    refusedTurn !== null &&
-    refusedTurn.by?.id !== serverUserId
-      ? (refusedTurn.by?.name ?? UNNAMED_ASKER)
-      : null;
-  const heldBy = statusHeldBy?.name ?? refusedName;
+  // Whose turn streams (space-turn.ts `whoseTurn`): from who started it, the
+  // last status read, and a 409's sender, never from the conversation record,
+  // so the answer does not depend on the order they arrive in. A pending status
+  // outranks the refusal (a turn that ended by polling fires no handler, so a
+  // later turn found by the poll may be someone else's).
+  const turn = whoseTurn({
+    isStreaming,
+    origin: turnOrigin,
+    status: statusData,
+    refusal: refusedTurn,
+    viewerId: serverUserId,
+  });
+  const heldBy = turn.kind === 'colleague' ? turn.name : null;
   // The clock runs from the turn's own start, not from when this screen began
   // to follow it.
-  const heldSince = statusHeldBy
-    ? turnStart(statusData?.pending_since)
-    : refusedName !== null
-      ? turnStart(refusedTurn?.since)
-      : null;
-  const canStop =
-    isStreaming &&
-    heldBy === null &&
-    !(statusData?.status === 'pending' && statusData.can_cancel === false);
+  const heldSince = turn.kind === 'colleague' || turn.kind === 'unknown' ? turn.since : null;
+  // Stop only for the reader's own turn: one this engine started, or one a
+  // status says they may cancel (`can_cancel`, B4).
+  const canStop = turn.kind === 'own' && turn.canStop;
+  const turnLabel =
+    turn.kind === 'colleague'
+      ? askingLabel(turn.name)
+      : turn.kind === 'unknown'
+        ? UNKNOWN_TURN_LABEL
+        : undefined;
 
   // What a refused send or re-ask changes here: a 409's turn is followed, read
   // first (`followTurn`), and its sender holds Send meanwhile; a 403 re-reads
@@ -902,7 +920,7 @@ export function useConversationController(
         setRefusedTurn({ by: refusal.by, since: refusal.since });
         // The follow waits on a transcript read: it attaches only if this
         // screen still shows this chat when the read lands.
-        void followTurn(refusal.executionId, () => liveRef.current === conversationId);
+        void followTurn(refusal.executionId, () => liveRef.current === conversationId, true);
       } else {
         void queryClient.invalidateQueries({ queryKey: detailKey });
       }
@@ -1038,6 +1056,7 @@ export function useConversationController(
     showAuthors,
     sendHeldBy: heldBy,
     heldSince,
+    turnLabel,
     canStop,
     isOwnerResolved: ownerId !== null,
     isLoadingHistory,

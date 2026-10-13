@@ -31,6 +31,7 @@ export type {
   RecoverResult,
   SendRefusal,
   StreamingSource,
+  TurnOrigin,
   StreamSmoothingConfig,
   StreamStyle,
 } from './types';

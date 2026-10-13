@@ -75,6 +75,7 @@ export interface UseConversationStreamResult {
   conversationId: string | null;
   conversationTitle: string | null;
   error: string | null;
+  turnOrigin: ChatEngineSnapshot['turnOrigin'];
   // ── Per-message live streaming sources (for wave-3 rows) ──
   streamingText: StreamingSource;
   reasoning: StreamingSource;
@@ -154,6 +155,7 @@ export function useConversationStream(
     conversationId: snapshot.conversationId,
     conversationTitle: snapshot.conversationTitle,
     error: snapshot.error,
+    turnOrigin: snapshot.turnOrigin,
     streamingText: engine.streamingText,
     reasoning: engine.reasoning,
     send: engine.send,
