@@ -1938,28 +1938,23 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       return null;
     } catch (err) {
       // 409 PENDING_RESPONSE — a response is already generating. In a space chat
-      // it may be another member's (backend B4 names them): the refusal goes back
-      // to the host, which gives the message back to the composer, and the engine
-      // follows the running turn as before.
+      // it may be another member's (backend B4 names them). The refusal goes back
+      // to the host, which gives the message back to the composer and follows the
+      // running turn. Not attached here: a stream is the one thing the host's
+      // re-read of the conversation may not touch (`adoptConversationHistory`),
+      // so attaching first would leave the running turn's question off screen
+      // until the chat is opened again (Spaces F4 review S1).
       if (err instanceof AxiosError && err.response?.status === 409) {
         const responseData = err.response.data as { code?: string; data?: PendingResponseData } | undefined;
         if (responseData?.code === 'PENDING_RESPONSE') {
           removeMessage(optimisticMsg.id);
           const pendingData = responseData.data;
-          const refusal: SendRefusal = { kind: 'held', by: pendingData?.execution_user ?? null };
-          if (pendingData?.execution_id) {
-            connectToStream(pendingData.execution_id);
-          } else if (convId) {
-            pollForCompletion(convId);
-          } else {
-            setState((prev) => ({
-              ...prev,
-              isStreaming: false,
-              isCancelling: false,
-              error: 'A response is still being generated.',
-            }));
-          }
-          return refusal;
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+          return {
+            kind: 'held',
+            by: pendingData?.execution_user ?? null,
+            executionId: pendingData?.execution_id ?? null,
+          };
         }
       }
 

@@ -777,13 +777,36 @@ export function useConversationController(
   });
   const statusData = statusQuery.data?.data ?? null;
 
+  // FOLLOW A TURN THAT IS ALREADY RUNNING (a colleague's in a space chat, or
+  // the reader's own from another tab). Read the transcript FIRST, so the
+  // turn's question is on screen (with its author) before the answer streams
+  // under it, then attach: to the stream when its execution is known (B6: a
+  // member may), else the way a reload mid-turn does (`recoverPendingState`:
+  // the stream, or the engine's own status poll when there is no execution
+  // yet). Two doors lead here, the status poll and a send refused with 409,
+  // and they can open together, so one follow runs at a time.
+  const followingRef = useRef(false);
+  const followTurn = useCallback(
+    async (executionId: string | null, stillWanted: () => boolean) => {
+      if (followingRef.current) return;
+      followingRef.current = true;
+      try {
+        await queryClient.refetchQueries({ queryKey: detailKey, exact: true });
+        if (!stillWanted()) return;
+        const fresh = queryClient.getQueryData(detailKey);
+        if (fresh) adoptConversationHistory(fresh);
+        if (executionId) connectToStream(executionId);
+        else await recoverPendingState(conversationId).catch(() => {});
+      } finally {
+        followingRef.current = false;
+      }
+    },
+    [queryClient, detailKey, adoptConversationHistory, connectToStream, recoverPendingState, conversationId],
+  );
+
   // React to each new status read, once. An engine action and query calls,
   // no setState, so it is React-Compiler-clean in an effect.
-  //  - A turn is running and this screen is idle: read the transcript FIRST,
-  //    so the sender's question is on screen (with its author) before the
-  //    answer streams under it, then attach the way a reload mid-turn does
-  //    (`recoverPendingState`: the stream when there is an execution, else
-  //    the engine's own status poll). B6: a member may attach to the stream.
+  //  - A turn is running and this screen is idle: follow it (`followTurn`).
   //  - Otherwise, a turn that began since the last read (it may have ended
   //    too) is fetched by reading the transcript again; the engine merges it.
   const seenStatusRef = useRef<ConversationStatusData | null>(null);
@@ -799,17 +822,11 @@ export function useConversationController(
       return;
     }
     let cancelled = false;
-    void (async () => {
-      await queryClient.refetchQueries({ queryKey: detailKey, exact: true });
-      if (cancelled) return;
-      const fresh = queryClient.getQueryData(detailKey);
-      if (fresh) adoptConversationHistory(fresh);
-      await recoverPendingState(conversationId).catch(() => {});
-    })();
+    void followTurn(statusData.execution_id, () => !cancelled);
     return () => {
       cancelled = true;
     };
-  }, [statusData, isStreaming, queryClient, detailKey, adoptConversationHistory, recoverPendingState, conversationId]);
+  }, [statusData, isStreaming, queryClient, detailKey, followTurn]);
 
   // A refused status read: read the transcript again, whose own refusal
   // shows "not available" (gone.ts). The poll has already stopped itself.
@@ -830,15 +847,19 @@ export function useConversationController(
     heldBy === null &&
     !(statusData?.status === 'pending' && statusData.can_cancel === false);
 
-  // What a refused send or re-ask changes here: a 409's sender holds the turn
-  // the engine now follows; a 403 re-reads the record, so `can_send` false
-  // swaps the composer for the view-only pill.
+  // What a refused send or re-ask changes here: a 409's turn is followed, read
+  // first (`followTurn`), and its sender holds Send meanwhile; a 403 re-reads
+  // the record, so `can_send` false swaps the composer for the view-only pill.
   const takeRefusal = useCallback(
     (refusal: SendRefusal) => {
-      if (refusal.kind === 'held') setRefusedBy(refusal.by);
-      else void queryClient.invalidateQueries({ queryKey: detailKey });
+      if (refusal.kind === 'held') {
+        setRefusedBy(refusal.by);
+        void followTurn(refusal.executionId, () => true);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: detailKey });
+      }
     },
-    [queryClient, detailKey],
+    [queryClient, detailKey, followTurn],
   );
 
   const submit = useCallback(
