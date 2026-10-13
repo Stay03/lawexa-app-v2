@@ -128,10 +128,10 @@ test('the open card is full size and opaque from its first frame, whatever is lo
   assert.deepEqual(keys, ['top', 'height']);
   assert.match(card, /top: 'var\(--v2-case-chat-held-top, var\(--visual-top, 0px\)\)'/);
   assert.match(card, /height: 'var\(--v2-case-chat-held-height, var\(--visual-height, 100dvh\)\)'/);
-  // The held pair has three writers, the hold effect (a keyboard's rise), the
-  // `?kbnopan=` probe's hold and the close effect, and one reader, this style.
-  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-top'/g)?.length, 3);
-  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-height'/g)?.length, 3);
+  // The held pair has two writers, the hold effect (a keyboard's rise) and the
+  // close effect, and one reader, this style.
+  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-top'/g)?.length, 2);
+  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-height'/g)?.length, 2);
   assert.equal(ask.match(/var\(--v2-case-chat-held-top,/g)?.length, 1);
   assert.equal(ask.match(/var\(--v2-case-chat-held-height,/g)?.length, 1);
   assert.doesNotMatch(ask, /isPending|isLoading|isFetching/);
@@ -504,7 +504,7 @@ test('the keyboard readout loads only with ?kbdebug=1 and listens only while mou
 
 /** The hold effect: one hold per rise of the keyboard while the phone chat is open. */
 const openEffect = () => {
-  const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card\) return;\s*const viewport = window\.visualViewport;[\s\S]*?\}, \[screenOpen, keyboardProbe\]\);/)?.[0];
+  const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card\) return;\s*const viewport = window\.visualViewport;[\s\S]*?\}, \[screenOpen\]\);/)?.[0];
   assert.ok(effect, 'a layout effect on the open state holds the card while the keyboard rises');
   return effect;
 };
@@ -577,7 +577,7 @@ test('a later rise holds too: a focus of a box in the open card while the keyboa
   // resize) changes nothing on screen.
   assert.match(
     effect,
-    /if \(!probed && published\('--visual-height'\) < card\.offsetHeight - 1\) \{\s*card\.setAttribute\('data-keyboard', 'rising'\);\s*\}/,
+    /if \(published\('--visual-height'\) < card\.offsetHeight - 1\) \{\s*card\.setAttribute\('data-keyboard', 'rising'\);\s*\}/,
   );
 });
 
@@ -613,7 +613,7 @@ test('a close during the hold leaves the held pair for the close effect, which f
   // the pair.
   assert.match(
     effect,
-    /return \(\) => \{\s*card\.removeEventListener\('focusin', onFocusIn\);\s*stopHold\?\.\(\);\s*\};\s*\}, \[screenOpen, keyboardProbe\]\);$/,
+    /return \(\) => \{\s*card\.removeEventListener\('focusin', onFocusIn\);\s*stopHold\?\.\(\);\s*\};\s*\}, \[screenOpen\]\);$/,
   );
   const stop = effect.match(/const stop = \(\): void => \{[\s\S]*?\n\s*\};/)?.[0];
   assert.ok(stop);
@@ -653,40 +653,13 @@ test('while the phone chat is open the canvas is the card colour, and every way 
   assert.equal(ask.match(/style\.backgroundColor =/g)?.length, 2, 'set once, restored once');
 });
 
-/* The no-pan probe (the techlead, 13 October 2026): built in the same commit as the
- * hold, behind `?kbnopan=static` and `?kbnopan=ride` only. Without the flag the
- * default path cannot reach it. */
-test('the ?kbnopan= probe is reachable only with the flag', () => {
-  // The flag is read in one place, CaseScreen, beside kbdebug, and passed as a prop:
-  // no other source has it outside a comment.
-  const readers = sourcesMentioning('kbnopan').filter((file) => /kbnopan/.test(strip(read(file))));
-  assert.deepEqual(readers, ['v2/features/cases/detail/CaseScreen.tsx']);
-  assert.match(screen, /const kbnopan = searchParams\.get\('kbnopan'\);/);
-  assert.match(
-    screen,
-    /const keyboardProbe: KeyboardProbe \| null =\s*kbnopan === 'static' \|\| kbnopan === 'ride' \? kbnopan : null;/,
-  );
-  assert.match(screen, /arrive=\{fadeOnArrival\}\s+keyboardProbe=\{keyboardProbe\}\s*\/>/);
-  // The dock's prop is null unless given, and the probe's hold is called in one place,
-  // behind that prop.
-  assert.match(ask, /keyboardProbe = null,\s*\}: \{/);
-  assert.equal(ask.match(/holdForProbe\(/g)?.length, 2, 'the definition and one call');
-  assert.match(ask, /const probed = keyboardProbe !== null && holdForProbe\(card, keyboardProbe\);\s*if \(!probed\) \{/);
-  // Everything the probe does is inside its function: the keyboard height it reads,
-  // the animation of the composer.
-  const start = ask.indexOf('function holdForProbe(');
-  const body = ask.slice(start, ask.indexOf('\n}', start));
-  assert.ok(body.length > 0);
-  assert.equal(ask.match(/--visual-keyboard/g)?.length, body.match(/--visual-keyboard/g)?.length);
-  assert.equal(ask.match(/\.animate\(/g)?.length, 1);
-  assert.match(body, /\.animate\(/);
-  // The hook's one extra write is harmless without the flag: only the probe reads it,
-  // and the hook drops it on unmount and at a width change.
-  assert.deepEqual(sourcesMentioning('--visual-keyboard').sort(), [
-    'v2/features/cases/detail/CaseAsk.tsx',
-    'v2/shell/use-keyboard-inset.ts',
-  ]);
-  assert.equal(keyboard.match(/setProperty\('--visual-keyboard'/g)?.length, 1);
-  assert.match(keyboard, /if \(viewport\.offsetTop > 0 && keyboard > 0\) \{\s*root\.style\.setProperty\('--visual-keyboard', `\$\{keyboard\}px`\);/);
-  assert.equal(keyboard.match(/removeProperty\('--visual-keyboard'\)/g)?.length, 2);
+/* The no-pan probe (`?kbnopan=static|ride`) is gone (the techlead, 13 October 2026):
+ * Arthur's recordings on an iPhone Xs Max showed iOS still panning the page with
+ * either mode, and the card held above the screen. The kbdebug readout stays. */
+test('the ?kbnopan= probe is removed, and the keyboard height it read is no longer published', () => {
+  assert.deepEqual(sourcesMentioning('kbnopan'), []);
+  assert.deepEqual(sourcesMentioning('--visual-keyboard'), []);
+  assert.doesNotMatch(ask, /KeyboardProbe|holdForProbe|keyboardProbe/);
+  assert.doesNotMatch(screen, /KeyboardProbe|keyboardProbe/);
+  assert.match(screen, /const keyboardDebug = searchParams\.get\('kbdebug'\) === '1';/);
 });

@@ -40,48 +40,6 @@ const KEYBOARD_RISE_MS = 350;
 const KEYBOARD_SETTLE_CAP_MS = 1000;
 
 /**
- * TEMPORARY, with the `?kbnopan=` flag that sets it (`CaseScreen`): a probe of
- * whether iOS skips its pan when the focused box is already above where the
- * keyboard will be. `static` sizes the card to that end geometry at the
- * focus; `ride` also moves the composer up from the screen's bottom on a
- * curve of its own. Delete with `KeyboardDebugReadout` once the recording
- * has been read.
- */
-export type KeyboardProbe = 'static' | 'ride';
-
-/**
- * The probe's hold, written in the same task as the focus so iOS measures the
- * box inside it: the card from the layout top down to where the keyboard's
- * top will be, using the keyboard height the hook last saw at this width
- * (`--visual-keyboard`). Returns false when no keyboard has been seen yet,
- * and the ordinary hold runs instead. Reached only with the flag set.
- */
-function holdForProbe(card: HTMLElement, probe: KeyboardProbe): boolean {
-  const root = document.documentElement.style;
-  const keyboard = parseFloat(root.getPropertyValue('--visual-keyboard'));
-  const height = parseFloat(root.getPropertyValue('--visual-height'));
-  if (!(keyboard > 0) || !(height > keyboard)) return false;
-  card.style.setProperty('--v2-case-chat-held-top', '0px');
-  card.style.setProperty('--v2-case-chat-held-height', `${height - keyboard}px`);
-  // The composer dock is the card's last child (one node, never remounted).
-  // Moved from the next frame on, so the focus-time measure sees it in place.
-  const composer = card.lastElementChild;
-  if (
-    probe === 'ride' &&
-    composer instanceof HTMLElement &&
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  ) {
-    requestAnimationFrame(() => {
-      composer.animate(
-        [{ transform: `translateY(${keyboard}px)` }, { transform: 'translateY(0)' }],
-        { duration: KEYBOARD_RISE_MS, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' },
-      );
-    });
-  }
-  return true;
-}
-
-/**
  * CaseAskDock — the case chat's one screen (`CaseChatCore`) as a dock at the
  * bottom of the case page: closed pill, new-chat view, and open conversation
  * are three states of the SAME card, and the middle is the only part that ever
@@ -133,7 +91,6 @@ export function CaseAskDock({
   onDock,
   onOpenChat,
   arrive = true,
-  keyboardProbe = null,
 }: {
   slug: string;
   signedIn: boolean;
@@ -157,8 +114,6 @@ export function CaseAskDock({
   onClose: () => void;
   onDock: () => void;
   onOpenChat: (conversationId: string) => void;
-  /** TEMPORARY: the `?kbnopan=` probe (see `KeyboardProbe`); null without it. */
-  keyboardProbe?: KeyboardProbe | null;
 }) {
   const panelMounted = view !== null;
   const screenMounted = screen && panelMounted;
@@ -389,12 +344,9 @@ export function CaseAskDock({
 
     const hold = (box: HTMLTextAreaElement, rising: boolean): void => {
       const width = viewport?.width;
-      const probed = keyboardProbe !== null && holdForProbe(card, keyboardProbe);
-      if (!probed) {
-        card.style.setProperty('--v2-case-chat-held-top', '0px');
-        card.style.setProperty('--v2-case-chat-held-height', '100dvh');
-        if (rising) card.setAttribute('data-keyboard', 'rising');
-      }
+      card.style.setProperty('--v2-case-chat-held-top', '0px');
+      card.style.setProperty('--v2-case-chat-held-height', '100dvh');
+      if (rising) card.setAttribute('data-keyboard', 'rising');
       let risen = false;
       let riseTimer = 0;
       let capTimer = 0;
@@ -403,7 +355,7 @@ export function CaseAskDock({
           release();
           return;
         }
-        if (!probed && published('--visual-height') < card.offsetHeight - 1) {
+        if (published('--visual-height') < card.offsetHeight - 1) {
           card.setAttribute('data-keyboard', 'rising');
         }
         if (risen && agrees()) release();
@@ -447,7 +399,7 @@ export function CaseAskDock({
       card.removeEventListener('focusin', onFocusIn);
       stopHold?.();
     };
-  }, [screenOpen, keyboardProbe]);
+  }, [screenOpen]);
 
   // WHILE THE PHONE CHAT IS OPEN A DRAG IN IT NEVER PANS THE SCREEN. With the
   // keyboard up, iOS scrolls the visible viewport inside the taller layout

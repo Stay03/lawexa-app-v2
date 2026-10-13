@@ -148,26 +148,16 @@ export function useKeyboardInset(): void {
      * It is also read on `focusin`. The reader's tap on the chat's box is a
      * focus, so the card's first frame is sized from the viewport as it is at
      * the tap, never from whatever a keyboard before it left behind.
-     *
-     * TEMPORARY, with the case chat's `?kbnopan=` probe (`KeyboardProbe` in
-     * CaseAsk), its one reader: the keyboard's height at this width, once iOS
-     * has panned for it, as `--visual-keyboard`. Without the flag nothing
-     * reads it. Dropped at a width change, where the keyboard is new.
      */
     const publishVisible = (): void => {
       if (viewport.width !== fullWidth) {
         fullWidth = viewport.width;
         fullHeight = viewport.height;
-        root.style.removeProperty('--visual-keyboard');
       }
       fullHeight = Math.max(fullHeight, viewport.height);
       const top = visibleTop(viewport.offsetTop, viewport.height, fullHeight);
       root.style.setProperty('--visual-height', `${viewport.height}px`);
       root.style.setProperty('--visual-top', `${top}px`);
-      const keyboard = fullHeight - viewport.height;
-      if (viewport.offsetTop > 0 && keyboard > 0) {
-        root.style.setProperty('--visual-keyboard', `${keyboard}px`);
-      }
     };
 
     const update = (): void => {
@@ -229,7 +219,6 @@ export function useKeyboardInset(): void {
       root.style.removeProperty('--keyboard-inset');
       root.style.removeProperty('--visual-height');
       root.style.removeProperty('--visual-top');
-      root.style.removeProperty('--visual-keyboard');
     };
   }, []);
 }

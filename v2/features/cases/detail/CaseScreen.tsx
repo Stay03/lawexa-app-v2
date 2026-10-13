@@ -14,7 +14,7 @@ import {
 } from '@/v2/runtime/url-params';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { casesQueries } from '../queries';
-import { CaseAskDock, type KeyboardProbe } from './CaseAsk';
+import { CaseAskDock } from './CaseAsk';
 import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
 import { CaseChatDocked } from './CaseChatPanel';
 import { CaseFallback } from './CaseFallback';
@@ -73,10 +73,6 @@ function CaseBody({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('q')?.trim() || undefined;
   const keyboardDebug = searchParams.get('kbdebug') === '1';
-  // TEMPORARY, with the readout: the no-pan probe (see `KeyboardProbe`).
-  const kbnopan = searchParams.get('kbnopan');
-  const keyboardProbe: KeyboardProbe | null =
-    kbnopan === 'static' || kbnopan === 'ride' ? kbnopan : null;
 
   // ── The side chat: LOCAL STATE is the source of truth; the URL is a
   // mirror and an entry point, written QUIETLY. ──
@@ -304,7 +300,6 @@ function CaseBody({ slug }: { slug: string }) {
             onDock={() => setDockedPref(true)}
             onOpenChat={switchChat}
             arrive={fadeOnArrival}
-            keyboardProbe={keyboardProbe}
           />
         ) : null}
       </div>
