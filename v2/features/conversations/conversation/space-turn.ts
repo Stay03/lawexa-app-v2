@@ -136,6 +136,19 @@ export function turnStart(pendingSince: string | null | undefined): number | nul
   return Number.isNaN(at) ? null : at;
 }
 
+/**
+ * The name a held turn goes by when the server names nobody (a 409 whose
+ * sender is not yet known, or a send that met a stream already live): the
+ * turn is still a colleague's, so Send is held and there is no Stop, and the
+ * row reads "Someone is asking", as the refusal's sentence does.
+ */
+export const UNNAMED_ASKER = 'Someone';
+
+/** The held Send's accessible name: whose answer it waits for. */
+export function heldSendLabel(name: string): string {
+  return name === UNNAMED_ASKER ? 'Wait for the answer' : `Wait for ${name}’s answer`;
+}
+
 /** The activity row's words while a colleague's turn runs. The orb and the
  *  elapsed clock beside it already say it is ongoing, so no dots. */
 export function askingLabel(name: string): string {

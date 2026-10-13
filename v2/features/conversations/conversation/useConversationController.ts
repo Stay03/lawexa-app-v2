@@ -34,6 +34,7 @@ import {
   turnChanged,
   turnHeldBy,
   turnStart,
+  UNNAMED_ASKER,
   viewOnlyReason,
   type SendRefused,
   type ViewOnlyReason,
@@ -868,23 +869,23 @@ export function useConversationController(
   // that met it: a colleague's holds Send and names them; the reader's own
   // keeps Stop, unless the status says the reader may not cancel it.
   const statusHeldBy = isStreaming ? turnHeldBy(statusData, serverUserId) : null;
-  const refusedBy = refusedTurn?.by ?? null;
   // The refusal names the turn only until a status read says whose it is: a
   // pending status is the authority (a turn that ended by polling fires no
-  // handler, so a later turn found by the poll may be someone else's).
-  const refusedByColleague =
+  // handler, so a later turn found by the poll may be someone else's). A
+  // refusal that names nobody is still a colleague's turn (UNNAMED_ASKER).
+  const refusedName =
     isStreaming &&
     statusData?.status !== 'pending' &&
-    refusedBy !== null &&
-    refusedBy.id !== serverUserId
-      ? refusedBy
+    refusedTurn !== null &&
+    refusedTurn.by?.id !== serverUserId
+      ? (refusedTurn.by?.name ?? UNNAMED_ASKER)
       : null;
-  const heldBy = statusHeldBy ?? refusedByColleague;
+  const heldBy = statusHeldBy?.name ?? refusedName;
   // The clock runs from the turn's own start, not from when this screen began
   // to follow it.
   const heldSince = statusHeldBy
     ? turnStart(statusData?.pending_since)
-    : refusedByColleague
+    : refusedName !== null
       ? turnStart(refusedTurn?.since)
       : null;
   const canStop =
@@ -1035,7 +1036,7 @@ export function useConversationController(
     viewOnlyReason: viewOnlyReason(detailData),
     isSpaceChat,
     showAuthors,
-    sendHeldBy: heldBy?.name ?? null,
+    sendHeldBy: heldBy,
     heldSince,
     canStop,
     isOwnerResolved: ownerId !== null,

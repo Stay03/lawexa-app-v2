@@ -22,6 +22,7 @@ import {
   canSendIn,
   draftWithRefused,
   hasSpaceContract,
+  heldSendLabel,
   isOwnTurn,
   SPACE_CHAT_POLL_MS,
   sendRefusal,
@@ -29,6 +30,7 @@ import {
   turnChanged,
   turnHeldBy,
   turnStart,
+  UNNAMED_ASKER,
   VIEW_ONLY_COPY,
   viewOnlyReason,
 } from './space-turn';
@@ -261,7 +263,7 @@ test('a colleague’s turn names them in the activity row, holds Send and offers
   const composer = readHere('ConversationComposer.tsx');
   assert.match(composer, /const ownTurnRunning = isStreaming && sendHeldBy === null;/);
   assert.match(composer, /\{isStreaming && canStop \? \(/);
-  assert.match(composer, /isStreaming && sendHeldBy !== null \? `Wait for \$\{sendHeldBy\}’s answer` : 'Send message'/);
+  assert.match(composer, /isStreaming && sendHeldBy !== null \? heldSendLabel\(sendHeldBy\) : 'Send message'/);
   assert.match(composer, /disabled=\{!canSend \|\| isStreaming\}/);
   const screen = readHere('ConversationScreen.tsx');
   assert.match(screen, /sendHeldBy=\{controller\.sendHeldBy\}\s+canStop=\{controller\.canStop\}/);
@@ -308,7 +310,7 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
   );
   assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
   assert.match(controller, /\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
-  assert.match(controller, /const heldBy = statusHeldBy \?\? refusedByColleague;/);
+  assert.match(controller, /const heldBy = statusHeldBy\?\.name \?\? refusedName;/);
 });
 
 test('the composer gives a refused message back, with its pasted cards and files, and says why', () => {
@@ -503,7 +505,7 @@ test('the row’s clock runs from the turn’s own start, and the name stays in 
   const controller = readHere('useConversationController.ts');
   assert.match(
     controller,
-    /const heldSince = statusHeldBy\s*\? turnStart\(statusData\?\.pending_since\)\s*: refusedByColleague\s*\? turnStart\(refusedTurn\?\.since\)\s*: null;/,
+    /const heldSince = statusHeldBy\s*\? turnStart\(statusData\?\.pending_since\)\s*: refusedName !== null\s*\? turnStart\(refusedTurn\?\.since\)\s*: null;/,
   );
   assert.match(read('v2', 'runtime', 'chat-engine', 'engine.ts'), /since: pendingData\?\.pending_since \?\? null,/);
   const list = readHere('MessageList.tsx');
@@ -563,7 +565,23 @@ test('the turn a refused send met stops naming its sender when it ends', () => {
   assert.match(controller, /onCompleted: \(\) => \{\s*(\/\/[^\n]*\n\s*)*setRefusedTurn\(null\);/);
   assert.match(controller, /onError: \(\) => setRefusedTurn\(null\),\s*onCancelled: \(\) => setRefusedTurn\(null\),/);
   // A pending status outranks the refusal (a turn that ended by polling fires no handler).
-  assert.match(controller, /isStreaming &&\s*statusData\?\.status !== 'pending' &&\s*refusedBy !== null &&/);
+  assert.match(controller, /isStreaming &&\s*statusData\?\.status !== 'pending' &&\s*refusedTurn !== null &&/);
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /resetStreamingBuffers\(\);\s*handlers\.onCancelled\?\.\(\);\s*\}\);/);
+});
+
+/* ── A refusal that names nobody is still a colleague's turn (re-review R5) ── */
+
+test('a held refusal with no sender holds Send, reads "Someone is asking" and offers no Stop', () => {
+  const controller = readHere('useConversationController.ts');
+  assert.match(
+    controller,
+    /refusedTurn !== null &&\s*refusedTurn\.by\?\.id !== serverUserId\s*\? \(refusedTurn\.by\?\.name \?\? UNNAMED_ASKER\)\s*: null;/,
+  );
+  // A held name, unnamed or not, means no Stop.
+  assert.match(controller, /const canStop =\s*isStreaming &&\s*heldBy === null &&/);
+  assert.match(controller, /sendHeldBy: heldBy,/);
+  assert.equal(askingLabel(UNNAMED_ASKER), 'Someone is asking');
+  assert.equal(heldSendLabel(UNNAMED_ASKER), 'Wait for the answer');
+  assert.equal(heldSendLabel('Ada Obi'), 'Wait for Ada Obi’s answer');
 });

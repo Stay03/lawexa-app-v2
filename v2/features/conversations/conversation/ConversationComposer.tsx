@@ -51,7 +51,7 @@ import {
   privateModeOf,
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
-import { draftWithRefused, type SendRefused } from './space-turn';
+import { draftWithRefused, heldSendLabel, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
 
 /**
@@ -460,7 +460,7 @@ export function ConversationComposer({
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
   const sendLabel =
-    isStreaming && sendHeldBy !== null ? `Wait for ${sendHeldBy}’s answer` : 'Send message';
+    isStreaming && sendHeldBy !== null ? heldSendLabel(sendHeldBy) : 'Send message';
 
   return (
     // Width comes from the CONTAINER (the /c/{id} overlay carries the compact
