@@ -583,7 +583,13 @@ export function MessageList({
         ref={scrollRef}
         onScroll={handleScroll}
         data-v2-chat-scroller=""
-        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        // `relative`: the transcript's own absolutely placed nodes (the author
+        // line's sr-only "Asked by …") take THIS scroller as their containing
+        // block, so it clips them. Without it they escaped to the next scroll
+        // container, the shell's content region, and made it scroll: the whole
+        // chat could be dragged up the screen (real-server pass 10, 13 October
+        // 2026: the region at 3528 px in a 664 px view).
+        className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         {/* Bottom padding clears the FLOATING composer that ConversationScreen lays
             over this scroll region (the pill is absolute/out-of-flow, so the transcript
