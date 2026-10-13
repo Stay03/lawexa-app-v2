@@ -187,6 +187,9 @@ export interface MessageListProps {
   viewerId: number | null;
   /** The activity row's resting label while a colleague's turn runs. */
   restingLabel?: string;
+  /** When that colleague's turn started (epoch ms): the row's clock runs from
+   *  it rather than from the rows this screen drew. */
+  heldSince?: number | null;
 }
 
 export function MessageList({
@@ -205,6 +208,7 @@ export function MessageList({
   showAuthors,
   viewerId,
   restingLabel,
+  heldSince = null,
 }: MessageListProps) {
   // What this render draws (see OPEN_TAIL): until the first frame has been
   // painted, the newest messages only; from then on, all of them. Everything
@@ -280,6 +284,7 @@ export function MessageList({
   // across token flushes and unrelated parent re-renders, so GroupRow's memo holds.
   const groups = useMemo(() => groupMessages(messages), [messages]);
   const streamStartTime = useMemo(() => computeStreamStart(messages), [messages]);
+  const activityStart = heldSince ?? streamStartTime;
   const lastGroupIndex = groups.length - 1;
   /** Off-screen groups are only estimated where the browser can keep the
    *  reader's place while the estimate is corrected. See the module. */
@@ -537,7 +542,7 @@ export function MessageList({
                 {groups.map((group, gi) => (
                   <Fragment key={groupKey(group, gi)}>
                     {gi === activityIndex && (
-                      <ActivityRow startTime={streamStartTime} narration={narration} restingLabel={restingLabel} />
+                      <ActivityRow startTime={activityStart} narration={narration} restingLabel={restingLabel} />
                     )}
                     <GroupRow
                       group={group}
@@ -569,7 +574,7 @@ export function MessageList({
                     the row sits after the last group, which is still immediately above
                     where the answer will appear. */}
                 {activityIndex === groups.length && (
-                  <ActivityRow startTime={streamStartTime} narration={narration} restingLabel={restingLabel} />
+                  <ActivityRow startTime={activityStart} narration={narration} restingLabel={restingLabel} />
                 )}
               </div>
             </ScrollKeepContext.Provider>
@@ -578,7 +583,7 @@ export function MessageList({
           {/* The one case the in-list placements cannot cover: activity with no
               groups at all (a turn whose first event is narration). */}
           {groups.length === 0 && showActivity && (
-            <ActivityRow startTime={streamStartTime} narration={narration} restingLabel={restingLabel} />
+            <ActivityRow startTime={activityStart} narration={narration} restingLabel={restingLabel} />
           )}
 
           {error && (

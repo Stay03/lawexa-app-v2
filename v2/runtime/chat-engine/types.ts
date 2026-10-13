@@ -135,8 +135,8 @@ export type RecoverResult =
 // ─── Send refusal (Spaces F4, backend B4) ──────────────────────────────────
 /**
  * Why {@link ChatEngine.send} did not send. `held`: another turn is running
- * in the chat (409 PENDING_RESPONSE); `by` is its sender and `executionId` its
- * execution when the server names them. The engine does NOT follow that turn
+ * in the chat (409 PENDING_RESPONSE); `by` is its sender, `executionId` its
+ * execution and `since` when it started, when the server names them. The engine does NOT follow that turn
  * itself: the host reads the conversation first, so the running turn's
  * question is on screen before its answer streams in, and then attaches
  * (`connectToStream`, or `recoverPendingState` when there is no execution
@@ -144,7 +144,7 @@ export type RecoverResult =
  * Either way the message did not go, so the host gives it back to the composer.
  */
 export type SendRefusal =
-  | { kind: 'held'; by: ConversationTurnUser | null; executionId: string | null }
+  | { kind: 'held'; by: ConversationTurnUser | null; executionId: string | null; since: string | null }
   | { kind: 'forbidden' };
 
 // ─── Engine handlers (hot-swappable callbacks + mode resolvers) ─────────────

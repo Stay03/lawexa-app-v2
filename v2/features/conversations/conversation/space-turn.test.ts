@@ -28,6 +28,7 @@ import {
   stopsPolling,
   turnChanged,
   turnHeldBy,
+  turnStart,
   VIEW_ONLY_COPY,
   viewOnlyReason,
 } from './space-turn';
@@ -256,7 +257,7 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
 });
 
 test('a colleague’s turn names them in the activity row, holds Send and offers no Stop', () => {
-  assert.match(readHere('ActivityStatus.tsx'), /\{narration \?\? restingLabel \?\? RESTING_LABEL\}/);
+  assert.match(readHere('ActivityStatus.tsx'), /: \(narration \?\? restingLabel \?\? RESTING_LABEL\);/);
   const composer = readHere('ConversationComposer.tsx');
   assert.match(composer, /const ownTurnRunning = isStreaming && sendHeldBy === null;/);
   assert.match(composer, /\{isStreaming && canStop \? \(/);
@@ -271,16 +272,16 @@ test('a colleague’s turn names them in the activity row, holds Send and offers
 
 test('a refused send says why, and that the message is kept', () => {
   assert.equal(
-    sendRefusal({ kind: 'held', by: { id: 41, name: 'Ada' }, executionId: null }, 7),
+    sendRefusal({ kind: 'held', by: { id: 41, name: 'Ada' }, executionId: null, since: null }, 7),
     'Ada is asking right now. Your message is kept.',
   );
-  assert.equal(sendRefusal({ kind: 'held', by: null, executionId: null }, 7), 'Someone is asking right now. Your message is kept.');
+  assert.equal(sendRefusal({ kind: 'held', by: null, executionId: null, since: null }, 7), 'Someone is asking right now. Your message is kept.');
   assert.equal(
-    sendRefusal({ kind: 'held', by: { id: 7, name: 'Me' }, executionId: null }, 7),
+    sendRefusal({ kind: 'held', by: { id: 7, name: 'Me' }, executionId: null, since: null }, 7),
     'Your last question is still being answered. Your message is kept.',
   );
   assert.equal(sendRefusal({ kind: 'forbidden' }, 7), VIEW_ONLY_COPY.viewer);
-  for (const line of [sendRefusal({ kind: 'held', by: null, executionId: null }, 7), sendRefusal({ kind: 'forbidden' }, 7)]) {
+  for (const line of [sendRefusal({ kind: 'held', by: null, executionId: null, since: null }, 7), sendRefusal({ kind: 'forbidden' }, 7)]) {
     assert.doesNotMatch(line, /[—–]/);
   }
 });
@@ -289,7 +290,7 @@ test('the engine hands the refusal back: a 409 without attaching, a 403 instead 
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(
     engine,
-    /removeMessage\(optimisticMsg\.id\);\s*const pendingData = responseData\.data;\s*setState\(\(prev\) => \(\{ \.\.\.prev, isStreaming: false, isCancelling: false \}\)\);\s*return \{\s*kind: 'held',\s*by: pendingData\?\.execution_user \?\? null,\s*executionId: pendingData\?\.execution_id \?\? null,\s*\};/,
+    /removeMessage\(optimisticMsg\.id\);\s*const pendingData = responseData\.data;\s*setState\(\(prev\) => \(\{ \.\.\.prev, isStreaming: false, isCancelling: false \}\)\);\s*return \{\s*kind: 'held',\s*by: pendingData\?\.execution_user \?\? null,\s*executionId: pendingData\?\.execution_id \?\? null,\s*since: pendingData\?\.pending_since \?\? null,\s*\};/,
   );
   assert.match(
     engine,
@@ -303,11 +304,11 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
   const controller = readHere('useConversationController.ts');
   assert.match(
     controller,
-    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*setRefusedBy\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
+    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*setRefusedTurn\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
   );
   assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
   assert.match(controller, /\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
-  assert.match(controller, /\(turnHeldBy\(statusData, serverUserId\) \?\? refusedByColleague\)/);
+  assert.match(controller, /const heldBy = statusHeldBy \?\? refusedByColleague;/);
 });
 
 test('the composer gives a refused message back, with its pasted cards and files, and says why', () => {
@@ -411,7 +412,7 @@ test('a refused follow-up (409 or 403) comes back to the composer with the compo
   assert.equal(draftWithRefused('  ', 'Explain the next step'), 'Explain the next step');
   assert.equal(draftWithRefused('My own words', 'Explain the next step'), 'My own words\n\nExplain the next step');
   // The sentences themselves, as the composer shows them for its own sends.
-  assert.equal(sendRefusal({ kind: 'held', by: { id: 41, name: 'Ada' }, executionId: null }, 7), 'Ada is asking right now. Your message is kept.');
+  assert.equal(sendRefusal({ kind: 'held', by: { id: 41, name: 'Ada' }, executionId: null, since: null }, 7), 'Ada is asking right now. Your message is kept.');
   assert.equal(sendRefusal({ kind: 'forbidden' }, 7), VIEW_ONLY_COPY.viewer);
 });
 
@@ -435,14 +436,14 @@ test('with the case dock’s composer, a refused follow-up reaches that composer
 test('a refused Ask again says why in the composer’s banner, for a 409 and for a 403', () => {
   // 409: the question is on screen already, so nothing is promised as kept.
   assert.equal(
-    askAgainRefusal({ kind: 'held', by: { id: 41, name: 'Ada Obi' }, executionId: null }, 7),
+    askAgainRefusal({ kind: 'held', by: { id: 41, name: 'Ada Obi' }, executionId: null, since: null }, 7),
     'Ada Obi is asking right now. Ask again once their answer is in.',
   );
-  assert.equal(askAgainRefusal({ kind: 'held', by: null, executionId: null }, 7), 'Someone is asking right now. Ask again once the answer is in.');
-  assert.equal(askAgainRefusal({ kind: 'held', by: { id: 7, name: 'Me' }, executionId: null }, 7), 'Your last question is still being answered.');
+  assert.equal(askAgainRefusal({ kind: 'held', by: null, executionId: null, since: null }, 7), 'Someone is asking right now. Ask again once the answer is in.');
+  assert.equal(askAgainRefusal({ kind: 'held', by: { id: 7, name: 'Me' }, executionId: null, since: null }, 7), 'Your last question is still being answered.');
   // 403: the Viewer line, as for a refused send.
   assert.equal(askAgainRefusal({ kind: 'forbidden' }, 7), VIEW_ONLY_COPY.viewer);
-  for (const line of [askAgainRefusal({ kind: 'held', by: null, executionId: null }, 7), askAgainRefusal({ kind: 'forbidden' }, 7)]) {
+  for (const line of [askAgainRefusal({ kind: 'held', by: null, executionId: null, since: null }, 7), askAgainRefusal({ kind: 'forbidden' }, 7)]) {
     assert.doesNotMatch(line, /kept|[—–]/, line);
   }
   const controller = readHere('useConversationController.ts');
@@ -453,7 +454,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
   // Both refusals change the screen as a refused send does.
   assert.match(
     controller,
-    /if \(refusal\.kind === 'held'\) \{\s*setRefusedBy\(refusal\.by\);\s*void followTurn\(refusal\.executionId, \(\) => true\);\s*\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
+    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);\s*void followTurn\(refusal\.executionId, \(\) => true\);\s*\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
   );
   const screen = readHere('ConversationScreen.tsx');
   assert.match(
@@ -490,4 +491,25 @@ test('after a 409 the running turn’s question is read before its answer stream
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   const branch = engine.slice(engine.indexOf("if (responseData?.code === 'PENDING_RESPONSE') {"), engine.indexOf('// 503 redaction service unavailable'));
   assert.doesNotMatch(branch, /connectToStream|pollForCompletion/);
+});
+
+/* ── The "is asking" row's clock and name (review N1, N3) ─────────────────── */
+
+test('the row’s clock runs from the turn’s own start, and the name stays in front of narration', () => {
+  assert.equal(turnStart('2026-10-13T09:00:00Z'), Date.parse('2026-10-13T09:00:00Z'));
+  assert.equal(turnStart(null), null);
+  assert.equal(turnStart(undefined), null);
+  assert.equal(turnStart('not a date'), null);
+  const controller = readHere('useConversationController.ts');
+  assert.match(
+    controller,
+    /const heldSince = statusHeldBy\s*\? turnStart\(statusData\?\.pending_since\)\s*: refusedByColleague\s*\? turnStart\(refusedTurn\?\.since\)\s*: null;/,
+  );
+  assert.match(read('v2', 'runtime', 'chat-engine', 'engine.ts'), /since: pendingData\?\.pending_since \?\? null,/);
+  const list = readHere('MessageList.tsx');
+  assert.match(list, /const activityStart = heldSince \?\? streamStartTime;/);
+  assert.equal((list.match(/<ActivityRow startTime=\{activityStart\}/g) ?? []).length, 3);
+  assert.match(readHere('ConversationScreen.tsx'), /heldSince=\{controller\.heldSince\}/);
+  const row = readHere('ActivityStatus.tsx');
+  assert.match(row, /restingLabel !== undefined && narration\s*\? `\$\{restingLabel\} · \$\{narration\}`/);
 });

@@ -1954,6 +1954,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
             kind: 'held',
             by: pendingData?.execution_user ?? null,
             executionId: pendingData?.execution_id ?? null,
+            since: pendingData?.pending_since ?? null,
           };
         }
       }

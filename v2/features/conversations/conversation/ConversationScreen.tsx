@@ -326,6 +326,7 @@ export function ConversationScreen({
             restingLabel={
               controller.sendHeldBy !== null ? askingLabel(controller.sendHeldBy) : undefined
             }
+            heldSince={controller.heldSince}
           />
         </DocumentExportScope>
 

@@ -128,6 +128,14 @@ export function turnHeldBy(
   return sender;
 }
 
+/** When a running turn started, as the activity row's clock reads it (epoch
+ *  ms), from the status's or the 409's `pending_since`; null when unknown. */
+export function turnStart(pendingSince: string | null | undefined): number | null {
+  if (!pendingSince) return null;
+  const at = Date.parse(pendingSince);
+  return Number.isNaN(at) ? null : at;
+}
+
 /** The activity row's words while a colleague's turn runs. The orb and the
  *  elapsed clock beside it already say it is ongoing, so no dots. */
 export function askingLabel(name: string): string {

@@ -33,6 +33,7 @@ import {
   stopsPolling,
   turnChanged,
   turnHeldBy,
+  turnStart,
   viewOnlyReason,
   type SendRefused,
   type ViewOnlyReason,
@@ -205,6 +206,9 @@ export interface ConversationController {
    * asking" and holds Send.
    */
   sendHeldBy: string | null;
+  /** When that colleague's turn started (epoch ms, from `pending_since`), for
+   *  the activity row's clock; null when unknown or not held. */
+  heldSince: number | null;
   /** Whether the reader may stop the running turn: their own turn, and the
    *  status does not say otherwise (`can_cancel`). */
   canStop: boolean;
@@ -309,9 +313,12 @@ export function useConversationController(
   // to a running turn, or found none). Until then the status poll waits, so
   // it can never attach to a turn the mount flow is attaching to.
   const [recoveredFor, setRecoveredFor] = useState<string | null>(null);
-  // Who the reader's last refused send met (a 409): the turn the engine then
-  // follows is theirs, until a status read says whose it is.
-  const [refusedBy, setRefusedBy] = useState<ConversationTurnUser | null>(null);
+  // Who the reader's last refused send met (a 409), and since when: the turn
+  // then followed is theirs, until a status read says whose it is.
+  const [refusedTurn, setRefusedTurn] = useState<{
+    by: ConversationTurnUser | null;
+    since: string | null;
+  } | null>(null);
 
   const narrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -838,10 +845,18 @@ export function useConversationController(
   // Whose turn streams, read off the last status, else off the refused send
   // that met it: a colleague's holds Send and names them; the reader's own
   // keeps Stop, unless the status says the reader may not cancel it.
-  const refusedByColleague = refusedBy !== null && refusedBy.id !== serverUserId ? refusedBy : null;
-  const heldBy = isStreaming
-    ? (turnHeldBy(statusData, serverUserId) ?? refusedByColleague)
-    : null;
+  const statusHeldBy = isStreaming ? turnHeldBy(statusData, serverUserId) : null;
+  const refusedBy = refusedTurn?.by ?? null;
+  const refusedByColleague =
+    isStreaming && refusedBy !== null && refusedBy.id !== serverUserId ? refusedBy : null;
+  const heldBy = statusHeldBy ?? refusedByColleague;
+  // The clock runs from the turn's own start, not from when this screen began
+  // to follow it.
+  const heldSince = statusHeldBy
+    ? turnStart(statusData?.pending_since)
+    : refusedByColleague
+      ? turnStart(refusedTurn?.since)
+      : null;
   const canStop =
     isStreaming &&
     heldBy === null &&
@@ -853,7 +868,7 @@ export function useConversationController(
   const takeRefusal = useCallback(
     (refusal: SendRefusal) => {
       if (refusal.kind === 'held') {
-        setRefusedBy(refusal.by);
+        setRefusedTurn({ by: refusal.by, since: refusal.since });
         void followTurn(refusal.executionId, () => true);
       } else {
         void queryClient.invalidateQueries({ queryKey: detailKey });
@@ -872,7 +887,7 @@ export function useConversationController(
       // The last status read is from before this send: dropped, so a stale
       // "pending, by a colleague" can never label the reader's own turn.
       queryClient.removeQueries({ queryKey: statusKey, exact: true });
-      setRefusedBy(null);
+      setRefusedTurn(null);
       const fileIds = attachments.map((a) => a.file_id);
       const refusal = await send(message, {
         conversationId,
@@ -966,7 +981,7 @@ export function useConversationController(
   const regenerate = useCallback(async (): Promise<SendRefused | undefined> => {
     if (isStreaming || !lastUserContent) return undefined;
     queryClient.removeQueries({ queryKey: statusKey, exact: true });
-    setRefusedBy(null);
+    setRefusedTurn(null);
     const refusal = await send(lastUserContent, {
       conversationId,
       streamMode: 'v2_stream',
@@ -985,6 +1000,7 @@ export function useConversationController(
     isSpaceChat,
     showAuthors,
     sendHeldBy: heldBy?.name ?? null,
+    heldSince,
     canStop,
     isOwnerResolved: ownerId !== null,
     isLoadingHistory,

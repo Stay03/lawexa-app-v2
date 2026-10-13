@@ -63,6 +63,12 @@ export function ActivityStatus({
   restingLabel?: string;
 }) {
   const [elapsed, setElapsed] = useState(0);
+  // A colleague's turn keeps their name in front of what their turn is doing,
+  // so whose turn it is never leaves the row while a step runs (Spaces F4).
+  const label =
+    restingLabel !== undefined && narration
+      ? `${restingLabel} · ${narration}`
+      : (narration ?? restingLabel ?? RESTING_LABEL);
 
   useEffect(() => {
     // setState only in the interval CALLBACK (an external-clock subscription) —
@@ -83,7 +89,7 @@ export function ActivityStatus({
     >
       <ThinkingOrb state="solving" size={20} className="shrink-0" aria-hidden />
       <span className="text-shimmer min-w-0 truncate font-medium">
-        {narration ?? restingLabel ?? RESTING_LABEL}
+        {label}
       </span>
       {elapsed > 0 && (
         <span className="text-muted-foreground/70 shrink-0 text-xs tabular-nums">
