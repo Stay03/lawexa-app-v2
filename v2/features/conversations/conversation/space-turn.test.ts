@@ -239,7 +239,9 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
     /enabled:\s*isSpaceChat &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
   );
   // Recovery settles after the mount flow's own attach, or on any connect.
-  assert.match(controller, /await recoverPendingState\(conversationId\)\.catch\(\(\) => \{\}\);\s*if \(!cancelled\) setRecoveredFor\(conversationId\);/);
+  assert.match(controller, /const recovered = await recoverPendingState\(conversationId\)[^\n]*\n\s*if \(cancelled\) return;[\s\S]*?setRecoveredFor\(conversationId\);\s*\}\)\(\);/);
+  // Opened mid-turn: the mount flow attached, so whose turn it is is read once.
+  assert.match(controller, /if \(recovered === 'reconnected' && inSpace\) void queryClient\.prefetchQuery\(statusOptions\);/);
   assert.match(controller, /onConnected: \(\) => \{\s*\/\/[^\n]*\n[^\n]*\n\s*setRecoveredFor\(conversationId\);/);
   assert.match(
     controller,

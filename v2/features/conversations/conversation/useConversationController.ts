@@ -333,6 +333,13 @@ export function useConversationController(
   const detailQuery = useQuery({ ...detailOptions, enabled: !isConfidential && !isGoneMarked });
   const detailData = detailQuery.data ?? null;
   const detailKey = detailOptions.queryKey;
+  // A space chat's status (Spaces F4): the poll below, and the one read the
+  // mount flow makes when it attaches to a turn already running.
+  const statusOptions = useMemo(
+    () => conversationsQueries.status({ conversationId, viewerId: serverUserId }),
+    [conversationId, serverUserId],
+  );
+  const statusKey = statusOptions.queryKey;
 
   // ── Streaming style (a per-device developer preference) → the engine. ──
   // Memoized on the primitive so the object identity only changes when the choice
@@ -514,6 +521,8 @@ export function useConversationController(
         return;
       }
 
+      // Whether the record names a space (Spaces F4), for the status read below.
+      let inSpace = false;
       try {
         // Cache-first history. Resolves from the warm entry with NO request (the
         // revisit case — the engine was already seeded with this exact record at
@@ -521,6 +530,7 @@ export function useConversationController(
         // the single fetch the query layer then owns, dedupes and retains.
         const data = await queryClient.ensureQueryData(detailOptions);
         if (cancelled) return;
+        inSpace = data.space != null;
         adoptConversationHistory(data);
       } catch (err) {
         if (cancelled) return;
@@ -540,8 +550,13 @@ export function useConversationController(
       if (cancelled) return;
       // Unchanged ordering: history ALWAYS settles before recovery re-attaches, so a
       // reconnect can never find an empty transcript to stream into.
-      await recoverPendingState(conversationId).catch(() => {});
-      if (!cancelled) setRecoveredFor(conversationId);
+      const recovered = await recoverPendingState(conversationId).catch(() => 'load_history' as const);
+      if (cancelled) return;
+      // Attached to a turn already running in a space chat (a colleague's,
+      // perhaps): the poll is off while this screen streams, so whose turn it
+      // is is read once here.
+      if (recovered === 'reconnected' && inSpace) void queryClient.prefetchQuery(statusOptions);
+      setRecoveredFor(conversationId);
     })();
 
     return () => {
@@ -559,6 +574,7 @@ export function useConversationController(
     setError,
     recoverPendingState,
     embedded,
+    statusOptions,
   ]);
 
   // ── Bind a NEW confidential transcript to its creator. ──
@@ -732,11 +748,6 @@ export function useConversationController(
   // a 403 or 404). Never while this screen streams: the engine owns liveness
   // then. Never before the mount flow settled its recovery, and never on a
   // personal or confidential chat.
-  const statusOptions = useMemo(
-    () => conversationsQueries.status({ conversationId, viewerId: serverUserId }),
-    [conversationId, serverUserId],
-  );
-  const statusKey = statusOptions.queryKey;
   const statusQuery = useQuery({
     ...statusOptions,
     enabled:
