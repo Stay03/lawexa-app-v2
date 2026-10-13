@@ -28,6 +28,7 @@ import {
   QUIET_NAV_SIGNAL,
   useCollabNavSignal,
 } from '@/v2/features/channels/my-channels/nav-signal';
+import { uniqueRowsById } from '@/v2/features/conversations/activity';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
@@ -158,7 +159,8 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
     pathname === href || pathname.startsWith(`${href}/`);
 
   const NewChatIcon = v2NewChat.icon;
-  const recents = recentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  // Each chat once: a bump can move a row a later page still holds (activity.ts).
+  const recents = uniqueRowsById(recentsQuery.data?.pages.flatMap((page) => page.data) ?? []);
   // Same filter, same source, same server-verified role as the rail — see
   // `visibleNavItems`. The two surfaces cannot drift on what exists.
   const navItems = visibleNavItems({

@@ -720,6 +720,10 @@ export interface ConversationData {
   can_send?: boolean;
   created_at: string;
   updated_at: string;
+  /** When its newest message was written (yours, a colleague's or Lawexa's); every
+   *  chat list sorts by it, newest first (Stay, 13 October 2026). Absent on an older
+   *  server, where the rows show updated_at (activity.ts). */
+  last_message_at?: string | null;
 }
 
 export interface ConversationResponse {
@@ -772,6 +776,10 @@ export interface ConversationListItem {
   can_send?: boolean;
   created_at: string;
   updated_at: string;
+  /** When its newest message was written (yours, a colleague's or Lawexa's); every
+   *  chat list sorts by it, newest first (Stay, 13 October 2026). Absent on an older
+   *  server, where the rows show updated_at (activity.ts). */
+  last_message_at?: string | null;
 }
 
 /** The two keys of a space a chat payload carries (backend B3). Declared here
@@ -812,7 +820,7 @@ export interface ListConversationsParams {
   per_page?: number;
   search?: string;
   status?: 'active' | 'archived';
-  sort_by?: 'created_at' | 'updated_at' | 'title';
+  sort_by?: 'created_at' | 'updated_at' | 'last_message_at' | 'title';
   sort_order?: 'asc' | 'desc';
 }
 

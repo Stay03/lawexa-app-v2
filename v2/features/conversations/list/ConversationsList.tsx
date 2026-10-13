@@ -15,6 +15,7 @@ import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { NewRowsPill } from '@/v2/shell/NewRowsPill';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
+import { lastActivityRank, uniqueRowsById } from '@/v2/features/conversations/activity';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { DeleteConversationDialog } from '@/v2/features/conversations/DeleteConversationDialog';
 import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
@@ -56,10 +57,10 @@ const NO_ROWS: readonly ConversationListItem[] = [];
 
 /** Module-level (⇒ referentially stable) row accessors for `useNewRows`. */
 const conversationId = (row: ConversationListItem): string => row.id;
-/** The list's sort axis: `updated_at desc`. `Date.parse` is deterministic, so it
- *  is safe in render (unlike `Date.now()`); `NaN` fails closed in the hook. */
-const conversationSortKey = (row: ConversationListItem): number =>
-  Date.parse(row.updated_at);
+/** The list's sort axis: the latest message, newest first (`last_message_at desc`,
+ *  {@link lastActivityRank}). Deterministic, so safe in render (unlike
+ *  `Date.now()`); `NaN` fails closed in the hook. */
+const conversationSortKey = lastActivityRank;
 
 /**
  * ConversationsList — the `/conversations` body (the `useSearchParams` consumer,
@@ -122,7 +123,7 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   // change" signal `useNewRows` needs to tell carried-over rows from new ones.
   const pages = query.data?.pages;
   const items = useMemo(
-    () => pages?.flatMap((page) => page.data) ?? NO_ROWS,
+    () => (pages ? uniqueRowsById(pages.flatMap((page) => page.data)) : NO_ROWS),
     [pages],
   );
 

@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { ConversationListItem } from '@/types/chat';
+import { lastActivityAt } from '../activity';
 import {
   FOCUS_RING,
   REVEAL,
@@ -117,7 +118,7 @@ export function ConversationRow({
   /** Opens the Remove from Space confirm (the space's Owner, in its tab). */
   onRemoveFromSpace?: () => void;
 }) {
-  const { id, title, status, updated_at, is_confidential } = conversation;
+  const { id, title, status, is_confidential } = conversation;
   const cleanTitle = stripPastedTags(title);
   const isArchived = status === 'archived';
   const spaceName = showSpace && !is_confidential ? (conversation.space?.name ?? null) : null;
@@ -198,7 +199,7 @@ export function ConversationRow({
               </Badge>
             ) : null}
             <span className="text-xs tabular-nums text-muted-foreground/80">
-              {formatRelativeTime(updated_at, now)}
+              {formatRelativeTime(lastActivityAt(conversation), now)}
             </span>
             <ChevronRight
               aria-hidden

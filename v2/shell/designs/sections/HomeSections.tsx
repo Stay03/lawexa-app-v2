@@ -10,6 +10,7 @@ import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { useMounted } from '@/v2/shell/use-mounted';
 import { formatCaseName } from '@/v2/features/cases/case-name';
 import { channelsQueries } from '@/v2/features/channels/queries';
+import { lastActivityAt } from '@/v2/features/conversations/activity';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { recentlyViewedQueries } from '@/v2/features/recently-viewed/queries';
 import type { RecentlyViewedItem } from '@/types/recently-viewed';
@@ -145,7 +146,7 @@ export function ConversationsSection() {
               href={`/c/${conversation.id}`}
               icon={MessageSquare}
               title={stripPastedTags(conversation.title) || 'Untitled conversation'}
-              meta={formatRelativeTime(conversation.updated_at, now)}
+              meta={formatRelativeTime(lastActivityAt(conversation), now)}
               move={{
                 kind: 'conversation',
                 // The real title only: the chat publishes nothing until its own

@@ -353,6 +353,9 @@ export function useConversationController(
   const detailQuery = useQuery({ ...detailOptions, enabled: !isConfidential && !isGoneMarked });
   const detailData = detailQuery.data ?? null;
   const detailKey = detailOptions.queryKey;
+  // The space a space chat is in: its chats list moves the chat up on each new
+  // message too (`conversationsCache.touch`), and its roster colours the askers.
+  const spaceUuid = detailData?.space?.uuid ?? null;
   // A space chat's status (Spaces F4): the poll below, and the one read the
   // mount flow makes when it attaches to a turn already running.
   const statusOptions = useMemo(
@@ -427,9 +430,11 @@ export function useConversationController(
       const line = truncateNarration(text);
       if (line) setNarration(line);
     },
-    // A turn finished — refresh this conversation's recents position + timestamp
-    // directly (covers the home-created turn 1, whose send ran in start-conversation
-    // rather than `submit`). No-op-stable when the row isn't cached (e.g. a
+    // A turn finished: the answer is the chat's newest message, so the chat moves
+    // to the top of every list (its space's chats too, the space read off the
+    // cached record at the time it ends) with that time. This also covers the
+    // home-created turn 1, whose send ran in start-conversation rather than
+    // `submit`. No-op-stable when the row isn't cached (e.g. a
     // confidential stub the server omits), so it never fabricates a leak.
     //
     // ALSO the transcript's terminal cache write: the turn is persisted server-side,
@@ -442,7 +447,9 @@ export function useConversationController(
       // The turn a refused send met is over (Spaces F4): its sender no longer
       // holds the next one. Cleared on every end of a stream, here and below.
       setRefusedTurn(null);
-      conversationsCache.touch(queryClient, conversationId);
+      conversationsCache.touch(queryClient, conversationId, {
+        spaceUuid: queryClient.getQueryData(detailKey)?.space?.uuid ?? null,
+      });
       if (isConfidentialMark(conversationId)) return;
       void queryClient.invalidateQueries({ queryKey: detailKey });
     },
@@ -775,7 +782,6 @@ export function useConversationController(
   // The space's roster, for each person's colour (member-colour.ts): the Owner
   // first, then by join time. One page of a hundred covers a space; anyone
   // past it, or who has left, takes the next free colour by first appearance.
-  const spaceUuid = detailData?.space?.uuid ?? null;
   const rosterQuery = useQuery({
     ...spacesQueries.members(spaceUuid ?? '', { viewerId: serverUserId, per_page: 100 }),
     enabled: showAuthors && spaceUuid !== null,
@@ -888,10 +894,14 @@ export function useConversationController(
     const previous = seenStatusRef.current;
     seenStatusRef.current = statusData;
     if (isStreaming) return;
+    // A message came since the last read (a colleague's question or its answer,
+    // or the reader's own from another tab): the chat moves to the top of the
+    // lists. The first read compares with nothing; the lists' own fetch has the
+    // order up to then.
+    const changed = previous !== null && turnChanged(previous, statusData);
+    if (changed) conversationsCache.touch(queryClient, conversationId, { spaceUuid });
     if (statusData.status !== 'pending') {
-      if (previous !== null && turnChanged(previous, statusData)) {
-        void queryClient.refetchQueries({ queryKey: detailKey, exact: true });
-      }
+      if (changed) void queryClient.refetchQueries({ queryKey: detailKey, exact: true });
       return;
     }
     let cancelled = false;
@@ -899,7 +909,7 @@ export function useConversationController(
     return () => {
       cancelled = true;
     };
-  }, [statusData, isStreaming, queryClient, detailKey, followTurn]);
+  }, [statusData, isStreaming, queryClient, detailKey, followTurn, conversationId, spaceUuid]);
 
   // A refused status read: read the transcript again, whose own refusal
   // shows "not available" (gone.ts). The poll has already stopped itself.
@@ -944,6 +954,8 @@ export function useConversationController(
     (refusal: SendRefusal) => {
       if (refusal.kind === 'held') {
         setRefusedTurn({ by: refusal.by, since: refusal.since });
+        // A colleague's question is running, so it is the chat's newest message.
+        conversationsCache.touch(queryClient, conversationId, { spaceUuid });
         // The follow waits on a transcript read: it attaches only if this
         // screen still shows this chat when the read lands.
         void followTurn(refusal.executionId, () => liveRef.current === conversationId, true);
@@ -951,7 +963,7 @@ export function useConversationController(
         void queryClient.invalidateQueries({ queryKey: detailKey });
       }
     },
-    [queryClient, detailKey, followTurn, conversationId],
+    [queryClient, detailKey, followTurn, conversationId, spaceUuid],
   );
 
   const submit = useCallback(
@@ -960,7 +972,7 @@ export function useConversationController(
       // instant the user sends — the sidebar/drawer reorder with NO refetch (wave-4
       // acceptance a). No-op-stable when the row isn't cached; `onCompleted` refreshes
       // the timestamp again when the turn settles.
-      conversationsCache.touch(queryClient, conversationId);
+      conversationsCache.touch(queryClient, conversationId, { spaceUuid });
       // The last status read is from before this send: dropped, so a stale
       // "pending, by a colleague" can never label the reader's own turn, and
       // forgotten as seen, so the first read after this turn is not taken for
@@ -979,7 +991,7 @@ export function useConversationController(
       takeRefusal(refusal);
       return { refused: sendRefusal(refusal, serverUserId) };
     },
-    [send, conversationId, jurisdiction, queryClient, statusKey, takeRefusal, serverUserId],
+    [send, conversationId, jurisdiction, queryClient, statusKey, takeRefusal, serverUserId, spaceUuid],
   );
 
   const stop = useCallback(() => cancelStream(), [cancelStream]);
@@ -1060,6 +1072,8 @@ export function useConversationController(
   // the composer's banner, as a refused send is; there is nothing to give back.
   const regenerate = useCallback(async (): Promise<SendRefused | undefined> => {
     if (isStreaming || !lastUserContent) return undefined;
+    // A re-ask is a new question: the chat moves up, as on a send.
+    conversationsCache.touch(queryClient, conversationId, { spaceUuid });
     queryClient.removeQueries({ queryKey: statusKey, exact: true });
     seenStatusRef.current = null;
     setRefusedTurn(null);
@@ -1071,7 +1085,7 @@ export function useConversationController(
     if (refusal === null) return undefined;
     takeRefusal(refusal);
     return { refused: askAgainRefusal(refusal, serverUserId) };
-  }, [isStreaming, lastUserContent, queryClient, statusKey, send, conversationId, jurisdiction, takeRefusal, serverUserId]);
+  }, [isStreaming, lastUserContent, queryClient, statusKey, send, conversationId, jurisdiction, takeRefusal, serverUserId, spaceUuid]);
 
   return {
     stream,

@@ -15,6 +15,7 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { ViewOnlyPill } from '@/v2/features/conversations/conversation/ViewOnlyPill';
+import { lastActivityAt } from '@/v2/features/conversations/activity';
 import {
   ConversationComposer,
   type ConversationComposerHandle,
@@ -432,7 +433,7 @@ export function RecentCaseChats({
                 {stripPastedTags(row.title) || 'Untitled conversation'}
               </span>
               <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/60">
-                {formatRelativeTime(row.updated_at, now)}
+                {formatRelativeTime(lastActivityAt(row), now)}
               </span>
             </button>
           </li>

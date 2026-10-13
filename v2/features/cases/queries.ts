@@ -311,7 +311,12 @@ export const casesQueries = {
     queryOptions({
       queryKey: [...casesQueries.all, 'conversations', slug, { viewerId }] as const,
       queryFn: () =>
-        chatApi.listContentConversations('case', slug, { per_page: 5 }),
+        chatApi.listContentConversations('case', slug, {
+          per_page: 5,
+          // Newest message first, as every chat list (backend 6f776f0).
+          sort_by: 'last_message_at',
+          sort_order: 'desc',
+        }),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
     }),

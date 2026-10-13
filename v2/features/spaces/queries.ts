@@ -153,7 +153,7 @@ export const spacesQueries = {
   ) => {
     const params: SpaceConversationListParams = {
       per_page: SPACE_CONTENT_PER_PAGE,
-      sort_by: 'updated_at',
+      sort_by: 'last_message_at',
       sort_order: 'desc',
       ...(search ? { search } : {}),
     };

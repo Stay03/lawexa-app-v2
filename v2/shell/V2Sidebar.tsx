@@ -36,6 +36,7 @@ import {
   QUIET_NAV_SIGNAL,
   useCollabNavSignal,
 } from '@/v2/features/channels/my-channels/nav-signal';
+import { uniqueRowsById } from '@/v2/features/conversations/activity';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
@@ -179,7 +180,8 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
     pathname === href || pathname.startsWith(`${href}/`);
 
   const NewChatIcon = v2NewChat.icon;
-  const recents = recentsQuery.data?.pages.flatMap((page) => page.data) ?? [];
+  // Each chat once: a bump can move a row a later page still holds (activity.ts).
+  const recents = uniqueRowsById(recentsQuery.data?.pages.flatMap((page) => page.data) ?? []);
   // Role-gated rows (Quiz's research-account soft launch) are filtered from the
   // ONE config, with the SERVER-verified role the layout already threaded in —
   // so the rail and the drawer can never disagree about what exists.

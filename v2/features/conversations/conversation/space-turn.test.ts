@@ -555,7 +555,8 @@ test('a send and a re-ask forget the last status as seen, so their own turn is n
   );
   assert.equal(resets?.length, 2, 'submit and regenerate');
   // The first read with nothing seen never refetches the transcript.
-  assert.match(controller, /if \(previous !== null && turnChanged\(previous, statusData\)\) \{/);
+  assert.match(controller, /const changed = previous !== null && turnChanged\(previous, statusData\);/);
+  assert.match(controller, /if \(changed\) void queryClient\.refetchQueries\(\{ queryKey: detailKey, exact: true \}\);/);
 });
 
 /* ── A stranger reading a published space chat is not polled (review N8) ──── */

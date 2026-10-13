@@ -39,7 +39,7 @@ import { SPACE_CHAT_POLL_MS, stopsPolling } from './conversation/space-turn';
 const RECENTS_PARAMS: ListConversationsParams = {
   per_page: 10,
   status: 'active',
-  sort_by: 'updated_at',
+  sort_by: 'last_message_at',
   sort_order: 'desc',
 };
 
@@ -57,7 +57,7 @@ const RECENTS_PARAMS: ListConversationsParams = {
 export const INFINITE_RECENTS_PARAMS = {
   per_page: 20,
   status: 'active',
-  sort_by: 'updated_at',
+  sort_by: 'last_message_at',
   sort_order: 'desc',
 } satisfies Omit<ListConversationsParams, 'page'>;
 
@@ -281,7 +281,7 @@ export const conversationsQueries = {
     const trimmed = search?.trim();
     const params: ListConversationsParams = {
       per_page: LIST_PAGE_PER_PAGE,
-      sort_by: 'updated_at',
+      sort_by: 'last_message_at',
       sort_order: 'desc',
       ...(trimmed ? { search: trimmed } : {}),
     };

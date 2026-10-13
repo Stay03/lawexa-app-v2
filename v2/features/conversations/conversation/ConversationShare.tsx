@@ -9,6 +9,7 @@ import type { ConversationData } from '@/types/chat';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
+import { conversationsCache } from '../cache';
 import { conversationsQueries } from '../queries';
 
 /**
@@ -57,6 +58,9 @@ export function ConversationShare({
     queryClient.setQueryData<ConversationData>(detailOptions.queryKey, (old) =>
       old ? { ...old, is_private: isPrivate } : old,
     );
+    // The lists show the change where the chat sits: sharing is not a message,
+    // so it does not move the chat up.
+    conversationsCache.setVisibility(queryClient, conversationId, isPrivate);
   };
 
   const publish = useMutation({

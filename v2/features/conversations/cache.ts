@@ -1,5 +1,7 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import type { ConversationListItem, ConversationsListResponse } from '@/types/chat';
+import type { SpaceConversationListResponse } from '@/types/collab';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { conversationsQueries } from './queries';
 
 /**
@@ -99,10 +101,10 @@ function patchTitleRows(
 }
 
 /** Pull a row out of an array by id → `[without, found?]`; same array when absent. */
-function extractRow(
-  rows: ConversationListItem[],
+function extractRow<T extends ConversationListItem>(
+  rows: T[],
   id: string,
-): readonly [ConversationListItem[], ConversationListItem | undefined] {
+): readonly [T[], T | undefined] {
   const index = rows.findIndex((row) => sameId(row, id));
   if (index === -1) return [rows, undefined] as const;
   const found = rows[index];
@@ -110,50 +112,58 @@ function extractRow(
 }
 
 /**
+ * A row as a new message leaves it: its `last_message_at` now (the order every
+ * chat list sorts by, Stay's "the chat with the most recent message goes to the
+ * top"), and the title when one comes with the write. `updated_at` is left
+ * alone: it means "the chat itself changed" and orders nothing any more.
+ */
+function withNewMessage<T extends ConversationListItem>(row: T, at: string, title?: string): T {
+  return { ...row, last_message_at: at, ...(title !== undefined && { title }) };
+}
+
+/** Move a row to the head of the first page of an infinite cache; the cache
+ *  unchanged when no page holds it (or nothing is fetched yet). */
+function bumpInPages<P extends { data: T[] }, T extends ConversationListItem>(
+  cache: InfiniteData<P>,
+  id: string,
+  bump: (row: T) => T,
+): InfiniteData<P> {
+  if (cache.pages.length === 0) return cache;
+  let found: T | undefined;
+  const stripped = cache.pages.map((page) => {
+    const [rows, hit] = extractRow(page.data, id);
+    if (hit) found = hit;
+    return rows === page.data ? page : { ...page, data: rows };
+  });
+  if (!found) return cache;
+  const bumped = bump(found);
+  return {
+    ...cache,
+    pages: stripped.map((page, index) =>
+      index === 0 ? { ...page, data: [bumped, ...page.data] } : page,
+    ),
+  };
+}
+
+/**
  * Move an existing row to the head of the FIRST page (infinite) / of `data` (flat)
- * with a fresh `updated_at` and an optional title patch — the "bump on activity"
- * write. No-op-stable: an absent id returns the input cache unchanged. A found row
- * always yields a new structure (the caller only bumps on a discrete send/complete
- * event, never in render), which both reorders it and refreshes the timestamp the
- * home's relative-time strip reads.
+ * with a fresh `last_message_at` and an optional title patch — the "bump on a new
+ * message" write. No-op-stable: an absent id returns the input cache unchanged. A
+ * found row always yields a new structure (the caller only bumps on a discrete
+ * message event, never in render), which reorders it and refreshes the time the
+ * rows show.
  */
 function bumpInCache(
   cache: ListCache,
   id: string,
   patch: { title?: string },
+  at: string,
 ): ListCache {
-  const updated_at = new Date().toISOString();
-
-  if (isInfinite(cache)) {
-    if (cache.pages.length === 0) return cache;
-    let found: ConversationListItem | undefined;
-    const stripped = cache.pages.map((page) => {
-      const [rows, hit] = extractRow(page.data, id);
-      if (hit) found = hit;
-      return rows === page.data ? page : { ...page, data: rows };
-    });
-    if (!found) return cache;
-    const bumped: ConversationListItem = {
-      ...found,
-      updated_at,
-      ...(patch.title !== undefined && { title: patch.title }),
-    };
-    return {
-      ...cache,
-      pages: stripped.map((page, index) =>
-        index === 0 ? { ...page, data: [bumped, ...page.data] } : page,
-      ),
-    };
-  }
-
+  const bump = (row: ConversationListItem) => withNewMessage(row, at, patch.title);
+  if (isInfinite(cache)) return bumpInPages(cache, id, bump);
   const [rows, found] = extractRow(cache.data, id);
   if (!found) return cache;
-  const bumped: ConversationListItem = {
-    ...found,
-    updated_at,
-    ...(patch.title !== undefined && { title: patch.title }),
-  };
-  return { ...cache, data: [bumped, ...rows] };
+  return { ...cache, data: [bump(found), ...rows] };
 }
 
 /**
@@ -206,24 +216,53 @@ export const conversationsCache = {
   },
 
   /**
-   * Bump a conversation to the top of every list with a fresh `updated_at` (a turn
-   * was sent or completed). Optionally sets the title in the same write. No-op-stable
-   * when the id isn't in a given list (e.g. a confidential stub the server omits, or
-   * a conversation past the loaded pages — the natural refetch reconciles those).
+   * A new message in a conversation (the reader's send, an answer completing, a
+   * colleague's turn in a space chat): bump it to the top of every list with a
+   * fresh `last_message_at`, and of its space's chats list when `spaceUuid` is
+   * given (a bump only: the space list is never inserted into). Optionally sets
+   * the title in the same write. No-op-stable when the id isn't in a given list
+   * (a confidential stub the server omits, a chat past the loaded pages, a
+   * colleague's chat not in the reader's own lists): the refetch, which sorts by
+   * the same field, puts those in the same place.
    */
-  touch(queryClient: QueryClient, id: string, patch: { title?: string } = {}): void {
-    writeEveryList(queryClient, (cache) => bumpInCache(cache, id, patch));
+  touch(
+    queryClient: QueryClient,
+    id: string,
+    patch: { title?: string; spaceUuid?: string | null } = {},
+  ): void {
+    const at = new Date().toISOString();
+    writeEveryList(queryClient, (cache) => bumpInCache(cache, id, patch, at));
+    if (patch.spaceUuid) {
+      queryClient.setQueriesData<InfiniteData<SpaceConversationListResponse>>(
+        { queryKey: [...spacesQueries.contentsOf(patch.spaceUuid), 'conversations'] },
+        (cache) => (cache ? bumpInPages(cache, id, (row) => withNewMessage(row, at)) : cache),
+      );
+    }
   },
 
   /**
-   * Patch a conversation's title in place WITHOUT reordering (the async AI-name
-   * upgrade arriving on the open conversation). Position is owned by recency, not by
-   * when the title resolved, so this never moves the row. No-op-stable when the title
-   * already matches — so it stays idempotent across the title effect's re-runs.
+   * Patch a conversation's title in place WITHOUT reordering (a rename, the async
+   * AI-name upgrade). Position is owned by the latest message, so this never moves
+   * the row. No-op-stable when the title already matches — so it stays idempotent
+   * across the title effect's re-runs.
    */
   patch(queryClient: QueryClient, id: string, fields: { title: string }): void {
     writeEveryList(queryClient, (cache) =>
       mapListCache(cache, (rows) => patchTitleRows(rows, id, fields.title)),
+    );
+  },
+
+  /** A visibility change (share, make private) in place, WITHOUT reordering:
+   *  it is not a message. No-op-stable when it already matches. */
+  setVisibility(queryClient: QueryClient, id: string, isPrivate: boolean): void {
+    writeEveryList(queryClient, (cache) =>
+      mapListCache(cache, (rows) => {
+        const index = rows.findIndex((row) => sameId(row, id));
+        if (index === -1 || rows[index].is_private === isPrivate) return rows;
+        const next = rows.slice();
+        next[index] = { ...rows[index], is_private: isPrivate };
+        return next;
+      }),
     );
   },
 
@@ -259,5 +298,6 @@ export function makeOptimisticConversation(id: string, title: string): Conversat
     messages_count: 1,
     created_at: now,
     updated_at: now,
+    last_message_at: now,
   };
 }
