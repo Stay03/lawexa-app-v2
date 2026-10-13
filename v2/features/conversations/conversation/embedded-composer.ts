@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { MessageAttachment } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import type { ViewOnlyReason } from './space-turn';
 
 /**
  * embedded-composer — the seam that lets a HOST surface own the one composer
@@ -35,8 +36,13 @@ export interface EmbeddedComposerSurface {
   isRedacted: boolean;
   isStreaming: boolean;
   isCancelling: boolean;
-  /** Server-verified ownership — false ⇒ the host shows its view-only strip. */
+  /** Server-verified ownership. */
   isOwner: boolean;
+  /** Whether the reader may send (the controller's `canSend`): false ⇒ the
+   *  host shows its view-only strip. */
+  canSend: boolean;
+  /** The strip's reason when the reader may not send. */
+  viewOnlyReason: ViewOnlyReason;
   /** False while ownership is still resolving — the host disables sending. */
   isOwnerResolved: boolean;
   submit: (message: string, attachments: MessageAttachment[]) => Promise<void>;
@@ -77,6 +83,8 @@ export function publishEmbeddedComposer(next: EmbeddedComposerSurface): void {
     surface.isStreaming === next.isStreaming &&
     surface.isCancelling === next.isCancelling &&
     surface.isOwner === next.isOwner &&
+    surface.canSend === next.canSend &&
+    surface.viewOnlyReason === next.viewOnlyReason &&
     surface.isOwnerResolved === next.isOwnerResolved &&
     surface.submit === next.submit &&
     surface.stop === next.stop

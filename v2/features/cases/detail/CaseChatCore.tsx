@@ -482,7 +482,7 @@ export function CaseChatComposerDock({
   // A conversation is open but its transcript hasn't published yet (one effect
   // tick, or a cold load) — sending now could only misfire, so the pill waits.
   const conversationPending = conversationId !== null && surface === null;
-  const viewOnly = surface !== null && surface.isOwnerResolved && !surface.isOwner;
+  const viewOnly = surface !== null && surface.isOwnerResolved && !surface.canSend;
 
   const createError = view === 'new' && start.error ? start.error : null;
 
@@ -508,9 +508,10 @@ export function CaseChatComposerDock({
         </div>
       </div>
 
-      {/* View-only strip — the open conversation is someone else's (a shared
-          link). The composer collapses but STAYS MOUNTED, so returning to the
-          list restores the same element; both swap with the same collapse. */}
+      {/* View-only strip — the reader may not send in the open conversation
+          (a shared link, or a space they only view). The composer collapses
+          but STAYS MOUNTED, so returning to the list restores the same
+          element; both swap with the same collapse. */}
       <div
         aria-hidden={!viewOnly}
         className={cn(
@@ -519,7 +520,7 @@ export function CaseChatComposerDock({
         )}
       >
         <div className="min-h-0 overflow-hidden">
-          <ViewOnlyPill />
+          <ViewOnlyPill reason={surface?.viewOnlyReason ?? 'shared'} />
         </div>
       </div>
       <div

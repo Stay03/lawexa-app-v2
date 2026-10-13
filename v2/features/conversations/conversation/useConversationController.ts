@@ -18,6 +18,7 @@ import { useSkeletonHold } from './skeleton-hold';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
+import { canSendIn, viewOnlyReason, type ViewOnlyReason } from './space-turn';
 import {
   isConfidentialMark,
   isRedactedMark,
@@ -163,8 +164,18 @@ function truncateNarration(text: string): string {
 
 export interface ConversationController {
   stream: ReturnType<typeof useConversationStream>;
-  /** Server-verified ownership: false ⇒ the read-only / shared view. */
+  /** Server-verified ownership: the owner's verbs (share, move, rename,
+   *  delete, export) follow it. */
   isOwner: boolean;
+  /**
+   * Whether the reader may send in this chat, which decides composer against
+   * view-only. The server's `can_send` when the record carries it (backend B4:
+   * the chat's owner, or an Owner or Contributor of its space), else
+   * ownership. Resolves with ownership, from the same record.
+   */
+  canSend: boolean;
+  /** Why the reader reads only, for the view-only pill (space-turn.ts). */
+  viewOnlyReason: ViewOnlyReason;
   /**
    * Whether ownership has been DETERMINED yet. False until the owner id resolves
    * (from the synchronous handoff path, or async history load). While false the
@@ -633,6 +644,10 @@ export function useConversationController(
   // device path (see the defect note in the mount flow).
   const ownerId = detailData?.user_id ?? localOwnerId;
   const isOwner = serverUserId != null && ownerId != null && serverUserId === ownerId;
+  // Sending is the server's answer when it gave one (space-turn.ts). The two
+  // paths with no record (the fresh-create handoff, the device-only
+  // confidential chat) are the owner's own, so ownership answers there.
+  const canSend = detailData ? canSendIn(detailData, isOwner) : isOwner;
 
   const references = detailData?.references ?? NO_REFERENCES;
 
@@ -758,6 +773,8 @@ export function useConversationController(
   return {
     stream,
     isOwner,
+    canSend,
+    viewOnlyReason: viewOnlyReason(detailData),
     isOwnerResolved: ownerId !== null,
     isLoadingHistory,
     showHistorySkeleton,

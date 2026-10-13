@@ -97,6 +97,8 @@ export function ConversationScreen({
     isConfidential,
     isRedacted,
     isOwner,
+    canSend,
+    viewOnlyReason,
     isOwnerResolved,
     submit: controllerSubmit,
     stop: controllerStop,
@@ -112,6 +114,8 @@ export function ConversationScreen({
       isStreaming,
       isCancelling,
       isOwner,
+      canSend,
+      viewOnlyReason,
       isOwnerResolved,
       submit: controllerSubmit,
       stop: controllerStop,
@@ -126,6 +130,8 @@ export function ConversationScreen({
     isStreaming,
     isCancelling,
     isOwner,
+    canSend,
+    viewOnlyReason,
     isOwnerResolved,
     controllerSubmit,
     controllerStop,
@@ -296,7 +302,9 @@ export function ConversationScreen({
                 // real composer paints immediately — this skeleton is now only the cold
                 // open, which is what it was always meant to be.
                 <ComposerSkeleton />
-              ) : controller.isOwner ? (
+              ) : controller.canSend ? (
+                // The reader may send: the chat's owner, or (backend B4) an
+                // Owner or Contributor of the chat's space.
                 <ConversationComposer
                   draftScopeId={conversationId}
                   jurisdiction={controller.jurisdiction}
@@ -313,7 +321,7 @@ export function ConversationScreen({
                   onStop={controller.stop}
                 />
               ) : (
-                <ViewOnlyPill />
+                <ViewOnlyPill reason={controller.viewOnlyReason} />
               )}
             </div>
           </div>
