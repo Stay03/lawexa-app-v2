@@ -126,8 +126,12 @@ function factsOf(...values: (string | null)[]): readonly string[] {
  * it, and the dialog gives a Member no line at all, so those are said here in
  * full. An organization's Member has no meaning the product defines, so its
  * chip stays a name: the card says nothing it cannot vouch for.
+ *
+ * The Contributor's sentence and the dialog's change together (Spaces F4,
+ * backend B4: a Contributor continues the space's conversations), so the
+ * inviter and the invitee read the same promise.
  */
-const CONTRIBUTOR_MEANING = 'Can read and add conversations, folders and files';
+const CONTRIBUTOR_MEANING = 'Can read, add to the space and continue its conversations';
 const TEAM_SPACE_MEMBER_MEANING = 'Can read and join the space’s open channels';
 const CHANNEL_MEMBER_MEANING = 'Can read and post in the channel';
 

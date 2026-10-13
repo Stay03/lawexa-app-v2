@@ -342,7 +342,7 @@ test('a role is a name in the closed select and a meaning in the open list', () 
     SHARED_INVITE_ROLES.map((option) => [option.label, option.description]),
     [
       ['Viewer', 'Can read everything in the space'],
-      ['Contributor', 'Can also add conversations, folders and files'],
+      ['Contributor', 'Can also add to the space and continue its conversations'],
     ],
   );
   assert.deepEqual(TEAM_INVITE_ROLES.map((option) => option.label), ['Member', 'Admin']);

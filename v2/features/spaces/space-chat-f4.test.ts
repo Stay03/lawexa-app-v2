@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { SHARED_INVITE_ROLES } from '@/v2/features/collab/membership/invite-roles';
+import { invitationRoleMeaning } from '@/v2/features/invitations/row-model';
 import { spaceEmptyCopy, startChatRefusal, startDialogLine } from './content-model';
 
 /**
@@ -71,4 +73,22 @@ test('the Conversations tab has a New conversation pill and an empty-state butto
   assert.match(panel, /placeholder="Search conversations"\s*busy=\{query\.isPlaceholderData\}\s*action=\{newChatButton\}/);
   assert.match(panel, /<EmptyStateAddButton icon=\{Plus\} onClick=\{startChat\}>\s*New conversation\s*<\/EmptyStateAddButton>/);
   assert.match(panel, /<StartConversationDialog\s*key=\{`start-\$\{starting\.key\}`\}\s*space=\{\{ uuid: spaceUuid, name: spaceName \}\}/);
+});
+
+test('the inviter and the invitee read one promise: a Contributor continues the space’s conversations', () => {
+  const dialogLine = SHARED_INVITE_ROLES.find((option) => option.value === 'editor')?.description;
+  const cardLine = invitationRoleMeaning({
+    kind: 'space',
+    invitation: {
+      role: 'member',
+      content_role: 'editor',
+      space: { uuid: 's', name: 'S', type: 'study', description: null, kind: 'shared' },
+    },
+  });
+  assert.equal(dialogLine, 'Can also add to the space and continue its conversations');
+  assert.equal(cardLine, 'Can read, add to the space and continue its conversations');
+  for (const line of [dialogLine ?? '', cardLine ?? '']) {
+    assert.match(line, /add to the space and continue its conversations$/, line);
+    assert.doesNotMatch(line, /[—–]/, line);
+  }
 });

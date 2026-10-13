@@ -76,7 +76,7 @@ test('an invitation’s role carries its meaning, in the dialog’s words where 
   );
   assert.equal(
     invitationRoleMeaning(spaceInvitation('shared', 'member', 'editor')),
-    'Can read and add conversations, folders and files',
+    'Can read, add to the space and continue its conversations',
   );
   // A shared space's invitation with no content role does not guess one.
   assert.equal(invitationRoleMeaning(spaceInvitation('shared', 'member')), null);

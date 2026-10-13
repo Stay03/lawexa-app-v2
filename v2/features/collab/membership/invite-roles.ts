@@ -31,12 +31,17 @@ export const TEAM_INVITE_ROLES: readonly InviteRoleOption<'member' | 'admin'>[] 
 /**
  * A SHARED space's roles (Spaces F7, 12 October 2026; backend B2). Viewer
  * first, because reading is the safer thing to give someone by default.
+ *
+ * A Contributor may continue the space's conversations since backend B4
+ * (Spaces F4), so the meaning says it. The invitation card says the same in
+ * its own sentence (`invitations/row-model.ts`, CONTRIBUTOR_MEANING), and
+ * the two change together.
  */
 export const SHARED_INVITE_ROLES: readonly InviteRoleOption<InvitableContentRole>[] = [
   { value: 'viewer', label: 'Viewer', description: 'Can read everything in the space' },
   {
     value: 'editor',
     label: 'Contributor',
-    description: 'Can also add conversations, folders and files',
+    description: 'Can also add to the space and continue its conversations',
   },
 ];
