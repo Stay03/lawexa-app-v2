@@ -1558,6 +1558,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
       }
       resetStreamingBuffers();
+      handlers.onCancelled?.();
     });
 
     // end — terminal. Finalize any placeholder left open.

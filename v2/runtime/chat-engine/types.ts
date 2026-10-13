@@ -179,6 +179,9 @@ export interface ChatEngineHandlers {
   onToolCalling?: (event: ToolCallingEvent) => void;
   onToolComplete?: (event: ToolCompleteEvent) => void;
   onCompleted?: (event: CompletedEvent) => void;
+  /** The stream's turn was stopped (its terminal `cancelled` event): by this
+   *  reader, or, for a turn followed in a space chat, by its sender. */
+  onCancelled?: () => void;
   onError?: (error: string) => void;
   onHistoryLoaded?: (data: ConversationData) => void;
   /**

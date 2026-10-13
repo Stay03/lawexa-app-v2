@@ -555,3 +555,15 @@ test('a 409’s follow attaches only while the screen still shows that chat', ()
   // followTurn checks before it attaches, after the read.
   assert.match(controller, /if \(!stillWanted\(\)\) return;\s*const fresh = queryClient\.getQueryData\(detailKey\);/);
 });
+
+/* ── A refused send's turn does not label the next one (re-review R4) ─────── */
+
+test('the turn a refused send met stops naming its sender when it ends', () => {
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /onCompleted: \(\) => \{\s*(\/\/[^\n]*\n\s*)*setRefusedTurn\(null\);/);
+  assert.match(controller, /onError: \(\) => setRefusedTurn\(null\),\s*onCancelled: \(\) => setRefusedTurn\(null\),/);
+  // A pending status outranks the refusal (a turn that ended by polling fires no handler).
+  assert.match(controller, /isStreaming &&\s*statusData\?\.status !== 'pending' &&\s*refusedBy !== null &&/);
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /resetStreamingBuffers\(\);\s*handlers\.onCancelled\?\.\(\);\s*\}\);/);
+});

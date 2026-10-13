@@ -417,10 +417,15 @@ export function useConversationController(
     // one turn short). With no observer left, the entry is simply marked invalid and
     // the next open revalidates on mount.
     onCompleted: () => {
+      // The turn a refused send met is over (Spaces F4): its sender no longer
+      // holds the next one. Cleared on every end of a stream, here and below.
+      setRefusedTurn(null);
       conversationsCache.touch(queryClient, conversationId);
       if (isConfidentialMark(conversationId)) return;
       void queryClient.invalidateQueries({ queryKey: detailKey });
     },
+    onError: () => setRefusedTurn(null),
+    onCancelled: () => setRefusedTurn(null),
   });
 
   const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle } = stream;
@@ -864,8 +869,16 @@ export function useConversationController(
   // keeps Stop, unless the status says the reader may not cancel it.
   const statusHeldBy = isStreaming ? turnHeldBy(statusData, serverUserId) : null;
   const refusedBy = refusedTurn?.by ?? null;
+  // The refusal names the turn only until a status read says whose it is: a
+  // pending status is the authority (a turn that ended by polling fires no
+  // handler, so a later turn found by the poll may be someone else's).
   const refusedByColleague =
-    isStreaming && refusedBy !== null && refusedBy.id !== serverUserId ? refusedBy : null;
+    isStreaming &&
+    statusData?.status !== 'pending' &&
+    refusedBy !== null &&
+    refusedBy.id !== serverUserId
+      ? refusedBy
+      : null;
   const heldBy = statusHeldBy ?? refusedByColleague;
   // The clock runs from the turn's own start, not from when this screen began
   // to follow it.
