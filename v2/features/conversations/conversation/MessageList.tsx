@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from 'react';
 import { ArrowDown, RotateCcw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import { ReferenceChips } from './ReferenceChips';
 import { TranscriptSkeleton } from './skeletons';
 import { openDefersBlocks } from './markdown/defer-plan';
 import { ScrollKeepContext, type ScrollKeep } from './markdown/scroll-keep-context';
+import { readsAtBottom } from './scroll-pin';
 
 /**
  * MessageList — the natively-virtualized, memoized transcript with chat scroll
@@ -72,6 +74,16 @@ import { ScrollKeepContext, type ScrollKeep } from './markdown/scroll-keep-conte
  *  fraction of a line mid-ease, which must still count as "at bottom"); a real
  *  user scroll-up of more than this still detaches instantly. */
 const BOTTOM_THRESHOLD_PX = 80;
+
+/** Every scroll the list makes itself. The handler compares the position a
+ *  scroll event finds with the one written here (`readsAtBottom`), so the
+ *  list's own scrolls, and growth that leaves the view where they put it, never
+ *  read as the reader moving away. Read back after the write: the browser
+ *  clamps it. */
+function scrollOwn(el: HTMLDivElement, ownTop: RefObject<number | null>, top: number) {
+  el.scrollTop = top;
+  ownTop.current = el.scrollTop;
+}
 
 /**
  * How many groups at the END of the transcript are exempt from native
@@ -258,6 +270,9 @@ export function MessageList({
   const atBottomRef = useRef(true);
   const messagesLenRef = useRef(messages.length);
   const followRafRef = useRef<number | null>(null);
+  /** Where the list's own last scroll left the view (`scrollOwn`), so the
+   *  scroll event that write fires never reads as the reader moving away. */
+  const ownScrollTopRef = useRef<number | null>(null);
 
   /**
    * THE JUMP-TO-LATEST PILL, AS ONE DERIVED VALUE.
@@ -309,8 +324,7 @@ export function MessageList({
       keepPlace: (fix) => {
         const el = scrollRef.current;
         if (!el) return;
-        if (fix === 'bottom') el.scrollTop = el.scrollHeight;
-        else el.scrollTop += fix;
+        scrollOwn(el, ownScrollTopRef, fix === 'bottom' ? el.scrollHeight : el.scrollTop + fix);
       },
     }),
     [canAnchor, landsAtBottom],
@@ -389,7 +403,7 @@ export function MessageList({
     const el = scrollRef.current;
     if (!el) return;
     didInitialScrollRef.current = true;
-    el.scrollTop = el.scrollHeight;
+    scrollOwn(el, ownScrollTopRef, el.scrollHeight);
   }, [messages.length]);
 
   // When the rest of an opened chat arrives above the first frame's messages, a
@@ -399,7 +413,7 @@ export function MessageList({
   useIsomorphicLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el || !didInitialScrollRef.current || !atBottomRef.current) return;
-    el.scrollTop = el.scrollHeight;
+    scrollOwn(el, ownScrollTopRef, el.scrollHeight);
   }, [messages.length]);
 
   // Sync the length ref + imperative scroll on a new turn. No setState here
@@ -411,7 +425,7 @@ export function MessageList({
     const last = messages[messages.length - 1];
     if (last && last.role === 'user' && messages.length > prevLen) {
       const el = scrollRef.current;
-      if (el) el.scrollTop = el.scrollHeight; // sending always scrolls into view
+      if (el) scrollOwn(el, ownScrollTopRef, el.scrollHeight); // sending always scrolls into view
     }
   }, [messages]);
 
@@ -438,7 +452,7 @@ export function MessageList({
       const target = el.scrollHeight - el.clientHeight;
       const diff = target - el.scrollTop;
       if (diff <= 1) {
-        el.scrollTop = target;
+        scrollOwn(el, ownScrollTopRef, target);
         return;
       }
       // BIG jump (history load, end-of-stream snap, card expand): SNAP. Easing a
@@ -448,10 +462,10 @@ export function MessageList({
       // Only the sub-line growth of normal streaming — the case the ease exists
       // for — glides.
       if (diff > BOTTOM_THRESHOLD_PX) {
-        el.scrollTop = target;
+        scrollOwn(el, ownScrollTopRef, target);
         return;
       }
-      el.scrollTop += Math.max(1, diff * 0.25);
+      scrollOwn(el, ownScrollTopRef, el.scrollTop + Math.max(1, diff * 0.25));
       followRafRef.current = requestAnimationFrame(followBottom);
     };
 
@@ -461,7 +475,12 @@ export function MessageList({
         followRafRef.current = requestAnimationFrame(followBottom);
       }
     });
-    observer.observe(content);
+    // The BORDER box: the dock's height reaches the content as bottom padding
+    // (`--v2-conv-dock-h`), which leaves the content box as it was. Watching
+    // that box missed every dock change: the measured height replacing the
+    // 7 rem fallback on open, and the composer growing a line as the reader
+    // types, which left the newest rows under the dock (Spaces F4 review S2).
+    observer.observe(content, { box: 'border-box' });
     return () => {
       observer.disconnect();
       if (followRafRef.current != null) cancelAnimationFrame(followRafRef.current);
@@ -476,8 +495,9 @@ export function MessageList({
   const handleScroll = () => {
     const el = scrollRef.current;
     if (!el) return;
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    const atBottom = distance <= BOTTOM_THRESHOLD_PX;
+    // Pinned by distance, or because the view sits where the list's own last
+    // scroll put it and only the page under it grew (scroll-pin.ts).
+    const atBottom = readsAtBottom(el, ownScrollTopRef.current, atBottomRef.current, BOTTOM_THRESHOLD_PX);
     atBottomRef.current = atBottom;
     if (atBottom) {
       if (detachedAt !== null) onScrolledUpChange?.(false);

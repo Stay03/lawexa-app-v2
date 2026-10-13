@@ -42,7 +42,7 @@ test('a cold open draws the newest first too: the two frames count from the firs
 test('the first scroll lands at the bottom before the browser paints', () => {
   assert.match(
     list,
-    /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(didInitialScrollRef\.current \|\| messages\.length === 0\) return;[\s\S]*?el\.scrollTop = el\.scrollHeight;\s*\}, \[messages\.length\]\);/,
+    /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(didInitialScrollRef\.current \|\| messages\.length === 0\) return;[\s\S]*?scrollOwn\(el, ownScrollTopRef, el\.scrollHeight\);\s*\}, \[messages\.length\]\);/,
   );
 });
 
@@ -55,6 +55,6 @@ test('the first frame is a text budget of about two phone screens, and at most e
 test('a reader at the bottom stays there when the rest of the chat arrives', () => {
   assert.match(
     list,
-    /useIsomorphicLayoutEffect\(\(\) => \{\s*const el = scrollRef\.current;\s*if \(!el \|\| !didInitialScrollRef\.current \|\| !atBottomRef\.current\) return;\s*el\.scrollTop = el\.scrollHeight;\s*\}, \[messages\.length\]\);/,
+    /useIsomorphicLayoutEffect\(\(\) => \{\s*const el = scrollRef\.current;\s*if \(!el \|\| !didInitialScrollRef\.current \|\| !atBottomRef\.current\) return;\s*scrollOwn\(el, ownScrollTopRef, el\.scrollHeight\);\s*\}, \[messages\.length\]\);/,
   );
 });

@@ -159,7 +159,7 @@ test('MessageList provides the scroller, the bottom and the open to the answers'
   );
   assert.match(
     messageList,
-    /if \(fix === 'bottom'\) el\.scrollTop = el\.scrollHeight;\s*else el\.scrollTop \+= fix;\s*\},\s*\}\),\s*\[canAnchor, landsAtBottom\],/,
+    /scrollOwn\(el, ownScrollTopRef, fix === 'bottom' \? el\.scrollHeight : el\.scrollTop \+ fix\);\s*\},\s*\}\),\s*\[canAnchor, landsAtBottom\],/,
   );
   assert.match(
     messageList,
