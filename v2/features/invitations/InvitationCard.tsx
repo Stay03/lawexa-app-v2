@@ -156,8 +156,12 @@ export const InvitationCard = memo(function InvitationCard({
               {/* The first fact is the kind ("Study space") and holds its
                   width; the description after it is what truncates. On a
                   phone the line used to cut the kind first ("Study s...")
-                  and keep the long description (design round 1). */}
-              {row.facts.length > 0 ? (
+                  and keep the long description (design round 1). The age
+                  is this line's trailing fact, held at its width the way a
+                  file row's is: as its own item in the role row below it
+                  wrapped onto a line of its own on a phone whenever the
+                  role's meaning was long (design round 5). */}
+              {row.facts.length > 0 || age ? (
                 <MetaLine
                   className="mt-1.5"
                   lead={row.facts.map((fact, index) =>
@@ -169,6 +173,7 @@ export const InvitationCard = memo(function InvitationCard({
                       fact
                     ),
                   )}
+                  trail={age ? [<span key="age" className="tabular-nums">{age}</span>] : undefined}
                 />
               ) : null}
             </div>
@@ -192,11 +197,6 @@ export const InvitationCard = memo(function InvitationCard({
                 countLabel={row.memberCount.words}
                 label={`${row.memberCount.words} in ${row.title}`}
               />
-            ) : null}
-            {age ? (
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {age}
-              </span>
             ) : null}
 
             {/* Full width on a phone so Accept can take the row and Decline
