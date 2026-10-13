@@ -343,8 +343,16 @@ export function MessageList({
    * group". `-1` is "not shown".
    */
   const lastGroup = groups[lastGroupIndex];
+  // The answer BEING WRITTEN, not any assistant row: in a space chat the screen
+  // can follow a colleague's turn while the transcript still ends with the
+  // finished answer to an earlier question (Spaces F4), and the row belongs
+  // after that answer, not above it. The engine's placeholder carries
+  // `isStreaming: true` until its turn ends, so the reader's own turn places
+  // the row exactly as before.
   const lastGroupIsAnswer =
-    lastGroup?.type === 'single' && lastGroup.message.role === 'assistant';
+    lastGroup?.type === 'single' &&
+    lastGroup.message.role === 'assistant' &&
+    lastGroup.message.isStreaming === true;
   const activityIndex = !showActivity
     ? -1
     : lastGroupIsAnswer

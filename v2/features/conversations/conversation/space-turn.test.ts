@@ -460,3 +460,18 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
   assert.match(screen, /onRegenerate=\{askAgain\}/);
   assert.match(readHere('ConversationComposer.tsx'), /explain: \(sentence\) => \{\s*setErrorText\(sentence\);\s*setErrorOpen\(true\);/);
 });
+
+/* ── The activity row sits above the answer being written, not a finished one ─ */
+
+test('the activity row goes above the last group only while that answer is being written', () => {
+  const list = readHere('MessageList.tsx');
+  assert.match(
+    list,
+    /const lastGroupIsAnswer =\s*lastGroup\?\.type === 'single' &&\s*lastGroup\.message\.role === 'assistant' &&\s*lastGroup\.message\.isStreaming === true;/,
+  );
+  // The reader's own turn: the engine's placeholder is the streaming row.
+  assert.match(
+    read('v2', 'runtime', 'chat-engine', 'engine.ts'),
+    /\{ id, role: 'assistant', content: '', timestamp: new Date\(\), isStreaming: true \}/,
+  );
+});
