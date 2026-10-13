@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
-import { isTopLevelRoute } from './top-level-route';
+import { hasOpenBar, isChatRoute } from './top-level-route';
 
 /**
  * ShellFrame — the shell's grid root, and the ONE element that says whether
@@ -30,7 +30,15 @@ import { isTopLevelRoute } from './top-level-route';
 export function ShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   return (
-    <div className={cn('v2-shell', isTopLevelRoute(pathname) && 'v2-shell--open')}>
+    <div
+      className={cn(
+        'v2-shell',
+        hasOpenBar(pathname) && 'v2-shell--open',
+        // A conversation scrolls in its own transcript, not in the content
+        // region, so the bar's room moves into that scroller (shell.css).
+        isChatRoute(pathname) && 'v2-shell--chat',
+      )}
+    >
       {children}
     </div>
   );

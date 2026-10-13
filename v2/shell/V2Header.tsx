@@ -30,7 +30,7 @@ import { useHeaderContext } from './header-context';
 import { useHeaderPlace, type HeaderPlace } from './header-place';
 import { FOCUS_RING } from './designs/modules';
 import { pushedScreenFor, type PushedScreen } from './pushed-route';
-import { isTopLevelRoute } from './top-level-route';
+import { hasOpenBar } from './top-level-route';
 import { useScreenContext } from './screen-context';
 
 /**
@@ -249,7 +249,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
    * `isPushed`. It is not asserted at runtime because it cannot be made true by
    * anything but an edit to one of the two tables, and both carry the rule.
    */
-  const isTopLevel = isTopLevelRoute(path);
+  // A conversation wears the same open bar (`hasOpenBar`): its title is in the
+  // transcript's masthead, so the centre stays empty here too.
+  const isTopLevel = hasOpenBar(path);
   // The two things a pushed screen's ADDRESS cannot know: a data-derived parent
   // and the screen's own menu rows. Guarded by the pathname it was published
   // for, so nothing here can outlive its screen.

@@ -312,6 +312,31 @@ html.v2-document-lock body {
     padding-top: var(--v2-bar-h);
   }
 
+  /* A CONVERSATION scrolls in its own transcript, never in the content region,
+     so padding the region would stop the messages at the bar's edge instead of
+     passing under its buttons. The bar's room moves inward: the chat's frame
+     (its screen, or its route skeleton) starts below the buttons, and a
+     transcript at the frame's top pulls back up under them and pads its own
+     scroller, so at rest the masthead sits below the buttons and the messages
+     pass under them as the reader scrolls, as a list's rows do (Stay, 13
+     October 2026). With the confidential banner above it the transcript
+     starts below the banner, as before. */
+  html.v2-document-lock .v2-shell--chat .v2-shell__content {
+    padding-top: 0;
+  }
+
+  html.v2-document-lock .v2-shell--chat [data-v2-chat-frame] {
+    padding-top: var(--v2-bar-h);
+  }
+
+  html.v2-document-lock .v2-shell--chat [data-v2-chat-list][data-under-bar] {
+    margin-top: calc(-1 * var(--v2-bar-h));
+  }
+
+  html.v2-document-lock .v2-shell--chat [data-v2-chat-list][data-under-bar] > [data-v2-chat-scroller] {
+    padding-top: var(--v2-bar-h);
+  }
+
   /* THE GLASS — the treatment that SHIPS (`data-v2-bar-treatment="blur"`).
      A pseudo-element rather than a child div, for the reason the dock's fade is
      one: its geometry is `calc()` against `env()`, which is a paragraph of

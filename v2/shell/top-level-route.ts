@@ -120,3 +120,20 @@ export function topLevelScreenFor(pathname: string): TopLevelScreen | null {
 export function isTopLevelRoute(pathname: string): boolean {
   return TOP_LEVEL.has(cleanPath(pathname));
 }
+
+/**
+ * A conversation, `/c/{id}`: personal or in a space. Not top-level (it is not
+ * in the table, and it publishes its own title, which the move-first clear for
+ * top-level screens must not wipe), but it wears the same OPEN BAR (Stay, 13
+ * October 2026: "remove the header from the top both here and regular single
+ * user chat too. it should look like the list page"). The chat's title and
+ * space move into the transcript's masthead (`ConversationMasthead`).
+ */
+export function isChatRoute(pathname: string): boolean {
+  return /^\/c\/[^/]+$/.test(cleanPath(pathname));
+}
+
+/** The see-through bar: every top-level screen, and a conversation. */
+export function hasOpenBar(pathname: string): boolean {
+  return isTopLevelRoute(pathname) || isChatRoute(pathname);
+}

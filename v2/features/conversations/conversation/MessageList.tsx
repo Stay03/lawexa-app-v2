@@ -9,6 +9,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from 'react';
 import { ArrowDown, RotateCcw, AlertCircle } from 'lucide-react';
@@ -202,6 +203,13 @@ export interface MessageListProps {
   /** When that colleague's turn started (epoch ms): the row's clock runs from
    *  it rather than from the rows this screen drew. */
   heldSince?: number | null;
+  /** The chat's own heading (title and space) at the top of the transcript,
+   *  where a list page carries its title; scrolls away with the messages. */
+  masthead?: ReactNode;
+  /** The transcript starts at the screen's top on a chat route, so its scroller
+   *  passes under the open bar (shell.css `.v2-shell--chat`); false when
+   *  something sits above it (the confidential banner). */
+  underBar?: boolean;
 }
 
 export function MessageList({
@@ -221,6 +229,8 @@ export function MessageList({
   viewerId,
   restingLabel,
   heldSince = null,
+  masthead = null,
+  underBar = false,
 }: MessageListProps) {
   // What this render draws (see OPEN_TAIL): until the first frame has been
   // painted, the newest messages only; from then on, all of them. Everything
@@ -550,10 +560,15 @@ export function MessageList({
   };
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      data-v2-chat-list=""
+      data-under-bar={underBar ? '' : undefined}
+    >
       <div
         ref={scrollRef}
         onScroll={handleScroll}
+        data-v2-chat-scroller=""
         className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         {/* Bottom padding clears the FLOATING composer that ConversationScreen lays
@@ -569,6 +584,11 @@ export function MessageList({
             anchorBottom && 'min-h-full justify-end',
           )}
         >
+          {/* The chat's heading. `mb-auto` keeps it at the top when a short chat's
+              rows sit at the bottom (`justify-end`), as a list's title sits at the
+              top of its page. */}
+          {masthead ? <div className="mb-auto">{masthead}</div> : null}
+
           {references.length > 0 && (
             <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
               <ReferenceChips references={references} />

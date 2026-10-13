@@ -7,6 +7,7 @@ import {
   useConversationController,
   type ConversationEmbed,
 } from './useConversationController';
+import { ConversationMasthead } from './ConversationMasthead';
 import { MessageList } from './MessageList';
 import { ConversationComposer, type ConversationComposerHandle } from './ConversationComposer';
 import { ComposerSkeleton } from './skeletons';
@@ -266,6 +267,7 @@ export function ConversationScreen({
         ref={screenRef}
         data-v2-marker="V2-CONVERSATION"
         data-conversation-id={conversationId}
+        data-v2-chat-frame=""
         className="relative flex h-full min-h-0 flex-col"
         style={externalComposer ? { ['--v2-conv-dock-h' as string]: '0px' } : undefined}
       >
@@ -332,6 +334,10 @@ export function ConversationScreen({
             viewerId={serverUserId}
             restingLabel={controller.turnLabel}
             heldSince={controller.heldSince}
+            // On its own route the chat carries its heading in the page, under the
+            // open bar; embedded (the case chat) the host owns the heading.
+            masthead={embed ? null : <ConversationMasthead />}
+            underBar={!embed && !controller.isConfidential}
           />
         </DocumentExportScope>
 
