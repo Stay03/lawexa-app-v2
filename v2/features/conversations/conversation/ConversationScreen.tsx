@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { memberColourIndex } from './member-colour';
 import {
   useConversationController,
   type ConversationEmbed,
@@ -91,6 +93,19 @@ export function ConversationScreen({
     error,
     retryLastMessage,
   } = stream;
+  // Each person's colour in a space chat (member-colour.ts): the roster's order,
+  // then anyone else who asked, by first appearance. A row this client drew for
+  // the reader carries no author yet, so it takes the reader's own uuid.
+  const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
+  const { spaceRoster } = controller;
+  const memberColours = useMemo(() => {
+    if (!spaceRoster) return null;
+    const asked: string[] = [];
+    for (const message of messages) {
+      if (message.role === 'user' && message.author?.uuid) asked.push(message.author.uuid);
+    }
+    return memberColourIndex(spaceRoster, asked);
+  }, [spaceRoster, messages]);
   // External-composer embedding (the case chat's ONE screen): the HOST owns the
   // composer element, this screen owns the conversation — so it renders the
   // transcript only and PUBLISHES its composer-facing surface through the
@@ -336,6 +351,8 @@ export function ConversationScreen({
             heldSince={controller.heldSince}
             // On its own route the chat carries its heading in the page, under the
             // open bar; embedded (the case chat) the host owns the heading.
+            memberColours={memberColours}
+            viewerUuid={viewerUuid}
             masthead={embed ? null : <ConversationMasthead />}
             underBar={!embed && !controller.isConfidential}
           />

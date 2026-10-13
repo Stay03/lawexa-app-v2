@@ -24,6 +24,8 @@ import { useSkeletonHold } from './skeleton-hold';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
+import { spacesQueries } from '@/v2/features/spaces/queries';
+import type { RosterEntry } from './member-colour';
 import {
   askAgainRefusal,
   askingLabel,
@@ -201,6 +203,9 @@ export interface ConversationController {
   /** Name who asked each user turn: a space chat whose record carries the B4
    *  fields. False on a personal chat, which looks exactly as before. */
   showAuthors: boolean;
+  /** The space's roster for each person's colour (member-colour.ts), or null:
+   *  a personal chat, or the roster not read yet. */
+  spaceRoster: readonly RosterEntry[] | null;
   /**
    * The colleague whose turn is streaming in this space chat, or null when
    * nothing streams or the turn is the reader's own. Drives "{name} is
@@ -767,6 +772,27 @@ export function useConversationController(
   const isSpaceMember = isSpaceChat && detailData?.my_space_role != null;
   const showAuthors = isSpaceChat && hasSpaceContract(detailData);
 
+  // The space's roster, for each person's colour (member-colour.ts): the Owner
+  // first, then by join time. One page of a hundred covers a space; anyone
+  // past it, or who has left, takes the next free colour by first appearance.
+  const spaceUuid = detailData?.space?.uuid ?? null;
+  const rosterQuery = useQuery({
+    ...spacesQueries.members(spaceUuid ?? '', { viewerId: serverUserId, per_page: 100 }),
+    enabled: showAuthors && spaceUuid !== null,
+  });
+  const rosterRows = rosterQuery.data?.data;
+  const spaceRoster = useMemo<readonly RosterEntry[] | null>(
+    () =>
+      showAuthors && rosterRows
+        ? rosterRows.map((member) => ({
+            uuid: member.user.uuid,
+            owner: member.role === 'owner' || member.content_role === 'owner',
+            joinedAt: member.joined_at ?? member.created_at,
+          }))
+        : null,
+    [showAuthors, rosterRows],
+  );
+
   const references = detailData?.references ?? NO_REFERENCES;
 
   // ── The skeleton gate (standing rule: never a skeleton over cached content). ──
@@ -1054,6 +1080,7 @@ export function useConversationController(
     viewOnlyReason: viewOnlyReason(detailData),
     isSpaceChat,
     showAuthors,
+    spaceRoster,
     sendHeldBy: heldBy,
     heldSince,
     turnLabel,

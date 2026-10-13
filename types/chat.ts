@@ -846,6 +846,10 @@ export interface MessagesListResponse {
 // Author information for shared conversations
 export interface ConversationAuthor {
   id: number;
+  /** The person's uuid, for the space's owner and members only (backend
+   *  a9a0b96): it matches the space roster, so a space chat gives each person
+   *  their colour (member-colour.ts). */
+  uuid?: string;
   name: string;
   avatar_url: string | null;
 }

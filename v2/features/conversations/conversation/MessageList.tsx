@@ -206,6 +206,11 @@ export interface MessageListProps {
   /** The chat's own heading (title and space) at the top of the transcript,
    *  where a list page carries its title; scrolls away with the messages. */
   masthead?: ReactNode;
+  /** Each person's colour index in a space chat, by uuid (member-colour.ts);
+   *  null on a personal chat, whose bubbles stay plain. */
+  memberColours?: ReadonlyMap<string, number> | null;
+  /** The reader's uuid, for the turns this client drew (they carry no author). */
+  viewerUuid?: string | null;
   /** The transcript starts at the screen's top on a chat route, so its scroller
    *  passes under the open bar (shell.css `.v2-shell--chat`); false when
    *  something sits above it (the confidential banner). */
@@ -231,7 +236,16 @@ export function MessageList({
   heldSince = null,
   masthead = null,
   underBar = false,
+  memberColours = null,
+  viewerUuid = null,
 }: MessageListProps) {
+  // A user turn's colour: its author's, or the reader's own for a row this
+  // client drew (no author key yet). A withheld author (null) has none.
+  const colourOf = (message: EngineMessage): number | null => {
+    if (!memberColours || message.role !== 'user') return null;
+    const uuid = message.author === undefined ? viewerUuid : message.author?.uuid;
+    return uuid ? (memberColours.get(uuid) ?? null) : null;
+  };
   // What this render draws (see OPEN_TAIL): until the first frame has been
   // painted, the newest messages only; from then on, all of them. Everything
   // below reads this list, so the scroll and pill logic always describe what
@@ -640,6 +654,7 @@ export function MessageList({
                       onRetry={onRetry}
                       showAuthor={showAuthors}
                       viewerId={viewerId}
+                      colourIndex={group.type === 'single' ? colourOf(group.message) : null}
                     />
                   </Fragment>
                 ))}
@@ -755,6 +770,7 @@ const GroupRow = memo(function GroupRow({
   onRetry,
   showAuthor,
   viewerId,
+  colourIndex,
 }: {
   group: MessageGroup;
   virtualize: boolean;
@@ -768,6 +784,8 @@ const GroupRow = memo(function GroupRow({
   onRetry: () => void;
   showAuthor: boolean;
   viewerId: number | null;
+  /** A user turn's member colour in a space chat (member-colour.ts), or null. */
+  colourIndex: number | null;
 }) {
   // Native windowing for off-screen rows; `auto` remembers measured height so a
   // scrolled-away row returns to the exact same size (no jump).
@@ -793,7 +811,14 @@ const GroupRow = memo(function GroupRow({
         <ErrorRow message={message as ErrorMessage} onRetry={onRetry} isStreaming={isStreaming} />
       );
     } else if (message.role === 'user') {
-      body = <UserMessageRow message={message} showAuthor={showAuthor} viewerId={viewerId} />;
+      body = (
+        <UserMessageRow
+          message={message}
+          showAuthor={showAuthor}
+          viewerId={viewerId}
+          colourIndex={colourIndex}
+        />
+      );
     } else {
       body = (
         <AssistantMessageRow

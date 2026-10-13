@@ -176,7 +176,7 @@ test('labels need the B4 fields on the record', () => {
 test('the list hands every user row the flag and the viewer; the row draws the line only then', () => {
   const list = readHere('MessageList.tsx');
   assert.match(list, /showAuthor=\{showAuthors\}\s+viewerId=\{viewerId\}/);
-  assert.match(list, /<UserMessageRow message=\{message\} showAuthor=\{showAuthor\} viewerId=\{viewerId\} \/>/);
+  assert.match(list, /<UserMessageRow\s+message=\{message\}\s+showAuthor=\{showAuthor\}\s+viewerId=\{viewerId\}\s+colourIndex=\{colourIndex\}\s*\/>/);
   const row = readHere(join('rows', 'UserMessageRow.tsx'));
   assert.match(row, /const author = showAuthor \? authorLine\(message\.author, viewerId\) : null;/);
   assert.match(row, /\{author\.person \? \(\s*<MemberAvatar/);

@@ -6,6 +6,7 @@ import { formatMessageTimestamp } from '@/lib/utils/date';
 import type { ChatMessage } from '@/types/chat';
 import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import { PastedContentCard } from '../PastedContentCard';
+import { memberStyle } from '../member-colour';
 import { authorLine } from '../space-turn';
 import { SentAttachments } from './SentAttachments';
 
@@ -36,17 +37,28 @@ const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
  */
 const ATTACHMENT_MARKER = /\s*<attached_(?:image|document)\b[^>]*\/>/g;
 
-function UserMessageBubble({ content }: { content: string }) {
+/** The bubble's ground: the member's colour in a space chat (the row sets the
+ *  `--member-*` properties), else the plain muted one. */
+const BUBBLE_GROUND = {
+  plain: 'bg-muted',
+  member: 'bg-[var(--member-bg)] dark:bg-[var(--member-bg-dark)]',
+} as const;
+const FADE_GROUND = {
+  plain: 'from-muted',
+  member: 'from-[var(--member-bg)] dark:from-[var(--member-bg-dark)]',
+} as const;
+
+function UserMessageBubble({ content, tint }: { content: string; tint: 'plain' | 'member' }) {
   const [expanded, setExpanded] = useState(false);
   const shouldTruncate = content.length > USER_MESSAGE_TRUNCATE_LENGTH;
 
   return (
-    <div className="bg-muted text-foreground rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words">
+    <div className={cn(BUBBLE_GROUND[tint], 'text-foreground rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words')}>
       {shouldTruncate && !expanded ? (
         <div>
           <div className="relative max-h-[200px] overflow-hidden">
             {content.slice(0, USER_MESSAGE_TRUNCATE_LENGTH)}
-            <div className="from-muted absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t to-transparent" />
+            <div className={cn(FADE_GROUND[tint], 'absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t to-transparent')} />
           </div>
           <button
             onClick={() => setExpanded(true)}
@@ -76,15 +88,20 @@ export function UserMessageRow({
   message,
   showAuthor,
   viewerId,
+  colourIndex = null,
 }: {
   message: ChatMessage;
   /** A space chat on a server with B4: name who asked (space-turn.ts). */
   showAuthor: boolean;
   /** The server-verified viewer, whose own turns read "You". */
   viewerId: number | null;
+  /** The asker's colour in a space chat (member-colour.ts); null keeps the
+   *  plain bubble, as on a personal chat. */
+  colourIndex?: number | null;
 }) {
   const [showTime, setShowTime] = useState(false);
   const author = showAuthor ? authorLine(message.author, viewerId) : null;
+  const tint = colourIndex === null ? 'plain' : 'member';
 
   const hasFiles = (message.attachments?.length ?? 0) > 0 || message.attachment !== undefined;
   const displayContent = stripContextTags(
@@ -104,9 +121,16 @@ export function UserMessageRow({
     <div
       onClick={() => setShowTime((v) => !v)}
       className="group flex flex-col items-end"
+      style={colourIndex === null ? undefined : memberStyle(colourIndex)}
     >
       {author ? (
-        <div className="text-muted-foreground mb-1 flex min-w-0 max-w-full items-center gap-1.5 text-xs">
+        <div
+          className={cn(
+            'mb-1 flex min-w-0 max-w-full items-center gap-1.5 text-xs',
+            // The name in the asker's ink, so the line and the bubble read as one person.
+            tint === 'member' ? 'text-[var(--member-ink)] dark:text-[var(--member-ink-dark)]' : 'text-muted-foreground',
+          )}
+        >
           {author.person ? (
             <MemberAvatar
               user={author.person}
@@ -128,13 +152,13 @@ export function UserMessageRow({
             ))}
           </div>
           {remainingText && (
-            <div className="bg-muted text-foreground mt-1.5 rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words">
+            <div className={cn(BUBBLE_GROUND[tint], 'text-foreground mt-1.5 rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words')}>
               {remainingText}
             </div>
           )}
         </>
       ) : (
-        <UserMessageBubble content={displayContent} />
+        <UserMessageBubble content={displayContent} tint={tint} />
       )}
 
       {attachments.length > 0 && <SentAttachments attachments={attachments} />}
