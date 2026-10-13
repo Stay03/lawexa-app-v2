@@ -36,7 +36,8 @@ test('the screen never publishes a null title over the one the tap set', () => {
 
 test('list rows replay their entrance only on a first load', () => {
   assert.match(listScreen, /const \[revealRows\] = useState\(\(\) => query\.isPending\);/);
-  assert.match(listScreen, /reveal=\{revealRows\}/);
+  // And then only a row the list has not shown (use-fresh-ids.ts).
+  assert.match(listScreen, /reveal=\{revealRows && freshIds\.has\(conversation\.id\)\}/);
   assert.match(rows, /!exiting && reveal && cn\(REVEAL, 'duration-300'\)/);
   // The hook sits above the guest early return (rules of hooks).
   assert.ok(listScreen.indexOf('const [revealRows]') < listScreen.indexOf('if (!signedIn) {'));

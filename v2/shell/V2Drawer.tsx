@@ -29,6 +29,7 @@ import {
   useCollabNavSignal,
 } from '@/v2/features/channels/my-channels/nav-signal';
 import { uniqueRowsById } from '@/v2/features/conversations/activity';
+import { useFreshIds } from '@/v2/runtime/use-fresh-ids';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
@@ -161,6 +162,9 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   const NewChatIcon = v2NewChat.icon;
   // Each chat once: a bump can move a row a later page still holds (activity.ts).
   const recents = uniqueRowsById(recentsQuery.data?.pages.flatMap((page) => page.data) ?? []);
+  // Only a chat the list has not shown fades in: a chat moving to the top must
+  // not replay the rows it passed (use-fresh-ids.ts).
+  const freshIds = useFreshIds(recents.map((row) => row.id));
   // Same filter, same source, same server-verified role as the rail — see
   // `visibleNavItems`. The two surfaces cannot drift on what exists.
   const navItems = visibleNavItems({
@@ -345,7 +349,8 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                         onMove={close}
                         className={cn(
                           ROW_BASE,
-                          'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+                          freshIds.has(conversation.id) &&
+                            'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
                           active
                             ? 'bg-primary/10 font-medium text-primary'
                             : 'text-muted-foreground hover:bg-muted hover:text-foreground',

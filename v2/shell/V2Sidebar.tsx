@@ -37,6 +37,7 @@ import {
   useCollabNavSignal,
 } from '@/v2/features/channels/my-channels/nav-signal';
 import { uniqueRowsById } from '@/v2/features/conversations/activity';
+import { useFreshIds } from '@/v2/runtime/use-fresh-ids';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import type { SessionUser } from '@/v2/runtime/session';
 import { LogoWordmark } from './Logo';
@@ -173,6 +174,12 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
   // the rail and the drawer can no more drift on what a row SAYS than on which
   // rows exist. Above the mobile early-return, because hooks are unconditional.
   const collabSignal = useCollabNavSignal();
+  // Each chat once: a bump can move a row a later page still holds (activity.ts).
+  const recents = uniqueRowsById(recentsQuery.data?.pages.flatMap((page) => page.data) ?? []);
+  // Only a chat the list has not shown fades in: a chat moving to the top must
+  // not replay the rows it passed (use-fresh-ids.ts). Above the mobile
+  // early-return too.
+  const freshIds = useFreshIds(recents.map((row) => row.id));
 
   if (isMobile) return null;
 
@@ -180,8 +187,6 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
     pathname === href || pathname.startsWith(`${href}/`);
 
   const NewChatIcon = v2NewChat.icon;
-  // Each chat once: a bump can move a row a later page still holds (activity.ts).
-  const recents = uniqueRowsById(recentsQuery.data?.pages.flatMap((page) => page.data) ?? []);
   // Role-gated rows (Quiz's research-account soft launch) are filtered from the
   // ONE config, with the SERVER-verified role the layout already threaded in —
   // so the rail and the drawer can never disagree about what exists.
@@ -313,7 +318,10 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                   return (
                     <SidebarMenuItem
                       key={conversation.id}
-                      className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+                      className={cn(
+                        freshIds.has(conversation.id) &&
+                          'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+                      )}
                     >
                       <SidebarMenuButton
                         asChild

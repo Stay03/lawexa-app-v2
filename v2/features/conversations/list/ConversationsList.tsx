@@ -16,6 +16,7 @@ import { NewRowsPill } from '@/v2/shell/NewRowsPill';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { lastActivityRank, uniqueRowsById } from '@/v2/features/conversations/activity';
+import { useFreshIds } from '@/v2/runtime/use-fresh-ids';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { DeleteConversationDialog } from '@/v2/features/conversations/DeleteConversationDialog';
 import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
@@ -204,6 +205,9 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   // that mounts with its rows already in the cache (coming back to it) shows
   // them in place; read once, at mount, so later pages do not change it.
   const [revealRows] = useState(() => query.isPending);
+  // And then only a row the list has not shown: a chat moving to the top must
+  // not replay the rows it passed (use-fresh-ids.ts).
+  const freshIds = useFreshIds(presented.map(({ row }) => row.id));
 
   if (!signedIn) {
     return (
@@ -282,7 +286,7 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
                 now={now}
                 index={index}
                 exiting={exiting}
-                reveal={revealRows}
+                reveal={revealRows && freshIds.has(conversation.id)}
                 showSpace
                 onDelete={() => setDeleteTarget(conversation.id)}
                 onMove={

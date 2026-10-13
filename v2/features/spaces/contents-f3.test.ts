@@ -382,7 +382,7 @@ test('a chat in a space names it under its title, and its owner can move it', ()
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
   assert.match(row, /const spaceName = showSpace && !is_confidential \? \(conversation\.space\?\.name \?\? null\) : null;/);
   const list = read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx');
-  assert.match(list, /reveal=\{revealRows\}\s*showSpace/);
+  assert.match(list, /reveal=\{revealRows && freshIds\.has\(conversation\.id\)\}\s*showSpace/);
 });
 
 test('the header place belongs to the chat that published it', () => {
