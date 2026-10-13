@@ -56,6 +56,7 @@ export function KeyboardDebugReadout() {
         parseFloat(root.getPropertyValue('--visual-height'));
       const heldTop = card?.style.getPropertyValue('--v2-case-chat-held-top') ?? '';
       const heldHeight = card?.style.getPropertyValue('--v2-case-chat-held-height') ?? '';
+      const heldPad = card?.style.getPropertyValue('--v2-case-chat-held-pad') ?? '';
       const box = composerFocused ? active.getBoundingClientRect() : null;
       const slot = card?.firstElementChild ?? null;
       output.textContent = [
@@ -65,6 +66,7 @@ export function KeyboardDebugReadout() {
         `card h ${card ? card.offsetHeight : 'none'}`,
         `held ${heldTop || heldHeight ? `${heldTop} ${heldHeight}` : 'none'}`,
         `rising ${card?.getAttribute('data-keyboard') ?? 'no'}`,
+        `pad ${heldPad || 'none'}`,
         `box ${box ? `top ${Math.round(box.top)} h ${Math.round(box.height)} bottom ${Math.round(box.bottom)}` : 'none'}`,
         `html bg ${root.backgroundColor || 'none'}`,
         `slot opacity ${slot ? getComputedStyle(slot).opacity : 'none'}`,

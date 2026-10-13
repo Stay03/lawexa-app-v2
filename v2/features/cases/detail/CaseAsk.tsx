@@ -39,6 +39,9 @@ const KEYBOARD_RISE_MS = 350;
  */
 const KEYBOARD_SETTLE_CAP_MS = 1000;
 
+/** The bar and middle's one fade in while they ride up with the keyboard. */
+const SLOT_RIDE_FADE_MS = 200;
+
 /**
  * CaseAskDock — the case chat's one screen (`CaseChatCore`) as a dock at the
  * bottom of the case page: closed pill, new-chat view, and open conversation
@@ -120,6 +123,8 @@ export function CaseAskDock({
   const stageRef = useRef<ConversationComposerHandle | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  /** The phone screen's bar and middle, faded in once as they ride the keyboard. */
+  const slotRef = useRef<HTMLDivElement | null>(null);
 
   // THE PAGE KEEPS ITS LENGTH WHILE THE CARD IS OUT OF THE FLOW. The resting
   // dock is the end of the case column, so its height is part of the
@@ -284,6 +289,7 @@ export function CaseAskDock({
     return () => {
       card.style.removeProperty('--v2-case-chat-held-top');
       card.style.removeProperty('--v2-case-chat-held-height');
+      card.style.removeProperty('--v2-case-chat-held-pad');
     };
   }, [screenOpen, screenMounted]);
 
@@ -303,20 +309,30 @@ export function CaseAskDock({
   // not change): it covers the page in every frame of the pan, and the
   // composer at its bottom rides iOS's pan. The pan trails the keyboard, so
   // the composer comes up from under the keyboard's edge; no page event can
-  // see that. Its bar and middle are transparent (`data-keyboard`). The card
-  // takes the visible geometry once iOS's numbers agree with it, top plus
-  // height at its bottom: at KEYBOARD_RISE_MS if they do by then, else at
-  // the first viewport event that makes them agree, and at
+  // see that. The card takes the visible geometry once iOS's numbers agree
+  // with it, top plus height at its bottom: at KEYBOARD_RISE_MS if they do by
+  // then, else at the first viewport event that makes them agree, and at
   // KEYBOARD_SETTLE_CAP_MS whatever they say. Its bottom edge is the same
-  // then, so the composer does not move, and the bar and middle fade in
-  // once. A deep link (`?chat=` at load) focuses nothing and opens as before.
+  // then, so the composer does not move. A deep link (`?chat=` at load)
+  // focuses nothing and opens as before.
+  //
+  // THE BAR AND MIDDLE RIDE THE KEYBOARD UP. They sit in the card's top, so
+  // iOS's 390 pt pan carried all of them off the screen, and they used to be
+  // hidden for the whole rise: half a second of an empty card with only the
+  // composer (Arthur's iPhone Xs Max, home-screen app, 13 October 2026). At
+  // the first viewport event that shows the keyboard (`ride`), the card gets
+  // a top padding of the part the keyboard will cover, so they are laid out
+  // in the band it leaves visible, the released card's own rect: the pan
+  // brings them up with the keyboard, they fade in once on the way, and the
+  // release moves nothing (`data-keyboard="riding"`). From the tap to that
+  // event they are transparent (`"rising"`).
   //
   // EVERY RISE HOLDS, NOT ONLY THE OPEN. The tap that opens the chat starts
   // one at once. A later focus of a box in the open card while the keyboard
   // is down (after Done, or a blur) starts one too, and its bar and middle
-  // go transparent at the first viewport event that shows the keyboard
-  // coming, so a focus that raises no keyboard (a desktop window, Android's
-  // one resize of the layout viewport) changes nothing on screen.
+  // ride only from the first viewport event that shows the keyboard coming,
+  // so a focus that raises no keyboard (a desktop window, Android's one
+  // resize of the layout viewport) changes nothing on screen.
   //
   // THE HOLD ENDS EARLY IF THE KEYBOARD STOPS RISING: the box losing focus
   // (the keyboard goes down) or the visible width changing (a rotation,
@@ -348,16 +364,37 @@ export function CaseAskDock({
       card.style.setProperty('--v2-case-chat-held-height', '100dvh');
       if (rising) card.setAttribute('data-keyboard', 'rising');
       let risen = false;
+      let riding = false;
       let riseTimer = 0;
       let capTimer = 0;
+      // The bar and middle ride in the band the keyboard leaves visible: a
+      // top padding of the part the keyboard will cover lays them out in the
+      // card's bottom, where the released card puts them, so iOS's pan brings
+      // them up with the keyboard and the release moves nothing. They cut to
+      // transparent here and fade in once on the way up.
+      const ride = (pad: number): void => {
+        riding = true;
+        card.style.setProperty('--v2-case-chat-held-pad', `${pad}px`);
+        card.setAttribute('data-keyboard', 'riding');
+        const slot = slotRef.current;
+        if (!slot) return;
+        // This fade replaces any still running, such as the open's mount fade,
+        // so the slot fades in once.
+        for (const animation of slot.getAnimations()) animation.cancel();
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          slot.animate([{ opacity: 0 }, { opacity: 1 }], {
+            duration: SLOT_RIDE_FADE_MS,
+            easing: 'ease-out',
+          });
+        }
+      };
       const onViewport = (): void => {
         if (viewport?.width !== width) {
           release();
           return;
         }
-        if (published('--visual-height') < card.offsetHeight - 1) {
-          card.setAttribute('data-keyboard', 'rising');
-        }
+        const covered = card.offsetHeight - published('--visual-height');
+        if (!riding && covered > 1) ride(covered);
         if (risen && agrees()) release();
       };
       const onRisen = (): void => {
@@ -377,6 +414,7 @@ export function CaseAskDock({
         stop();
         card.style.removeProperty('--v2-case-chat-held-top');
         card.style.removeProperty('--v2-case-chat-held-height');
+        card.style.removeProperty('--v2-case-chat-held-pad');
       };
       riseTimer = window.setTimeout(onRisen, KEYBOARD_RISE_MS);
       capTimer = window.setTimeout(release, KEYBOARD_SETTLE_CAP_MS);
@@ -469,7 +507,7 @@ export function CaseAskDock({
               // way open over the judgment. The status bar's inset pads the
               // bar, not the card, so the card's colour reaches the top edge.
               cn(
-                'fixed inset-x-0 z-40 flex flex-col bg-popover pt-[env(safe-area-inset-top,0px)]',
+                'fixed inset-x-0 z-40 flex flex-col bg-popover',
                 // Closing, the whole card fades out once, colour and all, and
                 // takes no tap on the way; its last frame is held until it
                 // leaves the screen (CaseScreen's holdover, a shade past
@@ -495,6 +533,11 @@ export function CaseAskDock({
                 // effects).
                 top: 'var(--v2-case-chat-held-top, var(--visual-top, 0px))',
                 height: 'var(--v2-case-chat-held-height, var(--visual-height, 100dvh))',
+                // The status bar's inset, plus, while the keyboard rises, the
+                // part of the held card the keyboard will cover (the hold
+                // effect's `ride`), so the bar and middle sit where the
+                // released card will put them.
+                paddingTop: 'calc(env(safe-area-inset-top, 0px) + var(--v2-case-chat-held-pad, 0px))',
               }
             : undefined
         }
@@ -504,11 +547,23 @@ export function CaseAskDock({
         {screenMounted ? (
           // Opening, the bar and middle fade in on the opaque card; closing,
           // the card fades as a whole, so this slot has no exit of its own.
-          // While the keyboard rises the slot is transparent, and takes no
-          // tap, and it fades in once when the rise ends; on a later rise it
-          // fades out first. A deep link has no hold, so the mount fade shows
-          // it. Reduced motion: it appears and goes at the switch.
-          <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-[keyboard=rising]:pointer-events-none in-data-[keyboard=rising]:opacity-0">
+          // From the tap until iOS reports the keyboard (`rising`) the slot is
+          // transparent; from then (`riding`) it is laid out in the band the
+          // keyboard leaves visible and fades in once, by script, as it rides
+          // up, with its CSS transition off so nothing else animates. A rise
+          // no keyboard follows (Android's one resize, a focus with no
+          // keyboard) never rides: the slot fades in at the release as before.
+          // It takes no tap until the release, in both states: while riding the
+          // bar and transcript are VISIBLE but still ignore taps, for up to
+          // KEYBOARD_SETTLE_CAP_MS (1 s) when iOS's numbers are slow to agree;
+          // before riding, only the invisible `rising` state blocked them. The
+          // composer is outside this slot, so typing is never blocked. A deep
+          // link has no hold, so the mount fade shows it. Reduced motion: it
+          // appears at the switch.
+          <div
+            ref={slotRef}
+            className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-[keyboard]:pointer-events-none in-data-[keyboard=rising]:opacity-0 in-data-[keyboard=riding]:transition-none"
+          >
             <CaseChatBar
               view={view}
               onBack={() => onOpenChat('new')}

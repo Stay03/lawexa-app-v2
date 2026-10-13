@@ -125,9 +125,11 @@ test('the open card is full size and opaque from its first frame, whatever is lo
   const card = styles.find((body) => body.includes('--visual-top'));
   assert.ok(card, 'the fixed card has a style of its own');
   const keys = [...card.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]);
-  assert.deepEqual(keys, ['top', 'height']);
+  assert.deepEqual(keys, ['top', 'height', 'paddingTop']);
   assert.match(card, /top: 'var\(--v2-case-chat-held-top, var\(--visual-top, 0px\)\)'/);
   assert.match(card, /height: 'var\(--v2-case-chat-held-height, var\(--visual-height, 100dvh\)\)'/);
+  // The status bar's inset, plus the riding pad while the keyboard rises.
+  assert.match(card, /paddingTop: 'calc\(env\(safe-area-inset-top, 0px\) \+ var\(--v2-case-chat-held-pad, 0px\)\)'/);
   // The held pair has two writers, the hold effect (a keyboard's rise) and the
   // close effect, and one reader, this style.
   assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-top'/g)?.length, 2);
@@ -139,7 +141,7 @@ test('the open card is full size and opaque from its first frame, whatever is lo
   assert.match(core, /className="min-h-0 flex-1 motion-safe:animate-in/);
   assert.match(core, /className="v2-quiet-scroll h-full min-h-0 overflow-y-auto overscroll-contain px-4 py-4"/);
   // No colour fade on the phone card: the page never shows through it.
-  assert.match(ask, /'fixed inset-x-0 z-40 flex flex-col bg-popover pt-\[env\(safe-area-inset-top,0px\)\]'/);
+  assert.match(ask, /'fixed inset-x-0 z-40 flex flex-col bg-popover'/);
   assert.match(ask, /'mx-auto w-full max-w-\[26rem\] rounded-2xl border transition-\[background-color,box-shadow,border-color\] duration-300/);
   assert.equal(ask.match(/transition-\[background-color/g)?.length, 1, "the colour transition is the floating card's only");
 });
@@ -373,7 +375,7 @@ test('a close freezes the card at its measured top and height before the keyboar
   // Dropped when the card leaves the screen or opens again mid-fade (the deps).
   assert.match(
     effect,
-    /return \(\) => \{\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*\};\s*\}, \[screenOpen, screenMounted\]\);$/,
+    /return \(\) => \{\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-pad'\);\s*\};\s*\}, \[screenOpen, screenMounted\]\);$/,
   );
   // Every close path runs it: each one ends `panelOpen` (`chat` null) first.
   assert.match(ask, /const screenOpen = screen && panelOpen;/);
@@ -401,11 +403,11 @@ test('the whole card fades out once, colour included; reduced motion skips the f
   // fades with the contents.
   assert.match(
     ask,
-    /'fixed inset-x-0 z-40 flex flex-col bg-popover pt-\[env\(safe-area-inset-top,0px\)\]',\s*'data-\[state=closed\]:pointer-events-none data-\[state=closed\]:motion-safe:animate-out data-\[state=closed\]:motion-safe:fade-out data-\[state=closed\]:motion-safe:duration-200 data-\[state=closed\]:fill-mode-forwards data-\[state=closed\]:motion-reduce:invisible',/,
+    /'fixed inset-x-0 z-40 flex flex-col bg-popover',\s*'data-\[state=closed\]:pointer-events-none data-\[state=closed\]:motion-safe:animate-out data-\[state=closed\]:motion-safe:fade-out data-\[state=closed\]:motion-safe:duration-200 data-\[state=closed\]:fill-mode-forwards data-\[state=closed\]:motion-reduce:invisible',/,
   );
   // Once: the panel slot inside has no exit of its own, only the opening fade.
   assert.equal(ask.match(/animate-out/g)?.length, 1);
-  assert.match(ask, /<div className="flex min-h-0 flex-1 flex-col [^"]*motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200[^"]*">/);
+  assert.match(ask, /<div\s+ref=\{slotRef\}\s+className="flex min-h-0 flex-1 flex-col [^"]*motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200[^"]*"\s*>/);
   // The opening is as it was: the card's colour is on from the first frame.
   assert.doesNotMatch(ask, /data-\[state=open\]/);
 });
@@ -447,7 +449,7 @@ test('the composer is never remounted: one node, at a fixed place in the card', 
   // comment as `{}`.)
   assert.match(
     ask,
-    /\{screenMounted \? \(\s*<div className=\"flex min-h-0 flex-1 flex-col[\s\S]*?\) : panelMounted \? \([\s\S]*?\) : null\}\s*(?:\{\}\s*)?<CaseChatComposerDock\s+view=\{view\}/,
+    /\{screenMounted \? \(\s*<div\s+ref=\{slotRef\}\s+className=\"flex min-h-0 flex-1 flex-col[\s\S]*?\) : panelMounted \? \([\s\S]*?\) : null\}\s*(?:\{\}\s*)?<CaseChatComposerDock\s+view=\{view\}/,
   );
   assert.equal(ask.match(/<CaseChatComposerDock/g)?.length, 1);
   const dock = ask.slice(ask.indexOf('<CaseChatComposerDock'), ask.indexOf('/>', ask.indexOf('<CaseChatComposerDock')));
@@ -542,10 +544,10 @@ test('a rise holds the card at the layout viewport, a length, until iOS reports 
   assert.equal(effect.match(/window\.setTimeout\(/g)?.length, 2, 'the rise and the cap, no other timer');
   // The numbers are read from the root's inline style, where the hook writes them.
   assert.match(effect, /parseFloat\(document\.documentElement\.style\.getPropertyValue\(name\)\)/);
-  // Released: the held pair and the attribute go.
+  // Released: the held pair, the riding pad and the attribute go.
   assert.match(
     effect,
-    /const release = \(\): void => \{\s*stop\(\);\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*\};/,
+    /const release = \(\): void => \{\s*stop\(\);\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-pad'\);\s*\};/,
   );
   assert.match(
     effect,
@@ -572,13 +574,45 @@ test('a later rise holds too: a focus of a box in the open card while the keyboa
     /const keyboardDown = \(\): boolean =>\s*published\('--visual-top'\) === 0 &&\s*Math\.abs\(published\('--visual-height'\) - card\.offsetHeight\) <= 1;/,
   );
   assert.equal(effect.match(/(?<![\w.])hold\(/g)?.length, 2, 'the tap and the later focus');
-  // Its bar and middle go transparent only at a viewport event that shows the
-  // keyboard coming, so a focus that raises none (a desktop window, Android's one
-  // resize) changes nothing on screen.
+  // Its bar and middle ride only from a viewport event that shows the keyboard
+  // coming (more than 1 px of the card covered), and once per rise, so a focus that
+  // raises none (a desktop window, Android's one resize, where the layout viewport
+  // and 100dvh shrink together) changes nothing on screen.
   assert.match(
     effect,
-    /if \(published\('--visual-height'\) < card\.offsetHeight - 1\) \{\s*card\.setAttribute\('data-keyboard', 'rising'\);\s*\}/,
+    /const covered = card\.offsetHeight - published\('--visual-height'\);\s*if \(!riding && covered > 1\) ride\(covered\);/,
   );
+  assert.equal(effect.match(/(?<![\w.])ride\(/g)?.length, 1, 'one call site');
+  // A later rise that raises no keyboard sets no attribute at all.
+  assert.match(effect, /if \(rising\) card\.setAttribute\('data-keyboard', 'rising'\);/);
+  assert.match(effect, /if \(stopHold === null && box instanceof HTMLTextAreaElement && keyboardDown\(\)\) \{\s*hold\(box, false\);/);
+});
+
+test('the bar and middle ride the keyboard up: laid out in the visible band, one fade, nothing moves at the release', () => {
+  const effect = openEffect();
+  // The pad is the part of the held card the keyboard will cover; written with the
+  // riding state and the one fade, which reduced motion skips.
+  assert.match(
+    effect,
+    /const ride = \(pad: number\): void => \{\s*riding = true;\s*card\.style\.setProperty\('--v2-case-chat-held-pad', `\$\{pad\}px`\);\s*card\.setAttribute\('data-keyboard', 'riding'\);\s*const slot = slotRef\.current;\s*if \(!slot\) return;[\s\S]*?for \(const animation of slot\.getAnimations\(\)\) animation\.cancel\(\);\s*if \(!window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\) \{\s*slot\.animate\(\[\{ opacity: 0 \}, \{ opacity: 1 \}\], \{\s*duration: SLOT_RIDE_FADE_MS,/,
+  );
+  assert.match(ask, /const SLOT_RIDE_FADE_MS = 200;/);
+  assert.equal(ask.match(/\.animate\(/g)?.length, 1, 'the one scripted fade');
+  // The pad has one writer (ride) and two removers, the release (every way a hold
+  // ends: the rise, the cap, a blur, a width change) and the close effect's
+  // cleanup; it is read once, by the card's padding.
+  assert.equal(ask.match(/setProperty\('--v2-case-chat-held-pad'/g)?.length, 1);
+  assert.equal(ask.match(/removeProperty\('--v2-case-chat-held-pad'\)/g)?.length, 2);
+  assert.equal(ask.match(/var\(--v2-case-chat-held-pad,/g)?.length, 1);
+  // While riding, the slot's CSS transition is off, so the scripted fade is the only
+  // animation; its opacity is not touched at the release, so nothing fades there.
+  assert.match(ask, /in-data-\[keyboard=riding\]:transition-none/);
+  assert.doesNotMatch(ask, /in-data-\[keyboard=riding\]:opacity/);
+  // Desktop xl is untouched: the hold runs only for the phone screen.
+  assert.match(ask, /const screenOpen = screen && panelOpen;/);
+  assert.match(effect, /^useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card\) return;/);
+  // The readout prints the pad.
+  assert.match(detail('KeyboardDebugReadout.tsx'), /`pad \$\{heldPad \|\| 'none'\}`/);
 });
 
 test('the hold cut short by a blur of the box ends it at once, on the visible viewport', () => {
@@ -620,16 +654,16 @@ test('a close during the hold leaves the held pair for the close effect, which f
   assert.doesNotMatch(stop, /removeProperty/);
   const close = closeEffect();
   assert.match(close, /const rect = card\.getBoundingClientRect\(\);\s*card\.style\.setProperty\('--v2-case-chat-held-top', `\$\{rect\.top\}px`\);/);
-  assert.match(close, /return \(\) => \{\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*\};/);
+  assert.match(close, /return \(\) => \{\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-pad'\);\s*\};/);
   // Every falling edge of screenOpen runs the close path, so a pair left on the card
   // never outlives the close: it is gone before any later open.
   assert.match(close, /const closed = wasScreenOpen\.current && !screenOpen;/);
 });
 
-test('the slot is transparent and takes no tap during the hold, then fades in once; reduced motion, no fade', () => {
+test('the slot is transparent until iOS reports the keyboard, takes no tap during the hold, and fades in once; reduced motion, no fade', () => {
   assert.match(
     ask,
-    /<div className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-\[keyboard=rising\]:pointer-events-none in-data-\[keyboard=rising\]:opacity-0">/,
+    /<div\s+ref=\{slotRef\}\s+className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-\[keyboard\]:pointer-events-none in-data-\[keyboard=rising\]:opacity-0 in-data-\[keyboard=riding\]:transition-none"\s*>/,
   );
   // The deep link keeps the mount fade; nothing slides.
   assert.doesNotMatch(ask, /slide-in|slide-out/);
