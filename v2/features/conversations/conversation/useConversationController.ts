@@ -470,8 +470,15 @@ export function useConversationController(
   // recovery path, where `recoverPendingState` re-attaches to the live execution —
   // the same path that recovers a reload-mid-stream. A per-mount `cancelled` flag
   // guards the async work against a unmount landing setState after teardown.
+  //
+  // `liveRef` names the conversation this mount is showing, for async work that
+  // starts outside this effect (a 409's follow, `takeRefusal`): set here, cleared
+  // in the cleanup, so work that resolves after the reader left never attaches
+  // to a turn nobody draws, or into another chat's transcript.
+  const liveRef = useRef<string | null>(null);
   useEffect(() => {
     let cancelled = false;
+    liveRef.current = conversationId;
 
     const { message, executionId, attachments } = readConvInit(conversationId);
     setConversationId(conversationId);
@@ -489,6 +496,7 @@ export function useConversationController(
       }
       return () => {
         cancelled = true;
+        liveRef.current = null;
       };
     }
 
@@ -589,6 +597,7 @@ export function useConversationController(
 
     return () => {
       cancelled = true;
+      liveRef.current = null;
     };
   }, [
     conversationId,
@@ -877,12 +886,14 @@ export function useConversationController(
     (refusal: SendRefusal) => {
       if (refusal.kind === 'held') {
         setRefusedTurn({ by: refusal.by, since: refusal.since });
-        void followTurn(refusal.executionId, () => true);
+        // The follow waits on a transcript read: it attaches only if this
+        // screen still shows this chat when the read lands.
+        void followTurn(refusal.executionId, () => liveRef.current === conversationId);
       } else {
         void queryClient.invalidateQueries({ queryKey: detailKey });
       }
     },
-    [queryClient, detailKey, followTurn],
+    [queryClient, detailKey, followTurn, conversationId],
   );
 
   const submit = useCallback(

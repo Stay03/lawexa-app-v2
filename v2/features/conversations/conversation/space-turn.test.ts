@@ -454,7 +454,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
   // Both refusals change the screen as a refused send does.
   assert.match(
     controller,
-    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);\s*void followTurn\(refusal\.executionId, \(\) => true\);\s*\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
+    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);[\s\S]*?void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId\);\s*\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
   );
   const screen = readHere('ConversationScreen.tsx');
   assert.match(
@@ -542,4 +542,16 @@ test('only a member of the space reads its status', () => {
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /const isSpaceMember = isSpaceChat && detailData\?\.my_space_role != null;/);
   assert.match(controller, /inSpace = data\.space != null && data\.my_space_role != null;/);
+});
+
+/* ── A 409's follow does not outlive its screen (re-review R1) ────────────── */
+
+test('a 409’s follow attaches only while the screen still shows that chat', () => {
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /useEffect\(\(\) => \{\s*let cancelled = false;\s*liveRef\.current = conversationId;/);
+  const clears = controller.match(/cancelled = true;\s*liveRef\.current = null;/g);
+  assert.equal(clears?.length, 2, 'both of the mount flow’s cleanups');
+  assert.match(controller, /void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId\);/);
+  // followTurn checks before it attaches, after the read.
+  assert.match(controller, /if \(!stillWanted\(\)\) return;\s*const fresh = queryClient\.getQueryData\(detailKey\);/);
 });
