@@ -34,7 +34,7 @@ import { ReferenceChips } from './ReferenceChips';
 import { TranscriptSkeleton } from './skeletons';
 import { openDefersBlocks } from './markdown/defer-plan';
 import { ScrollKeepContext, type ScrollKeep } from './markdown/scroll-keep-context';
-import { readsAtBottom } from './scroll-pin';
+import { followOnResize, readsAtBottom } from './scroll-pin';
 
 /**
  * MessageList — the natively-virtualized, memoized transcript with chat scroll
@@ -273,6 +273,9 @@ export function MessageList({
   /** Where the list's own last scroll left the view (`scrollOwn`), so the
    *  scroll event that write fires never reads as the reader moving away. */
   const ownScrollTopRef = useRef<number | null>(null);
+  /** Where the last scroll event found the view, so a shrink's clamp can be
+   *  told from the reader's own scroll (`clampedToBottom`). */
+  const lastScrollTopRef = useRef<number | null>(null);
 
   /**
    * THE JUMP-TO-LATEST PILL, AS ONE DERIVED VALUE.
@@ -469,9 +472,19 @@ export function MessageList({
       followRafRef.current = requestAnimationFrame(followBottom);
     };
 
+    // A pinned view only (followOnResize): a clamp to the bottom becomes the
+    // list's own position, so the clamp's scroll event never detaches; growth
+    // past the threshold snaps before this frame paints; smaller growth glides.
     const observer = new ResizeObserver(() => {
-      if (!atBottomRef.current) return;
-      if (followRafRef.current == null) {
+      const el = scrollRef.current;
+      if (!el) return;
+      const next = followOnResize(el, ownScrollTopRef.current, atBottomRef.current, BOTTOM_THRESHOLD_PX);
+      ownScrollTopRef.current = next.ownTop;
+      if (next.snapTo !== null) {
+        scrollOwn(el, ownScrollTopRef, next.snapTo);
+        return;
+      }
+      if (next.ease && followRafRef.current == null) {
         followRafRef.current = requestAnimationFrame(followBottom);
       }
     });
@@ -496,8 +509,16 @@ export function MessageList({
     const el = scrollRef.current;
     if (!el) return;
     // Pinned by distance, or because the view sits where the list's own last
-    // scroll put it and only the page under it grew (scroll-pin.ts).
-    const atBottom = readsAtBottom(el, ownScrollTopRef.current, atBottomRef.current, BOTTOM_THRESHOLD_PX);
+    // scroll put it and only the page under it grew; a detached view a shrink
+    // clamped to the bottom stays detached (scroll-pin.ts).
+    const atBottom = readsAtBottom(
+      el,
+      ownScrollTopRef.current,
+      atBottomRef.current,
+      BOTTOM_THRESHOLD_PX,
+      lastScrollTopRef.current,
+    );
+    lastScrollTopRef.current = el.scrollTop;
     atBottomRef.current = atBottom;
     if (atBottom) {
       if (detachedAt !== null) onScrolledUpChange?.(false);
