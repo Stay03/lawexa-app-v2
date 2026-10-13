@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
 import type { ChannelListResponse } from '@/types/collab';
-import { collabAccessState } from '@/v2/features/collab/model';
+import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { sumSpaceMentions } from '@/v2/features/spaces/cache';
 import { SPACES_BASELINE_PARAMS, spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -82,8 +82,8 @@ export const QUIET_NAV_SIGNAL: CollabNavSignal = { unread: false, mentions: 0 };
 
 /**
  * The live signal for the Channels nav row. Safe to call from any v2 chrome:
- * the queries are `enabled` only for an eligible collab viewer, which is the
- * same predicate that decides whether the row is rendered at all.
+ * each query is `enabled` on the predicate that renders its row (Team
+ * Channels for the unread dot, Spaces access for the mentions).
  */
 export function useCollabNavSignal(): CollabNavSignal {
   const session = useV2Session();
@@ -96,7 +96,9 @@ export function useCollabNavSignal(): CollabNavSignal {
     viewerId: session.userId,
   });
 
-  const unread = useQuery({ ...channels, enabled: eligible, select: selectUnreadPresent });
+  // The channel list is Team Channels only: below researcher the server
+  // refuses it, so it is asked for under the same flag that shows the row.
+  const unread = useQuery({ ...channels, enabled: canOpenTeamChannels(session), select: selectUnreadPresent });
   const mentions = useQuery({ ...spaces, enabled: eligible, select: sumSpaceMentions });
 
   return {

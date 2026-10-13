@@ -105,6 +105,12 @@ test('the gate, the spine, both homes and discover all read the flag, never the 
   const frame = read('v2', 'features', 'collab', 'shell', 'CollabFrame.tsx');
   assert.match(frame, /channelsQueries\.mine\(\{ viewerId \}\),\s*enabled: eligible && showsChannels,/);
   assert.match(frame, /const showsChannels = isSpaceRoute[\s\S]{0,200}?: canOpenTeamChannels\(session\);/);
+  // The nav row's unread dot reads the same list from every page's sidebar and
+  // drawer: below researcher it asked anyway and collected a 403 per page
+  // (real-server pass 5). The space mentions beside it stay on Spaces access.
+  const signal = read('v2', 'features', 'channels', 'my-channels', 'nav-signal.tsx');
+  assert.match(signal, /useQuery\(\{ \.\.\.channels, enabled: canOpenTeamChannels\(session\), select: selectUnreadPresent \}\)/);
+  assert.match(signal, /useQuery\(\{ \.\.\.spaces, enabled: eligible, select: sumSpaceMentions \}\)/);
   for (const home of ['WorkHome.tsx', 'StudyHome.tsx']) {
     const source = read('v2', 'shell', 'designs', home);
     assert.match(source, /const \{ canAccessTeamChannels \} = useV2Session\(\);/, home);
