@@ -1433,7 +1433,7 @@ export function ChannelFeed({
         aria-busy={
           isPending || isFetchingNextPage || isFetchingPreviousPage || windowSettling
         }
-        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
       >
         {/* The log region is PRE-MOUNTED (it exists before any message), so
             assistive tech has the live region registered before arrivals. */}

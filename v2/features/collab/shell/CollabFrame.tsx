@@ -683,7 +683,7 @@ function CollabPlaceFrame({
             shell's own scroller does not move inside a place. */}
         <div
           data-v2-scroller
-          className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
+          className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
         >
           {children}
         </div>
