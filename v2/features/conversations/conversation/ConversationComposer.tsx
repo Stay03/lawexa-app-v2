@@ -173,6 +173,15 @@ export interface ConversationComposerProps {
   onEngage?: () => void;
   /** The staging handle — see {@link ConversationComposerHandle}. */
   stageRef?: React.Ref<ConversationComposerHandle>;
+  /**
+   * The colleague whose turn is running in this space chat (Spaces F4), or
+   * null. While it is set the reader may type the next question, Send waits
+   * for their answer, and there is no Stop: only the sender may stop a turn.
+   */
+  sendHeldBy?: string | null;
+  /** Whether the running turn may be stopped from here: the reader's own
+   *  turn. Default true (a personal chat's every turn is the reader's). */
+  canStop?: boolean;
 }
 
 export function ConversationComposer({
@@ -192,6 +201,8 @@ export function ConversationComposer({
   disabled = false,
   onEngage,
   stageRef,
+  sendHeldBy = null,
+  canStop = true,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -219,6 +230,10 @@ export function ConversationComposer({
   const [errorText, setErrorText] = useState('');
   const [errorOpen, setErrorOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // The reader's own turn locks the pill; a colleague's leaves it open to type
+  // the next question, with Send held (`sendHeldBy`).
+  const ownTurnRunning = isStreaming && sendHeldBy === null;
 
   const showError = (message: string) => {
     setErrorText(message);
@@ -403,6 +418,9 @@ export function ConversationComposer({
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
 
+  const sendLabel =
+    isStreaming && sendHeldBy !== null ? `Wait for ${sendHeldBy}’s answer` : 'Send message';
+
   return (
     // Width comes from the CONTAINER (the /c/{id} overlay carries the compact
     // max-w; an embedding card is its own constraint) — so every host's pill
@@ -459,7 +477,7 @@ export function ConversationComposer({
                   signedIn={signedIn}
                   value={jurisdiction}
                   onChange={onJurisdictionChange}
-                  disabled={isStreaming || isSubmitting || disabled}
+                  disabled={ownTurnRunning || isSubmitting || disabled}
                   stop={stop}
                 />
                 {isRedacted && (
@@ -625,7 +643,7 @@ export function ConversationComposer({
             onEngage?.();
           }}
           onSubmit={handleSubmit}
-          disabled={isStreaming || isSubmitting || disabled}
+          disabled={ownTurnRunning || isSubmitting || disabled}
           maxHeight={150}
           variant={isConfidential ? 'confidential' : 'default'}
           onClick={onEngage}
@@ -644,7 +662,7 @@ export function ConversationComposer({
                     stop(event);
                     onEngage?.();
                   }}
-                  disabled={isStreaming || isSubmitting || disabled}
+                  disabled={ownTurnRunning || isSubmitting || disabled}
                   className="v2-interactive text-primary hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Plus className="size-4" />
@@ -719,7 +737,7 @@ export function ConversationComposer({
               onPasteFiles={(files) => void handleFilesAdded(files)}
             />
 
-            {isStreaming ? (
+            {isStreaming && canStop ? (
               <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
                 <Button
                   type="button"
@@ -738,14 +756,17 @@ export function ConversationComposer({
                 </Button>
               </PromptInputAction>
             ) : (
-              <PromptInputAction tooltip="Send message">
+              // While a turn runs that this reader may not stop (a colleague's,
+              // Spaces F4), Send stays in place, held, and says whose answer it
+              // waits for.
+              <PromptInputAction tooltip={sendLabel}>
                 <Button
                   type="button"
                   size="icon"
                   className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
                   onClick={handleSubmit}
-                  disabled={!canSend}
-                  aria-label="Send message"
+                  disabled={!canSend || isStreaming}
+                  aria-label={sendLabel}
                 >
                   {isSubmitting ? (
                     <Loader2 className="size-4 animate-spin" />

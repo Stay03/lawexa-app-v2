@@ -6,6 +6,7 @@ import type {
   ListConversationsParams,
 } from '@/types/chat';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
+import { SPACE_CHAT_POLL_MS, stopsPolling } from './conversation/space-turn';
 
 /**
  * Conversations query policy — copies the `v2/features/cases/queries.ts`
@@ -420,5 +421,39 @@ export const conversationsQueries = {
         if (status !== undefined && status >= 400 && status < 500) return false;
         return failureCount < 1;
       },
+    }),
+
+  /**
+   * The "all conversation statuses" handle: a third sibling of `lists()` and
+   * `details()`, so no list or transcript writer can reach a status entry.
+   */
+  statuses: () => [...conversationsQueries.all, 'status'] as const,
+
+  /**
+   * An open space chat's status (`GET /conversations/{uuid}/status`, without
+   * its messages): whose turn is running, and whether a turn began since the
+   * last read (Spaces F4, backend B4 has no push channel). The screen enables
+   * it only for a space chat that is not streaming (the engine owns liveness
+   * then); `enabled` stays a call-site concern.
+   *
+   * LIVE AND NEVER KEPT. `STALE_TIMES.live` and no retention (`gcTime: 0`): a
+   * status is true for four seconds and worth nothing to the next open. No
+   * `meta.persist`, so it never reaches the device cache. No retry: the next
+   * beat is the retry.
+   *
+   * THE BEAT. Every {@link SPACE_CHAT_POLL_MS}, paused in a hidden tab
+   * (`refetchIntervalInBackground` stays false) and read once on return. A
+   * refusal (403, 404) stops it for good (`stopsPolling`): the reader is no
+   * longer let in, and asking every four seconds would not change that.
+   */
+  status: ({ conversationId, viewerId }: ConversationDetailOptions) =>
+    queryOptions({
+      queryKey: [...conversationsQueries.statuses(), conversationId, { viewerId }] as const,
+      queryFn: () => chatApi.getStatus(conversationId, { withoutMessages: true }),
+      staleTime: STALE_TIMES.live,
+      gcTime: 0,
+      retry: false,
+      refetchInterval: (query) => (stopsPolling(query.state.error) ? false : SPACE_CHAT_POLL_MS),
+      refetchOnWindowFocus: (query) => !stopsPolling(query.state.error),
     }),
 };

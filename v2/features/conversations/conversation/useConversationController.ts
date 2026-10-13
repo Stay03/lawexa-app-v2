@@ -8,7 +8,11 @@ import {
   claimTranscript,
   deleteTranscript,
 } from '@/v2/runtime/chat-engine';
-import type { MessageAttachment, ConversationReference } from '@/types/chat';
+import type {
+  ConversationReference,
+  ConversationStatusData,
+  MessageAttachment,
+} from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
@@ -18,7 +22,15 @@ import { useSkeletonHold } from './skeleton-hold';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
-import { canSendIn, hasSpaceContract, viewOnlyReason, type ViewOnlyReason } from './space-turn';
+import {
+  canSendIn,
+  hasSpaceContract,
+  stopsPolling,
+  turnChanged,
+  turnHeldBy,
+  viewOnlyReason,
+  type ViewOnlyReason,
+} from './space-turn';
 import {
   isConfidentialMark,
   isRedactedMark,
@@ -182,6 +194,15 @@ export interface ConversationController {
    *  fields. False on a personal chat, which looks exactly as before. */
   showAuthors: boolean;
   /**
+   * The colleague whose turn is streaming in this space chat, or null when
+   * nothing streams or the turn is the reader's own. Drives "{name} is
+   * asking" and holds Send.
+   */
+  sendHeldBy: string | null;
+  /** Whether the reader may stop the running turn: their own turn, and the
+   *  status does not say otherwise (`can_cancel`). */
+  canStop: boolean;
+  /**
    * Whether ownership has been DETERMINED yet. False until the owner id resolves
    * (from the synchronous handoff path, or async history load). While false the
    * dock must show a skeleton — NOT the "shared" pill, which would otherwise flash
@@ -272,6 +293,10 @@ export function useConversationController(
   const [localOwnerId, setLocalOwnerId] = useState<number | null>(null);
   const [jurisdiction, setJurisdictionState] = useState<JurisdictionChoice>({ mode: 'auto' });
   const [narration, setNarration] = useState<string | null>(null);
+  // The conversation whose mount flow has settled its recovery (it attached
+  // to a running turn, or found none). Until then the status poll waits, so
+  // it can never attach to a turn the mount flow is attaching to.
+  const [recoveredFor, setRecoveredFor] = useState<string | null>(null);
 
   const narrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -341,6 +366,9 @@ export function useConversationController(
     // `submit`, "ask again", a retry, and a recovery reconnect — so no route into a
     // turn can leave a stale entry behind if the user navigates away mid-answer.
     onConnected: () => {
+      // A connect is the mount flow's recovery decision made (the handoff's
+      // attach, or the recovery's): the space chat's poll may run from now.
+      setRecoveredFor(conversationId);
       if (isConfidentialMark(conversationId)) return;
       void queryClient.invalidateQueries({ queryKey: detailKey, refetchType: 'none' });
     },
@@ -501,6 +529,7 @@ export function useConversationController(
       // Unchanged ordering: history ALWAYS settles before recovery re-attaches, so a
       // reconnect can never find an empty transcript to stream into.
       await recoverPendingState(conversationId).catch(() => {});
+      if (!cancelled) setRecoveredFor(conversationId);
     })();
 
     return () => {
@@ -685,6 +714,78 @@ export function useConversationController(
     queryClient.removeQueries({ queryKey: [...conversationsQueries.details(), conversationId] });
   }, [isGoneOnServer, isGoneMarked, conversationId, queryClient]);
 
+  // ── A space chat follows its other members (Spaces F4, backend B4). ──
+  // B4 has no push channel, so an open space chat reads its status every four
+  // seconds (`conversationsQueries.status`: paused in a hidden tab, stopped by
+  // a 403 or 404). Never while this screen streams: the engine owns liveness
+  // then. Never before the mount flow settled its recovery, and never on a
+  // personal or confidential chat.
+  const statusOptions = useMemo(
+    () => conversationsQueries.status({ conversationId, viewerId: serverUserId }),
+    [conversationId, serverUserId],
+  );
+  const statusKey = statusOptions.queryKey;
+  const statusQuery = useQuery({
+    ...statusOptions,
+    enabled:
+      isSpaceChat &&
+      !isConfidential &&
+      !isGoneOnServer &&
+      recoveredFor === conversationId &&
+      !isStreaming,
+  });
+  const statusData = statusQuery.data?.data ?? null;
+
+  // React to each new status read, once. An engine action and query calls,
+  // no setState, so it is React-Compiler-clean in an effect.
+  //  - A turn is running and this screen is idle: read the transcript FIRST,
+  //    so the sender's question is on screen (with its author) before the
+  //    answer streams under it, then attach the way a reload mid-turn does
+  //    (`recoverPendingState`: the stream when there is an execution, else
+  //    the engine's own status poll). B6: a member may attach to the stream.
+  //  - Otherwise, a turn that began since the last read (it may have ended
+  //    too) is fetched by reading the transcript again; the engine merges it.
+  const seenStatusRef = useRef<ConversationStatusData | null>(null);
+  useEffect(() => {
+    if (statusData === null || statusData === seenStatusRef.current) return;
+    const previous = seenStatusRef.current;
+    seenStatusRef.current = statusData;
+    if (isStreaming) return;
+    if (statusData.status !== 'pending') {
+      if (previous !== null && turnChanged(previous, statusData)) {
+        void queryClient.refetchQueries({ queryKey: detailKey, exact: true });
+      }
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      await queryClient.refetchQueries({ queryKey: detailKey, exact: true });
+      if (cancelled) return;
+      const fresh = queryClient.getQueryData(detailKey);
+      if (fresh) adoptConversationHistory(fresh);
+      await recoverPendingState(conversationId).catch(() => {});
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [statusData, isStreaming, queryClient, detailKey, adoptConversationHistory, recoverPendingState, conversationId]);
+
+  // A refused status read: read the transcript again, whose own refusal
+  // shows "not available" (gone.ts). The poll has already stopped itself.
+  const statusRefused = stopsPolling(statusQuery.error);
+  useEffect(() => {
+    if (statusRefused) void queryClient.refetchQueries({ queryKey: detailKey, exact: true });
+  }, [statusRefused, queryClient, detailKey]);
+
+  // Whose turn streams, read off the last status: a colleague's holds Send
+  // and names them; the reader's own keeps Stop, unless the status says the
+  // reader may not cancel it.
+  const heldBy = isStreaming ? turnHeldBy(statusData, serverUserId) : null;
+  const canStop =
+    isStreaming &&
+    heldBy === null &&
+    !(statusData?.status === 'pending' && statusData.can_cancel === false);
+
   const submit = useCallback(
     async (message: string, attachments: MessageAttachment[]) => {
       // Optimistically bump this conversation to the top of the recents caches the
@@ -692,6 +793,9 @@ export function useConversationController(
       // acceptance a). No-op-stable when the row isn't cached; `onCompleted` refreshes
       // the timestamp again when the turn settles.
       conversationsCache.touch(queryClient, conversationId);
+      // The last status read is from before this send: dropped, so a stale
+      // "pending, by a colleague" can never label the reader's own turn.
+      queryClient.removeQueries({ queryKey: statusKey, exact: true });
       const fileIds = attachments.map((a) => a.file_id);
       await send(message, {
         conversationId,
@@ -700,7 +804,7 @@ export function useConversationController(
         ...(fileIds.length > 0 && { fileIds, attachments }),
       });
     },
-    [send, conversationId, jurisdiction, queryClient],
+    [send, conversationId, jurisdiction, queryClient, statusKey],
   );
 
   const stop = useCallback(() => cancelStream(), [cancelStream]);
@@ -784,6 +888,8 @@ export function useConversationController(
     viewOnlyReason: viewOnlyReason(detailData),
     isSpaceChat,
     showAuthors,
+    sendHeldBy: heldBy?.name ?? null,
+    canStop,
     isOwnerResolved: ownerId !== null,
     isLoadingHistory,
     showHistorySkeleton,

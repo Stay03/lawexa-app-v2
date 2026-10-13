@@ -16,6 +16,7 @@ import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider } from './chat-context';
 import { DocumentExportScope } from './markdown/document-export';
 import { clearEmbeddedComposer, publishEmbeddedComposer } from './embedded-composer';
+import { askingLabel } from './space-turn';
 
 /**
  * ConversationScreen — the v2 `/c/[id]` client root. Mounts the controller (engine
@@ -274,6 +275,9 @@ export function ConversationScreen({
             onScrolledUpChange={setScrolledUp}
             showAuthors={controller.showAuthors}
             viewerId={serverUserId}
+            restingLabel={
+              controller.sendHeldBy !== null ? askingLabel(controller.sendHeldBy) : undefined
+            }
           />
         </DocumentExportScope>
 
@@ -319,6 +323,8 @@ export function ConversationScreen({
                   showMeta={!scrolledUp}
                   isStreaming={isStreaming}
                   isCancelling={isCancelling}
+                  sendHeldBy={controller.sendHeldBy}
+                  canStop={controller.canStop}
                   onSubmit={controller.submit}
                   onStop={controller.stop}
                 />

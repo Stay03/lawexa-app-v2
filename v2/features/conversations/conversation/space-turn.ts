@@ -1,4 +1,10 @@
-import type { ConversationAuthor, ConversationData } from '@/types/chat';
+import type {
+  ConversationAuthor,
+  ConversationData,
+  ConversationStatusData,
+  ConversationTurnUser,
+} from '@/types/chat';
+import { statusOf } from '@/v2/runtime/persist/policy';
 
 /**
  * space-turn — the pure rules of a chat in a space (Spaces F4, backend B4
@@ -17,6 +23,14 @@ import type { ConversationAuthor, ConversationData } from '@/types/chat';
  * Every user turn in a space chat names its writer above the bubble. Labels
  * are drawn only on a record that carries the B4 fields, so an app ahead of
  * the deploy never prints "You" on a colleague's question.
+ *
+ * ── WHOSE TURN IS RUNNING ──────────────────────────────────────────────────
+ * B4 has no push channel, so an open space chat reads its status every
+ * {@link SPACE_CHAT_POLL_MS} while it is visible and nothing streams. The
+ * status names the latest sender (`execution_user`) and keeps naming them
+ * after the turn ends, so "{name} is asking" is shown only while the status
+ * is `pending` (backend B3 answer). A turn that began and ended between two
+ * reads moves `last_message_id`, `execution_id` or `pending_since`.
  */
 
 /** The two fields of a conversation record these rules read. */
@@ -82,4 +96,51 @@ export function authorLine(
     return { label: 'You', spoken: 'Asked by you', person: null };
   }
   return { label: author.name, spoken: `Asked by ${author.name}`, person: author };
+}
+
+/** How often an open space chat reads its status: one small request every
+ *  four seconds, and none while it streams or its tab is hidden (T6). */
+export const SPACE_CHAT_POLL_MS = 4000;
+
+/**
+ * The member whose turn is running, when it is someone else's: `null` unless
+ * the status is `pending` with a sender who is not the reader. The status
+ * keeps the last sender after a turn ends, so `pending` is checked first.
+ */
+export function turnHeldBy(
+  status: Pick<ConversationStatusData, 'status' | 'execution_user'> | null,
+  viewerId: number | null,
+): ConversationTurnUser | null {
+  if (status === null || status.status !== 'pending') return null;
+  const sender = status.execution_user ?? null;
+  if (sender === null || sender.id === viewerId) return null;
+  return sender;
+}
+
+/** The activity row's words while a colleague's turn runs. The orb and the
+ *  elapsed clock beside it already say it is ongoing, so no dots. */
+export function askingLabel(name: string): string {
+  return `${name} is asking`;
+}
+
+/** The three fields that move when a turn begins (backend B5 answer, and
+ *  `last_message_id` from 1135730). */
+type TurnMarks = Pick<ConversationStatusData, 'execution_id' | 'pending_since' | 'last_message_id'>;
+
+/** Whether a turn began between two status reads, even one that also ended
+ *  between them: then the transcript is read again. */
+export function turnChanged(previous: TurnMarks, next: TurnMarks): boolean {
+  return (
+    previous.execution_id !== next.execution_id ||
+    previous.pending_since !== next.pending_since ||
+    previous.last_message_id !== next.last_message_id
+  );
+}
+
+/** A status read the server refused (403, 404): the reader left the space or
+ *  the chat left it, so the poll stops and the transcript is read again,
+ *  whose own refusal shows "not available" (gone.ts). */
+export function stopsPolling(error: unknown): boolean {
+  const status = statusOf(error);
+  return status === 403 || status === 404;
 }

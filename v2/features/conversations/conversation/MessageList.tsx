@@ -185,6 +185,8 @@ export interface MessageListProps {
   showAuthors: boolean;
   /** The server-verified viewer, whose own turns read "You". */
   viewerId: number | null;
+  /** The activity row's resting label while a colleague's turn runs. */
+  restingLabel?: string;
 }
 
 export function MessageList({
@@ -202,6 +204,7 @@ export function MessageList({
   onScrolledUpChange,
   showAuthors,
   viewerId,
+  restingLabel,
 }: MessageListProps) {
   // What this render draws (see OPEN_TAIL): until the first frame has been
   // painted, the newest messages only; from then on, all of them. Everything
@@ -526,7 +529,7 @@ export function MessageList({
                 {groups.map((group, gi) => (
                   <Fragment key={groupKey(group, gi)}>
                     {gi === activityIndex && (
-                      <ActivityRow startTime={streamStartTime} narration={narration} />
+                      <ActivityRow startTime={streamStartTime} narration={narration} restingLabel={restingLabel} />
                     )}
                     <GroupRow
                       group={group}
@@ -558,7 +561,7 @@ export function MessageList({
                     the row sits after the last group, which is still immediately above
                     where the answer will appear. */}
                 {activityIndex === groups.length && (
-                  <ActivityRow startTime={streamStartTime} narration={narration} />
+                  <ActivityRow startTime={streamStartTime} narration={narration} restingLabel={restingLabel} />
                 )}
               </div>
             </ScrollKeepContext.Provider>
@@ -567,7 +570,7 @@ export function MessageList({
           {/* The one case the in-list placements cannot cover: activity with no
               groups at all (a turn whose first event is narration). */}
           {groups.length === 0 && showActivity && (
-            <ActivityRow startTime={streamStartTime} narration={narration} />
+            <ActivityRow startTime={streamStartTime} narration={narration} restingLabel={restingLabel} />
           )}
 
           {error && (
@@ -629,13 +632,15 @@ export function MessageList({
 function ActivityRow({
   startTime,
   narration,
+  restingLabel,
 }: {
   startTime: number | null;
   narration: string | null;
+  restingLabel?: string;
 }) {
   return (
     <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-      <ActivityStatus startTime={startTime} narration={narration} />
+      <ActivityStatus startTime={startTime} narration={narration} restingLabel={restingLabel} />
     </div>
   );
 }

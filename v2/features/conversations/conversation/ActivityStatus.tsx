@@ -52,11 +52,15 @@ function formatElapsed(seconds: number): string {
 export function ActivityStatus({
   startTime,
   narration,
+  restingLabel,
 }: {
   /** Epoch ms the current stream began (from the first tool/handover/placeholder). */
   startTime: number | null;
   /** Latest transient narration line, or null for the resting label. */
   narration: string | null;
+  /** The resting label when the turn is a colleague's ("Ada Obi is asking",
+   *  Spaces F4); absent for the reader's own turn. */
+  restingLabel?: string;
 }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -79,7 +83,7 @@ export function ActivityStatus({
     >
       <ThinkingOrb state="solving" size={20} className="shrink-0" aria-hidden />
       <span className="text-shimmer min-w-0 truncate font-medium">
-        {narration ?? RESTING_LABEL}
+        {narration ?? restingLabel ?? RESTING_LABEL}
       </span>
       {elapsed > 0 && (
         <span className="text-muted-foreground/70 shrink-0 text-xs tabular-nums">

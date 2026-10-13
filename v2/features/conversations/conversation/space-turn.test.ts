@@ -4,8 +4,20 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
-import type { ApiMessage, ConversationAuthor } from '@/types/chat';
-import { authorLine, canSendIn, hasSpaceContract, VIEW_ONLY_COPY, viewOnlyReason } from './space-turn';
+import type { ApiMessage, ConversationAuthor, ConversationStatusData } from '@/types/chat';
+import { conversationsQueries } from '../queries';
+import {
+  askingLabel,
+  authorLine,
+  canSendIn,
+  hasSpaceContract,
+  SPACE_CHAT_POLL_MS,
+  stopsPolling,
+  turnChanged,
+  turnHeldBy,
+  VIEW_ONLY_COPY,
+  viewOnlyReason,
+} from './space-turn';
 
 /**
  * Spaces F4 (backend B4 bd76241 and 1135730): a chat in a space, read and
@@ -153,4 +165,88 @@ test('the list hands every user row the flag and the viewer; the row draws the l
   assert.match(row, /\{author\.person \? \(\s*<MemberAvatar/);
   assert.match(row, /<span className="sr-only">\{author\.spoken\}<\/span>/);
   assert.match(readHere('ConversationScreen.tsx'), /showAuthors=\{controller\.showAuthors\}\s+viewerId=\{serverUserId\}/);
+});
+
+/* ── Commit 4: whose turn is running ──────────────────────────────────────── */
+
+const status = (over: Partial<ConversationStatusData> = {}): ConversationStatusData => ({
+  status: 'completed',
+  messages: [],
+  execution_id: null,
+  stream_url: null,
+  pending_since: '2026-10-13T08:59:00Z',
+  execution_user: { id: 41, name: 'Ada Obi' },
+  pending_message: null,
+  can_cancel: false,
+  last_message_id: 10,
+  ...over,
+});
+
+test('"{name} is asking" names a colleague, only while the turn is pending', () => {
+  assert.deepEqual(turnHeldBy(status({ status: 'pending' }), 7), { id: 41, name: 'Ada Obi' });
+  assert.equal(turnHeldBy(status({ status: 'pending' }), 41), null, 'the reader’s own turn');
+  // The status keeps the last sender after the turn ends (B3 answer).
+  for (const ended of ['completed', 'failed', 'expired', 'idle'] as const) {
+    assert.equal(turnHeldBy(status({ status: ended }), 7), null, ended);
+  }
+  assert.equal(turnHeldBy(status({ status: 'pending', execution_user: null }), 7), null);
+  assert.equal(turnHeldBy(null, 7), null);
+  assert.equal(askingLabel('Ada'), 'Ada is asking');
+});
+
+test('a turn that began between two reads is seen, even one that also ended', () => {
+  const before = status();
+  assert.equal(turnChanged(before, before), false);
+  assert.equal(turnChanged(before, { ...before }), false);
+  assert.equal(turnChanged(before, status({ last_message_id: 11 })), true);
+  assert.equal(turnChanged(before, status({ pending_since: '2026-10-13T09:01:00Z' })), true);
+  assert.equal(turnChanged(before, status({ execution_id: 'e2' })), true);
+});
+
+test('the status is read every four seconds, live, never kept, and a refusal stops it', () => {
+  assert.equal(SPACE_CHAT_POLL_MS, 4000);
+  const leaf = conversationsQueries.status({ conversationId: 'c1', viewerId: 7 });
+  assert.deepEqual(leaf.queryKey, ['conversations', 'status', 'c1', { viewerId: 7 }]);
+  assert.equal(leaf.staleTime, 0);
+  assert.equal(leaf.gcTime, 0);
+  assert.equal(leaf.retry, false);
+  assert.equal('meta' in leaf, false, 'never on the device');
+  const forbidden = Object.assign(new Error('403'), { response: { status: 403 } });
+  const missing = Object.assign(new Error('404'), { response: { status: 404 } });
+  const down = Object.assign(new Error('503'), { response: { status: 503 } });
+  assert.equal(stopsPolling(forbidden), true);
+  assert.equal(stopsPolling(missing), true);
+  assert.equal(stopsPolling(down), false);
+  assert.equal(stopsPolling(null), false);
+  const queries = read('v2', 'features', 'conversations', 'queries.ts');
+  assert.match(queries, /refetchInterval: \(query\) => \(stopsPolling\(query\.state\.error\) \? false : SPACE_CHAT_POLL_MS\),/);
+});
+
+test('the poll waits for the mount flow, stops while streaming, and reads the transcript before attaching', () => {
+  const controller = readHere('useConversationController.ts');
+  assert.match(
+    controller,
+    /enabled:\s*isSpaceChat &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
+  );
+  // Recovery settles after the mount flow's own attach, or on any connect.
+  assert.match(controller, /await recoverPendingState\(conversationId\)\.catch\(\(\) => \{\}\);\s*if \(!cancelled\) setRecoveredFor\(conversationId\);/);
+  assert.match(controller, /onConnected: \(\) => \{\s*\/\/[^\n]*\n[^\n]*\n\s*setRecoveredFor\(conversationId\);/);
+  assert.match(
+    controller,
+    /await queryClient\.refetchQueries\(\{ queryKey: detailKey, exact: true \}\);\s*if \(cancelled\) return;\s*const fresh = queryClient\.getQueryData\(detailKey\);\s*if \(fresh\) adoptConversationHistory\(fresh\);\s*await recoverPendingState\(conversationId\)/,
+  );
+  // A send drops the last status read before it goes.
+  assert.match(controller, /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*const fileIds/);
+});
+
+test('a colleague’s turn names them in the activity row, holds Send and offers no Stop', () => {
+  assert.match(readHere('ActivityStatus.tsx'), /\{narration \?\? restingLabel \?\? RESTING_LABEL\}/);
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(composer, /const ownTurnRunning = isStreaming && sendHeldBy === null;/);
+  assert.match(composer, /\{isStreaming && canStop \? \(/);
+  assert.match(composer, /isStreaming && sendHeldBy !== null \? `Wait for \$\{sendHeldBy\}’s answer` : 'Send message'/);
+  assert.match(composer, /disabled=\{!canSend \|\| isStreaming\}/);
+  const screen = readHere('ConversationScreen.tsx');
+  assert.match(screen, /sendHeldBy=\{controller\.sendHeldBy\}\s+canStop=\{controller\.canStop\}/);
+  assert.match(screen, /controller\.sendHeldBy !== null \? askingLabel\(controller\.sendHeldBy\) : undefined/);
 });
