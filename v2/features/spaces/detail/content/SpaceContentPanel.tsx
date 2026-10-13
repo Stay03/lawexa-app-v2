@@ -288,17 +288,14 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
               tab="chats"
               canAdd={canAdd}
               onInvite={access.onInvite ?? undefined}
+              // One action: start one here. The line names the other way in
+              // (move one of yours in, from the chat's own menu); a second
+              // pill stacked three pills of three widths on a phone with
+              // Invite people under them (F4 review N6).
               action={
-                // The empty line's two ways in: start one here, or go and
-                // move one of your own in.
-                <div className="flex flex-wrap justify-center gap-2">
-                  <EmptyStateAddButton icon={Plus} onClick={startChat}>
-                    New conversation
-                  </EmptyStateAddButton>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href="/conversations">Go to your conversations</Link>
-                  </Button>
-                </div>
+                <EmptyStateAddButton icon={Plus} onClick={startChat}>
+                  New conversation
+                </EmptyStateAddButton>
               }
             />
           )

@@ -92,3 +92,12 @@ test('the inviter and the invitee read one promise: a Contributor continues the 
     assert.doesNotMatch(line, /[—–]/, line);
   }
 });
+
+test('the empty Conversations tab offers one action, so a phone does not stack three pills', () => {
+  const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
+  assert.match(
+    panel,
+    /tab="chats"[\s\S]*?action=\{\s*<EmptyStateAddButton icon=\{Plus\} onClick=\{startChat\}>\s*New conversation\s*<\/EmptyStateAddButton>\s*\}/,
+  );
+  assert.doesNotMatch(panel, /Go to your conversations/);
+});
