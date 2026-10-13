@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { MessageAttachment } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
-import type { ViewOnlyReason } from './space-turn';
+import type { SendRefused, ViewOnlyReason } from './space-turn';
 
 /**
  * embedded-composer — the seam that lets a HOST surface own the one composer
@@ -45,7 +45,7 @@ export interface EmbeddedComposerSurface {
   viewOnlyReason: ViewOnlyReason;
   /** False while ownership is still resolving — the host disables sending. */
   isOwnerResolved: boolean;
-  submit: (message: string, attachments: MessageAttachment[]) => Promise<void>;
+  submit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
   stop: () => void;
 }
 

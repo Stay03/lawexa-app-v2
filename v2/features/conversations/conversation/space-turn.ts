@@ -4,6 +4,7 @@ import type {
   ConversationStatusData,
   ConversationTurnUser,
 } from '@/types/chat';
+import type { SendRefusal } from '@/v2/runtime/chat-engine';
 import { statusOf } from '@/v2/runtime/persist/policy';
 
 /**
@@ -143,4 +144,25 @@ export function turnChanged(previous: TurnMarks, next: TurnMarks): boolean {
 export function stopsPolling(error: unknown): boolean {
   const status = statusOf(error);
   return status === 403 || status === 404;
+}
+
+/** A send the server would not take, as the composer shows it: the sentence
+ *  in its banner, with the message given back to the pill. */
+export interface SendRefused {
+  refused: string;
+}
+
+/**
+ * The composer's sentence for a refused send. Another member's turn: their
+ * name, and that the message is kept. The reader's own earlier turn (another
+ * tab or device): that it is still being answered. A refusal by role: the
+ * view-only pill's own reason, since the pill replaces the composer next.
+ */
+export function sendRefusal(refusal: SendRefusal, viewerId: number | null): string {
+  if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
+  if (refusal.by === null) return 'Someone is asking right now. Your message is kept.';
+  if (refusal.by.id === viewerId) {
+    return 'Your last question is still being answered. Your message is kept.';
+  }
+  return `${refusal.by.name} is asking right now. Your message is kept.`;
 }

@@ -549,10 +549,9 @@ export function CaseChatComposerDock({
             isStreaming={surface ? surface.isStreaming : false}
             isCancelling={surface ? surface.isCancelling : false}
             onSubmit={async (message, attachments) => {
-              if (surface) {
-                await surface.submit(message, attachments);
-                return;
-              }
+              // A refused send comes back to the composer, which gives the
+              // message back and says why.
+              if (surface) return surface.submit(message, attachments);
               const ok = await start.start(message, attachments);
               // The composer clears its draft optimistically; a failed create
               // hands the text back for the retry. Attachments are the one

@@ -68,6 +68,7 @@ import type {
   EngineMessage,
   ReasoningTrace,
   RecoverResult,
+  SendRefusal,
   StreamingSource,
   StreamSmoothingConfig,
 } from './types';
@@ -1829,8 +1830,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
   // ─── Send (centralized, with 409/redaction/block/error handling) ────────────
 
-  async function send(message: string, options: SendMessageOptions = {}) {
-    if (eventSource) return; // prevent concurrent sends
+  async function send(
+    message: string,
+    options: SendMessageOptions = {},
+  ): Promise<SendRefusal | null> {
+    if (eventSource) return null; // prevent concurrent sends
     dedupKeys = new Set(); // fresh send — no history to dedup against
 
     const convId = options.conversationId || conversationId;
@@ -1931,13 +1935,18 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           error: response.message || 'Failed to send message',
         }));
       }
+      return null;
     } catch (err) {
-      // 409 PENDING_RESPONSE — a response is already generating.
+      // 409 PENDING_RESPONSE — a response is already generating. In a space chat
+      // it may be another member's (backend B4 names them): the refusal goes back
+      // to the host, which gives the message back to the composer, and the engine
+      // follows the running turn as before.
       if (err instanceof AxiosError && err.response?.status === 409) {
         const responseData = err.response.data as { code?: string; data?: PendingResponseData } | undefined;
         if (responseData?.code === 'PENDING_RESPONSE') {
           removeMessage(optimisticMsg.id);
           const pendingData = responseData.data;
+          const refusal: SendRefusal = { kind: 'held', by: pendingData?.execution_user ?? null };
           if (pendingData?.execution_id) {
             connectToStream(pendingData.execution_id);
           } else if (convId) {
@@ -1950,7 +1959,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
               error: 'A response is still being generated.',
             }));
           }
-          return;
+          return refusal;
         }
       }
 
@@ -1962,7 +1971,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           ? `Redaction service is temporarily unavailable. Try again in ${retryAfter}s.`
           : 'Redaction service is temporarily unavailable. Please try again shortly.';
         setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: retryMsg }));
-        return;
+        return null;
       }
 
       // 429 content duplicate.
@@ -1974,7 +1983,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           isCancelling: false,
           error: 'This message was already sent. Please wait a moment.',
         }));
-        return;
+        return null;
       }
 
       // Server-side block (messages exhausted, account flagged) — inline soft banner.
@@ -1982,7 +1991,16 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (blocked) {
         removeMessage(optimisticMsg.id);
         addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null);
-        return;
+        return null;
+      }
+
+      // 403 — this reader may not send here (backend B4: a space's Viewer,
+      // `CANNOT_SEND`, after a demotion this screen has not read yet). Not a
+      // connection error: the host says why in the composer.
+      if (err instanceof AxiosError && err.response?.status === 403) {
+        removeMessage(optimisticMsg.id);
+        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        return { kind: 'forbidden' };
       }
 
       // Generic error.
@@ -1992,6 +2010,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           ? (err.response?.data as { message?: string })?.message || 'Failed to send message'
           : 'Network error. Please try again.';
       setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: errorMsg }));
+      return null;
     }
   }
 

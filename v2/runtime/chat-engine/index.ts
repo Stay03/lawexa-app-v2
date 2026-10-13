@@ -29,6 +29,7 @@ export type {
   EngineMessage,
   ReasoningTrace,
   RecoverResult,
+  SendRefusal,
   StreamingSource,
   StreamSmoothingConfig,
   StreamStyle,

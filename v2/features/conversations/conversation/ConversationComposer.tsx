@@ -51,6 +51,7 @@ import {
   privateModeOf,
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
+import type { SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
 
 /**
@@ -141,7 +142,12 @@ export interface ConversationComposerProps {
   isRedacted: boolean;
   isStreaming: boolean;
   isCancelling: boolean;
-  onSubmit: (message: string, attachments: MessageAttachment[]) => Promise<void>;
+  /**
+   * Send the turn. The draft clears as it goes; a refusal ({@link SendRefused}:
+   * another member's turn is running, or the reader may no longer send) gives
+   * the text, the pasted cards and the files back, with its sentence above.
+   */
+  onSubmit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
   onStop: () => void;
   /** Textarea placeholder — embedding surfaces brand it ("Ask about this case"). */
   placeholder?: string;
@@ -403,17 +409,27 @@ export function ConversationComposer({
       mime_type: u.mime_type,
     }));
 
+    // The draft clears as the message goes, and is kept here until the send is
+    // answered, so a refusal can give it all back.
+    const draft = { input, pasted: pastedItems.map((i) => i.text), uploads };
     setInput('');
     clearPasted();
-    // Send empties the tray, so every thumbnail made for it is released here.
-    for (const u of uploads) if (u.preview) URL.revokeObjectURL(u.preview);
     setUploads([]);
     setIsSubmitting(true);
+    let outcome: SendRefused | undefined;
     try {
-      await onSubmit(fullMessage, attachmentsSnapshot);
+      outcome = await onSubmit(fullMessage, attachmentsSnapshot);
     } finally {
       setIsSubmitting(false);
+      // A sent tray is gone, so every thumbnail made for it is released here.
+      if (!outcome) for (const u of draft.uploads) if (u.preview) URL.revokeObjectURL(u.preview);
     }
+    if (!outcome) return;
+    // Refused: the words come back unless the reader has typed new ones since.
+    updateInput((current) => (current.trim() === '' ? draft.input : current));
+    for (const text of draft.pasted) addPasted(text);
+    setUploads((current) => [...draft.uploads, ...current]);
+    showError(outcome.refused);
   };
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();

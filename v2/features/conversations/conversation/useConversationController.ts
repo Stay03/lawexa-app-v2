@@ -11,6 +11,7 @@ import {
 import type {
   ConversationReference,
   ConversationStatusData,
+  ConversationTurnUser,
   MessageAttachment,
 } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
@@ -25,10 +26,12 @@ import { ConfidentialConversationError, conversationsQueries } from '../queries'
 import {
   canSendIn,
   hasSpaceContract,
+  sendRefusal,
   stopsPolling,
   turnChanged,
   turnHeldBy,
   viewOnlyReason,
+  type SendRefused,
   type ViewOnlyReason,
 } from './space-turn';
 import {
@@ -239,8 +242,13 @@ export interface ConversationController {
   setJurisdiction: (next: JurisdictionChoice) => void;
   /** Latest transient narration line for the unified activity region (or null). */
   narration: string | null;
-  /** Send a turn on this conversation (the engine resolves confidential/redacted). */
-  submit: (message: string, attachments: MessageAttachment[]) => Promise<void>;
+  /**
+   * Send a turn on this conversation (the engine resolves confidential/redacted).
+   * Resolves to the refusal when the server would not take it (another member's
+   * turn is running, or the reader may no longer send): the composer gives the
+   * message back and shows the sentence.
+   */
+  submit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
   /** Graceful cancel (cancel POST; the engine waits for the terminal SSE event). */
   stop: () => void;
   /** Re-ask the last user turn to get a fresh answer (drives engine.send). */
@@ -297,6 +305,9 @@ export function useConversationController(
   // to a running turn, or found none). Until then the status poll waits, so
   // it can never attach to a turn the mount flow is attaching to.
   const [recoveredFor, setRecoveredFor] = useState<string | null>(null);
+  // Who the reader's last refused send met (a 409): the turn the engine then
+  // follows is theirs, until a status read says whose it is.
+  const [refusedBy, setRefusedBy] = useState<ConversationTurnUser | null>(null);
 
   const narrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -777,10 +788,13 @@ export function useConversationController(
     if (statusRefused) void queryClient.refetchQueries({ queryKey: detailKey, exact: true });
   }, [statusRefused, queryClient, detailKey]);
 
-  // Whose turn streams, read off the last status: a colleague's holds Send
-  // and names them; the reader's own keeps Stop, unless the status says the
-  // reader may not cancel it.
-  const heldBy = isStreaming ? turnHeldBy(statusData, serverUserId) : null;
+  // Whose turn streams, read off the last status, else off the refused send
+  // that met it: a colleague's holds Send and names them; the reader's own
+  // keeps Stop, unless the status says the reader may not cancel it.
+  const refusedByColleague = refusedBy !== null && refusedBy.id !== serverUserId ? refusedBy : null;
+  const heldBy = isStreaming
+    ? (turnHeldBy(statusData, serverUserId) ?? refusedByColleague)
+    : null;
   const canStop =
     isStreaming &&
     heldBy === null &&
@@ -796,15 +810,25 @@ export function useConversationController(
       // The last status read is from before this send: dropped, so a stale
       // "pending, by a colleague" can never label the reader's own turn.
       queryClient.removeQueries({ queryKey: statusKey, exact: true });
+      setRefusedBy(null);
       const fileIds = attachments.map((a) => a.file_id);
-      await send(message, {
+      const refusal = await send(message, {
         conversationId,
         streamMode: 'v2_stream',
         jurisdiction,
         ...(fileIds.length > 0 && { fileIds, attachments }),
       });
+      if (refusal === null) return undefined;
+      if (refusal.kind === 'held') {
+        setRefusedBy(refusal.by);
+      } else {
+        // Refused by role: read the record again, so `can_send` false swaps the
+        // composer for the view-only pill.
+        void queryClient.invalidateQueries({ queryKey: detailKey });
+      }
+      return { refused: sendRefusal(refusal, serverUserId) };
     },
-    [send, conversationId, jurisdiction, queryClient, statusKey],
+    [send, conversationId, jurisdiction, queryClient, statusKey, detailKey, serverUserId],
   );
 
   const stop = useCallback(() => cancelStream(), [cancelStream]);

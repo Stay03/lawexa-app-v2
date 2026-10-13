@@ -24,6 +24,7 @@ import type {
   ToolCompleteEvent,
   CompletedEvent,
   ConversationData,
+  ConversationTurnUser,
 } from '@/types/chat';
 import type { StreamSmoothingConfig } from './stream-smoother';
 
@@ -130,6 +131,18 @@ export type RecoverResult =
   | 'expired'
   | 'idle'
   | 'load_history';
+
+// ─── Send refusal (Spaces F4, backend B4) ──────────────────────────────────
+/**
+ * Why {@link ChatEngine.send} did not send. `held`: another turn is running
+ * in the chat (409 PENDING_RESPONSE), and `by` is its sender when the server
+ * names one; the engine follows that turn, as it always did. `forbidden`:
+ * this reader may not send here (403, a space's Viewer). Either way the
+ * message did not go, so the host gives it back to the composer.
+ */
+export type SendRefusal =
+  | { kind: 'held'; by: ConversationTurnUser | null }
+  | { kind: 'forbidden' };
 
 // ─── Engine handlers (hot-swappable callbacks + mode resolvers) ─────────────
 /**
@@ -264,7 +277,9 @@ export interface ChatEngine {
   readonly reasoning: StreamingSource;
 
   // ── Actions (v1 useChatStream parity) ──
-  send(message: string, options?: SendMessageOptions): Promise<void>;
+  /** Send a turn. Resolves to the refusal when the server would not take the
+   *  message ({@link SendRefusal}), else `null`. */
+  send(message: string, options?: SendMessageOptions): Promise<SendRefusal | null>;
   connectToStream(
     executionId: string,
     initialMessage?: string,

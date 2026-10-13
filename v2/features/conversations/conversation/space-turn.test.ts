@@ -3,8 +3,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
-import type { ApiMessage, ConversationAuthor, ConversationStatusData } from '@/types/chat';
+import type {
+  ApiMessage,
+  ConversationAuthor,
+  ConversationListItem,
+  ConversationsListResponse,
+  ConversationStatusData,
+} from '@/types/chat';
+import { conversationsCache, makeOptimisticConversation } from '../cache';
 import { conversationsQueries } from '../queries';
 import {
   askingLabel,
@@ -12,6 +20,7 @@ import {
   canSendIn,
   hasSpaceContract,
   SPACE_CHAT_POLL_MS,
+  sendRefusal,
   stopsPolling,
   turnChanged,
   turnHeldBy,
@@ -236,7 +245,7 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
     /await queryClient\.refetchQueries\(\{ queryKey: detailKey, exact: true \}\);\s*if \(cancelled\) return;\s*const fresh = queryClient\.getQueryData\(detailKey\);\s*if \(fresh\) adoptConversationHistory\(fresh\);\s*await recoverPendingState\(conversationId\)/,
   );
   // A send drops the last status read before it goes.
-  assert.match(controller, /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*const fileIds/);
+  assert.match(controller, /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);[\s\S]*?await send\(/);
 });
 
 test('a colleague’s turn names them in the activity row, holds Send and offers no Stop', () => {
@@ -249,4 +258,89 @@ test('a colleague’s turn names them in the activity row, holds Send and offers
   const screen = readHere('ConversationScreen.tsx');
   assert.match(screen, /sendHeldBy=\{controller\.sendHeldBy\}\s+canStop=\{controller\.canStop\}/);
   assert.match(screen, /controller\.sendHeldBy !== null \? askingLabel\(controller\.sendHeldBy\) : undefined/);
+});
+
+/* ── Commit 5: a send that meets another turn keeps the message ───────────── */
+
+test('a refused send says why, and that the message is kept', () => {
+  assert.equal(
+    sendRefusal({ kind: 'held', by: { id: 41, name: 'Ada' } }, 7),
+    'Ada is asking right now. Your message is kept.',
+  );
+  assert.equal(sendRefusal({ kind: 'held', by: null }, 7), 'Someone is asking right now. Your message is kept.');
+  assert.equal(
+    sendRefusal({ kind: 'held', by: { id: 7, name: 'Me' } }, 7),
+    'Your last question is still being answered. Your message is kept.',
+  );
+  assert.equal(sendRefusal({ kind: 'forbidden' }, 7), VIEW_ONLY_COPY.viewer);
+  for (const line of [sendRefusal({ kind: 'held', by: null }, 7), sendRefusal({ kind: 'forbidden' }, 7)]) {
+    assert.doesNotMatch(line, /[—–]/);
+  }
+});
+
+test('the engine hands the refusal back: a 409 before it follows the other turn, a 403 instead of a banner', () => {
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(
+    engine,
+    /const refusal: SendRefusal = \{ kind: 'held', by: pendingData\?\.execution_user \?\? null \};\s*if \(pendingData\?\.execution_id\) \{\s*connectToStream\(pendingData\.execution_id\);/,
+  );
+  assert.match(engine, /return refusal;/);
+  assert.match(
+    engine,
+    /if \(err instanceof AxiosError && err\.response\?\.status === 403\) \{\s*removeMessage\(optimisticMsg\.id\);\s*setState\(\(prev\) => \(\{ \.\.\.prev, isStreaming: false, isCancelling: false \}\)\);\s*return \{ kind: 'forbidden' \};/,
+  );
+  // The blocked-plan banner keeps its place before the 403.
+  assert.ok(engine.indexOf('const blocked = extractBlockedReason(err);') < engine.indexOf("return { kind: 'forbidden' };"));
+});
+
+test('submit drops the old status first, and a refusal by role re-reads the record', () => {
+  const controller = readHere('useConversationController.ts');
+  assert.match(
+    controller,
+    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*setRefusedBy\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
+  );
+  assert.match(controller, /void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);\s*\}\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
+  assert.match(controller, /\(turnHeldBy\(statusData, serverUserId\) \?\? refusedByColleague\)/);
+});
+
+test('the composer gives a refused message back, with its pasted cards and files, and says why', () => {
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(composer, /const draft = \{ input, pasted: pastedItems\.map\(\(i\) => i\.text\), uploads \};/);
+  assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot\);/);
+  assert.match(
+    composer,
+    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*showError\(outcome\.refused\);/,
+  );
+  // A sent tray's thumbnails are released only once the send was taken.
+  assert.match(composer, /if \(!outcome\) for \(const u of draft\.uploads\) if \(u\.preview\) URL\.revokeObjectURL\(u\.preview\);/);
+  // The case dock passes the refusal through.
+  assert.match(read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx'), /if \(surface\) return surface\.submit\(message, attachments\);/);
+});
+
+test('a send moves its chat to the top of the owner’s lists once, with no second row', () => {
+  const page = (rows: ConversationListItem[]): ConversationsListResponse => ({
+    success: true,
+    message: '',
+    data: rows,
+    pagination: { current_page: 1, per_page: 20, total: rows.length, last_page: 2, from: 1, to: rows.length },
+    links: { first: '', last: '', prev: null, next: null },
+  });
+  const row = (id: string) => makeOptimisticConversation(id, id);
+  const client = new QueryClient();
+  const flatKey = [...conversationsQueries.lists(), { per_page: 10 }, { viewerId: 7 }];
+  const infiniteKey = [...conversationsQueries.lists(), 'infinite', {}, { viewerId: 7 }];
+  client.setQueryData(flatKey, page([row('a'), row('b'), row('c')]));
+  client.setQueryData<InfiniteData<ConversationsListResponse>>(infiniteKey, {
+    pages: [page([row('a'), row('b')]), page([row('c'), row('d')])],
+    pageParams: [1, 2],
+  });
+  conversationsCache.touch(client, 'c');
+  const flat = client.getQueryData<ConversationsListResponse>(flatKey);
+  assert.deepEqual(flat?.data.map((r) => r.id), ['c', 'a', 'b']);
+  const infinite = client.getQueryData<InfiniteData<ConversationsListResponse>>(infiniteKey);
+  assert.deepEqual(infinite?.pages.map((p) => p.data.map((r) => r.id)), [['c', 'a', 'b'], ['d']]);
+  // A chat that is not in the reader's own lists (a colleague's) changes nothing.
+  conversationsCache.touch(client, 'zz');
+  assert.equal(client.getQueryData(flatKey), flat);
+  client.clear();
 });
