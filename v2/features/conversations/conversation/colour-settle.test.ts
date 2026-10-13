@@ -52,6 +52,9 @@ test('a chat’s space is read off the lists cached on this device', () => {
   assert.equal(spaceOfListedChat(client, 'c'), 's2');
   assert.equal(spaceOfListedChat(client, 'd'), null, 'not a chat');
   assert.equal(spaceOfListedChat(client, 'zz'), null, 'not cached');
+  // The reader's list may not name a chat's space; the space's own list still does.
+  client.setQueryData([...conversationsQueries.lists(), { per_page: 10 }, { viewerId: 7 }], envelope([makeOptimisticConversation('c', 'c')]));
+  assert.equal(spaceOfListedChat(client, 'c'), 's2');
   client.clear();
 });
 

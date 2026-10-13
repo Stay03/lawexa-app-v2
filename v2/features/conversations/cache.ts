@@ -287,8 +287,9 @@ export function spaceOfListedChat(queryClient: QueryClient, id: string): string 
   for (const [, cache] of queryClient.getQueriesData<ListCache>({ queryKey: conversationsQueries.lists() })) {
     if (!cache) continue;
     const rows = isInfinite(cache) ? cache.pages.flatMap((page) => page.data) : cache.data;
-    const row = rows.find((candidate) => sameId(candidate, id));
-    if (row) return row.space?.uuid ?? null;
+    // A row that names no space does not settle it: a space's own list may.
+    const space = rows.find((candidate) => sameId(candidate, id))?.space?.uuid;
+    if (space) return space;
   }
   for (const [key, cache] of queryClient.getQueriesData<InfiniteData<SpaceConversationListResponse>>({
     queryKey: spacesQueries.contents(),
