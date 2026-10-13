@@ -531,7 +531,8 @@ export function useConversationController(
         return;
       }
 
-      // Whether the record names a space (Spaces F4), for the status read below.
+      // Whether the reader is a member of the record's space (Spaces F4), for
+      // the status read below.
       let inSpace = false;
       try {
         // Cache-first history. Resolves from the warm entry with NO request (the
@@ -540,7 +541,9 @@ export function useConversationController(
         // the single fetch the query layer then owns, dedupes and retains.
         const data = await queryClient.ensureQueryData(detailOptions);
         if (cancelled) return;
-        inSpace = data.space != null;
+        // A member only: a stranger reading a published space chat is refused
+        // the status (403), so it is not asked.
+        inSpace = data.space != null && data.my_space_role != null;
         adoptConversationHistory(data);
       } catch (err) {
         if (cancelled) return;
@@ -736,6 +739,10 @@ export function useConversationController(
   // confidential chat) are the owner's own, so ownership answers there.
   const canSend = detailData ? canSendIn(detailData, isOwner) : isOwner;
   const isSpaceChat = detailData?.space != null;
+  // The reader is a member of the chat's space (they have a role in it). Only a
+  // member may read the status (B4); a stranger reading a published space chat
+  // would be refused it once and then re-read the transcript (F4 review N8).
+  const isSpaceMember = isSpaceChat && detailData?.my_space_role != null;
   const showAuthors = isSpaceChat && hasSpaceContract(detailData);
 
   const references = detailData?.references ?? NO_REFERENCES;
@@ -771,12 +778,13 @@ export function useConversationController(
   // B4 has no push channel, so an open space chat reads its status every four
   // seconds (`conversationsQueries.status`: paused in a hidden tab, stopped by
   // a 403 or 404). Never while this screen streams: the engine owns liveness
-  // then. Never before the mount flow settled its recovery, and never on a
-  // personal or confidential chat.
+  // then. Never before the mount flow settled its recovery, never for a reader
+  // who is not a member of the space, and never on a personal or confidential
+  // chat.
   const statusQuery = useQuery({
     ...statusOptions,
     enabled:
-      isSpaceChat &&
+      isSpaceMember &&
       !isConfidential &&
       !isGoneOnServer &&
       recoveredFor === conversationId &&

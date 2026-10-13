@@ -240,7 +240,7 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
   const controller = readHere('useConversationController.ts');
   assert.match(
     controller,
-    /enabled:\s*isSpaceChat &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
+    /enabled:\s*isSpaceMember &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
   );
   // Recovery settles after the mount flow's own attach, or on any connect.
   assert.match(controller, /const recovered = await recoverPendingState\(conversationId\)[^\n]*\n\s*if \(cancelled\) return;[\s\S]*?setRecoveredFor\(conversationId\);\s*\}\)\(\);/);
@@ -534,4 +534,12 @@ test('a send and a re-ask forget the last status as seen, so their own turn is n
   assert.equal(resets?.length, 2, 'submit and regenerate');
   // The first read with nothing seen never refetches the transcript.
   assert.match(controller, /if \(previous !== null && turnChanged\(previous, statusData\)\) \{/);
+});
+
+/* ── A stranger reading a published space chat is not polled (review N8) ──── */
+
+test('only a member of the space reads its status', () => {
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /const isSpaceMember = isSpaceChat && detailData\?\.my_space_role != null;/);
+  assert.match(controller, /inSpace = data\.space != null && data\.my_space_role != null;/);
 });
