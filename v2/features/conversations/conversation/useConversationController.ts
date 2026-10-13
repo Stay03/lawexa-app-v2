@@ -550,6 +550,21 @@ export function useConversationController(
       if (cancelled) return;
       // Unchanged ordering: history ALWAYS settles before recovery re-attaches, so a
       // reconnect can never find an empty transcript to stream into.
+      //
+      // KNOWN LIMIT, A SPACE CHAT OPENED FROM ITS CACHED COPY MID-TURN (Spaces F4,
+      // accepted by the techlead 13 October 2026). `ensureQueryData` above hands
+      // back the copy held in memory or on the device without waiting, so when a
+      // colleague's turn is running the screen attaches below with a transcript
+      // that ends BEFORE their question. The revisit's re-read lands while the
+      // engine streams, and the engine declines it (a live stream is never
+      // disturbed, `adoptConversationHistory`), so their answer streams in under
+      // the earlier question. It resolves at the turn's end when the engine
+      // followed it by polling (no execution id: `pollForCompletion` reloads the
+      // whole transcript), and on the next open of the chat when it followed the
+      // stream: the stream's terminal ids name the question as already shown,
+      // so the merge after `completed` does not add it. A cold open reads the
+      // transcript first and has neither gap; so does a turn the status poll
+      // finds once the screen is open (it reads the transcript before attaching).
       const recovered = await recoverPendingState(conversationId).catch(() => 'load_history' as const);
       if (cancelled) return;
       // Attached to a turn already running in a space chat (a colleague's,
