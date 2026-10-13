@@ -37,15 +37,37 @@ export function KeyboardDebugReadout() {
       return `top ${Math.round(rect.top)} h ${Math.round(rect.height)}`;
     };
 
+    // When the last focus landed, so a frame's distance from the tap is read
+    // off the recording.
+    let focusedAt = Number.NaN;
+    const ms = (value: number): string => (Number.isNaN(value) ? 'none' : `${Math.round(value)}`);
+
     const draw = (): void => {
-      const card = document.querySelector('[role="dialog"][aria-label="Chat about this case"]');
+      const card = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Chat about this case"]');
       const bar = document.querySelector('.v2-shell__header');
       const content = document.getElementById(V2_SHELL_CONTENT_ID);
       const close = card?.querySelector('[aria-label="Close the chat"]') ?? null;
       const active = document.activeElement;
       const composerFocused =
         card !== null && active instanceof HTMLTextAreaElement && card.contains(active);
+      const root = document.documentElement.style;
+      const published =
+        parseFloat(root.getPropertyValue('--visual-top')) +
+        parseFloat(root.getPropertyValue('--visual-height'));
+      const heldTop = card?.style.getPropertyValue('--v2-case-chat-held-top') ?? '';
+      const heldHeight = card?.style.getPropertyValue('--v2-case-chat-held-height') ?? '';
+      const box = composerFocused ? active.getBoundingClientRect() : null;
+      const slot = card?.firstElementChild ?? null;
       output.textContent = [
+        `t ${Math.round(performance.now() % 100000)}`,
+        `since focus ${ms(performance.now() - focusedAt)}`,
+        `vv.top+h ${ms(published)}`,
+        `card h ${card ? card.offsetHeight : 'none'}`,
+        `held ${heldTop || heldHeight ? `${heldTop} ${heldHeight}` : 'none'}`,
+        `rising ${card?.getAttribute('data-keyboard') ?? 'no'}`,
+        `box ${box ? `top ${Math.round(box.top)} h ${Math.round(box.height)} bottom ${Math.round(box.bottom)}` : 'none'}`,
+        `html bg ${root.backgroundColor || 'none'}`,
+        `slot opacity ${slot ? getComputedStyle(slot).opacity : 'none'}`,
         `vv.offsetTop ${viewport ? Math.round(viewport.offsetTop) : 'n/a'}`,
         `vv.height ${viewport ? Math.round(viewport.height) : 'n/a'}`,
         `innerHeight ${window.innerHeight}`,
@@ -73,19 +95,23 @@ export function KeyboardDebugReadout() {
       until = performance.now() + 2000;
       if (frame === 0) frame = requestAnimationFrame(tick);
     };
+    const onFocusIn = (): void => {
+      focusedAt = performance.now();
+      change();
+    };
 
     draw();
     viewport?.addEventListener('resize', change);
     viewport?.addEventListener('scroll', change);
     window.addEventListener('scroll', change);
-    document.addEventListener('focusin', change);
+    document.addEventListener('focusin', onFocusIn);
     document.addEventListener('focusout', change);
     return () => {
       cancelAnimationFrame(frame);
       viewport?.removeEventListener('resize', change);
       viewport?.removeEventListener('scroll', change);
       window.removeEventListener('scroll', change);
-      document.removeEventListener('focusin', change);
+      document.removeEventListener('focusin', onFocusIn);
       document.removeEventListener('focusout', change);
     };
   }, []);

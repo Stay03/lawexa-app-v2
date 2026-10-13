@@ -25,11 +25,61 @@ import { guardChatDrags } from './case-chat-drag-guard';
 const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
 
 /**
- * How long the opening phone card holds its rising geometry after the tap.
- * iOS animates the keyboard over about 250 ms; the rest covers the latency of
- * its first viewport event.
+ * How long the phone card holds its rising geometry after the keyboard starts
+ * up. iOS animates the keyboard over about 250 ms; the rest covers the latency
+ * of its viewport events. The hold ends then only if those events agree with
+ * the card (see the hold effect).
  */
 const KEYBOARD_RISE_MS = 350;
+
+/**
+ * The longest a rise holds the card, whatever iOS has reported by then: a
+ * keyboard whose second event never comes still gives the card back to the
+ * visible viewport.
+ */
+const KEYBOARD_SETTLE_CAP_MS = 1000;
+
+/**
+ * TEMPORARY, with the `?kbnopan=` flag that sets it (`CaseScreen`): a probe of
+ * whether iOS skips its pan when the focused box is already above where the
+ * keyboard will be. `static` sizes the card to that end geometry at the
+ * focus; `ride` also moves the composer up from the screen's bottom on a
+ * curve of its own. Delete with `KeyboardDebugReadout` once the recording
+ * has been read.
+ */
+export type KeyboardProbe = 'static' | 'ride';
+
+/**
+ * The probe's hold, written in the same task as the focus so iOS measures the
+ * box inside it: the card from the layout top down to where the keyboard's
+ * top will be, using the keyboard height the hook last saw at this width
+ * (`--visual-keyboard`). Returns false when no keyboard has been seen yet,
+ * and the ordinary hold runs instead. Reached only with the flag set.
+ */
+function holdForProbe(card: HTMLElement, probe: KeyboardProbe): boolean {
+  const root = document.documentElement.style;
+  const keyboard = parseFloat(root.getPropertyValue('--visual-keyboard'));
+  const height = parseFloat(root.getPropertyValue('--visual-height'));
+  if (!(keyboard > 0) || !(height > keyboard)) return false;
+  card.style.setProperty('--v2-case-chat-held-top', '0px');
+  card.style.setProperty('--v2-case-chat-held-height', `${height - keyboard}px`);
+  // The composer dock is the card's last child (one node, never remounted).
+  // Moved from the next frame on, so the focus-time measure sees it in place.
+  const composer = card.lastElementChild;
+  if (
+    probe === 'ride' &&
+    composer instanceof HTMLElement &&
+    !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    requestAnimationFrame(() => {
+      composer.animate(
+        [{ transform: `translateY(${keyboard}px)` }, { transform: 'translateY(0)' }],
+        { duration: KEYBOARD_RISE_MS, easing: 'cubic-bezier(0.22, 0.61, 0.36, 1)' },
+      );
+    });
+  }
+  return true;
+}
 
 /**
  * CaseAskDock — the case chat's one screen (`CaseChatCore`) as a dock at the
@@ -60,9 +110,9 @@ const KEYBOARD_RISE_MS = 350;
  * NO SLIDE ON THE PHONE. The open card does not move: the bar and middle fade
  * in above a composer that stays where the reader's finger left it. A box
  * whose height changes while it slides was the jump Stay saw on Samsung.
- * Opened by a tap, the card covers the page from the screen's top while the
- * keyboard rises and shows its bar and middle once it has stopped (see the
- * open effect below).
+ * While the keyboard rises, the card covers the page from the screen's top
+ * and shows its bar and middle once iOS's numbers have settled (see the hold
+ * effect below).
  *
  * CLOSING ON THE PHONE IS ONE FADE OF A STILL CARD. The card keeps the top
  * and height it had at the close while the keyboard goes down, the whole
@@ -83,6 +133,7 @@ export function CaseAskDock({
   onDock,
   onOpenChat,
   arrive = true,
+  keyboardProbe = null,
 }: {
   slug: string;
   signedIn: boolean;
@@ -106,6 +157,8 @@ export function CaseAskDock({
   onClose: () => void;
   onDock: () => void;
   onOpenChat: (conversationId: string) => void;
+  /** TEMPORARY: the `?kbnopan=` probe (see `KeyboardProbe`); null without it. */
+  keyboardProbe?: KeyboardProbe | null;
 }) {
   const panelMounted = view !== null;
   const screenMounted = screen && panelMounted;
@@ -163,6 +216,14 @@ export function CaseAskDock({
   // page (`pagehide`) gives them back too, so a page frozen in the
   // back-forward cache never holds hidden bars; if it comes back from that
   // cache (`pageshow`, persisted) with the chat still open, they hide again.
+  //
+  // THE CANVAS TAKES THE CARD'S COLOUR WHILE THE CHAT IS OPEN. iOS's pan
+  // trails its keyboard by up to 110 pt while the keyboard rises, and runs
+  // behind it again on Done, and the strip between them shows the canvas,
+  // which is the root's background: a dark band under the composer (Arthur's
+  // recording, 13 October 2026). With the root's background the card's
+  // colour, the composer sits on its own card above the keyboard. Saved and
+  // put back with the bars, so every way out restores it.
   useLayoutEffect(() => {
     if (!screenMounted) return;
     const chrome = SHELL_CHROME.flatMap((selector) =>
@@ -170,8 +231,10 @@ export function CaseAskDock({
     );
     const scroller = document.getElementById(V2_SHELL_CONTENT_ID);
     if (!scroller) return;
+    const root = document.documentElement;
     const display = chrome.map((element) => element.style.display);
     const { paddingTop, paddingBottom } = scroller.style;
+    const { backgroundColor } = root.style;
     const hide = (): void => {
       const before = scroller.getBoundingClientRect();
       chrome.forEach((element) => {
@@ -181,6 +244,7 @@ export function CaseAskDock({
       const padding = getComputedStyle(scroller);
       scroller.style.paddingTop = `${parseFloat(padding.paddingTop) + before.top - after.top}px`;
       scroller.style.paddingBottom = `${parseFloat(padding.paddingBottom) + after.bottom - before.bottom}px`;
+      root.style.backgroundColor = 'var(--popover)';
     };
     const restore = (): void => {
       chrome.forEach((element, index) => {
@@ -188,6 +252,7 @@ export function CaseAskDock({
       });
       scroller.style.paddingTop = paddingTop;
       scroller.style.paddingBottom = paddingBottom;
+      root.style.backgroundColor = backgroundColor;
     };
     const onPageShow = (event: PageTransitionEvent): void => {
       if (event.persisted) hide();
@@ -267,21 +332,39 @@ export function CaseAskDock({
     };
   }, [screenOpen, screenMounted]);
 
-  // OPENING ON A PHONE HOLDS STILL WHILE THE KEYBOARD RISES. iOS reports the
-  // keyboard's end geometry at its first viewport event and then pans the
-  // page for about 250 ms, so a card at `--visual-top` was drawn where it
-  // would end: low on the screen with the judgment above it, sliding up as
-  // the pan finished (Arthur's recordings, 12 October 2026). No event reports
-  // the pan's progress. So for KEYBOARD_RISE_MS after a tap the card's top
-  // is the layout viewport's top, where it covers the page in every frame of
-  // the pan, and its bottom is the visible bottom, where the composer rides
-  // the keyboard; its bar and middle are transparent (`data-keyboard`). Then
-  // the card takes the visible geometry: its bottom edge is the same, so the
-  // composer does not move, and the bar and middle fade in once. A deep link
-  // (`?chat=` at load) focuses nothing and opens as before.
+  // THE PHONE CARD HOLDS STILL WHILE THE KEYBOARD RISES. iOS pans the whole
+  // layout viewport up the screen for about 250 ms while its keyboard rises,
+  // and tells the page only the end geometry, in two events about 65 ms
+  // apart: a `resize` with the keyboard-up height and no offset, then a
+  // `scroll` with the offset. A card sized from those numbers while they
+  // were arriving was sized twice: from the sum of the two, it shrank to the
+  // new height at the first event and grew back at the second, and the
+  // composer at its bottom jumped up 390 pt and then down 346 pt (Arthur's
+  // recording, 13 October 2026). No event reports the pan's progress or the
+  // keyboard's.
   //
-  // THE HOLD ENDS EARLY IF THE KEYBOARD STOPS RISING: the composer losing
-  // focus (the keyboard goes down) or the visible width changing (a rotation,
+  // So during a rise the card's top is the layout viewport's top and its
+  // height is the layout viewport's (`100dvh`, a length the two events do
+  // not change): it covers the page in every frame of the pan, and the
+  // composer at its bottom rides iOS's pan. The pan trails the keyboard, so
+  // the composer comes up from under the keyboard's edge; no page event can
+  // see that. Its bar and middle are transparent (`data-keyboard`). The card
+  // takes the visible geometry once iOS's numbers agree with it, top plus
+  // height at its bottom: at KEYBOARD_RISE_MS if they do by then, else at
+  // the first viewport event that makes them agree, and at
+  // KEYBOARD_SETTLE_CAP_MS whatever they say. Its bottom edge is the same
+  // then, so the composer does not move, and the bar and middle fade in
+  // once. A deep link (`?chat=` at load) focuses nothing and opens as before.
+  //
+  // EVERY RISE HOLDS, NOT ONLY THE OPEN. The tap that opens the chat starts
+  // one at once. A later focus of a box in the open card while the keyboard
+  // is down (after Done, or a blur) starts one too, and its bar and middle
+  // go transparent at the first viewport event that shows the keyboard
+  // coming, so a focus that raises no keyboard (a desktop window, Android's
+  // one resize of the layout viewport) changes nothing on screen.
+  //
+  // THE HOLD ENDS EARLY IF THE KEYBOARD STOPS RISING: the box losing focus
+  // (the keyboard goes down) or the visible width changing (a rotation,
   // where the keyboard's geometry starts again). A close during the hold
   // ends it too, but leaves the held pair on the card: the close effect
   // measures the card as it is on screen and freezes it there. Every way to
@@ -289,36 +372,82 @@ export function CaseAskDock({
   useLayoutEffect(() => {
     const card = cardRef.current;
     if (!screenOpen || !card) return;
-    const active = document.activeElement;
-    if (!(active instanceof HTMLTextAreaElement) || !card.contains(active)) return;
     const viewport = window.visualViewport;
-    const width = viewport?.width;
-    card.style.setProperty('--v2-case-chat-held-top', '0px');
-    card.style.setProperty(
-      '--v2-case-chat-held-height',
-      'calc(var(--visual-top, 0px) + var(--visual-height, 100dvh))',
-    );
-    card.setAttribute('data-keyboard', 'rising');
-    let timer = 0;
-    const onResize = (): void => {
-      if (viewport?.width !== width) release();
+    const published = (name: string): number =>
+      parseFloat(document.documentElement.style.getPropertyValue(name));
+    // The visible rectangle the keyboard hook last published ends at the
+    // card's bottom. The hook's viewport listeners were added first (it
+    // mounts with the v2 layout), so on every event it publishes before
+    // this reads. With no visual viewport nothing will report, so it agrees.
+    const agrees = (): boolean =>
+      !viewport ||
+      Math.abs(published('--visual-top') + published('--visual-height') - card.offsetHeight) <= 1;
+    const keyboardDown = (): boolean =>
+      published('--visual-top') === 0 &&
+      Math.abs(published('--visual-height') - card.offsetHeight) <= 1;
+    let stopHold: (() => void) | null = null;
+
+    const hold = (box: HTMLTextAreaElement, rising: boolean): void => {
+      const width = viewport?.width;
+      const probed = keyboardProbe !== null && holdForProbe(card, keyboardProbe);
+      if (!probed) {
+        card.style.setProperty('--v2-case-chat-held-top', '0px');
+        card.style.setProperty('--v2-case-chat-held-height', '100dvh');
+        if (rising) card.setAttribute('data-keyboard', 'rising');
+      }
+      let risen = false;
+      let riseTimer = 0;
+      let capTimer = 0;
+      const onViewport = (): void => {
+        if (viewport?.width !== width) {
+          release();
+          return;
+        }
+        if (!probed && published('--visual-height') < card.offsetHeight - 1) {
+          card.setAttribute('data-keyboard', 'rising');
+        }
+        if (risen && agrees()) release();
+      };
+      const onRisen = (): void => {
+        risen = true;
+        if (agrees()) release();
+      };
+      const stop = (): void => {
+        window.clearTimeout(riseTimer);
+        window.clearTimeout(capTimer);
+        box.removeEventListener('focusout', release);
+        viewport?.removeEventListener('resize', onViewport);
+        viewport?.removeEventListener('scroll', onViewport);
+        card.removeAttribute('data-keyboard');
+        stopHold = null;
+      };
+      const release = (): void => {
+        stop();
+        card.style.removeProperty('--v2-case-chat-held-top');
+        card.style.removeProperty('--v2-case-chat-held-height');
+      };
+      riseTimer = window.setTimeout(onRisen, KEYBOARD_RISE_MS);
+      capTimer = window.setTimeout(release, KEYBOARD_SETTLE_CAP_MS);
+      box.addEventListener('focusout', release);
+      viewport?.addEventListener('resize', onViewport);
+      viewport?.addEventListener('scroll', onViewport);
+      stopHold = stop;
     };
-    const stop = (): void => {
-      window.clearTimeout(timer);
-      active.removeEventListener('focusout', release);
-      viewport?.removeEventListener('resize', onResize);
-      card.removeAttribute('data-keyboard');
+
+    const active = document.activeElement;
+    if (active instanceof HTMLTextAreaElement && card.contains(active)) hold(active, true);
+    const onFocusIn = (event: FocusEvent): void => {
+      const box = event.target;
+      if (stopHold === null && box instanceof HTMLTextAreaElement && keyboardDown()) {
+        hold(box, false);
+      }
     };
-    const release = (): void => {
-      stop();
-      card.style.removeProperty('--v2-case-chat-held-top');
-      card.style.removeProperty('--v2-case-chat-held-height');
+    card.addEventListener('focusin', onFocusIn);
+    return () => {
+      card.removeEventListener('focusin', onFocusIn);
+      stopHold?.();
     };
-    timer = window.setTimeout(release, KEYBOARD_RISE_MS);
-    active.addEventListener('focusout', release);
-    viewport?.addEventListener('resize', onResize);
-    return stop;
-  }, [screenOpen]);
+  }, [screenOpen, keyboardProbe]);
 
   // WHILE THE PHONE CHAT IS OPEN A DRAG IN IT NEVER PANS THE SCREEN. With the
   // keyboard up, iOS scrolls the visible viewport inside the taller layout
@@ -409,9 +538,9 @@ export function CaseAskDock({
                 // page to reveal the box, `--visual-top` follows the pan, so
                 // the card never hangs above the screen; with the keyboard
                 // down it is 0, so the card's own bar is the top of the
-                // screen (use-keyboard-inset). While the keyboard rises after
-                // a tap, and while it fades out, the held pair (the open and
-                // close effects).
+                // screen (use-keyboard-inset). While the keyboard rises, and
+                // while the card fades out, the held pair (the hold and close
+                // effects).
                 top: 'var(--v2-case-chat-held-top, var(--visual-top, 0px))',
                 height: 'var(--v2-case-chat-held-height, var(--visual-height, 100dvh))',
               }
@@ -423,10 +552,10 @@ export function CaseAskDock({
         {screenMounted ? (
           // Opening, the bar and middle fade in on the opaque card; closing,
           // the card fades as a whole, so this slot has no exit of its own.
-          // Opened by a tap, the slot is transparent, and takes no tap, while
-          // the keyboard rises, and fades in once when it stops; a deep link
-          // has no hold, so the mount fade shows it. Reduced motion: it
-          // appears at the switch.
+          // While the keyboard rises the slot is transparent, and takes no
+          // tap, and it fades in once when the rise ends; on a later rise it
+          // fades out first. A deep link has no hold, so the mount fade shows
+          // it. Reduced motion: it appears and goes at the switch.
           <div className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-[keyboard=rising]:pointer-events-none in-data-[keyboard=rising]:opacity-0">
             <CaseChatBar
               view={view}

@@ -49,9 +49,9 @@ test('the phone sheet is gone; the dock owns the chat on a phone, with one compo
 });
 
 test('the open phone card is the visible viewport, with no slide', () => {
-  // The held pair comes first, and exists only while the keyboard rises after a tap
-  // and while the card fades out (the open and close tests below); otherwise the
-  // card reads the visible viewport alone.
+  // The held pair comes first, and exists only while the keyboard rises and while
+  // the card fades out (the hold and close tests below); otherwise the card reads
+  // the visible viewport alone.
   assert.match(ask, /top: 'var\(--v2-case-chat-held-top, var\(--visual-top, 0px\)\)'/);
   assert.match(ask, /height: 'var\(--v2-case-chat-held-height, var\(--visual-height, 100dvh\)\)'/);
   assert.doesNotMatch(ask, /--keyboard-inset/);
@@ -128,10 +128,10 @@ test('the open card is full size and opaque from its first frame, whatever is lo
   assert.deepEqual(keys, ['top', 'height']);
   assert.match(card, /top: 'var\(--v2-case-chat-held-top, var\(--visual-top, 0px\)\)'/);
   assert.match(card, /height: 'var\(--v2-case-chat-held-height, var\(--visual-height, 100dvh\)\)'/);
-  // The held pair has two writers, the open effect (a tap's hold) and the close
-  // effect, and one reader, this style.
-  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-top'/g)?.length, 2);
-  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-height'/g)?.length, 2);
+  // The held pair has three writers, the hold effect (a keyboard's rise), the
+  // `?kbnopan=` probe's hold and the close effect, and one reader, this style.
+  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-top'/g)?.length, 3);
+  assert.equal(ask.match(/setProperty\(\s*'--v2-case-chat-held-height'/g)?.length, 3);
   assert.equal(ask.match(/var\(--v2-case-chat-held-top,/g)?.length, 1);
   assert.equal(ask.match(/var\(--v2-case-chat-held-height,/g)?.length, 1);
   assert.doesNotMatch(ask, /isPending|isLoading|isFetching/);
@@ -452,6 +452,10 @@ test('the composer is never remounted: one node, at a fixed place in the card', 
   assert.equal(ask.match(/<CaseChatComposerDock/g)?.length, 1);
   const dock = ask.slice(ask.indexOf('<CaseChatComposerDock'), ask.indexOf('/>', ask.indexOf('<CaseChatComposerDock')));
   assert.doesNotMatch(dock, /\bkey=/);
+  // The composer stays visible through a rise and rides iOS's pan (the techlead, 13
+  // October 2026). Fading it with the bar and middle is a deliberate switch, so a
+  // class on the dock that hides it fails here first.
+  assert.doesNotMatch(dock, /opacity-0/);
   // Inside the dock the composer is rendered once, unkeyed, whatever the state.
   assert.equal(core.match(/<ConversationComposer\b/g)?.length, 1);
   const composerProps = core.slice(core.indexOf('<ConversationComposer'), core.indexOf('onSubmit=', core.indexOf('<ConversationComposer')));
@@ -473,68 +477,128 @@ test('the keyboard readout loads only with ?kbdebug=1 and listens only while mou
   assert.ok(adds > 0);
   assert.equal(effect.match(/addEventListener\(/g)?.length, adds);
   assert.equal(effect.match(/removeEventListener\(/g)?.length, adds);
+  // The hold's own numbers (13 October 2026), so a recording shows when the card is
+  // held, what iOS has reported against the card, and where the box and the canvas are.
+  for (const line of ['t ', 'since focus ', 'vv.top+h ', 'card h ', 'held ', 'rising ', 'box ', 'html bg ', 'slot opacity ']) {
+    assert.ok(readout.includes('`' + line), line);
+  }
+  // The time since a focus comes from the focusin listener, which is still one listener.
+  assert.match(readout, /const onFocusIn = \(\): void => \{\s*focusedAt = performance\.now\(\);\s*change\(\);\s*\};/);
   // Never takes a tap, and reads no user data from the page (no field values, no text, no ids).
   assert.match(readout, /pointer-events-none fixed left-0/);
   assert.doesNotMatch(readout, /\.value\b|innerText|\.id\b|textContent\s*[^=\s]/);
 });
 
 /* Arthur's recordings of the open (12 October 2026): iOS reports the keyboard's end
- * geometry at its first event and pans the page for about 250 ms after it, so the
- * card was drawn low with the judgment above it and slid up. Opened by a tap, the
- * card now covers from the screen's top while the keyboard rises, its bar and
- * middle transparent, and takes the visible geometry once, the bar and middle
- * fading in. */
+ * geometry and pans the page for about 250 ms after it, so the card was drawn low with
+ * the judgment above it and slid up. During a rise the card now covers from the
+ * layout viewport's top, its bar and middle transparent, and takes the visible
+ * geometry once, the bar and middle fading in.
+ *
+ * His recording of 13 October 2026 (cb54453): iOS sends those end values in two
+ * events about 65 ms apart, a `resize` (height 462, offset 0) and then a `scroll`
+ * (offset 390). The held height was their live sum, so the card was 852 tall, then
+ * 462, then 852 again, and the composer at its bottom jumped up 390 pt and down
+ * 346 pt. The held height is now a length, and the hold ends only once iOS's numbers
+ * agree with the card. Every rise holds, not only the open's. */
 
-/** The open effect: the hold after a tap. */
+/** The hold effect: one hold per rise of the keyboard while the phone chat is open. */
 const openEffect = () => {
-  const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card\) return;\s*const active = document\.activeElement;[\s\S]*?\}, \[screenOpen\]\);/)?.[0];
-  assert.ok(effect, 'a layout effect on the open state holds the card after a tap');
+  const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card\) return;\s*const viewport = window\.visualViewport;[\s\S]*?\}, \[screenOpen, keyboardProbe\]\);/)?.[0];
+  assert.ok(effect, 'a layout effect on the open state holds the card while the keyboard rises');
   return effect;
 };
 
-test('a tap opens the card held from the screen top to the visible bottom, for KEYBOARD_RISE_MS', () => {
+test('a rise holds the card at the layout viewport, a length, until iOS reports a geometry that agrees', () => {
   const effect = openEffect();
   assert.match(ask, /const KEYBOARD_RISE_MS = 350;/);
-  // Only a focus in the card's box, which is the tap; a deep link focuses nothing.
-  assert.match(effect, /if \(!\(active instanceof HTMLTextAreaElement\) \|\| !card\.contains\(active\)\) return;/);
-  // The three writes: top at the layout viewport's top, bottom at the visible bottom.
-  assert.match(effect, /card\.style\.setProperty\('--v2-case-chat-held-top', '0px'\);/);
+  assert.match(ask, /const KEYBOARD_SETTLE_CAP_MS = 1000;/);
+  // The tap that opens the chat starts one at once: a focus in the card's box. A
+  // deep link focuses nothing.
   assert.match(
     effect,
-    /card\.style\.setProperty\(\s*'--v2-case-chat-held-height',\s*'calc\(var\(--visual-top, 0px\) \+ var\(--visual-height, 100dvh\)\)',\s*\);/,
+    /const active = document\.activeElement;\s*if \(active instanceof HTMLTextAreaElement && card\.contains\(active\)\) hold\(active, true\);/,
   );
-  assert.match(effect, /card\.setAttribute\('data-keyboard', 'rising'\);/);
-  // Released after the rise: the three writes undone.
-  assert.match(effect, /timer = window\.setTimeout\(release, KEYBOARD_RISE_MS\);/);
+  // The writes: top at the layout viewport's top, height the layout viewport's.
+  assert.match(
+    effect,
+    /card\.style\.setProperty\('--v2-case-chat-held-top', '0px'\);\s*card\.style\.setProperty\('--v2-case-chat-held-height', '100dvh'\);\s*if \(rising\) card\.setAttribute\('data-keyboard', 'rising'\);/,
+  );
+  // Never the live sum of the viewport variables: iOS sends them in two events 65 ms
+  // apart, and the sum sized the card twice, 852 then 462 then 852 (Arthur's
+  // recording, 13 October 2026).
+  assert.doesNotMatch(ask, /calc\(var\(--visual-top/);
+  // The release is gated on agreement: top plus height at the card's bottom, within
+  // 1 px. At KEYBOARD_RISE_MS only if they agree, after it at the first viewport
+  // event that makes them agree, and at the cap whatever they say.
+  assert.match(
+    effect,
+    /Math\.abs\(published\('--visual-top'\) \+ published\('--visual-height'\) - card\.offsetHeight\) <= 1/,
+  );
+  assert.match(effect, /const onRisen = \(\): void => \{\s*risen = true;\s*if \(agrees\(\)\) release\(\);\s*\};/);
+  assert.match(effect, /if \(risen && agrees\(\)\) release\(\);/);
+  assert.match(effect, /riseTimer = window\.setTimeout\(onRisen, KEYBOARD_RISE_MS\);/);
+  assert.match(effect, /capTimer = window\.setTimeout\(release, KEYBOARD_SETTLE_CAP_MS\);/);
+  assert.equal(effect.match(/window\.setTimeout\(/g)?.length, 2, 'the rise and the cap, no other timer');
+  // The numbers are read from the root's inline style, where the hook writes them.
+  assert.match(effect, /parseFloat\(document\.documentElement\.style\.getPropertyValue\(name\)\)/);
+  // Released: the held pair and the attribute go.
   assert.match(
     effect,
     /const release = \(\): void => \{\s*stop\(\);\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*\};/,
   );
   assert.match(
     effect,
-    /const stop = \(\): void => \{\s*window\.clearTimeout\(timer\);\s*active\.removeEventListener\('focusout', release\);\s*viewport\?\.removeEventListener\('resize', onResize\);\s*card\.removeAttribute\('data-keyboard'\);\s*\};/,
+    /const stop = \(\): void => \{\s*window\.clearTimeout\(riseTimer\);\s*window\.clearTimeout\(capTimer\);\s*box\.removeEventListener\('focusout', release\);\s*viewport\?\.removeEventListener\('resize', onViewport\);\s*viewport\?\.removeEventListener\('scroll', onViewport\);\s*card\.removeAttribute\('data-keyboard'\);\s*stopHold = null;\s*\};/,
   );
+  assert.match(effect, /viewport\?\.addEventListener\('resize', onViewport\);\s*viewport\?\.addEventListener\('scroll', onViewport\);/);
   // Nothing goes through state, and the composer's node and focus are untouched.
   assert.doesNotMatch(effect, /(?<![.\w])set[A-Z]\w*\(|\.focus\(|\.blur\(/);
 });
 
-test('the hold cut short by a blur of the composer ends it at once, on the visible viewport', () => {
+test('a later rise holds too: a focus of a box in the open card while the keyboard is down', () => {
   const effect = openEffect();
-  assert.match(effect, /active\.addEventListener\('focusout', release\);/);
+  // One focusin listener on the card for as long as the chat is open, removed with it.
+  assert.match(effect, /card\.addEventListener\('focusin', onFocusIn\);/);
+  assert.match(effect, /card\.removeEventListener\('focusin', onFocusIn\);/);
+  // Only a textarea, only when no hold runs, only with the keyboard down: the
+  // published top 0 and the published height the card's own.
+  assert.match(
+    effect,
+    /const onFocusIn = \(event: FocusEvent\): void => \{\s*const box = event\.target;\s*if \(stopHold === null && box instanceof HTMLTextAreaElement && keyboardDown\(\)\) \{\s*hold\(box, false\);\s*\}\s*\};/,
+  );
+  assert.match(
+    effect,
+    /const keyboardDown = \(\): boolean =>\s*published\('--visual-top'\) === 0 &&\s*Math\.abs\(published\('--visual-height'\) - card\.offsetHeight\) <= 1;/,
+  );
+  assert.equal(effect.match(/(?<![\w.])hold\(/g)?.length, 2, 'the tap and the later focus');
+  // Its bar and middle go transparent only at a viewport event that shows the
+  // keyboard coming, so a focus that raises none (a desktop window, Android's one
+  // resize) changes nothing on screen.
+  assert.match(
+    effect,
+    /if \(!probed && published\('--visual-height'\) < card\.offsetHeight - 1\) \{\s*card\.setAttribute\('data-keyboard', 'rising'\);\s*\}/,
+  );
+});
+
+test('the hold cut short by a blur of the box ends it at once, on the visible viewport', () => {
+  const effect = openEffect();
+  assert.match(effect, /box\.addEventListener\('focusout', release\);/);
   // `release` drops the held pair, so the card reads `--visual-top`/`--visual-height`,
   // which the keyboard hook keeps current as the keyboard goes down.
   assert.match(ask, /top: 'var\(--v2-case-chat-held-top, var\(--visual-top, 0px\)\)'/);
   assert.match(ask, /height: 'var\(--v2-case-chat-held-height, var\(--visual-height, 100dvh\)\)'/);
-  // And until then the held height is live arithmetic on those variables, not a
-  // number, so even a blur the listener missed leaves the bottom on the visible bottom.
-  assert.doesNotMatch(effect, /'--v2-case-chat-held-height',\s*`/);
+  // Until then the held height is a length, never a sum of the viewport variables:
+  // the two events that arrive during a rise cannot move the card's bottom.
+  assert.match(effect, /'--v2-case-chat-held-height', '100dvh'/);
+  assert.doesNotMatch(effect, /var\(--visual-(top|height)/);
 });
 
 test('the hold cut short by a rotation or a width change ends it on the visible viewport', () => {
   const effect = openEffect();
-  assert.match(effect, /const viewport = window\.visualViewport;\s*const width = viewport\?\.width;/);
-  assert.match(effect, /const onResize = \(\): void => \{\s*if \(viewport\?\.width !== width\) release\(\);\s*\};/);
-  assert.match(effect, /viewport\?\.addEventListener\('resize', onResize\);/);
+  assert.match(effect, /const viewport = window\.visualViewport;/);
+  assert.match(effect, /const width = viewport\?\.width;/);
+  assert.match(effect, /if \(viewport\?\.width !== width\) \{\s*release\(\);\s*return;\s*\}/);
   // Width, not height: the keyboard's own rise changes the height (and in the
   // home-screen app innerHeight), which must not end the hold.
   assert.doesNotMatch(effect, /innerHeight|viewport\?\.height/);
@@ -542,11 +606,18 @@ test('the hold cut short by a rotation or a width change ends it on the visible 
 
 test('a close during the hold leaves the held pair for the close effect, which freezes the card where it is', () => {
   const effect = openEffect();
-  // The cleanup is `stop`: the timer, the listeners and the attribute go, the held
-  // pair stays. React runs a component's layout cleanups before its layout effects,
-  // so the close effect then measures the card at its held geometry (covering from
-  // the top) and writes that rect over the pair; its own cleanup drops the pair.
-  assert.match(effect, /return stop;\s*\}, \[screenOpen\]\);$/);
+  // The cleanup stops a running hold: the timers, the listeners and the attribute go,
+  // the held pair stays. React runs a component's layout cleanups before its layout
+  // effects, so the close effect then measures the card at its held geometry
+  // (covering from the top) and writes that rect over the pair; its own cleanup drops
+  // the pair.
+  assert.match(
+    effect,
+    /return \(\) => \{\s*card\.removeEventListener\('focusin', onFocusIn\);\s*stopHold\?\.\(\);\s*\};\s*\}, \[screenOpen, keyboardProbe\]\);$/,
+  );
+  const stop = effect.match(/const stop = \(\): void => \{[\s\S]*?\n\s*\};/)?.[0];
+  assert.ok(stop);
+  assert.doesNotMatch(stop, /removeProperty/);
   const close = closeEffect();
   assert.match(close, /const rect = card\.getBoundingClientRect\(\);\s*card\.style\.setProperty\('--v2-case-chat-held-top', `\$\{rect\.top\}px`\);/);
   assert.match(close, /return \(\) => \{\s*card\.style\.removeProperty\('--v2-case-chat-held-top'\);\s*card\.style\.removeProperty\('--v2-case-chat-held-height'\);\s*\};/);
@@ -564,4 +635,58 @@ test('the slot is transparent and takes no tap during the hold, then fades in on
   assert.doesNotMatch(ask, /slide-in|slide-out/);
   // C' stays true: the composer's X and the hook's keyboard flag are gone.
   assert.doesNotMatch(ask, /v2-keyboard|editableFocused/);
+});
+
+test('while the phone chat is open the canvas is the card colour, and every way out puts it back', () => {
+  // iOS's pan trails its keyboard by up to 110 pt on the rise and runs behind it on
+  // Done, and the strip between them shows the canvas, the root's background: a dark
+  // band under the composer (Arthur's recording, 13 October 2026). Set in `hide`,
+  // the saved value put back in `restore`, so the pagehide/pageshow pair and the
+  // effect's cleanup cover it with the bars.
+  const chrome = chromeEffect();
+  assert.match(chrome, /const root = document\.documentElement;/);
+  assert.match(chrome, /const \{ backgroundColor \} = root\.style;/);
+  assert.match(
+    chrome,
+    /const hide = \(\): void => \{[\s\S]*?root\.style\.backgroundColor = 'var\(--popover\)';\s*\};\s*const restore = \(\): void => \{[\s\S]*?root\.style\.backgroundColor = backgroundColor;\s*\};/,
+  );
+  assert.equal(ask.match(/style\.backgroundColor =/g)?.length, 2, 'set once, restored once');
+});
+
+/* The no-pan probe (the techlead, 13 October 2026): built in the same commit as the
+ * hold, behind `?kbnopan=static` and `?kbnopan=ride` only. Without the flag the
+ * default path cannot reach it. */
+test('the ?kbnopan= probe is reachable only with the flag', () => {
+  // The flag is read in one place, CaseScreen, beside kbdebug, and passed as a prop:
+  // no other source has it outside a comment.
+  const readers = sourcesMentioning('kbnopan').filter((file) => /kbnopan/.test(strip(read(file))));
+  assert.deepEqual(readers, ['v2/features/cases/detail/CaseScreen.tsx']);
+  assert.match(screen, /const kbnopan = searchParams\.get\('kbnopan'\);/);
+  assert.match(
+    screen,
+    /const keyboardProbe: KeyboardProbe \| null =\s*kbnopan === 'static' \|\| kbnopan === 'ride' \? kbnopan : null;/,
+  );
+  assert.match(screen, /arrive=\{fadeOnArrival\}\s+keyboardProbe=\{keyboardProbe\}\s*\/>/);
+  // The dock's prop is null unless given, and the probe's hold is called in one place,
+  // behind that prop.
+  assert.match(ask, /keyboardProbe = null,\s*\}: \{/);
+  assert.equal(ask.match(/holdForProbe\(/g)?.length, 2, 'the definition and one call');
+  assert.match(ask, /const probed = keyboardProbe !== null && holdForProbe\(card, keyboardProbe\);\s*if \(!probed\) \{/);
+  // Everything the probe does is inside its function: the keyboard height it reads,
+  // the animation of the composer.
+  const start = ask.indexOf('function holdForProbe(');
+  const body = ask.slice(start, ask.indexOf('\n}', start));
+  assert.ok(body.length > 0);
+  assert.equal(ask.match(/--visual-keyboard/g)?.length, body.match(/--visual-keyboard/g)?.length);
+  assert.equal(ask.match(/\.animate\(/g)?.length, 1);
+  assert.match(body, /\.animate\(/);
+  // The hook's one extra write is harmless without the flag: only the probe reads it,
+  // and the hook drops it on unmount and at a width change.
+  assert.deepEqual(sourcesMentioning('--visual-keyboard').sort(), [
+    'v2/features/cases/detail/CaseAsk.tsx',
+    'v2/shell/use-keyboard-inset.ts',
+  ]);
+  assert.equal(keyboard.match(/setProperty\('--visual-keyboard'/g)?.length, 1);
+  assert.match(keyboard, /if \(viewport\.offsetTop > 0 && keyboard > 0\) \{\s*root\.style\.setProperty\('--visual-keyboard', `\$\{keyboard\}px`\);/);
+  assert.equal(keyboard.match(/removeProperty\('--visual-keyboard'\)/g)?.length, 2);
 });
