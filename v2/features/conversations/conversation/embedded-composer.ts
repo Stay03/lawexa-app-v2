@@ -122,10 +122,12 @@ export function clearEmbeddedComposer(conversationId: string): void {
  * state: a refusal is delivered once, to the host listening for that
  * conversation, and nothing replays it on a later mount. */
 
-/** A follow-up the server would not take: its text and the composer's sentence. */
+/** A follow-up the server would not take: its text and the composer's sentence.
+ *  `text` is null for a refused "Ask again": its question is already on screen,
+ *  so only the sentence is shown. */
 export interface FollowUpRefusal {
   conversationId: string;
-  text: string;
+  text: string | null;
   sentence: string;
 }
 

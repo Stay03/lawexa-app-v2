@@ -133,6 +133,9 @@ export interface ConversationComposerHandle {
    * typed after a blank line, so nothing they wrote is lost. Does not steal focus.
    */
   refuse: (text: string, sentence: string) => void;
+  /** Show a refusal's sentence in the banner with nothing to give back (a
+   *  refused "Ask again", whose question is already on screen). */
+  explain: (sentence: string) => void;
 }
 
 export interface ConversationComposerProps {
@@ -237,6 +240,10 @@ export function ConversationComposer({
       stage: setInput,
       refuse: (text, sentence) => {
         updateInput((current) => draftWithRefused(current, text));
+        setErrorText(sentence);
+        setErrorOpen(true);
+      },
+      explain: (sentence) => {
         setErrorText(sentence);
         setErrorOpen(true);
       },

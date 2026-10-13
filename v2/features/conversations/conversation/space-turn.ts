@@ -177,6 +177,18 @@ export function sendRefusal(refusal: SendRefusal, viewerId: number | null): stri
   return `${refusal.by.name} is asking right now. Your message is kept.`;
 }
 
+/**
+ * The composer's sentence for a refused "Ask again". Its question is already
+ * on screen and nothing was typed, so the sentence says when to ask again
+ * instead of promising a kept message. A refusal by role reads as for a send.
+ */
+export function askAgainRefusal(refusal: SendRefusal, viewerId: number | null): string {
+  if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
+  if (refusal.by === null) return 'Someone is asking right now. Ask again once the answer is in.';
+  if (refusal.by.id === viewerId) return 'Your last question is still being answered.';
+  return `${refusal.by.name} is asking right now. Ask again once their answer is in.`;
+}
+
 /** The draft a refused follow-up leaves in the composer: the follow-up when the
  *  box is empty, else after what the reader typed, a blank line between, so
  *  neither is lost. */

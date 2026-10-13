@@ -16,6 +16,7 @@ import { conversationsCache, makeOptimisticConversation } from '../cache';
 import { reportFollowUpRefusal, subscribeFollowUpRefusals, type FollowUpRefusal } from './embedded-composer';
 import { conversationsQueries } from '../queries';
 import {
+  askAgainRefusal,
   askingLabel,
   authorLine,
   canSendIn,
@@ -304,7 +305,8 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
     controller,
     /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*setRefusedBy\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
   );
-  assert.match(controller, /void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);\s*\}\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
+  assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
+  assert.match(controller, /else void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
   assert.match(controller, /\(turnHeldBy\(statusData, serverUserId\) \?\? refusedByColleague\)/);
 });
 
@@ -424,6 +426,37 @@ test('with the case dock’s composer, a refused follow-up reaches that composer
   const dock = read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx');
   assert.match(
     dock,
-    /return subscribeFollowUpRefusals\(conversationId, \(\{ text, sentence \}\) =>\s*stageRef\.current\?\.refuse\(text, sentence\),\s*\);/,
+    /return subscribeFollowUpRefusals\(conversationId, \(\{ text, sentence \}\) => \{\s*if \(text === null\) stageRef\.current\?\.explain\(sentence\);\s*else stageRef\.current\?\.refuse\(text, sentence\);\s*\}\);/,
   );
+});
+
+/* ── A refused "Ask again" is told, not dropped ───────────────────────────── */
+
+test('a refused Ask again says why in the composer’s banner, for a 409 and for a 403', () => {
+  // 409: the question is on screen already, so nothing is promised as kept.
+  assert.equal(
+    askAgainRefusal({ kind: 'held', by: { id: 41, name: 'Ada Obi' } }, 7),
+    'Ada Obi is asking right now. Ask again once their answer is in.',
+  );
+  assert.equal(askAgainRefusal({ kind: 'held', by: null }, 7), 'Someone is asking right now. Ask again once the answer is in.');
+  assert.equal(askAgainRefusal({ kind: 'held', by: { id: 7, name: 'Me' } }, 7), 'Your last question is still being answered.');
+  // 403: the Viewer line, as for a refused send.
+  assert.equal(askAgainRefusal({ kind: 'forbidden' }, 7), VIEW_ONLY_COPY.viewer);
+  for (const line of [askAgainRefusal({ kind: 'held', by: null }, 7), askAgainRefusal({ kind: 'forbidden' }, 7)]) {
+    assert.doesNotMatch(line, /kept|[—–]/, line);
+  }
+  const controller = readHere('useConversationController.ts');
+  assert.match(
+    controller,
+    /const refusal = await send\(lastUserContent, \{[\s\S]*?\}\);\s*if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{ refused: askAgainRefusal\(refusal, serverUserId\) \};/,
+  );
+  // Both refusals change the screen as a refused send does.
+  assert.match(controller, /if \(refusal\.kind === 'held'\) setRefusedBy\(refusal\.by\);\s*else void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
+  const screen = readHere('ConversationScreen.tsx');
+  assert.match(
+    screen,
+    /const outcome = await regenerate\(\);\s*if \(!outcome\) return;\s*if \(externalComposer\) \{\s*reportFollowUpRefusal\(\{ conversationId, text: null, sentence: outcome\.refused \}\);\s*\} else \{\s*composerRef\.current\?\.explain\(outcome\.refused\);/,
+  );
+  assert.match(screen, /onRegenerate=\{askAgain\}/);
+  assert.match(readHere('ConversationComposer.tsx'), /explain: \(sentence\) => \{\s*setErrorText\(sentence\);\s*setErrorOpen\(true\);/);
 });

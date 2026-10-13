@@ -218,6 +218,22 @@ export function ConversationScreen({
     [canSend, submit, externalComposer, conversationId],
   );
 
+  // "Ask again" refused (a colleague's turn, or a demotion): the sentence in
+  // the composer's banner, as for a refused send. Its question is already on
+  // screen, so there is no text to give back.
+  const regenerate = controller.regenerate;
+  const askAgain = useCallback(() => {
+    void (async () => {
+      const outcome = await regenerate();
+      if (!outcome) return;
+      if (externalComposer) {
+        reportFollowUpRefusal({ conversationId, text: null, sentence: outcome.refused });
+      } else {
+        composerRef.current?.explain(outcome.refused);
+      }
+    })();
+  }, [regenerate, externalComposer, conversationId]);
+
   // Terminal page states (engine surfaces these as sentinel error strings).
   if (error === 'confidential_transcript_lost') {
     return <ConfidentialLostState />;
@@ -302,7 +318,7 @@ export function ConversationScreen({
             narration={controller.narration}
             references={controller.references}
             canRegenerate={controller.canRegenerate}
-            onRegenerate={controller.regenerate}
+            onRegenerate={askAgain}
             onRetry={retryLastMessage}
             onScrolledUpChange={setScrolledUp}
             showAuthors={controller.showAuthors}

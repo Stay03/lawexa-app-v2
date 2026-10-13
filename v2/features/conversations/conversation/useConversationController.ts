@@ -7,6 +7,7 @@ import {
   useConversationStream,
   claimTranscript,
   deleteTranscript,
+  type SendRefusal,
 } from '@/v2/runtime/chat-engine';
 import type {
   ConversationReference,
@@ -24,6 +25,7 @@ import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import {
+  askAgainRefusal,
   canSendIn,
   hasSpaceContract,
   isOwnTurn,
@@ -252,8 +254,9 @@ export interface ConversationController {
   submit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
   /** Graceful cancel (cancel POST; the engine waits for the terminal SSE event). */
   stop: () => void;
-  /** Re-ask the last user turn to get a fresh answer (drives engine.send). */
-  regenerate: () => void;
+  /** Re-ask the last user turn to get a fresh answer (drives engine.send).
+   *  Resolves to the refusal's sentence when the server would not take it. */
+  regenerate: () => Promise<SendRefused | undefined>;
   /** True when a completed answer exists and nothing is streaming. */
   canRegenerate: boolean;
   /**
@@ -827,6 +830,17 @@ export function useConversationController(
     heldBy === null &&
     !(statusData?.status === 'pending' && statusData.can_cancel === false);
 
+  // What a refused send or re-ask changes here: a 409's sender holds the turn
+  // the engine now follows; a 403 re-reads the record, so `can_send` false
+  // swaps the composer for the view-only pill.
+  const takeRefusal = useCallback(
+    (refusal: SendRefusal) => {
+      if (refusal.kind === 'held') setRefusedBy(refusal.by);
+      else void queryClient.invalidateQueries({ queryKey: detailKey });
+    },
+    [queryClient, detailKey],
+  );
+
   const submit = useCallback(
     async (message: string, attachments: MessageAttachment[]) => {
       // Optimistically bump this conversation to the top of the recents caches the
@@ -846,16 +860,10 @@ export function useConversationController(
         ...(fileIds.length > 0 && { fileIds, attachments }),
       });
       if (refusal === null) return undefined;
-      if (refusal.kind === 'held') {
-        setRefusedBy(refusal.by);
-      } else {
-        // Refused by role: read the record again, so `can_send` false swaps the
-        // composer for the view-only pill.
-        void queryClient.invalidateQueries({ queryKey: detailKey });
-      }
+      takeRefusal(refusal);
       return { refused: sendRefusal(refusal, serverUserId) };
     },
-    [send, conversationId, jurisdiction, queryClient, statusKey, detailKey, serverUserId],
+    [send, conversationId, jurisdiction, queryClient, statusKey, takeRefusal, serverUserId],
   );
 
   const stop = useCallback(() => cancelStream(), [cancelStream]);
@@ -932,14 +940,21 @@ export function useConversationController(
     !!lastUserTurn.content &&
     isOwnTurn(lastUserTurn.author, serverUserId);
 
-  const regenerate = useCallback(() => {
-    if (isStreaming || !lastUserContent) return;
-    void send(lastUserContent, {
+  // A refused re-ask (Spaces F4: a colleague's turn, or a demotion) is told in
+  // the composer's banner, as a refused send is; there is nothing to give back.
+  const regenerate = useCallback(async (): Promise<SendRefused | undefined> => {
+    if (isStreaming || !lastUserContent) return undefined;
+    queryClient.removeQueries({ queryKey: statusKey, exact: true });
+    setRefusedBy(null);
+    const refusal = await send(lastUserContent, {
       conversationId,
       streamMode: 'v2_stream',
       jurisdiction,
     });
-  }, [isStreaming, lastUserContent, send, conversationId, jurisdiction]);
+    if (refusal === null) return undefined;
+    takeRefusal(refusal);
+    return { refused: askAgainRefusal(refusal, serverUserId) };
+  }, [isStreaming, lastUserContent, queryClient, statusKey, send, conversationId, jurisdiction, takeRefusal, serverUserId]);
 
   return {
     stream,
