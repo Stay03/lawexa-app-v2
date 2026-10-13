@@ -178,7 +178,15 @@ export function ConversationScreen({
     const screen = screenRef.current;
     if (!dock || !screen) return;
     const sync = () => {
-      screen.style.setProperty('--v2-conv-dock-h', `${dock.offsetHeight}px`);
+      const height = dock.offsetHeight;
+      // An empty dock (the skeleton hold before the composer skeleton on a cold
+      // open) measures 0. The 7 rem fallback stays, as ComposerSkeleton's own
+      // height, rather than 16 px of clearance: that put the newest row under
+      // the composer on the landing frame and grew the page by the dock's
+      // height a frame later, which the list read as a scroll away (measured,
+      // Spaces F4 review S2).
+      if (height === 0) screen.style.removeProperty('--v2-conv-dock-h');
+      else screen.style.setProperty('--v2-conv-dock-h', `${height}px`);
     };
     sync();
     const observer = new ResizeObserver(sync);

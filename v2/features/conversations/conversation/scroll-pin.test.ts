@@ -59,3 +59,12 @@ test('the follower watches the border box, where the dock height lands', () => {
   assert.match(list, /pb-\[calc\(var\(--v2-conv-dock-h,7rem\)\+1rem\)\]/);
   assert.match(screen, /observer\.observe\(dock\)/);
 });
+
+test('an empty dock keeps the fallback padding instead of measuring 0', () => {
+  // On a cold open the dock holds nothing for the skeleton hold; measured, it
+  // read 0 and the page later grew by the composer's height under a landed view.
+  assert.match(
+    screen,
+    /const height = dock\.offsetHeight;[\s\S]*?if \(height === 0\) screen\.style\.removeProperty\('--v2-conv-dock-h'\);\s*else screen\.style\.setProperty\('--v2-conv-dock-h', `\$\{height\}px`\);/,
+  );
+});
