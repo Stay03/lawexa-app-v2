@@ -19,7 +19,10 @@ import {
   ConversationComposer,
   type ConversationComposerHandle,
 } from '@/v2/features/conversations/conversation/ConversationComposer';
-import { useEmbeddedComposerSurface } from '@/v2/features/conversations/conversation/embedded-composer';
+import {
+  subscribeFollowUpRefusals,
+  useEmbeddedComposerSurface,
+} from '@/v2/features/conversations/conversation/embedded-composer';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { TranscriptSkeleton } from '@/v2/features/conversations/conversation/skeletons';
 import { casesQueries } from '../queries';
@@ -485,6 +488,16 @@ export function CaseChatComposerDock({
   const viewOnly = surface !== null && surface.isOwnerResolved && !surface.canSend;
 
   const createError = view === 'new' && start.error ? start.error : null;
+
+  // A result card's follow-up the server refused (Spaces F4) comes back to this
+  // dock's composer with its sentence, as a refused send typed here does. A
+  // subscription in an effect; the handle writes the composer's own state.
+  useEffect(() => {
+    if (conversationId === null || !stageRef) return;
+    return subscribeFollowUpRefusals(conversationId, ({ text, sentence }) =>
+      stageRef.current?.refuse(text, sentence),
+    );
+  }, [conversationId, stageRef]);
 
   return (
     <div className="shrink-0">

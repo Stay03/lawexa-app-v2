@@ -67,7 +67,7 @@ export function DeepResearchPromptCard({ prompt, isInteracted = false }: DeepRes
               key={action.id}
               variant={action.id === 'confirm' ? 'default' : 'outline'}
               size="sm"
-              disabled={clicked || isInteracted || chatContext?.isStreaming}
+              disabled={clicked || isInteracted || chatContext?.isStreaming || chatContext?.canSend === false}
               onClick={() => handleAction(action.label)}
             >
               {action.label}

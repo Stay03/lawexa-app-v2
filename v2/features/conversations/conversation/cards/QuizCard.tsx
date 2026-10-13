@@ -385,7 +385,7 @@ export function QuizCardList({ quizzes }: QuizCardListProps) {
         {!isSubmitted ? (
           <Button
             onClick={handleSubmitAnswers}
-            disabled={!allAnswered || !chatContext || chatContext.isStreaming}
+            disabled={!allAnswered || !chatContext || chatContext.isStreaming || !chatContext.canSend}
             className="animate-in fade-in slide-in-from-bottom-2 gap-2 duration-300"
             size="lg"
           >

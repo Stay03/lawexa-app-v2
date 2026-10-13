@@ -8,14 +8,18 @@ import {
   type ConversationEmbed,
 } from './useConversationController';
 import { MessageList } from './MessageList';
-import { ConversationComposer } from './ConversationComposer';
+import { ConversationComposer, type ConversationComposerHandle } from './ConversationComposer';
 import { ComposerSkeleton } from './skeletons';
 import { ConfidentialBanner } from './ConfidentialBanner';
 import { ViewOnlyPill } from './ViewOnlyPill';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider } from './chat-context';
 import { DocumentExportScope } from './markdown/document-export';
-import { clearEmbeddedComposer, publishEmbeddedComposer } from './embedded-composer';
+import {
+  clearEmbeddedComposer,
+  publishEmbeddedComposer,
+  reportFollowUpRefusal,
+} from './embedded-composer';
 import { askingLabel } from './space-turn';
 
 /**
@@ -189,12 +193,29 @@ export function ConversationScreen({
   // Inline result cards fire follow-up turns through this (no attachments).
   // Depends on the STABLE `controller.submit` (a useCallback), not the whole
   // controller object, so the card subtree's context value doesn't churn.
+  //
+  // A reader who may not send gets disabled card actions (the context's
+  // `canSend`), and this refuses too, as the server would. A follow-up the
+  // server refuses (Spaces F4: another member's turn, or the reader was made a
+  // Viewer) is given back to the composer as its draft, with the sentence the
+  // composer shows for its own refused sends: this screen's pill through its
+  // handle, or, with an external composer, the host's through the surface.
   const submit = controller.submit;
+  const composerRef = useRef<ConversationComposerHandle>(null);
   const sendFollowUp = useCallback(
     (message: string) => {
-      void submit(message, []);
+      if (!canSend) return;
+      void (async () => {
+        const outcome = await submit(message, []);
+        if (!outcome) return;
+        if (externalComposer) {
+          reportFollowUpRefusal({ conversationId, text: message, sentence: outcome.refused });
+        } else {
+          composerRef.current?.refuse(message, outcome.refused);
+        }
+      })();
     },
-    [submit],
+    [canSend, submit, externalComposer, conversationId],
   );
 
   // Terminal page states (engine surfaces these as sentinel error strings).
@@ -212,7 +233,12 @@ export function ConversationScreen({
     error && error !== 'confidential_transcript_lost' && error !== 'not_found' ? error : null;
 
   return (
-    <V2ChatProvider sendMessage={sendFollowUp} isStreaming={isStreaming} conversationId={conversationId}>
+    <V2ChatProvider
+      sendMessage={sendFollowUp}
+      isStreaming={isStreaming}
+      canSend={canSend}
+      conversationId={conversationId}
+    >
       <div
         ref={screenRef}
         data-v2-marker="V2-CONVERSATION"
@@ -319,6 +345,7 @@ export function ConversationScreen({
                 // Owner or Contributor of the chat's space.
                 <ConversationComposer
                   draftScopeId={conversationId}
+                  stageRef={composerRef}
                   jurisdiction={controller.jurisdiction}
                   onJurisdictionChange={controller.setJurisdiction}
                   isConfidential={controller.isConfidential}

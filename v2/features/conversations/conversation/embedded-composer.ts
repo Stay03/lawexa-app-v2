@@ -114,6 +114,43 @@ export function clearEmbeddedComposer(conversationId: string): void {
   emit();
 }
 
+/* ── A refused follow-up, handed to the host's composer ─────────────────────
+ * A result card's follow-up is sent by the conversation, not typed in the
+ * host's box, so when the server refuses it (Spaces F4: another member's turn,
+ * or the reader may no longer send) the conversation reports it here and the
+ * host gives the text back to its composer with the sentence. An event, not
+ * state: a refusal is delivered once, to the host listening for that
+ * conversation, and nothing replays it on a later mount. */
+
+/** A follow-up the server would not take: its text and the composer's sentence. */
+export interface FollowUpRefusal {
+  conversationId: string;
+  text: string;
+  sentence: string;
+}
+
+const refusalListeners = new Set<(refusal: FollowUpRefusal) => void>();
+
+/** Report a refused follow-up (the embedded conversation's side). */
+export function reportFollowUpRefusal(refusal: FollowUpRefusal): void {
+  for (const listener of refusalListeners) listener(refusal);
+}
+
+/** Listen for refused follow-ups in one conversation (the host's side, from an
+ *  effect). Returns the unsubscribe. */
+export function subscribeFollowUpRefusals(
+  conversationId: string,
+  onRefusal: (refusal: FollowUpRefusal) => void,
+): () => void {
+  const listener = (refusal: FollowUpRefusal) => {
+    if (refusal.conversationId === conversationId) onRefusal(refusal);
+  };
+  refusalListeners.add(listener);
+  return () => {
+    refusalListeners.delete(listener);
+  };
+}
+
 /**
  * The host's read: the published surface, but only while it belongs to the
  * conversation the host currently has open — a stale or foreign surface reads

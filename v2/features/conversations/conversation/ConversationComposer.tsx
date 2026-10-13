@@ -51,7 +51,7 @@ import {
   privateModeOf,
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
-import type { SendRefused } from './space-turn';
+import { draftWithRefused, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
 
 /**
@@ -126,6 +126,13 @@ function formatBytes(bytes: number): string {
 export interface ConversationComposerHandle {
   /** Replace the draft text (the "Start with" chips). Does not steal focus. */
   stage: (text: string) => void;
+  /**
+   * Give back a message the server refused that was not sent from this box (a
+   * result card's follow-up, Spaces F4), with the refusal's sentence in the
+   * banner. The text becomes the draft, or follows what the reader has already
+   * typed after a blank line, so nothing they wrote is lost. Does not steal focus.
+   */
+  refuse: (text: string, sentence: string) => void;
 }
 
 export interface ConversationComposerProps {
@@ -224,7 +231,18 @@ export function ConversationComposer({
 
   // The staging handle — `setInput` persists, so a staged opener survives a
   // reload exactly like typed text. No focus steal (parity with the old chips).
-  useImperativeHandle(stageRef, () => ({ stage: setInput }), [setInput]);
+  useImperativeHandle(
+    stageRef,
+    () => ({
+      stage: setInput,
+      refuse: (text, sentence) => {
+        updateInput((current) => draftWithRefused(current, text));
+        setErrorText(sentence);
+        setErrorOpen(true);
+      },
+    }),
+    [setInput, updateInput],
+  );
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const [removing, setRemoving] = useState<Set<string>>(new Set());
   const [removingPasted, setRemovingPasted] = useState<Set<string>>(new Set());

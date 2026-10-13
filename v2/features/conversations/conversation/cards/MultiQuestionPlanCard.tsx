@@ -110,7 +110,7 @@ export function MultiQuestionPlanCard({ plan, isInteracted = false }: MultiQuest
               key={action.id}
               variant={action.id === 'begin' ? 'default' : 'outline'}
               size="sm"
-              disabled={clicked || isInteracted || chatContext?.isStreaming}
+              disabled={clicked || isInteracted || chatContext?.isStreaming || chatContext?.canSend === false}
               onClick={() => handleAction(action.label)}
             >
               {action.label}

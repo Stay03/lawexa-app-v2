@@ -176,3 +176,10 @@ export function sendRefusal(refusal: SendRefusal, viewerId: number | null): stri
   }
   return `${refusal.by.name} is asking right now. Your message is kept.`;
 }
+
+/** The draft a refused follow-up leaves in the composer: the follow-up when the
+ *  box is empty, else after what the reader typed, a blank line between, so
+ *  neither is lost. */
+export function draftWithRefused(current: string, refusedText: string): string {
+  return current.trim() === '' ? refusedText : `${current}\n\n${refusedText}`;
+}

@@ -13,11 +13,13 @@ import type {
   ConversationStatusData,
 } from '@/types/chat';
 import { conversationsCache, makeOptimisticConversation } from '../cache';
+import { reportFollowUpRefusal, subscribeFollowUpRefusals, type FollowUpRefusal } from './embedded-composer';
 import { conversationsQueries } from '../queries';
 import {
   askingLabel,
   authorLine,
   canSendIn,
+  draftWithRefused,
   hasSpaceContract,
   isOwnTurn,
   SPACE_CHAT_POLL_MS,
@@ -370,4 +372,58 @@ test('the case page’s side chat holds Send and offers no Stop on a colleague�
   assert.match(readHere('ConversationScreen.tsx'), /publishEmbeddedComposer\(\{[\s\S]*?sendHeldBy,\s*canStop,\s*isOwnerResolved,/);
   const dock = read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx');
   assert.match(dock, /sendHeldBy=\{surface \? surface\.sendHeldBy : null\}\s*canStop=\{surface \? surface\.canStop : true\}/);
+});
+
+/* ── Result-card follow-ups respect can_send and give a refusal back ──────── */
+
+test('a reader who may not send gets disabled card actions, and the screen sends no follow-up', () => {
+  const screen = readHere('ConversationScreen.tsx');
+  assert.match(screen, /canSend=\{canSend\}\s*conversationId=\{conversationId\}/);
+  assert.match(screen, /\(message: string\) => \{\s*if \(!canSend\) return;/);
+  assert.match(readHere('chat-context.tsx'), /\(\) => \(\{ sendMessage, isStreaming, canSend, conversationId \}\)/);
+  for (const card of ['DeepResearchPromptCard', 'MultiQuestionPlanCard', 'MultiQuestionPromptCard', 'NextQuestionPromptCard']) {
+    assert.match(
+      readHere(join('cards', `${card}.tsx`)),
+      /disabled=\{clicked \|\| isInteracted \|\| chatContext\?\.isStreaming \|\| chatContext\?\.canSend === false\}/,
+      card,
+    );
+  }
+  assert.match(
+    readHere(join('cards', 'QuizCard.tsx')),
+    /disabled=\{!allAnswered \|\| !chatContext \|\| chatContext\.isStreaming \|\| !chatContext\.canSend\}/,
+  );
+});
+
+test('a refused follow-up (409 or 403) comes back to the composer with the composer’s own sentence', () => {
+  const screen = readHere('ConversationScreen.tsx');
+  // Both refusals arrive as `outcome.refused`, the sentence sendRefusal wrote.
+  assert.match(
+    screen,
+    /const outcome = await submit\(message, \[\]\);\s*if \(!outcome\) return;\s*if \(externalComposer\) \{\s*reportFollowUpRefusal\(\{ conversationId, text: message, sentence: outcome\.refused \}\);\s*\} else \{\s*composerRef\.current\?\.refuse\(message, outcome\.refused\);/,
+  );
+  assert.match(screen, /draftScopeId=\{conversationId\}\s*stageRef=\{composerRef\}/);
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(composer, /refuse: \(text, sentence\) => \{\s*updateInput\(\(current\) => draftWithRefused\(current, text\)\);\s*setErrorText\(sentence\);\s*setErrorOpen\(true\);/);
+  // The draft keeps what the reader typed, and the follow-up after it.
+  assert.equal(draftWithRefused('', 'Explain the next step'), 'Explain the next step');
+  assert.equal(draftWithRefused('  ', 'Explain the next step'), 'Explain the next step');
+  assert.equal(draftWithRefused('My own words', 'Explain the next step'), 'My own words\n\nExplain the next step');
+  // The sentences themselves, as the composer shows them for its own sends.
+  assert.equal(sendRefusal({ kind: 'held', by: { id: 41, name: 'Ada' } }, 7), 'Ada is asking right now. Your message is kept.');
+  assert.equal(sendRefusal({ kind: 'forbidden' }, 7), VIEW_ONLY_COPY.viewer);
+});
+
+test('with the case dock’s composer, a refused follow-up reaches that composer, once, for its own chat only', () => {
+  const heard: FollowUpRefusal[] = [];
+  const stop = subscribeFollowUpRefusals('c1', (refusal) => heard.push(refusal));
+  reportFollowUpRefusal({ conversationId: 'c1', text: 'Next question', sentence: 'Ada is asking right now. Your message is kept.' });
+  reportFollowUpRefusal({ conversationId: 'c2', text: 'Another chat', sentence: 'x' });
+  stop();
+  reportFollowUpRefusal({ conversationId: 'c1', text: 'After the dock left', sentence: 'x' });
+  assert.deepEqual(heard.map((r) => r.text), ['Next question']);
+  const dock = read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx');
+  assert.match(
+    dock,
+    /return subscribeFollowUpRefusals\(conversationId, \(\{ text, sentence \}\) =>\s*stageRef\.current\?\.refuse\(text, sentence\),\s*\);/,
+  );
 });
