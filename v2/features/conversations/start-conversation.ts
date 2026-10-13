@@ -11,6 +11,7 @@ import {
   renameTranscript,
   replaceLastUserTurnContent,
 } from '@/v2/runtime/chat-engine';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { conversationsCache, makeOptimisticConversation } from './cache';
 import { conversationsQueries } from './queries';
 
@@ -75,6 +76,14 @@ export interface StartConversationInput {
    * a case, so the follow-up a week later resumes rather than restarts.
    */
   references?: ChatReference[];
+  /**
+   * Start the conversation in this space (Spaces F4, backend B4): everyone in
+   * it reads the chat, and its Owner and Contributors may continue it. A space
+   * chat is never private: the server refuses `is_confidential` and
+   * `is_redacted` beside `space_uuid` (422), so the space's composer offers
+   * neither and this flow sends neither with it.
+   */
+  spaceUuid?: string;
 }
 
 export interface StartConversationDeps {
@@ -218,10 +227,12 @@ export async function startConversation(
     jurisdiction,
     workflowId,
     studyMode,
-    confidential,
-    redacted,
     references,
+    spaceUuid,
   } = input;
+  // See `spaceUuid`: the private modes never ride beside a space.
+  const confidential = spaceUuid === undefined && input.confidential === true;
+  const redacted = spaceUuid === undefined && input.redacted === true;
   const fileIds = attachments.map((a) => a.file_id);
 
   // Confidential turn 1: persist the user turn to IDB BEFORE the POST so a crash
@@ -255,6 +266,8 @@ export async function startConversation(
       ...(redacted && { is_redacted: true }),
       // Content this chat is about (case slug, …) — first turn only, sticky.
       ...(references && references.length > 0 && { references }),
+      // The space it starts in — first turn only, never with a private mode.
+      ...(spaceUuid !== undefined && { space_uuid: spaceUuid }),
     };
     const response = await chatApi.start(applyJurisdiction(baseBody, jurisdiction));
 
@@ -312,6 +325,13 @@ export async function startConversation(
     // fallback title, real fields, and the async AI-name upgrade) once the create
     // settles — the upsert is the instant paint, this is the correctness backstop.
     void deps.queryClient.invalidateQueries({ queryKey: conversationsQueries.lists() });
+    // Started in a space: its Conversations tab, its counts on its detail and
+    // on its row in `/spaces` re-ask, as a chat moved in does (content-mutations).
+    if (spaceUuid !== undefined) {
+      void deps.queryClient.invalidateQueries({ queryKey: spacesQueries.contentsOf(spaceUuid) });
+      void deps.queryClient.invalidateQueries({ queryKey: spacesQueries.detailsOf(spaceUuid) });
+      void deps.queryClient.invalidateQueries({ queryKey: spacesQueries.lists() });
+    }
 
     return {
       status: 'created',

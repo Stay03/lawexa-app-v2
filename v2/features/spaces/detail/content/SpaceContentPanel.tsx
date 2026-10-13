@@ -43,6 +43,7 @@ import { spacesQueries } from '../../queries';
 import { useServerSearch, type ServerSearch } from '../../use-server-search';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceFileRow } from './SpaceFileRow';
+import { StartConversationDialog } from './StartConversationDialog';
 import {
   SpaceContentEmptyState,
   SpaceContentErrorState,
@@ -65,7 +66,9 @@ import {
  *  - Every tab: a search the endpoint runs (title, folder name, file name),
  *    and an empty state that teaches (`spaceEmptyCopy`).
  *  - Conversations: each row names who started it; its owner may move it to
- *    another space or back out, the space's Owner may remove it.
+ *    another space or back out, the space's Owner may remove it. "New
+ *    conversation" starts one in the space for the Owner and Contributors
+ *    (F4, backend B4), in the home composer inside an overlay.
  *  - Folders: browsed one level at a time inside the tab (`parent_id`), with
  *    a way back up and a way to the folder's own page for what is filed in
  *    it; "New folder" at the current level for the Owner and Contributors.
@@ -221,7 +224,7 @@ function useItemDialogs(access: ContentAccess) {
 /* ── Conversations ────────────────────────────────────────────────────────── */
 
 function SpaceChatsList({ access }: { access: ContentAccess }) {
-  const { spaceUuid, spaceName, canRemove } = access;
+  const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
   const search = useServerSearch();
   const query = useInfiniteQuery({
@@ -242,6 +245,16 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
   // them in place (the conversations list's rule, 8 October 2026).
   const [reveal] = useState(() => query.isPending);
   const { openMove, openRemove, dialogs } = useItemDialogs(access);
+  // "New conversation": stays mounted after it closes so its exit plays, and
+  // a fresh open bumps its key, so every open starts with an empty composer.
+  const [starting, setStarting] = useState<{ open: boolean; key: number } | null>(null);
+  const startChat = () =>
+    setStarting((previous) => ({ open: true, key: (previous?.key ?? 0) + 1 }));
+  const newChatButton = canAdd ? (
+    <PillButton icon={Plus} onClick={startChat}>
+      New conversation
+    </PillButton>
+  ) : null;
 
   const targetOf = (conversation: SpaceConversation): SpaceItemTarget => ({
     type: 'conversation',
@@ -257,6 +270,7 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
         label="Search this space's conversations"
         placeholder="Search conversations"
         busy={query.isPlaceholderData}
+        action={newChatButton}
       />
       <PagedContent
         tab="chats"
@@ -272,12 +286,19 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
           ) : (
             <SpaceContentEmptyState
               tab="chats"
-              canAdd={access.canAdd}
+              canAdd={canAdd}
               onInvite={access.onInvite ?? undefined}
               action={
-                <Button asChild size="sm">
-                  <Link href="/conversations">Go to your conversations</Link>
-                </Button>
+                // The empty line's two ways in: start one here, or go and
+                // move one of your own in.
+                <div className="flex flex-wrap justify-center gap-2">
+                  <EmptyStateAddButton icon={Plus} onClick={startChat}>
+                    New conversation
+                  </EmptyStateAddButton>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/conversations">Go to your conversations</Link>
+                  </Button>
+                </div>
               }
             />
           )
@@ -306,6 +327,16 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
         </ul>
       </PagedContent>
       {dialogs}
+      {starting ? (
+        <StartConversationDialog
+          key={`start-${starting.key}`}
+          space={{ uuid: spaceUuid, name: spaceName }}
+          open={starting.open}
+          onOpenChange={(open) =>
+            setStarting((previous) => (previous ? { ...previous, open } : previous))
+          }
+        />
+      ) : null}
     </>
   );
 }

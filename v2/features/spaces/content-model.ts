@@ -174,6 +174,20 @@ export function removeRefusal(status: number): string {
   return 'Couldn’t remove it. Please try again.';
 }
 
+/** Why a conversation could not start in the space (backend B4): a Viewer or a
+ *  non-member (403, `CANNOT_ADD_TO_SPACE`), or the server's own reason for a
+ *  request it would not take (422). */
+export function startChatRefusal(status: number, serverMessage: string | null): string {
+  if (status === 403) return 'Only the Owner and Contributors can start conversations here.';
+  if (status === 422) return serverMessage?.trim() || 'This conversation can’t start here.';
+  return 'Couldn’t start the conversation. Please try again.';
+}
+
+/** The line under "New conversation": who reads the chat and who continues it. */
+export function startDialogLine(spaceName: string): string {
+  return `Everyone in ${spaceName} can read it. The Owner and Contributors can continue it.`;
+}
+
 /** Why a new folder was refused: a Viewer (403), or the server's own reason
  *  for a name or parent it would not take (422). */
 export function createFolderRefusal(status: number, serverMessage: string | null): string {
@@ -288,7 +302,7 @@ export function spaceEmptyCopy(
     case 'chats':
       return {
         title,
-        description: 'Open one of your conversations and choose Move to space.',
+        description: 'Start a conversation here, or move one of yours in.',
       };
     case 'folders':
       return {

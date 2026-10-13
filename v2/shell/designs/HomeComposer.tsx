@@ -50,6 +50,7 @@ import {
   RedactionUnavailableError,
   startConversation,
 } from '@/v2/features/conversations/start-conversation';
+import { startChatRefusal } from '@/v2/features/spaces/content-model';
 import {
   ALLOWED_FILE_TYPES,
   ATTACHMENT_SIZE_ERROR,
@@ -139,16 +140,19 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export interface HomeComposerProps {
+/** The space a conversation starts in (`StartConversationDialog`). */
+export interface HomeComposerSpace {
+  uuid: string;
+  name: string;
+}
+
+interface HomeComposerBaseProps {
   value: string;
   onValueChange: (value: string) => void;
   /** Signed-in users get the full furniture; guests get a bare composer. */
   signedIn: boolean;
   /** Drives the role-aware workflow selector (users vs admin/superadmin). */
   role?: UserRole;
-  /** Confidential is CONTROLLED by the design so the greeting can present it. */
-  confidential: boolean;
-  onConfidentialChange: (next: boolean) => void;
   /** Study-mode CTA state (Study tab only) — sends `study_mode: true` on create. */
   studyMode?: boolean;
   /**
@@ -174,15 +178,37 @@ export interface HomeComposerProps {
   sendButtonClassName?: string;
 }
 
+/**
+ * The home and the content pages offer the private modes, with confidential
+ * CONTROLLED by the design so the greeting can present it. A space (Spaces
+ * F4) offers neither: the server refuses both beside `space_uuid`, so the
+ * plus-menu has no Privacy section and there is nothing to control.
+ */
+export type HomeComposerProps = HomeComposerBaseProps &
+  (
+    | {
+        space?: undefined;
+        confidential: boolean;
+        onConfidentialChange: (next: boolean) => void;
+      }
+    | {
+        /** Start the conversation in this space (`space_uuid`, backend B4). */
+        space: HomeComposerSpace;
+        confidential?: undefined;
+        onConfidentialChange?: undefined;
+      }
+  );
+
 export function HomeComposer({
   value,
   onValueChange,
   signedIn,
   role,
-  confidential,
+  confidential = false,
   onConfidentialChange,
   studyMode = false,
   references,
+  space,
   placeholder = 'Ask a legal question',
   className,
   textareaClassName,
@@ -385,6 +411,7 @@ export function HomeComposer({
           confidential,
           redacted,
           references,
+          spaceUuid: space?.uuid,
         },
         { queryClient },
       );
@@ -426,7 +453,9 @@ export function HomeComposer({
         setError(null);
       } else if (err instanceof AxiosError) {
         // A real HTTP failure — surface the API's message (or a network fallback).
-        setError(extractApiError(err).message);
+        // In a space, a refusal is said in the space's words (a Viewer's 403).
+        const apiError = extractApiError(err);
+        setError(space ? startChatRefusal(apiError.status, apiError.message) : apiError.message);
       } else if (err instanceof Error) {
         // A `success: false` body throws with the server's message — keep it.
         setError(err.message);
@@ -643,44 +672,49 @@ export function HomeComposer({
                       </span>
                     </DropdownMenuItem>
 
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>Privacy</DropdownMenuLabel>
+                    {/* No private modes in a space: the server refuses both there. */}
+                    {space ? null : (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel>Privacy</DropdownMenuLabel>
 
-                    <DropdownMenuCheckboxItem
-                      checked={redacted}
-                      onCheckedChange={setRedacted}
-                      onSelect={(event) => event.preventDefault()}
-                    >
-                      <VenetianMask
-                        className={redacted ? 'text-indigo-500' : 'text-muted-foreground'}
-                      />
-                      <span className="flex flex-col">
-                        <span className="font-medium leading-tight">Redacted mode</span>
-                        <span className="text-xs text-muted-foreground">
-                          Hide names, addresses &amp; IDs from the model
-                        </span>
-                      </span>
-                    </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem
+                          checked={redacted}
+                          onCheckedChange={setRedacted}
+                          onSelect={(event) => event.preventDefault()}
+                        >
+                          <VenetianMask
+                            className={redacted ? 'text-indigo-500' : 'text-muted-foreground'}
+                          />
+                          <span className="flex flex-col">
+                            <span className="font-medium leading-tight">Redacted mode</span>
+                            <span className="text-xs text-muted-foreground">
+                              Hide names, addresses &amp; IDs from the model
+                            </span>
+                          </span>
+                        </DropdownMenuCheckboxItem>
 
-                    <DropdownMenuCheckboxItem
-                      checked={confidential}
-                      onCheckedChange={onConfidentialChange}
-                      onSelect={(event) => event.preventDefault()}
-                    >
-                      <ShieldCheck
-                        className={
-                          confidential
-                            ? 'text-emerald-600 dark:text-emerald-500'
-                            : 'text-muted-foreground'
-                        }
-                      />
-                      <span className="flex flex-col">
-                        <span className="font-medium leading-tight">Confidential mode</span>
-                        <span className="text-xs text-muted-foreground">
-                          Stored only on this device until you delete it
-                        </span>
-                      </span>
-                    </DropdownMenuCheckboxItem>
+                        <DropdownMenuCheckboxItem
+                          checked={confidential}
+                          onCheckedChange={onConfidentialChange}
+                          onSelect={(event) => event.preventDefault()}
+                        >
+                          <ShieldCheck
+                            className={
+                              confidential
+                                ? 'text-emerald-600 dark:text-emerald-500'
+                                : 'text-muted-foreground'
+                            }
+                          />
+                          <span className="flex flex-col">
+                            <span className="font-medium leading-tight">Confidential mode</span>
+                            <span className="text-xs text-muted-foreground">
+                              Stored only on this device until you delete it
+                            </span>
+                          </span>
+                        </DropdownMenuCheckboxItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
 
