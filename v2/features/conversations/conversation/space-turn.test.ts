@@ -359,3 +359,15 @@ test('Ask again is offered on the owner’s own last question, never on a collea
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /lastUserTurn !== null &&\s*!!lastUserTurn\.content &&\s*isOwnTurn\(lastUserTurn\.author, serverUserId\);/);
 });
+
+/* ── The case dock reads whose turn it is through the surface ─────────────── */
+
+test('the case page’s side chat holds Send and offers no Stop on a colleague’s turn', () => {
+  const surface = readHere('embedded-composer.ts');
+  assert.match(surface, /sendHeldBy: string \| null;/);
+  assert.match(surface, /canStop: boolean;/);
+  assert.match(surface, /surface\.sendHeldBy === next\.sendHeldBy &&\s*surface\.canStop === next\.canStop &&/);
+  assert.match(readHere('ConversationScreen.tsx'), /publishEmbeddedComposer\(\{[\s\S]*?sendHeldBy,\s*canStop,\s*isOwnerResolved,/);
+  const dock = read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx');
+  assert.match(dock, /sendHeldBy=\{surface \? surface\.sendHeldBy : null\}\s*canStop=\{surface \? surface\.canStop : true\}/);
+});

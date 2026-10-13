@@ -43,6 +43,13 @@ export interface EmbeddedComposerSurface {
   canSend: boolean;
   /** The strip's reason when the reader may not send. */
   viewOnlyReason: ViewOnlyReason;
+  /** The colleague whose turn is streaming in a space chat, or null (the
+   *  controller's `sendHeldBy`): the host's Send waits for them. */
+  sendHeldBy: string | null;
+  /** Whether the running turn may be stopped from here: the reader's own
+   *  (the controller's `canStop`). A colleague's turn gets no Stop, which the
+   *  server would refuse (backend B4: cancel is the sender's alone). */
+  canStop: boolean;
   /** False while ownership is still resolving — the host disables sending. */
   isOwnerResolved: boolean;
   submit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
@@ -85,6 +92,8 @@ export function publishEmbeddedComposer(next: EmbeddedComposerSurface): void {
     surface.isOwner === next.isOwner &&
     surface.canSend === next.canSend &&
     surface.viewOnlyReason === next.viewOnlyReason &&
+    surface.sendHeldBy === next.sendHeldBy &&
+    surface.canStop === next.canStop &&
     surface.isOwnerResolved === next.isOwnerResolved &&
     surface.submit === next.submit &&
     surface.stop === next.stop

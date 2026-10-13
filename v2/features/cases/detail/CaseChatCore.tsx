@@ -548,6 +548,10 @@ export function CaseChatComposerDock({
             isRedacted={surface ? surface.isRedacted : false}
             isStreaming={surface ? surface.isStreaming : false}
             isCancelling={surface ? surface.isCancelling : false}
+            // A case chat in a space: a colleague's turn holds Send and offers
+            // no Stop, as on the chat's own screen (Spaces F4).
+            sendHeldBy={surface ? surface.sendHeldBy : null}
+            canStop={surface ? surface.canStop : true}
             onSubmit={async (message, attachments) => {
               // A refused send comes back to the composer, which gives the
               // message back and says why.
