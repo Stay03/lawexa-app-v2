@@ -49,6 +49,12 @@ export interface ChatMessage {
   partial?: {
     reason: 'cancelled' | 'error' | 'timeout';
   };
+  /**
+   * Who asked, on a user turn read from the server (backend B4, see
+   * {@link ApiMessage.author}). Absent on a turn this client drew itself and on
+   * a server before B4; `null` when the server withholds the writer.
+   */
+  author?: ConversationAuthor | null;
 }
 
 // Tool message extends ChatMessage with tool-specific data
@@ -340,12 +346,35 @@ export interface TerminalEvent {
   persisted_message_ids?: number[];
 }
 
-// Pending response (409) from POST /api/chat
+/** The member whose turn is running in a chat (backend B4, `execution_user`). */
+export interface ConversationTurnUser {
+  id: number;
+  name: string;
+}
+
+/**
+ * The user message a running turn answers (backend B4, `pending_message`):
+ * its id, the first 140 characters of it, and who wrote it (`null` when the
+ * server withholds the writer).
+ */
+export interface PendingUserMessage {
+  id: number;
+  preview: string;
+  author_id: number | null;
+}
+
+// Pending response (409) from POST /api/chat. While another send holds the
+// chat but has not made its request yet, every field but `execution_user` is
+// null (backend B4).
 export interface PendingResponseData {
-  conversation_id: string;
+  conversation_id: string | null;
   execution_id: string | null;
   stream_url: string | null;
-  pending_since: string;
+  pending_since: string | null;
+  /** Who is generating (backend B4); absent on a server before B4. */
+  execution_user?: ConversationTurnUser | null;
+  /** The message being answered (backend B4); absent on a server before B4. */
+  pending_message?: PendingUserMessage | null;
 }
 
 // Conversation status endpoint (GET /api/conversations/{uuid}/status)
@@ -354,7 +383,23 @@ export interface ConversationStatusData {
   messages: ApiMessage[];
   execution_id: string | null;
   stream_url: string | null;
+  /** When the latest turn started. It stays set after the turn ends (B4). */
   pending_since: string | null;
+  /**
+   * The latest turn's sender (backend B4). It stays set after the turn ends,
+   * so it names who is asking only while `status` is `'pending'`.
+   */
+  execution_user?: ConversationTurnUser | null;
+  /** The message being answered; non-null only while `status` is `'pending'`. */
+  pending_message?: PendingUserMessage | null;
+  /** Whether THIS reader may stop the running turn: its sender only (B4). */
+  can_cancel?: boolean;
+  /**
+   * The id of the chat's latest user message, `null` when it has none (backend
+   * 1135730). A change between two reads is a turn that began, even one that
+   * also ended between them.
+   */
+  last_message_id?: number | null;
 }
 
 export interface ConversationStatusResponse {
@@ -414,6 +459,9 @@ export interface ChatStartRequest {
   // Tie this new conversation to the content it's about. Sent on the first
   // turn only (the link is sticky); merged + deduped server-side.
   references?: ChatReference[];
+  // Start the conversation in a space (backend B4): first turn only, never with
+  // conversation_id, is_confidential or is_redacted (the server answers 422).
+  space_uuid?: string;
 }
 
 export interface ChatStartResponse {
@@ -553,6 +601,13 @@ export interface ApiMessage {
   has_result?: boolean;
   /** That result's size in bytes, when left out. */
   result_bytes?: number;
+  /**
+   * Who wrote a user turn (backend B4): on every user row, `null` on assistant
+   * and tool rows. Old rows with no recorded writer name the chat's owner.
+   * `null` on a user row too when a stranger reads a published chat and the
+   * writer is not its owner. Absent on a server before B4.
+   */
+  author?: ConversationAuthor | null;
 }
 
 // Document upload response (POST /api/files/documents)
@@ -659,6 +714,10 @@ export interface ConversationData {
   references?: ConversationReference[];
   /** See {@link ConversationListItem.space}. */
   space?: ConversationSpaceRef | null;
+  /** See {@link ConversationListItem.my_space_role}. */
+  my_space_role?: ConversationSpaceRole | null;
+  /** See {@link ConversationListItem.can_send}. */
+  can_send?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -705,6 +764,12 @@ export interface ConversationListItem {
    *  (backend B3). Absent on an API before B3 and on payloads that do not
    *  carry it, which reads the same as `null`. */
   space?: ConversationSpaceRef | null;
+  /** The READER's role in that space (backend B4), whether or not they own the
+   *  chat; `null` outside a space or for a non-member. Absent before B4. */
+  my_space_role?: ConversationSpaceRole | null;
+  /** Whether the reader may send in this chat (backend B4). It already counts
+   *  ownership, so it is the one answer the composer follows. Absent before B4. */
+  can_send?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -715,6 +780,10 @@ export interface ConversationSpaceRef {
   uuid: string;
   name: string;
 }
+
+/** A reader's role in a chat's space, the stored value (backend B4): the
+ *  screens call `editor` a Contributor. */
+export type ConversationSpaceRole = 'owner' | 'editor' | 'viewer';
 
 // List conversations response
 export interface ConversationsListResponse {

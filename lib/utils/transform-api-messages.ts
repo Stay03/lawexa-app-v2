@@ -114,6 +114,9 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
           attachments: list,
           attachment: list[0],
         }),
+        // Who asked (backend B4). Copied only when the server sent the key, so
+        // a transcript from before B4 keeps the exact shape it always had.
+        ...(apiMsg.author !== undefined && { author: apiMsg.author }),
       } as ChatMessage);
     }
     // Handover message - orchestrator delegating to sub-agent
