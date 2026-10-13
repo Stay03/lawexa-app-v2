@@ -258,13 +258,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   const screen = useScreenContext(path);
   const back = screen?.back ?? null;
   // Quiet orientation label for the left cluster — a category, NOT the title.
-  const leftLabel = isHome
-    ? 'Home'
-    : isConversation
-      ? 'Conversation'
-      : isCase
-        ? 'Case'
-        : null;
+  // None on a chat: its bar matches the chats list page's (Stay, 13 October
+  // 2026: a chat should look like the list page), and its title is the masthead.
+  const leftLabel = isHome ? 'Home' : isCase ? 'Case' : null;
 
   return (
     <div

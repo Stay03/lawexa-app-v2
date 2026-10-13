@@ -37,11 +37,15 @@ const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
  */
 const ATTACHMENT_MARKER = /\s*<attached_(?:image|document)\b[^>]*\/>/g;
 
+/** A colour that arrives late (the space's roster answering after the
+ *  transcript, on a first open) eases in rather than popping. */
+const COLOUR_EASE = 'transition-colors duration-300 motion-reduce:transition-none';
+
 /** The bubble's ground: the member's colour in a space chat (the row sets the
  *  `--member-*` properties), else the plain muted one. */
 const BUBBLE_GROUND = {
-  plain: 'bg-muted',
-  member: 'bg-[var(--member-bg)] dark:bg-[var(--member-bg-dark)]',
+  plain: cn('bg-muted', COLOUR_EASE),
+  member: cn('bg-[var(--member-bg)] dark:bg-[var(--member-bg-dark)]', COLOUR_EASE),
 } as const;
 const FADE_GROUND = {
   plain: 'from-muted',
@@ -127,6 +131,7 @@ export function UserMessageRow({
         <div
           className={cn(
             'mb-1 flex min-w-0 max-w-full items-center gap-1.5 text-xs',
+            COLOUR_EASE,
             // The name in the asker's ink, so the line and the bubble read as one person.
             tint === 'member' ? 'text-[var(--member-ink)] dark:text-[var(--member-ink-dark)]' : 'text-muted-foreground',
           )}

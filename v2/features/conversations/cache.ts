@@ -277,6 +277,30 @@ export const conversationsCache = {
 };
 
 /**
+ * The space a chat is in, as the lists already cached on this device know it:
+ * a row of the reader's own lists names its `space`, and a space's chats list
+ * names it by its key. `null` when no cached list holds the chat (or says it is
+ * personal). Read when a chat opens, so its space's roster (the members'
+ * colours) loads beside the chat's record, not after it.
+ */
+export function spaceOfListedChat(queryClient: QueryClient, id: string): string | null {
+  for (const [, cache] of queryClient.getQueriesData<ListCache>({ queryKey: conversationsQueries.lists() })) {
+    if (!cache) continue;
+    const rows = isInfinite(cache) ? cache.pages.flatMap((page) => page.data) : cache.data;
+    const row = rows.find((candidate) => sameId(candidate, id));
+    if (row) return row.space?.uuid ?? null;
+  }
+  for (const [key, cache] of queryClient.getQueriesData<InfiniteData<SpaceConversationListResponse>>({
+    queryKey: spacesQueries.contents(),
+  })) {
+    // [...contents(), spaceUuid, 'conversations', params, viewer]
+    if (key[3] !== 'conversations' || typeof key[2] !== 'string' || !cache?.pages) continue;
+    if (cache.pages.some((page) => page.data.some((row) => sameId(row, id)))) return key[2];
+  }
+  return null;
+}
+
+/**
  * Build the transient placeholder row the create flow upserts before the server
  * echoes the real conversation. Only `id`, `title`, and `updated_at` are ever
  * rendered by a recents surface (the rail/drawer show `id` + `title`; the home strip

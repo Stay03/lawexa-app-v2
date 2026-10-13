@@ -50,7 +50,8 @@ test('eight colours, wrapping after; light and dark pairs from the crest wheel, 
 
 test('the wiring: roster by uuid, the reader\'s own rows by the reader\'s uuid, personal chats plain', () => {
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /spacesQueries\.members\(spaceUuid \?\? '', \{ viewerId: serverUserId, per_page: 100 \}\),\s*enabled: showAuthors && spaceUuid !== null,/);
+  // Enabled early on the cached lists' word (colour-settle.test.ts).
+  assert.match(controller, /spacesQueries\.members\(spaceUuid \?\? '', \{ viewerId: serverUserId, per_page: 100 \}\),\s*(\/\/[^\n]*\n\s*)*enabled: spaceUuid !== null && \(detailData === null \|\| showAuthors\),/);
   assert.match(controller, /owner: member\.role === 'owner' \|\| member\.content_role === 'owner',/);
   const screen = readHere('ConversationScreen.tsx');
   assert.match(screen, /if \(!spaceRoster\) return null;/);
@@ -60,7 +61,7 @@ test('the wiring: roster by uuid, the reader\'s own rows by the reader\'s uuid, 
   assert.match(list, /const uuid = message\.author === undefined \? viewerUuid : message\.author\?\.uuid;/);
   const row = readHere('rows', 'UserMessageRow.tsx');
   assert.match(row, /style=\{colourIndex === null \? undefined : memberStyle\(colourIndex\)\}/);
-  assert.match(row, /member: 'bg-\[var\(--member-bg\)\] dark:bg-\[var\(--member-bg-dark\)\]'/);
+  assert.match(row, /member: cn\('bg-\[var\(--member-bg\)\] dark:bg-\[var\(--member-bg-dark\)\]', COLOUR_EASE\)/);
   // The text stays the theme's foreground on both grounds.
   assert.match(row, /cn\(BUBBLE_GROUND\[tint\], 'text-foreground rounded-3xl/);
   assert.match(row, /tint === 'member' \? 'text-\[var\(--member-ink\)\] dark:text-\[var\(--member-ink-dark\)\]' : 'text-muted-foreground'/);

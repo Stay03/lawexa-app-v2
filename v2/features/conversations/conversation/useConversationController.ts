@@ -19,7 +19,7 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { useStreamStyle } from '@/v2/stream-style';
-import { conversationsCache } from '../cache';
+import { conversationsCache, spaceOfListedChat } from '../cache';
 import { useSkeletonHold } from './skeleton-hold';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
@@ -355,7 +355,11 @@ export function useConversationController(
   const detailKey = detailOptions.queryKey;
   // The space a space chat is in: its chats list moves the chat up on each new
   // message too (`conversationsCache.touch`), and its roster colours the askers.
-  const spaceUuid = detailData?.space?.uuid ?? null;
+  // Until the record answers, the cached lists name it (`spaceOfListedChat`), so
+  // the roster loads beside the record and the colours land with the first
+  // transcript, not a moment after it.
+  const listedSpace = useMemo(() => spaceOfListedChat(queryClient, conversationId), [queryClient, conversationId]);
+  const spaceUuid = detailData ? (detailData.space?.uuid ?? null) : listedSpace;
   // A space chat's status (Spaces F4): the poll below, and the one read the
   // mount flow makes when it attaches to a turn already running.
   const statusOptions = useMemo(
@@ -793,7 +797,8 @@ export function useConversationController(
   // past it, or who has left, takes the next free colour by first appearance.
   const rosterQuery = useQuery({
     ...spacesQueries.members(spaceUuid ?? '', { viewerId: serverUserId, per_page: 100 }),
-    enabled: showAuthors && spaceUuid !== null,
+    // Early on the lists' word; once the record is here, only where it shows authors.
+    enabled: spaceUuid !== null && (detailData === null || showAuthors),
   });
   const rosterRows = rosterQuery.data?.data;
   const spaceRoster = useMemo<readonly RosterEntry[] | null>(
