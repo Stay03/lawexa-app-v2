@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { ApiMessage, ConversationAuthor } from '@/types/chat';
-import { canSendIn, VIEW_ONLY_COPY, viewOnlyReason } from './space-turn';
+import { authorLine, canSendIn, hasSpaceContract, VIEW_ONLY_COPY, viewOnlyReason } from './space-turn';
 
 /**
  * Spaces F4 (backend B4 bd76241 and 1135730): a chat in a space, read and
@@ -117,4 +117,40 @@ test('the case dock reads the same answer through the embedded surface', () => {
   const dock = read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx');
   assert.match(dock, /surface\.isOwnerResolved && !surface\.canSend;/);
   assert.match(dock, /<ViewOnlyPill reason=\{surface\?\.viewOnlyReason \?\? 'shared'\} \/>/);
+});
+
+/* ── Commit 3: who asked ──────────────────────────────────────────────────── */
+
+test('a user turn names who asked: You for your own, the name for a colleague', () => {
+  assert.equal(authorLine({ id: 7, name: 'Me Myself', avatar_url: null }, 7)?.label, 'You');
+  const colleague = authorLine(ada, 7);
+  assert.equal(colleague?.label, 'Ada Obi');
+  assert.equal(colleague?.spoken, 'Asked by Ada Obi');
+  assert.deepEqual(colleague?.person, ada);
+  // The row this client drew itself carries no author key: the reader's own.
+  assert.deepEqual(authorLine(undefined, 7), { label: 'You', spoken: 'Asked by you', person: null });
+  // A writer withheld from a stranger is never "You".
+  assert.equal(authorLine(null, 7), null);
+  assert.equal(authorLine(null, null), null);
+});
+
+test('labels need the B4 fields on the record', () => {
+  assert.equal(hasSpaceContract({ can_send: false }), true);
+  assert.equal(hasSpaceContract({ can_send: true }), true);
+  assert.equal(hasSpaceContract({}), false);
+  assert.equal(hasSpaceContract(null), false);
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /const isSpaceChat = detailData\?\.space != null;/);
+  assert.match(controller, /const showAuthors = isSpaceChat && hasSpaceContract\(detailData\);/);
+});
+
+test('the list hands every user row the flag and the viewer; the row draws the line only then', () => {
+  const list = readHere('MessageList.tsx');
+  assert.match(list, /showAuthor=\{showAuthors\}\s+viewerId=\{viewerId\}/);
+  assert.match(list, /<UserMessageRow message=\{message\} showAuthor=\{showAuthor\} viewerId=\{viewerId\} \/>/);
+  const row = readHere(join('rows', 'UserMessageRow.tsx'));
+  assert.match(row, /const author = showAuthor \? authorLine\(message\.author, viewerId\) : null;/);
+  assert.match(row, /\{author\.person \? \(\s*<MemberAvatar/);
+  assert.match(row, /<span className="sr-only">\{author\.spoken\}<\/span>/);
+  assert.match(readHere('ConversationScreen.tsx'), /showAuthors=\{controller\.showAuthors\}\s+viewerId=\{serverUserId\}/);
 });

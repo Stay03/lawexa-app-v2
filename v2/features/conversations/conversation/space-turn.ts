@@ -1,4 +1,4 @@
-import type { ConversationData } from '@/types/chat';
+import type { ConversationAuthor, ConversationData } from '@/types/chat';
 
 /**
  * space-turn — the pure rules of a chat in a space (Spaces F4, backend B4
@@ -12,6 +12,11 @@ import type { ConversationData } from '@/types/chat';
  * already counts ownership (a chat's owner who is a Viewer of its space may
  * still send), so the composer follows `can_send` alone. A record without the
  * field comes from a server before B4, where only the owner could send.
+ *
+ * ── WHO ASKED ──────────────────────────────────────────────────────────────
+ * Every user turn in a space chat names its writer above the bubble. Labels
+ * are drawn only on a record that carries the B4 fields, so an app ahead of
+ * the deploy never prints "You" on a colleague's question.
  */
 
 /** The two fields of a conversation record these rules read. */
@@ -44,3 +49,37 @@ export const VIEW_ONLY_COPY = {
   viewer: 'Only the Owner and Contributors can continue this conversation.',
   shared: 'This conversation was shared with you.',
 } as const satisfies { title: string } & Record<ViewOnlyReason, string>;
+
+/**
+ * Whether the record carries the B4 fields: only then are the user turns'
+ * writers known, so only then are they labelled.
+ */
+export function hasSpaceContract(detail: SendFields | null): boolean {
+  return detail !== null && typeof detail.can_send === 'boolean';
+}
+
+/** The line above a user turn: what it shows, what a screen reader says, and
+ *  the face beside it (a colleague's; "You" needs none). */
+export interface AuthorLine {
+  label: string;
+  spoken: string;
+  person: ConversationAuthor | null;
+}
+
+/**
+ * Who asked a user turn. The reader's own turn is "You", and so is a turn
+ * with no `author` key, which only this client draws (its optimistic row; the
+ * server sends the key on every row since B4). A `null` author is a writer
+ * the server withheld from a stranger reading a published chat: no label, so
+ * nobody else's question can read as "You".
+ */
+export function authorLine(
+  author: ConversationAuthor | null | undefined,
+  viewerId: number | null,
+): AuthorLine | null {
+  if (author === null) return null;
+  if (author === undefined || (viewerId !== null && author.id === viewerId)) {
+    return { label: 'You', spoken: 'Asked by you', person: null };
+  }
+  return { label: author.name, spoken: `Asked by ${author.name}`, person: author };
+}

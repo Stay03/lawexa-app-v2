@@ -4,7 +4,9 @@ import { useState } from 'react';
 import { cn, stripContextTags, parsePastedContent } from '@/lib/utils';
 import { formatMessageTimestamp } from '@/lib/utils/date';
 import type { ChatMessage } from '@/types/chat';
+import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import { PastedContentCard } from '../PastedContentCard';
+import { authorLine } from '../space-turn';
 import { SentAttachments } from './SentAttachments';
 
 /**
@@ -15,6 +17,11 @@ import { SentAttachments } from './SentAttachments';
  * SentAttachments}) and pasted-content cards below. The inline content-context
  * tags (case/statute/note slugs, radar uuids) are stripped for display, exactly
  * as v1 does.
+ *
+ * In a space chat (Spaces F4) a line above the bubble names who asked: a
+ * colleague's face and name, or "You". Every question stays on the right,
+ * because the answers own the left; the name is what tells whose it is. It
+ * sits in the bubble's column, so it truncates with the bubble on a phone.
  */
 const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
 
@@ -65,8 +72,19 @@ function UserMessageBubble({ content }: { content: string }) {
   );
 }
 
-export function UserMessageRow({ message }: { message: ChatMessage }) {
+export function UserMessageRow({
+  message,
+  showAuthor,
+  viewerId,
+}: {
+  message: ChatMessage;
+  /** A space chat on a server with B4: name who asked (space-turn.ts). */
+  showAuthor: boolean;
+  /** The server-verified viewer, whose own turns read "You". */
+  viewerId: number | null;
+}) {
   const [showTime, setShowTime] = useState(false);
+  const author = showAuthor ? authorLine(message.author, viewerId) : null;
 
   const hasFiles = (message.attachments?.length ?? 0) > 0 || message.attachment !== undefined;
   const displayContent = stripContextTags(
@@ -87,6 +105,21 @@ export function UserMessageRow({ message }: { message: ChatMessage }) {
       onClick={() => setShowTime((v) => !v)}
       className="group flex flex-col items-end"
     >
+      {author ? (
+        <div className="text-muted-foreground mb-1 flex min-w-0 max-w-full items-center gap-1.5 text-xs">
+          {author.person ? (
+            <MemberAvatar
+              user={author.person}
+              size="sm"
+              className="shrink-0 data-[size=sm]:size-5"
+            />
+          ) : null}
+          <span aria-hidden className="truncate">
+            {author.label}
+          </span>
+          <span className="sr-only">{author.spoken}</span>
+        </div>
+      ) : null}
       {pastedTexts.length > 0 ? (
         <>
           <div className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">

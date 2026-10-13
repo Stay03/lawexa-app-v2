@@ -18,7 +18,7 @@ import { useSkeletonHold } from './skeleton-hold';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
-import { canSendIn, viewOnlyReason, type ViewOnlyReason } from './space-turn';
+import { canSendIn, hasSpaceContract, viewOnlyReason, type ViewOnlyReason } from './space-turn';
 import {
   isConfidentialMark,
   isRedactedMark,
@@ -176,6 +176,11 @@ export interface ConversationController {
   canSend: boolean;
   /** Why the reader reads only, for the view-only pill (space-turn.ts). */
   viewOnlyReason: ViewOnlyReason;
+  /** Whether the chat sits in a space (backend B3's `space` on the record). */
+  isSpaceChat: boolean;
+  /** Name who asked each user turn: a space chat whose record carries the B4
+   *  fields. False on a personal chat, which looks exactly as before. */
+  showAuthors: boolean;
   /**
    * Whether ownership has been DETERMINED yet. False until the owner id resolves
    * (from the synchronous handoff path, or async history load). While false the
@@ -648,6 +653,8 @@ export function useConversationController(
   // paths with no record (the fresh-create handoff, the device-only
   // confidential chat) are the owner's own, so ownership answers there.
   const canSend = detailData ? canSendIn(detailData, isOwner) : isOwner;
+  const isSpaceChat = detailData?.space != null;
+  const showAuthors = isSpaceChat && hasSpaceContract(detailData);
 
   const references = detailData?.references ?? NO_REFERENCES;
 
@@ -775,6 +782,8 @@ export function useConversationController(
     isOwner,
     canSend,
     viewOnlyReason: viewOnlyReason(detailData),
+    isSpaceChat,
+    showAuthors,
     isOwnerResolved: ownerId !== null,
     isLoadingHistory,
     showHistorySkeleton,

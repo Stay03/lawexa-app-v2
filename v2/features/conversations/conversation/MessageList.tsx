@@ -181,6 +181,10 @@ export interface MessageListProps {
    * text the reader scrolled up to read (#16, Stay's option 2, 4 October 2026).
    */
   onScrolledUpChange?: (scrolledUp: boolean) => void;
+  /** Name who asked each user turn: a space chat on a server with B4. */
+  showAuthors: boolean;
+  /** The server-verified viewer, whose own turns read "You". */
+  viewerId: number | null;
 }
 
 export function MessageList({
@@ -196,6 +200,8 @@ export function MessageList({
   onRegenerate,
   onRetry,
   onScrolledUpChange,
+  showAuthors,
+  viewerId,
 }: MessageListProps) {
   // What this render draws (see OPEN_TAIL): until the first frame has been
   // painted, the newest messages only; from then on, all of them. Everything
@@ -543,6 +549,8 @@ export function MessageList({
                       canRegenerate={canRegenerate}
                       onRegenerate={onRegenerate}
                       onRetry={onRetry}
+                      showAuthor={showAuthors}
+                      viewerId={viewerId}
                     />
                   </Fragment>
                 ))}
@@ -654,6 +662,8 @@ const GroupRow = memo(function GroupRow({
   canRegenerate,
   onRegenerate,
   onRetry,
+  showAuthor,
+  viewerId,
 }: {
   group: MessageGroup;
   virtualize: boolean;
@@ -665,6 +675,8 @@ const GroupRow = memo(function GroupRow({
   canRegenerate: boolean;
   onRegenerate: () => void;
   onRetry: () => void;
+  showAuthor: boolean;
+  viewerId: number | null;
 }) {
   // Native windowing for off-screen rows; `auto` remembers measured height so a
   // scrolled-away row returns to the exact same size (no jump).
@@ -690,7 +702,7 @@ const GroupRow = memo(function GroupRow({
         <ErrorRow message={message as ErrorMessage} onRetry={onRetry} isStreaming={isStreaming} />
       );
     } else if (message.role === 'user') {
-      body = <UserMessageRow message={message} />;
+      body = <UserMessageRow message={message} showAuthor={showAuthor} viewerId={viewerId} />;
     } else {
       body = (
         <AssistantMessageRow

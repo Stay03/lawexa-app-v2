@@ -272,6 +272,8 @@ export function ConversationScreen({
             onRegenerate={controller.regenerate}
             onRetry={retryLastMessage}
             onScrolledUpChange={setScrolledUp}
+            showAuthors={controller.showAuthors}
+            viewerId={serverUserId}
           />
         </DocumentExportScope>
 
