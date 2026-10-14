@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { MEMBER_HUES, MEMBER_TINT, memberColourIndex, memberStyle, type RosterEntry } from './member-colour';
+import { MEMBER_CHROMA_LIFT, MEMBER_HUES, MEMBER_TINT, chromaLift, memberColourIndex, memberStyle, type RosterEntry } from './member-colour';
 
 // Stay, 13 October 2026: "every owner should have a fixed color user 1, user 2,
 // user 3, etc". The rule is pure and tested here; its wiring is pinned in the source.
@@ -35,18 +35,52 @@ test('someone who asked but has left takes the next free colour, by first appear
   assert.equal(colours.get('gone-1'), 5);
 });
 
-test('eight colours, wrapping after; light and dark pairs from the crest wheel, no gold', () => {
-  assert.equal(MEMBER_HUES.length, 8);
+test('eight colours in join order: blue, rose, sand, teal, violet, green, coral, sea-green', () => {
+  assert.deepEqual([...MEMBER_HUES], [240, 350, 80, 185, 300, 120, 30, 150]);
   assert.equal(new Set(MEMBER_HUES).size, 8);
-  for (const hue of MEMBER_HUES) assert.ok(!(hue > 55 && hue < 105), `${hue} is in the gold band`);
   assert.deepEqual(memberStyle(8), memberStyle(0));
   // A faint tint over the neutral bubble (Stay, 14 October 2026; strength B).
   assert.deepEqual(memberStyle(0), {
-    '--member-bg': 'oklch(0.96 0.012 230)',
-    '--member-ink': 'oklch(0.5 0.04 230)',
-    '--member-bg-dark': 'oklch(0.277 0.015 230)',
-    '--member-ink-dark': 'oklch(0.78 0.032 230)',
+    '--member-bg': 'oklch(0.96 0.012 240)',
+    '--member-ink': 'oklch(0.5 0.04 240)',
+    '--member-bg-dark': 'oklch(0.277 0.015 240)',
+    '--member-ink-dark': 'oklch(0.78 0.032 240)',
   });
+});
+
+test('people next to each other in join order are at least 90° apart, the wrap included', () => {
+  // Stay, 14 October 2026: "Don't 2 of the colours looks similar? Blue and green?"
+  const apart = (a: number, b: number) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
+  for (let i = 0; i < MEMBER_HUES.length; i += 1) {
+    const a = MEMBER_HUES[i];
+    const b = MEMBER_HUES[(i + 1) % MEMBER_HUES.length];
+    assert.ok(apart(a, b) >= 90, `${a} and ${b} are ${apart(a, b)}° apart`);
+  }
+});
+
+test('only the bubbles take sand from the gold band; the crests keep the rule', () => {
+  // Gold is the app's information colour. At a bubble's faint tint 80° reads as
+  // pale cream, so the bubbles take it (techlead, 14 October 2026); it is the
+  // only hue in the band.
+  const inGold = MEMBER_HUES.filter((hue) => hue > 55 && hue < 105);
+  assert.deepEqual(inGold, [80]);
+  assert.ok(MEMBER_TINT.bg.c <= 0.02 && MEMBER_TINT.bgDark.c <= 0.02, 'a faint tint, not a gold fill');
+  assert.match(readHere('member-colour.ts'), /the bubbles alone take it/);
+});
+
+test('greens and teals carry a little more chroma, still within the faint limits', () => {
+  assert.equal(chromaLift(120), MEMBER_CHROMA_LIFT);
+  assert.equal(chromaLift(185), MEMBER_CHROMA_LIFT);
+  assert.equal(chromaLift(240), 1);
+  assert.equal(chromaLift(80), 1);
+  assert.deepEqual(memberStyle(3), {
+    '--member-bg': 'oklch(0.96 0.015 185)',
+    '--member-ink': 'oklch(0.5 0.05 185)',
+    '--member-bg-dark': 'oklch(0.277 0.0188 185)',
+    '--member-ink-dark': 'oklch(0.78 0.04 185)',
+  });
+  assert.ok(MEMBER_TINT.bg.c * MEMBER_CHROMA_LIFT <= 0.02 && MEMBER_TINT.bgDark.c * MEMBER_CHROMA_LIFT <= 0.02, 'fills');
+  assert.ok(MEMBER_TINT.ink.c * MEMBER_CHROMA_LIFT <= 0.05 && MEMBER_TINT.inkDark.c * MEMBER_CHROMA_LIFT <= 0.05, 'names');
 });
 
 test('the tint stays faint: close to the neutral bubble, the names muted', () => {

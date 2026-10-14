@@ -17,10 +17,24 @@ import type { CSSProperties } from 'react';
  * keeps its plain bubbles (`memberColours` null).
  *
  * ── THE PALETTE ────────────────────────────────────────────────────────────
- * Eight hues from the space crest's wheel (`collab/kit/crest-model.ts`), gold
- * excluded for the same reason it is there (gold is the app's information
- * colour), ordered so neighbouring indices sit far apart round the wheel.
- * Lightness carries the contrast, so every hue is safe at once.
+ * Eight hues, in join order: blue, rose, sand, teal, violet, green, coral,
+ * sea-green. At a faint tint neighbouring hues read alike (Stay, 14 October
+ * 2026: "Don't 2 of the colours looks similar? Blue and green?"), so any two
+ * people next to each other in join order, the eighth and the ninth (the first
+ * again) included, sit at least 90° apart round the wheel, and the first three
+ * are one cool and two warm. Lightness carries the contrast, so every hue is
+ * safe at once.
+ *
+ * Sand (80°) sits inside the band the space crests leave out for gold, the
+ * app's information colour (`collab/kit/crest-model.ts`). That rule stays for
+ * the crests, whose chroma is several times higher. At a bubble's faint tint
+ * 80° reads as pale cream, nowhere near the gold accent, and it is the only
+ * warm hue a full 90° from rose, so the bubbles alone take it (techlead, 14
+ * October 2026).
+ *
+ * Greens and teals grey out first at low chroma, so the hues from 110° to 200°
+ * carry {@link MEMBER_CHROMA_LIFT} times the chroma, still within the faint
+ * limits.
  *
  * ── THE STRENGTH ───────────────────────────────────────────────────────────
  * A faint tint over the neutral bubble, not a coloured bubble (Stay, 14
@@ -31,7 +45,16 @@ import type { CSSProperties } from 'react';
  * ink is a muted hue that keeps AA on the page. Every value lives in
  * {@link MEMBER_TINT}, so another strength is a change there alone.
  */
-export const MEMBER_HUES: readonly number[] = [230, 155, 330, 20, 280, 180, 130, 305];
+export const MEMBER_HUES: readonly number[] = [240, 350, 80, 185, 300, 120, 30, 150];
+
+/** The extra chroma for the hues that grey out first (greens and teals). */
+export const MEMBER_CHROMA_LIFT = 1.25;
+const LIFTED_HUES = { from: 110, to: 200 } as const;
+
+/** The chroma factor for one hue. */
+export function chromaLift(hue: number): number {
+  return hue >= LIFTED_HUES.from && hue <= LIFTED_HUES.to ? MEMBER_CHROMA_LIFT : 1;
+}
 
 /** oklch lightness and chroma of each member colour, per theme. */
 export const MEMBER_TINT = {
@@ -41,7 +64,8 @@ export const MEMBER_TINT = {
   inkDark: { l: 0.78, c: 0.032 },
 } as const;
 
-const oklch = ({ l, c }: { l: number; c: number }, hue: number) => `oklch(${l} ${c} ${hue})`;
+const oklch = ({ l, c }: { l: number; c: number }, hue: number) =>
+  `oklch(${l} ${Math.round(c * chromaLift(hue) * 10_000) / 10_000} ${hue})`;
 
 /** Style objects carrying the member custom properties, typed (React's
  *  `CSSProperties` has no index signature for `--*`). */
