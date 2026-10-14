@@ -216,3 +216,17 @@ test('a space chat mention or reply opens the chat at its message (techlead’s 
   assert.equal(notificationChannelUuid(mention), null);
   assert.equal(notificationChannelUuid(reply), null);
 });
+
+test('a space chat row reads the same by its class name, as GET /notifications serves it', () => {
+  // The bell's list names the class (SpaceChatMentionNotification); a broadcast
+  // names the snake form. Both reach the same title, mark and destination.
+  for (const type of ['SpaceChatMentionNotification', 'space_chat_mention']) {
+    const shown = presentNotification(row({ type, title: '', icon: null, action_url: '/c/c-1?m=54' }), ORIGIN);
+    assert.equal(shown.title, 'You were mentioned in a chat', type);
+    assert.equal(shown.mark, 'mention', type);
+    assert.deepEqual(shown.destination, { kind: 'internal', href: '/c/c-1?m=54' }, type);
+  }
+  const reply = presentNotification(row({ type: 'SpaceChatReplyNotification', title: '', icon: null }), ORIGIN);
+  assert.equal(reply.title, 'Someone replied to you in a chat');
+  assert.equal(reply.mark, 'reply');
+});
