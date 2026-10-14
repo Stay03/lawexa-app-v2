@@ -201,3 +201,17 @@ test('a reply whose original is gone gives the words back, not the quote, and sa
   // The words and the files still come back, as for every refused send.
   assert.match(composer, /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);/);
 });
+
+test('a send that never reached the server gives the words and the quote back (techlead, 15 October 2026)', async () => {
+  const turn = await import('./space-turn');
+  assert.equal(turn.sendRefusal({ kind: 'unsent' }, 7), "Couldn't reach Lawexa. Your message is kept, so you can send it again.");
+  assert.equal(turn.askAgainRefusal({ kind: 'unsent' }, 7), "Couldn't reach Lawexa. Ask again in a moment.");
+  // The engine reads "no answer at all" as this refusal, before the general error.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /if \(err instanceof AxiosError && !err\.response\) \{\s*removeMessage\(optimisticMsg\.id\);\s*setState\(\(prev\) => \(\{ \.\.\.prev, isStreaming: false, isCancelling: false \}\)\);\s*return \{ kind: 'unsent' \};\s*\}\s*\/\/ Generic error\./);
+  // It keeps the quote (no dropReply), and the record is not re-read for it.
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),/);
+  assert.doesNotMatch(controller, /refusal\.kind === 'unsent' && \{ dropReply/);
+  assert.match(controller, /\} else if \(refusal\.kind !== 'unsent'\) \{/);
+});

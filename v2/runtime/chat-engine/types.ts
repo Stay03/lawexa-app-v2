@@ -162,7 +162,10 @@ export type SendRefusal =
   | { kind: 'forbidden' }
   /** A reply whose original is gone (deleted, or not this chat's): the server's
    *  one 422 on `reply_to_message_id`. The words go back; the quote does not. */
-  | { kind: 'reply-gone' };
+  | { kind: 'reply-gone' }
+  /** The send never reached the server (no answer at all: the signal dropped,
+   *  the network is down). The words and the quote go back to the box. */
+  | { kind: 'unsent' };
 
 // ─── Engine handlers (hot-swappable callbacks + mode resolvers) ─────────────
 /**

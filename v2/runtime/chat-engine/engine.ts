@@ -2066,6 +2066,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return { kind: 'reply-gone' };
       }
 
+      // No answer at all — the request never reached the server (a phone that
+      // lost its signal mid-send, the network down). A refusal, not an error:
+      // the host gives the words, the cards, the files and the quote back, so
+      // nothing typed is lost (techlead, 15 October 2026). It used to fall
+      // through below: the question vanished and only an error stayed.
+      if (err instanceof AxiosError && !err.response) {
+        removeMessage(optimisticMsg.id);
+        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        return { kind: 'unsent' };
+      }
+
       // Generic error.
       removeMessage(optimisticMsg.id);
       const errorMsg =

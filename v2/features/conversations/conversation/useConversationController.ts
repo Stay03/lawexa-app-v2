@@ -987,7 +987,8 @@ export function useConversationController(
         // The follow waits on a transcript read: it attaches only if this
         // screen still shows this chat when the read lands.
         void followTurn(refusal.executionId, () => liveRef.current === conversationId, true);
-      } else {
+      } else if (refusal.kind !== 'unsent') {
+        // An unsent turn reached nobody (likely offline): nothing changed to re-read.
         void queryClient.invalidateQueries({ queryKey: detailKey });
       }
     },

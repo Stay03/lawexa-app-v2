@@ -161,6 +161,9 @@ export interface SendRefused {
   dropReply?: true;
 }
 
+/** The composer's line when the send never reached the server. */
+export const UNSENT_COPY = "Couldn't reach Lawexa. Your message is kept, so you can send it again.";
+
 /** The composer's line when a reply's original is no longer there. */
 export const REPLY_GONE_COPY = 'The message you replied to is no longer available. Your message is kept.';
 
@@ -173,6 +176,7 @@ export const REPLY_GONE_COPY = 'The message you replied to is no longer availabl
 export function sendRefusal(refusal: SendRefusal, viewerId: number | null): string {
   if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
   if (refusal.kind === 'reply-gone') return REPLY_GONE_COPY;
+  if (refusal.kind === 'unsent') return UNSENT_COPY;
   if (refusal.by === null) return 'Someone is asking right now. Your message is kept.';
   if (refusal.by.id === viewerId) {
     return 'Your last question is still being answered. Your message is kept.';
@@ -189,6 +193,7 @@ export function askAgainRefusal(refusal: SendRefusal, viewerId: number | null): 
   if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
   // "Ask again" never replies to anything; said plainly should it ever happen.
   if (refusal.kind === 'reply-gone') return 'That message is no longer available.';
+  if (refusal.kind === 'unsent') return "Couldn't reach Lawexa. Ask again in a moment.";
   if (refusal.by === null) return 'Someone is asking right now. Ask again once the answer is in.';
   if (refusal.by.id === viewerId) return 'Your last question is still being answered.';
   return `${refusal.by.name} is asking right now. Ask again once their answer is in.`;
