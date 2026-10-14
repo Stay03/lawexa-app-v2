@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
+import type { MessageReplyTo } from '@/types/chat';
 import { memberColourIndex } from './member-colour';
 import {
   useConversationController,
@@ -75,11 +76,14 @@ import {
 export function ConversationScreen({
   conversationId,
   embed,
+  jumpTo = null,
 }: {
   conversationId: string;
   /** Present when this screen lives inside another route (the case page's
    *  side chat) — see `ConversationEmbed` on the controller. */
   embed?: ConversationEmbed;
+  /** A message to go to once the chat has opened (`/c/{id}?m={id}`, a notification). */
+  jumpTo?: number | null;
 }) {
   const { userId: serverUserId } = useV2Session();
   const controller = useConversationController(conversationId, serverUserId, embed);
@@ -241,6 +245,13 @@ export function ConversationScreen({
     [canSend, submit, externalComposer, conversationId],
   );
 
+  // Replies (Stay, 14 October 2026): in a space chat where the reader may
+  // send, a message's Reply stages its quote in this screen's composer. Not in a
+  // personal chat (the server takes replies there, the app offers none this
+  // round), and not with an external composer, which this screen cannot reach.
+  const canReply = controller.showAuthors && canSend && !externalComposer && !isConfidential;
+  const stageReply = useCallback((target: MessageReplyTo) => composerRef.current?.reply(target), []);
+
   // "Ask again" refused (a colleague's turn, or a demotion): the sentence in
   // the composer's banner, as for a refused send. Its question is already on
   // screen, so there is no text to give back.
@@ -355,6 +366,8 @@ export function ConversationScreen({
             viewerUuid={viewerUuid}
             masthead={embed ? null : <ConversationMasthead />}
             underBar={!embed && !controller.isConfidential}
+            onReply={canReply ? stageReply : null}
+            jumpTo={jumpTo}
           />
         </DocumentExportScope>
 
@@ -405,6 +418,7 @@ export function ConversationScreen({
                   canStop={controller.canStop}
                   onSubmit={controller.submit}
                   onStop={controller.stop}
+                  viewerId={serverUserId}
                 />
               ) : (
                 <ViewOnlyPill reason={controller.viewOnlyReason} />

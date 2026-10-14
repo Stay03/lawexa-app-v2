@@ -23,12 +23,16 @@ import { UNNAMED_ASKER, type TurnSide } from '../space-turn';
  * writer (`null`) is never mine: it goes left as "Someone", in the plain grey.
  * The colours are the member colours (member-colour.ts), set on the row so the
  * crest, the name and the bubble read as one person.
+ *
+ * `action` is the turn's Reply for a mouse (HoverReply): beside "You · time" on
+ * the right, after the time on the left, shown while the pointer is over the turn.
  */
 export function SpaceTurn({
   side,
   author,
   time,
   colourIndex,
+  action = null,
   children,
 }: {
   side: TurnSide;
@@ -36,6 +40,8 @@ export function SpaceTurn({
   author: ConversationAuthor | null;
   time: Date;
   colourIndex: number | null;
+  /** The turn's hover Reply, or null where the reader cannot reply. */
+  action?: ReactNode;
   children: ReactNode;
 }) {
   const style = colourIndex === null ? undefined : memberStyle(colourIndex);
@@ -43,11 +49,12 @@ export function SpaceTurn({
 
   if (side === 'mine') {
     return (
-      <div className="flex flex-col items-end" style={style}>
+      <div className="group/turn flex flex-col items-end" style={style}>
         {/* Indented from the left even when the question is long, so it reads
             as the reader's own on a phone (techlead, 14 October 2026). */}
         <div className="flex max-w-[85%] min-w-0 flex-col items-end">{children}</div>
-        <div className="text-muted-foreground mt-1.5 text-xs tabular-nums">
+        <div className="text-muted-foreground mt-1.5 flex items-center gap-1 text-xs tabular-nums">
+          {action}
           <span aria-hidden>You · {at}</span>
           <span className="sr-only">Asked by you at {at}</span>
         </div>
@@ -58,7 +65,7 @@ export function SpaceTurn({
   const name = author?.name ?? UNNAMED_ASKER;
   const tinted = colourIndex !== null;
   return (
-    <div className="flex min-w-0 items-start gap-2.5" style={style}>
+    <div className="group/turn flex min-w-0 items-start gap-2.5" style={style}>
       <MemberAvatar
         user={author}
         className={cn(
@@ -85,6 +92,7 @@ export function SpaceTurn({
           <span className="sr-only">
             Asked by {name} at {at}
           </span>
+          {action}
         </div>
         {children}
       </div>

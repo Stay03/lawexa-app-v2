@@ -14,6 +14,7 @@ import type {
   ConversationStatusData,
   ConversationTurnUser,
   MessageAttachment,
+  MessageReplyTo,
 } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
@@ -265,7 +266,12 @@ export interface ConversationController {
    * turn is running, or the reader may no longer send): the composer gives the
    * message back and shows the sentence.
    */
-  submit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
+  /** Send a turn; `replyTo` makes it a reply to that saved message (space chats). */
+  submit: (
+    message: string,
+    attachments: MessageAttachment[],
+    replyTo?: MessageReplyTo | null,
+  ) => Promise<SendRefused | undefined>;
   /** Graceful cancel (cancel POST; the engine waits for the terminal SSE event). */
   stop: () => void;
   /** Re-ask the last user turn to get a fresh answer (drives engine.send).
@@ -979,7 +985,7 @@ export function useConversationController(
   );
 
   const submit = useCallback(
-    async (message: string, attachments: MessageAttachment[]) => {
+    async (message: string, attachments: MessageAttachment[], replyTo: MessageReplyTo | null = null) => {
       // The last status read is from before this send: dropped, so a stale
       // "pending, by a colleague" can never label the reader's own turn, and
       // forgotten as seen, so the first read after this turn is not taken for
@@ -993,6 +999,7 @@ export function useConversationController(
         streamMode: 'v2_stream',
         jurisdiction,
         ...(fileIds.length > 0 && { fileIds, attachments }),
+        ...(replyTo && { replyTo }),
       });
       if (refusal === null) return undefined;
       takeRefusal(refusal);

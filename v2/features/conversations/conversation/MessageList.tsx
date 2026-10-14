@@ -4,6 +4,7 @@ import {
   Fragment,
   memo,
   startTransition,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -19,6 +20,7 @@ import {
   isErrorMessage,
   type ConversationReference,
   type ErrorMessage,
+  type MessageReplyTo,
 } from '@/types/chat';
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
 import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
@@ -40,6 +42,8 @@ import { TranscriptSkeleton } from './skeletons';
 import { openDefersBlocks } from './markdown/defer-plan';
 import { ScrollKeepContext, type ScrollKeep } from './markdown/scroll-keep-context';
 import { followOnResize, nearBottom, readsAtBottom } from './scroll-pin';
+import { savedIdOf } from './reply-target';
+import { TurnActionsSheet, type HeldTurn } from './rows/TurnActionsSheet';
 
 /**
  * MessageList — the natively-virtualized, memoized transcript with chat scroll
@@ -169,6 +173,9 @@ const OPEN_TAIL_MESSAGES = 8;
 const OPEN_TAIL_CHARS = 3_000;
 const OPEN_TAIL: OpenTailLimit = { messages: OPEN_TAIL_MESSAGES, chars: OPEN_TAIL_CHARS };
 
+/** How long a message a jump lands on stays washed (the channel feed's length). */
+const FLASH_MS = 1200;
+
 /**
  * `useLayoutEffect` in the browser, `useEffect` on the server — React warns that a
  * layout effect does nothing during SSR, and the conversation screen does server-
@@ -219,6 +226,14 @@ export interface MessageListProps {
    *  passes under the open bar (shell.css `.v2-shell--chat`); false when
    *  something sits above it (the confidential banner). */
   underBar?: boolean;
+  /**
+   * Make a message the reply target (the composer's quote bar). Null where the
+   * reader cannot reply: a personal chat, or a reader who may not send. Must be
+   * a stable function: every row receives it.
+   */
+  onReply?: ((target: MessageReplyTo) => void) | null;
+  /** A message to scroll to and flash once the chat has opened (`/c/{id}?m={id}`). */
+  jumpTo?: number | null;
 }
 
 export function MessageList({
@@ -242,6 +257,8 @@ export function MessageList({
   underBar = false,
   memberColours = null,
   viewerUuid = null,
+  onReply = null,
+  jumpTo = null,
 }: MessageListProps) {
   // A user turn's colour: its author's, or the reader's own for the row this
   // client drew. A withheld or missing author has none.
@@ -304,6 +321,54 @@ export function MessageList({
   /** Where the last scroll event found the view, so a shrink's clamp can be
    *  told from the reader's own scroll (`clampedToBottom`). */
   const lastScrollTopRef = useRef<number | null>(null);
+
+  /**
+   * GO TO A MESSAGE (a reply's quote, a notification's `?m=`): scroll it to the
+   * middle of the view and wash it for {@link FLASH_MS}, as the channel feed's
+   * `flashMessage` does. The wash is a DOM stamp (`data-flash`), not state, so
+   * no memoised row re-renders for it. The scroll is the reader's as far as the
+   * list is concerned: it leaves the bottom, so "Latest" offers the way back.
+   * False when the message is not on the page.
+   */
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const jumpToMessage = useCallback((messageId: number, options?: { instant?: boolean }) => {
+    const root = scrollRef.current;
+    const row = root?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+    if (!root || !row) return false;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    row.scrollIntoView({ block: 'center', behavior: options?.instant || reduced ? 'auto' : 'smooth' });
+    if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    for (const other of root.querySelectorAll('[data-flash]')) other.removeAttribute('data-flash');
+    row.setAttribute('data-flash', '');
+    flashTimerRef.current = setTimeout(() => {
+      row.removeAttribute('data-flash');
+      flashTimerRef.current = null;
+    }, FLASH_MS);
+    return true;
+  }, []);
+  const jumpFromQuote = useCallback((messageId: number) => void jumpToMessage(messageId), [jumpToMessage]);
+  useEffect(
+    () => () => {
+      if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
+    },
+    [],
+  );
+
+  /** The question a long press opened the actions sheet for (touch). */
+  const [held, setHeld] = useState<HeldTurn | null>(null);
+  const closeSheet = useCallback(() => setHeld(null), []);
+  const replyFromSheet = useCallback((target: MessageReplyTo) => onReply?.(target), [onReply]);
+
+  // A notification's `?m=`: once the chat has opened at the bottom and every
+  // row is drawn, go to that message, once per target. A message no longer in
+  // the chat leaves the reader at the bottom.
+  const jumpedToRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!opened || jumpTo === null || jumpedToRef.current === jumpTo) return;
+    jumpedToRef.current = jumpTo;
+    const frame = requestAnimationFrame(() => void jumpToMessage(jumpTo, { instant: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [opened, jumpTo, jumpToMessage]);
 
   /**
    * THE JUMP-TO-LATEST PILL, AS ONE DERIVED VALUE.
@@ -671,6 +736,9 @@ export function MessageList({
                       viewerId={viewerId}
                       colourIndex={group.type === 'single' ? colourOf(group.message) : null}
                       answerMark={marks?.[gi]?.answer ?? null}
+                      onReply={onReply}
+                      onJump={jumpFromQuote}
+                      onHold={setHeld}
                     />
                   </Fragment>
                 ))}
@@ -741,6 +809,10 @@ export function MessageList({
               : `${pillCount} new messages`}
         </Button>
       </div>
+
+      {/* One actions sheet for the transcript, opened by a long press on a
+          question (touch). Only where the reader can reply. */}
+      {onReply && <TurnActionsSheet held={held} onReply={replyFromSheet} onClose={closeSheet} />}
     </div>
   );
 }
@@ -788,6 +860,9 @@ const GroupRow = memo(function GroupRow({
   viewerId,
   colourIndex,
   answerMark,
+  onReply,
+  onJump,
+  onHold,
 }: {
   group: MessageGroup;
   virtualize: boolean;
@@ -805,6 +880,9 @@ const GroupRow = memo(function GroupRow({
   colourIndex: number | null;
   /** In a space chat, where an answer starts: Lawexa's mark with this time. */
   answerMark: Date | null;
+  onReply: ((target: MessageReplyTo) => void) | null;
+  onJump: (messageId: number) => void;
+  onHold: (held: HeldTurn) => void;
 }) {
   // Native windowing for off-screen rows; `auto` remembers measured height so a
   // scrolled-away row returns to the exact same size (no jump).
@@ -836,6 +914,9 @@ const GroupRow = memo(function GroupRow({
           showAuthor={showAuthor}
           viewerId={viewerId}
           colourIndex={colourIndex}
+          onReply={onReply}
+          onJump={onJump}
+          onHold={onHold}
         />
       );
     } else {
@@ -848,13 +929,22 @@ const GroupRow = memo(function GroupRow({
           isLast={isLastGroup}
           canRegenerate={canRegenerate}
           onRegenerate={onRegenerate}
+          onReply={onReply}
         />
       );
     }
   }
 
+  // A question or an answer is found by its saved id (a reply's quote, `?m=`).
+  const messageId = group.type === 'single' ? savedIdOf(group.message) : null;
   return (
-    <div style={style}>
+    <div
+      style={style}
+      data-message-id={messageId ?? undefined}
+      // The jump's wash: `jumpToMessage` stamps `data-flash` on this node, and
+      // the transition plays the fade both ways. -mx/px keep the content where it was.
+      className="-mx-2 rounded-2xl px-2 transition-colors duration-500 data-flash:bg-primary/10 motion-reduce:transition-none"
+    >
       {answerMark ? <LawexaAnswerMark time={answerMark} /> : null}
       {body}
     </div>

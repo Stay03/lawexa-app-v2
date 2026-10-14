@@ -117,6 +117,8 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         // Who asked (backend B4). Copied only when the server sent the key, so
         // a transcript from before B4 keeps the exact shape it always had.
         ...(apiMsg.author !== undefined && { author: apiMsg.author }),
+        // The message it replies to (space chat replies); absent when none.
+        ...(apiMsg.reply_to && { replyTo: apiMsg.reply_to }),
       } as ChatMessage);
     }
     // Handover message - orchestrator delegating to sub-agent

@@ -61,6 +61,33 @@ export interface ChatMessage {
    * that merely lacks `author` is not assumed to be the reader's.
    */
   drawnHere?: true;
+  /**
+   * The message this turn answers (space chat replies, 14 October 2026): the
+   * server's {@link ApiMessage.reply_to}, or, on the row this client drew, the
+   * target the writer picked. Absent when the turn replies to nothing.
+   */
+  replyTo?: MessageReplyTo;
+}
+
+/**
+ * The message a reply quotes (techlead's contract, 14 October 2026). `author`
+ * follows the rule of {@link ApiMessage.author}: `null` for an answer of
+ * Lawexa's and for a writer withheld from the reader. A deleted target keeps
+ * its role, with no preview and `is_unavailable` set.
+ */
+export interface MessageReplyTo {
+  id: number;
+  role: 'user' | 'assistant';
+  author: ConversationAuthor | null;
+  preview: string | null;
+  is_unavailable: boolean;
+}
+
+/** A person tagged in a space chat message. A reader outside the space gets the name only. */
+export interface MessageMention {
+  uuid?: string;
+  name: string;
+  username?: string;
 }
 
 // Tool message extends ChatMessage with tool-specific data
@@ -468,6 +495,10 @@ export interface ChatStartRequest {
   // Start the conversation in a space (backend B4): first turn only, never with
   // conversation_id, is_confidential or is_redacted (the server answers 422).
   space_uuid?: string;
+  // The saved message this turn replies to (space chat replies). Needs
+  // conversation_id; a target outside the chat, a step, an error or a deleted
+  // row is one 422 on this field.
+  reply_to_message_id?: number;
 }
 
 export interface ChatStartResponse {
@@ -534,6 +565,9 @@ export interface SendMessageOptions {
   // Set on turn 1 when the user opted into redacted mode on the home page.
   // Subsequent turns omit the flag — the server reads the persisted setting.
   isRedacted?: boolean;
+  // The message this turn replies to: sent as reply_to_message_id, and drawn
+  // as the quote on the row this client draws.
+  replyTo?: MessageReplyTo;
 }
 
 // Chat state for hook
@@ -614,6 +648,12 @@ export interface ApiMessage {
    * writer is not its owner. Absent on a server before B4.
    */
   author?: ConversationAuthor | null;
+  /** The message this row replies to; `null` when it replies to nothing. Absent on a server before replies. */
+  reply_to?: MessageReplyTo | null;
+  /** The people tagged in this row (`[]` when none, and in personal chats). */
+  mentions?: MessageMention[];
+  /** Handles the writer typed that matched nobody in the space: on the writer's own rows only. */
+  unmatched_handles?: string[];
 }
 
 // Document upload response (POST /api/files/documents)

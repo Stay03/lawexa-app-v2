@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { AlertCircle, Check, Copy, RotateCcw, Square } from 'lucide-react';
+import { AlertCircle, Check, Copy, CornerUpLeft, RotateCcw, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   useStreamingText,
@@ -9,12 +9,14 @@ import {
   type EngineMessage,
   type StreamingSource,
 } from '@/v2/runtime/chat-engine';
-import type { ChatMessage } from '@/types/chat';
+import type { ChatMessage, MessageReplyTo } from '@/types/chat';
 import { ChatContent } from '../markdown/ChatContent';
 import { MessageDocumentScope } from '../markdown/document-export';
 import { savedMessageId } from '../markdown/export-target';
 import { trimUnclosedLinkTail } from '../markdown/partial-tail';
 import { ReasoningTrace } from '../reasoning/ReasoningTrace';
+import { replyTargetOf, type ReplyableRow } from '../reply-target';
+import { SwipeToReply } from './SwipeToReply';
 
 /**
  * AssistantMessageRow — the streaming answer row, and the proof of the "list never
@@ -30,6 +32,10 @@ import { ReasoningTrace } from '../reasoning/ReasoningTrace';
  * When finalized, the row reads `message.content` / `message.reasoning` (the engine
  * writes them onto the structural message and clears the live stores), so there is
  * no dependence on stale streaming state.
+ *
+ * In a space chat where the reader may send, a saved answer can be replied to:
+ * Reply in its action bar (shown on every device, as Copy is), or a swipe to the
+ * right on a touch screen. No long press here: an answer's text stays selectable.
  */
 export const AssistantMessageRow = memo(function AssistantMessageRow({
   message,
@@ -39,6 +45,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   isLast,
   canRegenerate,
   onRegenerate,
+  onReply = null,
 }: {
   message: EngineMessage;
   streamingText: StreamingSource;
@@ -47,6 +54,8 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   isLast: boolean;
   canRegenerate: boolean;
   onRegenerate: () => void;
+  /** Make this answer the reply target; null where the reader cannot reply. */
+  onReply?: ((target: MessageReplyTo) => void) | null;
 }) {
   const isStreaming = message.isStreaming ?? false;
 
@@ -78,67 +87,73 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   // Actions wait for the landing: mid-drain `text` is a prefix, so Copy would copy a
   // truncated answer and the buttons would be pushed down as the tail arrives.
   const showActions = !isStreaming && !draining && message.content.trim().length > 0;
+  // Only a saved, finished answer can be replied to (replyTargetOf).
+  const target = onReply && showActions ? replyTargetOf(message as ReplyableRow) : null;
+  const reply = target && onReply ? () => onReply(target) : null;
 
   return (
-    <div className="w-full">
-      <ReasoningTrace text={reasoningText} isStreaming={isStreaming} reasoningMs={message.reasoningMs} />
+    <SwipeToReply onReply={reply}>
+      <div className="w-full">
+        <ReasoningTrace text={reasoningText} isStreaming={isStreaming} reasoningMs={message.reasoningMs} />
 
-      {/* Rendered while STREAMING even with no text yet: in the `line` release style
-          the first unit is deliberately held until it is complete, and ChatContent's
-          skeleton bar is what stands in for it. Gating on `text` alone left that
-          opening beat blank (the transcript's activity status has already stepped
-          aside once the assistant placeholder exists). With empty text and the
-          `flow` style this renders a zero-height prose container, so nothing about
-          the current look changes. */}
-      {(text || isStreaming) && (
-        // The two gates are passed SEPARATELY because they want different answers
-        // during a drain: the per-word fade and the "generating" pill stay on (text
-        // is still appearing; a half-revealed card tag must not flash raw XML), but
-        // the `line` stand-in bar must not — the answer is complete, so a pulsing
-        // placeholder under it would promise a line that is never coming.
-        <MessageDocumentScope
-          messageId={message.savedId ?? savedMessageId(message.id)}
-          content={message.content}
-          landed={!isStreaming && !draining}
-        >
-          <ChatContent
-            content={shownText}
-            isStreaming={isStreaming}
-            isDraining={draining}
-            isInteracted={isInteracted}
+        {/* Rendered while STREAMING even with no text yet: in the `line` release style
+            the first unit is deliberately held until it is complete, and ChatContent's
+            skeleton bar is what stands in for it. Gating on `text` alone left that
+            opening beat blank (the transcript's activity status has already stepped
+            aside once the assistant placeholder exists). With empty text and the
+            `flow` style this renders a zero-height prose container, so nothing about
+            the current look changes. */}
+        {(text || isStreaming) && (
+          // The two gates are passed SEPARATELY because they want different answers
+          // during a drain: the per-word fade and the "generating" pill stay on (text
+          // is still appearing; a half-revealed card tag must not flash raw XML), but
+          // the `line` stand-in bar must not — the answer is complete, so a pulsing
+          // placeholder under it would promise a line that is never coming.
+          <MessageDocumentScope
+            messageId={message.savedId ?? savedMessageId(message.id)}
+            content={message.content}
+            landed={!isStreaming && !draining}
+          >
+            <ChatContent
+              content={shownText}
+              isStreaming={isStreaming}
+              isDraining={draining}
+              isInteracted={isInteracted}
+            />
+          </MessageDocumentScope>
+        )}
+
+        {partial && (
+          <div
+            className={cn(
+              'mt-1 flex items-center gap-1.5 text-xs',
+              partial.reason === 'cancelled' ? 'text-muted-foreground' : 'text-destructive',
+            )}
+          >
+            {partial.reason === 'cancelled' ? (
+              <>
+                <Square className="h-3 w-3" />
+                <span>Stopped</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="h-3 w-3" />
+                <span>Interrupted</span>
+              </>
+            )}
+          </div>
+        )}
+
+        {showActions && (
+          <MessageActions
+            text={text}
+            showRegenerate={isLast && canRegenerate}
+            onRegenerate={onRegenerate}
+            onReply={reply}
           />
-        </MessageDocumentScope>
-      )}
-
-      {partial && (
-        <div
-          className={cn(
-            'mt-1 flex items-center gap-1.5 text-xs',
-            partial.reason === 'cancelled' ? 'text-muted-foreground' : 'text-destructive',
-          )}
-        >
-          {partial.reason === 'cancelled' ? (
-            <>
-              <Square className="h-3 w-3" />
-              <span>Stopped</span>
-            </>
-          ) : (
-            <>
-              <AlertCircle className="h-3 w-3" />
-              <span>Interrupted</span>
-            </>
-          )}
-        </div>
-      )}
-
-      {showActions && (
-        <MessageActions
-          text={text}
-          showRegenerate={isLast && canRegenerate}
-          onRegenerate={onRegenerate}
-        />
-      )}
-    </div>
+        )}
+      </div>
+    </SwipeToReply>
   );
 });
 
@@ -159,10 +174,13 @@ function MessageActions({
   text,
   showRegenerate,
   onRegenerate,
+  onReply,
 }: {
   text: string;
   showRegenerate: boolean;
   onRegenerate: () => void;
+  /** Reply to this answer (a space chat); null hides the button. */
+  onReply: (() => void) | null;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -187,6 +205,17 @@ function MessageActions({
       >
         {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
       </button>
+      {onReply && (
+        <button
+          type="button"
+          onClick={onReply}
+          aria-label="Reply"
+          className="v2-interactive text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors"
+        >
+          <CornerUpLeft className="h-3.5 w-3.5" />
+          Reply
+        </button>
+      )}
       {showRegenerate && (
         <button
           type="button"

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { fetchConversationForMetadata } from '@/lib/api/server';
 import { SEO, getAppUrl } from '@/lib/constants/seo';
 import { ConversationScreen } from '@/v2/features/conversations/conversation/ConversationScreen';
+import { jumpTarget } from '@/v2/features/conversations/conversation/jump-target';
 
 /**
  * v2 `/c/[conversationId]` — server shell. Follows the v2 metadata convention
@@ -28,6 +29,8 @@ import { ConversationScreen } from '@/v2/features/conversations/conversation/Con
  */
 interface ConversationPageProps {
   params: Promise<{ conversationId: string }>;
+  /** `?m={id}`: a message to go to once the chat opens (jump-target.ts). */
+  searchParams: Promise<{ m?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: ConversationPageProps): Promise<Metadata> {
@@ -96,8 +99,10 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
  * that first render actually be the first thing the user sees.
  *
  * WHAT THE PAYLOAD HOLDS. Only this route's metadata (title, canonical, OG card)
- * and `<ConversationScreen conversationId>`, which carries no data: the page
- * awaits nothing but its params. That is head content, invisible in-app, and
+ * and `<ConversationScreen conversationId jumpTo>`, which carries no data: the
+ * page awaits nothing but its params and its query, neither of which costs I/O,
+ * and `jumpTo` is the `?m=` of the URL the router caches it under (a
+ * notification's link to a message, jump-target.ts). That is head content, invisible in-app, and
  * `fetchConversationForMetadata` is itself revalidated every 60s server-side.
  * Everything the reader sees comes from the client queries, which this window
  * does not touch: the conversation record is re-read from the server on every
@@ -113,9 +118,10 @@ export async function generateMetadata({ params }: ConversationPageProps): Promi
  */
 export const unstable_dynamicStaleTime = 1800;
 
-export default async function V2ConversationPage({ params }: ConversationPageProps) {
-  // The only remaining await: the route params, which cost no I/O.
+export default async function V2ConversationPage({ params, searchParams }: ConversationPageProps) {
+  // The only remaining awaits: the route params and the query, which cost no I/O.
   const { conversationId } = await params;
+  const { m } = await searchParams;
 
-  return <ConversationScreen conversationId={conversationId} />;
+  return <ConversationScreen conversationId={conversationId} jumpTo={jumpTarget(m)} />;
 }

@@ -18,6 +18,7 @@
 import type {
   ConversationMessage,
   MessageAttachment,
+  MessageReplyTo,
   SendMessageOptions,
   IterationEvent,
   ToolCallingEvent,
@@ -336,6 +337,7 @@ export interface ChatEngine {
   addUserMessage(
     content: string,
     attachments?: MessageAttachment[] | MessageAttachment,
+    replyTo?: MessageReplyTo,
   ): EngineMessage;
   disconnect(): void;
   cancelStream(): void;

@@ -3,12 +3,17 @@
 import { useState } from 'react';
 import { cn, stripContextTags, parsePastedContent } from '@/lib/utils';
 import { formatMessageTimestamp } from '@/lib/utils/date';
-import type { ChatMessage } from '@/types/chat';
+import type { ChatMessage, MessageReplyTo } from '@/types/chat';
 import { PastedContentCard } from '../PastedContentCard';
 import { memberStyle } from '../member-colour';
+import { replyAuthorLabel, replyTargetOf } from '../reply-target';
 import { turnSide } from '../space-turn';
+import { HoverReply } from './HoverReply';
+import { ReplyQuote } from './ReplyQuote';
 import { SentAttachments } from './SentAttachments';
 import { SpaceTurn } from './SpaceTurn';
+import { SwipeToReply } from './SwipeToReply';
+import type { HeldTurn } from './TurnActionsSheet';
 
 /**
  * UserMessageRow — v2 port of v1's user message block (§C KEEP). Right-aligned
@@ -23,6 +28,11 @@ import { SpaceTurn } from './SpaceTurn';
  * reader's own question on the right with "You · 10:36 AM", everyone else's
  * on the left with their crest, name and time. A personal chat keeps the
  * layout above, unchanged.
+ *
+ * A reply carries its quote at the top of the bubble ({@link ReplyQuote}). In a
+ * space chat where the reader may send, a saved question can be replied to:
+ * Reply on hover for a mouse, a swipe to the right or a long press (the actions
+ * sheet) on a touch screen (Stay, 14 October 2026: "like how whatsapp replies are").
  */
 const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
 
@@ -52,12 +62,22 @@ const FADE_GROUND = {
   member: 'from-[var(--member-bg)] dark:from-[var(--member-bg-dark)]',
 } as const;
 
-function UserMessageBubble({ content, tint }: { content: string; tint: 'plain' | 'member' }) {
+function UserMessageBubble({
+  content,
+  tint,
+  quote = null,
+}: {
+  content: string;
+  tint: 'plain' | 'member';
+  /** The quoted message of a reply, drawn at the top of the bubble. */
+  quote?: React.ReactNode;
+}) {
   const [expanded, setExpanded] = useState(false);
   const shouldTruncate = content.length > USER_MESSAGE_TRUNCATE_LENGTH;
 
   return (
-    <div className={cn(BUBBLE_GROUND[tint], 'text-foreground rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words')}>
+    <div className={cn(BUBBLE_GROUND[tint], 'text-foreground rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words', quote !== null && 'pt-2')}>
+      {quote !== null && <div className="-mx-2.5 min-w-0">{quote}</div>}
       {shouldTruncate && !expanded ? (
         <div>
           <div className="relative max-h-[200px] overflow-hidden">
@@ -93,6 +113,9 @@ export function UserMessageRow({
   showAuthor,
   viewerId,
   colourIndex = null,
+  onReply = null,
+  onJump,
+  onHold,
 }: {
   message: ChatMessage;
   /** A space chat on a server with B4: name who asked (space-turn.ts). */
@@ -102,6 +125,12 @@ export function UserMessageRow({
   /** The asker's colour in a space chat (member-colour.ts); null keeps the
    *  plain bubble, as on a personal chat. */
   colourIndex?: number | null;
+  /** Make this question the reply target; null where the reader cannot reply. */
+  onReply?: ((target: MessageReplyTo) => void) | null;
+  /** Scroll to a quoted message and flash it. */
+  onJump?: (messageId: number) => void;
+  /** Open the actions sheet for this question (a long press). */
+  onHold?: (held: HeldTurn) => void;
 }) {
   const [showTime, setShowTime] = useState(false);
   const tint = colourIndex === null ? 'plain' : 'member';
@@ -120,7 +149,14 @@ export function UserMessageRow({
         ? [message.attachment]
         : [];
 
+  const quote = message.replyTo ? (
+    <ReplyQuote replyTo={message.replyTo} viewerId={viewerId} onJump={onJump} />
+  ) : null;
+
   if (showAuthor) {
+    // Only a saved question can be replied to (replyTargetOf).
+    const target = onReply ? replyTargetOf(message) : null;
+    const reply = target && onReply ? () => onReply(target) : null;
     const content = (
       <>
         {pastedTexts.length > 0 ? (
@@ -132,25 +168,36 @@ export function UserMessageRow({
             </div>
             {remainingText && (
               <div className={cn(BUBBLE_GROUND[tint], 'text-foreground mt-1.5 rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words')}>
+                {quote !== null && <div className="-mx-2.5 min-w-0">{quote}</div>}
                 {remainingText}
               </div>
             )}
           </>
         ) : (
-          <UserMessageBubble content={displayContent} tint={tint} />
+          <UserMessageBubble content={displayContent} tint={tint} quote={quote} />
         )}
         {attachments.length > 0 && <SentAttachments attachments={attachments} />}
       </>
     );
     return (
-      <SpaceTurn
-        side={turnSide(message, viewerId)}
-        author={message.author ?? null}
-        time={message.timestamp}
-        colourIndex={colourIndex}
+      <SwipeToReply
+        onReply={reply}
+        onLongPress={
+          target && onHold
+            ? () => onHold({ target, content: displayContent, label: replyAuthorLabel(target, viewerId) })
+            : undefined
+        }
       >
-        {content}
-      </SpaceTurn>
+        <SpaceTurn
+          side={turnSide(message, viewerId)}
+          author={message.author ?? null}
+          time={message.timestamp}
+          colourIndex={colourIndex}
+          action={reply ? <HoverReply onClick={reply} /> : null}
+        >
+          {content}
+        </SpaceTurn>
+      </SwipeToReply>
     );
   }
 
@@ -169,12 +216,13 @@ export function UserMessageRow({
           </div>
           {remainingText && (
             <div className={cn(BUBBLE_GROUND[tint], 'text-foreground mt-1.5 rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words')}>
+              {quote !== null && <div className="-mx-2.5 min-w-0">{quote}</div>}
               {remainingText}
             </div>
           )}
         </>
       ) : (
-        <UserMessageBubble content={displayContent} tint={tint} />
+        <UserMessageBubble content={displayContent} tint={tint} quote={quote} />
       )}
 
       {attachments.length > 0 && <SentAttachments attachments={attachments} />}

@@ -71,9 +71,11 @@ test('the two sides as Arthur drew them', () => {
   const turn = read('rows', 'SpaceTurn.tsx');
   // Mine: right, the bubble at most 85% wide (indented even when long, as on a
   // phone), then "You · 10:36 AM" under it, always shown.
-  assert.match(turn, /if \(side === 'mine'\) \{\s*return \(\s*<div className="flex flex-col items-end" style=\{style\}>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<div className="flex max-w-\[85%\] min-w-0 flex-col items-end">\{children\}<\/div>\s*<div className="text-muted-foreground mt-1\.5 text-xs tabular-nums">\s*<span aria-hidden>You · \{at\}<\/span>/);
+  assert.match(turn, /if \(side === 'mine'\) \{\s*return \(\s*<div className="group\/turn flex flex-col items-end" style=\{style\}>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<div className="flex max-w-\[85%\] min-w-0 flex-col items-end">\{children\}<\/div>\s*<div className="text-muted-foreground mt-1\.5 flex items-center gap-1 text-xs tabular-nums">\s*\{action\}\s*<span aria-hidden>You · \{at\}<\/span>/);
   // Theirs: left, the crest, then the name and the time on one line, the question under it.
-  assert.match(turn, /<div className="flex min-w-0 items-start gap-2\.5" style=\{style\}>\s*<MemberAvatar/);
+  assert.match(turn, /<div className="group\/turn flex min-w-0 items-start gap-2\.5" style=\{style\}>\s*<MemberAvatar/);
+  // A colleague's turn has its hover Reply after the time.
+  assert.match(turn, /Asked by \{name\} at \{at\}\s*<\/span>\s*\{action\}/);
   assert.match(turn, /\{name\}\s*<\/span>\s*<span aria-hidden className="text-muted-foreground shrink-0 text-xs tabular-nums">\s*\{at\}/);
 });
 

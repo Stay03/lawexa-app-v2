@@ -90,7 +90,7 @@ test('a withheld writer stays null, and a transcript from before B4 keeps its ol
 
 test('a chat can be started in a space, by its uuid', () => {
   const types = read('types', 'chat.ts');
-  assert.match(types, /export interface ChatStartRequest \{[\s\S]*?\n {2}space_uuid\?: string;\r?\n\}/);
+  assert.match(types, /export interface ChatStartRequest \{[\s\S]*?\n {2}space_uuid\?: string;\r?\n[\s\S]*?\n\}/);
   // The status and the 409 name the sender and the message being answered.
   assert.match(types, /pending_message\?: PendingUserMessage \| null;/);
   assert.match(types, /export interface PendingUserMessage \{\s+id: number;\s+preview: string;\s+author_id: number \| null;\s+\}/);
@@ -162,7 +162,7 @@ test('labels need the B4 fields on the record', () => {
 test('the list hands every user row the flag and the viewer; the row draws the line only then', () => {
   const list = readHere('MessageList.tsx');
   assert.match(list, /showAuthor=\{showAuthors\}\s+viewerId=\{viewerId\}/);
-  assert.match(list, /<UserMessageRow\s+message=\{message\}\s+showAuthor=\{showAuthor\}\s+viewerId=\{viewerId\}\s+colourIndex=\{colourIndex\}\s*\/>/);
+  assert.match(list, /<UserMessageRow\s+message=\{message\}\s+showAuthor=\{showAuthor\}\s+viewerId=\{viewerId\}\s+colourIndex=\{colourIndex\}\s+onReply=\{onReply\}\s+onJump=\{onJump\}\s+onHold=\{onHold\}\s*\/>/);
   // A space chat lays the row out by side (SpaceTurn, Arthur's layout).
   const row = readHere(join('rows', 'UserMessageRow.tsx'));
   assert.match(row, /if \(showAuthor\) \{/);
@@ -315,11 +315,11 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
 
 test('the composer gives a refused message back, with its pasted cards and files, and says why', () => {
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /const draft = \{ input, pasted: pastedItems\.map\(\(i\) => i\.text\), uploads \};/);
-  assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot\);/);
+  assert.match(composer, /const draft = \{ input, pasted: pastedItems\.map\(\(i\) => i\.text\), uploads, reply: replyTo \};/);
+  assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot, draft\.reply\);/);
   assert.match(
     composer,
-    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*showError\(outcome\.refused, 'notice'\);/,
+    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)?if \(draft\.reply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*showError\(outcome\.refused, 'notice'\);/,
   );
   // A held send is a wait, not a fault: a muted status with a clock, never the red
   // alert (Stay, 13 October 2026). File errors keep the red box.

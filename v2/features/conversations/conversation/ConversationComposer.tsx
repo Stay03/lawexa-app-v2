@@ -5,6 +5,7 @@ import {
   AlertCircle,
   ArrowUp,
   Clock,
+  CornerUpLeft,
   FileText,
   FileUp,
   Loader2,
@@ -35,7 +36,8 @@ import { cn, serializePastedContent } from '@/lib/utils';
 import { chatApi } from '@/lib/api/chat';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
-import type { MessageAttachment } from '@/types/chat';
+import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
+import { useHeldValue } from '@/v2/features/channels/use-held-value';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
 import { PastedContentCard } from './PastedContentCard';
 import {
@@ -52,6 +54,7 @@ import {
   privateModeOf,
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
+import { REPLY_DRAFT, replyAuthorLabel, replySnippet } from './reply-target';
 import { draftWithRefused, heldSendLabel, UNNAMED_ASKER, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
 
@@ -137,6 +140,12 @@ export interface ConversationComposerHandle {
   /** Show a refusal's sentence in the banner with nothing to give back (a
    *  refused "Ask again", whose question is already on screen). */
   explain: (sentence: string) => void;
+  /**
+   * Make the next turn a reply to this message (space chats): its quote shows
+   * above the pill until the turn goes or the reader cancels it, and is kept
+   * with the draft. Focuses the box, as WhatsApp does.
+   */
+  reply: (target: MessageReplyTo) => void;
 }
 
 export interface ConversationComposerProps {
@@ -156,9 +165,13 @@ export interface ConversationComposerProps {
   /**
    * Send the turn. The draft clears as it goes; a refusal ({@link SendRefused}:
    * another member's turn is running, or the reader may no longer send) gives
-   * the text, the pasted cards and the files back, with its sentence above.
+   * the text, the pasted cards, the files and the reply back, with its sentence above.
    */
-  onSubmit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
+  onSubmit: (
+    message: string,
+    attachments: MessageAttachment[],
+    replyTo: MessageReplyTo | null,
+  ) => Promise<SendRefused | undefined>;
   onStop: () => void;
   /** Textarea placeholder — embedding surfaces brand it ("Ask about this case"). */
   placeholder?: string;
@@ -202,6 +215,8 @@ export interface ConversationComposerProps {
    * known yet. Default true (a host whose every turn is the reader's).
    */
   canStop?: boolean;
+  /** The server-verified reader, so a reply to their own question reads "You". */
+  viewerId?: number | null;
 }
 
 export function ConversationComposer({
@@ -223,8 +238,10 @@ export function ConversationComposer({
   stageRef,
   sendHeldBy = null,
   canStop = true,
+  viewerId = null,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   // Draft per scope, read through `draft-store` so the server render and the
   // hydration pass agree (Fable SSR review F2: the case page renders this
@@ -235,6 +252,13 @@ export function ConversationComposer({
   const { pastedItems, addPasted, removePasted, clearPasted } = usePastedContent(
     `conversation_draft_pasted_${draftScopeId}`,
   );
+
+  // The staged reply, kept with this chat's draft (reply-target.ts): a reload
+  // keeps it, and another chat's box has its own. The bar holds the last quote
+  // while it folds away.
+  const [replyTo, updateReply] = useDraft(`conversation_draft_reply_${draftScopeId}`, REPLY_DRAFT);
+  const setReply = useCallback((next: MessageReplyTo | null) => updateReply(() => next), [updateReply]);
+  const replyShown = useHeldValue(replyTo);
 
   // The staging handle — `setInput` persists, so a staged opener survives a
   // reload exactly like typed text. No focus steal (parity with the old chips).
@@ -253,8 +277,12 @@ export function ConversationComposer({
         setErrorTone('notice');
         setErrorOpen(true);
       },
+      reply: (target) => {
+        setReply(target);
+        rootRef.current?.querySelector('textarea')?.focus();
+      },
     }),
-    [setInput, updateInput],
+    [setInput, updateInput, setReply],
   );
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const [removing, setRemoving] = useState<Set<string>>(new Set());
@@ -450,14 +478,15 @@ export function ConversationComposer({
 
     // The draft clears as the message goes, and is kept here until the send is
     // answered, so a refusal can give it all back.
-    const draft = { input, pasted: pastedItems.map((i) => i.text), uploads };
+    const draft = { input, pasted: pastedItems.map((i) => i.text), uploads, reply: replyTo };
     setInput('');
     clearPasted();
     setUploads([]);
+    setReply(null);
     setIsSubmitting(true);
     let outcome: SendRefused | undefined;
     try {
-      outcome = await onSubmit(fullMessage, attachmentsSnapshot);
+      outcome = await onSubmit(fullMessage, attachmentsSnapshot, draft.reply);
     } finally {
       setIsSubmitting(false);
       // A sent tray is gone, so every thumbnail made for it is released here.
@@ -468,6 +497,8 @@ export function ConversationComposer({
     updateInput((current) => (current.trim() === '' ? draft.input : current));
     for (const text of draft.pasted) addPasted(text);
     setUploads((current) => [...draft.uploads, ...current]);
+    // …and the reply, unless the reader has picked another since.
+    if (draft.reply) updateReply((current) => current ?? draft.reply);
     showError(outcome.refused, 'notice');
   };
 
@@ -480,7 +511,17 @@ export function ConversationComposer({
     // Width comes from the CONTAINER (the /c/{id} overlay carries the compact
     // max-w; an embedding card is its own constraint) — so every host's pill
     // fills the same gutters and no two states can disagree about size.
-    <div className="w-full px-4 pb-3 pt-2">
+    <div
+      ref={rootRef}
+      className="w-full px-4 pb-3 pt-2"
+      onKeyDown={(event) => {
+        // Escape takes the reply off, as the bar's ✕ does.
+        if (event.key === 'Escape' && replyTo) {
+          event.preventDefault();
+          setReply(null);
+        }
+      }}
+    >
       <FileUpload
         onFilesAdded={handleFilesAdded}
         accept={acceptedTypesFor(privateMode)}
@@ -697,6 +738,53 @@ export function ConversationComposer({
             })}
           </div>
         )}
+
+        {/* Reply bar — the quote of the message the next turn answers, right above
+            the pill as WhatsApp draws it: who wrote it and its first line, and ✕
+            (or Escape) to take it off. The same persistent-node collapse as the
+            rows above, holding the last quote while it folds away. */}
+        <div
+          className={cn(
+            'grid transition-[grid-template-rows] duration-200 ease-out motion-reduce:transition-none',
+            replyTo ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+          )}
+        >
+          <div className="overflow-hidden" inert={!replyTo}>
+            <div
+              className={cn(
+                'bg-background mb-2 flex items-center gap-2 rounded-2xl border py-2 pr-2 pl-3 text-xs transition-opacity duration-200 ease-out motion-reduce:transition-none',
+                replyTo ? 'opacity-100' : 'opacity-0',
+              )}
+            >
+              <CornerUpLeft aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
+              {replyShown && (
+                <div
+                  className={cn(
+                    'min-w-0 flex-1 border-l-[3px] pl-2',
+                    replyShown.role === 'assistant' ? 'border-primary' : 'border-foreground/30',
+                  )}
+                >
+                  <p className={cn('truncate font-semibold', replyShown.role === 'assistant' && 'text-primary')}>
+                    <span className="sr-only">Replying to </span>
+                    {replyAuthorLabel(replyShown, viewerId)}
+                  </p>
+                  <p className="text-muted-foreground truncate">{replySnippet(replyShown)}</p>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={(event) => {
+                  stop(event);
+                  setReply(null);
+                }}
+                aria-label="Cancel reply"
+                className="v2-interactive text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:ring-ring flex size-7 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2"
+              >
+                <X aria-hidden className="size-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* ── The pill: the PromptInput card holds ONLY the single input row. ── */}
         <PromptInput

@@ -79,8 +79,10 @@ test('the conversation page stays in the router cache as long as its transcript 
   assert.match(page, /export const unstable_dynamicStaleTime = 1800;/);
   // GC_TIMES.list is 30 minutes: the two windows match.
   assert.match(read('v2', 'runtime', 'query.ts'), /list: 30 \* 60 \* 1000,/);
-  // The payload carries no data: the page awaits only its params and passes only the id.
-  assert.match(page, /const \{ conversationId \} = await params;\s*\n\s*return <ConversationScreen conversationId=\{conversationId\} \/>;/);
+  // The payload carries no data: the page awaits only its params and its query
+  // (no I/O), and passes the id and the URL's `?m=` (a notification's message).
+  assert.match(page, /const \{ conversationId \} = await params;\s*\n\s*const \{ m \} = await searchParams;\s*\n\s*return <ConversationScreen conversationId=\{conversationId\} jumpTo=\{jumpTarget\(m\)\} \/>;/);
+  assert.equal(page.match(/await /g)?.length, 4, 'params twice, searchParams and the metadata fetch, nothing else');
   // No layout of its own that could put data in the payload.
   assert.equal(existsSync(repo('app', 'v2', 'c', 'layout.tsx')), false);
   assert.equal(existsSync(repo('app', 'v2', 'c', '[conversationId]', 'layout.tsx')), false);

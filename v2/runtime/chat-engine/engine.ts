@@ -36,6 +36,7 @@ import {
   type ConversationMessage,
   type ConversationData,
   type MessageAttachment,
+  type MessageReplyTo,
   type ApiMessage,
   type SendMessageOptions,
   type CompletedEvent,
@@ -442,6 +443,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function addUserMessage(
     content: string,
     attachments?: MessageAttachment[] | MessageAttachment,
+    replyTo?: MessageReplyTo,
   ): EngineMessage {
     const list: MessageAttachment[] | undefined = Array.isArray(attachments)
       ? attachments
@@ -454,6 +456,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       content,
       timestamp: new Date(),
       drawnHere: true,
+      ...(replyTo && { replyTo }),
       ...(list && list.length > 0 && { attachments: list, attachment: list[0] }),
     };
     // A live turn is a transcript beginning too (the home handoff opens a brand-new
@@ -1901,7 +1904,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       }
     }
 
-    const optimisticMsg = addUserMessage(message, attachmentsList);
+    const optimisticMsg = addUserMessage(message, attachmentsList, options.replyTo);
     setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own' }));
 
     try {
@@ -1920,6 +1923,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         // Confidential turn N: re-send the prior transcript. is_confidential is set
         // once at creation (turn 1) and is immutable — never re-sent here.
         ...(isConfidentialTurnN && { messages: priorHistory }),
+        // A reply names its target by its saved id (space chat replies).
+        ...(convId && options.replyTo && { reply_to_message_id: options.replyTo.id }),
       };
       const response = await chatApi.start(applyJurisdiction(baseBody, choice));
 
@@ -2082,6 +2087,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         conversation_id: convId,
         ...(retryFileIds.length > 0 && { file_ids: retryFileIds }),
         ...(streamMode && { stream_mode: streamMode }),
+        // A retried reply still replies to the same message.
+        ...(originalMsg.replyTo && { reply_to_message_id: originalMsg.replyTo.id }),
       };
       const response = await chatApi.start(applyJurisdiction(retryBody, jurisdiction));
       if (response.success) {
