@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import { parseMessageContent } from '@/lib/utils/collab';
+import { adoptServerFields } from '@/v2/runtime/chat-engine/server-fields';
+import type { EngineMessage } from '@/v2/runtime/chat-engine';
 import type { ApiMessage } from '@/types/chat';
 import type { Member } from '@/types/collab';
 import {
@@ -69,10 +71,12 @@ test('the picker matches handle or name, and names the untaggable it matches', (
 });
 
 test('picking a person writes their handle and a space, and the caret follows it', () => {
+  // Before a space already there: no second one (review of ecaf2d5, finding 5).
   assert.deepEqual(applyMention('ask @ch about it', { query: 'ch', start: 4 }, 'chidi'), {
-    value: 'ask @chidi  about it',
-    caret: 11,
+    value: 'ask @chidi about it',
+    caret: 10,
   });
+  assert.deepEqual(applyMention('ask @ch', { query: 'ch', start: 4 }, 'chidi'), { value: 'ask @chidi ', caret: 11 });
   assert.deepEqual(applyMention('@', { query: '', start: 0 }, 'adaobi'), { value: '@adaobi ', caret: 8 });
 });
 
@@ -130,12 +134,95 @@ test('the wiring: the picker in a space chat, chips in the bubble, the writer’
   assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows\) : null\),/);
   assert.match(readHere('ConversationScreen.tsx'), /mentionOptions=\{controller\.mentionOptions\}/);
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /if \(mentionOptions\) \{\s*setMention\(mentionQueryAt\(next, textarea\(\)\?\.selectionStart \?\? next\.length\)\);/);
+  assert.match(composer, /if \(mentionOptions\) \{\s*detectMention\(next, textarea\(\)\?\.selectionStart \?\? next\.length\);/);
   assert.match(composer, /onKeyDown=\{handleMentionKeys\}/);
   assert.match(composer, /if \(!pickerOpen \|\| event\.nativeEvent\.isComposing\) return;/);
-  assert.match(composer, /<ul role="listbox" aria-label="Mention someone">/);
+  assert.match(composer, /<ul id=\{listId\} role="listbox" aria-label="Mention someone">/);
   const row = readHere('rows', 'UserMessageRow.tsx');
   assert.match(row, /const mentions = useMemo\(\(\) => mentionMetadata\(message\.mentions\), \[message\.mentions\]\);/);
   assert.match(row, /\{unmatched && <p className="text-muted-foreground mt-1 text-xs">\{unmatched\}<\/p>\}/);
   assert.match(readHere('rows', 'MentionText.tsx'), /isSelfMention\(segment\.uuid, viewerUuid\) \? 'bg-primary\/20 text-foreground' : 'bg-primary\/10 text-primary'/);
+});
+
+test('the pill’s key order changed in one shared component: every caller still sends on Enter', () => {
+  // Every PromptInputTextarea in the app, v1 and v2. Only the conversation
+  // composer (the /c screen and the case dock) passes onKeyDown; the rest leave
+  // the pill's own Enter-to-send exactly as it was.
+  const callers: Record<string, string[]> = {
+    'v2/shell/designs/HomeComposer.tsx': [],
+    'components/ui/floating-prompt-input.tsx': [],
+    'app/(main)/c/[conversationId]/conversation-client.tsx': [],
+    'app/(main)/page.tsx': [],
+    'v2/features/conversations/conversation/ConversationComposer.tsx': ['handleMentionKeys'],
+  };
+  for (const [file, handlers] of Object.entries(callers)) {
+    const source = read(...file.split('/'));
+    const uses = [...source.matchAll(/<PromptInputTextarea\b([\s\S]*?)\/>/g)].map((m) => m[1]);
+    assert.ok(uses.length > 0, `${file} renders the pill's textarea`);
+    const passed = uses.flatMap((props) => [...props.matchAll(/onKeyDown=\{(\w+)\}/g)].map((m) => m[1]));
+    assert.deepEqual(passed, handlers, file);
+  }
+  // The one handler leaves every key alone unless the picker is on screen, and
+  // only prevents Enter or Tab when it has a person to pick.
+  const composer = readHere('ConversationComposer.tsx');
+  const handler = composer.match(/const handleMentionKeys = [\s\S]*?\n {2}\};/)?.[0] ?? '';
+  assert.match(handler, /^const handleMentionKeys = \(event: React\.KeyboardEvent<HTMLTextAreaElement>\) => \{\s*\/\/[^\n]*\n\s*if \(!pickerOpen \|\| event\.nativeEvent\.isComposing\) return;/);
+  assert.match(handler, /if \(suggestions\.length > 0\) \{[\s\S]*?if \(event\.key === 'Enter' \|\| event\.key === 'Tab'\) \{\s*event\.preventDefault\(\);/);
+  // And the list above is every caller: a new one has to be added and looked at.
+  const found = (dir: string): string[] =>
+    readdirSync(join(root, dir), { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.tsx'))
+      .map((entry) => join(entry.parentPath, entry.name).slice(root.length + 1).replace(/\\/g, '/'))
+      .filter((file) => file !== 'components/ui/prompt-input.tsx' && /<PromptInputTextarea\b/.test(read(...file.split('/'))));
+  assert.deepEqual([...found('app'), ...found('components'), ...found('v2')].sort(), Object.keys(callers).sort());
+  // The pill: the host's handler first, and a key it prevents does not send.
+  const pill = read('components', 'ui', 'prompt-input.tsx');
+  assert.match(pill, /onKeyDown\?\.\(e\)\s*if \(e\.defaultPrevented\) return/);
+});
+
+test('the writer’s own question takes the server copy’s tags, keeping its own id (review finding 1)', () => {
+  const at = new Date('2026-10-14T09:00:00Z');
+  const drawn = { id: 'local-1', role: 'user', content: '@chidi see this', timestamp: at, drawnHere: true, savedId: 54 } as EngineMessage;
+  const answer = { id: 'local-2', role: 'assistant', content: 'ok', timestamp: at } as EngineMessage;
+  const serverCopy = {
+    id: 'msg_54',
+    role: 'user',
+    content: '@chidi see this',
+    timestamp: at,
+    mentions: [{ uuid: 'c', name: 'Chidi Okonkwo', username: 'chidi' }],
+    author: { id: 2, uuid: 'o', name: 'Ada Obi', avatar_url: null },
+  } as EngineMessage;
+  const rows = [drawn, answer];
+  const next = adoptServerFields(rows, [serverCopy]);
+  assert.notEqual(next, rows);
+  assert.equal(next[0].id, 'local-1', 'the local id stays');
+  assert.equal((next[0] as { drawnHere?: true }).drawnHere, true);
+  assert.deepEqual((next[0] as { mentions?: unknown }).mentions, [{ uuid: 'c', name: 'Chidi Okonkwo', username: 'chidi' }]);
+  assert.equal(next[1], answer, 'other rows untouched');
+  // Nothing to take: the same array back, so a merge that adds nothing renders nothing.
+  assert.equal(adoptServerFields(next, [serverCopy]), next);
+  assert.equal(adoptServerFields(rows, []), rows);
+  assert.equal(adoptServerFields([{ ...drawn, savedId: undefined } as EngineMessage], [serverCopy]).length, 1);
+  // Both merges use it.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /messages: \[\.\.\.adoptServerFields\(prev\.messages\.slice\(0, cutIndex\), transformed\), \.\.\.transformed\],/);
+  assert.match(engine, /const enriched = adoptServerFields\(state\.messages, next\);\s*if \(added\.length === 0 && enriched === state\.messages\) return false;/);
+  assert.match(engine, /messages: \[\.\.\.adoptServerFields\(prev\.messages, next\), \.\.\.added\],/);
+});
+
+test('the review of ecaf2d5 and the rendered check: what each finding changed', () => {
+  // 2. A question with a pasted card still draws its tags.
+  const row = readHere('rows', 'UserMessageRow.tsx');
+  assert.match(row, /\{mentions \? \(\s*<MentionText content=\{remainingText\} metadata=\{mentions\} viewerUuid=\{viewerUuid\} \/>\s*\) : \(\s*remainingText\s*\)\}/);
+  // 3. A caret moved without typing reads the @ there again.
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(composer, /onSelect=\{\(event\) => detectMention\(event\.currentTarget\.value, event\.currentTarget\.selectionStart\)\}/);
+  // 4. A combobox: the list is owned and the highlight announced; no button in an option.
+  assert.match(composer, /role: 'combobox',[\s\S]{0,200}?'aria-controls': listId,[\s\S]{0,120}?'aria-activedescendant':/);
+  assert.match(composer, /<ul id=\{listId\} role="listbox" aria-label="Mention someone">/);
+  assert.match(composer, /<li\s+key=\{candidate\.key\}\s+id=\{optionId\(index\)\}\s+role="option"/);
+  // The rendered check: a jump leaves the bottom before it scrolls, so a row
+  // that grows meanwhile cannot snap the view back down (?m= in Chromium).
+  const list = readHere('MessageList.tsx');
+  assert.match(list, /if \(!root \|\| !row\) return false;[\s\S]{0,400}?atBottomRef\.current = false;\s*if \(followRafRef\.current != null\) \{\s*cancelAnimationFrame\(followRafRef\.current\);\s*followRafRef\.current = null;\s*\}/);
 });

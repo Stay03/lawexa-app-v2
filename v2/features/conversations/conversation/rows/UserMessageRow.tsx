@@ -187,7 +187,11 @@ export function UserMessageRow({
             {remainingText && (
               <div className={cn(BUBBLE_GROUND[tint], 'text-foreground mt-1.5 rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words')}>
                 {quote !== null && <div className="-mx-2.5 min-w-0">{quote}</div>}
-                {remainingText}
+                {mentions ? (
+                  <MentionText content={remainingText} metadata={mentions} viewerUuid={viewerUuid} />
+                ) : (
+                  remainingText
+                )}
               </div>
             )}
           </>

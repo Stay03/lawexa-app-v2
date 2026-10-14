@@ -335,6 +335,15 @@ export function MessageList({
     const root = scrollRef.current;
     const row = root?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
     if (!root || !row) return false;
+    // Off the bottom before the scroll, not after its event: a row that grows
+    // meanwhile (an answer's deferred blocks parsing, a colour arriving) would
+    // otherwise snap a still-pinned view back to the bottom (rendered check,
+    // 14 October 2026: `?m=` landed at the bottom in Chromium).
+    atBottomRef.current = false;
+    if (followRafRef.current != null) {
+      cancelAnimationFrame(followRafRef.current);
+      followRafRef.current = null;
+    }
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const smooth = !options?.instant && !reduced;
     row.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });

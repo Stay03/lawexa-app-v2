@@ -74,6 +74,7 @@ import type {
   StreamSmoothingConfig,
 } from './types';
 import { answerMessageId, stampAnswerId } from './answer-id';
+import { adoptServerFields } from './server-fields';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -635,9 +636,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         };
       }
       const cutIndex = prev.messages.length - lastUserIdx;
+      // The kept rows include the question this client drew; the server's rows
+      // may carry its copy, with who it tags (server-fields.ts).
       return {
         ...prev,
-        messages: [...prev.messages.slice(0, cutIndex), ...transformed],
+        messages: [...adoptServerFields(prev.messages.slice(0, cutIndex), transformed), ...transformed],
         isStreaming: false,
         isCancelling: false,
         error: null,
@@ -906,16 +909,19 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // still moves us onto the newer snapshot object.
     appliedHistory = data;
     dedupKeys = dedupFromHistory(data.messages);
-    if (added.length === 0) return false;
+    // The questions this engine drew take the fields only the server's copies
+    // have: who they tag, who asked (server-fields.ts). Their ids stay local.
+    const enriched = adoptServerFields(state.messages, next);
+    if (added.length === 0 && enriched === state.messages) return false;
 
     // Appended rows are the SERVER's and keep their `msg_` ids, so a later merge
     // recognises them through `held` exactly as it does the seeded ones.
     setState((prev) => ({
       ...prev,
-      messages: [...prev.messages, ...added],
+      messages: [...adoptServerFields(prev.messages, next), ...added],
       conversationTitle: data.title || prev.conversationTitle,
     }));
-    return true;
+    return added.length > 0;
   }
 
   /**

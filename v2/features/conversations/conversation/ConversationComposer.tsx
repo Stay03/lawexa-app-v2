@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useImperativeHandle, useRef, useState } from 'react';
+import { useCallback, useId, useImperativeHandle, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowUp,
@@ -281,10 +281,21 @@ export function ConversationComposer({
   // still reaches the reply bar.
   const [mention, setMention] = useState<MentionQuery | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  // The picker is a combobox: the box owns the list, and the highlighted person
+  // is announced through `aria-activedescendant` as the arrows move it.
+  const listId = useId();
+  const optionId = (index: number) => `${listId}-${index}`;
   const suggestions = mention && mentionOptions ? mentionSuggestions(mentionOptions, mention.query) : [];
   const untaggable = mention && mentionOptions ? untaggableFor(mentionOptions, mention.query) : '';
   const pickerOpen = mention !== null && (suggestions.length > 0 || untaggable !== '');
   const textarea = () => rootRef.current?.querySelector('textarea') ?? null;
+  /** The `@` the caret ends, read again when the caret moves without typing
+   *  (arrows, Home and End, a click): a picker left open there would take Enter. */
+  const detectMention = (value: string, caret: number) => {
+    if (!mentionOptions) return;
+    const next = mentionQueryAt(value, caret);
+    setMention((current) => (current?.start === next?.start && current?.query === next?.query ? current : next));
+  };
   const pickMention = (candidate: MentionCandidate) => {
     if (!mention) return;
     const next = applyMention(input, mention, candidate.handle);
@@ -814,25 +825,28 @@ export function ConversationComposer({
             )}
           >
             {suggestions.length > 0 && (
-              <ul role="listbox" aria-label="Mention someone">
+              <ul id={listId} role="listbox" aria-label="Mention someone">
                 {suggestions.map((candidate, index) => (
-                  <li key={candidate.key} role="option" aria-selected={index === activeIndex}>
-                    <button
-                      type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        pickMention(candidate);
-                      }}
-                      onPointerEnter={() => setActiveIndex(index)}
-                      className={cn(
-                        'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                        index === activeIndex && 'bg-accent',
-                      )}
-                    >
-                      <MemberAvatar user={candidate.user} className="size-6 shrink-0" />
-                      <span className="min-w-0 flex-1 truncate">{candidate.name}</span>
-                      <span className="text-muted-foreground shrink-0 text-xs">@{candidate.handle}</span>
-                    </button>
+                  // The option itself takes the press (no button inside an
+                  // option), on mouse-down so the box keeps its focus.
+                  <li
+                    key={candidate.key}
+                    id={optionId(index)}
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      pickMention(candidate);
+                    }}
+                    onPointerEnter={() => setActiveIndex(index)}
+                    className={cn(
+                      'flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left text-sm',
+                      index === activeIndex && 'bg-accent',
+                    )}
+                  >
+                    <MemberAvatar user={candidate.user} className="size-6 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{candidate.name}</span>
+                    <span className="text-muted-foreground shrink-0 text-xs">@{candidate.handle}</span>
                   </li>
                 ))}
               </ul>
@@ -901,7 +915,7 @@ export function ConversationComposer({
             onEngage?.();
             // The `@` being typed, read at the caret (space chats only).
             if (mentionOptions) {
-              setMention(mentionQueryAt(next, textarea()?.selectionStart ?? next.length));
+              detectMention(next, textarea()?.selectionStart ?? next.length);
               setActiveIndex(0);
             }
           }}
@@ -989,9 +1003,19 @@ export function ConversationComposer({
               // Before the pill's own Enter-to-send (prompt-input.tsx), so a
               // picked person takes Enter and Tab instead of sending.
               onKeyDown={handleMentionKeys}
+              // A caret moved without typing reads the `@` there again.
+              onSelect={(event) => detectMention(event.currentTarget.value, event.currentTarget.selectionStart)}
               // Leaving the box puts the picker away.
               onBlur={() => setMention(null)}
-              aria-expanded={pickerOpen}
+              {...(mentionOptions && {
+                role: 'combobox',
+                'aria-autocomplete': 'list' as const,
+                'aria-haspopup': 'listbox' as const,
+                'aria-expanded': pickerOpen,
+                'aria-controls': listId,
+                'aria-activedescendant':
+                  pickerOpen && suggestions.length > 0 ? optionId(Math.min(activeIndex, suggestions.length - 1)) : undefined,
+              })}
               // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
               // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"

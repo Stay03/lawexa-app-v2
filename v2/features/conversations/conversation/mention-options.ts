@@ -68,7 +68,8 @@ export function applyMention(
 ): { value: string; caret: number } {
   const before = value.slice(0, mention.start);
   const after = value.slice(mention.start + 1 + mention.query.length);
-  const inserted = `@${handle} `;
+  // One space after the handle, unless the text already has one there.
+  const inserted = /^\s/.test(after) ? `@${handle}` : `@${handle} `;
   return { value: before + inserted + after, caret: (before + inserted).length };
 }
 
