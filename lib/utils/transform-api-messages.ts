@@ -119,6 +119,10 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         ...(apiMsg.author !== undefined && { author: apiMsg.author }),
         // The message it replies to (space chat replies); absent when none.
         ...(apiMsg.reply_to && { replyTo: apiMsg.reply_to }),
+        // Who it tags, and what the writer typed that tagged nobody (space chats).
+        ...(apiMsg.mentions && apiMsg.mentions.length > 0 && { mentions: apiMsg.mentions }),
+        ...(apiMsg.unmatched_handles &&
+          apiMsg.unmatched_handles.length > 0 && { unmatchedHandles: apiMsg.unmatched_handles }),
       } as ChatMessage);
     }
     // Handover message - orchestrator delegating to sub-agent

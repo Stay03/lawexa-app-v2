@@ -67,6 +67,14 @@ export interface ChatMessage {
    * target the writer picked. Absent when the turn replies to nothing.
    */
   replyTo?: MessageReplyTo;
+  /**
+   * The people this question tags (space chats): the server's
+   * {@link ApiMessage.mentions}. A reader outside the space gets names only,
+   * with the `@handle`s in the text already written as names.
+   */
+  mentions?: MessageMention[];
+  /** Handles the writer typed that matched nobody in the space: on their own rows only. */
+  unmatchedHandles?: string[];
 }
 
 /**
@@ -526,6 +534,8 @@ export interface ChatStartResponse {
      * Absent for confidential turns, which persist nothing.
      */
     user_message_id?: number;
+    /** Handles in this turn that matched nobody in the space (the writer's, space chats). */
+    unmatched_handles?: string[];
   };
 }
 

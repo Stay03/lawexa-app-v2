@@ -202,12 +202,15 @@ function PromptInputTextarea({
 
   const isMobile = useIsMobile()
 
+  // The host's handler runs first, so it can take a key for itself (a mention
+  // picker's Enter or Tab) by preventing it; only an Enter left alone sends.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    onKeyDown?.(e)
+    if (e.defaultPrevented) return
     if (e.key === "Enter" && !e.shiftKey && !isMobile) {
       e.preventDefault()
       onSubmit?.()
     }
-    onKeyDown?.(e)
   }
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {

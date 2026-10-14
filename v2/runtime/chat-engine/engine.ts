@@ -1947,6 +1947,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
             msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, savedId: userMessageId } : m)),
           );
         }
+        // Handles in it that tagged nobody (space chats): the writer's line under
+        // their own question shows at once, not only after the chat is reopened.
+        const unmatched = response.data.unmatched_handles;
+        if (unmatched && unmatched.length > 0) {
+          setMessages((msgs) =>
+            msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, unmatchedHandles: unmatched } : m)),
+          );
+        }
         handlers.onAccepted?.();
 
         // Redacted response carries the canonical (redacted) form of the user turn

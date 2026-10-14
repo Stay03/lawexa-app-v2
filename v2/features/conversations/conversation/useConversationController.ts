@@ -27,6 +27,8 @@ import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import type { RosterEntry } from './member-colour';
+import { spaceMentionOptions } from './mention-options';
+import type { MentionOptions } from '@/v2/features/channels/model';
 import {
   askAgainRefusal,
   askingLabel,
@@ -207,6 +209,9 @@ export interface ConversationController {
   /** The space's roster for each person's colour (member-colour.ts), or null:
    *  a personal chat, or the roster not read yet. */
   spaceRoster: readonly RosterEntry[] | null;
+  /** Who the composer's `@` picker offers (mention-options.ts), or null: a
+   *  personal chat, or the roster not read yet. */
+  mentionOptions: MentionOptions | null;
   /**
    * The colleague whose turn is streaming in this space chat, or null when
    * nothing streams or the turn is the reader's own. Drives "{name} is
@@ -818,6 +823,11 @@ export function useConversationController(
         : null,
     [showAuthors, rosterRows],
   );
+  // The same roster, for tagging people (Viewers included; mention-options.ts).
+  const mentionOptions = useMemo(
+    () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows) : null),
+    [showAuthors, rosterRows],
+  );
 
   const references = detailData?.references ?? NO_REFERENCES;
 
@@ -1110,6 +1120,7 @@ export function useConversationController(
     isSpaceChat,
     showAuthors,
     spaceRoster,
+    mentionOptions,
     sendHeldBy: heldBy,
     heldSince,
     turnLabel,

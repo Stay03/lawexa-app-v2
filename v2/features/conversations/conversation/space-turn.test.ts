@@ -162,7 +162,7 @@ test('labels need the B4 fields on the record', () => {
 test('the list hands every user row the flag and the viewer; the row draws the line only then', () => {
   const list = readHere('MessageList.tsx');
   assert.match(list, /showAuthor=\{showAuthors\}\s+viewerId=\{viewerId\}/);
-  assert.match(list, /<UserMessageRow\s+message=\{message\}\s+showAuthor=\{showAuthor\}\s+viewerId=\{viewerId\}\s+colourIndex=\{colourIndex\}\s+onReply=\{onReply\}\s+onJump=\{onJump\}\s+onHold=\{onHold\}\s*\/>/);
+  assert.match(list, /<UserMessageRow\s+message=\{message\}\s+showAuthor=\{showAuthor\}\s+viewerId=\{viewerId\}\s+viewerUuid=\{viewerUuid\}\s+colourIndex=\{colourIndex\}\s+onReply=\{onReply\}\s+onJump=\{onJump\}\s+onHold=\{onHold\}\s*\/>/);
   // A space chat lays the row out by side (SpaceTurn, Arthur's layout).
   const row = readHere(join('rows', 'UserMessageRow.tsx'));
   assert.match(row, /if \(showAuthor\) \{/);

@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn, stripContextTags, parsePastedContent } from '@/lib/utils';
 import { formatMessageTimestamp } from '@/lib/utils/date';
 import type { ChatMessage, MessageReplyTo } from '@/types/chat';
+import type { MessageMetadata } from '@/types/collab';
 import { PastedContentCard } from '../PastedContentCard';
 import { memberStyle } from '../member-colour';
+import { mentionMetadata, spaceUnmatchedSentence } from '../mention-options';
 import { replyAuthorLabel, replyTargetOf } from '../reply-target';
 import { turnSide } from '../space-turn';
 import { HoverReply } from './HoverReply';
+import { MentionText } from './MentionText';
 import { ReplyQuote } from './ReplyQuote';
 import { SentAttachments } from './SentAttachments';
 import { SpaceTurn } from './SpaceTurn';
@@ -33,6 +36,9 @@ import type { HeldTurn } from './TurnActionsSheet';
  * space chat where the reader may send, a saved question can be replied to:
  * Reply on hover for a mouse, a swipe to the right or a long press (the actions
  * sheet) on a touch screen (Stay, 14 October 2026: "like how whatsapp replies are").
+ *
+ * The people a question tags show as chips ({@link MentionText}), and the
+ * writer's own question says which `@`s matched nobody in the space.
  */
 const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
 
@@ -66,12 +72,19 @@ function UserMessageBubble({
   content,
   tint,
   quote = null,
+  mentions = null,
+  viewerUuid = null,
 }: {
   content: string;
   tint: 'plain' | 'member';
   /** The quoted message of a reply, drawn at the top of the bubble. */
   quote?: React.ReactNode;
+  /** The people the question tags, as chips; null draws the plain text. */
+  mentions?: MessageMetadata | null;
+  viewerUuid?: string | null;
 }) {
+  const words = (text: string) =>
+    mentions ? <MentionText content={text} metadata={mentions} viewerUuid={viewerUuid} /> : text;
   const [expanded, setExpanded] = useState(false);
   const shouldTruncate = content.length > USER_MESSAGE_TRUNCATE_LENGTH;
 
@@ -81,7 +94,7 @@ function UserMessageBubble({
       {shouldTruncate && !expanded ? (
         <div>
           <div className="relative max-h-[200px] overflow-hidden">
-            {content.slice(0, USER_MESSAGE_TRUNCATE_LENGTH)}
+            {words(content.slice(0, USER_MESSAGE_TRUNCATE_LENGTH))}
             <div className={cn(FADE_GROUND[tint], 'absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t to-transparent')} />
           </div>
           <button
@@ -93,7 +106,7 @@ function UserMessageBubble({
         </div>
       ) : (
         <div>
-          {content}
+          {words(content)}
           {shouldTruncate && (
             <button
               onClick={() => setExpanded(false)}
@@ -112,6 +125,7 @@ export function UserMessageRow({
   message,
   showAuthor,
   viewerId,
+  viewerUuid = null,
   colourIndex = null,
   onReply = null,
   onJump,
@@ -122,6 +136,8 @@ export function UserMessageRow({
   showAuthor: boolean;
   /** The server-verified viewer, whose own turns read "You". */
   viewerId: number | null;
+  /** The reader's uuid, for their own tag's emphasis. */
+  viewerUuid?: string | null;
   /** The asker's colour in a space chat (member-colour.ts); null keeps the
    *  plain bubble, as on a personal chat. */
   colourIndex?: number | null;
@@ -149,6 +165,8 @@ export function UserMessageRow({
         ? [message.attachment]
         : [];
 
+  const mentions = useMemo(() => mentionMetadata(message.mentions), [message.mentions]);
+  const unmatched = message.unmatchedHandles ? spaceUnmatchedSentence(message.unmatchedHandles) : '';
   const quote = message.replyTo ? (
     <ReplyQuote replyTo={message.replyTo} viewerId={viewerId} onJump={onJump} />
   ) : null;
@@ -174,9 +192,16 @@ export function UserMessageRow({
             )}
           </>
         ) : (
-          <UserMessageBubble content={displayContent} tint={tint} quote={quote} />
+          <UserMessageBubble
+            content={displayContent}
+            tint={tint}
+            quote={quote}
+            mentions={mentions}
+            viewerUuid={viewerUuid}
+          />
         )}
         {attachments.length > 0 && <SentAttachments attachments={attachments} />}
+        {unmatched && <p className="text-muted-foreground mt-1 text-xs">{unmatched}</p>}
       </>
     );
     return (

@@ -419,6 +419,7 @@ export function ConversationScreen({
                   onSubmit={controller.submit}
                   onStop={controller.stop}
                   viewerId={serverUserId}
+                  mentionOptions={controller.mentionOptions}
                 />
               ) : (
                 <ViewOnlyPill reason={controller.viewOnlyReason} />

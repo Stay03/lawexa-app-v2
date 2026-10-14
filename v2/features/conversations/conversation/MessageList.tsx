@@ -745,6 +745,7 @@ export function MessageList({
                       onRetry={onRetry}
                       showAuthor={showAuthors}
                       viewerId={viewerId}
+                      viewerUuid={viewerUuid}
                       colourIndex={group.type === 'single' ? colourOf(group.message) : null}
                       answerMark={marks?.[gi]?.answer ?? null}
                       onReply={onReply}
@@ -869,6 +870,7 @@ const GroupRow = memo(function GroupRow({
   onRetry,
   showAuthor,
   viewerId,
+  viewerUuid,
   colourIndex,
   answerMark,
   onReply,
@@ -887,6 +889,7 @@ const GroupRow = memo(function GroupRow({
   onRetry: () => void;
   showAuthor: boolean;
   viewerId: number | null;
+  viewerUuid: string | null;
   /** A user turn's member colour in a space chat (member-colour.ts), or null. */
   colourIndex: number | null;
   /** In a space chat, where an answer starts: Lawexa's mark with this time. */
@@ -924,6 +927,7 @@ const GroupRow = memo(function GroupRow({
           message={message}
           showAuthor={showAuthor}
           viewerId={viewerId}
+          viewerUuid={viewerUuid}
           colourIndex={colourIndex}
           onReply={onReply}
           onJump={onJump}

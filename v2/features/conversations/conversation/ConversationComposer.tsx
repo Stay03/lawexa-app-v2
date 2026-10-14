@@ -55,6 +55,15 @@ import {
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
 import { REPLY_DRAFT, replyAuthorLabel, replySnippet } from './reply-target';
+import {
+  applyMention,
+  mentionQueryAt,
+  mentionSuggestions,
+  untaggableFor,
+  type MentionQuery,
+} from './mention-options';
+import type { MentionCandidate, MentionOptions } from '@/v2/features/channels/model';
+import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import { draftWithRefused, heldSendLabel, UNNAMED_ASKER, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
 
@@ -217,6 +226,11 @@ export interface ConversationComposerProps {
   canStop?: boolean;
   /** The server-verified reader, so a reply to their own question reads "You". */
   viewerId?: number | null;
+  /**
+   * Who `@` offers (a space chat; mention-options.ts). Null: no picker, and an
+   * `@` is only text, as in a personal chat.
+   */
+  mentionOptions?: MentionOptions | null;
 }
 
 export function ConversationComposer({
@@ -239,6 +253,7 @@ export function ConversationComposer({
   sendHeldBy = null,
   canStop = true,
   viewerId = null,
+  mentionOptions = null,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -259,6 +274,50 @@ export function ConversationComposer({
   const [replyTo, updateReply] = useDraft(`conversation_draft_reply_${draftScopeId}`, REPLY_DRAFT);
   const setReply = useCallback((next: MessageReplyTo | null) => updateReply(() => next), [updateReply]);
   const replyShown = useHeldValue(replyTo);
+
+  // The `@` picker (space chats): the `@token` the caret ends, the people it
+  // matches, and the one line for those it names who have no handle. It is on
+  // screen only when it has something to show, so an Escape it does not use
+  // still reaches the reply bar.
+  const [mention, setMention] = useState<MentionQuery | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const suggestions = mention && mentionOptions ? mentionSuggestions(mentionOptions, mention.query) : [];
+  const untaggable = mention && mentionOptions ? untaggableFor(mentionOptions, mention.query) : '';
+  const pickerOpen = mention !== null && (suggestions.length > 0 || untaggable !== '');
+  const textarea = () => rootRef.current?.querySelector('textarea') ?? null;
+  const pickMention = (candidate: MentionCandidate) => {
+    if (!mention) return;
+    const next = applyMention(input, mention, candidate.handle);
+    setInput(next.value);
+    setMention(null);
+    requestAnimationFrame(() => {
+      const el = textarea();
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(next.caret, next.caret);
+    });
+  };
+  const handleMentionKeys = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter while an IME composes confirms the composition, nothing else.
+    if (!pickerOpen || event.nativeEvent.isComposing) return;
+    if (suggestions.length > 0) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const step = event.key === 'ArrowDown' ? 1 : -1;
+        setActiveIndex((index) => (index + step + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault();
+        pickMention(suggestions[Math.min(activeIndex, suggestions.length - 1)]);
+        return;
+      }
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      setMention(null);
+    }
+  };
 
   // The staging handle — `setInput` persists, so a staged opener survives a
   // reload exactly like typed text. No focus steal (parity with the old chips).
@@ -483,6 +542,7 @@ export function ConversationComposer({
     clearPasted();
     setUploads([]);
     setReply(null);
+    setMention(null);
     setIsSubmitting(true);
     let outcome: SendRefused | undefined;
     try {
@@ -514,7 +574,7 @@ export function ConversationComposer({
     // fills the same gutters and no two states can disagree about size.
     <div
       ref={rootRef}
-      className="w-full px-4 pb-3 pt-2"
+      className="relative w-full px-4 pb-3 pt-2"
       onKeyDown={(event) => {
         // Escape takes the reply off, as the bar's ✕ does, unless it was
         // closing something else first (the country popover, a pasted card's
@@ -742,6 +802,49 @@ export function ConversationComposer({
           </div>
         )}
 
+        {/* The `@` picker — floats above the whole box, as the channel composer's
+            does: the people the typed `@` matches, and one line for those it
+            names who cannot be tagged. A row is chosen on mouse-down, before the
+            box loses focus, so the handle lands where the caret was. */}
+        {pickerOpen && (
+          <div
+            className={cn(
+              'bg-popover absolute right-4 bottom-full left-4 z-20 mb-1 max-w-72 overflow-hidden rounded-xl border shadow-md',
+              'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-150',
+            )}
+          >
+            {suggestions.length > 0 && (
+              <ul role="listbox" aria-label="Mention someone">
+                {suggestions.map((candidate, index) => (
+                  <li key={candidate.key} role="option" aria-selected={index === activeIndex}>
+                    <button
+                      type="button"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        pickMention(candidate);
+                      }}
+                      onPointerEnter={() => setActiveIndex(index)}
+                      className={cn(
+                        'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                        index === activeIndex && 'bg-accent',
+                      )}
+                    >
+                      <MemberAvatar user={candidate.user} className="size-6 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate">{candidate.name}</span>
+                      <span className="text-muted-foreground shrink-0 text-xs">@{candidate.handle}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {untaggable !== '' && (
+              <p className={cn('text-muted-foreground px-3 py-2 text-xs', suggestions.length > 0 && 'border-t')}>
+                {untaggable}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Reply bar — the quote of the message the next turn answers, right above
             the pill as WhatsApp draws it: who wrote it and its first line, and ✕
             (or Escape) to take it off. The same persistent-node collapse as the
@@ -796,6 +899,11 @@ export function ConversationComposer({
             setInput(next);
             if (errorOpen) hideError();
             onEngage?.();
+            // The `@` being typed, read at the caret (space chats only).
+            if (mentionOptions) {
+              setMention(mentionQueryAt(next, textarea()?.selectionStart ?? next.length));
+              setActiveIndex(0);
+            }
           }}
           onSubmit={handleSubmit}
           disabled={ownTurnRunning || isSubmitting || disabled}
@@ -878,6 +986,12 @@ export function ConversationComposer({
             <PromptInputTextarea
               placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
               onFocus={onEngage}
+              // Before the pill's own Enter-to-send (prompt-input.tsx), so a
+              // picked person takes Enter and Tab instead of sending.
+              onKeyDown={handleMentionKeys}
+              // Leaving the box puts the picker away.
+              onBlur={() => setMention(null)}
+              aria-expanded={pickerOpen}
               // Compact v1-floating-prompt scale (min-h-9 = 36px, py-2). Font size is
               // NOT shrunk — the base Textarea stays text-base on mobile (iOS zoom).
               className="text-foreground placeholder:text-muted-foreground min-h-9 flex-1 px-2 py-2"
