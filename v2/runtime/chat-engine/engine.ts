@@ -75,6 +75,7 @@ import type {
 } from './types';
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { adoptServerFields } from './server-fields';
+import { largestSavedId, savedTurnId } from './saved-turn';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -1910,6 +1911,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       }
     }
 
+    // What was saved before this send: a question saved by it has a larger id
+    // (saved-turn.ts, for a send that fails after the server may have kept it).
+    const savedBefore = largestSavedId(state.messages);
     const optimisticMsg = addUserMessage(message, attachmentsList, options.replyTo);
     setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own' }));
 
@@ -2066,15 +2070,42 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return { kind: 'reply-gone' };
       }
 
-      // No answer at all — the request never reached the server (a phone that
-      // lost its signal mid-send, the network down). A refusal, not an error:
-      // the host gives the words, the cards, the files and the quote back, so
-      // nothing typed is lost (techlead, 15 October 2026). It used to fall
-      // through below: the question vanished and only an error stayed.
-      if (err instanceof AxiosError && !err.response) {
-        removeMessage(optimisticMsg.id);
-        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
-        return { kind: 'unsent' };
+      // No answer at all (a phone that lost its signal mid-send, the network
+      // down), or the server failed (5xx). Either can come AFTER the server saved
+      // the question (techlead, 15 October 2026), so the chat is read first:
+      //  - saved (saved-turn.ts): it stays, as the saved question it is, and the
+      //    error below says its answer failed; giving the words back would have
+      //    the reader send it twice;
+      //  - not saved, or the read fails too: a refusal, not an error — the host
+      //    gives the words, cards, files and the quote back, so nothing typed is
+      //    lost. It used to fall through: the question vanished with the text.
+      // A new chat has nothing to read, and a confidential or redacted one's
+      // words cannot be matched: those go straight back.
+      if (err instanceof AxiosError && (!err.response || err.response.status >= 500)) {
+        let savedId: number | null = null;
+        if (convId && !isConfidentialTurnN && !isRedactedTurnN) {
+          try {
+            const read = await chatApi.getConversation(convId, { lazyResults: true });
+            savedId = savedTurnId(read.data?.messages ?? [], message, savedBefore);
+          } catch {
+            savedId = null;
+          }
+        }
+        if (savedId === null) {
+          removeMessage(optimisticMsg.id);
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+          return { kind: 'unsent' };
+        }
+        const keptId = savedId;
+        rememberAuthoredIds([keptId]);
+        setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, savedId: keptId } : m)));
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          isCancelling: false,
+          error: 'Your question was sent, but its answer failed. Try again.',
+        }));
+        return null;
       }
 
       // Generic error.

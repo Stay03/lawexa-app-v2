@@ -206,12 +206,42 @@ test('a send that never reached the server gives the words and the quote back (t
   const turn = await import('./space-turn');
   assert.equal(turn.sendRefusal({ kind: 'unsent' }, 7), "Couldn't reach Lawexa. Your message is kept, so you can send it again.");
   assert.equal(turn.askAgainRefusal({ kind: 'unsent' }, 7), "Couldn't reach Lawexa. Ask again in a moment.");
-  // The engine reads "no answer at all" as this refusal, before the general error.
+  // The engine reads "no answer at all" (and a 5xx) as this refusal when the
+  // question was not saved, before the general error (the test below).
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
-  assert.match(engine, /if \(err instanceof AxiosError && !err\.response\) \{\s*removeMessage\(optimisticMsg\.id\);\s*setState\(\(prev\) => \(\{ \.\.\.prev, isStreaming: false, isCancelling: false \}\)\);\s*return \{ kind: 'unsent' \};\s*\}\s*\/\/ Generic error\./);
+  assert.match(engine, /if \(savedId === null\) \{\s*removeMessage\(optimisticMsg\.id\);\s*setState\(\(prev\) => \(\{ \.\.\.prev, isStreaming: false, isCancelling: false \}\)\);\s*return \{ kind: 'unsent' \};\s*\}/);
   // It keeps the quote (no dropReply), and the record is not re-read for it.
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),/);
   assert.doesNotMatch(controller, /refusal\.kind === 'unsent' && \{ dropReply/);
   assert.match(controller, /\} else if \(refusal\.kind !== 'unsent'\) \{/);
+});
+
+test('a 5xx or a lost connection reads the chat first: a saved question stays, an unsaved one comes back', async () => {
+  const { largestSavedId, savedTurnId } = await import('@/v2/runtime/chat-engine/saved-turn');
+  const at = '2026-10-15T09:00:00Z';
+  const row = (id: number, role: 'user' | 'assistant', content: string): ApiMessage => ({
+    id, conversation_id: 'c1', agent_id: null, role, content, metadata: {}, created_at: at,
+  });
+  const before = [row(40, 'user', 'Earlier question'), row(41, 'assistant', 'Earlier answer')];
+  // Saved: the newest user row, after what the screen held, with the same words.
+  assert.equal(savedTurnId([...before, row(42, 'user', 'Is notice needed?')], ' Is notice needed? ', 41), 42);
+  // Its file markers do not stop the match.
+  assert.equal(savedTurnId([...before, row(42, 'user', 'See this <attached_image name="a.png" />')], 'See this', 41), 42);
+  // Not saved: the chat ends with what was already there.
+  assert.equal(savedTurnId(before, 'Is notice needed?', 41), null);
+  // Not this question: an earlier one with the same words is not it.
+  assert.equal(savedTurnId([row(40, 'user', 'Is notice needed?'), row(41, 'assistant', 'Yes')], 'Is notice needed?', 41), null);
+  // Not this question: a colleague's newer, different one.
+  assert.equal(savedTurnId([...before, row(42, 'user', 'Something else')], 'Is notice needed?', 41), null);
+  // What the screen held: history ids and the saved ids of rows this engine drew.
+  assert.equal(largestSavedId([{ id: 'msg_41' }, { id: 'local-3', savedId: 44 }, { id: 'local-4' }] as never), 44);
+  assert.equal(largestSavedId([]), 0);
+  // The engine: both kinds of failure, the read, then one branch or the other.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /const savedBefore = largestSavedId\(state\.messages\);\s*const optimisticMsg = addUserMessage\(/);
+  assert.match(engine, /if \(err instanceof AxiosError && \(!err\.response \|\| err\.response\.status >= 500\)\) \{/);
+  assert.match(engine, /if \(convId && !isConfidentialTurnN && !isRedactedTurnN\) \{\s*try \{\s*const read = await chatApi\.getConversation\(convId, \{ lazyResults: true \}\);\s*savedId = savedTurnId\(read\.data\?\.messages \?\? \[\], message, savedBefore\);/);
+  // Kept: the question stays as the saved row it is, and the answer's failure shows.
+  assert.match(engine, /rememberAuthoredIds\(\[keptId\]\);\s*setMessages\(\(msgs\) => msgs\.map\(\(m\) => \(m\.id === optimisticMsg\.id \? \{ \.\.\.m, savedId: keptId \} : m\)\)\);[\s\S]{0,200}?error: 'Your question was sent, but its answer failed\. Try again\.',[\s\S]{0,40}?return null;/);
 });
