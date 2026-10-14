@@ -82,7 +82,7 @@ const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts),
 test('the session carries the server flag, false when the server does not send it', () => {
   const server = read('v2', 'runtime', 'session.ts');
   // Beside the user on /auth/me (data.can_access_team_channels), never on it.
-  assert.match(server, /can_access_team_channels: result\.data\?\.can_access_team_channels === true,/);
+  assert.match(server, /can_access_team_channels: data\?\.can_access_team_channels === true,/);
   assert.doesNotMatch(server, /user\.can_access_team_channels/);
   assert.match(read('app', 'v2', 'layout.tsx'), /canAccessTeamChannels=\{user\?\.can_access_team_channels \?\? false\}/);
   for (const surface of ['V2Sidebar.tsx', 'V2Drawer.tsx']) {

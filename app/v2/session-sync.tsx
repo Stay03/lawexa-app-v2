@@ -167,17 +167,23 @@ function syncSession(token: string | null, onMirrored?: () => void): void {
  *    the new user reading the old user's name and role — and, the reason this
  *    case is worth guarding at all, the old user's ownership id on `/c/{id}`.
  */
-function isSnapshotStale({
+export function isSnapshotStale({
   clientToken,
   clientUserId,
   serverSignedIn,
+  serverUnreachable = false,
   serverUserId,
 }: {
   clientToken: string | null;
   clientUserId: number | null;
   serverSignedIn: boolean;
+  /** The layout could not ask the API (session-resolve.ts): it published no
+   *  identity at all, so there is nothing to disagree with. Its own panel asks
+   *  again; a refresh from here would only add a second, unpaced one. */
+  serverUnreachable?: boolean;
   serverUserId: number | null;
 }): boolean {
+  if (serverUnreachable) return false;
   const clientSignedIn = !!clientToken;
   if (clientSignedIn !== serverSignedIn) return true;
   return clientSignedIn && clientUserId !== serverUserId;
@@ -192,9 +198,11 @@ function isSnapshotStale({
  */
 export function SessionSync({
   serverSignedIn,
+  serverUnreachable = false,
   serverUserId,
 }: {
   serverSignedIn: boolean;
+  serverUnreachable?: boolean;
   serverUserId: number | null;
 }): null {
   const router = useRouter();
@@ -207,10 +215,11 @@ export function SessionSync({
       clientToken,
       clientUserId,
       serverSignedIn,
+      serverUnreachable,
       serverUserId,
     });
     syncSession(clientToken, stale ? () => router.refresh() : undefined);
-  }, [clientToken, clientUserId, serverSignedIn, serverUserId, router]);
+  }, [clientToken, clientUserId, serverSignedIn, serverUnreachable, serverUserId, router]);
 
   return null;
 }

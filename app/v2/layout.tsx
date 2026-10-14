@@ -21,7 +21,8 @@ import { RouteTrail } from '@/v2/shell/route-trail';
 import { RouteMotion } from '@/v2/shell/route-motion';
 import { MoveFirstProvider } from '@/v2/shell/move-first';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
-import { verifySession } from '@/v2/runtime/session';
+import { resolveSession } from '@/v2/runtime/session';
+import { V2Unreachable } from '@/v2/runtime/session-recovery';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
 import { V2PushLifecycle } from '@/v2/runtime/push/lifecycle';
 import { V2PushTapListener } from '@/v2/runtime/push/tap-listener';
@@ -132,10 +133,28 @@ export default async function V2Layout({
   // the shell's TTFB was `/auth/me` PLUS `/conversations`. `prefetchRecentsState()` now
   // gates itself on cookie PRESENCE (a zero-network read) instead of taking the verified
   // user, so both requests are in flight at once and TTFB is the slower of the two.
-  const [session, recentsState] = await Promise.all([
-    verifySession(),
+  const [resolution, recentsState] = await Promise.all([
+    resolveSession(),
     prefetchRecentsState(),
   ]);
+
+  // THE API COULD NOT SAY WHO THE READER IS (session-resolve.ts). Not signed
+  // out: the guest shell would tell a signed-in reader they had left, and its
+  // pages would cache their reads under no viewer. So nothing below mounts, not
+  // even the session provider or the cache guard; the panel asks again on its
+  // own and the shell replaces it once the API answers. SessionSync still keeps
+  // the cookie mirrored.
+  if (resolution.kind === 'unreachable') {
+    return (
+      <div className="bg-background text-foreground">
+        <SessionSync serverSignedIn={false} serverUnreachable serverUserId={null} />
+        <DocumentLock />
+        <SystemBarColour />
+        <V2Unreachable />
+      </div>
+    );
+  }
+  const session = resolution.kind === 'signed-in' ? resolution.user : null;
 
   // Server-verified identity for the shell chrome (footer avatar/name/plan gate,
   // notification bell visibility).

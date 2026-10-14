@@ -3,6 +3,7 @@ import { cache } from 'react';
 import type { ApiResponse } from '@/types/api';
 import type { AuthProvider, User, UserRole } from '@/types/auth';
 import { apiFetch } from './api-server';
+import { resolveSessionWith, type SessionResolution } from './session-resolve';
 import { getSessionToken } from './session-token';
 
 export { getSessionToken };
@@ -89,50 +90,63 @@ export interface SessionDTO {
   user: SessionUser;
 }
 
-/**
- * Verify the current request's session against the backend and return a minimal
- * user DTO, or `null` when signed out / invalid / unreachable.
- *
- * Wrapped in React `cache()` so multiple callers within a single server render
- * (layout, page, metadata) share ONE `/auth/me` round trip. A 401 (revoked or
- * bogus token) or any network error resolves to `null` — callers render the
- * signed-out path rather than crashing.
- */
-export const verifySession = cache(async (): Promise<SessionDTO | null> => {
-  try {
-    // Short-circuit before the network hop when there's no token to send.
-    const token = await getSessionToken();
-    if (!token) return null;
+/** The minimal DTO from an `/auth/me` answer, or null when it names no user. */
+function toSessionDTO(
+  data: { user?: User; is_ambassador?: boolean; can_access_team_channels?: boolean } | null | undefined,
+): SessionDTO | null {
+  const user = data?.user;
+  if (!user) return null;
+  return {
+    user: {
+      id: user.id,
+      uuid: user.uuid ?? null,
+      name: user.name,
+      username: user.username ?? null,
+      email: user.email,
+      role: user.role,
+      avatar_url: user.avatar_url ?? null,
+      is_verified: user.is_verified,
+      auth_provider: user.auth_provider,
+      can_set_price: user.is_creator === true || user.role === 'admin',
+      is_ambassador: typeof data?.is_ambassador === 'boolean' ? data.is_ambassador : null,
+      profile_country_name: user.profile?.country?.trim() || null,
+      profile_country_code: user.profile?.country_code?.trim() || null,
+      is_lawyer: user.profile?.user_type === 'lawyer',
+      // Beside the user, like `is_ambassador`, never inside it: the user
+      // resource also describes other people (backend, 11 October 2026).
+      can_access_team_channels: data?.can_access_team_channels === true,
+    },
+  };
+}
 
+/**
+ * The current request's session, in the three states the layout acts on
+ * (session-resolve.ts): signed in, signed out (no cookie, or the server's 401 /
+ * 419), or unreachable (the API failed twice, or answered without a user). A
+ * blip is NOT signed out: the layout shows "can't reach Lawexa" for it, never
+ * the guest shell.
+ *
+ * Wrapped in React `cache()` so every caller in one server render (layout,
+ * page, metadata) shares ONE `/auth/me` round trip.
+ */
+export const resolveSession = cache(async (): Promise<SessionResolution<SessionDTO>> => {
+  const token = await getSessionToken();
+  return resolveSessionWith(token, async (signal) => {
     const result = await apiFetch<
       ApiResponse<{ user: User; is_ambassador?: boolean; can_access_team_channels?: boolean }>
-    >('/auth/me');
-    const user = result.data?.user;
-    if (!user) return null;
+    >('/auth/me', { signal });
+    return { user: toSessionDTO(result.data) };
+  });
+});
 
-    return {
-      user: {
-        id: user.id,
-        uuid: user.uuid ?? null,
-        name: user.name,
-        username: user.username ?? null,
-        email: user.email,
-        role: user.role,
-        avatar_url: user.avatar_url ?? null,
-        is_verified: user.is_verified,
-        auth_provider: user.auth_provider,
-        can_set_price: user.is_creator === true || user.role === 'admin',
-        is_ambassador: typeof result.data?.is_ambassador === 'boolean' ? result.data.is_ambassador : null,
-        profile_country_name: user.profile?.country?.trim() || null,
-        profile_country_code: user.profile?.country_code?.trim() || null,
-        is_lawyer: user.profile?.user_type === 'lawyer',
-        // Beside the user, like `is_ambassador`, never inside it: the user
-        // resource also describes other people (backend, 11 October 2026).
-        can_access_team_channels: result.data?.can_access_team_channels === true,
-      },
-    };
-  } catch {
-    // 401 (revoked/invalid token) and network failures both mean "no session".
-    return null;
-  }
+/**
+ * The verified session's minimal DTO, or `null` when there is none to use:
+ * signed out, or the API unreachable. For the callers that only need "is
+ * there a reader, and who" (the list prefetches, metadata); the LAYOUT reads
+ * {@link resolveSession} instead, because it must tell a blip from a sign-out.
+ * Shares `resolveSession`'s one round trip.
+ */
+export const verifySession = cache(async (): Promise<SessionDTO | null> => {
+  const resolution = await resolveSession();
+  return resolution.kind === 'signed-in' ? resolution.user : null;
 });
