@@ -20,12 +20,28 @@ import type { CSSProperties } from 'react';
  * Eight hues from the space crest's wheel (`collab/kit/crest-model.ts`), gold
  * excluded for the same reason it is there (gold is the app's information
  * colour), ordered so neighbouring indices sit far apart round the wheel.
- * Lightness carries the contrast, so every hue is safe at once: the bubble
- * ground is L .947 in light and L .315 in dark under the theme's foreground
- * text (far past 4.5:1), and the name ink L .415 / L .868, the crest's own
- * pairs.
+ * Lightness carries the contrast, so every hue is safe at once.
+ *
+ * ── THE STRENGTH ───────────────────────────────────────────────────────────
+ * A faint tint over the neutral bubble, not a coloured bubble (Stay, 14
+ * October 2026: "make them faint, be notable but it shouldn't draw all the
+ * attention"; strength B of the four the techlead compared). The grounds sit
+ * just off the theme's own bubble (`--muted`, L .97 light / .269 dark) with a
+ * little chroma, under the theme's foreground text (far past 4.5:1); the name
+ * ink is a muted hue that keeps AA on the page. Every value lives in
+ * {@link MEMBER_TINT}, so another strength is a change there alone.
  */
 export const MEMBER_HUES: readonly number[] = [230, 155, 330, 20, 280, 180, 130, 305];
+
+/** oklch lightness and chroma of each member colour, per theme. */
+export const MEMBER_TINT = {
+  bg: { l: 0.96, c: 0.012 },
+  ink: { l: 0.5, c: 0.04 },
+  bgDark: { l: 0.277, c: 0.015 },
+  inkDark: { l: 0.78, c: 0.032 },
+} as const;
+
+const oklch = ({ l, c }: { l: number; c: number }, hue: number) => `oklch(${l} ${c} ${hue})`;
 
 /** Style objects carrying the member custom properties, typed (React's
  *  `CSSProperties` has no index signature for `--*`). */
@@ -36,10 +52,10 @@ export type MemberStyle = CSSProperties & Record<`--member-${string}`, string>;
 export function memberStyle(index: number): MemberStyle {
   const hue = MEMBER_HUES[((index % MEMBER_HUES.length) + MEMBER_HUES.length) % MEMBER_HUES.length];
   return {
-    '--member-bg': `oklch(0.947 0.036 ${hue})`,
-    '--member-ink': `oklch(0.415 0.095 ${hue})`,
-    '--member-bg-dark': `oklch(0.315 0.048 ${hue})`,
-    '--member-ink-dark': `oklch(0.868 0.072 ${hue})`,
+    '--member-bg': oklch(MEMBER_TINT.bg, hue),
+    '--member-ink': oklch(MEMBER_TINT.ink, hue),
+    '--member-bg-dark': oklch(MEMBER_TINT.bgDark, hue),
+    '--member-ink-dark': oklch(MEMBER_TINT.inkDark, hue),
   };
 }
 

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { MEMBER_HUES, memberColourIndex, memberStyle, type RosterEntry } from './member-colour';
+import { MEMBER_HUES, MEMBER_TINT, memberColourIndex, memberStyle, type RosterEntry } from './member-colour';
 
 // Stay, 13 October 2026: "every owner should have a fixed color user 1, user 2,
 // user 3, etc". The rule is pure and tested here; its wiring is pinned in the source.
@@ -40,12 +40,22 @@ test('eight colours, wrapping after; light and dark pairs from the crest wheel, 
   assert.equal(new Set(MEMBER_HUES).size, 8);
   for (const hue of MEMBER_HUES) assert.ok(!(hue > 55 && hue < 105), `${hue} is in the gold band`);
   assert.deepEqual(memberStyle(8), memberStyle(0));
+  // A faint tint over the neutral bubble (Stay, 14 October 2026; strength B).
   assert.deepEqual(memberStyle(0), {
-    '--member-bg': 'oklch(0.947 0.036 230)',
-    '--member-ink': 'oklch(0.415 0.095 230)',
-    '--member-bg-dark': 'oklch(0.315 0.048 230)',
-    '--member-ink-dark': 'oklch(0.868 0.072 230)',
+    '--member-bg': 'oklch(0.96 0.012 230)',
+    '--member-ink': 'oklch(0.5 0.04 230)',
+    '--member-bg-dark': 'oklch(0.277 0.015 230)',
+    '--member-ink-dark': 'oklch(0.78 0.032 230)',
   });
+});
+
+test('the tint stays faint: close to the neutral bubble, the names muted', () => {
+  // The neutral bubble is --muted (L .97 light, .269 dark, no chroma).
+  assert.ok(Math.abs(MEMBER_TINT.bg.l - 0.97) <= 0.015 && MEMBER_TINT.bg.c <= 0.02, 'light fill');
+  assert.ok(Math.abs(MEMBER_TINT.bgDark.l - 0.269) <= 0.02 && MEMBER_TINT.bgDark.c <= 0.02, 'dark fill');
+  assert.ok(MEMBER_TINT.ink.c <= 0.05 && MEMBER_TINT.inkDark.c <= 0.05, 'muted names');
+  // Names keep AA on the page: dark enough on white, light enough on L .145.
+  assert.ok(MEMBER_TINT.ink.l <= 0.55 && MEMBER_TINT.inkDark.l >= 0.72, 'name lightness');
 });
 
 test('the wiring: roster by uuid, the reader\'s own rows by the reader\'s uuid, personal chats plain', () => {
