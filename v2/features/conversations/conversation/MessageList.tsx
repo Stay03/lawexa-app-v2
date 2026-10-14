@@ -336,7 +336,14 @@ export function MessageList({
     const row = root?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
     if (!root || !row) return false;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    row.scrollIntoView({ block: 'center', behavior: options?.instant || reduced ? 'auto' : 'smooth' });
+    const smooth = !options?.instant && !reduced;
+    row.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' });
+    // Rows above the tail are sized by estimate until they draw (GroupRow's
+    // `content-visibility`), so a long smooth scroll can end beside the row:
+    // once it has stopped, centre it once more, without animation.
+    if (smooth) {
+      root.addEventListener('scrollend', () => row.scrollIntoView({ block: 'center', behavior: 'auto' }), { once: true });
+    }
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current);
     for (const other of root.querySelectorAll('[data-flash]')) other.removeAttribute('data-flash');
     row.setAttribute('data-flash', '');
@@ -360,15 +367,19 @@ export function MessageList({
   const replyFromSheet = useCallback((target: MessageReplyTo) => onReply?.(target), [onReply]);
 
   // A notification's `?m=`: once the chat has opened at the bottom and every
-  // row is drawn, go to that message, once per target. A message no longer in
-  // the chat leaves the reader at the bottom.
+  // row is drawn, go to that message, once per target. A chat opened from the
+  // device's copy may not have it yet: the try repeats as rows arrive (the
+  // server's newer ones), as the channel feed's deep link does. A message no
+  // longer in the chat leaves the reader at the bottom.
   const jumpedToRef = useRef<number | null>(null);
+  const rowCount = latestMessages.length;
   useEffect(() => {
     if (!opened || jumpTo === null || jumpedToRef.current === jumpTo) return;
-    jumpedToRef.current = jumpTo;
-    const frame = requestAnimationFrame(() => void jumpToMessage(jumpTo, { instant: true }));
+    const frame = requestAnimationFrame(() => {
+      if (jumpToMessage(jumpTo, { instant: true })) jumpedToRef.current = jumpTo;
+    });
     return () => cancelAnimationFrame(frame);
-  }, [opened, jumpTo, jumpToMessage]);
+  }, [opened, jumpTo, jumpToMessage, rowCount]);
 
   /**
    * THE JUMP-TO-LATEST PILL, AS ONE DERIVED VALUE.

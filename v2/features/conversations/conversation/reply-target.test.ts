@@ -159,10 +159,30 @@ test('the wiring: replies only in a space chat the reader may send in, through t
   const answer = readHere('rows', 'AssistantMessageRow.tsx');
   assert.match(answer, /<SwipeToReply onReply=\{reply\}>/);
   assert.doesNotMatch(answer, /onLongPress/);
-  assert.match(readHere('rows', 'HoverReply.tsx'), /pointer-fine:inline-flex/);
+  // Unseen on touch but still reachable by a screen reader (review finding 4).
+  assert.match(readHere('rows', 'HoverReply.tsx'), /'pointer-coarse:not-focus-visible:sr-only',/);
   // The composer: the bar, Escape, and the reply going with the turn.
   const composer = readHere('ConversationComposer.tsx');
   assert.match(composer, /useDraft\(`conversation_draft_reply_\$\{draftScopeId\}`, REPLY_DRAFT\)/);
-  assert.match(composer, /if \(event\.key === 'Escape' && replyTo\) \{\s*event\.preventDefault\(\);\s*setReply\(null\);/);
+  assert.match(composer, /if \(event\.key === 'Escape' && replyTo && !event\.nativeEvent\.defaultPrevented\) \{\s*event\.preventDefault\(\);\s*setReply\(null\);/);
   assert.match(composer, /aria-label="Cancel reply"/);
+});
+
+test('the review of cbf3fa6: what each finding changed', () => {
+  // 1. The reader's own question carries its saved id once the send is taken,
+  //    so it can be replied to and jumped to in the session that sent it.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /rememberAuthoredIds\(\[userMessageId\]\);[\s\S]{0,500}?m\.id === optimisticMsg\.id \? \{ \.\.\.m, savedId: userMessageId \} : m/);
+  // 2. Escape that closed a popover or a dialog first leaves the reply staged.
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(composer, /event\.key === 'Escape' && replyTo && !event\.nativeEvent\.defaultPrevented/);
+  // 3. ?m= keeps trying as rows arrive, and stops once it has landed.
+  const list = readHere('MessageList.tsx');
+  assert.match(list, /if \(jumpToMessage\(jumpTo, \{ instant: true \}\)\) jumpedToRef\.current = jumpTo;/);
+  assert.match(list, /\}, \[opened, jumpTo, jumpToMessage, rowCount\]\);/);
+  // 6. A smooth jump centres the row again once it has stopped.
+  assert.match(list, /root\.addEventListener\('scrollend', \(\) => row\.scrollIntoView\(\{ block: 'center', behavior: 'auto' \}\), \{ once: true \}\);/);
+  // 5. A drag from inside something that scrolls sideways is left to it.
+  const swipe = readHere('rows', 'use-swipe-reply.ts');
+  assert.match(swipe, /if \(startsInSideScroller\(event\.target, event\.currentTarget\)\) return;/);
 });

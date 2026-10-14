@@ -13,7 +13,9 @@ import { useCallback, useRef } from 'react';
  * `touch-action: pan-y`, so the browser keeps the vertical scroll and hands the
  * horizontal drag to these handlers; a drag that turns vertical first is a
  * scroll, and the browser cancels the pointer. A drag that starts at the left
- * edge of the screen is left alone: on an iPhone that is the swipe back.
+ * edge of the screen is left alone: on an iPhone that is the swipe back. So is
+ * one that starts inside something that scrolls sideways (a table, code, the
+ * pasted cards): the drag scrolls that, and the message stays still.
  *
  * Like `use-long-press.ts` (the channel feed's, which this coexists with) the
  * moving state is written straight onto the DOM, never into React state, so a
@@ -31,6 +33,20 @@ const EDGE_GUARD_PX = 24;
 /** The furthest the message moves, with the drag past the threshold damped. */
 const MAX_SHIFT_PX = 88;
 const HAPTIC_MS = 10;
+
+/**
+ * Whether a press lands in something that scrolls sideways (a table or code
+ * block in an answer, the pasted cards' strip) between `target` and the row:
+ * that drag belongs to it, so the row must not start to follow and twitch back.
+ */
+function startsInSideScroller(target: EventTarget | null, row: Element): boolean {
+  for (let el = target instanceof Element ? target : null; el && el !== row; el = el.parentElement) {
+    if (el.scrollWidth <= el.clientWidth) continue;
+    const overflow = getComputedStyle(el).overflowX;
+    if (overflow === 'auto' || overflow === 'scroll') return true;
+  }
+  return false;
+}
 
 /** How far the message moves for a drag of `dx`: one to one up to the threshold, then damped. */
 export function swipeShift(dx: number): number {
@@ -83,6 +99,7 @@ export function useSwipeReply(onReply: (() => void) | null): SwipeReplyBindings 
     (event: React.PointerEvent<HTMLElement>) => {
       swallowRef.current = false;
       if (!onReply || event.pointerType !== 'touch' || event.clientX < EDGE_GUARD_PX) return;
+      if (startsInSideScroller(event.target, event.currentTarget)) return;
       startRef.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
       engagedRef.current = false;
       armedRef.current = false;

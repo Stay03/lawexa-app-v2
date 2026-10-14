@@ -1937,7 +1937,16 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         // `persisted_message_ids` cannot cover. Absent for confidential turns, which
         // persist nothing; `rememberAuthoredIds` ignores that.
         const userMessageId = response.data.user_message_id;
-        if (userMessageId !== undefined) rememberAuthoredIds([userMessageId]);
+        if (userMessageId !== undefined) {
+          rememberAuthoredIds([userMessageId]);
+          // …and the row itself carries it, as a streamed answer carries its own
+          // (answer-id.ts): the merge keeps this local row, so without it the
+          // reader's own question could not be replied to, or jumped to from a
+          // colleague's quote, until the chat was opened again (space chat replies).
+          setMessages((msgs) =>
+            msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, savedId: userMessageId } : m)),
+          );
+        }
         handlers.onAccepted?.();
 
         // Redacted response carries the canonical (redacted) form of the user turn

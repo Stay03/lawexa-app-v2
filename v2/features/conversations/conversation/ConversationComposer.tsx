@@ -515,8 +515,10 @@ export function ConversationComposer({
       ref={rootRef}
       className="w-full px-4 pb-3 pt-2"
       onKeyDown={(event) => {
-        // Escape takes the reply off, as the bar's ✕ does.
-        if (event.key === 'Escape' && replyTo) {
+        // Escape takes the reply off, as the bar's ✕ does, unless it was
+        // closing something else first (the country popover, a pasted card's
+        // dialog: Radix takes the key on the document and prevents it).
+        if (event.key === 'Escape' && replyTo && !event.nativeEvent.defaultPrevented) {
           event.preventDefault();
           setReply(null);
         }
