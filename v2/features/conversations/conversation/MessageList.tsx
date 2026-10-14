@@ -27,6 +27,10 @@ import { computeStreamStart } from './stream-start';
 import { splitOpenTail, type OpenTailLimit } from './open-tail';
 import { UserMessageRow } from './rows/UserMessageRow';
 import { AssistantMessageRow } from './rows/AssistantMessageRow';
+import { DaySeparator } from './rows/DaySeparator';
+import { LawexaAnswerMark } from './rows/LawexaAnswerMark';
+import { dayLabel, useNowMinute } from './day-label';
+import { spaceMarks } from './space-marks';
 import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
 import { CompactToolChain } from './tools/CompactToolChain';
@@ -325,6 +329,10 @@ export function MessageList({
   // Keyed on the (structurally stable) messages reference — stable group objects
   // across token flushes and unrelated parent re-renders, so GroupRow's memo holds.
   const groups = useMemo(() => groupMessages(messages), [messages]);
+  // A space chat's date separators and Lawexa marks (space-marks.ts); a
+  // personal chat draws neither.
+  const marks = useMemo(() => (showAuthors ? spaceMarks(groups) : null), [groups, showAuthors]);
+  const nowMinute = useNowMinute();
   const streamStartTime = useMemo(() => computeStreamStart(messages), [messages]);
   const activityStart = heldSince ?? streamStartTime;
   const lastGroupIndex = groups.length - 1;
@@ -634,6 +642,7 @@ export function MessageList({
               >
                 {groups.map((group, gi) => (
                   <Fragment key={groupKey(group, gi)}>
+                    {marks?.[gi]?.day ? <DaySeparator label={dayLabel(marks[gi].day, nowMinute)} /> : null}
                     {gi === activityIndex && (
                       <ActivityRow startTime={activityStart} narration={narration} restingLabel={restingLabel} />
                     )}
@@ -661,6 +670,7 @@ export function MessageList({
                       showAuthor={showAuthors}
                       viewerId={viewerId}
                       colourIndex={group.type === 'single' ? colourOf(group.message) : null}
+                      answerMark={marks?.[gi]?.answer ?? null}
                     />
                   </Fragment>
                 ))}
@@ -777,6 +787,7 @@ const GroupRow = memo(function GroupRow({
   showAuthor,
   viewerId,
   colourIndex,
+  answerMark,
 }: {
   group: MessageGroup;
   virtualize: boolean;
@@ -792,6 +803,8 @@ const GroupRow = memo(function GroupRow({
   viewerId: number | null;
   /** A user turn's member colour in a space chat (member-colour.ts), or null. */
   colourIndex: number | null;
+  /** In a space chat, where an answer starts: Lawexa's mark with this time. */
+  answerMark: Date | null;
 }) {
   // Native windowing for off-screen rows; `auto` remembers measured height so a
   // scrolled-away row returns to the exact same size (no jump).
@@ -840,5 +853,10 @@ const GroupRow = memo(function GroupRow({
     }
   }
 
-  return <div style={style}>{body}</div>;
+  return (
+    <div style={style}>
+      {answerMark ? <LawexaAnswerMark time={answerMark} /> : null}
+      {body}
+    </div>
+  );
 });

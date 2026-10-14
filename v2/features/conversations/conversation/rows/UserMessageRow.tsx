@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { cn, stripContextTags, parsePastedContent } from '@/lib/utils';
 import { formatMessageTimestamp } from '@/lib/utils/date';
 import type { ChatMessage } from '@/types/chat';
-import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import { PastedContentCard } from '../PastedContentCard';
 import { memberStyle } from '../member-colour';
-import { authorLine } from '../space-turn';
+import { turnSide } from '../space-turn';
 import { SentAttachments } from './SentAttachments';
+import { SpaceTurn } from './SpaceTurn';
 
 /**
  * UserMessageRow — v2 port of v1's user message block (§C KEEP). Right-aligned
@@ -19,10 +19,10 @@ import { SentAttachments } from './SentAttachments';
  * tags (case/statute/note slugs, radar uuids) are stripped for display, exactly
  * as v1 does.
  *
- * In a space chat (Spaces F4) a line above the bubble names who asked: a
- * colleague's face and name, or "You". Every question stays on the right,
- * because the answers own the left; the name is what tells whose it is. It
- * sits in the bubble's column, so it truncates with the bubble on a phone.
+ * In a space chat the row is laid out as Arthur drew it ({@link SpaceTurn}): the
+ * reader's own question on the right with "You · 10:36 AM", everyone else's
+ * on the left with their crest, name and time. A personal chat keeps the
+ * layout above, unchanged.
  */
 const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
 
@@ -104,7 +104,6 @@ export function UserMessageRow({
   colourIndex?: number | null;
 }) {
   const [showTime, setShowTime] = useState(false);
-  const author = showAuthor ? authorLine(message.author, viewerId) : null;
   const tint = colourIndex === null ? 'plain' : 'member';
 
   const hasFiles = (message.attachments?.length ?? 0) > 0 || message.attachment !== undefined;
@@ -121,34 +120,46 @@ export function UserMessageRow({
         ? [message.attachment]
         : [];
 
+  if (showAuthor) {
+    const content = (
+      <>
+        {pastedTexts.length > 0 ? (
+          <>
+            <div className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
+              {pastedTexts.map((text, index) => (
+                <PastedContentCard key={index} content={text} />
+              ))}
+            </div>
+            {remainingText && (
+              <div className={cn(BUBBLE_GROUND[tint], 'text-foreground mt-1.5 rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-words')}>
+                {remainingText}
+              </div>
+            )}
+          </>
+        ) : (
+          <UserMessageBubble content={displayContent} tint={tint} />
+        )}
+        {attachments.length > 0 && <SentAttachments attachments={attachments} />}
+      </>
+    );
+    return (
+      <SpaceTurn
+        side={turnSide(message.author, viewerId)}
+        author={message.author ?? null}
+        time={message.timestamp}
+        colourIndex={colourIndex}
+      >
+        {content}
+      </SpaceTurn>
+    );
+  }
+
   return (
     <div
       onClick={() => setShowTime((v) => !v)}
       className="group flex flex-col items-end"
       style={colourIndex === null ? undefined : memberStyle(colourIndex)}
     >
-      {author ? (
-        <div
-          className={cn(
-            'mb-1 flex min-w-0 max-w-full items-center gap-1.5 text-xs',
-            COLOUR_EASE,
-            // The name in the asker's ink, so the line and the bubble read as one person.
-            tint === 'member' ? 'text-[var(--member-ink)] dark:text-[var(--member-ink-dark)]' : 'text-muted-foreground',
-          )}
-        >
-          {author.person ? (
-            <MemberAvatar
-              user={author.person}
-              size="sm"
-              className="shrink-0 data-[size=sm]:size-5"
-            />
-          ) : null}
-          <span aria-hidden className="truncate">
-            {author.label}
-          </span>
-          <span className="sr-only">{author.spoken}</span>
-        </div>
-      ) : null}
       {pastedTexts.length > 0 ? (
         <>
           <div className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">

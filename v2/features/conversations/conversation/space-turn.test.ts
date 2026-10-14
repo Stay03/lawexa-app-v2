@@ -177,10 +177,13 @@ test('the list hands every user row the flag and the viewer; the row draws the l
   const list = readHere('MessageList.tsx');
   assert.match(list, /showAuthor=\{showAuthors\}\s+viewerId=\{viewerId\}/);
   assert.match(list, /<UserMessageRow\s+message=\{message\}\s+showAuthor=\{showAuthor\}\s+viewerId=\{viewerId\}\s+colourIndex=\{colourIndex\}\s*\/>/);
+  // A space chat lays the row out by side (SpaceTurn, Arthur's layout).
   const row = readHere(join('rows', 'UserMessageRow.tsx'));
-  assert.match(row, /const author = showAuthor \? authorLine\(message\.author, viewerId\) : null;/);
-  assert.match(row, /\{author\.person \? \(\s*<MemberAvatar/);
-  assert.match(row, /<span className="sr-only">\{author\.spoken\}<\/span>/);
+  assert.match(row, /if \(showAuthor\) \{/);
+  assert.match(row, /side=\{turnSide\(message\.author, viewerId\)\}\s*author=\{message\.author \?\? null\}/);
+  const turn = readHere(join('rows', 'SpaceTurn.tsx'));
+  assert.match(turn, /<MemberAvatar\s+user=\{author\}/);
+  assert.match(turn, /<span className="sr-only">Asked by you at \{at\}<\/span>/);
   assert.match(readHere('ConversationScreen.tsx'), /showAuthors=\{controller\.showAuthors\}\s+viewerId=\{serverUserId\}/);
 });
 

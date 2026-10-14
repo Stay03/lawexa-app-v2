@@ -109,6 +109,20 @@ export function isOwnTurn(
   return author !== null && viewerId !== null && author.id === viewerId;
 }
 
+/** Which side of a space chat a question sits on (Arthur's layout, 14 October
+ *  2026): the reader's own on the right, everyone else's on the left. */
+export type TurnSide = 'mine' | 'theirs';
+
+/** The side of a user turn: mine only when {@link isOwnTurn} says so (the
+ *  reader's id, or a row this client drew itself). A withheld writer (`null`)
+ *  is never mine. */
+export function turnSide(
+  author: ConversationAuthor | null | undefined,
+  viewerId: number | null,
+): TurnSide {
+  return isOwnTurn(author, viewerId) ? 'mine' : 'theirs';
+}
+
 /** How often an open space chat reads its status: one small request every
  *  four seconds, and none while it streams or its tab is hidden (T6). */
 export const SPACE_CHAT_POLL_MS = 4000;

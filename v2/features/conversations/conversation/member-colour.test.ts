@@ -108,5 +108,9 @@ test('the wiring: roster by uuid, the reader\'s own rows by the reader\'s uuid, 
   assert.match(row, /member: cn\('bg-\[var\(--member-bg\)\] dark:bg-\[var\(--member-bg-dark\)\]', COLOUR_EASE\)/);
   // The text stays the theme's foreground on both grounds.
   assert.match(row, /cn\(BUBBLE_GROUND\[tint\], 'text-foreground rounded-3xl/);
-  assert.match(row, /tint === 'member' \? 'text-\[var\(--member-ink\)\] dark:text-\[var\(--member-ink-dark\)\]' : 'text-muted-foreground'/);
+  // A colleague's name, and their crest, in their ink (SpaceTurn).
+  const turn = readHere('rows', 'SpaceTurn.tsx');
+  assert.match(turn, /const style = colourIndex === null \? undefined : memberStyle\(colourIndex\);/);
+  assert.match(turn, /tinted \? 'text-\[var\(--member-ink\)\] dark:text-\[var\(--member-ink-dark\)\]' : 'text-foreground'/);
+  assert.match(turn, /\[&_\[data-slot=avatar-fallback\]\]:bg-\[var\(--member-bg\)\]/);
 });
