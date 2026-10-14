@@ -179,3 +179,40 @@ test('a row that points into no channel says so', () => {
   assert.equal(notificationMessageUuid(invite, ORIGIN), null);
   assert.equal(notificationChannelUuid(row({ action_url: 'https://example.org/channels/x' }), ORIGIN), null);
 });
+
+test('a space chat mention or reply opens the chat at its message (techlead’s contract, 14 October 2026)', () => {
+  const mention = row({
+    type: 'space_chat_mention',
+    title: 'Chidi Okonkwo mentioned you in Contract review',
+    message: '@adaobi can you check this?',
+    action_url: '/c/3f2a-uuid?m=4820',
+    icon: 'mention',
+    space_uuid: 's-1',
+    conversation_uuid: '3f2a-uuid',
+    message_id: 4820,
+  });
+  assert.deepEqual(presentNotification(mention, ORIGIN), {
+    mark: 'mention',
+    title: 'Chidi Okonkwo mentioned you in Contract review',
+    preview: '@adaobi can you check this?',
+    destination: { kind: 'internal', href: '/c/3f2a-uuid?m=4820' },
+  });
+  const reply = row({
+    type: 'space_chat_reply',
+    title: 'Chidi Okonkwo replied to you in Contract review',
+    action_url: 'https://lawexa.com/c/3f2a-uuid?m=4821',
+    icon: 'reply',
+    conversation_uuid: '3f2a-uuid',
+    message_id: 4821,
+  });
+  const shown = presentNotification(reply, ORIGIN);
+  assert.equal(shown.mark, 'reply');
+  assert.deepEqual(shown.destination, { kind: 'internal', href: '/c/3f2a-uuid?m=4821' });
+  // A row that comes without its words still says what it is.
+  assert.equal(presentNotification(row({ type: 'space_chat_mention', title: '' }), ORIGIN).title, 'You were mentioned in a chat');
+  assert.equal(presentNotification(row({ type: 'space_chat_reply', title: '' }), ORIGIN).title, 'Someone replied to you in a chat');
+  // It is a chat's row, not a channel's: a press warms no channel history
+  // (mutations.ts stops at the missing channel, before reading the message).
+  assert.equal(notificationChannelUuid(mention), null);
+  assert.equal(notificationChannelUuid(reply), null);
+});

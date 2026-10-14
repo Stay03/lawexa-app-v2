@@ -52,6 +52,14 @@ export interface Notification {
   quiz_title?: string | null;
   question_count?: number | null;
   host?: { uuid: string; name: string } | null;
+  /**
+   * `space_chat_mention` and `space_chat_reply` (techlead's contract, 14
+   * October 2026): the chat and the message the row is about. `action_url` is
+   * `/c/{conversation_uuid}?m={message_id}`, which opens the chat at that
+   * message. ABSENT on every other kind.
+   */
+  conversation_uuid?: string | null;
+  message_id?: number | null;
 }
 
 // GET /api/notifications/{id} response

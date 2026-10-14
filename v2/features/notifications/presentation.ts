@@ -123,6 +123,11 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   organization_invite: 'Organization invitation',
   channel_quiz_live: 'A quiz is live',
   radar_report: 'A radar report is ready',
+  // A space chat (techlead's contract, 14 October 2026). The server sends its
+  // own title ("Chidi Okonkwo mentioned you in Contract review"); these are for
+  // a row that comes without one.
+  space_chat_mention: 'You were mentioned in a chat',
+  space_chat_reply: 'Someone replied to you in a chat',
 };
 
 function trimmedOrNull(value: string | null | undefined): string | null {
