@@ -69,8 +69,9 @@ test('(f) a turn just sent, before the server answers, is mine; the server’s c
 
 test('the two sides as Arthur drew them', () => {
   const turn = read('rows', 'SpaceTurn.tsx');
-  // Mine: right, the bubble, then "You · 10:36 AM" under it, always shown.
-  assert.match(turn, /if \(side === 'mine'\) \{\s*return \(\s*<div className="flex flex-col items-end" style=\{style\}>\s*\{children\}\s*<div className="text-muted-foreground mt-1\.5 text-xs tabular-nums">\s*<span aria-hidden>You · \{at\}<\/span>/);
+  // Mine: right, the bubble at most 85% wide (indented even when long, as on a
+  // phone), then "You · 10:36 AM" under it, always shown.
+  assert.match(turn, /if \(side === 'mine'\) \{\s*return \(\s*<div className="flex flex-col items-end" style=\{style\}>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<div className="flex max-w-\[85%\] min-w-0 flex-col items-end">\{children\}<\/div>\s*<div className="text-muted-foreground mt-1\.5 text-xs tabular-nums">\s*<span aria-hidden>You · \{at\}<\/span>/);
   // Theirs: left, the crest, then the name and the time on one line, the question under it.
   assert.match(turn, /<div className="flex min-w-0 items-start gap-2\.5" style=\{style\}>\s*<MemberAvatar/);
   assert.match(turn, /\{name\}\s*<\/span>\s*<span aria-hidden className="text-muted-foreground shrink-0 text-xs tabular-nums">\s*\{at\}/);
@@ -80,6 +81,8 @@ test('(d) a personal chat keeps its row: one right-hand bubble, no names, no cre
   const row = read('rows', 'UserMessageRow.tsx');
   // Only a space chat (showAuthor) takes the new layout.
   assert.match(row, /if \(showAuthor\) \{[\s\S]*?<SpaceTurn[\s\S]*?\n {2}\}\n\n {2}return \(\n {4}<div\n {6}onClick=\{\(\) => setShowTime\(\(v\) => !v\)\}\n {6}className="group flex flex-col items-end"/);
+  // The 85% cap is the space row's (SpaceTurn); the personal row keeps its width.
+  assert.doesNotMatch(row, /max-w-\[85%\]/);
   // And the answers carry Lawexa's mark only there.
   const list = read('MessageList.tsx');
   assert.match(list, /const marks = useMemo\(\(\) => \(showAuthors \? spaceMarks\(groups\) : null\), \[groups, showAuthors\]\);/);

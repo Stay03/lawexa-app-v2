@@ -44,7 +44,9 @@ export function SpaceTurn({
   if (side === 'mine') {
     return (
       <div className="flex flex-col items-end" style={style}>
-        {children}
+        {/* Indented from the left even when the question is long, so it reads
+            as the reader's own on a phone (techlead, 14 October 2026). */}
+        <div className="flex max-w-[85%] min-w-0 flex-col items-end">{children}</div>
         <div className="text-muted-foreground mt-1.5 text-xs tabular-nums">
           <span aria-hidden>You · {at}</span>
           <span className="sr-only">Asked by you at {at}</span>
