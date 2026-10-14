@@ -1,5 +1,6 @@
 import 'server-only';
 import { getApiUrl } from '@/lib/constants/seo';
+import { retryAfterMs } from './session-resolve';
 import { getSessionToken } from './session-token';
 
 /**
@@ -14,11 +15,15 @@ import { getSessionToken } from './session-token';
  */
 export class ApiServerError extends Error {
   readonly status: number;
+  /** The server's Retry-After in ms (a number of seconds; a 429 or 503 may
+   *  send it), else null. */
+  readonly retryAfterMs: number | null;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfterMs: number | null = null) {
     super(message);
     this.name = 'ApiServerError';
     this.status = status;
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -56,6 +61,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw new ApiServerError(
       response.status,
       `apiFetch ${path} failed: ${response.status} ${response.statusText}`,
+      retryAfterMs(response.headers.get('retry-after')),
     );
   }
 

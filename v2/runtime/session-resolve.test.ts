@@ -8,6 +8,8 @@ import {
   backoffDelay,
   classifyMeFailure,
   resolveSessionWith,
+  retryAfterMs,
+  retryPause,
 } from './session-resolve';
 
 /*
@@ -30,8 +32,10 @@ test('only the server’s 401 or 419 reads as signed out', () => {
   assert.equal(classifyMeFailure(httpError(401)), 'signed-out');
   assert.equal(classifyMeFailure(httpError(419)), 'signed-out');
   for (const status of [500, 502, 503, 504]) assert.equal(classifyMeFailure(httpError(status)), 'retry', `${status}`);
-  // A 429 or another 4xx is not helped by asking again at once.
-  assert.equal(classifyMeFailure(httpError(429)), 'unreachable');
+  // A rate-limited burst is a busy server, not an outage: asked again.
+  assert.equal(classifyMeFailure(httpError(429)), 'retry');
+  // A refusal or a missing route is not helped by asking again at once.
+  assert.equal(classifyMeFailure(httpError(403)), 'unreachable');
   assert.equal(classifyMeFailure(httpError(404)), 'unreachable');
   // fetch's network failure, the attempt's timeout, a body that was not JSON.
   for (const name of ['TypeError', 'AbortError', 'TimeoutError', 'SyntaxError']) {
@@ -81,10 +85,43 @@ test('an answer without a user, or a failure a retry will not change, is unreach
   assert.deepEqual(await resolveSessionWith('t', async () => ({ user: null }), { pause: noPause }), { kind: 'unreachable' });
   let calls = 0;
   assert.deepEqual(
-    await resolveSessionWith('t', async () => { calls += 1; throw httpError(429); }, { pause: noPause }),
+    await resolveSessionWith('t', async () => { calls += 1; throw httpError(404); }, { pause: noPause }),
     { kind: 'unreachable' },
   );
   assert.equal(calls, 1);
+});
+
+test('a 429 is asked again, after its Retry-After when that fits the budget', async () => {
+  const waits: number[] = [];
+  const pause = async (ms: number) => { waits.push(ms); };
+  let calls = 0;
+  const limited = (retryAfterMs: number | null) => Object.assign(httpError(429), { retryAfterMs });
+  const result = await resolveSessionWith('t', async () => {
+    calls += 1;
+    if (calls === 1) throw limited(1000);
+    return { user: { id: 7 } };
+  }, { pause, timeoutMs: 2500, pauseMs: 300 });
+  assert.deepEqual(result, { kind: 'signed-in', user: { id: 7 } });
+  assert.deepEqual(waits, [1000], 'the server’s 1 s');
+  // Past the budget, or absent: the normal pause.
+  waits.length = 0;
+  await resolveSessionWith('t', async () => { throw limited(30_000); }, { pause, timeoutMs: 2500, pauseMs: 300 });
+  await resolveSessionWith('t', async () => { throw limited(null); }, { pause, timeoutMs: 2500, pauseMs: 300 });
+  assert.deepEqual(waits, [300, 300]);
+});
+
+test('Retry-After reads seconds; a date or nothing reads as none', () => {
+  assert.equal(retryAfterMs('2'), 2000);
+  assert.equal(retryAfterMs(' 0 '), 0);
+  assert.equal(retryAfterMs(null), null);
+  assert.equal(retryAfterMs('Wed, 21 Oct 2026 07:28:00 GMT'), null);
+  assert.equal(retryPause({ retryAfterMs: 2500 }, 300, 2500), 2500, 'at the budget');
+  assert.equal(retryPause(new Error('x'), 300, 2500), 300);
+});
+
+test('the API client carries Retry-After on its error', () => {
+  const client = read('v2', 'runtime', 'api-server.ts');
+  assert.match(client, /retryAfterMs\(response\.headers\.get\('retry-after'\)\),/);
 });
 
 test('each attempt has its own short timeout', async () => {

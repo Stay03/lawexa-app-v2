@@ -30,13 +30,23 @@ const SIGNED_OUT_STATUSES = new Set([401, 419]);
  * Classify a failed `/auth/me`. `status` is read off an `ApiServerError`
  * (`api-server.ts`); a thrown `TypeError` is fetch's network failure (refused,
  * reset, DNS), an `AbortError`/`TimeoutError` the attempt's timeout, a
- * `SyntaxError` a body that was not JSON (a proxy's error page). 429 and other
- * 4xx are not retried: asking again at once would not help.
+ * `SyntaxError` a body that was not JSON (a proxy's error page). Each status:
+ *  - 401, 419: the server says the session is gone (revoked, expired, a CSRF
+ *    mismatch): signed out, never retried.
+ *  - 429: the server is busy and rate-limited this burst, not down: tried
+ *    again, after its Retry-After when that fits the attempt's budget.
+ *  - 5xx: the API or a proxy in front of it failed: tried again.
+ *  - 403: the server refused this request (a blocked account or a gate in
+ *    front of the route). It is not "signed out", and asking again at once
+ *    will not change it: unreachable.
+ *  - 404 and other 4xx: the route is not there or the request was malformed
+ *    (a misrouted deploy, a wrong API base): unreachable, not retried.
  */
 export function classifyMeFailure(error: unknown): MeFailure {
   if (error && typeof error === 'object' && 'status' in error && typeof error.status === 'number') {
     if (SIGNED_OUT_STATUSES.has(error.status)) return 'signed-out';
-    return error.status >= 500 ? 'retry' : 'unreachable';
+    if (error.status === 429 || error.status >= 500) return 'retry';
+    return 'unreachable';
   }
   if (error instanceof Error && ['TypeError', 'AbortError', 'TimeoutError', 'SyntaxError'].includes(error.name)) {
     return 'retry';
@@ -49,6 +59,22 @@ export function classifyMeFailure(error: unknown): MeFailure {
 export const ME_ATTEMPTS = 2;
 export const ME_TIMEOUT_MS = 2500;
 export const ME_RETRY_PAUSE_MS = 300;
+
+/** A Retry-After header in seconds, as ms; null when absent or an HTTP date. */
+export function retryAfterMs(header: string | null): number | null {
+  if (!header || !/^\d+$/.test(header.trim())) return null;
+  return Number(header.trim()) * 1000;
+}
+
+/** How long to wait before the next attempt: the server's Retry-After when it
+ *  sent one that fits the attempt's budget, else the normal pause. */
+export function retryPause(error: unknown, pauseMs: number, budgetMs: number): number {
+  const asked =
+    error && typeof error === 'object' && 'retryAfterMs' in error && typeof error.retryAfterMs === 'number'
+      ? error.retryAfterMs
+      : null;
+  return asked !== null && asked <= budgetMs ? asked : pauseMs;
+}
 
 /**
  * Resolve a session from a token and a `/auth/me` fetcher. No token is
@@ -81,7 +107,7 @@ export async function resolveSessionWith<U>(
       const failure = classifyMeFailure(error);
       if (failure === 'signed-out') return { kind: 'signed-out' };
       if (failure === 'unreachable' || attempt === attempts) return { kind: 'unreachable' };
-      await pause(pauseMs);
+      await pause(retryPause(error, pauseMs, timeoutMs));
     }
   }
   return { kind: 'unreachable' };
