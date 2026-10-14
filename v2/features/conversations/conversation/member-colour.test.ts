@@ -101,8 +101,8 @@ test('the wiring: roster by uuid, the reader\'s own rows by the reader\'s uuid, 
   assert.match(screen, /if \(!spaceRoster\) return null;/);
   assert.match(screen, /if \(message\.role === 'user' && message\.author\?\.uuid\) asked\.push\(message\.author\.uuid\);/);
   const list = readHere('MessageList.tsx');
-  // A row this client drew (no author key) is the reader's; a withheld author (null) has none.
-  assert.match(list, /const uuid = message\.author === undefined \? viewerUuid : message\.author\?\.uuid;/);
+  // The row this client drew is the reader's; a withheld or missing author has none.
+  assert.match(list, /const uuid = message\.drawnHere \? viewerUuid : message\.author\?\.uuid;/);
   const row = readHere('rows', 'UserMessageRow.tsx');
   assert.match(row, /style=\{colourIndex === null \? undefined : memberStyle\(colourIndex\)\}/);
   assert.match(row, /member: cn\('bg-\[var\(--member-bg\)\] dark:bg-\[var\(--member-bg-dark\)\]', COLOUR_EASE\)/);

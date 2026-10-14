@@ -243,11 +243,11 @@ export function MessageList({
   memberColours = null,
   viewerUuid = null,
 }: MessageListProps) {
-  // A user turn's colour: its author's, or the reader's own for a row this
-  // client drew (no author key yet). A withheld author (null) has none.
+  // A user turn's colour: its author's, or the reader's own for the row this
+  // client drew. A withheld or missing author has none.
   const colourOf = (message: EngineMessage): number | null => {
     if (!memberColours || message.role !== 'user') return null;
-    const uuid = message.author === undefined ? viewerUuid : message.author?.uuid;
+    const uuid = message.drawnHere ? viewerUuid : message.author?.uuid;
     return uuid ? (memberColours.get(uuid) ?? null) : null;
   };
   // What this render draws (see OPEN_TAIL): until the first frame has been

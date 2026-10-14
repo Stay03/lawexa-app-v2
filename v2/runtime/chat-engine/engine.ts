@@ -453,6 +453,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       role: 'user',
       content,
       timestamp: new Date(),
+      drawnHere: true,
       ...(list && list.length > 0 && { attachments: list, attachment: list[0] }),
     };
     // A live turn is a transcript beginning too (the home handoff opens a brand-new

@@ -10,9 +10,9 @@ import { UNNAMED_ASKER, turnSide } from './space-turn';
 /*
  * A space chat laid out as Arthur drew it (14 October 2026): the reader's own
  * questions on the right with "You · time", everyone else's on the left with
- * their crest, name and time. The side is decided by the reader's id, or a row
- * this client drew itself; a missing or withheld author is never "mine"
- * (techlead's rule). The cases are the techlead's (a)-(f); (e) is in
+ * their crest, name and time. The side is decided by the reader's id, or the
+ * row this client drew itself (`drawnHere`); a missing or withheld author is
+ * never "mine" (techlead's rule). The cases are the techlead's (a)-(f); (e) is in
  * space-marks.test.ts. The rows are .tsx, which this runner does not load, so
  * the side rule is tested as a function and the layout is pinned in source.
  */
@@ -25,10 +25,10 @@ const MEMBER: ConversationAuthor = { id: 2, uuid: 'member', name: 'Precious Ekon
 const GONE: ConversationAuthor = { id: 3, uuid: 'gone', name: 'Bola Left', avatar_url: null };
 
 test('(a) the owner and a member each see their own turns on the right and the other’s on the left', () => {
-  assert.equal(turnSide(OWNER, OWNER.id), 'mine');
-  assert.equal(turnSide(MEMBER, OWNER.id), 'theirs');
-  assert.equal(turnSide(MEMBER, MEMBER.id), 'mine');
-  assert.equal(turnSide(OWNER, MEMBER.id), 'theirs');
+  assert.equal(turnSide({ author: OWNER }, OWNER.id), 'mine');
+  assert.equal(turnSide({ author: MEMBER }, OWNER.id), 'theirs');
+  assert.equal(turnSide({ author: MEMBER }, MEMBER.id), 'mine');
+  assert.equal(turnSide({ author: OWNER }, MEMBER.id), 'theirs');
 });
 
 test('(b) a person who left the space is theirs, by name, in the next free colour', () => {
@@ -37,12 +37,12 @@ test('(b) a person who left the space is theirs, by name, in the next free colou
     { uuid: 'member', owner: false, joinedAt: '2026-10-02T09:00:00Z' },
   ];
   assert.equal(memberColourIndex(roster, ['gone']).get('gone'), 2, 'after the two on the roster');
-  assert.equal(turnSide(GONE, OWNER.id), 'theirs');
+  assert.equal(turnSide({ author: GONE }, OWNER.id), 'theirs');
 });
 
 test('(c) a withheld author (null) is never mine, even when the reader is unknown', () => {
-  assert.equal(turnSide(null, OWNER.id), 'theirs');
-  assert.equal(turnSide(null, null), 'theirs');
+  assert.equal(turnSide({ author: null }, OWNER.id), 'theirs');
+  assert.equal(turnSide({ author: null }, null), 'theirs');
   // Drawn on the left as "Someone", with the neutral crest and no colour.
   assert.equal(UNNAMED_ASKER, 'Someone');
   const turn = read('rows', 'SpaceTurn.tsx');
@@ -50,13 +50,21 @@ test('(c) a withheld author (null) is never mine, even when the reader is unknow
   assert.match(turn, /<MemberAvatar\s+user=\{author\}/);
 });
 
+test('a row without the author key is not mine: an old cached page, a resource that skips it', () => {
+  assert.equal(turnSide({}, OWNER.id), 'theirs');
+  assert.equal(turnSide({ author: undefined }, OWNER.id), 'theirs');
+});
+
 test('(f) a turn just sent, before the server answers, is mine; the server’s copy stays mine', () => {
-  // The client's own row carries no author key until the server's copy replaces it.
-  assert.equal(turnSide(undefined, OWNER.id), 'mine');
-  assert.equal(turnSide(OWNER, OWNER.id), 'mine');
-  // The row reads the side from the message itself, so it cannot jump on the swap.
+  // The client marks the row it draws; the server's copy names the reader.
+  assert.equal(turnSide({ drawnHere: true }, OWNER.id), 'mine');
+  assert.equal(turnSide({ drawnHere: true }, null), 'mine', 'before the reader is known');
+  assert.equal(turnSide({ author: OWNER }, OWNER.id), 'mine', 'after the swap');
+  const engine = readFileSync(join(here, '..', '..', '..', 'runtime', 'chat-engine', 'engine.ts'), 'utf8');
+  assert.match(engine, /role: 'user',\s*content,\s*timestamp: new Date\(\),\s*drawnHere: true,/);
+  // The row reads the side from the message itself.
   const row = read('rows', 'UserMessageRow.tsx');
-  assert.match(row, /side=\{turnSide\(message\.author, viewerId\)\}/);
+  assert.match(row, /side=\{turnSide\(message, viewerId\)\}/);
 });
 
 test('the two sides as Arthur drew them', () => {

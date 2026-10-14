@@ -18,7 +18,6 @@ import { conversationsQueries } from '../queries';
 import {
   askAgainRefusal,
   askingLabel,
-  authorLine,
   canSendIn,
   draftWithRefused,
   hasSpaceContract,
@@ -150,19 +149,6 @@ test('the case dock reads the same answer through the embedded surface', () => {
 
 /* ── Commit 3: who asked ──────────────────────────────────────────────────── */
 
-test('a user turn names who asked: You for your own, the name for a colleague', () => {
-  assert.equal(authorLine({ id: 7, name: 'Me Myself', avatar_url: null }, 7)?.label, 'You');
-  const colleague = authorLine(ada, 7);
-  assert.equal(colleague?.label, 'Ada Obi');
-  assert.equal(colleague?.spoken, 'Asked by Ada Obi');
-  assert.deepEqual(colleague?.person, ada);
-  // The row this client drew itself carries no author key: the reader's own.
-  assert.deepEqual(authorLine(undefined, 7), { label: 'You', spoken: 'Asked by you', person: null });
-  // A writer withheld from a stranger is never "You".
-  assert.equal(authorLine(null, 7), null);
-  assert.equal(authorLine(null, null), null);
-});
-
 test('labels need the B4 fields on the record', () => {
   assert.equal(hasSpaceContract({ can_send: false }), true);
   assert.equal(hasSpaceContract({ can_send: true }), true);
@@ -180,7 +166,7 @@ test('the list hands every user row the flag and the viewer; the row draws the l
   // A space chat lays the row out by side (SpaceTurn, Arthur's layout).
   const row = readHere(join('rows', 'UserMessageRow.tsx'));
   assert.match(row, /if \(showAuthor\) \{/);
-  assert.match(row, /side=\{turnSide\(message\.author, viewerId\)\}\s*author=\{message\.author \?\? null\}/);
+  assert.match(row, /side=\{turnSide\(message, viewerId\)\}\s*author=\{message\.author \?\? null\}/);
   const turn = readHere(join('rows', 'SpaceTurn.tsx'));
   assert.match(turn, /<MemberAvatar\s+user=\{author\}/);
   assert.match(turn, /<span className="sr-only">Asked by you at \{at\}<\/span>/);
@@ -380,13 +366,15 @@ test('a send moves its chat to the top of the owner’s lists once, with no seco
 /* ── Ask again re-asks only the reader's own question ─────────────────────── */
 
 test('Ask again is offered on the owner’s own last question, never on a colleague’s', () => {
-  assert.equal(isOwnTurn(undefined, 7), true, 'a row this client drew');
-  assert.equal(isOwnTurn({ id: 7, name: 'Me', avatar_url: null }, 7), true);
-  assert.equal(isOwnTurn(ada, 7), false);
-  assert.equal(isOwnTurn(null, 7), false, 'a withheld writer');
-  assert.equal(isOwnTurn({ id: 7, name: 'Me', avatar_url: null }, null), false);
+  assert.equal(isOwnTurn({ drawnHere: true }, 7), true, 'the row this client drew');
+  assert.equal(isOwnTurn({ author: { id: 7, name: 'Me', avatar_url: null } }, 7), true);
+  assert.equal(isOwnTurn({ author: ada }, 7), false);
+  assert.equal(isOwnTurn({ author: null }, 7), false, 'a withheld writer');
+  assert.equal(isOwnTurn({}, 7), false, 'a row without the author key');
+  assert.equal(isOwnTurn({ author: { id: 7, name: 'Me', avatar_url: null } }, null), false);
+  // A personal chat, or a server before B4 (only the owner sends), asks no one.
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /lastUserTurn !== null &&\s*!!lastUserTurn\.content &&\s*isOwnTurn\(lastUserTurn\.author, serverUserId\);/);
+  assert.match(controller, /lastUserTurn !== null &&\s*!!lastUserTurn\.content &&\s*\(!showAuthors \|\| isOwnTurn\(lastUserTurn, serverUserId\)\);/);
 });
 
 /* ── The case dock reads whose turn it is through the surface ─────────────── */

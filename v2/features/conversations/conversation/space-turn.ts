@@ -1,5 +1,5 @@
 import type {
-  ConversationAuthor,
+  ChatMessage,
   ConversationData,
   ConversationStatusData,
   ConversationTurnUser,
@@ -21,9 +21,10 @@ import { statusOf } from '@/v2/runtime/persist/policy';
  * field comes from a server before B4, where only the owner could send.
  *
  * ── WHO ASKED ──────────────────────────────────────────────────────────────
- * Every user turn in a space chat names its writer above the bubble. Labels
- * are drawn only on a record that carries the B4 fields, so an app ahead of
- * the deploy never prints "You" on a colleague's question.
+ * In a space chat the reader's own questions sit on the right and everyone
+ * else's on the left under their name (Arthur's layout, 14 October 2026). The
+ * sides are drawn only on a record that carries the B4 fields, so an app ahead
+ * of the deploy never puts a colleague's question on the reader's side.
  *
  * ── WHOSE TURN IS RUNNING ──────────────────────────────────────────────────
  * B4 has no push channel, so an open space chat reads its status every
@@ -73,40 +74,20 @@ export function hasSpaceContract(detail: SendFields | null): boolean {
   return detail !== null && typeof detail.can_send === 'boolean';
 }
 
-/** The line above a user turn: what it shows, what a screen reader says, and
- *  the face beside it (a colleague's; "You" needs none). */
-export interface AuthorLine {
-  label: string;
-  spoken: string;
-  person: ConversationAuthor | null;
-}
+/** What the side rules read from a user turn. */
+type TurnFields = Pick<ChatMessage, 'author' | 'drawnHere'>;
 
 /**
- * Who asked a user turn. The reader's own turn is "You", and so is a turn
- * with no `author` key, which only this client draws (its optimistic row; the
- * server sends the key on every row since B4). A `null` author is a writer
- * the server withheld from a stranger reading a published chat: no label, so
- * nobody else's question can read as "You".
+ * Whether a user turn is the reader's own: theirs by id, or the row this
+ * client drew itself ({@link ChatMessage.drawnHere}). Nothing else is assumed
+ * to be: a withheld writer (`null`) and a row without the `author` key (an
+ * older cached page, a resource that leaves the field out) are not the
+ * reader's (techlead, 14 October 2026).
  */
-export function authorLine(
-  author: ConversationAuthor | null | undefined,
-  viewerId: number | null,
-): AuthorLine | null {
-  if (author === null) return null;
-  if (author === undefined || isOwnTurn(author, viewerId)) {
-    return { label: 'You', spoken: 'Asked by you', person: null };
-  }
-  return { label: author.name, spoken: `Asked by ${author.name}`, person: author };
-}
-
-/** Whether a user turn is the reader's own: theirs by id, or drawn by this
- *  client (no `author` key). A withheld writer (`null`) is never assumed to be. */
-export function isOwnTurn(
-  author: ConversationAuthor | null | undefined,
-  viewerId: number | null,
-): boolean {
-  if (author === undefined) return true;
-  return author !== null && viewerId !== null && author.id === viewerId;
+export function isOwnTurn(turn: TurnFields, viewerId: number | null): boolean {
+  if (turn.drawnHere) return true;
+  const author = turn.author;
+  return author != null && viewerId !== null && author.id === viewerId;
 }
 
 /** Which side of a space chat a question sits on (Arthur's layout, 14 October
@@ -114,13 +95,9 @@ export function isOwnTurn(
 export type TurnSide = 'mine' | 'theirs';
 
 /** The side of a user turn: mine only when {@link isOwnTurn} says so (the
- *  reader's id, or a row this client drew itself). A withheld writer (`null`)
- *  is never mine. */
-export function turnSide(
-  author: ConversationAuthor | null | undefined,
-  viewerId: number | null,
-): TurnSide {
-  return isOwnTurn(author, viewerId) ? 'mine' : 'theirs';
+ *  reader's id, or the row this client drew itself). */
+export function turnSide(turn: TurnFields, viewerId: number | null): TurnSide {
+  return isOwnTurn(turn, viewerId) ? 'mine' : 'theirs';
 }
 
 /** How often an open space chat reads its status: one small request every

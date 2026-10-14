@@ -144,7 +144,7 @@ export function UserMessageRow({
     );
     return (
       <SpaceTurn
-        side={turnSide(message.author, viewerId)}
+        side={turnSide(message, viewerId)}
         author={message.author ?? null}
         time={message.timestamp}
         colourIndex={colourIndex}

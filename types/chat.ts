@@ -55,6 +55,12 @@ export interface ChatMessage {
    * a server before B4; `null` when the server withholds the writer.
    */
   author?: ConversationAuthor | null;
+  /**
+   * Set on the user turn this client drew itself, before the server's copy
+   * replaces it: the only row that is the reader's without an author. A row
+   * that merely lacks `author` is not assumed to be the reader's.
+   */
+  drawnHere?: true;
 }
 
 // Tool message extends ChatMessage with tool-specific data

@@ -1073,7 +1073,7 @@ export function useConversationController(
     lastIsCompletedAssistant &&
     lastUserTurn !== null &&
     !!lastUserTurn.content &&
-    isOwnTurn(lastUserTurn.author, serverUserId);
+    (!showAuthors || isOwnTurn(lastUserTurn, serverUserId));
 
   // A refused re-ask (Spaces F4: a colleague's turn, or a demotion) is told in
   // the composer's banner, as a refused send is; there is nothing to give back.
