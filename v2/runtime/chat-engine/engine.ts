@@ -2038,6 +2038,20 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return { kind: 'forbidden' };
       }
 
+      // 422 on `reply_to_message_id` — the message this turn replies to is no
+      // longer there (deleted since it was staged; the techlead's contract).
+      // A refusal, not an error: the host gives the words back without the quote.
+      if (
+        options.replyTo &&
+        err instanceof AxiosError &&
+        err.response?.status === 422 &&
+        (err.response.data as { errors?: Record<string, unknown> } | undefined)?.errors?.reply_to_message_id !== undefined
+      ) {
+        removeMessage(optimisticMsg.id);
+        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        return { kind: 'reply-gone' };
+      }
+
       // Generic error.
       removeMessage(optimisticMsg.id);
       const errorMsg =

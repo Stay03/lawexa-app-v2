@@ -186,3 +186,18 @@ test('the review of cbf3fa6: what each finding changed', () => {
   const swipe = readHere('rows', 'use-swipe-reply.ts');
   assert.match(swipe, /if \(startsInSideScroller\(event\.target, event\.currentTarget\)\) return;/);
 });
+
+test('a reply whose original is gone gives the words back, not the quote, and says why', async () => {
+  const turn = await import('./space-turn');
+  assert.equal(turn.sendRefusal({ kind: 'reply-gone' }, 7), 'The message you replied to is no longer available. Your message is kept.');
+  // The engine reads the one 422 on reply_to_message_id as this refusal, not as an error.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  assert.match(engine, /options\.replyTo &&\s*err instanceof AxiosError &&\s*err\.response\?\.status === 422 &&[\s\S]{0,160}?errors\?\.reply_to_message_id !== undefined\s*\) \{\s*removeMessage\(optimisticMsg\.id\);[\s\S]{0,120}?return \{ kind: 'reply-gone' \};/);
+  // The controller marks it, and the composer keeps the quote off.
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),/);
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(composer, /if \(draft\.reply && !outcome\.dropReply\) updateReply\(\(current\) => current \?\? draft\.reply\);/);
+  // The words and the files still come back, as for every refused send.
+  assert.match(composer, /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);/);
+});

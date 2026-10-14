@@ -159,7 +159,10 @@ export type RecoverResult =
  */
 export type SendRefusal =
   | { kind: 'held'; by: ConversationTurnUser | null; executionId: string | null; since: string | null }
-  | { kind: 'forbidden' };
+  | { kind: 'forbidden' }
+  /** A reply whose original is gone (deleted, or not this chat's): the server's
+   *  one 422 on `reply_to_message_id`. The words go back; the quote does not. */
+  | { kind: 'reply-gone' };
 
 // ─── Engine handlers (hot-swappable callbacks + mode resolvers) ─────────────
 /**

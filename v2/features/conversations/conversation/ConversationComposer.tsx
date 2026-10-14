@@ -497,8 +497,9 @@ export function ConversationComposer({
     updateInput((current) => (current.trim() === '' ? draft.input : current));
     for (const text of draft.pasted) addPasted(text);
     setUploads((current) => [...draft.uploads, ...current]);
-    // …and the reply, unless the reader has picked another since.
-    if (draft.reply) updateReply((current) => current ?? draft.reply);
+    // …and the reply, unless the reader has picked another since, or its
+    // original is what was refused (it is gone: the words alone come back).
+    if (draft.reply && !outcome.dropReply) updateReply((current) => current ?? draft.reply);
     showError(outcome.refused, 'notice');
   };
 

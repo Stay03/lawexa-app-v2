@@ -308,7 +308,7 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
     controller,
     /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*seenStatusRef\.current = null;\s*setRefusedTurn\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
   );
-  assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{ refused: sendRefusal\(refusal, serverUserId\) \};/);
+  assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{\s*refused: sendRefusal\(refusal, serverUserId\),\s*\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),\s*\};/);
   assert.match(controller, /\} else \{\s*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
   assert.match(controller, /const heldBy = turn\.kind === 'colleague' \? turn\.name : null;/);
 });
@@ -319,7 +319,7 @@ test('the composer gives a refused message back, with its pasted cards and files
   assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot, draft\.reply\);/);
   assert.match(
     composer,
-    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)?if \(draft\.reply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*showError\(outcome\.refused, 'notice'\);/,
+    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)*if \(draft\.reply && !outcome\.dropReply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*showError\(outcome\.refused, 'notice'\);/,
   );
   // A held send is a wait, not a fault: a muted status with a clock, never the red
   // alert (Stay, 13 October 2026). File errors keep the red box.

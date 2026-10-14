@@ -1003,7 +1003,10 @@ export function useConversationController(
       });
       if (refusal === null) return undefined;
       takeRefusal(refusal);
-      return { refused: sendRefusal(refusal, serverUserId) };
+      return {
+        refused: sendRefusal(refusal, serverUserId),
+        ...(refusal.kind === 'reply-gone' && { dropReply: true as const }),
+      };
     },
     [send, conversationId, jurisdiction, queryClient, statusKey, takeRefusal, serverUserId],
   );

@@ -157,7 +157,12 @@ export function stopsPolling(error: unknown): boolean {
  *  in its banner, with the message given back to the pill. */
 export interface SendRefused {
   refused: string;
+  /** The reply's original is gone: give the words back, not the quote. */
+  dropReply?: true;
 }
+
+/** The composer's line when a reply's original is no longer there. */
+export const REPLY_GONE_COPY = 'The message you replied to is no longer available. Your message is kept.';
 
 /**
  * The composer's sentence for a refused send. Another member's turn: their
@@ -167,6 +172,7 @@ export interface SendRefused {
  */
 export function sendRefusal(refusal: SendRefusal, viewerId: number | null): string {
   if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
+  if (refusal.kind === 'reply-gone') return REPLY_GONE_COPY;
   if (refusal.by === null) return 'Someone is asking right now. Your message is kept.';
   if (refusal.by.id === viewerId) {
     return 'Your last question is still being answered. Your message is kept.';
@@ -181,6 +187,8 @@ export function sendRefusal(refusal: SendRefusal, viewerId: number | null): stri
  */
 export function askAgainRefusal(refusal: SendRefusal, viewerId: number | null): string {
   if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
+  // "Ask again" never replies to anything; said plainly should it ever happen.
+  if (refusal.kind === 'reply-gone') return 'That message is no longer available.';
   if (refusal.by === null) return 'Someone is asking right now. Ask again once the answer is in.';
   if (refusal.by.id === viewerId) return 'Your last question is still being answered.';
   return `${refusal.by.name} is asking right now. Ask again once their answer is in.`;
