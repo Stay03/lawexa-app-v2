@@ -25,9 +25,14 @@ import {
 /** How many people the picker lists at once. */
 export const MAX_MENTION_SUGGESTIONS = 6;
 
-/** Who the `@` picker offers in a space chat, and who it explains instead. */
-export function spaceMentionOptions(members: readonly Member[]): MentionOptions {
-  const options = buildMentionOptions(members);
+/**
+ * Who the `@` picker offers in a space chat, and who it explains instead. The
+ * reader is left out of both: tagging yourself tells nobody anything
+ * (techlead, 15 October 2026).
+ */
+export function spaceMentionOptions(members: readonly Member[], viewerUuid: string | null = null): MentionOptions {
+  const others = viewerUuid ? members.filter((member) => member.user.uuid !== viewerUuid) : members;
+  const options = buildMentionOptions(others);
   return { candidates: options.candidates.filter((candidate) => candidate.user !== null), untaggable: options.untaggable };
 }
 

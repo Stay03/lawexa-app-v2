@@ -1,4 +1,4 @@
-import type { MessageReplyTo } from '@/types/chat';
+import type { MessageMention, MessageReplyTo } from '@/types/chat';
 import type { DraftCodec } from './draft-store';
 import { savedMessageId } from './markdown/export-target';
 import { UNNAMED_ASKER } from './space-turn';
@@ -29,6 +29,23 @@ export interface ReplyableRow {
   /** Set on handover, narration and error rows; a plain answer has none. */
   messageType?: string;
   author?: MessageReplyTo['author'];
+  /** The people the row tags (space chats): their handles read as names in the quote. */
+  mentions?: MessageMention[];
+}
+
+/**
+ * The text with each `@handle` the server resolved written as `@Name`, as the
+ * bubble shows it (techlead, 15 October 2026: the quote bar showed
+ * "@usertester"). Only resolved handles change; any other `@` stays as typed.
+ */
+export function withMentionNames(text: string, mentions: readonly MessageMention[] | undefined): string {
+  let named = text;
+  for (const mention of mentions ?? []) {
+    if (!mention.username) continue;
+    const handle = mention.username.replace(/[.]/g, '\\.');
+    named = named.replace(new RegExp(`(^|\\s)@${handle}(?![a-z0-9._])`, 'gi'), (_match, lead: string) => `${lead}@${mention.name}`);
+  }
+  return named;
 }
 
 /** A row's saved id: `msg_{id}` from history, or the id stamped on a streamed answer. */
@@ -47,7 +64,7 @@ export function replyTargetOf(row: ReplyableRow): MessageReplyTo | null {
   if (row.isStreaming) return null;
   const id = savedIdOf(row);
   if (id === null) return null;
-  const text = row.content.trim();
+  const text = withMentionNames(row.content, row.mentions).trim();
   if (text === '') return null;
   return {
     id,

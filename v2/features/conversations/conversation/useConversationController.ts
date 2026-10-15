@@ -28,6 +28,7 @@ import { ConfidentialConversationError, conversationsQueries } from '../queries'
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import type { RosterEntry } from './member-colour';
 import { spaceMentionOptions } from './mention-options';
+import { useAuthStore } from '@/lib/stores/authStore';
 import type { MentionOptions } from '@/v2/features/channels/model';
 import {
   askAgainRefusal,
@@ -823,10 +824,12 @@ export function useConversationController(
         : null,
     [showAuthors, rosterRows],
   );
-  // The same roster, for tagging people (Viewers included; mention-options.ts).
+  // The same roster, for tagging people (Viewers included, the reader left out;
+  // mention-options.ts).
+  const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
   const mentionOptions = useMemo(
-    () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows) : null),
-    [showAuthors, rosterRows],
+    () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows, viewerUuid) : null),
+    [showAuthors, rosterRows, viewerUuid],
   );
 
   const references = detailData?.references ?? NO_REFERENCES;

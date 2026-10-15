@@ -131,7 +131,7 @@ test('the wiring: the picker in a space chat, chips in the bubble, the writer’
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /const unmatched = response\.data\.unmatched_handles;\s*if \(unmatched && unmatched\.length > 0\) \{\s*setMessages\(\(msgs\) =>\s*msgs\.map\(\(m\) => \(m\.id === optimisticMsg\.id \? \{ \.\.\.m, unmatchedHandles: unmatched \} : m\)\),/);
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows\) : null\),/);
+  assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid\) : null\),/);
   assert.match(readHere('ConversationScreen.tsx'), /mentionOptions=\{controller\.mentionOptions\}/);
   const composer = readHere('ConversationComposer.tsx');
   assert.match(composer, /if \(mentionOptions\) \{\s*detectMention\(next, textarea\(\)\?\.selectionStart \?\? next\.length\);/);
@@ -225,4 +225,34 @@ test('the review of ecaf2d5 and the rendered check: what each finding changed', 
   // that grows meanwhile cannot snap the view back down (?m= in Chromium).
   const list = readHere('MessageList.tsx');
   assert.match(list, /if \(!root \|\| !row\) return false;[\s\S]{0,400}?atBottomRef\.current = false;\s*if \(followRafRef\.current != null\) \{\s*cancelAnimationFrame\(followRafRef\.current\);\s*followRafRef\.current = null;\s*\}/);
+});
+
+test('the picker leaves the reader out (techlead, 15 October 2026)', () => {
+  const options = spaceMentionOptions(ROSTER, 'o');
+  assert.deepEqual(options.candidates.map((c) => c.handle), ['chidi', 'bolaade']);
+  // Nor is a reader without a handle named in the can't-be-tagged line.
+  assert.deepEqual(spaceMentionOptions(ROSTER, 'n').untaggable, []);
+  // Without a known reader, everyone is offered.
+  assert.equal(spaceMentionOptions(ROSTER).candidates.length, 3);
+});
+
+test('a quote of a question that tags someone reads their name, as the bubble does', async () => {
+  const { replyTargetOf, withMentionNames } = await import('./reply-target');
+  const mentions = [
+    { uuid: 'o', name: 'User Tester', username: 'usertester' },
+    { uuid: 'c', name: 'Chi.di O', username: 'chi.di' },
+  ];
+  assert.equal(
+    withMentionNames('@usertester can you confirm, and @chi.di too? cc @nobody, mail a@usertester.com', mentions),
+    '@User Tester can you confirm, and @Chi.di O too? cc @nobody, mail a@usertester.com',
+  );
+  // A handle that only starts the same is not that person.
+  assert.equal(withMentionNames('@usertesterx hi', mentions), '@usertesterx hi');
+  assert.equal(withMentionNames('@chixdi hi', mentions), '@chixdi hi', 'the dot is a dot');
+  // A name with $ in it is written as it is.
+  assert.equal(withMentionNames('@usertester', [{ uuid: 'o', name: 'A $1 B', username: 'usertester' }]), '@A $1 B');
+  const target = replyTargetOf({ id: 'msg_54', role: 'user', content: '@usertester can you confirm the notice dates?', mentions });
+  assert.equal(target?.preview, '@User Tester can you confirm the notice dates?');
+  const controller = readHere('useConversationController.ts');
+  assert.match(controller, /const viewerUuid = useAuthStore\(\(state\) => state\.user\?\.uuid \?\? null\);/);
 });
