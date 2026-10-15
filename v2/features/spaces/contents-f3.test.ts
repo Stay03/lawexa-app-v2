@@ -130,10 +130,11 @@ test('the tabs: a Viewer sees no add control, only the space Owner sees Remove f
   assert.match(panel, /\{canAdd \? picker : null\}/);
   assert.doesNotMatch(panel, /uploads\.picker/);
   assert.match(panel, /return canAdd \? \(\s*<FileDropZone/);
-  // Remove from space on each tab's rows, for the space's Owner only.
-  assert.equal(panel.match(/onRemoveFromSpace=\{\s*canRemove \?/g)?.length, 3);
-  // Move on each tab's rows, for the item's owner only.
-  assert.match(panel, /ownsItem\(conversation\.user_id, viewerId\)/);
+  // Remove from space on the folder and file rows, for the space's Owner
+  // only; a chat's row follows its `can` (the shared conversation menu).
+  assert.equal(panel.match(/onRemoveFromSpace=\{\s*canRemove \?/g)?.length, 2);
+  assert.match(panel, /actions=\{menu\.actionsFor\(conversation\)\}/);
+  // Move on the folder and file rows, for the item's owner only.
   assert.match(panel, /ownsItem\(recordByUuid\.get\(row\.uuid\)\?\.user\?\.id, viewerId\) \? moveRow : undefined/);
   assert.match(panel, /ownsItem\(file\.uploader\.id, viewerId\) \? moveFile : undefined/);
   // The empty state hands its action on only to someone who may add.
@@ -154,10 +155,11 @@ test('the folder and file menus carry the space rows only when the host passes t
   assert.equal((panel.match(/onDelete=/g) ?? []).length, 1);
   assert.match(panel, /onCopyToMine=\{copyFile\}\s*onDelete=\{/);
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
-  // A confidential chat never gets a space row.
-  assert.match(row, /\{!hasMenu \? null : is_confidential \? \(\s*<span aria-hidden className="size-9 shrink-0" \/>/);
+  // A confidential chat never gets a menu; it keeps a spacer in the column.
+  assert.match(row, /const hasMenu = actions\.length > 0 && !is_confidential;/);
+  assert.match(row, /\) : menuColumn \? \(\s*<span aria-hidden className="size-9 shrink-0" \/>/);
   const list = read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx');
-  assert.match(list, /conversation\.is_confidential \|\| conversation\.is_redacted\s*\?\s*undefined\s*:\s*\(\) => openMove\(conversation\)/);
+  assert.match(list, /actions=\{menu\.actionsFor\(conversation\)\}/);
 });
 
 /* ── Refusals, in plain words ────────────────────────────────────────────── */
@@ -384,15 +386,13 @@ test('the remove confirm says it takes the item out and does not delete it', () 
 
 test('a chat in a space names it under its title, and its owner can move it', () => {
   const screen = read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
-  assert.match(
-    screen,
-    /canMove=\{\s*controller\.isOwnerResolved &&\s*controller\.isOwner &&\s*!controller\.isConfidential &&\s*!controller\.isRedacted\s*\}/,
-  );
+  // Who may move it is the chat's `can` now (conversation-menu.test.ts).
+  assert.doesNotMatch(screen, /canMove=/);
   assert.match(screen, /canShowPlace=\{controller\.isOwnerResolved && !controller\.isConfidential\}/);
   const actions = read('v2', 'features', 'conversations', 'conversation', 'ConversationActions.tsx');
   assert.match(actions, /setHeaderPlace\(\{ label: placeName, href: `\/spaces\/\$\{placeUuid\}` \}, conversationId\);/);
   assert.match(actions, /useEffect\(\(\) => \(\) => clearHeaderPlace\(conversationId\), \[conversationId\]\);/);
-  assert.match(actions, /id: 'move-chat',\s*label: 'Move to space',/);
+  assert.match(actions, /case 'move_to_space':\s*case 'move':\s*return \{\s*id: 'move-chat',\s*label,/);
   const header = read('v2', 'shell', 'V2Header.tsx');
   assert.match(header, /<HeaderPlaceLine place=\{showTitle \? place : null\} \/>/);
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');

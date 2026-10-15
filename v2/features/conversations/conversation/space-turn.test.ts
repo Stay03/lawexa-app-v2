@@ -131,8 +131,10 @@ test('the composer follows canSend, and the owner verbs stay with ownership', ()
   const pill = readHere('ViewOnlyPill.tsx');
   assert.match(pill, /export function ViewOnlyPill\(\{ reason \}: \{ reason: ViewOnlyReason \}\)/);
   assert.doesNotMatch(pill, /View only —/);
-  // Share, move, rename, delete and export are still the owner's.
-  assert.match(screen, /canDelete=\{\s*controller\.isOwnerResolved &&\s*controller\.isOwner &&/);
+  // Share, move, rename and delete follow the chat's `can` (the server's
+  // rules, 15 October 2026); export is still the owner's.
+  assert.match(screen, /canShowPlace=\{controller\.isOwnerResolved && !controller\.isConfidential\}/);
+  assert.match(screen, /enabled=\{controller\.isOwnerResolved && controller\.isOwner && !controller\.isConfidential\}/);
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /const canSend = detailData \? canSendIn\(detailData, isOwner\) : isOwner;/);
 });

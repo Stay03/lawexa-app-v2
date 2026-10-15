@@ -6,13 +6,14 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { ChevronLeft, FolderOpen, Plus, Upload, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { cn, stripPastedTags } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Space, SpaceConversation, SpaceFile, SpaceFolder } from '@/types/collab';
 import { UploadTray } from '@/v2/features/channels/files/UploadTray';
 import type { HomeComposerHandle } from '@/v2/shell/designs/HomeComposer';
+import { useConversationMenu } from '@/v2/features/conversations/list/use-conversation-menu';
 import {
   useUploadQueueFor,
   type UploadFailureNote,
@@ -71,8 +72,9 @@ import {
  * ── WHAT EACH TAB OFFERS (F3) ──────────────────────────────────────────────
  *  - Every tab: a search the endpoint runs (title, folder name, file name),
  *    and an empty state that teaches (`spaceEmptyCopy`).
- *  - Conversations: each row names who started it; its owner may move it to
- *    another space or back out, the space's Owner may remove it. The Owner
+ *  - Conversations: each row names who started it, and its "…" menu is the
+ *    one the conversations list uses (`useConversationMenu`, Arthur, 15
+ *    October 2026): the items the row's `can` allows. The Owner
  *    and Contributors start one from the box docked under the list. With none
  *    yet, the tab reads Arthur's "Start working with Lawexa" (15 October
  *    2026) over Upload files (into the space, in place) and, for whoever may
@@ -239,7 +241,7 @@ function useItemDialogs(access: ContentAccess) {
 /* ── Conversations ────────────────────────────────────────────────────────── */
 
 function SpaceChatsList({ access }: { access: ContentAccess }) {
-  const { spaceUuid, spaceName, canAdd, canRemove } = access;
+  const { spaceUuid, spaceName, canAdd } = access;
   const { viewerId, enabled } = useContentReadGate();
   // "You:" on the last-message line when the reader sent it (`lastMessageLine`).
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
@@ -261,18 +263,17 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
   // Rows fade in only on a first load; a list that mounts from cache shows
   // them in place (the conversations list's rule, 8 October 2026).
   const [reveal] = useState(() => query.isPending);
-  const { openMove, openRemove, dialogs } = useItemDialogs(access);
   // Upload files opens the docked box's own picker: the file is a chip in the
   // box until the first message goes, and is the space's from the moment it
   // uploads (Arthur, 15 October 2026: "no indication where it went").
   const dock = useRef<HomeComposerHandle>(null);
-
-  const targetOf = (conversation: SpaceConversation): SpaceItemTarget => ({
-    type: 'conversation',
-    id: conversation.id,
-    name: stripPastedTags(conversation.title),
-    space: { uuid: spaceUuid, name: spaceName },
+  // The "…" menu of each row: the items its `can` allows (rename, move, remove,
+  // share, delete), with the same dialogs as the conversations list.
+  const menu = useConversationMenu({
+    viewerId,
+    place: { uuid: spaceUuid, name: spaceName },
   });
+  const menuColumn = rows.some((conversation) => menu.actionsFor(conversation).length > 0);
 
   // A new conversation starts from the box docked at the bottom (Stay and
   // Arthur, 15 October 2026), so the toolbar and the empty state offer no
@@ -334,19 +335,13 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
               // A chat with no message to preview says so; it never falls back
               // to whose chat it is, which read as a message ("You").
               byline={lastMessageLine(conversation.last_message, viewerUuid) ?? 'No messages yet'}
-              onMove={
-                ownsItem(conversation.user_id, viewerId)
-                  ? () => openMove(targetOf(conversation))
-                  : undefined
-              }
-              onRemoveFromSpace={
-                canRemove ? () => openRemove(targetOf(conversation)) : undefined
-              }
+              actions={menu.actionsFor(conversation)}
+              menuColumn={menuColumn}
             />
           ))}
         </ul>
       </PagedContent>
-      {dialogs}
+      {menu.dialogs}
       {canAdd ? <SpaceChatDock space={{ uuid: spaceUuid, name: spaceName }} handle={dock} /> : null}
     </div>
   );

@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Boxes, Pencil, Share2, Trash2 } from 'lucide-react';
+import { Boxes, FolderOutput, Pencil, Share2, Trash2 } from 'lucide-react';
 
 import { stripPastedTags } from '@/lib/utils';
+import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { clearHeaderContext } from '@/v2/shell/header-context';
 import { clearHeaderPlace, setHeaderPlace } from '@/v2/shell/header-place';
@@ -16,15 +17,23 @@ import {
 } from '@/v2/shell/screen-context';
 import { DeleteConversationDialog } from '../DeleteConversationDialog';
 import { RenameConversationDialog } from '../RenameConversationDialog';
+import {
+  CONVERSATION_MENU_LABELS,
+  conversationMenuItems,
+  conversationRemoveRoute,
+  type ConversationMenuItem,
+} from '../list/conversation-menu';
 import { conversationsQueries } from '../queries';
 import { ConversationShare } from './ConversationShare';
 
 const NO_ACTIONS: readonly ScreenAction[] = [];
 
 /**
- * The open chat's own rows in the header menu ("Share chat", "Rename chat",
- * "Delete chat")
- * and the dialogs behind them. One publisher, because the screen context holds
+ * The open chat's own rows in the header menu and the dialogs behind them.
+ * Since Arthur's menu (15 October 2026) they are the rows' own: the items the
+ * chat's `can` allows, in his order and words (`conversation-menu.ts`), so the
+ * header, the conversations list and a space's tab offer the same things.
+ * Remove joins them inside a space, by the route ownership picks. One publisher, because the screen context holds
  * ONE action list per screen: two components each publishing would overwrite
  * each other.
  *
@@ -46,27 +55,15 @@ const NO_ACTIONS: readonly ScreenAction[] = [];
 export function ConversationActions({
   conversationId,
   viewerId,
-  canShare,
-  canMove,
   canShowPlace,
-  canDelete,
-  canRename,
   currentTitle,
   onRenamed,
 }: {
   conversationId: string;
   viewerId: number | null;
-  /** The owner, on a chat that is neither confidential nor redacted. */
-  canShare: boolean;
-  /** The owner, on a chat that may go into a space (the same rule as Share). */
-  canMove: boolean;
   /** A chat the server holds (never a confidential one), whoever reads it:
-   *  its record says which space it is in. */
+   *  its record says which space it is in, and what this reader may do. */
   canShowPlace: boolean;
-  /** The owner, on a chat the server holds (never a confidential one). */
-  canDelete: boolean;
-  /** The owner, on a chat the server holds, once its title is known. */
-  canRename: boolean;
   /** The chat's title as it shows now, which the rename field opens on. */
   currentTitle: string | null;
   /** The server stored a new title: re-read it so the header shows it. */
@@ -80,14 +77,12 @@ export function ConversationActions({
   // Held after closing so the dialog's exit plays; each open bumps the key,
   // so it starts clean.
   const [move, setMove] = useState({ open: false, key: 0 });
-  const renameReady = canRename && currentTitle !== null;
-  // The same entry the controller seeded the transcript from. Only the
-  // owner's rows switch it on (as Share always did); for anyone else it stays
-  // off and still reads that seeded record, so the place line costs no
-  // request of its own.
+  const [remove, setRemove] = useState({ open: false, key: 0 });
+  // The same entry the controller seeded the transcript from: its `can` is
+  // what this reader may do, and it names the space the chat is in.
   const { data: detail } = useQuery({
     ...conversationsQueries.detail({ conversationId, viewerId }),
-    enabled: canShare || canMove,
+    enabled: canShowPlace,
   });
 
   // The place line: the space's name under the title, linking to it. Read as
@@ -103,46 +98,52 @@ export function ConversationActions({
   }, [placeUuid, placeName, conversationId]);
   useEffect(() => () => clearHeaderPlace(conversationId), [conversationId]);
 
-  const shareReady = canShare && detail !== undefined;
-  const moveReady = canMove && detail !== undefined;
+  // What this reader may do, in Arthur's order. Rename also waits for the
+  // title, which its field opens on.
+  const items = useMemo<readonly ConversationMenuItem[]>(
+    () =>
+      canShowPlace && detail
+        ? conversationMenuItems(detail.can, detail.space != null).filter(
+            (item) => item !== 'rename' || currentTitle !== null,
+          )
+        : [],
+    [canShowPlace, detail, currentTitle],
+  );
   const actions = useMemo<readonly ScreenAction[]>(() => {
-    if (!shareReady && !moveReady && !renameReady && !canDelete) return NO_ACTIONS;
-    const rows: ScreenAction[] = [];
-    if (shareReady) {
-      rows.push({
-        id: 'share-chat',
-        label: 'Share chat',
-        icon: Share2,
-        onSelect: () => setShareOpen(true),
-      });
-    }
-    if (moveReady) {
-      rows.push({
-        id: 'move-chat',
-        label: 'Move to space',
-        icon: Boxes,
-        onSelect: () => setMove((previous) => ({ open: true, key: previous.key + 1 })),
-      });
-    }
-    if (renameReady) {
-      rows.push({
-        id: 'rename-chat',
-        label: 'Rename chat',
-        icon: Pencil,
-        onSelect: () => setRenameOpen(true),
-      });
-    }
-    if (canDelete) {
-      rows.push({
-        id: 'delete-chat',
-        label: 'Delete chat',
-        icon: Trash2,
-        destructive: true,
-        onSelect: () => setDeleteOpen(true),
-      });
-    }
-    return rows;
-  }, [shareReady, moveReady, renameReady, canDelete]);
+    if (items.length === 0) return NO_ACTIONS;
+    return items.map((item): ScreenAction => {
+      const label = CONVERSATION_MENU_LABELS[item];
+      switch (item) {
+        case 'rename':
+          return { id: 'rename-chat', label, icon: Pencil, onSelect: () => setRenameOpen(true) };
+        case 'move_to_space':
+        case 'move':
+          return {
+            id: 'move-chat',
+            label,
+            icon: Boxes,
+            onSelect: () => setMove((previous) => ({ open: true, key: previous.key + 1 })),
+          };
+        case 'remove':
+          return {
+            id: 'remove-chat',
+            label,
+            icon: FolderOutput,
+            onSelect: () => setRemove((previous) => ({ open: true, key: previous.key + 1 })),
+          };
+        case 'share':
+          return { id: 'share-chat', label, icon: Share2, onSelect: () => setShareOpen(true) };
+        case 'delete':
+          return {
+            id: 'delete-chat',
+            label,
+            icon: Trash2,
+            destructive: true,
+            onSelect: () => setDeleteOpen(true),
+          };
+      }
+    });
+  }, [items]);
 
   useEffect(() => {
     if (actions.length === 0) {
@@ -153,9 +154,12 @@ export function ConversationActions({
   }, [pathname, actions]);
   useEffect(() => () => clearScreenContext(), []);
 
+  const name = stripPastedTags(currentTitle ?? detail?.title ?? '');
+  const space = detail?.space ?? null;
+
   return (
     <>
-      {shareReady ? (
+      {detail && items.includes('share') ? (
         <ConversationShare
           conversationId={conversationId}
           viewerId={viewerId}
@@ -164,30 +168,36 @@ export function ConversationActions({
           onOpenChange={setShareOpen}
         />
       ) : null}
-      {moveReady && detail && move.key > 0 ? (
+      {detail && move.key > 0 ? (
         <MoveToSpaceDialog
           key={move.key}
-          item={{
-            type: 'conversation',
-            id: conversationId,
-            name: stripPastedTags(currentTitle ?? detail.title),
-            space: detail.space,
-          }}
+          item={{ type: 'conversation', id: conversationId, name, space }}
           open={move.open}
           onOpenChange={(open) => setMove((previous) => ({ ...previous, open }))}
         />
       ) : null}
+      {detail && space && remove.key > 0 ? (
+        <RemoveFromSpaceDialog
+          key={remove.key}
+          spaceUuid={space.uuid}
+          spaceName={space.name}
+          item={{ type: 'conversation', id: conversationId, name, space }}
+          route={conversationRemoveRoute(detail.user_id, viewerId)}
+          open={remove.open}
+          onOpenChange={(open) => setRemove((previous) => ({ ...previous, open }))}
+        />
+      ) : null}
       {/* Mounted only while open, so each open starts from the current title. */}
-      {renameReady && renameOpen ? (
+      {renameOpen && currentTitle !== null ? (
         <RenameConversationDialog
           conversationId={conversationId}
-          currentTitle={currentTitle ?? ''}
+          currentTitle={currentTitle}
           open={renameOpen}
           onOpenChange={setRenameOpen}
           onRenamed={onRenamed}
         />
       ) : null}
-      {canDelete ? (
+      {items.includes('delete') ? (
         <DeleteConversationDialog
           conversationId={conversationId}
           open={deleteOpen}

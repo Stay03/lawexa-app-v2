@@ -756,6 +756,8 @@ export type ConversationReference =
 export interface ConversationData {
   id: string;
   user_id: number;
+  /** What the reader may do with this chat; see {@link ConversationCan}. */
+  can?: ConversationCan;
   agent_id: number;
   title: string;
   status: 'active' | 'archived';
@@ -806,6 +808,21 @@ export interface ConversationMessagePreview {
   author?: { uuid?: string; name: string } | null;
 }
 
+/**
+ * What the READER may do with a chat (backend, 15 October 2026), worked out by
+ * the server's own rules: the owner, a space's Contributor or Viewer, or the
+ * space's Owner on a member's chat. The "…" menu shows an item only when its
+ * flag is true (`conversation-menu.ts`). Absent on an older server.
+ */
+export interface ConversationCan {
+  rename: boolean;
+  move_to_space: boolean;
+  move: boolean;
+  remove: boolean;
+  share: boolean;
+  delete: boolean;
+}
+
 // Conversation list item (without full messages)
 export interface ConversationListItem {
   id: string;
@@ -837,6 +854,8 @@ export interface ConversationListItem {
   /** Whether the reader may send in this chat (backend B4). It already counts
    *  ownership, so it is the one answer the composer follows. Absent before B4. */
   can_send?: boolean;
+  /** What the reader may do with this chat; see {@link ConversationCan}. */
+  can?: ConversationCan;
   created_at: string;
   updated_at: string;
   /** When its newest message was written (yours, a colleague's or Lawexa's); every

@@ -316,38 +316,16 @@ export function ConversationScreen({
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />
         )}
-        {/* The owner's "Share chat", "Move to space" and "Delete chat" rows in
-            the header menu, and the space line under the title. Not inside
-            another route (the case side chat has its own header). Share and
-            Move are never on a confidential or redacted chat; delete is never
-            on a confidential one, whose banner owns the device-only delete. */}
+        {/* The header menu's rows (the chat's `can`: Rename, Move to Space or
+            Move, Remove, Share, Delete) and the space line under the title.
+            Not inside another route (the case side chat has its own header),
+            and never on a confidential chat, which the server does not hold
+            and whose banner owns the device-only delete. */}
         {!embed ? (
           <ConversationActions
             conversationId={conversationId}
             viewerId={serverUserId}
-            canShare={
-              controller.isOwnerResolved &&
-              controller.isOwner &&
-              !controller.isConfidential &&
-              !controller.isRedacted
-            }
-            canMove={
-              controller.isOwnerResolved &&
-              controller.isOwner &&
-              !controller.isConfidential &&
-              !controller.isRedacted
-            }
             canShowPlace={controller.isOwnerResolved && !controller.isConfidential}
-            canDelete={
-              controller.isOwnerResolved &&
-              controller.isOwner &&
-              !controller.isConfidential
-            }
-            canRename={
-              controller.isOwnerResolved &&
-              controller.isOwner &&
-              !controller.isConfidential
-            }
             currentTitle={controller.stream.conversationTitle}
             onRenamed={() => void controller.stream.fetchConversationTitle(conversationId)}
           />

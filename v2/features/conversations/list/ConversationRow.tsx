@@ -1,5 +1,7 @@
 'use client';
 
+import { Fragment } from 'react';
+
 import { MoveFirstLink } from '@/v2/shell/move-first';
 import {
   Boxes,
@@ -7,6 +9,8 @@ import {
   FolderOutput,
   MessageSquare,
   MoreHorizontal,
+  Pencil,
+  Share2,
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
@@ -22,6 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { ConversationListItem } from '@/types/chat';
 import { lastActivityAt } from '../activity';
+import { CONVERSATION_MENU_LABELS, type ConversationMenuItem } from './conversation-menu';
 import {
   FOCUS_RING,
   REVEAL,
@@ -78,6 +83,14 @@ import {
  * Owner, in its tab). A confidential chat never gets either: it cannot go
  * into a space (the server answers 422), so its row keeps the spacer.
  *
+ * ── THE MENU IS THE SERVER'S ANSWER (Arthur, 15 October 2026) ──────────────
+ * The host hands over `actions`, already the items this reader may use, in
+ * Arthur's order (`conversation-menu.ts`, from the row's `can`), each with its
+ * handler. The row only draws them: Rename, Move to Space or Move, Remove,
+ * Share, and Delete under a rule. `menuColumn` says whether any row in the
+ * list has a menu, so a row with none keeps a same-size spacer and its time
+ * stays in the column.
+ *
  * `showSpace` puts the space the chat is in under its title, in the reader's
  * own list. It is text inside the row's link, not a second link: a link
  * inside a link is invalid and would split the row's one target in two. The
@@ -91,9 +104,8 @@ export function ConversationRow({
   reveal = true,
   byline = null,
   showSpace = false,
-  onDelete,
-  onMove,
-  onRemoveFromSpace,
+  actions = NO_ACTIONS,
+  menuColumn = false,
 }: {
   conversation: ConversationListItem;
   now: number;
@@ -111,19 +123,16 @@ export function ConversationRow({
   byline?: string | null;
   /** Name the space the chat is in under its title (the reader's own list). */
   showSpace?: boolean;
-  /** Opens the list's delete confirm for this row. */
-  onDelete?: () => void;
-  /** Opens the move-to-space dialog for this row (the chat's owner). */
-  onMove?: () => void;
-  /** Opens the Remove from Space confirm (the space's Owner, in its tab). */
-  onRemoveFromSpace?: () => void;
+  /** The menu's items for this reader, in order, each with its handler. */
+  actions?: readonly ConversationMenuAction[];
+  /** Whether the list draws a menu column at all (see the docblock). */
+  menuColumn?: boolean;
 }) {
   const { id, title, status, is_confidential } = conversation;
   const cleanTitle = stripPastedTags(title);
   const isArchived = status === 'archived';
   const spaceName = showSpace && !is_confidential ? (conversation.space?.name ?? null) : null;
-  const hasMenu =
-    onDelete !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
+  const hasMenu = actions.length > 0 && !is_confidential;
 
   return (
     <li
@@ -208,36 +217,43 @@ export function ConversationRow({
           </span>
         </MoveFirstLink>
 
-        {!hasMenu ? null : is_confidential ? (
+        {hasMenu ? (
+          <ConversationRowMenu title={cleanTitle} actions={actions} />
+        ) : menuColumn ? (
           <span aria-hidden className="size-9 shrink-0" />
-        ) : (
-          <ConversationRowMenu
-            title={cleanTitle}
-            onDelete={onDelete}
-            onMove={onMove}
-            onRemoveFromSpace={onRemoveFromSpace}
-          />
-        )}
+        ) : null}
       </div>
     </li>
   );
 }
 
+/** One item of the row's menu: which, and what it opens. */
+export interface ConversationMenuAction {
+  id: ConversationMenuItem;
+  onSelect: () => void;
+}
+
+/** Stable empty menu, so a row without one never mints a new array. */
+const NO_ACTIONS: readonly ConversationMenuAction[] = [];
+
+const MENU_ICONS: Readonly<Record<ConversationMenuItem, typeof Trash2>> = {
+  rename: Pencil,
+  move_to_space: Boxes,
+  move: Boxes,
+  remove: FolderOutput,
+  share: Share2,
+  delete: Trash2,
+};
+
 /** The row's actions menu. The trigger is `FolderActionsMenu`'s, so every v2
- *  list row's menu looks and behaves the same. The space rows come first and
- *  the destructive one last, below a separator. */
+ *  list row's menu looks and behaves the same. Delete is last, below a rule. */
 function ConversationRowMenu({
   title,
-  onDelete,
-  onMove,
-  onRemoveFromSpace,
+  actions,
 }: {
   title: string;
-  onDelete?: () => void;
-  onMove?: () => void;
-  onRemoveFromSpace?: () => void;
+  actions: readonly ConversationMenuAction[];
 }) {
-  const hasSpaceRows = onMove !== undefined || onRemoveFromSpace !== undefined;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -253,27 +269,22 @@ function ConversationRowMenu({
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end">
-        {onMove ? (
-          <DropdownMenuItem onSelect={onMove}>
-            <Boxes />
-            Move to space
-          </DropdownMenuItem>
-        ) : null}
-        {onRemoveFromSpace ? (
-          <DropdownMenuItem onSelect={onRemoveFromSpace}>
-            <FolderOutput />
-            Remove from space
-          </DropdownMenuItem>
-        ) : null}
-        {onDelete ? (
-          <>
-            {hasSpaceRows ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuItem variant="destructive" onSelect={onDelete}>
-              <Trash2 />
-              Delete chat
-            </DropdownMenuItem>
-          </>
-        ) : null}
+        {actions.map((action, index) => {
+          const Icon = MENU_ICONS[action.id];
+          const destructive = action.id === 'delete';
+          return (
+            <Fragment key={action.id}>
+              {destructive && index > 0 ? <DropdownMenuSeparator /> : null}
+              <DropdownMenuItem
+                variant={destructive ? 'destructive' : 'default'}
+                onSelect={action.onSelect}
+              >
+                <Icon />
+                {CONVERSATION_MENU_LABELS[action.id]}
+              </DropdownMenuItem>
+            </Fragment>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

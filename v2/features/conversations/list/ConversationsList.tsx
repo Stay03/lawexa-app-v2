@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 
-import { cn, stripPastedTags } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { ConversationListItem } from '@/types/chat';
 import { useNewRows } from '@/v2/runtime/use-new-rows';
@@ -18,14 +18,12 @@ import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { lastActivityRank, uniqueRowsById } from '@/v2/features/conversations/activity';
 import { useFreshIds } from '@/v2/runtime/use-fresh-ids';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
-import { DeleteConversationDialog } from '@/v2/features/conversations/DeleteConversationDialog';
 import { useExitingRows } from '@/v2/features/bookmarks/list/use-exiting-rows';
 import { usePreloadConversationScreen } from '@/v2/features/conversations/preload-conversation-screen';
-import type { SpaceItemTarget } from '@/v2/features/spaces/content-model';
-import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { useConversationsSearch } from './useConversationsSearch';
 import { ConversationsSearchBar } from './ConversationsSearchBar';
 import { ConversationRow } from './ConversationRow';
+import { useConversationMenu } from './use-conversation-menu';
 import {
   ConversationsEmptyState,
   ConversationsErrorState,
@@ -153,37 +151,19 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
     rowsArePlaceholder: query.isPlaceholderData,
   });
 
-  // DELETE. One confirm for the whole list, keyed by the targeted chat's id.
-  // On success the row is held for its exit collapse BEFORE the caches drop it
-  // (the mutation runs `onDeleted` first), so it folds out instead of vanishing.
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  // THE "…" MENU (Arthur, 15 October 2026): each row's items are the ones its
+  // `can` allows, and the dialogs behind them are the hook's
+  // (`use-conversation-menu.tsx`, shared with a space's Conversations tab). A
+  // deleted row is held for its exit collapse BEFORE the caches drop it (the
+  // mutation runs `onDeleted` first), so it folds out instead of vanishing.
   const { presented, beginExit } = useExitingRows(visibleRows, conversationId);
-  const onDeleted = (id: string) => {
-    const index = visibleRows.findIndex((row) => row.id === id);
-    if (index !== -1) beginExit(visibleRows[index], index);
-    setDeleteTarget(null);
-  };
-
-  // MOVE TO SPACE (Spaces F3). One dialog for the list, for the chat it was
-  // opened on. It stays mounted after closing so its exit plays; each open
-  // bumps the key, so it starts clean. Never on a confidential or redacted
-  // chat: the server refuses both a space (422), so the row offers nothing.
-  const [moveTarget, setMoveTarget] = useState<{
-    item: SpaceItemTarget;
-    open: boolean;
-    key: number;
-  } | null>(null);
-  const openMove = (conversation: ConversationListItem) =>
-    setMoveTarget((previous) => ({
-      item: {
-        type: 'conversation',
-        id: conversation.id,
-        name: stripPastedTags(conversation.title),
-        space: conversation.space,
-      },
-      open: true,
-      key: (previous?.key ?? 0) + 1,
-    }));
+  const menu = useConversationMenu({
+    viewerId,
+    onDeleted: (id) => {
+      const index = visibleRows.findIndex((row) => row.id === id);
+      if (index !== -1) beginExit(visibleRows[index], index);
+    },
+  });
 
   // Sentinel rooted against the shell's REAL scroll container (review finding:
   // with a viewport root, the nested `.v2-shell__content` overflow region clips
@@ -288,12 +268,10 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
                 exiting={exiting}
                 reveal={revealRows && freshIds.has(conversation.id)}
                 showSpace
-                onDelete={() => setDeleteTarget(conversation.id)}
-                onMove={
-                  conversation.is_confidential || conversation.is_redacted
-                    ? undefined
-                    : () => openMove(conversation)
-                }
+                actions={menu.actionsFor(conversation)}
+                // Every chat in the reader's own list is theirs, so the
+                // column is always there; a confidential row keeps a spacer.
+                menuColumn
               />
             ))}
           </ul>
@@ -314,25 +292,7 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
         </div>
       )}
 
-      <DeleteConversationDialog
-        conversationId={deleteTarget}
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-        onDeleted={onDeleted}
-      />
-
-      {moveTarget ? (
-        <MoveToSpaceDialog
-          key={moveTarget.key}
-          item={moveTarget.item}
-          open={moveTarget.open}
-          onOpenChange={(open) =>
-            setMoveTarget((previous) => (previous ? { ...previous, open } : previous))
-          }
-        />
-      ) : null}
+      {menu.dialogs}
 
       {/* The floating search pill, and nothing else: a conversation is started
           from the home composer, never from this list. */}
