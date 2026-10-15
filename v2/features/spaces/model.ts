@@ -381,6 +381,19 @@ export function showsPrivateMark(space: Pick<Space, 'kind' | 'is_private'>): boo
 }
 
 /**
+ * The line under the space's name in its header: the type, then whether it is
+ * private ("Study · Private"), the words the spaces list uses. Arthur, 15
+ * October 2026: the name leads, these two follow, and the viewer's role is the
+ * People tab's to show, not the header's. A shared space is always private.
+ */
+export function spaceHeaderFacts(
+  space: Pick<Space, 'type_label' | 'kind' | 'is_private'>,
+): [string, string] {
+  const isPrivate = isSharedSpace(space) || space.is_private;
+  return [space.type_label, isPrivate ? 'Private' : 'Public'];
+}
+
+/**
  * The viewer's content role in any kind of space, the one reading every role
  * word below comes from. A shared space states it (`my_content_role`) and is
  * never guessed: its Viewer has the old `my_role` "member", which would read as

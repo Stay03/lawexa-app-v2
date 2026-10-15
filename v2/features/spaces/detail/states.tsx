@@ -84,15 +84,9 @@ export interface SpaceFrameIdentity {
   uuid: string;
   name: string;
   type: SpaceType;
-  /** "Work" / "Study" — the kicker's first fact. */
-  typeLabel: string;
-  /** `spaceOwnerLabel` of the row: the organisation, or `null`. */
-  ownerLabel: string | null;
-  /** `spaceRoleLabel` of the row ("You're a viewer"), or `null`. A fact
-   *  about the viewer that the row states, not a permission. */
-  roleLabel: string | null;
-  /** `showsPrivateMark` of the row: a private TEAM space. */
-  isPrivate: boolean;
+  /** `spaceHeaderFacts` of the row: the line under the name ("Study ·
+   *  Private"). */
+  facts: [string, string];
   /** `spacePrincipleLine` of the row: Stay's lines on a shared space. */
   principle: string | null;
   /** The row's own description, or `null`. NOT "not yet loaded" — a space with
@@ -161,24 +155,21 @@ export function SpaceScreenFrame({
           )}
           {identity ? (
             <div className="min-w-0 flex-1">
-              <MetaLine
-                lead={[identity.typeLabel, identity.ownerLabel, identity.roleLabel]}
-              />
               {/* The live header's own heading, so the hand-off moves nothing
                   and the shell bar's title steps back from the first frame. */}
               <SpaceHeading
                 name={identity.name}
-                privateMark={identity.isPrivate}
                 // The same shape as the live name when it opens the details
                 // (the chevron), so the hand-off adds nothing; the sheet is the
                 // live screen's, so a tap here waits for it.
                 onOpenAbout={identity.description || identity.principle ? NOOP : undefined}
               />
+              <MetaLine className="mt-1 text-sm" lead={identity.facts} />
             </div>
           ) : (
-            <div className="min-w-0 flex-1 space-y-2.5">
-              <Skeleton className="h-3 w-40 rounded" />
+            <div className="min-w-0 flex-1 space-y-1.5">
               <Skeleton className="h-6 w-3/5 rounded md:h-7 md:w-2/5" />
+              <Skeleton className="h-4 w-28 rounded" />
             </div>
           )}
         </div>

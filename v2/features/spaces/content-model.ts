@@ -317,11 +317,13 @@ export function spaceEmptyCopy(
   }
   switch (tab) {
     case 'chats':
-      // The box is docked under this (`SpaceChatDock`): one short line
-      // pointing at it, no intro (Arthur, 15 October 2026).
+      // Arthur's words (15 October 2026, second pass). The box is docked
+      // under this (`SpaceChatDock`), with Upload files and Invite people
+      // between the two.
       return {
-        title,
-        description: 'Ask Lawexa below to start the first one.',
+        title: 'Start working with Lawexa',
+        description:
+          'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
       };
     case 'folders':
       return {

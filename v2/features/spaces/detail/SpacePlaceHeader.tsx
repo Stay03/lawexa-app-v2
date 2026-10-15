@@ -1,7 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useRef } from 'react';
-import { ChevronRight, Lock } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { Space } from '@/types/collab';
@@ -9,13 +9,7 @@ import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { setSpaceTitleOnScreen } from '@/v2/features/collab/shell/collab-header';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import {
-  showsPrivateMark,
-  spaceOwnerLabel,
-  spacePrincipleLine,
-  spaceRoleLabel,
-  type MembershipSubject,
-} from '../model';
+import { spaceHeaderFacts, spacePrincipleLine, type MembershipSubject } from '../model';
 
 /**
  * SpacePlaceHeader — the identity block at the top of the space page.
@@ -37,14 +31,13 @@ import {
  * conversation's details from its name. A space with nothing to say beyond
  * its name keeps a plain heading (`spaceHasAbout`).
  *
- * ── WHO YOU ARE HERE, AND HOW THE SPACE WORKS (design round 1) ─────────────
- * The kicker ends with the viewer's role ("Work · You're a viewer"), so a
- * Viewer knows before trying that they cannot add. On a shared space Stay's
- * two lines sit under the description, full or empty: "Members can add to this
- * space. What's here is organised for the whole team." A Viewer reads who adds
- * instead, because the first line is not true for them (`spacePrincipleLine`).
- * The word "Personal" left the kicker (`spaceOwnerLabel`), and so did the lock
- * on a shared space, which is always private and so said nothing.
+ * ── THE NAME, THEN THE TYPE AND WHO CAN GET IN (Arthur, 15 October 2026) ───
+ * "Display the Space name prominently, with the type and privacy status as
+ * secondary information", for example "Constitutional Law" over "Study ·
+ * Private" (`spaceHeaderFacts`). The privacy is in words, so the lock beside
+ * the name went. "You're the owner" went too: who holds which role is the
+ * People tab's to show. On a shared space Stay's two lines still sit in the
+ * details sheet (`spacePrincipleLine`).
  *
  * ── THE NAME IS PRINTED IN FULL AT EVERY WIDTH ─────────────────────────────
  * Below `md:` the heading used to be stated for assistive tech only, with the
@@ -77,14 +70,8 @@ export function SpacePlaceHeader({
         <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="lg" />
 
         <div className="min-w-0 flex-1">
-          <MetaLine
-            lead={[space.type_label, spaceOwnerLabel(space), spaceRoleLabel(membership)]}
-          />
-          <SpaceHeading
-            name={space.name}
-            privateMark={showsPrivateMark(space)}
-            onOpenAbout={hasAbout ? onOpenAbout : undefined}
-          />
+          <SpaceHeading name={space.name} onOpenAbout={hasAbout ? onOpenAbout : undefined} />
+          <MetaLine className="mt-1 text-sm" lead={spaceHeaderFacts(space)} />
         </div>
       </div>
     </header>
@@ -122,12 +109,9 @@ export function spaceHasAbout(
  */
 export function SpaceHeading({
   name,
-  privateMark,
   onOpenAbout,
 }: {
   name: string;
-  /** A team space that is private: the lock, and the words for it. */
-  privateMark: boolean;
   /** When given, the name is a button that opens the space's details (the
    *  way a chat app's conversation name opens its details). */
   onOpenAbout?: () => void;
@@ -158,7 +142,7 @@ export function SpaceHeading({
   return (
     <h1
       ref={ref}
-      className="mt-1 flex min-w-0 items-start gap-2 text-xl font-semibold leading-snug tracking-tight text-foreground md:text-2xl"
+      className="flex min-w-0 items-start gap-2 text-xl font-semibold leading-snug tracking-tight text-foreground md:text-2xl"
     >
       {onOpenAbout ? (
         <button
@@ -184,15 +168,6 @@ export function SpaceHeading({
           {name}
         </span>
       )}
-      {privateMark ? (
-        <>
-          <Lock
-            aria-hidden
-            className="mt-1.5 size-4 shrink-0 text-muted-foreground md:mt-2"
-          />
-          <span className="sr-only">Private space</span>
-        </>
-      ) : null}
     </h1>
   );
 }

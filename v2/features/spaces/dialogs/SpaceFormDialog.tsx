@@ -113,6 +113,13 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * A SHARED SPACE IS ALWAYS PRIVATE: the backend refuses `is_private: false` on
  * one (422). So "Who can join" is not offered for a shared space, in either
  * mode, and the form sends `is_private: true` for it.
+ *
+ * ── ARTHUR'S WORDS (15 October 2026) ───────────────────────────────────────
+ * The create form opens on "What are you working on?" and asks three things in
+ * this order: the space's name, what the reader is trying to achieve (the
+ * space's `description`, optional), and Work or Study. The labels and the type
+ * cards are the same in the edit form, so a space reads the same both ways.
+ * The kind, the owner and who can join follow, as before.
  */
 
 type Privacy = 'private' | 'open';
@@ -147,13 +154,13 @@ const TYPE_CHOICES: readonly Choice<SpaceType>[] = [
     value: 'work',
     icon: Briefcase,
     title: 'Work',
-    description: 'A firm, a team or a matter — where the work gets done.',
+    description: 'For legal research, drafting, a client matter, a department or a specific task.',
   },
   {
     value: 'study',
     icon: GraduationCap,
     title: 'Study',
-    description: 'A course, a reading group or exam prep.',
+    description: 'For coursework, final-year projects, Bar Finals, moots or exam preparation.',
   },
 ];
 
@@ -344,11 +351,10 @@ export function SpaceFormDialog({
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
-      title={isEdit ? 'Rename space' : 'Create a space'}
+      title={isEdit ? 'Rename space' : 'Create a Space'}
+      // The create form's heading and its line open the body (below).
       description={
-        isEdit
-          ? 'Change its name and details. Everyone in it sees the change.'
-          : 'A space holds chats, folders and files for the people you invite.'
+        isEdit ? 'Change its name and details. Everyone in it sees the change.' : undefined
       }
       className="md:max-w-2xl"
       footer={
@@ -362,21 +368,32 @@ export function SpaceFormDialog({
           </Button>
           <Button onClick={handleSubmit} disabled={!canSubmit}>
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
-            {isEdit ? 'Save changes' : 'Create space'}
+            {isEdit ? 'Save changes' : 'Create Space'}
           </Button>
         </>
       }
     >
+      {isEdit ? null : (
+        <div className="mb-5 space-y-1">
+          <h3 className="text-lg font-semibold tracking-tight text-foreground">
+            What are you working on?
+          </h3>
+          <p className="text-pretty text-sm text-muted-foreground">
+            Keep conversations and resources together, and invite others to collaborate.
+          </p>
+        </div>
+      )}
+
       {/* The preview leads on a phone (you see the object before you describe
           it) and sits beside the fields from `sm` up. */}
       <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem]">
         <div className="order-2 min-w-0 space-y-4 sm:order-1">
           <div className="space-y-2">
-            <Label htmlFor={`${uid}-name`}>Name</Label>
+            <Label htmlFor={`${uid}-name`}>Space name</Label>
             <Input
               id={`${uid}-name`}
               maxLength={SPACE_NAME_MAX}
-              placeholder="e.g. Firm HQ"
+              placeholder="e.g. Contract Review, Constitutional Law"
               value={name}
               onChange={(event) => setName(event.target.value)}
               onKeyDown={(event) => {
@@ -389,6 +406,28 @@ export function SpaceFormDialog({
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor={`${uid}-description`}>
+              What are you trying to achieve?
+              <span className="font-normal text-muted-foreground">(Optional)</span>
+            </Label>
+            <Textarea
+              id={`${uid}-description`}
+              maxLength={SPACE_DESCRIPTION_MAX}
+              rows={3}
+              placeholder="Describe your goal or what you want to accomplish..."
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
+
+          <ChoiceCards
+            legend="Type"
+            choices={TYPE_CHOICES}
+            value={type}
+            onChange={setType}
+          />
+
           {canChooseKind ? (
             <ChoiceCards
               legend="Kind"
@@ -398,13 +437,6 @@ export function SpaceFormDialog({
             />
           ) : null}
 
-          <ChoiceCards
-            legend="Type"
-            choices={TYPE_CHOICES}
-            value={type}
-            onChange={setType}
-          />
-
           {!isEdit && organization ? (
             <ChoiceCards
               legend="Owner"
@@ -413,18 +445,6 @@ export function SpaceFormDialog({
               onChange={setOwner}
             />
           ) : null}
-
-          <div className="space-y-2">
-            <Label htmlFor={`${uid}-description`}>Description</Label>
-            <Textarea
-              id={`${uid}-description`}
-              maxLength={SPACE_DESCRIPTION_MAX}
-              rows={3}
-              placeholder="What is this space for?"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
 
           {canBeOpen ? (
             <ChoiceCards

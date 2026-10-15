@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
-import { ChevronLeft, FolderOpen, Plus, Upload } from 'lucide-react';
+import { ChevronLeft, FolderOpen, Plus, Upload, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn, stripPastedTags } from '@/lib/utils';
@@ -71,9 +71,11 @@ import {
  *  - Every tab: a search the endpoint runs (title, folder name, file name),
  *    and an empty state that teaches (`spaceEmptyCopy`).
  *  - Conversations: each row names who started it; its owner may move it to
- *    another space or back out, the space's Owner may remove it. "New
- *    conversation" starts one in the space for the Owner and Contributors
- *    (F4, backend B4), in the home composer inside an overlay.
+ *    another space or back out, the space's Owner may remove it. The Owner
+ *    and Contributors start one from the box docked under the list. With none
+ *    yet, the tab reads Arthur's "Start working with Lawexa" (15 October
+ *    2026) over Upload files (into the space, in place) and, for whoever may
+ *    invite, Invite people.
  *  - Folders: browsed one level at a time inside the tab (`parent_id`), with
  *    a way back up and a way to the folder's own page for what is filed in
  *    it; "New folder" at the current level for the Owner and Contributors.
@@ -126,6 +128,7 @@ export function SpaceContentPanel({
       scope !== null && scope.canManage && space !== null && space.active_members_count <= 1
         ? scope.openInvite
         : null,
+    openInvite: scope !== null && scope.canManage ? scope.openInvite : null,
   };
   switch (tab) {
     case 'chats':
@@ -149,6 +152,9 @@ interface ContentAccess {
   contentRole: Space['my_content_role'] | null;
   /** Opens the invite dialog, for an Owner alone in the space; else `null`. */
   onInvite: (() => void) | null;
+  /** Opens the invite dialog, for whoever may invite (`scope.canManage`),
+   *  however many are in the space; else `null`. The empty chats tab's. */
+  openInvite: (() => void) | null;
 }
 
 /** Stable empty rows, so a pending list does not mint a new array per render. */
@@ -255,6 +261,7 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
   // them in place (the conversations list's rule, 8 October 2026).
   const [reveal] = useState(() => query.isPending);
   const { openMove, openRemove, dialogs } = useItemDialogs(access);
+  const uploads = useSpaceUploads(spaceUuid);
 
   const targetOf = (conversation: SpaceConversation): SpaceItemTarget => ({
     type: 'conversation',
@@ -276,6 +283,7 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
         busy={query.isPlaceholderData}
         action={null}
       />
+      {canAdd ? uploads.picker : null}
       <PagedContent
         tab="chats"
         query={query}
@@ -291,7 +299,22 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
             <SpaceContentEmptyState
               tab="chats"
               canAdd={canAdd}
-              onInvite={access.onInvite ?? undefined}
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <EmptyStateAddButton variant="outline" icon={Upload} onClick={uploads.pickFiles}>
+                    Upload files
+                  </EmptyStateAddButton>
+                  {access.openInvite ? (
+                    <EmptyStateAddButton
+                      variant="outline"
+                      icon={UserPlus}
+                      onClick={access.openInvite}
+                    >
+                      Invite people
+                    </EmptyStateAddButton>
+                  ) : null}
+                </div>
+              }
             />
           )
         }
@@ -564,6 +587,41 @@ function describeUploadFailure(error: unknown): UploadFailureNote {
   return uploadRefusal(apiError.status, apiError.errors?.file?.[0] ?? null, apiError.message);
 }
 
+/**
+ * Upload into the space from a tab: the shared upload queue (the channel
+ * panel's), driven by the space's own upload through `mutateAsync`, the one
+ * call that keeps a promise per file. `picker` is the hidden file input and
+ * the tray that shows each file's progress and refusal; the host renders it
+ * only for a reader who may add. The Files tab uses it, and so does the empty
+ * Conversations tab's Upload files.
+ */
+function useSpaceUploads(spaceUuid: string) {
+  const upload = useUploadSpaceFile(spaceUuid);
+  const queue = useUploadQueueFor(upload.mutateAsync, uploadPrecheck, describeUploadFailure);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const pickFiles = () => inputRef.current?.click();
+  const picker = (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept={ACCEPTED_FILE_TYPES}
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(event) => {
+          if (event.target.files) queue.add(event.target.files);
+          // Cleared so choosing the same file again still fires a change.
+          event.target.value = '';
+        }}
+      />
+      <UploadTray queue={queue} placement="inline" />
+    </>
+  );
+  return { queue, pickFiles, picker };
+}
+
 function SpaceFilesList({ access }: { access: ContentAccess }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
@@ -580,12 +638,7 @@ function SpaceFilesList({ access }: { access: ContentAccess }) {
   );
   const { openMove, openRemove, dialogs } = useItemDialogs(access);
 
-  // The shared upload queue (the channel panel's), driven by the space's own
-  // upload: `mutateAsync`, the one call that keeps a promise per file.
-  const upload = useUploadSpaceFile(spaceUuid);
-  const queue = useUploadQueueFor(upload.mutateAsync, uploadPrecheck, describeUploadFailure);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const pickFiles = () => inputRef.current?.click();
+  const { queue, pickFiles, picker } = useSpaceUploads(spaceUuid);
 
   const targetOf = useCallback(
     (file: SpaceFile): SpaceItemTarget => ({
@@ -646,25 +699,7 @@ function SpaceFilesList({ access }: { access: ContentAccess }) {
         busy={query.isPlaceholderData}
         action={uploadButton}
       />
-      {canAdd ? (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept={ACCEPTED_FILE_TYPES}
-            className="sr-only"
-            tabIndex={-1}
-            aria-hidden
-            onChange={(event) => {
-              if (event.target.files) queue.add(event.target.files);
-              // Cleared so choosing the same file again still fires a change.
-              event.target.value = '';
-            }}
-          />
-          <UploadTray queue={queue} placement="inline" />
-        </>
-      ) : null}
+      {canAdd ? picker : null}
       <PagedContent
         tab="files"
         query={query}
@@ -866,14 +901,18 @@ function PillButton({
 function EmptyStateAddButton({
   icon: Icon,
   onClick,
+  variant,
   children,
 }: {
   icon: typeof Plus;
   onClick: () => void;
+  /** `outline` for the empty Conversations tab, whose main action is the box
+   *  docked under it. */
+  variant?: 'outline';
   children: string;
 }) {
   return (
-    <Button type="button" size="sm" onClick={onClick}>
+    <Button type="button" size="sm" variant={variant} onClick={onClick}>
       <Icon aria-hidden className="size-4" />
       {children}
     </Button>

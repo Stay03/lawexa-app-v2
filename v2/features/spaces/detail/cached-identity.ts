@@ -4,13 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { Space } from '@/types/collab';
 import { findCachedRow } from '@/v2/runtime/seed-detail';
-import {
-  showsPrivateMark,
-  spaceKind,
-  spaceOwnerLabel,
-  spacePrincipleLine,
-  spaceRoleLabel,
-} from '../model';
+import { spaceHeaderFacts, spaceKind, spacePrincipleLine } from '../model';
 import { spacesQueries } from '../queries';
 import type { SpaceFrameIdentity } from './states';
 
@@ -22,8 +16,7 @@ import type { SpaceFrameIdentity } from './states';
  * ruling, and a cold arrival keeps the silhouette it always had.
  *
  * WHAT A SPACE ROW KNOWS is more than a channel row does — the crest, the
- * kicker, the viewer's role, the name, whether it is private, and the
- * description are all on it
+ * name, the type, whether it is private, and the description are all on it
  * (measured against `GET /spaces/{uuid}` on 15 August 2026: the detail adds
  * only `creator` and `members`). So the lobby's whole identity block can paint
  * from the first frame, and only the digest and the roster resolve later.
@@ -43,12 +36,10 @@ export function useCachedSpaceIdentity(
     uuid: row.uuid,
     name: row.name,
     type: row.type,
-    typeLabel: row.type_label,
-    // The same derivations the live header runs, so the kicker, the lock and
-    // Stay's lines cannot say one thing in the frame and another a paint later.
-    ownerLabel: spaceOwnerLabel(row),
-    roleLabel: spaceRoleLabel(row),
-    isPrivate: showsPrivateMark(row),
+    // The same derivations the live header runs, so the line under the name
+    // and Stay's lines cannot say one thing in the frame and another a paint
+    // later.
+    facts: spaceHeaderFacts(row),
     description: row.description?.trim() || null,
     principle: spacePrincipleLine(row),
     // A settled fact about the space, not a permission, so the frame may act
