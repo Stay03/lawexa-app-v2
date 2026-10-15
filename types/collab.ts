@@ -1870,8 +1870,10 @@ export interface DiscoverableSpace {
   description: string | null;
   type: SpaceType;
   type_label: string;
-  is_private: boolean;
-  organization: OrganizationRef | null;
+  /** No longer sent: the card is slim since public shared spaces (backend,
+   *  15 October 2026). Nothing reads these three. */
+  is_private?: boolean;
+  organization?: OrganizationRef | null;
   active_members_count: number;
   /** NOT SENT TODAY. Optional so the row degrades honestly if it ever arrives. */
   is_member?: boolean;
@@ -1882,7 +1884,7 @@ export interface DiscoverableSpace {
   owner?: { name: string; avatar_url?: string | null } | null;
   /** The reader's place: a member, an ask waiting for the Owner, or neither. */
   my_status?: 'member' | 'pending' | null;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface DiscoverSpacesParams {

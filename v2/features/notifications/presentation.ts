@@ -128,6 +128,11 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   // a row that comes without one.
   space_chat_mention: 'You were mentioned in a chat',
   space_chat_reply: 'Someone replied to you in a chat',
+  // Public shared spaces (backend, 15 October 2026). The server sends its own
+  // title and message; these are for a row that comes without one.
+  space_join_requested: 'Someone asked to join your space',
+  space_join_approved: 'You were let into a space',
+  space_join_declined: 'Your request to join was declined',
 };
 
 function trimmedOrNull(value: string | null | undefined): string | null {
