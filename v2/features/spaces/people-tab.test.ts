@@ -64,6 +64,22 @@ test('the panel: members for everyone; invite, links, Invited and Asked to join 
   assert.match(panel, /const rosterRow = useSpaceRosterRow\(\{ space, viewerUuid, canManage, shared \}\);/);
 });
 
+test('the top is one row; the name opens the details sheet on ?panel=about (Stay, 15 October 2026)', () => {
+  const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
+  assert.match(header, /<header className="border-b pb-4">/);
+  for (const gone of [/PresenceStack/, /New channel/, /<SpaceAbout\s/, /onOpenRoster/]) assert.doesNotMatch(header, gone);
+  // The name is a button only when there is something behind it.
+  assert.match(header, /onOpenAbout=\{hasAbout \? onOpenAbout : undefined\}/);
+  assert.match(header, /aria-haspopup="dialog"/);
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(screen, /canOpen: space \? \{ edit: canManage, about: true, invites: false, requests: false \} : undefined,/);
+  assert.match(screen, /<SpacePlaceHeader space=\{space\} membership=\{scope\.membership\} onOpenAbout=\{openAbout\} \/>/);
+  assert.match(screen, /<SpaceAboutSheet space=\{space\} membership=\{scope\.membership\} \{\.\.\.panel\.bind\('about'\)\} \/>/);
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceAboutSheet.tsx');
+  assert.match(sheet, /side="bottom"/);
+  assert.match(sheet, /memberCountLabel\(space\.active_members_count\)/);
+});
+
 test('the screen draws the People tab, and the silhouette has its shape', () => {
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /tab === 'people' \? \(\s*<SpacePeoplePanel key="people" space=\{space\} \/>/);

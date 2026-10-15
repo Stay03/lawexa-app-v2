@@ -192,12 +192,13 @@ test('the bar menu draws the rules and the space menu asks for one before Rename
 
 /* ── Round 0 #25: the header's faces are bigger on a desktop ─────────────── */
 
-test('the space header shows 40px faces from md up', () => {
+test('the space header shows no faces: the people are in their tab (Stay, 15 October 2026)', () => {
   const stack = read('v2', 'features', 'collab', 'kit', 'PresenceStack.tsx');
   assert.match(stack, /lg: \{ faces: 4, avatar: 'lg', text: 'text-sm' \},/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.match(header, /size="md"\s*withCount\s*onClick=\{onOpenRoster\}\s*className="md:hidden"/);
-  assert.match(header, /size="lg"\s*withCount\s*onClick=\{onOpenRoster\}\s*className="hidden md:inline-flex"/);
+  assert.doesNotMatch(header, /PresenceStack|onOpenRoster/);
+  const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
+  assert.doesNotMatch(states, /h-9 w-44 rounded-full/);
 });
 
 /* ── NICE ────────────────────────────────────────────────────────────────── */

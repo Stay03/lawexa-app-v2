@@ -3,7 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Hourglass, Link2, LogOut, Pencil, Trash2, Users } from 'lucide-react';
+import { Hourglass, Link2, LogOut, Pencil, Plus, Trash2, Users } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
@@ -36,6 +38,7 @@ import {
   SPACE_TABS_ROW,
 } from './lobby-parts';
 import { SpacePeoplePanel } from './people/SpacePeoplePanel';
+import { SpaceAboutSheet } from './SpaceAboutSheet';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import { SpaceTabs } from './SpaceTabs';
 import {
@@ -234,7 +237,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
    * stripped rather than left in the address opening nothing.
    */
   const panel = useUrlOverlay('panel', {
-    canOpen: space ? { edit: canManage, invites: false, requests: false } : undefined,
+    canOpen: space ? { edit: canManage, about: true, invites: false, requests: false } : undefined,
   });
 
   /**
@@ -282,6 +285,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   const pathname = usePathname() ?? '';
   const showPanel = panel.show;
   const openRename = useCallback(() => showPanel('edit'), [showPanel]);
+  const openAbout = useCallback(() => showPanel('about'), [showPanel]);
 
   const isOwner = scope?.isOwner ?? false;
   const leaveRoute = scope?.leaveRoute ?? 'leave';
@@ -402,14 +406,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
 
   return (
     <div className={spacePageColumn(showsChannels)}>
-      <SpacePlaceHeader
-        space={space}
-        members={scope.members}
-        membership={scope.membership}
-        canCreateChannel={canManage && showsChannels}
-        onCreateChannel={scope.openCreateChannel}
-        onOpenRoster={scope.openRoster}
-      />
+      <SpacePlaceHeader space={space} membership={scope.membership} onOpenAbout={openAbout} />
 
       <div className={SPACE_TABS_ROW}>
         <SpaceTabs
@@ -427,35 +424,48 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         className={SPACE_TAB_PANEL}
       >
         {tab === 'channels' ? (
-          <div className={SPACE_LOBBY_GRID}>
-            <SpaceActivityBlock
-              sections={scope.sections}
-              // THE ONE WIRING POINT for the space's threads, live since
-              // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges
-              // these with the channel rows so the space's mention badge has
-              // rows to land on; see the query mount above for the gate and
-              // the page size.
-              threads={threads}
-              isPending={scope.isChannelsPending || threadsQuery.isPending}
-              isError={scope.isChannelsError || threadsQuery.isError}
-              onRetry={retryActivity}
-              canCreate={canManage}
-              onCreateChannel={scope.openCreateChannel}
-              onOpenRail={scope.openRail}
-              now={now}
-            />
-
-            <div className="flex min-w-0 flex-col gap-6">
-              <SpacePeopleBlock
-                space={space}
-                members={scope.members}
-                isPending={scope.isMembersPending}
-                canManage={canManage}
-                onOpenRoster={scope.openRoster}
+          <>
+            {/* New channel moved here from the top of the space (Stay, 15
+                October 2026). From `lg:` the docked rail carries it at its
+                foot, so it is shown only below `lg:`: one at every width. */}
+            {canManage && showsChannels ? (
+              <div className="mb-4 lg:hidden">
+                <Button size="sm" className="v2-interactive" onClick={scope.openCreateChannel}>
+                  <Plus aria-hidden className="size-4" />
+                  New channel
+                </Button>
+              </div>
+            ) : null}
+            <div className={SPACE_LOBBY_GRID}>
+              <SpaceActivityBlock
+                sections={scope.sections}
+                // THE ONE WIRING POINT for the space's threads, live since
+                // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges
+                // these with the channel rows so the space's mention badge has
+                // rows to land on; see the query mount above for the gate and
+                // the page size.
+                threads={threads}
+                isPending={scope.isChannelsPending || threadsQuery.isPending}
+                isError={scope.isChannelsError || threadsQuery.isError}
+                onRetry={retryActivity}
+                canCreate={canManage}
+                onCreateChannel={scope.openCreateChannel}
+                onOpenRail={scope.openRail}
+                now={now}
               />
-              <SpaceAboutBlock space={space} />
+
+              <div className="flex min-w-0 flex-col gap-6">
+                <SpacePeopleBlock
+                  space={space}
+                  members={scope.members}
+                  isPending={scope.isMembersPending}
+                  canManage={canManage}
+                  onOpenRoster={scope.openRoster}
+                />
+                <SpaceAboutBlock space={space} />
+              </div>
             </div>
-          </div>
+          </>
         ) : tab === 'people' ? (
           <SpacePeoplePanel key="people" space={space} />
         ) : (
@@ -472,6 +482,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         viewerId={session.userId}
         {...panel.bind('edit')}
       />
+      <SpaceAboutSheet space={space} membership={scope.membership} {...panel.bind('about')} />
     </div>
   );
 }

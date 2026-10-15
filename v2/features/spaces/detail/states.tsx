@@ -23,7 +23,7 @@ import {
   SPACE_TAB_PANEL,
   SPACE_TABS_ROW,
 } from './lobby-parts';
-import { SpaceAbout, SpaceHeading } from './SpacePlaceHeader';
+import { SpaceHeading } from './SpacePlaceHeader';
 import { SpaceTabsSkeleton } from './SpaceTabs';
 
 /**
@@ -44,6 +44,8 @@ import { SpaceTabsSkeleton } from './SpaceTabs';
  * throughout. That is the whole point of the frame: a channel switch repaints
  * the pane, never the place.
  */
+
+const NOOP = () => {};
 
 /** One channel-row skeleton at {@link SpaceChannelRow}'s exact geometry — the
  *  36px tile, the two text lines, the right-anchored age. */
@@ -142,7 +144,10 @@ export function SpaceScreenFrame({
 }) {
   return (
     <div className={spacePageColumn(showsChannels)}>
-      <div className="border-b pb-5">
+      {/* One row, as the live header since Stay's 15 October 2026 note: the
+          description sits behind the name, the people in their tab, New
+          channel in the Channels tab. */}
+      <div className="border-b pb-4">
         <div className="flex items-start gap-4">
           {identity ? (
             <SpaceCrest
@@ -161,7 +166,14 @@ export function SpaceScreenFrame({
               />
               {/* The live header's own heading, so the hand-off moves nothing
                   and the shell bar's title steps back from the first frame. */}
-              <SpaceHeading name={identity.name} privateMark={identity.isPrivate} />
+              <SpaceHeading
+                name={identity.name}
+                privateMark={identity.isPrivate}
+                // The same shape as the live name when it opens the details
+                // (the chevron), so the hand-off adds nothing; the sheet is the
+                // live screen's, so a tap here waits for it.
+                onOpenAbout={identity.description || identity.principle ? NOOP : undefined}
+              />
             </div>
           ) : (
             <div className="min-w-0 flex-1 space-y-2.5">
@@ -169,23 +181,6 @@ export function SpaceScreenFrame({
               <Skeleton className="h-6 w-3/5 rounded md:h-7 md:w-2/5" />
             </div>
           )}
-        </div>
-        {identity ? (
-          // A space with no description prints nothing, exactly as the live
-          // header does. Reserving a bar for prose that is not coming is how
-          // the block below ends up moving when it arrives empty.
-          <SpaceAbout description={identity.description} principle={identity.principle} />
-        ) : (
-          <Skeleton className="mt-3 h-3.5 w-3/5 rounded" />
-        )}
-        {/* The action row is 36px tall, set by the presence stack: `size="md"`
-            avatars are 32px and its button pads them by 2px each way. The pill
-            below reserved 28px, so this row grew by 4px the moment the roster
-            landed and took the whole lobby down with it — measured, 15 August
-            2026. The `New channel` button beside it is the shorter 32px. */}
-        <div className="mt-4 flex items-center gap-3">
-          <Skeleton className="h-9 w-44 rounded-full" />
-          {showsChannels ? <Skeleton className="h-8 w-32 rounded-md lg:hidden" /> : null}
         </div>
       </div>
 
@@ -195,25 +190,29 @@ export function SpaceScreenFrame({
 
       <div className={SPACE_TAB_PANEL}>
         {tab === 'channels' ? (
-          <div className={SPACE_LOBBY_GRID}>
-            <div className="min-w-0">
-              <Skeleton className="mb-2 h-4 w-28 rounded" />
-              <ChannelListSkeleton />
-            </div>
-            <div className="flex min-w-0 flex-col gap-6">
-              <div>
-                <Skeleton className="mb-2 h-4 w-20 rounded" />
-                {/* The SAME component the live People block draws while its
-                    roster is in flight, so the fallback reserves the rows and
-                    the button that are actually coming. */}
-                <LobbyPeopleSkeleton />
+          <>
+            {/* The live tab's New channel button, below `lg:`. */}
+            {showsChannels ? <Skeleton className="mb-4 h-8 w-32 rounded-md lg:hidden" /> : null}
+            <div className={SPACE_LOBBY_GRID}>
+              <div className="min-w-0">
+                <Skeleton className="mb-2 h-4 w-28 rounded" />
+                <ChannelListSkeleton />
               </div>
-              <div>
-                <Skeleton className="mb-2 h-4 w-16 rounded" />
-                <LobbyFactsSkeleton />
+              <div className="flex min-w-0 flex-col gap-6">
+                <div>
+                  <Skeleton className="mb-2 h-4 w-20 rounded" />
+                  {/* The SAME component the live People block draws while its
+                      roster is in flight, so the fallback reserves the rows and
+                      the button that are actually coming. */}
+                  <LobbyPeopleSkeleton />
+                </div>
+                <div>
+                  <Skeleton className="mb-2 h-4 w-16 rounded" />
+                  <LobbyFactsSkeleton />
+                </div>
               </div>
             </div>
-          </div>
+          </>
         ) : tab === 'people' ? (
           // The People tab's own pending shape: the count line, then the rows.
           <div className="flex flex-col gap-6">

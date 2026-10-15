@@ -80,8 +80,9 @@ test('the lobby: no digest and no "New channel" without the flag, in the page an
   // The digest lives on the Channels tab, which exists only when channels show.
   assert.match(model, /return showsChannels \? TEAM_TABS : CONTENT_TABS;/);
   assert.match(screen, /const tab = parseSpaceTab\(tabParam, showsChannels\);/);
-  assert.match(screen, /\{tab === 'channels' \? \(\s*<div className=\{SPACE_LOBBY_GRID\}>\s*<SpaceActivityBlock/);
-  assert.match(screen, /canCreateChannel=\{canManage && showsChannels\}/);
+  assert.match(screen, /\{tab === 'channels' \? \(\s*<>[\s\S]{0,800}?<div className=\{SPACE_LOBBY_GRID\}>\s*<SpaceActivityBlock/);
+  // New channel sits at the top of the Channels tab since Stay's 15 October note.
+  assert.match(screen, /\{canManage && showsChannels \? \(\s*<div className="mb-4 lg:hidden">/);
   // The silhouettes ask the same predicate, so without the flag they draw no
   // channel block and no "New channel" place.
   assert.match(
@@ -98,6 +99,6 @@ test('the lobby: no digest and no "New channel" without the flag, in the page an
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
   // Design round 1: the header's "New channel" (and so its place) is shown
   // below `lg:` only, where no docked rail carries the same action.
-  assert.match(states, /\{showsChannels \? <Skeleton className="h-8 w-32 rounded-md lg:hidden" \/> : null\}/);
-  assert.match(states, /\{tab === 'channels' \? \(\s*<div className=\{SPACE_LOBBY_GRID\}>[\s\S]*?<ChannelListSkeleton \/>/);
+  assert.match(states, /\{showsChannels \? <Skeleton className="mb-4 h-8 w-32 rounded-md lg:hidden" \/> : null\}/);
+  assert.match(states, /\{tab === 'channels' \? \(\s*<>[\s\S]*?<div className=\{SPACE_LOBBY_GRID\}>[\s\S]*?<ChannelListSkeleton \/>/);
 });

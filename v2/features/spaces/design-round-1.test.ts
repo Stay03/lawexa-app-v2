@@ -102,9 +102,14 @@ test('Stay’s lines read true for each role, and a team space has none', () => 
   assert.doesNotMatch(line('viewer') ?? '', /Lawexa/);
 });
 
-test('the header draws the lines whether or not the space holds anything', () => {
+test('the lines are drawn whether or not the space holds anything: in the details sheet the name opens', () => {
+  // Since Stay's 15 October 2026 note the top is one row; the description and
+  // the lines live in the sheet, and the name opens it when there is any.
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceAboutSheet.tsx');
+  assert.match(sheet, /<SpaceAbout\s+description=\{space\.description\}\s+principle=\{spacePrincipleLine\(\{/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.match(header, /<SpaceAbout\s+description=\{space\.description\}\s+principle=\{spacePrincipleLine\(\{/);
+  assert.match(header, /onOpenAbout=\{hasAbout \? onOpenAbout : undefined\}/);
+  assert.doesNotMatch(header, /<SpaceAbout\s/);
 });
 
 /* ── "Personal" and the lock say nothing (critiques 4 and 10) ────────────── */
@@ -247,9 +252,12 @@ test('the members sheet counts the people in and the people invited apart', () =
   assert.match(sheet, />\s*Invited\s*</);
   const row = read('v2', 'features', 'collab', 'membership', 'RosterRow.tsx');
   assert.match(row, /\{member\.is_pending \? 'Cancel invitation' : 'Remove'\}/);
-  // The header's faces are the people who are in.
+  // The faces left the header for the People tab (Stay, 15 October 2026),
+  // which counts the people in and the invited apart the same way.
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.match(header, /\.filter\(\(member\) => member\.is_active && !member\.is_pending\)/);
+  assert.doesNotMatch(header, /PresenceStack/);
+  const people = read('v2', 'features', 'spaces', 'detail', 'people', 'SpacePeoplePanel.tsx');
+  assert.match(people, /rosterCountLabel\(joined\.length, invited\.length\)/);
 });
 
 /* ── Move to space: kinds, search, no silent cut (techlead 1 and 2) ──────── */
@@ -384,8 +392,11 @@ test('a space without channels takes the list’s column; the lobby keeps its wi
 test('one identity and one "New channel" per width on a team space', () => {
   const rail = read('v2', 'features', 'collab', 'shell', 'SpaceRail.tsx');
   assert.doesNotMatch(rail, /PresenceStack|spaceOwnerLabel/);
+  // One "New channel" per width: the Channels tab's below `lg:`, the rail's from it.
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.match(header, /<Button size="sm" className="v2-interactive lg:hidden" onClick=\{onCreateChannel\}>/);
+  assert.doesNotMatch(header, /New channel/);
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(screen, /<div className="mb-4 lg:hidden">\s*<Button size="sm" className="v2-interactive" onClick=\{scope\.openCreateChannel\}>/);
 });
 
 test('sheets draw no focus outline round the whole panel; collab dialogs get a dark edge', () => {

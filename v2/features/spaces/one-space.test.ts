@@ -200,13 +200,14 @@ test('the space page: tabs from the model, the lobby only on Channels, threads o
   assert.match(screen, /const tab = parseSpaceTab\(tabParam, showsChannels\);/);
   assert.match(screen, /quietReplaceUrlParams\(\{ tab: value \}\)/);
   assert.match(screen, /<SpaceTabs\s+showsChannels=\{showsChannels\}/);
-  assert.match(screen, /\{tab === 'channels' \? \(\s*<div className=\{SPACE_LOBBY_GRID\}>/);
+  assert.match(screen, /\{tab === 'channels' \? \(\s*<>[\s\S]{0,800}?<div className=\{SPACE_LOBBY_GRID\}>/);
   assert.match(screen, /<SpaceContentPanel key=\{tab\} tab=\{tab\} spaceUuid=\{space\.uuid\} \/>/);
   assert.match(
     screen,
     /enabled: eligible && space !== null && showsChannels && tab === 'channels',/,
   );
-  assert.match(screen, /canCreateChannel=\{canManage && showsChannels\}/);
+  // New channel sits at the top of the Channels tab since Stay's 15 October note.
+  assert.match(screen, /\{canManage && showsChannels \? \(\s*<div className="mb-4 lg:hidden">/);
   const tabs = read('v2', 'features', 'spaces', 'detail', 'SpaceTabs.tsx');
   assert.match(tabs, /spaceTabs\(showsChannels\)/);
   assert.match(tabs, /<TabRow/);

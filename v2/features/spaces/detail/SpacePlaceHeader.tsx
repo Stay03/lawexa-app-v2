@@ -1,16 +1,15 @@
 'use client';
 
 import { useLayoutEffect, useRef } from 'react';
-import { Lock, Plus } from 'lucide-react';
+import { ChevronRight, Lock } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import type { Member, Space } from '@/types/collab';
+import { cn } from '@/lib/utils';
+import type { Space } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
-import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import { setSpaceTitleOnScreen } from '@/v2/features/collab/shell/collab-header';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
-  memberCountLabel,
   showsPrivateMark,
   spaceOwnerLabel,
   spacePrincipleLine,
@@ -26,9 +25,17 @@ import {
  * an `h1`, a kebab — which reads as "a record about a space". A space is a
  * PLACE, so it leads with the crest at 48px (the same monogram and the same
  * hue the reader has already seen on the `/spaces` lane, in the rail beside
- * this page and in the channel header afterwards), and the people are FACES,
- * followed by their count in words so the stack reads as the door to the
- * members sheet it is.
+ * this page and in the channel header afterwards).
+ *
+ * ── ONE ROW, AND THE REST BEHIND THE NAME (Stay, 15 October 2026) ──────────
+ * "I also dont like the top of the space page, it takes too much space at the
+ * top and makes things messy, remove the members from there since there will
+ * now be a tab for that." So the block is the crest, the kicker and the name,
+ * nothing under them: the faces and their count went to the People tab, New
+ * channel to the Channels tab, and the description and Stay's lines to the
+ * details sheet the name opens (`SpaceAboutSheet`), the way a chat app opens a
+ * conversation's details from its name. A space with nothing to say beyond
+ * its name keeps a plain heading (`spaceHasAbout`).
  *
  * ── WHO YOU ARE HERE, AND HOW THE SPACE WORKS (design round 1) ─────────────
  * The kicker ends with the viewer's role ("Work · You're a viewer"), so a
@@ -46,12 +53,6 @@ import {
  * the bar's title steps back while this heading is on screen
  * (`setSpaceTitleOnScreen`), so the name and the crest are not printed twice.
  *
- * ── THE PRIMARY ACTION IS A PRIMARY BUTTON ─────────────────────────────────
- * "New channel" stands here at full weight for anyone who may use it, and is
- * absent for anyone who may not (a button that only 403s is worse than none).
- * From `lg:` the docked rail carries the same action at its foot, so it is
- * shown here only below `lg:`: one of each at every width.
- *
  * ── THE OVERFLOW LEFT THIS BLOCK (phase 7) ─────────────────────────────────
  * The space's verbs are published to the bar's single overflow menu
  * (`SpaceScreen`, through `v2/shell/screen-context.ts`): two identical kebabs
@@ -59,31 +60,19 @@ import {
  */
 export function SpacePlaceHeader({
   space,
-  members,
   membership,
-  canCreateChannel,
-  onCreateChannel,
-  onOpenRoster,
+  onOpenAbout,
 }: {
   space: Space;
-  members: readonly Member[];
   /** The viewer's roles, the frame's one reading of them. */
   membership: MembershipSubject;
-  /** May manage the space AND the space shows its channels to this viewer
-   *  (Spaces F2): a shared space has no channels to add one to. */
-  canCreateChannel: boolean;
-  onCreateChannel: () => void;
-  onOpenRoster: () => void;
+  /** Opens the space's details sheet (the description, Stay's lines). */
+  onOpenAbout: () => void;
 }) {
-  const countLabel = memberCountLabel(space.active_members_count);
-  // The faces are the people who are in: an invitee who has not accepted yet
-  // is not one of the members the count names.
-  const faces = members
-    .filter((member) => member.is_active && !member.is_pending)
-    .map((member) => member.user);
+  const hasAbout = spaceHasAbout(space, membership);
 
   return (
-    <header className="border-b pb-5">
+    <header className="border-b pb-4">
       <div className="flex items-start gap-4">
         <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="lg" />
 
@@ -91,50 +80,32 @@ export function SpacePlaceHeader({
           <MetaLine
             lead={[space.type_label, spaceOwnerLabel(space), spaceRoleLabel(membership)]}
           />
-          <SpaceHeading name={space.name} privateMark={showsPrivateMark(space)} />
+          <SpaceHeading
+            name={space.name}
+            privateMark={showsPrivateMark(space)}
+            onOpenAbout={hasAbout ? onOpenAbout : undefined}
+          />
         </div>
-      </div>
-
-      <SpaceAbout
-        description={space.description}
-        principle={spacePrincipleLine({
-          kind: space.kind,
-          my_content_role: membership.my_content_role,
-        })}
-      />
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        {/* One stack per width: 40px faces from `md:` up, beside the 24px
-            title, and the 32px ones on a phone (design round 2). */}
-        <PresenceStack
-          members={faces}
-          total={space.active_members_count}
-          countLabel={countLabel}
-          label={`${countLabel} in ${space.name}. Open the members list`}
-          size="md"
-          withCount
-          onClick={onOpenRoster}
-          className="md:hidden"
-        />
-        <PresenceStack
-          members={faces}
-          total={space.active_members_count}
-          countLabel={countLabel}
-          label={`${countLabel} in ${space.name}. Open the members list`}
-          size="lg"
-          withCount
-          onClick={onOpenRoster}
-          className="hidden md:inline-flex"
-        />
-        {canCreateChannel ? (
-          <Button size="sm" className="v2-interactive lg:hidden" onClick={onCreateChannel}>
-            <Plus aria-hidden className="size-4" />
-            New channel
-          </Button>
-        ) : null}
       </div>
     </header>
   );
+}
+
+/**
+ * Whether the space has anything to say beyond its name: a description, or
+ * Stay's lines on a shared space. Only then is the name a door to the sheet
+ * that prints them; a name that opens an empty sheet is a dead tap.
+ */
+export function spaceHasAbout(
+  space: Pick<Space, 'description' | 'kind'>,
+  membership: Pick<MembershipSubject, 'my_content_role'>,
+): boolean {
+  const description = space.description?.trim() || null;
+  const principle = spacePrincipleLine({
+    kind: space.kind,
+    my_content_role: membership.my_content_role,
+  });
+  return description !== null || principle !== null;
 }
 
 /**
@@ -152,10 +123,14 @@ export function SpacePlaceHeader({
 export function SpaceHeading({
   name,
   privateMark,
+  onOpenAbout,
 }: {
   name: string;
   /** A team space that is private: the lock, and the words for it. */
   privateMark: boolean;
+  /** When given, the name is a button that opens the space's details (the
+   *  way a chat app's conversation name opens its details). */
+  onOpenAbout?: () => void;
 }) {
   const ref = useRef<HTMLHeadingElement>(null);
 
@@ -185,9 +160,30 @@ export function SpaceHeading({
       ref={ref}
       className="mt-1 flex min-w-0 items-start gap-2 text-xl font-semibold leading-snug tracking-tight text-foreground md:text-2xl"
     >
-      <span className="line-clamp-2 min-w-0 break-words" title={name}>
-        {name}
-      </span>
+      {onOpenAbout ? (
+        <button
+          type="button"
+          onClick={onOpenAbout}
+          aria-haspopup="dialog"
+          className={cn(
+            'v2-interactive -mx-1 inline-flex min-w-0 items-start gap-1 rounded-md px-1 text-left transition-colors hover:text-foreground/80',
+            FOCUS_RING,
+          )}
+        >
+          <span className="line-clamp-2 min-w-0 break-words" title={name}>
+            {name}
+          </span>
+          <span className="sr-only">, about this space</span>
+          <ChevronRight
+            aria-hidden
+            className="mt-1.5 size-4 shrink-0 text-muted-foreground md:mt-2"
+          />
+        </button>
+      ) : (
+        <span className="line-clamp-2 min-w-0 break-words" title={name}>
+          {name}
+        </span>
+      )}
       {privateMark ? (
         <>
           <Lock
@@ -203,8 +199,8 @@ export function SpaceHeading({
 
 /**
  * The owner's description, then Stay's lines on a shared space. Two muted
- * paragraphs; `text-pretty` so neither ends on one orphaned word. Shared with
- * the silhouette for the same reason as the heading.
+ * paragraphs; `text-pretty` so neither ends on one orphaned word. Printed in
+ * the details sheet (`SpaceAboutSheet`) since the top of the page lost them.
  */
 export function SpaceAbout({
   description,
