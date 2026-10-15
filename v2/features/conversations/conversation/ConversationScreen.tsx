@@ -5,7 +5,8 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { MessageReplyTo } from '@/types/chat';
-import { quoteTone } from './reply-target';
+import { REPLY_DRAFT, quoteTone, replyDraftKey } from './reply-target';
+import { writeDraft } from './draft-store';
 import { memberColourIndex } from './member-colour';
 import {
   useConversationController,
@@ -251,7 +252,19 @@ export function ConversationScreen({
   // personal chat (the server takes replies there, the app offers none this
   // round), and not with an external composer, which this screen cannot reach.
   const canReply = controller.showAuthors && canSend && !externalComposer && !isConfidential;
-  const stageReply = useCallback((target: MessageReplyTo) => composerRef.current?.reply(target), []);
+  // Staged through the draft store, not only the composer's handle: the
+  // transcript can be on screen (drawn from the device's copy) while the
+  // composer is still its skeleton, and a Reply pressed then reached no
+  // composer and was lost (WebKit rendered check, 15 October 2026). The draft
+  // holds it, the composer shows it when it mounts, and the handle, when there
+  // is one, also puts the caret in the box.
+  const stageReply = useCallback(
+    (target: MessageReplyTo) => {
+      writeDraft(replyDraftKey(conversationId), REPLY_DRAFT, target);
+      composerRef.current?.reply(target);
+    },
+    [conversationId],
+  );
   // The quote bar in the quoted person's colour, as the reply's quote will be.
   const quoteToneOf = useCallback((replyTo: MessageReplyTo) => quoteTone(replyTo, memberColours), [memberColours]);
 

@@ -163,7 +163,7 @@ test('the wiring: replies only in a space chat the reader may send in, through t
   assert.match(readHere('rows', 'HoverReply.tsx'), /'pointer-coarse:not-focus-visible:sr-only',/);
   // The composer: the bar, Escape, and the reply going with the turn.
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /useDraft\(`conversation_draft_reply_\$\{draftScopeId\}`, REPLY_DRAFT\)/);
+  assert.match(composer, /useDraft\(replyDraftKey\(draftScopeId\), REPLY_DRAFT\)/);
   assert.match(composer, /if \(event\.key === 'Escape' && replyTo && !event\.nativeEvent\.defaultPrevented\) \{\s*event\.preventDefault\(\);\s*setReply\(null\);/);
   assert.match(composer, /aria-label="Cancel reply"/);
 });
@@ -273,4 +273,22 @@ test('a quote is drawn the WhatsApp way: a straight bar in the quoted person’s
   // The colours come from the space's member colours, the same ones the bubbles wear.
   assert.match(readHere('MessageList.tsx'), /\? quoteTone\(group\.message\.replyTo, memberColours\)/);
   assert.match(readHere('ConversationScreen.tsx'), /const quoteToneOf = useCallback\(\(replyTo: MessageReplyTo\) => quoteTone\(replyTo, memberColours\), \[memberColours\]\);/);
+});
+
+test('a Reply pressed before the composer has mounted is kept, not lost (WebKit, 15 October 2026)', async () => {
+  // The transcript draws from the device's copy while the composer is still its
+  // skeleton; a Reply then had only the composer's handle, which was null, and
+  // the quote was dropped. The screen now writes the staged reply to the draft
+  // store the composer reads, under the same key, and uses the handle only for focus.
+  const { replyDraftKey } = await import('./reply-target');
+  assert.equal(replyDraftKey('chat-1'), 'conversation_draft_reply_chat-1');
+  const screen = readHere('ConversationScreen.tsx');
+  const composer = readHere('ConversationComposer.tsx');
+  assert.match(
+    screen,
+    /const stageReply = useCallback\(\s*\(target: MessageReplyTo\) => \{\s*writeDraft\(replyDraftKey\(conversationId\), REPLY_DRAFT, target\);\s*composerRef\.current\?\.reply\(target\);\s*\},\s*\[conversationId\],\s*\);/,
+  );
+  // The composer reads the key the screen writes: its scope is the same chat id.
+  assert.match(composer, /useDraft\(replyDraftKey\(draftScopeId\), REPLY_DRAFT\)/);
+  assert.match(screen, /draftScopeId=\{conversationId\}/);
 });

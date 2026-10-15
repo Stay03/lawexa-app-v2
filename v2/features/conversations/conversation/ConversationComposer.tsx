@@ -54,7 +54,7 @@ import {
   privateModeOf,
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
-import { REPLY_DRAFT, replyAuthorLabel, replySnippet, type QuoteTone } from './reply-target';
+import { REPLY_DRAFT, replyAuthorLabel, replyDraftKey, replySnippet, type QuoteTone } from './reply-target';
 import { QuoteFrame } from './rows/QuoteFrame';
 import {
   applyMention,
@@ -276,7 +276,7 @@ export function ConversationComposer({
   // The staged reply, kept with this chat's draft (reply-target.ts): a reload
   // keeps it, and another chat's box has its own. The bar holds the last quote
   // while it folds away.
-  const [replyTo, updateReply] = useDraft(`conversation_draft_reply_${draftScopeId}`, REPLY_DRAFT);
+  const [replyTo, updateReply] = useDraft(replyDraftKey(draftScopeId), REPLY_DRAFT);
   const setReply = useCallback((next: MessageReplyTo | null) => updateReply(() => next), [updateReply]);
   const replyShown = useHeldValue(replyTo);
 

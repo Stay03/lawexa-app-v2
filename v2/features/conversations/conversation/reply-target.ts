@@ -128,6 +128,11 @@ function isReplyTo(value: unknown): value is MessageReplyTo {
   );
 }
 
+/** Where a chat's staged reply is kept (the composer reads it, a Reply writes it). */
+export function replyDraftKey(draftScopeId: string): string {
+  return `conversation_draft_reply_${draftScopeId}`;
+}
+
 /** The staged reply, kept with the chat's draft: a reload keeps it, another chat has its own. */
 export const REPLY_DRAFT: DraftCodec<MessageReplyTo | null> = {
   empty: null,
