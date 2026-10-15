@@ -1,0 +1,74 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import type { Member } from '@/types/collab';
+import { invitedRows } from './detail/people/people-model';
+import { SPACE_TAB_LABELS, parseSpaceTab } from './model';
+
+/* The People tab (Stay, 15 October 2026, "Inside a space" point 6: "inside the
+ * space, there should be a people tab which should list members, there should
+ * have the list of members and those pending to join in"; techlead: the
+ * Invited and Asked-to-join lists for whoever manages the people only). */
+
+const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+
+const member = (uuid: string, pending: boolean): Member => ({
+  id: uuid.length,
+  user: { uuid, name: `Person ${uuid}`, username: uuid, avatar_url: null },
+  role: 'member',
+  role_label: 'Member',
+  is_active: !pending,
+  is_pending: pending,
+  accepted_at: null,
+  joined_at: null,
+  left_at: null,
+  created_at: '2026-10-15T10:00:00+00:00',
+});
+
+test('the tab is People, reachable by ?tab=people for every viewer', () => {
+  assert.equal(SPACE_TAB_LABELS.people, 'People');
+  assert.equal(parseSpaceTab('people', true), 'people');
+  assert.equal(parseSpaceTab('people', false), 'people');
+});
+
+test('the Invited list: pending rows only, each person once, the pending list first', () => {
+  const pendingList = [member('b', true), member('c', true)];
+  const fromRoster = [member('c', true), member('d', true), member('a', false)];
+  assert.deepEqual(
+    invitedRows(fromRoster, pendingList).map((row) => row.user.uuid),
+    ['b', 'c', 'd'],
+  );
+  // An API from before the pending list ignores `status` and answers the
+  // active members: none of them is shown as invited.
+  assert.deepEqual(invitedRows([], [member('a', false), member('e', false)]), []);
+});
+
+test('the panel: members for everyone; invite, links, Invited and Asked to join for whoever manages', () => {
+  const panel = read('v2', 'features', 'spaces', 'detail', 'people', 'SpacePeoplePanel.tsx');
+  assert.match(panel, /useQuery\(spacesQueries\.members\(space\.uuid, \{ viewerId: session\.userId \}\)\)/);
+  // The pending list is asked for only by someone who may read it (403 otherwise).
+  assert.match(panel, /status: 'pending' \}\),\s*enabled: canManage,/);
+  assert.match(panel, /const invited = canManage \? invitedRows\(roster\.invited, pendingQuery\.data\?\.data \?\? \[\]\) : \[\];/);
+  assert.match(panel, /const requests = useSpaceJoinRequests\(space\.uuid, canManage\);/);
+  // Invite and the links open the members sheet's own steps: it owns `?invite=`.
+  assert.match(panel, /onClick=\{scope\.openInvite\}/);
+  assert.match(panel, /onClick=\{scope\.openInviteLinks\}/);
+  assert.doesNotMatch(panel, /useUrlOverlay/);
+  assert.match(panel, /\{canManage && waiting > 0 \? \(/);
+  assert.match(panel, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} contentRoles=\{shared\} \/>/);
+  assert.match(panel, />\s*Asked to join\s*</);
+  assert.match(panel, />\s*Invited\s*</);
+  // One row for the tab and the sheet.
+  assert.match(panel, /const rosterRow = useSpaceRosterRow\(\{ space, viewerUuid, canManage, shared \}\);/);
+});
+
+test('the screen draws the People tab, and the silhouette has its shape', () => {
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(screen, /tab === 'people' \? \(\s*<SpacePeoplePanel key="people" space=\{space\} \/>/);
+  const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
+  assert.match(states, /tab === 'people' \? \([\s\S]{0,200}<RosterSkeleton \/>/);
+  // The members call passes the status through.
+  assert.match(read('lib', 'api', 'collab.ts'), /page: params\.page \?\? 1,\s*status: params\.status,/);
+});

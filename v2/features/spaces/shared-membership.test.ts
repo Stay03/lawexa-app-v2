@@ -187,8 +187,12 @@ test('the members sheet reads content roles on a shared space and keeps team rul
   assert.match(sheet, /roles=\{inviteRoles\}/);
   assert.match(sheet, /linkScope=\{\{ spaceUuid: space\.uuid, contentRoles: shared \}\}/);
   assert.match(sheet, /contentRoles=\{shared\}/);
-  assert.match(sheet, /canManage && !shared\s*\?\s*\(target\) =>\s*updateRole\.mutate\(\{\s*userUuid: target\.user\.uuid,\s*payload: \{ role: 'admin' \}/);
-  assert.match(sheet, /canManage && shared\s*\?\s*\(target, next\) =>\s*updateRole\.mutate\(\{\s*userUuid: target\.user\.uuid,\s*payload: contentRoleChangePayload\(next\)/);
+  // The row's role actions live in the hook the sheet and the People tab share.
+  assert.match(sheet, /useSpaceRosterRow\(\{\s*space,\s*viewerUuid,\s*canManage,\s*shared,/);
+  const row = read('v2', 'features', 'spaces', 'detail', 'people', 'use-roster-row.tsx');
+  assert.match(row, /contentRoles=\{shared\}/);
+  assert.match(row, /canManage && !shared\s*\?\s*\(target\) =>\s*updateRole\.mutate\(\{\s*userUuid: target\.user\.uuid,\s*payload: \{ role: 'admin' \}/);
+  assert.match(row, /canManage && shared\s*\?\s*\(target, next\) =>\s*updateRole\.mutate\(\{\s*userUuid: target\.user\.uuid,\s*payload: contentRoleChangePayload\(next\)/);
   // The last Owner's way out is decided before the request (design round 1,
   // was a refusal before the request): the route is read off the roster, and
   // a 409 (or a team owner's 400) still lands in the same designed state.

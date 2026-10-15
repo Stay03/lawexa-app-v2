@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { SpaceKind, SpaceType } from '@/types/collab';
 import { CrestSkeleton, SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
+import { RosterSkeleton } from '@/v2/features/collab/membership/RosterRow';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
@@ -212,6 +213,12 @@ export function SpaceScreenFrame({
                 <LobbyFactsSkeleton />
               </div>
             </div>
+          </div>
+        ) : tab === 'people' ? (
+          // The People tab's own pending shape: the count line, then the rows.
+          <div className="flex flex-col gap-6">
+            <Skeleton className="h-4 w-24 rounded" />
+            <RosterSkeleton />
           </div>
         ) : (
           <SpaceContentSkeleton tab={tab} />

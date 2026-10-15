@@ -342,6 +342,7 @@ export const spacesApi = {
           search: params.search || undefined,
           per_page: params.per_page ?? 100,
           page: params.page ?? 1,
+          status: params.status,
         },
       }
     );

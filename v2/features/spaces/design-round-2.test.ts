@@ -214,8 +214,11 @@ test('a row under the Invited heading drops its Pending chip', () => {
   const rosterRow = read('v2', 'features', 'collab', 'membership', 'RosterRow.tsx');
   assert.match(rosterRow, /showPending = true,/);
   assert.match(rosterRow, /\{member\.is_pending && showPending && \(/);
+  // The row is shared by the sheet and the People tab (people/use-roster-row.tsx).
+  const row = read('v2', 'features', 'spaces', 'detail', 'people', 'use-roster-row.tsx');
+  assert.match(row, /showPending=\{!underInvited\}/);
   const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
-  assert.match(sheet, /showPending=\{!underInvited\}/);
+  assert.match(sheet, /const rosterRow = useSpaceRosterRow\(\{/);
   assert.match(sheet, /\{invited\.map\(\(member\) => rosterRow\(member, true\)\)\}/);
   assert.match(sheet, /\{joined\.map\(\(member\) => rosterRow\(member\)\)\}/);
 });

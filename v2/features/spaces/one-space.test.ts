@@ -103,10 +103,11 @@ test('only an Owner or a Contributor may add content; the old my_role does not c
 test('the tabs by kind × role: Channels first, and the default, only where channels show', () => {
   const tabsFor = (kind: SpaceKind, viewer: V2SessionSnapshot) =>
     spaceTabs(spaceShowsChannels({ kind }, viewer));
-  assert.deepEqual(tabsFor('team', researcher), ['channels', 'chats', 'folders', 'files']);
-  assert.deepEqual(tabsFor('shared', researcher), ['chats', 'folders', 'files']);
-  assert.deepEqual(tabsFor('team', user), ['chats', 'folders', 'files']);
-  assert.deepEqual(tabsFor('shared', user), ['chats', 'folders', 'files']);
+  // People last, for every member of every kind (Stay, 15 October 2026).
+  assert.deepEqual(tabsFor('team', researcher), ['channels', 'chats', 'folders', 'files', 'people']);
+  assert.deepEqual(tabsFor('shared', researcher), ['chats', 'folders', 'files', 'people']);
+  assert.deepEqual(tabsFor('team', user), ['chats', 'folders', 'files', 'people']);
+  assert.deepEqual(tabsFor('shared', user), ['chats', 'folders', 'files', 'people']);
   assert.equal(defaultSpaceTab(true), 'channels');
   assert.equal(defaultSpaceTab(false), 'chats');
 });

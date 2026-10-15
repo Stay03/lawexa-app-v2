@@ -136,6 +136,9 @@ export interface Member {
   notify_level?: NotifyLevel;
   notify_level_label?: string;
   invited_by?: SlimUser | null;
+  /** The invitee's account e-mail: on the `status=pending` list only, which
+   *  only the Owner or an admin may read. Never on the active list. */
+  email?: string;
   accepted_at: string | null;
   joined_at: string | null;
   left_at: string | null;
@@ -1120,6 +1123,12 @@ export interface MemberListParams {
   search?: string;
   per_page?: number;
   page?: number;
+  /**
+   * `pending`: the invites sent and not accepted yet, for the space's Owner or
+   * an admin only (403 for anyone else; backend fdc5780, 15 October 2026).
+   * Absent: the active members, as before.
+   */
+  status?: 'pending';
 }
 
 /**

@@ -35,7 +35,6 @@ import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
 import { MembersSheetFrame } from '@/v2/features/collab/membership/MembersSheetFrame';
 import {
   RosterErrorState,
-  RosterRow,
   RosterSkeleton,
 } from '@/v2/features/collab/membership/RosterRow';
 import { InviteLinksPanel } from '@/v2/features/invites/InviteLinksPanel';
@@ -45,7 +44,6 @@ import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   canManageMembership,
-  contentRoleChangePayload,
   contentRoleInRoster,
   inviteRoleOptions,
   invitePayload,
@@ -65,11 +63,10 @@ import {
 import {
   useInviteSpaceMember,
   useLeaveSpace,
-  useRemoveSpaceMember,
   useTransferSpaceOwnership,
-  useUpdateSpaceMemberRole,
 } from '../mutations';
 import { spacesQueries } from '../queries';
+import { useSpaceRosterRow } from './people/use-roster-row';
 
 /**
  * SpaceMembersSheet — roster, role management, ownership transfer, invites,
@@ -204,8 +201,6 @@ export function SpaceMembersSheet({
   });
 
   const invite = useInviteSpaceMember(space.uuid);
-  const updateRole = useUpdateSpaceMemberRole(space.uuid);
-  const removeMember = useRemoveSpaceMember(space.uuid);
   const transfer = useTransferSpaceOwnership(space.uuid);
   const leave = useLeaveSpace(space.uuid);
 
@@ -337,56 +332,21 @@ export function SpaceMembersSheet({
     });
   };
 
-  // `underInvited`: the row sits under the "Invited" heading, so it drops the
-  // Pending chip that would repeat it.
-  const rosterRow = (member: Member, underInvited = false) => (
-    <RosterRow
-      key={member.user.uuid}
-      member={member}
-      showPending={!underInvited}
-      isSelf={member.user.uuid === viewerUuid}
-      contentRoles={shared}
-      onPromote={
-        canManage && !shared
-          ? (target) =>
-              updateRole.mutate({
-                userUuid: target.user.uuid,
-                payload: { role: 'admin' },
-              })
-          : undefined
-      }
-      onDemote={
-        canManage && !shared
-          ? (target) =>
-              updateRole.mutate({
-                userUuid: target.user.uuid,
-                payload: { role: 'member' },
-              })
-          : undefined
-      }
-      onSetContentRole={
-        canManage && shared
-          ? (target, next) =>
-              updateRole.mutate({
-                userUuid: target.user.uuid,
-                payload: contentRoleChangePayload(next),
-              })
-          : undefined
-      }
-      onTransferOwnership={
-        isOwner
-          ? (target) => {
-              setTransferError(null);
-              setLeaveAfterTransfer(false);
-              setTransferTarget(target);
-            }
-          : undefined
-      }
-      onRemove={
-        canManage ? (target) => removeMember.mutate(target.user.uuid) : undefined
-      }
-    />
-  );
+  // One row, shared with the People tab (people/use-roster-row.tsx); handing
+  // the space over stays here, with its confirmation.
+  const rosterRow = useSpaceRosterRow({
+    space,
+    viewerUuid,
+    canManage,
+    shared,
+    onTransferOwnership: isOwner
+      ? (target) => {
+          setTransferError(null);
+          setLeaveAfterTransfer(false);
+          setTransferTarget(target);
+        }
+      : undefined,
+  });
 
   const backToMembers = () => onViewChange('members');
   /** On a step of its own (links, the waiting list), not the roster. */

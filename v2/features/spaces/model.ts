@@ -131,11 +131,13 @@ export function createSpaceKind(
 
 /* ── The space page's tabs (?tab=) ────────────────────────────────────────── */
 
-/** The space page's tab ids. `channels` holds the old lobby (about, the
- *  activity digest, people); the other three are the space's contents. */
-export type SpaceTab = 'channels' | 'chats' | 'folders' | 'files';
+/** The space page's tab ids. `channels` holds the old lobby (the activity
+ *  digest, about); `chats`, `folders` and `files` are the space's contents;
+ *  `people` is the members and, for whoever manages them, the invited and the
+ *  asked-to-join (Stay, 15 October 2026). */
+export type SpaceTab = 'channels' | 'chats' | 'folders' | 'files' | 'people';
 
-const CONTENT_TABS: readonly SpaceTab[] = ['chats', 'folders', 'files'];
+const CONTENT_TABS: readonly SpaceTab[] = ['chats', 'folders', 'files', 'people'];
 const TEAM_TABS: readonly SpaceTab[] = ['channels', ...CONTENT_TABS];
 
 /** The `chats` id stays (it is in copied `?tab=` links); the label is the
@@ -145,6 +147,7 @@ export const SPACE_TAB_LABELS: Readonly<Record<SpaceTab, string>> = {
   chats: 'Conversations',
   folders: 'Folders',
   files: 'Files',
+  people: 'People',
 };
 
 /** The tabs this viewer gets: the contents for every member, and Channels

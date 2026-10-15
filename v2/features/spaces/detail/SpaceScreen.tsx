@@ -35,6 +35,7 @@ import {
   SPACE_TAB_PANEL,
   SPACE_TABS_ROW,
 } from './lobby-parts';
+import { SpacePeoplePanel } from './people/SpacePeoplePanel';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import { SpaceTabs } from './SpaceTabs';
 import {
@@ -455,6 +456,8 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
               <SpaceAboutBlock space={space} />
             </div>
           </div>
+        ) : tab === 'people' ? (
+          <SpacePeoplePanel key="people" space={space} />
         ) : (
           // `key` per tab: each list is its own query and its own frozen
           // clock, so a switch is a fresh mount, never one list's rows
