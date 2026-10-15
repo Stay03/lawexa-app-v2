@@ -5,6 +5,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { MessageReplyTo } from '@/types/chat';
+import { quoteTone } from './reply-target';
 import { memberColourIndex } from './member-colour';
 import {
   useConversationController,
@@ -251,6 +252,8 @@ export function ConversationScreen({
   // round), and not with an external composer, which this screen cannot reach.
   const canReply = controller.showAuthors && canSend && !externalComposer && !isConfidential;
   const stageReply = useCallback((target: MessageReplyTo) => composerRef.current?.reply(target), []);
+  // The quote bar in the quoted person's colour, as the reply's quote will be.
+  const quoteToneOf = useCallback((replyTo: MessageReplyTo) => quoteTone(replyTo, memberColours), [memberColours]);
 
   // "Ask again" refused (a colleague's turn, or a demotion): the sentence in
   // the composer's banner, as for a refused send. Its question is already on
@@ -420,6 +423,7 @@ export function ConversationScreen({
                   onStop={controller.stop}
                   viewerId={serverUserId}
                   mentionOptions={controller.mentionOptions}
+                  quoteToneOf={quoteToneOf}
                 />
               ) : (
                 <ViewOnlyPill reason={controller.viewOnlyReason} />

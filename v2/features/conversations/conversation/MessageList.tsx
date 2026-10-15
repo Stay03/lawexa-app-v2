@@ -42,7 +42,7 @@ import { TranscriptSkeleton } from './skeletons';
 import { openDefersBlocks } from './markdown/defer-plan';
 import { ScrollKeepContext, type ScrollKeep } from './markdown/scroll-keep-context';
 import { followOnResize, nearBottom, readsAtBottom } from './scroll-pin';
-import { savedIdOf } from './reply-target';
+import { quoteTone, savedIdOf, type QuoteTone } from './reply-target';
 import { TurnActionsSheet, type HeldTurn } from './rows/TurnActionsSheet';
 
 /**
@@ -756,6 +756,11 @@ export function MessageList({
                       viewerId={viewerId}
                       viewerUuid={viewerUuid}
                       colourIndex={group.type === 'single' ? colourOf(group.message) : null}
+                      quoteTone={
+                        group.type === 'single' && group.message.role === 'user' && group.message.replyTo
+                          ? quoteTone(group.message.replyTo, memberColours)
+                          : 'plain'
+                      }
                       answerMark={marks?.[gi]?.answer ?? null}
                       onReply={onReply}
                       onJump={jumpFromQuote}
@@ -881,6 +886,7 @@ const GroupRow = memo(function GroupRow({
   viewerId,
   viewerUuid,
   colourIndex,
+  quoteTone: quoteColour,
   answerMark,
   onReply,
   onJump,
@@ -901,6 +907,8 @@ const GroupRow = memo(function GroupRow({
   viewerUuid: string | null;
   /** A user turn's member colour in a space chat (member-colour.ts), or null. */
   colourIndex: number | null;
+  /** The colour of the message a reply quotes. */
+  quoteTone: QuoteTone;
   /** In a space chat, where an answer starts: Lawexa's mark with this time. */
   answerMark: Date | null;
   onReply: ((target: MessageReplyTo) => void) | null;
@@ -938,6 +946,7 @@ const GroupRow = memo(function GroupRow({
           viewerId={viewerId}
           viewerUuid={viewerUuid}
           colourIndex={colourIndex}
+          quoteTone={quoteColour}
           onReply={onReply}
           onJump={onJump}
           onHold={onHold}

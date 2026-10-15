@@ -96,6 +96,21 @@ export function replySnippet(replyTo: MessageReplyTo): string {
     .trim();
 }
 
+/** A quote's colour: the quoted person's member colour index, Lawexa's gold, or plain grey. */
+export type QuoteTone = number | 'lawexa' | 'plain';
+
+/**
+ * The colour a quote is drawn in (rows/QuoteFrame.tsx): an answer is Lawexa's;
+ * a question its writer's member colour (the reader's own for "You"); a
+ * withheld writer, or one with no colour (a personal chat), plain grey.
+ */
+export function quoteTone(replyTo: MessageReplyTo, memberColours: ReadonlyMap<string, number> | null): QuoteTone {
+  if (replyTo.role === 'assistant') return 'lawexa';
+  const uuid = replyTo.author?.uuid;
+  if (!uuid || !memberColours) return 'plain';
+  return memberColours.get(uuid) ?? 'plain';
+}
+
 /** The sentence a quote shows for a target that has been deleted. */
 export const REPLY_UNAVAILABLE = 'Message unavailable';
 

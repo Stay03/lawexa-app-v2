@@ -54,7 +54,8 @@ import {
   privateModeOf,
 } from '../attachment-rules';
 import { TEXT_DRAFT, useDraft } from './draft-store';
-import { REPLY_DRAFT, replyAuthorLabel, replySnippet } from './reply-target';
+import { REPLY_DRAFT, replyAuthorLabel, replySnippet, type QuoteTone } from './reply-target';
+import { QuoteFrame } from './rows/QuoteFrame';
 import {
   applyMention,
   mentionQueryAt,
@@ -231,6 +232,9 @@ export interface ConversationComposerProps {
    * `@` is only text, as in a personal chat.
    */
   mentionOptions?: MentionOptions | null;
+  /** The colour a quote is drawn in (the screen's member colours), so the bar
+   *  matches the quote the reply will carry. Absent: plain, Lawexa's gold. */
+  quoteToneOf?: ((replyTo: MessageReplyTo) => QuoteTone) | null;
 }
 
 export function ConversationComposer({
@@ -254,6 +258,7 @@ export function ConversationComposer({
   canStop = true,
   viewerId = null,
   mentionOptions = null,
+  quoteToneOf = null,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -878,18 +883,21 @@ export function ConversationComposer({
             >
               <CornerUpLeft aria-hidden className="text-muted-foreground size-3.5 shrink-0" />
               {replyShown && (
-                <div
-                  className={cn(
-                    'min-w-0 flex-1 border-l-[3px] pl-2',
-                    replyShown.role === 'assistant' ? 'border-primary' : 'border-foreground/30',
-                  )}
+                // The same shape as the quote the reply will carry (rows/QuoteFrame.tsx).
+                <QuoteFrame
+                  className="bg-foreground/[0.06] flex-1 dark:bg-foreground/[0.08]"
+                  tone={
+                    quoteToneOf ? quoteToneOf(replyShown) : replyShown.role === 'assistant' ? 'lawexa' : 'plain'
+                  }
+                  name={
+                    <>
+                      <span className="sr-only">Replying to </span>
+                      {replyAuthorLabel(replyShown, viewerId)}
+                    </>
+                  }
                 >
-                  <p className={cn('truncate font-semibold', replyShown.role === 'assistant' && 'text-primary')}>
-                    <span className="sr-only">Replying to </span>
-                    {replyAuthorLabel(replyShown, viewerId)}
-                  </p>
-                  <p className="text-muted-foreground truncate">{replySnippet(replyShown)}</p>
-                </div>
+                  <span className="text-muted-foreground truncate">{replySnippet(replyShown)}</span>
+                </QuoteFrame>
               )}
               <button
                 type="button"

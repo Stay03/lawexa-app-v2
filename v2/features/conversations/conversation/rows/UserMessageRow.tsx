@@ -8,7 +8,7 @@ import type { MessageMetadata } from '@/types/collab';
 import { PastedContentCard } from '../PastedContentCard';
 import { memberStyle } from '../member-colour';
 import { mentionMetadata, spaceUnmatchedSentence } from '../mention-options';
-import { replyAuthorLabel, replyTargetOf } from '../reply-target';
+import { replyAuthorLabel, replyTargetOf, type QuoteTone } from '../reply-target';
 import { turnSide } from '../space-turn';
 import { HoverReply } from './HoverReply';
 import { MentionText } from './MentionText';
@@ -127,6 +127,7 @@ export function UserMessageRow({
   viewerId,
   viewerUuid = null,
   colourIndex = null,
+  quoteTone = 'plain',
   onReply = null,
   onJump,
   onHold,
@@ -141,6 +142,8 @@ export function UserMessageRow({
   /** The asker's colour in a space chat (member-colour.ts); null keeps the
    *  plain bubble, as on a personal chat. */
   colourIndex?: number | null;
+  /** The colour of the message this one quotes (reply-target.ts `quoteTone`). */
+  quoteTone?: QuoteTone;
   /** Make this question the reply target; null where the reader cannot reply. */
   onReply?: ((target: MessageReplyTo) => void) | null;
   /** Scroll to a quoted message and flash it. */
@@ -168,7 +171,7 @@ export function UserMessageRow({
   const mentions = useMemo(() => mentionMetadata(message.mentions), [message.mentions]);
   const unmatched = message.unmatchedHandles ? spaceUnmatchedSentence(message.unmatchedHandles) : '';
   const quote = message.replyTo ? (
-    <ReplyQuote replyTo={message.replyTo} viewerId={viewerId} onJump={onJump} />
+    <ReplyQuote replyTo={message.replyTo} viewerId={viewerId} tone={quoteTone} onJump={onJump} />
   ) : null;
 
   if (showAuthor) {

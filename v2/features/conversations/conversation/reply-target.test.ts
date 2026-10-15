@@ -245,3 +245,32 @@ test('a 5xx or a lost connection reads the chat first: a saved question stays, a
   // Kept: the question stays as the saved row it is, and the answer's failure shows.
   assert.match(engine, /rememberAuthoredIds\(\[keptId\]\);\s*setMessages\(\(msgs\) => msgs\.map\(\(m\) => \(m\.id === optimisticMsg\.id \? \{ \.\.\.m, savedId: keptId \} : m\)\)\);[\s\S]{0,200}?error: 'Your question was sent, but its answer failed\. Try again\.',[\s\S]{0,40}?return null;/);
 });
+
+test('a quote is drawn the WhatsApp way: a straight bar in the quoted person’s colour (Stay, 15 October 2026)', async () => {
+  const { quoteTone } = await import('./reply-target');
+  const colours = new Map([['ada', 3], ['me', 0]]);
+  // A question takes its writer's member colour; the reader's own ("You") takes theirs.
+  assert.equal(quoteTone(quote(), colours), 3);
+  assert.equal(quoteTone(quote({ author: { id: 1, uuid: 'me', name: 'Me', avatar_url: null } }), colours), 0);
+  // Lawexa's answer is gold; a withheld writer, an unknown one or a personal chat is plain.
+  assert.equal(quoteTone(quote({ role: 'assistant', author: null }), colours), 'lawexa');
+  assert.equal(quoteTone(quote({ author: null }), colours), 'plain');
+  assert.equal(quoteTone(quote({ author: { id: 9, uuid: 'gone', name: 'Gone', avatar_url: null } }), colours), 'plain');
+  assert.equal(quoteTone(quote(), null), 'plain');
+  // The shape: a rounded box that clips, and a 4 px bar flush left at full height,
+  // not a thick border on a rounded box (which curves round the corner).
+  const frame = readHere('rows', 'QuoteFrame.tsx');
+  assert.match(frame, /className=\{cn\('flex w-full min-w-0 overflow-hidden rounded-xl text-left text-xs', className\)\}/);
+  assert.match(frame, /<span aria-hidden data-quote-bar="" className=\{cn\('w-1 shrink-0 self-stretch', BAR\[kind\]\)\} \/>/);
+  assert.match(frame, /member: 'bg-\[var\(--member-ink\)\] dark:bg-\[var\(--member-ink-dark\)\]',\s*lawexa: 'bg-primary',\s*plain: 'bg-foreground\/30',/);
+  assert.match(frame, /style=\{typeof tone === 'number' \? memberStyle\(tone\) : undefined\}/);
+  // The bubble's quote and the composer's bar both draw through it; no border edge is left.
+  const quoteRow = readHere('rows', 'ReplyQuote.tsx');
+  const composer = readHere('ConversationComposer.tsx');
+  assert.equal((quoteRow.match(/<QuoteFrame tone=\{tone\} name=\{name\}>/g) ?? []).length, 2);
+  assert.match(composer, /<QuoteFrame\s+className="bg-foreground\/\[0\.06\] flex-1 dark:bg-foreground\/\[0\.08\]"\s+tone=\{\s*quoteToneOf \? quoteToneOf\(replyShown\)/);
+  for (const source of [quoteRow, composer, frame]) assert.doesNotMatch(source, /border-l-\[/);
+  // The colours come from the space's member colours, the same ones the bubbles wear.
+  assert.match(readHere('MessageList.tsx'), /\? quoteTone\(group\.message\.replyTo, memberColours\)/);
+  assert.match(readHere('ConversationScreen.tsx'), /const quoteToneOf = useCallback\(\(replyTo: MessageReplyTo\) => quoteTone\(replyTo, memberColours\), \[memberColours\]\);/);
+});
