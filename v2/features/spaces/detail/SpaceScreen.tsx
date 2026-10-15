@@ -495,7 +495,6 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
       <SpaceFormDialog
         key={panel.keyFor('edit')}
         space={space}
-        viewerId={session.userId}
         {...panel.bind('edit')}
       />
       <SpaceAboutSheet space={space} membership={scope.membership} {...panel.bind('about')} />

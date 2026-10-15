@@ -1,18 +1,13 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import {
   Briefcase,
-  Building2,
   ChevronRight,
-  FolderOpen,
   Globe,
   GraduationCap,
   Loader2,
   Lock,
-  MessagesSquare,
-  User,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -23,9 +18,6 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Space, SpaceKind, SpaceType } from '@/types/collab';
 import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
-import { canOpenTeamChannels } from '@/v2/features/collab/model';
-import { organizationsQueries } from '@/v2/features/organizations/queries';
-import { useV2Session } from '@/v2/runtime/session-context';
 import { readHistoryStamp } from '@/v2/runtime/url-params';
 import { OVERLAY_STAMP_KEY, useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -34,7 +26,6 @@ import {
   SPACE_DESCRIPTION_MAX,
   SPACE_NAME_MAX,
   canSpaceBeOpen,
-  createSpaceKind,
   spaceKind,
 } from '../model';
 import { useCreateSpace, useUpdateSpace } from '../mutations';
@@ -91,12 +82,6 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * The brief's second step — an invite list in the same submit — is not in this
  * pass.
  *
- * THE OWNING ORGANIZATION IS IMMUTABLE, which is why that fork only exists in
- * create mode: `PUT /spaces/{uuid}` takes no `organization_uuid`, so offering
- * the control on edit would be offering a change the server cannot make. It
- * appears at all only when the caller HAS an organization — the server has the
- * final say (a 422 lands inline, in its own words).
- *
  * FAILURES ARE INLINE, never a toast: both mutations are `silentError`, and
  * the sentence appears under the fields it is about, next to the button that
  * produced it.
@@ -115,16 +100,20 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * URL a host should push, so no caller has to re-derive the fallback rule.
  *
  * ── SHARED OR TEAM (Spaces F2, 11 October 2026) ────────────────────────────
- * One Space now comes in two kinds. Below researcher there is nothing to
- * choose: the dialog sends NO kind and the server makes a shared space (it
- * refuses `team` there), which has no starter channel, so the creator lands
- * on the space page. A researcher or above chooses Shared space or Team space
- * and the choice is sent (`createSpaceKind`). The kind is fixed once made, so
- * the edit form does not offer it.
+ * A space comes in two kinds, and a new one is always shared (below). The kind
+ * is fixed once made, so the edit form does not offer it. A SHARED SPACE IS
+ * ALWAYS PRIVATE: the backend refuses `is_private: false` on one (422), so
+ * "Who can join" shows only on the edit form of an older team space.
  *
- * A SHARED SPACE IS ALWAYS PRIVATE: the backend refuses `is_private: false` on
- * one (422). So "Who can join" is not offered for a shared space, in either
- * mode, and the form sends `is_private: true` for it.
+ * ── ONLY THE TWO STEPS, NOTHING ELSE (Stay, 15 October 2026, second pass) ──
+ * "Remove the kind and the private/org. We are not handling org now." Create
+ * asks the type, then the name and the goal, and nothing more: every space is
+ * made as a shared space (`kind: 'shared'`, sent without asking; with no kind
+ * the server makes the old team space, which a plain account may not), owned
+ * by the person making it, and private (the server keeps a shared space
+ * private whatever it is sent). Public waits for Stay's answer on what it
+ * means. The bar's chevron goes back a step on step two (`onBack`), and each
+ * step says which it is ("Step 1 of 2").
  *
  * ── ARTHUR'S WORDS (15 October 2026) ───────────────────────────────────────
  * The title, "What are you working on?" and its line, "Space name", "What are
@@ -192,21 +181,6 @@ const TYPE_EXAMPLES: Readonly<Record<SpaceType, { name: string; goal: string }>>
   },
 };
 
-const KIND_CHOICES: readonly Choice<SpaceKind>[] = [
-  {
-    value: 'shared',
-    icon: FolderOpen,
-    title: 'Shared space',
-    description: 'Conversations, folders and files you share with the people you invite. Always private.',
-  },
-  {
-    value: 'team',
-    icon: MessagesSquare,
-    title: 'Team space',
-    description: 'Adds Team Channels for discussion. Only researchers and above see channels.',
-  },
-];
-
 const PRIVACY_CHOICES: readonly Choice<Privacy>[] = [
   {
     value: 'private',
@@ -226,14 +200,12 @@ export function SpaceFormDialog({
   open,
   onOpenChange,
   space,
-  viewerId,
   onCreated,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Presence switches the dialog into edit mode. */
   space?: Space;
-  viewerId: number | null;
   /**
    * CREATE MODE ONLY: the space exists, and the host closes in place and
    * navigates. Absent (the edit mounts), a successful create just closes.
@@ -246,20 +218,9 @@ export function SpaceFormDialog({
 }) {
   const isEdit = !!space;
   const uid = useId();
-  const session = useV2Session();
-  // Only a create, and only for an account that may open Team Channels.
-  const canChooseKind = !isEdit && canOpenTeamChannels(session);
 
   const createSpace = useCreateSpace();
   const updateSpace = useUpdateSpace(space?.uuid ?? '');
-
-  // Only asked for in create mode, and only to decide whether the owner
-  // control is offered at all.
-  const myOrganization = useQuery({
-    ...organizationsQueries.mine({ viewerId }),
-    enabled: open && !isEdit,
-  });
-  const organization = myOrganization.data?.data ?? null;
 
   const [name, setName] = useState(space?.name ?? '');
   // Create's step two, in the URL (see the docblock); refused in edit, so a
@@ -294,19 +255,11 @@ export function SpaceFormDialog({
   const [privacy, setPrivacy] = useState<Privacy>(
     (space?.is_private ?? true) ? 'private' : 'open',
   );
-  const [owner, setOwner] = useState<string>(space?.organization?.uuid ?? 'personal');
-  // A researcher's create starts on Team, the kind the server would make for
-  // them unasked, so nothing changes for anyone who does not touch it.
-  const [chosenKind, setChosenKind] = useState<SpaceKind>('team');
   const [error, setError] = useState<string | null>(null);
 
-  // The kind this form is about: the space's own in edit; the choice when
-  // there is one; otherwise shared, which is what the server makes.
-  const kind: SpaceKind = space
-    ? spaceKind(space)
-    : canChooseKind
-      ? chosenKind
-      : 'shared';
+  // The kind this form is about: the space's own in edit; a new space is
+  // always a shared one (see the docblock).
+  const kind: SpaceKind = space ? spaceKind(space) : 'shared';
   const canBeOpen = canSpaceBeOpen(kind);
   const isPrivate = !canBeOpen || privacy === 'private';
   const submitting = createSpace.isPending || updateSpace.isPending;
@@ -322,23 +275,6 @@ export function SpaceFormDialog({
 
   const canSubmit = type !== null && name.trim().length > 0 && changed && !submitting;
   const showsTypeStep = !isEdit && urlType === null;
-
-  const ownerChoices: readonly Choice<string>[] = organization
-    ? [
-        {
-          value: 'personal',
-          icon: User,
-          title: 'Personal',
-          description: 'Yours. You invite people to it directly.',
-        },
-        {
-          value: organization.uuid,
-          icon: Building2,
-          title: organization.name,
-          description: `Owned by ${organization.name}. Its admins can manage it too.`,
-        },
-      ]
-    : [];
 
   // Picking a type is the step forward: its own history entry.
   const chooseType = (next: SpaceType) => {
@@ -420,10 +356,9 @@ export function SpaceFormDialog({
       {
         name: trimmedName,
         type,
-        kind: createSpaceKind(chosenKind, canChooseKind),
+        kind: 'shared',
         description: trimmedDescription || undefined,
         is_private: isPrivate,
-        organization_uuid: owner === 'personal' ? undefined : owner,
       },
       {
         onSuccess: (response) => {
@@ -505,6 +440,8 @@ export function SpaceFormDialog({
     <ResponsiveOverlay
       open={open}
       onOpenChange={handleOpenChange}
+      // Step two's chevron goes back to the cards; on step one it closes.
+      onBack={!isEdit && urlType !== null ? changeType : undefined}
       title={isEdit ? 'Rename space' : 'Create a Space'}
       // The create form's heading and its line open the first step (below).
       description={
@@ -542,16 +479,13 @@ export function SpaceFormDialog({
           {privacyField}
         </div>
       ) : showsTypeStep ? (
-        <div key="type" className={stepMotion(entered)}>
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold tracking-tight text-foreground">
-              What are you working on?
-            </h3>
-            <p className="text-pretty text-sm text-muted-foreground">
-              Keep conversations and resources together, and invite others to collaborate.
-            </p>
-          </div>
-          <div role="group" aria-label="Type" className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div key="type" className={cn('space-y-5', stepMotion(entered))}>
+          <StepHeading
+            step="Step 1 of 2"
+            title="What are you working on?"
+            line="Keep conversations and resources together, and invite others to collaborate."
+          />
+          <div role="group" aria-label="Type" className="grid gap-3 sm:grid-cols-2">
             {TYPE_CHOICES.map((choice) => (
               <TypeCard
                 key={choice.value}
@@ -564,30 +498,19 @@ export function SpaceFormDialog({
           </div>
         </div>
       ) : (
-        <div key="details" className={cn('space-y-4', stepMotion(entered))}>
-          {chosen ? <ChosenType choice={chosen} onChange={changeType} /> : null}
-          {nameField}
-          {goalField}
-
-          {canChooseKind ? (
-            <ChoiceCards
-              legend="Kind"
-              choices={KIND_CHOICES}
-              value={chosenKind}
-              onChange={setChosenKind}
+        <div key="details" className={cn('space-y-5', stepMotion(entered))}>
+          {chosen ? (
+            <StepHeading
+              step={`Step 2 of 2 · ${chosen.title}`}
+              title="Name your space"
+              line={chosen.description}
+              icon={chosen.icon}
             />
           ) : null}
-
-          {organization ? (
-            <ChoiceCards
-              legend="Owner"
-              choices={ownerChoices}
-              value={owner}
-              onChange={setOwner}
-            />
-          ) : null}
-
-          {privacyField}
+          <div className="space-y-4">
+            {nameField}
+            {goalField}
+          </div>
         </div>
       )}
 
@@ -673,27 +596,31 @@ function TypeCard({
   );
 }
 
-/** Step two's first line: the type picked, and the way back to change it. */
-function ChosenType({
-  choice,
-  onChange,
+/** A create step's heading: which step it is, what it asks, and one line
+ *  under it. Step two carries the type picked, with its glyph. */
+function StepHeading({
+  step,
+  title,
+  line,
+  icon: Icon,
 }: {
-  choice: Choice<SpaceType>;
-  onChange: () => void;
+  step: string;
+  title: string;
+  line: string;
+  icon?: Choice<SpaceType>['icon'];
 }) {
-  const Icon = choice.icon;
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 py-2.5 pl-3 pr-2">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        <Icon aria-hidden className="size-[18px]" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs text-muted-foreground">Type</span>
-        <span className="block text-sm font-medium text-foreground">{choice.title}</span>
-      </span>
-      <Button type="button" variant="ghost" size="sm" className="v2-interactive" onClick={onChange}>
-        Change<span className="sr-only"> type</span>
-      </Button>
+    <div className="flex items-start gap-3">
+      {Icon ? (
+        <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Icon aria-hidden className="size-5" />
+        </span>
+      ) : null}
+      <div className="min-w-0 space-y-1">
+        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{step}</p>
+        <h3 className="text-lg font-semibold tracking-tight text-balance text-foreground">{title}</h3>
+        <p className="text-pretty text-sm text-muted-foreground">{line}</p>
+      </div>
     </div>
   );
 }

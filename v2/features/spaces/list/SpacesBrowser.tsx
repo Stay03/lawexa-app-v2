@@ -293,7 +293,6 @@ export function SpacesBrowser() {
         key={panel.keyFor(CREATE_PANEL)}
         open={createDialog.open}
         onOpenChange={createDialog.onOpenChange}
-        viewerId={viewerId}
         onCreated={(spaceUuid, defaultChannelUuid) => {
           // Success is a MOVE. The dialog's entry is rewritten rather than
           // popped, so the push below is not racing a queued `history.back()`

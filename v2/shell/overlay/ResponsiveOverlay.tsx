@@ -172,6 +172,7 @@ export function ResponsiveOverlay({
   className,
   size = 'fill',
   guardUnsaved = false,
+  onBack,
   children,
 }: {
   open: boolean;
@@ -214,6 +215,14 @@ export function ResponsiveOverlay({
    * thumb has not.
    */
   guardUnsaved?: boolean;
+  /**
+   * A surface with steps of its own (Create a Space, Stay, 15 October 2026:
+   * "the back button at the top closes it instead of going back"). When given,
+   * the bar's chevron goes back a step instead of closing, and it shows on a
+   * desktop too, before the title, because the step it returns to is in this
+   * surface and nowhere else. Absent, the chevron closes, as it always has.
+   */
+  onBack?: () => void;
   children: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -347,7 +356,19 @@ export function ResponsiveOverlay({
                   Somebody who has typed something they did not mean had no
                   button that said so. An arrow would not have said it either:
                   an arrow means the previous screen, not "throw this away". */}
-              {size === 'fill' ? (
+              {onBack ? (
+                <button
+                  type="button"
+                  aria-label="Back"
+                  onClick={onBack}
+                  className={cn(
+                    'v2-interactive -ml-1 flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:-my-2 md:-ml-2 md:size-9',
+                    FOCUS_RING,
+                  )}
+                >
+                  <ChevronLeft aria-hidden className="size-5" />
+                </button>
+              ) : size === 'fill' ? (
                 <DialogClose asChild>
                   <button
                     type="button"

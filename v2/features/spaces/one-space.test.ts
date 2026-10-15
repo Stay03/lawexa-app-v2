@@ -289,13 +289,16 @@ test('the page follows a soft navigation that changes ?tab=', () => {
   );
 });
 
-test('the create dialog: kind sent only for researcher+, no "open" for a shared space', () => {
+test('the create dialog asks no kind, no owner and no privacy: every new space is a shared one (Stay, 15 October 2026)', () => {
   const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
-  assert.match(dialog, /const canChooseKind = !isEdit && canOpenTeamChannels\(session\);/);
-  assert.match(dialog, /kind: createSpaceKind\(chosenKind, canChooseKind\),/);
-  assert.match(dialog, /\{canChooseKind \? \(\s*<ChoiceCards\s+legend="Kind"/);
+  // Sent without asking: with no kind the server makes the old team space.
+  assert.match(dialog, /kind: 'shared',/);
+  assert.match(dialog, /const kind: SpaceKind = space \? spaceKind\(space\) : 'shared';/);
+  assert.doesNotMatch(dialog, /legend="Kind"|legend="Owner"|organization_uuid|canChooseKind|organizationsQueries/);
+  // Who can join stays on the edit form of a team space, where it can differ.
   assert.match(dialog, /const isPrivate = !canBeOpen \|\| privacy === 'private';/);
   assert.match(dialog, /const privacyField = canBeOpen \? \(\s*<ChoiceCards\s+legend="Who can join"/);
+  assert.equal((dialog.match(/\{privacyField\}/g) ?? []).length, 1);
 });
 
 test('create is two steps: the type first, then the fields, with no preview (Stay, 15 October 2026)', () => {
@@ -308,8 +311,13 @@ test('create is two steps: the type first, then the fields, with no preview (Sta
   assert.match(dialog, /stepParam\.show\(next\);/);
   assert.match(dialog, /\{showsTypeStep \? null : \(\s*<Button onClick=\{handleSubmit\}/);
   // Step two: the type chosen and the way back, then the fields.
-  assert.match(dialog, /\{chosen \? <ChosenType choice=\{chosen\} onChange=\{changeType\} \/> : null\}\s*\{nameField\}\s*\{goalField\}/);
+  assert.match(dialog, /step=\{`Step 2 of 2 · \$\{chosen\.title\}`\}\s*title="Name your space"/);
+  assert.match(dialog, /<div className="space-y-4">\s*\{nameField\}\s*\{goalField\}\s*<\/div>/);
   assert.match(dialog, /const changeType = \(\) => stepParam\.close\(\);/);
+  // The bar's chevron goes back a step on step two, and closes on step one.
+  assert.match(dialog, /onBack=\{!isEdit && urlType !== null \? changeType : undefined\}/);
+  const overlay = read('v2', 'shell', 'overlay', 'ResponsiveOverlay.tsx');
+  assert.match(overlay, /\{onBack \? \(\s*<button\s+type="button"\s+aria-label="Back"\s+onClick=\{onBack\}/);
   // Each step slides in from its side, and only with motion allowed.
   assert.match(dialog, /entered === 'forward' \? 'motion-safe:slide-in-from-right-4' : 'motion-safe:slide-in-from-left-4'/);
   // The preview is gone.
