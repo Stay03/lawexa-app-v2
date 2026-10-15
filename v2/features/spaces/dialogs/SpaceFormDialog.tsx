@@ -172,7 +172,7 @@ const TYPE_CHOICES: readonly Choice<SpaceType>[] = [
 /** The examples in the name and goal fields, by the type picked. */
 const TYPE_EXAMPLES: Readonly<Record<SpaceType, { name: string; goal: string }>> = {
   work: {
-    name: 'e.g. Okafor & Sons, lease dispute',
+    name: 'e.g. Okafor & Sons',
     goal: 'e.g. Review the lease and draft a reply to the landlord’s notice',
   },
   study: {

@@ -318,7 +318,7 @@ test('create is two steps: the type first, then the fields, with no preview (Sta
 
 test('the name and goal examples follow the type picked (Stay, 15 October 2026)', () => {
   const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
-  assert.match(dialog, /name: 'e\.g\. Okafor & Sons, lease dispute',/);
+  assert.match(dialog, /name: 'e\.g\. Okafor & Sons',/);
   assert.match(dialog, /goal: 'e\.g\. Review the lease and draft a reply to the landlord’s notice',/);
   assert.match(dialog, /name: 'e\.g\. Constitutional Law, Bar Finals prep',/);
   assert.match(dialog, /goal: 'e\.g\. Revise for the Bar Finals and practise past questions',/);
