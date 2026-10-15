@@ -45,53 +45,73 @@ function RequestRow({
   const joinsAs = contentRoles ? request.content_role_label?.trim() : undefined;
   return (
     <li className="rounded-xl border border-border/60 p-3">
-      <div className="flex min-w-0 items-center gap-3">
-        <MemberAvatar user={request.user} className="size-8 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">
-            {request.user.name}
-          </p>
-          {joinsAs ? (
-            <p className="truncate text-xs text-muted-foreground">
-              Joins as {joinsAs}
+      {/* TWO COMPACT BUTTONS AT THE END OF THE ROW. A full-width "Let them in"
+          read as "a mess" on desktop (Stay, 15 October 2026). A plain request
+          is one line on a wide screen; on a phone the buttons wrap under the
+          name, still compact, at the right. A request that also opens a
+          channel keeps its sentence ABOVE the buttons (the rule below), so
+          there the buttons always sit under it. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
+          <MemberAvatar user={request.user} className="size-8 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">
+              {request.user.name}
             </p>
-          ) : null}
+            {joinsAs ? (
+              <p className="truncate text-xs text-muted-foreground">
+                Joins as {joinsAs}
+              </p>
+            ) : null}
+          </div>
         </div>
+        {channel ? null : (
+          <DecideButtons channel={false} deciding={deciding} onDecide={onDecide} />
+        )}
       </div>
 
       {/* SAID BEFORE THE PRESS, NEVER AFTER. See the docblock. */}
       {channel ? (
-        <p className="mt-2 rounded-lg bg-primary/10 px-3 py-2 text-xs leading-relaxed text-foreground">
-          Saying yes also lets them into <strong>#{channel.name}</strong>, which
-          is not open to the whole space.
-        </p>
+        <>
+          <p className="mt-2 rounded-lg bg-primary/10 px-3 py-2 text-xs leading-relaxed text-foreground">
+            Saying yes also lets them into <strong>#{channel.name}</strong>, which
+            is not open to the whole space.
+          </p>
+          <div className="mt-3 flex justify-end">
+            <DecideButtons channel deciding={deciding} onDecide={onDecide} />
+          </div>
+        </>
       ) : null}
-
-      <div className="mt-3 flex gap-2">
-        <Button
-          size="sm"
-          className="flex-1"
-          disabled={deciding}
-          onClick={() => onDecide(true)}
-        >
-          {deciding ? (
-            <Loader2 aria-hidden className="size-4 animate-spin" />
-          ) : (
-            <UserCheck aria-hidden className="size-4" />
-          )}
-          {channel ? 'Let them in, and into the channel' : 'Let them in'}
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={deciding}
-          onClick={() => onDecide(false)}
-        >
-          <UserX aria-hidden className="size-4" />
-          Decline
-        </Button>
-      </div>
     </li>
+  );
+}
+
+/** The two decisions, compact, side by side. */
+function DecideButtons({
+  channel,
+  deciding,
+  onDecide,
+}: {
+  /** Saying yes also opens a channel: the button says so. */
+  channel: boolean;
+  deciding: boolean;
+  onDecide: (approve: boolean) => void;
+}) {
+  return (
+    <div className="ml-auto flex shrink-0 gap-2">
+      <Button size="sm" disabled={deciding} onClick={() => onDecide(true)}>
+        {deciding ? (
+          <Loader2 aria-hidden className="size-4 animate-spin" />
+        ) : (
+          <UserCheck aria-hidden className="size-4" />
+        )}
+        {channel ? 'Let them in, and into the channel' : 'Let them in'}
+      </Button>
+      <Button size="sm" variant="outline" disabled={deciding} onClick={() => onDecide(false)}>
+        <UserX aria-hidden className="size-4" />
+        Decline
+      </Button>
+    </div>
   );
 }
 

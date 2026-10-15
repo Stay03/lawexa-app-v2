@@ -6,6 +6,7 @@ import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { ChevronLeft, FolderOpen, Plus, Upload } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { SpaceConversation, SpaceFile, SpaceFolder } from '@/types/collab';
@@ -37,7 +38,7 @@ import {
   uploadRefusal,
   type SpaceItemTarget,
 } from '../../content-model';
-import { canAddContent, spaceChatByline, uniqueRowsById } from '../../model';
+import { canAddContent, lastMessageLine, spaceChatByline, uniqueRowsById } from '../../model';
 import { MoveToSpaceDialog } from '../../move/MoveToSpaceDialog';
 import { spacesQueries } from '../../queries';
 import { useServerSearch, type ServerSearch } from '../../use-server-search';
@@ -226,6 +227,8 @@ function useItemDialogs(access: ContentAccess) {
 function SpaceChatsList({ access }: { access: ContentAccess }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
+  // "You:" on the last-message line when the reader sent it (`lastMessageLine`).
+  const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
   const search = useServerSearch();
   const query = useInfiniteQuery({
     ...spacesQueries.conversations(spaceUuid, { viewerId, search: search.term }),
@@ -295,7 +298,10 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
               index={index}
               exiting={false}
               reveal={reveal}
-              byline={spaceChatByline(conversation.author, viewerId)}
+              byline={
+                lastMessageLine(conversation.last_message, viewerUuid) ??
+                spaceChatByline(conversation.author, viewerId)
+              }
               onMove={
                 ownsItem(conversation.user_id, viewerId)
                   ? () => openMove(targetOf(conversation))

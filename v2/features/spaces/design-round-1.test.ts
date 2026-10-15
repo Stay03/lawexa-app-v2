@@ -244,12 +244,13 @@ test('the members sheet counts the people in and the people invited apart', () =
   const { joined, invited } = splitRoster(roster);
   assert.equal(joined.length, 4);
   assert.equal(invited.length, 1);
-  assert.equal(rosterCountLabel(joined.length, invited.length), '4 members · 1 invited');
+  // Renamed 15 October 2026 (Stay): "invited" became "invite sent".
+  assert.equal(rosterCountLabel(joined.length, invited.length), '4 members · 1 invite sent');
   assert.equal(rosterCountLabel(1, 0), '1 member');
-  assert.equal(rosterCountLabel(3, 2), '3 members · 2 invited');
+  assert.equal(rosterCountLabel(3, 2), '3 members · 2 invites sent');
   const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
   assert.match(sheet, /rosterCountLabel\(joined\.length, invited\.length\)/);
-  assert.match(sheet, />\s*Invited\s*</);
+  assert.match(sheet, />\s*Invite sent\s*</);
   const row = read('v2', 'features', 'collab', 'membership', 'RosterRow.tsx');
   assert.match(row, /\{member\.is_pending \? 'Cancel invitation' : 'Remove'\}/);
   // The faces left the header for the People tab (Stay, 15 October 2026),

@@ -797,6 +797,13 @@ export interface ConversationMessagePreview {
   role: 'user' | 'assistant';
   preview: string;
   created_at: string;
+  /**
+   * Who sent it (backend, 15 October 2026): the person for a user turn, null
+   * for Lawexa's answer. Withheld as `MessageResource.author` is: a reader
+   * outside the space gets the chat owner's name only (no uuid), and null for
+   * anyone else. Absent on an API before it.
+   */
+  author?: { uuid?: string; name: string } | null;
 }
 
 // Conversation list item (without full messages)

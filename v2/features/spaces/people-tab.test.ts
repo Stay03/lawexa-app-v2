@@ -58,8 +58,10 @@ test('the panel: members for everyone; invite, links, Invited and Asked to join 
   assert.doesNotMatch(panel, /useUrlOverlay/);
   assert.match(panel, /\{canManage && waiting > 0 \? \(/);
   assert.match(panel, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} contentRoles=\{shared\} \/>/);
-  assert.match(panel, />\s*Asked to join\s*</);
-  assert.match(panel, />\s*Invited\s*</);
+  // Stay's names (15 October 2026): "Invite sent" and "Needs your approval".
+  assert.match(panel, />\s*Needs your approval\s*</);
+  assert.match(panel, />\s*Invite sent\s*</);
+  assert.doesNotMatch(panel, />\s*(Invited|Asked to join)\s*</);
   // One row for the tab and the sheet.
   assert.match(panel, /const rosterRow = useSpaceRosterRow\(\{ space, viewerUuid, canManage, shared \}\);/);
 });
@@ -96,4 +98,28 @@ test('the screen draws the People tab, and the silhouette has its shape', () => 
   assert.match(states, /tab === 'people' \? \([\s\S]{0,200}<RosterSkeleton \/>/);
   // The members call passes the status through.
   assert.match(read('lib', 'api', 'collab.ts'), /page: params\.page \?\? 1,\s*status: params\.status,/);
+});
+
+test('a join request row: two compact buttons at the end, the channel sentence still before its buttons (Stay, 15 October 2026)', () => {
+  const requests = read('v2', 'features', 'invites', 'JoinRequestsPanel.tsx');
+  assert.doesNotMatch(requests, /className="flex-1"/);
+  assert.match(requests, /\{channel \? null : \(\s*<DecideButtons channel=\{false\} deciding=\{deciding\} onDecide=\{onDecide\} \/>\s*\)\}/);
+  assert.match(requests, /Saying yes also lets them into[\s\S]*?<DecideButtons channel deciding=\{deciding\} onDecide=\{onDecide\} \/>/);
+  assert.match(requests, /<div className="ml-auto flex shrink-0 gap-2">/);
+});
+
+test('a space chat row says its last message and who sent it (Stay, 15 October 2026)', async () => {
+  const { lastMessageLine } = await import('./model');
+  const at = '2026-10-15T12:30:00+00:00';
+  assert.equal(lastMessageLine({ role: 'user', preview: 'Can a tenant withhold rent?', created_at: at, author: { uuid: 'u2', name: 'User2 Tester' } }, 'u1'), 'User2 Tester: Can a tenant withhold rent?');
+  assert.equal(lastMessageLine({ role: 'user', preview: 'Mine', created_at: at, author: { uuid: 'u1', name: 'User Tester' } }, 'u1'), 'You: Mine');
+  assert.equal(lastMessageLine({ role: 'assistant', preview: 'A short answer', created_at: at, author: null }, 'u1'), 'Lawexa: A short answer');
+  // A sender the server withholds leaves the preview alone; whitespace folds.
+  assert.equal(lastMessageLine({ role: 'user', preview: 'Two\n lines', created_at: at, author: null }, 'u1'), 'Two lines');
+  // An outsider gets the owner's name with no uuid: never "You" by mistake.
+  assert.equal(lastMessageLine({ role: 'user', preview: 'Hi', created_at: at, author: { name: 'Owner Name' } }, null), 'Owner Name: Hi');
+  assert.equal(lastMessageLine(null, 'u1'), null);
+  assert.equal(lastMessageLine({ role: 'user', preview: '  ', created_at: at }, 'u1'), null);
+  const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
+  assert.match(panel, /byline=\{\s*lastMessageLine\(conversation\.last_message, viewerUuid\) \?\?\s*spaceChatByline\(conversation\.author, viewerId\)\s*\}/);
 });

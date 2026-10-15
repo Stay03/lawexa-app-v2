@@ -9,6 +9,7 @@ import type {
   SpaceType,
   UpdateSpaceMemberRolePayload,
 } from '@/types/collab';
+import type { ConversationMessagePreview } from '@/types/chat';
 import {
   CONTENT_ROLE_LABELS,
   contentRoleOf,
@@ -215,6 +216,31 @@ export function spaceChatByline(
   if (!author) return null;
   if (viewerId !== null && author.id === viewerId) return 'You';
   return author.name.trim() || null;
+}
+
+/**
+ * A space's chat row's second line: its last message and who sent it (Stay,
+ * 15 October 2026: "replace 'you' with the last message in the chat and the
+ * person that sent it"). "Ada Obi: Can a tenant withhold rent…", "You: …" for
+ * the reader's own, "Lawexa: …" for an answer. A sender the server withholds
+ * (null) leaves the preview alone; no preview (an empty chat, or an API before
+ * it) gives null, and the row falls back to whose chat it is.
+ */
+export function lastMessageLine(
+  last: ConversationMessagePreview | null | undefined,
+  viewerUuid: string | null,
+): string | null {
+  const preview = last?.preview?.replace(/\s+/g, ' ').trim();
+  if (!last || !preview) return null;
+  const who =
+    last.role === 'assistant'
+      ? 'Lawexa'
+      : last.author
+        ? viewerUuid !== null && last.author.uuid === viewerUuid
+          ? 'You'
+          : last.author.name.trim() || null
+        : null;
+  return who ? `${who}: ${preview}` : preview;
 }
 
 /**
@@ -434,10 +460,11 @@ export function splitRoster(members: readonly Member[]): {
   return { joined, invited };
 }
 
-/** "4 members" / "4 members · 1 invited": the members sheet's count line. */
+/** "4 members" / "4 members · 1 invite sent": the count line of the People tab
+ *  and the members sheet (the heading was "Invited"; renamed 15 October 2026). */
 export function rosterCountLabel(joined: number, invited: number): string {
   const members = memberCountLabel(joined);
-  return invited > 0 ? `${members} · ${invited} invited` : members;
+  return invited > 0 ? `${members} · ${invited} ${invited === 1 ? 'invite' : 'invites'} sent` : members;
 }
 
 /**

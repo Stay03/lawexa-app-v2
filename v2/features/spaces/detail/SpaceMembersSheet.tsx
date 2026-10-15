@@ -454,7 +454,7 @@ export function SpaceMembersSheet({
                       id="space-roster-invited"
                       className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
                     >
-                      Invited
+                      Invite sent
                     </h3>
                     <div className="divide-y divide-border/60">
                       {invited.map((member) => rosterRow(member, true))}

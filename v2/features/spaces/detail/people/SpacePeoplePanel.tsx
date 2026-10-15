@@ -29,8 +29,10 @@ import { useSpaceRosterRow } from './use-roster-row';
  * - Whoever may manage the space's people (`scope.canManage`: the Owner of a
  *   shared space; the owner and admins of a team space) also gets Invite
  *   people and Invite links, and two more lists when they have anyone in
- *   them: "Invited" (asked, not accepted yet) and "Asked to join" (came
- *   through a link that needs approval; approve or decline on the row).
+ *   them: "Invite sent" (invited, not accepted yet) and "Needs your
+ *   approval" (came through a link that needs approval; let them in or
+ *   decline on the row). Stay renamed both on 15 October 2026 (they were
+ *   "Invited" and "Asked to join").
  *
  * The roster is the frame's own members query (same key, so this paints from
  * the warm cache and asks for nothing new); this mounts it again for its own
@@ -102,7 +104,7 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
           className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
         >
           <h2 id="space-people-invited" className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Invited
+            Invite sent
           </h2>
           <div className="divide-y divide-border/60">{invited.map((member) => rosterRow(member, true))}</div>
         </section>
@@ -114,7 +116,7 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
           className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
         >
           <h2 id="space-people-requests" className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-            Asked to join
+            Needs your approval
           </h2>
           <SpaceJoinRequestsPanel spaceUuid={space.uuid} contentRoles={shared} />
         </section>
