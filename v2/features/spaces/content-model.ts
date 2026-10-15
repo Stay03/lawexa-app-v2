@@ -167,6 +167,27 @@ export function moveRefusal(
   return 'Couldn’t move it. Please try again.';
 }
 
+/**
+ * Whether the viewer may delete this space file (backend, 15 October 2026;
+ * the rows carry no flag): the space's Owner any file, a Contributor only
+ * what they uploaded, a Viewer none.
+ */
+export function canDeleteSpaceFile(
+  space: Pick<Space, 'my_content_role'>,
+  uploaderId: number,
+  viewerId: number | null,
+): boolean {
+  if (space.my_content_role === 'owner') return true;
+  return space.my_content_role === 'editor' && viewerId !== null && uploaderId === viewerId;
+}
+
+/** Why a copy or a delete of a space file was refused, from the status. */
+export function spaceFileRefusal(action: 'copy' | 'delete', status: number, serverMessage: string | null): string {
+  if (status === 403) return serverMessage?.trim() || 'You cannot delete this file.';
+  if (status === 404) return 'This file is no longer in the space.';
+  return action === 'copy' ? 'Couldn’t save a copy. Please try again.' : 'Couldn’t delete the file. Please try again.';
+}
+
 /** Why a Remove from Space was refused (B3: 403 for anyone but the space's
  *  Owner, 404 when the item is no longer in the space). */
 export function removeRefusal(status: number): string {

@@ -9,6 +9,7 @@
 
 import { apiClient } from '@/lib/api/client';
 import type { ApiResponse } from '@/types/api';
+import type { UserFile } from '@/types/file';
 import type {
   AddListItemPayload,
   AiSessionListResponse,
@@ -290,6 +291,28 @@ export const spacesApi = {
    * so the caller waits for the promise before calling it done. `signal`
    * aborts the request (the upload tray's Cancel).
    */
+  /**
+   * Save a copy of a space's file to the caller's own files (backend, 15
+   * October 2026): `201` with the new file, a separate one, so deleting
+   * either leaves the other. Any active member may; a 404 means the file is
+   * not in this space (or the caller is not a member).
+   */
+  copyFileToMine: async (spaceUuid: string, fileId: number): Promise<ApiResponse<UserFile>> => {
+    const response = await apiClient.post<ApiResponse<UserFile>>(
+      `/spaces/${spaceUuid}/files/${fileId}/copy-to-mine`
+    );
+    return response.data;
+  },
+
+  /**
+   * Delete a space's file for everyone (`200`). The space's Owner may delete
+   * any; a Contributor only what they uploaded; a Viewer none (403 "You
+   * cannot delete this file.").
+   */
+  deleteFile: async (spaceUuid: string, fileId: number): Promise<void> => {
+    await apiClient.delete(`/spaces/${spaceUuid}/files/${fileId}`);
+  },
+
   uploadFile: async (
     spaceUuid: string,
     file: File,

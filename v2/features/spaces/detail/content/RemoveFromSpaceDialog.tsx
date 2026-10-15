@@ -63,7 +63,10 @@ export function RemoveFromSpaceDialog({
       onSuccess: () => {
         onOpenChange(false);
         toast.success(`Removed from ${spaceName}`, {
-          description: `“${item.name}” was not deleted. It is back with the person who added it.`,
+          description:
+            item.type === 'file'
+              ? `“${item.name}” was not deleted. It is in your own files now.`
+              : `“${item.name}” was not deleted. It is back with the person who added it.`,
         });
       },
       onError: (mutationError) => setError(removeRefusal(extractApiError(mutationError).status)),
@@ -79,7 +82,9 @@ export function RemoveFromSpaceDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>{`Remove “${item.name}” from this space?`}</AlertDialogTitle>
           <AlertDialogDescription>
-            {`This takes the ${noun} out of ${spaceName}, so members no longer see it here. It is not deleted: it goes back to the person who added it.`}
+            {item.type === 'file'
+              ? `This takes the file out of ${spaceName}, so members no longer see it here. It is not deleted: a space's file belongs to the space, so it moves to your own files.`
+              : `This takes the ${noun} out of ${spaceName}, so members no longer see it here. It is not deleted: it goes back to the person who added it.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (

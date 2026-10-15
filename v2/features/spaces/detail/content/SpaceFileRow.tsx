@@ -1,13 +1,14 @@
 'use client';
 
 import { memo } from 'react';
-import { Boxes, ExternalLink, FolderOutput, Loader2, MoreHorizontal } from 'lucide-react';
+import { Boxes, Copy, ExternalLink, FolderOutput, Loader2, MoreHorizontal, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatBytes } from '@/lib/utils/format-bytes';
@@ -68,6 +69,8 @@ export const SpaceFileRow = memo(function SpaceFileRow({
   index,
   onMove,
   onRemoveFromSpace,
+  onCopyToMine,
+  onDelete,
 }: {
   file: SpaceFile;
   /** Staggers the entrance for the first screenful only. */
@@ -76,6 +79,10 @@ export const SpaceFileRow = memo(function SpaceFileRow({
   onMove?: (file: SpaceFile) => void;
   /** Opens the Remove from Space confirm (the space's Owner). Stable, likewise. */
   onRemoveFromSpace?: (file: SpaceFile) => void;
+  /** Saves a copy to the reader's own files (every member). Stable, likewise. */
+  onCopyToMine?: (file: SpaceFile) => void;
+  /** Opens the delete confirm (the Owner, or the Contributor who uploaded it). */
+  onDelete?: (file: SpaceFile) => void;
 }) {
   // Per row, deliberately: one instance shared by the list would put every
   // row's spinner on at once the moment any row was opened.
@@ -152,7 +159,7 @@ export const SpaceFileRow = memo(function SpaceFileRow({
           </button>
         )}
 
-        {onMove || onRemoveFromSpace ? (
+        {onMove || onRemoveFromSpace || onCopyToMine || onDelete ? (
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
@@ -164,6 +171,14 @@ export const SpaceFileRow = memo(function SpaceFileRow({
               <MoreHorizontal aria-hidden className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              {/* A copy the reader keeps, separate from the space's file (Stay,
+                  15 October 2026: a space file belongs to the space). */}
+              {onCopyToMine ? (
+                <DropdownMenuItem onSelect={() => onCopyToMine(file)}>
+                  <Copy />
+                  Save a copy to my files
+                </DropdownMenuItem>
+              ) : null}
               {onMove ? (
                 <DropdownMenuItem onSelect={() => onMove(file)}>
                   <Boxes />
@@ -175,6 +190,15 @@ export const SpaceFileRow = memo(function SpaceFileRow({
                   <FolderOutput />
                   Remove from space
                 </DropdownMenuItem>
+              ) : null}
+              {onDelete ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onSelect={() => onDelete(file)}>
+                    <Trash2 />
+                    Delete file
+                  </DropdownMenuItem>
+                </>
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>

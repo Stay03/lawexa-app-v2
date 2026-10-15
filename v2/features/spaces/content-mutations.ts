@@ -117,6 +117,33 @@ export function useUploadSpaceFile(spaceUuid: string) {
   });
 }
 
+/* ── A space's files: a copy for me, and delete (15 October 2026) ──────────── */
+
+/**
+ * Save a copy of a space's file to the reader's own files (POST
+ * /spaces/{uuid}/files/{id}/copy-to-mine). The space is unchanged, so nothing
+ * of the space's is dirtied, and v2 has no own-files list to refresh yet.
+ */
+export function useCopySpaceFileToMine(spaceUuid: string) {
+  return useMutation({
+    mutationFn: (fileId: number) => spacesApi.copyFileToMine(spaceUuid, fileId),
+    meta: { silentError: true },
+  });
+}
+
+/**
+ * Delete a space's file for everyone (DELETE /spaces/{uuid}/files/{id}): the
+ * space's lists and counts change.
+ */
+export function useDeleteSpaceFile(spaceUuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (fileId: number) => spacesApi.deleteFile(spaceUuid, fileId),
+    meta: { silentError: true },
+    onSuccess: () => invalidateSpaceContents(queryClient, spaceUuid),
+  });
+}
+
 /* ── Taking out ───────────────────────────────────────────────────────────── */
 
 /**

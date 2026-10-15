@@ -119,7 +119,7 @@ test('the file row body is the open control, at least 44px tall', () => {
   assert.match(row, /<MetaLine\s+as="span"/);
   // The 32px open button is gone; the menu stays a sibling of the body.
   assert.doesNotMatch(row, /aria-label=\{`Open \$\{file\.original_name\}`\}/);
-  assert.match(row, /<\/button>\s*\)\}\s*\{onMove \|\| onRemoveFromSpace \? \(/);
+  assert.match(row, /<\/button>\s*\)\}\s*\{onMove \|\| onRemoveFromSpace \|\| onCopyToMine \|\| onDelete \? \(/);
   // The failure line, with its own Try again button, sits outside the body.
   assert.ok(row.indexOf("Couldn&rsquo;t open it.") > row.indexOf('</DropdownMenu>'));
 });

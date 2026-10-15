@@ -4,12 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from 'next/link';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { ChevronLeft, FolderOpen, Plus, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { SpaceConversation, SpaceFile, SpaceFolder } from '@/types/collab';
+import type { Space, SpaceConversation, SpaceFile, SpaceFolder } from '@/types/collab';
 import { UploadTray } from '@/v2/features/channels/files/UploadTray';
 import {
   useUploadQueueFor,
@@ -30,10 +31,12 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { SearchField } from '@/v2/shell/SearchField';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
-import { useUploadSpaceFile } from '../../content-mutations';
+import { useCopySpaceFileToMine, useUploadSpaceFile } from '../../content-mutations';
 import {
+  canDeleteSpaceFile,
   canRemoveFromSpace,
   ownsItem,
+  spaceFileRefusal,
   uploadPrecheck,
   uploadRefusal,
   type SpaceItemTarget,
@@ -43,6 +46,7 @@ import { MoveToSpaceDialog } from '../../move/MoveToSpaceDialog';
 import { spacesQueries } from '../../queries';
 import { useServerSearch, type ServerSearch } from '../../use-server-search';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
+import { DeleteSpaceFileDialog } from './DeleteSpaceFileDialog';
 import { SpaceFileRow } from './SpaceFileRow';
 import { SpaceChatDock } from './SpaceChatDock';
 import {
@@ -116,6 +120,7 @@ export function SpaceContentPanel({
     spaceName: space?.name ?? '',
     canAdd: space !== null && canAddContent(space),
     canRemove: space !== null && canRemoveFromSpace(space),
+    contentRole: space?.my_content_role ?? null,
     // An Owner alone in the space: the empty tabs offer to bring people in.
     onInvite:
       scope !== null && scope.canManage && space !== null && space.active_members_count <= 1
@@ -140,6 +145,8 @@ interface ContentAccess {
   canAdd: boolean;
   /** The space's Owner: Remove from space on any item. */
   canRemove: boolean;
+  /** The reader's content role, for who may delete which file. */
+  contentRole: Space['my_content_role'] | null;
   /** Opens the invite dialog, for an Owner alone in the space; else `null`. */
   onInvite: (() => void) | null;
 }
@@ -595,6 +602,35 @@ function SpaceFilesList({ access }: { access: ContentAccess }) {
     [openRemove, targetOf],
   );
 
+  // Save a copy to my files (every member) and delete (the Owner any file, a
+  // Contributor what they uploaded): backend, 15 October 2026.
+  const copyToMine = useCopySpaceFileToMine(spaceUuid);
+  const copyMutate = copyToMine.mutate;
+  const copyFile = useCallback(
+    (file: SpaceFile) =>
+      copyMutate(file.id, {
+        onSuccess: () =>
+          toast.success('Saved a copy to your files', {
+            description: `“${file.original_name}” in your files is your own. The one in ${spaceName} stays.`,
+          }),
+        onError: (error) => {
+          const apiError = extractApiError(error);
+          toast.error(spaceFileRefusal('copy', apiError.status, apiError.message));
+        },
+      }),
+    [copyMutate, spaceName],
+  );
+  const [deleting, setDeleting] = useState<{ file: { id: number; name: string }; open: boolean; key: number } | null>(null);
+  const deleteFile = useCallback(
+    (file: SpaceFile) =>
+      setDeleting((previous) => ({
+        file: { id: file.id, name: file.original_name },
+        open: true,
+        key: (previous?.key ?? 0) + 1,
+      })),
+    [],
+  );
+
   const uploadButton = canAdd ? (
     <PillButton icon={Upload} onClick={pickFiles}>
       Upload
@@ -662,11 +698,27 @@ function SpaceFilesList({ access }: { access: ContentAccess }) {
               index={index}
               onMove={ownsItem(file.uploader.id, viewerId) ? moveFile : undefined}
               onRemoveFromSpace={canRemove ? removeFile : undefined}
+              onCopyToMine={copyFile}
+              onDelete={
+                canDeleteSpaceFile({ my_content_role: access.contentRole }, file.uploader.id, viewerId)
+                  ? deleteFile
+                  : undefined
+              }
             />
           ))}
         </ul>
       </PagedContent>
       {dialogs}
+      {deleting ? (
+        <DeleteSpaceFileDialog
+          key={`delete-${deleting.key}`}
+          spaceUuid={spaceUuid}
+          spaceName={spaceName}
+          file={deleting.file}
+          open={deleting.open}
+          onOpenChange={(open) => setDeleting((previous) => (previous ? { ...previous, open } : previous))}
+        />
+      ) : null}
     </>
   );
 

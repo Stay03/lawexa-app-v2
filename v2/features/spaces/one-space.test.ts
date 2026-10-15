@@ -228,7 +228,11 @@ test('the content lists: their own keys under spaces, read-only rows', () => {
     assert.match(api, new RegExp(`\`/spaces/\\$\\{spaceUuid\\}/${path}\``), path);
   }
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.doesNotMatch(panel, /onDelete=|onRename=/);
+  // Rename stays the owner's: never in a space tab's menu. Delete is in it for
+  // files alone since 15 October 2026 (a space's file belongs to the space).
+  assert.doesNotMatch(panel, /onRename=/);
+  assert.equal((panel.match(/onDelete=/g) ?? []).length, 1);
+  assert.match(panel, /onCopyToMine=\{copyFile\}\s*onDelete=\{/);
   assert.doesNotMatch(panel, /FilesTab/);
   // Every list keeps each row once across pages.
   assert.doesNotMatch(panel, /flatMap/);

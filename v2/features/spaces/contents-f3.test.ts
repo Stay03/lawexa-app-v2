@@ -145,7 +145,11 @@ test('the folder and file menus carry the space rows only when the host passes t
   // Rename and Delete stay the owner's pair: never in a space tab's menu.
   assert.match(menu, /\{onRename \? \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuItem\s+variant="destructive"/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.doesNotMatch(panel, /onRename=|onDelete=/);
+  // Rename stays the owner's: never in a space tab's menu. Delete is in it for
+  // files alone since 15 October 2026 (a space's file belongs to the space).
+  assert.doesNotMatch(panel, /onRename=/);
+  assert.equal((panel.match(/onDelete=/g) ?? []).length, 1);
+  assert.match(panel, /onCopyToMine=\{copyFile\}\s*onDelete=\{/);
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
   // A confidential chat never gets a space row.
   assert.match(row, /\{!hasMenu \? null : is_confidential \? \(\s*<span aria-hidden className="size-9 shrink-0" \/>/);
@@ -323,7 +327,8 @@ test('each write invalidates the space lists, the item’s own list and the coun
     /onSuccess: \(_response, \{ item \}\) =>\s*Promise\.all\(\[\s*queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.contents\(\) \}\),\s*queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.details\(\) \}\),\s*queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.lists\(\) \}\),\s*invalidateItemFamily\(queryClient, item\),/,
   );
   // Every write explains its own refusal in place.
-  assert.equal(mutations.match(/meta: \{ silentError: true \}/g)?.length, 4);
+  // (Six with the space file's copy and delete, 15 October 2026.)
+  assert.equal(mutations.match(/meta: \{ silentError: true \}/g)?.length, 6);
   // The prefix a move invalidates is the one every space's contents sit under.
   const queries = read('v2', 'features', 'spaces', 'queries.ts');
   assert.match(queries, /contents: \(\) => \[\.\.\.spacesQueries\.all, 'contents'\] as const,/);
