@@ -75,46 +75,54 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
   };
 
   return (
-    <li className="rounded-xl border border-border/60 p-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="md" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-semibold text-foreground">
-            {space.name}
+    // ONE GRID, TWO SHAPES (techlead, 15 October 2026): on a phone the action
+    // runs full width under the text, where a thumb is; from `md:` it sits at
+    // its own size on the right of the title row, so a 640px card does not
+    // carry a bar across its whole width.
+    <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-xl border border-border/60 p-4 md:grid-cols-[auto_minmax(0,1fr)_auto]">
+      <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="md" />
+      <div className="min-w-0">
+        <p className="truncate text-[15px] font-semibold text-foreground">
+          {space.name}
+        </p>
+        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Users aria-hidden className="size-3.5 shrink-0" />
+          <span className="truncate">
+            {space.active_members_count}{' '}
+            {space.active_members_count === 1 ? 'person' : 'people'} · {space.type_label}
+            {space.owner?.name ? ` · by ${space.owner.name}` : ''}
+          </span>
+        </p>
+        {space.description ? (
+          <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            {space.description}
           </p>
-          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <Users aria-hidden className="size-3.5 shrink-0" />
-            <span className="truncate">
-              {space.active_members_count}{' '}
-              {space.active_members_count === 1 ? 'person' : 'people'} · {space.type_label}
-              {space.owner?.name ? ` · by ${space.owner.name}` : ''}
-            </span>
-          </p>
-          {space.description ? (
-            <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-              {space.description}
-            </p>
-          ) : null}
-        </div>
+        ) : null}
       </div>
 
-      <div className="mt-3">
+      <div className="col-span-2 mt-3 md:col-span-1 md:mt-0 md:self-start">
         {action === 'open' ? (
-          <Button asChild variant="outline" size="sm" className="w-full">
+          <Button asChild variant="outline" size="sm" className="w-full md:w-auto">
             <Link href={`/spaces/${space.uuid}`}>Open</Link>
           </Button>
         ) : action === 'pending' ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2">
-            <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              <Check aria-hidden className="size-4 text-primary" />
-              Request sent
+          // One row: what happened on the left, the way to take it back on the
+          // right. The helper line is the phone's; on desktop the row is short.
+          <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary/60 py-1.5 pr-1 pl-3 md:gap-2 md:bg-transparent md:p-0">
+            <span className="flex min-w-0 flex-col">
+              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <Check aria-hidden className="size-4 shrink-0 text-primary" />
+                Request sent
+              </span>
+              <span className="truncate text-xs text-muted-foreground md:hidden">
+                The owner will let you in.
+              </span>
             </span>
-            <span className="text-xs text-muted-foreground">The owner will let you in.</span>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="v2-interactive -my-1 ml-auto"
+              className="v2-interactive shrink-0"
               disabled={ask.isPending}
               onClick={() => sendAsk(false)}
             >
@@ -125,7 +133,7 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
         ) : action === 'ask' ? (
           <Button
             size="sm"
-            className="w-full"
+            className="w-full md:w-auto"
             disabled={ask.isPending}
             onClick={() => sendAsk(true)}
           >
@@ -135,7 +143,7 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
         ) : (
           <Button
             size="sm"
-            className="w-full"
+            className="w-full md:w-auto"
             disabled={join.isPending}
             onClick={press}
           >
