@@ -125,7 +125,10 @@ test('the tabs: a Viewer sees no add control, only the space Owner sees Remove f
   assert.match(panel, /const uploadButton = canAdd \? \(/);
   // The file input and the tray exist only for someone who may add, and so
   // does the drop zone.
-  assert.match(panel, /\{canAdd \? \(\s*<>\s*<input/);
+  // (One picker since 15 October 2026, `useSpaceUploads`, in Files and in
+  // the empty Conversations tab.)
+  assert.match(panel, /\{canAdd \? picker : null\}/);
+  assert.match(panel, /\{canAdd \? uploads\.picker : null\}/);
   assert.match(panel, /return canAdd \? \(\s*<FileDropZone/);
   // Remove from space on each tab's rows, for the space's Owner only.
   assert.equal(panel.match(/onRemoveFromSpace=\{\s*canRemove \?/g)?.length, 3);
@@ -224,13 +227,21 @@ test('empty tabs teach the Owner and Contributors, and tell a Viewer who fills t
   const nouns = { chats: 'conversations', folders: 'folders', files: 'files' } as const;
   for (const tab of ['chats', 'folders', 'files'] as const) {
     const adder = spaceEmptyCopy(tab, true);
-    assert.equal(adder.title, `No ${nouns[tab]} in this space yet`, tab);
+    // Arthur's heading for the Conversations tab (15 October 2026).
+    assert.equal(
+      adder.title,
+      tab === 'chats' ? 'Start working with Lawexa' : `No ${nouns[tab]} in this space yet`,
+      tab,
+    );
     assert.doesNotMatch(adder.title + adder.description, /Members can add|organised for the whole team/, tab);
     const viewer = spaceEmptyCopy(tab, false);
     assert.equal(viewer.title, `No ${nouns[tab]} in this space yet`, tab);
     assert.equal(viewer.description, `Contributors and the owner add ${nouns[tab]} here.`, tab);
   }
-  assert.equal(spaceEmptyCopy('chats', true).description, 'Ask Lawexa below to start the first one.');
+  assert.equal(
+    spaceEmptyCopy('chats', true).description,
+    'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
+  );
   assert.match(spaceEmptyCopy('folders', true).description, /Folders you add here are shared with everyone in this space\./);
   assert.match(spaceEmptyCopy('files', true).description, /Files you add here are shared with everyone in this space\./);
 });

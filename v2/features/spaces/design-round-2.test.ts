@@ -73,7 +73,7 @@ test('the folders and files empty states offer a labelled button', () => {
   // The word is plain text in the button, never `sr-only`.
   assert.match(
     panel,
-    /<Button type="button" size="sm" onClick=\{onClick\}>\s*<Icon aria-hidden className="size-4" \/>\s*\{children\}\s*<\/Button>/,
+    /<Button type="button" size="sm" variant=\{variant\} onClick=\{onClick\}>\s*<Icon aria-hidden className="size-4" \/>\s*\{children\}\s*<\/Button>/,
   );
   // The toolbar pills are not handed to an empty state any more.
   assert.doesNotMatch(panel, /action=\{(newFolderButton|uploadButton)\}\s*onInvite/);

@@ -16,6 +16,7 @@ import {
   showsPrivateMark,
   spaceKindMark,
   spaceLeaveRoute,
+  spaceHeaderFacts,
   spaceMenuItems,
   spaceOwnerLabel,
   spacePrincipleLine,
@@ -73,18 +74,33 @@ test('a team space speaks the content roles too (design round 2, NICE 3)', () =>
   assert.equal(spaceRoleLabel({ my_role: 'owner', my_content_role: null }), 'You’re the owner');
 });
 
-test('the space header prints the role; the list says whose by its sections', () => {
+test('the space header prints the type and privacy, not the role (Arthur, 15 October 2026)', () => {
+  assert.deepEqual(
+    spaceHeaderFacts({ type_label: 'Study', kind: 'shared', is_private: true }),
+    ['Study', 'Private'],
+  );
+  assert.deepEqual(
+    spaceHeaderFacts({ type_label: 'Work', kind: 'team', is_private: false }),
+    ['Work', 'Public'],
+  );
+  // A shared space is always private, whatever the column says.
+  assert.deepEqual(
+    spaceHeaderFacts({ type_label: 'Work', kind: 'shared', is_private: false }),
+    ['Work', 'Private'],
+  );
   // The spaces list row was redrawn as a chat-list row (Stay, 15 October 2026);
   // spaces-list-rows.test.ts pins it now.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
   assert.doesNotMatch(row, /spaceRoleLabel/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
+  // The name first, the line under it.
   assert.match(
     header,
-    /lead=\{\[space\.type_label, spaceOwnerLabel\(space\), spaceRoleLabel\(membership\)\]\}/,
+    /<SpaceHeading name=\{space\.name\}[^>]*\/>\s*<MetaLine className="mt-1 text-sm" lead=\{spaceHeaderFacts\(space\)\} \/>/,
   );
+  assert.doesNotMatch(header, /spaceRoleLabel|spaceOwnerLabel/);
   const frame = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
-  assert.match(frame, /lead=\{\[identity\.typeLabel, identity\.ownerLabel, identity\.roleLabel\]\}/);
+  assert.match(frame, /<MetaLine className="mt-1 text-sm" lead=\{identity\.facts\} \/>/);
 });
 
 /* ── Stay's two lines, on every shared space (critique 3) ────────────────── */
@@ -134,9 +150,11 @@ test('the lock shows only where it can differ: a private team space', () => {
   assert.equal(showsPrivateMark({ is_private: true }), true);
   // The list row now always says Private or Public, as an icon (spaceIsPrivate).
   assert.match(read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx'), /const isPrivate = spaceIsPrivate\(space\);/);
-  assert.match(
+  // The space header says Private or Public in words, so it has no lock
+  // (Arthur, 15 October 2026).
+  assert.doesNotMatch(
     read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx'),
-    /privateMark=\{showsPrivateMark\(space\)\}/,
+    /privateMark|<Lock/,
   );
 });
 
@@ -192,7 +210,7 @@ test('the page publishes the menu from the one rule and opens the frame’s dial
   // The Owner steps of the sheet are gated like the create param.
   assert.match(frame, /\{ links: canManage, requests: canManage, invite: canManage \}/);
   const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
-  assert.match(dialog, /title=\{isEdit \? 'Rename space' : 'Create a space'\}/);
+  assert.match(dialog, /title=\{isEdit \? 'Rename space' : 'Create a Space'\}/);
 });
 
 test('the members sheet steps round-trip through ?roster=', () => {

@@ -56,10 +56,11 @@ test('the refusals, word for word', () => {
   }
 });
 
-test('an empty Conversations tab points at the box to those who may add, and tells a Viewer who does', () => {
+test('an empty Conversations tab reads Arthur’s words to those who may add, and tells a Viewer who does', () => {
   assert.deepEqual(spaceEmptyCopy('chats', true), {
-    title: 'No conversations in this space yet',
-    description: 'Ask Lawexa below to start the first one.',
+    title: 'Start working with Lawexa',
+    description:
+      'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
   });
   assert.equal(spaceEmptyCopy('chats', false).description, 'Contributors and the owner add conversations here.');
 });
@@ -97,8 +98,18 @@ test('the inviter and the invitee read one promise: a Contributor continues the 
   }
 });
 
-test('the empty Conversations tab offers no button: the box under it is the way to start', () => {
+test('the empty Conversations tab offers Upload files, and Invite people to whoever may invite (Arthur, 15 October 2026)', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /<SpaceContentEmptyState\s+tab="chats"\s+canAdd=\{canAdd\}\s+onInvite=\{access\.onInvite \?\? undefined\}\s+\/>/);
+  // Both are secondary: the box docked under the tab is the way to start.
+  assert.match(
+    panel,
+    /<EmptyStateAddButton variant="outline" icon=\{Upload\} onClick=\{uploads\.pickFiles\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
+  );
+  assert.match(
+    panel,
+    /\{access\.openInvite \? \(\s*<EmptyStateAddButton\s+variant="outline"\s+icon=\{UserPlus\}\s+onClick=\{access\.openInvite\}\s*>\s*Invite people/,
+  );
+  // Whoever may manage the space's people, however many are in it.
+  assert.match(panel, /openInvite: scope !== null && scope\.canManage \? scope\.openInvite : null,/);
   assert.doesNotMatch(panel, /Go to your conversations/);
 });
