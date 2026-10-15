@@ -319,8 +319,12 @@ test('create is two steps: the type first, then the fields, with no preview (Sta
   assert.match(dialog, /\{`Step \$\{step\} of 2`\}/);
   assert.match(dialog, /<div className="space-y-4">\s*\{nameField\}\s*\{goalField\}\s*\{privacyField\}\s*<\/div>/);
   assert.match(dialog, /const changeType = \(\) => stepParam\.close\(\);/);
-  // The bar's chevron goes back a step on step two, and closes on step one.
-  assert.match(dialog, /onBack=\{!isEdit && urlType !== null \? changeType : undefined\}/);
+  // The bar's chevron goes back a step on step two, and keeps its slot empty on step one.
+  assert.match(dialog, /onBack=\{isEdit \? undefined : urlType !== null \? changeType : null\}/);
+  // One question style on both steps, and no line under create's title.
+  assert.match(dialog, /className=\{STEP_QUESTION\}>\s*What are you working on\?/);
+  assert.match(dialog, /\{isEdit \? 'Space name' : 'Name your space'\}/);
+  assert.doesNotMatch(dialog, /Keep conversations and resources together/);
   // On a phone, create is a sheet as tall as the step; edit keeps the screen.
   assert.match(dialog, /size=\{isEdit \? 'fill' : 'content'\}/);
   assert.match(dialog, /guardUnsaved=\{!isEdit && \(name\.trim\(\) !== '' \|\| description\.trim\(\) !== ''\)\}/);
@@ -330,6 +334,8 @@ test('create is two steps: the type first, then the fields, with no preview (Sta
   assert.match(dialog, /variant="secondary"[\s\S]{0,320}?Cancel[\s\S]{0,400}?className="flex-1 md:w-auto md:flex-none"/);
   const overlay = read('v2', 'shell', 'overlay', 'ResponsiveOverlay.tsx');
   assert.match(overlay, /\{onBack \? \(\s*<button\s+type="button"\s+aria-label="Back"\s+onClick=\{onBack\}/);
+  // Step one keeps the Back slot, empty, so the title does not move.
+  assert.match(overlay, /onBack === null \? \([\s\S]*?<span aria-hidden className="-ml-1 size-10 shrink-0 md:-my-2 md:-ml-2 md:size-9" \/>/);
   // Each step slides in from its side, and only with motion allowed.
   assert.match(dialog, /entered === 'forward' \? 'motion-safe:slide-in-from-right-4' : 'motion-safe:slide-in-from-left-4'/);
   // The preview is gone.

@@ -116,6 +116,16 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * goes back a step on step two (`onBack`), and each step says which it is
  * ("Step 1 of 2").
  *
+ * ── BOTH STEPS ARE ONE FRAME (Arthur, 15 October 2026) ─────────────────────
+ * "Does it even make sense to you.. there is no ux consistency from 1 to 2."
+ * The title moved (step two's chevron pushed it right), the line under it
+ * came and went, and only step one had a question. Now each step has the same
+ * four rows in the same places: the bar (the Back slot is kept, empty, on step
+ * one, so the title does not move), the step mark (the type chip on step two,
+ * the same row height on step one), a question in one style ("What are you
+ * working on?", "Name your space"), and the buttons. The line under the title
+ * is gone from create; the edit form keeps it.
+ *
  * ── ON A PHONE IT IS A SHEET, AS TALL AS THE STEP (Stay, 15 October 2026) ──
  * "The step 1 and 2 on mobile looks awful." A whole screen for two rows or two
  * fields left most of it empty, with the buttons stranded at the foot. Create
@@ -395,9 +405,12 @@ export function SpaceFormDialog({
   // Only drawn once a type is picked (step two, or the edit form).
   const examples = TYPE_EXAMPLES[type ?? 'work'];
 
+  // On create's step two the name's label is the step's question.
   const nameField = (
-    <div className="space-y-2">
-      <Label htmlFor={`${uid}-name`}>Space name</Label>
+    <div className={isEdit ? 'space-y-2' : 'space-y-3'}>
+      <Label htmlFor={`${uid}-name`} className={isEdit ? undefined : STEP_QUESTION}>
+        {isEdit ? 'Space name' : 'Name your space'}
+      </Label>
       <Input
         ref={nameRef}
         id={`${uid}-name`}
@@ -459,16 +472,13 @@ export function SpaceFormDialog({
       size={isEdit ? 'fill' : 'content'}
       // A tap beside the sheet must not throw away what was typed.
       guardUnsaved={!isEdit && (name.trim() !== '' || description.trim() !== '')}
-      // Step two's chevron goes back to the cards; on step one it closes.
-      onBack={!isEdit && urlType !== null ? changeType : undefined}
+      // Step two's chevron goes back to the cards; step one keeps its slot
+      // empty (`null`), so the title stands in one place on both.
+      onBack={isEdit ? undefined : urlType !== null ? changeType : null}
       title={isEdit ? 'Rename space' : 'Create a Space'}
-      // Step one's line is the sheet's own, under the title; step two needs none.
+      // Create has no line under the title, on either step (see the docblock).
       description={
-        isEdit
-          ? 'Change its name and details. Everyone in it sees the change.'
-          : showsTypeStep
-            ? 'Keep conversations and resources together, and invite others to collaborate.'
-            : undefined
+        isEdit ? 'Change its name and details. Everyone in it sees the change.' : undefined
       }
       className="md:max-w-xl"
       footer={
@@ -514,27 +524,29 @@ export function SpaceFormDialog({
       ) : showsTypeStep ? (
         <div key="type" className={cn('space-y-4', stepMotion(entered))}>
           <StepMark step={1} />
-          <p id={`${uid}-type-question`} className="text-sm font-medium text-foreground">
-            What are you working on?
-          </p>
-          <div
-            role="group"
-            aria-labelledby={`${uid}-type-question`}
-            className="grid gap-2.5 sm:grid-cols-2"
-          >
-            {TYPE_CHOICES.map((choice) => (
-              <TypeCard
-                key={choice.value}
-                id={`${uid}-type-${choice.value}`}
-                choice={choice}
-                chosen={choice.value === lastType}
-                onChoose={() => chooseType(choice.value)}
-              />
-            ))}
+          <div className="space-y-3">
+            <p id={`${uid}-type-question`} className={STEP_QUESTION}>
+              What are you working on?
+            </p>
+            <div
+              role="group"
+              aria-labelledby={`${uid}-type-question`}
+              className="grid gap-2.5 sm:grid-cols-2"
+            >
+              {TYPE_CHOICES.map((choice) => (
+                <TypeCard
+                  key={choice.value}
+                  id={`${uid}-type-${choice.value}`}
+                  choice={choice}
+                  chosen={choice.value === lastType}
+                  onChoose={() => chooseType(choice.value)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       ) : (
-        <div key="details" className={cn('space-y-5', stepMotion(entered))}>
+        <div key="details" className={cn('space-y-4', stepMotion(entered))}>
           <StepMark step={2} chosen={chosen} />
           <div className="space-y-4">
             {nameField}
@@ -555,6 +567,9 @@ export function SpaceFormDialog({
     </ResponsiveOverlay>
   );
 }
+
+/** Each create step's question, one style on both. */
+const STEP_QUESTION = 'text-base leading-snug font-semibold text-foreground';
 
 /** Create's step-two param (see the docblock). */
 const STEP_PARAM = 'step';

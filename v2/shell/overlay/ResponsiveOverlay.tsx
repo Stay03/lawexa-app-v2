@@ -222,7 +222,7 @@ export function ResponsiveOverlay({
    * desktop too, before the title, because the step it returns to is in this
    * surface and nowhere else. Absent, the chevron closes, as it always has.
    */
-  onBack?: () => void;
+  onBack?: (() => void) | null;
   children: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -368,6 +368,12 @@ export function ResponsiveOverlay({
                 >
                   <ChevronLeft aria-hidden className="size-5" />
                 </button>
+              ) : onBack === null ? (
+                // A stepped surface on its first step: the Back button's box,
+                // empty, so the title stands where it will on the next step
+                // (Arthur, 15 October 2026: "no ux consistency from 1 to 2").
+                // Nothing focusable: Radix would focus it first on desktop.
+                <span aria-hidden className="-ml-1 size-10 shrink-0 md:-my-2 md:-ml-2 md:size-9" />
               ) : size === 'fill' ? (
                 <DialogClose asChild>
                   <button
