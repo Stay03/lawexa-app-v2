@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Briefcase,
@@ -26,6 +26,8 @@ import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
 import { canOpenTeamChannels } from '@/v2/features/collab/model';
 import { organizationsQueries } from '@/v2/features/organizations/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { readHistoryStamp } from '@/v2/runtime/url-params';
+import { OVERLAY_STAMP_KEY, useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import {
@@ -59,6 +61,15 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * organisation member has, and Create Space. Each step slides in from the side
  * it comes from; with reduced motion it only appears. The edit form keeps one
  * page: the type is already chosen there. The crest preview is gone.
+ *
+ * STEP TWO HAS ITS OWN URL (Stay: "hope each part has its own url so back
+ * works?"): `?step=work` or `?step=study`, pushed on top of the host's own
+ * entry for the dialog (`?panel=new` on the spaces list). So Back from step two
+ * returns to the cards, and Back again closes the dialog. Not `?type=`: that is
+ * the spaces list's filter. Closing from step two (Cancel, the X, Esc) and a
+ * create that succeeds there both leave over the two entries at once
+ * (`history.go(-2)`), so the stack is left as the dialog found it and Back from
+ * the new space goes to the list, never into a half-filled form.
  *
  * ── THE STARTER CHANNEL IS THE SERVER'S, NOT OURS ──────────────────────────
  * The open question here was whether creating `general` from the client would
@@ -251,14 +262,34 @@ export function SpaceFormDialog({
   const organization = myOrganization.data?.data ?? null;
 
   const [name, setName] = useState(space?.name ?? '');
+  // Create's step two, in the URL (see the docblock); refused in edit, so a
+  // stray `?step=` on a space page is stripped and does nothing.
+  const stepParam = useUrlOverlay(STEP_PARAM, { canOpen: !isEdit });
+  const urlType = isEdit ? null : parseStepType(stepParam.value);
+  const [editType, setEditType] = useState<SpaceType>(space?.type ?? 'work');
   // No type until the reader picks one: picking it is create's first step.
-  const [type, setType] = useState<SpaceType | null>(space?.type ?? null);
-  // Create only: which step shows, and how it was reached (`opened` plays no
-  // slide, since the dialog itself is animating in).
-  const [step, setStep] = useState<{ at: 'type' | 'details'; entered: 'opened' | 'forward' | 'back' }>(
-    { at: 'type', entered: 'opened' },
-  );
+  const type: SpaceType | null = isEdit ? editType : urlType;
+  // The card picked last, lit when Change or Back returns to the cards.
+  const [lastType, setLastType] = useState<SpaceType | null>(null);
+  // How the step showing was reached, so it slides in from that side.
+  // `opened` plays nothing, since the dialog itself is animating in. Adjusted
+  // during render when the step changes, React's way to follow an input.
+  const [seenType, setSeenType] = useState<SpaceType | null>(urlType);
+  const [entered, setEntered] = useState<'opened' | 'forward' | 'back'>('opened');
+  if (urlType !== seenType) {
+    setSeenType(urlType);
+    setEntered(urlType === null ? 'back' : 'forward');
+  }
   const nameRef = useRef<HTMLInputElement>(null);
+  /** Set while this dialog is walking back over its own two entries, so a
+   *  second Cancel in the same moment cannot walk back two more. */
+  const leavingRef = useRef(false);
+  /** A create that succeeded on step two: the host is told once the two
+   *  entries are gone, so its navigation lands after them. */
+  const afterLeaveRef = useRef<(() => void) | null>(null);
+  /** Whether the entry under step two is the host's overlay entry, read when
+   *  step two is pushed. */
+  const stepAboveOverlayRef = useRef(false);
   const [description, setDescription] = useState(space?.description ?? '');
   const [privacy, setPrivacy] = useState<Privacy>(
     (space?.is_private ?? true) ? 'private' : 'open',
@@ -290,7 +321,7 @@ export function SpaceFormDialog({
     isPrivate !== (space?.is_private ?? true);
 
   const canSubmit = type !== null && name.trim().length > 0 && changed && !submitting;
-  const showsTypeStep = !isEdit && step.at === 'type';
+  const showsTypeStep = !isEdit && urlType === null;
 
   const ownerChoices: readonly Choice<string>[] = organization
     ? [
@@ -309,20 +340,59 @@ export function SpaceFormDialog({
       ]
     : [];
 
-  // Picking a type is the step forward; the name is asked for next, so it
-  // takes the focus once its step has drawn.
+  // Picking a type is the step forward: its own history entry.
   const chooseType = (next: SpaceType) => {
-    setType(next);
+    setLastType(next);
     setError(null);
-    setStep({ at: 'details', entered: 'forward' });
-    requestAnimationFrame(() => nameRef.current?.focus());
+    stepAboveOverlayRef.current = readHistoryStamp(OVERLAY_STAMP_KEY) !== null;
+    stepParam.show(next);
   };
-  // Back to the cards, with the focus on the one chosen, so Change and a
-  // second pick are two key presses.
-  const changeType = () => {
-    setStep({ at: 'type', entered: 'back' });
-    requestAnimationFrame(() => document.getElementById(`${uid}-type-${type}`)?.focus());
+  // Change is Back: it walks off step two's entry.
+  const changeType = () => stepParam.close();
+
+  // Step two leaves over BOTH of the dialog's entries at once when the one
+  // under it is an overlay's own (stamped); a dialog opened from a shared link
+  // has no such entry under it, so step two is blanked in place instead.
+  const leaveFromStepTwo = (after: () => void) => {
+    if (leavingRef.current) return;
+    if (readHistoryStamp(OVERLAY_STAMP_KEY) === STEP_PARAM && stepAboveOverlayRef.current) {
+      leavingRef.current = true;
+      afterLeaveRef.current = after;
+      window.history.go(-2);
+      return;
+    }
+    stepParam.closeInPlace();
+    after();
   };
+
+  const handleOpenChange = (next: boolean) => {
+    if (next || urlType === null) {
+      onOpenChange(next);
+      return;
+    }
+    // The host's own close already happened with the walk back: its param is
+    // gone from the restored entry.
+    leaveFromStepTwo(() => {});
+  };
+
+  // The focus follows the step: the name when step two draws, the card picked
+  // last when Change or Back returns to the cards. And a walk back that this
+  // dialog started is complete once step two's param is gone.
+  useEffect(() => {
+    if (isEdit) return;
+    if (urlType !== null) {
+      nameRef.current?.focus();
+      return;
+    }
+    leavingRef.current = false;
+    const after = afterLeaveRef.current;
+    afterLeaveRef.current = null;
+    if (after) {
+      after();
+      return;
+    }
+    if (entered === 'back' && lastType) document.getElementById(`${uid}-type-${lastType}`)?.focus();
+  }, [entered, isEdit, lastType, uid, urlType]);
 
   const handleSubmit = () => {
     if (!canSubmit || type === null) return;
@@ -358,9 +428,15 @@ export function SpaceFormDialog({
       {
         onSuccess: (response) => {
           const created = response.data;
-          if (onCreated) {
-            onCreated(created.uuid, created.default_channel?.uuid ?? null);
-          } else onOpenChange(false);
+          const finish = () => {
+            if (onCreated) {
+              onCreated(created.uuid, created.default_channel?.uuid ?? null);
+            } else onOpenChange(false);
+          };
+          if (urlType === null) finish();
+          // From step two the host moves only once the dialog's entries are
+          // gone, so Back from the new space goes to the list.
+          else leaveFromStepTwo(finish);
         },
         onError: (failure) => setError(extractApiError(failure).message),
       },
@@ -428,7 +504,7 @@ export function SpaceFormDialog({
        is a centred card. Each create step is short enough to fit a phone. */
     <ResponsiveOverlay
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={handleOpenChange}
       title={isEdit ? 'Rename space' : 'Create a Space'}
       // The create form's heading and its line open the first step (below).
       description={
@@ -439,7 +515,7 @@ export function SpaceFormDialog({
         <>
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
             disabled={submitting}
           >
             Cancel
@@ -460,13 +536,13 @@ export function SpaceFormDialog({
           <ChoiceCards
             legend="Type"
             choices={TYPE_CHOICES}
-            value={type ?? 'work'}
-            onChange={setType}
+            value={editType}
+            onChange={setEditType}
           />
           {privacyField}
         </div>
       ) : showsTypeStep ? (
-        <div key="type" className={stepMotion(step.entered)}>
+        <div key="type" className={stepMotion(entered)}>
           <div className="space-y-1">
             <h3 className="text-lg font-semibold tracking-tight text-foreground">
               What are you working on?
@@ -481,14 +557,14 @@ export function SpaceFormDialog({
                 key={choice.value}
                 id={`${uid}-type-${choice.value}`}
                 choice={choice}
-                chosen={choice.value === type}
+                chosen={choice.value === lastType}
                 onChoose={() => chooseType(choice.value)}
               />
             ))}
           </div>
         </div>
       ) : (
-        <div key="details" className={cn('space-y-4', stepMotion(step.entered))}>
+        <div key="details" className={cn('space-y-4', stepMotion(entered))}>
           {chosen ? <ChosenType choice={chosen} onChange={changeType} /> : null}
           {nameField}
           {goalField}
@@ -525,6 +601,14 @@ export function SpaceFormDialog({
       )}
     </ResponsiveOverlay>
   );
+}
+
+/** Create's step-two param (see the docblock). */
+const STEP_PARAM = 'step';
+
+/** `?step=` read as a type; anything else is step one. */
+function parseStepType(value: string | null): SpaceType | null {
+  return value === 'work' || value === 'study' ? value : null;
 }
 
 /** How a create step comes in: from the side it was reached from, and with

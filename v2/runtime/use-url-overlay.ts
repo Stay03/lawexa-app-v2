@@ -105,8 +105,10 @@ import {
 /** The value a plain (unnamed) overlay opens at. */
 const OPEN_VALUE = '1';
 
-/** History-state key naming the param whose `show()` pushed the entry. */
-const OVERLAY_STAMP_KEY = '__v2Overlay';
+/** History-state key naming the param whose `show()` pushed the entry.
+ *  Exported for an overlay with steps of its own (`SpaceFormDialog`), which
+ *  must know whose entry sits under its step before it walks back over it. */
+export const OVERLAY_STAMP_KEY = '__v2Overlay';
 
 /** Radix `open`/`onOpenChange` pair for ONE value of a multi-panel param. */
 export interface OverlayBinding {

@@ -301,19 +301,40 @@ test('the create dialog: kind sent only for researcher+, no "open" for a shared 
 test('create is two steps: the type first, then the fields, with no preview (Stay, 15 October 2026)', () => {
   const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
   // No type until one is picked, and nothing to submit without one.
-  assert.match(dialog, /useState<SpaceType \| null>\(space\?\.type \?\? null\)/);
+  assert.match(dialog, /const type: SpaceType \| null = isEdit \? editType : urlType;/);
   assert.match(dialog, /const canSubmit = type !== null && name\.trim\(\)\.length > 0 && changed && !submitting;/);
   // Step one: the two cards are buttons that move on; no Create Space yet.
   assert.match(dialog, /onChoose=\{\(\) => chooseType\(choice\.value\)\}/);
-  assert.match(dialog, /setStep\(\{ at: 'details', entered: 'forward' \}\);/);
+  assert.match(dialog, /stepParam\.show\(next\);/);
   assert.match(dialog, /\{showsTypeStep \? null : \(\s*<Button onClick=\{handleSubmit\}/);
   // Step two: the type chosen and the way back, then the fields.
   assert.match(dialog, /\{chosen \? <ChosenType choice=\{chosen\} onChange=\{changeType\} \/> : null\}\s*\{nameField\}\s*\{goalField\}/);
-  assert.match(dialog, /setStep\(\{ at: 'type', entered: 'back' \}\);/);
+  assert.match(dialog, /const changeType = \(\) => stepParam\.close\(\);/);
   // Each step slides in from its side, and only with motion allowed.
   assert.match(dialog, /entered === 'forward' \? 'motion-safe:slide-in-from-right-4' : 'motion-safe:slide-in-from-left-4'/);
   // The preview is gone.
   assert.doesNotMatch(dialog, /SpacePreview|SpaceCrest|Preview/);
+});
+
+test('step two has its own URL, so Back goes step two → step one → closed (Stay, 15 October 2026)', () => {
+  const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
+  // `?step=work|study`, its own pushed entry; never `?type=`, the list's filter.
+  assert.match(dialog, /const STEP_PARAM = 'step';/);
+  assert.match(dialog, /const stepParam = useUrlOverlay\(STEP_PARAM, \{ canOpen: !isEdit \}\);/);
+  assert.match(dialog, /return value === 'work' \|\| value === 'study' \? value : null;/);
+  assert.match(dialog, /const showsTypeStep = !isEdit && urlType === null;/);
+  // Closing from step two, and a create that succeeds there, leave over both
+  // of the dialog's entries at once, only when the one under step two is an
+  // overlay's own; otherwise step two is blanked in place.
+  assert.match(dialog, /readHistoryStamp\(OVERLAY_STAMP_KEY\) === STEP_PARAM && stepAboveOverlayRef\.current/);
+  assert.match(dialog, /window\.history\.go\(-2\);/);
+  assert.match(dialog, /stepParam\.closeInPlace\(\);\s*after\(\);/);
+  assert.match(dialog, /else leaveFromStepTwo\(finish\);/);
+  // Every close goes through it: the overlay's own and Cancel.
+  assert.match(dialog, /onOpenChange=\{handleOpenChange\}/);
+  assert.match(dialog, /onClick=\{\(\) => handleOpenChange\(false\)\}/);
+  const overlay = read('v2', 'runtime', 'use-url-overlay.ts');
+  assert.match(overlay, /export const OVERLAY_STAMP_KEY = '__v2Overlay';/);
 });
 
 test('the name and goal examples follow the type picked (Stay, 15 October 2026)', () => {
