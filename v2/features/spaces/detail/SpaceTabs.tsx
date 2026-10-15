@@ -42,7 +42,8 @@ export function SpaceTabs({
       onChange={onChange}
       ariaLabel="What is in this space"
       panelId={panelId}
-      className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
+      // gap-0: five tabs (a team space) fit a 390px phone; at 360 the edge fades.
+      className="inline-flex max-w-full items-center gap-0 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
       tabClassName={(selected) =>
         cn(
           // px-3 (was 3.5): the four tabs of a shared space fit a 360px
