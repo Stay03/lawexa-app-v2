@@ -108,15 +108,16 @@ test('the tabs by kind × role: Channels first, and the default, only where chan
   assert.deepEqual(tabsFor('shared', researcher), ['chats', 'folders', 'files', 'people']);
   assert.deepEqual(tabsFor('team', user), ['chats', 'folders', 'files', 'people']);
   assert.deepEqual(tabsFor('shared', user), ['chats', 'folders', 'files', 'people']);
-  assert.equal(defaultSpaceTab(true), 'channels');
-  assert.equal(defaultSpaceTab(false), 'chats');
+  // Every space opens on Conversations, where the message box is (15 October 2026).
+  assert.equal(defaultSpaceTab(), 'chats');
 });
 
 test('?tab= resolves against the tabs this viewer has, never to a missing one', () => {
   assert.equal(parseSpaceTab('files', false), 'files');
   assert.equal(parseSpaceTab('channels', true), 'channels');
   assert.equal(parseSpaceTab('channels', false), 'chats');
-  assert.equal(parseSpaceTab('nonsense', true), 'channels');
+  assert.equal(parseSpaceTab('nonsense', true), 'chats');
+  assert.equal(parseSpaceTab(null, true), 'chats');
   assert.equal(parseSpaceTab(null, false), 'chats');
 });
 

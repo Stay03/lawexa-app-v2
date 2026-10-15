@@ -95,7 +95,8 @@ test('the lobby: no digest and no "New channel" without the flag, in the page an
     cached,
     /const showsChannels = spaceShowsChannels\(\s*\{ kind: identity\?\.kind \?\? 'team' \},\s*session,\s*\);/,
   );
-  assert.match(cached, /tab=\{defaultSpaceTab\(showsChannels\)\}/);
+  // Every space opens on Conversations since 15 October 2026.
+  assert.match(cached, /tab=\{defaultSpaceTab\(\)\}/);
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
   // Design round 1: the header's "New channel" (and so its place) is shown
   // below `lg:` only, where no docked rail carries the same action.

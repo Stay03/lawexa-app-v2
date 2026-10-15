@@ -26,7 +26,9 @@ import { Skeleton } from '@/components/ui/skeleton';
  * The choice is per SPACE and not per tab, so switching tabs never moves the
  * header.
  */
-const SPACE_COLUMN_BASE = 'mx-auto w-full px-4 pb-16 pt-5 sm:pt-6';
+// A full-height flex column, so the Conversations tab's docked box sits at the
+// bottom of the pane when the list is short (`SpaceChatDock`'s `mt-auto`).
+const SPACE_COLUMN_BASE = 'mx-auto flex min-h-full w-full flex-col px-4 pb-16 pt-5 sm:pt-6';
 
 /** The page's column: the lobby's width where the space shows its channels,
  *  the list's everywhere else. */
@@ -43,7 +45,7 @@ export const SPACE_LOBBY_GRID =
 /** The tab strip under the identity block, and the panel under the strip.
  *  Shared by the live page and its silhouette, so the hand-off moves nothing. */
 export const SPACE_TABS_ROW = 'mt-5';
-export const SPACE_TAB_PANEL = 'mt-5';
+export const SPACE_TAB_PANEL = 'mt-5 flex flex-1 flex-col';
 
 /**
  * One region of the lobby. The heading is a real `h2` and the count beside it

@@ -6,7 +6,6 @@ import { useQuery } from '@tanstack/react-query';
 import { Hourglass, Link2, LogOut, Pencil, Plus, Trash2, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
 import { collabAccessState } from '@/v2/features/collab/model';
@@ -84,8 +83,9 @@ import {
  * above (the activity digest,
  * the people, the facts) wherever the space shows its channels to this viewer
  * (`scope.showsChannels`, the frame's answer, so the tab and the rail can
- * never disagree). A team space seen by a researcher opens on Channels, so
- * nothing changes for the team; everyone else opens on Conversations.
+ * never disagree). Every space opens on Conversations, with the message box
+ * at its bottom (Stay and Arthur, 15 October 2026); a People tab ends the
+ * strip.
  *
  * THE TAB IS IN THE URL, QUIETLY (`?tab=`, the radar screen's idiom): read
  * once from the address, then held here and written back with a quiet
@@ -147,11 +147,11 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   const tab = parseSpaceTab(tabParam, showsChannels);
   const setTab = useCallback(
     (next: SpaceTab) => {
-      const value = next === defaultSpaceTab(showsChannels) ? null : next;
+      const value = next === defaultSpaceTab() ? null : next;
       setTabParam(value);
       quietReplaceUrlParams({ tab: value });
     },
-    [showsChannels],
+    [],
   );
   // Back and Forward restore the address but not this state (the quiet write
   // never told the router), so the tab is re-read from the address on each.

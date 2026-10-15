@@ -184,11 +184,6 @@ export function startChatRefusal(status: number, serverMessage: string | null): 
   return 'Couldn’t start the conversation. Please try again.';
 }
 
-/** The line under "New conversation": who reads the chat and who continues it. */
-export function startDialogLine(spaceName: string): string {
-  return `Everyone in ${spaceName} can read it. The Owner and Contributors can continue it.`;
-}
-
 /** Why a new folder was refused: a Viewer (403), or the server's own reason
  *  for a name or parent it would not take (422). */
 export function createFolderRefusal(status: number, serverMessage: string | null): string {
@@ -301,9 +296,11 @@ export function spaceEmptyCopy(
   }
   switch (tab) {
     case 'chats':
+      // The box is docked under this (`SpaceChatDock`): one short line
+      // pointing at it, no intro (Arthur, 15 October 2026).
       return {
         title,
-        description: 'Start a conversation here, or move one of yours in.',
+        description: 'Ask Lawexa below to start the first one.',
       };
     case 'folders':
       return {

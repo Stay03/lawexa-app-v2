@@ -35,7 +35,7 @@ export function CachedSpaceFrame() {
     <SpaceScreenFrame
       identity={identity}
       showsChannels={showsChannels}
-      tab={defaultSpaceTab(showsChannels)}
+      tab={defaultSpaceTab()}
     />
   );
 }

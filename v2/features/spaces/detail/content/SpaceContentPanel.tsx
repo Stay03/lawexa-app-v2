@@ -43,7 +43,7 @@ import { spacesQueries } from '../../queries';
 import { useServerSearch, type ServerSearch } from '../../use-server-search';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceFileRow } from './SpaceFileRow';
-import { StartConversationDialog } from './StartConversationDialog';
+import { SpaceChatDock } from './SpaceChatDock';
 import {
   SpaceContentEmptyState,
   SpaceContentErrorState,
@@ -245,16 +245,6 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
   // them in place (the conversations list's rule, 8 October 2026).
   const [reveal] = useState(() => query.isPending);
   const { openMove, openRemove, dialogs } = useItemDialogs(access);
-  // "New conversation": stays mounted after it closes so its exit plays, and
-  // a fresh open bumps its key, so every open starts with an empty composer.
-  const [starting, setStarting] = useState<{ open: boolean; key: number } | null>(null);
-  const startChat = () =>
-    setStarting((previous) => ({ open: true, key: (previous?.key ?? 0) + 1 }));
-  const newChatButton = canAdd ? (
-    <PillButton icon={Plus} onClick={startChat}>
-      New conversation
-    </PillButton>
-  ) : null;
 
   const targetOf = (conversation: SpaceConversation): SpaceItemTarget => ({
     type: 'conversation',
@@ -263,14 +253,18 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
     space: { uuid: spaceUuid, name: spaceName },
   });
 
+  // A new conversation starts from the box docked at the bottom (Stay and
+  // Arthur, 15 October 2026), so the toolbar and the empty state offer no
+  // start button of their own; the earlier conversations stay in the list
+  // above it, each opening its chat to read and continue.
   return (
-    <>
+    <div className="flex flex-1 flex-col">
       <ContentToolbar
         search={search}
         label="Search this space's conversations"
         placeholder="Search conversations"
         busy={query.isPlaceholderData}
-        action={newChatButton}
+        action={null}
       />
       <PagedContent
         tab="chats"
@@ -288,15 +282,6 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
               tab="chats"
               canAdd={canAdd}
               onInvite={access.onInvite ?? undefined}
-              // One action: start one here. The line names the other way in
-              // (move one of yours in, from the chat's own menu); a second
-              // pill stacked three pills of three widths on a phone with
-              // Invite people under them (F4 review N6).
-              action={
-                <EmptyStateAddButton icon={Plus} onClick={startChat}>
-                  New conversation
-                </EmptyStateAddButton>
-              }
             />
           )
         }
@@ -324,17 +309,8 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
         </ul>
       </PagedContent>
       {dialogs}
-      {starting ? (
-        <StartConversationDialog
-          key={`start-${starting.key}`}
-          space={{ uuid: spaceUuid, name: spaceName }}
-          open={starting.open}
-          onOpenChange={(open) =>
-            setStarting((previous) => (previous ? { ...previous, open } : previous))
-          }
-        />
-      ) : null}
-    </>
+      {canAdd ? <SpaceChatDock space={{ uuid: spaceUuid, name: spaceName }} /> : null}
+    </div>
   );
 }
 

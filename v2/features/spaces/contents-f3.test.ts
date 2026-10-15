@@ -226,7 +226,7 @@ test('empty tabs teach the Owner and Contributors, and tell a Viewer who fills t
     assert.equal(viewer.title, `No ${nouns[tab]} in this space yet`, tab);
     assert.equal(viewer.description, `Contributors and the owner add ${nouns[tab]} here.`, tab);
   }
-  assert.equal(spaceEmptyCopy('chats', true).description, 'Start a conversation here, or move one of yours in.');
+  assert.equal(spaceEmptyCopy('chats', true).description, 'Ask Lawexa below to start the first one.');
   assert.match(spaceEmptyCopy('folders', true).description, /Folders you add here are shared with everyone in this space\./);
   assert.match(spaceEmptyCopy('files', true).description, /Files you add here are shared with everyone in this space\./);
 });

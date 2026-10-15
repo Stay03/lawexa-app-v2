@@ -140,7 +140,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** The space a conversation starts in (`StartConversationDialog`). */
+/** The space a conversation starts in (`SpaceChatDock`, a space's Conversations tab). */
 export interface HomeComposerSpace {
   uuid: string;
   name: string;

@@ -157,12 +157,13 @@ export function spaceTabs(showsChannels: boolean): readonly SpaceTab[] {
 }
 
 /**
- * The tab a bare `/spaces/{uuid}` opens on. A team space seen by a researcher
- * keeps the lobby it always opened on, so nothing changes for the team;
- * everyone else lands on the chats.
+ * The tab a bare `/spaces/{uuid}` opens on: Conversations, for every space
+ * and every viewer, so the message box at its bottom is there the moment the
+ * space opens (Arthur and Stay, 15 October 2026; techlead's call). A team
+ * space's Channels tab stays first in the strip, one tap away.
  */
-export function defaultSpaceTab(showsChannels: boolean): SpaceTab {
-  return showsChannels ? 'channels' : 'chats';
+export function defaultSpaceTab(): SpaceTab {
+  return 'chats';
 }
 
 /**
@@ -175,7 +176,7 @@ export function parseSpaceTab(
   showsChannels: boolean,
 ): SpaceTab {
   const tabs = spaceTabs(showsChannels);
-  return tabs.find((tab) => tab === raw) ?? defaultSpaceTab(showsChannels);
+  return tabs.find((tab) => tab === raw) ?? defaultSpaceTab();
 }
 
 /**
