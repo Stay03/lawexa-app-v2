@@ -18,7 +18,9 @@ import {
   setScreenContext,
   type ScreenAction,
 } from '@/v2/shell/screen-context';
+import { useSpaceJoinRequests } from '@/v2/features/invites/queries';
 import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
+import { spacesQueries } from '../queries';
 import {
   defaultSpaceTab,
   parseSpaceTab,
@@ -196,6 +198,20 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
    * shared space has none.
    */
   const eligible = collabAccessState(session) === 'eligible';
+
+  /* The People tab's two lists for whoever manages the people (the invites not
+     accepted yet, and who asked to join), asked for as the space opens, so the
+     tab opens with them drawn. Asked for only when the tab mounted, they landed
+     a beat after the members, already cached, and popped in under them
+     (inside-shots-1, 15 October 2026). Same keys as the tab's own reads, so
+     the tab paints from this cache and asks again for nothing. */
+  const peopleReads = eligible && space !== null && canManage;
+  useQuery({
+    ...spacesQueries.members(spaceUuid, { viewerId: session.userId, status: 'pending' }),
+    enabled: peopleReads,
+  });
+  useSpaceJoinRequests(spaceUuid, peopleReads);
+
   const threadsQuery = useQuery({
     ...channelsQueries.threadsBySpace({
       spaceUuid,

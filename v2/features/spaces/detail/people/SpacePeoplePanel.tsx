@@ -96,7 +96,11 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
       )}
 
       {invited.length > 0 ? (
-        <section aria-labelledby="space-people-invited">
+        // Fades in: on a cold cache the list can land after the members.
+        <section
+          aria-labelledby="space-people-invited"
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+        >
           <h2 id="space-people-invited" className="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Invited
           </h2>
@@ -105,7 +109,10 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
       ) : null}
 
       {canManage && waiting > 0 ? (
-        <section aria-labelledby="space-people-requests">
+        <section
+          aria-labelledby="space-people-requests"
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+        >
           <h2 id="space-people-requests" className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Asked to join
           </h2>

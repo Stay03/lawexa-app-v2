@@ -80,6 +80,15 @@ test('the top is one row; the name opens the details sheet on ?panel=about (Stay
   assert.match(sheet, /memberCountLabel\(space\.active_members_count\)/);
 });
 
+test('the manager-only lists are asked for as the space opens, and fade in (inside-shots-1)', () => {
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(screen, /const peopleReads = eligible && space !== null && canManage;/);
+  assert.match(screen, /status: 'pending' \}\),\s*enabled: peopleReads,/);
+  assert.match(screen, /useSpaceJoinRequests\(spaceUuid, peopleReads\);/);
+  const panel = read('v2', 'features', 'spaces', 'detail', 'people', 'SpacePeoplePanel.tsx');
+  assert.equal((panel.match(/className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"/g) ?? []).length, 2);
+});
+
 test('the screen draws the People tab, and the silhouette has its shape', () => {
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /tab === 'people' \? \(\s*<SpacePeoplePanel key="people" space=\{space\} \/>/);
