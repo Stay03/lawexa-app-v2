@@ -295,5 +295,34 @@ test('the create dialog: kind sent only for researcher+, no "open" for a shared 
   assert.match(dialog, /kind: createSpaceKind\(chosenKind, canChooseKind\),/);
   assert.match(dialog, /\{canChooseKind \? \(\s*<ChoiceCards\s+legend="Kind"/);
   assert.match(dialog, /const isPrivate = !canBeOpen \|\| privacy === 'private';/);
-  assert.match(dialog, /\{canBeOpen \? \(\s*<ChoiceCards\s+legend="Who can join"/);
+  assert.match(dialog, /const privacyField = canBeOpen \? \(\s*<ChoiceCards\s+legend="Who can join"/);
+});
+
+test('create is two steps: the type first, then the fields, with no preview (Stay, 15 October 2026)', () => {
+  const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
+  // No type until one is picked, and nothing to submit without one.
+  assert.match(dialog, /useState<SpaceType \| null>\(space\?\.type \?\? null\)/);
+  assert.match(dialog, /const canSubmit = type !== null && name\.trim\(\)\.length > 0 && changed && !submitting;/);
+  // Step one: the two cards are buttons that move on; no Create Space yet.
+  assert.match(dialog, /onChoose=\{\(\) => chooseType\(choice\.value\)\}/);
+  assert.match(dialog, /setStep\(\{ at: 'details', entered: 'forward' \}\);/);
+  assert.match(dialog, /\{showsTypeStep \? null : \(\s*<Button onClick=\{handleSubmit\}/);
+  // Step two: the type chosen and the way back, then the fields.
+  assert.match(dialog, /\{chosen \? <ChosenType choice=\{chosen\} onChange=\{changeType\} \/> : null\}\s*\{nameField\}\s*\{goalField\}/);
+  assert.match(dialog, /setStep\(\{ at: 'type', entered: 'back' \}\);/);
+  // Each step slides in from its side, and only with motion allowed.
+  assert.match(dialog, /entered === 'forward' \? 'motion-safe:slide-in-from-right-4' : 'motion-safe:slide-in-from-left-4'/);
+  // The preview is gone.
+  assert.doesNotMatch(dialog, /SpacePreview|SpaceCrest|Preview/);
+});
+
+test('the name and goal examples follow the type picked (Stay, 15 October 2026)', () => {
+  const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
+  assert.match(dialog, /name: 'e\.g\. Okafor & Sons, lease dispute',/);
+  assert.match(dialog, /goal: 'e\.g\. Review the lease and draft a reply to the landlord’s notice',/);
+  assert.match(dialog, /name: 'e\.g\. Constitutional Law, Bar Finals prep',/);
+  assert.match(dialog, /goal: 'e\.g\. Revise for the Bar Finals and practise past questions',/);
+  assert.match(dialog, /const examples = TYPE_EXAMPLES\[type \?\? 'work'\];/);
+  assert.match(dialog, /placeholder=\{examples\.name\}/);
+  assert.match(dialog, /placeholder=\{examples\.goal\}/);
 });

@@ -1,10 +1,11 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Briefcase,
   Building2,
+  ChevronRight,
   FolderOpen,
   Globe,
   GraduationCap,
@@ -18,13 +19,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Space, SpaceKind, SpaceType } from '@/types/collab';
 import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
-import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { canOpenTeamChannels } from '@/v2/features/collab/model';
 import { organizationsQueries } from '@/v2/features/organizations/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import {
   SPACE_DESCRIPTION_MAX,
@@ -46,18 +48,17 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * saying what choosing it does, visible BEFORE the choice rather than behind a
  * dropdown. The keyboard model is the platform's own (see `ChoiceCards`).
  *
- * ── THE PREVIEW MAKES THE OBJECT VISIBLE WHILE IT IS BEING MADE ────────────
- * The right column shows the real `SpaceCrest` at 64px with the monogram
- * re-deriving on every keystroke, over the chips the finished space will carry.
- * The point is that nobody should fill in five fields to find out what they
- * built. In EDIT mode the crest is the space's actual crest, hue and all.
- *
- * IN CREATE MODE THE CREST HAS NO HUE, AND THAT IS THE HONEST RENDER. A
- * crest's colour comes from the uuid, which only exists once the server has
- * made the space (`crest-model.ts`). Deriving a preview hue from the NAME
- * would look better and be a lie — the crest would visibly change colour the
- * moment the space was created. So the preview shows the neutral ground with
- * the live monogram, and the colour arrives with the object.
+ * ── CREATE IS TWO STEPS (Stay, 15 October 2026) ────────────────────────────
+ * "Remove the preview, first show only the option of work/study then when they
+ * select on that show the other two options." Step one is "What are you
+ * working on?" over the Work and Study cards (Arthur's sentences), and nothing
+ * else; picking one is the step forward, so the cards are buttons, not radios
+ * (an arrow key moving through a radio group would advance the form). Step two
+ * names the type chosen, with Change to go back, then Space name (focused),
+ * "What are you trying to achieve? (Optional)", the forks a researcher or an
+ * organisation member has, and Create Space. Each step slides in from the side
+ * it comes from; with reduced motion it only appears. The edit form keeps one
+ * page: the type is already chosen there. The crest preview is gone.
  *
  * ── THE STARTER CHANNEL IS THE SERVER'S, NOT OURS ──────────────────────────
  * The open question here was whether creating `general` from the client would
@@ -115,11 +116,15 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * mode, and the form sends `is_private: true` for it.
  *
  * ── ARTHUR'S WORDS (15 October 2026) ───────────────────────────────────────
- * The create form opens on "What are you working on?" and asks three things in
- * this order: the space's name, what the reader is trying to achieve (the
- * space's `description`, optional), and Work or Study. The labels and the type
- * cards are the same in the edit form, so a space reads the same both ways.
- * The kind, the owner and who can join follow, as before.
+ * The title, "What are you working on?" and its line, "Space name", "What are
+ * you trying to achieve? (Optional)" (the space's `description`), the two type
+ * sentences and "Create Space" are his. The edit form uses the same labels and
+ * type sentences, so a space reads the same both ways.
+ *
+ * THE EXAMPLES FOLLOW THE TYPE (Stay, 15 October 2026: "for work an example
+ * should be the name of a client or something"): the two fields' placeholders
+ * are a client matter for Work and a course for Study (`TYPE_EXAMPLES`). The
+ * names are made up.
  */
 
 type Privacy = 'private' | 'open';
@@ -163,6 +168,18 @@ const TYPE_CHOICES: readonly Choice<SpaceType>[] = [
     description: 'For coursework, final-year projects, Bar Finals, moots or exam preparation.',
   },
 ];
+
+/** The examples in the name and goal fields, by the type picked. */
+const TYPE_EXAMPLES: Readonly<Record<SpaceType, { name: string; goal: string }>> = {
+  work: {
+    name: 'e.g. Okafor & Sons, lease dispute',
+    goal: 'e.g. Review the lease and draft a reply to the landlord’s notice',
+  },
+  study: {
+    name: 'e.g. Constitutional Law, Bar Finals prep',
+    goal: 'e.g. Revise for the Bar Finals and practise past questions',
+  },
+};
 
 const KIND_CHOICES: readonly Choice<SpaceKind>[] = [
   {
@@ -234,7 +251,14 @@ export function SpaceFormDialog({
   const organization = myOrganization.data?.data ?? null;
 
   const [name, setName] = useState(space?.name ?? '');
-  const [type, setType] = useState<SpaceType>(space?.type ?? 'work');
+  // No type until the reader picks one: picking it is create's first step.
+  const [type, setType] = useState<SpaceType | null>(space?.type ?? null);
+  // Create only: which step shows, and how it was reached (`opened` plays no
+  // slide, since the dialog itself is animating in).
+  const [step, setStep] = useState<{ at: 'type' | 'details'; entered: 'opened' | 'forward' | 'back' }>(
+    { at: 'type', entered: 'opened' },
+  );
+  const nameRef = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState(space?.description ?? '');
   const [privacy, setPrivacy] = useState<Privacy>(
     (space?.is_private ?? true) ? 'private' : 'open',
@@ -265,7 +289,8 @@ export function SpaceFormDialog({
     description.trim() !== (space?.description ?? '') ||
     isPrivate !== (space?.is_private ?? true);
 
-  const canSubmit = name.trim().length > 0 && changed && !submitting;
+  const canSubmit = type !== null && name.trim().length > 0 && changed && !submitting;
+  const showsTypeStep = !isEdit && step.at === 'type';
 
   const ownerChoices: readonly Choice<string>[] = organization
     ? [
@@ -284,13 +309,23 @@ export function SpaceFormDialog({
       ]
     : [];
 
-  // The organisation the space will belong to, or nothing: "Personal" beside
-  // "Shared" read as a second kind of space (design round 1).
-  const ownerLabel =
-    owner === 'personal' ? null : (organization?.name ?? 'Organization');
+  // Picking a type is the step forward; the name is asked for next, so it
+  // takes the focus once its step has drawn.
+  const chooseType = (next: SpaceType) => {
+    setType(next);
+    setError(null);
+    setStep({ at: 'details', entered: 'forward' });
+    requestAnimationFrame(() => nameRef.current?.focus());
+  };
+  // Back to the cards, with the focus on the one chosen, so Change and a
+  // second pick are two key presses.
+  const changeType = () => {
+    setStep({ at: 'type', entered: 'back' });
+    requestAnimationFrame(() => document.getElementById(`${uid}-type-${type}`)?.focus());
+  };
 
   const handleSubmit = () => {
-    if (!canSubmit) return;
+    if (!canSubmit || type === null) return;
     const trimmedName = name.trim();
     const trimmedDescription = description.trim();
     setError(null);
@@ -332,31 +367,74 @@ export function SpaceFormDialog({
     );
   };
 
+  // Only drawn once a type is picked (step two, or the edit form).
+  const examples = TYPE_EXAMPLES[type ?? 'work'];
+
+  const nameField = (
+    <div className="space-y-2">
+      <Label htmlFor={`${uid}-name`}>Space name</Label>
+      <Input
+        ref={nameRef}
+        id={`${uid}-name`}
+        maxLength={SPACE_NAME_MAX}
+        placeholder={examples.name}
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onKeyDown={(event) => {
+          // IME Enter confirms the composition; it must never submit.
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            handleSubmit();
+          }
+        }}
+      />
+    </div>
+  );
+
+  const goalField = (
+    <div className="space-y-2">
+      <Label htmlFor={`${uid}-description`}>
+        What are you trying to achieve?
+        <span className="font-normal text-muted-foreground">(Optional)</span>
+      </Label>
+      <Textarea
+        id={`${uid}-description`}
+        maxLength={SPACE_DESCRIPTION_MAX}
+        rows={3}
+        placeholder={examples.goal}
+        value={description}
+        onChange={(event) => setDescription(event.target.value)}
+      />
+    </div>
+  );
+
+  const privacyField = canBeOpen ? (
+    <ChoiceCards
+      legend="Who can join"
+      choices={PRIVACY_CHOICES}
+      value={privacy}
+      onChange={setPrivacy}
+    />
+  ) : null;
+
+  const chosen = TYPE_CHOICES.find((choice) => choice.value === type) ?? null;
+
   return (
     /* ── TALLER THAN A PHONE, SO ON A PHONE IT IS THE WHOLE PHONE ──────────
-       This form is the reason `ResponsiveOverlay` exists. Measured on a 360px
-       phone it came to ~1,115px — the two `ChoiceCards` groups stack below
-       `sm:` and cost ~217px each — inside a 640px screen. As a centred box
-       taller than the viewport it hung off BOTH ends by equal amounts, so
-       Save, Cancel and the close X were off-screen at once with no scroll able
-       to reach them (the page is locked and the dialog is portalled outside the
-       app's only scroll region). That is the bug Arthur photographed on
-       2026-08-07.
-
-       Capping the box made Save reachable. Reachable by scrolling is not the
-       same as reachable, and a box is the wrong shape for a form this long at
-       any height. The overlay keeps the three bands — a header that stays, a
-       body that scrolls, a footer that stays — and on a phone gives them the
-       whole screen. Above `md:` it is the same centred card it always was. */
+       `ResponsiveOverlay` keeps three bands: a header that stays, a body that
+       scrolls, a footer that stays. On a phone it gives them the whole screen
+       (the bug Arthur photographed on 2026-08-07 was a centred box taller than
+       the viewport, with Save and the close X both off-screen). Above `md:` it
+       is a centred card. Each create step is short enough to fit a phone. */
     <ResponsiveOverlay
       open={open}
       onOpenChange={onOpenChange}
       title={isEdit ? 'Rename space' : 'Create a Space'}
-      // The create form's heading and its line open the body (below).
+      // The create form's heading and its line open the first step (below).
       description={
         isEdit ? 'Change its name and details. Everyone in it sees the change.' : undefined
       }
-      className="md:max-w-2xl"
+      className="md:max-w-xl"
       footer={
         <>
           <Button
@@ -366,67 +444,54 @@ export function SpaceFormDialog({
           >
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={!canSubmit}>
-            {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
-            {isEdit ? 'Save changes' : 'Create Space'}
-          </Button>
+          {showsTypeStep ? null : (
+            <Button onClick={handleSubmit} disabled={!canSubmit}>
+              {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              {isEdit ? 'Save changes' : 'Create Space'}
+            </Button>
+          )}
         </>
       }
     >
-      {isEdit ? null : (
-        <div className="mb-5 space-y-1">
-          <h3 className="text-lg font-semibold tracking-tight text-foreground">
-            What are you working on?
-          </h3>
-          <p className="text-pretty text-sm text-muted-foreground">
-            Keep conversations and resources together, and invite others to collaborate.
-          </p>
-        </div>
-      )}
-
-      {/* The preview leads on a phone (you see the object before you describe
-          it) and sits beside the fields from `sm` up. */}
-      <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem]">
-        <div className="order-2 min-w-0 space-y-4 sm:order-1">
-          <div className="space-y-2">
-            <Label htmlFor={`${uid}-name`}>Space name</Label>
-            <Input
-              id={`${uid}-name`}
-              maxLength={SPACE_NAME_MAX}
-              placeholder="e.g. Contract Review, Constitutional Law"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              onKeyDown={(event) => {
-                // IME Enter confirms the composition; it must never submit.
-                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  handleSubmit();
-                }
-              }}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor={`${uid}-description`}>
-              What are you trying to achieve?
-              <span className="font-normal text-muted-foreground">(Optional)</span>
-            </Label>
-            <Textarea
-              id={`${uid}-description`}
-              maxLength={SPACE_DESCRIPTION_MAX}
-              rows={3}
-              placeholder="Describe your goal or what you want to accomplish..."
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-            />
-          </div>
-
+      {isEdit ? (
+        <div className="space-y-4">
+          {nameField}
+          {goalField}
           <ChoiceCards
             legend="Type"
             choices={TYPE_CHOICES}
-            value={type}
+            value={type ?? 'work'}
             onChange={setType}
           />
+          {privacyField}
+        </div>
+      ) : showsTypeStep ? (
+        <div key="type" className={stepMotion(step.entered)}>
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold tracking-tight text-foreground">
+              What are you working on?
+            </h3>
+            <p className="text-pretty text-sm text-muted-foreground">
+              Keep conversations and resources together, and invite others to collaborate.
+            </p>
+          </div>
+          <div role="group" aria-label="Type" className="mt-5 grid gap-3 sm:grid-cols-2">
+            {TYPE_CHOICES.map((choice) => (
+              <TypeCard
+                key={choice.value}
+                id={`${uid}-type-${choice.value}`}
+                choice={choice}
+                chosen={choice.value === type}
+                onChoose={() => chooseType(choice.value)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div key="details" className={cn('space-y-4', stepMotion(step.entered))}>
+          {chosen ? <ChosenType choice={chosen} onChange={changeType} /> : null}
+          {nameField}
+          {goalField}
 
           {canChooseKind ? (
             <ChoiceCards
@@ -437,7 +502,7 @@ export function SpaceFormDialog({
             />
           ) : null}
 
-          {!isEdit && organization ? (
+          {organization ? (
             <ChoiceCards
               legend="Owner"
               choices={ownerChoices}
@@ -446,27 +511,9 @@ export function SpaceFormDialog({
             />
           ) : null}
 
-          {canBeOpen ? (
-            <ChoiceCards
-              legend="Who can join"
-              choices={PRIVACY_CHOICES}
-              value={privacy}
-              onChange={setPrivacy}
-            />
-          ) : null}
+          {privacyField}
         </div>
-
-        <div className="order-1 sm:order-2">
-          <SpacePreview
-            uuid={space?.uuid ?? null}
-            name={name}
-            type={type}
-            kind={kind}
-            isPrivate={isPrivate}
-            ownerLabel={ownerLabel}
-          />
-        </div>
-      </div>
+      )}
 
       {error && (
         <p
@@ -480,64 +527,89 @@ export function SpaceFormDialog({
   );
 }
 
-/** The object as it is being made: its crest, its name, and the three facts the
- *  forks above decide. `aria-hidden` — every value in here is already the
- *  announced state of the control that set it. */
-function SpacePreview({
-  uuid,
-  name,
-  type,
-  kind,
-  isPrivate,
-  ownerLabel,
-}: {
-  /** `null` in create mode: no uuid yet, so no hue yet. */
-  uuid: string | null;
-  name: string;
-  type: SpaceType;
-  kind: SpaceKind;
-  isPrivate: boolean;
-  /** The organisation, or `null` for a space that belongs to none. */
-  ownerLabel: string | null;
-}) {
-  const trimmed = name.trim();
-  return (
-    <div
-      aria-hidden
-      className="flex flex-col items-center gap-3 rounded-xl border border-border bg-secondary/30 p-4 text-center"
-    >
-      <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Preview
-      </span>
-
-      <SpaceCrest uuid={uuid} name={trimmed || '?'} type={type} size="xl" />
-
-      <span
-        className={
-          trimmed
-            ? 'min-w-0 max-w-full truncate text-[15px] font-semibold text-foreground'
-            : 'text-[15px] font-semibold text-muted-foreground/60'
-        }
-      >
-        {trimmed || 'Your space'}
-      </span>
-
-      <span className="flex flex-wrap items-center justify-center gap-1">
-        <PreviewChip>{kind === 'team' ? 'Team' : 'Shared'}</PreviewChip>
-        <PreviewChip>{type === 'study' ? 'Study' : 'Work'}</PreviewChip>
-        {/* A shared space is always private, so the chip only says
-            something on a team space (`showsPrivateMark`'s rule). */}
-        {kind === 'team' ? <PreviewChip>{isPrivate ? 'Private' : 'Open'}</PreviewChip> : null}
-        {ownerLabel ? <PreviewChip>{ownerLabel}</PreviewChip> : null}
-      </span>
-    </div>
+/** How a create step comes in: from the side it was reached from, and with
+ *  reduced motion not at all. The first step plays nothing on opening, since
+ *  the dialog itself is animating in. */
+function stepMotion(entered: 'opened' | 'forward' | 'back'): string {
+  if (entered === 'opened') return '';
+  return cn(
+    'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-safe:ease-out',
+    entered === 'forward' ? 'motion-safe:slide-in-from-right-4' : 'motion-safe:slide-in-from-left-4',
   );
 }
 
-function PreviewChip({ children }: { children: React.ReactNode }) {
+/** One of create's first-step cards: picking it moves to the next step, so it
+ *  is a button. A column of two on a phone, two side by side above `sm:`. */
+function TypeCard({
+  id,
+  choice,
+  chosen,
+  onChoose,
+}: {
+  id: string;
+  choice: Choice<SpaceType>;
+  /** The type picked before Change brought the reader back. */
+  chosen: boolean;
+  onChoose: () => void;
+}) {
+  const Icon = choice.icon;
   return (
-    <span className="max-w-full truncate rounded-md bg-background px-1.5 py-0.5 text-[11px] text-muted-foreground">
-      {children}
-    </span>
+    <button
+      id={id}
+      type="button"
+      onClick={onChoose}
+      className={cn(
+        'group v2-interactive flex w-full items-start gap-3 rounded-xl border bg-background p-4 text-left sm:flex-col sm:p-5',
+        'transition-colors duration-150 motion-reduce:transition-none',
+        'hover:border-primary/50 hover:bg-primary/5',
+        chosen ? 'border-primary/60 bg-primary/5' : 'border-border',
+        FOCUS_RING,
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 motion-reduce:transition-none',
+          'group-hover:bg-primary/10 group-hover:text-primary',
+          chosen ? 'bg-primary/10 text-primary' : 'bg-secondary text-foreground',
+        )}
+      >
+        <Icon aria-hidden className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1 space-y-1">
+        <span className="block text-[15px] font-semibold text-foreground">{choice.title}</span>
+        <span className="block text-pretty text-sm leading-relaxed text-muted-foreground">
+          {choice.description}
+        </span>
+      </span>
+      <ChevronRight
+        aria-hidden
+        className="mt-3 size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none sm:hidden"
+      />
+    </button>
+  );
+}
+
+/** Step two's first line: the type picked, and the way back to change it. */
+function ChosenType({
+  choice,
+  onChange,
+}: {
+  choice: Choice<SpaceType>;
+  onChange: () => void;
+}) {
+  const Icon = choice.icon;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 py-2.5 pl-3 pr-2">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <Icon aria-hidden className="size-[18px]" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs text-muted-foreground">Type</span>
+        <span className="block text-sm font-medium text-foreground">{choice.title}</span>
+      </span>
+      <Button type="button" variant="ghost" size="sm" className="v2-interactive" onClick={onChange}>
+        Change<span className="sr-only"> type</span>
+      </Button>
+    </div>
   );
 }
