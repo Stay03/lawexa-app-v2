@@ -49,6 +49,7 @@ import {
   type V2NavItem,
 } from './nav.config';
 import { MoveFirstLink } from './move-first';
+import { RecentChatLabel, recentSpaceName } from './recent-chat-label';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
@@ -315,6 +316,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                 recents.map((conversation) => {
                   const title = stripPastedTags(conversation.title);
                   const active = isActive(`/c/${conversation.id}`);
+                  const spaceName = recentSpaceName(conversation);
                   return (
                     <SidebarMenuItem
                       key={conversation.id}
@@ -327,8 +329,12 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                         asChild
                         tooltip={title}
                         isActive={active}
+                        // Two lines when the chat is in a space: the lg row with
+                        // a lighter vertical pad holds the title and the space.
+                        size={spaceName ? 'lg' : 'default'}
                         className={cn(
                           'text-muted-foreground transition-colors',
+                          spaceName && 'py-1.5',
                           active && ACTIVE_ROW,
                         )}
                       >
@@ -340,7 +346,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
                           headerOwner={conversation.id}
                         >
                           <MessageSquare />
-                          <span className="truncate">{title}</span>
+                          <RecentChatLabel title={title} spaceName={spaceName} />
                         </MoveFirstLink>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

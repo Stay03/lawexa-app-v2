@@ -697,10 +697,10 @@ export function MessageList({
             anchorBottom && 'min-h-full justify-end',
           )}
         >
-          {/* The chat's heading. `mb-auto` keeps it at the top when a short chat's
-              rows sit at the bottom (`justify-end`), as a list's title sits at the
-              top of its page. */}
-          {masthead ? <div className="mb-auto">{masthead}</div> : null}
+          {/* The chat's heading, for screen readers only (ConversationMasthead).
+              No wrapper: an in-flow box would take a row of the column and its
+              `gap-6`, pushing the first message down. */}
+          {masthead}
 
           {references.length > 0 && (
             <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">

@@ -42,6 +42,7 @@ import {
 } from './nav.config';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 import { MoveFirstLink } from './move-first';
+import { RecentChatLabel, recentSpaceName } from './recent-chat-label';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -357,7 +358,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                         )}
                       >
                         <MessageSquare className="size-4 shrink-0" />
-                        <span className="truncate">{title}</span>
+                        <RecentChatLabel title={title} spaceName={recentSpaceName(conversation)} />
                       </MoveFirstLink>
                     );
                   })

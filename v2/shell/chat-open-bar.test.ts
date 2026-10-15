@@ -60,17 +60,41 @@ test('on a phone the bar room moves into the chat: its frame below the buttons, 
   assert.match(read('app', 'v2', 'c', '[conversationId]', 'loading.tsx'), /data-v2-chat-frame=""/);
 });
 
-test('the masthead carries the title and the space link, on its own route only', () => {
+test('a chat draws no title and no space at its top, in the skeleton or the loaded page (Stay, 15 October 2026)', () => {
   const screen = read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
   assert.match(screen, /masthead=\{embed \? null : <ConversationMasthead \/>\}/);
   // Below the confidential banner, the transcript does not pull up under the bar.
   assert.match(screen, /underBar=\{!embed && !controller\.isConfidential\}/);
+  // The masthead is a heading for screen readers only: no visible title, no
+  // space link, no title-shaped shimmer while the title resolves.
   const masthead = read('v2', 'features', 'conversations', 'conversation', 'ConversationMasthead.tsx');
   assert.match(masthead, /const \{ title, confidential \} = useHeaderContext\(\);/);
-  assert.match(masthead, /const place = useHeaderPlace\(\);/);
-  assert.match(masthead, /<h1 /);
-  assert.match(masthead, /aria-label=\{`Open the space \$\{place\.label\}`\}/);
-  // At the top even when a short chat's rows sit at the bottom.
+  assert.match(masthead, /if \(title === null\) return null;/);
+  assert.match(masthead, /<h1 className="sr-only">/);
+  assert.equal((masthead.match(/<h1/g) ?? []).length, 1);
+  for (const gone of [/useHeaderPlace/, /<Link/, /animate-pulse/, /Open the space/]) assert.doesNotMatch(masthead, gone);
+  // No wrapper box: it would take a row of the column and push the first message down.
   const list = read('v2', 'features', 'conversations', 'conversation', 'MessageList.tsx');
-  assert.match(list, /\{masthead \? <div className="mb-auto">\{masthead\}<\/div> : null\}/);
+  assert.match(list, /\r?\n\s*\{masthead\}\r?\n/);
+  assert.doesNotMatch(list, /<div className="mb-auto">\{masthead\}<\/div>/);
+  // The shared skeletons (route boundary, history, move-first frame) draw no title line either.
+  assert.doesNotMatch(read('v2', 'features', 'conversations', 'conversation', 'skeletons.tsx'), /h-7 w-2\/3/);
+});
+
+test('the sidebar and the drawer name the space under a recent chat, as the chats list does (Stay, 15 October 2026)', async () => {
+  const { recentSpaceName } = await import('./recent-chat-space');
+  const space = { uuid: 's1', name: 'Adeyemi chambers' };
+  assert.equal(recentSpaceName({ space, is_confidential: false }), 'Adeyemi chambers');
+  // A confidential chat names no space, as its list row does not.
+  assert.equal(recentSpaceName({ space, is_confidential: true }), null);
+  assert.equal(recentSpaceName({ space: null }), null);
+  assert.equal(recentSpaceName({}), null);
+  const label = read('v2', 'shell', 'recent-chat-label.tsx');
+  assert.match(label, /if \(!spaceName\) return <span className="truncate">\{title\}<\/span>;/);
+  assert.match(label, /<Boxes aria-hidden className="size-3! shrink-0" \/>\s*<span className="sr-only">, in <\/span>\s*<span className="truncate">\{spaceName\}<\/span>/);
+  const sidebar = read('v2', 'shell', 'V2Sidebar.tsx');
+  assert.match(sidebar, /const spaceName = recentSpaceName\(conversation\);/);
+  assert.match(sidebar, /size=\{spaceName \? 'lg' : 'default'\}/);
+  assert.match(sidebar, /<RecentChatLabel title=\{title\} spaceName=\{spaceName\} \/>/);
+  assert.match(read('v2', 'shell', 'V2Drawer.tsx'), /<RecentChatLabel title=\{title\} spaceName=\{recentSpaceName\(conversation\)\} \/>/);
 });
