@@ -182,7 +182,7 @@ export function UserMessageRow({
       <>
         {pastedTexts.length > 0 ? (
           <>
-            <div className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
+            <div data-v2-strip="" className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
               {pastedTexts.map((text, index) => (
                 <PastedContentCard key={index} content={text} />
               ))}
@@ -241,7 +241,7 @@ export function UserMessageRow({
     >
       {pastedTexts.length > 0 ? (
         <>
-          <div className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
+          <div data-v2-strip="" className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
             {pastedTexts.map((text, index) => (
               <PastedContentCard key={index} content={text} />
             ))}

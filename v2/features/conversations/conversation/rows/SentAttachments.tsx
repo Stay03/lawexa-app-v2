@@ -139,7 +139,7 @@ export function SentAttachments({ attachments }: { attachments: readonly Message
         /* The strip scrolls inside the message's width. `ml-auto` keeps a
            short strip at the right edge, under the bubble, and resolves to
            zero once the strip overflows, so its start is never cut off. */
-        <div className="max-w-full overflow-x-auto overscroll-x-contain">
+        <div data-v2-strip="" className="max-w-full overflow-x-auto overscroll-x-contain">
           <div className="ml-auto flex w-max gap-1.5">
             {pictures.map((picture, index) => {
               const link = links[index];

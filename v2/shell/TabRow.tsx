@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -82,6 +82,30 @@ export function TabRow<Item extends { id: string }>({
   children: (tab: Item, selected: boolean) => React.ReactNode;
 }) {
   const refs = useRef(new Map<string, HTMLButtonElement>());
+  const listRef = useRef<HTMLDivElement>(null);
+  // The edge fades (shell.css, `[data-v2-strip]`): which ends have more to
+  // scroll to, written straight onto the element as the strip scrolls or
+  // resizes. No React state: nothing renders from it, and a re-render per
+  // scroll frame would be waste.
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const mark = () => {
+      const more = list.scrollWidth - list.clientWidth;
+      const start = more > 1 && list.scrollLeft > 1;
+      const end = more > 1 && list.scrollLeft < more - 1;
+      list.toggleAttribute('data-overflow-start', start);
+      list.toggleAttribute('data-overflow-end', end);
+    };
+    mark();
+    const observer = new ResizeObserver(mark);
+    observer.observe(list);
+    list.addEventListener('scroll', mark, { passive: true });
+    return () => {
+      observer.disconnect();
+      list.removeEventListener('scroll', mark);
+    };
+  }, [tabs.length]);
   // The roving-tabindex position — where FOCUS last was, which may differ
   // from the selection under manual activation. Updated by each tab's own
   // focus event, so click, arrow keys, and programmatic focus all agree.
@@ -126,7 +150,7 @@ export function TabRow<Item extends { id: string }>({
   };
 
   return (
-    <div role="tablist" aria-label={ariaLabel} className={className}>
+    <div ref={listRef} role="tablist" aria-label={ariaLabel} data-v2-strip="" className={className}>
       {tabs.map((tab, index) => {
         const selected = value === tab.id;
         return (

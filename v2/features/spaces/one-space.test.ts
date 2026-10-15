@@ -309,13 +309,22 @@ test('create is two steps: the type first, then the fields, with no preview (Sta
   // Step one: the two cards are buttons that move on; no Create Space yet.
   assert.match(dialog, /onChoose=\{\(\) => chooseType\(choice\.value\)\}/);
   assert.match(dialog, /stepParam\.show\(next\);/);
-  assert.match(dialog, /\{showsTypeStep \? null : \(\s*<Button onClick=\{handleSubmit\}/);
+  assert.match(dialog, /\{showsTypeStep \? null : \(\s*<Button\s+type="button"\s+onClick=\{handleSubmit\}/);
   // Step two: the type chosen and the way back, then the fields.
-  assert.match(dialog, /step=\{`Step 2 of 2 · \$\{chosen\.title\}`\}\s*title="Name your space"/);
+  // The step mark, with the type picked as a chip (the phone redo, 15 October 2026).
+  assert.match(dialog, /<StepMark step=\{2\} chosen=\{chosen\} \/>/);
+  assert.match(dialog, /\{`Step \$\{step\} of 2`\}/);
   assert.match(dialog, /<div className="space-y-4">\s*\{nameField\}\s*\{goalField\}\s*<\/div>/);
   assert.match(dialog, /const changeType = \(\) => stepParam\.close\(\);/);
   // The bar's chevron goes back a step on step two, and closes on step one.
   assert.match(dialog, /onBack=\{!isEdit && urlType !== null \? changeType : undefined\}/);
+  // On a phone, create is a sheet as tall as the step; edit keeps the screen.
+  assert.match(dialog, /size=\{isEdit \? 'fill' : 'content'\}/);
+  assert.match(dialog, /guardUnsaved=\{!isEdit && \(name\.trim\(\) !== '' \|\| description\.trim\(\) !== ''\)\}/);
+  // A phone does not raise the keyboard by itself on step two.
+  assert.match(dialog, /if \(window\.matchMedia\('\(min-width: 48rem\)'\)\.matches\) nameRef\.current\?\.focus\(\);/);
+  // Cancel and Create Space side by side, FieldPanel's pair.
+  assert.match(dialog, /variant="secondary"[\s\S]{0,320}?Cancel[\s\S]{0,400}?className="flex-1 md:w-auto md:flex-none"/);
   const overlay = read('v2', 'shell', 'overlay', 'ResponsiveOverlay.tsx');
   assert.match(overlay, /\{onBack \? \(\s*<button\s+type="button"\s+aria-label="Back"\s+onClick=\{onBack\}/);
   // Each step slides in from its side, and only with motion allowed.

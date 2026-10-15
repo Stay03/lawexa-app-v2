@@ -807,6 +807,34 @@ html.v2-document-lock body {
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
+
+/* -----------------------------------------------------------------------------
+   A HORIZONTAL STRIP NEVER SHOWS A SCROLLBAR (Stay, 15 October 2026, an
+   Android phone: "just look at that atrocious scroll bar in the tab"). Tab
+   rows (`TabRow` stamps `data-v2-strip` on its tablist) and the chip and
+   attachment strips scroll by swipe, wheel and keys; the bar under them was
+   noise. An attribute, not a class, and v2's own, so the rule never reaches a
+   v1 page this sheet survives into, and it holds inside portals too.
+
+   When a strip does not fit, the edge with more in that direction fades
+   (`data-overflow-start` / `-end`, set by `TabRow` as the strip scrolls and
+   resizes), so a cut tab reads as "more this way", not as a broken row.
+   -------------------------------------------------------------------------- */
+[data-v2-strip] {
+  scrollbar-width: none;
+}
+[data-v2-strip]::-webkit-scrollbar {
+  display: none;
+}
+[data-v2-strip][data-overflow-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+}
+[data-v2-strip][data-overflow-start] {
+  mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+}
+[data-v2-strip][data-overflow-start][data-overflow-end] {
+  mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+}
 .v2-quiet-scroll:hover,
 .v2-quiet-scroll:focus-within,
 .v2-quiet-scroll:active {

@@ -115,6 +115,17 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * means. The bar's chevron goes back a step on step two (`onBack`), and each
  * step says which it is ("Step 1 of 2").
  *
+ * ── ON A PHONE IT IS A SHEET, AS TALL AS THE STEP (Stay, 15 October 2026) ──
+ * "The step 1 and 2 on mobile looks awful." A whole screen for two rows or two
+ * fields left most of it empty, with the buttons stranded at the foot. Create
+ * is now the bottom sheet the profile fields use (`size="content"`): rounded,
+ * dimmed behind, as tall as the step. The title is the sheet's; a small step
+ * mark (two bars, "Step 1 of 2", the type on step two) replaces the headings;
+ * Work and Study are compact rows; Cancel and Create Space sit side by side as
+ * FieldPanel's pair. A phone does not raise the keyboard on its own when step
+ * two draws: the reader taps the name, and the sheet rides above the keys.
+ * The edit form keeps the full screen: it is longer.
+ *
  * ── ARTHUR'S WORDS (15 October 2026) ───────────────────────────────────────
  * The title, "What are you working on?" and its line, "Space name", "What are
  * you trying to achieve? (Optional)" (the space's `description`), the two type
@@ -317,7 +328,9 @@ export function SpaceFormDialog({
   useEffect(() => {
     if (isEdit) return;
     if (urlType !== null) {
-      nameRef.current?.focus();
+      // From `md:` only: on a phone the keyboard would spring up and push the
+      // sheet before the reader asked for it (`ResponsiveOverlay`'s rule).
+      if (window.matchMedia('(min-width: 48rem)').matches) nameRef.current?.focus();
       return;
     }
     leavingRef.current = false;
@@ -391,6 +404,8 @@ export function SpaceFormDialog({
         placeholder={examples.name}
         value={name}
         onChange={(event) => setName(event.target.value)}
+        enterKeyHint="done"
+        className="h-11 md:h-9"
         onKeyDown={(event) => {
           // IME Enter confirms the composition; it must never submit.
           if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
@@ -412,6 +427,7 @@ export function SpaceFormDialog({
         id={`${uid}-description`}
         maxLength={SPACE_DESCRIPTION_MAX}
         rows={3}
+        className="min-h-24"
         placeholder={examples.goal}
         value={description}
         onChange={(event) => setDescription(event.target.value)}
@@ -431,39 +447,55 @@ export function SpaceFormDialog({
   const chosen = TYPE_CHOICES.find((choice) => choice.value === type) ?? null;
 
   return (
-    /* ── TALLER THAN A PHONE, SO ON A PHONE IT IS THE WHOLE PHONE ──────────
-       `ResponsiveOverlay` keeps three bands: a header that stays, a body that
-       scrolls, a footer that stays. On a phone it gives them the whole screen
-       (the bug Arthur photographed on 2026-08-07 was a centred box taller than
-       the viewport, with Save and the close X both off-screen). Above `md:` it
-       is a centred card. Each create step is short enough to fit a phone. */
+    /* `ResponsiveOverlay` keeps three bands: a header that stays, a body that
+       scrolls, a footer that stays. Create is a sheet on a phone, as tall as
+       the step (see the docblock); the longer edit form keeps the whole
+       screen (the bug Arthur photographed on 2026-08-07 was a centred box
+       taller than the viewport). Above `md:` both are a centred card. */
     <ResponsiveOverlay
       open={open}
       onOpenChange={handleOpenChange}
+      size={isEdit ? 'fill' : 'content'}
+      // A tap beside the sheet must not throw away what was typed.
+      guardUnsaved={!isEdit && (name.trim() !== '' || description.trim() !== '')}
       // Step two's chevron goes back to the cards; on step one it closes.
       onBack={!isEdit && urlType !== null ? changeType : undefined}
       title={isEdit ? 'Rename space' : 'Create a Space'}
-      // The create form's heading and its line open the first step (below).
+      // Step one's line is the sheet's own, under the title; step two needs none.
       description={
-        isEdit ? 'Change its name and details. Everyone in it sees the change.' : undefined
+        isEdit
+          ? 'Change its name and details. Everyone in it sees the change.'
+          : showsTypeStep
+            ? 'Keep conversations and resources together, and invite others to collaborate.'
+            : undefined
       }
       className="md:max-w-xl"
       footer={
-        <>
+        /* FieldPanel's pair (Stay picked it from pictures, 19 September 2026):
+           side by side and even on a phone, Cancel with a surface of its own;
+           natural size and right-aligned from `md:`. */
+        <div className="flex gap-2.5">
           <Button
-            variant="outline"
+            type="button"
+            variant="secondary"
             onClick={() => handleOpenChange(false)}
             disabled={submitting}
+            className={showsTypeStep ? 'w-full md:w-auto' : 'flex-1 md:w-auto md:flex-none'}
           >
             Cancel
           </Button>
           {showsTypeStep ? null : (
-            <Button onClick={handleSubmit} disabled={!canSubmit}>
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+              className="flex-1 md:w-auto md:flex-none"
+            >
               {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
               {isEdit ? 'Save changes' : 'Create Space'}
             </Button>
           )}
-        </>
+        </div>
       }
     >
       {isEdit ? (
@@ -479,13 +511,16 @@ export function SpaceFormDialog({
           {privacyField}
         </div>
       ) : showsTypeStep ? (
-        <div key="type" className={cn('space-y-5', stepMotion(entered))}>
-          <StepHeading
-            step="Step 1 of 2"
-            title="What are you working on?"
-            line="Keep conversations and resources together, and invite others to collaborate."
-          />
-          <div role="group" aria-label="Type" className="grid gap-3 sm:grid-cols-2">
+        <div key="type" className={cn('space-y-4', stepMotion(entered))}>
+          <StepMark step={1} />
+          <p id={`${uid}-type-question`} className="text-sm font-medium text-foreground">
+            What are you working on?
+          </p>
+          <div
+            role="group"
+            aria-labelledby={`${uid}-type-question`}
+            className="grid gap-2.5 sm:grid-cols-2"
+          >
             {TYPE_CHOICES.map((choice) => (
               <TypeCard
                 key={choice.value}
@@ -499,14 +534,7 @@ export function SpaceFormDialog({
         </div>
       ) : (
         <div key="details" className={cn('space-y-5', stepMotion(entered))}>
-          {chosen ? (
-            <StepHeading
-              step={`Step 2 of 2 · ${chosen.title}`}
-              title="Name your space"
-              line={chosen.description}
-              icon={chosen.icon}
-            />
-          ) : null}
+          <StepMark step={2} chosen={chosen} />
           <div className="space-y-4">
             {nameField}
             {goalField}
@@ -566,7 +594,7 @@ function TypeCard({
       type="button"
       onClick={onChoose}
       className={cn(
-        'group v2-interactive flex w-full items-start gap-3 rounded-xl border bg-background p-4 text-left sm:flex-col sm:p-5',
+        'group v2-interactive flex w-full items-center gap-3.5 rounded-2xl border bg-transparent px-4 py-3.5 text-left sm:flex-col sm:items-start sm:rounded-xl sm:p-5',
         'transition-colors duration-150 motion-reduce:transition-none',
         'hover:border-primary/50 hover:bg-primary/5',
         chosen ? 'border-primary/60 bg-primary/5' : 'border-border',
@@ -575,52 +603,50 @@ function TypeCard({
     >
       <span
         className={cn(
-          'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-150 motion-reduce:transition-none',
-          'group-hover:bg-primary/10 group-hover:text-primary',
-          chosen ? 'bg-primary/10 text-primary' : 'bg-secondary text-foreground',
+          'flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary',
         )}
       >
         <Icon aria-hidden className="size-5" />
       </span>
-      <span className="min-w-0 flex-1 space-y-1">
-        <span className="block text-[15px] font-semibold text-foreground">{choice.title}</span>
-        <span className="block text-pretty text-sm leading-relaxed text-muted-foreground">
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] leading-tight font-medium text-foreground">
+          {choice.title}
+        </span>
+        <span className="mt-0.5 block text-pretty text-[13px] leading-snug text-muted-foreground">
           {choice.description}
         </span>
       </span>
       <ChevronRight
         aria-hidden
-        className="mt-3 size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none sm:hidden"
+        className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none sm:hidden"
       />
     </button>
   );
 }
 
-/** A create step's heading: which step it is, what it asks, and one line
- *  under it. Step two carries the type picked, with its glyph. */
-function StepHeading({
+/** Where the reader is: two bars (the first, or both, gold), "Step 1 of 2",
+ *  and on step two the type picked, as a chip. */
+function StepMark({
   step,
-  title,
-  line,
-  icon: Icon,
+  chosen = null,
 }: {
-  step: string;
-  title: string;
-  line: string;
-  icon?: Choice<SpaceType>['icon'];
+  step: 1 | 2;
+  chosen?: Choice<SpaceType> | null;
 }) {
+  const Icon = chosen?.icon;
   return (
-    <div className="flex items-start gap-3">
-      {Icon ? (
-        <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <Icon aria-hidden className="size-5" />
+    <div className="flex h-6 items-center gap-3">
+      <span aria-hidden className="flex items-center gap-1">
+        <span className="h-1 w-6 rounded-full bg-primary" />
+        <span className={cn('h-1 w-6 rounded-full', step === 2 ? 'bg-primary' : 'bg-foreground/10')} />
+      </span>
+      <span className="text-xs text-muted-foreground tabular-nums">{`Step ${step} of 2`}</span>
+      {chosen && Icon ? (
+        <span className="ml-auto inline-flex h-6 items-center gap-1 rounded-full bg-primary/10 px-2 text-xs font-medium text-primary">
+          <Icon aria-hidden className="size-3.5" />
+          {chosen.title}
         </span>
       ) : null}
-      <div className="min-w-0 space-y-1">
-        <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{step}</p>
-        <h3 className="text-lg font-semibold tracking-tight text-balance text-foreground">{title}</h3>
-        <p className="text-pretty text-sm text-muted-foreground">{line}</p>
-      </div>
     </div>
   );
 }

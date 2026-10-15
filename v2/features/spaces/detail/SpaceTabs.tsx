@@ -45,7 +45,9 @@ export function SpaceTabs({
       className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
       tabClassName={(selected) =>
         cn(
-          'v2-interactive min-h-8 shrink-0 rounded-full px-3.5 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
+          // px-3 (was 3.5): the four tabs of a shared space fit a 360px
+          // phone without scrolling (Stay, 15 October 2026).
+          'v2-interactive min-h-8 shrink-0 rounded-full px-3 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
           selected
             ? 'bg-background text-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground',

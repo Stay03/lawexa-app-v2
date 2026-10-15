@@ -90,7 +90,9 @@ export function ChoiceCards<Value extends string>({
             <label
               key={choice.value}
               className={cn(
-                'group v2-interactive relative flex h-full cursor-pointer flex-col gap-1 rounded-xl border border-border bg-background p-3 pr-9',
+                // Transparent, not `bg-background`: on a popover's surface the
+                // page colour read as a hole in dark mode (0.145 on 0.205).
+                'group v2-interactive relative flex h-full cursor-pointer flex-col gap-1 rounded-xl border border-border bg-transparent p-3 pr-9',
                 'transition-colors duration-150 motion-reduce:transition-none',
                 'hover:bg-secondary/40',
                 'has-[:checked]:border-primary/60 has-[:checked]:bg-primary/5',
