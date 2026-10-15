@@ -121,5 +121,7 @@ test('a space chat row says its last message and who sent it (Stay, 15 October 2
   assert.equal(lastMessageLine(null, 'u1'), null);
   assert.equal(lastMessageLine({ role: 'user', preview: '  ', created_at: at }, 'u1'), null);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /byline=\{\s*lastMessageLine\(conversation\.last_message, viewerUuid\) \?\?\s*spaceChatByline\(conversation\.author, viewerId\)\s*\}/);
+  // No message to preview: say so, never "You" (techlead, 15 October 2026).
+  assert.match(panel, /byline=\{lastMessageLine\(conversation\.last_message, viewerUuid\) \?\? 'No messages yet'\}/);
+  assert.doesNotMatch(panel, /spaceChatByline/);
 });

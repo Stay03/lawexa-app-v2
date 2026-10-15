@@ -38,7 +38,7 @@ import {
   uploadRefusal,
   type SpaceItemTarget,
 } from '../../content-model';
-import { canAddContent, lastMessageLine, spaceChatByline, uniqueRowsById } from '../../model';
+import { canAddContent, lastMessageLine, uniqueRowsById } from '../../model';
 import { MoveToSpaceDialog } from '../../move/MoveToSpaceDialog';
 import { spacesQueries } from '../../queries';
 import { useServerSearch, type ServerSearch } from '../../use-server-search';
@@ -298,10 +298,9 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
               index={index}
               exiting={false}
               reveal={reveal}
-              byline={
-                lastMessageLine(conversation.last_message, viewerUuid) ??
-                spaceChatByline(conversation.author, viewerId)
-              }
+              // A chat with no message to preview says so; it never falls back
+              // to whose chat it is, which read as a message ("You").
+              byline={lastMessageLine(conversation.last_message, viewerUuid) ?? 'No messages yet'}
               onMove={
                 ownsItem(conversation.user_id, viewerId)
                   ? () => openMove(targetOf(conversation))
