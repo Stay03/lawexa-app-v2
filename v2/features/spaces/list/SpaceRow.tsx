@@ -84,7 +84,8 @@ export const SpaceRow = memo(function SpaceRow({
           FOCUS_RING,
         )}
       >
-        <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="lg" />
+        {/* No Work/Study corner mark: the row says it in words at the top right. */}
+        <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="lg" noMark />
 
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">

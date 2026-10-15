@@ -59,6 +59,9 @@ test('line 1: the name and its unread marks, then Private or Public and Work or 
   assert.match(row, /<UnreadDot \/>[\s\S]*?<CountBadge[\s\S]*?ml-auto shrink-0 pl-2/);
   // No icons, no role line, no faces, no counts.
   assert.doesNotMatch(row, /lucide-react|PresenceStack|spaceContentCountsLabel|spaceRoleLabel/);
+  // Nor the crest's Work/Study corner mark: the words say it (techlead, 15 October 2026).
+  assert.match(row, /<SpaceCrest uuid=\{space\.uuid\} name=\{space\.name\} type=\{space\.type\} size="lg" noMark \/>/);
+  assert.match(read('v2', 'features', 'collab', 'kit', 'Crest.tsx'), /glyph=\{noMark \? null : type === 'study' \? GraduationCap : Briefcase\}/);
 });
 
 test('the list draws the two sections, with headings and counts, and leaves an empty one out', () => {

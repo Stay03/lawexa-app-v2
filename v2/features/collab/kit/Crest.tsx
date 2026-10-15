@@ -136,19 +136,23 @@ export function SpaceCrest({
   name,
   type,
   size = 'md',
+  noMark = false,
   className,
 }: {
   uuid: string | null;
   name: string;
   type: SpaceType;
   size?: CrestSize;
+  /** Leave the Work/Study corner mark off, where the row already says it in
+   *  words (the spaces list since 15 October 2026). */
+  noMark?: boolean;
   className?: string;
 }) {
   return (
     <Crest
       uuid={uuid}
       name={name}
-      glyph={type === 'study' ? GraduationCap : Briefcase}
+      glyph={noMark ? null : type === 'study' ? GraduationCap : Briefcase}
       size={size}
       className={className}
     />
