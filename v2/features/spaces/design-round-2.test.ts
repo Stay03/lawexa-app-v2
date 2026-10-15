@@ -39,18 +39,11 @@ test('the move and remove dialogs, siblings with counters from 1, carry their na
 
 /* ── MUST 2: the phone list row has two meta lines ───────────────────────── */
 
-test('below sm the list row splits its meta; from sm up it is one line', () => {
+test('the list row is two lines at every width: name and icons, then the newest message', () => {
+  // The spaces list row was redrawn as a chat-list row (Stay, 15 October 2026);
+  // spaces-list-rows.test.ts pins it now.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
-  assert.match(
-    row,
-    /<div className="sm:hidden">\s*<MetaLine className="mt-1\.5" lead=\{\[role\]\} trail=\{trail\} \/>\s*<MetaLine className="mt-0\.5" lead=\{inside\(PHONE_CHIP_LIMIT\)\} \/>\s*<\/div>/,
-  );
-  assert.match(
-    row,
-    /<MetaLine\s+className=\{cn\('mt-1\.5', role && 'hidden sm:flex'\)\}\s+lead=\{\[role, \.\.\.inside\(\)\]\}\s+trail=\{trail\}/,
-  );
-  // A row with no role keeps the one line at every width.
-  assert.match(row, /\{role \? \(\s*<div className="sm:hidden">/);
+  assert.doesNotMatch(row, /MetaLine|sm:hidden/);
 });
 
 /* ── MUST 3: on a phone only the uploader truncates ──────────────────────── */
@@ -291,16 +284,9 @@ test('the move picker reads its role word from the spaces model', () => {
 
 /* ── Round 2 critique NICE 4: two whole channel names on a phone ─────────── */
 
-test('the phone meta line shows two channel chips and says more for the rest', () => {
+test('the list row shows no channel chips any more', () => {
+  // The spaces list row was redrawn as a chat-list row (Stay, 15 October 2026);
+  // spaces-list-rows.test.ts pins it now.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
-  assert.match(row, /const PHONE_CHIP_LIMIT = 2;/);
-  assert.match(row, /function ChannelChips\(\{ activity, max \}: \{ activity: SpaceActivity; max\?: number \}\)/);
-  assert.match(
-    row,
-    /const chips = max === undefined \? activity\.chips : activity\.chips\.slice\(0, max\);/,
-  );
-  // "more" covers the names the cap held back, not only the server's overflow.
-  assert.match(row, /const hasMore = activity\.hasMore \|\| chips\.length < activity\.chips\.length;/);
-  assert.match(row, /\{hasMore \? \(/);
-  assert.doesNotMatch(row, /activity\.chips\.map/);
+  assert.doesNotMatch(row, /ChannelChips|PHONE_CHIP_LIMIT|activity/);
 });

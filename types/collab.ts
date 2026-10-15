@@ -222,6 +222,17 @@ export interface SpaceRef {
   kind?: SpaceKind;
 }
 
+/** A space's newest message, for its row in the spaces list ({@link Space.latest_message}). */
+export interface SpaceLatestMessage {
+  conversation_uuid: string;
+  conversation_title: string;
+  role: 'user' | 'assistant';
+  /** Tagged handles already written as names. */
+  preview: string;
+  created_at: string;
+  author: { uuid?: string; name: string } | null;
+}
+
 export interface Space {
   uuid: string;
   name: string;
@@ -261,6 +272,16 @@ export interface Space {
   conversations_count?: number;
   folders_count?: number;
   files_count?: number;
+  /**
+   * The newest message of the space's newest chat (backend, 15 October 2026),
+   * on the `GET /spaces` list only: personal chats, not confidential, not
+   * deleted. `author` follows the chat rows' rule (null for Lawexa's answer).
+   * `null` for a space with no message; absent on an API before it.
+   */
+  latest_message?: SpaceLatestMessage | null;
+  /** What the list sorts by (the newest message, file or other change), so it
+   *  can be newer than `latest_message.created_at`. */
+  last_activity_at?: string | null;
   /** Roster present on `show`. */
   members?: Member[];
   /**

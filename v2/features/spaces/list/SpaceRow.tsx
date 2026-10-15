@@ -2,199 +2,69 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
-import { Lock } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import type { SlimUser, Space } from '@/types/collab';
+import type { Space } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
-import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
-import { PresenceStack } from '@/v2/features/collab/kit/PresenceStack';
 import {
   CountBadge,
   FOCUS_RING,
   UnreadDot,
   formatRelativeTime,
 } from '@/v2/shell/designs/modules';
-import {
-  isSharedSpace,
-  memberCountLabel,
-  showsPrivateMark,
-  spaceContentCountsLabel,
-  spaceKindMark,
-  spaceOwnerLabel,
-  spaceRoleLabel,
-  spaceUnreadGrammar,
-} from '../model';
-import type { SpaceActivity } from './space-activity';
+import { lastMessageLine, spaceUnreadGrammar } from '../model';
+import { spaceIsPrivate } from './list-rows';
 
 /**
- * SpaceRow — one space as a PLACE LANE: a bounded object with its own edges,
- * led by its crest, saying what is happening inside it. It is no longer the
- * `ModuleRow` silhouette a bookmark, a case and a conversation also wear —
- * because a space is not a document, and a list where every kind of thing has
- * the same outline is read rather than recognised.
+ * SpaceRow — one space in the spaces list, read like a chat list (Stay, 15
+ * October 2026).
  *
  * ── THE ANATOMY ────────────────────────────────────────────────────────────
- *   [ crest 48 ]  name · unread dot · Team or Shared · lock    [ mentions ]
- *                 You're the owner · •#general #matter-4471 more · Acme
- *                                                        12 members · 2h
+ *   [ crest 48 ]  name • [ mentions ]                 Private · Study
+ *                 Ada Obi: Can a tenant withhold rent?            2h
  *
- * The DESCRIPTION is gone from the lane on purpose. It swung the row between
- * two and four lines against a two-line skeleton, and it answers a question
- * ("what is this space for") that belongs on the space's own page, not in a
- * list being scanned for activity. The OWNER is not gone: on an account that
- * belongs to an organization, WHOSE space this is changes what it means, so
- * the org name stays on the meta line whether or not chips are there too. A
- * space with no organisation says nothing there: the word "Personal" read as a
- * kind of space next to the type (design round 1, 12 October 2026).
+ * Stay found the old lane "very messy": a role line, a kind box, a lock,
+ * channel chips, content counts, faces and a member count. Now:
+ *  - Line 1 is the name (it truncates), the unread grammar right after it (the
+ *    bold name, the gold dot, the gold mention number: `spaceUnreadGrammar`,
+ *    unchanged), and at the top right, in the same place on every row,
+ *    "Private" in violet or "Public" in green, then "· Work" or "· Study"
+ *    (Stay: "write them in text and put them on the top right … it gets
+ *    uniformity"; an icon pair came first and was turned down).
+ *  - Line 2 is the newest message in the space and who sent it, with its time
+ *    at the right of that line ("the time stays by the side of the message like
+ *    how that usually is"): "Name: preview", "You: …", "Lawexa: …"
+ *    (`lastMessageLine`, the same words a space's own chat rows use). A space
+ *    with no message says so, muted.
+ *  - Whose space it is lives in the list's sections ("Your spaces", "Joined"),
+ *    not on the row; the members are in the space's People tab.
  *
- * ── YOUR ROLE LEADS THE META LINE (design round 1) ─────────────────────────
- * The approved row carries the viewer's role, and a space you own and a space
- * you only view looked identical. "You're the owner", "You're a contributor",
- * "You're a viewer" (`spaceRoleLabel`) is the line's FIRST fact and never
- * shrinks, because the role is what decides what the reader can do inside.
- * On a phone that left the chips and counts after it no room at all (three
- * gold dots and "more"), so below `sm:` the meta runs on two lines: the role
- * with the members and age, then the chips or counts with the owner (design
- * round 2, 12 October 2026). The lane grows by one 16px line on phones only.
- * A team space speaks the same three words as a shared one, so the move
- * picker's "Contributor" and this line's "You're a contributor" name one
- * person one way (`viewerContentRole`, design round 2).
- * The lock appears only where it can differ
- * (`showsPrivateMark`): a shared space is always private.
- *
- * ── THE UNREAD GRAMMAR, UNCHANGED (DIRECTION 2, backend Ruling A) ───────────
- *   `unread_channels_count > 0` → the name goes SEMIBOLD with a gold dot
- *                                 beside it. Muted channels are excluded
- *                                 server-side, so a space whose only noisy
- *                                 channel is muted stays quiet.
- *   `mention_count > 0`         → the gold numeric badge on the right. A
- *                                 NUMBER IS ONLY EVER MENTIONS, and muted
- *                                 channels ARE counted: a mute never
- *                                 suppresses a direct @you.
- *   neither                     → the quiet lane. Most lanes, most of the time.
- * No red anywhere. Nothing here dims, because mute is per-channel and a space
- * is never muted — so the badge needs no dim-wrapper sibling to escape.
- *
- * THE BADGE IS THE ONLY NUMERAL ON THE LANE. The member count is words ("12
- * members") and the channel overflow is the word "more", so nothing on the row
- * competes with the one figure that carries meaning. Two numerals told apart
- * by colour alone is exactly the ambiguity that rule exists to prevent.
- *
- * ── THE CREST DOES NOT REACT TO ACTIVITY ───────────────────────────────────
- * The old tile warmed to gold on unread, which put a second gold object beside
- * the badge that carries the real number and made the identity mark move under
- * load. The crest is constant; bold, dot and badge carry all the signal.
- *
- * ── THE CHANNEL CHIPS ARE THE SECOND LINE, WHEN THERE ARE ANY ──────────────
- * Chips come from the viewer's cross-space channel cache (see
- * `space-activity.ts` for what that is one page of, and for why the overflow
- * is a word and not a number). An unread chip is marked by a SOLID GOLD DOT
- * plus foreground text at medium weight — the house unread grammar, at chip
- * scale. It is deliberately not a gold wash: measured, `bg-primary/15` over
- * the page reaches 1.13:1 in light and 1.01:1 in dark against the neighbouring
- * quiet chip, which is no signal at all, while the solid dot measures 4.33:1
- * light and 7.31:1 dark. Gold works as a small solid mark and never survives
- * as a tint.
- *
- * With no chips known — a space the viewer has joined no channel in, or a
- * cache that has not reached it — the line names what the space IS instead, so
- * the lane never renders an empty column.
- *
- * `memo` still earns its place: a rollup change in one space re-renders that
- * lane and leaves the others alone. It does yield when the channel cache
- * moves, because that is precisely when the chips must change.
- *
- * ── THE KIND, QUIETLY (Spaces F2, 11 October 2026) ─────────────────────────
- * One Space now comes in two kinds, and the row names its kind in the small
- * mark beside the name: "Team" for a team space (the old kind, the one with
- * channels), "Shared" for a shared space (`spaceKindMark`). Its second line,
- * when it has no channel chips, says what it HOLDS ("3 chats · 1 file") from
- * the counts the backend stamps from B1, which is the question a shared
- * space's lane answers; an API without the counts keeps the line it had. The
- * starter Work and Study spaces are rows like any other.
- *
- * THE LIST AND THE MOVE PICKER SPEAK ONE WORD (design round 4, 12 October
- * 2026). The picker names every row's kind, because its rows carry no counts
- * and no chips to tell the kinds apart. The list used to mark only a team
- * space, so a reader met the word "Shared" first in a dialog, and a regular
- * user saw no kind on any row. Both now call `spaceKindMark`, so one space
- * wears one mark wherever it is listed.
- *
- * "TEAM" NEEDS AN EXPLICIT `team`, AND A VIEWER WHO HAS TEAM CHANNELS (fix
- * after review, 11 October 2026; `showsTeamMark`, which `spaceKindMark`
- * follows). Before B1 every row comes without a kind, and a regular user must
- * never see "Team" on their own Work or Study space: below researcher a team
- * space shows no channels, so the word would name something they cannot open.
- * An absent kind wears no mark.
+ * THE TIME IS RELATIVE ("2h", "3d"): a clock time would be printed in the
+ * server's timezone on the first render and the reader's after it, and React
+ * refuses a mismatched hydration. `showTime` turns it off in one place.
  */
-
-/** One frozen empty roster. `GET /api/spaces` attaches `members` only on
- *  `show`, so on this screen every lane resolves to this — sharing the
- *  reference keeps the memo from churning on a value that is always absent. */
-const NO_FACES: readonly SlimUser[] = [];
-
-/** The channel names a phone's second meta line shows. Three shared its 270px
- *  lane and cut each to about ten letters (design round 2); two read about
- *  sixteen each. From `sm:` up the line shows every chip it has. */
-const PHONE_CHIP_LIMIT = 2;
-
 export const SpaceRow = memo(function SpaceRow({
   space,
-  activity,
   now,
   index,
-  canOpenTeamChannels,
+  viewerUuid,
+  showTime = true,
 }: {
   space: Space;
-  /** The viewer's channels in this space — chips, overflow, latest activity. */
-  activity: SpaceActivity;
   /** Frozen clock for the relative age (React Compiler lint). */
   now: number;
   /** Staggers the entrance for the first screenful only. */
   index: number;
-  /** Whether this viewer may open Team Channels (the screen's one answer). */
-  canOpenTeamChannels: boolean;
+  /** "You:" on the message line when the reader sent it. */
+  viewerUuid: string | null;
+  /** The newest message's time at the right of line 2. */
+  showTime?: boolean;
 }) {
   const { unread, mentions } = spaceUnreadGrammar(space);
-  const age = formatRelativeTime(activity.lastMessageAt, now);
-  const hasChips = activity.chips.length > 0;
-  const shared = isSharedSpace(space);
-  const kind = spaceKindMark(space, canOpenTeamChannels);
-  const holds = shared ? spaceContentCountsLabel(space) : null;
-  const roleWords = spaceRoleLabel(space);
-  // Gated here, not inside: `MetaLine` decides presence, so an element that
-  // could render nothing would leave a dangling separator.
-  const role = roleWords ? (
-    <span key="role" className="shrink-0">
-      {roleWords}
-    </span>
-  ) : null;
-  const memberWords = memberCountLabel(space.active_members_count);
-  const faces = space.members
-    ? space.members.filter((member) => member.is_active).map((member) => member.user)
-    : NO_FACES;
-  // What is inside, then whose it is: the chips when the viewer has channels
-  // here, else what the space holds or what it is. The phone's line has room
-  // for two names read whole, so it shows two and says "more" for the rest.
-  const inside = (maxChips?: number) => [
-    hasChips ? (
-      <ChannelChips key="chips" activity={activity} max={maxChips} />
-    ) : (
-      holds ?? space.type_label
-    ),
-    spaceOwnerLabel(space),
-  ];
-  const trail = [
-    <PresenceStack
-      key="members"
-      members={faces}
-      total={space.active_members_count}
-      countLabel={memberWords}
-      label={`${memberWords} in ${space.name}`}
-    />,
-    age,
-  ];
+  const latest = space.latest_message ?? null;
+  const line = lastMessageLine(latest, viewerUuid);
+  const age = showTime && latest ? formatRelativeTime(latest.created_at, now) : '';
+  const isPrivate = spaceIsPrivate(space);
 
   return (
     <li
@@ -228,85 +98,41 @@ export const SpaceRow = memo(function SpaceRow({
               {space.name}
             </span>
             {unread ? <UnreadDot /> : null}
-            {kind ? (
-              <span className="shrink-0 rounded-md border border-border px-1.5 text-[10px] font-medium leading-4 text-muted-foreground">
-                {kind}
-              </span>
-            ) : null}
-            {showsPrivateMark(space) ? (
-              <Lock
-                aria-label="Private space"
-                className="size-3.5 shrink-0 text-muted-foreground"
+            {mentions > 0 ? (
+              <CountBadge
+                count={mentions}
+                label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${space.name}`}
               />
             ) : null}
+            {/* The same place on every row (Stay: "put them on the top right
+                cos that's wasted space and it gets uniformity"). */}
+            <span className="ml-auto shrink-0 pl-2 text-xs">
+              <span
+                className={cn(
+                  'font-semibold',
+                  isPrivate
+                    ? 'text-violet-600 dark:text-violet-300'
+                    : 'text-emerald-600 dark:text-emerald-400',
+                )}
+              >
+                {isPrivate ? 'Private' : 'Public'}
+              </span>
+              <span className="text-muted-foreground"> · {space.type_label}</span>
+            </span>
           </div>
 
-          {/* A phone splits the meta onto two lines (design round 2): the
-              role with the members and age, then what is inside. On one line
-              the role, which never shrinks, left the chips no room for a
-              letter. From `sm:` up the one line has the width it needs. */}
-          {role ? (
-            <div className="sm:hidden">
-              <MetaLine className="mt-1.5" lead={[role]} trail={trail} />
-              <MetaLine className="mt-0.5" lead={inside(PHONE_CHIP_LIMIT)} />
-            </div>
-          ) : null}
-          <MetaLine
-            className={cn('mt-1.5', role && 'hidden sm:flex')}
-            lead={[role, ...inside()]}
-            trail={trail}
-          />
+          <div className="mt-1 flex min-w-0 items-center gap-2 text-[13px]">
+            {line ? (
+              <span className={cn('min-w-0 flex-1 truncate', unread ? 'text-foreground' : 'text-muted-foreground')}>
+                {line}
+              </span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate italic text-muted-foreground">No messages yet</span>
+            )}
+            {age ? <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{age}</span> : null}
+          </div>
         </div>
-
-        {mentions > 0 ? (
-          <CountBadge
-            count={mentions}
-            label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${space.name}`}
-          />
-        ) : null}
       </Link>
     </li>
   );
 });
-
-/**
- * The live second line: up to three channel names (`max` fewer), unread ones
- * marked with the house gold dot, then the honest word for "there are others",
- * which also covers the names `max` held back. The chips arrive unread first,
- * so a cut drops quiet channels before an unread one.
- *
- * NO PLINTH BEHIND THE CHIPS. A tinted ground looked tidier and cost contrast
- * it could not pay for: `bg-secondary/70` moves the page by 1.07:1 in light —
- * invisible — while dragging `text-muted-foreground` from 4.73:1 down to
- * 4.43:1, under DIRECTION 11's floor. Plain text on the page keeps the read
- * chip at 4.73:1 / 7.63:1 and the gold dot at 4.33:1 / 7.31:1, and `#` is a
- * strong enough token boundary that the ground was never doing the separating.
- */
-function ChannelChips({ activity, max }: { activity: SpaceActivity; max?: number }) {
-  const chips = max === undefined ? activity.chips : activity.chips.slice(0, max);
-  const hasMore = activity.hasMore || chips.length < activity.chips.length;
-  return (
-    <span className="flex min-w-0 items-center gap-2">
-      {chips.map((chip) => (
-        <span
-          key={chip.uuid}
-          className={cn(
-            'inline-flex min-w-0 items-center gap-1 text-[11px]',
-            chip.unread ? 'font-medium text-foreground' : 'text-muted-foreground',
-          )}
-        >
-          {chip.unread ? (
-            <span
-              aria-label="Unread"
-              className="size-1.5 shrink-0 rounded-full bg-primary"
-            />
-          ) : null}
-          <span className="min-w-0 truncate">{`#${chip.name}`}</span>
-        </span>
-      ))}
-      {hasMore ? (
-        <span className="shrink-0 text-[11px] text-muted-foreground">more</span>
-      ) : null}
-    </span>
-  );
-}

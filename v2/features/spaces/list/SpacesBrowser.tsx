@@ -6,10 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
-import { channelsQueries } from '@/v2/features/channels/queries';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
-import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
+import { collabAccessState } from '@/v2/features/collab/model';
 import { usePendingInvitationCount } from '@/v2/features/invitations/use-pending-count';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
@@ -26,19 +26,21 @@ import { SPACES_BASELINE_PARAMS, spacesQueries } from '../queries';
 import { PendingPill } from './PendingPill';
 import { SpaceRow } from './SpaceRow';
 import { SpaceTypeTabs } from './SpaceTypeTabs';
-import { NO_SPACE_ACTIVITY, spaceActivityIndex } from './space-activity';
+import { spaceListSections } from './list-rows';
 import { SpacesEmptyState, SpacesErrorState, SpacesListSkeleton } from './states';
 
 /**
  * SpacesBrowser — the `/spaces` body, and the `useSearchParams` consumer (so it
  * lives under the Suspense boundary `SpacesScreen` provides).
  *
- * ── ONE STREAM, TYPE AS A FILTER ───────────────────────────────────────────
- * Work and Study are a FILTER, never a layout: the server returns the caller's
- * spaces in one list, and splitting the page into two headed sections would
- * bury a busy Study space under a heading while a quiet Work one sat at the
- * top. The tab strip narrows the same stream (study A1's verdict, and the
- * `/bookmarks` precedent).
+ * ── TYPE AS A FILTER, OWNERSHIP AS THE SECTIONS ────────────────────────────
+ * Work and Study are a FILTER, never a layout: the tab strip narrows the one
+ * stream the server returns (study A1's verdict, and the `/bookmarks`
+ * precedent). The page IS split by whose space it is (Stay, 15 October 2026:
+ * "a way to indicate my spaces from spaces i joined"): "Your spaces", then
+ * "Joined" (`spaceListSections`), each keeping the server's order, which is
+ * the most recent activity first, so a busy space sits at the top of its own
+ * section.
  *
  * ── THE URL IS THE STATE ───────────────────────────────────────────────────
  * `?type=` is the tab, written with the LOUD native-history write
@@ -54,12 +56,11 @@ import { SpacesEmptyState, SpacesErrorState, SpacesListSkeleton } from './states
  * "never a skeleton over content already in cache" rule kept by the cache,
  * where it belongs, rather than by borrowing another tab's rows.
  *
- * ── THE LANES READ A SECOND CACHE, AND SPEND NOTHING FOR IT ────────────────
- * Channel chips and last-activity come from `channelsQueries.mine`, which the
- * realtime spine already mounts app-wide with these exact params — so this is
- * the SAME cache entry, warm on arrival, live between refetches, and costing
- * no request. It is a progressive enhancement: while it is cold or empty the
- * lanes name what each space IS instead, and nothing waits on it.
+ * ── EACH ROW SAYS ITS NEWEST MESSAGE ───────────────────────────────────────
+ * The rows read like a chat list (Stay, 15 October 2026): the space's newest
+ * message and who sent it, from the row's own `latest_message`, so the list
+ * reads nothing beyond its one request. The channel chips that came from the
+ * channel cache are gone with the rest of the old lane.
  *
  * ── THE TOOLBAR IS STATIC CHROME, AND ONE ITEM LESS ────────────────────────
  * The tab strip and New space render on the first frame and never wait on data
@@ -157,16 +158,8 @@ export function SpacesBrowser() {
     enabled: eligible,
   });
 
-  // Same params as the spine's mount (`spine.tsx`), so this resolves to that
-  // entry rather than minting a second one. And the spine's gate: below
-  // researcher every channel route is refused (Spaces F1/F2, 11 October 2026),
-  // so the lanes show what each space holds instead of channel chips.
-  const myChannels = useQuery({
-    ...channelsQueries.mine({ viewerId }),
-    enabled: canOpenTeamChannels(session),
-  });
-  // The same answer, for the rows' "Team" mark (`showsTeamMark`).
-  const teamChannelsOpen = canOpenTeamChannels(session);
+  // "You:" on a row's message line when the reader sent it.
+  const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
 
   const pendingInvitations = usePendingInvitationCount({ viewerId, enabled: eligible });
 
@@ -174,13 +167,9 @@ export function SpacesBrowser() {
     replaceUrlParams({ type: next === 'all' ? null : next });
   };
 
-  const spaces = query.data?.data ?? [];
-
-  const myChannelRows = myChannels.data?.data;
-  const activityBySpace = useMemo(
-    () => spaceActivityIndex(myChannelRows ?? []),
-    [myChannelRows],
-  );
+  const spaces = query.data?.data;
+  const sections = useMemo(() => spaceListSections(spaces ?? []), [spaces]);
+  const count = spaces?.length ?? 0;
 
   // A 4xx is a REFUSAL the server explained; a 5xx or a network drop is not,
   // and its message ("Network error…") is less useful than the designed copy.
@@ -192,9 +181,9 @@ export function SpacesBrowser() {
 
   // Every state decision reads the loaded set, never a projection.
   const showSkeleton = query.isPending;
-  const showError = query.isError && spaces.length === 0;
-  const showEmpty = !showSkeleton && !showError && spaces.length === 0;
-  const showInlineError = query.isError && spaces.length > 0;
+  const showError = query.isError && count === 0;
+  const showEmpty = !showSkeleton && !showError && count === 0;
+  const showInlineError = query.isError && count > 0;
 
   return (
     <PageShell onCreate={openCreate}>
@@ -255,18 +244,42 @@ export function SpacesBrowser() {
               />
             ) : null}
 
-            <ul className="flex flex-col gap-2">
-              {spaces.map((space, index) => (
-                <SpaceRow
-                  key={space.uuid}
-                  space={space}
-                  activity={activityBySpace.get(space.uuid) ?? NO_SPACE_ACTIVITY}
-                  now={now}
-                  index={index}
-                  canOpenTeamChannels={teamChannelsOpen}
-                />
-              ))}
-            </ul>
+            {/* Two sections (Stay, 15 October 2026): the spaces the reader
+                owns, then the ones they joined, each newest activity first.
+                An empty section is left out. */}
+            <div className="flex flex-col gap-7">
+              {(
+                [
+                  ['mine', 'Your spaces', sections.mine],
+                  ['joined', 'Joined', sections.joined],
+                ] as const
+              ).map(([id, title, rows], sectionIndex) =>
+                rows.length > 0 ? (
+                  <section key={id} aria-labelledby={`spaces-section-${id}`}>
+                    <h2
+                      id={`spaces-section-${id}`}
+                      className="mb-2.5 flex items-baseline gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase"
+                    >
+                      {title}
+                      <span className="text-xs font-medium tracking-normal normal-case tabular-nums">
+                        {rows.length}
+                      </span>
+                    </h2>
+                    <ul className="flex flex-col gap-2">
+                      {rows.map((space, index) => (
+                        <SpaceRow
+                          key={space.uuid}
+                          space={space}
+                          now={now}
+                          index={index + (sectionIndex === 1 ? sections.mine.length : 0)}
+                          viewerUuid={viewerUuid}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ) : null,
+              )}
+            </div>
           </>
         )}
       </div>

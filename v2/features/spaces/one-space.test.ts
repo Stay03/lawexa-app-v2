@@ -267,29 +267,14 @@ test('the "Team" mark needs an explicit team kind and a viewer with Team Channel
 });
 
 test('the spaces list marks team spaces and asks for channels only for researcher+', () => {
+  // The spaces list row was redrawn as a chat-list row (Stay, 15 October 2026);
+  // spaces-list-rows.test.ts pins it now.
+  // The row no longer marks kinds or reads channels, so the list asks for no
+  // channels at all, for any role.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
-  // Design round 4: the row's mark is the move picker's `spaceKindMark`
-  // (was `showsTeamMark` and a literal "Team"), which keeps the Team rule.
-  assert.match(row, /const kind = spaceKindMark\(space, canOpenTeamChannels\);/);
-  assert.match(row, /\{kind \? \(/);
-  // Design round 1: the viewer's role leads the line (was
-  // `[holds ?? space.type_label, spaceOwnerLabel(space)]`).
-  // Design round 2: the facts after the role are one list, shared by the
-  // phone's second line and the single line from sm: up (was
-  // `[role, holds ?? space.type_label, spaceOwnerLabel(space)]`), built by
-  // `inside(max)` so the phone can cap its chips (round 2, NICE 4).
-  assert.match(
-    row,
-    /hasChips \? \(\s*<ChannelChips key="chips" activity=\{activity\} max=\{maxChips\} \/>\s*\) : \(\s*holds \?\? space\.type_label\s*\),\s*spaceOwnerLabel\(space\),/,
-  );
-  assert.match(row, /lead=\{\[role, \.\.\.inside\(\)\]\}/);
+  assert.doesNotMatch(row, /spaceKindMark|ChannelChips/);
   const browser = read('v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx');
-  assert.match(
-    browser,
-    /channelsQueries\.mine\(\{ viewerId \}\),\s*enabled: canOpenTeamChannels\(session\),/,
-  );
-  assert.match(browser, /const teamChannelsOpen = canOpenTeamChannels\(session\);/);
-  assert.match(browser, /canOpenTeamChannels=\{teamChannelsOpen\}/);
+  assert.doesNotMatch(browser, /channelsQueries|canOpenTeamChannels/);
 });
 
 test('the page follows a soft navigation that changes ?tab=', () => {

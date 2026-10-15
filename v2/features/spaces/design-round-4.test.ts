@@ -39,14 +39,10 @@ test('the list row and the move picker name a space’s kind with one rule', () 
   assert.equal(spaceKindMark({ kind: 'shared' }, false), 'Shared');
   assert.equal(spaceKindMark({ kind: 'team' }, true), 'Team');
   assert.equal(spaceKindMark({ kind: 'team' }, false), null);
+  // The list row lost its kind box (Stay, 15 October 2026: Work or Study as
+  // an icon instead); the move picker keeps the mark.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
-  assert.match(row, /const kind = spaceKindMark\(space, canOpenTeamChannels\);/);
-  assert.match(
-    row,
-    /\{kind \? \(\s*<span className="shrink-0 rounded-md border border-border px-1\.5 text-\[10px\] font-medium leading-4 text-muted-foreground">\s*\{kind\}\s*<\/span>\s*\) : null\}/,
-  );
-  // The docblock still names the Team rule's source; the row no longer calls it.
-  assert.doesNotMatch(row, /showsTeamMark\(/);
+  assert.doesNotMatch(row, /spaceKindMark|showsTeamMark\(/);
   const dialog = read('v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx');
   assert.match(dialog, /const kind = spaceKindMark\(space, teamChannelsOpen\);/);
 });

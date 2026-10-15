@@ -96,12 +96,12 @@ test('the gate, the spine, both homes and discover all read the flag, never the 
   assert.match(access, /<TeamChannelsClosedState \/>/);
   const spine = read('v2', 'runtime', 'realtime', 'spine.tsx');
   assert.match(spine, /channelsQueries\.mine\(\{ viewerId \}\), enabled: canOpenTeamChannels\(session\)/);
-  // The two other mounts of the channel list ask for it only with the flag too:
-  // the Spaces list's channel chips directly, and the collab frame through
+  // The collab frame asks for the channel list only with the flag too, through
   // `showsChannels` (Spaces F2: the flag AND a team space on a space route,
-  // the flag itself on a channel route).
+  // the flag itself on a channel route). The Spaces list no longer reads it:
+  // its rows lost the channel chips (Stay, 15 October 2026).
   const browser = read('v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx');
-  assert.match(browser, /channelsQueries\.mine\(\{ viewerId \}\),[\s\S]{0,200}?enabled: canOpenTeamChannels\(session\),/);
+  assert.doesNotMatch(browser, /channelsQueries/);
   const frame = read('v2', 'features', 'collab', 'shell', 'CollabFrame.tsx');
   assert.match(frame, /channelsQueries\.mine\(\{ viewerId \}\),\s*enabled: eligible && showsChannels,/);
   assert.match(frame, /const showsChannels = isSpaceRoute[\s\S]{0,200}?: canOpenTeamChannels\(session\);/);

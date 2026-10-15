@@ -73,9 +73,11 @@ test('a team space speaks the content roles too (design round 2, NICE 3)', () =>
   assert.equal(spaceRoleLabel({ my_role: 'owner', my_content_role: null }), 'You’re the owner');
 });
 
-test('the list row and the space header both print the role', () => {
+test('the space header prints the role; the list says whose by its sections', () => {
+  // The spaces list row was redrawn as a chat-list row (Stay, 15 October 2026);
+  // spaces-list-rows.test.ts pins it now.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
-  assert.match(row, /const roleWords = spaceRoleLabel\(space\);/);
+  assert.doesNotMatch(row, /spaceRoleLabel/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
   assert.match(
     header,
@@ -130,7 +132,8 @@ test('the lock shows only where it can differ: a private team space', () => {
   assert.equal(showsPrivateMark({ kind: 'team', is_private: true }), true);
   assert.equal(showsPrivateMark({ kind: 'team', is_private: false }), false);
   assert.equal(showsPrivateMark({ is_private: true }), true);
-  assert.match(read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx'), /\{showsPrivateMark\(space\) \? \(/);
+  // The list row now always says Private or Public, as an icon (spaceIsPrivate).
+  assert.match(read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx'), /const isPrivate = spaceIsPrivate\(space\);/);
   assert.match(
     read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx'),
     /privateMark=\{showsPrivateMark\(space\)\}/,
