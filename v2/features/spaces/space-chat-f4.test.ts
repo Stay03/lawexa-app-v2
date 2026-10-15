@@ -67,7 +67,7 @@ test('an empty Conversations tab reads Arthur’s words to those who may add, an
 
 test('the Conversations tab has the message box at its bottom, for the Owner and Contributors, and no New conversation (Stay, 15 October 2026)', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /\{canAdd \? <SpaceChatDock space=\{\{ uuid: spaceUuid, name: spaceName \}\} \/> : null\}/);
+  assert.match(panel, /\{canAdd \? <SpaceChatDock space=\{\{ uuid: spaceUuid, name: spaceName \}\} handle=\{dock\} \/> : null\}/);
   assert.match(panel, /placeholder="Search conversations"\s*busy=\{query\.isPlaceholderData\}\s*action=\{null\}/);
   assert.doesNotMatch(panel, /New conversation|StartConversationDialog|startChat/);
   // The earlier conversations stay in the list above the box.
@@ -103,7 +103,7 @@ test('the empty Conversations tab offers Upload files, and Invite people to whoe
   // Both are secondary: the box docked under the tab is the way to start.
   assert.match(
     panel,
-    /<EmptyStateAddButton variant="outline" icon=\{Upload\} onClick=\{uploads\.pickFiles\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
+    /<EmptyStateAddButton variant="outline" icon=\{Upload\} onClick=\{\(\) => dock\.current\?\.attach\(\)\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
   );
   assert.match(
     panel,
@@ -112,4 +112,14 @@ test('the empty Conversations tab offers Upload files, and Invite people to whoe
   // Whoever may manage the space's people, however many are in it.
   assert.match(panel, /openInvite: scope !== null && scope\.canManage \? scope\.openInvite : null,/);
   assert.doesNotMatch(panel, /Go to your conversations/);
+});
+
+test('Upload files in an empty space puts the file in the box as a chip (Arthur, 15 October 2026)', () => {
+  const composer = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
+  // The box's own picker, opened from outside: the file joins the box's chips,
+  // uploads into the space, and goes with the first message.
+  assert.match(composer, /useImperativeHandle\(handle, \(\) => \(\{ attach: \(\) => fileInputRef\.current\?\.click\(\) \}\), \[\]\);/);
+  assert.match(composer, /const uploaded = await uploadAttachment\(file, space\?\.uuid \?\? null\);/);
+  const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
+  assert.match(dock, /handle=\{handle\}/);
 });

@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Space, SpaceConversation, SpaceFile, SpaceFolder } from '@/types/collab';
 import { UploadTray } from '@/v2/features/channels/files/UploadTray';
+import type { HomeComposerHandle } from '@/v2/shell/designs/HomeComposer';
 import {
   useUploadQueueFor,
   type UploadFailureNote,
@@ -261,7 +262,10 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
   // them in place (the conversations list's rule, 8 October 2026).
   const [reveal] = useState(() => query.isPending);
   const { openMove, openRemove, dialogs } = useItemDialogs(access);
-  const uploads = useSpaceUploads(spaceUuid);
+  // Upload files opens the docked box's own picker: the file is a chip in the
+  // box until the first message goes, and is the space's from the moment it
+  // uploads (Arthur, 15 October 2026: "no indication where it went").
+  const dock = useRef<HomeComposerHandle>(null);
 
   const targetOf = (conversation: SpaceConversation): SpaceItemTarget => ({
     type: 'conversation',
@@ -283,7 +287,6 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
         busy={query.isPlaceholderData}
         action={null}
       />
-      {canAdd ? uploads.picker : null}
       <PagedContent
         tab="chats"
         query={query}
@@ -301,7 +304,7 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
               canAdd={canAdd}
               action={
                 <div className="flex flex-wrap items-center justify-center gap-2">
-                  <EmptyStateAddButton variant="outline" icon={Upload} onClick={uploads.pickFiles}>
+                  <EmptyStateAddButton variant="outline" icon={Upload} onClick={() => dock.current?.attach()}>
                     Upload files
                   </EmptyStateAddButton>
                   {access.openInvite ? (
@@ -344,7 +347,7 @@ function SpaceChatsList({ access }: { access: ContentAccess }) {
         </ul>
       </PagedContent>
       {dialogs}
-      {canAdd ? <SpaceChatDock space={{ uuid: spaceUuid, name: spaceName }} /> : null}
+      {canAdd ? <SpaceChatDock space={{ uuid: spaceUuid, name: spaceName }} handle={dock} /> : null}
     </div>
   );
 }

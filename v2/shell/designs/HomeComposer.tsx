@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
@@ -146,6 +146,12 @@ export interface HomeComposerSpace {
   name: string;
 }
 
+/** What a host may ask of the box: open its own file picker, so a file picked
+ *  from outside the box (an empty space's Upload files) lands in it as a chip. */
+export interface HomeComposerHandle {
+  attach: () => void;
+}
+
 interface HomeComposerBaseProps {
   value: string;
   onValueChange: (value: string) => void;
@@ -176,6 +182,10 @@ interface HomeComposerBaseProps {
   textareaClassName?: string;
   /** Extra classes for the send button (per-design desktop sizing). */
   sendButtonClassName?: string;
+  /** The box's handle (`HomeComposerHandle`): a host's own button opens the
+   *  box's picker (Arthur, 15 October 2026: an upload from an empty space showed
+   *  no sign of where it went; now it is a chip in the box until it is sent). */
+  handle?: Ref<HomeComposerHandle>;
 }
 
 /**
@@ -213,10 +223,12 @@ export function HomeComposer({
   className,
   textareaClassName,
   sendButtonClassName,
+  handle,
 }: HomeComposerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  useImperativeHandle(handle, () => ({ attach: () => fileInputRef.current?.click() }), []);
 
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const [removing, setRemoving] = useState<Set<string>>(new Set());

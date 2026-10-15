@@ -125,10 +125,10 @@ test('the tabs: a Viewer sees no add control, only the space Owner sees Remove f
   assert.match(panel, /const uploadButton = canAdd \? \(/);
   // The file input and the tray exist only for someone who may add, and so
   // does the drop zone.
-  // (One picker since 15 October 2026, `useSpaceUploads`, in Files and in
-  // the empty Conversations tab.)
+  // (The Files tab's picker, `useSpaceUploads`; the empty Conversations tab
+  // opens the docked box's own picker instead, Arthur, 15 October 2026.)
   assert.match(panel, /\{canAdd \? picker : null\}/);
-  assert.match(panel, /\{canAdd \? uploads\.picker : null\}/);
+  assert.doesNotMatch(panel, /uploads\.picker/);
   assert.match(panel, /return canAdd \? \(\s*<FileDropZone/);
   // Remove from space on each tab's rows, for the space's Owner only.
   assert.equal(panel.match(/onRemoveFromSpace=\{\s*canRemove \?/g)?.length, 3);

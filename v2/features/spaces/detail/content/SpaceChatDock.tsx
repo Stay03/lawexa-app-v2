@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type Ref } from 'react';
 
 import { useV2Session } from '@/v2/runtime/session-context';
-import { HomeComposer, type HomeComposerSpace } from '@/v2/shell/designs/HomeComposer';
+import {
+  HomeComposer,
+  type HomeComposerHandle,
+  type HomeComposerSpace,
+} from '@/v2/shell/designs/HomeComposer';
 
 /** Arthur's words for the box (15 October 2026), the same for a Work and a
  *  Study space: one layout, and here one line of copy too. */
@@ -32,8 +36,18 @@ export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Spa
  * The text is local state: the page is keyed by the space, so a draft never
  * follows the reader into another space, and the home's shared draft key
  * (`useComposerDraft`) is left alone.
+ *
+ * `handle` is the box's own (`HomeComposerHandle`): the empty tab's Upload
+ * files opens this box's picker, so the file shows as a chip in the box, saved
+ * in the space and sent with the first message (Arthur, 15 October 2026).
  */
-export function SpaceChatDock({ space }: { space: HomeComposerSpace }) {
+export function SpaceChatDock({
+  space,
+  handle,
+}: {
+  space: HomeComposerSpace;
+  handle?: Ref<HomeComposerHandle>;
+}) {
   const session = useV2Session();
   const [value, setValue] = useState('');
 
@@ -50,6 +64,7 @@ export function SpaceChatDock({ space }: { space: HomeComposerSpace }) {
           signedIn={session.signedIn}
           role={session.role ?? undefined}
           space={space}
+          handle={handle}
           placeholder={SPACE_COMPOSER_PLACEHOLDER}
           className="p-2.5 shadow-lg"
           textareaClassName="text-base"
