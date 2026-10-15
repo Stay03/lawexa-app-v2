@@ -112,19 +112,22 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * the server makes the old team space, which a plain account may not), owned
  * by the person making it. Step two asks one more thing, Private or Public
  * (Private first; Arthur's answer, 15 October 2026: a public space is listed
- * on Discover, people ask to join and the Owner approves). The bar's chevron
- * goes back a step on step two (`onBack`), and each step says which it is
- * ("Step 1 of 2").
+ * on Discover, people ask to join and the Owner approves). Each step says
+ * which it is ("Step 1 of 2").
  *
  * ── BOTH STEPS ARE ONE FRAME (Arthur, 15 October 2026) ─────────────────────
  * "Does it even make sense to you.. there is no ux consistency from 1 to 2."
  * The title moved (step two's chevron pushed it right), the line under it
  * came and went, and only step one had a question. Now each step has the same
- * four rows in the same places: the bar (the Back slot is kept, empty, on step
- * one, so the title does not move), the step mark (the type chip on step two,
- * the same row height on step one), a question in one style ("What are you
- * working on?", "Name your space"), and the buttons. The line under the title
- * is gone from create; the edit form keeps it.
+ * four rows in the same places: the bar, the same on both (the title flush
+ * left, the close X on a desktop; no Back in it), the step mark (the type chip
+ * on step two, the same row height on step one), a question in one style
+ * ("What are you working on?", "Name your space"), and the buttons. Back is a
+ * button in step two's footer, beside Create Space; step one's footer is
+ * Cancel. Hardware and browser Back still go from step two to step one (the
+ * URL above). On a desktop the card's top stands still (`anchor="top"`), so
+ * only its foot moves between the steps; a phone's sheet grows upward. The
+ * line under the title is gone from create; the edit form keeps it.
  *
  * ── ON A PHONE IT IS A SHEET, AS TALL AS THE STEP (Stay, 15 October 2026) ──
  * "The step 1 and 2 on mobile looks awful." A whole screen for two rows or two
@@ -472,9 +475,8 @@ export function SpaceFormDialog({
       size={isEdit ? 'fill' : 'content'}
       // A tap beside the sheet must not throw away what was typed.
       guardUnsaved={!isEdit && (name.trim() !== '' || description.trim() !== '')}
-      // Step two's chevron goes back to the cards; step one keeps its slot
-      // empty (`null`), so the title stands in one place on both.
-      onBack={isEdit ? undefined : urlType !== null ? changeType : null}
+      // The top edge stands still on a desktop; only the foot moves.
+      anchor={isEdit ? 'center' : 'top'}
       title={isEdit ? 'Rename space' : 'Create a Space'}
       // Create has no line under the title, on either step (see the docblock).
       description={
@@ -486,15 +488,29 @@ export function SpaceFormDialog({
            side by side and even on a phone, Cancel with a surface of its own;
            natural size and right-aligned from `md:`. */
         <div className="flex gap-2.5">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => handleOpenChange(false)}
-            disabled={submitting}
-            className={showsTypeStep ? 'w-full md:w-auto' : 'flex-1 md:w-auto md:flex-none'}
-          >
-            Cancel
-          </Button>
+          {/* Step two's way back is here, beside Create Space (the bar is the
+              same on both steps); step one and the edit form have Cancel. */}
+          {isEdit || showsTypeStep ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => handleOpenChange(false)}
+              disabled={submitting}
+              className={showsTypeStep ? 'w-full md:w-auto' : 'flex-1 md:w-auto md:flex-none'}
+            >
+              Cancel
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={changeType}
+              disabled={submitting}
+              className="flex-1 md:w-auto md:flex-none"
+            >
+              Back
+            </Button>
+          )}
           {showsTypeStep ? null : (
             <Button
               type="button"

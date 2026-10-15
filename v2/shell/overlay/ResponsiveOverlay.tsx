@@ -155,6 +155,11 @@ const SURFACE_PHONE_CONTENT =
 const SURFACE_DESKTOP =
   'md:left-1/2 md:right-auto md:bottom-auto md:top-[calc(50%-var(--keyboard-inset,0px)/2)] md:h-auto md:max-h-[calc(100dvh-4rem-var(--keyboard-inset,0px))] md:w-full md:max-w-lg md:-translate-x-1/2 md:-translate-y-1/2 md:overflow-hidden md:rounded-4xl md:shadow-lg md:ring-1 md:ring-foreground/5';
 
+/** `anchor="top"`: the card's top edge stays at one height and only its foot
+ *  moves, for a surface whose steps differ in height (Create a Space). */
+const SURFACE_DESKTOP_TOP =
+  'md:top-[max(2rem,12dvh)] md:translate-y-0 md:max-h-[calc(100dvh-max(2rem,12dvh)-2rem-var(--keyboard-inset,0px))]';
+
 /**
  * Phone rises from the bottom edge; desktop keeps the card's zoom. The `md:`
  * reset of the slide is required — without it the card would arrive translated.
@@ -172,7 +177,7 @@ export function ResponsiveOverlay({
   className,
   size = 'fill',
   guardUnsaved = false,
-  onBack,
+  anchor = 'center',
   children,
 }: {
   open: boolean;
@@ -216,13 +221,12 @@ export function ResponsiveOverlay({
    */
   guardUnsaved?: boolean;
   /**
-   * A surface with steps of its own (Create a Space, Stay, 15 October 2026:
-   * "the back button at the top closes it instead of going back"). When given,
-   * the bar's chevron goes back a step instead of closing, and it shows on a
-   * desktop too, before the title, because the step it returns to is in this
-   * surface and nowhere else. Absent, the chevron closes, as it always has.
+   * Where the DESKTOP card stands. `center` (the default) is the middle of the
+   * window. `top` keeps its top edge at one height, so a surface whose steps
+   * differ in height grows only at the foot (Create a Space, 15 October 2026).
+   * The phone shape is unaffected.
    */
-  onBack?: (() => void) | null;
+  anchor?: 'center' | 'top';
   children: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -246,6 +250,7 @@ export function ResponsiveOverlay({
           className={cn(
             size === 'content' ? SURFACE_PHONE_CONTENT : SURFACE_PHONE,
             SURFACE_DESKTOP,
+            anchor === 'top' && SURFACE_DESKTOP_TOP,
             SURFACE_MOTION,
             className,
           )}
@@ -356,25 +361,7 @@ export function ResponsiveOverlay({
                   Somebody who has typed something they did not mean had no
                   button that said so. An arrow would not have said it either:
                   an arrow means the previous screen, not "throw this away". */}
-              {onBack ? (
-                <button
-                  type="button"
-                  aria-label="Back"
-                  onClick={onBack}
-                  className={cn(
-                    'v2-interactive -ml-1 flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground md:-my-2 md:-ml-2 md:size-9',
-                    FOCUS_RING,
-                  )}
-                >
-                  <ChevronLeft aria-hidden className="size-5" />
-                </button>
-              ) : onBack === null ? (
-                // A stepped surface on its first step: the Back button's box,
-                // empty, so the title stands where it will on the next step
-                // (Arthur, 15 October 2026: "no ux consistency from 1 to 2").
-                // Nothing focusable: Radix would focus it first on desktop.
-                <span aria-hidden className="-ml-1 size-10 shrink-0 md:-my-2 md:-ml-2 md:size-9" />
-              ) : size === 'fill' ? (
+              {size === 'fill' ? (
                 <DialogClose asChild>
                   <button
                     type="button"
