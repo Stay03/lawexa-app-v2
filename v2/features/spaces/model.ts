@@ -109,12 +109,13 @@ export function spaceShowsChannels(
 }
 
 /**
- * Whether a space of this kind may be open to anyone. A shared space is always
- * private (the backend refuses `is_private: false` on it with a 422), so the
- * forms do not offer the choice there.
+ * Whether a space of this kind may be public. Both may, since public shared
+ * spaces arrived (Arthur, 15 October 2026: listed on Discover, people ask to
+ * join and the Owner approves). Before that a shared space was always private
+ * and the backend answered `is_private: false` with a 422.
  */
 export function canSpaceBeOpen(kind: SpaceKind): boolean {
-  return kind === 'team';
+  return kind === 'shared' || kind === 'team';
 }
 
 /**

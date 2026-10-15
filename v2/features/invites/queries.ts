@@ -154,6 +154,20 @@ export function useDiscoverSpaces(params: DiscoverSpacesParams) {
   });
 }
 
+/** Ask to join a public shared space, or take the ask back. The Discover
+ *  rows re-ask the server, which says the reader's status (`my_status`). */
+export function useAskToJoinSpace() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ spaceUuid, ask }: { spaceUuid: string; ask: boolean }): Promise<void> => {
+      if (ask) await discoverApi.askToJoin(spaceUuid);
+      else await discoverApi.cancelAsk(spaceUuid);
+    },
+    meta: { silentError: true },
+    onSuccess: () => client.invalidateQueries({ queryKey: ['discover-spaces'] }),
+  });
+}
+
 export function useJoinPublicSpace() {
   const client = useQueryClient();
   return useMutation({

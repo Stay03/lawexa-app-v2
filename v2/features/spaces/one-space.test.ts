@@ -123,7 +123,8 @@ test('?tab= resolves against the tabs this viewer has, never to a missing one', 
 
 test('a shared space is never offered as open; a create sends a kind only for researcher+', () => {
   assert.equal(canSpaceBeOpen('team'), true);
-  assert.equal(canSpaceBeOpen('shared'), false);
+  // Public shared spaces (Arthur, 15 October 2026): listed on Discover.
+  assert.equal(canSpaceBeOpen('shared'), true);
   assert.equal(createSpaceKind('team', true), 'team');
   assert.equal(createSpaceKind('shared', true), 'shared');
   assert.equal(createSpaceKind('team', false), undefined);
@@ -289,16 +290,18 @@ test('the page follows a soft navigation that changes ?tab=', () => {
   );
 });
 
-test('the create dialog asks no kind, no owner and no privacy: every new space is a shared one (Stay, 15 October 2026)', () => {
+test('the create dialog asks no kind and no owner: every new space is a shared one, Private or Public (Stay, Arthur, 15 October 2026)', () => {
   const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
   // Sent without asking: with no kind the server makes the old team space.
   assert.match(dialog, /kind: 'shared',/);
   assert.match(dialog, /const kind: SpaceKind = space \? spaceKind\(space\) : 'shared';/);
   assert.doesNotMatch(dialog, /legend="Kind"|legend="Owner"|organization_uuid|canChooseKind|organizationsQueries/);
-  // Who can join stays on the edit form of a team space, where it can differ.
+  // Who can join: on step two of create and on the edit form, Private first.
   assert.match(dialog, /const isPrivate = !canBeOpen \|\| privacy === 'private';/);
   assert.match(dialog, /const privacyField = canBeOpen \? \(\s*<ChoiceCards\s+legend="Who can join"/);
-  assert.equal((dialog.match(/\{privacyField\}/g) ?? []).length, 1);
+  assert.equal((dialog.match(/\{privacyField\}/g) ?? []).length, 2);
+  assert.match(dialog, /\{nameField\}\s*\{goalField\}\s*\{privacyField\}\s*<\/div>/);
+  assert.match(dialog, /title: 'Public',\s*description: 'Shown on Discover\. People ask to join, and you approve them\.',/);
 });
 
 test('create is two steps: the type first, then the fields, with no preview (Stay, 15 October 2026)', () => {
@@ -314,7 +317,7 @@ test('create is two steps: the type first, then the fields, with no preview (Sta
   // The step mark, with the type picked as a chip (the phone redo, 15 October 2026).
   assert.match(dialog, /<StepMark step=\{2\} chosen=\{chosen\} \/>/);
   assert.match(dialog, /\{`Step \$\{step\} of 2`\}/);
-  assert.match(dialog, /<div className="space-y-4">\s*\{nameField\}\s*\{goalField\}\s*<\/div>/);
+  assert.match(dialog, /<div className="space-y-4">\s*\{nameField\}\s*\{goalField\}\s*\{privacyField\}\s*<\/div>/);
   assert.match(dialog, /const changeType = \(\) => stepParam\.close\(\);/);
   // The bar's chevron goes back a step on step two, and closes on step one.
   assert.match(dialog, /onBack=\{!isEdit && urlType !== null \? changeType : undefined\}/);

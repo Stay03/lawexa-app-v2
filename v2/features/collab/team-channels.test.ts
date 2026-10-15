@@ -119,7 +119,9 @@ test('the gate, the spine, both homes and discover all read the flag, never the 
   }
   const sections = read('v2', 'shell', 'designs', 'sections', 'HomeSections.tsx');
   assert.match(sections, /<HomeSection title="Jump back in" action=\{\{ href: '\/channels', label: 'All' \}\}>/);
+  // Discover is every signed-in account's since public shared spaces arrived
+  // (Arthur, 15 October 2026); the server decides which rows each one gets.
   const discover = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
-  assert.match(discover, /const \{ canAccessTeamChannels \} = useV2Session\(\);\s*if \(!canAccessTeamChannels\)/);
+  assert.doesNotMatch(discover, /canAccessTeamChannels/);
   assert.doesNotMatch(read('v2', 'features', 'collab', 'model.ts'), /canAccessTeamChannels\(session\.role\)/);
 });

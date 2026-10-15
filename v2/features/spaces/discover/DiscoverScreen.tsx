@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Compass, Loader2, Search, Users } from 'lucide-react';
+import { Check, Compass, Loader2, Search, Users } from 'lucide-react';
 import { isAxiosError } from 'axios';
 
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,12 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import type { DiscoverableSpace } from '@/types/collab';
-import { useDiscoverSpaces, useJoinPublicSpace } from '@/v2/features/invites/queries';
-import { TeamChannelsClosedState } from '@/v2/features/collab/ui/states';
-import { useV2Session } from '@/v2/runtime/session-context';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import {
+  useAskToJoinSpace,
+  useDiscoverSpaces,
+  useJoinPublicSpace,
+} from '@/v2/features/invites/queries';
+import { askRefusal, discoverAction } from './discover-model';
 
 /**
  * DiscoverScreen — the public spaces anybody can find, and the way in.
@@ -30,12 +32,32 @@ import { LIST_COLUMN } from '@/v2/shell/page-columns';
  * guest, and that is the answer we translate. We do not try to work out
  * guest-ness here, for the same reason the invite page does not — a guest
  * carries a real sign-in.
+ *
+ * ── PUBLIC SHARED SPACES ASK FIRST (Arthur, 15 October 2026) ───────────────
+ * A public space is listed here, and joining it is a request its Owner
+ * approves in the People tab, so its card says "Ask to join", then "Request
+ * sent" with a way to take it back (`discoverAction`). An older public team
+ * space keeps "Join". Every signed-in account sees the list now; it was Team
+ * Channels' alone while only team spaces could be public.
  */
 
 function SpaceRow({ space }: { space: DiscoverableSpace }) {
   const router = useRouter();
   const join = useJoinPublicSpace();
+  const ask = useAskToJoinSpace();
   const [refusal, setRefusal] = useState<string | null>(null);
+  const action = discoverAction(space);
+
+  const sendAsk = (asking: boolean) => {
+    setRefusal(null);
+    ask.mutate(
+      { spaceUuid: space.uuid, ask: asking },
+      {
+        onError: (error) =>
+          setRefusal(askRefusal(isAxiosError(error) ? error.response?.status : undefined)),
+      },
+    );
+  };
 
   const press = () => {
     setRefusal(null);
@@ -60,10 +82,13 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
           <p className="truncate text-[15px] font-semibold text-foreground">
             {space.name}
           </p>
-          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Users aria-hidden className="size-3.5" />
-            {space.active_members_count}{' '}
-            {space.active_members_count === 1 ? 'person' : 'people'} · {space.type_label}
+          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <Users aria-hidden className="size-3.5 shrink-0" />
+            <span className="truncate">
+              {space.active_members_count}{' '}
+              {space.active_members_count === 1 ? 'person' : 'people'} · {space.type_label}
+              {space.owner?.name ? ` · by ${space.owner.name}` : ''}
+            </span>
           </p>
           {space.description ? (
             <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
@@ -74,9 +99,38 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
       </div>
 
       <div className="mt-3">
-        {space.is_member === true ? (
+        {action === 'open' ? (
           <Button asChild variant="outline" size="sm" className="w-full">
             <Link href={`/spaces/${space.uuid}`}>Open</Link>
+          </Button>
+        ) : action === 'pending' ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2">
+            <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+              <Check aria-hidden className="size-4 text-primary" />
+              Request sent
+            </span>
+            <span className="text-xs text-muted-foreground">The owner will let you in.</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="v2-interactive -my-1 ml-auto"
+              disabled={ask.isPending}
+              onClick={() => sendAsk(false)}
+            >
+              {ask.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+              Cancel request
+            </Button>
+          </div>
+        ) : action === 'ask' ? (
+          <Button
+            size="sm"
+            className="w-full"
+            disabled={ask.isPending}
+            onClick={() => sendAsk(true)}
+          >
+            {ask.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+            Ask to join
           </Button>
         ) : (
           <Button
@@ -138,7 +192,7 @@ function DiscoverFrame({
         Find a space
       </h1>
       <p className="text-sm text-muted-foreground md:mt-1.5">
-        Spaces anybody can find and join. Private ones never appear here.
+        Public spaces you can ask to join. Private ones never appear here.
       </p>
 
       <div className="relative mt-5">
@@ -210,20 +264,12 @@ export function DiscoverFallback() {
 }
 
 /**
- * DISCOVER LISTS PUBLIC TEAM SPACES, so it is Team Channels' (researchers and
- * above, Stay, 11 October 2026). The new Spaces are private and invitation-only
- * and never appear here; the backend refuses this list below researcher. Any
- * other account meets the Team Channels panel, pointing at its own Spaces.
+ * Every signed-in account sees Discover since public shared spaces arrived
+ * (Arthur, 15 October 2026). It was Team Channels' alone while only team
+ * spaces could be public; the server still decides which rows each account
+ * gets.
  */
 export function DiscoverScreen() {
-  const { canAccessTeamChannels } = useV2Session();
-  if (!canAccessTeamChannels) {
-    return (
-      <div className={LIST_COLUMN}>
-        <TeamChannelsClosedState />
-      </div>
-    );
-  }
   return <DiscoverBody />;
 }
 

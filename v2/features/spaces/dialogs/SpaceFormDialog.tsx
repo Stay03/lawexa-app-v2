@@ -110,10 +110,11 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * asks the type, then the name and the goal, and nothing more: every space is
  * made as a shared space (`kind: 'shared'`, sent without asking; with no kind
  * the server makes the old team space, which a plain account may not), owned
- * by the person making it, and private (the server keeps a shared space
- * private whatever it is sent). Public waits for Stay's answer on what it
- * means. The bar's chevron goes back a step on step two (`onBack`), and each
- * step says which it is ("Step 1 of 2").
+ * by the person making it. Step two asks one more thing, Private or Public
+ * (Private first; Arthur's answer, 15 October 2026: a public space is listed
+ * on Discover, people ask to join and the Owner approves). The bar's chevron
+ * goes back a step on step two (`onBack`), and each step says which it is
+ * ("Step 1 of 2").
  *
  * ── ON A PHONE IT IS A SHEET, AS TALL AS THE STEP (Stay, 15 October 2026) ──
  * "The step 1 and 2 on mobile looks awful." A whole screen for two rows or two
@@ -197,13 +198,13 @@ const PRIVACY_CHOICES: readonly Choice<Privacy>[] = [
     value: 'private',
     icon: Lock,
     title: 'Private',
-    description: 'Only invited members can find it or join.',
+    description: 'Only people you invite can find it or join.',
   },
   {
     value: 'open',
     icon: Globe,
-    title: 'Open',
-    description: 'Anyone can find it and join without an invitation.',
+    title: 'Public',
+    description: 'Shown on Discover. People ask to join, and you approve them.',
   },
 ];
 
@@ -538,6 +539,7 @@ export function SpaceFormDialog({
           <div className="space-y-4">
             {nameField}
             {goalField}
+            {privacyField}
           </div>
         </div>
       )}

@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Compass, Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -201,10 +202,24 @@ export function SpacesBrowser() {
         <SpaceTypeTabs value={filter} onChange={setFilter} panelId={PANEL_ID} />
         <PendingPill count={pendingInvitations} />
 
+        {/* The way to public spaces (Arthur, 15 October 2026: a public space
+            is listed on Discover, and people ask to join it). Quiet, so New
+            space stays the one primary action here. */}
+        <Link
+          href="/spaces/discover"
+          className={cn(
+            'v2-interactive ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+            FOCUS_RING,
+          )}
+        >
+          <Compass aria-hidden className="size-4" />
+          Discover
+        </Link>
+
         <button
           type="button"
           onClick={openCreate}
-          className={cn(CREATE_PILL, FOCUS_RING, 'ml-auto hidden sm:inline-flex')}
+          className={cn(CREATE_PILL, FOCUS_RING, 'hidden sm:inline-flex')}
         >
           <Plus aria-hidden className="size-4" />
           New space

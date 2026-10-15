@@ -1875,6 +1875,13 @@ export interface DiscoverableSpace {
   active_members_count: number;
   /** NOT SENT TODAY. Optional so the row degrades honestly if it ever arrives. */
   is_member?: boolean;
+  /** `shared` (asked to join, the Owner approves) or `team` (joined at once).
+   *  Public shared spaces, backend 15 October 2026. Absent reads as `team`. */
+  kind?: SpaceKind;
+  /** Who made it, for the card. */
+  owner?: { name: string; avatar_url?: string | null } | null;
+  /** The reader's place: a member, an ask waiting for the Owner, or neither. */
+  my_status?: 'member' | 'pending' | null;
   created_at: string;
 }
 

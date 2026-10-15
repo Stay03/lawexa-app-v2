@@ -458,7 +458,9 @@ test('a thread row truncates once at most', () => {
 test('on a phone "New" sits on the title row; from sm: "New space" ends the toolbar', () => {
   const browser = read('v2', 'features', 'spaces', 'list', 'SpacesBrowser.tsx');
   assert.match(browser, /className=\{cn\(CREATE_PILL, FOCUS_RING, 'mt-0\.5 sm:hidden'\)\}/);
-  assert.match(browser, /className=\{cn\(CREATE_PILL, FOCUS_RING, 'ml-auto hidden sm:inline-flex'\)\}/);
+  assert.match(browser, /className=\{cn\(CREATE_PILL, FOCUS_RING, 'hidden sm:inline-flex'\)\}/);
+  // Discover's quiet link takes the right edge before it (15 October 2026).
+  assert.match(browser, /'v2-interactive ml-auto inline-flex h-9 items-center gap-1\.5 rounded-full/);
 });
 
 test('an Owner alone in an empty space is offered people', () => {

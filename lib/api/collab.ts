@@ -1518,4 +1518,26 @@ export const discoverApi = {
     );
     return response.data;
   },
+
+  /**
+   * Ask to join a public SHARED space; its Owner approves in the People tab
+   * (backend, 15 October 2026). `201` with `{status: 'pending'}`, `200` for an
+   * ask already waiting, `409` for a member, `404` for a private or missing
+   * space.
+   */
+  askToJoin: async (spaceUuid: string): Promise<ApiResponse<{ status: 'pending' }>> => {
+    const response = await apiClient.post<ApiResponse<{ status: 'pending' }>>(
+      `/spaces/${spaceUuid}/join-requests`,
+      {}
+    );
+    return response.data;
+  },
+
+  /** Take back an ask that is still waiting. */
+  cancelAsk: async (spaceUuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/spaces/${spaceUuid}/join-requests/mine`
+    );
+    return response.data;
+  },
 };
