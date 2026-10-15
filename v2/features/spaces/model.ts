@@ -385,12 +385,14 @@ export function showsPrivateMark(space: Pick<Space, 'kind' | 'is_private'>): boo
  * The line under the space's name in its header: the type, then whether it is
  * private ("Study · Private"), the words the spaces list uses. Arthur, 15
  * October 2026: the name leads, these two follow, and the viewer's role is the
- * People tab's to show, not the header's. A shared space is always private.
+ * People tab's to show, not the header's. Read off `is_private` alone: a
+ * shared space may be public since public shared spaces arrived (Arthur, 15
+ * October 2026), so its kind says nothing about it any more.
  */
 export function spaceHeaderFacts(
   space: Pick<Space, 'type_label' | 'kind' | 'is_private'>,
 ): [string, string] {
-  const isPrivate = isSharedSpace(space) || space.is_private;
+  const isPrivate = space.is_private;
   return [space.type_label, isPrivate ? 'Private' : 'Public'];
 }
 

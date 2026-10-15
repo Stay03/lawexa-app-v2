@@ -28,7 +28,8 @@ test('two sections: the spaces the reader owns, then the ones they joined, in th
 });
 
 test('private or public: a shared space is always private; a team space says', () => {
-  assert.equal(spaceIsPrivate({ kind: 'shared', is_private: false }), true);
+  // A public shared space (15 October 2026) reads as public.
+  assert.equal(spaceIsPrivate({ kind: 'shared', is_private: false }), false);
   assert.equal(spaceIsPrivate({ kind: 'team', is_private: false }), false);
   assert.equal(spaceIsPrivate({ kind: 'team', is_private: true }), true);
 });

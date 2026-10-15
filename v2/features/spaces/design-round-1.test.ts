@@ -83,10 +83,10 @@ test('the space header prints the type and privacy, not the role (Arthur, 15 Oct
     spaceHeaderFacts({ type_label: 'Work', kind: 'team', is_private: false }),
     ['Work', 'Public'],
   );
-  // A shared space is always private, whatever the column says.
+  // A public shared space (15 October 2026) says so.
   assert.deepEqual(
     spaceHeaderFacts({ type_label: 'Work', kind: 'shared', is_private: false }),
-    ['Work', 'Private'],
+    ['Work', 'Public'],
   );
   // The spaces list row was redrawn as a chat-list row (Stay, 15 October 2026);
   // spaces-list-rows.test.ts pins it now.

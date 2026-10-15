@@ -1,5 +1,5 @@
 import type { Space } from '@/types/collab';
-import { isMembershipOwner, isSharedSpace } from '../model';
+import { isMembershipOwner } from '../model';
 
 /**
  * The spaces list in two sections (Stay, 15 October 2026: "there should also
@@ -15,7 +15,8 @@ export function spaceListSections(spaces: readonly Space[]): { mine: Space[]; jo
   return { mine, joined };
 }
 
-/** Private or public, for the row's icon. A shared space is always private. */
+/** Private or public, for the row's word. Read off `is_private` alone: a
+ *  shared space may be public since public shared spaces (15 October 2026). */
 export function spaceIsPrivate(space: Pick<Space, 'kind' | 'is_private'>): boolean {
-  return isSharedSpace(space) || space.is_private;
+  return space.is_private;
 }
