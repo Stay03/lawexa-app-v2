@@ -40,7 +40,7 @@ import {
 import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
-import { chatApi } from '@/lib/api/chat';
+import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
 import { extractApiError, extractBlockedReason } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { UserRole } from '@/types/auth';
@@ -326,17 +326,18 @@ export function HomeComposer({
     await Promise.all(
       accepted.map(async ({ file, entry }) => {
         try {
-          const uploadRes = await chatApi.uploadDocument(file);
+          // From a space's box the file is the space's (attachment-upload.ts).
+          const uploaded = await uploadAttachment(file, space?.uuid ?? null);
           setUploads((prev) =>
             prev.map((u) =>
               u.key === entry.key
                 ? {
                     ...u,
                     status: 'uploaded',
-                    file_id: uploadRes.data.id,
-                    file_name: uploadRes.data.original_name,
-                    file_size: uploadRes.data.size,
-                    mime_type: uploadRes.data.mime_type,
+                    file_id: uploaded.id,
+                    file_name: uploaded.original_name,
+                    file_size: uploaded.size,
+                    mime_type: uploaded.mime_type,
                   }
                 : u,
             ),

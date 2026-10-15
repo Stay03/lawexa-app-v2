@@ -204,6 +204,8 @@ export interface ConversationController {
   viewOnlyReason: ViewOnlyReason;
   /** Whether the chat sits in a space (backend B3's `space` on the record). */
   isSpaceChat: boolean;
+  /** The chat's space, or null: where a space chat's attachments are uploaded. */
+  spaceUuid: string | null;
   /** Name who asked each user turn: a space chat whose record carries the B4
    *  fields. False on a personal chat, which looks exactly as before. */
   showAuthors: boolean;
@@ -1122,6 +1124,7 @@ export function useConversationController(
     canSend,
     viewOnlyReason: viewOnlyReason(detailData),
     isSpaceChat,
+    spaceUuid,
     showAuthors,
     spaceRoster,
     mentionOptions,

@@ -33,7 +33,7 @@ import {
   PromptInputTextarea,
 } from '@/components/ui/prompt-input';
 import { cn, serializePastedContent } from '@/lib/utils';
-import { chatApi } from '@/lib/api/chat';
+import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
@@ -235,6 +235,9 @@ export interface ConversationComposerProps {
   /** The colour a quote is drawn in (the screen's member colours), so the bar
    *  matches the quote the reply will carry. Absent: plain, Lawexa's gold. */
   quoteToneOf?: ((replyTo: MessageReplyTo) => QuoteTone) | null;
+  /** The chat's space, or null: a space chat's attachments are uploaded to the
+   *  space (POST /spaces/{space}/files), so they are the space's files. */
+  spaceUuid?: string | null;
 }
 
 export function ConversationComposer({
@@ -259,6 +262,7 @@ export function ConversationComposer({
   viewerId = null,
   mentionOptions = null,
   quoteToneOf = null,
+  spaceUuid = null,
 }: ConversationComposerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -470,17 +474,18 @@ export function ConversationComposer({
     await Promise.all(
       accepted.map(async ({ file, entry }) => {
         try {
-          const res = await chatApi.uploadDocument(file);
+          // In a space chat the file is the space's (attachment-upload.ts).
+          const uploaded = await uploadAttachment(file, spaceUuid);
           setUploads((prev) =>
             prev.map((u) =>
               u.key === entry.key
                 ? {
                     ...u,
                     status: 'uploaded',
-                    file_id: res.data.id,
-                    file_name: res.data.original_name,
-                    file_size: res.data.size,
-                    mime_type: res.data.mime_type,
+                    file_id: uploaded.id,
+                    file_name: uploaded.original_name,
+                    file_size: uploaded.size,
+                    mime_type: uploaded.mime_type,
                   }
                 : u,
             ),

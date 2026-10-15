@@ -437,6 +437,7 @@ export function ConversationScreen({
                   viewerId={serverUserId}
                   mentionOptions={controller.mentionOptions}
                   quoteToneOf={quoteToneOf}
+                  spaceUuid={controller.spaceUuid}
                 />
               ) : (
                 <ViewOnlyPill reason={controller.viewOnlyReason} />
