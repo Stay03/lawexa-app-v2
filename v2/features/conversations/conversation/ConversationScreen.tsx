@@ -259,10 +259,11 @@ export function ConversationScreen({
     sync();
     const observer = new ResizeObserver(sync);
     observer.observe(dock);
-    return () => {
-      observer.disconnect();
-      screen.style.removeProperty(DOCK_HEIGHT_VAR);
-    };
+    // The cleanup leaves the value alone. On unmount the root goes with it, and
+    // when `externalComposer` turns on in a mounted screen React has already
+    // written the root's 0px (child DOM before the parent's effect cleanup), so
+    // removing the variable here would undo it.
+    return () => observer.disconnect();
   }, [externalComposer]);
 
   // Inline result cards fire follow-up turns through this (no attachments).

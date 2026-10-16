@@ -160,6 +160,11 @@ test('the dock height is written only when it changes, and a reopen renders the 
   // an external composer still pins 0px.
   assert.match(screen, /style=\{dockHeightStyle\(externalComposer\)\}/);
   assert.match(screen, /if \(externalComposer\) return \{ \[DOCK_HEIGHT_VAR\]: '0px' \} as CSSProperties;/);
-  // Before paint, after MessageList's landing read.
+  // Before paint, after MessageList's landing read, measured again whenever
+  // the composer kind flips in a mounted screen.
   assert.match(screen, /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(externalComposer\) return;\s*const dock = dockRef\.current;/);
+  assert.match(screen, /return \(\) => observer\.disconnect\(\);\s*\}, \[externalComposer\]\);/);
+  // The cleanup never clears the root's value: a flip to an external composer
+  // has already written 0px there.
+  assert.doesNotMatch(screen, /removeProperty\(DOCK_HEIGHT_VAR\);\s*\};\s*\}, \[externalComposer\]\)/);
 });
