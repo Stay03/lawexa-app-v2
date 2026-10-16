@@ -123,3 +123,17 @@ test('Upload files in an empty space puts the file in the box as a chip (Arthur,
   const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
   assert.match(dock, /handle=\{handle\}/);
 });
+
+test('on a desktop the space box is the chat pill: one row, centred, phone unchanged (Stay, 15 October 2026)', () => {
+  const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
+  assert.match(dock, /<div className="pb-3 md:mx-auto md:w-full md:max-w-md">/);
+  assert.match(dock, /placeholder=\{SPACE_COMPOSER_PLACEHOLDER\}\s+compact\s/);
+  const composer = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
+  // Every compact class is an `md:` one, so the phone keeps its box.
+  for (const [, classes] of composer.matchAll(/compact && '([^']+)'/g)) {
+    for (const name of classes.split(' ')) assert.match(name, /^md:/, name);
+  }
+  assert.match(composer, /compact && 'md:flex md:flex-wrap md:items-end md:gap-x-1 md:p-1\.5'/);
+  assert.match(composer, /compact && 'md:contents'/);
+  assert.match(composer, /compact && 'md:order-3 md:size-8'/);
+});

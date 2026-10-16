@@ -40,6 +40,11 @@ export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Spa
  * `handle` is the box's own (`HomeComposerHandle`): the empty tab's Upload
  * files opens this box's picker, so the file shows as a chip in the box, saved
  * in the space and sent with the first message (Arthur, 15 October 2026).
+ *
+ * ON A DESKTOP IT IS THE CHAT'S PILL (Stay, 15 October 2026: "the text area in
+ * the web one is too long and big"): one row (`compact`), centred, as wide as
+ * the follow-up box on `/c/{id}` (`max-w-md`, the cap that screen's overlay
+ * carries). The phone keeps the full-width box.
  */
 export function SpaceChatDock({
   space,
@@ -57,7 +62,7 @@ export function SpaceChatDock({
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/90 to-transparent"
       />
-      <div className="pb-3">
+      <div className="pb-3 md:mx-auto md:w-full md:max-w-md">
         <HomeComposer
           value={value}
           onValueChange={setValue}
@@ -66,6 +71,7 @@ export function SpaceChatDock({
           space={space}
           handle={handle}
           placeholder={SPACE_COMPOSER_PLACEHOLDER}
+          compact
           className="p-2.5 shadow-lg"
           textareaClassName="text-base"
         />
