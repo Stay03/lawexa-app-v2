@@ -276,14 +276,20 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
    * menu, above a separator, and `SpacePlaceHeader` lost its trigger.
    *
    * ── AND THEY ARE THE APPROVED MENU (design round 1, 12 October 2026) ─────
-   * Members, Rename, Leave, Delete, as the role allows (`spaceMenuItems`, where
+   * Members, Edit space, Leave, Delete, as the role allows (`spaceMenuItems`, where
    * the order and the rules are pinned). Every member gets
    * Members and Leave, so a Viewer who wants out no longer has to guess that
    * the faces are a button. The Owner (and a team space's admin) adds Invite
    * links and Waiting to join, which open those steps of the members sheet,
-   * and Rename. Delete is the Owner's alone. The bar draws a rule before
-   * Rename, so the people rows read as one group, and one before Leave, the
+   * and Edit space. Delete is the Owner's alone. The bar draws a rule before
+   * Edit space, so the people rows read as one group, and one before Leave, the
    * first destructive row (`ruledAbove`).
+   *
+   * "EDIT SPACE", NOT "RENAME" (techlead, 16 October 2026). The row opens the
+   * whole edit form (name, goal, type, who can join), and Arthur looked for an
+   * edit and found only a rename. The About sheet offers the same form to
+   * whoever may manage the space (`onEdit`). The menu's id stays `rename`, the
+   * rule's own name for the row.
    *
    * LEAVE IS NEVER A DEAD END: where it could only be refused, for the last
    * Owner of a space nobody else is in, it is not offered, and Delete is the
@@ -301,7 +307,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
    */
   const pathname = usePathname() ?? '';
   const showPanel = panel.show;
-  const openRename = useCallback(() => showPanel('edit'), [showPanel]);
+  const openEdit = useCallback(() => showPanel('edit'), [showPanel]);
   const openAbout = useCallback(() => showPanel('about'), [showPanel]);
 
   const isOwner = scope?.isOwner ?? false;
@@ -341,10 +347,10 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
       },
       rename: {
         id: 'rename',
-        label: 'Rename',
+        label: 'Edit space',
         icon: Pencil,
         separatorBefore: true,
-        onSelect: openRename,
+        onSelect: openEdit,
       },
       leave: {
         id: 'leave',
@@ -370,7 +376,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     openRoster,
     openInviteLinks,
     openJoinRequests,
-    openRename,
+    openEdit,
     openLeave,
     openDelete,
   ]);
@@ -502,7 +508,12 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         space={space}
         {...panel.bind('edit')}
       />
-      <SpaceAboutSheet space={space} membership={scope.membership} {...panel.bind('about')} />
+      <SpaceAboutSheet
+        space={space}
+        membership={scope.membership}
+        onEdit={canManage ? openEdit : undefined}
+        {...panel.bind('about')}
+      />
     </div>
   );
 }

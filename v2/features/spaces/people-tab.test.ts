@@ -76,7 +76,10 @@ test('the top is one row; the name opens the details sheet on ?panel=about (Stay
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /canOpen: space \? \{ edit: canManage, about: true, invites: false, requests: false \} : undefined,/);
   assert.match(screen, /<SpacePlaceHeader space=\{space\} membership=\{scope\.membership\} onOpenAbout=\{openAbout\} \/>/);
-  assert.match(screen, /<SpaceAboutSheet space=\{space\} membership=\{scope\.membership\} \{\.\.\.panel\.bind\('about'\)\} \/>/);
+  assert.match(
+    screen,
+    /<SpaceAboutSheet\s+space=\{space\}\s+membership=\{scope\.membership\}\s+onEdit=\{canManage \? openEdit : undefined\}\s+\{\.\.\.panel\.bind\('about'\)\}\s*\/>/,
+  );
   const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceAboutSheet.tsx');
   assert.match(sheet, /side="bottom"/);
   assert.match(sheet, /memberCountLabel\(space\.active_members_count\)/);

@@ -167,7 +167,7 @@ test('a rule goes before the first destructive row and where a row asks', () => 
   assert.equal(ruledAbove([menuRow('a')], 5), false);
 });
 
-test('the bar menu draws the rules and the space menu asks for one before Rename', () => {
+test('the bar menu draws the rules and the space menu asks for one before Edit space', () => {
   const menu = read('v2', 'shell', 'V2HeaderMenu.tsx');
   assert.match(
     menu,
@@ -180,7 +180,7 @@ test('the bar menu draws the rules and the space menu asks for one before Rename
     /\(action\.separatorBefore \?\? false\) === \(other\.separatorBefore \?\? false\)/,
   );
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /label: 'Rename',\s*icon: Pencil,\s*separatorBefore: true,/);
+  assert.match(screen, /label: 'Edit space',\s*icon: Pencil,\s*separatorBefore: true,/);
 });
 
 /* ── Round 0 #25: the header's faces are bigger on a desktop ─────────────── */
@@ -289,4 +289,18 @@ test('the list row shows no channel chips any more', () => {
   // spaces-list-rows.test.ts pins it now.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
   assert.doesNotMatch(row, /ChannelChips|PHONE_CHIP_LIMIT|activity/);
+});
+
+/* ── Edit space (techlead, 16 October 2026) ──────────────────────────────── */
+
+test('the About sheet offers Edit space to whoever may manage the space, on the same panel param', () => {
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceAboutSheet.tsx');
+  assert.match(sheet, /\{onEdit \? \(\s*<Button type="button" variant="secondary" onClick=\{onEdit\}/);
+  assert.match(sheet, /<Pencil aria-hidden className="size-4" \/>\s*Edit space/);
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  // The menu's gate, and the same `?panel=` param, so the form replaces the
+  // sheet in one history entry.
+  assert.match(screen, /onEdit=\{canManage \? openEdit : undefined\}/);
+  assert.match(screen, /const openEdit = useCallback\(\(\) => showPanel\('edit'\), \[showPanel\]\);/);
+  assert.match(screen, /canOpen: space \? \{ edit: canManage, about: true,/);
 });

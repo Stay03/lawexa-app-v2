@@ -101,9 +101,9 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  *
  * ── SHARED OR TEAM (Spaces F2, 11 October 2026) ────────────────────────────
  * A space comes in two kinds, and a new one is always shared (below). The kind
- * is fixed once made, so the edit form does not offer it. A SHARED SPACE IS
- * ALWAYS PRIVATE: the backend refuses `is_private: false` on one (422), so
- * "Who can join" shows only on the edit form of an older team space.
+ * is fixed once made, so the edit form does not offer it. Both kinds may be
+ * public since 15 October 2026 (`canSpaceBeOpen`), so "Who can join" shows on
+ * every edit form, as on create's step two.
  *
  * ── ONLY THE TWO STEPS, NOTHING ELSE (Stay, 15 October 2026, second pass) ──
  * "Remove the kind and the private/org. We are not handling org now." Create
@@ -477,7 +477,7 @@ export function SpaceFormDialog({
       guardUnsaved={!isEdit && (name.trim() !== '' || description.trim() !== '')}
       // The top edge stands still on a desktop; only the foot moves.
       anchor={isEdit ? 'center' : 'top'}
-      title={isEdit ? 'Rename space' : 'Create a Space'}
+      title={isEdit ? 'Edit space' : 'Create a Space'}
       // Create has no line under the title, on either step (see the docblock).
       description={
         isEdit ? 'Change its name and details. Everyone in it sees the change.' : undefined

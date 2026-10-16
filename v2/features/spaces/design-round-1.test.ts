@@ -196,12 +196,14 @@ test('the page publishes the menu from the one rule and opens the frame’s dial
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /spaceMenuItems\(\{ canManage, isOwner, leaveRoute \}\)\.map\(\(item\) => verbs\[item\]\)/);
   assert.match(screen, /label: 'Members', icon: Users, onSelect: openRoster/);
-  // Design round 2: Rename asks for the rule above it (was one line,
-  // `label: 'Rename', icon: Pencil, onSelect: openRename`).
-  assert.match(screen, /label: 'Rename',\s*icon: Pencil,\s*separatorBefore: true,\s*onSelect: openRename/);
+  // Design round 2: the row asks for the rule above it. 16 October 2026: it
+  // is "Edit space", the whole form (was 'Rename' with `openRename`).
+  assert.match(screen, /label: 'Edit space',\s*icon: Pencil,\s*separatorBefore: true,\s*onSelect: openEdit/);
   assert.match(screen, /label: 'Leave space',\s*icon: LogOut,\s*destructive: true,\s*onSelect: openLeave/);
   assert.doesNotMatch(screen, /if \(!canManage\) return NO_SCREEN_ACTIONS;/);
-  assert.doesNotMatch(screen, /Invite by link|Edit space|You decide who actually gets in/);
+  // "Edit space" came back on 16 October 2026 as the edit row's label
+  // (techlead); the other two stay retired.
+  assert.doesNotMatch(screen, /Invite by link|You decide who actually gets in/);
   const frame = read('v2', 'features', 'collab', 'shell', 'CollabFrame.tsx');
   // Design round 2: the key carries a prefix, apart from the sheet's (was
   // `key={space.uuid}`, the same key as its sibling).
@@ -210,7 +212,7 @@ test('the page publishes the menu from the one rule and opens the frame’s dial
   // The Owner steps of the sheet are gated like the create param.
   assert.match(frame, /\{ links: canManage, requests: canManage, invite: canManage \}/);
   const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
-  assert.match(dialog, /title=\{isEdit \? 'Rename space' : 'Create a Space'\}/);
+  assert.match(dialog, /title=\{isEdit \? 'Edit space' : 'Create a Space'\}/);
 });
 
 test('the members sheet steps round-trip through ?roster=', () => {

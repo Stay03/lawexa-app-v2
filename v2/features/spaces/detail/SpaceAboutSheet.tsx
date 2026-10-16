@@ -1,6 +1,8 @@
 'use client';
 
-import { Users } from 'lucide-react';
+import { Pencil, Users } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
 
 import {
   Sheet,
@@ -27,15 +29,24 @@ import { SpaceAbout } from './SpacePlaceHeader';
  * and a copied link opens it. The member count is a line, not a door: the
  * People tab is one tap away under the page's own tab strip, and closing an
  * overlay while switching the tab would race the page's Back handling.
+ *
+ * EDIT SPACE IS HERE TOO (techlead, 16 October 2026): Arthur opened this sheet
+ * from the name looking for a way to edit the space and found none. For
+ * whoever may manage the space, `onEdit` opens the edit form. It is the same
+ * `?panel=` param, so the form takes this sheet's place in one history entry
+ * and Back closes it, rather than reopening this sheet.
  */
 export function SpaceAboutSheet({
   space,
   membership,
+  onEdit,
   open,
   onOpenChange,
 }: {
   space: Space;
   membership: MembershipSubject;
+  /** Opens the edit form; absent for anyone who may not manage the space. */
+  onEdit?: () => void;
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }) {
@@ -75,6 +86,12 @@ export function SpaceAboutSheet({
             <Users aria-hidden className="size-4 shrink-0" />
             {memberCountLabel(space.active_members_count)}
           </p>
+          {onEdit ? (
+            <Button type="button" variant="secondary" onClick={onEdit} className="w-full md:w-auto">
+              <Pencil aria-hidden className="size-4" />
+              Edit space
+            </Button>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>
