@@ -702,12 +702,14 @@ export const channelsApi = {
   },
 
   /**
-   * Set or clear a thread's status (backend, 16 October 2026). `200` answers
-   * with the thread's whole `ChannelResource`, and sending the value it already
-   * holds is a `200` that changes nothing. `422` is an unknown value, a note
-   * over 140 characters, or a channel that is not a thread ("Only a thread can
-   * have a status."), each with the server's sentence; `403` is a reader who
-   * cannot post here.
+   * Set a thread's status (backend, 16 October 2026; revised the same day: a
+   * status cannot be cleared). `200` answers with the thread's whole
+   * `ChannelResource`, and sending the value it already holds is a `200` that
+   * changes nothing. `422` is `null` or an unknown value, a note over 140
+   * characters, `needs_action_from` on any status but Needs Action, a person
+   * who cannot post in the thread (`errors.needs_action_from`), or a channel
+   * that is not a thread, each with the server's sentence; `403` is a reader
+   * who cannot post here.
    */
   setStatus: async (
     uuid: string,

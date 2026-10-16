@@ -35,9 +35,11 @@ import {
 import {
   THREAD_STATUS_FILTERS,
   isClosedThread,
+  knownThreadStatus,
   showsThreadStatusFilter,
   threadStatusFilterCount,
   threadStatusFilterLabel,
+  threadStatusPerson,
   threadStatusQuiet,
   type ThreadStatusFilter,
 } from '../thread-status-model';
@@ -411,7 +413,7 @@ function ThreadRow({
   // (Stay, 16 October 2026). The minute clock is a subscription, never a
   // `Date.now()` in render; it only feeds the stale suffix.
   const now = useMinuteNow();
-  const status = thread.status ?? null;
+  const status = knownThreadStatus(thread.status);
   const closed = isClosedThread(thread);
   const quiet = threadStatusQuiet(thread, now);
 
@@ -449,7 +451,13 @@ function ThreadRow({
               {title}
             </span>
             {state === 'behind' && <UnreadDot />}
-            {status && <ThreadStatusChip value={status.value} quiet={quiet} />}
+            {status && (
+              <ThreadStatusChip
+                value={status.value}
+                person={threadStatusPerson(status)}
+                quiet={quiet}
+              />
+            )}
           </div>
           {/* Hung under the title, not under the glyph — 14px mark plus the
               1.5 gap is exactly 20px. */}

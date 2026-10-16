@@ -506,9 +506,24 @@ export interface Channel {
   updated_at: string;
 }
 
-/** The five values a thread's status can hold. `null` (no status) is not one
- *  of them on the wire; it is the absence of a status. */
-export type ThreadStatusValue = 'running' | 'waiting' | 'blocked' | 'done' | 'closed';
+/**
+ * The five values a thread's status can hold (Arthur, 16 October 2026, the
+ * revised set). `null` (no status) is not one of them on the wire; it is the
+ * absence of a status, and once a status is set it cannot go back to `null`.
+ * A value outside these five must draw no chip, never crash.
+ */
+export type ThreadStatusValue =
+  | 'working'
+  | 'needs_action'
+  | 'on_hold'
+  | 'completed'
+  | 'closed';
+
+/** A person a status names: who changed it, or who needs to act. */
+export interface ThreadStatusPerson {
+  uuid: string;
+  name: string;
+}
 
 /**
  * A thread's status as the server serializes it, the same object on every
@@ -517,24 +532,34 @@ export type ThreadStatusValue = 'running' | 'waiting' | 'blocked' | 'done' | 'cl
  */
 export interface ThreadStatus {
   value: ThreadStatusValue;
-  /** The server's word for the value ("Running"). */
+  /** The server's word for the value ("Needs Action"). */
   label: string;
   /** Optional, at most 140 characters. */
   note: string | null;
   changed_at: string;
   /** Who set it; for an agent change, the person the agent acted for. `null`
    *  once that account is gone. */
-  changed_by: { uuid: string; name: string } | null;
+  changed_by: ThreadStatusPerson | null;
   via: 'app' | 'agent';
-  /** A Running or Waiting thread nobody has spoken in for a while. */
+  /** A Working or Needs Action thread nobody has spoken in for a while. */
   is_stale: boolean;
+  /** Needs Action only: who needs to act. `null` on every other status, and on
+   *  a Needs Action set without a person. Optional for a payload that
+   *  predates the field. */
+  needs_action_from?: ThreadStatusPerson | null;
 }
 
 export type ThreadStatusCounts = Record<ThreadStatusValue, number>;
 
-/** `PATCH /channels/{thread}/status`. `status: null` clears it. */
+/**
+ * `PATCH /channels/{thread}/status`. `null` or an unknown value is a 422, and
+ * so is `needs_action_from` on any status but `needs_action`. Built by
+ * `buildSetThreadStatusBody` and nowhere else.
+ */
 export interface SetThreadStatusPayload {
-  status: ThreadStatusValue | null;
+  status: ThreadStatusValue;
+  /** The user uuid of who needs to act; Needs Action only. */
+  needs_action_from?: string;
   note?: string | null;
 }
 
@@ -619,9 +644,10 @@ export type MembershipMessageType = (typeof MEMBERSHIP_MESSAGE_TYPES)[number];
  * own `postSystemMessage`, which writes `user_id => null`.
  *
  * `thread_status_changed` (backend, 16 October 2026) is a thread's status
- * moving: "Ada set this thread to Running". Same row shape, `author: null`,
- * `is_ai: false`; its metadata carries `from`, `to`, `note`, `actor_uuid`,
- * `actor_name` and `via`.
+ * moving: "Ada set this thread to Needs Action for Tolu: review clause 4".
+ * Same row shape, `author: null`, `is_ai: false`; its metadata carries
+ * `from`, `to`, `note`, `actor_uuid`, `actor_name`, `via`, and for Needs
+ * Action `needs_action_from_uuid` and `needs_action_from_name`.
  */
 export const QUIET_SYSTEM_MESSAGE_TYPES = [
   ...MEMBERSHIP_MESSAGE_TYPES,
@@ -676,6 +702,9 @@ export interface MessageMetadata {
   actor_uuid?: string | null;
   actor_name?: string | null;
   via?: 'app' | 'agent';
+  /** `thread_status_changed` to Needs Action only: who needs to act. */
+  needs_action_from_uuid?: string | null;
+  needs_action_from_name?: string | null;
   /** On every AI-authored message since 2026-08-03 (no backfill — `null` on
    *  older history and on human messages). Equals the summon's
    *  `execution_id` exactly; the responding pill clears on the FIRST match. */
@@ -1186,7 +1215,8 @@ export interface ThreadListParams {
   mine?: boolean;
   /**
    * Narrow to threads holding one of these statuses, sent as
-   * `?status=running,waiting`; `'none'` is the threads with no status. Omitted
+   * `?status=needs_action,working`; `'none'` is the threads with no status. The
+   * server keeps its urgency order inside a filter. Omitted
    * when unset, so the unfiltered request is the URL it always was.
    */
   status?: readonly (ThreadStatusValue | 'none')[];

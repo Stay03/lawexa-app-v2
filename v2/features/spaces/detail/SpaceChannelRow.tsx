@@ -7,6 +7,7 @@ import { BellOff } from 'lucide-react';
 import { channelVisibilityFace } from '@/lib/collab/visibility';
 
 import { cn } from '@/lib/utils';
+import { channelStatusCountsLine } from '@/v2/features/channels/thread-status-model';
 import {
   channelPreviewLine,
   type RailRow,
@@ -79,6 +80,7 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
   const age = now > 0 ? formatRelativeTime(channel.last_message_at, now) : '';
   const line = channelPreviewLine(row);
   const preview = line.kind === 'none' ? null : line;
+  const statusCounts = channelStatusCountsLine(channel.thread_status_counts);
   // THE DIM IS SCOPED, NEVER ON THE ANCHOR — see the docblock. The mention
   // badge must sit OUTSIDE this wrapper.
   const dim = muted
@@ -136,8 +138,18 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
               ) : null}
             </span>
 
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-              {preview ? <ChannelPreviewText line={preview} /> : null}
+            {/* The channel's threads that need someone ("2 need action · 1
+                working", Arthur, 16 October 2026) hold their width after the
+                preview, which is the part that truncates. */}
+            <span className="mt-0.5 flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground">
+              <span className="min-w-0 truncate">
+                {preview ? <ChannelPreviewText line={preview} /> : null}
+              </span>
+              {statusCounts ? (
+                <span className="shrink-0 whitespace-nowrap">
+                  {preview ? `· ${statusCounts}` : statusCounts}
+                </span>
+              ) : null}
             </span>
           </span>
         </span>

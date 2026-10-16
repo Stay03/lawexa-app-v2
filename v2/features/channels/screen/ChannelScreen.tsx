@@ -77,6 +77,7 @@ import { channelDisplayName, threadParentHref } from '../thread-model';
 import { FilesTab } from '../files/FilesTab';
 import { ListsTab } from '../lists/ListsTab';
 import { ChannelMembersSheet } from '../members/ChannelMembersSheet';
+import { knownThreadStatus } from '../thread-status-model';
 import { ThreadStatusControl } from '../threads/ThreadStatusControl';
 import { ThreadsSheet } from '../threads/ThreadsSheet';
 import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
@@ -916,8 +917,10 @@ export function ChannelScreen({
      draws the header as it was. The button is for someone who can post here,
      the PATCH's own rule; everyone else sees the chip alone. With no status
      and no way to set one there is nothing to show, so the slot is absent and
-     the phone keeps its subtitle line (techlead, 16 October 2026). */
-  const threadStatus = isThread && channel.status !== undefined ? channel.status : undefined;
+     the phone keeps its subtitle line (techlead, 16 October 2026). A value
+     this app does not know counts as no status. */
+  const threadStatus =
+    isThread && channel.status !== undefined ? knownThreadStatus(channel.status) : undefined;
   const renderStatus =
     threadStatus === undefined || (threadStatus === null && !canParticipate)
       ? undefined
@@ -925,6 +928,7 @@ export function ChannelScreen({
           <ThreadStatusControl
             threadUuid={channel.uuid}
             parentUuid={parentUuid}
+            viewerId={viewerId}
             status={threadStatus}
             lastMessageAt={channel.last_message_at}
             canSet={canParticipate}

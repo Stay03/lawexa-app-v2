@@ -193,9 +193,9 @@ export function QuietSystemLine({ message }: { message: Message }) {
 /**
  * A thread's status moving (Stay, 16 October 2026: thread status): the chip
  * for the new status, then the server's sentence as it came ("Ada set this
- * thread to Running"), then the time. The same recessive grammar as a join
- * line, centred and muted, never a bubble. A cleared status, or a value this
- * app does not know yet, draws the sentence with no chip.
+ * thread to Needs Action for Tolu: review clause 4"), then the time. The same
+ * recessive grammar as a join line, centred and muted, never a bubble. A value
+ * this app does not know draws the sentence with no chip.
  *
  * The note, when there is one, is already inside the server's sentence
  * ("... to Done: shipped"), so it is not printed twice.
@@ -208,7 +208,7 @@ function StatusChangeLine({
   const time = formatMessageTime(change.at);
   const label = time ? `${change.sentence} · ${time}` : change.sentence;
   /* THE SENTENCE WRAPS TO TWO LINES (techlead, 16 October 2026). On one
-     truncated line a phone cut the note ("…Running: Checking p…"), and the note
+     truncated line a phone cut the note ("…Working: Checking p…"), and the note
      is the part a reader came to the line for. So the line is a centred group
      whose text clamps at two lines; the chip keeps to the first line
      (`items-start`, the text nudged down to the chip's middle), and a desktop

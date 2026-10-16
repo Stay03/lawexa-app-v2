@@ -127,6 +127,34 @@ export function compareRoomRecency(left: RankableRoom, right: RankableRoom): num
     : channelDisplayName(left).localeCompare(channelDisplayName(right));
 }
 
+/**
+ * Interleave two lists WITHOUT re-sorting either: at each step the head that
+ * `compare` puts first is taken, so each list keeps its own order and only the
+ * interleaving is decided. Ties take from `first`.
+ *
+ * WHY (Arthur, 16 October 2026). The thread lists come back in the server's
+ * URGENCY order (Needs Action, Working, On Hold, no status, Completed,
+ * Closed), which no client comparator may undo. A surface that mixes threads
+ * with channels by activity merges with this, so the threads among themselves
+ * stay exactly as the server sent them.
+ */
+export function mergeKeepingOrder<T>(
+  first: readonly T[],
+  second: readonly T[],
+  compare: (left: T, right: T) => number,
+): T[] {
+  const merged: T[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < first.length && j < second.length) {
+    if (compare(first[i], second[j]) <= 0) merged.push(first[i++]);
+    else merged.push(second[j++]);
+  }
+  while (i < first.length) merged.push(first[i++]);
+  while (j < second.length) merged.push(second[j++]);
+  return merged;
+}
+
 /* ── Permissions ──────────────────────────────────────────────────────────── */
 
 /** Channel governance: owner/admin may edit/delete the channel, invite, and

@@ -18,6 +18,7 @@ import {
   formatRelativeTime,
 } from '@/v2/shell/designs/modules';
 import { channelUnreadGrammar } from '../model';
+import { channelStatusCountsLine } from '../thread-status-model';
 
 /**
  * MyChannelRow — one channel in the cross-space `/channels` index.
@@ -85,6 +86,7 @@ export const MyChannelRow = memo(function MyChannelRow({
   const Glyph = visibilityFace.icon;
   const age = formatRelativeTime(activityAt ?? channel.last_message_at, now);
   const preview = channel.last_message;
+  const statusCounts = channelStatusCountsLine(channel.thread_status_counts);
   const dim = muted
     ? 'opacity-60 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none'
     : undefined;
@@ -154,6 +156,9 @@ export const MyChannelRow = memo(function MyChannelRow({
                   'No messages yet'
                 ),
               ]}
+              // The threads that need someone ("2 need action · 1 working",
+              // Arthur, 16 October 2026) hold their width in the trail.
+              trail={statusCounts ? [statusCounts] : undefined}
             />
           </div>
         </div>

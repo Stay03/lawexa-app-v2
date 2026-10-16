@@ -1,5 +1,10 @@
 import type { Channel } from '@/types/collab';
-import { channelUnreadGrammar, compareRoomRecency, roomActivityAt } from '../model';
+import {
+  channelUnreadGrammar,
+  compareRoomRecency,
+  mergeKeepingOrder,
+  roomActivityAt,
+} from '../model';
 import { channelDisplayName } from '../thread-model';
 
 /**
@@ -121,12 +126,22 @@ export const NO_MY_THREADS: readonly Channel[] = [];
  * that a channel created today with nothing said in it now dates from its
  * creation instead of sinking under "Earlier", which is the more honest of the
  * two answers.
+ *
+ * ── BUT THE THREADS ARE NEVER RE-RANKED (Arthur, 16 October 2026) ─────────
+ * `GET /threads` now comes back in URGENCY order (Needs Action first), and the
+ * client must keep it. So the channels are ranked as before and the threads
+ * are merged in as they came ({@link mergeKeepingOrder}): only where a thread
+ * falls between channels is decided here, never its place among threads.
  */
 export function mergeMyRooms(
   channels: readonly Channel[],
   threads: readonly Channel[],
 ): Channel[] {
-  return [...channels, ...threads].sort(compareRoomRecency);
+  return mergeKeepingOrder(
+    [...channels].sort(compareRoomRecency),
+    threads,
+    compareRoomRecency,
+  );
 }
 
 /* ── Grouped view: a channel, and its threads underneath it ────────────────── */
@@ -215,12 +230,11 @@ export interface MyChannelGroup {
  * so a reader can be in a thread whose channel they never joined. Dropping a
  * row in that case would hide a conversation rather than mis-file it.
  *
- * ── ORDER WITHIN A HEADING IS THE SAME RULE, DELIBERATELY ──────────────────
- * Newest first, no special treatment for a thread that mentions you. The owner
- * was asked whether mentions should be pulled into the visible three so one can
- * never hide behind the button, and has not answered; his stated rule is strict
- * recency, so that is what this does. If that changes it is a comparator, not a
- * rebuild.
+ * ── ORDER WITHIN A HEADING IS THE SERVER'S ─────────────────────────────────
+ * The threads under a heading keep the order `GET /threads` sent, which since
+ * Arthur's revision (16 October 2026) is URGENCY: Needs Action, Working, On
+ * Hold, no status, Completed, Closed, newest inside each. No special treatment
+ * for a thread that mentions you, and no client re-ranking.
  */
 export function groupMyRooms(
   channels: readonly Channel[],
@@ -279,7 +293,9 @@ export function groupMyRooms(
 }
 
 function buildGroup(channel: Channel, bucket: readonly Channel[]): MyChannelGroup {
-  const ordered = [...bucket].sort(compareRoomRecency);
+  // The server's order (urgency, Arthur, 16 October 2026), never re-ranked:
+  // the bucket was filled by walking the server's rows.
+  const ordered = bucket;
   const newest = ordered.reduce(
     (latest, thread) => {
       const at = roomActivityAt(thread);

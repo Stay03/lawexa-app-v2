@@ -1,6 +1,7 @@
 import type {
   Channel,
   Message,
+  SetThreadStatusPayload,
   ThreadStatus,
   ThreadStatusCounts,
   ThreadStatusValue,
@@ -8,58 +9,71 @@ import type {
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 
 /**
- * thread-status-model — the pure vocabulary of a thread's status (Stay, 15-16
- * October 2026: the design "locked in" from the thread-status mock). No JSX and
- * no hooks: the chip, the header control, the Threads sheet's filter row and
- * the feed's status line all read their words from here, so none of them can
- * name a status its own way.
+ * thread-status-model — the pure vocabulary of a thread's status. First "locked
+ * in" by Stay (15-16 October 2026, the thread-status mock); the values, words
+ * and rules revised by Arthur the same day: Working, Needs Action, On Hold,
+ * Completed, Closed, no way back to "no status", and Needs Action naming who
+ * needs to act. No JSX and no hooks: the chip, the header control, the Threads
+ * sheet's filter row, the channel rows' counts and the feed's status line all
+ * read their words from here, so none of them can name a status its own way.
  *
- * ── ABSENT IS NOT `null` ───────────────────────────────────────────────────
+ * ── ABSENT IS NOT `null`, AND UNKNOWN IS NEITHER ──────────────────────────
  * `status: null` is a thread with no status; a payload with no `status` key at
  * all is a server that predates the feature. The second must draw exactly what
- * was drawn before the feature existed (no chip, no control, no filter row), so
- * every helper that decides whether to draw anything takes the field as it
- * arrived and tests for `undefined` first.
+ * was drawn before the feature existed (no chip, no control, no filter row).
+ * A status whose value this app does not know draws no chip and never throws:
+ * every surface reads it through {@link knownThreadStatus}.
+ *
+ * ── THE SERVER OWNS THE ORDER ─────────────────────────────────────────────
+ * All three thread lists come back sorted by urgency (Needs Action, Working,
+ * On Hold, no status, Completed, Closed; newest inside each). Nothing here
+ * sorts, and the cache writers patch rows where they stand: a changed row
+ * moves group on the next fetch, never on its own.
  */
 
-/** The five values, in the order every list of them is drawn. */
+/** The five values, in Arthur's order, which every list of them follows. */
 export const THREAD_STATUS_VALUES: readonly ThreadStatusValue[] = [
-  'running',
-  'waiting',
-  'blocked',
-  'done',
+  'working',
+  'needs_action',
+  'on_hold',
+  'completed',
   'closed',
 ];
 
 const LABELS: Readonly<Record<ThreadStatusValue, string>> = {
-  running: 'Running',
-  waiting: 'Waiting',
-  blocked: 'Blocked',
-  done: 'Done',
+  working: 'Working',
+  needs_action: 'Needs Action',
+  on_hold: 'On Hold',
+  completed: 'Completed',
   closed: 'Closed',
 };
 
 export interface ThreadStatusOption {
-  /** `null` is "No status", which clears it. */
-  value: ThreadStatusValue | null;
+  value: ThreadStatusValue;
   label: string;
   /** The one line under the label in the menu and the sheet. */
   hint: string;
 }
 
 /**
- * The six choices in the header's menu and the phone's sheet. The hints are
- * the mock's words; Closed says "Finished and filed" and nothing about leaving
- * the list, because a Closed thread STAYS in the list (Stay, 16 October 2026),
- * greyed.
+ * The five choices in the header's menu and the phone's sheet, with Arthur's
+ * one-line meanings. There is no "No status": a status, once set, cannot be
+ * cleared (the server refuses `null`).
  */
 export const THREAD_STATUS_OPTIONS: readonly ThreadStatusOption[] = [
-  { value: null, label: 'No status', hint: 'Nothing to track' },
-  { value: 'running', label: 'Running', hint: 'Someone is working on it' },
-  { value: 'waiting', label: 'Waiting', hint: 'Needs an answer from someone' },
-  { value: 'blocked', label: 'Blocked', hint: 'Cannot move until something is fixed' },
-  { value: 'done', label: 'Done', hint: 'Finished; still open for replies' },
-  { value: 'closed', label: 'Closed', hint: 'Finished and filed' },
+  { value: 'working', label: 'Working', hint: 'Work is underway.' },
+  {
+    value: 'needs_action',
+    label: 'Needs Action',
+    hint: 'Someone needs to respond, review, make a decision or take the next step.',
+  },
+  { value: 'on_hold', label: 'On Hold', hint: 'Work is deliberately paused.' },
+  {
+    value: 'completed',
+    label: 'Completed',
+    hint: 'The work is finished, but the thread may remain open for follow-up.',
+  },
+  { value: 'closed', label: 'Closed', hint: 'The thread is formally concluded.' },
 ];
 
 export function isThreadStatusValue(value: unknown): value is ThreadStatusValue {
@@ -69,10 +83,23 @@ export function isThreadStatusValue(value: unknown): value is ThreadStatusValue 
   );
 }
 
+/** The status, if this app knows its value; `null` for none AND for unknown. */
+export function knownThreadStatus(
+  status: ThreadStatus | null | undefined,
+): ThreadStatus | null {
+  return status && isThreadStatusValue(status.value) ? status : null;
+}
+
 /** The word for a value. The app's own words, so a chip drawn from a feed
  *  line's bare `metadata.to` reads the same as one drawn from a full status. */
 export function threadStatusLabel(value: ThreadStatusValue): string {
   return LABELS[value];
+}
+
+/** Who needs to act, on a Needs Action status that names one; else `null`. */
+export function threadStatusPerson(status: ThreadStatus | null): string | null {
+  if (!status || status.value !== 'needs_action') return null;
+  return status.needs_action_from?.name?.trim() || null;
 }
 
 /** "2m ago", "just now", or `''` before the clock has a reading. */
@@ -85,10 +112,10 @@ function agoPhrase(iso: string, now: number): string {
 /**
  * The footer under the menu: who set the status and when.
  *
- *  - "Set to Running by Ada · 2m ago"
- *  - "Set to Running by Lawexa for Ada · 2m ago" when an agent made the change
+ *  - "Set to Working by Ada · 2m ago"
+ *  - "Set to Working by Lawexa for Ada · 2m ago" when an agent made the change
  *    (`changed_by` is then the person it acted for)
- *  - "Set to Running · 2m ago" once the account behind it is gone
+ *  - "Set to Working · 2m ago" once the account behind it is gone
  *
  * The age drops out while `now` is 0 (before the minute clock hydrates).
  */
@@ -105,18 +132,18 @@ export function threadStatusFooter(status: ThreadStatus, now: number): string {
 }
 
 /**
- * "quiet 1d" after the chip of a Running or Waiting thread the server marks
- * stale; `null` otherwise. The age is the thread's last message, or the status
- * change when the thread has none; while the clock has no reading it is just
- * "quiet".
+ * "quiet 1d" after the chip of a Working or Needs Action thread the server
+ * marks stale; `null` otherwise. The age is the thread's last message, or the
+ * status change when the thread has none; while the clock has no reading it is
+ * just "quiet".
  */
 export function threadStatusQuiet(
   thread: Pick<Channel, 'status' | 'last_message_at'>,
   now: number,
 ): string | null {
-  const status = thread.status;
+  const status = knownThreadStatus(thread.status);
   if (!status || !status.is_stale) return null;
-  if (status.value !== 'running' && status.value !== 'waiting') return null;
+  if (status.value !== 'working' && status.value !== 'needs_action') return null;
   const since = thread.last_message_at ?? status.changed_at;
   const age = now > 0 ? formatRelativeTime(since, now) : '';
   return age && age !== 'now' ? `quiet ${age}` : 'quiet';
@@ -124,7 +151,73 @@ export function threadStatusQuiet(
 
 /** A Closed thread keeps its row, with its title in muted ink. */
 export function isClosedThread(thread: Pick<Channel, 'status'>): boolean {
-  return thread.status?.value === 'closed';
+  return knownThreadStatus(thread.status)?.value === 'closed';
+}
+
+/* ── Setting a status ──────────────────────────────────────────────────── */
+
+/** What the reader chose: a value, and for Needs Action who and why. */
+export interface ThreadStatusChoice {
+  status: ThreadStatusValue;
+  /** Needs Action only; ignored on any other value. */
+  needsActionFrom?: { uuid: string; name: string } | null;
+  note?: string | null;
+}
+
+/**
+ * THE PATCH BODY, BUILT IN ONE PLACE (backend contract, 16 October 2026):
+ * `{ status, needs_action_from?, note? }`. `needs_action_from` is the person's
+ * user uuid and rides ONLY with Needs Action (anything else is a 422). The
+ * note rides with Needs Action, trimmed, `null` when empty; the other values
+ * send none, as the first pass did, which leaves the server's note rule alone.
+ */
+export function buildSetThreadStatusBody(choice: ThreadStatusChoice): SetThreadStatusPayload {
+  if (choice.status !== 'needs_action') return { status: choice.status };
+  const body: SetThreadStatusPayload = {
+    status: 'needs_action',
+    note: choice.note?.trim() || null,
+  };
+  if (choice.needsActionFrom) body.needs_action_from = choice.needsActionFrom.uuid;
+  return body;
+}
+
+/**
+ * Whether a choice is the status the thread already holds, so it sends
+ * nothing. Radix calls `onValueChange` for the checked radio item too, and the
+ * phone sheet's rows are plain buttons, so without this a press on the current
+ * status would send a PATCH and the optimistic write would claim "Set to …
+ * just now" for a change nobody made. Needs Action is the same only when the
+ * person and the note are the same too.
+ */
+export function isSameThreadStatus(
+  choice: ThreadStatusChoice,
+  current: ThreadStatus | null,
+): boolean {
+  if (!current || choice.status !== current.value) return false;
+  if (choice.status !== 'needs_action') return true;
+  const person = choice.needsActionFrom?.uuid ?? null;
+  const note = choice.note?.trim() || null;
+  return (
+    person === (current.needs_action_from?.uuid ?? null) &&
+    note === (current.note?.trim() || null)
+  );
+}
+
+/**
+ * The sentence to show inline when setting a status fails: the field error
+ * when there is one (`errors.status`, `errors.needs_action_from` for a person
+ * who cannot post in the thread, `errors.note` for a long note), else the
+ * server's message.
+ */
+export function threadStatusErrorText(error: {
+  message: string;
+  errors: Record<string, string[]> | null;
+}): string {
+  const field =
+    error.errors?.status?.[0] ??
+    error.errors?.needs_action_from?.[0] ??
+    error.errors?.note?.[0];
+  return field || error.message;
 }
 
 /* ── The Threads sheet's status filter ─────────────────────────────────── */
@@ -182,6 +275,23 @@ export function showsThreadStatusFilter(
   return rows.some((row) => row.status !== undefined);
 }
 
+/**
+ * A channel row's status fact: "2 need action · 1 working" (Arthur, 16
+ * October 2026: channel rows show only these two; the sheet's chips show all
+ * five). `null` when both are zero or the row carries no counts.
+ */
+export function channelStatusCountsLine(
+  counts: ThreadStatusCounts | undefined,
+): string | null {
+  if (!counts) return null;
+  const parts: string[] = [];
+  const needs = counts.needs_action ?? 0;
+  const working = counts.working ?? 0;
+  if (needs > 0) parts.push(`${needs} ${needs === 1 ? 'needs' : 'need'} action`);
+  if (working > 0) parts.push(`${working} working`);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 /* ── The feed's status line ────────────────────────────────────────────── */
 
 /** What a `thread_status_changed` line says, read off one message. */
@@ -191,6 +301,8 @@ export interface ThreadStatusChange {
   note: string | null;
   /** The person, or for an agent change the person it acted for. */
   byName: string | null;
+  /** Needs Action only: who needs to act. */
+  needsActionFromName: string | null;
   via: 'app' | 'agent';
   at: string;
   /** The server's own sentence, shown as it came. */
@@ -214,39 +326,11 @@ export function statusChangeOf(message: Message): ThreadStatusChange | null {
     to: isThreadStatusValue(meta.to) ? meta.to : null,
     note: meta.note?.trim() || null,
     byName: meta.actor_name?.trim() || null,
+    needsActionFromName: meta.needs_action_from_name?.trim() || null,
     via: meta.via === 'agent' ? 'agent' : 'app',
     at: message.created_at,
     sentence: message.content.trim(),
   };
-}
-
-/* ── The PATCH's refusals ──────────────────────────────────────────────── */
-
-/**
- * The sentence to show inline when setting a status fails: the field error
- * when there is one (`errors.status` for a bad value or a channel that is not
- * a thread, `errors.note` for a long note), else the server's message.
- */
-export function threadStatusErrorText(error: {
-  message: string;
-  errors: Record<string, string[]> | null;
-}): string {
-  const field = error.errors?.status?.[0] ?? error.errors?.note?.[0];
-  return field || error.message;
-}
-
-/**
- * Whether a choice is the status the thread already holds. Radix calls
- * `onValueChange` for the checked radio item too, and the phone sheet's rows
- * are plain buttons, so without this a press on the current status would send
- * a PATCH and the optimistic write would claim "Set to Running by you · just
- * now" for a change nobody made (checker, 16 October 2026).
- */
-export function isSameThreadStatus(
-  next: ThreadStatusValue | null,
-  current: Pick<ThreadStatus, 'value'> | null,
-): boolean {
-  return next === (current?.value ?? null);
 }
 
 /**
@@ -284,14 +368,19 @@ export function spellQuiet(quiet: string): string {
   return `quiet ${count} ${word}${count === 1 ? '' : 's'}`;
 }
 
-/** The header trigger's name: "Status: Running, quiet 1 day. Change status". */
+/**
+ * The header trigger's name: "Status: Needs Action, Tolu, quiet 1 day. Change
+ * status", or "Set status" for a thread without one.
+ */
 export function threadStatusTriggerLabel(
-  status: Pick<ThreadStatus, 'label'> | null,
+  status: ThreadStatus | null,
   quiet: string | null,
 ): string {
   if (!status) return 'Set status';
+  const person = threadStatusPerson(status);
+  const who = person ? `, ${person}` : '';
   const stale = quiet ? `, ${spellQuiet(quiet)}` : '';
-  return `Status: ${status.label}${stale}. Change status`;
+  return `Status: ${threadStatusLabel(status.value)}${who}${stale}. Change status`;
 }
 
 /* ── Keeping a parent's counts and its filtered sheet honest ───────────── */
@@ -300,18 +389,23 @@ export function threadStatusTriggerLabel(
  * Move one thread from `from` to `to` in a parent's `thread_status_counts`,
  * locally, so a status change costs no GET of the parent (checker, 16 October
  * 2026: production holds about four serial requests, and an agent can move
- * many threads at once). `null` is no status, which is not counted. The same
- * object comes back when nothing moves; a count never goes below zero.
+ * many threads at once). `null` is no status, which is not counted, and so is
+ * a value this app does not know. The same object comes back when nothing
+ * moves; a count never goes below zero.
  */
 export function shiftThreadStatusCounts(
   counts: ThreadStatusCounts,
   from: ThreadStatusValue | null,
   to: ThreadStatusValue | null,
 ): ThreadStatusCounts {
-  if (from === to) return counts;
+  const known = (value: ThreadStatusValue | null) =>
+    isThreadStatusValue(value) ? value : null;
+  const before = known(from);
+  const after = known(to);
+  if (before === after) return counts;
   const next = { ...counts };
-  if (from !== null) next[from] = Math.max(0, (next[from] ?? 0) - 1);
-  if (to !== null) next[to] = (next[to] ?? 0) + 1;
+  if (before !== null) next[before] = Math.max(0, (next[before] ?? 0) - 1);
+  if (after !== null) next[after] = (next[after] ?? 0) + 1;
   return next;
 }
 

@@ -21,7 +21,12 @@ import {
   threadProvenanceLabel,
   threadUnreadState,
 } from '../thread-model';
-import { isClosedThread, threadStatusQuiet } from '../thread-status-model';
+import {
+  isClosedThread,
+  knownThreadStatus,
+  threadStatusPerson,
+  threadStatusQuiet,
+} from '../thread-status-model';
 
 /**
  * MyThreadRow — one THREAD in the cross-space `/channels` index, drawn to
@@ -118,7 +123,7 @@ export const MyThreadRow = memo(function MyThreadRow({
   const provenance = threadProvenanceLabel(thread.parent_channel_name);
   // The status chip after the title, a Closed title in muted ink (Stay, 16
   // October 2026). Absent on an older payload, which draws no chip.
-  const status = thread.status ?? null;
+  const status = knownThreadStatus(thread.status);
   const closed = isClosedThread(thread);
   const quiet = threadStatusQuiet(thread, now);
   const dim = muted
@@ -185,7 +190,13 @@ export const MyThreadRow = memo(function MyThreadRow({
                 {title}
               </span>
               {behind ? <UnreadDot /> : null}
-              {status ? <ThreadStatusChip value={status.value} quiet={quiet} /> : null}
+              {status ? (
+                <ThreadStatusChip
+                  value={status.value}
+                  person={threadStatusPerson(status)}
+                  quiet={quiet}
+                />
+              ) : null}
               {muted ? (
                 <BellOff
                   aria-label="Muted"

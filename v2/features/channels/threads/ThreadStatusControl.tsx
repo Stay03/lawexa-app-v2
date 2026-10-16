@@ -21,7 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import type { ThreadStatus, ThreadStatusValue } from '@/types/collab';
+import type { ThreadStatus, ThreadStatusPerson, ThreadStatusValue } from '@/types/collab';
 import {
   ThreadStatusChip,
   ThreadStatusDot,
@@ -31,20 +31,24 @@ import {
   THREAD_STATUS_OPTIONS,
   isSameThreadStatus,
   isThreadStatusValue,
+  knownThreadStatus,
   nextRadioIndex,
   threadStatusErrorText,
   threadStatusFooter,
+  threadStatusPerson,
   threadStatusQuiet,
   threadStatusTriggerLabel,
+  type ThreadStatusChoice,
   type ThreadStatusOption,
 } from '../thread-status-model';
 import { useMinuteNow } from '../use-minute-now';
 import { useSetThreadStatus } from './mutations';
+import { NeedsActionStep } from './NeedsActionStep';
 
 /**
  * ThreadStatusControl — a thread's status in its header, and the way to set it
  * (Stay, 15-16 October 2026: thread status, "locked in" from the mock's
- * option B).
+ * option B; revised by Arthur the same day).
  *
  * ── WHO GETS A BUTTON ──────────────────────────────────────────────────────
  * The PATCH is authorized like posting (`403` for anyone who cannot post), so
@@ -52,33 +56,42 @@ import { useSetThreadStatus } from './mutations';
  * nothing else. Everyone else sees the chip alone, or nothing when there is no
  * status.
  *
+ * ── FIVE CHOICES, NO WAY BACK TO NONE ──────────────────────────────────────
+ * A status, once set, cannot be cleared (the server refuses `null`), so the
+ * menu offers the five and ticks the current one. A thread without a status
+ * shows "Set status".
+ *
+ * ── NEEDS ACTION ASKS FIRST ────────────────────────────────────────────────
+ * The other four save on a tap. Needs Action opens a second step in the same
+ * surface ({@link NeedsActionStep}): who needs to act and a short note, both
+ * optional, then Save.
+ *
  * ── ONE CONTROL, TWO SURFACES ──────────────────────────────────────────────
  * `surface="menu"` opens a shadcn `DropdownMenu` beside the name on a wide
  * pane; `surface="sheet"` opens a bottom sheet on a phone, the channel
- * screen's own pattern for phone choices (`MessageActionsSheet`). The header
- * mounts one of each and shows exactly one by breakpoint, the two-triggers
- * idiom it already uses, so no media query runs in render.
+ * screen's own pattern for phone choices (`MessageActionsSheet`), and stands
+ * in the subtitle's line with the note after it. The header mounts one of
+ * each and shows exactly one by breakpoint, so no media query runs in render.
  *
  * ── THE SURFACE STAYS OPEN UNTIL THE SERVER ANSWERS ────────────────────────
  * The choice is optimistic: the tick and the chip move on the press. The menu
  * or sheet closes on success. On a refusal the thread is re-read and the
  * server's sentence shows inside the surface, where the press was, with no
- * toast. A reader who dismisses the surface first still sees the chip go back.
- * Picking the status the thread already has only closes the surface.
- *
- * The note is read-only in this first pass: there is no note field, but a note
- * the server holds is shown under the footer.
+ * toast. Choosing what the thread already holds only closes the surface.
  */
 export function ThreadStatusControl({
   threadUuid,
   parentUuid,
-  status,
+  viewerId,
+  status: rawStatus,
   lastMessageAt,
   canSet,
   surface,
 }: {
   threadUuid: string;
   parentUuid: string | null;
+  /** The session's viewer, the cache partition of the members roster. */
+  viewerId: number | null;
   /** The thread's status; the caller mounts this only when the field exists. */
   status: ThreadStatus | null;
   lastMessageAt: string | null;
@@ -86,53 +99,53 @@ export function ThreadStatusControl({
   surface: 'menu' | 'sheet';
 }) {
   const now = useMinuteNow();
+  // A value this app does not know reads as no status: no chip, no crash.
+  const status = knownThreadStatus(rawStatus);
   const quiet = threadStatusQuiet({ status, last_message_at: lastMessageAt }, now);
 
   if (!canSet) {
     // The prefix says what the chip is to a screen reader; sighted readers
-    // have the header around it.
-    // On a phone it sits in the subtitle's line, so it takes the row's size.
+    // have the header around it. On a phone it sits in the subtitle's line,
+    // so it takes the row's size and the note follows it.
     return status ? (
-      <span className="inline-flex shrink-0 items-center">
-        <span className="sr-only">Status: </span>
-        <ThreadStatusChip
-          size={surface === 'sheet' ? 'sm' : 'md'}
-          value={status.value}
-          quiet={quiet}
-        />
-      </span>
+      <>
+        <span className="inline-flex min-w-0 shrink-0 items-center">
+          <span className="sr-only">Status: </span>
+          <ThreadStatusChip
+            size={surface === 'sheet' ? 'sm' : 'md'}
+            value={status.value}
+            person={threadStatusPerson(status)}
+            quiet={quiet}
+          />
+        </span>
+        {surface === 'sheet' && <PhoneNote status={status} />}
+      </>
     ) : null;
   }
 
-  return surface === 'menu' ? (
-    <StatusMenu
-      threadUuid={threadUuid}
-      parentUuid={parentUuid}
-      status={status}
-      quiet={quiet}
-      now={now}
-    />
-  ) : (
-    <StatusSheet
-      threadUuid={threadUuid}
-      parentUuid={parentUuid}
-      status={status}
-      quiet={quiet}
-      now={now}
-    />
-  );
+  const shared = { threadUuid, parentUuid, viewerId, status, quiet, now };
+  return surface === 'menu' ? <StatusMenu {...shared} /> : <StatusSheet {...shared} />;
 }
 
 interface SurfaceProps {
   threadUuid: string;
   parentUuid: string | null;
+  viewerId: number | null;
   status: ThreadStatus | null;
   quiet: string | null;
   now: number;
 }
 
-/** The menu's value for "No status"; a radio group needs a string. */
-const NONE = 'none';
+/** The phone line's note, after the chip; nothing when there is none. */
+function PhoneNote({ status }: { status: ThreadStatus | null }) {
+  const note = status?.note?.trim() || null;
+  if (!note) return null;
+  return (
+    <span className="ml-1.5 min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
+      {note}
+    </span>
+  );
+}
 
 /** The press, the optimistic write, the close on success, the inline error. */
 function useStatusChoice(
@@ -146,17 +159,17 @@ function useStatusChoice(
   const viewerName = useAuthStore((state) => state.user?.name ?? null);
   const [error, setError] = useState<string | null>(null);
 
-  const choose = (next: ThreadStatusValue | null) => {
-    // Picking the status it already has changes nothing, so it sends nothing
-    // and writes no "Set to … · just now" for a change nobody made.
-    if (isSameThreadStatus(next, status)) {
+  const choose = (choice: ThreadStatusChoice) => {
+    // Choosing what the thread already holds changes nothing, so it sends
+    // nothing and writes no "Set to … · just now" for a change nobody made.
+    if (isSameThreadStatus(choice, status)) {
       close();
       return;
     }
     setError(null);
     mutation.mutate(
       {
-        status: next,
+        choice,
         viewer:
           viewerUuid && viewerName ? { uuid: viewerUuid, name: viewerName } : null,
       },
@@ -193,7 +206,12 @@ function TriggerFace({
   );
   return status ? (
     <>
-      <ThreadStatusChip size={compact ? 'sm' : 'md'} value={status.value} quiet={quiet} />
+      <ThreadStatusChip
+        size={compact ? 'sm' : 'md'}
+        value={status.value}
+        person={threadStatusPerson(status)}
+        quiet={quiet}
+      />
       {chevron}
     </>
   ) : (
@@ -245,18 +263,6 @@ function StatusFooter({
   );
 }
 
-/** The leading mark of one option: the status dot, or a hollow ring for none. */
-function OptionMark({ value }: { value: ThreadStatusValue | null }) {
-  return value === null ? (
-    <span
-      aria-hidden
-      className="size-2 shrink-0 rounded-full border border-muted-foreground/70"
-    />
-  ) : (
-    <ThreadStatusDot value={value} className="size-2" />
-  );
-}
-
 function OptionText({ option }: { option: ThreadStatusOption }) {
   return (
     <span className="flex min-w-0 flex-col">
@@ -266,21 +272,46 @@ function OptionText({ option }: { option: ThreadStatusOption }) {
   );
 }
 
-function StatusMenu({ threadUuid, parentUuid, status, quiet, now }: SurfaceProps) {
+/** One tap on an option: Needs Action asks first, the others save. */
+function optionPress(
+  choose: (choice: ThreadStatusChoice) => void,
+  openNeedsAction: () => void,
+) {
+  return (value: ThreadStatusValue) => {
+    if (value === 'needs_action') openNeedsAction();
+    else choose({ status: value });
+  };
+}
+
+/** The step's Save: Needs Action, with whoever and whatever was given. */
+function saveNeedsAction(choose: (choice: ThreadStatusChoice) => void) {
+  return (person: ThreadStatusPerson | null, note: string | null) =>
+    choose({ status: 'needs_action', needsActionFrom: person, note });
+}
+
+function StatusMenu({ threadUuid, parentUuid, viewerId, status, quiet, now }: SurfaceProps) {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<'list' | 'needs_action'>('list');
   const { choose, error, clearError, pending } = useStatusChoice(
     threadUuid,
     parentUuid,
     status,
     () => setOpen(false),
   );
+  const press = optionPress(choose, () => {
+    clearError();
+    setStep('needs_action');
+  });
 
   return (
     <DropdownMenu
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
-        if (next) clearError();
+        if (next) {
+          clearError();
+          setStep('list');
+        }
       }}
     >
       <DropdownMenuTrigger
@@ -289,50 +320,77 @@ function StatusMenu({ threadUuid, parentUuid, status, quiet, now }: SurfaceProps
       >
         <TriggerFace status={status} quiet={quiet} />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72">
-        <DropdownMenuLabel>Status</DropdownMenuLabel>
-        <DropdownMenuRadioGroup
-          value={status?.value ?? NONE}
-          onValueChange={(next) => choose(isThreadStatusValue(next) ? next : null)}
-        >
-          {THREAD_STATUS_OPTIONS.map((option) => (
-            <DropdownMenuRadioItem
-              key={option.value ?? NONE}
-              value={option.value ?? NONE}
-              disabled={pending}
-              // Held open: the surface closes when the server agrees, and a
-              // refusal is shown inside it (see the docblock).
-              onSelect={(event) => event.preventDefault()}
-              className="items-start"
+      <DropdownMenuContent align="start" className="w-80">
+        {step === 'needs_action' ? (
+          <NeedsActionStep
+            parentUuid={parentUuid}
+            viewerId={viewerId}
+            initialPerson={status?.needs_action_from ?? null}
+            initialNote={status?.value === 'needs_action' ? status.note : null}
+            pending={pending}
+            error={error}
+            onBack={() => {
+              clearError();
+              setStep('list');
+            }}
+            onSave={saveNeedsAction(choose)}
+          />
+        ) : (
+          <>
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              // Without a status nothing is ticked; there is no item to clear one with.
+              value={status?.value ?? ''}
+              onValueChange={(next) => {
+                if (isThreadStatusValue(next)) press(next);
+              }}
             >
-              <span className="mt-1.5 flex">
-                <OptionMark value={option.value} />
-              </span>
-              <OptionText option={option} />
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-        {(status || error) && <DropdownMenuSeparator />}
-        <StatusFooter status={status} now={now} error={error} />
+              {THREAD_STATUS_OPTIONS.map((option) => (
+                <DropdownMenuRadioItem
+                  key={option.value}
+                  value={option.value}
+                  disabled={pending}
+                  // Held open: the surface closes when the server agrees, and
+                  // a refusal is shown inside it (see the docblock).
+                  onSelect={(event) => event.preventDefault()}
+                  className="items-start"
+                >
+                  <span className="mt-1.5 flex">
+                    <ThreadStatusDot value={option.value} className="size-2" />
+                  </span>
+                  <OptionText option={option} />
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            {(status || error) && <DropdownMenuSeparator />}
+            <StatusFooter status={status} now={now} error={error} />
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
 
-function StatusSheet({ threadUuid, parentUuid, status, quiet, now }: SurfaceProps) {
+function StatusSheet({ threadUuid, parentUuid, viewerId, status, quiet, now }: SurfaceProps) {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<'list' | 'needs_action'>('list');
   const { choose, error, clearError, pending } = useStatusChoice(
     threadUuid,
     parentUuid,
     status,
     () => setOpen(false),
   );
+  const press = optionPress(choose, () => {
+    clearError();
+    setStep('needs_action');
+  });
   const current = status?.value ?? null;
 
-  /* A REAL RADIO GROUP: one tab stop (the checked option), ArrowUp/ArrowDown
-     move focus and wrap, Home/End jump. Arrows move FOCUS ONLY. Choosing sends
-     a request, so it stays on tap, Enter and Space, never on an arrow press.
-     The options are read off the group in the handler, never in render. */
+  /* A REAL RADIO GROUP: one tab stop (the checked option, or the first when
+     none is), ArrowUp/ArrowDown move focus and wrap, Home/End jump. Arrows
+     move FOCUS ONLY. Choosing sends a request (or opens Needs Action's step),
+     so it stays on tap, Enter and Space, never on an arrow press. The options
+     are read off the group in the handler, never in render. */
   const onRadioKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
     if (!keys.includes(event.key)) return;
@@ -354,62 +412,85 @@ function StatusSheet({ threadUuid, parentUuid, status, quiet, now }: SurfaceProp
         aria-label={threadStatusTriggerLabel(status, quiet)}
         onClick={() => {
           clearError();
+          setStep('list');
           setOpen(true);
         }}
         className={TRIGGER_COMPACT}
       >
         <TriggerFace status={status} quiet={quiet} compact />
       </button>
+      <PhoneNote status={status} />
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" className="v2-safe-bottom rounded-t-2xl">
           <SheetHeader className="pb-0">
-            <SheetTitle>Status</SheetTitle>
+            <SheetTitle>
+              {step === 'needs_action' ? 'Needs Action' : 'Status'}
+            </SheetTitle>
           </SheetHeader>
-          <div className="flex flex-col px-2 pb-2">
-            <div
-              role="radiogroup"
-              aria-label="Thread status"
-              onKeyDown={onRadioKeyDown}
-              className="flex flex-col"
-            >
-              {THREAD_STATUS_OPTIONS.map((option) => {
-                const selected = option.value === current;
-                return (
-                  <button
-                    key={option.value ?? NONE}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    // Roving tab stop: the checked option alone is in the tab
-                    // order. `aria-disabled`, not `disabled`, while a request
-                    // is out, so focus is not thrown off the option it is on.
-                    tabIndex={selected ? 0 : -1}
-                    aria-disabled={pending}
-                    onClick={() => {
-                      if (!pending) choose(option.value);
-                    }}
-                    className={cn(
-                      'v2-interactive flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm',
-                      'transition-colors duration-150 motion-reduce:transition-none',
-                      selected ? 'bg-secondary' : 'hover:bg-secondary/60',
-                      pending && 'opacity-60',
-                      FOCUS_RING,
-                    )}
-                  >
-                    <OptionMark value={option.value} />
-                    <span className="min-w-0 flex-1">
-                      <OptionText option={option} />
-                    </span>
-                    {selected && (
-                      <Check aria-hidden className="size-4 shrink-0 text-primary" />
-                    )}
-                  </button>
-                );
-              })}
+          {step === 'needs_action' ? (
+            <div className="px-3 pb-3">
+              <NeedsActionStep
+                parentUuid={parentUuid}
+                viewerId={viewerId}
+                initialPerson={status?.needs_action_from ?? null}
+                initialNote={status?.value === 'needs_action' ? status.note : null}
+                pending={pending}
+                error={error}
+                onBack={() => {
+                  clearError();
+                  setStep('list');
+                }}
+                onSave={saveNeedsAction(choose)}
+              />
             </div>
-            {(status || error) && <div className="mx-1 my-1 h-px bg-border" />}
-            <StatusFooter status={status} now={now} error={error} />
-          </div>
+          ) : (
+            <div className="flex flex-col px-2 pb-2">
+              <div
+                role="radiogroup"
+                aria-label="Thread status"
+                onKeyDown={onRadioKeyDown}
+                className="flex flex-col"
+              >
+                {THREAD_STATUS_OPTIONS.map((option, index) => {
+                  const selected = option.value === current;
+                  const tabStop = current === null ? index === 0 : selected;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      // Roving tab stop: one option alone is in the tab order.
+                      // `aria-disabled`, not `disabled`, while a request is
+                      // out, so focus is not thrown off the option it is on.
+                      tabIndex={tabStop ? 0 : -1}
+                      aria-disabled={pending}
+                      onClick={() => {
+                        if (!pending) press(option.value);
+                      }}
+                      className={cn(
+                        'v2-interactive flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm',
+                        'transition-colors duration-150 motion-reduce:transition-none',
+                        selected ? 'bg-secondary' : 'hover:bg-secondary/60',
+                        pending && 'opacity-60',
+                        FOCUS_RING,
+                      )}
+                    >
+                      <ThreadStatusDot value={option.value} className="size-2" />
+                      <span className="min-w-0 flex-1">
+                        <OptionText option={option} />
+                      </span>
+                      {selected && (
+                        <Check aria-hidden className="size-4 shrink-0 text-primary" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {(status || error) && <div className="mx-1 my-1 h-px bg-border" />}
+              <StatusFooter status={status} now={now} error={error} />
+            </div>
+          )}
         </SheetContent>
       </Sheet>
     </>

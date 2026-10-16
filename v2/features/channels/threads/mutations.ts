@@ -7,7 +7,6 @@ import type {
   Channel,
   ChannelResponse,
   ThreadStatus,
-  ThreadStatusValue,
 } from '@/types/collab';
 import {
   applyThreadStatus,
@@ -18,7 +17,11 @@ import {
   shiftParentThreadStatusCounts,
 } from '../cache';
 import { channelsQueries } from '../queries';
-import { threadStatusLabel } from '../thread-status-model';
+import {
+  buildSetThreadStatusBody,
+  threadStatusLabel,
+  type ThreadStatusChoice,
+} from '../thread-status-model';
 
 /**
  * threads/mutations — starting a thread from a message (Phase 3, 2026-08-12).
@@ -101,14 +104,17 @@ export function useStartThread(channelUuid: string) {
 }
 
 export interface SetThreadStatusVariables {
-  /** The status to move to; `null` clears it. */
-  status: ThreadStatusValue | null;
+  /** The status to move to, and for Needs Action who and why. A status
+   *  cannot be cleared (Arthur, 16 October 2026), so there is no `null`. */
+  choice: ThreadStatusChoice;
   /** Who is pressing, for the optimistic footer ("by Ada"). */
   viewer: { uuid: string; name: string } | null;
 }
 
 /**
- * Set or clear a thread's status (Stay, 16 October 2026: thread status).
+ * Set a thread's status (Stay, 16 October 2026: thread status; revised by
+ * Arthur the same day). The body is `buildSetThreadStatusBody`'s, the one
+ * place the PATCH's field names live.
  *
  * OPTIMISTIC, because the tick and the chip are the whole answer: every cached
  * copy of the thread (its detail, the list rows, the parent's Threads sheet)
@@ -128,10 +134,9 @@ export interface SetThreadStatusVariables {
  * of it, as on the engagement toggles.
  *
  * Settling queues one coalesced re-read of the parent's status-FILTERED sheet,
- * the only entries that can now hold a row that no longer matches.
- *
- * The note is not sent: the first pass has no note field (Stay, 16 October
- * 2026). Leaving the key out keeps whatever the server holds.
+ * the only entries that can now hold a row that no longer matches. No writer
+ * here reorders a list: rows are patched where they stand, and the server's
+ * urgency order regroups them on the next fetch.
  */
 export function useSetThreadStatus(threadUuid: string, parentUuid: string | null) {
   const queryClient = useQueryClient();
@@ -142,39 +147,39 @@ export function useSetThreadStatus(threadUuid: string, parentUuid: string | null
     SetThreadStatusVariables,
     { previous: ThreadStatus | null | undefined }
   >({
-    mutationFn: ({ status }) => channelsApi.setStatus(threadUuid, { status }),
+    mutationFn: ({ choice }) =>
+      channelsApi.setStatus(threadUuid, buildSetThreadStatusBody(choice)),
     meta: { silentError: true },
 
-    onMutate: async ({ status, viewer }) => {
+    onMutate: async ({ choice, viewer }) => {
       await queryClient.cancelQueries({
         queryKey: channelsQueries.detailsOf(threadUuid),
       });
       const previous = findCachedThreadStatus(queryClient, threadUuid);
-      const optimistic: ThreadStatus | null =
-        status === null
-          ? null
-          : {
-              value: status,
-              label: threadStatusLabel(status),
-              note: null,
-              changed_at: new Date().toISOString(),
-              changed_by: viewer,
-              via: 'app',
-              is_stale: false,
-            };
+      const needsAction = choice.status === 'needs_action';
+      const optimistic: ThreadStatus = {
+        value: choice.status,
+        label: threadStatusLabel(choice.status),
+        note: needsAction ? choice.note?.trim() || null : null,
+        changed_at: new Date().toISOString(),
+        changed_by: viewer,
+        via: 'app',
+        is_stale: false,
+        needs_action_from: needsAction ? (choice.needsActionFrom ?? null) : null,
+      };
       applyThreadStatus(queryClient, threadUuid, optimistic);
       if (parentUuid !== null && previous !== undefined) {
         shiftParentThreadStatusCounts(
           queryClient,
           parentUuid,
           previous?.value ?? null,
-          status,
+          choice.status,
         );
       }
       return { previous };
     },
 
-    onError: async (_error, { status }, context) => {
+    onError: async (_error, { choice: { status } }, context) => {
       const fresh = await rereadThreadStatus(queryClient, threadUuid);
       const settled = fresh !== undefined ? fresh : context?.previous;
       if (settled === undefined) return;
@@ -190,11 +195,11 @@ export function useSetThreadStatus(threadUuid: string, parentUuid: string | null
       }
     },
 
-    onSuccess: (response, { status: sent }) => {
+    onSuccess: (response, { choice: { status: sent } }, context) => {
       const status = response.data.status;
       if (status === undefined) return;
       applyThreadStatus(queryClient, threadUuid, status);
-      if (parentUuid !== null) {
+      if (parentUuid !== null && context?.previous !== undefined) {
         shiftParentThreadStatusCounts(
           queryClient,
           parentUuid,

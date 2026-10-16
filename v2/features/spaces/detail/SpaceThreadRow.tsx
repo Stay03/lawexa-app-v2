@@ -12,6 +12,8 @@ import {
 } from '@/v2/features/channels/thread-model';
 import {
   isClosedThread,
+  knownThreadStatus,
+  threadStatusPerson,
   threadStatusQuiet,
 } from '@/v2/features/channels/thread-status-model';
 import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
@@ -86,7 +88,7 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
   const provenance = threadProvenanceLabel(thread.parent_channel_name);
   // The status chip after the title, a Closed title in muted ink (Stay, 16
   // October 2026). Absent on an older payload, which draws no chip.
-  const status = thread.status ?? null;
+  const status = knownThreadStatus(thread.status);
   const closed = isClosedThread(thread);
   const quiet = threadStatusQuiet(thread, now);
   // SCOPED, NEVER ON THE ANCHOR - see the docblock. The mention badge and the
@@ -146,7 +148,13 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
                 {title}
               </span>
               {behind ? <UnreadDot /> : null}
-              {status ? <ThreadStatusChip value={status.value} quiet={quiet} /> : null}
+              {status ? (
+                <ThreadStatusChip
+                  value={status.value}
+                  person={threadStatusPerson(status)}
+                  quiet={quiet}
+                />
+              ) : null}
               {muted ? (
                 <BellOff
                   aria-label="Muted"
