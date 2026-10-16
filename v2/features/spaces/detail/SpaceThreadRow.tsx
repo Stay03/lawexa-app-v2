@@ -153,6 +153,7 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
                   value={status.value}
                   person={threadStatusPerson(status)}
                   quiet={quiet}
+                  fold
                 />
               ) : null}
               {muted ? (

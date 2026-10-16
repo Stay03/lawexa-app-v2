@@ -195,6 +195,7 @@ export const MyThreadRow = memo(function MyThreadRow({
                   value={status.value}
                   person={threadStatusPerson(status)}
                   quiet={quiet}
+                  fold
                 />
               ) : null}
               {muted ? (

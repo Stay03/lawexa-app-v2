@@ -32,6 +32,15 @@ import {
  * every box around it keeps `min-width: auto` and inherits that floor. A
  * `min-w-0` on that chain lets the pill shrink under its own word, which the
  * second round of pictures showed.
+ *
+ * `fold` is for a thread list row on a phone, where the title shares a 390px
+ * line with the chip and must keep about 20 characters (techlead, 16 October
+ * 2026). Below `md:` the person hides (the thread's header and its menu name
+ * them), and the suffix sits in a one-line wrapping box with the pill: when
+ * the row has room it shows, and when it does not it wraps out of sight
+ * whole, never as a "· q…" stub. The box gives way fifty times faster than
+ * the title, so the suffix goes before the title loses a letter. From `md:`
+ * up the row is as before.
  */
 
 const TONE: Readonly<Record<ThreadStatusValue, { chip: string; dot: string }>> = {
@@ -86,6 +95,13 @@ export function ThreadStatusDot({
   );
 }
 
+/** A row's pill and suffix below `md:`: one 20px line, the suffix wrapping out
+ *  of sight whole when the row has no room. `min-w-min` keeps the pill: a box
+ *  that clips has no automatic minimum width, and a long title squeezed it to
+ *  nothing (the 390px check, 16 October 2026). */
+const FOLD_BOX =
+  'max-md:flex max-md:h-5 max-md:min-w-min max-md:shrink-[50] max-md:flex-wrap max-md:overflow-hidden';
+
 /** The pill's column keeps its content; the suffix's gives way to nothing. */
 const FIT_GRID = 'inline-grid grid-cols-[auto_minmax(0,max-content)]';
 
@@ -95,6 +111,7 @@ export function ThreadStatusChip({
   size = 'sm',
   quiet = null,
   fit = false,
+  fold = false,
   className,
 }: {
   value: ThreadStatusValue;
@@ -106,6 +123,8 @@ export function ThreadStatusChip({
   quiet?: string | null;
   /** Gives way to a narrow line by trimming the suffix only. */
   fit?: boolean;
+  /** A list row: below `md:` the person hides and the suffix shows only whole. */
+  fold?: boolean;
   className?: string;
 }) {
   if (!isThreadStatusValue(value)) return null;
@@ -129,7 +148,9 @@ export function ThreadStatusChip({
         {threadStatusLabel(value)}
       </span>
       {person ? (
-        <span className="min-w-0 max-w-32 truncate">{`· ${person}`}</span>
+        <span className={cn('min-w-0 max-w-32 truncate', fold && 'max-md:hidden')}>
+          {`· ${person}`}
+        </span>
       ) : null}
     </span>
   );
@@ -139,6 +160,7 @@ export function ThreadStatusChip({
       className={cn(
         'items-center gap-1',
         fit ? FIT_GRID : 'inline-flex shrink-0',
+        fold && FOLD_BOX,
         className,
       )}
     >

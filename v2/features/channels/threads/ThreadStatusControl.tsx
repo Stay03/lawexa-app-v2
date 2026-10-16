@@ -61,7 +61,9 @@ import { moveRadioFocus } from './radio-focus';
  * `surface="menu"` opens a shadcn `Popover` beside the name on a wide pane
  * (a dialog, not a menu, because the Needs Action step is a form); `surface="sheet"` opens a bottom sheet on a phone, the channel
  * screen's own pattern for phone choices (`MessageActionsSheet`), and stands
- * in the subtitle's line with the note after it. The header mounts one of
+ * in the subtitle's line, the pill and the chevron alone: the note lives in
+ * the sheet and the feed line, and its stub on the bar read as noise
+ * (techlead, 16 October 2026). The header mounts one of
  * each and shows exactly one by breakpoint, so no media query runs in render.
  *
  * ── THE SURFACE STAYS OPEN UNTIL THE SERVER ANSWERS ────────────────────────
@@ -97,21 +99,18 @@ export function ThreadStatusControl({
   if (!canSet) {
     // The prefix says what the chip is to a screen reader; sighted readers
     // have the header around it. On a phone it sits in the subtitle's line,
-    // so it takes the row's size and the note follows it.
+    // so it takes the row's size.
     return status ? (
-      <>
-        <span className="inline-flex items-center">
-          <span className="sr-only">Status: </span>
-          <ThreadStatusChip
-            size={surface === 'sheet' ? 'sm' : 'md'}
-            value={status.value}
-            person={threadStatusPerson(status)}
-            quiet={quiet}
-            fit
-          />
-        </span>
-        {surface === 'sheet' && <PhoneNote status={status} />}
-      </>
+      <span className="inline-flex items-center">
+        <span className="sr-only">Status: </span>
+        <ThreadStatusChip
+          size={surface === 'sheet' ? 'sm' : 'md'}
+          value={status.value}
+          person={threadStatusPerson(status)}
+          quiet={quiet}
+          fit
+        />
+      </span>
     ) : null;
   }
 
@@ -126,17 +125,6 @@ interface SurfaceProps {
   status: ThreadStatus | null;
   quiet: string | null;
   now: number;
-}
-
-/** The phone line's note, after the chip; nothing when there is none. */
-function PhoneNote({ status }: { status: ThreadStatus | null }) {
-  const note = status?.note?.trim() || null;
-  if (!note) return null;
-  return (
-    <span className="ml-1.5 min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
-      {note}
-    </span>
-  );
 }
 
 /** The press, the optimistic write, the close on success, the inline error. */
@@ -452,7 +440,6 @@ function StatusSheet({ threadUuid, parentUuid, viewerId, status, quiet, now }: S
       >
         <TriggerFace status={status} quiet={quiet} compact />
       </button>
-      <PhoneNote status={status} />
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" className="v2-safe-bottom rounded-t-2xl">
           <SheetHeader className="pb-0">

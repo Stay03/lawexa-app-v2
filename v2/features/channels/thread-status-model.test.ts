@@ -381,6 +381,22 @@ test('on a phone a thread with a status line takes the room of the faces, Member
   assert.match(screen, /const channelMenu = canParticipate \?[\s\S]*?panel\.show\('members'\)[\s\S]*?\) : undefined;/);
 });
 
+test('on a phone a list row folds its chip so the title keeps about 20 characters', () => {
+  // Techlead, 16 October 2026: "Tenancy …" on the phone Threads list. Below
+  // md: the row chip drops the person, and the quiet suffix shows only whole.
+  const chip = read('v2', 'features', 'collab', 'kit', 'ThreadStatusChip.tsx');
+  assert.match(chip, /fold && 'max-md:hidden'/);
+  assert.match(chip, /'max-md:flex max-md:h-5 max-md:min-w-min max-md:shrink-\[50\] max-md:flex-wrap max-md:overflow-hidden'/);
+  assert.match(chip, /fold && FOLD_BOX/);
+  for (const parts of [
+    ['v2', 'features', 'channels', 'threads', 'ThreadsSheet.tsx'],
+    ['v2', 'features', 'channels', 'my-channels', 'MyThreadRow.tsx'],
+    ['v2', 'features', 'spaces', 'detail', 'SpaceThreadRow.tsx'],
+  ]) {
+    assert.match(read(...parts), /<ThreadStatusChip[^>]*quiet=\{quiet\}\s*fold\s*\/>/, parts.at(-1));
+  }
+});
+
 test('on a wide pane the status has its own line under the name, as on a phone', () => {
   // Techlead, 16 October 2026: a Needs Action chip beside the name cut it to
   // "Te…", and Needs Action must name who acts, so the name keeps its row.
@@ -405,7 +421,7 @@ test('the header status trims only its quiet suffix, never the word or the perso
   assert.match(chip, /const FIT_GRID = 'inline-grid grid-cols-\[auto_minmax\(0,max-content\)\]';/);
   assert.match(chip, /fit \? FIT_GRID : 'inline-flex shrink-0'/);
   assert.match(chip, /fit && 'min-w-0 truncate'/);
-  assert.match(chip, /<span className="min-w-0 max-w-32 truncate">\{`· \$\{person\}`\}<\/span>/);
+  assert.match(chip, /<span className=\{cn\('min-w-0 max-w-32 truncate', fold && 'max-md:hidden'\)\}>\s*\{`· \$\{person\}`\}\s*<\/span>/);
 });
 
 test('on a phone the status stands in the subtitle line and the title keeps the row', () => {
@@ -422,13 +438,14 @@ test('on a phone the status stands in the subtitle line and the title keeps the 
   // No status and no way to set one: no slot, so the subtitle stays.
   const screen = read('v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx');
   assert.match(screen, /threadStatus === undefined \|\| \(threadStatus === null && !canParticipate\)/);
-  // The phone's trigger is the row chip, no taller than it, and the note
-  // follows it on the same line.
+  // The phone's trigger is the row chip, no taller than it, and the line is
+  // the pill and the chevron alone: no note stub after it (techlead).
   const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
   assert.match(
     control,
-    /className=\{TRIGGER_COMPACT\}\s*>\s*<TriggerFace status=\{status\} quiet=\{quiet\} compact \/>\s*<\/button>\s*<PhoneNote status=\{status\} \/>/,
+    /className=\{TRIGGER_COMPACT\}\s*>\s*<TriggerFace status=\{status\} quiet=\{quiet\} compact \/>\s*<\/button>\s*<Sheet /,
   );
+  assert.doesNotMatch(control, /PhoneNote/);
 });
 
 test('the menu has no clear item, and Needs Action asks who before it saves', () => {

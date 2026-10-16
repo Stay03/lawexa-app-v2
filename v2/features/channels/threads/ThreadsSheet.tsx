@@ -456,6 +456,7 @@ function ThreadRow({
                 value={status.value}
                 person={threadStatusPerson(status)}
                 quiet={quiet}
+                fold
               />
             )}
           </div>
