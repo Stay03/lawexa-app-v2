@@ -19,7 +19,13 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCaseName } from '@/v2/features/cases/case-name';
 import { casesQueries } from '@/v2/features/cases/queries';
+import { channelsQueries } from '@/v2/features/channels/queries';
+import { channelDisplayName } from '@/v2/features/channels/thread-model';
 import type { CollabHeaderContext } from '@/v2/features/collab/shell/collab-header';
+import { conversationsQueries } from '@/v2/features/conversations/queries';
+import { foldersQueries } from '@/v2/features/folders/queries';
+import { noteDisplayTitle } from '@/v2/features/notes/note-text';
+import { notesQueries } from '@/v2/features/notes/queries';
 import { useCachedSpaceIdentity } from '@/v2/features/spaces/detail/cached-identity';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { statutesQueries } from '@/v2/features/statutes/queries';
@@ -39,9 +45,9 @@ import type { HeaderPlace } from './header-place';
  * and the parts come from `breadcrumb-trail.ts`.
  *
  * ── NOTHING HERE FETCHES ───────────────────────────────────────────────────
- * Every name is one the screen has already asked for: the space, statute and
- * case reads are `enabled: false`, which subscribes to the screen's cache entry
- * and never requests it. A live observer would refetch on every visit
+ * Every name is one the screen has already asked for: each query here is
+ * `enabled: false`, which subscribes to the screen's cache entry and never
+ * requests it. A live observer would refetch on every visit
  * (`REFETCH_ON_VISIT` is `'always'`), doubling the screen's own request. The
  * rest is published: the chat's title and space, the collab frame's space
  * name, and the screen's own crumb (`screen-context.ts`).
@@ -64,6 +70,7 @@ export function V2Breadcrumb({
   pathname,
   chatTitle,
   chatSpace,
+  confidential,
   collab,
   crumb,
 }: {
@@ -72,6 +79,8 @@ export function V2Breadcrumb({
   chatTitle: string | null;
   /** The space a chat is in (`header-place.ts`). */
   chatSpace: HeaderPlace | null;
+  /** The published confidential flag: a confidential chat is in no space. */
+  confidential: boolean;
   collab: CollabHeaderContext | null;
   /** The screen's own last part (`screen-context.ts`). */
   crumb: string | null;
@@ -87,10 +96,28 @@ export function V2Breadcrumb({
           tabLabel={crumb}
         />
       );
-    case 'chat': {
-      const trail = breadcrumbTrail(pathname, { ...NO_BREADCRUMB_DATA, chatTitle, chatSpace });
+    case 'discover': {
+      const trail = breadcrumbTrail(pathname, NO_BREADCRUMB_DATA);
       return trail ? <TrailView trail={trail} /> : null;
     }
+    case 'channel':
+      return (
+        <ChannelTrail pathname={pathname} channelUuid={route.channelUuid} collab={collab} />
+      );
+    case 'chat':
+      return (
+        <ChatTrail
+          pathname={pathname}
+          conversationId={route.conversationId}
+          chatTitle={chatTitle}
+          chatSpace={chatSpace}
+          confidential={confidential}
+        />
+      );
+    case 'folder':
+      return <FolderTrail pathname={pathname} uuid={route.uuid} />;
+    case 'note':
+      return <NoteTrail pathname={pathname} slug={route.slug} />;
     case 'statute':
       return <StatuteTrail pathname={pathname} slug={route.slug} sectionLabel={crumb} />;
     case 'case': {
@@ -131,6 +158,97 @@ function SpaceTrail({
   const published = collab?.spaceUuid === spaceUuid ? collab.spaceName : null;
   const spaceName = data?.data?.name ?? cached?.name ?? published ?? null;
   const trail = breadcrumbTrail(pathname, { ...NO_BREADCRUMB_DATA, spaceName, tabLabel });
+  return trail ? <TrailView trail={trail} /> : null;
+}
+
+/** A channel names itself and its space from the frame's own channel read;
+ *  the collab frame's publish fills the space in while that is pending. */
+function ChannelTrail({
+  pathname,
+  channelUuid,
+  collab,
+}: {
+  pathname: string;
+  channelUuid: string;
+  collab: CollabHeaderContext | null;
+}) {
+  const { userId: viewerId } = useV2Session();
+  const { data } = useQuery({
+    ...channelsQueries.detail(channelUuid, { viewerId }),
+    enabled: false,
+  });
+  const channel = data?.data ?? null;
+  const trail = breadcrumbTrail(pathname, {
+    ...NO_BREADCRUMB_DATA,
+    // The name only from the record: it alone says whether this is a thread,
+    // which takes no `#`. The frame's publish is read from the same entry.
+    channelName: channel ? channelDisplayName(channel) : null,
+    channelIsThread: channel?.is_thread ?? false,
+    channelSpaceUuid: channel?.space.uuid ?? collab?.spaceUuid ?? null,
+    channelSpaceName: channel?.space.name ?? collab?.spaceName ?? null,
+  });
+  return trail ? <TrailView trail={trail} /> : null;
+}
+
+/**
+ * A chat is personal once its record says it is in no space, or once it is
+ * known to be confidential (which never names a space, and whose record the
+ * detail fetcher refuses, so it may never reach the cache). A record that names a space waits for the chat's own place
+ * publish, which applies the chat's rules about who may see it. Until one of
+ * those answers, the first part is a skeleton.
+ */
+function ChatTrail({
+  pathname,
+  conversationId,
+  chatTitle,
+  chatSpace,
+  confidential,
+}: {
+  pathname: string;
+  conversationId: string;
+  chatTitle: string | null;
+  chatSpace: HeaderPlace | null;
+  confidential: boolean;
+}) {
+  const { userId: viewerId } = useV2Session();
+  const { data } = useQuery({
+    ...conversationsQueries.detail({ conversationId, viewerId }),
+    enabled: false,
+  });
+  const chatIsPersonal =
+    confidential || (data !== undefined && (data.is_confidential === true || !data.space));
+  const trail = breadcrumbTrail(pathname, {
+    ...NO_BREADCRUMB_DATA,
+    chatTitle,
+    chatSpace,
+    chatIsPersonal,
+  });
+  return trail ? <TrailView trail={trail} /> : null;
+}
+
+/** The folder's name and its one parent, from the screen's detail read. */
+function FolderTrail({ pathname, uuid }: { pathname: string; uuid: string }) {
+  const { userId: viewerId } = useV2Session();
+  const { data } = useQuery({ ...foldersQueries.detail({ uuid, viewerId }), enabled: false });
+  const folder = data?.data ?? null;
+  const parent = folder?.parent ?? null;
+  const trail = breadcrumbTrail(pathname, {
+    ...NO_BREADCRUMB_DATA,
+    folderName: folder?.name ?? null,
+    folderParent: parent ? { uuid: parent.uuid, name: parent.name } : null,
+  });
+  return trail ? <TrailView trail={trail} /> : null;
+}
+
+/** The note's title as its masthead prints it, "Untitled" included. */
+function NoteTrail({ pathname, slug }: { pathname: string; slug: string }) {
+  const { userId: viewerId } = useV2Session();
+  const { data } = useQuery({ ...notesQueries.detail({ slug, viewerId }), enabled: false });
+  const note = data?.data ?? null;
+  const trail = breadcrumbTrail(pathname, {
+    ...NO_BREADCRUMB_DATA,
+    noteTitle: note ? noteDisplayTitle(note.title) : null,
+  });
   return trail ? <TrailView trail={trail} /> : null;
 }
 

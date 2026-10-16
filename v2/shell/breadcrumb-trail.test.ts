@@ -24,9 +24,17 @@ const KNOWN: BreadcrumbData = {
   tabLabel: 'Files',
   chatTitle: 'Lease review',
   chatSpace: { label: 'Adeyemi chambers', href: `/spaces/${SPACE}` },
+  chatIsPersonal: false,
+  channelName: 'general',
+  channelIsThread: false,
+  channelSpaceUuid: SPACE,
+  channelSpaceName: 'Adeyemi chambers',
   caseTitle: 'Adeyemi v. Okafor',
   statuteTitle: 'Courts Act',
   sectionLabel: 'Section 1 · Application',
+  folderName: 'Leases',
+  folderParent: { uuid: 'f-parent', name: 'Property' },
+  noteTitle: 'Notes on estoppel',
 };
 
 function shape(trail: BreadcrumbTrail | null) {
@@ -57,7 +65,7 @@ test('a space on a tab: Spaces › the space › the tab', () => {
   assert.deepEqual(breadcrumbTrail(`/v2/spaces/${SPACE}`, KNOWN), trail);
 });
 
-test('a chat in a space: Spaces › the space › the chat; a personal chat has no trail', () => {
+test('a chat in a space: Spaces › the space › the chat', () => {
   const trail = breadcrumbTrail('/c/abc', KNOWN);
   assert.deepEqual(shape(trail), [
     ['Spaces', '/spaces'],
@@ -65,7 +73,88 @@ test('a chat in a space: Spaces › the space › the chat; a personal chat has 
     ['Lease review', null],
   ]);
   assertLinks(trail);
-  assert.equal(breadcrumbTrail('/c/abc', { ...KNOWN, chatSpace: null }), null);
+});
+
+test('a personal chat: Conversations › the chat; an unplaced chat is not guessed', () => {
+  const trail = breadcrumbTrail('/c/abc', { ...KNOWN, chatSpace: null, chatIsPersonal: true });
+  assert.deepEqual(shape(trail), [
+    ['Conversations', '/conversations'],
+    ['Lease review', null],
+  ]);
+  assertLinks(trail);
+  // Not yet known to be in a space or not: the first part is a skeleton.
+  assert.deepEqual(shape(breadcrumbTrail('/c/abc', { ...KNOWN, chatSpace: null })), [
+    [null, null],
+    ['Lease review', null],
+  ]);
+  // A place wins over a stale personal flag.
+  assert.equal(breadcrumbTrail('/c/abc', { ...KNOWN, chatIsPersonal: true })?.parts[0].label, 'Spaces');
+});
+
+test('find a space: Spaces › Find a space', () => {
+  const trail = breadcrumbTrail('/spaces/discover', NO_BREADCRUMB_DATA);
+  assert.deepEqual(shape(trail), [
+    ['Spaces', '/spaces'],
+    ['Find a space', null],
+  ]);
+  assertLinks(trail);
+});
+
+test('a team channel: Spaces › the space › # the channel; a thread takes no #', () => {
+  const trail = breadcrumbTrail(`/channels/${SPACE}`, KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Spaces', '/spaces'],
+    ['Adeyemi chambers', `/spaces/${SPACE}`],
+    ['# general', null],
+  ]);
+  assertLinks(trail);
+  const thread = breadcrumbTrail(`/channels/${SPACE}`, {
+    ...KNOWN,
+    channelName: 'Is the lease void?',
+    channelIsThread: true,
+  });
+  assert.equal(thread?.parts.at(-1)?.label, 'Is the lease void?');
+  assert.deepEqual(shape(breadcrumbTrail(`/channels/${SPACE}`, NO_BREADCRUMB_DATA)), [
+    ['Spaces', '/spaces'],
+    [null, null],
+    [null, null],
+  ]);
+});
+
+test('a folder: Library › Folders › the one parent › the folder', () => {
+  const trail = breadcrumbTrail('/folders/f-1', KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Library', null],
+    ['Folders', '/folders'],
+    ['Property', '/folders/f-parent'],
+    ['Leases', null],
+  ]);
+  assertLinks(trail);
+  // A top-level folder has no parent part.
+  const top = breadcrumbTrail('/folders/f-1', { ...KNOWN, folderParent: null });
+  assert.deepEqual(shape(top), [
+    ['Library', null],
+    ['Folders', '/folders'],
+    ['Leases', null],
+  ]);
+  assertLinks(top);
+  // Before the folder lands, its name is a skeleton and no parent is shown.
+  assert.deepEqual(shape(breadcrumbTrail('/folders/f-1', { ...KNOWN, folderName: null })), [
+    ['Library', null],
+    ['Folders', '/folders'],
+    [null, null],
+  ]);
+});
+
+test('a note: Library › Notes › the note', () => {
+  const trail = breadcrumbTrail('/notes/estoppel', KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Library', null],
+    ['Notes', '/notes'],
+    ['Notes on estoppel', null],
+  ]);
+  assertLinks(trail);
+  assert.equal(breadcrumbTrail('/notes/estoppel', NO_BREADCRUMB_DATA)?.parts.at(-1)?.label, null);
 });
 
 test('a statute: Library › Statutes › the statute', () => {
@@ -125,16 +214,20 @@ test('every other address keeps the bar it had', () => {
     '/',
     '/work',
     '/spaces',
-    '/spaces/discover',
     `/spaces/${SPACE}/extra`,
-    `/channels/${SPACE}`,
+    '/channels',
+    `/channels/${SPACE}/extra`,
     '/cases',
     '/cases/x/report',
     '/statutes',
     '/c',
     '/c/abc/extra',
-    '/folders/abc',
-    '/notes/abc',
+    '/folders',
+    '/folders/abc/extra',
+    '/notes',
+    '/notes/mine',
+    '/notes/create',
+    '/notes/abc/edit',
   ]) {
     assert.equal(breadcrumbTrail(path, KNOWN), null, path);
     assert.deepEqual(trailRouteFor(path), { kind: 'none' }, path);
@@ -172,8 +265,13 @@ test('the trail reads the screens’ cache and never fetches', () => {
   assert.match(view, /\.\.\.spacesQueries\.detail\(spaceUuid, \{ viewerId \}\),\s*enabled: false,/);
   assert.match(view, /\.\.\.statutesQueries\.detail\(slug\), enabled: false/);
   assert.match(view, /\.\.\.casesQueries\.detail\(slug, searchQuery\), enabled: false/);
-  assert.equal((view.match(/useQuery\(/g) ?? []).length, 3);
-  assert.equal((view.match(/enabled: false,?\s*\}\);/g) ?? []).length, 3);
+  assert.match(view, /\.\.\.channelsQueries\.detail\(channelUuid, \{ viewerId \}\),\s*enabled: false,/);
+  assert.match(view, /\.\.\.conversationsQueries\.detail\(\{ conversationId, viewerId \}\),\s*enabled: false,/);
+  assert.match(view, /\.\.\.foldersQueries\.detail\(\{ uuid, viewerId \}\), enabled: false/);
+  assert.match(view, /\.\.\.notesQueries\.detail\(\{ slug, viewerId \}\), enabled: false/);
+  // Every read in the file is one of those.
+  assert.equal((view.match(/useQuery\(/g) ?? []).length, 7);
+  assert.equal((view.match(/enabled: false,?\s*\}\);/g) ?? []).length, 7);
   // `?q=` is read under a boundary.
   assert.match(view, /<Suspense fallback=\{pending \? <TrailView trail=\{pending\} \/> : null\}>\s*<CaseTrail/);
 });
@@ -182,14 +280,14 @@ test('the bar hides its centre from md: only on a trail route', () => {
   const header = read('v2', 'shell', 'V2Header.tsx');
   assert.match(
     header,
-    /const showsTrail =\s*breadcrumbTrail\(path, \{ \.\.\.NO_BREADCRUMB_DATA, chatSpace: place \}\) !== null;/,
+    /const showsTrail = breadcrumbTrail\(path, NO_BREADCRUMB_DATA\) !== null;/,
   );
   assert.match(header, /showsTrail && 'md:grid-cols-\[minmax\(0,1fr\)_auto\]',/);
   assert.match(header, /'v2-safe-top grid h-14 grid-cols-\[1fr_auto_1fr\] items-center gap-2 px-3',/);
   assert.match(header, /hiddenFromMd=\{showsTrail\}/);
   assert.match(header, /<div className=\{cn\('grid min-w-0 place-items-center', hiddenFromMd && 'md:hidden'\)\}>/);
   // The trail takes the label's slot; elsewhere the label stays.
-  assert.match(header, /\{showsTrail \? \(\s*<V2Breadcrumb[\s\S]{0,200}?\/>\s*\) : leftLabel \? \(/);
+  assert.match(header, /\{showsTrail \? \(\s*<V2Breadcrumb[\s\S]{0,300}?\/>\s*\) : leftLabel \? \(/);
   assert.match(header, /crumb=\{screen\?\.crumb \?\? null\}/);
 });
 

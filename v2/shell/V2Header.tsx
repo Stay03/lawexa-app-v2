@@ -107,7 +107,8 @@ const OPEN_BAR_CONTROL =
  *      is a quiet CATEGORY ("Home" / "Case"), never the specific title — the
  *      centre already carries that, so the left stays uncrowded and never
  *      duplicates it. Routes with no category hide the label + its separator.
- *    - On a TRAIL route (a space, a chat in a space, a statute, a case) the
+ *    - On a TRAIL route (a space, a channel, a chat, a statute, a case, a
+ *      folder, a note; the full list is in `breadcrumb-trail.ts`) the
  *      label's slot holds the breadcrumb trail instead (`V2Breadcrumb`, Arthur,
  *      16 October 2026). The centre is empty from `md:` up on every one of
  *      those routes, so there it is hidden and the left column takes its room:
@@ -272,10 +273,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // only on a case's sub-pages (its report), which have no trail.
   const leftLabel = isHome ? 'Home' : isCase ? 'Case' : null;
   // Whether this address carries a breadcrumb trail. It depends on the route
-  // and, for a chat, on whether its record placed it in a space; never on a
-  // name, so the bar's shape does not change as the names land.
-  const showsTrail =
-    breadcrumbTrail(path, { ...NO_BREADCRUMB_DATA, chatSpace: place }) !== null;
+  // alone, never on a name, so the bar's shape does not change as the names
+  // land.
+  const showsTrail = breadcrumbTrail(path, NO_BREADCRUMB_DATA) !== null;
 
   return (
     <div
@@ -359,6 +359,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
             pathname={path}
             chatTitle={title}
             chatSpace={place}
+            confidential={confidential}
             collab={collab}
             crumb={screen?.crumb ?? null}
           />
