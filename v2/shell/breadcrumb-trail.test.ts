@@ -378,3 +378,9 @@ test('each trail checks its read and the visitor before it draws', () => {
   const header = read('v2', 'shell', 'V2Header.tsx');
   assert.match(header, /<V2Breadcrumb\s*pathname=\{path\}\s*collab=\{collab\}\s*crumb=\{screen\?\.crumb \?\? null\}\s*\/>/);
 });
+
+test('the folder page drops its own trail where the bar carries one', () => {
+  const crumb = read('v2', 'features', 'folders', 'detail', 'FolderBreadcrumb.tsx');
+  // `sm:` to `md:` only: from `md:` the bar's trail says the same thing.
+  assert.match(crumb, /<nav aria-label="Breadcrumb" className="hidden sm:block md:hidden">/);
+});

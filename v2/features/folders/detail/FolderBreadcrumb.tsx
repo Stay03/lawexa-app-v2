@@ -45,6 +45,12 @@ import type { FolderRecord } from '../types';
  * one above the other. It is gone; the trail is `sm:` and up only, where it is a
  * real breadcrumb rather than a shrunken one.
  *
+ * ── FROM `md:` THE SHELL'S BAR CARRIES IT (Arthur, 15 October 2026) ────────
+ * The desktop bar now shows "Library › Folders › {parent} › {folder}"
+ * (`v2/shell/breadcrumb-trail.ts`), and this trail under it said the same
+ * thing a second time. So this one is `sm:` to `md:` only, the band where the
+ * bar has no trail.
+ *
  * The ADDRESS is computed in `folder-row-model` terms here and in `FolderScreen`
  * alike, from the one payload field that can address it.
  */
@@ -58,8 +64,8 @@ export function FolderBreadcrumb({ folder }: { folder: FolderRecord }) {
 
   return (
     <>
-      {/* Desktop: the full trail. */}
-      <nav aria-label="Breadcrumb" className="hidden sm:block">
+      {/* `sm:` to `md:`: the full trail. From `md:` the bar carries it. */}
+      <nav aria-label="Breadcrumb" className="hidden sm:block md:hidden">
         <ol className="flex items-center gap-1 text-xs text-muted-foreground">
           <li className="shrink-0">
             <Crumb href="/folders">Folders</Crumb>
