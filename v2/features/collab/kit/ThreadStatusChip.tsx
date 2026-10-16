@@ -19,11 +19,19 @@ import {
  * `person` follows the word after a middle dot ("Needs Action · Tolu");
  * `quiet` hangs the stale suffix ("quiet 1d") after the chip in muted ink.
  *
- * `fit` is for a thread's header, where the chip shares a line with the
- * title: it shrinks to the room it is given instead of pushing the title to
- * "Te…" or running under the faces (techlead's pictures, 16 October 2026). The
- * suffix gives way first, then the person; the word itself is never cut. A
- * row keeps the chip whole, as before.
+ * `fit` is for a thread's header, where the status has a line of its own
+ * under the title: only the "quiet 1d" suffix gives way to a narrow line,
+ * because a Needs Action never leaves people guessing who must act (Arthur,
+ * via the techlead, 16 October 2026). The pill, its word and its person stay
+ * whole. A row keeps the suffix whole too, as before.
+ *
+ * THE FLOOR IS A GRID TRACK, NOT `min-w-0`. With `fit` the pill and the
+ * suffix are a two-column grid: the pill in an `auto` column, the suffix in a
+ * `minmax(0, max-content)` one. A grid's smallest size is the sum of its
+ * columns' minimums, so it shrinks to exactly the pill and no further, and
+ * every box around it keeps `min-width: auto` and inherits that floor. A
+ * `min-w-0` on that chain lets the pill shrink under its own word, which the
+ * second round of pictures showed.
  */
 
 const TONE: Readonly<Record<ThreadStatusValue, { chip: string; dot: string }>> = {
@@ -78,6 +86,9 @@ export function ThreadStatusDot({
   );
 }
 
+/** The pill's column keeps its content; the suffix's gives way to nothing. */
+const FIT_GRID = 'inline-grid grid-cols-[auto_minmax(0,max-content)]';
+
 export function ThreadStatusChip({
   value,
   person = null,
@@ -93,7 +104,7 @@ export function ThreadStatusChip({
   size?: 'sm' | 'md';
   /** The stale suffix, e.g. "quiet 1d"; `null` draws none. */
   quiet?: string | null;
-  /** Shrinks to its line, suffix first, then the person; never the word. */
+  /** Gives way to a narrow line by trimming the suffix only. */
   fit?: boolean;
   className?: string;
 }) {
@@ -102,17 +113,18 @@ export function ThreadStatusChip({
     <span
       className={cn(
         'inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-full font-medium whitespace-nowrap',
-        fit && 'shrink',
         size === 'md' ? 'h-6 px-2.5 text-xs' : 'h-5 px-2 text-[11px]',
         TONE[value].chip,
         quiet ? null : className,
       )}
     >
-      <span
-        aria-hidden
-        className={cn('size-1.5 shrink-0 rounded-full', TONE[value].dot)}
-      />
-      <span className="shrink-0">{threadStatusLabel(value)}</span>
+      <span className="inline-flex shrink-0 items-center gap-1.5">
+        <span
+          aria-hidden
+          className={cn('size-1.5 shrink-0 rounded-full', TONE[value].dot)}
+        />
+        {threadStatusLabel(value)}
+      </span>
       {person ? (
         <span className="min-w-0 max-w-32 truncate">{`· ${person}`}</span>
       ) : null}
@@ -120,13 +132,18 @@ export function ThreadStatusChip({
   );
   if (!quiet) return chip;
   return (
-    <span className={cn('inline-flex min-w-0 shrink-0 items-center gap-1', fit && 'shrink', className)}>
+    <span
+      className={cn(
+        'items-center gap-1',
+        fit ? FIT_GRID : 'inline-flex shrink-0',
+        className,
+      )}
+    >
       {chip}
-      {/* Weighted to give way well before the person's name does. */}
       <span
         className={cn(
           'text-[11px] whitespace-nowrap text-muted-foreground',
-          fit && 'min-w-0 shrink-[8] truncate',
+          fit && 'min-w-0 truncate',
         )}
       >
         {`· ${quiet}`}

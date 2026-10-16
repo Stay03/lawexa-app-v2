@@ -100,7 +100,7 @@ export function ThreadStatusControl({
     // so it takes the row's size and the note follows it.
     return status ? (
       <>
-        <span className="inline-flex min-w-0 items-center">
+        <span className="inline-flex items-center">
           <span className="sr-only">Status: </span>
           <ThreadStatusChip
             size={surface === 'sheet' ? 'sm' : 'md'}
@@ -223,11 +223,14 @@ function TriggerFace({
 }
 
 const TRIGGER_BASE = cn(
-  'v2-interactive inline-flex min-w-0 items-center gap-1 rounded-full pr-1.5',
+  'v2-interactive inline-flex items-center gap-1 rounded-full pr-1.5',
   'transition-colors duration-150 hover:bg-secondary/60 motion-reduce:transition-none',
   FOCUS_RING,
 );
-const TRIGGER = cn(TRIGGER_BASE, 'min-h-8');
+/** A wide pane's, on the line under the name: the chip's own 24px, so the
+ *  name's row and this line both fit the header's 56px (the loading
+ *  header's height too, so nothing jumps). 24px is the pointer target floor. */
+const TRIGGER = cn(TRIGGER_BASE, 'min-h-6');
 /** The phone's, in the subtitle line: no taller than the chip it holds. */
 const TRIGGER_COMPACT = cn(TRIGGER_BASE, 'min-h-5');
 

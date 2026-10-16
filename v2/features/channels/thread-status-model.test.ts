@@ -370,20 +370,33 @@ test('a thread header carries the status control only for someone who can post',
   const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
   // One of each, each shown at its own width only.
   assert.match(header, /flex min-w-0 flex-1 items-center gap-2 md:hidden">/);
-  assert.match(header, /hidden min-w-0 shrink-\[4\] items-center md:flex">\s*\{renderStatus\('menu'\)\}/);
+  assert.match(header, /data-desktop-status-line className="flex min-w-0 items-center">\s*\{renderStatus\('menu'\)\}/);
 });
 
-test('the header status shrinks to its line, suffix first, and never cuts the word', () => {
-  // The techlead's pictures, 16 October 2026: a Needs Action chip naming a
-  // person cut the desktop title to "Te…", and on a phone "· quiet 1d" ran
+test('on a wide pane the status has its own line under the name, as on a phone', () => {
+  // Techlead, 16 October 2026: a Needs Action chip beside the name cut it to
+  // "Te…", and Needs Action must name who acts, so the name keeps its row.
+  const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
+  assert.match(header, /<div className="hidden min-w-0 flex-1 flex-col justify-center gap-0\.5 md:flex">\s*<div className="flex min-w-0 items-center gap-2">/);
+  // The status line follows the name's row, never inside it.
+  assert.match(header, /<\/Link>\s*<\/div>\s*\{\/\* The thread's status, under its name, `md:` and up\. \*\/\}\s*\{renderStatus && \(\s*<div data-desktop-status-line/);
+  assert.equal(header.match(/renderStatus\('menu'\)/g)?.length, 1);
+});
+
+test('the header status trims only its quiet suffix, never the word or the person', () => {
+  // The techlead's pictures, 16 October 2026: on a phone "· quiet 1d" ran
   // under the faces. The header's chip fits; a row's stays whole.
   const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
   assert.equal(control.match(/\bfit\b\s*\/>/g)?.length, 2);
-  assert.match(control, /'v2-interactive inline-flex min-w-0 items-center gap-1 rounded-full pr-1\.5'/);
+  // The floor is the word: no box from the header down to the chip may take
+  // `min-w-0`, or the pill shrinks under its own label.
+  assert.match(control, /'v2-interactive inline-flex items-center gap-1 rounded-full pr-1\.5'/);
+  assert.match(control, /<span className="inline-flex items-center">\s*<span className="sr-only">Status: <\/span>/);
   const chip = read('v2', 'features', 'collab', 'kit', 'ThreadStatusChip.tsx');
   assert.match(chip, /fit = false/);
-  assert.match(chip, /<span className="shrink-0">\{threadStatusLabel\(value\)\}<\/span>/);
-  assert.match(chip, /fit && 'min-w-0 shrink-\[8\] truncate'/);
+  assert.match(chip, /const FIT_GRID = 'inline-grid grid-cols-\[auto_minmax\(0,max-content\)\]';/);
+  assert.match(chip, /fit \? FIT_GRID : 'inline-flex shrink-0'/);
+  assert.match(chip, /fit && 'min-w-0 truncate'/);
   assert.match(chip, /<span className="min-w-0 max-w-32 truncate">\{`· \$\{person\}`\}<\/span>/);
 });
 

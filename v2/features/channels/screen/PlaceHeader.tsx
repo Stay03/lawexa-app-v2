@@ -340,108 +340,116 @@ export function ChannelPlaceHeader({
               readers who navigate by headings. */}
           <h1 className="sr-only md:hidden">{displayName}</h1>
 
-          {/* ── Identity, `md:` and up (unchanged) ───────────────────── */}
-          <div className="hidden min-w-0 flex-1 items-center gap-2 md:flex">
-            {parent && <BackChip parent={parent} />}
+          {/* ── Identity, `md:` and up ──────────────────────────────────
+              A COLUMN: the name's row, and under it a thread's status line.
+              A Needs Action chip naming a person beside the name cut the name
+              to "Te…" on a 1440 desktop, and Arthur's rule is that a Needs
+              Action never leaves people guessing who must act. So the wide
+              header takes the phone's layout: the name keeps its row and the
+              status has a line of its own (techlead, 16 October 2026). With no
+              status the column holds the one row it always did. */}
+          <div className="hidden min-w-0 flex-1 flex-col justify-center gap-0.5 md:flex">
+            <div className="flex min-w-0 items-center gap-2">
+              {parent && <BackChip parent={parent} />}
 
-            <VisibilityIcon
-              aria-hidden
-              className="size-4 shrink-0 text-muted-foreground"
-            />
-            <span className="sr-only">{channel.visibility_label}</span>
+              <VisibilityIcon
+                aria-hidden
+                className="size-4 shrink-0 text-muted-foreground"
+              />
+              <span className="sr-only">{channel.visibility_label}</span>
 
-            {/* The `min-w-0` chain runs identity → h1 → button → span, and every
-                link of it is load-bearing: a flex item defaults to
-                `min-width: auto`, so without it the name refuses to shrink and
-                pushes the presence stack and the actions off the bar instead of
-                ellipsizing. The truncation itself lives on the innermost span,
-                because `truncate` on an element with a flex child clips it
-                without ever drawing the ellipsis.
+              {/* The `min-w-0` chain runs identity → h1 → button → span, and every
+                  link of it is load-bearing: a flex item defaults to
+                  `min-width: auto`, so without it the name refuses to shrink and
+                  pushes the presence stack and the actions off the bar instead of
+                  ellipsizing. The truncation itself lives on the innermost span,
+                  because `truncate` on an element with a flex child clips it
+                  without ever drawing the ellipsis.
 
-                `sr-only` below `md:` — the shell bar prints the channel there
-                (see the docblock). It is the heading, not the trigger, at that
-                width, so the button inside it is `hidden` rather than clipped:
-                `sr-only` leaves a control focusable, and a phone reader must
-                not be able to tab into an invisible copy of a control the
-                purpose line beside it already offers. */}
-            <h1 className="sr-only min-w-0 md:not-sr-only md:flex md:items-center md:text-base md:leading-tight md:font-semibold">
-              {description ? (
-                <>
-                  {/* The description used to cost 20px on every channel forever.
-                      As a disclosure it costs a chevron, and the name itself is
-                      the control — the reader reaches for what they want to know
-                      more about. */}
-                  <button
-                    type="button"
-                    aria-expanded={descriptionOpen}
-                    aria-controls={DESCRIPTION_ID}
-                    onClick={() => setDescriptionOpen((open) => !open)}
-                    className={cn(
-                      'v2-interactive hidden min-w-0 items-center gap-1 rounded md:flex',
-                      'transition-colors duration-150 hover:text-foreground/80 motion-reduce:transition-none',
-                      FOCUS_RING,
-                    )}
-                  >
-                    <span className="min-w-0 truncate">{displayName}</span>
-                    <ChevronDown
-                      aria-hidden
+                  `sr-only` below `md:` — the shell bar prints the channel there
+                  (see the docblock). It is the heading, not the trigger, at that
+                  width, so the button inside it is `hidden` rather than clipped:
+                  `sr-only` leaves a control focusable, and a phone reader must
+                  not be able to tab into an invisible copy of a control the
+                  purpose line beside it already offers. */}
+              <h1 className="sr-only min-w-0 md:not-sr-only md:flex md:items-center md:text-base md:leading-tight md:font-semibold">
+                {description ? (
+                  <>
+                    {/* The description used to cost 20px on every channel forever.
+                        As a disclosure it costs a chevron, and the name itself is
+                        the control — the reader reaches for what they want to know
+                        more about. */}
+                    <button
+                      type="button"
+                      aria-expanded={descriptionOpen}
+                      aria-controls={DESCRIPTION_ID}
+                      onClick={() => setDescriptionOpen((open) => !open)}
                       className={cn(
-                        'size-4 shrink-0 text-muted-foreground',
-                        'transition-transform duration-200 motion-reduce:transition-none',
-                        descriptionOpen && 'rotate-180',
+                        'v2-interactive hidden min-w-0 items-center gap-1 rounded md:flex',
+                        'transition-colors duration-150 hover:text-foreground/80 motion-reduce:transition-none',
+                        FOCUS_RING,
                       )}
-                    />
-                  </button>
-                  {/* The heading's OWN text below `md:`, where the button above
-                      is `display:none` and would otherwise take the name out of
-                      the accessibility tree along with the pixels. */}
-                  <span className="md:hidden">{displayName}</span>
-                </>
-              ) : (
-                <span className="min-w-0 md:truncate">{displayName}</span>
-              )}
-            </h1>
+                    >
+                      <span className="min-w-0 truncate">{displayName}</span>
+                      <ChevronDown
+                        aria-hidden
+                        className={cn(
+                          'size-4 shrink-0 text-muted-foreground',
+                          'transition-transform duration-200 motion-reduce:transition-none',
+                          descriptionOpen && 'rotate-180',
+                        )}
+                      />
+                    </button>
+                    {/* The heading's OWN text below `md:`, where the button above
+                        is `display:none` and would otherwise take the name out of
+                        the accessibility tree along with the pixels. */}
+                    <span className="md:hidden">{displayName}</span>
+                  </>
+                ) : (
+                  <span className="min-w-0 md:truncate">{displayName}</span>
+                )}
+              </h1>
 
-            {/* The status beside the thread's name, `md:` and up. It gives
-                way four times faster than the name, so a long Needs Action
-                chip cuts its own suffix and person before the title. */}
+
+              {/* THE PURPOSE LINE HAS GONE FROM THE PHONE BAR. It was the
+                  disclosure trigger at this width, and the reason the bar could
+                  change height while a reader was reading. The description now
+                  lives in the details surface the identity opens, whole rather
+                  than truncated to one line. `md:` and up keeps the disclosure
+                  on the name itself, which is where it always was. */}
+
+              {/* The space as a real object, not a text link: the same crest the
+                  space's own lane and header carry, so the reader recognises
+                  where they are instead of reading it. `md:` → `lg:` only — see
+                  the breakpoint note in the file docblock. */}
+              <Link
+                href={`/spaces/${channel.space.uuid}`}
+                className={cn(
+                  // Capped so a long space name can never be the thing that
+                  // squeezes the channel's own name out of the bar.
+                  'v2-interactive hidden min-w-0 max-w-56 shrink items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-1',
+                  'text-xs text-muted-foreground md:inline-flex lg:hidden',
+                  'transition-colors duration-150 hover:bg-secondary hover:text-foreground motion-reduce:transition-none',
+                  FOCUS_RING,
+                )}
+              >
+                <SpaceCrest
+                  uuid={channel.space.uuid}
+                  name={channel.space.name}
+                  type={channel.space.type}
+                  size="sm"
+                  className="size-5 rounded"
+                />
+                <span className="min-w-0 truncate">{channel.space.name}</span>
+              </Link>
+            </div>
+
+            {/* The thread's status, under its name, `md:` and up. */}
             {renderStatus && (
-              <div className="hidden min-w-0 shrink-[4] items-center md:flex">
+              <div data-desktop-status-line className="flex min-w-0 items-center">
                 {renderStatus('menu')}
               </div>
             )}
-
-            {/* THE PURPOSE LINE HAS GONE FROM THE PHONE BAR. It was the
-                disclosure trigger at this width, and the reason the bar could
-                change height while a reader was reading. The description now
-                lives in the details surface the identity opens, whole rather
-                than truncated to one line. `md:` and up keeps the disclosure
-                on the name itself, which is where it always was. */}
-
-            {/* The space as a real object, not a text link: the same crest the
-                space's own lane and header carry, so the reader recognises
-                where they are instead of reading it. `md:` → `lg:` only — see
-                the breakpoint note in the file docblock. */}
-            <Link
-              href={`/spaces/${channel.space.uuid}`}
-              className={cn(
-                // Capped so a long space name can never be the thing that
-                // squeezes the channel's own name out of the bar.
-                'v2-interactive hidden min-w-0 max-w-56 shrink items-center gap-1.5 rounded-full border py-0.5 pr-2.5 pl-1',
-                'text-xs text-muted-foreground md:inline-flex lg:hidden',
-                'transition-colors duration-150 hover:bg-secondary hover:text-foreground motion-reduce:transition-none',
-                FOCUS_RING,
-              )}
-            >
-              <SpaceCrest
-                uuid={channel.space.uuid}
-                name={channel.space.name}
-                type={channel.space.type}
-                size="sm"
-                className="size-5 rounded"
-              />
-              <span className="min-w-0 truncate">{channel.space.name}</span>
-            </Link>
           </div>
 
           {/* ── Sections (wide panes only — see the docblock) ─────────── */}
