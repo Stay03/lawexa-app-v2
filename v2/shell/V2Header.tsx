@@ -357,9 +357,6 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         {showsTrail ? (
           <V2Breadcrumb
             pathname={path}
-            chatTitle={title}
-            chatSpace={place}
-            confidential={confidential}
             collab={collab}
             crumb={screen?.crumb ?? null}
           />

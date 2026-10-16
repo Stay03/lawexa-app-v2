@@ -60,6 +60,22 @@ function getServerSnapshot(): HeaderContext {
  */
 let owner: string | null = null;
 
+/** The context paired with its owner, one stable object per change of either. */
+export interface HeaderSnapshot {
+  context: HeaderContext;
+  owner: string | null;
+}
+
+const NO_OWNED: HeaderSnapshot = { context: EMPTY, owner: null };
+let owned: HeaderSnapshot = NO_OWNED;
+
+/** Re-pair `owned` after a write. `true` when it changed, so subscribers hear it. */
+function syncOwned(): boolean {
+  if (owned.context === context && owned.owner === owner) return false;
+  owned = context === EMPTY && owner === null ? NO_OWNED : { context, owner };
+  return true;
+}
+
 /**
  * Publish the active route's header context. Idempotent — equal values are a
  * no-op for subscribers. `publisher` names who owns it from now on, even when
@@ -67,12 +83,13 @@ let owner: string | null = null;
  */
 export function setHeaderContext(next: HeaderContext, publisher?: string): void {
   owner = publisher ?? null;
-  if (next.title === context.title && next.confidential === context.confidential) {
-    return;
+  if (next.title !== context.title || next.confidential !== context.confidential) {
+    context =
+      next.title === null && !next.confidential ? EMPTY : { title: next.title, confidential: next.confidential };
   }
-  context =
-    next.title === null && !next.confidential ? EMPTY : { title: next.title, confidential: next.confidential };
-  emit();
+  // An owner change alone still notifies, for `useHeaderContextFor`; the plain
+  // hook's snapshot is unchanged then, so its readers do not re-render.
+  if (syncOwned()) emit();
 }
 
 /**
@@ -82,17 +99,11 @@ export function setHeaderContext(next: HeaderContext, publisher?: string): void 
 export function clearHeaderContext(publisher?: string): void {
   if (publisher !== undefined && publisher !== owner) return;
   owner = null;
-  if (context === EMPTY) return;
   context = EMPTY;
-  emit();
+  if (syncOwned()) emit();
 }
 
 /** The current context and its owner, to put back after a cancelled move. */
-export interface HeaderSnapshot {
-  context: HeaderContext;
-  owner: string | null;
-}
-
 export function snapshotHeaderContext(): HeaderSnapshot {
   return { context, owner };
 }
@@ -104,4 +115,33 @@ export function restoreHeaderContext(snapshot: HeaderSnapshot): void {
 /** Subscribe the header to the published route context. */
 export function useHeaderContext(): HeaderContext {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+function getOwnedSnapshot(): HeaderSnapshot {
+  return owned;
+}
+
+function getServerOwnedSnapshot(): HeaderSnapshot {
+  return NO_OWNED;
+}
+
+/**
+ * The context only while `publisher` owns it, else the empty one. Pure, for
+ * `node:test`; the breadcrumb's guard (see {@link useHeaderContextFor}).
+ */
+export function headerContextFor(snapshot: HeaderSnapshot, publisher: string): HeaderContext {
+  return snapshot.owner === publisher ? snapshot.context : EMPTY;
+}
+
+/**
+ * The context published FOR `publisher` (a conversation id), or the empty one.
+ * The desktop breadcrumb reads a chat's title through this: a move-first tap
+ * publishes the next chat's title while the address still names the last one,
+ * and a plain link move paints the last chat's title for a frame on the next
+ * address (checker, 16 October 2026). Guarded by owner the way
+ * `screen-context.ts` guards by pathname.
+ */
+export function useHeaderContextFor(publisher: string): HeaderContext {
+  const snapshot = useSyncExternalStore(subscribe, getOwnedSnapshot, getServerOwnedSnapshot);
+  return headerContextFor(snapshot, publisher);
 }

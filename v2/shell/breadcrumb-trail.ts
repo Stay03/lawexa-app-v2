@@ -234,3 +234,21 @@ export function breadcrumbTrail(
       return null;
   }
 }
+
+/** What a screen's cache entry says, as the breadcrumb's disabled observer sees it. */
+export interface CrumbRead {
+  isError: boolean;
+  hasData: boolean;
+}
+
+/**
+ * Whether a read can still name its part. It cannot when the screen's request
+ * was refused (a 403 or 404 with nothing cached) or was never made for this
+ * visitor (`allowed`: the screen's own `enabled` gate, a signed-out reader on
+ * a statute, say). The trail then draws nothing rather than a skeleton that
+ * waits forever (checker, 16 October 2026). A failed refetch over a record the
+ * screen still shows keeps its trail, as the screen keeps its page.
+ */
+export function crumbResolves(read: CrumbRead, allowed = true): boolean {
+  return allowed && !(read.isError && !read.hasData);
+}

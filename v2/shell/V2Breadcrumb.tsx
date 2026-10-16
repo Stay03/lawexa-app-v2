@@ -21,8 +21,10 @@ import { formatCaseName } from '@/v2/features/cases/case-name';
 import { casesQueries } from '@/v2/features/cases/queries';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { channelDisplayName } from '@/v2/features/channels/thread-model';
+import { collabAccessState } from '@/v2/features/collab/model';
 import type { CollabHeaderContext } from '@/v2/features/collab/shell/collab-header';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
+import { folderDisplayName } from '@/v2/features/folders/folder-row-model';
 import { foldersQueries } from '@/v2/features/folders/queries';
 import { noteDisplayTitle } from '@/v2/features/notes/note-text';
 import { notesQueries } from '@/v2/features/notes/queries';
@@ -33,11 +35,13 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import {
   NO_BREADCRUMB_DATA,
   breadcrumbTrail,
+  crumbResolves,
   trailRouteFor,
   type BreadcrumbTrail,
 } from './breadcrumb-trail';
 import { FOCUS_RING } from './designs/modules';
-import type { HeaderPlace } from './header-place';
+import { useHeaderContextFor } from './header-context';
+import { useHeaderPlaceFor } from './header-place';
 
 /**
  * V2Breadcrumb — the desktop bar's trail: where the reader is, from `md:` up
@@ -49,8 +53,14 @@ import type { HeaderPlace } from './header-place';
  * `enabled: false`, which subscribes to the screen's cache entry and never
  * requests it. A live observer would refetch on every visit
  * (`REFETCH_ON_VISIT` is `'always'`), doubling the screen's own request. The
- * rest is published: the chat's title and space, the collab frame's space
- * name, and the screen's own crumb (`screen-context.ts`).
+ * rest is published: the chat's title and space (read only for the chat they
+ * were published for), the collab frame's space name, and the screen's own
+ * crumb (`screen-context.ts`).
+ *
+ * ── A NAME THAT CAN NEVER ARRIVE IS NO TRAIL ───────────────────────────────
+ * A refused read (403, 404) or one the screen never makes for this visitor
+ * (signed out, not eligible for spaces) draws nothing, not a skeleton that
+ * waits forever (`crumbResolves`).
  *
  * ── A NAME NOT KNOWN YET IS A SKELETON ─────────────────────────────────────
  * The stores and the cache are empty on the server and on the first client
@@ -68,19 +78,10 @@ import type { HeaderPlace } from './header-place';
  */
 export function V2Breadcrumb({
   pathname,
-  chatTitle,
-  chatSpace,
-  confidential,
   collab,
   crumb,
 }: {
   pathname: string;
-  /** The published route title (`header-context.ts`). */
-  chatTitle: string | null;
-  /** The space a chat is in (`header-place.ts`). */
-  chatSpace: HeaderPlace | null;
-  /** The published confidential flag: a confidential chat is in no space. */
-  confidential: boolean;
   collab: CollabHeaderContext | null;
   /** The screen's own last part (`screen-context.ts`). */
   crumb: string | null;
@@ -101,19 +102,9 @@ export function V2Breadcrumb({
       return trail ? <TrailView trail={trail} /> : null;
     }
     case 'channel':
-      return (
-        <ChannelTrail pathname={pathname} channelUuid={route.channelUuid} collab={collab} />
-      );
+      return <ChannelTrail pathname={pathname} channelUuid={route.channelUuid} />;
     case 'chat':
-      return (
-        <ChatTrail
-          pathname={pathname}
-          conversationId={route.conversationId}
-          chatTitle={chatTitle}
-          chatSpace={chatSpace}
-          confidential={confidential}
-        />
-      );
+      return <ChatTrail pathname={pathname} conversationId={route.conversationId} />;
     case 'folder':
       return <FolderTrail pathname={pathname} uuid={route.uuid} />;
     case 'note':
@@ -137,7 +128,8 @@ export function V2Breadcrumb({
 }
 
 /** The space's name: the screen's cached detail, else its list row, else the
- *  collab frame's publish, which arrives a paint after the other two. */
+ *  collab frame's publish, which arrives a paint after the other two. A space
+ *  the frame cannot open for this visitor, or one it was refused, has none. */
 function SpaceTrail({
   pathname,
   spaceUuid,
@@ -149,72 +141,81 @@ function SpaceTrail({
   collab: CollabHeaderContext | null;
   tabLabel: string | null;
 }) {
-  const { userId: viewerId } = useV2Session();
-  const { data } = useQuery({
-    ...spacesQueries.detail(spaceUuid, { viewerId }),
+  const session = useV2Session();
+  const { data, isError } = useQuery({
+    ...spacesQueries.detail(spaceUuid, { viewerId: session.userId }),
     enabled: false,
   });
   const cached = useCachedSpaceIdentity(spaceUuid);
+  const allowed = collabAccessState(session) === 'eligible';
+  if (!crumbResolves({ isError, hasData: data !== undefined }, allowed)) return null;
   const published = collab?.spaceUuid === spaceUuid ? collab.spaceName : null;
   const spaceName = data?.data?.name ?? cached?.name ?? published ?? null;
   const trail = breadcrumbTrail(pathname, { ...NO_BREADCRUMB_DATA, spaceName, tabLabel });
   return trail ? <TrailView trail={trail} /> : null;
 }
 
-/** A channel names itself and its space from the frame's own channel read;
- *  the collab frame's publish fills the space in while that is pending. */
-function ChannelTrail({
-  pathname,
-  channelUuid,
-  collab,
-}: {
-  pathname: string;
-  channelUuid: string;
-  collab: CollabHeaderContext | null;
-}) {
-  const { userId: viewerId } = useV2Session();
-  const { data } = useQuery({
+/**
+ * A channel names itself and its space from the frame's own reads: the
+ * channel's record, then its space's. Nothing from the collab publish: it
+ * carries no channel id to guard on, so across spaces it could name the last
+ * space for a render (checker, 16 October 2026). Either read refused is the
+ * frame's `placeRefused`, and the trail draws nothing.
+ */
+function ChannelTrail({ pathname, channelUuid }: { pathname: string; channelUuid: string }) {
+  const session = useV2Session();
+  const viewerId = session.userId;
+  const channelRead = useQuery({
     ...channelsQueries.detail(channelUuid, { viewerId }),
     enabled: false,
   });
-  const channel = data?.data ?? null;
+  const channel = channelRead.data?.data ?? null;
+  const spaceUuid = channel?.space.uuid ?? null;
+  // The same `''` key the frame mounts while the channel is pending.
+  const spaceRead = useQuery({
+    ...spacesQueries.detail(spaceUuid ?? '', { viewerId }),
+    enabled: false,
+  });
+  const allowed = collabAccessState(session) === 'eligible';
+  const refused =
+    !crumbResolves({ isError: channelRead.isError, hasData: channel !== null }, allowed) ||
+    (spaceUuid !== null &&
+      !crumbResolves({ isError: spaceRead.isError, hasData: spaceRead.data !== undefined }));
+  if (refused) return null;
   const trail = breadcrumbTrail(pathname, {
     ...NO_BREADCRUMB_DATA,
     // The name only from the record: it alone says whether this is a thread,
-    // which takes no `#`. The frame's publish is read from the same entry.
+    // which takes no `#`.
     channelName: channel ? channelDisplayName(channel) : null,
     channelIsThread: channel?.is_thread ?? false,
-    channelSpaceUuid: channel?.space.uuid ?? collab?.spaceUuid ?? null,
-    channelSpaceName: channel?.space.name ?? collab?.spaceName ?? null,
+    channelSpaceUuid: spaceUuid,
+    channelSpaceName: spaceRead.data?.data?.name ?? channel?.space.name ?? null,
   });
   return trail ? <TrailView trail={trail} /> : null;
 }
 
 /**
+ * A chat's title, place and confidential flag are read only while they were
+ * published FOR this chat (`useHeaderContextFor`, `useHeaderPlaceFor`): a tap
+ * publishes the next chat's title before the address changes, and a link move
+ * paints the last chat's for a frame (checker, 16 October 2026).
+ *
  * A chat is personal once its record says it is in no space, or once it is
  * known to be confidential (which never names a space, and whose record the
- * detail fetcher refuses, so it may never reach the cache). A record that names a space waits for the chat's own place
- * publish, which applies the chat's rules about who may see it. Until one of
- * those answers, the first part is a skeleton.
+ * detail fetcher refuses, so it may never reach the cache). A record that
+ * names a space waits for the chat's own place publish, which applies the
+ * chat's rules about who may see it. Until one of those answers, the first
+ * part is a skeleton. A refused record, confidential aside, has no trail.
  */
-function ChatTrail({
-  pathname,
-  conversationId,
-  chatTitle,
-  chatSpace,
-  confidential,
-}: {
-  pathname: string;
-  conversationId: string;
-  chatTitle: string | null;
-  chatSpace: HeaderPlace | null;
-  confidential: boolean;
-}) {
+function ChatTrail({ pathname, conversationId }: { pathname: string; conversationId: string }) {
   const { userId: viewerId } = useV2Session();
-  const { data } = useQuery({
+  const { title: chatTitle, confidential } = useHeaderContextFor(conversationId);
+  const chatSpace = useHeaderPlaceFor(conversationId);
+  const { data, isError } = useQuery({
     ...conversationsQueries.detail({ conversationId, viewerId }),
     enabled: false,
   });
+  if (!confidential && !crumbResolves({ isError, hasData: data !== undefined })) return null;
   const chatIsPersonal =
     confidential || (data !== undefined && (data.is_confidential === true || !data.space));
   const trail = breadcrumbTrail(pathname, {
@@ -226,24 +227,33 @@ function ChatTrail({
   return trail ? <TrailView trail={trail} /> : null;
 }
 
-/** The folder's name and its one parent, from the screen's detail read. */
+/** The folder's name and its one parent, named as the folder screen names
+ *  them (`folderDisplayName`, so a blank name reads "Untitled folder"). */
 function FolderTrail({ pathname, uuid }: { pathname: string; uuid: string }) {
-  const { userId: viewerId } = useV2Session();
-  const { data } = useQuery({ ...foldersQueries.detail({ uuid, viewerId }), enabled: false });
+  const { signedIn, userId: viewerId } = useV2Session();
+  const { data, isError } = useQuery({
+    ...foldersQueries.detail({ uuid, viewerId }),
+    enabled: false,
+  });
+  if (!crumbResolves({ isError, hasData: data !== undefined }, signedIn)) return null;
   const folder = data?.data ?? null;
   const parent = folder?.parent ?? null;
   const trail = breadcrumbTrail(pathname, {
     ...NO_BREADCRUMB_DATA,
-    folderName: folder?.name ?? null,
-    folderParent: parent ? { uuid: parent.uuid, name: parent.name } : null,
+    folderName: folder ? folderDisplayName(folder.name) : null,
+    folderParent: parent ? { uuid: parent.uuid, name: folderDisplayName(parent.name) } : null,
   });
   return trail ? <TrailView trail={trail} /> : null;
 }
 
 /** The note's title as its masthead prints it, "Untitled" included. */
 function NoteTrail({ pathname, slug }: { pathname: string; slug: string }) {
-  const { userId: viewerId } = useV2Session();
-  const { data } = useQuery({ ...notesQueries.detail({ slug, viewerId }), enabled: false });
+  const { signedIn, userId: viewerId } = useV2Session();
+  const { data, isError } = useQuery({
+    ...notesQueries.detail({ slug, viewerId }),
+    enabled: false,
+  });
+  if (!crumbResolves({ isError, hasData: data !== undefined }, signedIn)) return null;
   const note = data?.data ?? null;
   const trail = breadcrumbTrail(pathname, {
     ...NO_BREADCRUMB_DATA,
@@ -261,7 +271,9 @@ function StatuteTrail({
   slug: string;
   sectionLabel: string | null;
 }) {
-  const { data } = useQuery({ ...statutesQueries.detail(slug), enabled: false });
+  const { signedIn } = useV2Session();
+  const { data, isError } = useQuery({ ...statutesQueries.detail(slug), enabled: false });
+  if (!crumbResolves({ isError, hasData: data !== undefined }, signedIn)) return null;
   const detail = data?.data ?? null;
   const statuteTitle = detail ? detail.short_title?.trim() || detail.title : null;
   const trail = breadcrumbTrail(pathname, {
@@ -275,7 +287,11 @@ function StatuteTrail({
 /** The case's name as its masthead prints it (`CaseDocument`). */
 function CaseTrail({ pathname, slug }: { pathname: string; slug: string }) {
   const searchQuery = useSearchParams().get('q')?.trim() || undefined;
-  const { data } = useQuery({ ...casesQueries.detail(slug, searchQuery), enabled: false });
+  const { data, isError } = useQuery({
+    ...casesQueries.detail(slug, searchQuery),
+    enabled: false,
+  });
+  if (!crumbResolves({ isError, hasData: data !== undefined })) return null;
   const detail = data?.data ?? null;
   const caseTitle = detail ? formatCaseName(detail.display_title || detail.title) : null;
   const trail = breadcrumbTrail(pathname, { ...NO_BREADCRUMB_DATA, caseTitle });

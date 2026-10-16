@@ -43,6 +43,13 @@ export function folderHref(uuid: string): string {
 /** What an unnamed folder is CALLED on screen — a display substitution only. */
 export const UNTITLED_FOLDER_NAME = 'Untitled folder';
 
+/** A folder's name as every screen prints it: trimmed, or
+ *  {@link UNTITLED_FOLDER_NAME}. The rows and the desktop breadcrumb share it,
+ *  so a blank name is never an empty link (checker, 16 October 2026). */
+export function folderDisplayName(name: string | null | undefined): string {
+  return name?.trim() || UNTITLED_FOLDER_NAME;
+}
+
 /**
  * Filing practice (and the study's design research) says three levels is where
  * a folder tree stops helping. v2 ENCOURAGES that ceiling and blocks nothing:
@@ -140,7 +147,7 @@ export function folderRow(record: FolderNode | FolderRecord): FolderRowModel {
   return {
     uuid: record.uuid,
     href: folderHref(record.uuid),
-    name: trimmed || UNTITLED_FOLDER_NAME,
+    name: folderDisplayName(record.name),
     hasName: !!trimmed,
     itemsCount: record.items_count,
     childrenCount: record.children_count,

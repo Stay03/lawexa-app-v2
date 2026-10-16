@@ -32,6 +32,22 @@ export interface HeaderPlace {
 
 let place: HeaderPlace | null = null;
 let owner: string | null = null;
+
+/** The place paired with its owner, one stable object per change of either. */
+export interface OwnedHeaderPlace {
+  place: HeaderPlace | null;
+  owner: string | null;
+}
+
+const NO_OWNED: OwnedHeaderPlace = { place: null, owner: null };
+let owned: OwnedHeaderPlace = NO_OWNED;
+
+/** Re-pair `owned` after a write. `true` when it changed. */
+function syncOwned(): boolean {
+  if (owned.place === place && owned.owner === owner) return false;
+  owned = place === null && owner === null ? NO_OWNED : { place, owner };
+  return true;
+}
 const listeners = new Set<() => void>();
 
 function emit(): void {
@@ -57,21 +73,47 @@ function getServerSnapshot(): HeaderPlace | null {
  *  no-op for subscribers. */
 export function setHeaderPlace(next: HeaderPlace, publisher: string): void {
   owner = publisher;
-  if (place && place.label === next.label && place.href === next.href) return;
-  place = { label: next.label, href: next.href };
-  emit();
+  if (!place || place.label !== next.label || place.href !== next.href) {
+    place = { label: next.label, href: next.href };
+  }
+  // An owner change alone still notifies, for `useHeaderPlaceFor`; the plain
+  // hook's snapshot is unchanged then, so its readers do not re-render.
+  if (syncOwned()) emit();
 }
 
 /** Drop the place, only while `publisher` still owns it. */
 export function clearHeaderPlace(publisher: string): void {
   if (publisher !== owner) return;
   owner = null;
-  if (place === null) return;
   place = null;
-  emit();
+  if (syncOwned()) emit();
 }
 
 /** Subscribe the header to the published place. */
 export function useHeaderPlace(): HeaderPlace | null {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+function getOwnedSnapshot(): OwnedHeaderPlace {
+  return owned;
+}
+
+function getServerOwnedSnapshot(): OwnedHeaderPlace {
+  return NO_OWNED;
+}
+
+/** The place only while `publisher` owns it. Pure, for `node:test`. */
+export function headerPlaceFor(snapshot: OwnedHeaderPlace, publisher: string): HeaderPlace | null {
+  return snapshot.owner === publisher ? snapshot.place : null;
+}
+
+/**
+ * The place published FOR `publisher` (a conversation id), or `null`. The
+ * desktop breadcrumb reads it so the last chat's space never names the next
+ * chat for a frame (checker, 16 October 2026); same guard as
+ * `useHeaderContextFor`.
+ */
+export function useHeaderPlaceFor(publisher: string): HeaderPlace | null {
+  const snapshot = useSyncExternalStore(subscribe, getOwnedSnapshot, getServerOwnedSnapshot);
+  return headerPlaceFor(snapshot, publisher);
 }
