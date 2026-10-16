@@ -381,7 +381,7 @@ test('a thread header carries the status control only for someone who can post',
   const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
   // One of each, each shown at its own width only.
   assert.match(header, /flex min-w-0 flex-1 items-center gap-2 md:hidden">/);
-  assert.match(header, /data-desktop-status-line className="flex min-w-0 items-center">\s*\{renderStatus\('menu'\)\}/);
+  assert.match(header, /data-desktop-status className="flex shrink-0 items-center">\s*\{renderStatus\('menu'\)\}/);
 });
 
 test('on a phone a thread with a status line takes the room of the faces, Members staying in the menu', () => {
@@ -408,13 +408,14 @@ test('on a phone a list row folds its chip so the title keeps about 20 character
   }
 });
 
-test('on a wide pane the status has its own line under the name, as on a phone', () => {
-  // Techlead, 16 October 2026: a Needs Action chip beside the name cut it to
-  // "Te…", and Needs Action must name who acts, so the name keeps its row.
+test('on a wide pane the status pill sits right after the name, on one row, with no back chip', () => {
+  // Arthur, 17 October 2026: option B, "approved for build". The pill does
+  // not shrink, so a long name truncates before it, and a Needs Action still
+  // names who acts.
   const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
-  assert.match(header, /<div className="hidden min-w-0 flex-1 flex-col justify-center gap-0\.5 md:flex">\s*<div className="flex min-w-0 items-center gap-2">/);
-  // The status line follows the name's row, never inside it.
-  assert.match(header, /<\/Link>\s*<\/div>\s*\{\/\* The thread's status, under its name, `md:` and up\. \*\/\}\s*\{renderStatus && \(\s*<div data-desktop-status-line/);
+  assert.match(header, /<div className="hidden min-w-0 flex-1 flex-col justify-center md:flex">\s*<div className="flex min-w-0 items-center gap-2">\s*\{parent && !renderStatus && <BackChip parent=\{parent\} \/>\}/);
+  assert.match(header, /<\/h1>\s*\{\/\* The thread's status, beside its name, `md:` and up\. \*\/\}\s*\{renderStatus && \(\s*<div data-desktop-status className="flex shrink-0 items-center">/);
+  assert.doesNotMatch(header, /data-desktop-status-line/);
   assert.equal(header.match(/renderStatus\('menu'\)/g)?.length, 1);
 });
 

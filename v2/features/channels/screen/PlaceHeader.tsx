@@ -341,16 +341,16 @@ export function ChannelPlaceHeader({
           <h1 className="sr-only md:hidden">{displayName}</h1>
 
           {/* ── Identity, `md:` and up ──────────────────────────────────
-              A COLUMN: the name's row, and under it a thread's status line.
-              A Needs Action chip naming a person beside the name cut the name
-              to "Te…" on a 1440 desktop, and Arthur's rule is that a Needs
-              Action never leaves people guessing who must act. So the wide
-              header takes the phone's layout: the name keeps its row and the
-              status has a line of its own (techlead, 16 October 2026). With no
-              status the column holds the one row it always did. */}
-          <div className="hidden min-w-0 flex-1 flex-col justify-center gap-0.5 md:flex">
+              ONE ROW: the name, and right after it a thread's status pill
+              (Arthur, 17 October 2026: option B, "approved for build"). A
+              thread with a status drops its "‹ general" chip from the row, so
+              the name and the pill are the row's first things; the desktop
+              bar's trail above still leads back, and a phone keeps its back
+              arrow. The pill does not shrink, so a long name truncates before
+              it: a Needs Action always names who must act (Arthur). */}
+          <div className="hidden min-w-0 flex-1 flex-col justify-center md:flex">
             <div className="flex min-w-0 items-center gap-2">
-              {parent && <BackChip parent={parent} />}
+              {parent && !renderStatus && <BackChip parent={parent} />}
 
               <VisibilityIcon
                 aria-hidden
@@ -410,6 +410,12 @@ export function ChannelPlaceHeader({
                 )}
               </h1>
 
+              {/* The thread's status, beside its name, `md:` and up. */}
+              {renderStatus && (
+                <div data-desktop-status className="flex shrink-0 items-center">
+                  {renderStatus('menu')}
+                </div>
+              )}
 
               {/* THE PURPOSE LINE HAS GONE FROM THE PHONE BAR. It was the
                   disclosure trigger at this width, and the reason the bar could
@@ -443,13 +449,6 @@ export function ChannelPlaceHeader({
                 <span className="min-w-0 truncate">{channel.space.name}</span>
               </Link>
             </div>
-
-            {/* The thread's status, under its name, `md:` and up. */}
-            {renderStatus && (
-              <div data-desktop-status-line className="flex min-w-0 items-center">
-                {renderStatus('menu')}
-              </div>
-            )}
           </div>
 
           {/* ── Sections (wide panes only — see the docblock) ─────────── */}
