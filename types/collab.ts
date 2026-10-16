@@ -1405,7 +1405,8 @@ export interface CreateSpacePayload {
 export interface UpdateSpacePayload {
   name?: string;
   type?: SpaceType;
-  description?: string;
+  /** `null` clears it; an absent key leaves the old one (backend, 16 October 2026). */
+  description?: string | null;
   is_private?: boolean;
   settings?: Record<string, unknown>;
 }

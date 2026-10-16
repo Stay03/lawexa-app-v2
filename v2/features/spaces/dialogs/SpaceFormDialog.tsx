@@ -368,7 +368,10 @@ export function SpaceFormDialog({
         {
           name: trimmedName,
           type,
-          description: trimmedDescription || undefined,
+          // `null`, not an absent key: the server keeps the old goal when the
+          // key is missing, so an emptied field never cleared it (backend,
+          // 16 October 2026: PUT /spaces reads `null` as "clear").
+          description: trimmedDescription || null,
           is_private: isPrivate,
         },
         {

@@ -304,3 +304,12 @@ test('the About sheet offers Edit space to whoever may manage the space, on the 
   assert.match(screen, /const openEdit = useCallback\(\(\) => showPanel\('edit'\), \[showPanel\]\);/);
   assert.match(screen, /canOpen: space \? \{ edit: canManage, about: true,/);
 });
+
+test('an emptied goal is sent as null, so the edit form clears it', () => {
+  // Backend, 16 October 2026: PUT /spaces leaves the old description when the
+  // key is absent, and clears it on `null`.
+  const dialog = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
+  assert.match(dialog, /type,[\s\S]{0,400}?description: trimmedDescription \|\| null,\s*is_private: isPrivate,/);
+  const types = read('types', 'collab.ts');
+  assert.match(types, /export interface UpdateSpacePayload \{[\s\S]*?description\?: string \| null;/);
+});
