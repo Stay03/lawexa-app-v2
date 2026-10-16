@@ -44,3 +44,20 @@ test('every inner scroller with absolutely placed children is a containing block
     assert.ok(read(...path).includes(className), `${path.join('/')} keeps its scroller positioned`);
   }
 });
+
+/* The quiet bar's reveal is an inherited property switched on the scroller, so
+ * every switch restyles everything inside it (598 elements in a long chat,
+ * chat reopen fix, 16 October 2026). On a touch screen `:hover` sticks and
+ * `:active` holds under a finger, so the reveal lives only under a fine pointer
+ * that can hover. */
+test('the quiet scrollbar reveals only where a mouse can hover', () => {
+  const css = read('v2', 'shell', 'shell.css');
+  const reveal = /\.v2-quiet-scroll:hover,\s*\.v2-quiet-scroll:focus-within,\s*\.v2-quiet-scroll:active \{\s*scrollbar-color: var\(--border\) transparent;\s*\}/;
+  const media = css.search(/@media \(hover: hover\) and \(pointer: fine\) \{\s*\.v2-quiet-scroll:hover,/);
+  assert.ok(media >= 0, 'the reveal sits in a hover-and-fine-pointer media query');
+  assert.match(css.slice(media), reveal);
+  // Nowhere outside it: exactly one reveal in the sheet.
+  assert.equal(css.match(new RegExp(reveal.source, 'g'))?.length, 1);
+  // The resting rule stays unconditional.
+  assert.match(css, /^\.v2-quiet-scroll \{\s*scrollbar-width: thin;\s*scrollbar-color: transparent transparent;\s*\}/m);
+});

@@ -835,10 +835,19 @@ html.v2-document-lock body {
 [data-v2-strip][data-overflow-start][data-overflow-end] {
   mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent);
 }
-.v2-quiet-scroll:hover,
-.v2-quiet-scroll:focus-within,
-.v2-quiet-scroll:active {
-  scrollbar-color: var(--border) transparent;
+/* The quiet bar shows on interaction ONLY WHERE A MOUSE CAN HOVER (chat reopen
+   fix, 16 October 2026). `scrollbar-color` is an inherited property, so each
+   switch restyled every element inside the scroller: 598 in a long chat's
+   transcript, forced by its scroll handler, about 120 ms on a phone at 4x CPU.
+   On a touch screen `:hover` sticks after a tap and `:active` holds while a
+   finger is down, so it fired on every reopen and every touch-scroll, for a
+   bar a phone draws as an overlay anyway. A mouse keeps the reveal. */
+@media (hover: hover) and (pointer: fine) {
+  .v2-quiet-scroll:hover,
+  .v2-quiet-scroll:focus-within,
+  .v2-quiet-scroll:active {
+    scrollbar-color: var(--border) transparent;
+  }
 }
 
 /* -----------------------------------------------------------------------------
