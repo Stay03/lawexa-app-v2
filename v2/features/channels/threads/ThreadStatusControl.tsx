@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type KeyboardEvent } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -29,10 +29,13 @@ import {
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   THREAD_STATUS_OPTIONS,
+  isSameThreadStatus,
   isThreadStatusValue,
+  nextRadioIndex,
   threadStatusErrorText,
   threadStatusFooter,
   threadStatusQuiet,
+  threadStatusTriggerLabel,
   type ThreadStatusOption,
 } from '../thread-status-model';
 import { useMinuteNow } from '../use-minute-now';
@@ -58,9 +61,10 @@ import { useSetThreadStatus } from './mutations';
  *
  * ── THE SURFACE STAYS OPEN UNTIL THE SERVER ANSWERS ────────────────────────
  * The choice is optimistic: the tick and the chip move on the press. The menu
- * or sheet closes on success. On a refusal the cache is put back and the
+ * or sheet closes on success. On a refusal the thread is re-read and the
  * server's sentence shows inside the surface, where the press was, with no
  * toast. A reader who dismisses the surface first still sees the chip go back.
+ * Picking the status the thread already has only closes the surface.
  *
  * The note is read-only in this first pass: there is no note field, but a note
  * the server holds is shown under the footer.
@@ -85,8 +89,13 @@ export function ThreadStatusControl({
   const quiet = threadStatusQuiet({ status, last_message_at: lastMessageAt }, now);
 
   if (!canSet) {
+    // The prefix says what the chip is to a screen reader; sighted readers
+    // have the header around it.
     return status ? (
-      <ThreadStatusChip size="md" value={status.value} quiet={quiet} />
+      <span className="inline-flex shrink-0 items-center">
+        <span className="sr-only">Status: </span>
+        <ThreadStatusChip size="md" value={status.value} quiet={quiet} />
+      </span>
     ) : null;
   }
 
@@ -124,6 +133,7 @@ const NONE = 'none';
 function useStatusChoice(
   threadUuid: string,
   parentUuid: string | null,
+  status: ThreadStatus | null,
   close: () => void,
 ) {
   const mutation = useSetThreadStatus(threadUuid, parentUuid);
@@ -132,6 +142,12 @@ function useStatusChoice(
   const [error, setError] = useState<string | null>(null);
 
   const choose = (next: ThreadStatusValue | null) => {
+    // Picking the status it already has changes nothing, so it sends nothing
+    // and writes no "Set to … · just now" for a change nobody made.
+    if (isSameThreadStatus(next, status)) {
+      close();
+      return;
+    }
     setError(null);
     mutation.mutate(
       {
@@ -175,10 +191,6 @@ const TRIGGER = cn(
   'transition-colors duration-150 hover:bg-secondary/60 motion-reduce:transition-none',
   FOCUS_RING,
 );
-
-function triggerLabel(status: ThreadStatus | null): string {
-  return status ? `Status: ${status.label}. Change status` : 'Set status';
-}
 
 /** The footer, the note, and a refusal — the same three lines on both surfaces. */
 function StatusFooter({
@@ -231,6 +243,7 @@ function StatusMenu({ threadUuid, parentUuid, status, quiet, now }: SurfaceProps
   const { choose, error, clearError, pending } = useStatusChoice(
     threadUuid,
     parentUuid,
+    status,
     () => setOpen(false),
   );
 
@@ -242,7 +255,10 @@ function StatusMenu({ threadUuid, parentUuid, status, quiet, now }: SurfaceProps
         if (next) clearError();
       }}
     >
-      <DropdownMenuTrigger className={TRIGGER} aria-label={triggerLabel(status)}>
+      <DropdownMenuTrigger
+        className={TRIGGER}
+        aria-label={threadStatusTriggerLabel(status, quiet)}
+      >
         <TriggerFace status={status} quiet={quiet} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72">
@@ -280,16 +296,34 @@ function StatusSheet({ threadUuid, parentUuid, status, quiet, now }: SurfaceProp
   const { choose, error, clearError, pending } = useStatusChoice(
     threadUuid,
     parentUuid,
+    status,
     () => setOpen(false),
   );
   const current = status?.value ?? null;
+
+  /* A REAL RADIO GROUP: one tab stop (the checked option), ArrowUp/ArrowDown
+     move focus and wrap, Home/End jump. Arrows move FOCUS ONLY. Choosing sends
+     a request, so it stays on tap, Enter and Space, never on an arrow press.
+     The options are read off the group in the handler, never in render. */
+  const onRadioKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
+    if (!keys.includes(event.key)) return;
+    const radios = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+    );
+    if (radios.length === 0) return;
+    event.preventDefault();
+    const at = radios.findIndex((radio) => radio === document.activeElement);
+    const target = nextRadioIndex(event.key, at, radios.length);
+    radios[target]?.focus();
+  };
 
   return (
     <>
       <button
         type="button"
         aria-haspopup="dialog"
-        aria-label={triggerLabel(status)}
+        aria-label={threadStatusTriggerLabel(status, quiet)}
         onClick={() => {
           clearError();
           setOpen(true);
@@ -303,35 +337,48 @@ function StatusSheet({ threadUuid, parentUuid, status, quiet, now }: SurfaceProp
           <SheetHeader className="pb-0">
             <SheetTitle>Status</SheetTitle>
           </SheetHeader>
-          <div role="radiogroup" aria-label="Status" className="flex flex-col px-2 pb-2">
-            {THREAD_STATUS_OPTIONS.map((option) => {
-              const selected = option.value === current;
-              return (
-                <button
-                  key={option.value ?? NONE}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  disabled={pending}
-                  onClick={() => choose(option.value)}
-                  className={cn(
-                    'v2-interactive flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm',
-                    'transition-colors duration-150 motion-reduce:transition-none',
-                    selected ? 'bg-secondary' : 'hover:bg-secondary/60',
-                    pending && 'opacity-60',
-                    FOCUS_RING,
-                  )}
-                >
-                  <OptionMark value={option.value} />
-                  <span className="min-w-0 flex-1">
-                    <OptionText option={option} />
-                  </span>
-                  {selected && (
-                    <Check aria-hidden className="size-4 shrink-0 text-primary" />
-                  )}
-                </button>
-              );
-            })}
+          <div className="flex flex-col px-2 pb-2">
+            <div
+              role="radiogroup"
+              aria-label="Thread status"
+              onKeyDown={onRadioKeyDown}
+              className="flex flex-col"
+            >
+              {THREAD_STATUS_OPTIONS.map((option) => {
+                const selected = option.value === current;
+                return (
+                  <button
+                    key={option.value ?? NONE}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    // Roving tab stop: the checked option alone is in the tab
+                    // order. `aria-disabled`, not `disabled`, while a request
+                    // is out, so focus is not thrown off the option it is on.
+                    tabIndex={selected ? 0 : -1}
+                    aria-disabled={pending}
+                    onClick={() => {
+                      if (!pending) choose(option.value);
+                    }}
+                    className={cn(
+                      'v2-interactive flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm',
+                      'transition-colors duration-150 motion-reduce:transition-none',
+                      selected ? 'bg-secondary' : 'hover:bg-secondary/60',
+                      pending && 'opacity-60',
+                      FOCUS_RING,
+                    )}
+                  >
+                    <OptionMark value={option.value} />
+                    <span className="min-w-0 flex-1">
+                      <OptionText option={option} />
+                    </span>
+                    {selected && (
+                      <Check aria-hidden className="size-4 shrink-0 text-primary" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
             {(status || error) && <div className="mx-1 my-1 h-px bg-border" />}
             <StatusFooter status={status} now={now} error={error} />
           </div>

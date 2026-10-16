@@ -10,10 +10,16 @@ import type {
   MessageThreadStub,
   NotifyLevel,
   ThreadStatus,
+  ThreadStatusValue,
 } from '@/types/collab';
 import type { SpaceRollupDeltas } from '@/v2/features/spaces/cache';
 import { channelsQueries } from './queries';
 import { channelDisplayName } from './thread-model';
+import {
+  createTrailingCoalescer,
+  isStatusFilteredThreadsKey,
+  shiftThreadStatusCounts,
+} from './thread-status-model';
 
 /**
  * channels cache — the reference-stable writers the realtime spine and the W2
@@ -834,8 +840,8 @@ export function findCachedThreadStatus(
  * The sheet's entries are page-infinite, which is why they get their own walk
  * here rather than the `lists()` fan-out (see the key-geography note in
  * `queries.ts`). A filtered sheet may now hold a row that no longer matches
- * its chip; the caller invalidates the parent's threads so the server
- * re-files it.
+ * its chip; {@link noteThreadStatusChange} queues one coalesced re-read of
+ * those entries so the server re-files it.
  *
  * Same-value writes return the same references, so a duplicate broadcast
  * re-renders nothing.
@@ -893,20 +899,150 @@ export function applyThreadStatus(
 }
 
 /**
- * After a thread's status moved: the parent's Threads sheet re-reads (a
- * filtered chip may no longer hold the row) and the parent's detail re-reads
- * for its `thread_status_counts`. Only entries that exist are refetched; an
- * unopened sheet asks for nothing.
+ * Move one thread between buckets of its PARENT's `thread_status_counts`,
+ * wherever the parent is cached (its detail and any list row), with no GET
+ * (checker, 16 October 2026: one parent re-read per change was a refetch storm
+ * under a bulk or agent change). A parent cached without the field is left
+ * alone.
  */
-export function noteThreadStatusMoved(
+export function shiftParentThreadStatusCounts(
   queryClient: QueryClient,
-  parentUuid: string | null,
+  parentUuid: string,
+  from: ThreadStatusValue | null,
+  to: ThreadStatusValue | null,
 ): void {
+  if (from === to) return;
+  const shift = (row: Channel): Channel => {
+    if (row.uuid !== parentUuid || row.thread_status_counts === undefined) return row;
+    const counts = shiftThreadStatusCounts(row.thread_status_counts, from, to);
+    return counts === row.thread_status_counts
+      ? row
+      : { ...row, thread_status_counts: counts };
+  };
+
+  queryClient.setQueriesData<ChannelResponse>(
+    { queryKey: channelsQueries.detailsOf(parentUuid) },
+    (data) => {
+      if (!data) return data;
+      const next = shift(data.data);
+      return next === data.data ? data : { ...data, data: next };
+    },
+  );
+  queryClient.setQueriesData<ChannelListResponse>(
+    { queryKey: channelsQueries.lists() },
+    (data) => {
+      if (!data) return data;
+      let changed = false;
+      const rows = data.data.map((row) => {
+        const next = shift(row);
+        if (next !== row) changed = true;
+        return next;
+      });
+      return changed ? { ...data, data: rows } : data;
+    },
+  );
+}
+
+/** How long a burst of status changes on one parent is gathered before its
+ *  filtered sheet is re-read once. */
+const FILTERED_THREADS_REFETCH_MS = 500;
+
+const filteredRefetchers = new WeakMap<QueryClient, (parentUuid: string) => void>();
+
+/**
+ * Re-read a parent's STATUS-FILTERED Threads-sheet entries, coalesced per
+ * parent on a 500ms trailing timer. Only a filtered entry can hold a row that
+ * no longer matches its chip (or miss one that now does); the unfiltered sheet
+ * is patched in place by {@link applyThreadStatus}. Nothing is scheduled when
+ * no filtered entry for that parent is cached.
+ */
+export function scheduleFilteredThreadsRefetch(
+  queryClient: QueryClient,
+  parentUuid: string,
+): void {
+  const hasFiltered = queryClient
+    .getQueryCache()
+    .findAll({ queryKey: channelsQueries.threadsOf(parentUuid) })
+    .some((query) => isStatusFilteredThreadsKey(query.queryKey));
+  if (!hasFiltered) return;
+
+  let schedule = filteredRefetchers.get(queryClient);
+  if (!schedule) {
+    schedule = createTrailingCoalescer(FILTERED_THREADS_REFETCH_MS, (uuid) => {
+      void queryClient.invalidateQueries({
+        queryKey: channelsQueries.threadsOf(uuid),
+        predicate: (query) => isStatusFilteredThreadsKey(query.queryKey),
+      });
+    });
+    filteredRefetchers.set(queryClient, schedule);
+  }
+  schedule(parentUuid);
+}
+
+/**
+ * Re-read ONE thread's detail and hand back the status it now holds — the
+ * refusal path of the status mutation, which must not restore a snapshot a
+ * broadcast may have outdated. `undefined` when there is no cached detail to
+ * re-read or the read fails; the caller then falls back to its snapshot.
+ */
+export async function rereadThreadStatus(
+  queryClient: QueryClient,
+  threadUuid: string,
+): Promise<ThreadStatus | null | undefined> {
+  const key = channelsQueries.detailsOf(threadUuid);
+  if (queryClient.getQueriesData<ChannelResponse>({ queryKey: key }).length === 0) {
+    return undefined;
+  }
+  try {
+    await queryClient.invalidateQueries({ queryKey: key }, { throwOnError: true });
+  } catch {
+    return undefined;
+  }
+  for (const [, data] of queryClient.getQueriesData<ChannelResponse>({ queryKey: key })) {
+    if (data?.data.uuid === threadUuid) return data.data.status;
+  }
+  return undefined;
+}
+
+/** The thread's parent, read off its cached detail; `null` when not cached. */
+export function cachedThreadParentUuid(
+  queryClient: QueryClient,
+  threadUuid: string,
+): string | null {
+  for (const [, data] of queryClient.getQueriesData<ChannelResponse>({
+    queryKey: channelsQueries.detailsOf(threadUuid),
+  })) {
+    if (data?.data.uuid === threadUuid) return data.data.parent_channel_uuid ?? null;
+  }
+  return null;
+}
+
+/**
+ * One status change, everywhere: read what the cache held, assign the new
+ * status to every copy of the thread, move the parent's counts by the
+ * difference, and queue the parent's filtered sheet for one coalesced re-read.
+ *
+ * Derived from the cached previous value, so it is idempotent: the
+ * broadcast that echoes the viewer's own optimistic change finds the new value
+ * already there and moves nothing. When nothing cached carried the old value
+ * the counts are left alone rather than guessed.
+ */
+export function noteThreadStatusChange(
+  queryClient: QueryClient,
+  threadUuid: string,
+  parentUuid: string | null,
+  status: ThreadStatus | null,
+): void {
+  const previous = findCachedThreadStatus(queryClient, threadUuid);
+  applyThreadStatus(queryClient, threadUuid, status);
   if (parentUuid === null) return;
-  void queryClient.invalidateQueries({
-    queryKey: channelsQueries.threadsOf(parentUuid),
-  });
-  void queryClient.invalidateQueries({
-    queryKey: channelsQueries.detailsOf(parentUuid),
-  });
+  if (previous !== undefined) {
+    shiftParentThreadStatusCounts(
+      queryClient,
+      parentUuid,
+      previous?.value ?? null,
+      status?.value ?? null,
+    );
+  }
+  scheduleFilteredThreadsRefetch(queryClient, parentUuid);
 }

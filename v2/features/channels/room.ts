@@ -34,10 +34,10 @@ import {
   applyMessageUpdated,
   applyPinState,
   applyReactionToggled,
-  applyThreadStatus,
   applyThreadStub,
+  cachedThreadParentUuid,
   noteChannelMembershipChanged,
-  noteThreadStatusMoved,
+  noteThreadStatusChange,
 } from './cache';
 import {
   addRespondingTurn,
@@ -438,16 +438,19 @@ export function useChannelRoom(
           `.channel.status_changed` rides BOTH the thread's room and its
           parent's, so this one binding serves the thread screen and the
           parent's Threads sheet. The status object is the same one every route
-          serializes, so it is assigned as it came. Heard on the PARENT's room
-          (the thread is not this channel), the parent's sheet and counts also
-          re-read, because a filtered chip may no longer hold the row. The
-          feed's own line for the change arrives separately, as an ordinary
-          `.message.created`. */
+          serializes, so it is assigned as it came. The parent's counts move
+          LOCALLY and only a status-filtered sheet is re-read, once per burst
+          (`noteThreadStatusChange`): a bulk or agent change of many threads
+          must not become a GET per thread. Heard on the parent's room, this
+          channel IS the parent; heard on the thread's own, the parent comes off
+          the cached detail. The feed's own line for the change arrives
+          separately, as an ordinary `.message.created`. */
     room.listen('.channel.status_changed', (payload: ThreadStatusChangedPayload) => {
-      applyThreadStatus(queryClient, payload.thread_uuid, payload.status);
-      if (payload.thread_uuid !== channelUuid) {
-        noteThreadStatusMoved(queryClient, channelUuid);
-      }
+      const parentUuid =
+        payload.thread_uuid !== channelUuid
+          ? channelUuid
+          : cachedThreadParentUuid(queryClient, payload.thread_uuid);
+      noteThreadStatusChange(queryClient, payload.thread_uuid, parentUuid, payload.status);
     });
 
     /* ── Lawexa turns (§B, §F.6/§F.7) ───────────────────────────────────── */

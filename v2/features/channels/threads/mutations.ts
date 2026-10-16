@@ -13,8 +13,11 @@ import {
   applyThreadStatus,
   applyThreadStub,
   findCachedThreadStatus,
-  noteThreadStatusMoved,
+  rereadThreadStatus,
+  scheduleFilteredThreadsRefetch,
+  shiftParentThreadStatusCounts,
 } from '../cache';
+import { channelsQueries } from '../queries';
 import { threadStatusLabel } from '../thread-status-model';
 
 /**
@@ -109,14 +112,23 @@ export interface SetThreadStatusVariables {
  *
  * OPTIMISTIC, because the tick and the chip are the whole answer: every cached
  * copy of the thread (its detail, the list rows, the parent's Threads sheet)
- * moves on the press, through `applyThreadStatus`. A refusal puts back what
- * the cache held before and the caller shows the server's sentence inline,
- * where the press was; `meta.silentError` keeps the global toast out of it,
- * as on the engagement toggles. Success assigns the server's own status
- * object, which carries the real `changed_at`, `changed_by` and `is_stale`.
+ * moves on the press, through `applyThreadStatus`, and the parent's counts
+ * move by the difference, locally. The thread's detail fetch is cancelled
+ * first, so a read already in flight cannot land over the optimistic value.
+ * Success assigns the server's own status object, which carries the real
+ * `changed_at`, `changed_by` and `is_stale`.
  *
- * Settling either way re-reads the parent's threads and detail, so a filtered
- * sheet re-files the row and the filter chips' counts move.
+ * A REFUSAL RE-READS THE THREAD rather than restoring the snapshot (checker,
+ * 16 October 2026): a broadcast may have moved the status while the PATCH was
+ * in flight, and the snapshot would then put back a value that is no longer
+ * true. One GET of this thread's detail answers it, and its status is then
+ * written to the list rows and the counts the same way. Only when that read
+ * fails does the snapshot go back. The caller shows the server's sentence
+ * inline, where the press was; `meta.silentError` keeps the global toast out
+ * of it, as on the engagement toggles.
+ *
+ * Settling queues one coalesced re-read of the parent's status-FILTERED sheet,
+ * the only entries that can now hold a row that no longer matches.
  *
  * The note is not sent: the first pass has no note field (Stay, 16 October
  * 2026). Leaving the key out keeps whatever the server holds.
@@ -133,7 +145,10 @@ export function useSetThreadStatus(threadUuid: string, parentUuid: string | null
     mutationFn: ({ status }) => channelsApi.setStatus(threadUuid, { status }),
     meta: { silentError: true },
 
-    onMutate: ({ status, viewer }) => {
+    onMutate: async ({ status, viewer }) => {
+      await queryClient.cancelQueries({
+        queryKey: channelsQueries.detailsOf(threadUuid),
+      });
       const previous = findCachedThreadStatus(queryClient, threadUuid);
       const optimistic: ThreadStatus | null =
         status === null
@@ -148,24 +163,51 @@ export function useSetThreadStatus(threadUuid: string, parentUuid: string | null
               is_stale: false,
             };
       applyThreadStatus(queryClient, threadUuid, optimistic);
+      if (parentUuid !== null && previous !== undefined) {
+        shiftParentThreadStatusCounts(
+          queryClient,
+          parentUuid,
+          previous?.value ?? null,
+          status,
+        );
+      }
       return { previous };
     },
 
-    onError: (_error, _variables, context) => {
-      if (context && context.previous !== undefined) {
-        applyThreadStatus(queryClient, threadUuid, context.previous);
+    onError: async (_error, { status }, context) => {
+      const fresh = await rereadThreadStatus(queryClient, threadUuid);
+      const settled = fresh !== undefined ? fresh : context?.previous;
+      if (settled === undefined) return;
+      applyThreadStatus(queryClient, threadUuid, settled);
+      // The counts moved on the press only when the old value was known.
+      if (parentUuid !== null && context?.previous !== undefined) {
+        shiftParentThreadStatusCounts(
+          queryClient,
+          parentUuid,
+          status,
+          settled?.value ?? null,
+        );
       }
     },
 
-    onSuccess: (response) => {
+    onSuccess: (response, { status: sent }) => {
       const status = response.data.status;
-      if (status !== undefined) {
-        applyThreadStatus(queryClient, threadUuid, status);
+      if (status === undefined) return;
+      applyThreadStatus(queryClient, threadUuid, status);
+      if (parentUuid !== null) {
+        shiftParentThreadStatusCounts(
+          queryClient,
+          parentUuid,
+          sent,
+          status?.value ?? null,
+        );
       }
     },
 
     onSettled: () => {
-      noteThreadStatusMoved(queryClient, parentUuid);
+      if (parentUuid !== null) {
+        scheduleFilteredThreadsRefetch(queryClient, parentUuid);
+      }
     },
   });
 }

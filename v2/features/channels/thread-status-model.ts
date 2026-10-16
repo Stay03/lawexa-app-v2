@@ -234,3 +234,121 @@ export function threadStatusErrorText(error: {
   const field = error.errors?.status?.[0] ?? error.errors?.note?.[0];
   return field || error.message;
 }
+
+/**
+ * Whether a choice is the status the thread already holds. Radix calls
+ * `onValueChange` for the checked radio item too, and the phone sheet's rows
+ * are plain buttons, so without this a press on the current status would send
+ * a PATCH and the optimistic write would claim "Set to Running by you · just
+ * now" for a change nobody made (checker, 16 October 2026).
+ */
+export function isSameThreadStatus(
+  next: ThreadStatusValue | null,
+  current: Pick<ThreadStatus, 'value'> | null,
+): boolean {
+  return next === (current?.value ?? null);
+}
+
+/**
+ * Where focus goes in the phone sheet's radio group on a key press: ArrowDown
+ * and ArrowUp step and wrap, Home and End jump. `at` is the focused option's
+ * index (-1 when focus is elsewhere in the group, which starts at the ends).
+ * Focus only; choosing stays on tap, Enter and Space.
+ */
+export function nextRadioIndex(key: string, at: number, count: number): number {
+  if (count <= 0) return -1;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (key === 'ArrowDown') return at < 0 ? 0 : (at + 1) % count;
+  if (key === 'ArrowUp') return at < 0 ? count - 1 : (at - 1 + count) % count;
+  return at;
+}
+
+/* ── Screen-reader words ───────────────────────────────────────────────── */
+
+const UNIT_WORDS: Readonly<Record<string, string>> = {
+  m: 'minute',
+  h: 'hour',
+  d: 'day',
+  w: 'week',
+  mo: 'month',
+  y: 'year',
+};
+
+/** "quiet 1d" → "quiet 1 day", "quiet 3w" → "quiet 3 weeks"; "quiet" stays. */
+export function spellQuiet(quiet: string): string {
+  const match = /^quiet (\d+)(mo|m|h|d|w|y)$/.exec(quiet);
+  if (!match) return quiet;
+  const count = Number(match[1]);
+  const word = UNIT_WORDS[match[2]];
+  return `quiet ${count} ${word}${count === 1 ? '' : 's'}`;
+}
+
+/** The header trigger's name: "Status: Running, quiet 1 day. Change status". */
+export function threadStatusTriggerLabel(
+  status: Pick<ThreadStatus, 'label'> | null,
+  quiet: string | null,
+): string {
+  if (!status) return 'Set status';
+  const stale = quiet ? `, ${spellQuiet(quiet)}` : '';
+  return `Status: ${status.label}${stale}. Change status`;
+}
+
+/* ── Keeping a parent's counts and its filtered sheet honest ───────────── */
+
+/**
+ * Move one thread from `from` to `to` in a parent's `thread_status_counts`,
+ * locally, so a status change costs no GET of the parent (checker, 16 October
+ * 2026: production holds about four serial requests, and an agent can move
+ * many threads at once). `null` is no status, which is not counted. The same
+ * object comes back when nothing moves; a count never goes below zero.
+ */
+export function shiftThreadStatusCounts(
+  counts: ThreadStatusCounts,
+  from: ThreadStatusValue | null,
+  to: ThreadStatusValue | null,
+): ThreadStatusCounts {
+  if (from === to) return counts;
+  const next = { ...counts };
+  if (from !== null) next[from] = Math.max(0, (next[from] ?? 0) - 1);
+  if (to !== null) next[to] = (next[to] ?? 0) + 1;
+  return next;
+}
+
+/**
+ * Whether a cached Threads-sheet entry is filtered by status. Its key is
+ * `[...threadsOf(parent), { mine, status }, { viewerId }]` (see `queries.ts`);
+ * only a filtered entry can hold a row that no longer matches, so only those
+ * are ever re-read after a status change. The unfiltered sheet is patched in
+ * place.
+ */
+export function isStatusFilteredThreadsKey(queryKey: readonly unknown[]): boolean {
+  const filters = queryKey[3];
+  if (typeof filters !== 'object' || filters === null) return false;
+  const status = (filters as { status?: unknown }).status;
+  return status !== null && status !== undefined;
+}
+
+/**
+ * A per-key trailing timer: every `schedule(key)` within `delayMs` of the last
+ * one for that key pushes the run back, and the key runs once at the end. Ten
+ * status changes on one parent in a burst become one re-read of its filtered
+ * sheet. Called from event handlers only, never from render.
+ */
+export function createTrailingCoalescer(
+  delayMs: number,
+  run: (key: string) => void,
+): (key: string) => void {
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  return (key) => {
+    const pending = timers.get(key);
+    if (pending !== undefined) clearTimeout(pending);
+    timers.set(
+      key,
+      setTimeout(() => {
+        timers.delete(key);
+        run(key);
+      }, delayMs),
+    );
+  };
+}
