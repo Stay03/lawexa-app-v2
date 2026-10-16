@@ -402,9 +402,11 @@ export function ChannelPlaceHeader({
               )}
             </h1>
 
-            {/* The status beside the thread's name, `md:` and up. */}
+            {/* The status beside the thread's name, `md:` and up. It gives
+                way four times faster than the name, so a long Needs Action
+                chip cuts its own suffix and person before the title. */}
             {renderStatus && (
-              <div className="hidden shrink-0 items-center md:flex">
+              <div className="hidden min-w-0 shrink-[4] items-center md:flex">
                 {renderStatus('menu')}
               </div>
             )}

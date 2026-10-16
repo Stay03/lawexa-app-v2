@@ -370,7 +370,21 @@ test('a thread header carries the status control only for someone who can post',
   const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
   // One of each, each shown at its own width only.
   assert.match(header, /flex min-w-0 flex-1 items-center gap-2 md:hidden">/);
-  assert.match(header, /hidden shrink-0 items-center md:flex">\s*\{renderStatus\('menu'\)\}/);
+  assert.match(header, /hidden min-w-0 shrink-\[4\] items-center md:flex">\s*\{renderStatus\('menu'\)\}/);
+});
+
+test('the header status shrinks to its line, suffix first, and never cuts the word', () => {
+  // The techlead's pictures, 16 October 2026: a Needs Action chip naming a
+  // person cut the desktop title to "Te…", and on a phone "· quiet 1d" ran
+  // under the faces. The header's chip fits; a row's stays whole.
+  const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
+  assert.equal(control.match(/\bfit\b\s*\/>/g)?.length, 2);
+  assert.match(control, /'v2-interactive inline-flex min-w-0 items-center gap-1 rounded-full pr-1\.5'/);
+  const chip = read('v2', 'features', 'collab', 'kit', 'ThreadStatusChip.tsx');
+  assert.match(chip, /fit = false/);
+  assert.match(chip, /<span className="shrink-0">\{threadStatusLabel\(value\)\}<\/span>/);
+  assert.match(chip, /fit && 'min-w-0 shrink-\[8\] truncate'/);
+  assert.match(chip, /<span className="min-w-0 max-w-32 truncate">\{`· \$\{person\}`\}<\/span>/);
 });
 
 test('on a phone the status stands in the subtitle line and the title keeps the row', () => {

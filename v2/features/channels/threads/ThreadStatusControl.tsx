@@ -100,13 +100,14 @@ export function ThreadStatusControl({
     // so it takes the row's size and the note follows it.
     return status ? (
       <>
-        <span className="inline-flex min-w-0 shrink-0 items-center">
+        <span className="inline-flex min-w-0 items-center">
           <span className="sr-only">Status: </span>
           <ThreadStatusChip
             size={surface === 'sheet' ? 'sm' : 'md'}
             value={status.value}
             person={threadStatusPerson(status)}
             quiet={quiet}
+            fit
           />
         </span>
         {surface === 'sheet' && <PhoneNote status={status} />}
@@ -202,6 +203,7 @@ function TriggerFace({
         value={status.value}
         person={threadStatusPerson(status)}
         quiet={quiet}
+        fit
       />
       {chevron}
     </>
@@ -221,7 +223,7 @@ function TriggerFace({
 }
 
 const TRIGGER_BASE = cn(
-  'v2-interactive inline-flex shrink-0 items-center gap-1 rounded-full pr-1.5',
+  'v2-interactive inline-flex min-w-0 items-center gap-1 rounded-full pr-1.5',
   'transition-colors duration-150 hover:bg-secondary/60 motion-reduce:transition-none',
   FOCUS_RING,
 );

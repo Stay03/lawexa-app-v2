@@ -18,6 +18,12 @@ import {
  * pattern for tinted pills, so the chip holds its contrast in both themes.
  * `person` follows the word after a middle dot ("Needs Action · Tolu");
  * `quiet` hangs the stale suffix ("quiet 1d") after the chip in muted ink.
+ *
+ * `fit` is for a thread's header, where the chip shares a line with the
+ * title: it shrinks to the room it is given instead of pushing the title to
+ * "Te…" or running under the faces (techlead's pictures, 16 October 2026). The
+ * suffix gives way first, then the person; the word itself is never cut. A
+ * row keeps the chip whole, as before.
  */
 
 const TONE: Readonly<Record<ThreadStatusValue, { chip: string; dot: string }>> = {
@@ -77,6 +83,7 @@ export function ThreadStatusChip({
   person = null,
   size = 'sm',
   quiet = null,
+  fit = false,
   className,
 }: {
   value: ThreadStatusValue;
@@ -86,6 +93,8 @@ export function ThreadStatusChip({
   size?: 'sm' | 'md';
   /** The stale suffix, e.g. "quiet 1d"; `null` draws none. */
   quiet?: string | null;
+  /** Shrinks to its line, suffix first, then the person; never the word. */
+  fit?: boolean;
   className?: string;
 }) {
   if (!isThreadStatusValue(value)) return null;
@@ -93,6 +102,7 @@ export function ThreadStatusChip({
     <span
       className={cn(
         'inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-full font-medium whitespace-nowrap',
+        fit && 'shrink',
         size === 'md' ? 'h-6 px-2.5 text-xs' : 'h-5 px-2 text-[11px]',
         TONE[value].chip,
         quiet ? null : className,
@@ -102,7 +112,7 @@ export function ThreadStatusChip({
         aria-hidden
         className={cn('size-1.5 shrink-0 rounded-full', TONE[value].dot)}
       />
-      {threadStatusLabel(value)}
+      <span className="shrink-0">{threadStatusLabel(value)}</span>
       {person ? (
         <span className="min-w-0 max-w-32 truncate">{`· ${person}`}</span>
       ) : null}
@@ -110,9 +120,15 @@ export function ThreadStatusChip({
   );
   if (!quiet) return chip;
   return (
-    <span className={cn('inline-flex shrink-0 items-center gap-1', className)}>
+    <span className={cn('inline-flex min-w-0 shrink-0 items-center gap-1', fit && 'shrink', className)}>
       {chip}
-      <span className="text-[11px] whitespace-nowrap text-muted-foreground">
+      {/* Weighted to give way well before the person's name does. */}
+      <span
+        className={cn(
+          'text-[11px] whitespace-nowrap text-muted-foreground',
+          fit && 'min-w-0 shrink-[8] truncate',
+        )}
+      >
         {`· ${quiet}`}
       </span>
     </span>
