@@ -481,8 +481,11 @@ export interface Channel {
    * A compact preview of the channel's most recent surviving message — a display
    * name (`"Lawexa"` for AI-authored messages) and a plaintext snippet (markdown
    * and mentions flattened, ≤120 chars). `null` when no message survives (e.g.
-   * the last was deleted). Stamped ONLY by `GET /api/channels` (the cross-space
-   * my-channels route); the per-space channel list never sets it.
+   * the last was deleted). Stamped by `GET /api/channels` (the cross-space
+   * my-channels route) and, for threads, by `GET /channels/{channel}/threads`
+   * and `GET /spaces/{space}/threads` (backend 31741379, 16 October 2026); the
+   * per-space channel list never sets it. ABSENT from a list that does not
+   * stamp it, so a row falls back to its older line.
    */
   last_message?: { author_name: string; snippet: string } | null;
   created_at: string;

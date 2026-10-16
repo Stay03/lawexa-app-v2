@@ -10,6 +10,7 @@ import {
   followerLabel,
   threadProvenanceLabel,
 } from '@/v2/features/channels/thread-model';
+import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import {
   CountBadge,
@@ -147,13 +148,32 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
                 facts cut three times. The channel name is the only fact that
                 may be long, so it alone sits in the lead and ellipsizes; the
                 short counted facts sit in the trail, which holds its width. */}
+            {/* Who spoke last and what they said (Stay, 16 October 2026),
+                in place of the follower count, once the list carries it. The
+                channel and the preview are ONE fact, so the line is cut once,
+                at its end (design round 1); until the list carries it, today's
+                line. */}
             <MetaLine
               className="mt-0.5"
-              lead={[showProvenance ? provenance : null]}
-              trail={[
-                followerLabel(thread.active_members_count),
-                thread.last_message_at === null ? 'No messages yet' : null,
+              lead={[
+                thread.last_message ? (
+                  <LastMessagePreview
+                    key="preview"
+                    preview={thread.last_message}
+                    prefix={showProvenance ? provenance : null}
+                  />
+                ) : showProvenance ? (
+                  provenance
+                ) : null,
               ]}
+              trail={
+                thread.last_message === undefined
+                  ? [
+                      followerLabel(thread.active_members_count),
+                      thread.last_message_at === null ? 'No messages yet' : null,
+                    ]
+                  : [thread.last_message === null ? 'No messages yet' : null]
+              }
             />
           </div>
         </div>

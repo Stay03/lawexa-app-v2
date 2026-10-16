@@ -451,8 +451,11 @@ test('the invitations screen has a title on a desktop and keeps Spaces lit in th
 
 test('a thread row truncates once at most', () => {
   const row = read('v2', 'features', 'spaces', 'detail', 'SpaceThreadRow.tsx');
-  assert.match(row, /lead=\{\[showProvenance \? provenance : null\]\}/);
-  assert.match(row, /trail=\{\[\s*followerLabel\(thread\.active_members_count\),/);
+  // One fact in the lead: the channel joins the last message's one truncation
+  // (16 October 2026), and stands alone when there is none.
+  assert.match(row, /lead=\{\[\s*thread\.last_message \? \(\s*<LastMessagePreview\s+key="preview"\s+preview=\{thread\.last_message\}\s+prefix=\{showProvenance \? provenance : null\}\s*\/>\s*\) : showProvenance \? \(\s*provenance\s*\) : null,\s*\]\}/);
+  // Until the list carries the preview, the follower count holds the trail.
+  assert.match(row, /\? \[\s*followerLabel\(thread\.active_members_count\),/);
 });
 
 test('on a phone "New" sits on the title row; from sm: "New space" ends the toolbar', () => {

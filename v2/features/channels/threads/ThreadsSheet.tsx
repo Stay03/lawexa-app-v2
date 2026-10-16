@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel } from '@/types/collab';
+import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
@@ -320,6 +321,9 @@ function ThreadRow({
   const title = channelDisplayName(thread);
   const mentions = thread.mention_count ?? 0;
   const lastMessageAt = thread.last_message_at;
+  // Who spoke last and what they said (Stay, 16 October 2026), in place of the
+  // follower count, once the list carries it; until then, today's line.
+  const preview = thread.last_message;
 
   return (
     <li>
@@ -356,10 +360,14 @@ function ThreadRow({
               1.5 gap is exactly 20px. */}
           <MetaLine
             className="mt-0.5 pl-5"
-            lead={[
-              followerLabel(thread.active_members_count),
-              lastMessageAt === null ? 'No messages yet' : null,
-            ]}
+            lead={
+              preview === undefined
+                ? [
+                    followerLabel(thread.active_members_count),
+                    lastMessageAt === null ? 'No messages yet' : null,
+                  ]
+                : [preview ? <LastMessagePreview key="preview" preview={preview} /> : 'No messages yet']
+            }
           />
         </div>
 

@@ -9,6 +9,7 @@ import { channelVisibilityFace } from '@/lib/collab/visibility';
 import { cn } from '@/lib/utils';
 import type { Channel } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
+import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import {
   CountBadge,
@@ -148,10 +149,7 @@ export const MyChannelRow = memo(function MyChannelRow({
               lead={[
                 channel.space.name,
                 preview ? (
-                  <span key="preview" className="min-w-0 truncate">
-                    <span className="text-foreground/70">{preview.author_name}</span>
-                    {`: ${preview.snippet}`}
-                  </span>
+                  <LastMessagePreview key="preview" preview={preview} />
                 ) : (
                   'No messages yet'
                 ),
