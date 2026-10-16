@@ -138,7 +138,10 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * Work and Study are compact rows; Cancel and Create Space sit side by side as
  * FieldPanel's pair. A phone does not raise the keyboard on its own when step
  * two draws: the reader taps the name, and the sheet rides above the keys.
- * The edit form keeps the full screen: it is longer.
+ * The edit form is the same sheet (techlead, 16 October 2026: Stay rejected
+ * the full-screen phone popup, and Arthur asked for one frame): it is longer,
+ * so it can stand nearly as tall as the screen, its fields scroll inside it
+ * and Cancel and Save changes stay pinned at its foot.
  *
  * ── ARTHUR'S WORDS (15 October 2026) ───────────────────────────────────────
  * The title, "What are you working on?" and its line, "Space name", "What are
@@ -468,16 +471,18 @@ export function SpaceFormDialog({
 
   return (
     /* `ResponsiveOverlay` keeps three bands: a header that stays, a body that
-       scrolls, a footer that stays. Create is a sheet on a phone, as tall as
-       the step (see the docblock); the longer edit form keeps the whole
-       screen (the bug Arthur photographed on 2026-08-07 was a centred box
-       taller than the viewport). Above `md:` both are a centred card. */
+       scrolls, a footer that stays. Create and edit are both a sheet on a
+       phone, as tall as what they hold and capped below the screen's top, so
+       a long edit form scrolls inside it rather than growing a centred box
+       taller than the viewport (the bug Arthur photographed on 2026-08-07).
+       Above `md:` both are a centred card. */
     <ResponsiveOverlay
       open={open}
       onOpenChange={handleOpenChange}
-      size={isEdit ? 'fill' : 'content'}
-      // A tap beside the sheet must not throw away what was typed.
-      guardUnsaved={!isEdit && (name.trim() !== '' || description.trim() !== '')}
+      size="content"
+      // A tap beside the sheet must not throw away what was typed: on create
+      // anything typed, on edit any change from the saved space.
+      guardUnsaved={isEdit ? changed : name.trim() !== '' || description.trim() !== ''}
       // The top edge stands still on a desktop; only the foot moves.
       anchor={isEdit ? 'center' : 'top'}
       title={isEdit ? 'Edit space' : 'Create a Space'}

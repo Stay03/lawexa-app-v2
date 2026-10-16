@@ -329,9 +329,12 @@ test('create is two steps: the type first, then the fields, with no preview (Sta
   assert.match(dialog, /className=\{STEP_QUESTION\}>\s*What are you working on\?/);
   assert.match(dialog, /\{isEdit \? 'Space name' : 'Name your space'\}/);
   assert.doesNotMatch(dialog, /Keep conversations and resources together/);
-  // On a phone, create is a sheet as tall as the step; edit keeps the screen.
-  assert.match(dialog, /size=\{isEdit \? 'fill' : 'content'\}/);
-  assert.match(dialog, /guardUnsaved=\{!isEdit && \(name\.trim\(\) !== '' \|\| description\.trim\(\) !== ''\)\}/);
+  // On a phone, create and edit are one sheet frame (techlead, 16 October
+  // 2026: Stay rejected the full-screen phone popup); was
+  // `size={isEdit ? 'fill' : 'content'}`. A tap beside it keeps an edit too.
+  assert.match(dialog, /size="content"/);
+  assert.doesNotMatch(dialog, /size=\{isEdit/);
+  assert.match(dialog, /guardUnsaved=\{isEdit \? changed : name\.trim\(\) !== '' \|\| description\.trim\(\) !== ''\}/);
   // A phone does not raise the keyboard by itself on step two.
   assert.match(dialog, /if \(window\.matchMedia\('\(min-width: 48rem\)'\)\.matches\) nameRef\.current\?\.focus\(\);/);
   // Cancel and Create Space side by side, FieldPanel's pair.
