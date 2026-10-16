@@ -14,9 +14,16 @@ import {
 import { SpaceJoinRequestsPanel } from '@/v2/features/invites/JoinRequestsPanel';
 import { useSpaceJoinRequests } from '@/v2/features/invites/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { isSharedSpace, memberCountLabel, rosterCountLabel, splitRoster } from '../../model';
+import {
+  canAskToContribute,
+  isSharedSpace,
+  memberCountLabel,
+  rosterCountLabel,
+  splitRoster,
+} from '../../model';
 import { spacesQueries } from '../../queries';
 import { invitedRows } from './people-model';
+import { ContributeAsk, RoleRequestsSection } from './RoleRequests';
 import { useSpaceRosterRow } from './use-roster-row';
 
 /**
@@ -33,6 +40,11 @@ import { useSpaceRosterRow } from './use-roster-row';
  *   approval" (came through a link that needs approval; let them in or
  *   decline on the row). Stay renamed both on 15 October 2026 (they were
  *   "Invited" and "Asked to join").
+ * - On a shared space (Arthur's joining changes, 16 October 2026): the Owner
+ *   picks Contributor or Viewer on each "Needs your approval" row, and sees
+ *   "Wants to contribute" above it, the Viewers who asked to contribute, to
+ *   allow or decline. A Viewer gets "Ask to contribute" where the Owner has
+ *   Invite, and "Request sent" with "Withdraw request" while it is open.
  *
  * The roster is the frame's own members query (same key, so this paints from
  * the warm cache and asks for nothing new); this mounts it again for its own
@@ -47,6 +59,7 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
   const canManage = scope?.canManage ?? false;
   const shared = isSharedSpace(space);
+  const viewerMayAsk = scope ? canAskToContribute(scope.membership) : false;
 
   const membersQuery = useQuery(spacesQueries.members(space.uuid, { viewerId: session.userId }));
   // The invites not accepted yet (`?status=pending`), asked for only by whoever
@@ -65,6 +78,8 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
     ? rosterCountLabel(joined.length, invited.length)
     : memberCountLabel(space.active_members_count);
   const waiting = requests.data?.data.length ?? 0;
+  // The reader's own row carries their open ask, if any (RoleRequests).
+  const ownRow = joined.find((member) => member.user.uuid === viewerUuid) ?? null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -81,6 +96,8 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
               Invite people
             </Button>
           </div>
+        ) : viewerMayAsk && membersQuery.isSuccess ? (
+          <ContributeAsk spaceUuid={space.uuid} ownRow={ownRow} />
         ) : null}
       </div>
 
@@ -109,6 +126,8 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
           <div className="divide-y divide-border/60">{invited.map((member) => rosterRow(member, true))}</div>
         </section>
       ) : null}
+
+      {canManage && shared ? <RoleRequestsSection spaceUuid={space.uuid} /> : null}
 
       {canManage && waiting > 0 ? (
         <section

@@ -143,6 +143,47 @@ export function useUpdateSpaceMemberRole(spaceUuid: string) {
   });
 }
 
+/**
+ * A Viewer's ask to contribute, and taking it back (shared spaces, 16 October
+ * 2026). The ask rides on the reader's own row in the members list, so both
+ * refetch that list.
+ */
+export function useAskToContribute(spaceUuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => spacesApi.askToContribute(spaceUuid),
+    meta: { silentError: true },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: spacesQueries.membersOf(spaceUuid) });
+    },
+  });
+}
+
+export function useWithdrawContributeRequest(spaceUuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => spacesApi.withdrawContributeRequest(spaceUuid),
+    meta: { silentError: true },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: spacesQueries.membersOf(spaceUuid) });
+    },
+  });
+}
+
+/** The Owner allows or declines an ask; an allow changes a role, so the
+ *  roster and the requests list both refetch (one prefix). */
+export function useDecideRoleRequest(spaceUuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { memberId: number; approve: boolean }) =>
+      spacesApi.decideRoleRequest(vars.memberId, vars.approve),
+    meta: { silentError: true },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: spacesQueries.membersOf(spaceUuid) });
+    },
+  });
+}
+
 export function useRemoveSpaceMember(spaceUuid: string) {
   const queryClient = useQueryClient();
   return useMutation({

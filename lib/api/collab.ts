@@ -367,8 +367,36 @@ export const spacesApi = {
           per_page: params.per_page ?? 100,
           page: params.page ?? 1,
           status: params.status,
+          requests: params.requests ? 1 : undefined,
         },
       }
+    );
+    return response.data;
+  },
+
+  /** A Viewer asks to become a Contributor (shared spaces). 422 for anyone
+   *  else, 409 with an ask already open. */
+  askToContribute: async (uuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(`/spaces/${uuid}/role-requests`, {
+      content_role: 'editor',
+    });
+    return response.data;
+  },
+
+  /** The Viewer takes their own open ask back. */
+  withdrawContributeRequest: async (uuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/spaces/${uuid}/role-requests/mine`
+    );
+    return response.data;
+  },
+
+  /** The Owner decides an ask, addressed by the member row's `id`: approve
+   *  makes them a Contributor; either clears the ask. */
+  decideRoleRequest: async (memberId: number, approve: boolean): Promise<ApiResponse<null>> => {
+    const response = await apiClient.post<ApiResponse<null>>(
+      `/space-role-requests/${memberId}/${approve ? 'approve' : 'reject'}`,
+      {}
     );
     return response.data;
   },

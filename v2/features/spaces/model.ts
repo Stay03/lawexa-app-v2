@@ -504,6 +504,15 @@ export function isOwnerMustTransferError(status: number): boolean {
 export type MembershipSubject = Pick<Space, 'kind' | 'my_role' | 'my_content_role'>;
 
 /**
+ * Who may ask to become a Contributor: a Viewer of a SHARED space (backend,
+ * 16 October 2026: anyone else gets 422). Owners and Contributors have
+ * nothing to ask for, and a team space has no content roles to ask about.
+ */
+export function canAskToContribute(space: MembershipSubject): boolean {
+  return isSharedSpace(space) && space.my_content_role === 'viewer';
+}
+
+/**
  * Who may invite, change roles, make invite links, see the waiting list and
  * remove members. On a SHARED space only the content Owner (backend B2: an
  * Contributor or Viewer gets 403), read off `my_content_role`. On a TEAM space,

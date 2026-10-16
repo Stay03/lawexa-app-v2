@@ -143,6 +143,14 @@ export interface Member {
   joined_at: string | null;
   left_at: string | null;
   created_at: string;
+  /**
+   * A Viewer's open ask to become a Contributor (backend, 16 October 2026):
+   * "editor" while it is open, else null. Filled on the reader's own row, and
+   * on every row for an Owner; null on others' rows for everyone else.
+   * Absent before the joining changes. Space rosters only.
+   */
+  requested_content_role?: 'editor' | null;
+  role_requested_at?: string | null;
 }
 
 /******************************************************************************
@@ -1262,6 +1270,11 @@ export interface MemberListParams {
    * Absent: the active members, as before.
    */
   status?: 'pending';
+  /**
+   * `true`: only the members with an open ask to contribute, for the space's
+   * Owner only (403 otherwise; backend, 16 October 2026).
+   */
+  requests?: true;
 }
 
 /**
