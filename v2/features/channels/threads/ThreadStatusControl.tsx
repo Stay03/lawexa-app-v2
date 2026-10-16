@@ -1,20 +1,12 @@
 'use client';
 
-import { useState, type KeyboardEvent } from 'react';
+import { useState } from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useAuthStore } from '@/lib/stores/authStore';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Sheet,
   SheetContent,
@@ -30,9 +22,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   THREAD_STATUS_OPTIONS,
   isSameThreadStatus,
-  isThreadStatusValue,
   knownThreadStatus,
-  nextRadioIndex,
   threadStatusErrorText,
   threadStatusFooter,
   threadStatusPerson,
@@ -44,6 +34,7 @@ import {
 import { useMinuteNow } from '../use-minute-now';
 import { useSetThreadStatus } from './mutations';
 import { NeedsActionStep } from './NeedsActionStep';
+import { moveRadioFocus } from './radio-focus';
 
 /**
  * ThreadStatusControl — a thread's status in its header, and the way to set it
@@ -67,8 +58,8 @@ import { NeedsActionStep } from './NeedsActionStep';
  * optional, then Save.
  *
  * ── ONE CONTROL, TWO SURFACES ──────────────────────────────────────────────
- * `surface="menu"` opens a shadcn `DropdownMenu` beside the name on a wide
- * pane; `surface="sheet"` opens a bottom sheet on a phone, the channel
+ * `surface="menu"` opens a shadcn `Popover` beside the name on a wide pane
+ * (a dialog, not a menu, because the Needs Action step is a form); `surface="sheet"` opens a bottom sheet on a phone, the channel
  * screen's own pattern for phone choices (`MessageActionsSheet`), and stands
  * in the subtitle's line with the note after it. The header mounts one of
  * each and shows exactly one by breakpoint, so no media query runs in render.
@@ -289,6 +280,75 @@ function saveNeedsAction(choose: (choice: ThreadStatusChoice) => void) {
     choose({ status: 'needs_action', needsActionFrom: person, note });
 }
 
+/**
+ * The five statuses as ONE radio group: the checked option is the single tab
+ * stop (the first when there is no status), arrows move focus, and a click,
+ * Enter or Space chooses. `aria-disabled`, not `disabled`, while a request is
+ * out, so focus is not thrown off the option it is on.
+ */
+function StatusRadioGroup({
+  current,
+  pending,
+  onPress,
+  dense = false,
+}: {
+  current: ThreadStatusValue | null;
+  pending: boolean;
+  onPress: (value: ThreadStatusValue) => void;
+  /** The desktop popover's tighter rows; the phone keeps its 56px targets. */
+  dense?: boolean;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Thread status"
+      onKeyDown={moveRadioFocus}
+      className="flex flex-col"
+    >
+      {THREAD_STATUS_OPTIONS.map((option, index) => {
+        const selected = option.value === current;
+        const tabStop = current === null ? index === 0 : selected;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            tabIndex={tabStop ? 0 : -1}
+            aria-disabled={pending}
+            onClick={() => {
+              if (!pending) onPress(option.value);
+            }}
+            className={cn(
+              'v2-interactive flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm',
+              dense ? 'min-h-11' : 'min-h-14',
+              'transition-colors duration-150 motion-reduce:transition-none',
+              selected ? 'bg-secondary' : 'hover:bg-secondary/60',
+              pending && 'opacity-60',
+              FOCUS_RING,
+            )}
+          >
+            <ThreadStatusDot value={option.value} className="size-2" />
+            <span className="min-w-0 flex-1">
+              <OptionText option={option} />
+            </span>
+            {selected && <Check aria-hidden className="size-4 shrink-0 text-primary" />}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The desktop control: a shadcn `Popover`, not a menu (checker, 16 October
+ * 2026). The Needs Action step is a form, and a form inside `role="menu"` is
+ * invalid ARIA; worse, Radix's menu content swallowed Tab once Enter had
+ * unmounted the focused item, so the step could not be reached by keyboard.
+ * The popover is modal, so Tab wraps inside it, and Escape closes it. Its
+ * first view is the status radio group; choosing Needs Action swaps the body
+ * to the step, which takes focus itself (see `NeedsActionStep`).
+ */
 function StatusMenu({ threadUuid, parentUuid, viewerId, status, quiet, now }: SurfaceProps) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<'list' | 'needs_action'>('list');
@@ -304,7 +364,8 @@ function StatusMenu({ threadUuid, parentUuid, viewerId, status, quiet, now }: Su
   });
 
   return (
-    <DropdownMenu
+    <Popover
+      modal
       open={open}
       onOpenChange={(next) => {
         setOpen(next);
@@ -314,13 +375,17 @@ function StatusMenu({ threadUuid, parentUuid, viewerId, status, quiet, now }: Su
         }
       }}
     >
-      <DropdownMenuTrigger
+      <PopoverTrigger
         className={TRIGGER}
         aria-label={threadStatusTriggerLabel(status, quiet)}
       >
         <TriggerFace status={status} quiet={quiet} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-80">
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        aria-label={step === 'needs_action' ? 'Needs Action' : 'Status'}
+        className="w-80 gap-0 p-1"
+      >
         {step === 'needs_action' ? (
           <NeedsActionStep
             parentUuid={parentUuid}
@@ -337,37 +402,19 @@ function StatusMenu({ threadUuid, parentUuid, viewerId, status, quiet, now }: Su
           />
         ) : (
           <>
-            <DropdownMenuLabel>Status</DropdownMenuLabel>
-            <DropdownMenuRadioGroup
-              // Without a status nothing is ticked; there is no item to clear one with.
-              value={status?.value ?? ''}
-              onValueChange={(next) => {
-                if (isThreadStatusValue(next)) press(next);
-              }}
-            >
-              {THREAD_STATUS_OPTIONS.map((option) => (
-                <DropdownMenuRadioItem
-                  key={option.value}
-                  value={option.value}
-                  disabled={pending}
-                  // Held open: the surface closes when the server agrees, and
-                  // a refusal is shown inside it (see the docblock).
-                  onSelect={(event) => event.preventDefault()}
-                  className="items-start"
-                >
-                  <span className="mt-1.5 flex">
-                    <ThreadStatusDot value={option.value} className="size-2" />
-                  </span>
-                  <OptionText option={option} />
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-            {(status || error) && <DropdownMenuSeparator />}
+            <p className="px-3 py-2 text-xs text-muted-foreground">Status</p>
+            <StatusRadioGroup
+              current={status?.value ?? null}
+              pending={pending}
+              onPress={press}
+              dense
+            />
+            {(status || error) && <div className="mx-1 my-1 h-px bg-border" />}
             <StatusFooter status={status} now={now} error={error} />
           </>
         )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -384,25 +431,6 @@ function StatusSheet({ threadUuid, parentUuid, viewerId, status, quiet, now }: S
     clearError();
     setStep('needs_action');
   });
-  const current = status?.value ?? null;
-
-  /* A REAL RADIO GROUP: one tab stop (the checked option, or the first when
-     none is), ArrowUp/ArrowDown move focus and wrap, Home/End jump. Arrows
-     move FOCUS ONLY. Choosing sends a request (or opens Needs Action's step),
-     so it stays on tap, Enter and Space, never on an arrow press. The options
-     are read off the group in the handler, never in render. */
-  const onRadioKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
-    if (!keys.includes(event.key)) return;
-    const radios = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
-    );
-    if (radios.length === 0) return;
-    event.preventDefault();
-    const at = radios.findIndex((radio) => radio === document.activeElement);
-    const target = nextRadioIndex(event.key, at, radios.length);
-    radios[target]?.focus();
-  };
 
   return (
     <>
@@ -445,48 +473,11 @@ function StatusSheet({ threadUuid, parentUuid, viewerId, status, quiet, now }: S
             </div>
           ) : (
             <div className="flex flex-col px-2 pb-2">
-              <div
-                role="radiogroup"
-                aria-label="Thread status"
-                onKeyDown={onRadioKeyDown}
-                className="flex flex-col"
-              >
-                {THREAD_STATUS_OPTIONS.map((option, index) => {
-                  const selected = option.value === current;
-                  const tabStop = current === null ? index === 0 : selected;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      // Roving tab stop: one option alone is in the tab order.
-                      // `aria-disabled`, not `disabled`, while a request is
-                      // out, so focus is not thrown off the option it is on.
-                      tabIndex={tabStop ? 0 : -1}
-                      aria-disabled={pending}
-                      onClick={() => {
-                        if (!pending) press(option.value);
-                      }}
-                      className={cn(
-                        'v2-interactive flex min-h-14 w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm',
-                        'transition-colors duration-150 motion-reduce:transition-none',
-                        selected ? 'bg-secondary' : 'hover:bg-secondary/60',
-                        pending && 'opacity-60',
-                        FOCUS_RING,
-                      )}
-                    >
-                      <ThreadStatusDot value={option.value} className="size-2" />
-                      <span className="min-w-0 flex-1">
-                        <OptionText option={option} />
-                      </span>
-                      {selected && (
-                        <Check aria-hidden className="size-4 shrink-0 text-primary" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
+              <StatusRadioGroup
+                current={status?.value ?? null}
+                pending={pending}
+                onPress={press}
+              />
               {(status || error) && <div className="mx-1 my-1 h-px bg-border" />}
               <StatusFooter status={status} now={now} error={error} />
             </div>

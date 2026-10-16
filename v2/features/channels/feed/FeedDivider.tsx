@@ -198,7 +198,8 @@ export function QuietSystemLine({ message }: { message: Message }) {
  * this app does not know draws the sentence with no chip.
  *
  * The note, when there is one, is already inside the server's sentence
- * ("... to Done: shipped"), so it is not printed twice.
+ * ("... to Needs Action for Tolu: review clause 4"), so it is not printed
+ * twice.
  */
 function StatusChangeLine({
   change,

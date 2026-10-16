@@ -28,7 +28,6 @@ import {
   threadStatusQuiet,
   threadStatusTriggerLabel,
 } from './thread-status-model';
-import { mergeKeepingOrder } from './model';
 
 /* Thread status (Stay, 15-16 October 2026, the design "locked in" from the
  * thread-status mock; values, words and rules revised by Arthur the same day).
@@ -287,32 +286,21 @@ test('a refusal shows the field error, else the server sentence', () => {
   );
 });
 
-test('the server’s order is kept: merging decides only where threads fall', () => {
-  // Threads in urgency order (not by recency) must come out in that order.
-  const threads = ['t-needs-old', 't-working-new', 't-closed-mid'];
-  const channels = ['c-new', 'c-old'];
-  const at: Record<string, number> = {
-    'c-new': 50,
-    'c-old': 5,
-    't-needs-old': 10,
-    't-working-new': 60,
-    't-closed-mid': 30,
-  };
-  const merged = mergeKeepingOrder(channels, threads, (a, b) => at[b] - at[a]);
-  assert.deepEqual(
-    merged.filter((id) => id.startsWith('t-')),
-    threads,
-    'the threads keep the server order',
-  );
-  assert.deepEqual(merged, ['c-new', 't-needs-old', 't-working-new', 't-closed-mid', 'c-old']);
-
-  // No surface re-sorts its threads.
+test('urgency order lives in the Threads sheet only; My channels and the lobby stay by recency', () => {
+  // Techlead and backend, 16 October 2026: the sheet keeps the server's
+  // urgency order and never re-sorts; My channels and "Active here" keep
+  // Stay's rule (20 August), the most recent on top.
+  const sheet = read('v2', 'features', 'channels', 'threads', 'ThreadsSheet.tsx');
+  assert.doesNotMatch(sheet, /\.sort\(|toSorted\(/);
+  assert.match(sheet, /query\.data\?\.pages\.flatMap\(\(page\) => page\.data\)/);
   const myModel = read('v2', 'features', 'channels', 'my-channels', 'model.ts');
-  assert.doesNotMatch(myModel, /\[\.\.\.channels, \.\.\.threads\]\.sort/);
-  assert.match(myModel, /const ordered = bucket;/);
+  assert.match(myModel, /return \[\.\.\.channels, \.\.\.threads\]\.sort\(compareRoomRecency\);/);
+  assert.match(myModel, /const ordered = \[\.\.\.bucket\]\.sort\(compareRoomRecency\);/);
   const digest = read('v2', 'features', 'spaces', 'detail', 'activity-digest.ts');
-  assert.doesNotMatch(digest, /(unread|rest|muted)\.sort\(byRecency\)/);
-  assert.match(digest, /mergeKeepingOrder\(channels\.map\(asChannelRow\)\.sort\(byRecency\), tierThreads, byRecency\)/);
+  for (const tier of ['unread', 'rest', 'muted']) {
+    assert.match(digest, new RegExp(`${tier}\\.sort\\(byRecency\\);`), tier);
+  }
+  assert.doesNotMatch(myModel + digest, /mergeKeepingOrder/);
   // The cache writers patch rows where they stand: no sort, no move to the top.
   const cache = read('v2', 'features', 'channels', 'cache.ts');
   const writer = cache.slice(cache.indexOf('export function applyThreadStatus'));
@@ -422,10 +410,51 @@ test('the menu has no clear item, and Needs Action asks who before it saves', ()
   assert.match(step, /enabled: parentUuid !== null/);
   assert.match(step, /maxLength=\{NOTE_MAX\}/);
   assert.match(step, /const NOTE_MAX = 140;/);
-  // Keys stay in the step inside the desktop menu, but Escape still closes.
-  assert.match(step, /if \(event\.key !== 'Escape'\) event\.stopPropagation\(\);/);
   const mutations = read('v2', 'features', 'channels', 'threads', 'mutations.ts');
   assert.match(mutations, /channelsApi\.setStatus\(threadUuid, buildSetThreadStatusBody\(choice\)\)/);
+});
+
+/* ── Checker round 2 (16 October 2026) ─────────────────────────────────── */
+
+test('the desktop control is a modal popover, not a menu, so the step is reachable by keyboard', () => {
+  const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
+  assert.doesNotMatch(control, /<DropdownMenu|ui\/dropdown-menu'/);
+  assert.match(control, /<Popover\s+modal\b/);
+  assert.match(control, /<PopoverTrigger\b/);
+  assert.match(control, /<PopoverContent\b/);
+  // Both surfaces draw the same radio group of the five.
+  assert.equal(control.match(/<StatusRadioGroup\b/g)?.length, 2);
+  // The step takes focus when it arrives, through a STABLE callback ref, so
+  // typing in the note never pulls focus back to the search box.
+  const step = read('v2', 'features', 'channels', 'threads', 'NeedsActionStep.tsx');
+  assert.match(step, /const focusOnArrive = useCallback\(\(node: HTMLElement \| null\) => \{\s*node\?\.focus\(\);\s*\}, \[\]\);/);
+  assert.match(step, /<Input\s+ref=\{focusOnArrive\}/);
+  assert.match(step, /ref=\{parentUuid === null \? focusOnArrive : undefined\}/);
+  assert.doesNotMatch(step, /stopPropagation/);
+});
+
+test('the member picker is a real radio group led by "No one in particular"', () => {
+  const step = read('v2', 'features', 'channels', 'threads', 'NeedsActionStep.tsx');
+  assert.match(step, /const NO_ONE = 'No one in particular';/);
+  assert.match(step, /\{ uuid: null, name: NO_ONE \},\s*\.\.\.people,/);
+  assert.match(step, /role="radiogroup"\s*aria-labelledby="v2-needs-action-title"\s*onKeyDown=\{moveRadioFocus\}/);
+  assert.match(step, /const tabStop = chosenVisible \? selected : index === 0;/);
+  assert.match(step, /tabIndex=\{tabStop \? 0 : -1\}/);
+  // A tap chooses; it never un-chooses (the old second-tap toggle is gone).
+  assert.doesNotMatch(step, /selected \? null/);
+});
+
+test('the member search asks the server after a pause, with the first page as the fallback', () => {
+  const step = read('v2', 'features', 'channels', 'threads', 'NeedsActionStep.tsx');
+  assert.match(step, /const SEARCH_DEBOUNCE_MS = 250;/);
+  // Debounced in the change handler, never in an effect.
+  assert.match(step, /setDebounced\(next\.trim\(\)\);\s*\}, SEARCH_DEBOUNCE_MS\);/);
+  assert.match(step, /onChange=\{\(event\) => onSearchChange\(event\.target\.value\)\}/);
+  assert.match(step, /channelsQueries\.members\(parentUuid \?\? '', \{ viewerId, search: debounced \}\)/);
+  assert.match(step, /enabled: parentUuid !== null && debounced !== ''/);
+  assert.match(step, /if \(typed !== '' && debounced === typed && searched\.data\)/);
+  const api = read('lib', 'api', 'collab.ts');
+  assert.match(api, /`\/channels\/\$\{uuid\}\/members`,\s*\{\s*params: \{\s*search: params\.search \|\| undefined,/);
 });
 
 test('the feed status line wraps to two lines, chip on the first', () => {
@@ -560,7 +589,7 @@ test('screen readers hear the status, its person and how long it has been quiet'
   assert.match(control, /<span className="sr-only">Status: <\/span>\s*<ThreadStatusChip/);
 });
 
-test('the phone sheet is a real radio group: one tab stop, arrows move focus only', () => {
+test('the status list is a real radio group on both surfaces: one tab stop, arrows move focus only', () => {
   assert.equal(nextRadioIndex('ArrowDown', 1, 5), 2);
   assert.equal(nextRadioIndex('ArrowDown', 4, 5), 0);
   assert.equal(nextRadioIndex('ArrowUp', 0, 5), 4);
@@ -568,11 +597,12 @@ test('the phone sheet is a real radio group: one tab stop, arrows move focus onl
   assert.equal(nextRadioIndex('Home', 3, 5), 0);
   assert.equal(nextRadioIndex('End', 3, 5), 4);
   const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
-  assert.match(control, /role="radiogroup"\s*aria-label="Thread status"\s*onKeyDown=\{onRadioKeyDown\}/);
+  assert.match(control, /role="radiogroup"\s*aria-label="Thread status"\s*onKeyDown=\{moveRadioFocus\}/);
   // The checked option is the tab stop; with no status, the first one.
   assert.match(control, /const tabStop = current === null \? index === 0 : selected;/);
   assert.match(control, /tabIndex=\{tabStop \? 0 : -1\}/);
   // The key handler moves focus and never chooses.
-  const handler = control.slice(control.indexOf('const onRadioKeyDown'));
-  assert.doesNotMatch(handler.slice(0, handler.indexOf('\n  };')), /choose\(|press\(/);
+  const handler = read('v2', 'features', 'channels', 'threads', 'radio-focus.ts');
+  assert.match(handler, /radios\[target\]\?\.focus\(\);/);
+  assert.doesNotMatch(handler, /choose\(|press\(|click\(/);
 });

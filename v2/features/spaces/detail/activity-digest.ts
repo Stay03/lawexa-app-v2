@@ -1,8 +1,5 @@
 import type { Channel } from '@/types/collab';
-import {
-  channelUnreadGrammar,
-  mergeKeepingOrder,
-} from '@/v2/features/channels/model';
+import { channelUnreadGrammar } from '@/v2/features/channels/model';
 import {
   channelDisplayName,
   threadUnreadState,
@@ -180,14 +177,9 @@ export function buildActivityDigest(
   threads: readonly Channel[],
   limit: number,
 ): ActivityDigest {
-  /* THE CHANNELS ARE RANKED, THE THREADS ARE NOT (Arthur, 16 October 2026).
-     `GET /spaces/{uuid}/threads` comes back in URGENCY order, which the client
-     must keep, so each tier ranks its channels by recency as before and takes
-     its threads as the server sent them; `mergeKeepingOrder` only decides
-     where a thread falls between channels, never its place among threads. */
-  const unread: ActivityDigestRow[] = [];
-  const rest: ActivityDigestRow[] = [];
-  const muted: ActivityDigestRow[] = [];
+  const unread: ActivityDigestRow[] = sections.unread.map(asChannelRow);
+  const rest: ActivityDigestRow[] = sections.rest.map(asChannelRow);
+  const muted: ActivityDigestRow[] = sections.muted.map(asChannelRow);
 
   for (const thread of threads) {
     // The SAME partition test `buildRailSections` applies to a channel, so
@@ -204,18 +196,16 @@ export function buildActivityDigest(
     else rest.push(row);
   }
 
-  const tier = (channels: readonly RailRow[], tierThreads: ActivityDigestRow[]) =>
-    mergeKeepingOrder(channels.map(asChannelRow).sort(byRecency), tierThreads, byRecency);
-  const unreadRows = tier(sections.unread, unread);
-  const restRows = tier(sections.rest, rest);
-  const mutedRows = tier(sections.muted, muted);
+  unread.sort(byRecency);
+  rest.sort(byRecency);
+  muted.sort(byRecency);
 
   const facts = [countLabel(sections.total, 'channel')];
   if (threads.length > 0) facts.push(countLabel(threads.length, 'thread'));
-  if (unreadRows.length > 0) facts.push(`${unreadRows.length} unread`);
+  if (unread.length > 0) facts.push(`${unread.length} unread`);
 
   return {
-    rows: [...unreadRows, ...restRows, ...mutedRows].slice(0, limit),
+    rows: [...unread, ...rest, ...muted].slice(0, limit),
     meta: facts.join(' · '),
   };
 }
