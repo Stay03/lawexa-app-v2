@@ -11,6 +11,15 @@ import {
   useDecideJoinRequest,
   useSpaceJoinRequests,
 } from './queries';
+import {
+  REQUEST_AVATAR,
+  REQUEST_BUTTON,
+  REQUEST_ICON,
+  REQUEST_ITEM,
+  REQUEST_LINE,
+  REQUEST_LIST,
+  REQUEST_NAME,
+} from './request-row';
 
 /**
  * JoinRequestsPanel — who is waiting, and the two buttons that decide.
@@ -48,16 +57,16 @@ function RequestRow({
 }) {
   const channel = request.also_joins_channel;
   return (
-    <li className="rounded-xl border border-border/60 p-3">
+    <li className={REQUEST_ITEM}>
       {/* TWO COMPACT BUTTONS AT THE END OF THE ROW. A full-width "Let them in"
           read as "a mess" on desktop (Stay, 15 October 2026). A plain request
-          is one line on a wide screen; on a phone the buttons wrap under the
-          name, still compact, at the right. A request that also opens a
+          is one line: on a phone a roster row with small pills, on a wide
+          screen a card (`request-row.ts`). A request that also opens a
           channel keeps its sentence ABOVE the buttons (the rule below), so
           there the buttons always sit under it. */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
-          <MemberAvatar user={request.user} className="size-8 shrink-0" />
+      <div className={REQUEST_LINE}>
+        <div className={REQUEST_NAME}>
+          <MemberAvatar user={request.user} className={REQUEST_AVATAR} />
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
             {request.user.name}
           </p>
@@ -96,16 +105,27 @@ function DecideButtons({
 }) {
   return (
     <div className="ml-auto flex shrink-0 gap-2">
-      <Button size="sm" disabled={deciding} onClick={() => onDecide(true)}>
+      <Button
+        size="sm"
+        className={REQUEST_BUTTON}
+        disabled={deciding}
+        onClick={() => onDecide(true)}
+      >
         {deciding ? (
           <Loader2 aria-hidden className="size-4 animate-spin" />
         ) : (
-          <UserCheck aria-hidden className="size-4" />
+          <UserCheck aria-hidden className={REQUEST_ICON} />
         )}
         {channel ? 'Let them in, and into the channel' : 'Let them in'}
       </Button>
-      <Button size="sm" variant="outline" disabled={deciding} onClick={() => onDecide(false)}>
-        <UserX aria-hidden className="size-4" />
+      <Button
+        size="sm"
+        variant="outline"
+        className={REQUEST_BUTTON}
+        disabled={deciding}
+        onClick={() => onDecide(false)}
+      >
+        <UserX aria-hidden className={REQUEST_ICON} />
         Decline
       </Button>
     </div>
@@ -128,8 +148,8 @@ function Panel({
   if (pending) {
     return (
       <div className="space-y-3">
-        <Skeleton className="h-24 w-full rounded-xl" />
-        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-11 w-full rounded-xl md:h-24" />
+        <Skeleton className="h-11 w-full rounded-xl md:h-24" />
       </div>
     );
   }
@@ -139,7 +159,7 @@ function Panel({
     );
   }
   return (
-    <ul className="space-y-3">
+    <ul className={REQUEST_LIST}>
       {rows.map((request) => (
         <RequestRow
           key={request.id}

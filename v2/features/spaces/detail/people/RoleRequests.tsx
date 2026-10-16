@@ -7,6 +7,15 @@ import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Member } from '@/types/collab';
 import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
+import {
+  REQUEST_AVATAR,
+  REQUEST_BUTTON,
+  REQUEST_ICON,
+  REQUEST_ITEM,
+  REQUEST_LINE,
+  REQUEST_LIST,
+  REQUEST_NAME,
+} from '@/v2/features/invites/request-row';
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
   useAskToContribute,
@@ -103,14 +112,16 @@ export function RoleRequestsSection({ spaceUuid }: { spaceUuid: string }) {
       >
         Wants to contribute
       </h2>
-      <ul className="space-y-3">
+      {/* The same row as "Needs your approval": a roster row on a phone, a
+          card from `md:` (`request-row.ts`). */}
+      <ul className={REQUEST_LIST}>
         {rows.map((member) => {
           const deciding = decide.isPending && decide.variables?.memberId === member.id;
           return (
-            <li key={member.id} className="rounded-xl border border-border/60 p-3">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
-                <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
-                  <MemberAvatar user={member.user} className="size-8 shrink-0" />
+            <li key={member.id} className={REQUEST_ITEM}>
+              <div className={REQUEST_LINE}>
+                <div className={REQUEST_NAME}>
+                  <MemberAvatar user={member.user} className={REQUEST_AVATAR} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">{member.user.name}</p>
                     <p className="truncate text-xs text-muted-foreground">
@@ -121,23 +132,25 @@ export function RoleRequestsSection({ spaceUuid }: { spaceUuid: string }) {
                 <div className="ml-auto flex shrink-0 gap-2">
                   <Button
                     size="sm"
+                    className={REQUEST_BUTTON}
                     disabled={decide.isPending}
                     onClick={() => decide.mutate({ memberId: member.id, approve: true })}
                   >
                     {deciding && decide.variables?.approve ? (
                       <Loader2 aria-hidden className="size-4 animate-spin" />
                     ) : (
-                      <UserCheck aria-hidden className="size-4" />
+                      <UserCheck aria-hidden className={REQUEST_ICON} />
                     )}
                     Allow
                   </Button>
                   <Button
                     size="sm"
                     variant="outline"
+                    className={REQUEST_BUTTON}
                     disabled={decide.isPending}
                     onClick={() => decide.mutate({ memberId: member.id, approve: false })}
                   >
-                    <UserX aria-hidden className="size-4" />
+                    <UserX aria-hidden className={REQUEST_ICON} />
                     Decline
                   </Button>
                 </div>

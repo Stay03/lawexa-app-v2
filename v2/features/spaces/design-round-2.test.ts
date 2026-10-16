@@ -201,7 +201,7 @@ test('the links and waiting steps use plain verbs', () => {
   assert.match(links, /<Trash2 aria-hidden className="size-4" \/> Stop link/);
   assert.doesNotMatch(links, /Stop it/);
   const requests = read('v2', 'features', 'invites', 'JoinRequestsPanel.tsx');
-  assert.match(requests, /<UserX aria-hidden className="size-4" \/>\s*Decline\s*<\/Button>/);
+  assert.match(requests, /<UserX aria-hidden className=\{REQUEST_ICON\} \/>\s*Decline\s*<\/Button>/);
 });
 
 test('a row under the Invited heading drops its Pending chip', () => {

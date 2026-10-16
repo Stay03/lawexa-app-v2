@@ -63,7 +63,7 @@ test('below sm the current row shows the check alone; the words come back from s
 
 test('the waiting list draws its face with MemberAvatar', () => {
   const requests = read('v2', 'features', 'invites', 'JoinRequestsPanel.tsx');
-  assert.match(requests, /<MemberAvatar user=\{request\.user\} className="size-8 shrink-0" \/>/);
+  assert.match(requests, /<MemberAvatar user=\{request\.user\} className=\{REQUEST_AVATAR\} \/>/);
   assert.doesNotMatch(requests, /slice\(0, 1\)/);
   assert.doesNotMatch(requests, /@\/components\/ui\/avatar/);
 });
