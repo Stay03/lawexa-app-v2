@@ -230,3 +230,24 @@ test('a space chat row reads the same by its class name, as GET /notifications s
   assert.equal(reply.title, 'Someone replied to you in a chat');
   assert.equal(reply.mark, 'reply');
 });
+
+test('joining and role bells read the server title, else their own, and open the space', () => {
+  // Backend, 16 October 2026: the server titles these itself; a row without
+  // a title still reads as a notification, and each opens its space.
+  const cases: ReadonlyArray<[string, string, string]> = [
+    ['space_member_joined', 'Someone joined your space', '/spaces/s-1?tab=people'],
+    ['space_role_requested', 'Someone asked to contribute', '/spaces/s-1?tab=people'],
+    ['space_role_approved', 'You are now a Contributor', '/spaces/s-1'],
+    ['space_role_declined', 'Your request to contribute was declined', '/spaces/s-1'],
+  ];
+  for (const [type, fallback, href] of cases) {
+    const wordless = presentNotification(row({ type, action_url: href, icon: 'invite' }), ORIGIN);
+    assert.equal(wordless.title, fallback, type);
+    assert.deepEqual(wordless.destination, { kind: 'internal', href }, type);
+    const titled = presentNotification(
+      row({ type, title: 'Ada joined Bar Finals', action_url: href, icon: 'invite' }),
+      ORIGIN,
+    );
+    assert.equal(titled.title, 'Ada joined Bar Finals', type);
+  }
+});

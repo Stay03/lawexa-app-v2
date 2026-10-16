@@ -133,6 +133,13 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   space_join_requested: 'Someone asked to join your space',
   space_join_approved: 'You were let into a space',
   space_join_declined: 'Your request to join was declined',
+  // Joining and roles (backend, 16 October 2026). The server sends its own
+  // title ("Ada joined Bar Finals", "You are now a Contributor in Bar
+  // Finals"); these are for a row that comes without one.
+  space_member_joined: 'Someone joined your space',
+  space_role_requested: 'Someone asked to contribute',
+  space_role_approved: 'You are now a Contributor',
+  space_role_declined: 'Your request to contribute was declined',
 };
 
 function trimmedOrNull(value: string | null | undefined): string | null {
