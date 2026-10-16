@@ -112,7 +112,10 @@ export function ThreadStatusChip({
   const chip = (
     <span
       className={cn(
-        'inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-full font-medium whitespace-nowrap',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full font-medium whitespace-nowrap',
+        // Never `min-w-0` with `fit`: in the grid it zeroes the pill's column
+        // and the pill draws under its own word (the phone pictures, round 5).
+        !fit && 'min-w-0',
         size === 'md' ? 'h-6 px-2.5 text-xs' : 'h-5 px-2 text-[11px]',
         TONE[value].chip,
         quiet ? null : className,

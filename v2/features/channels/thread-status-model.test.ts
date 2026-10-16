@@ -373,6 +373,14 @@ test('a thread header carries the status control only for someone who can post',
   assert.match(header, /data-desktop-status-line className="flex min-w-0 items-center">\s*\{renderStatus\('menu'\)\}/);
 });
 
+test('on a phone a thread with a status line takes the room of the faces, Members staying in the menu', () => {
+  const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
+  assert.match(header, /<div className=\{cn\('shrink-0', renderStatus && menu && 'hidden md:block'\)\}>\s*\{presence !== null && onOpenRoster/);
+  const screen = read('v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx');
+  // The menu that stands in for the faces carries Members.
+  assert.match(screen, /const channelMenu = canParticipate \?[\s\S]*?panel\.show\('members'\)[\s\S]*?\) : undefined;/);
+});
+
 test('on a wide pane the status has its own line under the name, as on a phone', () => {
   // Techlead, 16 October 2026: a Needs Action chip beside the name cut it to
   // "Te…", and Needs Action must name who acts, so the name keeps its row.

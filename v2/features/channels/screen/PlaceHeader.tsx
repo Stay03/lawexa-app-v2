@@ -468,7 +468,13 @@ export function ChannelPlaceHeader({
               A `div`, never a `span`: both of these build on `AvatarGroup`,
               which emits flow content, and a `div` inside a `span` is invalid.
               Which one renders is the whole question — see the file docblock. */}
-          <div className="shrink-0">
+          {/* ON A PHONE A THREAD'S STATUS LINE TAKES THE FACES' ROOM. The line
+              is ~157px beside them, and "Needs Action · User2 Tester" needs
+              ~184px; a Needs Action must say whole who acts, so the faces give
+              way (techlead, 16 October 2026). Only when the overflow menu is
+              there, because it carries Members; a reader with no menu keeps
+              the faces. Wide panes keep them always. */}
+          <div className={cn('shrink-0', renderStatus && menu && 'hidden md:block')}>
             {presence !== null && onOpenRoster ? (
               <HereNow presence={presence} onOpenRoster={onOpenRoster} />
             ) : (
