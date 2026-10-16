@@ -3,8 +3,19 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { channelsApi } from '@/lib/api/collab';
-import type { Channel, ChannelResponse } from '@/types/collab';
-import { applyThreadStub } from '../cache';
+import type {
+  Channel,
+  ChannelResponse,
+  ThreadStatus,
+  ThreadStatusValue,
+} from '@/types/collab';
+import {
+  applyThreadStatus,
+  applyThreadStub,
+  findCachedThreadStatus,
+  noteThreadStatusMoved,
+} from '../cache';
+import { threadStatusLabel } from '../thread-status-model';
 
 /**
  * threads/mutations — starting a thread from a message (Phase 3, 2026-08-12).
@@ -82,6 +93,79 @@ export function useStartThread(channelUuid: string) {
         my_unread_count: thread.is_member === true ? 0 : null,
         last_message_at: thread.last_message_at,
       });
+    },
+  });
+}
+
+export interface SetThreadStatusVariables {
+  /** The status to move to; `null` clears it. */
+  status: ThreadStatusValue | null;
+  /** Who is pressing, for the optimistic footer ("by Ada"). */
+  viewer: { uuid: string; name: string } | null;
+}
+
+/**
+ * Set or clear a thread's status (Stay, 16 October 2026: thread status).
+ *
+ * OPTIMISTIC, because the tick and the chip are the whole answer: every cached
+ * copy of the thread (its detail, the list rows, the parent's Threads sheet)
+ * moves on the press, through `applyThreadStatus`. A refusal puts back what
+ * the cache held before and the caller shows the server's sentence inline,
+ * where the press was; `meta.silentError` keeps the global toast out of it,
+ * as on the engagement toggles. Success assigns the server's own status
+ * object, which carries the real `changed_at`, `changed_by` and `is_stale`.
+ *
+ * Settling either way re-reads the parent's threads and detail, so a filtered
+ * sheet re-files the row and the filter chips' counts move.
+ *
+ * The note is not sent: the first pass has no note field (Stay, 16 October
+ * 2026). Leaving the key out keeps whatever the server holds.
+ */
+export function useSetThreadStatus(threadUuid: string, parentUuid: string | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    ChannelResponse,
+    Error,
+    SetThreadStatusVariables,
+    { previous: ThreadStatus | null | undefined }
+  >({
+    mutationFn: ({ status }) => channelsApi.setStatus(threadUuid, { status }),
+    meta: { silentError: true },
+
+    onMutate: ({ status, viewer }) => {
+      const previous = findCachedThreadStatus(queryClient, threadUuid);
+      const optimistic: ThreadStatus | null =
+        status === null
+          ? null
+          : {
+              value: status,
+              label: threadStatusLabel(status),
+              note: null,
+              changed_at: new Date().toISOString(),
+              changed_by: viewer,
+              via: 'app',
+              is_stale: false,
+            };
+      applyThreadStatus(queryClient, threadUuid, optimistic);
+      return { previous };
+    },
+
+    onError: (_error, _variables, context) => {
+      if (context && context.previous !== undefined) {
+        applyThreadStatus(queryClient, threadUuid, context.previous);
+      }
+    },
+
+    onSuccess: (response) => {
+      const status = response.data.status;
+      if (status !== undefined) {
+        applyThreadStatus(queryClient, threadUuid, status);
+      }
+    },
+
+    onSettled: () => {
+      noteThreadStatusMoved(queryClient, parentUuid);
     },
   });
 }

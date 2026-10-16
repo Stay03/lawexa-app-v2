@@ -9,6 +9,7 @@ import type {
   MessageReaction,
   MessageThreadStub,
   NotifyLevel,
+  ThreadStatus,
 } from '@/types/collab';
 import type { SpaceRollupDeltas } from '@/v2/features/spaces/cache';
 import { channelsQueries } from './queries';
@@ -794,4 +795,118 @@ export function applyChannelCounts(
     notifyLevel: prev?.my_notify_level ?? null,
     deltas,
   };
+}
+
+/**
+ * The thread's status as this cache holds it right now, read from the
+ * thread's detail first (the freshest surface) and then from any list row.
+ * `undefined` when no cached copy carries the field, which is what a rollback
+ * must then leave alone.
+ */
+export function findCachedThreadStatus(
+  queryClient: QueryClient,
+  threadUuid: string,
+): ThreadStatus | null | undefined {
+  for (const [, data] of queryClient.getQueriesData<ChannelResponse>({
+    queryKey: channelsQueries.detailsOf(threadUuid),
+  })) {
+    if (data?.data.uuid === threadUuid && data.data.status !== undefined) {
+      return data.data.status;
+    }
+  }
+  for (const [, data] of queryClient.getQueriesData<ChannelListResponse>({
+    queryKey: channelsQueries.lists(),
+  })) {
+    const row = data?.data.find((candidate) => candidate.uuid === threadUuid);
+    if (row && row.status !== undefined) return row.status;
+  }
+  return undefined;
+}
+
+/**
+ * ASSIGN a thread's status onto every cached copy of that thread (Stay, 16
+ * October 2026: thread status): its detail, every flat list under `lists()`
+ * (the space digest's threads, the cross-space `/threads`), and every page of
+ * every parent's Threads sheet. The status mutation writes through this
+ * optimistically and on success; `.channel.status_changed` writes through it
+ * for everyone else.
+ *
+ * The sheet's entries are page-infinite, which is why they get their own walk
+ * here rather than the `lists()` fan-out (see the key-geography note in
+ * `queries.ts`). A filtered sheet may now hold a row that no longer matches
+ * its chip; the caller invalidates the parent's threads so the server
+ * re-files it.
+ *
+ * Same-value writes return the same references, so a duplicate broadcast
+ * re-renders nothing.
+ */
+export function applyThreadStatus(
+  queryClient: QueryClient,
+  threadUuid: string,
+  status: ThreadStatus | null,
+): void {
+  const assign = (row: Channel): Channel =>
+    row.uuid !== threadUuid || row.status === status ? row : { ...row, status };
+
+  queryClient.setQueriesData<ChannelResponse>(
+    { queryKey: channelsQueries.detailsOf(threadUuid) },
+    (data) => {
+      if (!data) return data;
+      const next = assign(data.data);
+      return next === data.data ? data : { ...data, data: next };
+    },
+  );
+
+  queryClient.setQueriesData<ChannelListResponse>(
+    { queryKey: channelsQueries.lists() },
+    (data) => {
+      if (!data) return data;
+      let changed = false;
+      const rows = data.data.map((row) => {
+        const next = assign(row);
+        if (next !== row) changed = true;
+        return next;
+      });
+      return changed ? { ...data, data: rows } : data;
+    },
+  );
+
+  queryClient.setQueriesData<InfiniteData<ChannelListResponse>>(
+    { queryKey: [...channelsQueries.all, 'threads'] },
+    (data) => {
+      if (!data) return data;
+      let changed = false;
+      const pages = data.pages.map((page) => {
+        let pageChanged = false;
+        const rows = page.data.map((row) => {
+          const next = assign(row);
+          if (next !== row) pageChanged = true;
+          return next;
+        });
+        if (!pageChanged) return page;
+        changed = true;
+        return { ...page, data: rows };
+      });
+      return changed ? { ...data, pages } : data;
+    },
+  );
+}
+
+/**
+ * After a thread's status moved: the parent's Threads sheet re-reads (a
+ * filtered chip may no longer hold the row) and the parent's detail re-reads
+ * for its `thread_status_counts`. Only entries that exist are refetched; an
+ * unopened sheet asks for nothing.
+ */
+export function noteThreadStatusMoved(
+  queryClient: QueryClient,
+  parentUuid: string | null,
+): void {
+  if (parentUuid === null) return;
+  void queryClient.invalidateQueries({
+    queryKey: channelsQueries.threadsOf(parentUuid),
+  });
+  void queryClient.invalidateQueries({
+    queryKey: channelsQueries.detailsOf(parentUuid),
+  });
 }

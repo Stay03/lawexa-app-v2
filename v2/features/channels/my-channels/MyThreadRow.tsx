@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import type { Channel } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
+import { ThreadStatusChip } from '@/v2/features/collab/kit/ThreadStatusChip';
 import {
   CountBadge,
   FOCUS_RING,
@@ -20,6 +21,7 @@ import {
   threadProvenanceLabel,
   threadUnreadState,
 } from '../thread-model';
+import { isClosedThread, threadStatusQuiet } from '../thread-status-model';
 
 /**
  * MyThreadRow — one THREAD in the cross-space `/channels` index, drawn to
@@ -114,6 +116,11 @@ export const MyThreadRow = memo(function MyThreadRow({
   const title = channelDisplayName(thread);
   const age = formatRelativeTime(thread.last_message_at, now);
   const provenance = threadProvenanceLabel(thread.parent_channel_name);
+  // The status chip after the title, a Closed title in muted ink (Stay, 16
+  // October 2026). Absent on an older payload, which draws no chip.
+  const status = thread.status ?? null;
+  const closed = isClosedThread(thread);
+  const quiet = threadStatusQuiet(thread, now);
   const dim = muted
     ? 'opacity-60 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none'
     : undefined;
@@ -172,11 +179,13 @@ export const MyThreadRow = memo(function MyThreadRow({
                     : state === 'none'
                       ? 'font-medium text-muted-foreground'
                       : 'font-medium text-foreground',
+                  closed && 'text-muted-foreground',
                 )}
               >
                 {title}
               </span>
               {behind ? <UnreadDot /> : null}
+              {status ? <ThreadStatusChip value={status.value} quiet={quiet} /> : null}
               {muted ? (
                 <BellOff
                   aria-label="Muted"

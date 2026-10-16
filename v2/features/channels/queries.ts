@@ -16,6 +16,10 @@ import type {
 } from '@/types/collab';
 import { extractApiError } from '@/lib/utils/api-error';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
+import {
+  threadStatusFilterParam,
+  type ThreadStatusFilter,
+} from './thread-status-model';
 
 /**
  * Channels query factory (the `v2/features/cases/queries.ts` exemplar pattern)
@@ -472,20 +476,30 @@ export const channelsQueries = {
    * configuration. `staleTime` is the lever that actually works here: opening
    * the panel more than a minute after the last fetch re-reads the unread
    * tallies, which are the reason this list exists.
+   *
+   * `status` IS IN THE KEY FOR THE SAME REASON (Stay, 16 October 2026: filter
+   * by status). `?status=` is a server filter with its own pages and totals, so
+   * each chip is its own entry. `null` (Any status) sends nothing.
    */
   threads: ({
     channelUuid,
     mine,
+    status = null,
     viewerId,
-  }: MessagesOptions & { mine: boolean }) =>
+  }: MessagesOptions & { mine: boolean; status?: ThreadStatusFilter }) =>
     infiniteQueryOptions({
       queryKey: [
         ...channelsQueries.threadsOf(channelUuid),
-        { mine },
+        { mine, status },
         { viewerId },
       ] as const,
       queryFn: ({ pageParam }) =>
-        channelsApi.getThreads(channelUuid, { mine, per_page: 20, page: pageParam }),
+        channelsApi.getThreads(channelUuid, {
+          mine,
+          status: threadStatusFilterParam(status),
+          per_page: 20,
+          page: pageParam,
+        }),
       initialPageParam: 1,
       getNextPageParam: (lastPage) =>
         lastPage.pagination.current_page < lastPage.pagination.last_page

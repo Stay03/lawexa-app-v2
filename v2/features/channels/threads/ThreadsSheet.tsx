@@ -17,6 +17,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { Channel } from '@/types/collab';
 import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
+import {
+  ThreadStatusChip,
+  ThreadStatusDot,
+} from '@/v2/features/collab/kit/ThreadStatusChip';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { TabRow } from '@/v2/shell/TabRow';
@@ -28,7 +32,17 @@ import {
   threadUnreadState,
   type ThreadUnreadState,
 } from '../thread-model';
+import {
+  THREAD_STATUS_FILTERS,
+  isClosedThread,
+  showsThreadStatusFilter,
+  threadStatusFilterCount,
+  threadStatusFilterLabel,
+  threadStatusQuiet,
+  type ThreadStatusFilter,
+} from '../thread-status-model';
 import { RelativeTime } from '../ui/RelativeTime';
+import { useMinuteNow } from '../use-minute-now';
 
 /**
  * ThreadsSheet — where the conversations went. Threads Phase 4, 2026-08-12.
@@ -161,15 +175,32 @@ export function ThreadsSheet({
     quietReplaceUrlParams({ mine: next === 'mine' ? '1' : null });
   };
 
+  /* THE STATUS FILTER IS PLAIN COMPONENT STATE (Stay, 16 October 2026: filter
+     by status). It narrows the server's list through `?status=` and is its own
+     cache entry per chip. It is not mirrored into the URL the way `?mine=` is:
+     nothing links to a status-filtered sheet, and a second param would need a
+     second popstate adopter for no reader. The sheet stays mounted while
+     closed, so the chip a reader picked is still picked when they reopen it. */
+  const [statusFilter, setStatusFilter] = useState<ThreadStatusFilter>(null);
+
   const mine = filter === 'mine';
   const query = useInfiniteQuery({
-    ...channelsQueries.threads({ channelUuid: channel.uuid, mine, viewerId }),
+    ...channelsQueries.threads({
+      channelUuid: channel.uuid,
+      mine,
+      status: statusFilter,
+      viewerId,
+    }),
     enabled: open,
   });
   const threads = useMemo(
     () => query.data?.pages.flatMap((page) => page.data) ?? [],
     [query.data],
   );
+  /* Drawn only once the server shows it knows about statuses (the parent's
+     counts, or a row's `status` key); against an older API the sheet is
+     exactly as it was. See `showsThreadStatusFilter`. */
+  const showStatusFilter = showsThreadStatusFilter(channel, threads, statusFilter);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -212,6 +243,49 @@ export function ThreadsSheet({
               {(tab) => tab.label}
             </TabRow>
           </div>
+          {showStatusFilter && (
+            /* The second filter row, under All / Following, as in the mock:
+               Any status, then the five. One chip at a time. It scrolls
+               sideways on a phone rather than wrapping, so the header keeps
+               one height. Toggle buttons (`aria-pressed`), not tabs: the tab
+               panel below already belongs to All / Following. */
+            <div
+              role="group"
+              aria-label="Filter threads by status"
+              className="v2-quiet-scroll -mx-4 flex items-center gap-1.5 overflow-x-auto overscroll-x-contain px-4 pt-1 pb-0.5"
+            >
+              {THREAD_STATUS_FILTERS.map((entry) => {
+                const selected = entry === statusFilter;
+                const count = threadStatusFilterCount(
+                  entry,
+                  channel.thread_status_counts,
+                  mine,
+                );
+                return (
+                  <button
+                    key={entry ?? 'any'}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => setStatusFilter(entry)}
+                    className={cn(
+                      'v2-interactive inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium',
+                      'transition-colors duration-150 motion-reduce:transition-none',
+                      selected
+                        ? 'border-primary bg-primary/10 text-foreground'
+                        : 'text-muted-foreground hover:text-foreground',
+                      FOCUS_RING,
+                    )}
+                  >
+                    {entry !== null && <ThreadStatusDot value={entry} />}
+                    {threadStatusFilterLabel(entry)}
+                    {count !== null && (
+                      <span className="tabular-nums">{count}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </SheetHeader>
 
         <div
@@ -238,6 +312,15 @@ export function ThreadsSheet({
                     Try again
                   </Button>
                 }
+              />
+            </div>
+          ) : threads.length === 0 && statusFilter !== null ? (
+            <div className="px-4 py-6">
+              <CollabMessage
+                icon={GitBranch}
+                tone="neutral"
+                title={`No ${threadStatusFilterLabel(statusFilter)} threads`}
+                description="Choose Any status to see every thread."
               />
             </div>
           ) : threads.length === 0 ? (
@@ -324,6 +407,13 @@ function ThreadRow({
   // Who spoke last and what they said (Stay, 16 October 2026), in place of the
   // follower count, once the list carries it; until then, today's line.
   const preview = thread.last_message;
+  // The status chip after the title, and a Closed thread's title in muted ink
+  // (Stay, 16 October 2026). The minute clock is a subscription, never a
+  // `Date.now()` in render; it only feeds the stale suffix.
+  const now = useMinuteNow();
+  const status = thread.status ?? null;
+  const closed = isClosedThread(thread);
+  const quiet = threadStatusQuiet(thread, now);
 
   return (
     <li>
@@ -350,11 +440,16 @@ function ThreadRow({
                 `ThreadLine` and `MyChannelRow` extend. */}
             <span
               title={title}
-              className={cn('min-w-0 truncate text-sm', TITLE_TONE[state])}
+              className={cn(
+                'min-w-0 truncate text-sm',
+                TITLE_TONE[state],
+                closed && 'text-muted-foreground',
+              )}
             >
               {title}
             </span>
             {state === 'behind' && <UnreadDot />}
+            {status && <ThreadStatusChip value={status.value} quiet={quiet} />}
           </div>
           {/* Hung under the title, not under the glyph — 14px mark plus the
               1.5 gap is exactly 20px. */}

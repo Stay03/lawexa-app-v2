@@ -10,8 +10,13 @@ import {
   followerLabel,
   threadProvenanceLabel,
 } from '@/v2/features/channels/thread-model';
+import {
+  isClosedThread,
+  threadStatusQuiet,
+} from '@/v2/features/channels/thread-status-model';
 import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
+import { ThreadStatusChip } from '@/v2/features/collab/kit/ThreadStatusChip';
 import {
   CountBadge,
   FOCUS_RING,
@@ -79,6 +84,11 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
   const behind = state === 'behind' && !muted;
   const age = now > 0 ? formatRelativeTime(thread.last_message_at, now) : '';
   const provenance = threadProvenanceLabel(thread.parent_channel_name);
+  // The status chip after the title, a Closed title in muted ink (Stay, 16
+  // October 2026). Absent on an older payload, which draws no chip.
+  const status = thread.status ?? null;
+  const closed = isClosedThread(thread);
+  const quiet = threadStatusQuiet(thread, now);
   // SCOPED, NEVER ON THE ANCHOR - see the docblock. The mention badge and the
   // age sit OUTSIDE this wrapper.
   const dim = muted
@@ -130,11 +140,13 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
                     : state === 'none'
                       ? 'font-medium text-muted-foreground'
                       : 'font-medium text-foreground',
+                  closed && 'text-muted-foreground',
                 )}
               >
                 {title}
               </span>
               {behind ? <UnreadDot /> : null}
+              {status ? <ThreadStatusChip value={status.value} quiet={quiet} /> : null}
               {muted ? (
                 <BellOff
                   aria-label="Muted"

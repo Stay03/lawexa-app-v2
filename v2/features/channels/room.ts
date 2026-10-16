@@ -12,6 +12,7 @@ import type {
   ReactionToggledPayload,
   SlimUser,
   TaskList,
+  ThreadStatusChangedPayload,
   ThreadUpdatedPayload,
 } from '@/types/collab';
 import type {
@@ -33,8 +34,10 @@ import {
   applyMessageUpdated,
   applyPinState,
   applyReactionToggled,
+  applyThreadStatus,
   applyThreadStub,
   noteChannelMembershipChanged,
+  noteThreadStatusMoved,
 } from './cache';
 import {
   addRespondingTurn,
@@ -429,6 +432,22 @@ export function useChannelRoom(
         message_count: payload.message_count,
         last_message_at: payload.last_message_at,
       });
+    });
+
+    /* ── A thread's status moving (Stay, 16 October 2026) ────────────────────
+          `.channel.status_changed` rides BOTH the thread's room and its
+          parent's, so this one binding serves the thread screen and the
+          parent's Threads sheet. The status object is the same one every route
+          serializes, so it is assigned as it came. Heard on the PARENT's room
+          (the thread is not this channel), the parent's sheet and counts also
+          re-read, because a filtered chip may no longer hold the row. The
+          feed's own line for the change arrives separately, as an ordinary
+          `.message.created`. */
+    room.listen('.channel.status_changed', (payload: ThreadStatusChangedPayload) => {
+      applyThreadStatus(queryClient, payload.thread_uuid, payload.status);
+      if (payload.thread_uuid !== channelUuid) {
+        noteThreadStatusMoved(queryClient, channelUuid);
+      }
     });
 
     /* ── Lawexa turns (§B, §F.6/§F.7) ───────────────────────────────────── */

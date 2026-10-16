@@ -77,6 +77,7 @@ import { channelDisplayName, threadParentHref } from '../thread-model';
 import { FilesTab } from '../files/FilesTab';
 import { ListsTab } from '../lists/ListsTab';
 import { ChannelMembersSheet } from '../members/ChannelMembersSheet';
+import { ThreadStatusControl } from '../threads/ThreadStatusControl';
 import { ThreadsSheet } from '../threads/ThreadsSheet';
 import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
 import { GameOverlay } from '../quiz/GameOverlay';
@@ -910,6 +911,25 @@ export function ChannelScreen({
     </>
   ) : undefined;
 
+  /* A THREAD'S STATUS, BESIDE ITS NAME (Stay, 16 October 2026: thread status).
+     Only on a thread whose payload carries the field, so a server without it
+     draws the header as it was. The button is for someone who can post here,
+     the PATCH's own rule; everyone else sees the chip alone. */
+  const threadStatus = isThread && channel.status !== undefined ? channel.status : undefined;
+  const renderStatus =
+    threadStatus === undefined
+      ? undefined
+      : (surface: 'menu' | 'sheet') => (
+          <ThreadStatusControl
+            threadUuid={channel.uuid}
+            parentUuid={parentUuid}
+            status={threadStatus}
+            lastMessageAt={channel.last_message_at}
+            canSet={canParticipate}
+            surface={surface}
+          />
+        );
+
   const identityHeader = (
     <ChannelPlaceHeader
       channel={channel}
@@ -928,6 +948,7 @@ export function ChannelScreen({
       sectionCounts={sectionCounts}
       lenses={lenses}
       menu={channelMenu}
+      renderStatus={renderStatus}
     />
   );
 

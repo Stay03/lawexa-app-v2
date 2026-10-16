@@ -61,6 +61,7 @@ import type {
   SavedMessageListResponse,
   SendMessagePayload,
   SendMessageResponse,
+  SetThreadStatusPayload,
   SpaceConversationListParams,
   SpaceConversationListResponse,
   SpaceFileListParams,
@@ -688,10 +689,33 @@ export const channelsApi = {
       {
         params: {
           mine: params.mine ? 1 : undefined,
+          status:
+            params.status && params.status.length > 0
+              ? params.status.join(',')
+              : undefined,
           per_page: params.per_page ?? 20,
           page: params.page ?? 1,
         },
       }
+    );
+    return response.data;
+  },
+
+  /**
+   * Set or clear a thread's status (backend, 16 October 2026). `200` answers
+   * with the thread's whole `ChannelResource`, and sending the value it already
+   * holds is a `200` that changes nothing. `422` is an unknown value, a note
+   * over 140 characters, or a channel that is not a thread ("Only a thread can
+   * have a status."), each with the server's sentence; `403` is a reader who
+   * cannot post here.
+   */
+  setStatus: async (
+    uuid: string,
+    payload: SetThreadStatusPayload
+  ): Promise<ChannelResponse> => {
+    const response = await apiClient.patch<ChannelResponse>(
+      `/channels/${uuid}/status`,
+      payload
     );
     return response.data;
   },

@@ -488,8 +488,63 @@ export interface Channel {
    * stamp it, so a row falls back to its older line.
    */
   last_message?: { author_name: string; snippet: string } | null;
+  /**
+   * A thread's status (Stay, 16 October 2026: thread status "locked in"), on
+   * every thread row and on the thread's own detail. `null` is a thread with no
+   * status. ABSENT on a payload from a server that predates the field, and on
+   * every ordinary channel, so absent draws exactly what was drawn before: no
+   * chip, no control, no filter.
+   */
+  status?: ThreadStatus | null;
+  /**
+   * How many of this channel's threads hold each status. On channel rows from
+   * the same release as {@link status}; absent before it. The Threads sheet
+   * prints these on its filter chips and nothing else reads them.
+   */
+  thread_status_counts?: ThreadStatusCounts;
   created_at: string;
   updated_at: string;
+}
+
+/** The five values a thread's status can hold. `null` (no status) is not one
+ *  of them on the wire; it is the absence of a status. */
+export type ThreadStatusValue = 'running' | 'waiting' | 'blocked' | 'done' | 'closed';
+
+/**
+ * A thread's status as the server serializes it, the same object on every
+ * route that carries it (the three thread lists, the thread detail, the PATCH
+ * response and the `.channel.status_changed` broadcast).
+ */
+export interface ThreadStatus {
+  value: ThreadStatusValue;
+  /** The server's word for the value ("Running"). */
+  label: string;
+  /** Optional, at most 140 characters. */
+  note: string | null;
+  changed_at: string;
+  /** Who set it; for an agent change, the person the agent acted for. `null`
+   *  once that account is gone. */
+  changed_by: { uuid: string; name: string } | null;
+  via: 'app' | 'agent';
+  /** A Running or Waiting thread nobody has spoken in for a while. */
+  is_stale: boolean;
+}
+
+export type ThreadStatusCounts = Record<ThreadStatusValue, number>;
+
+/** `PATCH /channels/{thread}/status`. `status: null` clears it. */
+export interface SetThreadStatusPayload {
+  status: ThreadStatusValue | null;
+  note?: string | null;
+}
+
+/**
+ * `.channel.status_changed` — broadcast on the thread's room AND its parent's,
+ * so both the thread screen and the parent's Threads sheet hear it.
+ */
+export interface ThreadStatusChangedPayload {
+  thread_uuid: string;
+  status: ThreadStatus | null;
 }
 
 /******************************************************************************
@@ -522,7 +577,8 @@ export type MessageType =
   | 'member_joined'
   | 'member_left'
   | 'member_removed'
-  | 'thread_started';
+  | 'thread_started'
+  | 'thread_status_changed';
 
 /**
  * The three membership lines (backend 2026-08-11, live 01:16 UTC).
@@ -561,10 +617,16 @@ export type MembershipMessageType = (typeof MEMBERSHIP_MESSAGE_TYPES)[number];
  * thread: {title}", carrying `thread_uuid` and a `root_message_uuid` that is
  * null for a thread begun with no message behind it. Verified in the server's
  * own `postSystemMessage`, which writes `user_id => null`.
+ *
+ * `thread_status_changed` (backend, 16 October 2026) is a thread's status
+ * moving: "Ada set this thread to Running". Same row shape, `author: null`,
+ * `is_ai: false`; its metadata carries `from`, `to`, `note`, `actor_uuid`,
+ * `actor_name` and `via`.
  */
 export const QUIET_SYSTEM_MESSAGE_TYPES = [
   ...MEMBERSHIP_MESSAGE_TYPES,
   'thread_started',
+  'thread_status_changed',
 ] as const satisfies readonly MessageType[];
 
 export function isQuietSystemLine(message: Message): boolean {
@@ -605,6 +667,15 @@ export interface MessageMetadata {
    *  thread was started cold. The server writes the key either way, so branch
    *  on the VALUE and never on whether the key is present. */
   root_message_uuid?: string | null;
+  /** `thread_status_changed` only: the status before and after (plain values;
+   *  `null` is no status), the optional note, who made the change (for an
+   *  agent change, the person it acted for) and how. */
+  from?: ThreadStatusValue | null;
+  to?: ThreadStatusValue | null;
+  note?: string | null;
+  actor_uuid?: string | null;
+  actor_name?: string | null;
+  via?: 'app' | 'agent';
   /** On every AI-authored message since 2026-08-03 (no backfill — `null` on
    *  older history and on human messages). Equals the summon's
    *  `execution_id` exactly; the responding pill clears on the FIRST match. */
@@ -1113,6 +1184,12 @@ export interface ThreadListParams {
    * so this is "the ones I have spoken in", not "the ones I subscribed to".
    */
   mine?: boolean;
+  /**
+   * Narrow to threads holding one of these statuses, sent as
+   * `?status=running,waiting`; `'none'` is the threads with no status. Omitted
+   * when unset, so the unfiltered request is the URL it always was.
+   */
+  status?: readonly (ThreadStatusValue | 'none')[];
   per_page?: number;
   page?: number;
 }

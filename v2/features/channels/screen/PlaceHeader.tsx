@@ -179,6 +179,7 @@ export function ChannelPlaceHeader({
   sectionCounts,
   lenses,
   menu,
+  renderStatus,
 }: {
   channel: Channel;
   /** The thread's way back. `null` on an ordinary channel — see the docblock. */
@@ -200,6 +201,14 @@ export function ChannelPlaceHeader({
   lenses: readonly HeaderLens[];
   /** The overflow menu's ITEMS. Absent ⇒ no overflow button at all. */
   menu?: ReactNode;
+  /**
+   * A thread's status, beside its name (Stay, 16 October 2026: thread status).
+   * Called twice: `'sheet'` for the phone bar and `'menu'` for the wide one,
+   * each shown at its own width only, the same two-triggers idiom as the
+   * description. Absent on an ordinary channel and on a server without the
+   * field, which draws the bar as it was.
+   */
+  renderStatus?: (surface: 'menu' | 'sheet') => ReactNode;
 }) {
   const [descriptionOpen, setDescriptionOpen] = useState(false);
   const visibilityFace = channelVisibilityFace(channel.visibility);
@@ -274,6 +283,14 @@ export function ChannelPlaceHeader({
             </span>
           </button>
 
+          {/* The thread's status beside its name on a phone. A sibling of the
+              identity button, not inside it: a button cannot hold a button. */}
+          {renderStatus && (
+            <div className="flex shrink-0 items-center md:hidden">
+              {renderStatus('sheet')}
+            </div>
+          )}
+
           {/* The name is the screen's heading, and it cannot live inside the
               button above: a button holds phrasing content, and a heading is
               not that. So the heading is stated once, invisibly, for the
@@ -341,6 +358,13 @@ export function ChannelPlaceHeader({
                 <span className="min-w-0 md:truncate">{displayName}</span>
               )}
             </h1>
+
+            {/* The status beside the thread's name, `md:` and up. */}
+            {renderStatus && (
+              <div className="hidden shrink-0 items-center md:flex">
+                {renderStatus('menu')}
+              </div>
+            )}
 
             {/* THE PURPOSE LINE HAS GONE FROM THE PHONE BAR. It was the
                 disclosure trigger at this width, and the reason the bar could

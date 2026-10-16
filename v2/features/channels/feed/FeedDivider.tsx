@@ -2,8 +2,11 @@ import Link from 'next/link';
 import { GitBranch, LogOut, UserMinus, UserPlus, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { formatMessageTime } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
+import { ThreadStatusChip } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { statusChangeOf } from '../thread-status-model';
 
 /**
  * FeedDivider — the transcript's non-message lines, WITH A HIERARCHY. Phase-5
@@ -123,6 +126,9 @@ export function QuietSystemLine({ message }: { message: Message }) {
   const text = message.content.trim();
   if (!text) return null;
 
+  const statusChange = statusChangeOf(message);
+  if (statusChange) return <StatusChangeLine change={statusChange} />;
+
   const threadUuid =
     type === 'thread_started' ? (message.metadata.thread_uuid ?? null) : null;
 
@@ -180,6 +186,42 @@ export function QuietSystemLine({ message }: { message: Message }) {
       >
         {line}
       </Link>
+    </div>
+  );
+}
+
+/**
+ * A thread's status moving (Stay, 16 October 2026: thread status): the chip
+ * for the new status, then the server's sentence as it came ("Ada set this
+ * thread to Running"), then the time. The same recessive grammar as a join
+ * line, centred and muted, never a bubble. A cleared status, or a value this
+ * app does not know yet, draws the sentence with no chip.
+ *
+ * The note, when there is one, is already inside the server's sentence
+ * ("... to Done: shipped"), so it is not printed twice.
+ */
+function StatusChangeLine({
+  change,
+}: {
+  change: NonNullable<ReturnType<typeof statusChangeOf>>;
+}) {
+  const time = formatMessageTime(change.at);
+  const label = time ? `${change.sentence} · ${time}` : change.sentence;
+  return (
+    <div
+      role="separator"
+      aria-label={label}
+      className="flex items-center justify-center gap-1.5 py-1"
+    >
+      {/* A `separator`'s children are presentational, so the chip's word is
+          not read twice; the row's label carries the sentence. */}
+      {change.to && <ThreadStatusChip value={change.to} />}
+      <span
+        aria-hidden
+        className="min-w-0 truncate text-[11px] leading-snug text-muted-foreground"
+      >
+        {label}
+      </span>
     </div>
   );
 }
