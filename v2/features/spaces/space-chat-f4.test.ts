@@ -136,4 +136,7 @@ test('on a desktop the space box is the chat pill: one row, centred, phone uncha
   assert.match(composer, /compact && 'md:flex md:flex-wrap md:items-end md:gap-x-1 md:p-1\.5'/);
   assert.match(composer, /compact && 'md:contents'/);
   assert.match(composer, /compact && 'md:order-3 md:size-8'/);
+  // The model leaves the row from `md:` and stands beside the jurisdiction.
+  assert.match(composer, /<div className=\{cn\('contents', compact && 'md:hidden'\)\}>\s*<WorkflowField/);
+  assert.match(composer, /\{compact \? \(\s*<div className="hidden md:block">\s*<WorkflowField/);
 });

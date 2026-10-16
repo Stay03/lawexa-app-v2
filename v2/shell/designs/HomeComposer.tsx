@@ -189,9 +189,10 @@ interface HomeComposerBaseProps {
   /**
    * From `md:`, ONE ROW, the size of the chat's follow-up pill (Stay, 15
    * October 2026, on the space's box: "the text area in the web one is too long
-   * and big naaaw!!! make it look nice"). The plus menu and the model sit on the
-   * left, the text in the middle on one line that grows as it is typed, Send on
-   * the right; a file's chip takes a row of its own above them, inside the box.
+   * and big naaaw!!! make it look nice"). The plus menu on the left, the text in
+   * the middle on one line that grows as it is typed, Send on the right; the
+   * model moves up beside the jurisdiction, as the pill has no model in its row;
+   * a file's chip takes a row of its own above them, inside the box.
    * CSS only (`md:` variants), so the phone keeps the box it has. The host caps
    * the width.
    */
@@ -568,6 +569,21 @@ export function HomeComposer({
             stop={stop}
             label="Jurisdiction:"
           />
+          {/* Compact, from `md:`: the model stands here, beside the
+              jurisdiction, as the chat's pill keeps its row to the text. In the
+              row it squeezed Arthur's placeholder onto two lines. */}
+          {compact ? (
+            <div className="hidden md:block">
+              <WorkflowField
+                options={workflow.options}
+                value={workflow.value}
+                onChange={workflow.setValue}
+                isLoading={workflow.isLoading}
+                disabled={isSubmitting}
+                stop={stop}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -767,15 +783,18 @@ export function HomeComposer({
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* Role-aware workflow selector — v1's Lite/Expert or admin list. */}
-                <WorkflowField
-                  options={workflow.options}
-                  value={workflow.value}
-                  onChange={workflow.setValue}
-                  isLoading={workflow.isLoading}
-                  disabled={isSubmitting}
-                  stop={stop}
-                />
+                {/* Role-aware workflow selector — v1's Lite/Expert or admin list.
+                    Compact, from `md:` it stands above the box instead. */}
+                <div className={cn('contents', compact && 'md:hidden')}>
+                  <WorkflowField
+                    options={workflow.options}
+                    value={workflow.value}
+                    onChange={workflow.setValue}
+                    isLoading={workflow.isLoading}
+                    disabled={isSubmitting}
+                    stop={stop}
+                  />
+                </div>
 
               </div>
             ) : (
