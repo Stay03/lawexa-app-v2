@@ -21,6 +21,7 @@ import {
   CaseHardLimitState,
   CaseNotFoundState,
 } from '../detail/states';
+import '../detail/case-masthead.css';
 import '../detail/case-document.css';
 
 /**

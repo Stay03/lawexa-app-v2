@@ -22,46 +22,6 @@
   --doc-measure: 68ch;
 }
 
-/* ── The heading block ──────────────────────────────────────────────────── */
-
-/**
- * The kicker — provenance before the name (court · date), in the LABEL VOICE:
- * small uppercase tracked sans. The same voice marks every section heading
- * below, which is the page's whole organizing system: sans caps = structure,
- * serif = the law. Two voices, used consistently, instead of eight rows of
- * equal-weight data.
- */
-.v2-case-doc .doc-kicker {
-  font-family: var(--font-sans);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-}
-
-.v2-case-doc .doc-title {
-  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
-  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
-  font-weight: 600;
-  font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.125rem);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  text-wrap: balance;
-}
-
-/**
- * The report citation, on its own line under the name. Set in the UI sans at a
- * small size — a citation is a REFERENCE STRING, not prose, and keeping it out
- * of the serif is what stops it reading as part of the name it used to be
- * fused into.
- */
-.v2-case-doc .doc-citation {
-  font-size: 0.8125rem;
-  letter-spacing: 0.01em;
-  color: var(--muted-foreground);
-}
-
 /* ── Section headings inside the document ───────────────────────────────── */
 
 /**
@@ -177,3 +137,22 @@
 
 /* Reduced motion is handled globally for the v2 tree (shell.css stills every
    `.animate-pulse` under `html.v2-document-lock`), so nothing is needed here. */
+
+/* ── A first open that drew the tapped row's name (speed step 4) ────────── */
+
+/**
+ * The case arriving after the loading screen drew the tapped row's kicker and
+ * name (`CaseFallback`): those two stay as they are, and everything else in
+ * the document fades in, so the name does not blink out and back in.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .v2-case-arrive-peeked :where(article > :not(header), article > header > :not(.doc-kicker, .doc-title)) {
+    animation: v2-case-arrive 300ms ease-out both;
+  }
+}
+
+@keyframes v2-case-arrive {
+  from {
+    opacity: 0;
+  }
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowUpRight, Lock, Scale, WifiOff } from 'lucide-react';
 
@@ -22,14 +23,24 @@ export const CASE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
  * a wait: the reader cannot tell an RSC payload from a query, so showing them
  * two different appearances only prints a seam into the middle of the load.
  */
-export function CaseDocumentSkeleton() {
+export function CaseDocumentSkeleton({
+  masthead,
+}: {
+  /** The kicker and the name already known (a tapped row's, `CaseFallback`),
+   *  drawn in place of their two bars. */
+  masthead?: ReactNode;
+} = {}) {
   return (
     <div aria-hidden className="flex flex-col gap-9">
       {/* The header silhouette: kicker · name · citation · topic · outcome ·
           actions. */}
       <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <Skeleton className="h-3 w-48 rounded" />
-        <Skeleton className="h-8 w-4/5 rounded-lg md:h-9" />
+        {masthead ?? (
+          <>
+            <Skeleton className="h-3 w-48 rounded" />
+            <Skeleton className="h-8 w-4/5 rounded-lg md:h-9" />
+          </>
+        )}
         <Skeleton className="h-3.5 w-2/5 rounded" />
         <Skeleton className="h-4 w-3/5 rounded" />
         <Skeleton className="h-6 w-28 rounded-full" />

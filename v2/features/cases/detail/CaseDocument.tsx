@@ -37,6 +37,7 @@ import { CaseText, caseTextParagraphs } from './case-text';
 import type { OutlineSection } from './CaseOutline';
 import { SectionHeading } from './SectionHeading';
 import { ViewLimitNotice } from './states';
+import './case-masthead.css';
 import './case-document.css';
 
 /**

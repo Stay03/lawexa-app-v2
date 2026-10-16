@@ -71,10 +71,10 @@ test('a search row reads the case on intent and cancels it when the reader moves
 
 test('a case screen that mounts with the case in hand does not replay its fade (no blink at the swap)', () => {
   const screen = read('detail', 'CaseScreen.tsx');
-  assert.match(screen, /const \[fadeOnArrival\] = useState\(\(\) => query\.isPending\)/);
+  assert.match(screen, /const \[arrival\] = useState\(\(\) => \(query\.isPending \? \(peeked \? 'peeked' : 'fade'\) : 'none'\)\);/);
   // The document wrapper also goes inert under the phone chat (11 October 2026).
   assert.match(screen, /<div className=\{arrive\} inert=\{pageUnderChat\}>\s*<CaseDocument/);
-  assert.match(screen, /arrive=\{fadeOnArrival\}/);
+  assert.match(screen, /arrive=\{arrival !== 'none'\}/);
   assert.doesNotMatch(screen, /className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">\s*<CaseDocument/);
   // The dock skips its arrival fade while the phone chat is open: the fade's
   // transform would make the dock the containing block of the fixed screen.

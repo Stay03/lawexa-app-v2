@@ -13,6 +13,7 @@ import {
   quietReplaceUrlParams,
 } from '@/v2/runtime/url-params';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import { useCasePeek } from '../case-peek';
 import { casesQueries } from '../queries';
 import { CaseAskDock } from './CaseAsk';
 import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
@@ -27,7 +28,6 @@ import { usePanelBreakpoint } from './use-panel-breakpoint';
 const DOCK_PREF_KEY = 'v2-case-chat-docked';
 import {
   CASE_COLUMN,
-  CaseDocumentSkeleton,
   CaseErrorState,
   CaseHardLimitState,
   CaseNotFoundState,
@@ -178,8 +178,18 @@ function CaseBody({ slug }: { slug: string }) {
   // and the page that replaces that boundary a moment later, which would
   // otherwise replay the fade and blink the whole case once (measured on the
   // option 2 prototype, 7 October 2026).
-  const [fadeOnArrival] = useState(() => query.isPending);
-  const arrive = fadeOnArrival ? 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300' : '';
+  //
+  // A tapped row's name already on screen (`case-peek.ts`, speed step 4) stays
+  // still: the kicker and the name do not fade, everything else does
+  // (`v2-case-arrive-peeked` in case-document.css).
+  const peeked = useCasePeek(slug) !== null;
+  const [arrival] = useState(() => (query.isPending ? (peeked ? 'peeked' : 'fade') : 'none'));
+  const arrive =
+    arrival === 'fade'
+      ? 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300'
+      : arrival === 'peeked'
+        ? 'v2-case-arrive-peeked'
+        : '';
 
   /**
    * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7).
@@ -193,13 +203,9 @@ function CaseBody({ slug }: { slug: string }) {
    * nothing else. See `PushedTitle` in `v2/shell/pushed-route.ts`.
    */
 
-  if (query.isPending) {
-    return (
-      <div className={CASE_COLUMN}>
-        <CaseDocumentSkeleton />
-      </div>
-    );
-  }
+  // The same shape as the route's loading screen, a tapped row's name
+  // included, so the hand-off from the boundary to this wait moves nothing.
+  if (query.isPending) return <CaseFallback />;
 
   if (query.isError) {
     // A 429 is not a failure to load — it is the plan's monthly allowance, and it
@@ -299,7 +305,7 @@ function CaseBody({ slug }: { slug: string }) {
             onClose={closeChat}
             onDock={() => setDockedPref(true)}
             onOpenChat={switchChat}
-            arrive={fadeOnArrival}
+            arrive={arrival !== 'none'}
           />
         ) : null}
       </div>

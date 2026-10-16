@@ -8,6 +8,7 @@ import { FLAG_W, FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
 import { useCaseRowIntent } from './use-case-row-intent';
+import { rememberCasePeek } from '../case-peek';
 import { caseHref, formatCaseDate, type CaseRowModel } from '../case-row-model';
 
 /**
@@ -77,6 +78,12 @@ export const CaseRow = memo(function CaseRow({
           href={href}
           prefetch={false}
           {...intent}
+          // The case screen draws this row's name at once on a first open,
+          // before any request answers (`case-peek.ts`, speed step 4).
+          onClick={() => {
+            rememberCasePeek(row);
+            intent.onClick();
+          }}
           className={cn(
             'v2-interactive min-w-0 flex-1 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
             FOCUS_RING,
