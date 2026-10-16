@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -26,6 +34,25 @@ import {
   publishEmbeddedComposer,
   reportFollowUpRefusal,
 } from './embedded-composer';
+
+/** The composer's height on the screen's root, read by the transcript's
+ *  bottom padding and the jump-to-latest pill (MessageList). */
+const DOCK_HEIGHT_VAR = '--v2-conv-dock-h';
+
+/** The floating composer's height the last open measured, so the next open's
+ *  root renders it from the first commit (see the measure below). Module
+ *  memory: one tab, one composer. */
+let lastDockHeight: string | null = null;
+
+/** The root's inline value: 0px under an external composer, else the last
+ *  measured height, else nothing (MessageList's 7rem fallback). */
+function dockHeightStyle(externalComposer: boolean): CSSProperties | undefined {
+  if (externalComposer) return { [DOCK_HEIGHT_VAR]: '0px' } as CSSProperties;
+  return lastDockHeight ? ({ [DOCK_HEIGHT_VAR]: lastDockHeight } as CSSProperties) : undefined;
+}
+
+/** `useLayoutEffect` in the browser, `useEffect` on the server, as MessageList. */
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 /**
  * ConversationScreen — the v2 `/c/[id]` client root. Mounts the controller (engine
@@ -189,12 +216,22 @@ export function ConversationScreen({
   // With an EXTERNAL composer there is no overlay: the effect no-ops and the root
   // pins the variable to 0px inline, so MessageList's pre-measure fallback (7rem)
   // can never reserve clearance for a pill that lives below in flow.
+  //
+  // WRITTEN ONLY WHEN IT CHANGES, AND RENDERED FROM THE LAST OPEN (chat reopen
+  // fix, 16 October 2026). The variable sits on the screen's root, so every
+  // element of the transcript inherits it, and writing it after the mount
+  // restyled the whole transcript a second time: 760 elements, about 140 ms on
+  // a phone at 4x CPU. The composer's height is almost always the one the last
+  // chat measured, so the root renders that value from its first commit
+  // (`lastDockHeight`) and the transcript is styled once with it. The measure
+  // runs in a layout effect, before paint and after MessageList's own landing
+  // read, and writes only a height that differs from what the root holds.
   const screenRef = useRef<HTMLDivElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
   // Whether the reader has scrolled up from the bottom; set by MessageList's
   // scroll handler, read by the composer's chip row (#16).
   const [scrolledUp, setScrolledUp] = useState(false);
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (externalComposer) return;
     const dock = dockRef.current;
     const screen = screenRef.current;
@@ -207,15 +244,24 @@ export function ConversationScreen({
       // sliver of clearance: it put the newest row under the composer on the
       // landing frame and grew the page by the dock's height a frame later,
       // which the list read as a scroll away (measured, Spaces F4 review S2).
-      if (dock.childElementCount === 0) screen.style.removeProperty('--v2-conv-dock-h');
-      else screen.style.setProperty('--v2-conv-dock-h', `${dock.offsetHeight}px`);
+      if (dock.childElementCount === 0) {
+        if (screen.style.getPropertyValue(DOCK_HEIGHT_VAR) !== '') {
+          screen.style.removeProperty(DOCK_HEIGHT_VAR);
+        }
+        return;
+      }
+      const height = `${dock.offsetHeight}px`;
+      lastDockHeight = height;
+      if (screen.style.getPropertyValue(DOCK_HEIGHT_VAR) !== height) {
+        screen.style.setProperty(DOCK_HEIGHT_VAR, height);
+      }
     };
     sync();
     const observer = new ResizeObserver(sync);
     observer.observe(dock);
     return () => {
       observer.disconnect();
-      screen.style.removeProperty('--v2-conv-dock-h');
+      screen.style.removeProperty(DOCK_HEIGHT_VAR);
     };
   }, [externalComposer]);
 
@@ -311,7 +357,7 @@ export function ConversationScreen({
         data-conversation-id={conversationId}
         data-v2-chat-frame=""
         className="relative flex h-full min-h-0 flex-col"
-        style={externalComposer ? { ['--v2-conv-dock-h' as string]: '0px' } : undefined}
+        style={dockHeightStyle(externalComposer)}
       >
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />

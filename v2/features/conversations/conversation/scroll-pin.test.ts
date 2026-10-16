@@ -143,9 +143,23 @@ test('an empty dock keeps the fallback padding, whatever its safe-area padding m
   // padding alone measures 34 px, so a height of 0 never came (release re-review).
   assert.match(
     screen,
-    /if \(dock\.childElementCount === 0\) screen\.style\.removeProperty\('--v2-conv-dock-h'\);\s*else screen\.style\.setProperty\('--v2-conv-dock-h', `\$\{dock\.offsetHeight\}px`\);/,
+    /if \(dock\.childElementCount === 0\) \{\s*if \(screen\.style\.getPropertyValue\(DOCK_HEIGHT_VAR\) !== ''\) \{\s*screen\.style\.removeProperty\(DOCK_HEIGHT_VAR\);\s*\}\s*return;\s*\}\s*const height = `\$\{dock\.offsetHeight\}px`;/,
   );
   assert.doesNotMatch(screen, /offsetHeight === 0/);
   // The dock carries that padding, which is why its height is not the test.
   assert.match(screen, /ref=\{dockRef\}\s*className="pointer-events-auto v2-safe-bottom/);
+});
+
+test('the dock height is written only when it changes, and a reopen renders the last one', () => {
+  // Chat reopen fix, 16 October 2026: the variable sits on the screen's root,
+  // so writing it after the mount restyled the whole transcript (760 elements).
+  assert.match(screen, /const DOCK_HEIGHT_VAR = '--v2-conv-dock-h';/);
+  assert.match(screen, /let lastDockHeight: string \| null = null;/);
+  assert.match(screen, /lastDockHeight = height;\s*if \(screen\.style\.getPropertyValue\(DOCK_HEIGHT_VAR\) !== height\) \{\s*screen\.style\.setProperty\(DOCK_HEIGHT_VAR, height\);/);
+  // Rendered from the first commit, so the transcript is styled once with it;
+  // an external composer still pins 0px.
+  assert.match(screen, /style=\{dockHeightStyle\(externalComposer\)\}/);
+  assert.match(screen, /if \(externalComposer\) return \{ \[DOCK_HEIGHT_VAR\]: '0px' \} as CSSProperties;/);
+  // Before paint, after MessageList's landing read.
+  assert.match(screen, /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(externalComposer\) return;\s*const dock = dockRef\.current;/);
 });
