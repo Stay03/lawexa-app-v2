@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 import { SEO, getAppUrl } from '@/lib/constants/seo';
 import { fetchStatuteForMetadata } from '@/lib/api/server';
 import {
+  canonicalProvisionSegment,
   formatProvisionLabel,
   parseProvisionSegment,
   type ProvisionCitation,
@@ -146,6 +147,10 @@ export default async function V2StatutePage({ params }: StatutePageProps) {
   // At most ONE provision segment. Anything deeper is not a citation this
   // grammar can ever mint — a real 404, not a reader-level miss.
   if (provision && provision.length > 1) notFound();
+  // Another spelling of a section ("sec-49", from a link Lawexa gave in a
+  // chat) goes to its address, so the reader lands on the section.
+  const canonical = provision?.[0] ? canonicalProvisionSegment(provision[0]) : null;
+  if (canonical) permanentRedirect(`/statutes/${slug}/${canonical}`);
 
   return <StatuteScreen slug={slug} provision={provision?.[0] ?? null} />;
 }
