@@ -914,10 +914,12 @@ export function ChannelScreen({
   /* A THREAD'S STATUS, BESIDE ITS NAME (Stay, 16 October 2026: thread status).
      Only on a thread whose payload carries the field, so a server without it
      draws the header as it was. The button is for someone who can post here,
-     the PATCH's own rule; everyone else sees the chip alone. */
+     the PATCH's own rule; everyone else sees the chip alone. With no status
+     and no way to set one there is nothing to show, so the slot is absent and
+     the phone keeps its subtitle line (techlead, 16 October 2026). */
   const threadStatus = isThread && channel.status !== undefined ? channel.status : undefined;
   const renderStatus =
-    threadStatus === undefined
+    threadStatus === undefined || (threadStatus === null && !canParticipate)
       ? undefined
       : (surface: 'menu' | 'sheet') => (
           <ThreadStatusControl

@@ -203,10 +203,12 @@ export function ChannelPlaceHeader({
   menu?: ReactNode;
   /**
    * A thread's status, beside its name (Stay, 16 October 2026: thread status).
-   * Called twice: `'sheet'` for the phone bar and `'menu'` for the wide one,
-   * each shown at its own width only, the same two-triggers idiom as the
-   * description. Absent on an ordinary channel and on a server without the
-   * field, which draws the bar as it was.
+   * Called twice: `'sheet'` for the phone bar, where it stands in the
+   * subtitle's line under the title, and `'menu'` for the wide one, beside the
+   * name; each is shown at its own width only, the same two-triggers idiom as
+   * the description. Absent on an ordinary channel, on a server without the
+   * field, and whenever there is nothing to show (no status, and a reader who
+   * cannot set one), all of which draw the bar as it was.
    */
   renderStatus?: (surface: 'menu' | 'sheet') => ReactNode;
 }) {
@@ -255,40 +257,81 @@ export function ChannelPlaceHeader({
             <ChevronLeft aria-hidden className="size-5" />
           </Link>
 
-          <button
-            type="button"
-            onClick={onOpenAbout}
-            className={cn(
-              'v2-interactive flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pr-1 text-left md:hidden',
-              FOCUS_RING,
-            )}
-          >
-            <SpaceCrest
-              uuid={channel.space.uuid}
-              name={channel.space.name}
-              type={channel.space.type}
-              size="sm"
-              className="size-8 shrink-0 rounded-lg"
-            />
-            {/* The `min-w-0` chain again: without it on both the span and its
-                children the name refuses to shrink and pushes the faces off
-                the bar instead of ellipsizing. */}
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="min-w-0 truncate text-sm font-semibold leading-tight text-foreground">
-                {displayName}
-              </span>
-              <span className="min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
-                {phoneSubtitle}
-              </span>
-            </span>
-          </button>
+          {renderStatus ? (
+            /* A THREAD WITH A STATUS LINE (techlead, 16 October 2026). With
+               the pill in the title row a 390px phone cut the title to
+               "Draf…", so on a phone the status takes the SUBTITLE's line
+               under the title and the title gets the row's whole width.
 
-          {/* The thread's status beside its name on a phone. A sibling of the
-              identity button, not inside it: a button cannot hold a button. */}
-          {renderStatus && (
-            <div className="flex shrink-0 items-center md:hidden">
-              {renderStatus('sheet')}
+               The status is a button of its own and a button cannot hold a
+               button, so the identity splits in two: the title opens the
+               details (its name still carries the subtitle, `sr-only`, so it
+               is announced as before), and the crest opens them too as a
+               pointer-only target, out of the tab order. */
+            <div className="flex min-w-0 flex-1 items-center gap-2 md:hidden">
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-hidden
+                onClick={onOpenAbout}
+                className="v2-interactive shrink-0 rounded-lg"
+              >
+                <SpaceCrest
+                  uuid={channel.space.uuid}
+                  name={channel.space.name}
+                  type={channel.space.type}
+                  size="sm"
+                  className="size-8 rounded-lg"
+                />
+              </button>
+              <div
+                data-phone-status-line
+                className="flex min-w-0 flex-1 flex-col items-start"
+              >
+                <button
+                  type="button"
+                  onClick={onOpenAbout}
+                  className={cn(
+                    'v2-interactive min-w-0 max-w-full truncate rounded text-left text-sm font-semibold leading-tight text-foreground',
+                    FOCUS_RING,
+                  )}
+                >
+                  {displayName}
+                  <span className="sr-only">{`, ${phoneSubtitle}`}</span>
+                </button>
+                <div className="flex min-w-0 max-w-full items-center">
+                  {renderStatus('sheet')}
+                </div>
+              </div>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenAbout}
+              className={cn(
+                'v2-interactive flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pr-1 text-left md:hidden',
+                FOCUS_RING,
+              )}
+            >
+              <SpaceCrest
+                uuid={channel.space.uuid}
+                name={channel.space.name}
+                type={channel.space.type}
+                size="sm"
+                className="size-8 shrink-0 rounded-lg"
+              />
+              {/* The `min-w-0` chain again: without it on both the span and
+                  its children the name refuses to shrink and pushes the faces
+                  off the bar instead of ellipsizing. */}
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="min-w-0 truncate text-sm font-semibold leading-tight text-foreground">
+                  {displayName}
+                </span>
+                <span className="min-w-0 truncate text-[11px] leading-tight text-muted-foreground">
+                  {phoneSubtitle}
+                </span>
+              </span>
+            </button>
           )}
 
           {/* The name is the screen's heading, and it cannot live inside the

@@ -245,8 +245,36 @@ test('a thread header carries the status control only for someone who can post',
   assert.match(screen, /canSet=\{canParticipate\}/);
   const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
   // One of each, each shown at its own width only.
-  assert.match(header, /md:hidden">\s*\{renderStatus\('sheet'\)\}/);
+  assert.match(header, /flex min-w-0 flex-1 items-center gap-2 md:hidden">/);
   assert.match(header, /hidden shrink-0 items-center md:flex">\s*\{renderStatus\('menu'\)\}/);
+});
+
+test('on a phone the status stands in the subtitle line and the title keeps the row', () => {
+  const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
+  // The status is the second line of the identity column, under the title,
+  // never a sibling in the title row.
+  assert.match(
+    header,
+    /data-phone-status-line[\s\S]{0,700}\{displayName\}\s*<span className="sr-only">\{`, \$\{phoneSubtitle\}`\}<\/span>\s*<\/button>\s*<div className="flex min-w-0 max-w-full items-center">\s*\{renderStatus\('sheet'\)\}/,
+  );
+  assert.equal(header.match(/renderStatus\('sheet'\)/g)?.length, 1);
+  // Without a status line the phone bar is the one it always was.
+  assert.match(header, /\) : \(\s*<button\s+type="button"\s+onClick=\{onOpenAbout\}[\s\S]{0,1600}\{phoneSubtitle\}/);
+  // No status and no way to set one: no slot, so the subtitle stays.
+  const screen = read('v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx');
+  assert.match(screen, /threadStatus === undefined \|\| \(threadStatus === null && !canParticipate\)/);
+  // The phone's trigger is the row chip, no taller than it.
+  const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
+  assert.match(control, /className=\{TRIGGER_COMPACT\}\s*>\s*<TriggerFace status=\{status\} quiet=\{quiet\} compact \/>/);
+});
+
+test('the feed status line wraps to two lines, chip on the first', () => {
+  const divider = read('v2', 'features', 'channels', 'feed', 'FeedDivider.tsx');
+  const line = divider.slice(divider.indexOf('function StatusChangeLine'));
+  const body = line.slice(0, line.search(/\n\}\r?\n/));
+  assert.match(body, /flex items-start justify-center/);
+  assert.match(body, /line-clamp-2/);
+  assert.doesNotMatch(body, /\btruncate\b/);
 });
 
 test('a status change draws as a quiet line with its chip, and moves the caches live', () => {

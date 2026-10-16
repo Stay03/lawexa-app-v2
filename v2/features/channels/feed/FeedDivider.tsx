@@ -207,18 +207,24 @@ function StatusChangeLine({
 }) {
   const time = formatMessageTime(change.at);
   const label = time ? `${change.sentence} · ${time}` : change.sentence;
+  /* THE SENTENCE WRAPS TO TWO LINES (techlead, 16 October 2026). On one
+     truncated line a phone cut the note ("…Running: Checking p…"), and the note
+     is the part a reader came to the line for. So the line is a centred group
+     whose text clamps at two lines; the chip keeps to the first line
+     (`items-start`, the text nudged down to the chip's middle), and a desktop
+     line that fits stays one line. */
   return (
     <div
       role="separator"
       aria-label={label}
-      className="flex items-center justify-center gap-1.5 py-1"
+      className="flex items-start justify-center gap-1.5 py-1"
     >
       {/* A `separator`'s children are presentational, so the chip's word is
           not read twice; the row's label carries the sentence. */}
       {change.to && <ThreadStatusChip value={change.to} />}
       <span
         aria-hidden
-        className="min-w-0 truncate text-[11px] leading-snug text-muted-foreground"
+        className="line-clamp-2 min-w-0 pt-0.5 text-[11px] leading-snug break-words text-muted-foreground"
       >
         {label}
       </span>

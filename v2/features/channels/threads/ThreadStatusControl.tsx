@@ -91,10 +91,15 @@ export function ThreadStatusControl({
   if (!canSet) {
     // The prefix says what the chip is to a screen reader; sighted readers
     // have the header around it.
+    // On a phone it sits in the subtitle's line, so it takes the row's size.
     return status ? (
       <span className="inline-flex shrink-0 items-center">
         <span className="sr-only">Status: </span>
-        <ThreadStatusChip size="md" value={status.value} quiet={quiet} />
+        <ThreadStatusChip
+          size={surface === 'sheet' ? 'sm' : 'md'}
+          value={status.value}
+          quiet={quiet}
+        />
       </span>
     ) : null;
   }
@@ -165,32 +170,55 @@ function useStatusChoice(
   return { choose, error, clearError: () => setError(null), pending: mutation.isPending };
 }
 
-/** The trigger: the chip plus a chevron, or a quiet "Set status". */
+/**
+ * The trigger: the chip plus a chevron, or a quiet "Set status". `compact` is
+ * the phone's, standing in the subtitle's line under the title (techlead, 16
+ * October 2026): the row chip and a smaller chevron, so the line keeps the
+ * subtitle's height.
+ */
 function TriggerFace({
   status,
   quiet,
+  compact = false,
 }: {
   status: ThreadStatus | null;
   quiet: string | null;
+  compact?: boolean;
 }) {
+  const chevron = (
+    <ChevronDown
+      aria-hidden
+      className={cn('shrink-0 text-muted-foreground', compact ? 'size-3' : 'size-3.5')}
+    />
+  );
   return status ? (
     <>
-      <ThreadStatusChip size="md" value={status.value} quiet={quiet} />
-      <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+      <ThreadStatusChip size={compact ? 'sm' : 'md'} value={status.value} quiet={quiet} />
+      {chevron}
     </>
   ) : (
     <>
-      <span className="text-xs font-medium text-muted-foreground">Set status</span>
-      <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+      <span
+        className={cn(
+          'font-medium text-muted-foreground',
+          compact ? 'text-[11px] leading-tight' : 'text-xs',
+        )}
+      >
+        Set status
+      </span>
+      {chevron}
     </>
   );
 }
 
-const TRIGGER = cn(
-  'v2-interactive inline-flex min-h-8 shrink-0 items-center gap-1 rounded-full pr-1.5',
+const TRIGGER_BASE = cn(
+  'v2-interactive inline-flex shrink-0 items-center gap-1 rounded-full pr-1.5',
   'transition-colors duration-150 hover:bg-secondary/60 motion-reduce:transition-none',
   FOCUS_RING,
 );
+const TRIGGER = cn(TRIGGER_BASE, 'min-h-8');
+/** The phone's, in the subtitle line: no taller than the chip it holds. */
+const TRIGGER_COMPACT = cn(TRIGGER_BASE, 'min-h-5');
 
 /** The footer, the note, and a refusal — the same three lines on both surfaces. */
 function StatusFooter({
@@ -328,9 +356,9 @@ function StatusSheet({ threadUuid, parentUuid, status, quiet, now }: SurfaceProp
           clearError();
           setOpen(true);
         }}
-        className={TRIGGER}
+        className={TRIGGER_COMPACT}
       >
-        <TriggerFace status={status} quiet={quiet} />
+        <TriggerFace status={status} quiet={quiet} compact />
       </button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="bottom" className="v2-safe-bottom rounded-t-2xl">
