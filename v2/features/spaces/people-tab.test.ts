@@ -57,7 +57,7 @@ test('the panel: members for everyone; invite, links, Invited and Asked to join 
   assert.match(panel, /onClick=\{scope\.openInviteLinks\}/);
   assert.doesNotMatch(panel, /useUrlOverlay/);
   assert.match(panel, /\{canManage && waiting > 0 \? \(/);
-  assert.match(panel, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} contentRoles=\{shared\} \/>/);
+  assert.match(panel, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} \/>/);
   // Stay's names (15 October 2026): "Invite sent" and "Needs your approval".
   assert.match(panel, />\s*Needs your approval\s*</);
   assert.match(panel, />\s*Invite sent\s*</);
@@ -106,10 +106,10 @@ test('the screen draws the People tab, and the silhouette has its shape', () => 
 test('a join request row: two compact buttons at the end, the channel sentence still before its buttons (Stay, 15 October 2026)', () => {
   const requests = read('v2', 'features', 'invites', 'JoinRequestsPanel.tsx');
   assert.doesNotMatch(requests, /className="flex-1"/);
-  // Both carry the row's `decide`, which adds the picked role on a shared
-  // space (16 October 2026; was `onDecide`).
-  assert.match(requests, /\{channel \? null : \(\s*<DecideButtons channel=\{false\} deciding=\{deciding\} onDecide=\{decide\} \/>\s*\)\}/);
-  assert.match(requests, /Saying yes also lets them into[\s\S]*?<DecideButtons channel deciding=\{deciding\} onDecide=\{decide\} \/>/);
+  assert.match(requests, /\{channel \? null : \(\s*<DecideButtons channel=\{false\} deciding=\{deciding\} onDecide=\{onDecide\} \/>\s*\)\}/);
+  assert.match(requests, /Saying yes also lets them into[\s\S]*?<DecideButtons channel deciding=\{deciding\} onDecide=\{onDecide\} \/>/);
+  // No role picker on the row (Stay, 16 October 2026): the server's default.
+  assert.doesNotMatch(requests, /RoleSelect|Joins as|contentRole/);
   assert.match(requests, /<div className="ml-auto flex shrink-0 gap-2">/);
 });
 

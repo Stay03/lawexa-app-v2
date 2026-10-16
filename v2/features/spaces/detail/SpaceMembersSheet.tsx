@@ -398,7 +398,7 @@ export function SpaceMembersSheet({
           </div>
         ) : step === 'requests' ? (
           <div key="requests" className={STEP_FADE}>
-            <SpaceJoinRequestsPanel spaceUuid={space.uuid} contentRoles={shared} />
+            <SpaceJoinRequestsPanel spaceUuid={space.uuid} />
           </div>
         ) : (
           <div key="members" className={cn('space-y-4', STEP_FADE)}>

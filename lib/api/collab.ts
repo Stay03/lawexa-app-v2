@@ -1488,16 +1488,12 @@ export const joinRequestsApi = {
     return response.data;
   },
 
-  /** `contentRole` on a shared space: the role approving gives (the
-   *  approval card always sends the one it shows). Absent: the server's
-   *  default (the link's role, else Contributor). */
-  approveSpace: async (
-    id: number,
-    contentRole?: 'editor' | 'viewer'
-  ): Promise<ApiResponse<null>> => {
+  /** No role is sent: the server gives its default, the invite link's role,
+   *  else Contributor (Stay, 16 October 2026: "Contributor by default"). */
+  approveSpace: async (id: number): Promise<ApiResponse<null>> => {
     const response = await apiClient.post<ApiResponse<null>>(
       `/space-join-requests/${id}/approve`,
-      contentRole ? { content_role: contentRole } : {}
+      {}
     );
     return response.data;
   },

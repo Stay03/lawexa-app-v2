@@ -1968,12 +1968,6 @@ export interface JoinRequest {
   content_role?: ContentRole;
   content_role_label?: string;
   /**
-   * What approving with no role would give: the invite link's role, else
-   * "editor" (backend, 16 October 2026). The approval card starts on it
-   * (`joinRequestStartRole`); absent before the joining changes.
-   */
-  approves_as?: 'editor' | 'viewer';
-  /**
    * PRESENT = approving this ALSO grants that channel. It has to be said on
    * the approve control: an admin reading "join request" would otherwise hand
    * out channel access they never agreed to. `null` grants the space only.

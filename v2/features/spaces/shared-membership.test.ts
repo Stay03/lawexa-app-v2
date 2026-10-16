@@ -230,15 +230,13 @@ test('links and the waiting list speak content roles on a shared space, never a 
   // were two sheets on the space page, each passed `isSharedSpace(space)`).
   const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
   assert.match(sheet, /<InviteLinksPanel spaceUuid=\{space\.uuid\} contentRoles=\{shared\} \/>/);
-  assert.match(sheet, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} contentRoles=\{shared\} \/>/);
+  assert.match(sheet, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} \/>/);
   const requests = read('v2', 'features', 'invites', 'JoinRequestsPanel.tsx');
-  // The Owner picks the role on a shared space (16 October 2026; the row used
-  // to print `content_role_label`): the shared roles in the invite dialog's
-  // RoleSelect, starting on the server's approves_as, and sent on approve.
-  assert.match(requests, /joinRequestStartRole\(request\.approves_as\)/);
-  assert.match(requests, /<RoleSelect id=\{roleId\} value=\{role\} roles=\{SHARED_INVITE_ROLES\} onChange=\{setRole\} \/>/);
-  assert.match(requests, /const decide = \(approve: boolean\) => onDecide\(approve, contentRoles \? role : undefined\);/);
-  assert.match(requests, /decide\.mutate\(\{ id, approve, contentRole \}\)/);
+  // Approving sends no role (Stay, 16 October 2026: "Contributor by
+  // default"): the server gives the invite link's role, else Contributor.
+  assert.doesNotMatch(requests, /RoleSelect|Joins as/);
+  const api = read('lib', 'api', 'collab.ts');
+  assert.match(api, /approveSpace: async \(id: number\): Promise<ApiResponse<null>> => \{\s*const response = await apiClient\.post<ApiResponse<null>>\(\s*`\/space-join-requests\/\$\{id\}\/approve`,\s*\{\}\s*\);/);
   const dialog = read('v2', 'features', 'collab', 'membership', 'InvitePeopleDialog.tsx');
   assert.doesNotMatch(dialog, /[—–]\s*can invite/);
   // The list is drawn by the shared RoleSelect since design round 1.

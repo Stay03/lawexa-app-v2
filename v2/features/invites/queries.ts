@@ -13,7 +13,6 @@ import type {
   DiscoverSpacesParams,
 } from '@/types/collab';
 import { channelsQueries } from '@/v2/features/channels/queries';
-import type { InvitableContentRole } from '@/v2/features/collab/membership/content-role';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 
 /**
@@ -98,17 +97,13 @@ export function useChannelJoinRequests(channelUuid: string, enabled = true) {
 export function useDecideJoinRequest(
   kind: 'space' | 'channel',
   parentUuid: string,
-): UseMutationResult<
-  unknown,
-  Error,
-  { id: number; approve: boolean; contentRole?: InvitableContentRole }
-> {
+): UseMutationResult<unknown, Error, { id: number; approve: boolean }> {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, approve, contentRole }) => {
+    mutationFn: ({ id, approve }) => {
       if (kind === 'space') {
         return approve
-          ? joinRequestsApi.approveSpace(id, contentRole)
+          ? joinRequestsApi.approveSpace(id)
           : joinRequestsApi.rejectSpace(id);
       }
       return approve

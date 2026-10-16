@@ -137,7 +137,7 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
           <h2 id="space-people-requests" className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
             Needs your approval
           </h2>
-          <SpaceJoinRequestsPanel spaceUuid={space.uuid} contentRoles={shared} />
+          <SpaceJoinRequestsPanel spaceUuid={space.uuid} />
         </section>
       ) : null}
     </div>
