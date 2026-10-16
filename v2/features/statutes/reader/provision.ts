@@ -58,22 +58,6 @@ export function parseProvisionSegment(segment: string): ProvisionCitation | null
   return { section: match[1], subsection: match[2] ?? null };
 }
 
-/**
- * Other spellings of a section's address, and the one they mean (Stay, 16
- * October 2026: a link Lawexa gave in a chat, `/statutes/criminal-code-act-
- * 1916/sec-49`, opened the statute at the top while the page's own link is
- * `.../section-49`). `sec-`, `s-`, `art-` and `article-`, with the same num and
- * optional subsection as the grammar, are forwarded by the route to the
- * `section-` address, so a link already sent in a chat lands on its section.
- * `null` for a segment that is already canonical, or not an address at all.
- */
-const ALIAS = /^(?:sec|s|art|article)-(\d+[a-z]*(?:-\d+[a-z]*)?)$/;
-
-export function canonicalProvisionSegment(segment: string): string | null {
-  const match = ALIAS.exec(segment.toLowerCase());
-  return match ? `section-${match[1]}` : null;
-}
-
 /* ── Num normalization ───────────────────────────────────────────────────── */
 
 /**

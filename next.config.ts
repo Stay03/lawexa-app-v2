@@ -96,6 +96,19 @@ const nextConfig = (phase: string): NextConfig => {
           permanent: true,
         },
         {
+          // Other spellings of a statute section's address go to it (Stay, 16
+          // October 2026: Lawexa's link `/statutes/criminal-code-act-1916/
+          // sec-49` opened the statute at the top; the reader's address is
+          // `section-49`, `v2/features/statutes/reader/provision.ts`). Here and
+          // not in the route: the route streams behind its `loading.tsx`, so a
+          // redirect there arrives as a 200 with a meta refresh; this one is a
+          // real 308, before any render, which a link preview follows too.
+          source:
+            '/statutes/:slug/:spelling(sec|s|art|article)-:num(\\d+[a-zA-Z]*(?:-\\d+[a-zA-Z]*)?)',
+          destination: '/statutes/:slug/section-:num',
+          permanent: true,
+        },
+        {
           // Typo alias: /ambassador (singular) -> /ambassadors
           source: '/ambassador',
           destination: '/ambassadors',
