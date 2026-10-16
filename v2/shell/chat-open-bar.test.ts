@@ -32,8 +32,14 @@ test('a conversation has the open bar, and is not a top-level screen', () => {
 
 test('the shell frame and the bar read the open-bar predicate', () => {
   const frame = read('v2', 'shell', 'ShellFrame.tsx');
-  assert.match(frame, /hasOpenBar\(pathname\) && 'v2-shell--open'/);
-  assert.match(frame, /isChatRoute\(pathname\) && 'v2-shell--chat'/);
+  // Data attributes on a fixed class (ShellFrame's docblock: a class change on
+  // the root restyled the whole page).
+  assert.match(frame, /className="v2-shell"/);
+  assert.match(frame, /data-v2-open-bar=\{hasOpenBar\(pathname\) \? '' : undefined\}/);
+  assert.match(frame, /data-v2-chat=\{isChatRoute\(pathname\) \? '' : undefined\}/);
+  // As code, not as the history the docblock tells.
+  assert.doesNotMatch(frame, /'v2-shell--(open|chat)'/);
+  assert.doesNotMatch(read('v2', 'shell', 'shell.css'), /\.v2-shell--(open|chat)/);
   const header = read('v2', 'shell', 'V2Header.tsx');
   assert.match(header, /const isTopLevel = hasOpenBar\(path\);/);
   // The move-first clear still keys on top-level screens only.
@@ -43,8 +49,8 @@ test('the shell frame and the bar read the open-bar predicate', () => {
 test('on a phone the bar room moves into the chat: its frame below the buttons, the transcript scrolling under them', () => {
   const css = read('v2', 'shell', 'shell.css');
   const phone = css.slice(css.indexOf('@media (max-width: 47.999rem)'));
-  assert.match(phone, /html\.v2-document-lock \.v2-shell--chat \.v2-shell__content \{\s*padding-top: 0;\s*\}/);
-  assert.match(phone, /html\.v2-document-lock \.v2-shell--chat \[data-v2-chat-frame\] \{\s*padding-top: var\(--v2-bar-h\);\s*\}/);
+  assert.match(phone, /html\.v2-document-lock \.v2-shell\[data-v2-chat\] \.v2-shell__content \{\s*padding-top: 0;\s*\}/);
+  assert.match(phone, /html\.v2-document-lock \.v2-shell\[data-v2-chat\] \[data-v2-chat-frame\] \{\s*padding-top: var\(--v2-bar-h\);\s*\}/);
   assert.match(phone, /\[data-v2-chat-list\]\[data-under-bar\] \{\s*margin-top: calc\(-1 \* var\(--v2-bar-h\)\);\s*\}/);
   assert.match(phone, /\[data-v2-chat-list\]\[data-under-bar\] > \[data-v2-chat-scroller\] \{\s*padding-top: var\(--v2-bar-h\);\s*\}/);
   const list = read('v2', 'features', 'conversations', 'conversation', 'MessageList.tsx');

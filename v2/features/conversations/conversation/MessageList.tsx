@@ -223,7 +223,7 @@ export interface MessageListProps {
   /** The reader's uuid, for the turns this client drew (they carry no author). */
   viewerUuid?: string | null;
   /** The transcript starts at the screen's top on a chat route, so its scroller
-   *  passes under the open bar (shell.css `.v2-shell--chat`); false when
+   *  passes under the open bar (shell.css `.v2-shell[data-v2-chat]`); false when
    *  something sits above it (the confidential banner). */
   underBar?: boolean;
   /**

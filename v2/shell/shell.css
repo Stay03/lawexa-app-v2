@@ -160,8 +160,8 @@ html.v2-document-lock body {
    being a bar. Nothing is painted behind it, there is no rule line under it,
    its controls sit on the page as round solid buttons, and the CONTENT passes
    underneath them as it scrolls. `top-level-route.ts` decides which screens
-   those are, off the address, and `ShellFrame` puts `.v2-shell--open` on the
-   grid root for them.
+   those are, off the address, and `ShellFrame` puts `data-v2-open-bar` on the
+   grid root for them (an attribute, never a class: ShellFrame's docblock).
 
    ── WHY THE ROW COLLAPSES INSTEAD OF THE BAR FLOATING ──────────────────────
    `position: fixed` is forbidden in this shell and the reason is two blocks up:
@@ -287,7 +287,7 @@ html.v2-document-lock body {
    this file — so the reader meets exactly one title however wide the screen is.
    -------------------------------------------------------------------------- */
 @media (max-width: 47.999rem) {
-  html.v2-document-lock .v2-shell--open {
+  html.v2-document-lock .v2-shell[data-v2-open-bar] {
     grid-template-rows: 0 1fr auto;
   }
 
@@ -297,7 +297,7 @@ html.v2-document-lock body {
      tie is broken by document order, which the content wins because it comes
      after the header. Thirty puts the bar above the floating pill for certain
      on a short viewport, where the two can actually meet. */
-  html.v2-document-lock .v2-shell--open .v2-shell__header {
+  html.v2-document-lock .v2-shell[data-v2-open-bar] .v2-shell__header {
     align-self: start;
     z-index: 30;
     background: none;
@@ -308,7 +308,7 @@ html.v2-document-lock body {
     position: relative;
   }
 
-  html.v2-document-lock .v2-shell--open .v2-shell__content {
+  html.v2-document-lock .v2-shell[data-v2-open-bar] .v2-shell__content {
     padding-top: var(--v2-bar-h);
   }
 
@@ -321,19 +321,19 @@ html.v2-document-lock body {
      pass under them as the reader scrolls, as a list's rows do (Stay, 13
      October 2026). With the confidential banner above it the transcript
      starts below the banner, as before. */
-  html.v2-document-lock .v2-shell--chat .v2-shell__content {
+  html.v2-document-lock .v2-shell[data-v2-chat] .v2-shell__content {
     padding-top: 0;
   }
 
-  html.v2-document-lock .v2-shell--chat [data-v2-chat-frame] {
+  html.v2-document-lock .v2-shell[data-v2-chat] [data-v2-chat-frame] {
     padding-top: var(--v2-bar-h);
   }
 
-  html.v2-document-lock .v2-shell--chat [data-v2-chat-list][data-under-bar] {
+  html.v2-document-lock .v2-shell[data-v2-chat] [data-v2-chat-list][data-under-bar] {
     margin-top: calc(-1 * var(--v2-bar-h));
   }
 
-  html.v2-document-lock .v2-shell--chat [data-v2-chat-list][data-under-bar] > [data-v2-chat-scroller] {
+  html.v2-document-lock .v2-shell[data-v2-chat] [data-v2-chat-list][data-under-bar] > [data-v2-chat-scroller] {
     padding-top: var(--v2-bar-h);
   }
 
@@ -364,7 +364,7 @@ html.v2-document-lock body {
      which is precisely the treatment the owner rejected. There it paints
      nothing at all and the bar is exactly what it was before this rule. */
   @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-    html.v2-document-lock .v2-shell--open
+    html.v2-document-lock .v2-shell[data-v2-open-bar]
       .v2-shell__header[data-v2-bar-treatment='blur']::before {
       content: '';
       position: absolute;
@@ -477,7 +477,7 @@ html.v2-document-lock body {
      between the round controls returns the same element either way, so a finger
      still reaches the rows underneath; and at 900px the pseudo-element has no
      `content` at all, so the desktop bar keeps its plate untouched. */
-  html.v2-document-lock .v2-shell--open
+  html.v2-document-lock .v2-shell[data-v2-open-bar]
     .v2-shell__header[data-v2-bar-treatment='fade']::before {
     content: '';
     position: absolute;

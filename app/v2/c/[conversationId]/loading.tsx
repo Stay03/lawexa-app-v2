@@ -38,7 +38,7 @@ import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/rout
 export default function Loading() {
   return (
     // `data-v2-chat-frame`: below the open bar's buttons on a phone, as the
-    // screen it stands in for is (shell.css `.v2-shell--chat`).
+    // screen it stands in for is (shell.css `.v2-shell[data-v2-chat]`).
     <div className="relative flex h-full min-h-0 flex-col" data-v2-chat-frame="">
       <RouteSkeletonMark />
       <span role="status" className="sr-only">
