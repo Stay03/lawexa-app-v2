@@ -28,8 +28,16 @@ export const NEW_MEMBER_DAYS = 7;
  * `now` (the caller's minute clock, so render stays pure). An invited person
  * who has not joined, a missing or unreadable `joined_at`, and a date in the
  * future (a clock ahead of ours) are never New.
+ *
+ * NEVER THE OWNER (techlead, 16 October 2026). The mark tells the Owner who
+ * joined; an Owner who made the space this week joined it then too, and
+ * marking their own row New said nothing.
  */
-export function joinedRecently(member: Pick<Member, 'joined_at' | 'is_pending'>, now: number): boolean {
+export function joinedRecently(
+  member: Pick<Member, 'joined_at' | 'is_pending' | 'role' | 'content_role'>,
+  now: number,
+): boolean {
+  if (member.content_role === 'owner' || member.role === 'owner') return false;
   if (member.is_pending || !member.joined_at) return false;
   const joined = Date.parse(member.joined_at);
   if (Number.isNaN(joined)) return false;
