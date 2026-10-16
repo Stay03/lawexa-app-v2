@@ -420,7 +420,7 @@ test('the header status trims only its quiet suffix, never the word or the perso
   assert.match(chip, /fit = false/);
   assert.match(chip, /const FIT_GRID = 'inline-grid grid-cols-\[auto_minmax\(0,max-content\)\]';/);
   assert.match(chip, /fit \? FIT_GRID : 'inline-flex shrink-0'/);
-  assert.match(chip, /fit && 'min-w-0 truncate'/);
+  assert.match(chip, /fit && 'min-w-0 truncate max-md:hidden'/);
   assert.match(chip, /<span className=\{cn\('min-w-0 max-w-32 truncate', fold && 'max-md:hidden'\)\}>\s*\{`· \$\{person\}`\}\s*<\/span>/);
 });
 

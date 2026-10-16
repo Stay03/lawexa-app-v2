@@ -168,7 +168,10 @@ export function ThreadStatusChip({
       <span
         className={cn(
           'text-[11px] whitespace-nowrap text-muted-foreground',
-          fit && 'min-w-0 truncate',
+          // A phone's bar is the pill and the chevron alone: a "· quiet …"
+          // stub there read as noise (techlead, 16 October 2026). The trigger's
+          // spoken label still says it.
+          fit && 'min-w-0 truncate max-md:hidden',
         )}
       >
         {`· ${quiet}`}
