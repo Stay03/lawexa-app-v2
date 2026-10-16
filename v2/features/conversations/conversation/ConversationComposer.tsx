@@ -1012,6 +1012,16 @@ export function ConversationComposer({
 
             <PromptInputTextarea
               placeholder={pastedItems.length > 0 ? 'Add a message…' : placeholder}
+              // A message box, never a form field to fill: Chrome on iPhone
+              // drew its autofill bar (password, card, address) over the box,
+              // and does not count that bar in the visual viewport, so nothing
+              // the page measures can make room for it (Arthur's ?kbdebug=1
+              // recording, 16 October 2026). `off` and a neutral name ask it
+              // not to offer autofill here at all. The keyboard's own word
+              // suggestions are separate and stay.
+              autoComplete="off"
+              name="lawexa-message"
+              inputMode="text"
               onFocus={onEngage}
               // Before the pill's own Enter-to-send (prompt-input.tsx), so a
               // picked person takes Enter and Tab instead of sending.
