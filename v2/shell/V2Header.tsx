@@ -32,6 +32,8 @@ import { FOCUS_RING } from './designs/modules';
 import { pushedScreenFor, type PushedScreen } from './pushed-route';
 import { hasOpenBar } from './top-level-route';
 import { useScreenContext } from './screen-context';
+import { NO_BREADCRUMB_DATA, breadcrumbTrail } from './breadcrumb-trail';
+import { V2Breadcrumb } from './V2Breadcrumb';
 
 /**
  * THE SEE-THROUGH BAR'S CONTROLS, on a top-level screen below `md:` — a SOLID
@@ -102,9 +104,15 @@ const OPEN_BAR_CONTROL =
  *    - Desktop (`hidden md:*`): `SidebarTrigger` (slides the rail off-canvas), the
  *      wordmark ONLY while the rail is collapsed (the expanded rail already shows
  *      it), a separator, and a ROUTE-AWARE breadcrumb label (owner #43). The label
- *      is a quiet CATEGORY ("Home" / "Conversation"), never the specific title —
- *      the centre already carries that, so the left stays uncrowded and never
+ *      is a quiet CATEGORY ("Home" / "Case"), never the specific title — the
+ *      centre already carries that, so the left stays uncrowded and never
  *      duplicates it. Routes with no category hide the label + its separator.
+ *    - On a TRAIL route (a space, a chat in a space, a statute, a case) the
+ *      label's slot holds the breadcrumb trail instead (`V2Breadcrumb`, Arthur,
+ *      16 October 2026). The centre is empty from `md:` up on every one of
+ *      those routes, so there it is hidden and the left column takes its room:
+ *      the trail can then print a statute's whole name. The grid keeps its
+ *      three tracks below `md:` and on every other route.
  *  - CENTRE (grid col 2, auto): route-scoped (owner #43, option A). On the home
  *    (`/`, `/work`, `/study`) it is the `HomeTabs` product control (owner #34);
  *    on every other route it surfaces that route's published context — the title
@@ -260,7 +268,14 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // Quiet orientation label for the left cluster — a category, NOT the title.
   // None on a chat: its bar matches the chats list page's (Stay, 13 October
   // 2026: a chat should look like the list page), and its title is the masthead.
+  // A trail takes this slot where there is one (below), so "Case" now shows
+  // only on a case's sub-pages (its report), which have no trail.
   const leftLabel = isHome ? 'Home' : isCase ? 'Case' : null;
+  // Whether this address carries a breadcrumb trail. It depends on the route
+  // and, for a chat, on whether its record placed it in a space; never on a
+  // name, so the bar's shape does not change as the names land.
+  const showsTrail =
+    breadcrumbTrail(path, { ...NO_BREADCRUMB_DATA, chatSpace: place }) !== null;
 
   return (
     <div
@@ -274,6 +289,9 @@ export function V2Header({ user }: { user: SessionUser | null }) {
         // this one gets out of the way below `md:` — see `screenOwnsPhoneBar`
         // above. A CSS variant, never a viewport hook.
         screenOwnsPhoneBar && 'max-md:hidden',
+        // A trail route hides the centre from `md:` up (see `HeaderCenter`),
+        // so the left column takes its room and the right keeps its own width.
+        showsTrail && 'md:grid-cols-[minmax(0,1fr)_auto]',
       )}
     >
       {/* LEFT cluster. */}
@@ -336,7 +354,15 @@ export function V2Header({ user }: { user: SessionUser | null }) {
             <LogoWordmark className="h-9" />
           </span>
         ) : null}
-        {leftLabel ? (
+        {showsTrail ? (
+          <V2Breadcrumb
+            pathname={path}
+            chatTitle={title}
+            chatSpace={place}
+            collab={collab}
+            crumb={screen?.crumb ?? null}
+          />
+        ) : leftLabel ? (
           <>
             <Separator
               orientation="vertical"
@@ -352,6 +378,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
       {/* CENTRE — home tabs on `/`, route context elsewhere (owner #43), and
           NOTHING on a top-level screen: its title lives in the page now. */}
       <HeaderCenter
+        hiddenFromMd={showsTrail}
         isHome={isHome}
         isTopLevel={isTopLevel}
         pushed={pushed}
@@ -465,8 +492,12 @@ function CollabRouteBack() {
  * prints its title in the page body (`ScreenTitle`), which is why they stopped
  * publishing a header context — a bar that still had one would put the reader's
  * screen name on the pixels twice.
+ *
+ * On a TRAIL route it is hidden from `md:` up, where it is empty anyway, so the
+ * breadcrumb can use the room (Arthur, 16 October 2026).
  */
 function HeaderCenter({
+  hiddenFromMd,
   isHome,
   isTopLevel,
   pushed,
@@ -476,6 +507,8 @@ function HeaderCenter({
   place,
   collab,
 }: {
+  /** A trail route: the breadcrumb takes this room from `md:` up. */
+  hiddenFromMd: boolean;
   isHome: boolean;
   /** True on a screen the reader did NOT push into (`top-level-route.ts`). */
   isTopLevel: boolean;
@@ -490,7 +523,7 @@ function HeaderCenter({
   collab: CollabHeaderContext | null;
 }) {
   return (
-    <div className="grid min-w-0 place-items-center">
+    <div className={cn('grid min-w-0 place-items-center', hiddenFromMd && 'md:hidden')}>
       <div
         data-active={isHome}
         inert={!isHome || undefined}

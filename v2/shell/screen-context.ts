@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 /**
- * screen-context — the two things about a pushed screen that its ADDRESS cannot
+ * screen-context — the things about a pushed screen that its ADDRESS cannot
  * know, published by the screen and consumed by the bar.
  *
  * `pushed-route.ts` answers everything a pathname can answer, synchronously,
@@ -19,6 +19,9 @@ import type { LucideIcon } from 'lucide-react';
  *     y124 and `/spaces/{uuid}` one at y183; both now fold into the bar's
  *     single overflow menu, which is where the owner's "at most three things in
  *     the bar: back, title, ONE action on the right" puts them.
+ *
+ *  3. THE LAST BREADCRUMB PART, where it lives in the screen's own state (a
+ *     space's tab, a statute section's heading). See {@link ScreenContext.crumb}.
  *
  * ── WHY THE ACTIONS ARE DATA AND NOT A `ReactNode` ─────────────────────────
  * A rendered menu handed through a module store has to be memoised whole or
@@ -86,6 +89,14 @@ export interface ScreenContext {
   back: ScreenBack | null;
   /** Empty means the bar's menu shows only the app's own rows. */
   actions: readonly ScreenAction[];
+  /**
+   * The last part of the desktop breadcrumb, where only the screen knows it:
+   * a space's open tab (its switches never reach the router, so the address
+   * goes stale) and a statute section's heading (it is in the parsed
+   * document). Absent or `null` leaves the part to `breadcrumb-trail.ts`, which
+   * draws a skeleton or the address's own label (Arthur, 16 October 2026).
+   */
+  crumb?: string | null;
 }
 
 const NO_ACTIONS: readonly ScreenAction[] = [];
@@ -140,6 +151,7 @@ function isSame(left: ScreenContext, right: ScreenContext): boolean {
   return (
     left.pathname === right.pathname &&
     sameBack(left.back, right.back) &&
+    (left.crumb ?? null) === (right.crumb ?? null) &&
     sameActions(left.actions, right.actions)
   );
 }
@@ -175,4 +187,9 @@ export function useScreenContext(pathname: string): ScreenContext | null {
 /** The screen's own menu rows for `pathname`, never `undefined`. */
 export function useScreenActions(pathname: string): readonly ScreenAction[] {
   return useScreenContext(pathname)?.actions ?? NO_ACTIONS;
+}
+
+/** The screen's breadcrumb part for `pathname`, or `null`. */
+export function useScreenCrumb(pathname: string): string | null {
+  return useScreenContext(pathname)?.crumb ?? null;
 }

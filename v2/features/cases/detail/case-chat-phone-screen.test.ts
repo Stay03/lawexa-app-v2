@@ -254,7 +254,8 @@ test('nothing on the page moves with the bars: the region takes the rows they ga
 test('nothing in the bar replays or re-measures when it comes back', () => {
   // `display: none` to its old value restarts an element's CSS animations and wakes
   // any observer of its size. The bar and what it renders have neither.
-  for (const file of ['V2Header.tsx', 'TunedHeader.tsx', 'V2NotificationBell.tsx', 'V2HeaderMenu.tsx', 'HomeTabs.tsx', 'Logo.tsx']) {
+  // The desktop breadcrumb is in the bar too, and truncates by CSS alone.
+  for (const file of ['V2Header.tsx', 'V2Breadcrumb.tsx', 'TunedHeader.tsx', 'V2NotificationBell.tsx', 'V2HeaderMenu.tsx', 'HomeTabs.tsx', 'Logo.tsx']) {
     const source = strip(read('v2', 'shell', file));
     assert.doesNotMatch(source, /animate-in|animate-\[|ResizeObserver|IntersectionObserver|getBoundingClientRect/, file);
   }

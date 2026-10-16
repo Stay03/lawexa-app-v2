@@ -1,9 +1,15 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { useV2Session } from '@/v2/runtime/session-context';
+import {
+  clearScreenContext,
+  setScreenContext,
+  type ScreenAction,
+} from '@/v2/shell/screen-context';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import { statutesQueries } from '../queries';
 import { parseAkn, spyTargetsOf, type AknBlock, type AknOutlineDivision } from './akn';
@@ -16,6 +22,7 @@ import {
   holderBlockIndex,
   indexSections,
   parseProvisionSegment,
+  provisionCrumb,
   resolveCitation,
 } from './provision';
 import {
@@ -131,6 +138,8 @@ const MOUNT_YIELD_MS = 16;
 
 const NO_BLOCKS: AknBlock[] = [];
 const NO_OUTLINE: AknOutlineDivision[] = [];
+/** The reader publishes a breadcrumb part and no menu rows of its own. */
+const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
 
 export function StatuteDocument({
   slug,
@@ -368,6 +377,19 @@ export function StatuteDocument({
     [provision],
   );
   const sectionIndex = useMemo(() => indexSections(blocks), [blocks]);
+  // The desktop breadcrumb's last part, "Section 1 · Application" (Arthur, 16
+  // October 2026). The heading is only in the parsed document, so the bar
+  // prints the address's "Section 1" until this resolves, and keeps it for a
+  // citation that points nowhere.
+  const crumb = useMemo(
+    () => (citation ? provisionCrumb(sectionIndex, citation) : null),
+    [sectionIndex, citation],
+  );
+  const pathname = usePathname() ?? '';
+  useEffect(() => {
+    setScreenContext({ pathname, back: null, actions: NO_SCREEN_ACTIONS, crumb });
+  }, [pathname, crumb]);
+  useEffect(() => () => clearScreenContext(), []);
   const provisionTarget = useMemo(
     () => (citation ? resolveCitation(sectionIndex, citation) : null),
     [sectionIndex, citation],

@@ -22,6 +22,7 @@ import { useSpaceJoinRequests } from '@/v2/features/invites/queries';
 import { SpaceFormDialog } from '../dialogs/SpaceFormDialog';
 import { spacesQueries } from '../queries';
 import {
+  SPACE_TAB_LABELS,
   defaultSpaceTab,
   parseSpaceTab,
   spaceMenuItems,
@@ -374,9 +375,13 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     openDelete,
   ]);
 
+  // The desktop breadcrumb's last part is the open tab (Arthur, 16 October
+  // 2026). Only once the space has landed: before that the tabs it has are not
+  // known, so a `?tab=channels` link would name the default tab for a frame.
+  const crumb = hasSpace ? SPACE_TAB_LABELS[tab] : null;
   useEffect(() => {
-    setScreenContext({ pathname, back: null, actions });
-  }, [pathname, actions]);
+    setScreenContext({ pathname, back: null, actions, crumb });
+  }, [pathname, actions, crumb]);
   useEffect(() => () => clearScreenContext(), []);
 
   // Before the detail lands, the silhouette draws the tab the page is most

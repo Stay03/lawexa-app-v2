@@ -176,6 +176,40 @@ function findSubsection(section: Element, num: string): Element | null {
   return findNestedSubsection(section, num);
 }
 
+/* ── The bar's breadcrumb ────────────────────────────────────────────────── */
+
+/**
+ * "Section 1 · Application": a provision's label and its section's heading,
+ * as the desktop bar's last breadcrumb part prints them (Arthur, 16 October
+ * 2026). A heading's closing full stop goes, and a section with no heading is
+ * its label alone. Pure, for `node:test`.
+ */
+export function provisionCrumbLabel(label: string, heading: string): string {
+  const words = heading.replace(/[.:;,\s]+$/, '');
+  return words ? `${label} · ${words}` : label;
+}
+
+/**
+ * The breadcrumb for `citation` once the document has parsed, or `null` when
+ * it points nowhere (the bar then keeps the address's own "Section 54"). A
+ * subsection the document lacks names the section the reader landed on, as
+ * the reader's own notice does.
+ */
+export function provisionCrumb(
+  index: ReadonlyMap<string, SectionTarget>,
+  citation: ProvisionCitation,
+): string | null {
+  const section = index.get(citation.section);
+  const resolution = resolveCitation(index, citation);
+  if (!section || resolution.matched === 'none') return null;
+  const shown =
+    resolution.matched === 'section' ? { ...citation, subsection: null } : citation;
+  return provisionCrumbLabel(
+    formatProvisionLabel(shown),
+    collapsedText(childByLocal(section.element, 'heading')),
+  );
+}
+
 function findNestedSubsection(el: Element, num: string): Element | null {
   for (const child of el.children) {
     if (

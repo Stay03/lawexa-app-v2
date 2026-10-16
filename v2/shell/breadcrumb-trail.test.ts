@@ -1,0 +1,206 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import {
+  NO_BREADCRUMB_DATA,
+  breadcrumbTrail,
+  trailRouteFor,
+  type BreadcrumbData,
+  type BreadcrumbTrail,
+} from './breadcrumb-trail';
+import { provisionCrumbLabel } from '@/v2/features/statutes/reader/provision';
+
+/* The desktop bar's breadcrumb trail (Arthur, 16 October 2026: "I think it's
+ * good", on the mock-ups). Pure rules first, then the wiring, pinned by source. */
+
+const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+
+const SPACE = '6d3c8110-3b34-403a-aed5-bd669a52cf56';
+
+const KNOWN: BreadcrumbData = {
+  spaceName: 'Adeyemi chambers',
+  tabLabel: 'Files',
+  chatTitle: 'Lease review',
+  chatSpace: { label: 'Adeyemi chambers', href: `/spaces/${SPACE}` },
+  caseTitle: 'Adeyemi v. Okafor',
+  statuteTitle: 'Courts Act',
+  sectionLabel: 'Section 1 · Application',
+};
+
+function shape(trail: BreadcrumbTrail | null) {
+  assert.ok(trail);
+  return trail.parts.map((part) => [part.label, part.href ?? null]);
+}
+
+/** Every part but the last links somewhere, Library never does, and the last never does. */
+function assertLinks(trail: BreadcrumbTrail | null) {
+  assert.ok(trail);
+  const last = trail.parts.length - 1;
+  trail.parts.forEach((part, index) => {
+    if (index === last) assert.equal(part.href, undefined, 'the current page is not a link');
+    else if (part.label === 'Library') assert.equal(part.href, undefined, 'there is no Library page');
+    else assert.ok(part.href, `${part.label} links to its page`);
+  });
+}
+
+test('a space on a tab: Spaces › the space › the tab', () => {
+  const trail = breadcrumbTrail(`/spaces/${SPACE}`, KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Spaces', '/spaces'],
+    ['Adeyemi chambers', `/spaces/${SPACE}`],
+    ['Files', null],
+  ]);
+  assertLinks(trail);
+  // The internal address carries the same trail.
+  assert.deepEqual(breadcrumbTrail(`/v2/spaces/${SPACE}`, KNOWN), trail);
+});
+
+test('a chat in a space: Spaces › the space › the chat; a personal chat has no trail', () => {
+  const trail = breadcrumbTrail('/c/abc', KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Spaces', '/spaces'],
+    ['Adeyemi chambers', `/spaces/${SPACE}`],
+    ['Lease review', null],
+  ]);
+  assertLinks(trail);
+  assert.equal(breadcrumbTrail('/c/abc', { ...KNOWN, chatSpace: null }), null);
+});
+
+test('a statute: Library › Statutes › the statute', () => {
+  const trail = breadcrumbTrail('/statutes/courts-act-1993', KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Library', null],
+    ['Statutes', '/statutes'],
+    ['Courts Act', null],
+  ]);
+  assertLinks(trail);
+});
+
+test('a statute section: Library › Statutes › the statute › the section', () => {
+  const trail = breadcrumbTrail('/statutes/courts-act-1993/section-1', KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Library', null],
+    ['Statutes', '/statutes'],
+    ['Courts Act', '/statutes/courts-act-1993'],
+    ['Section 1 · Application', null],
+  ]);
+  assertLinks(trail);
+  // Until the document has parsed, the address's own label, never a guessed heading.
+  const early = breadcrumbTrail('/statutes/courts-act-1993/section-54-2', {
+    ...KNOWN,
+    sectionLabel: null,
+  });
+  assert.equal(early?.parts.at(-1)?.label, 'Section 54(2)');
+  // A segment that is not a citation is the statute itself; deeper is a 404.
+  assert.equal(breadcrumbTrail('/statutes/courts-act-1993/whatever', KNOWN)?.parts.length, 3);
+  assert.equal(breadcrumbTrail('/statutes/courts-act-1993/section-1/x', KNOWN), null);
+});
+
+test('a case: Library › Cases › the case', () => {
+  const trail = breadcrumbTrail('/cases/adeyemi-v-okafor', KNOWN);
+  assert.deepEqual(shape(trail), [
+    ['Library', null],
+    ['Cases', '/cases'],
+    ['Adeyemi v. Okafor', null],
+  ]);
+  assertLinks(trail);
+});
+
+test('a name not known yet stays null, so it draws a skeleton', () => {
+  assert.deepEqual(shape(breadcrumbTrail(`/spaces/${SPACE}`, NO_BREADCRUMB_DATA)), [
+    ['Spaces', '/spaces'],
+    [null, `/spaces/${SPACE}`],
+    [null, null],
+  ]);
+  assert.equal(breadcrumbTrail('/cases/x', NO_BREADCRUMB_DATA)?.parts.at(-1)?.label, null);
+  assert.equal(breadcrumbTrail('/statutes/x', NO_BREADCRUMB_DATA)?.parts.at(-1)?.label, null);
+  const chat = breadcrumbTrail('/c/abc', { ...NO_BREADCRUMB_DATA, chatSpace: KNOWN.chatSpace });
+  assert.equal(chat?.parts.at(-1)?.label, null);
+});
+
+test('every other address keeps the bar it had', () => {
+  for (const path of [
+    '/',
+    '/work',
+    '/spaces',
+    '/spaces/discover',
+    `/spaces/${SPACE}/extra`,
+    `/channels/${SPACE}`,
+    '/cases',
+    '/cases/x/report',
+    '/statutes',
+    '/c',
+    '/c/abc/extra',
+    '/folders/abc',
+    '/notes/abc',
+  ]) {
+    assert.equal(breadcrumbTrail(path, KNOWN), null, path);
+    assert.deepEqual(trailRouteFor(path), { kind: 'none' }, path);
+  }
+});
+
+test('a section heading joins its label, without its closing full stop', () => {
+  assert.equal(provisionCrumbLabel('Section 1', 'Application.'), 'Section 1 · Application');
+  assert.equal(provisionCrumbLabel('Section 54(2)', 'Powers of the court'), 'Section 54(2) · Powers of the court');
+  assert.equal(provisionCrumbLabel('Section 3', ''), 'Section 3');
+});
+
+/* ── The wiring ───────────────────────────────────────────────────────────── */
+
+test('the trail is desktop-only and only its last part truncates', () => {
+  const view = read('v2', 'shell', 'V2Breadcrumb.tsx');
+  // Nothing on a phone.
+  assert.match(view, /<Breadcrumb className="hidden min-w-0 items-center gap-2 md:flex">/);
+  assert.match(view, /<BreadcrumbList className="min-w-0 flex-nowrap/);
+  // The last part is the page, and the only one that gives way.
+  assert.match(
+    view,
+    /index === last \? \(\s*<BreadcrumbItem className="min-w-0">[\s\S]{0,200}?<BreadcrumbPage className="min-w-0 truncate px-1\.5 py-1 font-medium text-foreground">/,
+  );
+  assert.match(view, /<BreadcrumbItem className="shrink-0">/);
+  assert.equal((view.match(/truncate/g) ?? []).length, 2, 'the docblock and the last part');
+  // A name still on its way is a skeleton, never a link.
+  assert.match(view, /part\.label === null \? \(\s*<CrumbSkeleton \/>\s*\) : part\.href \?/);
+  // The chevrons are muted and quieter still.
+  assert.match(view, /<BreadcrumbSeparator className="text-muted-foreground opacity-60">\s*<ChevronRight \/>/);
+});
+
+test('the trail reads the screens’ cache and never fetches', () => {
+  const view = read('v2', 'shell', 'V2Breadcrumb.tsx');
+  assert.match(view, /\.\.\.spacesQueries\.detail\(spaceUuid, \{ viewerId \}\),\s*enabled: false,/);
+  assert.match(view, /\.\.\.statutesQueries\.detail\(slug\), enabled: false/);
+  assert.match(view, /\.\.\.casesQueries\.detail\(slug, searchQuery\), enabled: false/);
+  assert.equal((view.match(/useQuery\(/g) ?? []).length, 3);
+  assert.equal((view.match(/enabled: false,?\s*\}\);/g) ?? []).length, 3);
+  // `?q=` is read under a boundary.
+  assert.match(view, /<Suspense fallback=\{pending \? <TrailView trail=\{pending\} \/> : null\}>\s*<CaseTrail/);
+});
+
+test('the bar hides its centre from md: only on a trail route', () => {
+  const header = read('v2', 'shell', 'V2Header.tsx');
+  assert.match(
+    header,
+    /const showsTrail =\s*breadcrumbTrail\(path, \{ \.\.\.NO_BREADCRUMB_DATA, chatSpace: place \}\) !== null;/,
+  );
+  assert.match(header, /showsTrail && 'md:grid-cols-\[minmax\(0,1fr\)_auto\]',/);
+  assert.match(header, /'v2-safe-top grid h-14 grid-cols-\[1fr_auto_1fr\] items-center gap-2 px-3',/);
+  assert.match(header, /hiddenFromMd=\{showsTrail\}/);
+  assert.match(header, /<div className=\{cn\('grid min-w-0 place-items-center', hiddenFromMd && 'md:hidden'\)\}>/);
+  // The trail takes the label's slot; elsewhere the label stays.
+  assert.match(header, /\{showsTrail \? \(\s*<V2Breadcrumb[\s\S]{0,200}?\/>\s*\) : leftLabel \? \(/);
+  assert.match(header, /crumb=\{screen\?\.crumb \?\? null\}/);
+});
+
+test('the space and the statute publish the part only they know', () => {
+  const space = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(space, /const crumb = hasSpace \? SPACE_TAB_LABELS\[tab\] : null;/);
+  assert.match(space, /setScreenContext\(\{ pathname, back: null, actions, crumb \}\);/);
+  const statute = read('v2', 'features', 'statutes', 'reader', 'StatuteDocument.tsx');
+  assert.match(statute, /\(\) => \(citation \? provisionCrumb\(sectionIndex, citation\) : null\),/);
+  assert.match(statute, /setScreenContext\(\{ pathname, back: null, actions: NO_SCREEN_ACTIONS, crumb \}\);/);
+  assert.match(statute, /useEffect\(\(\) => \(\) => clearScreenContext\(\), \[\]\);/);
+  // An equal crumb is a no-op publish, like the rest of the context.
+  assert.match(read('v2', 'shell', 'screen-context.ts'), /\(left\.crumb \?\? null\) === \(right\.crumb \?\? null\)/);
+});
