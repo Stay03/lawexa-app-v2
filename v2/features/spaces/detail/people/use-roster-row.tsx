@@ -3,9 +3,11 @@
 import type { ReactNode } from 'react';
 
 import type { Member, Space } from '@/types/collab';
+import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
 import { RosterRow } from '@/v2/features/collab/membership/RosterRow';
 import { contentRoleChangePayload } from '../../model';
 import { useRemoveSpaceMember, useUpdateSpaceMemberRole } from '../../mutations';
+import { joinedRecently } from './people-model';
 
 /**
  * One roster row for a space, with the actions the viewer may take on it: the
@@ -15,6 +17,9 @@ import { useRemoveSpaceMember, useUpdateSpaceMemberRole } from '../../mutations'
  *
  * `onTransferOwnership` stays with the caller: the sheet holds the transfer
  * confirmation and its error line, so only the sheet passes it.
+ *
+ * A member who joined in the last week reads "New" (`joinedRecently`), timed
+ * by the shared minute clock so no render reads the time itself.
  */
 export function useSpaceRosterRow({
   space,
@@ -32,6 +37,7 @@ export function useSpaceRosterRow({
 }): (member: Member, underInvited?: boolean) => ReactNode {
   const updateRole = useUpdateSpaceMemberRole(space.uuid);
   const removeMember = useRemoveSpaceMember(space.uuid);
+  const now = useMinuteNow();
 
   // `underInvited`: the row sits under the "Invited" heading, so it drops the
   // Pending chip that would repeat it.
@@ -41,6 +47,7 @@ export function useSpaceRosterRow({
         key={member.user.uuid}
         member={member}
         showPending={!underInvited}
+        isNew={joinedRecently(member, now)}
         isSelf={member.user.uuid === viewerUuid}
         contentRoles={shared}
         onPromote={

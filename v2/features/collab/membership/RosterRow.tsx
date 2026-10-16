@@ -63,6 +63,7 @@ export function RosterRow({
   onTransferOwnership,
   onRemove,
   showPending = true,
+  isNew = false,
 }: {
   member: Member;
   isSelf?: boolean;
@@ -78,6 +79,9 @@ export function RosterRow({
   /** `false` under a heading that already says "Invited", where the chip
    *  would say it a second time (design round 2). */
   showPending?: boolean;
+  /** Joined in the last week: a small "New" beside the role (the space's
+   *  People tab, 16 October 2026). */
+  isNew?: boolean;
 }) {
   const contentRole = contentRoles ? contentRoleOf(member) : null;
   const isOwner = contentRole !== null ? contentRole === 'owner' : member.role === 'owner';
@@ -134,6 +138,11 @@ export function RosterRow({
           {member.is_pending && showPending && (
             <Badge variant="outline" className="h-4 px-1 text-[10px] font-medium">
               Pending
+            </Badge>
+          )}
+          {isNew && (
+            <Badge className="h-4 border-transparent bg-primary/12 px-1 text-[10px] font-medium text-primary">
+              New
             </Badge>
           )}
         </div>
