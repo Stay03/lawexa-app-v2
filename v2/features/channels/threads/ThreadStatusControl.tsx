@@ -47,9 +47,9 @@ import { moveRadioFocus } from './radio-focus';
  * nothing else. Everyone else sees the chip alone, or nothing when there is no
  * status.
  *
- * ── FIVE CHOICES, NO WAY BACK TO NONE ──────────────────────────────────────
+ * ── SIX CHOICES, NO WAY BACK TO NONE ───────────────────────────────────────
  * A status, once set, cannot be cleared (the server refuses `null`), so the
- * menu offers the five and ticks the current one. A thread without a status
+ * menu offers the six and ticks the current one. A thread without a status
  * shows "Set status".
  *
  * ── NEEDS ACTION ASKS FIRST ────────────────────────────────────────────────
@@ -274,7 +274,7 @@ function saveNeedsAction(choose: (choice: ThreadStatusChoice) => void) {
 }
 
 /**
- * The five statuses as ONE radio group: the checked option is the single tab
+ * The six statuses as ONE radio group: the checked option is the single tab
  * stop (the first when there is no status), arrows move focus, and a click,
  * Enter or Space chooses. `aria-disabled`, not `disabled`, while a request is
  * out, so focus is not thrown off the option it is on.

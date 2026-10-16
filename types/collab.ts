@@ -510,9 +510,11 @@ export interface Channel {
  * The five values a thread's status can hold (Arthur, 16 October 2026, the
  * revised set). `null` (no status) is not one of them on the wire; it is the
  * absence of a status, and once a status is set it cannot go back to `null`.
- * A value outside these five must draw no chip, never crash.
+ * A value outside these six must draw no chip, never crash. `queued`: the work
+ * is agreed and waits for someone to start it (backend, 16 October 2026).
  */
 export type ThreadStatusValue =
+  | 'queued'
   | 'working'
   | 'needs_action'
   | 'on_hold'

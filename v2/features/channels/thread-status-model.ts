@@ -13,7 +13,9 @@ import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
  * in" by Stay (15-16 October 2026, the thread-status mock); the values, words
  * and rules revised by Arthur the same day: Working, Needs Action, On Hold,
  * Completed, Closed, no way back to "no status", and Needs Action naming who
- * needs to act. No JSX and no hooks: the chip, the header control, the Threads
+ * needs to act. Queued came that evening (Stay: "open new thread and start
+ * this"): the work is agreed and waits for someone to start it, so it comes
+ * first, before Working, and it never goes stale. No JSX and no hooks: the chip, the header control, the Threads
  * sheet's filter row, the channel rows' counts and the feed's status line all
  * read their words from here, so none of them can name a status its own way.
  *
@@ -26,13 +28,15 @@ import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
  *
  * ── THE SERVER OWNS THE ORDER ─────────────────────────────────────────────
  * All three thread lists come back sorted by urgency (Needs Action, Working,
- * On Hold, no status, Completed, Closed; newest inside each). Nothing here
+ * Queued, On Hold, no status, Completed, Closed; newest inside each). Nothing here
  * sorts, and the cache writers patch rows where they stand: a changed row
  * moves group on the next fetch, never on its own.
  */
 
-/** The five values, in Arthur's order, which every list of them follows. */
+/** The six values, in order of a thread's life (Queued before Working, then
+ *  Arthur's order), which every list of them follows. */
 export const THREAD_STATUS_VALUES: readonly ThreadStatusValue[] = [
+  'queued',
   'working',
   'needs_action',
   'on_hold',
@@ -41,6 +45,7 @@ export const THREAD_STATUS_VALUES: readonly ThreadStatusValue[] = [
 ];
 
 const LABELS: Readonly<Record<ThreadStatusValue, string>> = {
+  queued: 'Queued',
   working: 'Working',
   needs_action: 'Needs Action',
   on_hold: 'On Hold',
@@ -56,11 +61,12 @@ export interface ThreadStatusOption {
 }
 
 /**
- * The five choices in the header's menu and the phone's sheet, with Arthur's
- * one-line meanings. There is no "No status": a status, once set, cannot be
+ * The six choices in the header's menu and the phone's sheet, with Arthur's
+ * one-line meanings (Queued's is the techlead's, from Stay's ask). There is no "No status": a status, once set, cannot be
  * cleared (the server refuses `null`).
  */
 export const THREAD_STATUS_OPTIONS: readonly ThreadStatusOption[] = [
+  { value: 'queued', label: 'Queued', hint: 'The work is agreed and waits for someone to start it.' },
   { value: 'working', label: 'Working', hint: 'Work is underway.' },
   {
     value: 'needs_action',
@@ -278,7 +284,7 @@ export function showsThreadStatusFilter(
 /**
  * A channel row's status fact: "2 need action · 1 working" (Arthur, 16
  * October 2026: channel rows show only these two; the sheet's chips show all
- * five). `null` when both are zero or the row carries no counts.
+ * six). `null` when both are zero or the row carries no counts.
  */
 export function channelStatusCountsLine(
   counts: ThreadStatusCounts | undefined,

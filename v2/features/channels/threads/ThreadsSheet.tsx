@@ -247,7 +247,7 @@ export function ThreadsSheet({
           </div>
           {showStatusFilter && (
             /* The second filter row, under All / Following, as in the mock:
-               Any status, then the five. One chip at a time. It scrolls
+               Any status, then the six. One chip at a time. It scrolls
                sideways on a phone rather than wrapping, so the header keeps
                one height. Toggle buttons (`aria-pressed`), not tabs: the tab
                panel below already belongs to All / Following. */

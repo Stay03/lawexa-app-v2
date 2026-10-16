@@ -54,10 +54,11 @@ function status(overrides: Partial<ThreadStatus> = {}): ThreadStatus {
 
 const TOLU = { uuid: 'u2', name: 'Tolu' };
 
-test('the menu offers the five statuses, in order, in Arthur’s words, and no "No status"', () => {
+test('the menu offers the six statuses, Queued first, in Arthur’s words, and no "No status"', () => {
   assert.deepEqual(
     THREAD_STATUS_OPTIONS.map((option) => [option.value, option.label, option.hint]),
     [
+      ['queued', 'Queued', 'The work is agreed and waits for someone to start it.'],
       ['working', 'Working', 'Work is underway.'],
       [
         'needs_action',
@@ -167,9 +168,10 @@ test('a Closed thread is greyed; every other value is not', () => {
   assert.equal(isClosedThread({}), false);
 });
 
-test('the filter row: Any status then the five, one value on the wire', () => {
+test('the filter row: Any status then the six, one value on the wire', () => {
   assert.deepEqual(THREAD_STATUS_FILTERS.map(threadStatusFilterLabel), [
     'Any status',
+    'Queued',
     'Working',
     'Needs Action',
     'On Hold',
@@ -178,11 +180,13 @@ test('the filter row: Any status then the five, one value on the wire', () => {
   ]);
   assert.equal(threadStatusFilterParam(null), undefined);
   assert.deepEqual(threadStatusFilterParam('on_hold'), ['on_hold']);
+  assert.deepEqual(threadStatusFilterParam('queued'), ['queued']);
 });
 
-const COUNTS = { needs_action: 2, working: 1, on_hold: 0, completed: 4, closed: 3 };
+const COUNTS = { queued: 1, needs_action: 2, working: 1, on_hold: 0, completed: 4, closed: 3 };
 
-test('filter chips carry all five counts, on All only, and never on Any status', () => {
+test('filter chips carry all six counts, on All only, and never on Any status', () => {
+  assert.equal(threadStatusFilterCount('queued', COUNTS, false), 1);
   assert.equal(threadStatusFilterCount('needs_action', COUNTS, false), 2);
   assert.equal(threadStatusFilterCount('on_hold', COUNTS, false), 0);
   assert.equal(threadStatusFilterCount('closed', COUNTS, false), 3);
@@ -342,9 +346,16 @@ test('every thread list draws the chip, with its person, after the title, and gr
   }
 });
 
-test('Needs Action stands out: a filled amber pill where the others are tinted', () => {
+test('every pill is tinted: Needs Action took the same faint tint (option 1), Queued is violet', () => {
+  // Stay, 20:40Z: "Go with option 1". Needs Action was a filled amber pill;
+  // it now takes the faint tint with a darker amber word, the size unchanged.
   const chip = read('v2', 'features', 'collab', 'kit', 'ThreadStatusChip.tsx');
-  assert.match(chip, /needs_action: \{\s*chip: 'bg-amber-400 text-amber-950/);
+  assert.match(chip, /needs_action: \{\s*chip: 'bg-amber-500\/14 text-amber-800 dark:bg-amber-400\/14 dark:text-amber-300',\s*dot: 'bg-amber-600 dark:bg-amber-400',/);
+  assert.doesNotMatch(chip, /bg-amber-400 text-amber-950/);
+  assert.match(chip, /queued: \{\s*chip: 'bg-violet-500\/12 text-violet-700 dark:bg-violet-400\/15 dark:text-violet-300',/);
+  // The option list's dots are the pills' own.
+  assert.match(chip, /needs_action: TONE\.needs_action\.dot,/);
+  assert.match(chip, /queued: TONE\.queued\.dot,/);
   assert.match(chip, /working: \{\s*chip: 'bg-blue-500\/12/);
   assert.match(chip, /on_hold: \{\s*chip: 'bg-slate-500\/12/);
   assert.match(chip, /completed: \{\s*chip: 'bg-emerald-500\/12/);
@@ -474,7 +485,7 @@ test('the desktop control is a modal popover, not a menu, so the step is reachab
   assert.match(control, /<Popover\s+modal\b/);
   assert.match(control, /<PopoverTrigger\b/);
   assert.match(control, /<PopoverContent\b/);
-  // Both surfaces draw the same radio group of the five.
+  // Both surfaces draw the same radio group of the six.
   assert.equal(control.match(/<StatusRadioGroup\b/g)?.length, 2);
   // The step takes focus when it arrives, through a STABLE callback ref, so
   // typing in the note never pulls focus back to the search box.
@@ -533,6 +544,7 @@ test('a status change draws as a quiet line with its chip, and moves the caches 
 
 test('a status change moves the parent counts locally and never re-reads the parent', () => {
   assert.deepEqual(shiftThreadStatusCounts(COUNTS, 'needs_action', 'completed'), {
+    queued: 1,
     needs_action: 1,
     working: 1,
     on_hold: 0,

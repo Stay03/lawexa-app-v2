@@ -8,9 +8,12 @@ import {
 /**
  * ThreadStatusChip — a thread's status as a dot and a word. First drawn from
  * Stay's mock (16 October 2026); colours revised by Arthur the same day:
- * Working blue, Needs Action amber and FILLED (the one that stands out a
- * little more, with no glow and no motion), On Hold a calm slate, Completed
- * green, Closed grey and muted. Pure and presentational. The dot is
+ * Working blue, Needs Action amber, On Hold a calm slate, Completed green,
+ * Closed grey and muted; Queued violet, calm and apart from On Hold's slate
+ * (16 October 2026, the evening). Needs Action was FILLED, the one that stood
+ * out; on Arthur's "too much gold" Stay picked option 1, "all tinted": it
+ * takes the same faint tint as the others, with a darker amber word, at the
+ * same size. Pure and presentational. The dot is
  * `aria-hidden`; the word is the chip's text, so the colour is never the only
  * signal. A value this app does not know draws nothing.
  *
@@ -44,13 +47,17 @@ import {
  */
 
 const TONE: Readonly<Record<ThreadStatusValue, { chip: string; dot: string }>> = {
+  queued: {
+    chip: 'bg-violet-500/12 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300',
+    dot: 'bg-violet-500 dark:bg-violet-400',
+  },
   working: {
     chip: 'bg-blue-500/12 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300',
     dot: 'bg-blue-500 dark:bg-blue-400',
   },
   needs_action: {
-    chip: 'bg-amber-400 text-amber-950 dark:bg-amber-400 dark:text-amber-950',
-    dot: 'bg-amber-950/70',
+    chip: 'bg-amber-500/14 text-amber-800 dark:bg-amber-400/14 dark:text-amber-300',
+    dot: 'bg-amber-600 dark:bg-amber-400',
   },
   on_hold: {
     chip: 'bg-slate-500/12 text-slate-700 dark:bg-slate-400/15 dark:text-slate-300',
@@ -66,14 +73,12 @@ const TONE: Readonly<Record<ThreadStatusValue, { chip: string; dot: string }>> =
   },
 };
 
-/**
- * The dot alone, for a list of options whose words sit beside it. Needs
- * Action's filled amber reads as the dot here, since there is no pill behind
- * it.
- */
+/** The dot alone, for a list of options whose words sit beside it: each
+ *  status's own dot, the same as on its pill. */
 const OPTION_DOT: Readonly<Record<ThreadStatusValue, string>> = {
+  queued: TONE.queued.dot,
   working: TONE.working.dot,
-  needs_action: 'bg-amber-500 dark:bg-amber-400',
+  needs_action: TONE.needs_action.dot,
   on_hold: TONE.on_hold.dot,
   completed: TONE.completed.dot,
   closed: TONE.closed.dot,
