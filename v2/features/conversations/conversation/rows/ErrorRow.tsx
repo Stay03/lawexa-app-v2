@@ -37,7 +37,7 @@ export function ErrorRow({
         <AlertCircle className="text-primary mt-0.5 h-4 w-4 shrink-0" aria-hidden />
         <span className="text-foreground min-w-0 flex-1">{message.content}</span>
         <Link
-          href="/upgrade"
+          href="/pricing"
           className="text-primary shrink-0 text-sm font-medium hover:underline"
         >
           Upgrade

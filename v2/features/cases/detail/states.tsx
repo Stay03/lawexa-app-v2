@@ -153,7 +153,7 @@ export function ViewLimitNotice({ message }: { message?: string }) {
         </p>
       </div>
       <Link
-        href="/upgrade"
+        href="/pricing"
         className={cn(
           'v2-interactive inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
           FOCUS_RING,
@@ -206,7 +206,7 @@ export function CaseHardLimitState({
               <Link href="/cases">Browse cases</Link>
             </Button>
             <Button asChild size="sm">
-              <Link href="/upgrade">
+              <Link href="/pricing">
                 Upgrade plan
                 <ArrowUpRight aria-hidden className="size-4" />
               </Link>

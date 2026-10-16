@@ -548,7 +548,7 @@ export function HomeComposer({
             ) : null}
           </span>
           <Link
-            href="/upgrade"
+            href="/pricing"
             className="shrink-0 text-sm font-medium text-primary hover:underline"
           >
             Upgrade

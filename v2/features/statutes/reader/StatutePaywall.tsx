@@ -83,7 +83,7 @@ export function StatutePaywall({
         <p className="akn-paywall-copy">{line}</p>
         <p className="pt-4">
           <Link
-            href={viewer === 'guest' ? '/register' : '/upgrade'}
+            href={viewer === 'guest' ? '/register' : '/pricing'}
             className={cn(
               'v2-interactive inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
               FOCUS_RING,

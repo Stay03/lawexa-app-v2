@@ -109,6 +109,16 @@ const nextConfig = (phase: string): NextConfig => {
           permanent: true,
         },
         {
+          // The plans live at /pricing. v1's /upgrade page only redirects
+          // there, and a v2 in-app link to it crossed into v1 mid-navigation
+          // and landed on v2's error screen (Arthur, 16 October 2026). This
+          // 308 runs before any render, so an /upgrade link in an e-mail, a
+          // push notification or a bookmark lands on the plans in either app.
+          source: '/upgrade',
+          destination: '/pricing',
+          permanent: true,
+        },
+        {
           // Typo alias: /ambassador (singular) -> /ambassadors
           source: '/ambassador',
           destination: '/ambassadors',
