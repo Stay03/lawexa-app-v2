@@ -295,7 +295,7 @@ test('the list row shows no channel chips any more', () => {
 
 test('the About sheet offers Edit space to whoever may manage the space, on the same panel param', () => {
   const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceAboutSheet.tsx');
-  assert.match(sheet, /\{onEdit \? \(\s*<Button type="button" variant="secondary" onClick=\{onEdit\}/);
+  assert.match(sheet, /<Button\s+type="button"\s+variant="secondary"\s+onClick=\{onEdit\}\s+className="w-full md:w-auto md:self-start"/);
   assert.match(sheet, /<Pencil aria-hidden className="size-4" \/>\s*Edit space/);
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   // The menu's gate, and the same `?panel=` param, so the form replaces the

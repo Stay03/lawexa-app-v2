@@ -87,7 +87,14 @@ export function SpaceAboutSheet({
             {memberCountLabel(space.active_members_count)}
           </p>
           {onEdit ? (
-            <Button type="button" variant="secondary" onClick={onEdit} className="w-full md:w-auto">
+            // `self-start` from `md:`: the column stretches its children, so
+            // `w-auto` alone left a 1440px-wide button (the first pictures).
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onEdit}
+              className="w-full md:w-auto md:self-start"
+            >
               <Pencil aria-hidden className="size-4" />
               Edit space
             </Button>
