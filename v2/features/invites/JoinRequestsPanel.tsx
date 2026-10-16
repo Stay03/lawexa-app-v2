@@ -1,11 +1,16 @@
 'use client';
 
+import { useId, useState } from 'react';
 import { Loader2, UserCheck, UserX } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { JoinRequest } from '@/types/collab';
+import type { InvitableContentRole } from '@/v2/features/collab/membership/content-role';
+import { SHARED_INVITE_ROLES } from '@/v2/features/collab/membership/invite-roles';
 import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
+import { RoleSelect } from '@/v2/features/collab/membership/RoleSelect';
+import { joinRequestStartRole } from './join-role';
 import {
   useChannelJoinRequests,
   useDecideJoinRequest,
@@ -23,6 +28,13 @@ import {
  * on the row, above the buttons, in the sentence the admin is about to act on
  * — not in a tooltip, and not after the fact.
  *
+ * ── ON A SHARED SPACE THE OWNER PICKS THE ROLE (16 October 2026) ───────────
+ * Each request carries a Contributor | Viewer choice, the invite dialog's own
+ * `RoleSelect`, starting on what approving with no role would give
+ * (`joinRequestStartRole`: Contributor unless the Owner's own link said
+ * Viewer). "Let them in" always sends the role on screen, so the Owner gives
+ * exactly what they see.
+ *
  * ── EVERY DECISION IS ADDRESSED BY THE ROW'S OWN `id` ──────────────────────
  * Read from the response, never constructed. The API shipped once without that
  * field and thirty passing tests missed it, because a test keeps the id it
@@ -36,37 +48,44 @@ function RequestRow({
   onDecide,
 }: {
   request: JoinRequest;
-  /** A shared space: say which role saying yes gives (Spaces F7). */
+  /** A shared space: the Owner picks the role saying yes gives. */
   contentRoles: boolean;
   deciding: boolean;
-  onDecide: (approve: boolean) => void;
+  onDecide: (approve: boolean, contentRole?: InvitableContentRole) => void;
 }) {
   const channel = request.also_joins_channel;
-  const joinsAs = contentRoles ? request.content_role_label?.trim() : undefined;
+  const roleId = useId();
+  const [role, setRole] = useState<InvitableContentRole>(() =>
+    joinRequestStartRole(request.approves_as),
+  );
+  const decide = (approve: boolean) => onDecide(approve, contentRoles ? role : undefined);
   return (
     <li className="rounded-xl border border-border/60 p-3">
       {/* TWO COMPACT BUTTONS AT THE END OF THE ROW. A full-width "Let them in"
           read as "a mess" on desktop (Stay, 15 October 2026). A plain request
-          is one line on a wide screen; on a phone the buttons wrap under the
-          name, still compact, at the right. A request that also opens a
-          channel keeps its sentence ABOVE the buttons (the rule below), so
-          there the buttons always sit under it. */}
+          is one line on a wide screen; on a phone the role choice and the
+          buttons wrap under the name, still compact, at the right. A request
+          that also opens a channel keeps its sentence ABOVE the buttons (the
+          rule below), so there the buttons always sit under it. */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex min-w-0 flex-1 basis-48 items-center gap-3">
           <MemberAvatar user={request.user} className="size-8 shrink-0" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-foreground">
-              {request.user.name}
-            </p>
-            {joinsAs ? (
-              <p className="truncate text-xs text-muted-foreground">
-                Joins as {joinsAs}
-              </p>
-            ) : null}
-          </div>
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+            {request.user.name}
+          </p>
         </div>
+        {contentRoles ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <label htmlFor={roleId} className="text-xs text-muted-foreground">
+              Joins as
+            </label>
+            <div className="w-36">
+              <RoleSelect id={roleId} value={role} roles={SHARED_INVITE_ROLES} onChange={setRole} />
+            </div>
+          </div>
+        ) : null}
         {channel ? null : (
-          <DecideButtons channel={false} deciding={deciding} onDecide={onDecide} />
+          <DecideButtons channel={false} deciding={deciding} onDecide={decide} />
         )}
       </div>
 
@@ -78,7 +97,7 @@ function RequestRow({
             is not open to the whole space.
           </p>
           <div className="mt-3 flex justify-end">
-            <DecideButtons channel deciding={deciding} onDecide={onDecide} />
+            <DecideButtons channel deciding={deciding} onDecide={decide} />
           </div>
         </>
       ) : null}
@@ -127,7 +146,7 @@ function Panel({
   contentRoles?: boolean;
   pending: boolean;
   deciding: boolean;
-  onDecide: (id: number, approve: boolean) => void;
+  onDecide: (id: number, approve: boolean, contentRole?: InvitableContentRole) => void;
   emptyLine: string;
 }) {
   if (pending) {
@@ -151,15 +170,14 @@ function Panel({
           request={request}
           contentRoles={contentRoles}
           deciding={deciding}
-          onDecide={(approve) => onDecide(request.id, approve)}
+          onDecide={(approve, contentRole) => onDecide(request.id, approve, contentRole)}
         />
       ))}
     </ul>
   );
 }
 
-/** `contentRoles` on a SHARED space: each request says the role approving
- *  gives, from `content_role_label` (backend B2). */
+/** `contentRoles` on a SHARED space: the Owner picks each request's role. */
 export function SpaceJoinRequestsPanel({
   spaceUuid,
   contentRoles = false,
@@ -175,7 +193,7 @@ export function SpaceJoinRequestsPanel({
       contentRoles={contentRoles}
       pending={query.isPending}
       deciding={decide.isPending}
-      onDecide={(id, approve) => decide.mutate({ id, approve })}
+      onDecide={(id, approve, contentRole) => decide.mutate({ id, approve, contentRole })}
       emptyLine="Nobody is waiting to join."
     />
   );

@@ -106,8 +106,10 @@ test('the screen draws the People tab, and the silhouette has its shape', () => 
 test('a join request row: two compact buttons at the end, the channel sentence still before its buttons (Stay, 15 October 2026)', () => {
   const requests = read('v2', 'features', 'invites', 'JoinRequestsPanel.tsx');
   assert.doesNotMatch(requests, /className="flex-1"/);
-  assert.match(requests, /\{channel \? null : \(\s*<DecideButtons channel=\{false\} deciding=\{deciding\} onDecide=\{onDecide\} \/>\s*\)\}/);
-  assert.match(requests, /Saying yes also lets them into[\s\S]*?<DecideButtons channel deciding=\{deciding\} onDecide=\{onDecide\} \/>/);
+  // Both carry the row's `decide`, which adds the picked role on a shared
+  // space (16 October 2026; was `onDecide`).
+  assert.match(requests, /\{channel \? null : \(\s*<DecideButtons channel=\{false\} deciding=\{deciding\} onDecide=\{decide\} \/>\s*\)\}/);
+  assert.match(requests, /Saying yes also lets them into[\s\S]*?<DecideButtons channel deciding=\{deciding\} onDecide=\{decide\} \/>/);
   assert.match(requests, /<div className="ml-auto flex shrink-0 gap-2">/);
 });
 
