@@ -224,7 +224,7 @@ test('the content feed: its own key under spaces, read-only rows', () => {
   assert.match(panel, /uniqueRowsById\(pages, itemKey\)/);
   assert.match(
     panel,
-    /const itemKey = \(entry: SpaceItem\): string =>\s*entry\.type === 'folder' \? `folder:\$\{entry\.item\.uuid\}` : `\$\{entry\.type\}:\$\{entry\.item\.id\}`;/,
+    /const itemKey = \(entry: SpaceItem\): string =>\s*entry\.type === 'folder' \|\| entry\.type === 'channel' \|\| entry\.type === 'thread'\s*\? `\$\{entry\.type\}:\$\{entry\.item\.uuid\}`\s*: `\$\{entry\.type\}:\$\{entry\.item\.id\}`;/,
   );
   // Files open through the tap-first opener, never the channel download hook.
   const fileRow = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');

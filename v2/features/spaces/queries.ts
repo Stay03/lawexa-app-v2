@@ -155,12 +155,28 @@ export const spacesQueries = {
    */
   items: (
     spaceUuid: string,
-    { viewerId, type, search = '' }: ViewerScoped & { type?: SpaceItemsType; search?: string },
+    {
+      viewerId,
+      type,
+      search = '',
+      rooms = false,
+    }: ViewerScoped & {
+      type?: SpaceItemsType;
+      search?: string;
+      /** The space's channels and the reader's followed threads join All and
+       *  Conversations (Stay, 17 October 2026): for a reader who has team
+       *  channels, in a team space (`spaceShowsChannels`). The server keeps
+       *  the same rule, so asking is never a leak; asking only where they show
+       *  keeps everyone else's cache entry what it was. */
+      rooms?: boolean;
+    },
   ) => {
+    const withRooms = rooms && (type === undefined || type === 'conversations');
     const params: SpaceItemsParams = {
       per_page: SPACE_CONTENT_PER_PAGE,
       ...(type ? { type } : {}),
       ...(search ? { search } : {}),
+      ...(withRooms ? { include: 'channels,threads' as const } : {}),
     };
     return infiniteQueryOptions({
       queryKey: [...spacesQueries.itemsOf(spaceUuid), params, { viewerId }] as const,

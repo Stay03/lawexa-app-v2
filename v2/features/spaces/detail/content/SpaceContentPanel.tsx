@@ -31,6 +31,8 @@ import { useConversationMenu } from '@/v2/features/conversations/list/use-conver
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
 import { folderRow, type FolderRowModel } from '@/v2/features/folders/folder-row-model';
 import { FolderRow } from '@/v2/features/folders/list/FolderRow';
+import { channelUnreadGrammar } from '@/v2/features/channels/model';
+import { threadUnreadState } from '@/v2/features/channels/thread-model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { HomeComposerHandle } from '@/v2/shell/designs/HomeComposer';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -53,6 +55,7 @@ import {
   lastMessageLine,
   SPACE_TAB_LABELS,
   SPACE_TABS,
+  spaceShowsChannels,
   uniqueRowsById,
   type SpaceTab,
 } from '../../model';
@@ -61,6 +64,8 @@ import { spacesQueries } from '../../queries';
 import { useServerSearch, type ServerSearch } from '../../use-server-search';
 import { LobbySection, SPACE_PILL_BAR } from '../lobby-parts';
 import { SpacePeoplePanel } from '../people/SpacePeoplePanel';
+import { SpaceChannelRow } from '../SpaceChannelRow';
+import { SpaceThreadRow } from '../SpaceThreadRow';
 import { DeleteSpaceFileDialog } from './DeleteSpaceFileDialog';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceChatDock } from './SpaceChatDock';
@@ -139,6 +144,11 @@ export function SpaceContentPanel({
     openInvite: scope !== null && canManage ? scope.openInvite : null,
   };
   const { viewerId, enabled } = useContentReadGate();
+  const session = useV2Session();
+  // The space's channels and the threads the reader follows sit in All and
+  // Conversations (Stay, 17 October 2026, approved 15:46 UTC), for a reader
+  // who has team channels, in a team space: the rail's own rule.
+  const rooms = spaceShowsChannels(space, session);
   // The search, the feed's read, the uploads and the new-folder dialog live
   // here and not in the list, which a new pill remounts: the bar keeps the
   // pill that has focus, a typed search carries to the next pill, and a file
@@ -147,7 +157,7 @@ export function SpaceContentPanel({
   const listTab: SpaceContentTab = tab === 'people' ? 'all' : tab;
   const type = FEED_TYPE[listTab];
   const query = useInfiniteQuery({
-    ...spacesQueries.items(space.uuid, { viewerId, type, search: search.term }),
+    ...spacesQueries.items(space.uuid, { viewerId, type, search: search.term, rooms }),
     enabled: enabled && tab !== 'people',
     // A new search on this pill keeps its rows on screen until the answer
     // lands; a new pill does not. The key's params are its fifth part
@@ -176,7 +186,9 @@ export function SpaceContentPanel({
         New folder
       </PillButton>
     ) : null;
-  const copy = SEARCH_COPY[listTab];
+  // With rooms in the list, the server's search covers channel names and
+  // thread titles too, so the field says so.
+  const copy = rooms && (listTab === 'all' || listTab === 'conversations') ? ROOMS_SEARCH_COPY[listTab] : SEARCH_COPY[listTab];
 
   const list =
     tab === 'people' ? (
@@ -294,6 +306,17 @@ const SEARCH_COPY: Readonly<Record<SpaceContentTab, { placeholder: string; label
   folders: { placeholder: 'Search folders', label: "Search this space's folders" },
 };
 
+const ROOMS_SEARCH_COPY: Readonly<Record<'all' | 'conversations', { placeholder: string; label: string }>> = {
+  all: {
+    placeholder: 'Search conversations, files and channels',
+    label: "Search this space's conversations, files, channels and threads",
+  },
+  conversations: {
+    placeholder: 'Search conversations and channels',
+    label: "Search this space's conversations, channels and threads",
+  },
+};
+
 const PILLS = SPACE_TABS.map((id) => ({ id, label: SPACE_TAB_LABELS[id] }));
 
 /** The spaces list's pill row. */
@@ -310,7 +333,9 @@ const NO_ITEMS: readonly SpaceItem[] = [];
 
 /** A feed row's identity across pages: the kind and that kind's own id. */
 const itemKey = (entry: SpaceItem): string =>
-  entry.type === 'folder' ? `folder:${entry.item.uuid}` : `${entry.type}:${entry.item.id}`;
+  entry.type === 'folder' || entry.type === 'channel' || entry.type === 'thread'
+    ? `${entry.type}:${entry.item.uuid}`
+    : `${entry.type}:${entry.item.id}`;
 
 /**
  * The gate every content read shares: the collab door (signed in, verified
@@ -503,6 +528,10 @@ function SpaceFeed({
         const actions = folderMenu(entry);
         return actions.onMove !== undefined || actions.onRemoveFromSpace !== undefined;
       }
+      case 'channel':
+      case 'thread':
+        // A room's own menu lives in the room.
+        return false;
     }
   });
 
@@ -549,6 +578,36 @@ function SpaceFeed({
             layout="feed"
             menuColumn={menuColumn}
             {...folderMenu(entry)}
+          />
+        );
+      case 'channel':
+        // The rail's own row model, so the unread, mute and mention grammar
+        // is the rail's (channelUnreadGrammar).
+        return (
+          <SpaceChannelRow
+            key={itemKey(entry)}
+            row={{ channel: entry.item, grammar: channelUnreadGrammar(entry.item), preview: entry.item.last_message }}
+            now={now}
+            layout="feed"
+            menuColumn={menuColumn}
+          />
+        );
+      case 'thread':
+        return (
+          <SpaceThreadRow
+            key={itemKey(entry)}
+            row={{
+              kind: 'thread',
+              thread: entry.item,
+              grammar: channelUnreadGrammar(entry.item),
+              state: threadUnreadState(entry.item),
+            }}
+            // The thread's channel, as the lobby names it, so a thread reads
+            // as a room inside the space and not as a chat.
+            showProvenance
+            now={now}
+            layout="feed"
+            menuColumn={menuColumn}
           />
         );
     }

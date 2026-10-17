@@ -1758,7 +1758,19 @@ export type SpaceItemsType = 'conversations' | 'files' | 'folders';
 export type SpaceItem =
   | { type: 'conversation'; sort_at: string; item: SpaceConversation }
   | { type: 'file'; sort_at: string; item: SpaceFile }
-  | { type: 'folder'; sort_at: string; item: SpaceFolder };
+  | { type: 'folder'; sort_at: string; item: SpaceFolder }
+  /** With `include` (backend, 17 October 2026): a row of GET
+   *  /spaces/{uuid}/channels, field for field. Top-level channels only. */
+  | { type: 'channel'; sort_at: string; item: Channel }
+  /** With `include`: a row of GET /spaces/{uuid}/threads, field for field
+   *  (parent_channel_uuid, parent_channel_name, can_read, can_post). Only the
+   *  threads the reader follows. */
+  | { type: 'thread'; sort_at: string; item: Channel };
+
+/** The room kinds the feed adds only when asked (`include`), and only for a
+ *  reader with team channels (researcher and above) in a team space: anyone
+ *  else gets today's feed whatever is asked. */
+export type SpaceItemsInclude = 'channels,threads';
 
 export interface SpaceItemsParams {
   /** One kind; none is all three mixed. */
@@ -1768,6 +1780,10 @@ export interface SpaceItemsParams {
   search?: string;
   /** `pagination.next_cursor` from the page before, passed back unchanged. */
   cursor?: string | null;
+  /** Add the space's channels and the threads the reader follows to All and
+   *  Conversations (see {@link SpaceItemsInclude}). Absent, the feed is the
+   *  three kinds it always was. */
+  include?: SpaceItemsInclude;
   per_page?: number;
 }
 

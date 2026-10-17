@@ -99,8 +99,10 @@ test('the collab frame starts it with the details, once per space', () => {
   );
   assert.doesNotMatch(readFileSync(join(here, 'SpaceScreen.tsx'), 'utf8'), /useEarlyFeed/);
   const hook = readFileSync(join(here, 'early-feed.ts'), 'utf8');
-  assert.match(hook, /void queryClient\.prefetchInfiniteQuery\(spacesQueries\.items\(spaceUuid, \{ viewerId \}\)\);/);
-  assert.match(hook, /\?\.my_role,/);
+  // The home's own ask, rooms included where they show, so the home finds it.
+  assert.match(hook, /const rooms = spaceKind\(cached\) === 'team' && teamChannels;/);
+  assert.match(hook, /void queryClient\.prefetchInfiniteQuery\(spacesQueries\.items\(spaceUuid, \{ viewerId, rooms \}\)\);/);
+  assert.match(hook, /cachedRole: cached\?\.my_role,/);
   assert.match(hook, /tabParam: new URLSearchParams\(window\.location\.search\)\.get\('tab'\),/);
-  assert.match(hook, /\}, \[eligible, queryClient, spaceUuid, viewerId\]\);/);
+  assert.match(hook, /\}, \[eligible, queryClient, spaceUuid, viewerId, teamChannels\]\);/);
 });

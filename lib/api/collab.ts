@@ -251,6 +251,7 @@ export const spacesApi = {
         type: params.type || undefined,
         search: params.search || undefined,
         cursor: params.cursor || undefined,
+        include: params.include || undefined,
         per_page: params.per_page ?? 20,
       },
     });

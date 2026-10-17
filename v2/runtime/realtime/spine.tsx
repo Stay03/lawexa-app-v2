@@ -182,6 +182,12 @@ function handleChannelUnread(
     mentionCount: event.mention_count,
   });
 
+  // 1b. A space's home lists its channels and the reader's threads in its one
+  //     feed (Stay, 17 October 2026). The feed is re-read, never written (its
+  //     pages mix kinds under a server cursor, and a new message moves the
+  //     room up), so it is marked stale here: only a home on screen refetches.
+  void queryClient.invalidateQueries({ queryKey: spacesQueries.itemsOf(event.space_uuid) });
+
   // 2. Roll the transition up to the space row, or refetch absolutes when the
   //    transition is unknowable (throttled — see the module docblock).
   if (application.deltas) {

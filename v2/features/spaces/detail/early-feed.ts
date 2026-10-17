@@ -4,9 +4,10 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type { Space } from '@/types/collab';
-import { collabAccessState } from '@/v2/features/collab/model';
+import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { findCachedRow } from '@/v2/runtime/seed-detail';
+import { spaceKind } from '../model';
 import { spacesQueries } from '../queries';
 import { startsFeedEarly } from './early-feed-model';
 
@@ -33,15 +34,19 @@ export function useEarlyFeed(spaceUuid: string | null): void {
   const session = useV2Session();
   const eligible = collabAccessState(session) === 'eligible';
   const viewerId = session.userId;
+  const teamChannels = canOpenTeamChannels(session);
   useEffect(() => {
     if (spaceUuid === null) return;
+    const cached = findCachedRow<Space>(queryClient, spacesQueries.lists(), (row) => row.uuid === spaceUuid);
     const early = startsFeedEarly({
       eligible,
-      cachedRole: findCachedRow<Space>(queryClient, spacesQueries.lists(), (row) => row.uuid === spaceUuid)
-        ?.my_role,
+      cachedRole: cached?.my_role,
       tabParam: new URLSearchParams(window.location.search).get('tab'),
     });
-    if (!early) return;
-    void queryClient.prefetchInfiniteQuery(spacesQueries.items(spaceUuid, { viewerId }));
-  }, [eligible, queryClient, spaceUuid, viewerId]);
+    if (!early || !cached) return;
+    // The list's own ask, rooms included where they show (`spaceShowsChannels`,
+    // which the home reads off the space), so the home finds this read.
+    const rooms = spaceKind(cached) === 'team' && teamChannels;
+    void queryClient.prefetchInfiniteQuery(spacesQueries.items(spaceUuid, { viewerId, rooms }));
+  }, [eligible, queryClient, spaceUuid, viewerId, teamChannels]);
 }

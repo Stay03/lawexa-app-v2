@@ -62,8 +62,19 @@ import {
 export const SpaceChannelRow = memo(function SpaceChannelRow({
   row,
   now,
+  layout = 'list',
+  menuColumn = false,
 }: {
   row: RailRow;
+  /** `feed`: the row in a space's one list (Stay, 17 October 2026: channels
+   *  and threads inside the All and Conversations pills), in the conversation
+   *  row's box (`px-3`, `py-2.5`, `min-h-14`, the 36px tile centred, a
+   *  14px name), so it lines up with the chats, files and folders around it.
+   *  `list`: the lobby's own row. */
+  layout?: 'list' | 'feed';
+  /** Some other row in the list has a menu: keep its column (`ConversationRow`'s
+   *  prop), so the rows' right edges line up. This row has no menu. */
+  menuColumn?: boolean;
   /**
    * The shared minute clock. `0` is its pre-hydration value and means "no age
    * yet" — handing it to the formatter would date every row as "now".
@@ -86,90 +97,103 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
   const dim = muted
     ? 'opacity-60 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none'
     : undefined;
+  const feed = layout === 'feed';
 
-  return (
+  // NO `aria-current` HERE. This row only ever appears on the space's own
+  // page, where no channel is open — the ACTIVE-row state belongs to the
+  // rail, which is the thing that sits beside an open channel.
+  const link = (
+    <Link
+      href={`/channels/${channel.uuid}`}
+      className={cn(
+        'group flex min-w-0 gap-3 rounded-xl px-3 py-2.5',
+        feed ? 'min-h-14 flex-1 items-center' : 'items-start',
+        'transition-colors duration-150 motion-reduce:transition-none v2-interactive',
+        'hover:bg-secondary/50',
+        FOCUS_RING,
+      )}
+    >
+      <span className={cn('flex min-w-0 flex-1 gap-3', feed ? 'items-center' : 'items-start', dim)}>
+        <span
+          aria-hidden
+          className={cn(
+            'flex size-9 shrink-0 items-center justify-center rounded-lg',
+            !feed && 'mt-0.5',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            // The SAME activity test every other collab row uses, so a
+            // muted-with-@you channel is warm on every surface.
+            unread || mentions > 0
+              ? 'bg-primary/10 text-primary'
+              : 'bg-secondary text-muted-foreground group-hover:text-foreground',
+          )}
+        >
+          <Icon className="size-[18px]" />
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span
+              title={channel.name}
+              className={cn(
+                'min-w-0 truncate text-foreground',
+                feed ? 'text-sm' : 'text-[15px]',
+                'transition-colors duration-150 group-hover:text-primary motion-reduce:transition-none',
+                unread ? 'font-semibold' : 'font-medium',
+              )}
+            >
+              {channel.name}
+            </span>
+            {unread ? <UnreadDot /> : null}
+            {muted ? (
+              <BellOff
+                aria-label="Muted"
+                className="size-3.5 shrink-0 text-muted-foreground"
+              />
+            ) : null}
+          </span>
+
+          {/* The channel's threads that need someone ("2 need action · 1
+              working", Arthur, 16 October 2026) hold their width after the
+              preview, which is the part that truncates. */}
+          <span className="mt-0.5 flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground">
+            <span className="min-w-0 truncate">
+              {preview ? <ChannelPreviewText line={preview} /> : null}
+            </span>
+            {statusCounts ? (
+              <span className="shrink-0 whitespace-nowrap">
+                {preview ? `· ${statusCounts}` : statusCounts}
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </span>
+
+      <span className={cn('flex shrink-0 items-center gap-2', !feed && 'mt-1')}>
+        {/* OUTSIDE the dim wrapper, which is the only way it can stay at full
+            strength on a muted row (Ruling A's one guaranteed-loud signal). */}
+        {mentions > 0 ? (
+          <CountBadge
+            count={mentions}
+            label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${channel.name}`}
+          />
+        ) : null}
+        {age ? (
+          <span className={cn('text-xs tabular-nums text-muted-foreground', dim)}>
+            {age}
+          </span>
+        ) : null}
+      </span>
+    </Link>
+  );
+
+  return feed ? (
     <li>
-      {/* NO `aria-current` HERE. This row only ever appears on the space's own
-          page, where no channel is open — the ACTIVE-row state belongs to the
-          rail, which is the thing that sits beside an open channel. */}
-      <Link
-        href={`/channels/${channel.uuid}`}
-        className={cn(
-          'group flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5',
-          'transition-colors duration-150 motion-reduce:transition-none v2-interactive',
-          'hover:bg-secondary/50',
-          FOCUS_RING,
-        )}
-      >
-        <span className={cn('flex min-w-0 flex-1 items-start gap-3', dim)}>
-          <span
-            aria-hidden
-            className={cn(
-              'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg',
-              'transition-colors duration-150 motion-reduce:transition-none',
-              // The SAME activity test every other collab row uses, so a
-              // muted-with-@you channel is warm on every surface.
-              unread || mentions > 0
-                ? 'bg-primary/10 text-primary'
-                : 'bg-secondary text-muted-foreground group-hover:text-foreground',
-            )}
-          >
-            <Icon className="size-[18px]" />
-          </span>
-
-          <span className="min-w-0 flex-1">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span
-                title={channel.name}
-                className={cn(
-                  'min-w-0 truncate text-[15px] text-foreground',
-                  'transition-colors duration-150 group-hover:text-primary motion-reduce:transition-none',
-                  unread ? 'font-semibold' : 'font-medium',
-                )}
-              >
-                {channel.name}
-              </span>
-              {unread ? <UnreadDot /> : null}
-              {muted ? (
-                <BellOff
-                  aria-label="Muted"
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                />
-              ) : null}
-            </span>
-
-            {/* The channel's threads that need someone ("2 need action · 1
-                working", Arthur, 16 October 2026) hold their width after the
-                preview, which is the part that truncates. */}
-            <span className="mt-0.5 flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground">
-              <span className="min-w-0 truncate">
-                {preview ? <ChannelPreviewText line={preview} /> : null}
-              </span>
-              {statusCounts ? (
-                <span className="shrink-0 whitespace-nowrap">
-                  {preview ? `· ${statusCounts}` : statusCounts}
-                </span>
-              ) : null}
-            </span>
-          </span>
-        </span>
-
-        <span className="mt-1 flex shrink-0 items-center gap-2">
-          {/* OUTSIDE the dim wrapper, which is the only way it can stay at full
-              strength on a muted row (Ruling A's one guaranteed-loud signal). */}
-          {mentions > 0 ? (
-            <CountBadge
-              count={mentions}
-              label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${channel.name}`}
-            />
-          ) : null}
-          {age ? (
-            <span className={cn('text-xs tabular-nums text-muted-foreground', dim)}>
-              {age}
-            </span>
-          ) : null}
-        </span>
-      </Link>
+      <div className="flex min-w-0 items-center gap-1">
+        {link}
+        {menuColumn ? <span aria-hidden className="size-9 shrink-0" /> : null}
+      </div>
     </li>
+  ) : (
+    <li>{link}</li>
   );
 });

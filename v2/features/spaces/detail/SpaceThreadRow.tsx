@@ -68,8 +68,15 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
   row,
   now,
   showProvenance,
+  layout = 'list',
+  menuColumn = false,
 }: {
   row: ThreadDigestRow;
+  /** `feed`: the row in a space's one list, in the conversation row's box
+   *  (see `SpaceChannelRow`'s prop of the same name). `list`: the lobby's. */
+  layout?: 'list' | 'feed';
+  /** Keep the menu's column for the rows' right edges (this row has no menu). */
+  menuColumn?: boolean;
   /** Whether to name the parent channel: not when the space has only one. */
   showProvenance: boolean;
   /**
@@ -97,124 +104,138 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
     ? 'opacity-60 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none'
     : undefined;
 
-  return (
-    <li>
-      <Link
-        href={`/channels/${thread.uuid}`}
-        className={cn(
-          'group flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5',
-          'transition-colors duration-150 motion-reduce:transition-none v2-interactive',
-          'hover:bg-secondary/50',
-          FOCUS_RING,
-        )}
-      >
-        {/* `div`s, not `span`s: `MetaLine` renders `div`s by contract and a
-            `div` inside a `span` is invalid - the ThreadsSheet rule. An `a`
-            accepts flow content, so the whole-row link still nests correctly. */}
-        <div className={cn('flex min-w-0 flex-1 items-start gap-3', dim)}>
-          <div
-            aria-hidden
-            className={cn(
-              'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg',
-              'transition-colors duration-150 motion-reduce:transition-none',
-              // The SAME warm test every other collab row uses, so a
-              // muted-with-@you thread stays warm on every surface.
-              behind || mentions > 0
-                ? 'bg-primary/10 text-primary'
-                : 'bg-secondary text-muted-foreground group-hover:text-foreground',
-            )}
-          >
-            <GitBranch className="size-[18px]" />
-          </div>
+  const feed = layout === 'feed';
 
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5">
-              {/* A title runs to 120 chars server-side, so the whole of it
-                  lives in the tooltip when the row truncates - the courtesy
-                  `ThreadsSheet` and `MyChannelRow` extend. */}
-              <span
-                title={title}
-                className={cn(
-                  'min-w-0 truncate text-[15px]',
-                  'transition-colors duration-150 group-hover:text-primary motion-reduce:transition-none',
-                  behind
-                    ? 'font-semibold text-foreground'
-                    : state === 'none'
-                      ? 'font-medium text-muted-foreground'
-                      : 'font-medium text-foreground',
-                  closed && 'text-muted-foreground',
-                )}
-              >
-                {title}
-              </span>
-              {behind ? <UnreadDot /> : null}
-              {status ? (
-                <ThreadStatusChip
-                  value={status.value}
-                  person={threadStatusPerson(status)}
-                  quiet={quiet}
-                  fold
-                />
-              ) : null}
-              {muted ? (
-                <BellOff
-                  aria-label="Muted"
-                  className="size-3.5 shrink-0 text-muted-foreground"
-                />
-              ) : null}
-            </div>
-
-            {/* ONE TRUNCATION PER LINE (design round 1). On a phone the line
-                read "Thread in gene... · 1 followi... · No messages ...": three
-                facts cut three times. The channel name is the only fact that
-                may be long, so it alone sits in the lead and ellipsizes; the
-                short counted facts sit in the trail, which holds its width. */}
-            {/* Who spoke last and what they said (Stay, 16 October 2026),
-                in place of the follower count, once the list carries it. The
-                channel and the preview are ONE fact, so the line is cut once,
-                at its end (design round 1); until the list carries it, today's
-                line. */}
-            <MetaLine
-              className="mt-0.5"
-              lead={[
-                thread.last_message ? (
-                  <LastMessagePreview
-                    key="preview"
-                    preview={thread.last_message}
-                    prefix={showProvenance ? provenance : null}
-                  />
-                ) : showProvenance ? (
-                  provenance
-                ) : null,
-              ]}
-              trail={
-                thread.last_message === undefined
-                  ? [
-                      followerLabel(thread.active_members_count),
-                      thread.last_message_at === null ? 'No messages yet' : null,
-                    ]
-                  : [thread.last_message === null ? 'No messages yet' : null]
-              }
-            />
-          </div>
+  const link = (
+    <Link
+      href={`/channels/${thread.uuid}`}
+      className={cn(
+        'group flex min-w-0 gap-3 rounded-xl px-3 py-2.5',
+        feed ? 'min-h-14 flex-1 items-center' : 'items-start',
+        'transition-colors duration-150 motion-reduce:transition-none v2-interactive',
+        'hover:bg-secondary/50',
+        FOCUS_RING,
+      )}
+    >
+      {/* `div`s, not `span`s: `MetaLine` renders `div`s by contract and a
+          `div` inside a `span` is invalid - the ThreadsSheet rule. An `a`
+          accepts flow content, so the whole-row link still nests correctly. */}
+      <div className={cn('flex min-w-0 flex-1 gap-3', feed ? 'items-center' : 'items-start', dim)}>
+        <div
+          aria-hidden
+          className={cn(
+            'flex size-9 shrink-0 items-center justify-center rounded-lg',
+            !feed && 'mt-0.5',
+            'transition-colors duration-150 motion-reduce:transition-none',
+            // The SAME warm test every other collab row uses, so a
+            // muted-with-@you thread stays warm on every surface.
+            behind || mentions > 0
+              ? 'bg-primary/10 text-primary'
+              : 'bg-secondary text-muted-foreground group-hover:text-foreground',
+          )}
+        >
+          <GitBranch className="size-[18px]" />
         </div>
 
-        {/* OUTSIDE the dim wrapper, which is the only way it can stay at full
-            strength on a muted row (Ruling A's one guaranteed-loud signal). */}
-        <div className="mt-1 flex shrink-0 items-center gap-2">
-          {mentions > 0 ? (
-            <CountBadge
-              count={mentions}
-              label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${title}`}
-            />
-          ) : null}
-          {age ? (
-            <span className={cn('text-xs tabular-nums text-muted-foreground', dim)}>
-              {age}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {/* A title runs to 120 chars server-side, so the whole of it
+                lives in the tooltip when the row truncates - the courtesy
+                `ThreadsSheet` and `MyChannelRow` extend. */}
+            <span
+              title={title}
+              className={cn(
+                'min-w-0 truncate',
+                feed ? 'text-sm' : 'text-[15px]',
+                'transition-colors duration-150 group-hover:text-primary motion-reduce:transition-none',
+                behind
+                  ? 'font-semibold text-foreground'
+                  : state === 'none'
+                    ? 'font-medium text-muted-foreground'
+                    : 'font-medium text-foreground',
+                closed && 'text-muted-foreground',
+              )}
+            >
+              {title}
             </span>
-          ) : null}
+            {behind ? <UnreadDot /> : null}
+            {status ? (
+              <ThreadStatusChip
+                value={status.value}
+                person={threadStatusPerson(status)}
+                quiet={quiet}
+                fold
+              />
+            ) : null}
+            {muted ? (
+              <BellOff
+                aria-label="Muted"
+                className="size-3.5 shrink-0 text-muted-foreground"
+              />
+            ) : null}
+          </div>
+
+          {/* ONE TRUNCATION PER LINE (design round 1). On a phone the line
+              read "Thread in gene... · 1 followi... · No messages ...": three
+              facts cut three times. The channel name is the only fact that
+              may be long, so it alone sits in the lead and ellipsizes; the
+              short counted facts sit in the trail, which holds its width. */}
+          {/* Who spoke last and what they said (Stay, 16 October 2026),
+              in place of the follower count, once the list carries it. The
+              channel and the preview are ONE fact, so the line is cut once,
+              at its end (design round 1); until the list carries it, today's
+              line. */}
+          <MetaLine
+            className={feed ? undefined : 'mt-0.5'}
+            lead={[
+              thread.last_message ? (
+                <LastMessagePreview
+                  key="preview"
+                  preview={thread.last_message}
+                  prefix={showProvenance ? provenance : null}
+                />
+              ) : showProvenance ? (
+                provenance
+              ) : null,
+            ]}
+            trail={
+              thread.last_message === undefined
+                ? [
+                    followerLabel(thread.active_members_count),
+                    thread.last_message_at === null ? 'No messages yet' : null,
+                  ]
+                : [thread.last_message === null ? 'No messages yet' : null]
+            }
+          />
         </div>
-      </Link>
+      </div>
+
+      {/* OUTSIDE the dim wrapper, which is the only way it can stay at full
+          strength on a muted row (Ruling A's one guaranteed-loud signal). */}
+      <div className={cn('flex shrink-0 items-center gap-2', !feed && 'mt-1')}>
+        {mentions > 0 ? (
+          <CountBadge
+            count={mentions}
+            label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${title}`}
+          />
+        ) : null}
+        {age ? (
+          <span className={cn('text-xs tabular-nums text-muted-foreground', dim)}>
+            {age}
+          </span>
+        ) : null}
+      </div>
+    </Link>
+  );
+
+  return feed ? (
+    <li>
+      <div className="flex min-w-0 items-center gap-1">
+        {link}
+        {menuColumn ? <span aria-hidden className="size-9 shrink-0" /> : null}
+      </div>
     </li>
+  ) : (
+    <li>{link}</li>
   );
 });
