@@ -108,3 +108,26 @@ test('the case screen counts the open once it has the case, and the view call is
   const api = readFileSync(join(here, '..', '..', '..', 'lib', 'api', 'cases.ts'), 'utf8');
   assert.match(api, /apiClient\.post\(`\/cases\/\$\{slug\}\/view`, undefined, \{\s*params: searchQuery \? \{ q: searchQuery \} : undefined,\s*\}\)/);
 });
+
+test('a direct load without the server key: the page makes one counted read and no view call', async () => {
+  // No LAWEXA_SSR_KEY: prefetchCaseDetailState returns nothing, so the page
+  // mounts with no answer and reads the case itself, an ordinary read.
+  const sent = await calls(async (client) => {
+    await pageDraws(client, 'nokey-case');
+  });
+  assert.deepEqual(sent, [{ kind: 'read', url: '/cases/nokey-case' }]);
+});
+
+test('a direct load with the server key: the server reads as the reader, with no prefetch header', () => {
+  // So the API counts that read as the open's one view, under the reader's
+  // own account (its bearer token), with the reader's address and browser
+  // forwarded under the shared key (backend a0020709).
+  const server = readFileSync(join(here, 'server.ts'), 'utf8');
+  const read = server.slice(server.indexOf('export async function prefetchCaseDetailState'));
+  assert.match(read, /apiFetch<CaseDetailResponse>\(`\/cases\/\$\{encodeURIComponent\(slug\)\}\?\$\{query\.toString\(\)\}`/);
+  assert.match(read, /'X-Lawexa-SSR-Key': key,\s*'X-Lawexa-Client-IP': ip,/);
+  assert.doesNotMatch(read, /X-Lawexa-Prefetch|CASE_PREFETCH_HEADER|prefetch: true/);
+  const apiServer = readFileSync(join(here, '..', '..', 'runtime', 'api-server.ts'), 'utf8');
+  assert.match(apiServer, /const token = await getSessionToken\(\);/);
+  assert.match(apiServer, /headers\.set\('Authorization', `Bearer \$\{token\}`\);/);
+});
