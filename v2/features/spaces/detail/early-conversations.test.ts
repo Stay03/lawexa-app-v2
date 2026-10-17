@@ -80,10 +80,20 @@ test('a later visit still asks again, as every visit did', async () => {
   assert.equal(reads, 2);
 });
 
-test('the screen starts it with the details, decided once at mount', () => {
-  const screen = readFileSync(join(here, 'SpaceScreen.tsx'), 'utf8');
-  assert.match(screen, /useEarlyConversations\(spaceUuid, urlTab\);/);
+test('the collab frame starts it with the details, once per space', () => {
+  // Not the screen: it mounts with the page's server payload, a second after
+  // the frame has asked for the details, together with the tab (timed runs,
+  // 17 October 2026: one read, +1.2 s, with every input true).
+  const frame = readFileSync(join(here, '..', '..', 'collab', 'shell', 'CollabFrame.tsx'), 'utf8');
+  assert.match(frame, /useEarlyConversations\(isSpaceRoute \? route\.spaceUuid : null\);/);
+  assert.ok(
+    frame.indexOf('useEarlyConversations(') > frame.indexOf('spacesQueries.detail(spaceUuid'),
+    'beside the details read',
+  );
+  assert.doesNotMatch(readFileSync(join(here, 'SpaceScreen.tsx'), 'utf8'), /useEarlyConversations/);
   const hook = readFileSync(join(here, 'early-conversations.ts'), 'utf8');
   assert.match(hook, /void queryClient\.prefetchInfiniteQuery\(spacesQueries\.conversations\(spaceUuid, \{ viewerId \}\)\);/);
   assert.match(hook, /\?\.my_role,/);
+  assert.match(hook, /tabParam: new URLSearchParams\(window\.location\.search\)\.get\('tab'\),/);
+  assert.match(hook, /\}, \[eligible, queryClient, spaceUuid, viewerId\]\);/);
 });
