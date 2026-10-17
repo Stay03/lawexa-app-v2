@@ -198,7 +198,15 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
   }
 
   return (
-    <div data-v2-chat-dock="" className="pointer-events-none">
+    <div
+      data-v2-chat-dock=""
+      // What the box is drawing from, for the journey checks (and a reader of
+      // the DOM): the screen's surface, the early ruling, or nothing yet.
+      data-source={surface ? 'screen' : early ? 'early' : 'cold'}
+      data-hold-send={surface ? String(surface.holdSend) : early ? 'true' : undefined}
+      data-streaming={surface ? String(surface.isStreaming) : undefined}
+      className="pointer-events-none"
+    >
       <div ref={dockRef} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">
         {content}
       </div>
