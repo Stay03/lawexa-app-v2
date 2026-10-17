@@ -431,7 +431,13 @@ test('on a phone a list row folds its chip so the title keeps about 20 character
     ['v2', 'features', 'channels', 'my-channels', 'MyThreadRow.tsx'],
     ['v2', 'features', 'spaces', 'detail', 'SpaceThreadRow.tsx'],
   ]) {
-    assert.match(read(...parts), /<ThreadStatusChip[^>]*quiet=\{quiet\}\s*fold\s*\/>/, parts.at(-1));
+    // The space feed's row also places the chip by width (a className after
+    // `fold`, techlead, 17 October 2026); it still folds.
+    assert.match(
+      read(...parts),
+      /<ThreadStatusChip[^>]*quiet=\{quiet\}\s*fold(?:\s*\/\/[^\n]*)*(?:\s*className=(?:\{[^}]*\}|"[^"]*"))?\s*\/>/,
+      parts.at(-1),
+    );
   }
 });
 
