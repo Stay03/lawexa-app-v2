@@ -170,11 +170,16 @@ test('the box is the shell’s, beside the route content, for a chat route or a 
 
 test('the box floats over the content row, above the tap’s frame and under the phone bar', () => {
   const css = read('v2', 'shell', 'shell.css');
-  // The content's own row AND column: on a taken row with no column the dock
-  // was auto-placed into a new column, half the width (check film, 17 October).
   assert.match(
     css,
-    /\.v2-shell__dock:has\(\[data-v2-chat-dock\]\) \{\s*grid-row: 2;[\s\S]*?grid-column: 1 \/ -1;\s*align-self: end;\s*z-index: 41;\s*pointer-events: none;\s*\}/,
+    /\.v2-shell__dock:has\(\[data-v2-chat-dock\]\) \{\s*grid-row: 2;\s*align-self: end;\s*z-index: 41;\s*pointer-events: none;\s*\}/,
+  );
+  // Every row names the one column: an item that names only its row is
+  // auto-placed, and on a taken row that opens a NEW column, which split the
+  // box and the transcript in two (check films, 17 October 2026).
+  assert.match(
+    css,
+    /\.v2-shell__header,\s*\.v2-shell__content,\s*\.v2-shell__dock \{\s*min-width: 0;[\s\S]*?grid-column: 1;\s*\}/,
   );
   // Above the move-first frame (fixed, z-40) and under the phone's open bar.
   assert.match(read('v2', 'shell', 'move-first.tsx'), /"v2-move-first fixed z-40 /);
@@ -201,4 +206,11 @@ test('the jurisdiction chosen before the screen is up is the one the screen open
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /setJurisdictionState\(readJurisdictionSlot\(conversationId\)\);/);
   assert.match(controller, /writeJurisdictionSlot\(conversationId, next\);/);
+});
+
+test('the case page’s side chat takes typing while its thread wires up; only Send waits (Stay, 17 October 2026)', () => {
+  const core = read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx');
+  assert.match(core, /const conversationPending = conversationId !== null && surface === null;/);
+  assert.match(core, /holdSend=\{conversationPending\}/);
+  assert.doesNotMatch(core, /disabled=\{conversationPending\}/);
 });

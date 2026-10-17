@@ -85,6 +85,12 @@ html.v2-document-lock body {
 .v2-shell__content,
 .v2-shell__dock {
   min-width: 0;
+  /* One column, named on every row. A chat's docked box moves onto the
+     content row (the rule below); an item that names only its row is
+     auto-placed, and on a taken row auto-placement opens a NEW column, so
+     the box and the transcript split the width in two (check film, 17
+     October 2026). With the column named, two items may share the cell. */
+  grid-column: 1;
 }
 
 /* Header row (grid-row 1). Neutral solid background so the safe-area strip under
@@ -166,11 +172,6 @@ html.v2-document-lock body {
    context, so the transcript's own layers stay under it. */
 .v2-shell__dock:has([data-v2-chat-dock]) {
   grid-row: 2;
-  /* The content's own column, named: a grid item placed on a taken row with
-     no column is auto-placed into a NEW column beside the content, which put
-     the pill in the right half and squeezed the transcript into the left
-     (check film, 17 October 2026). */
-  grid-column: 1 / -1;
   align-self: end;
   z-index: 41;
   pointer-events: none;

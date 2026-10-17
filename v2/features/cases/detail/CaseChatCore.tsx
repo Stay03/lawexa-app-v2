@@ -484,7 +484,9 @@ export function CaseChatComposerDock({
   const conversationId = view !== null && view !== 'new' ? view : null;
   const surface = useEmbeddedComposerSurface(conversationId);
   // A conversation is open but its transcript hasn't published yet (one effect
-  // tick, or a cold load) — sending now could only misfire, so the pill waits.
+  // tick, or a cold load): sending now could only misfire, so Send waits. The
+  // box itself takes typing meanwhile (`holdSend`, message box B; Stay, 17
+  // October 2026: "yes" for the case chat too).
   const conversationPending = conversationId !== null && surface === null;
   const viewOnly = surface !== null && surface.isOwnerResolved && !surface.canSend;
 
@@ -555,7 +557,7 @@ export function CaseChatComposerDock({
             animateMeta={animateMeta}
             onEngage={onEngage}
             stageRef={stageRef}
-            disabled={conversationPending}
+            holdSend={conversationPending}
             jurisdiction={surface ? surface.jurisdiction : start.jurisdiction}
             onJurisdictionChange={
               surface ? surface.setJurisdiction : start.onJurisdictionChange
