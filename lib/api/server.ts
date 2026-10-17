@@ -25,14 +25,66 @@ export interface ConversationMetadata {
   meta: SeoMeta;
 }
 
+/** How long a 404 from the public conversation route is remembered. */
+export const CONVERSATION_MISS_TTL_MS = 60 * 1000;
+
+/** The most ids remembered at once; past it the oldest is forgotten. */
+export const CONVERSATION_MISS_LIMIT = 500;
+
+/**
+ * Ids the public route answered 404 for, with when that answer expires.
+ *
+ * WHY (17 October 2026). Every chat in a Space is private, so this route can
+ * only answer 404 for it, and the 404 is not kept by `revalidate`. A Space's
+ * list prefetches each chat row's `/c/{id}`, and each prefetch runs
+ * `generateMetadata`, so every Space open asked the backend once per chat row
+ * for an answer that never changes (4 reads per open, the same 4 again 11 s
+ * later, on a local trace). Only a 404 is remembered: a 200 keeps its own
+ * `revalidate`, and a refusal or a failure is asked again next time.
+ */
+const conversationMisses = new Map<string, number>();
+
+/** Empties the remembered 404s. For tests. */
+export function forgetConversationMisses(): void {
+  conversationMisses.clear();
+}
+
+function isRememberedMiss(conversationId: string): boolean {
+  const expiresAt = conversationMisses.get(conversationId);
+  if (expiresAt === undefined) {
+    return false;
+  }
+  if (expiresAt > Date.now()) {
+    return true;
+  }
+  conversationMisses.delete(conversationId);
+  return false;
+}
+
+function rememberMiss(conversationId: string): void {
+  conversationMisses.delete(conversationId);
+  if (conversationMisses.size >= CONVERSATION_MISS_LIMIT) {
+    const oldest = conversationMisses.keys().next().value;
+    if (oldest !== undefined) {
+      conversationMisses.delete(oldest);
+    }
+  }
+  conversationMisses.set(conversationId, Date.now() + CONVERSATION_MISS_TTL_MS);
+}
+
 /**
  * Server-side conversation fetcher for metadata generation.
  * Uses the public SEO endpoint — no authentication required.
- * Returns null for private, archived, or non-existent conversations (404).
+ * Returns null for private, archived, or non-existent conversations (404),
+ * and remembers that 404 for {@link CONVERSATION_MISS_TTL_MS}.
  */
 export async function fetchConversationForMetadata(
   conversationId: string
 ): Promise<ConversationMetadata | null> {
+  if (isRememberedMiss(conversationId)) {
+    return null;
+  }
+
   const apiUrl = getApiUrl();
 
   try {
@@ -42,6 +94,11 @@ export async function fetchConversationForMetadata(
       },
       next: { revalidate: 60 },
     });
+
+    if (response.status === 404) {
+      rememberMiss(conversationId);
+      return null;
+    }
 
     if (!response.ok) {
       return null;
