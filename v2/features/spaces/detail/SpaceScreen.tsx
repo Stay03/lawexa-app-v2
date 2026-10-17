@@ -49,6 +49,7 @@ import {
   SpacePeopleBlock,
 } from './SpaceLobbyBlocks';
 import { useCachedSpaceIdentity } from './cached-identity';
+import { useEarlyConversations } from './early-conversations';
 import {
   SpaceAccessDeniedState,
   SpaceErrorState,
@@ -136,6 +137,9 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
   const [tabParam, setTabParam] = useState<string | null>(urlTab);
+  // The Conversations tab's first page starts with the space's details, for a
+  // member arriving from the spaces list (`early-conversations.ts`).
+  useEarlyConversations(spaceUuid, urlTab);
   // A soft navigation to this same space with another `?tab=` (a link from
   // elsewhere in the app) changes the router's search params without
   // remounting this page, so the tab follows it. Adjusted during render, keyed

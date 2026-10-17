@@ -10,6 +10,10 @@ import type {
 } from '@/types/collab';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 
+/** A read this recent is the visit's own: a tab mounting after the screen
+ *  started its read uses it instead of asking again. */
+export const JUST_READ_MS = 3000;
+
 /** One page of a space's chats, folders or files. Twenty fills a phone twice
  *  over, so the sentinel has a page in hand before the reader reaches it. */
 const SPACE_CONTENT_PER_PAGE = 20;
@@ -170,7 +174,12 @@ export const spacesQueries = {
       getNextPageParam: nextPageOf,
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
-      refetchOnMount: REFETCH_ON_VISIT,
+      // Every visit asks again, except one that mounts just after a read: the
+      // screen starts this read beside the space's details for a member
+      // (`early-conversations.ts`, speed step 5), and the tab mounting a moment
+      // later must not read it a second time.
+      refetchOnMount: (query) =>
+        Date.now() - query.state.dataUpdatedAt < JUST_READ_MS ? false : REFETCH_ON_VISIT,
     });
   },
 
