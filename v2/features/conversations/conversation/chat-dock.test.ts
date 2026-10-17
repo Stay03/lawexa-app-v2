@@ -187,7 +187,13 @@ test('the box floats over the content row, above the tap’s frame and under the
   // Never fixed: the keyboard inset that shrinks the shell lifts it.
   assert.doesNotMatch(readHere('ChatDock.tsx'), /className="[^"]*\bfixed\b/);
   // The pill takes touches; the gaps pass them to the transcript.
-  assert.match(readHere('ChatDock.tsx'), /<div data-v2-chat-dock="" className="pointer-events-none">\s*<div ref=\{dockRef\} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">/);
+  // (The wrapper also says what the box draws from, data-source and the two
+  // flags, for the journey checks.)
+  assert.match(
+    readHere('ChatDock.tsx'),
+    /<div\s+data-v2-chat-dock=""[\s\S]{0,600}?className="pointer-events-none"\s*>\s*<div ref=\{dockRef\} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">/,
+  );
+  assert.match(readHere('ChatDock.tsx'), /data-source=\{surface \? 'screen' : early \? 'early' : 'cold'\}/);
 });
 
 test('the screen draws no box of its own on its route, and the frames draw none either', () => {
