@@ -70,6 +70,11 @@ test('in the feed the room rows take the conversation row’s box and keep the m
     // The lobby keeps its own row.
     assert.match(row, /\) : \(\s*<li>\{link\}<\/li>\s*\);/, file);
   }
+  // The channel's second line: no top margin in the feed (rows 56px, not 58),
+  // and no empty preview span before the status counts (they lead the line).
+  const channel = read('v2', 'features', 'spaces', 'detail', 'SpaceChannelRow.tsx');
+  assert.match(channel, /'flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground',\s*!feed && 'mt-0\.5',/);
+  assert.match(channel, /\{preview \? \(\s*<span className="min-w-0 truncate">\s*<ChannelPreviewText line=\{preview\} \/>/);
 });
 
 test('a new message in a room re-reads that space’s feed, which is never written', () => {

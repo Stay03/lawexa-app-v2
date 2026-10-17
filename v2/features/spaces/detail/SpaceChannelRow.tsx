@@ -154,11 +154,19 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
 
           {/* The channel's threads that need someone ("2 need action · 1
               working", Arthur, 16 October 2026) hold their width after the
-              preview, which is the part that truncates. */}
-          <span className="mt-0.5 flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground">
-            <span className="min-w-0 truncate">
-              {preview ? <ChannelPreviewText line={preview} /> : null}
-            </span>
+              preview, which is the part that truncates. With no preview the
+              counts lead the line, so no empty span holds a gap before them. */}
+          <span
+            className={cn(
+              'flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground',
+              !feed && 'mt-0.5',
+            )}
+          >
+            {preview ? (
+              <span className="min-w-0 truncate">
+                <ChannelPreviewText line={preview} />
+              </span>
+            ) : null}
             {statusCounts ? (
               <span className="shrink-0 whitespace-nowrap">
                 {preview ? `· ${statusCounts}` : statusCounts}
