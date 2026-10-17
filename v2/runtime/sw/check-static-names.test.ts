@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -66,6 +66,42 @@ test('the build-id manifests may change only while no chunk names them', () => {
     previous: { 'build-x/_buildManifest.js': 'v1', 'chunks/a1.js': 'load("_buildManifest.js")' },
   });
   assert.equal(named.status, 1, named.out);
+});
+
+test('the build writes a manifest of every static file and its hash, and two manifests compare the same way', () => {
+  // The build script runs the writer after next build, so Coolify serves its own build's manifest.
+  const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+  assert.equal(pkg.scripts.build, 'next build && node scripts/write-asset-hashes.mjs && node scripts/check-live-assets.mjs build');
+
+  const root = mkdtempSync(join(tmpdir(), 'asset-hashes-'));
+  try {
+    const writer = join(process.cwd(), 'scripts', 'write-asset-hashes.mjs');
+    const write = (name: string, files: Record<string, string>) => {
+      const dir = build(root, name, files);
+      writeFileSync(join(dir, 'required-server-files.json'), JSON.stringify({ config: { deploymentId: 'abc', experimental: { immutableAssetToken: 'a1' } } }));
+      const out = join(root, `${name}.json`);
+      const result = spawnSync(process.execPath, [writer, dir, out], { encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+      return out;
+    };
+    const before = write('before', { 'chunks/a1.js': 'one', 'css/b2.css': 'two' });
+    const manifest = JSON.parse(readFileSync(before, 'utf8')) as { assetToken: string; deploymentId: string; files: Record<string, string> };
+    assert.equal(manifest.assetToken, 'a1');
+    assert.equal(manifest.deploymentId, 'abc');
+    assert.deepEqual(Object.keys(manifest.files), ['chunks/a1.js', 'css/b2.css']);
+    assert.match(manifest.files['chunks/a1.js'], /^[0-9a-f]{64}$/);
+
+    const same = write('same', { 'chunks/a1.js': 'one', 'css/b2.css': 'two', 'chunks/c3.js': 'new' });
+    const pass = spawnSync(process.execPath, [SCRIPT, same, before], { encoding: 'utf8' });
+    assert.equal(pass.status, 0, `${pass.stdout}${pass.stderr}`);
+
+    const drifted = write('drifted', { 'chunks/a1.js': 'one, changed', 'css/b2.css': 'two' });
+    const fail = spawnSync(process.execPath, [SCRIPT, drifted, before], { encoding: 'utf8' });
+    assert.equal(fail.status, 1);
+    assert.match(fail.stderr, /static\/chunks\/a1\.js/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('a missing build folder is a usage error, not a pass', () => {

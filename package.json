@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/write-asset-hashes.mjs && node scripts/check-live-assets.mjs build",
     "start": "next start",
     "lint": "eslint",
     "test": "node --experimental-strip-types --no-warnings=ExperimentalWarning --import ./scripts/test/register.mjs --test \"v2/**/*.test.ts\""

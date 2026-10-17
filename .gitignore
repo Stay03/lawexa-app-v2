@@ -49,3 +49,6 @@ res-stream.txt
 
 # Playwright MCP working dir (film shots, console logs)
 .playwright-mcp/
+
+# Written by scripts/write-asset-hashes.mjs after each build (served at /asset-hashes.json).
+/public/asset-hashes.json
