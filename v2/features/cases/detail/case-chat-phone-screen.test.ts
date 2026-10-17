@@ -408,7 +408,8 @@ test('the whole card fades out once, colour included; reduced motion skips the f
   );
   // Once: the panel slot inside has no exit of its own, only the opening fade.
   assert.equal(ask.match(/animate-out/g)?.length, 1);
-  assert.match(ask, /<div\s+ref=\{slotRef\}\s+className="flex min-h-0 flex-1 flex-col [^"]*motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200[^"]*"\s*>/);
+  // Every browser but Chrome and Edge on iPhone (chromium-ios.test.ts).
+  assert.match(ask, /: 'flex min-h-0 flex-1 flex-col [^']*motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200[^']*'\s*\}\s*>/);
   // The opening is as it was: the card's colour is on from the first frame.
   assert.doesNotMatch(ask, /data-\[state=open\]/);
 });
@@ -450,7 +451,7 @@ test('the composer is never remounted: one node, at a fixed place in the card', 
   // comment as `{}`.)
   assert.match(
     ask,
-    /\{screenMounted \? \(\s*<div\s+ref=\{slotRef\}\s+className=\"flex min-h-0 flex-1 flex-col[\s\S]*?\) : panelMounted \? \([\s\S]*?\) : null\}\s*(?:\{\}\s*)?<CaseChatComposerDock\s+view=\{view\}/,
+    /\{screenMounted \? \(\s*<div\s+ref=\{slotRef\}\s+className=\{[\s\S]*?'flex min-h-0 flex-1 flex-col[\s\S]*?\) : panelMounted \? \([\s\S]*?\) : null\}\s*(?:\{\}\s*)?<CaseChatComposerDock\s+view=\{view\}/,
   );
   assert.equal(ask.match(/<CaseChatComposerDock/g)?.length, 1);
   const dock = ask.slice(ask.indexOf('<CaseChatComposerDock'), ask.indexOf('/>', ask.indexOf('<CaseChatComposerDock')));
@@ -507,7 +508,7 @@ test('the keyboard readout loads only with ?kbdebug=1 and listens only while mou
 
 /** The hold effect: one hold per rise of the keyboard while the phone chat is open. */
 const openEffect = () => {
-  const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card\) return;\s*const viewport = window\.visualViewport;[\s\S]*?\}, \[screenOpen\]\);/)?.[0];
+  const effect = ask.match(/useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card \|\| chromiumIOS\) return;\s*const viewport = window\.visualViewport;[\s\S]*?\}, \[screenOpen, chromiumIOS\]\);/)?.[0];
   assert.ok(effect, 'a layout effect on the open state holds the card while the keyboard rises');
   return effect;
 };
@@ -611,7 +612,7 @@ test('the bar and middle ride the keyboard up: laid out in the visible band, one
   assert.doesNotMatch(ask, /in-data-\[keyboard=riding\]:opacity/);
   // Desktop xl is untouched: the hold runs only for the phone screen.
   assert.match(ask, /const screenOpen = screen && panelOpen;/);
-  assert.match(effect, /^useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card\) return;/);
+  assert.match(effect, /^useLayoutEffect\(\(\) => \{\s*const card = cardRef\.current;\s*if \(!screenOpen \|\| !card \|\| chromiumIOS\) return;/);
   // The readout prints the pad.
   assert.match(detail('KeyboardDebugReadout.tsx'), /`pad \$\{heldPad \|\| 'none'\}`/);
 });
@@ -648,7 +649,7 @@ test('a close during the hold leaves the held pair for the close effect, which f
   // the pair.
   assert.match(
     effect,
-    /return \(\) => \{\s*card\.removeEventListener\('focusin', onFocusIn\);\s*stopHold\?\.\(\);\s*\};\s*\}, \[screenOpen\]\);$/,
+    /return \(\) => \{\s*card\.removeEventListener\('focusin', onFocusIn\);\s*stopHold\?\.\(\);\s*\};\s*\}, \[screenOpen, chromiumIOS\]\);$/,
   );
   const stop = effect.match(/const stop = \(\): void => \{[\s\S]*?\n\s*\};/)?.[0];
   assert.ok(stop);
@@ -664,7 +665,7 @@ test('a close during the hold leaves the held pair for the close effect, which f
 test('the slot is transparent until iOS reports the keyboard, takes no tap during the hold, and fades in once; reduced motion, no fade', () => {
   assert.match(
     ask,
-    /<div\s+ref=\{slotRef\}\s+className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-\[keyboard\]:pointer-events-none in-data-\[keyboard=rising\]:opacity-0 in-data-\[keyboard=riding\]:transition-none"\s*>/,
+    /: 'flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-\[keyboard\]:pointer-events-none in-data-\[keyboard=rising\]:opacity-0 in-data-\[keyboard=riding\]:transition-none'\s*\}\s*>/,
   );
   // The deep link keeps the mount fade; nothing slides.
   assert.doesNotMatch(ask, /slide-in|slide-out/);

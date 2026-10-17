@@ -4,6 +4,14 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
+import { isChromiumIOS } from './chromium-ios';
+
+const CARD = '[role="dialog"][aria-label="Chat about this case"]';
+const DEBUG_OUTLINES = `
+${CARD} > :first-child > :first-child { outline: 2px solid #84cc16; outline-offset: -2px; }
+${CARD} > :first-child { outline: 2px solid #d946ef; outline-offset: -4px; }
+${CARD} > :last-child { outline: 2px solid #06b6d4; outline-offset: -2px; }
+`;
 
 /**
  * KeyboardDebugReadout shows live viewport numbers over the case page, for a
@@ -41,9 +49,11 @@ export function KeyboardDebugReadout() {
     // off the recording.
     let focusedAt = Number.NaN;
     const ms = (value: number): string => (Number.isNaN(value) ? 'none' : `${Math.round(value)}`);
+    const chromium = isChromiumIOS(navigator.userAgent);
+    const holds: string[] = [];
 
     const draw = (): void => {
-      const card = document.querySelector<HTMLElement>('[role="dialog"][aria-label="Chat about this case"]');
+      const card = document.querySelector<HTMLElement>(CARD);
       const bar = document.querySelector('.v2-shell__header');
       const content = document.getElementById(V2_SHELL_CONTENT_ID);
       const close = card?.querySelector('[aria-label="Close the chat"]') ?? null;
@@ -59,7 +69,9 @@ export function KeyboardDebugReadout() {
       const heldPad = card?.style.getPropertyValue('--v2-case-chat-held-pad') ?? '';
       const box = composerFocused ? active.getBoundingClientRect() : null;
       const slot = card?.firstElementChild ?? null;
+      const composer = card?.lastElementChild ?? null;
       output.textContent = [
+        `ua ${chromium ? 'chromium-ios' : 'other'}`,
         `t ${Math.round(performance.now() % 100000)}`,
         `since focus ${ms(performance.now() - focusedAt)}`,
         `vv.top+h ${ms(published)}`,
@@ -70,6 +82,11 @@ export function KeyboardDebugReadout() {
         `box ${box ? `top ${Math.round(box.top)} h ${Math.round(box.height)} bottom ${Math.round(box.bottom)}` : 'none'}`,
         `html bg ${root.backgroundColor || 'none'}`,
         `slot opacity ${slot ? getComputedStyle(slot).opacity : 'none'}`,
+        `card opacity ${card ? getComputedStyle(card).opacity : 'none'} state ${card?.getAttribute('data-state') ?? 'none'}`,
+        `reserve ${card?.hasAttribute('data-accessory-reserve') ? card.style.getPropertyValue('padding-bottom') : 'none'}`,
+        `slot ${rectOf(slot)}`,
+        `composer ${rectOf(composer)}`,
+        `holds ${holds.length ? holds.join(' ') : 'none'}`,
         `vv.offsetTop ${viewport ? Math.round(viewport.offsetTop) : 'n/a'}`,
         `vv.height ${viewport ? Math.round(viewport.height) : 'n/a'}`,
         `innerHeight ${window.innerHeight}`,
@@ -102,6 +119,20 @@ export function KeyboardDebugReadout() {
       change();
     };
 
+    // The hold's states with their times since the last focus, the last four:
+    // which states the card passed through, which no single frame shows.
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        const target = record.target as HTMLElement;
+        if (!target.matches(CARD)) continue;
+        const state = target.getAttribute('data-keyboard') ?? 'off';
+        holds.push(`${state}@${ms(performance.now() - focusedAt)}`);
+        if (holds.length > 4) holds.shift();
+        change();
+      }
+    });
+    observer.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['data-keyboard'] });
+
     draw();
     viewport?.addEventListener('resize', change);
     viewport?.addEventListener('scroll', change);
@@ -109,6 +140,7 @@ export function KeyboardDebugReadout() {
     document.addEventListener('focusin', onFocusIn);
     document.addEventListener('focusout', change);
     return () => {
+      observer.disconnect();
       cancelAnimationFrame(frame);
       viewport?.removeEventListener('resize', change);
       viewport?.removeEventListener('scroll', change);
@@ -119,11 +151,20 @@ export function KeyboardDebugReadout() {
   }, []);
 
   return createPortal(
-    <pre
-      ref={outputRef}
-      aria-hidden
-      className="pointer-events-none fixed left-0 top-[var(--visual-top,0px)] z-[2147483647] m-0 bg-black/70 px-1 py-0.5 font-mono text-[9px] leading-tight text-white"
-    />,
+    <>
+      {/* WHERE EACH PART PAINTS. The numbers above are layout; a recording
+          shows pixels. Outlines that cost no layout (`outline`, not `border`)
+          on the chat's bar (lime), its middle (magenta) and its composer
+          (cyan) show on the video where each one is drawn, so a blank card can
+          be told apart from a card drawn somewhere else (Arthur's recording 2,
+          16 October 2026). */}
+      <style>{DEBUG_OUTLINES}</style>
+      <pre
+        ref={outputRef}
+        aria-hidden
+        className="pointer-events-none fixed left-0 top-[var(--visual-top,0px)] z-[2147483647] m-0 bg-black/70 px-1 py-0.5 font-mono text-[9px] leading-tight text-white"
+      />
+    </>,
     document.body,
   );
 }

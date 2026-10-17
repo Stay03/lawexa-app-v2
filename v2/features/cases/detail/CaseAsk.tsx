@@ -14,6 +14,11 @@ import {
   type CaseChatStart,
 } from './CaseChatCore';
 import { guardChatDrags } from './case-chat-drag-guard';
+import {
+  CHROMIUM_IOS_ACCESSORY_RESERVE_PX,
+  keyboardIsUp,
+  useChromiumIOS,
+} from './chromium-ios';
 
 /**
  * The shell's own bars, taken out of the layout (`display: none`) while the
@@ -125,6 +130,9 @@ export function CaseAskDock({
   const cardRef = useRef<HTMLDivElement | null>(null);
   /** The phone screen's bar and middle, faded in once as they ride the keyboard. */
   const slotRef = useRef<HTMLDivElement | null>(null);
+  /** Chrome or Edge on iPhone: they resize for the keyboard instead of
+   *  panning, and their autofill bar can sit over the card (`chromium-ios.ts`). */
+  const chromiumIOS = useChromiumIOS();
 
   // THE PAGE KEEPS ITS LENGTH WHILE THE CARD IS OUT OF THE FLOW. The resting
   // dock is the end of the case column, so its height is part of the
@@ -340,9 +348,15 @@ export function CaseAskDock({
   // ends it too, but leaves the held pair on the card: the close effect
   // measures the card as it is on screen and freezes it there. Every way to
   // the end leaves the card on the visible viewport or frozen by the close.
+  //
+  // NOT IN CHROME OR EDGE ON IPHONE. They resize the page for the keyboard
+  // and never pan it, so there is no pan to hold through; the card takes the
+  // visible area directly and the slot never goes transparent or fades while
+  // the keyboard rises (`chromium-ios.ts`, Arthur's recordings, 16 October
+  // 2026). Every other browser keeps this hold exactly as it was.
   useLayoutEffect(() => {
     const card = cardRef.current;
-    if (!screenOpen || !card) return;
+    if (!screenOpen || !card || chromiumIOS) return;
     const viewport = window.visualViewport;
     const published = (name: string): number =>
       parseFloat(document.documentElement.style.getPropertyValue(name));
@@ -437,7 +451,43 @@ export function CaseAskDock({
       card.removeEventListener('focusin', onFocusIn);
       stopHold?.();
     };
-  }, [screenOpen]);
+  }, [screenOpen, chromiumIOS]);
+
+  // ROOM FOR CHROMIUM'S AUTOFILL BAR, ONLY WHILE THE KEYBOARD IS UP. Chrome
+  // and Edge on iPhone draw their key, card and location bar on the message
+  // box, and on iOS 26 it can float inside the area they report as visible,
+  // so nothing measured can make room for it. While the keyboard is up the
+  // card keeps CHROMIUM_IOS_ACCESSORY_RESERVE_PX clear under the composer;
+  // with it down the card is exactly as before (the property is removed, not
+  // set to 0). Every other browser never runs this.
+  useEffect(() => {
+    const card = cardRef.current;
+    const viewport = window.visualViewport;
+    if (!screenOpen || !card || !chromiumIOS || !viewport) return;
+    let fullHeight = viewport.height;
+    let fullWidth = viewport.width;
+    const apply = (): void => {
+      if (viewport.width !== fullWidth) {
+        fullWidth = viewport.width;
+        fullHeight = viewport.height;
+      }
+      fullHeight = Math.max(fullHeight, viewport.height);
+      if (keyboardIsUp(viewport.height, fullHeight)) {
+        card.style.setProperty('padding-bottom', `${CHROMIUM_IOS_ACCESSORY_RESERVE_PX}px`);
+        card.setAttribute('data-accessory-reserve', '');
+      } else {
+        card.style.removeProperty('padding-bottom');
+        card.removeAttribute('data-accessory-reserve');
+      }
+    };
+    apply();
+    viewport.addEventListener('resize', apply);
+    return () => {
+      viewport.removeEventListener('resize', apply);
+      card.style.removeProperty('padding-bottom');
+      card.removeAttribute('data-accessory-reserve');
+    };
+  }, [screenOpen, chromiumIOS]);
 
   // WHILE THE PHONE CHAT IS OPEN A DRAG IN IT NEVER PANS THE SCREEN. With the
   // keyboard up, iOS scrolls the visible viewport inside the taller layout
@@ -562,7 +612,14 @@ export function CaseAskDock({
           // appears at the switch.
           <div
             ref={slotRef}
-            className="flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-[keyboard]:pointer-events-none in-data-[keyboard=rising]:opacity-0 in-data-[keyboard=riding]:transition-none"
+            className={
+              chromiumIOS
+                ? // Chrome and Edge on iPhone: drawn at once, no fade, so no
+                  // opacity layer animates while the browser resizes the page
+                  // for the keyboard (`chromium-ios.ts`).
+                  'flex min-h-0 flex-1 flex-col'
+                : 'flex min-h-0 flex-1 flex-col transition-opacity duration-200 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 motion-reduce:transition-none in-data-[keyboard]:pointer-events-none in-data-[keyboard=rising]:opacity-0 in-data-[keyboard=riding]:transition-none'
+            }
           >
             <CaseChatBar
               view={view}
