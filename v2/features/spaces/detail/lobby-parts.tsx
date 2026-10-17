@@ -25,9 +25,11 @@ export const SPACE_PAGE_COLUMN =
 /** The pills and search held at the top of the pane: stacked on a phone, one
  *  row from `md:`. Shared by the live home and its silhouette, so the
  *  hand-off moves nothing. `-mx-4 px-4` runs its rule and ground to the
- *  column's edges, so rows scroll under it unseen. */
+ *  column's edges, so rows scroll under it unseen. `md:min-h-17` is the row
+ *  with its 44px search, held when People hides the search, so the pills do
+ *  not jump on a computer. */
 export const SPACE_PILL_BAR =
-  'sticky top-0 z-10 -mx-4 flex flex-col gap-3 border-b bg-background px-4 py-3 md:flex-row md:items-center';
+  'sticky top-0 z-10 -mx-4 flex flex-col gap-3 border-b bg-background px-4 py-3 md:min-h-17 md:flex-row md:items-center';
 
 /**
  * One region of the lobby. The heading is a real `h2` and the count beside it

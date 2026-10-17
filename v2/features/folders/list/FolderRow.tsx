@@ -109,7 +109,7 @@ export const FolderRow = memo(function FolderRow({
         <span
           className={cn(
             'flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground',
-            feed ? 'mt-0.5' : 'mt-1',
+            !feed && 'mt-1',
           )}
         >
           {/* LEAD — what the folder holds. */}

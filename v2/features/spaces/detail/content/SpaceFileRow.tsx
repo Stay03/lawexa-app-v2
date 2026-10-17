@@ -113,7 +113,6 @@ export const SpaceFileRow = memo(function SpaceFileRow({
             phone only the uploader's name truncates (design round 2). */}
         <MetaLine
           as="span"
-          className="mt-0.5"
           lead={[
             <span key="kind" className="flex shrink-0 items-center gap-2">
               <span>{fileTypeLabel(file)}</span>
