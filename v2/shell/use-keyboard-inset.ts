@@ -72,155 +72,177 @@ import { restoreDocumentScroll } from './document-scroll';
  * property on unmount.
  */
 export function useKeyboardInset(): void {
-  useEffect(() => {
-    // SSR / non-DOM guard.
-    if (typeof window === 'undefined') return;
+  useEffect(() => syncKeyboardInset(), []);
+}
 
-    const viewport = window.visualViewport;
-    // No visualViewport → nothing to measure. (No capability sniffing beyond this:
-    // the occlusion formula below self-calibrates to whatever the browser does with
-    // the keyboard — see the BEHAVIOUR MEASUREMENT note above.)
-    if (!viewport) return;
+/**
+ * The hook's work: measure now, keep measuring on every viewport and window
+ * event, and return the cleanup. A plain function so a test can run it against
+ * a fake window and step through the order iOS sends its events in.
+ */
+export function syncKeyboardInset(): () => void {
+  // SSR / non-DOM guard.
+  if (typeof window === 'undefined') return () => undefined;
 
-    const root = document.documentElement;
+  const viewport = window.visualViewport;
+  // No visualViewport → nothing to measure. (No capability sniffing beyond this:
+  // the occlusion formula below self-calibrates to whatever the browser does with
+  // the keyboard — see the BEHAVIOUR MEASUREMENT note above.)
+  if (!viewport) return () => undefined;
 
-    /**
-     * Has the viewport actually come to rest, or is it panned under a keyboard?
-     *
-     * ZERO OCCLUSION IS A PROXY FOR "KEYBOARD GONE", AND THE PROXY HAS A HOLE.
-     * With the document locked, iOS reveals a focused field by panning the
-     * VISUAL viewport inside the layout viewport, which grows `offsetTop`. At
-     * full pan `offsetTop` reaches `innerHeight - viewport.height`, so the
-     * occlusion arithmetic crosses exactly zero WHILE THE KEYBOARD IS STILL UP.
-     * Restoring the scroll at that moment would yank the field the reader is
-     * typing in out from under them.
-     *
-     * Found by an adversarial review of this file on 2026-08-08, hours after it
-     * shipped. The window is narrow — it also needs iOS to have left a layout
-     * scroll to undo — but "narrow" is not "impossible", and the cost of being
-     * wrong is losing your place mid-sentence.
-     *
-     * ── THE FIRST GUARD WAS A PROXY, AND THE PROXY BROKE THE FIX ────────────
-     * That review's hazard was first closed by asking whether anything was
-     * FOCUSED. It is the wrong question, and @arthur found out the hard way the
-     * same day: edit a message, dismiss the keyboard with Done, and iOS keeps
-     * the field focused. Zero occlusion, focus still in a text box, so the
-     * restore never ran and the screen stayed shoved up — the exact bug this
-     * whole file exists to fix, reintroduced by its own guard. The docblock
-     * below already said Done does not reliably blur; I wrote that and then
-     * relied on blur anyway one function up.
-     *
-     * `offsetTop` is the thing itself rather than a proxy for it. A panned
-     * visual viewport has a non-zero `offsetTop`; a keyboard that has gone has
-     * `offsetTop === 0`, focused field or not. So the hazard stays closed and
-     * the fix stays working, and neither depends on where the caret is.
-     */
-    const settled = (): boolean => viewport.offsetTop === 0;
+  const root = document.documentElement;
 
-    /**
-     * The tallest the visible viewport has been at this width: the screen
-     * with no keyboard. Reset when the width changes, which is a rotation.
-     */
-    let fullHeight = viewport.height;
-    let fullWidth = viewport.width;
+  /**
+   * Has the viewport actually come to rest, or is it panned under a keyboard?
+   *
+   * ZERO OCCLUSION IS A PROXY FOR "KEYBOARD GONE", AND THE PROXY HAS A HOLE.
+   * With the document locked, iOS reveals a focused field by panning the
+   * VISUAL viewport inside the layout viewport, which grows `offsetTop`. At
+   * full pan `offsetTop` reaches `innerHeight - viewport.height`, so the
+   * occlusion arithmetic crosses exactly zero WHILE THE KEYBOARD IS STILL UP.
+   * Restoring the scroll at that moment would yank the field the reader is
+   * typing in out from under them.
+   *
+   * Found by an adversarial review of this file on 2026-08-08, hours after it
+   * shipped. The window is narrow — it also needs iOS to have left a layout
+   * scroll to undo — but "narrow" is not "impossible", and the cost of being
+   * wrong is losing your place mid-sentence.
+   *
+   * ── THE FIRST GUARD WAS A PROXY, AND THE PROXY BROKE THE FIX ────────────
+   * That review's hazard was first closed by asking whether anything was
+   * FOCUSED. It is the wrong question, and @arthur found out the hard way the
+   * same day: edit a message, dismiss the keyboard with Done, and iOS keeps
+   * the field focused. Zero occlusion, focus still in a text box, so the
+   * restore never ran and the screen stayed shoved up — the exact bug this
+   * whole file exists to fix, reintroduced by its own guard. The docblock
+   * below already said Done does not reliably blur; I wrote that and then
+   * relied on blur anyway one function up.
+   *
+   * `offsetTop` is the thing itself rather than a proxy for it. A panned
+   * visual viewport has a non-zero `offsetTop`; a keyboard that has gone has
+   * `offsetTop === 0`, focused field or not. So the hazard stays closed and
+   * the fix stays working, and neither depends on where the caret is.
+   */
+  const settled = (): boolean => viewport.offsetTop === 0;
 
-    /**
-     * The visible rectangle, for a screen fixed to it (the phone case chat).
-     *
-     * THE TOP IS CLAMPED TO WHERE A VISIBLE RECTANGLE CAN BE. While the
-     * keyboard is up, iOS pans the page and `offsetTop` says by how much; the
-     * screen must follow it. The pan can never be more than the keyboard
-     * takes, `fullHeight - height`, so with the keyboard down the top is 0.
-     * iOS breaks that when the keyboard goes down: the resize reports the full
-     * height while `offsetTop` still holds the keyboard's pan, and no later
-     * event corrects it. Published raw, that stale pan pushed the full-screen
-     * chat down the screen with the page's own bar above it (Arthur's iPhone,
-     * after 16b19dd).
-     *
-     * THE LIMIT IS NOT `innerHeight`. That was the first version (6023bb9),
-     * and in the iPhone home-screen app `innerHeight` shrinks with the
-     * keyboard, so the limit read 0 while iOS had panned the page: the
-     * full-height chat sat a keyboard's height above the screen, and only its
-     * composer showed, at the top (Arthur's IMG_4108, 12 October 2026). The
-     * tallest visible height at this width does not move with the keyboard in
-     * either mode, so it is the limit in both.
-     *
-     * It is also read on `focusin`. The reader's tap on the chat's box is a
-     * focus, so the card's first frame is sized from the viewport as it is at
-     * the tap, never from whatever a keyboard before it left behind.
-     */
-    const publishVisible = (): void => {
-      if (viewport.width !== fullWidth) {
-        fullWidth = viewport.width;
-        fullHeight = viewport.height;
-      }
-      fullHeight = Math.max(fullHeight, viewport.height);
-      const top = visibleTop(viewport.offsetTop, viewport.height, fullHeight);
-      root.style.setProperty('--visual-height', `${viewport.height}px`);
-      root.style.setProperty('--visual-top', `${top}px`);
-    };
+  /**
+   * The tallest the visible viewport has been at this width: the screen
+   * with no keyboard. Reset when the width changes, which is a rotation.
+   */
+  let fullHeight = viewport.height;
+  let fullWidth = viewport.width;
 
-    const update = (): void => {
-      // Height occluded at the bottom of the layout viewport (keyboard + any
-      // accessory bar). Reads ≈0 when the browser resized the layout viewport
-      // (innerHeight shrank in lockstep) and the true keyboard height when it
-      // overlaid. Clamp ≥ 0 — rubber-band scrolling can transiently make the raw
-      // value negative.
+  /**
+   * The visible rectangle, for a screen fixed to it (the phone case chat).
+   *
+   * THE TOP IS CLAMPED TO WHERE A VISIBLE RECTANGLE CAN BE. While the
+   * keyboard is up, iOS pans the page and `offsetTop` says by how much; the
+   * screen must follow it. The pan can never be more than the keyboard
+   * takes, `fullHeight - height`, so with the keyboard down the top is 0.
+   * iOS breaks that when the keyboard goes down: the resize reports the full
+   * height while `offsetTop` still holds the keyboard's pan, and no later
+   * event corrects it. Published raw, that stale pan pushed the full-screen
+   * chat down the screen with the page's own bar above it (Arthur's iPhone,
+   * after 16b19dd).
+   *
+   * THE LIMIT IS NOT `innerHeight`. That was the first version (6023bb9),
+   * and in the iPhone home-screen app `innerHeight` shrinks with the
+   * keyboard, so the limit read 0 while iOS had panned the page: the
+   * full-height chat sat a keyboard's height above the screen, and only its
+   * composer showed, at the top (Arthur's IMG_4108, 12 October 2026). The
+   * tallest visible height at this width does not move with the keyboard in
+   * either mode, so it is the limit in both.
+   *
+   * It is also read on `focusin`. The reader's tap on the chat's box is a
+   * focus, so the card's first frame is sized from the viewport as it is at
+   * the tap, never from whatever a keyboard before it left behind.
+   */
+  const publishVisible = (): void => {
+    if (viewport.width !== fullWidth) {
+      fullWidth = viewport.width;
+      fullHeight = viewport.height;
+    }
+    fullHeight = Math.max(fullHeight, viewport.height);
+    const top = visibleTop(viewport.offsetTop, viewport.height, fullHeight);
+    root.style.setProperty('--visual-height', `${viewport.height}px`);
+    root.style.setProperty('--visual-top', `${top}px`);
+  };
+
+  const update = (): void => {
+    // Height occluded at the bottom of the layout viewport (keyboard + any
+    // accessory bar). Reads ≈0 when the browser resized the layout viewport
+    // (innerHeight shrank in lockstep) and the true keyboard height when it
+    // overlaid. Clamp ≥ 0 — rubber-band scrolling can transiently make the raw
+    // value negative.
+    const occlusion = Math.max(
+      0,
+      window.innerHeight - viewport.height - viewport.offsetTop,
+    );
+    root.style.setProperty('--keyboard-inset', `${occlusion}px`);
+    // The visible viewport (11 October 2026): its height caps a screen
+    // riding the keyboard, so nothing sized from it can grow past the top,
+    // and its offset says how far iOS has panned the page under the keyboard.
+    publishVisible();
+    // Zero occlusion AND an unpanned visual viewport. The second term is what
+    // separates "the keyboard has gone" from "the keyboard is up and the pan
+    // has run to the bottom" — see `settled`.
+    if (occlusion === 0 && settled()) restoreDocumentScroll();
+  };
+
+  /**
+   * The blur path — a second chance, for the engines that settle late.
+   *
+   * iOS settles its scroll AFTER the blur, so a reset fired synchronously on
+   * `focusout` lands too early and is overwritten. One frame later is enough.
+   *
+   * It does not take the `settled` check, and that asymmetry is deliberate: a
+   * blur means the keyboard is on its way out, so a pan still in progress is
+   * a transient to be undone rather than a state to respect. The occlusion
+   * re-read is the gate that matters here — a blur that merely moves focus to
+   * the NEXT field still measures a keyboard, and does nothing.
+   */
+  const onFocusOut = (): void => {
+    requestAnimationFrame(() => {
       const occlusion = Math.max(
         0,
         window.innerHeight - viewport.height - viewport.offsetTop,
       );
       root.style.setProperty('--keyboard-inset', `${occlusion}px`);
-      // The visible viewport (11 October 2026): its height caps a screen
-      // riding the keyboard, so nothing sized from it can grow past the top,
-      // and its offset says how far iOS has panned the page under the keyboard.
       publishVisible();
-      // Zero occlusion AND an unpanned visual viewport. The second term is what
-      // separates "the keyboard has gone" from "the keyboard is up and the pan
-      // has run to the bottom" — see `settled`.
-      if (occlusion === 0 && settled()) restoreDocumentScroll();
-    };
+      if (occlusion === 0) restoreDocumentScroll();
+    });
+  };
 
-    /**
-     * The blur path — a second chance, for the engines that settle late.
-     *
-     * iOS settles its scroll AFTER the blur, so a reset fired synchronously on
-     * `focusout` lands too early and is overwritten. One frame later is enough.
-     *
-     * It does not take the `settled` check, and that asymmetry is deliberate: a
-     * blur means the keyboard is on its way out, so a pan still in progress is
-     * a transient to be undone rather than a state to respect. The occlusion
-     * re-read is the gate that matters here — a blur that merely moves focus to
-     * the NEXT field still measures a keyboard, and does nothing.
-     */
-    const onFocusOut = (): void => {
-      requestAnimationFrame(() => {
-        const occlusion = Math.max(
-          0,
-          window.innerHeight - viewport.height - viewport.offsetTop,
-        );
-        root.style.setProperty('--keyboard-inset', `${occlusion}px`);
-        publishVisible();
-        if (occlusion === 0) restoreDocumentScroll();
-      });
-    };
+  // THE WINDOW'S OWN RESIZE TOO, NOT ONLY THE VISUAL VIEWPORT'S. The formula
+  // reads ≈0 in a resizing browser only if `innerHeight` has already shrunk
+  // when it is read. Chrome and Edge on iPhone resize the page for the
+  // keyboard, and they can report the visual viewport's new height while
+  // `innerHeight` still holds the old one: the inset read the keyboard's
+  // height, and since nothing on the visual viewport changed again, it stayed.
+  // The shell, `100dvh` minus that inset, then shrank to its content
+  // region's padding, and iOS clips the fixed phone case chat, a DOM child of
+  // that region, to its box: a black chat with the keyboard up, from the
+  // second open on (Arthur's recordings 3 and 5, 16 and 17 October 2026:
+  // content h 56 on every black frame, h 337 on every drawn one). The
+  // window's resize comes when `innerHeight` changes, so the inset is read
+  // again from numbers that agree.
+  update();
+  viewport.addEventListener('resize', update);
+  viewport.addEventListener('scroll', update);
+  window.addEventListener('resize', update);
+  document.addEventListener('focusout', onFocusOut);
+  document.addEventListener('focusin', publishVisible);
 
-    update();
-    viewport.addEventListener('resize', update);
-    viewport.addEventListener('scroll', update);
-    document.addEventListener('focusout', onFocusOut);
-    document.addEventListener('focusin', publishVisible);
-
-    return () => {
-      viewport.removeEventListener('resize', update);
-      viewport.removeEventListener('scroll', update);
-      document.removeEventListener('focusout', onFocusOut);
-      document.removeEventListener('focusin', publishVisible);
-      root.style.removeProperty('--keyboard-inset');
-      root.style.removeProperty('--visual-height');
-      root.style.removeProperty('--visual-top');
-    };
-  }, []);
+  return () => {
+    viewport.removeEventListener('resize', update);
+    viewport.removeEventListener('scroll', update);
+    window.removeEventListener('resize', update);
+    document.removeEventListener('focusout', onFocusOut);
+    document.removeEventListener('focusin', publishVisible);
+    root.style.removeProperty('--keyboard-inset');
+    root.style.removeProperty('--visual-height');
+    root.style.removeProperty('--visual-top');
+  };
 }
 
 /**

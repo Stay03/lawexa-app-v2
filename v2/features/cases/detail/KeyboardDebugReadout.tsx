@@ -85,6 +85,8 @@ export function KeyboardDebugReadout() {
       const heldHeight = card?.style.getPropertyValue('--v2-case-chat-held-height') ?? '';
       const heldPad = card?.style.getPropertyValue('--v2-case-chat-held-pad') ?? '';
       const box = composerFocused ? active.getBoundingClientRect() : null;
+      const shell = document.querySelector<HTMLElement>('.v2-shell');
+      const shellHeight = shell ? shell.offsetHeight : 'none';
       const slot = card?.firstElementChild ?? null;
       const composer = card?.lastElementChild ?? null;
       output.textContent = [
@@ -92,6 +94,9 @@ export function KeyboardDebugReadout() {
         `t ${Math.round(performance.now() % 100000)}`,
         `since focus ${ms(performance.now() - focusedAt)}`,
         `vv.top+h ${ms(published)}`,
+        // The shell's height is `100dvh` minus this inset. Near the top, where
+        // the autofill bar never covers it (it hid the shell line in recording 5).
+        `kb inset ${root.getPropertyValue('--keyboard-inset') || 'none'} shell h ${shellHeight}`,
         `card h ${card ? card.offsetHeight : 'none'}`,
         `held ${heldTop || heldHeight ? `${heldTop} ${heldHeight}` : 'none'}`,
         `rising ${card?.getAttribute('data-keyboard') ?? 'no'}`,
@@ -164,6 +169,7 @@ export function KeyboardDebugReadout() {
     viewport?.addEventListener('resize', change);
     viewport?.addEventListener('scroll', change);
     window.addEventListener('scroll', change);
+    window.addEventListener('resize', change);
     document.addEventListener('focusin', onFocusIn);
     document.addEventListener('focusout', change);
     return () => {
@@ -172,6 +178,7 @@ export function KeyboardDebugReadout() {
       viewport?.removeEventListener('resize', change);
       viewport?.removeEventListener('scroll', change);
       window.removeEventListener('scroll', change);
+      window.removeEventListener('resize', change);
       document.removeEventListener('focusin', onFocusIn);
       document.removeEventListener('focusout', change);
     };
