@@ -61,17 +61,32 @@ async function liveCommit() {
  * LAWEXA_ASSET_TOKEN in the same push), and WARNS AND PASSES when the live manifest cannot be read (a first
  * deploy, or a site that is down and needs this very fix), so a fix can always ship. The after-deploy
  * compare stays the second net.
+ *
+ * THE OUTCOME IS SERVED. Nobody here reads the server's build log, so the step writes what it did into the
+ * manifest itself, as `build_check`: "passed", "passed:token-changed", "skipped:<reason>" or
+ * "not_checked:<reason>" (a failure never deploys, so it is never served). The after step prints it and
+ * exits non-zero when it is not a pass, so a check that silently did not run on production shows at push time.
  */
+const MANIFEST = join('public', 'asset-hashes.json');
+
+function record(outcome) {
+  const current = JSON.parse(readFileSync(MANIFEST, 'utf8'));
+  writeFileSync(MANIFEST, `${JSON.stringify({ ...current, build_check: outcome })}\n`);
+}
+
 async function buildCheck() {
   const setting = process.env.LAWEXA_ASSET_CHECK_ORIGIN?.trim();
   const onServer = Boolean(process.env.SOURCE_COMMIT || process.env.COOLIFY_GIT_COMMIT_SHA);
   const origin = setting === 'off' ? null : setting || (onServer ? process.env.NEXT_PUBLIC_APP_URL?.trim() : null);
   if (!origin) {
-    console.log('check-live-assets build: skipped (not a server build, or LAWEXA_ASSET_CHECK_ORIGIN=off)');
+    const reason = setting === 'off' ? 'off' : onServer ? 'no-app-url' : 'not-a-server-build';
+    console.log(`check-live-assets build: skipped (${reason})`);
+    record(`skipped:${reason}`);
     return;
   }
-  const next = JSON.parse(readFileSync(join('public', 'asset-hashes.json'), 'utf8'));
+  const next = JSON.parse(readFileSync(MANIFEST, 'utf8'));
   let live;
+  let unread = '';
   try {
     const response = await fetch(`${origin.replace(/\/$/, '')}/asset-hashes.json?t=${Date.now()}`, {
       headers: { 'User-Agent': UA, Accept: 'application/json' },
@@ -79,20 +94,26 @@ async function buildCheck() {
       signal: AbortSignal.timeout(15_000),
     });
     live = response.ok ? await response.json() : null;
-    if (!live) console.warn(`\n!!! check-live-assets build: ${origin}/asset-hashes.json answered ${response.status}; NOT CHECKED. Run the after-deploy compare.\n`);
+    if (!live) unread = `http-${response.status}`;
   } catch (error) {
-    console.warn(`\n!!! check-live-assets build: could not read ${origin}/asset-hashes.json (${error.message}); NOT CHECKED. Run the after-deploy compare.\n`);
+    unread = error.name === 'TimeoutError' ? 'timeout' : 'unreachable';
   }
-  if (!live) return;
+  if (!live) {
+    console.warn(`\n!!! check-live-assets build: could not read ${origin}/asset-hashes.json (${unread}); NOT CHECKED. Run the after-deploy compare.\n`);
+    record(`not_checked:${unread}`);
+    return;
+  }
   if (live.assetToken !== next.assetToken) {
     console.log(`check-live-assets build: token ${live.assetToken} -> ${next.assetToken}, every address is new; nothing can be stale`);
+    record('passed:token-changed');
     return;
   }
   const liveFile = join(tmpdir(), `asset-hashes-live-${Date.now()}.json`);
   writeFileSync(liveFile, JSON.stringify(live));
   console.log(`check-live-assets build: against ${origin} (live ${live.deploymentId})`);
-  const result = spawnSync(process.execPath, [join(import.meta.dirname, 'check-static-names.mjs'), join('public', 'asset-hashes.json'), liveFile], { stdio: 'inherit' });
+  const result = spawnSync(process.execPath, [join(import.meta.dirname, 'check-static-names.mjs'), MANIFEST, liveFile], { stdio: 'inherit' });
   if (result.status !== 0) process.exit(1);
+  record('passed');
 }
 
 try {
@@ -122,19 +143,23 @@ try {
       console.error(`live is ${commit} but serves no /asset-hashes.json: the build did not run scripts/write-asset-hashes.mjs (is the platform running "npm run build"?)`);
       process.exit(2);
     }
-    console.log(`live is ${commit}, token ${after.assetToken}, ${Object.keys(after.files ?? {}).length} files`);
+    const inBuild = typeof after.build_check === 'string' ? after.build_check : 'missing';
+    const inBuildPassed = inBuild === 'passed' || inBuild.startsWith('passed:');
+    console.log(`live is ${commit}, token ${after.assetToken}, ${Object.keys(after.files ?? {}).length} files, in-build check: ${inBuild}`);
     if (before.missing) {
       console.log('nothing to compare: the build before this one had no manifest. This deploy starts the record; the next push is checked.');
       process.exit(0);
     }
+    if (!inBuildPassed) console.error(`the in-build check did not pass on the server (${inBuild}): it did not guard this deploy.`);
     if (before.assetToken !== after.assetToken) {
       console.log(`the token changed (${before.assetToken} -> ${after.assetToken}): every address is new, so nothing can be stale.`);
-      process.exit(0);
+      process.exit(inBuildPassed ? 0 : 4);
     }
     const afterFile = join(tmpdir(), `asset-hashes-after-${Date.now()}.json`);
     writeFileSync(afterFile, JSON.stringify(after));
     const result = spawnSync(process.execPath, [join(import.meta.dirname, 'check-static-names.mjs'), afterFile, file], { stdio: 'inherit' });
-    process.exit(result.status ?? 2);
+    // The compare's own failure first; then a deploy the in-build check did not guard.
+    process.exit(result.status !== 0 ? (result.status ?? 2) : inBuildPassed ? 0 : 4);
   } else {
     console.error('usage: node scripts/check-live-assets.mjs save <before.json>\n       node scripts/check-live-assets.mjs after <before.json> <pushed sha>');
     process.exit(2);
