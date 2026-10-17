@@ -24,6 +24,7 @@ import {
   threadStatusFilterLabel,
   threadStatusFilterParam,
   threadStatusFooter,
+  threadStatusHeaderPerson,
   threadStatusPerson,
   threadStatusQuiet,
   threadStatusTriggerLabel,
@@ -94,6 +95,32 @@ test('Needs Action names who needs to act; no other status does', () => {
   assert.equal(threadStatusPerson(status({ value: 'needs_action' })), null);
   assert.equal(threadStatusPerson(status({ value: 'working', needs_action_from: TOLU })), null);
   assert.equal(threadStatusPerson(null), null);
+});
+
+test('the header pill names the person by first name only; everything else keeps the full name', () => {
+  // Arthur, 17 October 2026: "first name", so more of a long title shows.
+  const needs = (name: string) => status({ value: 'needs_action', needs_action_from: { uuid: 'u2', name } });
+  assert.equal(threadStatusHeaderPerson(needs('User2 Tester')), 'User2');
+  assert.equal(threadStatusHeaderPerson(needs('  Ada   Obi  ')), 'Ada');
+  assert.equal(threadStatusHeaderPerson(needs('Tolu')), 'Tolu', 'a one-word name whole');
+  assert.equal(threadStatusHeaderPerson(status({ value: 'working', needs_action_from: TOLU })), null);
+  assert.equal(threadStatusHeaderPerson(null), null);
+  // The full name stays in the rows, the menu and the spoken label.
+  assert.equal(threadStatusPerson(needs('User2 Tester')), 'User2 Tester');
+  assert.equal(
+    threadStatusTriggerLabel(needs('User2 Tester'), null),
+    'Status: Needs Action, User2 Tester. Change status',
+  );
+  const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
+  assert.equal(control.match(/person=\{threadStatusHeaderPerson\(status\)\}/g)?.length, 2);
+  assert.doesNotMatch(control, /person=\{threadStatusPerson\(status\)\}/);
+  for (const parts of [
+    ['v2', 'features', 'channels', 'threads', 'ThreadsSheet.tsx'],
+    ['v2', 'features', 'channels', 'my-channels', 'MyThreadRow.tsx'],
+    ['v2', 'features', 'spaces', 'detail', 'SpaceThreadRow.tsx'],
+  ]) {
+    assert.match(read(...parts), /person=\{threadStatusPerson\(status\)\}/, parts.at(-1));
+  }
 });
 
 test('the PATCH body is built in one place, the person only with Needs Action', () => {
@@ -670,4 +697,16 @@ test('the status list is a real radio group on both surfaces: one tab stop, arro
   const handler = read('v2', 'features', 'channels', 'threads', 'radio-focus.ts');
   assert.match(handler, /radios\[target\]\?\.focus\(\);/);
   assert.doesNotMatch(handler, /choose\(|press\(|click\(/);
+});
+
+test('a thread with a status keeps its Pinned and Saved lenses in More, at every width', () => {
+  // Arthur, 17 October 2026: "move the pin and save to the more so there is
+  // more space". They open the same panels from the menu.
+  const header = read('v2', 'features', 'channels', 'screen', 'PlaceHeader.tsx');
+  assert.match(header, /<ActionCluster lenses=\{lenses\} menu=\{menu\} lensesInMenu=\{renderStatus !== undefined\} \/>/);
+  assert.match(header, /const lensesOnlyInMenu = lensesFoldIntoMenu && lensesInMenu;/);
+  assert.match(header, /\{lenses\.length > 0 && !lensesOnlyInMenu && \(/);
+  assert.match(header, /<DropdownMenuGroup className=\{lensesOnlyInMenu \? undefined : 'md:hidden'\}>/);
+  // Each item is the lens's own action and label.
+  assert.match(header, /<DropdownMenuItem key=\{lens\.id\} onClick=\{lens\.onSelect\}>\s*<lens\.icon aria-hidden className="size-4" \/>\s*\{lens\.label\}/);
 });

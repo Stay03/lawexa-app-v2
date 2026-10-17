@@ -489,7 +489,7 @@ export function ChannelPlaceHeader({
           </div>
 
           {/* ── Actions ──────────────────────────────────────────────── */}
-          <ActionCluster lenses={lenses} menu={menu} />
+          <ActionCluster lenses={lenses} menu={menu} lensesInMenu={renderStatus !== undefined} />
         </div>
 
         {/* The description, revealed. `EnablePushNudge`'s symmetric grid-rows
@@ -605,15 +605,21 @@ function BackChip({ parent }: { parent: HeaderParent }) {
 function ActionCluster({
   lenses,
   menu,
+  lensesInMenu = false,
 }: {
   lenses: readonly HeaderLens[];
   menu?: ReactNode;
+  /** The lenses live in More at every width (a thread with a status line,
+   *  Arthur, 17 October 2026: "move the pin and save to the more so there is
+   *  more space" for the title). Only with a menu to hold them. */
+  lensesInMenu?: boolean;
 }) {
   const lensesFoldIntoMenu = menu !== undefined && lenses.length > 0;
+  const lensesOnlyInMenu = lensesFoldIntoMenu && lensesInMenu;
 
   return (
     <div className="flex shrink-0 items-center gap-1.5">
-      {lenses.length > 0 && (
+      {lenses.length > 0 && !lensesOnlyInMenu && (
         <div
           className={cn(
             'items-center gap-0.5 rounded-lg border p-0.5',
@@ -659,7 +665,7 @@ function ActionCluster({
                 row, so the separator leaves with them and the menu never opens
                 on a rule with nothing above it. */}
             {lensesFoldIntoMenu && (
-              <DropdownMenuGroup className="md:hidden">
+              <DropdownMenuGroup className={lensesOnlyInMenu ? undefined : 'md:hidden'}>
                 {lenses.map((lens) => (
                   <DropdownMenuItem key={lens.id} onClick={lens.onSelect}>
                     <lens.icon aria-hidden className="size-4" />

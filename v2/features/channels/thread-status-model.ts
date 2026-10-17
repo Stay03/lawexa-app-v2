@@ -108,6 +108,17 @@ export function threadStatusPerson(status: ThreadStatus | null): string | null {
   return status.needs_action_from?.name?.trim() || null;
 }
 
+/**
+ * The person in a thread HEADER's pill: the first word of their name ("User2"
+ * for "User2 Tester"), a one-word name whole (Arthur, 17 October 2026: "first
+ * name", so more of the title shows beside the pill). The status menu, the
+ * rows, the Threads sheet and the timeline keep the full name, and the
+ * header's spoken label still says it whole.
+ */
+export function threadStatusHeaderPerson(status: ThreadStatus | null): string | null {
+  return threadStatusPerson(status)?.split(/\s+/)[0] ?? null;
+}
+
 /** "2m ago", "just now", or `''` before the clock has a reading. */
 function agoPhrase(iso: string, now: number): string {
   const age = now > 0 ? formatRelativeTime(iso, now) : '';

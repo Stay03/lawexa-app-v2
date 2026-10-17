@@ -25,7 +25,7 @@ import {
   knownThreadStatus,
   threadStatusErrorText,
   threadStatusFooter,
-  threadStatusPerson,
+  threadStatusHeaderPerson,
   threadStatusQuiet,
   threadStatusTriggerLabel,
   type ThreadStatusChoice,
@@ -106,7 +106,7 @@ export function ThreadStatusControl({
         <ThreadStatusChip
           size={surface === 'sheet' ? 'sm' : 'md'}
           value={status.value}
-          person={threadStatusPerson(status)}
+          person={threadStatusHeaderPerson(status)}
           quiet={quiet}
           fit
         />
@@ -189,7 +189,7 @@ function TriggerFace({
       <ThreadStatusChip
         size={compact ? 'sm' : 'md'}
         value={status.value}
-        person={threadStatusPerson(status)}
+        person={threadStatusHeaderPerson(status)}
         quiet={quiet}
         fit
       />
