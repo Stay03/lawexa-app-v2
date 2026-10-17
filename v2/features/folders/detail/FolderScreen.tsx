@@ -41,6 +41,8 @@ import {
   type DeletableFolder,
 } from '../folder-mutations';
 import { FolderPublicMark, FolderTile } from '../folder-bits';
+import { useFolderPeek } from '../folder-peek';
+import './folder-arrive.css';
 import { FolderNameDialog } from '../FolderNameDialog';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { FolderRow } from '../list/FolderRow';
@@ -53,7 +55,6 @@ import { parseFolderItemTab, type FolderItemTab } from './item-tabs';
 import { folderStreamState } from './stream-state';
 import {
   FolderDeletingState,
-  FolderDetailSkeleton,
   FolderEmptyState,
   FolderErrorState,
   FolderItemsErrorState,
@@ -284,7 +285,13 @@ function FolderBody({ uuid }: { uuid: string }) {
   // in the header exactly as it does in the h1, instead of leaving the header
   // empty (L6). `folderRow` is pure, so memoising it here costs one object.
   const headerRow = useMemo(() => (folder ? folderRow(folder) : null), [folder]);
-  const headerTitle = headerRow?.name ?? null;
+  // Before the folder answers, a tapped row's name (`folder-peek.ts`, speed
+  // step 5): on a phone the bar is where the name is read, so it shows at once.
+  const peek = useFolderPeek(uuid);
+  const headerTitle = headerRow?.name ?? peek?.name ?? null;
+  // The tile and the name already drawn stay still when the folder arrives;
+  // everything else fades (`folder-arrive.css`). Decided once, at mount.
+  const [arrival] = useState(() => (folderQuery.isPending && peek !== null ? 'peeked' : 'fade'));
   useEffect(() => {
     if (!headerTitle) return;
     setHeaderContext({ title: headerTitle, confidential: false });
@@ -397,13 +404,9 @@ function FolderBody({ uuid }: { uuid: string }) {
     );
   }
 
-  if (folderQuery.isPending) {
-    return (
-      <div className={LIST_COLUMN}>
-        <FolderDetailSkeleton />
-      </div>
-    );
-  }
+  // The route's loading shape, a tapped row's tile and name included, so the
+  // hand-off from the boundary to this wait moves nothing.
+  if (folderQuery.isPending) return <FolderDetailFallback />;
 
   if (folderQuery.isError || !folder) {
     const apiError = folderQuery.error ? extractApiError(folderQuery.error) : null;
@@ -481,7 +484,13 @@ function FolderBody({ uuid }: { uuid: string }) {
 
   return (
     <div className={LIST_COLUMN}>
-      <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+      <div
+        className={
+          arrival === 'peeked'
+            ? 'v2-folder-arrive-peeked'
+            : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300'
+        }
+      >
         <FolderBreadcrumb folder={folder} />
 
         {/* `sm:mt-3` — below `sm:` the trail above renders nothing (the shell's

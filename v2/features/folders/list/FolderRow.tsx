@@ -8,6 +8,7 @@ import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { FolderPublicMark, FolderTile } from '../folder-bits';
 import { FolderActionsMenu } from '../FolderActionsMenu';
 import { folderCountsLabel, type FolderRowModel } from '../folder-row-model';
+import { rememberFolderPeek } from '../folder-peek';
 
 /**
  * FolderRow — one folder, in the house two-zone grammar.
@@ -136,7 +137,9 @@ export const FolderRow = memo(function FolderRow({
             {identity}
           </button>
         ) : (
-          <Link href={row.href} className={identityClass}>
+          // The folder page draws this row's tile and name at once, before any
+          // request answers (`folder-peek.ts`, speed step 5).
+          <Link href={row.href} onClick={() => rememberFolderPeek(row)} className={identityClass}>
             {identity}
           </Link>
         )}

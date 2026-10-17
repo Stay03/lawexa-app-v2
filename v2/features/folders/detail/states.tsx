@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { FolderOpen, FolderX, Search, WifiOff, type LucideIcon } from 'lucide-react';
 
@@ -117,7 +118,15 @@ export function FolderNextPageSkeleton() {
  * turns out to hold, and reserving space for a control that may never arrive
  * would leave a permanent gap above every single-type folder.
  */
-export function FolderDetailSkeleton() {
+export function FolderDetailSkeleton({
+  tile,
+  name,
+}: {
+  /** The tile and the name already known (a tapped row's,
+   *  `FolderDetailFallback`), drawn in place of their bars. */
+  tile?: ReactNode;
+  name?: ReactNode;
+} = {}) {
   return (
     <div aria-hidden className="flex flex-col">
       {/* THE SILHOUETTE FOLLOWS THE LIVE HEADER, WHICH LOST TWO THINGS ON A
@@ -128,9 +137,9 @@ export function FolderDetailSkeleton() {
           rows below them jumping at the hand-off. */}
       <Skeleton className="hidden h-4 w-40 rounded sm:block" />
       <div className="flex items-start gap-3 sm:mt-4">
-        <Skeleton className="size-11 shrink-0 rounded-xl" />
+        {tile ?? <Skeleton className="size-11 shrink-0 rounded-xl" />}
         <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-          <Skeleton className="hidden h-6 w-3/5 rounded md:block" />
+          {name ?? <Skeleton className="hidden h-6 w-3/5 rounded md:block" />}
           <Skeleton className="h-3.5 w-40 rounded" />
         </div>
       </div>
