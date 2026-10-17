@@ -7,7 +7,7 @@ import { QueryClient } from '@tanstack/react-query';
 import type { ConversationData, ConversationListItem } from '@/types/chat';
 import { makeOptimisticConversation } from '../cache';
 import { conversationsQueries } from '../queries';
-import { earlyRuling } from './early-ruling';
+import { earlyRuling, seedEarlyRuling } from './early-ruling';
 import {
   clearRouteComposer,
   publishRouteComposer,
@@ -86,6 +86,24 @@ test('a row without can_send falls back to ownership, and the create flow’s pl
   client.clear();
 });
 
+test('a chat the reader just started is theirs from the move’s first frame (the create seed)', () => {
+  const client = new QueryClient();
+  // Its only list row is the create flow's placeholder (owner 0), which says nothing.
+  assert.equal(earlyRuling(client, 'new-1', 7), null);
+  seedEarlyRuling('new-1', { ownerId: 7, canSend: true, viewOnlyReason: 'shared', spaceUuid: 's-1', isConfidential: false });
+  assert.deepEqual(earlyRuling(client, 'new-1', 7), {
+    ownerId: 7,
+    canSend: true,
+    viewOnlyReason: 'shared',
+    spaceUuid: 's-1',
+    isConfidential: false,
+  });
+  // The home and space boxes seed it, except for a hard (confidential) load.
+  const home = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
+  assert.match(home, /if \(!result\.hardNavigate && userId !== null\) \{\s*seedEarlyRuling\(result\.conversationId, \{/);
+  client.clear();
+});
+
 /* ── The store the screen publishes to ────────────────────────────────────── */
 
 const surfaceFor = (conversationId: string): RouteComposerSurface => ({
@@ -152,7 +170,12 @@ test('the box is the shell’s, beside the route content, for a chat route or a 
 
 test('the box floats over the content row, above the tap’s frame and under the phone bar', () => {
   const css = read('v2', 'shell', 'shell.css');
-  assert.match(css, /\.v2-shell__dock:has\(\[data-v2-chat-dock\]\) \{\s*grid-row: 2;\s*align-self: end;\s*z-index: 41;\s*pointer-events: none;\s*\}/);
+  // The content's own row AND column: on a taken row with no column the dock
+  // was auto-placed into a new column, half the width (check film, 17 October).
+  assert.match(
+    css,
+    /\.v2-shell__dock:has\(\[data-v2-chat-dock\]\) \{\s*grid-row: 2;[\s\S]*?grid-column: 1 \/ -1;\s*align-self: end;\s*z-index: 41;\s*pointer-events: none;\s*\}/,
+  );
   // Above the move-first frame (fixed, z-40) and under the phone's open bar.
   assert.match(read('v2', 'shell', 'move-first.tsx'), /"v2-move-first fixed z-40 /);
   assert.match(css, /\.v2-shell__header \{\s*align-self: start;\s*z-index: 42;/);

@@ -41,6 +41,8 @@ import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
+import { seedEarlyRuling } from '@/v2/features/conversations/conversation/early-ruling';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { extractApiError, extractBlockedReason } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { UserRole } from '@/types/auth';
@@ -227,6 +229,7 @@ export function HomeComposer({
 }: HomeComposerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { userId } = useV2Session();
   const fileInputRef = useRef<HTMLInputElement>(null);
   useImperativeHandle(handle, () => ({ attach: () => fileInputRef.current?.click() }), []);
 
@@ -442,6 +445,19 @@ export function HomeComposer({
       }
 
       const target = `/c/${result.conversationId}?init=1`;
+      // The new chat is the reader's own and they may send in it, so the
+      // chat's docked box (ChatDock) is the real one from the move's first
+      // frame, held while the first answer streams, not a skeleton until the
+      // chat's screen says so (message box B).
+      if (!result.hardNavigate && userId !== null) {
+        seedEarlyRuling(result.conversationId, {
+          ownerId: userId,
+          canSend: true,
+          viewOnlyReason: 'shared',
+          spaceUuid: space?.uuid ?? null,
+          isConfidential: false,
+        });
+      }
       if (result.hardNavigate) {
         // Confidential / redacted: a fresh load so v1's session mode store hydrates
         // the mark we wrote, regardless of whether its module was already resident.

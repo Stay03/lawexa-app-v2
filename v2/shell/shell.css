@@ -166,6 +166,11 @@ html.v2-document-lock body {
    context, so the transcript's own layers stay under it. */
 .v2-shell__dock:has([data-v2-chat-dock]) {
   grid-row: 2;
+  /* The content's own column, named: a grid item placed on a taken row with
+     no column is auto-placed into a NEW column beside the content, which put
+     the pill in the right half and squeezed the transcript into the left
+     (check film, 17 October 2026). */
+  grid-column: 1 / -1;
   align-self: end;
   z-index: 41;
   pointer-events: none;

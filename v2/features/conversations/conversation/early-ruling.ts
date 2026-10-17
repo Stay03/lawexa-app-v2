@@ -15,9 +15,14 @@ import { canSendIn, viewOnlyReason, type ViewOnlyReason } from './space-turn';
  * frame; once the screen publishes its own ruling (`route-composer.ts`), that
  * one wins.
  *
- * `null` when nothing cached knows the chat: a cold open from a pasted link or
- * a reload, where the box waits as its skeleton, as it always has. The create
- * flow's placeholder row (owner 0) is not an answer, so it is `null` too.
+ * A chat the reader has just started (the home's box, a space's box) is in no
+ * list yet but its placeholder row, which says nothing (owner 0). The box that
+ * started it seeds the answer it knows for certain (`seedEarlyRuling`: the
+ * reader owns it and may send), so the new chat's box is real from the move's
+ * first frame instead of a skeleton.
+ *
+ * `null` when nothing knows the chat: a cold open from a pasted link or a
+ * reload, where the box waits as its skeleton, as it always has.
  *
  * Pure: a read of the query cache, no hooks, so it runs under node:test.
  */
@@ -29,6 +34,16 @@ export interface EarlyRuling {
   isConfidential: boolean;
 }
 
+/** The rulings seeded by a create, by conversation id. Module memory: a tab
+ *  starts a handful of chats at most, and a seed is only read until the
+ *  chat's record is cached. */
+const seeded = new Map<string, EarlyRuling>();
+
+/** A chat the reader just created: theirs, and they may send in it. */
+export function seedEarlyRuling(conversationId: string, ruling: EarlyRuling): void {
+  seeded.set(conversationId, ruling);
+}
+
 export function earlyRuling(
   queryClient: QueryClient,
   conversationId: string,
@@ -38,6 +53,8 @@ export function earlyRuling(
     conversationsQueries.detail({ conversationId, viewerId }).queryKey,
   );
   if (detail && detail.user_id > 0) {
+    // The record is the answer from here on; the seed is not needed again.
+    seeded.delete(conversationId);
     const isOwner = viewerId !== null && detail.user_id === viewerId;
     return {
       ownerId: detail.user_id,
@@ -47,6 +64,8 @@ export function earlyRuling(
       isConfidential: Boolean(detail.is_confidential),
     };
   }
+  const seed = seeded.get(conversationId);
+  if (seed) return seed;
   const row = listedConversation(queryClient, conversationId);
   if (!row) return null;
   const isOwner = viewerId !== null && row.user_id === viewerId;
