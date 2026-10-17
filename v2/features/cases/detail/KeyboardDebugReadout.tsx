@@ -45,6 +45,23 @@ export function KeyboardDebugReadout() {
       return `top ${Math.round(rect.top)} h ${Math.round(rect.height)}`;
     };
 
+    /** An element as its tag, first class, z-index, opacity and position (and
+     *  `hidden` when not displayed): no text, no ids of people. */
+    const describe = (element: Element | null): string => {
+      if (!element) return 'none';
+      const style = getComputedStyle(element);
+      const classes = [...element.classList].slice(0, 1).join('.');
+      return `${element.tagName.toLowerCase()}${classes ? '.' + classes : ''} ${style.display === 'none' ? 'hidden ' : ''}z${style.zIndex} o${style.opacity} ${style.position.slice(0, 3)}`;
+    };
+    const centreOf = (element: Element): { x: number; y: number } => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    };
+    const stackAt = (point: { x: number; y: number } | null): string =>
+      point
+        ? document.elementsFromPoint(point.x, point.y).slice(0, 2).map(describe).join(' > ') || 'nothing'
+        : 'none';
+
     // When the last focus landed, so a frame's distance from the tap is read
     // off the recording.
     let focusedAt = Number.NaN;
@@ -99,6 +116,16 @@ export function KeyboardDebugReadout() {
         `header display ${bar ? getComputedStyle(bar).display : 'none'}`,
         `X ${rectOf(close)}`,
         `composer focused ${composerFocused ? 'yes' : 'no'}`,
+        // WHAT SITS ON TOP. The top two elements under the card's centre and
+        // the box's centre, and the shell's rows: a blank card with its
+        // outlines' top edge still showing (recording 3) is covered by
+        // something, and these name it. Hit testing skips anything with
+        // `pointer-events: none`, so the shell rows are listed as well.
+        `at card ${stackAt(card ? centreOf(card) : null)}`,
+        `at box ${stackAt(box ? { x: box.left + box.width / 2, y: box.top + box.height / 2 } : null)}`,
+        `shell ${describe(document.querySelector('.v2-shell'))} ${rectOf(document.querySelector('.v2-shell'))}`,
+        `dock ${describe(document.querySelector('.v2-shell__dock'))} ${rectOf(document.querySelector('.v2-shell__dock'))}`,
+        `content el ${describe(content)}`,
       ].join('\n');
     };
 
@@ -162,7 +189,7 @@ export function KeyboardDebugReadout() {
       <pre
         ref={outputRef}
         aria-hidden
-        className="pointer-events-none fixed left-0 top-[var(--visual-top,0px)] z-[2147483647] m-0 bg-black/70 px-1 py-0.5 font-mono text-[9px] leading-tight text-white"
+        className="pointer-events-none fixed left-0 top-[var(--visual-top,0px)] z-[2147483647] m-0 max-w-[55vw] bg-black/70 px-1 py-0.5 font-mono text-[9px] leading-tight break-all whitespace-pre-wrap text-white"
       />
     </>,
     document.body,
