@@ -27,7 +27,7 @@ import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import type { RosterEntry } from './member-colour';
-import { rosterFromRecord } from './record-roster';
+import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { MentionOptions } from '@/v2/features/channels/model';
@@ -821,14 +821,7 @@ export function useConversationController(
   });
   const rosterRows = rosterQuery.data?.data;
   const spaceRoster = useMemo<readonly RosterEntry[] | null>(
-    () =>
-      showAuthors && rosterRows
-        ? rosterRows.map((member) => ({
-            uuid: member.user.uuid,
-            owner: member.role === 'owner' || member.content_role === 'owner',
-            joinedAt: member.joined_at ?? member.created_at,
-          }))
-        : null,
+    () => (showAuthors && rosterRows ? rosterFromMembers(rosterRows) : null),
     [showAuthors, rosterRows],
   );
   // The record's own roster (backend, 17 October 2026): the colours from it

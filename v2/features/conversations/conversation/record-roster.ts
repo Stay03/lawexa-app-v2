@@ -1,4 +1,5 @@
 import type { SpaceRosterEntry } from '@/types/chat';
+import type { Member } from '@/types/collab';
 import type { RosterEntry } from './member-colour';
 
 /**
@@ -26,6 +27,23 @@ export function rosterFromRecord(rows: readonly SpaceRosterEntry[]): RosterEntry
     uuid: row.user_uuid,
     owner: row.role === 'owner' || row.content_role === 'owner',
     joinedAt: row.joined_at,
+  }));
+}
+
+/**
+ * The members read in the same terms, and from the same fields: `joined_at`
+ * as the server stores it, null included. It used to fall back to the row's
+ * `created_at`, which the record does not carry, so a member with no join time
+ * sorted by creation on one list and last on the other, and could take a
+ * different colour in each (techlead, 17 October 2026). With both read alike,
+ * `memberColourIndex` orders the same people the same way, whichever list
+ * coloured them.
+ */
+export function rosterFromMembers(rows: readonly Member[]): RosterEntry[] {
+  return rows.map((member) => ({
+    uuid: member.user.uuid,
+    owner: member.role === 'owner' || member.content_role === 'owner',
+    joinedAt: member.joined_at,
   }));
 }
 

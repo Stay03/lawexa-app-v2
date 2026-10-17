@@ -96,7 +96,8 @@ test('the wiring: roster by uuid, the reader\'s own rows by the reader\'s uuid, 
   const controller = readHere('useConversationController.ts');
   // Enabled early on the cached lists' word (colour-settle.test.ts).
   assert.match(controller, /spacesQueries\.members\(spaceUuid \?\? '', \{ viewerId: serverUserId, per_page: 100 \}\),\s*(\/\/[^\n]*\n\s*)*enabled: spaceUuid !== null && \(detailData === null \|\| showAuthors\),/);
-  assert.match(controller, /owner: member\.role === 'owner' \|\| member\.content_role === 'owner',/);
+  // The members read and the record's roster are mapped alike (record-roster.ts).
+  assert.match(controller, /showAuthors && rosterRows \? rosterFromMembers\(rosterRows\) : null/);
   const screen = readHere('ConversationScreen.tsx');
   // No roster from the record or the members read: no colours (record-roster.test.ts).
   assert.match(screen, /return roster \? memberColourIndex\(roster, asked\) : null;/);
