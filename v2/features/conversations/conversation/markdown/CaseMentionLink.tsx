@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ComponentProps, type ReactNode } from 'react';
-import Link from 'next/link';
+import { MoveFirstLink } from '@/v2/shell/move-first';
 import type { ExtraProps } from 'react-markdown';
 
 import { cn } from '@/lib/utils';
@@ -105,9 +105,9 @@ function CaseMention({ slug, children }: { slug: string; children: ReactNode }) 
   // on the client the anchor upgrades in place to its interactive variant.
   if (pointer === null) {
     return (
-      <Link href={casePath} className={MENTION_TRIGGER_CLASS}>
+      <MoveFirstLink href={casePath} kind="case" className={MENTION_TRIGGER_CLASS}>
         {children}
-      </Link>
+      </MoveFirstLink>
     );
   }
 
@@ -141,15 +141,18 @@ function DesktopCaseHoverCard({
   casePath: string;
   children: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <HoverCard openDelay={350} closeDelay={250}>
+    <HoverCard open={open} onOpenChange={setOpen} openDelay={350} closeDelay={250}>
       <HoverCardTrigger asChild>
-        <Link href={casePath} className={MENTION_TRIGGER_CLASS}>
+        {/* Moves first: the case's frame paints in the click, as a case row's
+            does ("a case opens at once", 17 October 2026). */}
+        <MoveFirstLink href={casePath} kind="case" onMove={() => setOpen(false)} className={MENTION_TRIGGER_CLASS}>
           {children}
-        </Link>
+        </MoveFirstLink>
       </HoverCardTrigger>
       <HoverCardContent side="top" align="start" className={MENTION_CONTENT_WIDTH}>
-        <CasePreview slug={slug} href={casePath} />
+        <CasePreview slug={slug} href={casePath} onOpen={() => setOpen(false)} />
       </HoverCardContent>
     </HoverCard>
   );
@@ -203,7 +206,7 @@ function TouchCasePopover({
           'gap-0 overflow-hidden p-0 motion-reduce:animate-none!',
         )}
       >
-        <CasePreview slug={slug} href={casePath} />
+        <CasePreview slug={slug} href={casePath} onOpen={() => setOpen(false)} />
       </PopoverContent>
     </Popover>
   );

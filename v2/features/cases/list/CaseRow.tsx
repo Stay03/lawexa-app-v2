@@ -1,11 +1,11 @@
 'use client';
 
 import { memo } from 'react';
-import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { FLAG_W, FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { MoveFirstLink } from '@/v2/shell/move-first';
 import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
 import { useCaseRowIntent } from './use-case-row-intent';
 import { rememberCasePeek } from '../case-peek';
@@ -74,8 +74,13 @@ export const CaseRow = memo(function CaseRow({
       style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
     >
       <div className="group relative flex items-start gap-2">
-        <Link
+        {/* Moves first: the tap paints the case's frame (its name, its skeleton
+            and the ask box) before any route work, as a chat's row does ("a case
+            opens at once", Stay, 17 October 2026). */}
+        <MoveFirstLink
           href={href}
+          kind="case"
+          title={row.title}
           prefetch={false}
           {...intent}
           // The case screen draws this row's name at once on a first open,
@@ -137,7 +142,7 @@ export const CaseRow = memo(function CaseRow({
               {row.holding}
             </p>
           ) : null}
-        </Link>
+        </MoveFirstLink>
 
         {/* Outside the link, so the star is its own control with its own
             accessible name rather than a click the row has to swallow. */}

@@ -51,7 +51,9 @@ test('the row leaves its facts on the tap, and both waits draw them', () => {
   const row = read('list', 'CaseRow.tsx');
   assert.match(row, /onClick=\{\(\) => \{\s*rememberCasePeek\(row\);\s*intent\.onClick\(\);\s*\}\}/);
   const fallback = read('detail', 'CaseFallback.tsx');
-  assert.match(fallback, /const peek = useCasePeek\(slugOf\(usePathname\(\)\)\);/);
+  // The route's boundary reads the slug from the address; the tap's frame passes its own.
+  assert.match(fallback, /return <CaseFallbackFor slug=\{slugOf\(usePathname\(\)\)\} \/>;/);
+  assert.match(fallback, /const peek = useCasePeek\(slug\);/);
   assert.match(fallback, /<CaseDocumentSkeleton masthead=\{peek \? <PeekMasthead peek=\{peek\} \/> : undefined\} \/>/);
   // The masthead's own classes and type, so the case arriving moves nothing.
   assert.match(fallback, /<p className="doc-kicker flex flex-wrap items-center gap-x-2 gap-y-1">/);

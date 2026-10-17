@@ -1129,9 +1129,14 @@ html.v2-document-lock [data-slot='sheet-content'][data-state='closed'] {
    gone in the same frame the chat's frame appears, with no exit over it and no
    snap-back (film, 10 October 2026). The attribute lives for one task, so a
    sheet opened later during the move is not hidden.
+   A popover or hover card counts too: a case citation's preview, whose "Open
+   case" moves first, sits above the frame's layer (z-50 over z-40) and goes
+   with it ("a case opens at once", 17 October 2026).
    -------------------------------------------------------------------------- */
 html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-overlay'],
-html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-content'] {
+html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-content'],
+html.v2-document-lock[data-v2-sheet-cut] [data-slot='popover-content'],
+html.v2-document-lock[data-v2-sheet-cut] [data-slot='hover-card-content'] {
   display: none;
 }
 

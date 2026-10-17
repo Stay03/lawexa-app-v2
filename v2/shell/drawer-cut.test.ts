@@ -44,7 +44,8 @@ test('on the current page or without the provider the sheet closes at once, as b
 });
 
 test('a v2 rule hides every sheet while the attribute is set', () => {
-  assert.match(css, /html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='sheet-overlay'\],\s*html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='sheet-content'\] \{\s*display: none;\s*\}/);
+  // A case citation's popover or hover card goes the same way (a case opens at once, 17 October 2026).
+  assert.match(css, /html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='sheet-overlay'\],\s*html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='sheet-content'\],\s*html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='popover-content'\],\s*html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='hover-card-content'\] \{\s*display: none;\s*\}/);
 });
 
 test('the drawer\'s chat rows close the drawer through onMove, not in the click', () => {

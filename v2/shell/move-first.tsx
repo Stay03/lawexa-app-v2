@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { flushSync } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { CaseFallbackFor, slugOf } from '@/v2/features/cases/detail/CaseFallback';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { ConversationFrame } from '@/v2/features/conversations/conversation/skeletons';
 import { conversationIdOf, warmConversation } from '@/v2/features/conversations/warm';
@@ -62,8 +63,9 @@ import { isTopLevelRoute } from './top-level-route';
  * keep the browser's default: Next only calls `onNavigate` for a plain click.
  */
 
-/** A destination's light frame. `title` is the row's own label, when it has one. */
-type MoveFirstFrame = ComponentType<{ title?: string }>;
+/** A destination's light frame. `title` is the row's own label, when it has one;
+ *  `href` is where the tap is going (the router is still on the origin). */
+type MoveFirstFrame = ComponentType<{ title?: string; href: string }>;
 
 function PageFrame() {
   return (
@@ -92,8 +94,20 @@ function ConversationMoveFrame() {
   );
 }
 
+/**
+ * A case: the case page's own loading shape (`CaseFallbackFor`), with the
+ * tapped row's name in the masthead and the "Ask about this case" box at the
+ * bottom, so a first tap on a case moves at once, as a chat does (Stay, 17
+ * October 2026). The route's loading boundary and the page draw the same
+ * shape in the same place, so the hand-off moves nothing.
+ */
+function CaseMoveFrame({ href }: { href: string }) {
+  return <CaseFallbackFor slug={slugOf(new URL(href, window.location.href).pathname)} />;
+}
+
 const MOVE_FIRST_FRAMES = {
   conversation: ConversationMoveFrame,
+  case: CaseMoveFrame,
   page: PageFrame,
 } satisfies Record<string, MoveFirstFrame>;
 
@@ -428,7 +442,7 @@ function PendingScreen({ move }: { move: PendingMove }) {
       <span role="status" className="sr-only">
         {move.title ? `Opening ${move.title}` : 'Opening'}
       </span>
-      <Frame title={move.title} />
+      <Frame title={move.title} href={move.href} />
     </div>
   );
 }

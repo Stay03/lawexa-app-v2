@@ -1,14 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, ArrowUpRight, CalendarDays, Scale } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CaseDetail } from '@/types/case';
 import { formatCaseName } from '@/v2/features/cases/case-name';
+import { rememberCasePeek } from '@/v2/features/cases/case-peek';
 import { casesQueries } from '@/v2/features/cases/queries';
+import { MoveFirstLink } from '@/v2/shell/move-first';
 
 /**
  * CasePreview — the body of a case-mention preview (desktop hover-card + touch
@@ -63,7 +64,18 @@ function buildSummary(detail: CaseDetail): string {
   return `${text.slice(0, SUMMARY_MAX).replace(/\s+\S*$/, '').trimEnd()}…`;
 }
 
-export function CasePreview({ slug, href }: { slug: string; href: string }) {
+export function CasePreview({
+  slug,
+  href,
+  onOpen,
+}: {
+  slug: string;
+  href: string;
+  /** Closes the popover or hover card the preview sits in. "Open case" moves
+   *  first (a case opens at once), and the card goes in the frame's own paint
+   *  (move-first.tsx's sheet cut, shell.css). */
+  onOpen?: () => void;
+}) {
   const query = useQuery(casesQueries.preview(slug));
   const detail = query.data?.data ?? null;
 
@@ -72,13 +84,23 @@ export function CasePreview({ slug, href }: { slug: string; href: string }) {
   }
 
   if (query.isError || !detail) {
-    return <PreviewError href={href} onRetry={() => void query.refetch()} />;
+    return <PreviewError href={href} onRetry={() => void query.refetch()} onOpen={onOpen} />;
   }
 
-  return <PreviewBody detail={detail} href={href} />;
+  return <PreviewBody detail={detail} slug={slug} href={href} onOpen={onOpen} />;
 }
 
-function PreviewBody({ detail, href }: { detail: CaseDetail; href: string }) {
+function PreviewBody({
+  detail,
+  slug,
+  href,
+  onOpen,
+}: {
+  detail: CaseDetail;
+  slug: string;
+  href: string;
+  onOpen?: () => void;
+}) {
   // The readable name alone — the citation is reference data the card's meta
   // row does not need, and the all-caps fused form defeated the line clamp.
   const title = formatCaseName(detail.display_title || detail.title);
@@ -118,13 +140,29 @@ function PreviewBody({ detail, href }: { detail: CaseDetail; href: string }) {
         ) : null}
       </div>
 
-      <Link
+      <MoveFirstLink
         href={href}
+        kind="case"
+        title={title}
+        // The case's frame draws this name, court and date at once, as a case
+        // row's tap does (case-peek.ts).
+        onClick={() =>
+          rememberCasePeek({
+            slug,
+            title,
+            rawTitle: detail.display_title || detail.title,
+            court: court || null,
+            countryCode: null,
+            countryName: null,
+            judgmentDate: detail.judgment_date ?? null,
+          })
+        }
+        onMove={onOpen}
         className="text-primary border-border v2-interactive focus-visible:ring-ring flex min-h-11 items-center justify-between gap-2 border-t px-4 py-2.5 text-xs font-medium transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
       >
         Open case
         <ArrowUpRight aria-hidden className="size-4 shrink-0" />
-      </Link>
+      </MoveFirstLink>
     </div>
   );
 }
@@ -149,7 +187,7 @@ function PreviewSkeleton() {
   );
 }
 
-function PreviewError({ href, onRetry }: { href: string; onRetry: () => void }) {
+function PreviewError({ href, onRetry, onOpen }: { href: string; onRetry: () => void; onOpen?: () => void }) {
   return (
     <div
       className="flex flex-col items-start gap-2 p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
@@ -167,12 +205,14 @@ function PreviewError({ href, onRetry }: { href: string; onRetry: () => void }) 
         >
           Try again
         </button>
-        <Link
+        <MoveFirstLink
           href={href}
+          kind="case"
+          onMove={onOpen}
           className="text-primary v2-interactive focus-visible:ring-ring rounded-md px-2.5 py-1 text-xs font-medium transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2"
         >
           Open case
-        </Link>
+        </MoveFirstLink>
       </div>
     </div>
   );
