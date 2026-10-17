@@ -503,6 +503,11 @@ export interface ChatStartRequest {
   // Start the conversation in a space (backend B4): first turn only, never with
   // conversation_id, is_confidential or is_redacted (the server answers 422).
   space_uuid?: string;
+  // A new chat's first send only, never with conversation_id (422): a uuid made
+  // once per composed send and sent again on every retry of it, so a retry after
+  // the server already made the chat gets that chat back (backend, 17 October
+  // 2026). Not a uuid: 422 on this field.
+  client_request_id?: string;
   // The saved message this turn replies to (space chat replies). Needs
   // conversation_id; a target outside the chat, a step, an error or a deleted
   // row is one 422 on this field.
@@ -536,6 +541,12 @@ export interface ChatStartResponse {
     user_message_id?: number;
     /** Handles in this turn that matched nobody in the space (the writer's, space chats). */
     unmatched_handles?: string[];
+    /**
+     * A retry of a first send the server already answered (`client_request_id`):
+     * only `conversation_id` comes with it, no execution, nothing charged. Open
+     * that chat. If the reader deleted it since, it reads 404: not sent.
+     */
+    already_sent?: boolean;
   };
 }
 

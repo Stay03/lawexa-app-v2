@@ -13,6 +13,7 @@ import {
 } from '@/v2/runtime/chat-engine';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { conversationsCache, makeOptimisticConversation } from './cache';
+import { renewRequestId, requestIdFor, settleRequestId, type FirstSend } from './first-send-id';
 import { conversationsQueries } from './queries';
 
 /**
@@ -116,6 +117,20 @@ function newTempId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `tmp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+/**
+ * Whether the chat an `already_sent` names can still be opened. Only a 404
+ * says no (the reader deleted it since); any other failure to read it leaves
+ * the chat page to say what is wrong, as for any other open.
+ */
+async function chatIsThere(conversationId: string): Promise<boolean> {
+  try {
+    await chatApi.getStatus(conversationId, { withoutMessages: true });
+    return true;
+  } catch (err) {
+    return !(err instanceof AxiosError && err.response?.status === 404);
+  }
 }
 
 /** Strip an uploaded file to the wire/handoff attachment shape. */
@@ -234,6 +249,9 @@ export async function startConversation(
   const confidential = spaceUuid === undefined && input.confidential === true;
   const redacted = spaceUuid === undefined && input.redacted === true;
   const fileIds = attachments.map((a) => a.file_id);
+  // The send as composed, for its `client_request_id` (first-send-id.ts): a
+  // retry of it carries the same id, so it never makes a second chat.
+  const firstSend: FirstSend = { message, fileIds, spaceUuid, references, confidential, redacted };
 
   // Confidential turn 1: persist the user turn to IDB BEFORE the POST so a crash
   // never loses it. Use a temp id until the server returns the real one.
@@ -269,7 +287,31 @@ export async function startConversation(
       // The space it starts in — first turn only, never with a private mode.
       ...(spaceUuid !== undefined && { space_uuid: spaceUuid }),
     };
-    const response = await chatApi.start(applyJurisdiction(baseBody, jurisdiction));
+    const post = (clientRequestId: string) =>
+      chatApi.start(applyJurisdiction({ ...baseBody, client_request_id: clientRequestId }, jurisdiction));
+    let response = await post(requestIdFor(firstSend));
+
+    // A RETRY OF A SEND THE SERVER ALREADY ANSWERED: its chat, with nothing
+    // run or charged again. Opened as the 409's chat is, and the caller clears
+    // the words it kept. If the reader deleted that chat since, the question
+    // reached no one they can see: sent again, once, under a new id.
+    if (response.success && response.data.already_sent) {
+      const sentTo = response.data.conversation_id;
+      if (await chatIsThere(sentTo)) {
+        settleRequestId(firstSend);
+        if (confidential && tempConvId && tempConvId !== sentTo) {
+          await renameTranscript(tempConvId, sentTo).catch(() => {});
+        }
+        return { status: 'existing', conversationId: sentTo };
+      }
+      response = await post(renewRequestId(firstSend));
+      if (response.success && response.data.already_sent) {
+        // A new id cannot name an old send; if the server says so anyway, its
+        // chat is opened rather than a handoff written without an execution.
+        settleRequestId(firstSend);
+        return { status: 'existing', conversationId: response.data.conversation_id };
+      }
+    }
 
     if (!response.success) {
       if (tempConvId) await deleteTranscript(tempConvId).catch(() => {});
@@ -333,6 +375,7 @@ export async function startConversation(
       void deps.queryClient.invalidateQueries({ queryKey: spacesQueries.lists() });
     }
 
+    settleRequestId(firstSend);
     return {
       status: 'created',
       conversationId,
@@ -344,6 +387,9 @@ export async function startConversation(
     if (err instanceof AxiosError && err.response?.status === 409) {
       const existing: string | undefined = err.response.data?.data?.conversation_id;
       if (existing) {
+        // A retry while its first send is still answering lands here too: the
+        // chat exists, so this send is done.
+        settleRequestId(firstSend);
         if (confidential && tempConvId && tempConvId !== existing) {
           await renameTranscript(tempConvId, existing).catch(() => {});
         }
