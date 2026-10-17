@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FolderTile } from '../folder-bits';
 import { useFolderPeek } from '../folder-peek';
@@ -29,6 +31,17 @@ import { FolderDetailSkeleton } from './states';
  */
 export function FolderDetailFallback() {
   const peek = useFolderPeek(uuidOf(usePathname()));
+  // ON A PHONE THE NAME IS THE BAR'S, so the wait puts it there too. The
+  // route's loading file draws this before `FolderScreen`'s code has arrived,
+  // and only the screen published the bar's title: the tapped row's name
+  // came with the screen, 825-849 ms after the tap on every phone run (speed
+  // step 5, 17 October 2026). Published under this file's own name, so its
+  // clear never takes a title the screen has published since.
+  useEffect(() => {
+    if (!peek) return;
+    setHeaderContext({ title: peek.name, confidential: false }, FALLBACK_PUBLISHER);
+    return () => clearHeaderContext(FALLBACK_PUBLISHER);
+  }, [peek]);
   return (
     <>
       <span role="status" className="sr-only">
@@ -59,6 +72,9 @@ export function FolderDetailFallback() {
 }
 
 /** The folder's uuid from `/folders/{uuid}`, or undefined on any other path. */
+/** Who published the bar's title, for `clearHeaderContext`. */
+export const FALLBACK_PUBLISHER = 'folder-detail-fallback';
+
 function uuidOf(pathname: string | null): string | undefined {
   const match = pathname?.match(/\/folders\/([^/]+)\/?$/);
   return match ? decodeURIComponent(match[1]) : undefined;
