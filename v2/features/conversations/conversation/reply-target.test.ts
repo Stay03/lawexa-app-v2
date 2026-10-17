@@ -141,11 +141,13 @@ test('a swipe follows the finger to the threshold, then gives way', () => {
   assert.equal(swipeShift(1000), 88);
 });
 
-test('the wiring: replies only in a space chat the reader may send in, through this screen’s composer', () => {
+test('the wiring: replies only in a space chat the reader may send in, through the chat’s docked box', () => {
   const screen = readHere('ConversationScreen.tsx');
   assert.match(screen, /const canReply = controller\.showAuthors && canSend && !externalComposer && !isConfidential;/);
   assert.match(screen, /onReply=\{canReply \? stageReply : null\}/);
-  assert.match(screen, /composerRef\.current\?\.reply\(target\)/);
+  // The box is the shell's (message box B): the screen sends it the reply.
+  assert.match(screen, /stageRouteReply\(conversationId, target\);/);
+  assert.match(readHere('ChatDock.tsx'), /subscribeRouteReplies\(conversationId, \(target\) => composerRef\.current\?\.reply\(target\)\)/);
   const list = readHere('MessageList.tsx');
   assert.match(list, /data-message-id=\{messageId \?\? undefined\}/);
   assert.match(list, /data-flash:bg-primary\/10/);
@@ -286,9 +288,11 @@ test('a Reply pressed before the composer has mounted is kept, not lost (WebKit,
   const composer = readHere('ConversationComposer.tsx');
   assert.match(
     screen,
-    /const stageReply = useCallback\(\s*\(target: MessageReplyTo\) => \{\s*writeDraft\(replyDraftKey\(conversationId\), REPLY_DRAFT, target\);\s*composerRef\.current\?\.reply\(target\);\s*\},\s*\[conversationId\],\s*\);/,
+    /const stageReply = useCallback\(\s*\(target: MessageReplyTo\) => \{\s*writeDraft\(replyDraftKey\(conversationId\), REPLY_DRAFT, target\);\s*stageRouteReply\(conversationId, target\);\s*\},\s*\[conversationId\],\s*\);/,
   );
-  // The composer reads the key the screen writes: its scope is the same chat id.
+  // The composer reads the key the screen writes: the docked box's scope is the
+  // same chat id, before and after the screen is up.
   assert.match(composer, /useDraft\(replyDraftKey\(draftScopeId\), REPLY_DRAFT\)/);
-  assert.match(screen, /draftScopeId=\{conversationId\}/);
+  const dock = readHere('ChatDock.tsx');
+  assert.equal(dock.match(/draftScopeId=\{conversationId\}/g)?.length, 2);
 });

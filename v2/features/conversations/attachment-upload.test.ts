@@ -43,5 +43,8 @@ test('both composers upload through it, with their space', () => {
   const home = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
   assert.match(home, /const uploaded = await uploadAttachment\(file, space\?\.uuid \?\? null\);/);
   assert.doesNotMatch(home, /chatApi\.uploadDocument/);
-  assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /spaceUuid=\{controller\.spaceUuid\}/);
+  // A chat's box is the shell's dock (message box B): the screen publishes the
+  // chat's space, and the dock hands it to the composer.
+  assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /const \{ mentionOptions, spaceUuid \} = controller;[\s\S]*?publishRouteComposer\(\{[\s\S]*?spaceUuid,\s*\}\);/);
+  assert.match(read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx'), /spaceUuid=\{surface\.spaceUuid\}/);
 });

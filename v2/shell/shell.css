@@ -153,6 +153,24 @@ html.v2-document-lock body {
   display: none;
 }
 
+/* A CHAT'S BOX FLOATS OVER THE CONTENT ROW (message box B, 17 October 2026).
+   While the dock holds a chat's message box (`ChatDock`, `data-v2-chat-dock`)
+   the dock row moves onto the content row and sits at its bottom, over the
+   transcript, which scrolls under it: the floating pill the owner asked for,
+   now one element from the tap's first frame because the dock outlives the
+   route's frames. It is still a grid item, never `position: fixed`, so the
+   keyboard inset that shrinks the shell lifts it. Nothing is painted behind it
+   (`pointer-events: none` here, `auto` on the pill), so touches in the gaps
+   reach the transcript. `z-index: 41` puts it above the move-first frame
+   (`fixed z-40`, move-first.tsx); the content region creates no stacking
+   context, so the transcript's own layers stay under it. */
+.v2-shell__dock:has([data-v2-chat-dock]) {
+  grid-row: 2;
+  align-self: end;
+  z-index: 41;
+  pointer-events: none;
+}
+
 /* -----------------------------------------------------------------------------
    THE SEE-THROUGH BAR ON A TOP-LEVEL SCREEN (mobile native overhaul, phase 10).
 
@@ -291,15 +309,16 @@ html.v2-document-lock body {
     grid-template-rows: 0 1fr auto;
   }
 
-  /* `z-index: 30` and not 20, and the number is load-bearing. The content
-     region creates NO stacking context of its own, so a `z-20` sticky child
-     inside it (the `ScreenDock`) sits in the same context as this bar — and a
-     tie is broken by document order, which the content wins because it comes
-     after the header. Thirty puts the bar above the floating pill for certain
+  /* `z-index: 42`, and the number is load-bearing. The content region creates
+     NO stacking context of its own, so a `z-20` sticky child inside it (the
+     `ScreenDock`) sits in the same context as this bar, and a tie is broken by
+     document order, which the content wins because it comes after the header.
+     A chat's docked box sits at 41 (above the move-first frame's 40, see the
+     dock rule above), so 42 keeps the bar above the floating pill for certain
      on a short viewport, where the two can actually meet. */
   html.v2-document-lock .v2-shell[data-v2-open-bar] .v2-shell__header {
     align-self: start;
-    z-index: 30;
+    z-index: 42;
     background: none;
     /* Containing block for the glass strip below, and nothing else. It is set
        HERE rather than on the base rule because the strip exists only on a

@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useEffectEvent,
+  useMemo,
   useRef,
   useState,
   useTransition,
@@ -147,6 +148,26 @@ const MoveFirstContext = createContext<Navigate | null>(null);
  */
 const MoveFirstQuietContext = createContext(false);
 
+/** Where a move-first tap is going while its frame shows: the destination and
+ *  its frame kind, else `null`. */
+export interface MoveFirstPending {
+  href: string;
+  kind: MoveFirstKind;
+}
+
+/**
+ * The tap's destination while the move is under way, from the tap's own
+ * commit until the new screen commits. The router's pathname does not change
+ * in that window (the tap's history entry passes through Next untouched), so a
+ * shell part that must draw for the destination from the first frame reads it
+ * here: the chat's docked message box (`ChatDock`, message box B).
+ */
+const MoveFirstPendingContext = createContext<MoveFirstPending | null>(null);
+
+export function useMoveFirstPending(): MoveFirstPending | null {
+  return useContext(MoveFirstPendingContext);
+}
+
 /** The path of an in-app href, for comparing with `usePathname()`. */
 function pathOf(href: string): string {
   return new URL(href, window.location.href).pathname;
@@ -245,6 +266,12 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   // Derived, so prefetching comes back by itself when the layer goes, whether
   // the navigation landed, failed or was replaced.
   const linksQuiet = quiet && visible;
+  const pendingHref = visible && pending ? pending.href : null;
+  const pendingKind = visible && pending ? pending.kind : null;
+  const pendingMove = useMemo<MoveFirstPending | null>(
+    () => (pendingHref !== null && pendingKind !== null ? { href: pendingHref, kind: pendingKind } : null),
+    [pendingHref, pendingKind],
+  );
 
   /** Commit the destination's frame now, in this task, before any route work. */
   const raise = (
@@ -382,8 +409,10 @@ export function MoveFirstProvider({ children }: { children: ReactNode }) {
   return (
     <MoveFirstContext.Provider value={navigate}>
       <MoveFirstQuietContext.Provider value={linksQuiet}>
-        {children}
-        {visible && pending ? <PendingScreen move={pending} /> : null}
+        <MoveFirstPendingContext.Provider value={pendingMove}>
+          {children}
+          {visible && pending ? <PendingScreen move={pending} /> : null}
+        </MoveFirstPendingContext.Provider>
       </MoveFirstQuietContext.Provider>
     </MoveFirstContext.Provider>
   );

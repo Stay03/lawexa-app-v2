@@ -123,10 +123,15 @@ test('a Viewer is told who may continue; anyone else that it was shared with the
 });
 
 test('the composer follows canSend, and the owner verbs stay with ownership', () => {
+  // The box is the shell's dock (message box B): it follows the published
+  // `canSend`, and before the screen is up the early ruling's.
+  const dock = readHere('ChatDock.tsx');
+  assert.match(dock, /\) : surface\.canSend \? \(/);
+  assert.match(dock, /content = early\.canSend \? \(/);
+  assert.doesNotMatch(dock, /isOwner \? \(/);
+  assert.match(dock, /<ViewOnlyPill reason=\{surface\.viewOnlyReason\} \/>/);
   const screen = readHere('ConversationScreen.tsx');
-  assert.match(screen, /\) : controller\.canSend \? \(/);
-  assert.doesNotMatch(screen, /\) : controller\.isOwner \? \(/);
-  assert.match(screen, /<ViewOnlyPill reason=\{controller\.viewOnlyReason\} \/>/);
+  assert.match(screen, /publishRouteComposer\(\{[\s\S]*?canSend,\s*viewOnlyReason,/);
   // The pill is its own module (so the case dock need not load this screen).
   const pill = readHere('ViewOnlyPill.tsx');
   assert.match(pill, /export function ViewOnlyPill\(\{ reason \}: \{ reason: ViewOnlyReason \}\)/);
@@ -269,7 +274,9 @@ test('a colleague’s turn names them in the activity row, holds Send and offers
   assert.match(composer, /isStreaming && !canStop \? heldSendLabel\(sendHeldBy \?\? UNNAMED_ASKER\) : 'Send message'/);
   assert.match(composer, /disabled=\{!canSend \|\| isStreaming\}/);
   const screen = readHere('ConversationScreen.tsx');
-  assert.match(screen, /sendHeldBy=\{controller\.sendHeldBy\}\s+canStop=\{controller\.canStop\}/);
+  // Published to the shell's docked box (message box B), which hands them on.
+  assert.match(screen, /publishRouteComposer\(\{[\s\S]*?sendHeldBy,\s*canStop,/);
+  assert.match(readHere('ChatDock.tsx'), /sendHeldBy=\{surface\.sendHeldBy\}\s+canStop=\{surface\.canStop\}/);
   assert.match(screen, /restingLabel=\{controller\.turnLabel\}/);
 });
 
@@ -415,11 +422,18 @@ test('a reader who may not send gets disabled card actions, and the screen sends
 test('a refused follow-up (409 or 403) comes back to the composer with the composer’s own sentence', () => {
   const screen = readHere('ConversationScreen.tsx');
   // Both refusals arrive as `outcome.refused`, the sentence sendRefusal wrote.
+  // To whichever box the chat has, the case host's or the shell's dock
+  // (message box B), through one per-chat report.
   assert.match(
     screen,
-    /const outcome = await submit\(message, \[\]\);\s*if \(!outcome\) return;\s*if \(externalComposer\) \{\s*reportFollowUpRefusal\(\{ conversationId, text: message, sentence: outcome\.refused \}\);\s*\} else \{\s*composerRef\.current\?\.refuse\(message, outcome\.refused\);/,
+    /const outcome = await submit\(message, \[\]\);\s*if \(!outcome\) return;\s*\/\/[^\n]*\n\s*reportFollowUpRefusal\(\{ conversationId, text: message, sentence: outcome\.refused \}\);/,
   );
-  assert.match(screen, /draftScopeId=\{conversationId\}\s*stageRef=\{composerRef\}/);
+  const dock = readHere('ChatDock.tsx');
+  assert.match(
+    dock,
+    /subscribeFollowUpRefusals\(conversationId, \(refusal\) => \{\s*if \(refusal\.text === null\) composerRef\.current\?\.explain\(refusal\.sentence\);\s*else composerRef\.current\?\.refuse\(refusal\.text, refusal\.sentence\);/,
+  );
+  assert.match(dock, /draftScopeId=\{conversationId\}\s*stageRef=\{composerRef\}/);
   const composer = readHere('ConversationComposer.tsx');
   assert.match(composer, /refuse: \(text, sentence\) => \{\s*updateInput\(\(current\) => draftWithRefused\(current, text\)\);\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);
   // The draft keeps what the reader typed, and the follow-up after it.
@@ -474,7 +488,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
   const screen = readHere('ConversationScreen.tsx');
   assert.match(
     screen,
-    /const outcome = await regenerate\(\);\s*if \(!outcome\) return;\s*if \(externalComposer\) \{\s*reportFollowUpRefusal\(\{ conversationId, text: null, sentence: outcome\.refused \}\);\s*\} else \{\s*composerRef\.current\?\.explain\(outcome\.refused\);/,
+    /const outcome = await regenerate\(\);\s*if \(!outcome\) return;\s*reportFollowUpRefusal\(\{ conversationId, text: null, sentence: outcome\.refused \}\);/,
   );
   assert.match(screen, /onRegenerate=\{askAgain\}/);
   assert.match(readHere('ConversationComposer.tsx'), /explain: \(sentence\) => \{\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);

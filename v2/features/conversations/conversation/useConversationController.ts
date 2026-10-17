@@ -21,6 +21,7 @@ import { stripPastedTags } from '@/lib/utils';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache, listedConversation, spaceOfListedChat } from '../cache';
+import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { useSkeletonHold } from './skeleton-hold';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
@@ -111,7 +112,6 @@ function historyErrorMessage(err: unknown): string {
 }
 
 const CONV_INIT_PREFIX = 'conv_init_';
-const CONV_JURISDICTION_PREFIX = 'conv_jurisdiction_';
 /** Narration auto-expiry so the calm status line returns to its resting label. */
 const NARRATION_TTL_MS = 8000;
 
@@ -164,19 +164,6 @@ function readConvInit(conversationId: string): {
   } finally {
     // Consume once — a reload must not replay a finished handoff.
     window.sessionStorage.removeItem(key);
-  }
-}
-
-/** Read v1's per-conversation jurisdiction slot (defaults to auto when absent). */
-function readJurisdictionSlot(conversationId: string): JurisdictionChoice {
-  if (typeof window === 'undefined') return { mode: 'auto' };
-  try {
-    const raw = window.sessionStorage.getItem(`${CONV_JURISDICTION_PREFIX}${conversationId}`);
-    if (!raw) return { mode: 'auto' };
-    const parsed = JSON.parse(raw) as JurisdictionChoice;
-    return parsed && typeof parsed === 'object' && 'mode' in parsed ? parsed : { mode: 'auto' };
-  } catch {
-    return { mode: 'auto' };
   }
 }
 
@@ -499,14 +486,7 @@ export function useConversationController(
   const setJurisdiction = useCallback(
     (next: JurisdictionChoice) => {
       setJurisdictionState(next);
-      if (typeof window === 'undefined') return;
-      try {
-        const key = `${CONV_JURISDICTION_PREFIX}${conversationId}`;
-        if (next.mode === 'auto') window.sessionStorage.removeItem(key);
-        else window.sessionStorage.setItem(key, JSON.stringify(next));
-      } catch {
-        // sessionStorage unavailable — the choice still applies in-memory this turn.
-      }
+      writeJurisdictionSlot(conversationId, next);
     },
     [conversationId],
   );

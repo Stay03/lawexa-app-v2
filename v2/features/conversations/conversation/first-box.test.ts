@@ -74,20 +74,24 @@ test('the create flow\'s placeholder row (owner 0) says nothing', () => {
   client.clear();
 });
 
-test('the screen draws the real box once the owner is known, and holds Send while the history loads', () => {
+test('the docked box draws once the owner is known, and holds Send while the history loads', () => {
   const controller = read('useConversationController.ts');
   assert.match(controller, /const ownerId = detailData\?\.user_id \?\? localOwnerId \?\? listedRow\?\.user_id \?\? null;/);
   assert.match(controller, /const canSend = detailData \? canSendIn\(detailData, isOwner\) : \(listedRow\?\.can_send \?\? isOwner\);/);
   const screen = read('ConversationScreen.tsx');
+  const dock = read('ChatDock.tsx');
   // The skeleton only while the owner is unknown (a cold open with no list behind it).
-  assert.match(screen, /\{!controller\.isOwnerResolved \? \(/);
-  assert.match(screen, /holdingSkeleton \? null : <ComposerSkeleton \/>/);
+  assert.match(dock, /content = !surface\.isOwnerResolved \? \(\s*surface\.holdingSkeleton \? null : <ComposerSkeleton \/>/);
   // The history no longer keeps the box grey; it holds Send instead, so the
   // box takes typing at once (not `disabled`, which locks the textarea and dims
   // the box).
-  assert.doesNotMatch(screen, /!controller\.isOwnerResolved \|\| isLoadingHistory/);
-  assert.match(screen, /<ConversationComposer\s+holdSend=\{isLoadingHistory\}/);
-  assert.doesNotMatch(screen, /disabled=\{isLoadingHistory\}/);
+  assert.match(screen, /holdSend: isLoadingHistory,/);
+  assert.match(dock, /<ConversationComposer\s+holdSend=\{surface\.holdSend\}/);
+  assert.doesNotMatch(screen + dock, /disabled=\{isLoadingHistory\}/);
+  // Before the screen is up: the same box, Send held, with the ruling this
+  // device already has (early-ruling.ts).
+  assert.match(dock, /const \[early\] = useState\(\(\) => earlyRuling\(queryClient, conversationId, userId\)\);/);
+  assert.match(dock, /<ConversationComposer\s+holdSend\s+draftScopeId=\{conversationId\}/);
 });
 
 test('holdSend holds Send and Enter only: the textarea stays live', () => {

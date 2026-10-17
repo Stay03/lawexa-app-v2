@@ -13,19 +13,16 @@ import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/rout
  * NEVER reaches this file. It is the cold-open shape, which is what a route
  * boundary is for.
  *
- * ONE SILHOUETTE, NOT TWO. This draws the SAME transcript and the SAME composer
- * shape that `MessageList` and `ConversationScreen` draw while they resolve — both
- * imported from `v2/features/conversations/conversation/skeletons`. It used to draw
- * the transcript alone, which is why the composer appeared as a grey pill on a cold
- * open and not at all on a warm one: the warm path skips the screen's own skeletons
- * and leaves this file as the only thing on screen. Same screen, same picture, in
- * every cache state.
+ * ONE SILHOUETTE, NOT TWO. This draws the SAME transcript shape that `MessageList`
+ * draws while it resolves (`v2/features/conversations/conversation/skeletons`). The
+ * message box is not in it: the chat's box is the shell's (`ChatDock`, message box
+ * B), already on screen from the tap, and it outlives this file, which is deleted
+ * when the screen commits.
  *
  * GEOMETRY IS THE SCREEN'S OWN, copied so nothing shifts on hand-off: the reading
  * column (`max-w-2xl`, `px-4 pt-6`) inside the scroll region, the transcript's
  * reserved bottom padding for the floating pill (`--v2-conv-dock-h`, with the same
- * `7rem` pre-measure fallback MessageList uses), and the composer as an ABSOLUTE
- * bottom layer with `v2-safe-bottom` — exactly as `ConversationScreen` lays it out.
+ * `7rem` pre-measure fallback MessageList uses), exactly as the screen lays it out.
  *
  * `aria-hidden` + `inert` per §8(ii): a Suspense fallback is DELETED (not
  * reconciled) the moment content arrives, so anything focusable or stateful in here

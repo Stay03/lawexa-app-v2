@@ -20,6 +20,7 @@ import { TouchPress } from '@/v2/shell/touch-press';
 import { RouteTrail } from '@/v2/shell/route-trail';
 import { RouteMotion } from '@/v2/shell/route-motion';
 import { MoveFirstProvider } from '@/v2/shell/move-first';
+import { ChatDock } from '@/v2/features/conversations/conversation/ChatDock';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { resolveSession } from '@/v2/runtime/session';
 import { V2Unreachable } from '@/v2/runtime/session-recovery';
@@ -355,8 +356,19 @@ export default async function V2Layout({
                       is the portal target for the real composer. On every other route it
                       renders nothing and the dock row collapses to zero height — the
                       bottom safe-area rides on the dock CONTENT, not this row, so no
-                      route gains a phantom notch strip. */}
-                  <AppShell header={<V2Header user={user} />} dock={<DockHost />}>
+                      route gains a phantom notch strip. ChatDock is a chat's one
+                      message box (message box B): on a chat route, or while a tap
+                      is moving to one, from the tap's first frame; nothing
+                      anywhere else. */}
+                  <AppShell
+                    header={<V2Header user={user} />}
+                    dock={
+                      <>
+                        <DockHost />
+                        <ChatDock />
+                      </>
+                    }
+                  >
                     {children}
                   </AppShell>
                 </SidebarInset>

@@ -13,6 +13,9 @@ import { clampedToBottom, followOnResize, nearBottom, readsAtBottom } from './sc
 const here = dirname(fileURLToPath(import.meta.url));
 const list = readFileSync(join(here, 'MessageList.tsx'), 'utf8');
 const screen = readFileSync(join(here, 'ConversationScreen.tsx'), 'utf8');
+// The chat's message box, and the measure of its height, moved to the shell's
+// dock (message box B, 17 October 2026).
+const dockBox = readFileSync(join(here, 'ChatDock.tsx'), 'utf8');
 
 const T = 80;
 // A 1000 px page in a 400 px view: the bottom is scrollTop 600.
@@ -134,7 +137,7 @@ test('the follower watches the border box, where the dock height lands', () => {
   assert.match(list, /observer\.observe\(content, \{ box: 'border-box' \}\);/);
   // The dock's height reaches the list only as this bottom padding.
   assert.match(list, /pb-\[calc\(var\(--v2-conv-dock-h,7rem\)\+1rem\)\]/);
-  assert.match(screen, /observer\.observe\(dock\)/);
+  assert.match(dockBox, /observer\.observe\(dock\)/);
 });
 
 test('an empty dock keeps the fallback padding, whatever its safe-area padding measures', () => {
@@ -142,29 +145,29 @@ test('an empty dock keeps the fallback padding, whatever its safe-area padding m
   // its children, not its height: in the iPhone home-screen app its safe-area
   // padding alone measures 34 px, so a height of 0 never came (release re-review).
   assert.match(
-    screen,
-    /if \(dock\.childElementCount === 0\) \{\s*if \(screen\.style\.getPropertyValue\(DOCK_HEIGHT_VAR\) !== ''\) \{\s*screen\.style\.removeProperty\(DOCK_HEIGHT_VAR\);\s*\}\s*return;\s*\}\s*const height = `\$\{dock\.offsetHeight\}px`;/,
+    dockBox,
+    /if \(dock\.childElementCount === 0\) \{\s*if \(root\.style\.getPropertyValue\(DOCK_HEIGHT_VAR\) !== ''\) root\.style\.removeProperty\(DOCK_HEIGHT_VAR\);\s*return;\s*\}\s*const height = `\$\{dock\.offsetHeight\}px`;/,
   );
-  assert.doesNotMatch(screen, /offsetHeight === 0/);
+  assert.doesNotMatch(dockBox, /offsetHeight === 0/);
   // The dock carries that padding, which is why its height is not the test.
-  assert.match(screen, /ref=\{dockRef\}\s*className="pointer-events-auto v2-safe-bottom/);
+  assert.match(dockBox, /ref=\{dockRef\} className="pointer-events-auto v2-safe-bottom/);
 });
 
 test('the dock height is written only when it changes, and a reopen renders the last one', () => {
-  // Chat reopen fix, 16 October 2026: the variable sits on the screen's root,
-  // so writing it after the mount restyled the whole transcript (760 elements).
-  assert.match(screen, /const DOCK_HEIGHT_VAR = '--v2-conv-dock-h';/);
-  assert.match(screen, /let lastDockHeight: string \| null = null;/);
-  assert.match(screen, /lastDockHeight = height;\s*if \(screen\.style\.getPropertyValue\(DOCK_HEIGHT_VAR\) !== height\) \{\s*screen\.style\.setProperty\(DOCK_HEIGHT_VAR, height\);/);
-  // Rendered from the first commit, so the transcript is styled once with it;
-  // an external composer still pins 0px.
-  assert.match(screen, /style=\{dockHeightStyle\(externalComposer\)\}/);
-  assert.match(screen, /if \(externalComposer\) return \{ \[DOCK_HEIGHT_VAR\]: '0px' \} as CSSProperties;/);
-  // Before paint, after MessageList's landing read, measured again whenever
-  // the composer kind flips in a mounted screen.
-  assert.match(screen, /useIsomorphicLayoutEffect\(\(\) => \{\s*if \(externalComposer\) return;\s*const dock = dockRef\.current;/);
-  assert.match(screen, /return \(\) => observer\.disconnect\(\);\s*\}, \[externalComposer\]\);/);
-  // The cleanup never clears the root's value: a flip to an external composer
-  // has already written 0px there.
-  assert.doesNotMatch(screen, /removeProperty\(DOCK_HEIGHT_VAR\);\s*\};\s*\}, \[externalComposer\]\)/);
+  // Chat reopen fix, 16 October 2026: writing the variable after the mount
+  // restyled the whole transcript (760 elements). It lives on the root element
+  // now, written by the shell's box (message box B), and stays there when the
+  // box goes, so the next chat's transcript is styled once with the height the
+  // box last had.
+  assert.match(dockBox, /const DOCK_HEIGHT_VAR = '--v2-conv-dock-h';/);
+  assert.match(dockBox, /const root = document\.documentElement;/);
+  assert.match(dockBox, /if \(root\.style\.getPropertyValue\(DOCK_HEIGHT_VAR\) !== height\) root\.style\.setProperty\(DOCK_HEIGHT_VAR, height\);/);
+  assert.doesNotMatch(dockBox, /useEffect\(\(\) => \(\) => document\.documentElement\.style\.removeProperty/);
+  // Before paint, after MessageList's landing read.
+  assert.match(dockBox, /useIsomorphicLayoutEffect\(\(\) => \{\s*const dock = dockRef\.current;/);
+  assert.match(dockBox, /return \(\) => observer\.disconnect\(\);\s*\}, \[\]\);/);
+  // The screen writes no height of its own; under an external composer it pins 0px.
+  assert.match(screen, /const NO_DOCK_CLEARANCE = \{ \[DOCK_HEIGHT_VAR\]: '0px' \} as CSSProperties;/);
+  assert.match(screen, /style=\{externalComposer \? NO_DOCK_CLEARANCE : undefined\}/);
+  assert.doesNotMatch(screen, /setProperty\(DOCK_HEIGHT_VAR/);
 });

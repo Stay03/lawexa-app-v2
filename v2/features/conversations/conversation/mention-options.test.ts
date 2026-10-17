@@ -132,7 +132,9 @@ test('the wiring: the picker in a space chat, chips in the bubble, the writer’
   assert.match(engine, /const unmatched = response\.data\.unmatched_handles;\s*if \(unmatched && unmatched\.length > 0\) \{\s*setMessages\(\(msgs\) =>\s*msgs\.map\(\(m\) => \(m\.id === optimisticMsg\.id \? \{ \.\.\.m, unmatchedHandles: unmatched \} : m\)\),/);
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid\) : null\),/);
-  assert.match(readHere('ConversationScreen.tsx'), /mentionOptions=\{controller\.mentionOptions\}/);
+  // The screen publishes the options; the shell's docked box hands them on.
+  assert.match(readHere('ConversationScreen.tsx'), /publishRouteComposer\(\{[\s\S]*?mentionOptions,/);
+  assert.match(readHere('ChatDock.tsx'), /mentionOptions=\{surface\.mentionOptions\}/);
   const composer = readHere('ConversationComposer.tsx');
   assert.match(composer, /if \(mentionOptions\) \{\s*detectMention\(next, textarea\(\)\?\.selectionStart \?\? next\.length\);/);
   assert.match(composer, /onKeyDown=\{handleMentionKeys\}/);

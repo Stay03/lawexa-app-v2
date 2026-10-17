@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -23,10 +15,7 @@ import {
 } from './useConversationController';
 import { ConversationMasthead } from './ConversationMasthead';
 import { MessageList } from './MessageList';
-import { ConversationComposer, type ConversationComposerHandle } from './ConversationComposer';
-import { ComposerSkeleton } from './skeletons';
 import { ConfidentialBanner } from './ConfidentialBanner';
-import { ViewOnlyPill } from './ViewOnlyPill';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider } from './chat-context';
 import { DocumentExportScope } from './markdown/document-export';
@@ -35,57 +24,35 @@ import {
   publishEmbeddedComposer,
   reportFollowUpRefusal,
 } from './embedded-composer';
+import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './route-composer';
 
-/** The composer's height on the screen's root, read by the transcript's
- *  bottom padding and the jump-to-latest pill (MessageList). */
+/** The composer's height, read by the transcript's bottom padding and the
+ *  jump-to-latest pill (MessageList). On a chat's own route the shell's docked
+ *  box writes it on the root element (`ChatDock`); under an external composer
+ *  the box is below the screen in flow, so the screen pins it to 0px. */
 const DOCK_HEIGHT_VAR = '--v2-conv-dock-h';
-
-/** The floating composer's height the last open measured, so the next open's
- *  root renders it from the first commit (see the measure below). Module
- *  memory: one tab, one composer. */
-let lastDockHeight: string | null = null;
-
-/** The root's inline value: 0px under an external composer, else the last
- *  measured height, else nothing (MessageList's 7rem fallback). */
-function dockHeightStyle(externalComposer: boolean): CSSProperties | undefined {
-  if (externalComposer) return { [DOCK_HEIGHT_VAR]: '0px' } as CSSProperties;
-  return lastDockHeight ? ({ [DOCK_HEIGHT_VAR]: lastDockHeight } as CSSProperties) : undefined;
-}
-
-/** `useLayoutEffect` in the browser, `useEffect` on the server, as MessageList. */
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+const NO_DOCK_CLEARANCE = { [DOCK_HEIGHT_VAR]: '0px' } as CSSProperties;
 
 /**
  * ConversationScreen — the v2 `/c/[id]` client root. Mounts the controller (engine
  * + privacy resolvers + handoff/recovery), renders the transcript in the shell's
- * content region, and floats the composer OVER the transcript. Carries the
+ * content region, and publishes the docked box's state (ChatDock). Carries the
  * server-renderable `data-v2-marker="V2-CONVERSATION"`.
  *
- * FLOATING COMPOSER — IN THE CONTENT REGION, NOT THE DOCK (owner floating-pill round).
- * The composer USED to portal into the AppShell dock grid-row; the owner rejected that
- * look — the dock is a separate row BELOW the transcript, so the pill sat on an opaque
- * band with no transcript above or below it. It now renders as an ABSOLUTE layer over
- * the bottom of THIS screen (`relative` root), so the transcript genuinely scrolls
- * BEHIND and UNDER the floating pill: text is visible above it, a soft top fade eases
- * that transition, and the transparent area below the pill (down to the notch
- * safe-area) shows the transcript too — no opaque band.
+ * THE BOX IS THE SHELL'S, AND STILL FLOATS (message box B, Stay, 17 October 2026).
+ * On its own route the chat's message box is `ChatDock`, in the AppShell's dock slot,
+ * so it is one element from the tap's first frame to the chat (see ChatDock.tsx). This
+ * screen PUBLISHES what the box needs (route-composer.ts) and draws the transcript.
+ * The box still floats OVER the transcript's bottom, as the owner asked when the dock
+ * was an opaque band below it (the floating-pill round): a shell.css rule lifts the
+ * dock row onto the content row while it holds the box, with nothing painted behind
+ * it, so the transcript scrolls under the pill. It is a grid item, never
+ * `position: fixed`, so the keyboard inset that shrinks the shell lifts it
+ * (use-keyboard-inset.ts). The transcript reserves its bottom padding from
+ * `--v2-conv-dock-h`, which the box measures onto the root element.
  *
- * KEYBOARD SAFETY — the same mechanism as the home sticky docks. ConversationScreen is
- * `h-full` inside the shell content region (grid-row 2), whose height is
- * `calc(100dvh - keyboard-inset)` minus the header. When the keyboard opens — the
- * layout viewport shrinking on resize browsers, or `--keyboard-inset` being written on
- * overlay browsers (see use-keyboard-inset.ts) — that region shrinks, this `relative`
- * root shrinks, and the `absolute bottom-0` pill rides up above the keyboard. It is
- * `absolute` rather than `sticky` because the pill must float OVER the transcript with
- * text visible below it, which a flow-reserving `sticky` element cannot do; the
- * keyboard-safety is identical (both are bottom-anchored inside the shrunken region).
- *
- * NO-CLS. The pill is out of flow (absolute), so it never shifts the transcript; the
- * transcript instead reserves a stable bottom padding for it, measured live into
- * `--v2-conv-dock-h` by the observer below (it grows with the composer's staging so the
- * last message always clears the pill). The resolving `ComposerSkeleton` shares the
- * pill's exact geometry, so the floating bar never jumps as ownership/history resolve.
- * MessageList keeps its OWN internal scroller + scroll-etiquette untouched.
+ * Embedded (the case page's side chat), the host owns the box below this screen in
+ * flow and reads the embedded surface; the screen pins the clearance to 0px.
  *
  * OWNERSHIP ID FROM CONTEXT (privacy-relevant — read this before changing it).
  * `serverUserId` is the SERVER-VERIFIED user id the controller compares against the
@@ -212,62 +179,9 @@ export function ConversationScreen({
   // skeleton flash (skeleton-hold.ts).
   const holdingSkeleton = isLoadingHistory && !showHistorySkeleton;
 
-  // Measure the floating composer's height into `--v2-conv-dock-h` so the transcript
-  // (and the jump-to-latest pill) reserve exactly enough bottom clearance — and
-  // re-measure as staging grows/shrinks the pill. No setState: it only writes a CSS
-  // custom property (React Compiler-clean, mirrors use-keyboard-inset.ts).
-  // With an EXTERNAL composer there is no overlay: the effect no-ops and the root
-  // pins the variable to 0px inline, so MessageList's pre-measure fallback (7rem)
-  // can never reserve clearance for a pill that lives below in flow.
-  //
-  // WRITTEN ONLY WHEN IT CHANGES, AND RENDERED FROM THE LAST OPEN (chat reopen
-  // fix, 16 October 2026). The variable sits on the screen's root, so every
-  // element of the transcript inherits it, and writing it after the mount
-  // restyled the whole transcript a second time: 760 elements, about 140 ms on
-  // a phone at 4x CPU. The composer's height is almost always the one the last
-  // chat measured, so the root renders that value from its first commit
-  // (`lastDockHeight`) and the transcript is styled once with it. The measure
-  // runs in a layout effect, before paint and after MessageList's own landing
-  // read, and writes only a height that differs from what the root holds.
-  const screenRef = useRef<HTMLDivElement>(null);
-  const dockRef = useRef<HTMLDivElement>(null);
   // Whether the reader has scrolled up from the bottom; set by MessageList's
   // scroll handler, read by the composer's chip row (#16).
   const [scrolledUp, setScrolledUp] = useState(false);
-  useIsomorphicLayoutEffect(() => {
-    if (externalComposer) return;
-    const dock = dockRef.current;
-    const screen = screenRef.current;
-    if (!dock || !screen) return;
-    const sync = () => {
-      // An empty dock (the skeleton hold before the composer skeleton on a cold
-      // open) holds no composer yet, so its height is only its safe-area
-      // padding: 0 in a browser tab, 34 px in the iPhone home-screen app. The
-      // 7 rem fallback stays, as ComposerSkeleton's own height, rather than that
-      // sliver of clearance: it put the newest row under the composer on the
-      // landing frame and grew the page by the dock's height a frame later,
-      // which the list read as a scroll away (measured, Spaces F4 review S2).
-      if (dock.childElementCount === 0) {
-        if (screen.style.getPropertyValue(DOCK_HEIGHT_VAR) !== '') {
-          screen.style.removeProperty(DOCK_HEIGHT_VAR);
-        }
-        return;
-      }
-      const height = `${dock.offsetHeight}px`;
-      lastDockHeight = height;
-      if (screen.style.getPropertyValue(DOCK_HEIGHT_VAR) !== height) {
-        screen.style.setProperty(DOCK_HEIGHT_VAR, height);
-      }
-    };
-    sync();
-    const observer = new ResizeObserver(sync);
-    observer.observe(dock);
-    // The cleanup leaves the value alone. On unmount the root goes with it, and
-    // when `externalComposer` turns on in a mounted screen React has already
-    // written the root's 0px (child DOM before the parent's effect cleanup), so
-    // removing the variable here would undo it.
-    return () => observer.disconnect();
-  }, [externalComposer]);
 
   // Inline result cards fire follow-up turns through this (no attachments).
   // Depends on the STABLE `controller.submit` (a useCallback), not the whole
@@ -280,21 +194,17 @@ export function ConversationScreen({
   // composer shows for its own refused sends: this screen's pill through its
   // handle, or, with an external composer, the host's through the surface.
   const submit = controller.submit;
-  const composerRef = useRef<ConversationComposerHandle>(null);
   const sendFollowUp = useCallback(
     (message: string) => {
       if (!canSend) return;
       void (async () => {
         const outcome = await submit(message, []);
         if (!outcome) return;
-        if (externalComposer) {
-          reportFollowUpRefusal({ conversationId, text: message, sentence: outcome.refused });
-        } else {
-          composerRef.current?.refuse(message, outcome.refused);
-        }
+        // To whichever box this chat has: the case host's, or the shell's dock.
+        reportFollowUpRefusal({ conversationId, text: message, sentence: outcome.refused });
       })();
     },
-    [canSend, submit, externalComposer, conversationId],
+    [canSend, submit, conversationId],
   );
 
   // Replies (Stay, 14 October 2026): in a space chat where the reader may
@@ -306,12 +216,12 @@ export function ConversationScreen({
   // transcript can be on screen (drawn from the device's copy) while the
   // composer is still its skeleton, and a Reply pressed then reached no
   // composer and was lost (WebKit rendered check, 15 October 2026). The draft
-  // holds it, the composer shows it when it mounts, and the handle, when there
-  // is one, also puts the caret in the box.
+  // holds it, the composer shows it when it mounts, and the docked box, when it
+  // is up, also puts the caret in it (`stageRouteReply`).
   const stageReply = useCallback(
     (target: MessageReplyTo) => {
       writeDraft(replyDraftKey(conversationId), REPLY_DRAFT, target);
-      composerRef.current?.reply(target);
+      stageRouteReply(conversationId, target);
     },
     [conversationId],
   );
@@ -326,13 +236,70 @@ export function ConversationScreen({
     void (async () => {
       const outcome = await regenerate();
       if (!outcome) return;
-      if (externalComposer) {
-        reportFollowUpRefusal({ conversationId, text: null, sentence: outcome.refused });
-      } else {
-        composerRef.current?.explain(outcome.refused);
-      }
+      reportFollowUpRefusal({ conversationId, text: null, sentence: outcome.refused });
     })();
-  }, [regenerate, externalComposer, conversationId]);
+  }, [regenerate, conversationId]);
+
+  // ── The docked box (route-composer.ts) ────────────────────────────────────
+  // On its own route the chat's box is the shell's (`ChatDock`), so the screen
+  // publishes what the box needs and the box draws it. Under an external
+  // composer the host's box reads the embedded surface above instead.
+  const terminal =
+    error === 'confidential_transcript_lost' || error === 'not_found' || controller.isGoneOnServer;
+  const { mentionOptions, spaceUuid } = controller;
+  useEffect(() => {
+    if (externalComposer) return;
+    publishRouteComposer({
+      conversationId,
+      terminal,
+      holdingSkeleton,
+      isOwnerResolved,
+      canSend,
+      viewOnlyReason,
+      holdSend: isLoadingHistory,
+      showMeta: !scrolledUp,
+      jurisdiction,
+      setJurisdiction,
+      isConfidential,
+      isRedacted,
+      isStreaming,
+      isCancelling,
+      sendHeldBy,
+      canStop,
+      submit: controllerSubmit,
+      stop: controllerStop,
+      mentionOptions,
+      quoteToneOf,
+      spaceUuid,
+    });
+  }, [
+    externalComposer,
+    conversationId,
+    terminal,
+    holdingSkeleton,
+    isOwnerResolved,
+    canSend,
+    viewOnlyReason,
+    isLoadingHistory,
+    scrolledUp,
+    jurisdiction,
+    setJurisdiction,
+    isConfidential,
+    isRedacted,
+    isStreaming,
+    isCancelling,
+    sendHeldBy,
+    canStop,
+    controllerSubmit,
+    controllerStop,
+    mentionOptions,
+    quoteToneOf,
+    spaceUuid,
+  ]);
+  useEffect(() => {
+    if (externalComposer) return;
+    return () => clearRouteComposer(conversationId);
+  }, [externalComposer, conversationId]);
 
   // Terminal page states (engine surfaces these as sentinel error strings).
   if (error === 'confidential_transcript_lost') {
@@ -356,12 +323,11 @@ export function ConversationScreen({
       conversationId={conversationId}
     >
       <div
-        ref={screenRef}
         data-v2-marker="V2-CONVERSATION"
         data-conversation-id={conversationId}
         data-v2-chat-frame=""
         className="relative flex h-full min-h-0 flex-col"
-        style={dockHeightStyle(externalComposer)}
+        style={externalComposer ? NO_DOCK_CLEARANCE : undefined}
       >
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />
@@ -415,67 +381,6 @@ export function ConversationScreen({
           />
         </DocumentExportScope>
 
-        {/* Floating composer layer — an ABSOLUTE overlay over the transcript's bottom
-            (never the dock row, never `position: fixed`). `pointer-events-none` lets
-            the transparent gaps pass touches/scroll through to the transcript behind;
-            only the pill re-enables events. `z-10` keeps it above the transcript. No
-            top fade/scrim: the transcript stays crisp right up to the pill (owner —
-            the fade read as a dim band above the bar). The compact width cap lives
-            HERE (the composer itself is container-width, so embedding hosts size it);
-            ComposerSkeleton/ViewOnlyPill carry their own identical caps — same
-            numbers, harmless nesting. Absent entirely with an EXTERNAL composer:
-            the host owns the one composer element below this screen in flow. */}
-        {!externalComposer && (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10">
-            <div
-              ref={dockRef}
-              className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md"
-            >
-              {!controller.isOwnerResolved ? (
-                // Ownership still unknown → the composer-shaped skeleton (same
-                // geometry as the real pill), after the skeleton hold. NEVER the
-                // "shared" pill here: isOwner is false while the owner id is null, so
-                // it would misleadingly flash for owners on a direct open or reload.
-                //
-                // A chat tapped from a list knows its owner from the list's row, and a
-                // revisit from its cached record, so both draw the real box at once:
-                // this skeleton is only a cold open with no list behind it.
-                holdingSkeleton ? null : <ComposerSkeleton />
-              ) : controller.canSend ? (
-                // The reader may send: the chat's owner, or (backend B4) an
-                // Owner or Contributor of the chat's space. While the history is
-                // still loading the box takes typing but holds Send (`holdSend`):
-                // a turn started now would make the engine decline the history
-                // that lands under it (Stay, 17 October 2026).
-                <ConversationComposer
-                  holdSend={isLoadingHistory}
-                  draftScopeId={conversationId}
-                  stageRef={composerRef}
-                  jurisdiction={controller.jurisdiction}
-                  onJurisdictionChange={controller.setJurisdiction}
-                  isConfidential={controller.isConfidential}
-                  isRedacted={controller.isRedacted}
-                  // The country chip folds away while the reader is scrolled
-                  // up, so it never covers the text they went back to read;
-                  // "Latest" stays (#16, Stay's option 2).
-                  showMeta={!scrolledUp}
-                  isStreaming={isStreaming}
-                  isCancelling={isCancelling}
-                  sendHeldBy={controller.sendHeldBy}
-                  canStop={controller.canStop}
-                  onSubmit={controller.submit}
-                  onStop={controller.stop}
-                  viewerId={serverUserId}
-                  mentionOptions={controller.mentionOptions}
-                  quoteToneOf={quoteToneOf}
-                  spaceUuid={controller.spaceUuid}
-                />
-              ) : (
-                <ViewOnlyPill reason={controller.viewOnlyReason} />
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </V2ChatProvider>
   );
