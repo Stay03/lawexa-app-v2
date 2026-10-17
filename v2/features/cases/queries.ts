@@ -93,6 +93,12 @@ export interface ViewerScoped {
   viewerId: number | null;
 }
 
+/** A search term for a case read, or undefined: an empty or blank one is no
+ *  search, so every caller names "no search" the same way in the key. */
+export function searchTermOf(searchQuery: string | undefined): string | undefined {
+  return searchQuery?.trim() || undefined;
+}
+
 export const casesQueries = {
   all: ['cases'] as const,
 
@@ -193,26 +199,29 @@ export const casesQueries = {
    * different search is the same case — so the row that matters (the case) is
    * identical in both entries and the duplication is bounded by how many
    * distinct searches led here in one session.
+   *
+   * ONE SPELLING OF "NO SEARCH" (speed step 4, 17 October 2026). The library
+   * row passed `''` and the case page `undefined`, so a read started on the
+   * row filled `{ q: '' }` while the page read `{ q: null }`, never found it,
+   * and read the case a second time (backend's cache log). An empty or blank
+   * search is no search: both are `null` in the key and absent in the request.
    */
-  detail: (slug: string, searchQuery?: string) =>
-    queryOptions({
+  detail: (slug: string, searchQuery?: string) => {
+    const q = searchTermOf(searchQuery);
+    return queryOptions({
       meta: { persist: 'gated' },
-      queryKey: [
-        ...casesQueries.details(),
-        slug,
-        'full',
-        { q: searchQuery ?? null },
-      ] as const,
+      queryKey: [...casesQueries.details(), slug, 'full', { q: q ?? null }] as const,
       queryFn: () =>
         casesApi.getBySlug(slug, {
           includeSimilarCases: true,
           includeCitedCases: true,
           includeCitedBy: true,
-          searchQuery,
+          searchQuery: q,
         }),
       staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.reference,
-    }),
+    });
+  },
 
   /**
    * The same case page payload, read BEFORE the reader opens the case (a
@@ -231,7 +240,7 @@ export const casesQueries = {
         includeSimilarCases: true,
         includeCitedCases: true,
         includeCitedBy: true,
-        searchQuery,
+        searchQuery: searchTermOf(searchQuery),
         prefetch: true,
         signal,
       }),
