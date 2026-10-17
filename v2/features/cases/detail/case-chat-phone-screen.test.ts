@@ -684,7 +684,8 @@ test('while the phone chat is open the canvas is the card colour, and every way 
   assert.match(chrome, /const \{ backgroundColor \} = root\.style;/);
   assert.match(
     chrome,
-    /const hide = \(\): void => \{[\s\S]*?root\.style\.backgroundColor = 'var\(--popover\)';\s*\};\s*const restore = \(\): void => \{[\s\S]*?root\.style\.backgroundColor = backgroundColor;\s*\};/,
+    // The shell's full-height mark rides with it (case-chat-safari-clip.test.ts).
+    /const hide = \(\): void => \{[\s\S]*?root\.style\.backgroundColor = 'var\(--popover\)';\s*root\.setAttribute\(CHAT_SCREEN_ATTR, ''\);\s*\};\s*const restore = \(\): void => \{[\s\S]*?root\.style\.backgroundColor = backgroundColor;\s*root\.removeAttribute\(CHAT_SCREEN_ATTR\);\s*\};/,
   );
   assert.equal(ask.match(/style\.backgroundColor =/g)?.length, 2, 'set once, restored once');
 });

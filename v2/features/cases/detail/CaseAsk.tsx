@@ -30,6 +30,19 @@ import {
 const SHELL_CHROME = ['.v2-shell__header', '.v2-shell__dock'] as const;
 
 /**
+ * On <html> while the phone chat covers the screen: the shell keeps its full
+ * height (shell.css) instead of giving the keyboard's height up. Safari reports
+ * a rising keyboard in two events about 65 ms apart, and between them the inset
+ * reads the keyboard's height while iOS has already panned the page: the shell
+ * shrank to 440 of 718 px, iOS clips this fixed card to the shell's content
+ * region, and everything under it showed black for a frame or two (Arthur's
+ * Safari recording with ?kbdebug=1, 17 October 2026: "kb inset 278 shell h 440",
+ * card held at 100dvh). The card places itself from the visible viewport, so
+ * it never needed the shell to shrink.
+ */
+const CHAT_SCREEN_ATTR = 'data-v2-chat-screen';
+
+/**
  * How long the phone card holds its rising geometry after the keyboard starts
  * up. iOS animates the keyboard over about 250 ms; the rest covers the latency
  * of its viewport events. The hold ends then only if those events agree with
@@ -213,6 +226,7 @@ export function CaseAskDock({
       scroller.style.paddingTop = `${parseFloat(padding.paddingTop) + before.top - after.top}px`;
       scroller.style.paddingBottom = `${parseFloat(padding.paddingBottom) + after.bottom - before.bottom}px`;
       root.style.backgroundColor = 'var(--popover)';
+      root.setAttribute(CHAT_SCREEN_ATTR, '');
     };
     const restore = (): void => {
       chrome.forEach((element, index) => {
@@ -221,6 +235,7 @@ export function CaseAskDock({
       scroller.style.paddingTop = paddingTop;
       scroller.style.paddingBottom = paddingBottom;
       root.style.backgroundColor = backgroundColor;
+      root.removeAttribute(CHAT_SCREEN_ATTR);
     };
     const onPageShow = (event: PageTransitionEvent): void => {
       if (event.persisted) hide();

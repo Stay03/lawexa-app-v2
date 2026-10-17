@@ -54,6 +54,15 @@ html.v2-document-lock body {
    itself, so `--keyboard-inset` stays 0 and `100dvh` already tracks the keyboard
    — no JS needed. The `100vh` line is a fallback for engines without `dvh`.
    -------------------------------------------------------------------------- */
+/* While the phone case chat covers the screen the shell keeps its full height:
+   the card places itself from the visible viewport, and a shell shrunk by the
+   inset clips it on iOS (black under the card in Safari while the keyboard
+   rises; CaseAsk.tsx, CHAT_SCREEN_ATTR). Engines that resize for the keyboard
+   shrink `100dvh` themselves, as before. */
+html[data-v2-chat-screen] .v2-shell {
+  height: 100dvh;
+}
+
 .v2-shell {
   display: grid;
   grid-template-rows: auto 1fr auto;
