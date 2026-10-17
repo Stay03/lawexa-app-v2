@@ -105,6 +105,14 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
     : undefined;
 
   const feed = layout === 'feed';
+  // On a phone the chip leads this line, and beside it "No messages yet" left
+  // "Thread in general" a "T.." stub (the 003a5f7 shots); the age at the right
+  // still dates the row (techlead, 17 October 2026).
+  const noMessages = feed && status ? (
+    <span className="shrink-0 max-md:hidden">No messages yet</span>
+  ) : (
+    'No messages yet'
+  );
 
   /* Where who spoke last and what they said (Stay, 16 October 2026), in place
    * of the follower count, once the list carries it. The channel and the
@@ -128,9 +136,9 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
         thread.last_message === undefined
           ? [
               followerLabel(thread.active_members_count),
-              thread.last_message_at === null ? 'No messages yet' : null,
+              thread.last_message_at === null ? noMessages : null,
             ]
-          : [thread.last_message === null ? 'No messages yet' : null]
+          : [thread.last_message === null ? noMessages : null]
       }
     />
   );

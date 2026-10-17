@@ -81,6 +81,10 @@ test('in the feed the room rows take the conversation row’s box and keep the m
   const thread = read('v2', 'features', 'spaces', 'detail', 'SpaceThreadRow.tsx');
   assert.match(thread, /className=\{feed \? 'max-md:hidden' : undefined\}/);
   assert.match(thread, /\{feed && status \? \(\s*<div className="flex min-w-0 items-center gap-2">\s*<ThreadStatusChip[^>]*className="-my-0\.5 md:hidden"\s*\/>\s*\{meta\}/);
+  // Beside the phone's chip, "No messages yet" goes, so where the thread
+  // branched from keeps its room; the age still dates the row.
+  assert.match(thread, /const noMessages = feed && status \? \(\s*<span className="shrink-0 max-md:hidden">No messages yet<\/span>/);
+  assert.equal(thread.match(/\? noMessages : null/g)?.length, 2);
 });
 
 test('a new message in a room re-reads that space’s feed, which is never written', () => {
