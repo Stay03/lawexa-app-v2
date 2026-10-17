@@ -37,16 +37,23 @@ test('a chat’s space is read off the lists cached on this device', () => {
     pages: [envelope([inSpace, personal])],
     pageParams: [1],
   });
-  // A colleague's chat, only in the space's own list: named by that list's key.
-  client.setQueryData([...spacesQueries.contentsOf('s2'), 'conversations', {}, { viewerId: 7 }], {
-    pages: [envelope([makeOptimisticConversation('c', 'c')])],
-    pageParams: [1],
+  // A colleague's chat, only in the space's feed (design B4): named by the
+  // feed's key. The feed's pages mix kinds; a folder or a file is not a chat.
+  const feedPage = (data: unknown[]) => ({
+    success: true,
+    message: '',
+    data,
+    pagination: { per_page: 20, has_more: false, next_cursor: null, prev_cursor: null },
   });
-  // A space's folders list is not a chats list.
-  client.setQueryData([...spacesQueries.contentsOf('s3'), 'folders', {}, { viewerId: 7 }], {
-    pages: [envelope([{ id: 'd' }])],
-    pageParams: [1],
-  });
+  client.setQueryData(spacesQueries.items('s2', { viewerId: 7 }).queryKey, {
+    pages: [
+      feedPage([
+        { type: 'folder', sort_at: '2026-10-17T09:00:00Z', item: { uuid: 'd' } },
+        { type: 'conversation', sort_at: '2026-10-17T08:00:00Z', item: makeOptimisticConversation('c', 'c') },
+      ]),
+    ],
+    pageParams: [null],
+  } as never);
   assert.equal(spaceOfListedChat(client, 'a'), 's1');
   assert.equal(spaceOfListedChat(client, 'b'), null, 'a personal chat');
   assert.equal(spaceOfListedChat(client, 'c'), 's2');

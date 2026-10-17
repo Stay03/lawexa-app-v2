@@ -5,7 +5,6 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { QueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { ConversationListItem, ConversationsListResponse } from '@/types/chat';
-import type { SpaceConversationListResponse } from '@/types/collab';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { lastActivityAt, lastActivityRank, uniqueRowsById } from './activity';
 import { conversationsCache, makeOptimisticConversation } from './cache';
@@ -60,18 +59,32 @@ test('a list draws each chat once, the first copy kept', () => {
 
 /* ── The cache moves a chat on a message, and only on a message ────────────── */
 
-test('a new message moves the chat up in the reader’s lists and its space’s chats, with its time', () => {
+test('a new message moves the chat up in the reader’s lists, with its time, and re-reads its space’s feed', () => {
   const client = new QueryClient();
   const infiniteKey = [...conversationsQueries.lists(), 'infinite', {}, { viewerId: 7 }];
-  const spaceKey = [...spacesQueries.contentsOf('s1'), 'conversations', {}, { viewerId: 7 }];
   client.setQueryData<InfiniteData<ConversationsListResponse>>(infiniteKey, {
     pages: [envelope([row('a'), row('b')]), envelope([row('c')])],
     pageParams: [1, 2],
   });
-  client.setQueryData<InfiniteData<SpaceConversationListResponse>>(spaceKey, {
-    pages: [envelope([row('x'), row('c')])],
-    pageParams: [1],
+  // A space's one feed (design B4) mixes three kinds under a server cursor, so
+  // it is re-read, never written.
+  const feed = (rows: string[]) => ({
+    pages: [
+      {
+        success: true,
+        message: '',
+        data: rows.map((id) => ({ type: 'conversation', sort_at: '2026-10-13T10:00:00.000Z', item: row(id) })),
+        pagination: { per_page: 20, has_more: false, next_cursor: null, prev_cursor: null },
+      },
+    ],
+    pageParams: [null],
   });
+  const spaceKey = spacesQueries.items('s1', { viewerId: 7 }).queryKey;
+  const otherKey = spacesQueries.items('s2', { viewerId: 7 }).queryKey;
+  const spaceFeed = feed(['x', 'c']);
+  const otherFeed = feed(['x', 'c']);
+  client.setQueryData(spaceKey, spaceFeed as never);
+  client.setQueryData(otherKey, otherFeed as never);
   const before = Date.now();
   conversationsCache.touch(client, 'c', { spaceUuid: 's1' });
 
@@ -81,19 +94,13 @@ test('a new message moves the chat up in the reader’s lists and its space’s 
   assert.ok(Date.parse(moved.last_message_at!) >= before, 'last_message_at is now');
   assert.equal(moved.updated_at, '2026-10-13T10:00:00.000Z', 'updated_at is left alone');
 
-  const space = client.getQueryData<InfiniteData<SpaceConversationListResponse>>(spaceKey);
-  assert.deepEqual(space?.pages[0].data.map((r) => r.id), ['c', 'x']);
-  assert.equal(space!.pages[0].data[0].last_message_at, moved.last_message_at, 'one time for both');
-
-  // Another space's chats, and a chat no list holds, are left as they are.
-  const otherKey = [...spacesQueries.contentsOf('s2'), 'conversations', {}, { viewerId: 7 }];
-  const other = { pages: [envelope([row('x'), row('c')])], pageParams: [1] };
-  client.setQueryData(otherKey, other);
-  conversationsCache.touch(client, 'c', { spaceUuid: 's1' });
-  assert.equal(client.getQueryData(otherKey), other);
-  const spaceNow = client.getQueryData(spaceKey);
-  conversationsCache.touch(client, 'zz', { spaceUuid: 's1' });
-  assert.equal(client.getQueryData(spaceKey), spaceNow);
+  // The chat's space's feed is marked stale and left as it was; another
+  // space's feed is not touched.
+  const cache = client.getQueryCache();
+  assert.equal(client.getQueryData(spaceKey), spaceFeed);
+  assert.equal(cache.find({ queryKey: spaceKey })?.state.isInvalidated, true);
+  assert.equal(client.getQueryData(otherKey), otherFeed);
+  assert.equal(cache.find({ queryKey: otherKey })?.state.isInvalidated, false);
   client.clear();
 });
 

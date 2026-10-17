@@ -1,6 +1,6 @@
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import type { ConversationListItem, ConversationsListResponse } from '@/types/chat';
-import type { SpaceConversationListResponse } from '@/types/collab';
+import type { SpaceConversation, SpaceItemsResponse } from '@/types/collab';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { conversationsQueries } from './queries';
 
@@ -219,8 +219,8 @@ export const conversationsCache = {
   /**
    * A new message in a conversation (the reader's send, an answer completing, a
    * colleague's turn in a space chat): bump it to the top of every list with a
-   * fresh `last_message_at`, and of its space's chats list when `spaceUuid` is
-   * given (a bump only: the space list is never inserted into). Optionally sets
+   * fresh `last_message_at`; with `spaceUuid`, its space's feed is re-read
+   * (`rereadSpaceFeeds`: the feed is never written). Optionally sets
    * the title in the same write. No-op-stable when the id isn't in a given list
    * (a confidential stub the server omits, a chat past the loaded pages, a
    * colleague's chat not in the reader's own lists): the refetch, which sorts by
@@ -233,13 +233,7 @@ export const conversationsCache = {
   ): void {
     const at = new Date().toISOString();
     writeEveryList(queryClient, (cache) => bumpInCache(cache, id, patch, at));
-    if (patch.spaceUuid) {
-      queryClient.setQueriesData<InfiniteData<SpaceConversationListResponse>>(
-        { queryKey: [...spacesQueries.contentsOf(patch.spaceUuid), 'conversations'] },
-        (cache) => (cache ? bumpInPages(cache, id, (row) => withNewMessage(row, at)) : cache),
-      );
-      rereadSpaceFeeds(queryClient, patch.spaceUuid);
-    }
+    if (patch.spaceUuid) rereadSpaceFeeds(queryClient, patch.spaceUuid);
   },
 
   /**
@@ -295,8 +289,30 @@ function rereadSpaceFeeds(queryClient: QueryClient, spaceUuid?: string): void {
 }
 
 /**
+ * Every chat in the space feeds cached on this device, each with its space.
+ * A feed's key is `[...contents(), spaceUuid, 'items', params, viewer]`, and
+ * its pages mix the three kinds, so only the conversations are taken.
+ */
+function cachedSpaceChats(queryClient: QueryClient): { spaceUuid: string; row: SpaceConversation }[] {
+  const chats: { spaceUuid: string; row: SpaceConversation }[] = [];
+  for (const [key, cache] of queryClient.getQueriesData<InfiniteData<SpaceItemsResponse>>({
+    queryKey: spacesQueries.contents(),
+    predicate: (query) => query.queryKey[3] === 'items',
+  })) {
+    const spaceUuid = key[2];
+    if (typeof spaceUuid !== 'string' || !cache?.pages) continue;
+    for (const page of cache.pages) {
+      for (const entry of page.data) {
+        if (entry.type === 'conversation') chats.push({ spaceUuid, row: entry.item });
+      }
+    }
+  }
+  return chats;
+}
+
+/**
  * The space a chat is in, as the lists already cached on this device know it:
- * a row of the reader's own lists names its `space`, and a space's chats list
+ * a row of the reader's own lists names its `space`, and a space's feed
  * names it by its key. `null` when no cached list holds the chat (or says it is
  * personal). Read when a chat opens, so its space's roster (the members'
  * colours) loads beside the chat's record, not after it.
@@ -309,14 +325,7 @@ export function spaceOfListedChat(queryClient: QueryClient, id: string): string 
     const space = rows.find((candidate) => sameId(candidate, id))?.space?.uuid;
     if (space) return space;
   }
-  for (const [key, cache] of queryClient.getQueriesData<InfiniteData<SpaceConversationListResponse>>({
-    queryKey: spacesQueries.contents(),
-  })) {
-    // [...contents(), spaceUuid, 'conversations', params, viewer]
-    if (key[3] !== 'conversations' || typeof key[2] !== 'string' || !cache?.pages) continue;
-    if (cache.pages.some((page) => page.data.some((row) => sameId(row, id)))) return key[2];
-  }
-  return null;
+  return cachedSpaceChats(queryClient).find(({ row }) => sameId(row, id))?.spaceUuid ?? null;
 }
 
 /**
