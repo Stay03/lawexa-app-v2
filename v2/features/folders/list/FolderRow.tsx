@@ -37,16 +37,12 @@ import { rememberFolderPeek } from '../folder-peek';
  * `memo` holds because every prop is either a value or a callback the browser
  * memoises at the list level.
  *
- * A SPACE'S FOLDERS TAB (Spaces F2, 11 October 2026) draws the same row with
- * no `onRename`: those folders may belong to other members, and renaming and
- * deleting stay with each folder's owner.
- *
- * ── IN A SPACE, THE ROW OPENS A LEVEL (Spaces F3, 12 October 2026) ────────
- * The space's tab browses its folders one level at a time (`parent_id`), so
- * there it passes `onOpen` and the identity block becomes a BUTTON that goes
- * down a level inside the tab, instead of a link away to the folder page. The
- * menu carries the space rows its host passes: `onMove` (the folder's owner)
- * and `onRemoveFromSpace` (the space's Owner). No actions, no menu.
+ * A SPACE'S HOME (Spaces F2, 11 October 2026; one list since B4, 17 October
+ * 2026) draws the same row with no `onRename`: those folders may belong to
+ * other members, and renaming and deleting stay with each folder's owner. A
+ * tap opens the folder's page, as everywhere else. The menu carries the space
+ * rows its host passes: `onMove` (the folder's owner) and `onRemoveFromSpace`
+ * (the space's Owner). No actions, no menu.
  */
 export const FolderRow = memo(function FolderRow({
   row,
@@ -55,7 +51,8 @@ export const FolderRow = memo(function FolderRow({
   onRename,
   onMove,
   onRemoveFromSpace,
-  onOpen,
+  layout = 'list',
+  menuColumn = false,
 }: {
   row: FolderRowModel;
   /** Staggers the entrance for the first screenful only. */
@@ -70,25 +67,36 @@ export const FolderRow = memo(function FolderRow({
   onMove?: (row: FolderRowModel) => void;
   /** Opens the Remove from Space confirm. Stable, like `onRename`. */
   onRemoveFromSpace?: (row: FolderRowModel) => void;
-  /** Goes down into this folder inside the host (a space's tab) instead of
-   *  linking to its page. Stable, like `onRename`. */
-  onOpen?: (row: FolderRowModel) => void;
+  /** `feed`: the row in a space's one list (B4, 17 October 2026), in the
+   *  conversation row's box (`ConversationRow`: `px-3`, `py-2.5`, `min-h-14`,
+   *  the 36px tile centred, a 14px name), so the folder's tile and name line
+   *  up with the conversations and files around it. `list`: the folders
+   *  lists' own row. */
+  layout?: 'list' | 'feed';
+  /** Some other row in the list has a menu: keep its column when this one
+   *  has none, so the rows' right edges line up (`ConversationRow`'s prop). */
+  menuColumn?: boolean;
 }) {
+  const feed = layout === 'feed';
   const trail = formatRelativeTime(row.trailAt, now);
   const hasMenu =
     onRename !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
   const identityClass = cn(
-    'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-secondary/50',
+    'v2-interactive flex min-w-0 flex-1 gap-3 text-left transition-colors hover:bg-secondary/50',
+    feed
+      ? 'min-h-14 items-center rounded-xl px-3 py-2.5'
+      : 'items-start rounded-lg px-2 py-3',
     FOCUS_RING,
   );
   const identity = (
     <>
-      <FolderTile tint={row.tint} />
+      <FolderTile tint={row.tint} className={feed ? 'mt-0' : undefined} />
 
       <span className="min-w-0 flex-1">
         <span
           className={cn(
-            'block truncate text-[15px] font-medium transition-colors group-hover:text-primary',
+            'block truncate font-medium transition-colors group-hover:text-primary',
+            feed ? 'text-sm' : 'text-[15px]',
             // An unnamed folder wears its fallback in a quieter voice: the
             // word is the absence of a name, not a name.
             row.hasName ? 'text-foreground' : 'italic text-muted-foreground',
@@ -98,7 +106,12 @@ export const FolderRow = memo(function FolderRow({
           {row.name}
         </span>
 
-        <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+        <span
+          className={cn(
+            'flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground',
+            feed ? 'mt-0.5' : 'mt-1',
+          )}
+        >
           {/* LEAD — what the folder holds. */}
           <span className="flex min-w-0 flex-1 items-center gap-2">
             <span className="min-w-0 truncate tabular-nums">
@@ -131,23 +144,23 @@ export const FolderRow = memo(function FolderRow({
       // Capped at 14 so a deep page never staggers into a visible delay.
       style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
     >
-      <div className="group relative flex min-w-0 items-start gap-2">
-        {onOpen ? (
-          <button type="button" onClick={() => onOpen(row)} className={identityClass}>
-            {identity}
-          </button>
-        ) : (
-          // The folder page draws this row's tile and name at once, before any
-          // request answers (`folder-peek.ts`, speed step 5).
-          <Link href={row.href} onClick={() => rememberFolderPeek(row)} className={identityClass}>
-            {identity}
-          </Link>
+      <div
+        className={cn(
+          'group relative flex min-w-0',
+          feed ? 'items-center gap-1' : 'items-start gap-2',
         )}
+      >
+        {/* The folder page draws this row's tile and name at once, before any
+            request answers (`folder-peek.ts`, speed step 5). */}
+        <Link href={row.href} onClick={() => rememberFolderPeek(row)} className={identityClass}>
+          {identity}
+        </Link>
 
-        {/* Outside the link. `mt-3.5` = the link's `py-3` plus the tile's
-            `mt-0.5`, so the trigger and the tile sit on the same baseline and
-            the row reads as one bar between two anchors (the arithmetic
-            `BookmarkRow` and `NoteRow` both document). */}
+        {/* Outside the link. In a list, `mt-3.5` = the link's `py-3` plus the
+            tile's `mt-0.5`, so the trigger and the tile sit on the same
+            baseline and the row reads as one bar between two anchors (the
+            arithmetic `BookmarkRow` and `NoteRow` both document); in the feed
+            the row centres them. */}
         {hasMenu ? (
           <FolderActionsMenu
             folder={{
@@ -159,8 +172,10 @@ export const FolderRow = memo(function FolderRow({
             onRename={onRename ? () => onRename(row) : undefined}
             onMove={onMove ? () => onMove(row) : undefined}
             onRemoveFromSpace={onRemoveFromSpace ? () => onRemoveFromSpace(row) : undefined}
-            className="mt-3.5"
+            className={feed ? undefined : 'mt-3.5'}
           />
+        ) : menuColumn ? (
+          <span aria-hidden className="size-9 shrink-0" />
         ) : null}
       </div>
     </li>

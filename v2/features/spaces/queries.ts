@@ -1,28 +1,20 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { spacesApi } from '@/lib/api/collab';
 import type {
-  LengthAwareResponse,
   MemberListParams,
-  SpaceConversationListParams,
-  SpaceFileListParams,
-  SpaceFolderListParams,
+  SpaceItemsParams,
+  SpaceItemsType,
   SpaceListParams,
 } from '@/types/collab';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 
-/** A read this recent is the visit's own: a tab mounting after the screen
+/** A read this recent is the visit's own: a list mounting after the frame
  *  started its read uses it instead of asking again. */
 export const JUST_READ_MS = 3000;
 
-/** One page of a space's chats, folders or files. Twenty fills a phone twice
- *  over, so the sentinel has a page in hand before the reader reaches it. */
+/** One page of a space's feed. Twenty fills a phone twice over, so the
+ *  sentinel has a page in hand before the reader reaches it. */
 const SPACE_CONTENT_PER_PAGE = 20;
-
-/** The next page off the length-aware envelope, or `undefined` at the end. */
-function nextPageOf<T>(lastPage: LengthAwareResponse<T>): number | undefined {
-  const { current_page, last_page } = lastPage.pagination;
-  return current_page < last_page ? current_page + 1 : undefined;
-}
 
 /**
  * Spaces query factory (the `v2/features/cases/queries.ts` exemplar pattern) —
@@ -124,17 +116,15 @@ export const spacesQueries = {
 
   /**
    * ── A SPACE'S CONTENTS: chats, folders, files (backend B3, design 4.2) ────
-   * Spaces F2, 11 October 2026. Three paginated lists every member may read,
-   * each an infinite query paged on the API's `pagination` envelope, the way
-   * the conversations and folders lists page.
+   * Since design B4 (17 October 2026) one feed every member may read
+   * ({@link items}), cursor-paged.
    *
-   * THEY LIVE UNDER `['spaces']`, NOT UNDER THE FEATURES THEY LIST. The chats
-   * leaf in particular must stay OUT of `conversationsQueries.lists()`: every
-   * `conversationsCache` writer fans over that prefix and treats what it finds
-   * as the VIEWER'S OWN list (a send bumps a row to the top, a create upserts
-   * one), which a space's list of other people's chats is not. Same for the
-   * folders family. One handle per space ({@link contentsOf}) invalidates all
-   * three when F3/F4 move or add something.
+   * IT LIVES UNDER `['spaces']`, NOT UNDER THE FEATURES IT LISTS. It must stay
+   * OUT of `conversationsQueries.lists()`: every `conversationsCache` writer
+   * fans over that prefix and treats what it finds as the VIEWER'S OWN list (a
+   * send bumps a row to the top, a create upserts one), which a space's list of
+   * other people's chats is not. One handle per space ({@link contentsOf})
+   * invalidates it when something is moved or added.
    *
    * Standard tier, 30-minute retention, `REFETCH_ON_VISIT`: other members add
    * to a space while the reader is away, so an arrival must ask (the
@@ -148,99 +138,42 @@ export const spacesQueries = {
   contentsOf: (spaceUuid: string) =>
     [...spacesQueries.contents(), spaceUuid] as const,
 
-  /** The space's chats, newest activity first; `search` filters by title on
-   *  the server (Spaces F3). An empty search is not sent, so it shares the
-   *  unfiltered entry. */
-  conversations: (
+  /** Every cached page set of one space's one-list feed (`items`), whatever the
+   *  pill or search: the handle its re-reads invalidate. */
+  itemsOf: (spaceUuid: string) => [...spacesQueries.contentsOf(spaceUuid), 'items'] as const,
+
+  /**
+   * A space's conversations, files and root folders as one list, newest first
+   * (the Space home, design B4; `GET /spaces/{uuid}/items`). One pill is one
+   * `type`, none is All; `search` is the server's (conversation titles and file
+   * names, or folder names under the Folders pill). Cursor-paged forward.
+   *
+   * Under the space's contents key, so every write that already re-reads a
+   * space's contents (an add, a remove, a move, a new chat) re-reads this too.
+   * No live event feeds it: a new message elsewhere marks it stale
+   * (`conversationsCache.touch`).
+   */
+  items: (
     spaceUuid: string,
-    { viewerId, search = '' }: ViewerScoped & { search?: string },
+    { viewerId, type, search = '' }: ViewerScoped & { type?: SpaceItemsType; search?: string },
   ) => {
-    const params: SpaceConversationListParams = {
+    const params: SpaceItemsParams = {
       per_page: SPACE_CONTENT_PER_PAGE,
-      sort_by: 'last_message_at',
-      sort_order: 'desc',
+      ...(type ? { type } : {}),
       ...(search ? { search } : {}),
     };
     return infiniteQueryOptions({
-      queryKey: [
-        ...spacesQueries.contentsOf(spaceUuid),
-        'conversations',
-        params,
-        { viewerId },
-      ] as const,
-      queryFn: ({ pageParam }) =>
-        spacesApi.getConversations(spaceUuid, { ...params, page: pageParam }),
-      initialPageParam: 1,
-      getNextPageParam: nextPageOf,
+      queryKey: [...spacesQueries.itemsOf(spaceUuid), params, { viewerId }] as const,
+      queryFn: ({ pageParam }) => spacesApi.getItems(spaceUuid, { ...params, cursor: pageParam }),
+      initialPageParam: null as string | null,
+      getNextPageParam: (last) => (last.pagination.has_more ? last.pagination.next_cursor : undefined),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
-      // Every visit asks again, except one that mounts just after a read: the
-      // screen starts this read beside the space's details for a member
-      // (`early-conversations.ts`, speed step 5), and the tab mounting a moment
+      // The All list is read beside the space's details for a member
+      // (`early-feed.ts`, speed step 5); the home mounting a moment
       // later must not read it a second time.
       refetchOnMount: (query) =>
         Date.now() - query.state.dataUpdatedAt < JUST_READ_MS ? false : REFETCH_ON_VISIT,
-    });
-  },
-
-  /**
-   * The space's folders at one level: the root, or the children of `parentId`
-   * (Spaces F3 drills down inside the tab, so the level is part of the key),
-   * filtered by `search`.
-   */
-  folders: (
-    spaceUuid: string,
-    {
-      viewerId,
-      parentId = null,
-      search = '',
-    }: ViewerScoped & { parentId?: string | null; search?: string },
-  ) => {
-    const params: SpaceFolderListParams = {
-      per_page: SPACE_CONTENT_PER_PAGE,
-      ...(parentId ? { parent_id: parentId } : {}),
-      ...(search ? { search } : {}),
-    };
-    return infiniteQueryOptions({
-      queryKey: [
-        ...spacesQueries.contentsOf(spaceUuid),
-        'folders',
-        params,
-        { viewerId },
-      ] as const,
-      queryFn: ({ pageParam }) =>
-        spacesApi.getFolders(spaceUuid, { ...params, page: pageParam }),
-      initialPageParam: 1,
-      getNextPageParam: nextPageOf,
-      staleTime: STALE_TIMES.standard,
-      gcTime: GC_TIMES.list,
-      refetchOnMount: REFETCH_ON_VISIT,
-    });
-  },
-
-  /** The space's files; `name` filters by file name on the server. */
-  files: (
-    spaceUuid: string,
-    { viewerId, name = '' }: ViewerScoped & { name?: string },
-  ) => {
-    const params: SpaceFileListParams = {
-      per_page: SPACE_CONTENT_PER_PAGE,
-      ...(name ? { name } : {}),
-    };
-    return infiniteQueryOptions({
-      queryKey: [
-        ...spacesQueries.contentsOf(spaceUuid),
-        'files',
-        params,
-        { viewerId },
-      ] as const,
-      queryFn: ({ pageParam }) =>
-        spacesApi.getFiles(spaceUuid, { ...params, page: pageParam }),
-      initialPageParam: 1,
-      getNextPageParam: nextPageOf,
-      staleTime: STALE_TIMES.standard,
-      gcTime: GC_TIMES.list,
-      refetchOnMount: REFETCH_ON_VISIT,
     });
   },
 

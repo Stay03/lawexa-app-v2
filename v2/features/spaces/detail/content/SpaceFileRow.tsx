@@ -21,16 +21,19 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { fileTypeLabel } from '../../content-model';
 
 /** The row's body, as a button or (for a file that is gone) as plain text.
- *  The 40px mark and `py-2.5` make it 60px tall, over the 44px floor. */
+ *  The conversation row's box (`ConversationRow`): `px-3`, the 36px mark,
+ *  `py-2.5` and `min-h-14`, so in the space's one list a file's mark and name
+ *  start where a conversation's do and the two rows are the same height. */
 const IDENTITY_CLASS =
-  'flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2.5 text-left';
+  'flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left';
 
 /**
- * SpaceFileRow — one file in a space's Files tab (Spaces F2, 11 October 2026).
+ * SpaceFileRow — one file in a space's list (Spaces F2, 11 October 2026; the
+ * home's one list since B4, 17 October 2026).
  *
  * ── WHY NOT THE CHANNEL LIBRARY'S `FileRow` ────────────────────────────────
  * That row is the right LOOK, and this one copies its anatomy exactly: the
- * 40px `FileMark` (a thumbnail when the file is an image), the name, and the
+ * `FileMark` (a thumbnail when the file is an image), the name, and the
  * two-zone meta line (size and uploader, then the age). It cannot be the same
  * component, because it is built around a CHANNEL: it takes the `Channel`,
  * decides delete rights off the channel's roles, and its delete mutation edits
@@ -95,7 +98,7 @@ export const SpaceFileRow = memo(function SpaceFileRow({
       {/* `FileMark` reads a non-null `url`; a file whose url the server
           withheld wears its type glyph, which is what the mark does for an
           empty url anyway. */}
-      <FileMark file={{ ...file, url: file.url ?? '' }} />
+      <FileMark file={{ ...file, url: file.url ?? '' }} size="sm" />
 
       <span className="block min-w-0 flex-1">
         <span
@@ -163,7 +166,7 @@ export const SpaceFileRow = memo(function SpaceFileRow({
           <DropdownMenu>
             <DropdownMenuTrigger
               className={cn(
-                'v2-interactive flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground',
+                'v2-interactive flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground',
                 FOCUS_RING,
               )}
               aria-label={`Actions for ${file.original_name}`}
@@ -209,7 +212,7 @@ export const SpaceFileRow = memo(function SpaceFileRow({
           button. A file that is GONE says so and offers nothing, because
           trying again cannot help; a refused or blocked open offers a fresh
           gesture, which is exactly what an engine that refused the first one
-          will honour. Indented to the name: the row's `px-2`, the 40px mark
+          will honour. Indented to the name: the row's `px-3`, the 36px mark
           and its `gap-3`. */}
       {gone ? (
         <p role="status" className="pb-1 pl-15 text-[11px] text-muted-foreground">

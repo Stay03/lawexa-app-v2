@@ -1744,6 +1744,42 @@ export type SpaceFileResponse = ItemResponse<SpaceFile>;
 export type SpaceFolderResponse = ItemResponse<SpaceFolder>;
 
 /**
+ * ── ONE LIST OF A SPACE'S CONTENTS (backend, 17 October 2026) ─────────────
+ * `GET /spaces/{uuid}/items`: conversations, files and root folders together,
+ * newest first (the Space home, design B4). Each row's `item` is exactly the
+ * resource its own list returns, so the existing rows draw it. `sort_at` is
+ * never null: a conversation's last message (else its creation), a file's
+ * upload, a folder's rename or move. Order is `sort_at` desc, then type, then
+ * id, so a cursor never repeats or skips a row. Members only (403); a missing
+ * space 404s.
+ */
+export type SpaceItemsType = 'conversations' | 'files' | 'folders';
+
+export type SpaceItem =
+  | { type: 'conversation'; sort_at: string; item: SpaceConversation }
+  | { type: 'file'; sort_at: string; item: SpaceFile }
+  | { type: 'folder'; sort_at: string; item: SpaceFolder };
+
+export interface SpaceItemsParams {
+  /** One kind; none is all three mixed. */
+  type?: SpaceItemsType;
+  /** Conversation titles and file names; with no type, folders drop out.
+   *  With `type: 'folders'`, folder names (subfolders included). */
+  search?: string;
+  /** `pagination.next_cursor` from the page before, passed back unchanged. */
+  cursor?: string | null;
+  per_page?: number;
+}
+
+/** `ApiResponse::cursorPaginated`: forward only (`prev_cursor` always null). */
+export interface SpaceItemsResponse {
+  success: boolean;
+  message: string;
+  data: SpaceItem[];
+  pagination: CursorMeta;
+}
+
+/**
  * ── WRITING TO A SPACE'S CONTENTS (backend B3, cb0fae8) ────────────────────
  * Spaces F3, 12 October 2026. Each body below carries exactly the keys the B3
  * contract documents and nothing else; `content-model.ts` builds them and the

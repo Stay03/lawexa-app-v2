@@ -19,7 +19,7 @@ import {
   uploadPrecheck,
   uploadRefusal,
 } from './content-model';
-import { canAddContent, SPACE_TAB_LABELS } from './model';
+import { canAddContent, parseSpaceTab, SPACE_TAB_LABELS, SPACE_TABS } from './model';
 
 /* Spaces F3 (12 October 2026, backend B3 cb0fae8): adding to a space,
  * taking items out, and moving items in and out. Pure rules first, then the
@@ -117,26 +117,26 @@ test('a move is offered only on the viewer’s own item, into spaces they can ad
   );
 });
 
-test('the tabs: a Viewer sees no add control, only the space Owner sees Remove from space', () => {
+test('the home: a Viewer sees no add control, only the space Owner sees Remove from space', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /canAdd: space !== null && canAddContent\(space\),/);
-  assert.match(panel, /canRemove: space !== null && canRemoveFromSpace\(space\),/);
-  assert.match(panel, /const newFolderButton = canAdd \? \(/);
-  assert.match(panel, /const uploadButton = canAdd \? \(/);
+  assert.match(panel, /canAdd: canAddContent\(space\),/);
+  assert.match(panel, /canRemove: canRemoveFromSpace\(space\),/);
+  // Upload files on the Files pill, New folder on the Folders pill (B4).
+  assert.match(panel, /access\.canAdd && tab === 'files' \? \(\s*<PillButton icon=\{Upload\} onClick=\{pickFiles\}>\s*Upload files/);
+  assert.match(panel, /access\.canAdd && tab === 'folders' \? \(\s*<PillButton icon=\{Plus\} onClick=\{startFolder\}>\s*New folder/);
   // The file input and the tray exist only for someone who may add, and so
   // does the drop zone.
-  // (The Files tab's picker, `useSpaceUploads`; the empty Conversations tab
-  // opens the docked box's own picker instead, Arthur, 15 October 2026.)
-  assert.match(panel, /\{canAdd \? picker : null\}/);
-  assert.doesNotMatch(panel, /uploads\.picker/);
-  assert.match(panel, /return canAdd \? \(\s*<FileDropZone/);
+  // (`useSpaceUploads`; the empty All and Conversations pills open the docked
+  // box's own picker instead, Arthur, 15 October 2026.)
+  assert.match(panel, /\{access\.canAdd \? picker : null\}/);
+  assert.match(panel, /\{access\.canAdd && tab !== 'people' \? \(\s*<FileDropZone/);
   // Remove from space on the folder and file rows, for the space's Owner
   // only; a chat's row follows its `can` (the shared conversation menu).
-  assert.equal(panel.match(/onRemoveFromSpace=\{\s*canRemove \?/g)?.length, 2);
-  assert.match(panel, /actions=\{menu\.actionsFor\(conversation\)\}/);
+  assert.equal(panel.match(/onRemoveFromSpace: canRemove \?/g)?.length, 2);
+  assert.match(panel, /actions=\{menu\.actionsFor\(entry\.item\)\}/);
   // Move on the folder and file rows, for the item's owner only.
-  assert.match(panel, /ownsItem\(recordByUuid\.get\(row\.uuid\)\?\.user\?\.id, viewerId\) \? moveRow : undefined/);
-  assert.match(panel, /ownsItem\(file\.uploader\.id, viewerId\) \? moveFile : undefined/);
+  assert.match(panel, /onMove: ownsItem\(entry\.item\.user\?\.id, viewerId\) \? moveFolder : undefined/);
+  assert.match(panel, /onMove: ownsItem\(file\.uploader\.id, viewerId\) \? moveFile : undefined/);
   // The empty state hands its action on only to someone who may add.
   const states = read('v2', 'features', 'spaces', 'detail', 'content', 'states.tsx');
   assert.match(states, /action=\{canAdd \? action : undefined\}/);
@@ -149,11 +149,11 @@ test('the folder and file menus carry the space rows only when the host passes t
   // Rename and Delete stay the owner's pair: never in a space tab's menu.
   assert.match(menu, /\{onRename \? \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuItem\s+variant="destructive"/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  // Rename stays the owner's: never in a space tab's menu. Delete is in it for
+  // Rename stays the owner's: never in a space's menu. Delete is in it for
   // files alone since 15 October 2026 (a space's file belongs to the space).
-  assert.doesNotMatch(panel, /onRename=/);
-  assert.equal((panel.match(/onDelete=/g) ?? []).length, 1);
-  assert.match(panel, /onCopyToMine=\{copyFile\}\s*onDelete=\{/);
+  assert.doesNotMatch(panel, /onRename/);
+  assert.equal((panel.match(/onDelete:/g) ?? []).length, 1);
+  assert.match(panel, /onCopyToMine: copyFile,\s*onDelete: canDeleteSpaceFile\(/);
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
   // A confidential chat never gets a menu; it keeps a spacer in the column.
   assert.match(row, /const hasMenu = actions\.length > 0 && !is_confidential;/);
@@ -222,17 +222,17 @@ test('the channel panel keeps its own queue rules through the shared queue', () 
 
 /* ── Empty states and labels ─────────────────────────────────────────────── */
 
-test('empty tabs teach the Owner and Contributors, and tell a Viewer who fills them', () => {
+test('empty pills teach the Owner and Contributors, and tell a Viewer who fills them', () => {
   // Design round 1: Stay's lines moved to the header of every shared space,
   // so the empty state names what is missing and how it gets filled instead
   // of repeating them.
-  const nouns = { chats: 'conversations', folders: 'folders', files: 'files' } as const;
-  for (const tab of ['chats', 'folders', 'files'] as const) {
+  const nouns = { conversations: 'conversations', folders: 'folders', files: 'files' } as const;
+  for (const tab of ['conversations', 'folders', 'files'] as const) {
     const adder = spaceEmptyCopy(tab, true);
     // Arthur's heading for the Conversations tab (15 October 2026).
     assert.equal(
       adder.title,
-      tab === 'chats' ? 'Start working with Lawexa' : `No ${nouns[tab]} in this space yet`,
+      tab === 'conversations' ? 'Start working with Lawexa' : `No ${nouns[tab]} in this space yet`,
       tab,
     );
     assert.doesNotMatch(adder.title + adder.description, /Members can add|organised for the whole team/, tab);
@@ -240,8 +240,14 @@ test('empty tabs teach the Owner and Contributors, and tell a Viewer who fills t
     assert.equal(viewer.title, `No ${nouns[tab]} in this space yet`, tab);
     assert.equal(viewer.description, `Contributors and the owner add ${nouns[tab]} here.`, tab);
   }
+  // All, empty: Arthur's words to whoever may add, the three kinds to a Viewer.
+  assert.deepEqual(spaceEmptyCopy('all', true), spaceEmptyCopy('conversations', true));
+  assert.deepEqual(spaceEmptyCopy('all', false), {
+    title: 'Nothing in this space yet',
+    description: 'Contributors and the owner add conversations, files and folders here.',
+  });
   assert.equal(
-    spaceEmptyCopy('chats', true).description,
+    spaceEmptyCopy('conversations', true).description,
     'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
   );
   assert.match(spaceEmptyCopy('folders', true).description, /Folders you add here are shared with everyone in this space\./);
@@ -255,7 +261,7 @@ test('no em dash in the new UI strings', () => {
     read('v2', 'features', 'spaces', 'detail', 'content', 'RemoveFromSpaceDialog.tsx'),
     read('v2', 'features', 'spaces', 'detail', 'content', 'states.tsx'),
   ];
-  for (const tab of ['chats', 'folders', 'files'] as const) {
+  for (const tab of ['all', 'conversations', 'folders', 'files'] as const) {
     for (const canAdd of [true, false]) {
       const { title, description } = spaceEmptyCopy(tab, canAdd);
       assert.doesNotMatch(title + description, /—/);
@@ -269,8 +275,13 @@ test('no em dash in the new UI strings', () => {
   }
 });
 
-test('the tab is called Conversations; its id stays chats for old links', () => {
-  assert.equal(SPACE_TAB_LABELS.chats, 'Conversations');
+test('the pills are All, Conversations, Files, Folders and People; old tab ids open All', () => {
+  assert.deepEqual(
+    SPACE_TABS.map((tab) => SPACE_TAB_LABELS[tab]),
+    ['All', 'Conversations', 'Files', 'Folders', 'People'],
+  );
+  for (const old of ['chats', 'channels', null, 'nonsense']) assert.equal(parseSpaceTab(old), 'all');
+  for (const tab of SPACE_TABS) assert.equal(parseSpaceTab(tab), tab);
 });
 
 test('Spaces copy promises no Lawexa behaviour', () => {
@@ -346,9 +357,10 @@ test('each write invalidates the space lists, the item’s own list and the coun
   const queries = read('v2', 'features', 'spaces', 'queries.ts');
   assert.match(queries, /contents: \(\) => \[\.\.\.spacesQueries\.all, 'contents'\] as const,/);
   assert.match(queries, /\[\.\.\.spacesQueries\.contents\(\), spaceUuid\] as const,/);
-  // The folder level and the searches are part of each list's key.
-  assert.match(queries, /\.\.\.\(parentId \? \{ parent_id: parentId \} : \{\}\),\s*\.\.\.\(search \? \{ search \} : \{\}\),/);
-  assert.match(queries, /\.\.\.\(name \? \{ name \} : \{\}\),/);
+  // The pill and the search are part of the feed's key, under the space's
+  // contents, so every write above re-reads it (design B4).
+  assert.match(queries, /\.\.\.\(type \? \{ type \} : \{\}\),\s*\.\.\.\(search \? \{ search \} : \{\}\),/);
+  assert.match(queries, /itemsOf: \(spaceUuid: string\) => \[\.\.\.spacesQueries\.contentsOf\(spaceUuid\), 'items'\] as const,/);
 });
 
 test('approving a join request refreshes the real space and channel keys', () => {

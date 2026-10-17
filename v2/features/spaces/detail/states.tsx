@@ -15,16 +15,8 @@ import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import type { SpaceTab } from '../model';
 import { SpaceContentSkeleton } from './content/states';
-import {
-  LobbyFactsSkeleton,
-  LobbyPeopleSkeleton,
-  spacePageColumn,
-  SPACE_LOBBY_GRID,
-  SPACE_TAB_PANEL,
-  SPACE_TABS_ROW,
-} from './lobby-parts';
-import { SpaceHeading } from './SpacePlaceHeader';
-import { SpaceTabsSkeleton } from './SpaceTabs';
+import { SPACE_PAGE_COLUMN, SPACE_PILL_BAR } from './lobby-parts';
+import { SPACE_HEADER_ROW, SpaceHeading, spaceMembersLabel } from './SpacePlaceHeader';
 
 /**
  * The `/spaces/[spaceId]` states — the loading silhouettes and the designed
@@ -92,126 +84,87 @@ export interface SpaceFrameIdentity {
   /** The row's own description, or `null`. NOT "not yet loaded" — a space with
    *  no description prints nothing here, and so does this. */
   description: string | null;
+  /** The row's `active_members_count`, for "7 members" under the name. */
+  membersCount: number;
   /** `team` or `shared` (an absent kind on the row reads as `team`). */
   kind: SpaceKind;
 }
 
 /**
- * The whole lobby's silhouette — the identity block (crest, kicker, name,
- * description, presence + primary action), the activity digest, and the two
- * side regions. Geometry mirrors the live lobby, so the hand-off is content
- * resolving rather than a layout swap.
+ * The space home's silhouette: the header (crest, name, the line under it),
+ * the pill bar and the list. Geometry mirrors the live home, so the hand-off
+ * is content resolving rather than a layout swap.
  *
  * ── AND IT TAKES THE IDENTITY THE LIST ALREADY HAD ─────────────────────────
  * Owner, 15 August 2026: "for spaces the first skeleton is a full skeleton, the
  * second one has some text and images and stuff". Two loading states that do
  * not look alike read as two pages, not one page arriving. The row the reader
- * tapped carries the crest, the kicker (with the viewer's role), the name,
- * whether it is private, its description and so Stay's lines — so with
- * `identity` supplied the first state IS the second one, and only the channel
- * digest and the roster resolve later.
+ * tapped carries the crest, the name, the line under it (with the members
+ * count), its description and so Stay's lines, so with `identity` supplied the
+ * first state IS the second one, and only the list resolves later.
  *
- * THE ACTION ROW IS NEVER SEEDED. Whether this reader may create a channel is a
- * ruling off `my_role`, and the presence stack needs a roster that arrives on
- * its own request. Those keep their shapes, which is what a shape is for.
- *
- * ── THE TABS, AND THE PANEL OF THE TAB THAT WILL OPEN (Spaces F2) ──────────
- * Since 11 October 2026 the page is a tab strip under the identity block, and
- * the panel below it is the lobby only on the Channels tab. So the silhouette
- * draws the strip and the panel of the tab the page is about to open: the
- * lobby's grid for `channels`, the rows of the list otherwise. `showsChannels`
- * is the caller's best answer before the detail lands (the cached row's kind,
- * and whether this viewer may open Team Channels at all); it also decides
- * whether a "New channel" button's place is reserved.
+ * ── THE PANEL OF THE PILL THAT WILL OPEN ───────────────────────────────────
+ * The People pill draws the roster's shape; every other pill draws rows (the
+ * list's rows share one geometry, `SpaceContentSkeleton`). The add control a
+ * pill carries is a ruling off the reader's role, so it is never reserved.
  */
 export function SpaceScreenFrame({
   identity = null,
-  showsChannels,
   tab,
 }: {
   /** The tapped row's identity; `null` on a cold arrival keeps the silhouette. */
   identity?: SpaceFrameIdentity | null;
-  /** Whether the page will show its channels (the Channels tab, the button). */
-  showsChannels: boolean;
-  /** The tab the page will open on. */
+  /** The pill the page will open on. */
   tab: SpaceTab;
 }) {
   return (
-    <div className={spacePageColumn(showsChannels)}>
-      {/* One row, as the live header since Stay's 15 October 2026 note: the
-          description sits behind the name, the people in their tab, New
-          channel in the Channels tab. */}
-      <div className="border-b pb-4">
-        <div className="flex items-start gap-4">
-          {identity ? (
-            <SpaceCrest
-              uuid={identity.uuid}
+    <div className={SPACE_PAGE_COLUMN}>
+      <div className={SPACE_HEADER_ROW}>
+        {identity ? (
+          <SpaceCrest uuid={identity.uuid} name={identity.name} type={identity.type} size="md" />
+        ) : (
+          <CrestSkeleton size="md" />
+        )}
+        {identity ? (
+          <div className="min-w-0 flex-1">
+            {/* The live header's own heading, so the hand-off moves nothing
+                and the shell bar's title steps back from the first frame. */}
+            <SpaceHeading
               name={identity.name}
-              type={identity.type}
-              size="lg"
+              // The same shape as the live name when it opens the details
+              // (the chevron), so the hand-off adds nothing; the sheet is the
+              // live screen's, so a tap here waits for it.
+              onOpenAbout={identity.description || identity.principle ? NOOP : undefined}
             />
-          ) : (
-            <CrestSkeleton size="lg" />
-          )}
-          {identity ? (
-            <div className="min-w-0 flex-1">
-              {/* The live header's own heading, so the hand-off moves nothing
-                  and the shell bar's title steps back from the first frame. */}
-              <SpaceHeading
-                name={identity.name}
-                // The same shape as the live name when it opens the details
-                // (the chevron), so the hand-off adds nothing; the sheet is the
-                // live screen's, so a tap here waits for it.
-                onOpenAbout={identity.description || identity.principle ? NOOP : undefined}
-              />
-              <MetaLine className="mt-1 text-sm" lead={identity.facts} />
-            </div>
-          ) : (
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <Skeleton className="h-6 w-3/5 rounded md:h-7 md:w-2/5" />
-              <Skeleton className="h-4 w-28 rounded" />
-            </div>
-          )}
-        </div>
+            <MetaLine
+              className="mt-0.5 text-sm"
+              lead={identity.facts}
+              trail={[spaceMembersLabel(identity.membersCount)]}
+            />
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <Skeleton className="h-6 w-3/5 rounded md:h-7 md:w-2/5" />
+            <Skeleton className="h-4 w-40 rounded" />
+          </div>
+        )}
       </div>
 
-      <div className={SPACE_TABS_ROW}>
-        <SpaceTabsSkeleton showsChannels={showsChannels} />
+      {/* The live pill bar's box: the five pills, then the search. */}
+      <div aria-hidden className={SPACE_PILL_BAR}>
+        <Skeleton className="h-9 w-[21rem] max-w-full shrink-0 rounded-full" />
+        {tab === 'people' ? null : <Skeleton className="h-11 min-w-0 flex-1 rounded-4xl" />}
       </div>
 
-      <div className={SPACE_TAB_PANEL}>
-        {tab === 'channels' ? (
-          <>
-            {/* The live tab's New channel button, below `lg:`. */}
-            {showsChannels ? <Skeleton className="mb-4 h-8 w-32 rounded-md lg:hidden" /> : null}
-            <div className={SPACE_LOBBY_GRID}>
-              <div className="min-w-0">
-                <Skeleton className="mb-2 h-4 w-28 rounded" />
-                <ChannelListSkeleton />
-              </div>
-              <div className="flex min-w-0 flex-col gap-6">
-                <div>
-                  <Skeleton className="mb-2 h-4 w-20 rounded" />
-                  {/* The SAME component the live People block draws while its
-                      roster is in flight, so the fallback reserves the rows and
-                      the button that are actually coming. */}
-                  <LobbyPeopleSkeleton />
-                </div>
-                <div>
-                  <Skeleton className="mb-2 h-4 w-16 rounded" />
-                  <LobbyFactsSkeleton />
-                </div>
-              </div>
-            </div>
-          </>
-        ) : tab === 'people' ? (
-          // The People tab's own pending shape: the count line, then the rows.
+      <div className="mt-4">
+        {tab === 'people' ? (
+          // The People pill's own pending shape: the count line, then the rows.
           <div className="flex flex-col gap-6">
             <Skeleton className="h-4 w-24 rounded" />
             <RosterSkeleton />
           </div>
         ) : (
-          <SpaceContentSkeleton tab={tab} />
+          <SpaceContentSkeleton />
         )}
       </div>
     </div>

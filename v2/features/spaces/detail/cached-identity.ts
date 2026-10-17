@@ -42,6 +42,8 @@ export function useCachedSpaceIdentity(
     facts: spaceHeaderFacts(row),
     description: row.description?.trim() || null,
     principle: spacePrincipleLine(row),
+    // The end of the line under the name ("7 members"), the live header's.
+    membersCount: row.active_members_count,
     // A settled fact about the space, not a permission, so the frame may act
     // on it before the detail lands: it decides whether a team space's rail
     // width is reserved from the first frame (`CollabFrame`).

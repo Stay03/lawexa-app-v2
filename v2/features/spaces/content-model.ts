@@ -35,9 +35,8 @@ import { canAddContent, type SpaceTab } from './model';
 /** The three kinds of item a space holds. */
 export type SpaceItemKind = SpaceItemRef['type'];
 
-/** The space's content tabs; `channels` is the lobby and `people` the roster,
- *  and neither holds items. */
-export type SpaceContentTab = Exclude<SpaceTab, 'channels' | 'people'>;
+/** The space home's pills that list items; `people` is the roster. */
+export type SpaceContentTab = Exclude<SpaceTab, 'people'>;
 
 /** Whether the viewer may take items out of this space: its content Owner. */
 export function canRemoveFromSpace(space: Pick<Space, 'my_content_role'>): boolean {
@@ -292,17 +291,17 @@ export function fileTypeLabel(file: { mime_type: string; original_name: string }
     : 'File';
 }
 
-/** Each content tab's plural noun, the word its empty state uses. */
-const SPACE_TAB_NOUN: Readonly<Record<SpaceContentTab, string>> = {
-  chats: 'conversations',
+/** Each kind pill's plural noun, the word its empty state uses. */
+const SPACE_TAB_NOUN: Readonly<Record<Exclude<SpaceContentTab, 'all'>, string>> = {
+  conversations: 'conversations',
   folders: 'folders',
   files: 'files',
 };
 
 /**
- * What an empty content tab says. Since design round 1 Stay's two lines sit
- * in a shared space's header whether it is full or empty, so the empty state
- * no longer repeats them: it names what is missing and how it gets filled. An
+ * What an empty pill says. Since design round 1 Stay's two lines sit in a
+ * shared space's header whether it is full or empty, so the empty state no
+ * longer repeats them: it names what is missing and how it gets filled. An
  * Owner or Contributor reads how to add, with the way to add beside it; a
  * Viewer cannot add, so they read who does, and get no button.
  */
@@ -310,30 +309,28 @@ export function spaceEmptyCopy(
   tab: SpaceContentTab,
   canAdd: boolean,
 ): { title: string; description: string } {
+  if (tab === 'all' && !canAdd) {
+    return {
+      title: 'Nothing in this space yet',
+      description: 'Contributors and the owner add conversations, files and folders here.',
+    };
+  }
+  if (tab === 'all' || (tab === 'conversations' && canAdd)) {
+    // Arthur's words (15 October 2026, second pass). The box is docked under
+    // this (`SpaceChatDock`), with Upload files and Invite people between the
+    // two.
+    return {
+      title: 'Start working with Lawexa',
+      description:
+        'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
+    };
+  }
   const noun = SPACE_TAB_NOUN[tab];
   const title = `No ${noun} in this space yet`;
-  if (!canAdd) {
-    return { title, description: `Contributors and the owner add ${noun} here.` };
-  }
-  switch (tab) {
-    case 'chats':
-      // Arthur's words (15 October 2026, second pass). The box is docked
-      // under this (`SpaceChatDock`), with Upload files and Invite people
-      // between the two.
-      return {
-        title: 'Start working with Lawexa',
-        description:
-          'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
-      };
-    case 'folders':
-      return {
-        title,
-        description: 'Folders you add here are shared with everyone in this space.',
-      };
-    case 'files':
-      return {
-        title,
-        description: 'Files you add here are shared with everyone in this space.',
-      };
-  }
+  return {
+    title,
+    description: canAdd
+      ? `${noun.charAt(0).toUpperCase()}${noun.slice(1)} you add here are shared with everyone in this space.`
+      : `Contributors and the owner add ${noun} here.`,
+  };
 }

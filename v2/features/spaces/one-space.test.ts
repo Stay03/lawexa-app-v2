@@ -17,7 +17,7 @@ import {
   spaceContentCountsLabel,
   spaceKind,
   spaceShowsChannels,
-  spaceTabs,
+  SPACE_TABS,
   showsTeamMark,
   uniqueRowsById,
 } from './model';
@@ -100,25 +100,25 @@ test('only an Owner or a Contributor may add content; the old my_role does not c
   assert.equal(canAddContent(teamAdmin), false);
 });
 
-test('the tabs by kind × role: Channels first, and the default, only where channels show', () => {
-  const tabsFor = (kind: SpaceKind, viewer: V2SessionSnapshot) =>
-    spaceTabs(spaceShowsChannels({ kind }, viewer));
-  // People last, for every member of every kind (Stay, 15 October 2026).
-  assert.deepEqual(tabsFor('team', researcher), ['channels', 'chats', 'folders', 'files', 'people']);
-  assert.deepEqual(tabsFor('shared', researcher), ['chats', 'folders', 'files', 'people']);
-  assert.deepEqual(tabsFor('team', user), ['chats', 'folders', 'files', 'people']);
-  assert.deepEqual(tabsFor('shared', user), ['chats', 'folders', 'files', 'people']);
-  // Every space opens on Conversations, where the message box is (15 October 2026).
-  assert.equal(defaultSpaceTab(), 'chats');
+test('the pills are the same for every kind and role; channels stay in the rail (B4)', () => {
+  // People last (Stay, 15 October 2026); no Channels pill (design B4).
+  assert.deepEqual(SPACE_TABS, ['all', 'conversations', 'files', 'folders', 'people']);
+  // Channels still show where they did, in the rail.
+  const shows = (kind: SpaceKind, viewer: V2SessionSnapshot) => spaceShowsChannels({ kind }, viewer);
+  assert.equal(shows('team', researcher), true);
+  assert.equal(shows('shared', researcher), false);
+  assert.equal(shows('team', user), false);
+  // Every space opens on All, with the message box under it.
+  assert.equal(defaultSpaceTab(), 'all');
 });
 
-test('?tab= resolves against the tabs this viewer has, never to a missing one', () => {
-  assert.equal(parseSpaceTab('files', false), 'files');
-  assert.equal(parseSpaceTab('channels', true), 'channels');
-  assert.equal(parseSpaceTab('channels', false), 'chats');
-  assert.equal(parseSpaceTab('nonsense', true), 'chats');
-  assert.equal(parseSpaceTab(null, true), 'chats');
-  assert.equal(parseSpaceTab(null, false), 'chats');
+test('?tab= resolves to a pill, never to a missing one', () => {
+  assert.equal(parseSpaceTab('files'), 'files');
+  assert.equal(parseSpaceTab('people'), 'people');
+  assert.equal(parseSpaceTab('channels'), 'all');
+  assert.equal(parseSpaceTab('chats'), 'all');
+  assert.equal(parseSpaceTab('nonsense'), 'all');
+  assert.equal(parseSpaceTab(null), 'all');
 });
 
 test('a shared space is never offered as open; a create sends a kind only for researcher+', () => {
@@ -196,50 +196,36 @@ test('the frame: no rail, drawer, channel dialog or channel request unless chann
   assert.match(slot, /if \(context\.openRail === null\) return null;/);
 });
 
-test('the space page: tabs from the model, the lobby only on Channels, threads only there', () => {
+test('the space page: pills from the model, one panel, no channel read (B4)', () => {
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /const showsChannels = scope\?\.showsChannels \?\? false;/);
-  assert.match(screen, /const tab = parseSpaceTab\(tabParam, showsChannels\);/);
+  assert.match(screen, /const tab = parseSpaceTab\(tabParam\);/);
   assert.match(screen, /quietReplaceUrlParams\(\{ tab: value \}\)/);
-  assert.match(screen, /<SpaceTabs\s+showsChannels=\{showsChannels\}/);
-  assert.match(screen, /\{tab === 'channels' \? \(\s*<>[\s\S]{0,800}?<div className=\{SPACE_LOBBY_GRID\}>/);
-  assert.match(screen, /<SpaceContentPanel key=\{tab\} tab=\{tab\} spaceUuid=\{space\.uuid\} \/>/);
-  assert.match(
-    screen,
-    /enabled: eligible && space !== null && showsChannels && tab === 'channels',/,
-  );
-  // New channel sits at the top of the Channels tab since Stay's 15 October note.
-  assert.match(screen, /\{canManage && showsChannels \? \(\s*<div className="mb-4 lg:hidden">/);
-  const tabs = read('v2', 'features', 'spaces', 'detail', 'SpaceTabs.tsx');
-  assert.match(tabs, /spaceTabs\(showsChannels\)/);
-  assert.match(tabs, /<TabRow/);
+  assert.match(screen, /<SpaceContentPanel space=\{space\} tab=\{tab\} onTabChange=\{setTab\} \/>/);
+  assert.doesNotMatch(screen, /SpaceTabs|threadsBySpace|showsChannels/);
+  const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
+  assert.match(panel, /<TabRow\s+tabs=\{PILLS\}/);
+  assert.match(panel, /const PILLS = SPACE_TABS\.map\(\(id\) => \(\{ id, label: SPACE_TAB_LABELS\[id\] \}\)\);/);
 });
 
-test('the content lists: their own keys under spaces, read-only rows', () => {
+test('the content feed: its own key under spaces, read-only rows', () => {
   const queries = read('v2', 'features', 'spaces', 'queries.ts');
-  for (const leaf of ['conversations', 'folders', 'files']) {
-    assert.match(
-      queries,
-      new RegExp(`\\.\\.\\.spacesQueries\\.contentsOf\\(spaceUuid\\),\\s*'${leaf}',\\s*params,\\s*\\{ viewerId \\},`),
-      leaf,
-    );
-  }
+  assert.match(queries, /queryKey: \[\.\.\.spacesQueries\.itemsOf\(spaceUuid\), params, \{ viewerId \}\] as const,/);
   const api = read('lib', 'api', 'collab.ts');
-  for (const path of ['conversations', 'folders', 'files']) {
-    assert.match(api, new RegExp(`\`/spaces/\\$\\{spaceUuid\\}/${path}\``), path);
-  }
+  assert.match(api, /`\/spaces\/\$\{spaceUuid\}\/items`/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  // Rename stays the owner's: never in a space tab's menu. Delete is in it for
+  // Rename stays the owner's: never in a space's menu. Delete is in it for
   // files alone since 15 October 2026 (a space's file belongs to the space).
-  assert.doesNotMatch(panel, /onRename=/);
-  assert.equal((panel.match(/onDelete=/g) ?? []).length, 1);
-  assert.match(panel, /onCopyToMine=\{copyFile\}\s*onDelete=\{/);
+  assert.doesNotMatch(panel, /onRename/);
+  assert.equal((panel.match(/onDelete:/g) ?? []).length, 1);
+  assert.match(panel, /onCopyToMine: copyFile,\s*onDelete: /);
   assert.doesNotMatch(panel, /FilesTab/);
-  // Every list keeps each row once across pages.
+  // The list keeps each item once across pages, keyed by kind and id.
   assert.doesNotMatch(panel, /flatMap/);
-  for (const idOf of ['chatId', 'folderUuid', 'fileId']) {
-    assert.match(panel, new RegExp(`uniqueRowsById\\(pages, ${idOf}\\)`), idOf);
-  }
+  assert.match(panel, /uniqueRowsById\(pages, itemKey\)/);
+  assert.match(
+    panel,
+    /const itemKey = \(entry: SpaceItem\): string =>\s*entry\.type === 'folder' \? `folder:\$\{entry\.item\.uuid\}` : `\$\{entry\.type\}:\$\{entry\.item\.id\}`;/,
+  );
   // Files open through the tap-first opener, never the channel download hook.
   const fileRow = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
   assert.match(fileRow, /const \{ open, opening, failed, gone \} = useOpenFileInNewTab\(\);/);

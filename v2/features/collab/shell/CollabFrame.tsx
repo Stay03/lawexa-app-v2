@@ -18,7 +18,7 @@ import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/mod
 import { useCachedSpaceIdentity } from '@/v2/features/spaces/detail/cached-identity';
 import { ChannelFormDialog } from '@/v2/features/spaces/dialogs/ChannelFormDialog';
 import { DeleteSpaceDialog } from '@/v2/features/spaces/detail/DeleteSpaceDialog';
-import { useEarlyConversations } from '@/v2/features/spaces/detail/early-conversations';
+import { useEarlyFeed } from '@/v2/features/spaces/detail/early-feed';
 import { SpaceMembersSheet } from '@/v2/features/spaces/detail/SpaceMembersSheet';
 import {
   canManageMembership,
@@ -220,10 +220,10 @@ function CollabPlaceFrame({
     enabled: eligible && spaceUuid !== null,
   });
   const space = spaceQuery.data?.data ?? null;
-  // A member opening a space from the list: its Conversations tab's first page
+  // A member opening a space from the list: its home's All list
   // goes out beside the details above, not a second later with the page's code
-  // (`early-conversations.ts`, speed step 5).
-  useEarlyConversations(isSpaceRoute ? route.spaceUuid : null);
+  // (`early-feed.ts`, speed step 5).
+  useEarlyFeed(isSpaceRoute ? route.spaceUuid : null);
 
   /**
    * Whether this place shows its channels to this viewer (see "A space

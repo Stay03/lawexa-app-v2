@@ -131,54 +131,39 @@ export function createSpaceKind(
   return canChooseKind ? chosen : undefined;
 }
 
-/* ── The space page's tabs (?tab=) ────────────────────────────────────────── */
+/* ── The space home's pills (?tab=) ───────────────────────────────────────── */
 
-/** The space page's tab ids. `channels` holds the old lobby (the activity
- *  digest, about); `chats`, `folders` and `files` are the space's contents;
- *  `people` is the members and, for whoever manages them, the invited and the
- *  asked-to-join (Stay, 15 October 2026). */
-export type SpaceTab = 'channels' | 'chats' | 'folders' | 'files' | 'people';
+/** The space home's pills (design B4, Arthur and Stay, 17 October 2026): one
+ *  list of everything (`all`), one kind of it, or the members and, for whoever
+ *  manages them, the invited and the asked-to-join (`people`). Channels are
+ *  not a pill: the space rail keeps them. */
+export type SpaceTab = 'all' | 'conversations' | 'files' | 'folders' | 'people';
 
-const CONTENT_TABS: readonly SpaceTab[] = ['chats', 'folders', 'files', 'people'];
-const TEAM_TABS: readonly SpaceTab[] = ['channels', ...CONTENT_TABS];
+/** The pills, in the order the home draws them. */
+export const SPACE_TABS: readonly SpaceTab[] = ['all', 'conversations', 'files', 'folders', 'people'];
 
-/** The `chats` id stays (it is in copied `?tab=` links); the label is the
- *  approved name, the one the sidebar uses (design round 0, 12 October 2026). */
 export const SPACE_TAB_LABELS: Readonly<Record<SpaceTab, string>> = {
-  channels: 'Channels',
-  chats: 'Conversations',
-  folders: 'Folders',
+  all: 'All',
+  conversations: 'Conversations',
   files: 'Files',
+  folders: 'Folders',
   people: 'People',
 };
 
-/** The tabs this viewer gets: the contents for every member, and Channels
- *  first when the space shows its channels ({@link spaceShowsChannels}). */
-export function spaceTabs(showsChannels: boolean): readonly SpaceTab[] {
-  return showsChannels ? TEAM_TABS : CONTENT_TABS;
-}
-
-/**
- * The tab a bare `/spaces/{uuid}` opens on: Conversations, for every space
- * and every viewer, so the message box at its bottom is there the moment the
- * space opens (Arthur and Stay, 15 October 2026; techlead's call). A team
- * space's Channels tab stays first in the strip, one tap away.
- */
+/** The pill a bare `/spaces/{uuid}` opens on: everything in the space, with
+ *  the message box under it. */
 export function defaultSpaceTab(): SpaceTab {
-  return 'chats';
+  return 'all';
 }
 
 /**
- * Read `?tab=` against the tabs this viewer actually has. Anything else, a
- * hand-edited value or `channels` on a space that shows none, resolves to the
- * default, so a copied link never lands on a tab that is not there.
+ * Read `?tab=`. Anything that is not a pill resolves to All, so a copied link
+ * never lands on nothing. That includes the two ids the tab strip used to
+ * write: `channels` (the old lobby) and `chats` (the old Conversations tab,
+ * the page every space opened on), which both now open the one list.
  */
-export function parseSpaceTab(
-  raw: string | null | undefined,
-  showsChannels: boolean,
-): SpaceTab {
-  const tabs = spaceTabs(showsChannels);
-  return tabs.find((tab) => tab === raw) ?? defaultSpaceTab();
+export function parseSpaceTab(raw: string | null | undefined): SpaceTab {
+  return SPACE_TABS.find((tab) => tab === raw) ?? defaultSpaceTab();
 }
 
 /**

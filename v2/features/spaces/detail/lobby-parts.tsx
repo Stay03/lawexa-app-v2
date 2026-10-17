@@ -7,45 +7,27 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * lobby-parts — the pieces of furniture the space page's regions share: the
- * column it is laid out in, and the section heading every block wears.
+ * column it is laid out in, the pill bar's box, and the section heading every
+ * block wears.
  *
- * ── TWO COLUMNS, CHOSEN PER SPACE (design round 1, 12 October 2026) ────────
- * A space that shows its channels opens on the Channels tab, the LOBBY: an
- * identity block over a digest that wants a second column on a wide screen,
- * beside a 240px rail that has already taken its share of the viewport. It
- * keeps `max-w-5xl`, and `xl:` rather than `lg:` is where its split happens —
- * at 1024px the pane is only 784px wide, and a 288px aside would leave the
- * main column narrower than the rows inside it want to be.
+ * ── ONE COLUMN (design round 1, 12 October 2026; B4, 17 October 2026) ──────
+ * A space is a stack of rows (its conversations, files and folders) and takes
+ * the list column, `max-w-3xl`, the width the `/spaces` list and the
+ * Conversations and Folders screens use, so going from the list into a space
+ * moves nothing sideways. The wider lobby column went with the Channels tab.
  *
- * Every other space is a stack of rows (its conversations, folders and files)
- * and takes the list column, `max-w-3xl`, the width the `/spaces` list and the
- * Conversations and Folders screens use. It used to take the lobby's too, so
- * going from the list into a space moved the content 128px left and made it
- * 256px wider, and a chat's time sat 900px from its title.
- *
- * The choice is per SPACE and not per tab, so switching tabs never moves the
- * header.
+ * A full-height flex column, so the docked box sits at the bottom of the pane
+ * when the list is short (`SpaceChatDock`'s `mt-auto`).
  */
-// A full-height flex column, so the Conversations tab's docked box sits at the
-// bottom of the pane when the list is short (`SpaceChatDock`'s `mt-auto`).
-const SPACE_COLUMN_BASE = 'mx-auto flex min-h-full w-full flex-col px-4 pb-16 pt-5 sm:pt-6';
+export const SPACE_PAGE_COLUMN =
+  'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';
 
-/** The page's column: the lobby's width where the space shows its channels,
- *  the list's everywhere else. */
-export function spacePageColumn(showsChannels: boolean): string {
-  return `${SPACE_COLUMN_BASE} ${showsChannels ? 'max-w-5xl' : 'max-w-3xl'}`;
-}
-
-/** The lobby's two-column grid: the digest, then the facts about the place.
- *  Since Spaces F2 it is the Channels TAB's panel, so the gap above it is the
- *  panel's ({@link SPACE_TAB_PANEL}), the same for every tab. */
-export const SPACE_LOBBY_GRID =
-  'grid gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_18rem]';
-
-/** The tab strip under the identity block, and the panel under the strip.
- *  Shared by the live page and its silhouette, so the hand-off moves nothing. */
-export const SPACE_TABS_ROW = 'mt-5';
-export const SPACE_TAB_PANEL = 'mt-5 flex flex-1 flex-col';
+/** The pills and search held at the top of the pane: stacked on a phone, one
+ *  row from `md:`. Shared by the live home and its silhouette, so the
+ *  hand-off moves nothing. `-mx-4 px-4` runs its rule and ground to the
+ *  column's edges, so rows scroll under it unseen. */
+export const SPACE_PILL_BAR =
+  'sticky top-0 z-10 -mx-4 flex flex-col gap-3 border-b bg-background px-4 py-3 md:flex-row md:items-center';
 
 /**
  * One region of the lobby. The heading is a real `h2` and the count beside it

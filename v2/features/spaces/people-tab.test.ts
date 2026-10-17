@@ -27,10 +27,9 @@ const member = (uuid: string, pending: boolean): Member => ({
   created_at: '2026-10-15T10:00:00+00:00',
 });
 
-test('the tab is People, reachable by ?tab=people for every viewer', () => {
+test('the pill is People, reachable by ?tab=people for every viewer', () => {
   assert.equal(SPACE_TAB_LABELS.people, 'People');
-  assert.equal(parseSpaceTab('people', true), 'people');
-  assert.equal(parseSpaceTab('people', false), 'people');
+  assert.equal(parseSpaceTab('people'), 'people');
 });
 
 test('the Invited list: pending rows only, each person once, the pending list first', () => {
@@ -68,14 +67,18 @@ test('the panel: members for everyone; invite, links, Invited and Asked to join 
 
 test('the top is one row; the name opens the details sheet on ?panel=about (Stay, 15 October 2026)', () => {
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.match(header, /<header className="border-b pb-4">/);
-  for (const gone of [/PresenceStack/, /New channel/, /<SpaceAbout\s/, /onOpenRoster/]) assert.doesNotMatch(header, gone);
+  assert.match(header, /<header className=\{SPACE_HEADER_ROW\}>/);
+  assert.match(header, /export const SPACE_HEADER_ROW = 'flex items-center gap-3 pb-2';/);
+  for (const gone of [/PresenceStack/, /New channel/, /<SpaceAbout\s/]) assert.doesNotMatch(header, gone);
   // The name is a button only when there is something behind it.
   assert.match(header, /onOpenAbout=\{hasAbout \? onOpenAbout : undefined\}/);
   assert.match(header, /aria-haspopup="dialog"/);
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /canOpen: space \? \{ edit: canManage, about: true, invites: false, requests: false \} : undefined,/);
-  assert.match(screen, /<SpacePlaceHeader space=\{space\} membership=\{scope\.membership\} onOpenAbout=\{openAbout\} \/>/);
+  assert.match(
+    screen,
+    /<SpacePlaceHeader\s+space=\{space\}\s+membership=\{scope\.membership\}\s+onOpenAbout=\{openAbout\}\s+onOpenRoster=\{scope\.openRoster\}\s*\/>/,
+  );
   assert.match(
     screen,
     /<SpaceAboutSheet\s+space=\{space\}\s+membership=\{scope\.membership\}\s+onEdit=\{canManage \? openEdit : undefined\}\s+\{\.\.\.panel\.bind\('about'\)\}\s*\/>/,
@@ -94,9 +97,11 @@ test('the manager-only lists are asked for as the space opens, and fade in (insi
   assert.equal((panel.match(/className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"/g) ?? []).length, 2);
 });
 
-test('the screen draws the People tab, and the silhouette has its shape', () => {
-  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /tab === 'people' \? \(\s*<SpacePeoplePanel key="people" space=\{space\} \/>/);
+test('the home draws the People pill, and the silhouette has its shape', () => {
+  const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
+  assert.match(panel, /tab === 'people' \? \(\s*<SpacePeoplePanel space=\{space\} \/>/);
+  // People has nothing to search.
+  assert.match(panel, /\{tab === 'people' \? null : \(\s*<div className="flex min-w-0 flex-1 items-center gap-2">\s*<SearchField/);
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
   assert.match(states, /tab === 'people' \? \([\s\S]{0,200}<RosterSkeleton \/>/);
   // The members call passes the status through.
@@ -127,6 +132,6 @@ test('a space chat row says its last message and who sent it (Stay, 15 October 2
   assert.equal(lastMessageLine({ role: 'user', preview: '  ', created_at: at }, 'u1'), null);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   // No message to preview: say so, never "You" (techlead, 15 October 2026).
-  assert.match(panel, /byline=\{lastMessageLine\(conversation\.last_message, viewerUuid\) \?\? 'No messages yet'\}/);
+  assert.match(panel, /byline=\{lastMessageLine\(entry\.item\.last_message, viewerUuid\) \?\? 'No messages yet'\}/);
   assert.doesNotMatch(panel, /spaceChatByline/);
 });

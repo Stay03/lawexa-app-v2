@@ -79,7 +79,7 @@ test('Remove takes your own chat out with the move route, a member’s through t
   assert.match(dialog, /it goes back to \$\{yours \? 'your' : 'its owner’s'\} own chats\. Files sent in it stay in the space\./);
 });
 
-test('the lists, the space tab and the header all build the menu from `can`', () => {
+test('the lists, the space home and the header all build the menu from `can`', () => {
   const hook = read('v2', 'features', 'conversations', 'list', 'use-conversation-menu.tsx');
   assert.match(hook, /return conversationMenuItems\(conversation\.can, space !== null\)\.map\(\(id\) => \(\{/);
   assert.match(hook, /route: conversationRemoveRoute\(conversation\.user_id, viewerId\),/);
@@ -87,7 +87,7 @@ test('the lists, the space tab and the header all build the menu from `can`', ()
   assert.match(list, /const menu = useConversationMenu\(\{/);
   assert.match(list, /\{menu\.dialogs\}/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /useConversationMenu\(\{\s*viewerId,\s*place: \{ uuid: spaceUuid, name: spaceName \},\s*\}\)/);
+  assert.match(panel, /useConversationMenu\(\{\s*viewerId,\s*place: \{ uuid: spaceUuid, name: spaceName \},?\s*\}\)/);
   assert.match(panel, /\{menu\.dialogs\}/);
   const header = read('v2', 'features', 'conversations', 'conversation', 'ConversationActions.tsx');
   assert.match(header, /conversationMenuItems\(detail\.can, detail\.space != null\)/);

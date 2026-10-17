@@ -3,11 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Hourglass, Link2, LogOut, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { Hourglass, Link2, LogOut, Pencil, Trash2, Users } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { channelsQueries } from '@/v2/features/channels/queries';
-import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -26,28 +23,14 @@ import {
   defaultSpaceTab,
   parseSpaceTab,
   spaceMenuItems,
-  spaceShowsChannels,
   type SpaceMenuItem,
   type SpaceTab,
 } from '../model';
-import { NO_SPACE_THREADS } from './activity-digest';
 import { CachedSpaceFrame } from './CachedSpaceFrame';
 import { SpaceContentPanel } from './content/SpaceContentPanel';
-import {
-  spacePageColumn,
-  SPACE_LOBBY_GRID,
-  SPACE_TAB_PANEL,
-  SPACE_TABS_ROW,
-} from './lobby-parts';
-import { SpacePeoplePanel } from './people/SpacePeoplePanel';
+import { SPACE_PAGE_COLUMN } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
-import { SpaceTabs } from './SpaceTabs';
-import {
-  SpaceAboutBlock,
-  SpaceActivityBlock,
-  SpacePeopleBlock,
-} from './SpaceLobbyBlocks';
 import { useCachedSpaceIdentity } from './cached-identity';
 import {
   SpaceAccessDeniedState,
@@ -56,14 +39,8 @@ import {
 } from './states';
 
 /**
- * SpaceScreen — the `/spaces/{uuid}` LOBBY.
- *
- * ── IT STOPPED BEING A MENU ────────────────────────────────────────────────
- * It used to be a document header over a `divide-y` list of channels: heading,
- * hairline, list, and nothing else. Navigation now belongs to the persistent
- * `SpaceRail` (docked beside this pane, drawered on a phone), which frees this
- * page to be what a space's own page should be — an identity block, a digest of
- * what is happening in the rooms, the people, and the facts that place it.
+ * SpaceScreen — the `/spaces/{uuid}` home: the space's header, then
+ * everything in it (`SpaceContentPanel`).
  *
  * ── IT OWNS ALMOST NO DATA ─────────────────────────────────────────────────
  * The space, its channels, its roster and the reader's role all come from
@@ -77,31 +54,22 @@ import {
  * overlay. The leave and delete confirmations moved to the frame in design
  * round 1, because the members sheet's footer opens them too.
  *
- * ── ONE SPACE, FOUR TABS (Spaces F2, 11 October 2026) ──────────────────────
- * Stay decided that one Space holds chats, folders and files for every
- * member, and that channels stay with team spaces, for researchers and above.
- * So under the identity block the page is a tab strip: Conversations, Folders
- * and Files for every member (F3 lets the Owner and Contributors add to them,
- * see `SpaceContentPanel`), and first of all a Channels tab holding the lobby
- * above (the activity digest,
- * the people, the facts) wherever the space shows its channels to this viewer
- * (`scope.showsChannels`, the frame's answer, so the tab and the rail can
- * never disagree). Every space opens on Conversations, with the message box
- * at its bottom (Stay and Arthur, 15 October 2026); a People tab ends the
- * strip.
+ * ── ONE HOME, FIVE PILLS (design B4, Arthur and Stay, 17 October 2026) ────
+ * One Space holds chats, folders and files for every member (Stay, Spaces F2,
+ * 11 October 2026). Under the header the page is one list of them with the
+ * message box at its bottom, filtered by pills (All, Conversations, Files,
+ * Folders) and a People pill for the members (`SpaceContentPanel`). The tab
+ * strip and the Channels tab's lobby went: channels are not in the first v2,
+ * and the space rail keeps them for whoever has them.
  *
- * THE TAB IS IN THE URL, QUIETLY (`?tab=`, the radar screen's idiom): read
+ * THE PILL IS IN THE URL, QUIETLY (`?tab=`, the radar screen's idiom): read
  * once from the address, then held here and written back with a quiet
- * replace, so switching tabs costs no history entry and no router round trip,
- * and a copied link opens the same tab. The default tab writes nothing, and a
- * value this viewer does not have (`channels` on a shared space) resolves to
- * the default rather than to an empty strip.
+ * replace, so switching pills costs no history entry and no router round
+ * trip, and a copied link opens the same pill. All writes nothing, and any
+ * value that is not a pill (the old `chats` and `channels`) opens All.
  */
 /** Stable empty reference — a fresh `[]` per render would churn the publish. */
 const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
-
-/** The one tab panel's id; `TabRow` mints the tab ids from it. */
-const PANEL_ID = 'space-tab-panel';
 
 export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   // `useSearchParams` (the tab) needs a boundary; its fallback is the route's
@@ -121,18 +89,12 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
      takes over. Identity only: every ruling still waits for the detail. */
   const cachedIdentity = useCachedSpaceIdentity(spaceUuid);
   const session = useV2Session();
-  // The shared minute clock, so the digest's ages stay true while the reader
-  // sits here. `0` before hydration; the rows treat that as "no age yet".
-  const now = useMinuteNow();
 
   const space = scope?.space ?? null;
   const canManage = scope?.canManage ?? false;
-  const showsChannels = scope?.showsChannels ?? false;
 
-  /* ── The tab (see the docblock) ──────────────────────────────────────────
-     The raw `?tab=` value, read once, then owned here. Held RAW rather than
-     resolved, because which tabs exist is only known once the space has
-     loaded: a `?tab=channels` link must survive the pending render. */
+  /* ── The pill (see the docblock) ─────────────────────────────────────────
+     The raw `?tab=` value, read once, then owned here. */
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
   const [tabParam, setTabParam] = useState<string | null>(urlTab);
@@ -147,7 +109,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     setSeenUrlTab(urlTab);
     setTabParam(urlTab);
   }
-  const tab = parseSpaceTab(tabParam, showsChannels);
+  const tab = parseSpaceTab(tabParam);
   const setTab = useCallback(
     (next: SpaceTab) => {
       const value = next === defaultSpaceTab() ? null : next;
@@ -166,79 +128,20 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  /**
-   * ── THE SPACE'S THREADS, THE LOBBY'S OWN READ ─────────────────────────────
-   * The one query this page mounts that the frame does not, and the reason is
-   * that nothing else wants it: the rail and the drawer are channels-only by
-   * design, so holding this in `CollabFrame` would make every channel route pay
-   * for a list only the lobby draws.
-   *
-   * GATED EXACTLY AS `CollabFrame` GATES `channelsQueries.bySpace` ON THIS
-   * ROUTE, and for the same two reasons. `eligible` because an unverified or
-   * out-of-audience account's collab reads are refused by the door before the
-   * network is worth spending (`collab/model.ts`). And it waits for the SPACE to
-   * have succeeded, which `space !== null` is exactly: `spaceQuery.data` is the
-   * only thing that fills it, and a 403 there means the reader is not a member,
-   * so the blocked read must not be requested. There is no parallel-fetch case
-   * to give up here, unlike on the channel route: this screen only exists at
-   * `/spaces/{uuid}`.
-   *
-   * `per_page: 50`, THE SAME PAGE THE CHANNEL LIST ASKS FOR, and the size is
-   * about ranking rather than about drawing. The digest paints six rows, so a
-   * bigger page buys nothing to draw; what it buys is a truer FIRST six. An
-   * unread thread sorts into the unread tier however old it is, and a thread
-   * that fell off the page cannot be ranked at all - so a short page is exactly
-   * how the mention this block exists to explain would go missing again. Both
-   * halves of one merged list are therefore cut off at the same depth, and the
-   * heading's "N threads" is a page count in the same way "N channels" already
-   * is.
-   *
-   * AND ONLY WHERE THE DIGEST IS ON SCREEN (Spaces F2): the space shows its
-   * channels to this viewer, and the Channels tab is the one open. Threads are
-   * channels, so below researcher the backend refuses the route (B0), and a
-   * shared space has none.
-   */
   const eligible = collabAccessState(session) === 'eligible';
 
-  /* The People tab's two lists for whoever manages the people (the invites not
-     accepted yet, and who asked to join), asked for as the space opens, so the
-     tab opens with them drawn. Asked for only when the tab mounted, they landed
-     a beat after the members, already cached, and popped in under them
-     (inside-shots-1, 15 October 2026). Same keys as the tab's own reads, so
-     the tab paints from this cache and asks again for nothing. */
+  /* The People pill's two lists for whoever manages the people (the invites
+     not accepted yet, and who asked to join), asked for as the space opens, so
+     the pill opens with them drawn. Asked for only when the pill mounted, they
+     landed a beat after the members, already cached, and popped in under them
+     (inside-shots-1, 15 October 2026). Same keys as the pill's own reads, so
+     it paints from this cache and asks again for nothing. */
   const peopleReads = eligible && space !== null && canManage;
   useQuery({
     ...spacesQueries.members(spaceUuid, { viewerId: session.userId, status: 'pending' }),
     enabled: peopleReads,
   });
   useSpaceJoinRequests(spaceUuid, peopleReads);
-
-  const threadsQuery = useQuery({
-    ...channelsQueries.threadsBySpace({
-      spaceUuid,
-      viewerId: session.userId,
-      per_page: 50,
-    }),
-    enabled: eligible && space !== null && showsChannels && tab === 'channels',
-  });
-  /* The frozen empty default while the list is pending, refused or ungated:
-     a fresh `[]` here would give `SpaceActivityBlock`'s digest memo a new
-     dependency on every render and re-rank the whole list for nothing. */
-  const threads = threadsQuery.data?.data ?? NO_SPACE_THREADS;
-
-  /* ONE DIGEST, SO ONE PENDING STATE AND ONE ERROR STATE. The block ranks
-     channels and threads into a single list, so painting it while half of it is
-     still in flight would show a ranking that is wrong: the thread that should
-     be the first row arriving fourth, a beat later, under the reader's finger.
-     The two requests are fired together and run in parallel, so the wait is the
-     slower of them and not the sum. The retry is likewise both, because the
-     panel says "try again" about the list and the list has two halves. */
-  const retryChannels = scope?.retryChannels;
-  const refetchThreads = threadsQuery.refetch;
-  const retryActivity = useCallback(() => {
-    retryChannels?.();
-    void refetchThreads();
-  }, [retryChannels, refetchThreads]);
 
   /**
    * The rename dialog is the ONE overlay this page still owns — creating a
@@ -381,30 +284,17 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     openDelete,
   ]);
 
-  // The desktop breadcrumb's last part is the open tab (Arthur, 16 October
-  // 2026). Only once the space has landed: before that the tabs it has are not
-  // known, so a `?tab=channels` link would name the default tab for a frame.
-  const crumb = hasSpace ? SPACE_TAB_LABELS[tab] : null;
+  // The desktop breadcrumb ends at the space on All, and names any other pill
+  // after it (Arthur, 16 October 2026: the trail's last part is where the
+  // reader is). Only once the space has landed: `null` is a skeleton.
+  const crumb = !hasSpace ? null : tab === defaultSpaceTab() ? '' : SPACE_TAB_LABELS[tab];
   useEffect(() => {
     setScreenContext({ pathname, back: null, actions, crumb });
   }, [pathname, actions, crumb]);
   useEffect(() => () => clearScreenContext(), []);
 
-  // Before the detail lands, the silhouette draws the tab the page is most
-  // likely to open: the cached row's kind (a cold arrival reads as a team
-  // space, which every space before shared ones is), the `CachedSpaceFrame`
-  // rule, plus whatever `?tab=` asked for.
-  const pendingShowsChannels = spaceShowsChannels(
-    { kind: cachedIdentity?.kind ?? 'team' },
-    session,
-  );
-  const pendingFrame = (
-    <SpaceScreenFrame
-      identity={cachedIdentity}
-      showsChannels={pendingShowsChannels}
-      tab={parseSpaceTab(tabParam, pendingShowsChannels)}
-    />
-  );
+  // Before the detail lands, the silhouette draws the pill `?tab=` asked for.
+  const pendingFrame = <SpaceScreenFrame identity={cachedIdentity} tab={tab} />;
 
   // Defensive, and never expected: this page is a child of the `(collab)`
   // layout, which always provides the scope. Drawing the silhouette is the
@@ -416,7 +306,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   if (scope.isSpaceError || space === null) {
     const status = scope.spaceErrorStatus ?? 0;
     return (
-      <div className={spacePageColumn(false)}>
+      <div className={SPACE_PAGE_COLUMN}>
         {status === 403 || status === 404 ? (
           <SpaceAccessDeniedState />
         ) : (
@@ -432,76 +322,15 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   }
 
   return (
-    <div className={spacePageColumn(showsChannels)}>
-      <SpacePlaceHeader space={space} membership={scope.membership} onOpenAbout={openAbout} />
+    <div className={SPACE_PAGE_COLUMN}>
+      <SpacePlaceHeader
+        space={space}
+        membership={scope.membership}
+        onOpenAbout={openAbout}
+        onOpenRoster={scope.openRoster}
+      />
 
-      <div className={SPACE_TABS_ROW}>
-        <SpaceTabs
-          showsChannels={showsChannels}
-          value={tab}
-          onChange={setTab}
-          panelId={PANEL_ID}
-        />
-      </div>
-
-      <div
-        id={PANEL_ID}
-        role="tabpanel"
-        aria-labelledby={`${PANEL_ID}-tab-${tab}`}
-        className={SPACE_TAB_PANEL}
-      >
-        {tab === 'channels' ? (
-          <>
-            {/* New channel moved here from the top of the space (Stay, 15
-                October 2026). From `lg:` the docked rail carries it at its
-                foot, so it is shown only below `lg:`: one at every width. */}
-            {canManage && showsChannels ? (
-              <div className="mb-4 lg:hidden">
-                <Button size="sm" className="v2-interactive" onClick={scope.openCreateChannel}>
-                  <Plus aria-hidden className="size-4" />
-                  New channel
-                </Button>
-              </div>
-            ) : null}
-            <div className={SPACE_LOBBY_GRID}>
-              <SpaceActivityBlock
-                sections={scope.sections}
-                // THE ONE WIRING POINT for the space's threads, live since
-                // 2026-08-16 (`GET /spaces/{uuid}/threads`). The digest merges
-                // these with the channel rows so the space's mention badge has
-                // rows to land on; see the query mount above for the gate and
-                // the page size.
-                threads={threads}
-                isPending={scope.isChannelsPending || threadsQuery.isPending}
-                isError={scope.isChannelsError || threadsQuery.isError}
-                onRetry={retryActivity}
-                canCreate={canManage}
-                onCreateChannel={scope.openCreateChannel}
-                onOpenRail={scope.openRail}
-                now={now}
-              />
-
-              <div className="flex min-w-0 flex-col gap-6">
-                <SpacePeopleBlock
-                  space={space}
-                  members={scope.members}
-                  isPending={scope.isMembersPending}
-                  canManage={canManage}
-                  onOpenRoster={scope.openRoster}
-                />
-                <SpaceAboutBlock space={space} />
-              </div>
-            </div>
-          </>
-        ) : tab === 'people' ? (
-          <SpacePeoplePanel key="people" space={space} />
-        ) : (
-          // `key` per tab: each list is its own query and its own frozen
-          // clock, so a switch is a fresh mount, never one list's rows
-          // briefly under another tab's name.
-          <SpaceContentPanel key={tab} tab={tab} spaceUuid={space.uuid} />
-        )}
-      </div>
+      <SpaceContentPanel space={space} tab={tab} onTabChange={setTab} />
 
       <SpaceFormDialog
         key={panel.keyFor('edit')}

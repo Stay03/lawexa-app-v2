@@ -93,14 +93,21 @@ test('the space header prints the type and privacy, not the role (Arthur, 15 Oct
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
   assert.doesNotMatch(row, /spaceRoleLabel/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  // The name first, the line under it.
+  // The name first, the line under it, ending with the members count (B4).
   assert.match(
     header,
-    /<SpaceHeading name=\{space\.name\}[^>]*\/>\s*<MetaLine className="mt-1 text-sm" lead=\{spaceHeaderFacts\(space\)\} \/>/,
+    /<MetaLine\s+as="span"\s+className="text-sm"\s+lead=\{spaceHeaderFacts\(space\)\}\s+trail=\{\[spaceMembersLabel\(space\.active_members_count\)\]\}\s*\/>/,
+  );
+  assert.ok(
+    header.indexOf('<SpaceHeading name={space.name}') < header.indexOf('{facts}'),
+    'the name before the line',
   );
   assert.doesNotMatch(header, /spaceRoleLabel|spaceOwnerLabel/);
   const frame = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
-  assert.match(frame, /<MetaLine className="mt-1 text-sm" lead=\{identity\.facts\} \/>/);
+  assert.match(
+    frame,
+    /<MetaLine\s+className="mt-0\.5 text-sm"\s+lead=\{identity\.facts\}\s+trail=\{\[spaceMembersLabel\(identity\.membersCount\)\]\}\s*\/>/,
+  );
 });
 
 /* ── Stay's two lines, on every shared space (critique 3) ────────────────── */
@@ -406,21 +413,24 @@ test('the space name is a visible heading at every width, and the bar steps back
   assert.match(slot, /const stepBack = channelName === null && titleOnScreen;/);
 });
 
-test('a space without channels takes the list’s column; the lobby keeps its width', () => {
+test('every space takes the list’s column, in the page and its silhouette (B4)', () => {
   const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
-  assert.match(parts, /showsChannels \? 'max-w-5xl' : 'max-w-3xl'/);
+  assert.match(parts, /export const SPACE_PAGE_COLUMN =\s*'mx-auto flex min-h-full w-full max-w-3xl flex-col/);
+  assert.doesNotMatch(parts, /max-w-5xl/);
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /<div className=\{spacePageColumn\(showsChannels\)\}>/);
+  assert.equal(screen.match(/<div className=\{SPACE_PAGE_COLUMN\}>/g)?.length, 2, 'the home and its refusals');
+  const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
+  assert.match(states, /<div className=\{SPACE_PAGE_COLUMN\}>/);
 });
 
-test('one identity and one "New channel" per width on a team space', () => {
+test('one identity on a team space, and "New channel" only in the rail', () => {
   const rail = read('v2', 'features', 'collab', 'shell', 'SpaceRail.tsx');
   assert.doesNotMatch(rail, /PresenceStack|spaceOwnerLabel/);
-  // One "New channel" per width: the Channels tab's below `lg:`, the rail's from it.
+  // The Channels tab and its phone "New channel" went with design B4.
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
   assert.doesNotMatch(header, /New channel/);
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /<div className="mb-4 lg:hidden">\s*<Button size="sm" className="v2-interactive" onClick=\{scope\.openCreateChannel\}>/);
+  assert.doesNotMatch(screen, /openCreateChannel/);
 });
 
 test('sheets draw no focus outline round the whole panel; collab dialogs get a dark edge', () => {
@@ -472,7 +482,7 @@ test('an Owner alone in an empty space is offered people', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(
     panel,
-    /scope !== null && scope\.canManage && space !== null && space\.active_members_count <= 1\s*\? scope\.openInvite\s*: null,/,
+    /onInvite: scope !== null && canManage && space\.active_members_count <= 1 \? scope\.openInvite : null,/,
   );
   const states = read('v2', 'features', 'spaces', 'detail', 'content', 'states.tsx');
   assert.match(states, /onInvite \? \(\s*<Button type="button" variant="outline" size="sm" onClick=\{onInvite\}>/);

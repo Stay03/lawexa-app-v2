@@ -64,19 +64,20 @@ test('the folders and files empty states offer a labelled button', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(
     panel,
-    /action=\{\s*<EmptyStateAddButton icon=\{Plus\} onClick=\{startFolder\}>\s*New folder\s*<\/EmptyStateAddButton>/,
+    /tab === 'folders' \? \(\s*<EmptyStateAddButton icon=\{Plus\} onClick=\{onNewFolder\}>\s*New folder\s*<\/EmptyStateAddButton>/,
   );
   assert.match(
     panel,
-    /action=\{\s*<EmptyStateAddButton icon=\{Upload\} onClick=\{pickFiles\}>\s*Upload\s*<\/EmptyStateAddButton>/,
+    /tab === 'files' \? \(\s*<EmptyStateAddButton icon=\{Upload\} onClick=\{onUpload\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
   );
+  assert.match(panel, /action=\{emptyAction\}/);
   // The word is plain text in the button, never `sr-only`.
   assert.match(
     panel,
     /<Button type="button" size="sm" variant=\{variant\} onClick=\{onClick\}>\s*<Icon aria-hidden className="size-4" \/>\s*\{children\}\s*<\/Button>/,
   );
-  // The toolbar pills are not handed to an empty state any more.
-  assert.doesNotMatch(panel, /action=\{(newFolderButton|uploadButton)\}\s*onInvite/);
+  // The bar's pill buttons are not handed to an empty state.
+  assert.doesNotMatch(panel, /action=\{action\}/);
 });
 
 /* ── SHOULD 5: a sheet opens with focus on its body ──────────────────────── */
@@ -113,8 +114,9 @@ test('the file row body is the open control, at least 44px tall', () => {
     row,
     /<button\s+type="button"\s+onClick=\{\(\) => open\(file\.id\)\}\s+disabled=\{opening\}\s+className=\{cn\(\s*IDENTITY_CLASS,/,
   );
-  // 40px mark plus `py-2.5`: 60px.
-  assert.match(row, /const IDENTITY_CLASS =\s*'flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2\.5 text-left';/);
+  // The conversation row's box since B4: `min-h-14` (56px), the 36px mark.
+  assert.match(row, /const IDENTITY_CLASS =\s*'flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2\.5 text-left';/);
+  assert.match(row, /<FileMark file=\{\{ \.\.\.file, url: file\.url \?\? '' \}\} size="sm" \/>/);
   // The meta line is phrasing content inside the button.
   assert.match(row, /<MetaLine\s+as="span"/);
   // The 32px open button is gone; the menu stays a sibling of the body.
@@ -185,11 +187,15 @@ test('the bar menu draws the rules and the space menu asks for one before Edit s
 
 /* ── Round 0 #25: the header's faces are bigger on a desktop ─────────────── */
 
-test('the space header shows no faces: the people are in their tab (Stay, 15 October 2026)', () => {
+test('the space header shows no faces; its count opens the members (Stay, 15 October 2026; B4)', () => {
   const stack = read('v2', 'features', 'collab', 'kit', 'PresenceStack.tsx');
   assert.match(stack, /lg: \{ faces: 4, avatar: 'lg', text: 'text-sm' \},/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.doesNotMatch(header, /PresenceStack|onOpenRoster/);
+  assert.doesNotMatch(header, /PresenceStack|Avatar/);
+  // "Work · Private · 7 members" is the button that opens the members sheet.
+  assert.match(header, /\{onOpenRoster \? \(\s*<button\s+type="button"\s+onClick=\{onOpenRoster\}/);
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(screen, /onOpenRoster=\{scope\.openRoster\}/);
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
   assert.doesNotMatch(states, /h-9 w-44 rounded-full/);
 });
@@ -217,12 +223,15 @@ test('a row under the Invited heading drops its Pending chip', () => {
   assert.match(sheet, /\{joined\.map\(\(member\) => rosterRow\(member\)\)\}/);
 });
 
-test('the folder level bar keeps the word Open on a phone', () => {
+test('a folder in the space opens its own page, as everywhere else (B4)', () => {
+  // The Folders tab browsed one level at a time inside the tab; the home's
+  // list opens the folder page instead, so the level bar went.
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(
-    panel,
-    /<FolderOpen aria-hidden className="size-4" \/>[\s\S]*?<span>\s*Open<span className="sr-only sm:not-sr-only">\{' folder'\}<\/span>\s*<\/span>/,
-  );
+  assert.doesNotMatch(panel, /FolderLevelBar|onOpen=/);
+  assert.match(panel, /<FolderRow[\s\S]{0,200}?layout="feed"/);
+  const row = read('v2', 'features', 'folders', 'list', 'FolderRow.tsx');
+  assert.match(row, /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\} className=\{identityClass\}>/);
+  assert.doesNotMatch(row, /onOpen/);
 });
 
 test('the add pill is 44px on the folders screen as on a space tab', () => {

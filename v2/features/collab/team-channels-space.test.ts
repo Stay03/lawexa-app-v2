@@ -47,16 +47,12 @@ test('no channel request runs on a space route without the flag', () => {
   );
   // No request reads the drawn-rail guess.
   assert.doesNotMatch(frame, /enabled:[^;]*railShown/);
-  assert.match(screen, /const showsChannels = scope\?\.showsChannels \?\? false;/);
-  assert.match(
-    screen,
-    /channelsQueries\.threadsBySpace\([\s\S]*?enabled: eligible && space !== null && showsChannels && tab === 'channels',/,
-  );
-  // And there is no other channel read in either file.
+  // And there is no other channel read in either file: the space home has no
+  // channel lobby since design B4 (17 October 2026), so it reads none.
   const channelReads = (source: string) =>
     source.match(/channelsQueries\.(bySpace|mine|threadsBySpace)\(/g) ?? [];
   assert.equal(channelReads(frame).length, 2);
-  assert.equal(channelReads(screen).length, 1);
+  assert.equal(channelReads(screen).length, 0);
 });
 
 test('no rail, reserved width, drawer, header toggle or create dialog without the flag', () => {
@@ -76,30 +72,17 @@ test('no rail, reserved width, drawer, header toggle or create dialog without th
   assert.match(slot, /if \(context\.openRail === null\) return null;/);
 });
 
-test('the lobby: no digest and no "New channel" without the flag, in the page and its silhouette', () => {
-  // The digest lives on the Channels tab, which exists only when channels show.
-  assert.match(model, /return showsChannels \? TEAM_TABS : CONTENT_TABS;/);
-  assert.match(screen, /const tab = parseSpaceTab\(tabParam, showsChannels\);/);
-  assert.match(screen, /\{tab === 'channels' \? \(\s*<>[\s\S]{0,800}?<div className=\{SPACE_LOBBY_GRID\}>\s*<SpaceActivityBlock/);
-  // New channel sits at the top of the Channels tab since Stay's 15 October note.
-  assert.match(screen, /\{canManage && showsChannels \? \(\s*<div className="mb-4 lg:hidden">/);
-  // The silhouettes ask the same predicate, so without the flag they draw no
-  // channel block and no "New channel" place.
-  assert.match(
-    screen,
-    /const pendingShowsChannels = spaceShowsChannels\(\s*\{ kind: cachedIdentity\?\.kind \?\? 'team' \},\s*session,\s*\);/,
-  );
-  assert.match(screen, /tab=\{parseSpaceTab\(tabParam, pendingShowsChannels\)\}/);
+test('the space home has no channel lobby, in the page or its silhouette (design B4)', () => {
+  // No Channels pill: the rail keeps the channels for whoever has them.
+  assert.doesNotMatch(model, /'channels'/);
+  assert.doesNotMatch(screen, /SpaceActivityBlock|SPACE_LOBBY_GRID|New channel|showsChannels/);
+  // A `?tab=channels` link from before opens All.
+  assert.match(screen, /const tab = parseSpaceTab\(tabParam\);/);
   const cached = read('v2', 'features', 'spaces', 'detail', 'CachedSpaceFrame.tsx');
-  assert.match(
-    cached,
-    /const showsChannels = spaceShowsChannels\(\s*\{ kind: identity\?\.kind \?\? 'team' \},\s*session,\s*\);/,
-  );
-  // Every space opens on Conversations since 15 October 2026.
+  assert.doesNotMatch(cached, /spaceShowsChannels/);
   assert.match(cached, /tab=\{defaultSpaceTab\(\)\}/);
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
-  // Design round 1: the header's "New channel" (and so its place) is shown
-  // below `lg:` only, where no docked rail carries the same action.
-  assert.match(states, /\{showsChannels \? <Skeleton className="mb-4 h-8 w-32 rounded-md lg:hidden" \/> : null\}/);
-  assert.match(states, /\{tab === 'channels' \? \(\s*<>[\s\S]*?<div className=\{SPACE_LOBBY_GRID\}>[\s\S]*?<ChannelListSkeleton \/>/);
+  const frameStart = states.indexOf('export function SpaceScreenFrame');
+  const frameBody = states.slice(frameStart, states.indexOf('/* ── Designed refusals', frameStart));
+  assert.doesNotMatch(frameBody, /ChannelListSkeleton|SPACE_LOBBY_GRID|showsChannels/);
 });

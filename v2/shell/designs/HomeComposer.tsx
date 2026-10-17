@@ -186,17 +186,6 @@ interface HomeComposerBaseProps {
    *  box's picker (Arthur, 15 October 2026: an upload from an empty space showed
    *  no sign of where it went; now it is a chip in the box until it is sent). */
   handle?: Ref<HomeComposerHandle>;
-  /**
-   * From `md:`, ONE ROW, the size of the chat's follow-up pill (Stay, 15
-   * October 2026, on the space's box: "the text area in the web one is too long
-   * and big naaaw!!! make it look nice"). The plus menu on the left, the text in
-   * the middle on one line that grows as it is typed, Send on the right; the
-   * model moves up beside the jurisdiction, as the pill has no model in its row;
-   * a file's chip takes a row of its own above them, inside the box.
-   * CSS only (`md:` variants), so the phone keeps the box it has. The host caps
-   * the width.
-   */
-  compact?: boolean;
 }
 
 /**
@@ -235,7 +224,6 @@ export function HomeComposer({
   textareaClassName,
   sendButtonClassName,
   handle,
-  compact = false,
 }: HomeComposerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -569,21 +557,6 @@ export function HomeComposer({
             stop={stop}
             label="Jurisdiction:"
           />
-          {/* Compact, from `md:`: the model stands here, beside the
-              jurisdiction, as the chat's pill keeps its row to the text. In the
-              row it squeezed Arthur's placeholder onto two lines. */}
-          {compact ? (
-            <div className="hidden md:block">
-              <WorkflowField
-                options={workflow.options}
-                value={workflow.value}
-                onChange={workflow.setValue}
-                isLoading={workflow.isLoading}
-                disabled={isSubmitting}
-                stop={stop}
-              />
-            </div>
-          ) : null}
         </div>
       ) : null}
 
@@ -606,19 +579,11 @@ export function HomeComposer({
           onSubmit={handleSubmit}
           disabled={isSubmitting}
           variant={confidential ? 'confidential' : 'default'}
-          className={cn(
-            className,
-            compact && 'md:flex md:flex-wrap md:items-end md:gap-x-1 md:p-1.5',
-          )}
+          className={className}
         >
           {/* Attachment chips — one per selected file, with live upload status. */}
           {signedIn && uploads.length > 0 ? (
-            <div
-              className={cn(
-                'flex flex-wrap gap-2 px-2 pt-2',
-                compact && 'md:basis-full md:px-1 md:pt-1 md:pb-1.5',
-              )}
-            >
+            <div className="flex flex-wrap gap-2 px-2 pt-2">
               {uploads.map((upload) => {
                 const isRemoving = removing.has(upload.key);
                 const isFailed = upload.status === 'failed';
@@ -670,11 +635,7 @@ export function HomeComposer({
 
           <PromptInputTextarea
             placeholder={placeholder}
-            className={cn(
-              'text-foreground placeholder:text-muted-foreground',
-              textareaClassName,
-              compact && 'md:order-2 md:min-h-9 md:w-auto md:min-w-0 md:flex-1 md:px-1.5 md:py-2',
-            )}
+            className={cn('text-foreground placeholder:text-muted-foreground', textareaClassName)}
             /* Pasting a picture here does what the attach button does, and what
                pasting one into the conversation composer does. A screenshot
                landing in one box and vanishing in the other is the kind of
@@ -682,22 +643,12 @@ export function HomeComposer({
             onPasteFiles={(files) => void handleFilesAdded(files)}
           />
 
-          {/* One row from `md:` when compact: the actions dissolve into the
-              box's row (`contents`), so their two halves stand either side of
-              the text. */}
-          <PromptInputActions
-            className={cn('flex items-center gap-2 px-2 pb-1', compact && 'md:contents')}
-          >
+          <PromptInputActions className="flex items-center gap-2 px-2 pb-1">
             {signedIn ? (
               // Horizontally-scrollable toolbar keeps every control reachable at
               // 320px without wrapping the row. py-0.5: overflow-x-auto forces
               // overflow-y to auto, which would clip the + focus ring otherwise.
-              <div
-                className={cn(
-                  'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-                  compact && 'md:order-1 md:flex-none',
-                )}
-              >
+              <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overscroll-x-contain py-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {/* Plus-menu: Attach + consolidated privacy toggles. */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -706,12 +657,9 @@ export function HomeComposer({
                       aria-label="Attach files and privacy options"
                       onClick={stop}
                       disabled={isSubmitting}
-                      className={cn(
-                        'v2-interactive relative flex size-9 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-                        compact && 'md:size-8',
-                      )}
+                      className="v2-interactive relative flex size-9 shrink-0 items-center justify-center rounded-full text-primary transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <Plus className={cn('size-5', compact && 'md:size-4')} />
+                      <Plus className="size-5" />
                       {/* Redacted dot — scales+fades both ways, never a hard pop. */}
                       <span
                         aria-hidden
@@ -783,18 +731,15 @@ export function HomeComposer({
                   </DropdownMenuContent>
                 </DropdownMenu>
 
-                {/* Role-aware workflow selector — v1's Lite/Expert or admin list.
-                    Compact, from `md:` it stands above the box instead. */}
-                <div className={cn('contents', compact && 'md:hidden')}>
-                  <WorkflowField
-                    options={workflow.options}
-                    value={workflow.value}
-                    onChange={workflow.setValue}
-                    isLoading={workflow.isLoading}
-                    disabled={isSubmitting}
-                    stop={stop}
-                  />
-                </div>
+                {/* Role-aware workflow selector — v1's Lite/Expert or admin list. */}
+                <WorkflowField
+                  options={workflow.options}
+                  value={workflow.value}
+                  onChange={workflow.setValue}
+                  isLoading={workflow.isLoading}
+                  disabled={isSubmitting}
+                  stop={stop}
+                />
 
               </div>
             ) : (
@@ -809,7 +754,6 @@ export function HomeComposer({
                 className={cn(
                   'v2-interactive size-11 shrink-0 rounded-full bg-primary hover:bg-primary/90',
                   sendButtonClassName,
-                  compact && 'md:order-3 md:size-8',
                 )}
                 onClick={handleSubmit}
                 disabled={

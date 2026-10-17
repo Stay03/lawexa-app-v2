@@ -56,28 +56,32 @@ test('the refusals, word for word', () => {
   }
 });
 
-test('an empty Conversations tab reads Arthur’s words to those who may add, and tells a Viewer who does', () => {
-  assert.deepEqual(spaceEmptyCopy('chats', true), {
+test('an empty All or Conversations pill reads Arthur’s words to those who may add, and tells a Viewer who does', () => {
+  const arthur = {
     title: 'Start working with Lawexa',
     description:
       'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
-  });
-  assert.equal(spaceEmptyCopy('chats', false).description, 'Contributors and the owner add conversations here.');
+  };
+  assert.deepEqual(spaceEmptyCopy('all', true), arthur);
+  assert.deepEqual(spaceEmptyCopy('conversations', true), arthur);
+  assert.equal(spaceEmptyCopy('conversations', false).description, 'Contributors and the owner add conversations here.');
 });
 
-test('the Conversations tab has the message box at its bottom, for the Owner and Contributors, and no New conversation (Stay, 15 October 2026)', () => {
+test('the home has the message box at its bottom, for the Owner and Contributors, and no New conversation (Stay, 15 October 2026)', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /\{canAdd \? <SpaceChatDock space=\{\{ uuid: spaceUuid, name: spaceName \}\} handle=\{dock\} \/> : null\}/);
-  assert.match(panel, /placeholder="Search conversations"\s*busy=\{query\.isPlaceholderData\}\s*action=\{null\}/);
+  assert.match(
+    panel,
+    /\{access\.canAdd \? \(\s*<SpaceChatDock space=\{\{ uuid: space\.uuid, name: space\.name \}\} handle=\{dock\} \/>\s*\) : null\}/,
+  );
   assert.doesNotMatch(panel, /New conversation|StartConversationDialog|startChat/);
   // The earlier conversations stay in the list above the box.
-  assert.match(panel, /<ConversationRow\s+key=\{conversation\.id\}/);
+  assert.match(panel, /<ConversationRow\s+key=\{itemKey\(entry\)\}/);
   // Docked at the pane's bottom: sticky, pushed down by a full-height column.
   const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
   assert.match(dock, /className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto px-4 pt-6 v2-safe-bottom"/);
   const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
-  assert.match(parts, /const SPACE_COLUMN_BASE = 'mx-auto flex min-h-full w-full flex-col px-4 pb-16 pt-5 sm:pt-6';/);
-  assert.match(parts, /export const SPACE_TAB_PANEL = 'mt-5 flex flex-1 flex-col';/);
+  assert.match(parts, /'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6'/);
+  assert.match(panel, /<div className="flex flex-1 flex-col">\s*<div className=\{SPACE_PILL_BAR\}>/);
 });
 
 test('the inviter and the invitee read one promise: a Contributor continues the space’s conversations', () => {
@@ -98,19 +102,20 @@ test('the inviter and the invitee read one promise: a Contributor continues the 
   }
 });
 
-test('the empty Conversations tab offers Upload files, and Invite people to whoever may invite (Arthur, 15 October 2026)', () => {
+test('the empty All and Conversations pills offer Upload files, and Invite people to whoever may invite (Arthur, 15 October 2026)', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  // Both are secondary: the box docked under the tab is the way to start.
+  // Both are secondary: the box docked under the list is the way to start.
   assert.match(
     panel,
-    /<EmptyStateAddButton variant="outline" icon=\{Upload\} onClick=\{\(\) => dock\.current\?\.attach\(\)\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
+    /<EmptyStateAddButton variant="outline" icon=\{Upload\} onClick=\{onAttach\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
   );
+  assert.match(panel, /onAttach=\{\(\) => dock\.current\?\.attach\(\)\}/);
   assert.match(
     panel,
     /\{access\.openInvite \? \(\s*<EmptyStateAddButton\s+variant="outline"\s+icon=\{UserPlus\}\s+onClick=\{access\.openInvite\}\s*>\s*Invite people/,
   );
   // Whoever may manage the space's people, however many are in it.
-  assert.match(panel, /openInvite: scope !== null && scope\.canManage \? scope\.openInvite : null,/);
+  assert.match(panel, /openInvite: scope !== null && canManage \? scope\.openInvite : null,/);
   assert.doesNotMatch(panel, /Go to your conversations/);
 });
 
@@ -124,19 +129,14 @@ test('Upload files in an empty space puts the file in the box as a chip (Arthur,
   assert.match(dock, /handle=\{handle\}/);
 });
 
-test('on a desktop the space box is the chat pill: one row, centred, phone unchanged (Stay, 15 October 2026)', () => {
+test('the space box is the phone’s at every width, centred on a desktop (B4, Arthur, 17 October 2026)', () => {
   const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
+  // As wide as the chat's follow-up box on a desktop (Stay, 15 October 2026).
   assert.match(dock, /<div className="pb-3 md:mx-auto md:w-full md:max-w-md">/);
-  assert.match(dock, /placeholder=\{SPACE_COMPOSER_PLACEHOLDER\}\s+compact\s/);
-  const composer = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
-  // Every compact class is an `md:` one, so the phone keeps its box.
-  for (const [, classes] of composer.matchAll(/compact && '([^']+)'/g)) {
-    for (const name of classes.split(' ')) assert.match(name, /^md:/, name);
-  }
-  assert.match(composer, /compact && 'md:flex md:flex-wrap md:items-end md:gap-x-1 md:p-1\.5'/);
-  assert.match(composer, /compact && 'md:contents'/);
-  assert.match(composer, /compact && 'md:order-3 md:size-8'/);
-  // The model leaves the row from `md:` and stands beside the jurisdiction.
-  assert.match(composer, /<div className=\{cn\('contents', compact && 'md:hidden'\)\}>\s*<WorkflowField/);
-  assert.match(composer, /\{compact \? \(\s*<div className="hidden md:block">\s*<WorkflowField/);
+  // Arthur's line stays (12:04Z and 12:17Z): not the follow-up one.
+  assert.match(dock, /placeholder=\{SPACE_COMPOSER_PLACEHOLDER\}/);
+  assert.match(dock, /export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Space\?';/);
+  // The one-row desktop pill went: no host asks the composer for it.
+  assert.doesNotMatch(dock, /compact/);
+  assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /compact/);
 });

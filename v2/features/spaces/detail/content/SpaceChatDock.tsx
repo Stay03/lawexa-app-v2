@@ -14,7 +14,7 @@ import {
 export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Space?';
 
 /**
- * The message box at the bottom of a space's Conversations tab (Stay, 15
+ * The message box at the bottom of a space's home (Stay, 15
  * October 2026: "it should be a text area at the bottom like the chat page and
  * when i click send it should then take me to the normal space chat/message
  * page with lawexa responding"; Arthur: the composer is visible as soon as the
@@ -37,14 +37,16 @@ export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Spa
  * follows the reader into another space, and the home's shared draft key
  * (`useComposerDraft`) is left alone.
  *
- * `handle` is the box's own (`HomeComposerHandle`): the empty tab's Upload
+ * `handle` is the box's own (`HomeComposerHandle`): the empty list's Upload
  * files opens this box's picker, so the file shows as a chip in the box, saved
  * in the space and sent with the first message (Arthur, 15 October 2026).
  *
- * ON A DESKTOP IT IS THE CHAT'S PILL (Stay, 15 October 2026: "the text area in
- * the web one is too long and big"): one row (`compact`), centred, as wide as
- * the follow-up box on `/c/{id}` (`max-w-md`, the cap that screen's overlay
- * carries). The phone keeps the full-width box.
+ * THE PHONE'S BOX AT EVERY WIDTH (design B4, Arthur, 17 October 2026: "Keep
+ * composer consistent"): the text on top and the model at the bottom left. On
+ * a desktop it is centred and as wide as the follow-up box on `/c/{id}`
+ * (`max-w-md`, the cap that screen's overlay carries), which still answers
+ * Stay's 15 October 2026 note ("the text area in the web one is too long and
+ * big"); the one-row pill it was there is gone.
  */
 export function SpaceChatDock({
   space,
@@ -71,7 +73,6 @@ export function SpaceChatDock({
           space={space}
           handle={handle}
           placeholder={SPACE_COMPOSER_PLACEHOLDER}
-          compact
           className="p-2.5 shadow-lg"
           textareaClassName="text-base"
         />

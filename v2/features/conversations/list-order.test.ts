@@ -125,7 +125,9 @@ test('every chat list asks for last_message_at, newest first', () => {
   assert.equal(conversations.match(/sort_by: 'last_message_at',\s*sort_order: 'desc',/g)?.length, 3, 'peek, rail, list page');
   assert.doesNotMatch(conversations, /sort_by: 'updated_at'/);
   const spaces = read('v2', 'features', 'spaces', 'queries.ts');
-  assert.match(spaces, /sort_by: 'last_message_at',\s*sort_order: 'desc',/, 'a space’s chats');
+  // A space's chats are in its one feed (design B4), which the server orders
+  // by the last message, else the creation (`sort_at`), newest first.
+  assert.match(spaces, /spacesApi\.getItems\(/, 'a space’s chats');
   assert.doesNotMatch(spaces, /sort_by: 'updated_at'/);
 });
 

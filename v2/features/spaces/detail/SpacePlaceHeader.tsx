@@ -17,27 +17,27 @@ import { spaceHeaderFacts, spacePrincipleLine, type MembershipSubject } from '..
  * ── IT LEADS WITH THE PLACE, NOT WITH A DOCUMENT ───────────────────────────
  * The shipped header was the case page's grammar — a grey type tile, a kicker,
  * an `h1`, a kebab — which reads as "a record about a space". A space is a
- * PLACE, so it leads with the crest at 48px (the same monogram and the same
- * hue the reader has already seen on the `/spaces` lane, in the rail beside
- * this page and in the channel header afterwards).
+ * PLACE, so it leads with the crest (the same monogram and the same hue the
+ * reader has already seen on the `/spaces` lane, in the rail beside this page
+ * and in the channel header afterwards).
  *
- * ── ONE ROW, AND THE REST BEHIND THE NAME (Stay, 15 October 2026) ──────────
+ * ── ONE SHORT ROW, AND THE REST BEHIND THE NAME (Stay, 15 October 2026) ────
  * "I also dont like the top of the space page, it takes too much space at the
- * top and makes things messy, remove the members from there since there will
- * now be a tab for that." So the block is the crest, the kicker and the name,
- * nothing under them: the faces and their count went to the People tab, New
- * channel to the Channels tab, and the description and Stay's lines to the
- * details sheet the name opens (`SpaceAboutSheet`), the way a chat app opens a
- * conversation's details from its name. A space with nothing to say beyond
- * its name keeps a plain heading (`spaceHasAbout`).
+ * top and makes things messy." So the block is the crest, the name and one
+ * line under it, at the 36px crest since design B4 (17 October 2026): the
+ * description and Stay's lines are in the details sheet the name opens
+ * (`SpaceAboutSheet`), the way a chat app opens a conversation's details from
+ * its name. A space with nothing to say beyond its name keeps a plain heading
+ * (`spaceHasAbout`).
  *
- * ── THE NAME, THEN THE TYPE AND WHO CAN GET IN (Arthur, 15 October 2026) ───
- * "Display the Space name prominently, with the type and privacy status as
- * secondary information", for example "Constitutional Law" over "Study ·
- * Private" (`spaceHeaderFacts`). The privacy is in words, so the lock beside
- * the name went. "You're the owner" went too: who holds which role is the
- * People tab's to show. On a shared space Stay's two lines still sit in the
- * details sheet (`spacePrincipleLine`).
+ * ── THE NAME, THEN THE TYPE, WHO CAN GET IN, AND HOW MANY ARE IN IT ────────
+ * Arthur, 15 October 2026: "Display the Space name prominently, with the type
+ * and privacy status as secondary information", for example "Constitutional
+ * Law" over "Study · Private" (`spaceHeaderFacts`). B4 ends the line with the
+ * members count ("Work · Private · 7 members"), and the line opens the members
+ * sheet (`onOpenRoster`), as the People pill shows the same people in the
+ * list's place. On a shared space Stay's two lines still sit in the details
+ * sheet (`spacePrincipleLine`).
  *
  * ── THE NAME IS PRINTED IN FULL AT EVERY WIDTH ─────────────────────────────
  * Below `md:` the heading used to be stated for assistive tech only, with the
@@ -55,27 +55,55 @@ export function SpacePlaceHeader({
   space,
   membership,
   onOpenAbout,
+  onOpenRoster,
 }: {
   space: Space;
   /** The viewer's roles, the frame's one reading of them. */
   membership: MembershipSubject;
   /** Opens the space's details sheet (the description, Stay's lines). */
   onOpenAbout: () => void;
+  /** Opens the members sheet (`SpaceMembersSheet`, the frame's). */
+  onOpenRoster?: () => void;
 }) {
   const hasAbout = spaceHasAbout(space, membership);
+  const facts = (
+    <MetaLine
+      as="span"
+      className="text-sm"
+      lead={spaceHeaderFacts(space)}
+      trail={[spaceMembersLabel(space.active_members_count)]}
+    />
+  );
 
   return (
-    <header className="border-b pb-4">
-      <div className="flex items-start gap-4">
-        <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="lg" />
+    <header className={SPACE_HEADER_ROW}>
+      <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="md" />
 
-        <div className="min-w-0 flex-1">
-          <SpaceHeading name={space.name} onOpenAbout={hasAbout ? onOpenAbout : undefined} />
-          <MetaLine className="mt-1 text-sm" lead={spaceHeaderFacts(space)} />
-        </div>
+      <div className="min-w-0 flex-1">
+        <SpaceHeading name={space.name} onOpenAbout={hasAbout ? onOpenAbout : undefined} />
+        {onOpenRoster ? (
+          <button
+            type="button"
+            onClick={onOpenRoster}
+            className={cn('v2-interactive mt-0.5 block rounded-sm text-left', FOCUS_RING)}
+          >
+            {facts}
+          </button>
+        ) : (
+          <div className="mt-0.5">{facts}</div>
+        )}
       </div>
     </header>
   );
+}
+
+/** The header's row, shared with the route's silhouette so the hand-off
+ *  moves nothing. */
+export const SPACE_HEADER_ROW = 'flex items-center gap-3 pb-2';
+
+/** "7 members", the header's count of who is in the space. */
+export function spaceMembersLabel(count: number): string {
+  return `${count} ${count === 1 ? 'member' : 'members'}`;
 }
 
 /**

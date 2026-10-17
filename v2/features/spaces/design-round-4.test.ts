@@ -126,9 +126,10 @@ test('a picture file shows its thumbnail, else the picture glyph on the neutral 
   assert.match(mark, /case 'image':\s*return <ImageIcon aria-hidden className=\{className\} \/>;/);
   // A thumbnail that fails falls back to the glyph, and one still loading
   // shows the skeleton over the same ground as the other type glyphs.
-  assert.match(mark, /if \(settled === 'failed'\) return <GlyphMark kind="image" \/>;/);
+  assert.match(mark, /if \(settled === 'failed'\) return <GlyphMark kind="image" box=\{box\} \/>;/);
   assert.match(mark, /const GROUND = 'bg-secondary text-muted-foreground';/);
-  assert.match(mark, /<span className=\{cn\(BOX, 'relative block bg-secondary'\)\}>/);
+  assert.match(mark, /<span className=\{cn\(box, 'relative block bg-secondary'\)\}>/);
+  // The space's file row wears the 36px box, the conversation row's tile (B4).
   const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
-  assert.match(row, /<FileMark file=\{\{ \.\.\.file, url: file\.url \?\? '' \}\} \/>/);
+  assert.match(row, /<FileMark file=\{\{ \.\.\.file, url: file\.url \?\? '' \}\} size="sm" \/>/);
 });

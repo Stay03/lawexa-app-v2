@@ -36,7 +36,7 @@ test('the calls, the menu rows and the delete confirm', () => {
   assert.match(row, /<DropdownMenuItem variant="destructive" onSelect=\{\(\) => onDelete\(file\)\}>\s*<Trash2 \/>\s*Delete file/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   // Every member may copy; delete only where the role allows.
-  assert.match(panel, /onCopyToMine=\{copyFile\}/);
+  assert.match(panel, /onCopyToMine: copyFile,/);
   assert.match(panel, /canDeleteSpaceFile\(\{ my_content_role: access\.contentRole \}, file\.uploader\.id, viewerId\)\s*\?\s*deleteFile\s*:\s*undefined/);
   const dialog = read('v2', 'features', 'spaces', 'detail', 'content', 'DeleteSpaceFileDialog.tsx');
   assert.match(dialog, /It is deleted from \$\{spaceName\} for every member\. A copy anyone saved to their own files stays\./);

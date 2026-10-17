@@ -79,6 +79,10 @@ import { fileKind, isRenderableImage, type FileKind } from './file-model';
  */
 
 const BOX = 'size-10 shrink-0 overflow-hidden rounded-lg';
+/** The 36px box of the conversation row's icon tile, for a list that mixes
+ *  files with conversations (a space's home), so every row's name starts at
+ *  the same x. */
+const SMALL_BOX = 'size-9 shrink-0 overflow-hidden rounded-lg';
 const GROUND = 'bg-secondary text-muted-foreground';
 
 /** Concrete element per bucket — never a component reference picked in render. */
@@ -100,9 +104,9 @@ function KindGlyph({ kind }: { kind: FileKind }) {
   }
 }
 
-function GlyphMark({ kind }: { kind: FileKind }) {
+function GlyphMark({ kind, box }: { kind: FileKind; box: string }) {
   return (
-    <span aria-hidden className={cn(BOX, GROUND, 'flex items-center justify-center')}>
+    <span aria-hidden className={cn(box, GROUND, 'flex items-center justify-center')}>
       <KindGlyph kind={kind} />
     </span>
   );
@@ -110,13 +114,13 @@ function GlyphMark({ kind }: { kind: FileKind }) {
 
 /** The thumbnail attempt. Mounted under `key={url}`, so a regenerated URL is a
  *  fresh instance and a fresh try. */
-function ImageThumb({ url }: { url: string }) {
+function ImageThumb({ url, box }: { url: string; box: string }) {
   const [settled, setSettled] = useState<'pending' | 'shown' | 'failed'>('pending');
 
-  if (settled === 'failed') return <GlyphMark kind="image" />;
+  if (settled === 'failed') return <GlyphMark kind="image" box={box} />;
 
   return (
-    <span className={cn(BOX, 'relative block bg-secondary')}>
+    <span className={cn(box, 'relative block bg-secondary')}>
       {settled === 'pending' ? (
         <Skeleton className="absolute inset-0 size-full rounded-lg" />
       ) : null}
@@ -146,15 +150,23 @@ function ImageThumb({ url }: { url: string }) {
  *  component. */
 export type MarkableFile = Pick<ChannelFile, 'mime_type' | 'original_name' | 'url'>;
 
-export function FileMark({ file }: { file: MarkableFile }) {
+export function FileMark({
+  file,
+  size = 'md',
+}: {
+  file: MarkableFile;
+  /** `sm` is the 36px box ({@link SMALL_BOX}); `md`, 40px, everywhere else. */
+  size?: 'md' | 'sm';
+}) {
   const kind = fileKind(file);
+  const box = size === 'sm' ? SMALL_BOX : BOX;
   if (kind !== 'image' || !isRenderableImage(file) || !file.url) {
-    return <GlyphMark kind={kind} />;
+    return <GlyphMark kind={kind} box={box} />;
   }
-  return <ImageThumb key={file.url} url={file.url} />;
+  return <ImageThumb key={file.url} url={file.url} box={box} />;
 }
 
 /** The mark's reserved shape — same box and radius, so the swap moves nothing. */
-export function FileMarkSkeleton() {
-  return <Skeleton className={BOX} />;
+export function FileMarkSkeleton({ size = 'md' }: { size?: 'md' | 'sm' }) {
+  return <Skeleton className={size === 'sm' ? SMALL_BOX : BOX} />;
 }

@@ -213,6 +213,7 @@ export const conversationsCache = {
     writeEveryList(queryClient, (cache) =>
       mapListCache(cache, (rows) => removeRows(rows, id)),
     );
+    rereadSpaceFeeds(queryClient);
   },
 
   /**
@@ -237,6 +238,7 @@ export const conversationsCache = {
         { queryKey: [...spacesQueries.contentsOf(patch.spaceUuid), 'conversations'] },
         (cache) => (cache ? bumpInPages(cache, id, (row) => withNewMessage(row, at)) : cache),
       );
+      rereadSpaceFeeds(queryClient, patch.spaceUuid);
     }
   },
 
@@ -250,6 +252,7 @@ export const conversationsCache = {
     writeEveryList(queryClient, (cache) =>
       mapListCache(cache, (rows) => patchTitleRows(rows, id, fields.title)),
     );
+    rereadSpaceFeeds(queryClient);
   },
 
   /** A visibility change (share, make private) in place, WITHOUT reordering:
@@ -264,6 +267,7 @@ export const conversationsCache = {
         return next;
       }),
     );
+    rereadSpaceFeeds(queryClient);
   },
 
   /**
@@ -275,6 +279,20 @@ export const conversationsCache = {
     writeEveryList(queryClient, (cache) => upsertInCache(cache, row));
   },
 };
+
+/**
+ * A space home's one-list feed (`spacesQueries.items`) is re-read, never
+ * written: its pages mix three kinds under a server cursor, so a bump or a
+ * patch in place could not keep its order honest (backend, 17 October 2026:
+ * no live event; the app re-reads on its own events). One space when the
+ * write knows it, else every space's feed: only the one on screen refetches.
+ */
+function rereadSpaceFeeds(queryClient: QueryClient, spaceUuid?: string): void {
+  void queryClient.invalidateQueries({
+    queryKey: spaceUuid ? spacesQueries.itemsOf(spaceUuid) : spacesQueries.contents(),
+    predicate: (query) => query.queryKey[3] === 'items',
+  });
+}
 
 /**
  * The space a chat is in, as the lists already cached on this device know it:

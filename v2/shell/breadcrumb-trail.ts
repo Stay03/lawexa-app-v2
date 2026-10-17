@@ -9,7 +9,7 @@ import {
  * of the trail on a space, a chat in a space, a statute and a case; the rest of
  * the approved proposal followed the same day).
  *
- *   /spaces/{uuid}                  Spaces › {space} › {tab}
+ *   /spaces/{uuid}                  Spaces › {space} [› {pill}]
  *   /spaces/discover                Spaces › Find a space
  *   /channels/{uuid}                Spaces › {space} › # {channel}
  *   /c/{id}, in a space             Spaces › {space} › {chat title}
@@ -173,12 +173,18 @@ export function breadcrumbTrail(
   const route = trailRouteFor(pathname);
   switch (route.kind) {
     case 'space':
+      // An empty pill label is the All pill (design B4): the trail ends at the
+      // space, which is then the current page and no link. `null` is a pill
+      // not known yet, drawn as its skeleton.
       return {
-        parts: [
-          SPACES,
-          { label: data.spaceName, href: `/spaces/${route.spaceUuid}` },
-          { label: data.tabLabel },
-        ],
+        parts:
+          data.tabLabel === ''
+            ? [SPACES, { label: data.spaceName }]
+            : [
+                SPACES,
+                { label: data.spaceName, href: `/spaces/${route.spaceUuid}` },
+                { label: data.tabLabel },
+              ],
       };
     case 'discover':
       return { parts: [SPACES, FIND_A_SPACE] };

@@ -62,7 +62,7 @@ function assertLinks(trail: BreadcrumbTrail | null) {
   });
 }
 
-test('a space on a tab: Spaces › the space › the tab', () => {
+test('a space on a pill: Spaces › the space › the pill', () => {
   const trail = breadcrumbTrail(`/spaces/${SPACE}`, KNOWN);
   assert.deepEqual(shape(trail), [
     ['Spaces', '/spaces'],
@@ -72,6 +72,15 @@ test('a space on a tab: Spaces › the space › the tab', () => {
   assertLinks(trail);
   // The internal address carries the same trail.
   assert.deepEqual(breadcrumbTrail(`/v2/spaces/${SPACE}`, KNOWN), trail);
+});
+
+test('a space on All: the trail ends at the space, which is no link (B4)', () => {
+  const trail = breadcrumbTrail(`/spaces/${SPACE}`, { ...KNOWN, tabLabel: '' });
+  assert.deepEqual(shape(trail), [
+    ['Spaces', '/spaces'],
+    ['Adeyemi chambers', null],
+  ]);
+  assertLinks(trail);
 });
 
 test('a chat in a space: Spaces › the space › the chat', () => {
@@ -303,7 +312,7 @@ test('the bar hides its centre from md: only on a trail route', () => {
 
 test('the space and the statute publish the part only they know', () => {
   const space = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(space, /const crumb = hasSpace \? SPACE_TAB_LABELS\[tab\] : null;/);
+  assert.match(space, /const crumb = !hasSpace \? null : tab === defaultSpaceTab\(\) \? '' : SPACE_TAB_LABELS\[tab\];/);
   assert.match(space, /setScreenContext\(\{ pathname, back: null, actions, crumb \}\);/);
   const statute = read('v2', 'features', 'statutes', 'reader', 'StatuteDocument.tsx');
   assert.match(statute, /\(\) => \(citation \? provisionCrumb\(sectionIndex, citation\) : null\),/);

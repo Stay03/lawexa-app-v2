@@ -71,6 +71,8 @@ import type {
   SpaceFolderListResponse,
   SpaceFolderResponse,
   SpaceItemRef,
+  SpaceItemsParams,
+  SpaceItemsResponse,
   SpaceInvitationListResponse,
   SpaceListParams,
   SpaceListResponse,
@@ -238,6 +240,20 @@ export const spacesApi = {
         },
       }
     );
+    return response.data;
+  },
+
+  /** A space's conversations, files and root folders as one list, newest
+   *  first, cursor-paged (`SpaceItemsResponse`). */
+  getItems: async (spaceUuid: string, params: SpaceItemsParams = {}): Promise<SpaceItemsResponse> => {
+    const response = await apiClient.get<SpaceItemsResponse>(`/spaces/${spaceUuid}/items`, {
+      params: {
+        type: params.type || undefined,
+        search: params.search || undefined,
+        cursor: params.cursor || undefined,
+        per_page: params.per_page ?? 20,
+      },
+    });
     return response.data;
   },
 
