@@ -20,7 +20,7 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { useStreamStyle } from '@/v2/stream-style';
-import { conversationsCache, spaceOfListedChat } from '../cache';
+import { conversationsCache, listedConversation, spaceOfListedChat } from '../cache';
 import { useSkeletonHold } from './skeleton-hold';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
@@ -798,12 +798,16 @@ export function useConversationController(
   // `localOwnerId` is the fallback for the two paths that have no server record to
   // read: the fresh-create handoff (the creator IS the owner) and the confidential
   // device path (see the defect note in the mount flow).
-  const ownerId = detailData?.user_id ?? localOwnerId;
+  // Before the record, the row of a cached list the chat was tapped from says
+  // whose it is and whether the reader may send (`listedConversation`), so the
+  // real box draws at once (Stay, 17 October 2026). The record replaces it.
+  const listedRow = useMemo(() => listedConversation(queryClient, conversationId), [queryClient, conversationId]);
+  const ownerId = detailData?.user_id ?? localOwnerId ?? listedRow?.user_id ?? null;
   const isOwner = serverUserId != null && ownerId != null && serverUserId === ownerId;
   // Sending is the server's answer when it gave one (space-turn.ts). The two
   // paths with no record (the fresh-create handoff, the device-only
   // confidential chat) are the owner's own, so ownership answers there.
-  const canSend = detailData ? canSendIn(detailData, isOwner) : isOwner;
+  const canSend = detailData ? canSendIn(detailData, isOwner) : (listedRow?.can_send ?? isOwner);
   const isSpaceChat = detailData?.space != null;
   // The reader is a member of the chat's space (they have a role in it). Only a
   // member may read the status (B4); a stranger reading a published space chat

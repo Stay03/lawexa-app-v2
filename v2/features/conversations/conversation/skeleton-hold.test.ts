@@ -71,7 +71,11 @@ test('the screen draws nothing while the hold runs, then the skeleton, for trans
   const screen = read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
   assert.match(screen, /const holdingSkeleton = isLoadingHistory && !showHistorySkeleton;/);
   assert.match(screen, /isLoadingHistory=\{showHistorySkeleton\}/);
-  assert.match(screen, /\{holdingSkeleton \? null : !controller\.isOwnerResolved \|\| isLoadingHistory \? \(/);
+  // The composer's skeleton waits only on an unknown owner now: a chat tapped
+  // from a list knows its owner from the row and draws its box at once, Send
+  // held while the history loads (first-box.test.ts).
+  assert.match(screen, /\{!controller\.isOwnerResolved \? \(/);
+  assert.match(screen, /holdingSkeleton \? null : <ComposerSkeleton \/>/);
 });
 
 test('the conversation page stays in the router cache as long as its transcript stays in memory', () => {

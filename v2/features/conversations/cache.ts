@@ -329,6 +329,34 @@ export function spaceOfListedChat(queryClient: QueryClient, id: string): string 
 }
 
 /**
+ * The chat as a list cached on this device has it: the reader's own lists, then
+ * a space's chats list. A list row already says whose chat it is (`user_id`) and
+ * whether the reader may send in it (`can_send`, B4), so a chat tapped from a
+ * list can draw its real message box at once instead of a grey pill until its
+ * record answers (Stay, 17 October 2026). The create flow's placeholder row
+ * (`makeOptimisticConversation`, owner 0) says nothing and is skipped. `null`
+ * when no cached list holds the chat.
+ */
+export function listedConversation(queryClient: QueryClient, id: string): ConversationListItem | null {
+  for (const [, cache] of queryClient.getQueriesData<ListCache>({ queryKey: conversationsQueries.lists() })) {
+    if (!cache) continue;
+    const rows = isInfinite(cache) ? cache.pages.flatMap((page) => page.data) : cache.data;
+    const row = rows.find((candidate) => sameId(candidate, id));
+    if (row && row.user_id > 0) return row;
+  }
+  for (const [key, cache] of queryClient.getQueriesData<InfiniteData<SpaceConversationListResponse>>({
+    queryKey: spacesQueries.contents(),
+  })) {
+    if (key[3] !== 'conversations' || !cache?.pages) continue;
+    for (const page of cache.pages) {
+      const row = page.data.find((candidate) => sameId(candidate, id));
+      if (row && row.user_id > 0) return row;
+    }
+  }
+  return null;
+}
+
+/**
  * Build the transient placeholder row the create flow upserts before the server
  * echoes the real conversation. Only `id`, `title`, and `updated_at` are ever
  * rendered by a recents surface (the rail/drawer show `id` + `title`; the home strip

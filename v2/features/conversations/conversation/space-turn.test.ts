@@ -136,7 +136,8 @@ test('the composer follows canSend, and the owner verbs stay with ownership', ()
   assert.match(screen, /canShowPlace=\{controller\.isOwnerResolved && !controller\.isConfidential\}/);
   assert.match(screen, /enabled=\{controller\.isOwnerResolved && controller\.isOwner && !controller\.isConfidential\}/);
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /const canSend = detailData \? canSendIn\(detailData, isOwner\) : isOwner;/);
+  // Before the record, a cached list's row says whether the reader may send (first-box.test.ts).
+  assert.match(controller, /const canSend = detailData \? canSendIn\(detailData, isOwner\) : \(listedRow\?\.can_send \?\? isOwner\);/);
 });
 
 test('the case dock reads the same answer through the embedded surface', () => {

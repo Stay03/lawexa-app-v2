@@ -431,21 +431,24 @@ export function ConversationScreen({
               ref={dockRef}
               className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md"
             >
-              {holdingSkeleton ? null : !controller.isOwnerResolved || isLoadingHistory ? (
-                // Ownership/history still resolving → the composer-shaped skeleton (same
-                // geometry as the real pill). NEVER the "shared" pill here: isOwner is
-                // false while the owner id is null, so it would misleadingly flash for
-                // owners on every direct-nav / reload / recents click.
+              {!controller.isOwnerResolved ? (
+                // Ownership still unknown → the composer-shaped skeleton (same
+                // geometry as the real pill), after the skeleton hold. NEVER the
+                // "shared" pill here: isOwner is false while the owner id is null, so
+                // it would misleadingly flash for owners on a direct open or reload.
                 //
-                // On a REVISIT neither term is ever true: the cached conversation record
-                // carries `user_id`, so ownership is resolved in the first render and the
-                // real composer paints immediately — this skeleton is now only the cold
-                // open, which is what it was always meant to be.
-                <ComposerSkeleton />
+                // A chat tapped from a list knows its owner from the list's row, and a
+                // revisit from its cached record, so both draw the real box at once:
+                // this skeleton is only a cold open with no list behind it.
+                holdingSkeleton ? null : <ComposerSkeleton />
               ) : controller.canSend ? (
                 // The reader may send: the chat's owner, or (backend B4) an
-                // Owner or Contributor of the chat's space.
+                // Owner or Contributor of the chat's space. While the history is
+                // still loading the box takes typing but holds Send (`disabled`): a
+                // turn started now would make the engine decline the history that
+                // lands under it (Stay, 17 October 2026).
                 <ConversationComposer
+                  disabled={isLoadingHistory}
                   draftScopeId={conversationId}
                   stageRef={composerRef}
                   jurisdiction={controller.jurisdiction}
