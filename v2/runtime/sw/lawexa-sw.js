@@ -22,23 +22,26 @@
  * /_next/static/ only, and returns without answering for everything else.
  *
  * ── AFTER A DEPLOY ─────────────────────────────────────────────────────────
- * Every chunk URL carries `?dpl=<commit>`, so after a deploy every file has a
- * new URL. On Chromium the static route matches the exact URL only, so the
- * first open after a deploy downloads the files again, as it does with no
- * worker (measured 7 October 2026: a cached chunk under a new `dpl` came from
- * the network, 2,322 bytes); every open after that is served from the cache.
- * The fetch handler (other browsers) does better: a miss on the full URL looks
- * up the same path under an earlier `dpl` (same file name, same bytes, by
- * Next's content-hash naming) and serves that copy. Two generations are kept,
- * the current deploy and the one before, so a tab opened before a deploy can
- * still load its lazy chunks; older ones are deleted.
+ * Every chunk URL carries `?dpl=<asset token>` (next.config.ts), a token that
+ * holds across deploys, so a file whose name did not change keeps its URL and
+ * the Chromium static route serves it from the cache on the first open after
+ * a deploy too. (Until 17 October 2026 the tag was the commit, every file got a
+ * new URL, and that first open downloaded everything again.) A changed file
+ * has a new name, so it is a miss and comes from the network. The fetch
+ * handler (other browsers) still looks up the same path under an earlier
+ * `dpl` on a miss, for a tab opened before a token change.
+ *
+ * THE SWITCH. The cache's name carries the token (`__LAWEXA_ASSET_TOKEN__`,
+ * filled in by `serve.ts` from the build). A new token, set to make every
+ * phone fetch fresh, renames the cache, and `activate` deletes the old one, so
+ * no copy from before the switch can be served, by either path.
  *
  * A new version of this file activates at once (skipWaiting + clients.claim).
  * That is safe here because no page is cached: a page is never left running
  * against code it did not load.
  */
 
-const CACHE = 'lawexa-static-v1';
+const CACHE = 'lawexa-static-v1-__LAWEXA_ASSET_TOKEN__';
 const META = 'lawexa-sw-meta';
 const META_KEY = '/__lawexa-sw-meta';
 const STATIC_PREFIX = '/_next/static/';

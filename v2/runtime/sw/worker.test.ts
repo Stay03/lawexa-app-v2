@@ -30,7 +30,8 @@ test('on Chromium, static routes serve /_next/static/ from the cache and send ev
 
 test('only whole same-origin answers are kept, in one cache whose name the removal path knows', () => {
   assert.match(worker, /return response\.ok && response\.status === 200 && response\.type === 'basic';/);
-  assert.match(worker, /const CACHE = 'lawexa-static-v1';/);
+  // The cache's name carries the build's asset token (serve.ts fills it in).
+  assert.match(worker, /const CACHE = 'lawexa-static-v1-__LAWEXA_ASSET_TOKEN__';/);
   assert.match(worker, /const META = 'lawexa-sw-meta';/);
   assert.match(worker, /const WARM_MESSAGE = '([^']+)';/);
   assert.equal(worker.match(/const WARM_MESSAGE = '([^']+)';/)?.[1], SW_WARM_MESSAGE);

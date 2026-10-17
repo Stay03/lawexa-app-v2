@@ -73,9 +73,19 @@ export function serviceWorkerWanted(gate: WorkerGate): boolean {
   );
 }
 
-/** The body /sw.js answers with: the real worker or the one that removes it. */
-export function serviceWorkerBodyFor(gate: WorkerGate, workerSource: string): string {
-  return serviceWorkerWanted(gate) ? workerSource : SELF_DESTRUCT_SOURCE;
+/** Where the worker's cache name takes the build's asset token (next.config.ts). */
+export const SW_TOKEN_PLACEHOLDER = '__LAWEXA_ASSET_TOKEN__';
+
+/**
+ * The body /sw.js answers with: the real worker, its cache named for the
+ * build's asset token, or the one that removes it. A new token is a new cache
+ * name, so the worker that carries it deletes the old cache on activate (the
+ * switch that makes every phone fetch fresh, next.config.ts). Only letters,
+ * digits, `_` and `-` reach the worker's source.
+ */
+export function serviceWorkerBodyFor(gate: WorkerGate, workerSource: string, assetToken = ''): string {
+  if (!serviceWorkerWanted(gate)) return SELF_DESTRUCT_SOURCE;
+  return workerSource.split(SW_TOKEN_PLACEHOLDER).join(assetToken.replace(/[^A-Za-z0-9_-]/g, ''));
 }
 
 /** The cookie names the route reads, from their single definitions. */

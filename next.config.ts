@@ -14,9 +14,9 @@ import { PHASE_PRODUCTION_SERVER } from "next/constants";
  *     but a checkout is available.
  *  3. `null` — let Next.js fall back to its own generated build id.
  *
- * This value feeds `deploymentId` (the `?dpl=` asset tag + skew-protection
- * header), which is what actually forces clients onto fresh assets after a
- * deploy. It is also wired into `generateBuildId`, but note Next pins `BUILD_ID`
+ * This value feeds `deploymentId` (the skew-protection header and the HTML's
+ * `data-dpl-id`; the `?dpl=` asset tag is the asset token below, which holds
+ * across deploys). It is also wired into `generateBuildId`, but note Next pins `BUILD_ID`
  * to a constant sentinel whenever `deploymentId` is set and drives skew
  * protection off `deploymentId` instead — so `generateBuildId` only takes effect
  * as the fallback path when no SHA is resolvable (deploymentId omitted).
@@ -62,6 +62,49 @@ function builtDeploymentId(): string | null | undefined {
   }
 }
 
+/**
+ * THE ASSET TOKEN (speed step 6, part 1; Stay, 17 October 2026). The `?dpl=`
+ * every /_next/static URL carries. It used to be the commit (`deploymentId`),
+ * so every push gave every file a new address and a phone downloaded all of
+ * them again, though 964 of 1,002 had not changed (backend's check of two
+ * builds). Now it is this token, which stays the same across pushes, so a file
+ * whose name did not change keeps its address and stays in the phone's cache.
+ * `deploymentId` still carries the commit for skew protection and the HTML's
+ * `data-dpl-id`.
+ *
+ * Safe because a file's NAME changes when its content does (Turbopack names
+ * chunks by hash); `scripts/check-static-names.mjs` fails a build in which a
+ * name stayed and its content changed, against the last pushed build.
+ *
+ * THE SWITCH. To make every phone fetch every file fresh, as before, set
+ * `LAWEXA_ASSET_TOKEN` to a new value in the build's environment (or bump
+ * {@link ASSET_TOKEN_DEFAULT}) and push. Every address changes, and the service
+ * worker's cache, whose name carries the token, is replaced.
+ */
+const ASSET_TOKEN_DEFAULT = "1";
+
+/** The build's token, read back by `next start` like the deployment id. */
+function builtAssetToken(): string | null | undefined {
+  try {
+    const files = JSON.parse(
+      readFileSync(join(process.cwd(), ".next", "required-server-files.json"), "utf8"),
+    );
+    const token = files?.config?.experimental?.immutableAssetToken;
+    return typeof token === "string" && token.length > 0 ? token : null;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveAssetToken(phase: string): string {
+  if (phase === PHASE_PRODUCTION_SERVER) {
+    const built = builtAssetToken();
+    if (built) return built;
+  }
+  const fromEnv = process.env.LAWEXA_ASSET_TOKEN?.trim().replace(/[^A-Za-z0-9_-]/g, "");
+  return `a${fromEnv || ASSET_TOKEN_DEFAULT}`;
+}
+
 function resolveDeploymentId(phase: string): string | null {
   if (phase === PHASE_PRODUCTION_SERVER) {
     const built = builtDeploymentId();
@@ -80,6 +123,9 @@ const nextConfig = (phase: string): NextConfig => {
     generateBuildId: () => buildId,
     ...(buildId ? { deploymentId: buildId } : {}),
     experimental: {
+      // The `?dpl=` on every asset: a token that holds across pushes (see
+      // `resolveAssetToken`), not the commit.
+      immutableAssetToken: resolveAssetToken(phase),
       // How long a prefetched route shell (layout and loading state) stays usable
       // in the browser. Next's default is 300 s; past it, a tap on a kept tab
       // waits for the server to send the shell again before the address changes

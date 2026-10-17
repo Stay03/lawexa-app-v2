@@ -43,6 +43,10 @@ export async function GET(): Promise<Response> {
       swSetting: process.env[SW_ENV],
     },
     realWorker(),
+    // The build's asset token, written into this bundle by Next at build time
+    // (`experimental.immutableAssetToken`, next.config.ts), so the worker's
+    // cache follows the same token as the files' addresses.
+    process.env.NEXT_IMMUTABLE_ASSET_TOKEN ?? '',
   );
 
   return new Response(body, {
