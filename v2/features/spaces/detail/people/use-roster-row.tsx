@@ -26,6 +26,7 @@ export function useSpaceRosterRow({
   viewerUuid,
   canManage,
   shared,
+  showRoles = true,
   onTransferOwnership,
 }: {
   space: Pick<Space, 'uuid'>;
@@ -33,6 +34,9 @@ export function useSpaceRosterRow({
   canManage: boolean;
   /** A shared space speaks in content roles (Owner, Contributor, Viewer). */
   shared: boolean;
+  /** `false` on the People tab: no role word under each name but the
+   *  Owner's (Stay, 17 October 2026). The members sheet keeps them. */
+  showRoles?: boolean;
   onTransferOwnership?: (target: Member) => void;
 }): (member: Member, underInvited?: boolean) => ReactNode {
   const updateRole = useUpdateSpaceMemberRole(space.uuid);
@@ -48,6 +52,7 @@ export function useSpaceRosterRow({
         member={member}
         showPending={!underInvited}
         isNew={joinedRecently(member, now)}
+        showRole={showRoles}
         isSelf={member.user.uuid === viewerUuid}
         contentRoles={shared}
         onPromote={

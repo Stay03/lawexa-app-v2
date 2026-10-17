@@ -69,7 +69,9 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
     enabled: canManage,
   });
   const requests = useSpaceJoinRequests(space.uuid, canManage);
-  const rosterRow = useSpaceRosterRow({ space, viewerUuid, canManage, shared });
+  // No Viewer or Contributor under each name here (Stay, 17 October 2026);
+  // the row's menu still changes it.
+  const rosterRow = useSpaceRosterRow({ space, viewerUuid, canManage, shared, showRoles: false });
 
   const roster = splitRoster(membersQuery.data?.data ?? []);
   const joined = roster.joined;

@@ -61,8 +61,23 @@ test('the panel: members for everyone; invite, links, Invited and Asked to join 
   assert.match(panel, />\s*Needs your approval\s*</);
   assert.match(panel, />\s*Invite sent\s*</);
   assert.doesNotMatch(panel, />\s*(Invited|Asked to join)\s*</);
-  // One row for the tab and the sheet.
-  assert.match(panel, /const rosterRow = useSpaceRosterRow\(\{ space, viewerUuid, canManage, shared \}\);/);
+  // One row for the tab and the sheet; the tab drops the role words.
+  assert.match(panel, /const rosterRow = useSpaceRosterRow\(\{ space, viewerUuid, canManage, shared, showRoles: false \}\);/);
+});
+
+test('the People tab shows no Viewer or Contributor under a name; the Owner keeps the crown and "Owner" (Stay, 17 October 2026)', () => {
+  const row = read('v2', 'features', 'collab', 'membership', 'RosterRow.tsx');
+  assert.match(row, /showRole = true,/);
+  assert.match(row, /const roleShown = showRole \|\| isOwner;/);
+  // The role word and its dot only when the role shows; the handle always.
+  assert.match(row, /\{roleShown \? \(\s*<>\s*\{member\.user\.username && \(\s*<span aria-hidden[^>]*>\s*·\s*<\/span>\s*\)\}\s*<span className="shrink-0 text-xs capitalize text-muted-foreground">\s*\{roleLabel\}/);
+  assert.match(row, /<Crown aria-hidden/);
+  const hook = read('v2', 'features', 'spaces', 'detail', 'people', 'use-roster-row.tsx');
+  assert.match(hook, /showRoles = true,/);
+  assert.match(hook, /showRole=\{showRoles\}/);
+  // The members sheet keeps them.
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
+  assert.doesNotMatch(sheet, /showRoles/);
 });
 
 test('the top is one row; the name opens the details sheet on ?panel=about (Stay, 15 October 2026)', () => {

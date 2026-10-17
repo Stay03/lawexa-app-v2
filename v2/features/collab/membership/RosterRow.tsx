@@ -64,6 +64,7 @@ export function RosterRow({
   onRemove,
   showPending = true,
   isNew = false,
+  showRole = true,
 }: {
   member: Member;
   isSelf?: boolean;
@@ -82,6 +83,11 @@ export function RosterRow({
   /** Joined in the last week: a small "New" beside the role (the space's
    *  People tab, 16 October 2026). */
   isNew?: boolean;
+  /** `false` drops the role word under the name for everyone but the Owner,
+   *  who keeps the crown and "Owner" (the space's People tab, Stay, 17
+   *  October 2026: "Remove the viewer/contributor text on the people area").
+   *  The menu still changes the role. */
+  showRole?: boolean;
 }) {
   const contentRole = contentRoles ? contentRoleOf(member) : null;
   const isOwner = contentRole !== null ? contentRole === 'owner' : member.role === 'owner';
@@ -97,6 +103,7 @@ export function RosterRow({
   const roleLabel = contentRoles
     ? contentRoleLabelOf(member)
     : member.role_label || member.role;
+  const roleShown = showRole || isOwner;
   // Ownership may only pass to an ACTIVE member — a pending invitee has not
   // accepted yet, and the server would refuse.
   const canTransfer =
@@ -123,18 +130,22 @@ export function RosterRow({
             <Crown aria-hidden className="size-3 shrink-0 text-primary" />
           )}
           {member.user.username && (
+            <span className="min-w-0 truncate text-xs text-muted-foreground">
+              @{member.user.username}
+            </span>
+          )}
+          {roleShown ? (
             <>
-              <span className="min-w-0 truncate text-xs text-muted-foreground">
-                @{member.user.username}
-              </span>
-              <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
-                ·
+              {member.user.username && (
+                <span aria-hidden className="shrink-0 text-xs text-muted-foreground">
+                  ·
+                </span>
+              )}
+              <span className="shrink-0 text-xs capitalize text-muted-foreground">
+                {roleLabel}
               </span>
             </>
-          )}
-          <span className="shrink-0 text-xs capitalize text-muted-foreground">
-            {roleLabel}
-          </span>
+          ) : null}
           {member.is_pending && showPending && (
             <Badge variant="outline" className="h-4 px-1 text-[10px] font-medium">
               Pending
