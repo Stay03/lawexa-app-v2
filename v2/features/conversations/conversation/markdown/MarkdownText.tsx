@@ -64,6 +64,17 @@ import { splitMarkdownBlocks } from './split-blocks';
  * kept defers none of them: there is nothing left to spread over frames.
  */
 
+/**
+ * THE FADE IS THE TAIL'S (speed step 6, part 2; Stay, 17 October 2026). Only
+ * the last two blocks of a streaming answer take the animated pipeline. A
+ * block further back is finished: it parses once, plain, into preparedBlocks,
+ * and holds no word spans while the answer goes on. Two and not one, so the
+ * block that has just been left still plays its words' 160ms fade out when
+ * the next one starts. When the answer lands, only those two re-parse; every
+ * block before them is already the plain parse, so its memo holds.
+ */
+const ANIMATED_TAIL_BLOCKS = 2;
+
 // Stable module-level plugin list — a fresh array each render would defeat memo.
 const REMARK_PLUGINS = [remarkBreaks, remarkGfm];
 
@@ -264,7 +275,11 @@ export const MarkdownText = memo(function MarkdownText({
         index < pendingCount ? (
           <PendingBlock key={index} content={block} />
         ) : (
-          <MarkdownBlock key={index} content={block} animate={animate} />
+          <MarkdownBlock
+            key={index}
+            content={block}
+            animate={animate && index >= blocks.length - ANIMATED_TAIL_BLOCKS}
+          />
         ),
       )}
     </div>
