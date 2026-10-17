@@ -14,7 +14,8 @@ import {
 } from '@/v2/runtime/url-params';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { useCasePeek } from '../case-peek';
-import { casesQueries } from '../queries';
+import { countOpen } from '../case-view';
+import { casesQueries, searchTermOf } from '../queries';
 import { CaseAskDock } from './CaseAsk';
 import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
 import { CaseChatDocked } from './CaseChatPanel';
@@ -172,6 +173,13 @@ function CaseBody({ slug }: { slug: string }) {
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
+  // ONE VIEW PER OPEN. Drawn from a read made ahead of the open (a hover),
+  // which counted none, the open sends its one view; drawn from an ordinary
+  // read, it sends nothing (`case-view.ts`).
+  const drawn = detail !== null;
+  useEffect(() => {
+    if (drawn) countOpen(slug, searchTermOf(searchQuery));
+  }, [drawn, slug, searchQuery]);
   // Fade the document in only when it arrives AFTER this screen mounted (the
   // skeleton gives way to it). A screen that mounts with the case already in
   // hand draws it at once: the loading boundary drawing a prefetched case,

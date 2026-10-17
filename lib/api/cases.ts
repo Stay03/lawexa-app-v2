@@ -71,6 +71,18 @@ export const casesApi = {
   },
 
   /**
+   * Count one view for a case the reader opened from a read made ahead of the
+   * open (a v2 hover prefetch), which counted none. The same throttle as an
+   * ordinary read; a repeat inside the API's window stores nothing. `?q=` is
+   * the search attribution, as on the read. Answers 204.
+   */
+  recordView: async (slug: string, searchQuery?: string): Promise<void> => {
+    await apiClient.post(`/cases/${slug}/view`, undefined, {
+      params: searchQuery ? { q: searchQuery } : undefined,
+    });
+  },
+
+  /**
    * Get the paged list of later cases that cite this one. The case payload
    * caps `cited_by` at 50 rows; this is the whole list.
    * @param slug - Slug of the cited case

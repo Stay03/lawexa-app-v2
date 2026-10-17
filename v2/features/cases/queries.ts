@@ -1,5 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { casesApi } from '@/lib/api/cases';
+import { noteCountedRead, noteReadAhead } from './case-view';
 import { chatApi } from '@/lib/api/chat';
 import { trendingApi } from '@/lib/api/trending';
 import type { CaseListParams } from '@/types/case';
@@ -211,13 +212,17 @@ export const casesQueries = {
     return queryOptions({
       meta: { persist: 'gated' },
       queryKey: [...casesQueries.details(), slug, 'full', { q: q ?? null }] as const,
-      queryFn: () =>
-        casesApi.getBySlug(slug, {
+      // An ordinary read counts the open's view itself (`case-view.ts`).
+      queryFn: async () => {
+        const answer = await casesApi.getBySlug(slug, {
           includeSimilarCases: true,
           includeCitedCases: true,
           includeCitedBy: true,
           searchQuery: q,
-        }),
+        });
+        noteCountedRead(slug, q);
+        return answer;
+      },
       staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.reference,
     });
@@ -235,15 +240,21 @@ export const casesQueries = {
    */
   prefetchDetail: (slug: string, searchQuery?: string) => ({
     queryKey: casesQueries.detail(slug, searchQuery).queryKey,
-    queryFn: ({ signal }: { signal: AbortSignal }) =>
-      casesApi.getBySlug(slug, {
+    // A read ahead counts no view, so the page that draws it counts the open
+    // once (`case-view.ts`).
+    queryFn: async ({ signal }: { signal: AbortSignal }) => {
+      const q = searchTermOf(searchQuery);
+      const answer = await casesApi.getBySlug(slug, {
         includeSimilarCases: true,
         includeCitedCases: true,
         includeCitedBy: true,
-        searchQuery: searchTermOf(searchQuery),
+        searchQuery: q,
         prefetch: true,
         signal,
-      }),
+      });
+      noteReadAhead(slug, q);
+      return answer;
+    },
     staleTime: STALE_TIMES.reference,
   }),
 
