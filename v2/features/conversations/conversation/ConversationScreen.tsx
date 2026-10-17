@@ -16,6 +16,7 @@ import type { MessageReplyTo } from '@/types/chat';
 import { REPLY_DRAFT, quoteTone, replyDraftKey } from './reply-target';
 import { writeDraft } from './draft-store';
 import { memberColourIndex } from './member-colour';
+import { colourRosterFor } from './record-roster';
 import {
   useConversationController,
   type ConversationEmbed,
@@ -130,15 +131,17 @@ export function ConversationScreen({
   // then anyone else who asked, by first appearance. A row this client drew for
   // the reader carries no author yet, so it takes the reader's own uuid.
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
-  const { spaceRoster } = controller;
+  // The record's own roster when it lists every asker, else the members read
+  // (record-roster.ts).
+  const { spaceRoster, recordRoster } = controller;
   const memberColours = useMemo(() => {
-    if (!spaceRoster) return null;
     const asked: string[] = [];
     for (const message of messages) {
       if (message.role === 'user' && message.author?.uuid) asked.push(message.author.uuid);
     }
-    return memberColourIndex(spaceRoster, asked);
-  }, [spaceRoster, messages]);
+    const roster = colourRosterFor(recordRoster, spaceRoster, asked);
+    return roster ? memberColourIndex(roster, asked) : null;
+  }, [recordRoster, spaceRoster, messages]);
   // External-composer embedding (the case chat's ONE screen): the HOST owns the
   // composer element, this screen owns the conversation — so it renders the
   // transcript only and PUBLISHES its composer-facing surface through the

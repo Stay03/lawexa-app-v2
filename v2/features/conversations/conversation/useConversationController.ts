@@ -27,6 +27,7 @@ import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import type { RosterEntry } from './member-colour';
+import { rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { MentionOptions } from '@/v2/features/channels/model';
@@ -212,6 +213,10 @@ export interface ConversationController {
   /** The space's roster for each person's colour (member-colour.ts), or null:
    *  a personal chat, or the roster not read yet. */
   spaceRoster: readonly RosterEntry[] | null;
+  /** The same, from the chat record's `space_roster` (record-roster.ts), or null:
+   *  a personal chat, or a record without it. It colours the chat when it lists
+   *  every asker, so the colours land with the transcript. */
+  recordRoster: readonly RosterEntry[] | null;
   /** Who the composer's `@` picker offers (mention-options.ts), or null: a
    *  personal chat, or the roster not read yet. */
   mentionOptions: MentionOptions | null;
@@ -826,6 +831,15 @@ export function useConversationController(
         : null,
     [showAuthors, rosterRows],
   );
+  // The record's own roster (backend, 17 October 2026): the colours from it
+  // need no second read, which on a direct open came a round trip after the
+  // transcript. The members read above stays, for tagging people and for an
+  // asker it does not list (record-roster.ts).
+  const recordRows = detailData?.space_roster;
+  const recordRoster = useMemo<readonly RosterEntry[] | null>(
+    () => (showAuthors && recordRows ? rosterFromRecord(recordRows) : null),
+    [showAuthors, recordRows],
+  );
   // The same roster, for tagging people (Viewers included, the reader left out;
   // mention-options.ts).
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
@@ -1127,6 +1141,7 @@ export function useConversationController(
     spaceUuid,
     showAuthors,
     spaceRoster,
+    recordRoster,
     mentionOptions,
     sendHeldBy: heldBy,
     heldSince,

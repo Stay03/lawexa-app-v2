@@ -776,6 +776,12 @@ export interface ConversationData {
   my_space_role?: ConversationSpaceRole | null;
   /** See {@link ConversationListItem.can_send}. */
   can_send?: boolean;
+  /**
+   * The space's newest 100 active members, for each person's colour (backend,
+   * 17 October 2026): only for an active member of the chat's space, absent
+   * otherwise and on the public route. See record-roster.ts.
+   */
+  space_roster?: SpaceRosterEntry[];
   created_at: string;
   updated_at: string;
   /** When its newest message was written (yours, a colleague's or Lawexa's); every
@@ -862,6 +868,16 @@ export interface ConversationListItem {
    *  chat list sorts by it, newest first (Stay, 13 October 2026). Absent on an older
    *  server, where the rows show updated_at (activity.ts). */
   last_message_at?: string | null;
+}
+
+/** One member on a chat record's `space_roster`. Roles are the space's words
+ *  (MemberRole and ContentRole in `types/collab`), kept as
+ *  strings here because `types/collab` imports this file. */
+export interface SpaceRosterEntry {
+  user_uuid: string;
+  role: string;
+  content_role: string | null;
+  joined_at: string | null;
 }
 
 /** The two keys of a space a chat payload carries (backend B3). Declared here

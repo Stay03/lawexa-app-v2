@@ -98,7 +98,8 @@ test('the wiring: roster by uuid, the reader\'s own rows by the reader\'s uuid, 
   assert.match(controller, /spacesQueries\.members\(spaceUuid \?\? '', \{ viewerId: serverUserId, per_page: 100 \}\),\s*(\/\/[^\n]*\n\s*)*enabled: spaceUuid !== null && \(detailData === null \|\| showAuthors\),/);
   assert.match(controller, /owner: member\.role === 'owner' \|\| member\.content_role === 'owner',/);
   const screen = readHere('ConversationScreen.tsx');
-  assert.match(screen, /if \(!spaceRoster\) return null;/);
+  // No roster from the record or the members read: no colours (record-roster.test.ts).
+  assert.match(screen, /return roster \? memberColourIndex\(roster, asked\) : null;/);
   assert.match(screen, /if \(message\.role === 'user' && message\.author\?\.uuid\) asked\.push\(message\.author\.uuid\);/);
   const list = readHere('MessageList.tsx');
   // The row this client drew is the reader's; a withheld or missing author has none.
