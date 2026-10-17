@@ -204,6 +204,13 @@ export interface ConversationComposerProps {
   /** Extra hard-disable from the host (e.g. a conversation still wiring up). */
   disabled?: boolean;
   /**
+   * Holds Send and Enter only: the box takes typing, files and focus, and
+   * looks live. For a chat whose history is still loading, so the reader can
+   * start the follow-up at once and it goes when the chat is ready (message
+   * box B, Stay, 17 October 2026). `disabled` stays the hard lock.
+   */
+  holdSend?: boolean;
+  /**
    * Interactions that should open the host's panel (focus / click / typing).
    * The host grows its panel AROUND this box, never mounts another one, so the
    * focus the reader's tap gave it is the focus the open chat keeps: on an
@@ -255,6 +262,7 @@ export function ConversationComposer({
   showMeta = true,
   animateMeta = true,
   disabled = false,
+  holdSend = false,
   onEngage,
   stageRef,
   sendHeldBy = null,
@@ -407,7 +415,8 @@ export function ConversationComposer({
     !isUploading &&
     !hasFailedUpload &&
     !isSubmitting &&
-    !disabled;
+    !disabled &&
+    !holdSend;
 
   const handleFilesAdded = async (newFiles: File[]) => {
     if (newFiles.length === 0) return;
@@ -545,7 +554,7 @@ export function ConversationComposer({
   };
 
   const handleSubmit = async () => {
-    if (isStreaming || isSubmitting || isUploading || hasFailedUpload || disabled) return;
+    if (isStreaming || isSubmitting || isUploading || hasFailedUpload || disabled || holdSend) return;
     const fullMessage = serializePastedContent(pastedItems.map((i) => i.text), input);
     if (!fullMessage) return;
 

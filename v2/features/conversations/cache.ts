@@ -330,7 +330,7 @@ export function spaceOfListedChat(queryClient: QueryClient, id: string): string 
 
 /**
  * The chat as a list cached on this device has it: the reader's own lists, then
- * a space's chats list. A list row already says whose chat it is (`user_id`) and
+ * a space's feed. A list row already says whose chat it is (`user_id`) and
  * whether the reader may send in it (`can_send`, B4), so a chat tapped from a
  * list can draw its real message box at once instead of a grey pill until its
  * record answers (Stay, 17 October 2026). The create flow's placeholder row
@@ -344,16 +344,8 @@ export function listedConversation(queryClient: QueryClient, id: string): Conver
     const row = rows.find((candidate) => sameId(candidate, id));
     if (row && row.user_id > 0) return row;
   }
-  for (const [key, cache] of queryClient.getQueriesData<InfiniteData<SpaceConversationListResponse>>({
-    queryKey: spacesQueries.contents(),
-  })) {
-    if (key[3] !== 'conversations' || !cache?.pages) continue;
-    for (const page of cache.pages) {
-      const row = page.data.find((candidate) => sameId(candidate, id));
-      if (row && row.user_id > 0) return row;
-    }
-  }
-  return null;
+  const spaceRow = cachedSpaceChats(queryClient).find(({ row }) => sameId(row, id))?.row;
+  return spaceRow && spaceRow.user_id > 0 ? spaceRow : null;
 }
 
 /**

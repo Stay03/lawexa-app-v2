@@ -444,11 +444,11 @@ export function ConversationScreen({
               ) : controller.canSend ? (
                 // The reader may send: the chat's owner, or (backend B4) an
                 // Owner or Contributor of the chat's space. While the history is
-                // still loading the box takes typing but holds Send (`disabled`): a
-                // turn started now would make the engine decline the history that
-                // lands under it (Stay, 17 October 2026).
+                // still loading the box takes typing but holds Send (`holdSend`):
+                // a turn started now would make the engine decline the history
+                // that lands under it (Stay, 17 October 2026).
                 <ConversationComposer
-                  disabled={isLoadingHistory}
+                  holdSend={isLoadingHistory}
                   draftScopeId={conversationId}
                   stageRef={composerRef}
                   jurisdiction={controller.jurisdiction}

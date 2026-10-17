@@ -42,11 +42,21 @@ test('the row of the reader\'s own recents says whose the chat is and whether th
   client.clear();
 });
 
-test('a space chat is found on its space\'s chats list, a viewer\'s row saying they may not send', () => {
+test('a space chat is found in its space\'s feed, a viewer\'s row saying they may not send', () => {
   const client = new QueryClient();
-  client.setQueryData(spacesQueries.conversations('s-1', { viewerId: 7 }).queryKey, {
-    pages: [page([row('c-9', 3, false)])],
-    pageParams: [1],
+  client.setQueryData(spacesQueries.items('s-1', { viewerId: 7 }).queryKey, {
+    pages: [
+      {
+        success: true,
+        message: '',
+        data: [
+          { type: 'file', sort_at: '2026-10-17T09:00:00Z', item: { id: 9 } },
+          { type: 'conversation', sort_at: '2026-10-17T08:00:00Z', item: row('c-9', 3, false) },
+        ],
+        pagination: { per_page: 20, has_more: false, next_cursor: null, prev_cursor: null },
+      },
+    ],
+    pageParams: [null],
   } as never);
   const found = listedConversation(client, 'c-9');
   assert.equal(found?.user_id, 3);
@@ -72,7 +82,23 @@ test('the screen draws the real box once the owner is known, and holds Send whil
   // The skeleton only while the owner is unknown (a cold open with no list behind it).
   assert.match(screen, /\{!controller\.isOwnerResolved \? \(/);
   assert.match(screen, /holdingSkeleton \? null : <ComposerSkeleton \/>/);
-  // The history no longer keeps the box grey; it holds Send instead.
+  // The history no longer keeps the box grey; it holds Send instead, so the
+  // box takes typing at once (not `disabled`, which locks the textarea and dims
+  // the box).
   assert.doesNotMatch(screen, /!controller\.isOwnerResolved \|\| isLoadingHistory/);
-  assert.match(screen, /<ConversationComposer\s+disabled=\{isLoadingHistory\}/);
+  assert.match(screen, /<ConversationComposer\s+holdSend=\{isLoadingHistory\}/);
+  assert.doesNotMatch(screen, /disabled=\{isLoadingHistory\}/);
+});
+
+test('holdSend holds Send and Enter only: the textarea stays live', () => {
+  const composer = read('ConversationComposer.tsx');
+  assert.match(composer, /holdSend = false,/);
+  assert.match(composer, /!disabled &&\s*!holdSend;/);
+  assert.match(
+    composer,
+    /if \(isStreaming \|\| isSubmitting \|\| isUploading \|\| hasFailedUpload \|\| disabled \|\| holdSend\) return;/,
+  );
+  // The textarea's own lock and the dimming read `disabled` alone.
+  assert.match(composer, /disabled=\{ownTurnRunning \|\| isSubmitting \|\| disabled\}/);
+  assert.doesNotMatch(composer, /disabled=\{[^}]*holdSend/);
 });
