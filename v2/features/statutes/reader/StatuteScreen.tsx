@@ -1,15 +1,18 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { cn } from '@/lib/utils';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { statutesQueries } from '../queries';
+import { useStatutePeek } from '../statute-peek';
+import { StatuteFallback } from './StatuteFallback';
 import { StatuteDocument } from './StatuteDocument';
 import { StatuteHeader } from './StatuteHeader';
 import { StatuteNotesProvider } from '../notes/context';
 import {
   STATUTE_COLUMN,
-  StatuteDocumentSkeleton,
   StatuteErrorState,
   StatuteNotFoundState,
   StatuteRateLimitState,
@@ -52,6 +55,29 @@ export function StatuteScreen({
     enabled: signedIn,
   });
   const detail = query.data?.data ?? null;
+  // A tapped row's name already on screen (`statute-peek.ts`, speed step 5)
+  // stays still when the statute arrives: the kicker, the name and the
+  // designation do not fade, everything else does (`v2-statute-arrive-peeked`
+  // in statute-document.css). Decided once, at mount.
+  const peeked = useStatutePeek(slug) !== null;
+  const [arrival] = useState(() => (query.isPending && peeked ? 'peeked' : 'fade'));
+
+  // THE TEXT STARTS WITH THE METADATA, NOT AFTER IT (speed step 5). The
+  // document's read (`statutesQueries.akn`, up to ~900 KB) lives in
+  // `StatuteDocument`, which mounts only once the metadata has answered, so the
+  // body waited for one read and then the other. Its key is the slug alone and
+  // nothing in the metadata decides whether it runs (backend, 17 October 2026:
+  // a statute with no text answers a small empty document, read today all the
+  // same; both reads count one view, deduplicated per reader). So it starts
+  // here, beside the metadata, and `StatuteDocument` picks up the same entry.
+  // Only for an open from a tapped row, whose slug the list proved: a pasted
+  // dead link would otherwise spend a second 404 and a throttle hit. A
+  // prefetch, so this screen does not re-render when the text lands.
+  const queryClient = useQueryClient();
+  const [fromRow] = useState(() => peeked);
+  useEffect(() => {
+    if (signedIn && fromRow) void queryClient.prefetchQuery(statutesQueries.akn(slug));
+  }, [signedIn, fromRow, queryClient, slug]);
 
   /**
    * NOTHING IS PUBLISHED TO THE HEADER FROM HERE ANY MORE (phase 7). The bar
@@ -70,13 +96,9 @@ export function StatuteScreen({
     );
   }
 
-  if (query.isPending) {
-    return (
-      <div className={STATUTE_COLUMN}>
-        <StatuteDocumentSkeleton />
-      </div>
-    );
-  }
+  // The route's loading shape, a tapped row's name included, so the hand-off
+  // from the boundary to this wait moves nothing.
+  if (query.isPending) return <StatuteFallback />;
 
   if (query.isError) {
     // A dead slug REJECTS (axios throws on 404) — it must land on the
@@ -112,7 +134,12 @@ export function StatuteScreen({
       <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-24 pt-5 sm:pt-8">
         <article
           aria-label={detail.title}
-          className="flex flex-col gap-8 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+          className={cn(
+            'flex flex-col gap-8',
+            arrival === 'peeked'
+              ? 'v2-statute-arrive-peeked'
+              : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+          )}
         >
           <StatuteHeader detail={detail} />
           {/* KEYED BY SLUG: a statute→statute navigation reuses this component

@@ -24,35 +24,6 @@
   --doc-measure: 68ch;
 }
 
-/* ── The heading block (shared voices with the case document) ───────────── */
-
-.v2-statute-doc .doc-kicker {
-  font-family: var(--font-sans);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-}
-
-.v2-statute-doc .doc-title {
-  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
-  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
-  font-weight: 600;
-  font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.125rem);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-  text-wrap: balance;
-}
-
-/** The short designation ("Act 459", "Cap C23") — a reference string, set in
- *  the UI sans so it never reads as part of the serif name. */
-.v2-statute-doc .doc-citation {
-  font-size: 0.8125rem;
-  letter-spacing: 0.01em;
-  color: var(--muted-foreground);
-}
-
 /* ── The document body ──────────────────────────────────────────────────── */
 
 /**
@@ -741,4 +712,24 @@ html.dark .v2-statute-doc {
 .v2-statute-doc .akn-p + .akn-anchor > .akn-p:first-child,
 .v2-statute-doc .akn-anchor + .akn-p {
   margin-top: 0.75em;
+}
+
+/* ── A first open that drew the tapped row's name (speed step 5) ────────── */
+
+/**
+ * The statute arriving after the loading screen drew the tapped row's kicker,
+ * name and designation (`StatuteFallback`): those three stay as they are, and
+ * everything else fades in, so the name does not blink out and back in.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .v2-statute-arrive-peeked > :not(header),
+  .v2-statute-arrive-peeked > header > :not(.doc-kicker, .doc-title, .doc-citation) {
+    animation: v2-statute-arrive 300ms ease-out both;
+  }
+}
+
+@keyframes v2-statute-arrive {
+  from {
+    opacity: 0;
+  }
 }

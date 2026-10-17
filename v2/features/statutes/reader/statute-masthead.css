@@ -1,0 +1,37 @@
+/**
+ * The statute masthead's type: the kicker, the name and the designation line.
+ *
+ * ITS OWN FILE so the statute's loading screen can draw a tapped row's name in
+ * the masthead's own type (`StatuteFallback`, speed step 5) without shipping
+ * the reading stylesheet, or the reader, behind the list. `StatuteHeader`
+ * imports it too, so the name does not move or change face on arrival.
+ */
+
+/* ── The heading block (shared voices with the case document) ───────────── */
+
+.v2-statute-doc .doc-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.v2-statute-doc .doc-title {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.125rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/** The short designation ("Act 459", "Cap C23") — a reference string, set in
+ *  the UI sans so it never reads as part of the serif name. */
+.v2-statute-doc .doc-citation {
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  color: var(--muted-foreground);
+}

@@ -16,6 +16,7 @@ import {
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { NotesButton } from '../notes/NotesButton';
 import { incompleteNotice, statuteSource } from './statute-source';
+import './statute-masthead.css';
 
 /**
  * StatuteHeader — the reader's heading block, in the case-document header

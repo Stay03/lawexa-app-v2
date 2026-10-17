@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { FLAG_W, FlagIcon } from '@/v2/shell/FlagIcon';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { StatuteBookmarkButton } from '../bookmark/StatuteBookmarkButton';
+import { rememberStatutePeek } from '../statute-peek';
 import {
   statuteHref,
   statuteStatusTone,
@@ -92,6 +93,9 @@ export const StatuteRow = memo(function StatuteRow({
       <div className="group relative flex items-start gap-2">
         <Link
           href={statuteHref(row.slug)}
+          // The reader draws this row's name at once on a first open, before any
+          // request answers (`statute-peek.ts`, speed step 5).
+          onClick={() => rememberStatutePeek(row)}
           className={cn(
             'v2-interactive min-w-0 flex-1 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
             FOCUS_RING,
