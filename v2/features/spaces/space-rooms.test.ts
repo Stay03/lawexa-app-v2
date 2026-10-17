@@ -56,6 +56,10 @@ test('the home asks for rooms by the rail’s own rule, and draws them with the 
   assert.equal(panel.match(/layout="feed"/g)?.length, 3, 'folders, channels and threads');
   // A room's menu lives in the room.
   assert.match(panel, /case 'channel':\s*case 'thread':\s*\/\/[^\n]*\n\s*return false;/);
+  // With rooms the All field's placeholder fits a 390px phone; the label names
+  // every kind, and a reader without rooms keeps today's copy.
+  assert.match(panel, /all: \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*placeholder: 'Search this Space',\s*label: "Search this space's conversations, files, channels and threads",/);
+  assert.match(panel, /placeholder: 'Search conversations and files',/);
   // Rows are told apart by uuid, as their lists do.
   assert.match(panel, /entry\.type === 'folder' \|\| entry\.type === 'channel' \|\| entry\.type === 'thread'/);
 });

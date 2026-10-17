@@ -308,7 +308,9 @@ const SEARCH_COPY: Readonly<Record<SpaceContentTab, { placeholder: string; label
 
 const ROOMS_SEARCH_COPY: Readonly<Record<'all' | 'conversations', { placeholder: string; label: string }>> = {
   all: {
-    placeholder: 'Search conversations, files and channels',
+    // A list of four kinds overflows a 390px field ("…and channe", techlead,
+    // 17 October 2026); the label still names them.
+    placeholder: 'Search this Space',
     label: "Search this space's conversations, files, channels and threads",
   },
   conversations: {
