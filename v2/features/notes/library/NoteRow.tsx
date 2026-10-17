@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { NoteBookmarkButton } from '../bookmark/NoteBookmarkButton';
 import type { NoteRowModel } from '../note-row-model';
+import { rememberNotePeek } from '../note-peek';
 
 /**
  * NoteRow — one note in the library list, in the cases/statutes row grammar:
@@ -69,6 +70,9 @@ export const NoteRow = memo(function NoteRow({
       <div className="group relative flex items-start gap-2">
         <Link
           href={row.href}
+          // The reader draws this row's name at once on a first open, before any
+          // request answers (`note-peek.ts`, speed step 5).
+          onClick={() => rememberNotePeek(row)}
           className={cn(
             'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
             FOCUS_RING,

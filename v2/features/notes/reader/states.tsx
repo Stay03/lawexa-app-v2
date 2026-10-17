@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Lock, NotebookPen, WifiOff, type LucideIcon } from 'lucide-react';
 
@@ -34,15 +35,25 @@ export const NOTE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
  * so two appearances for one wait would only print a seam into the middle of
  * the load.
  */
-export function NoteDocumentSkeleton() {
+export function NoteDocumentSkeleton({
+  masthead,
+}: {
+  /** The kicker and the name already known (a tapped row's, `NoteFallback`),
+   *  drawn in place of their two bars. */
+  masthead?: ReactNode;
+} = {}) {
   return (
     <div aria-hidden className="flex flex-col gap-8">
       {/* Header silhouette: kicker · title · actions. The back-link bar that
           opened this went with the chip itself (phase 7) — the way back is in
           the shell's bar now, which is already painted while this shows. */}
       <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        <Skeleton className="h-3 w-40 rounded" />
-        <Skeleton className="h-8 w-3/4 rounded-lg md:h-9" />
+        {masthead ?? (
+          <>
+            <Skeleton className="h-3 w-40 rounded" />
+            <Skeleton className="h-8 w-3/4 rounded-lg md:h-9" />
+          </>
+        )}
         <div className="flex gap-2 pt-1">
           <Skeleton className="h-9 w-24 rounded-full" />
           <Skeleton className="h-9 w-28 rounded-full" />

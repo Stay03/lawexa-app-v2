@@ -1,0 +1,40 @@
+/**
+ * The note masthead's type: the kicker and the name, untitled included.
+ *
+ * ITS OWN FILE so the note's loading screen can draw a tapped row's name in the
+ * masthead's own type (`NoteFallback`, speed step 5) without shipping the
+ * reading stylesheet, or the reader, behind the list. `NoteDocument` imports
+ * it too, so the name does not move or change face on arrival.
+ */
+
+/* ── The heading block ──────────────────────────────────────────────────── */
+
+/** Provenance before the title — author · updated — in the label voice. */
+.v2-note-doc .doc-kicker {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+.v2-note-doc .doc-title {
+  font-family: var(--font-fraunces), 'Iowan Old Style', 'Palatino', Georgia, serif;
+  font-variation-settings: 'SOFT' 20, 'WONK' 0, 'opsz' 40;
+  font-weight: 600;
+  font-size: clamp(1.5rem, 1.2rem + 1.6vw, 2.125rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/**
+ * An untitled note wears the fallback in a quieter ink than a real title.
+ * The word "Untitled" is not the note's name — it is the reader being told
+ * there isn't one — and setting it at full title weight would claim otherwise.
+ */
+.v2-note-doc .doc-title-untitled {
+  color: var(--muted-foreground);
+  font-style: italic;
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
@@ -11,10 +11,11 @@ import {
   type ScreenBack,
 } from '@/v2/shell/screen-context';
 import { notesQueries } from '../queries';
+import { useNotePeek } from '../note-peek';
 import { NoteDocument } from './NoteDocument';
+import { NoteFallback } from './NoteFallback';
 import {
   NOTE_COLUMN,
-  NoteDocumentSkeleton,
   NoteErrorState,
   NoteNotFoundState,
   NoteSignedOutState,
@@ -58,6 +59,12 @@ export function NoteScreen({ slug }: { slug: string }) {
     enabled: signedIn,
   });
   const note = query.data?.data ?? null;
+  // A tapped row's name already on screen (`note-peek.ts`, speed step 5) stays
+  // still when the note arrives: the kicker and the name do not fade,
+  // everything else does (`v2-note-arrive-peeked` in note-document.css).
+  // Decided once, at mount.
+  const peeked = useNotePeek(slug) !== null;
+  const [arrival] = useState(() => (query.isPending && peeked ? 'peeked' : 'fade'));
 
   /**
    * THE BAR CARRIES NO TITLE HERE (phase 7): the note is a document and its
@@ -93,13 +100,9 @@ export function NoteScreen({ slug }: { slug: string }) {
     );
   }
 
-  if (query.isPending) {
-    return (
-      <div className={NOTE_COLUMN}>
-        <NoteDocumentSkeleton />
-      </div>
-    );
-  }
+  // The route's loading shape, a tapped row's name included, so the hand-off
+  // from the boundary to this wait moves nothing.
+  if (query.isPending) return <NoteFallback />;
 
   if (query.isError) {
     return (
@@ -147,7 +150,13 @@ export function NoteScreen({ slug }: { slug: string }) {
   return (
     // `.v2-note-doc` scopes the reading typography (note-document.css).
     <div className={`v2-note-doc ${NOTE_COLUMN}`}>
-      <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+      <div
+        className={
+          arrival === 'peeked'
+            ? 'v2-note-arrive-peeked'
+            : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300'
+        }
+      >
         <NoteDocument note={note} editHref={editHref} />
       </div>
     </div>

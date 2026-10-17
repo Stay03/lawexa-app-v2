@@ -6,6 +6,7 @@ import { formatNoteDate, noteDisplayTitle, noteHasTitle } from '../note-text';
 import { NoteActions } from './NoteActions';
 import { NoteContent } from './NoteContent';
 import { NoteEmptyBodyState } from './states';
+import './note-masthead.css';
 import './note-document.css';
 
 /**
