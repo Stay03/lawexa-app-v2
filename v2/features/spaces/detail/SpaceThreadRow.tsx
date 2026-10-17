@@ -106,6 +106,35 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
 
   const feed = layout === 'feed';
 
+  /* Where who spoke last and what they said (Stay, 16 October 2026), in place
+   * of the follower count, once the list carries it. The channel and the
+   * preview are ONE fact, so the line is cut once, at its end (design round 1);
+   * until the list carries it, today's line. */
+  const meta = (
+    <MetaLine
+      className={feed ? 'min-w-0 flex-1' : 'mt-0.5'}
+      lead={[
+        thread.last_message ? (
+          <LastMessagePreview
+            key="preview"
+            preview={thread.last_message}
+            prefix={showProvenance ? provenance : null}
+          />
+        ) : showProvenance ? (
+          provenance
+        ) : null,
+      ]}
+      trail={
+        thread.last_message === undefined
+          ? [
+              followerLabel(thread.active_members_count),
+              thread.last_message_at === null ? 'No messages yet' : null,
+            ]
+          : [thread.last_message === null ? 'No messages yet' : null]
+      }
+    />
+  );
+
   const link = (
     <Link
       href={`/channels/${thread.uuid}`}
@@ -165,6 +194,9 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
                 person={threadStatusPerson(status)}
                 quiet={quiet}
                 fold
+                // In the feed on a phone the chip leads the second line, so
+                // the title has the whole row (techlead, 17 October 2026).
+                className={feed ? 'max-md:hidden' : undefined}
               />
             ) : null}
             {muted ? (
@@ -180,33 +212,22 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
               facts cut three times. The channel name is the only fact that
               may be long, so it alone sits in the lead and ellipsizes; the
               short counted facts sit in the trail, which holds its width. */}
-          {/* Who spoke last and what they said (Stay, 16 October 2026),
-              in place of the follower count, once the list carries it. The
-              channel and the preview are ONE fact, so the line is cut once,
-              at its end (design round 1); until the list carries it, today's
-              line. */}
-          <MetaLine
-            className={feed ? undefined : 'mt-0.5'}
-            lead={[
-              thread.last_message ? (
-                <LastMessagePreview
-                  key="preview"
-                  preview={thread.last_message}
-                  prefix={showProvenance ? provenance : null}
-                />
-              ) : showProvenance ? (
-                provenance
-              ) : null,
-            ]}
-            trail={
-              thread.last_message === undefined
-                ? [
-                    followerLabel(thread.active_members_count),
-                    thread.last_message_at === null ? 'No messages yet' : null,
-                  ]
-                : [thread.last_message === null ? 'No messages yet' : null]
-            }
-          />
+          {/* The phone's chip leads this line. `-my-0.5` lets the 20px pill
+              sit in the 16px line, so the row stays the feed's 56px. */}
+          {feed && status ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <ThreadStatusChip
+                value={status.value}
+                person={threadStatusPerson(status)}
+                quiet={quiet}
+                fold
+                className="-my-0.5 md:hidden"
+              />
+              {meta}
+            </div>
+          ) : (
+            meta
+          )}
         </div>
       </div>
 

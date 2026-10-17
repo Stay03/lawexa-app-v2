@@ -75,6 +75,12 @@ test('in the feed the room rows take the conversation row’s box and keep the m
   const channel = read('v2', 'features', 'spaces', 'detail', 'SpaceChannelRow.tsx');
   assert.match(channel, /'flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground',\s*!feed && 'mt-0\.5',/);
   assert.match(channel, /\{preview \? \(\s*<span className="min-w-0 truncate">\s*<ChannelPreviewText line=\{preview\} \/>/);
+  // A thread's status chip leads the second line on a phone, so the title
+  // has the whole row (techlead, 17 October 2026); from md: up it stays by
+  // the title. The pill overlaps its 16px line, so the row stays 56px.
+  const thread = read('v2', 'features', 'spaces', 'detail', 'SpaceThreadRow.tsx');
+  assert.match(thread, /className=\{feed \? 'max-md:hidden' : undefined\}/);
+  assert.match(thread, /\{feed && status \? \(\s*<div className="flex min-w-0 items-center gap-2">\s*<ThreadStatusChip[^>]*className="-my-0\.5 md:hidden"\s*\/>\s*\{meta\}/);
 });
 
 test('a new message in a room re-reads that space’s feed, which is never written', () => {
