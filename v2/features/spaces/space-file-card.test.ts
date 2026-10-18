@@ -50,8 +50,9 @@ test('the ⋮ is the vertical dots, named for its file', () => {
 
 test('the list holds one card, keeps its file while it closes, and gives it the row rules', () => {
   const source = panel();
-  assert.match(source, /const \[card, setCard\] = useState<\{ file: SpaceFile; open: boolean \} \| null>\(null\);/);
-  assert.match(source, /const openFile = useCallback\(\(file: SpaceFile\) => setCard\(\{ file, open: true \}\), \[\]\);/);
+  assert.match(source, /const \[card, setCard\] = useState<\{ file: SpaceFile; row: HTMLElement; open: boolean \} \| null>\(null\);/);
+  assert.match(source, /const openFile = useCallback\(\(file: SpaceFile, row: HTMLElement\) => setCard\(\{ file, row, open: true \}\), \[\]\);/);
+  assert.match(source, /anchor=\{card\?\.row \?\? null\}/);
   assert.match(source, /onOpenChange=\{\(open\) => setCard\(\(previous\) => \(previous \? \{ \.\.\.previous, open \} : previous\)\)\}/);
   assert.match(source, /actions=\{card \? fileActions\(card\.file\) : \{\}\}/);
   // The same rules the row's "…" had: move for the uploader, remove for the
@@ -59,6 +60,25 @@ test('the list holds one card, keeps its file while it closes, and gives it the 
   assert.match(source, /onMove: ownsItem\(file\.uploader\.id, viewerId\) \? moveFile : undefined,/);
   assert.match(source, /onRemoveFromSpace: canRemove \? removeFile : undefined,/);
   const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
-  assert.match(rows, /openFile: \(file: SpaceFile\) => void;/);
+  assert.match(rows, /openFile: \(file: SpaceFile, row: HTMLElement\) => void;/);
   assert.doesNotMatch(rows, /SpaceFileMenu|MoreHorizontal/);
+});
+
+test('on a computer the card hangs from the tapped row: 22rem, no overlay, one frame at a time', () => {
+  // Stay, 18 October 2026, 19:46 UTC: option 1 ("horrible on web" was the
+  // phone's sheet across the whole window over a dimmed app).
+  const source = card();
+  assert.match(source, /const wide = useCardBreakpoint\(\);/);
+  assert.match(source, /if \(wide && anchorRef\) \{/);
+  assert.match(source, /<PopoverAnchor virtualRef=\{anchorRef\} \/>/);
+  assert.match(source, /side="bottom"\s+align="start"/);
+  assert.match(source, /w-\[22rem\]/);
+  // The phone keeps the sheet; a popover has no overlay.
+  assert.match(source, /<SheetContent\s+side="bottom"/);
+  assert.doesNotMatch(source, /SheetOverlay|PopoverOverlay/);
+  // The sheet's title belongs to its dialog; the popover's is a plain heading.
+  assert.match(source, /<h2 className=\{titleClass\}>\{file\.original_name\}<\/h2>/);
+  const query = read('v2', 'features', 'spaces', 'detail', 'content', 'use-card-breakpoint.ts');
+  assert.match(query, /const QUERY = '\(min-width: 48rem\)';/);
+  assert.match(query, /useSyncExternalStore\(subscribe, getSnapshot, getServerSnapshot\)/);
 });

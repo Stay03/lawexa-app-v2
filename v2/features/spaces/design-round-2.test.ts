@@ -115,7 +115,7 @@ test('the file row body is the open control, at least 44px tall', () => {
   // itself, its failure line and "no longer available" are in the card.
   assert.match(
     file,
-    /<button type="button" onClick=\{\(\) => menus\.openFile\(file\)\} aria-haspopup="dialog" className=\{className\}>/,
+    /<button type="button" onClick=\{\(event\) => menus\.openFile\(file, event\.currentTarget\)\} aria-haspopup="dialog" className=\{className\}>/,
   );
   assert.doesNotMatch(file, /menu:|note:|open\(file\.id\)/);
 });

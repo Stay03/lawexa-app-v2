@@ -447,8 +447,8 @@ function SpaceFeed({
   });
   // The one card of this list: the file it shows stays while it closes, so its
   // exit plays over the same text.
-  const [card, setCard] = useState<{ file: SpaceFile; open: boolean } | null>(null);
-  const openFile = useCallback((file: SpaceFile) => setCard({ file, open: true }), []);
+  const [card, setCard] = useState<{ file: SpaceFile; row: HTMLElement; open: boolean } | null>(null);
+  const openFile = useCallback((file: SpaceFile, row: HTMLElement) => setCard({ file, row, open: true }), []);
   // The feed cut into days, newest first.
   const days = useMemo(() => {
     const groups: { label: string; entries: SpaceItem[] }[] = [];
@@ -519,6 +519,7 @@ function SpaceFeed({
 
       <SpaceFileCard
         file={card?.file ?? null}
+        anchor={card?.row ?? null}
         open={card?.open ?? false}
         onOpenChange={(open) => setCard((previous) => (previous ? { ...previous, open } : previous))}
         actions={card ? fileActions(card.file) : {}}

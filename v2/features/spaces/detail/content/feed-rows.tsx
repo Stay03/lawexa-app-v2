@@ -61,8 +61,8 @@ import { fileTypeLabel } from '../../content-model';
 
 /** What the feed decides for its rows: a file's card, a folder's model, a chat's byline. */
 export interface FeedRowMenus {
-  /** Opens the file's card (its name, "Open file" and its ⋮). */
-  openFile: (file: SpaceFile) => void;
+  /** Opens the file's card (its name, "Open file" and its ⋮), hung from the tapped row on a computer. */
+  openFile: (file: SpaceFile, row: HTMLElement) => void;
   folderRow: (entry: Extract<SpaceItem, { type: 'folder' }>) => FolderRowModel;
   byline: (item: ConversationListItem) => string;
 }
@@ -207,7 +207,7 @@ function FeedFileRow({ file, now, menus }: { file: SpaceFile; now: number; menus
         time: formatRelativeTime(file.created_at, now),
       }}
       render={(className, content) => (
-        <button type="button" onClick={() => menus.openFile(file)} aria-haspopup="dialog" className={className}>
+        <button type="button" onClick={(event) => menus.openFile(file, event.currentTarget)} aria-haspopup="dialog" className={className}>
           {content}
         </button>
       )}
