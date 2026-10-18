@@ -16,7 +16,7 @@ import {
 import { statutesQueries } from '../queries';
 import { useStatutePeek } from '../statute-peek';
 import { StatuteFallback } from './StatuteFallback';
-import { StatuteDocument, type StatuteLinkHandlers } from './StatuteDocument';
+import { StatuteDocument, type StatuteLinkHandlers, type StatuteLinkPart } from './StatuteDocument';
 import { StatuteHeader } from './StatuteHeader';
 import { StatuteNotesProvider } from '../notes/context';
 import {
@@ -151,15 +151,33 @@ function StatuteBody({
     linkHandlersRef.current = handlers;
   }, []);
   const statuteTitle = detail?.title ?? '';
+  // ON A PHONE THE JUMP LANDS TWICE. The full-screen chat locks the page's
+  // scroller while it is open and, as it unmounts (`CaseAsk`, the holdover a
+  // shade past the close), puts the page back where the reader left it, which
+  // undid the jump (the film, 18 October 2026: "Go to section 18" left the page
+  // at its top). So the part is held here and landed again once the chat has
+  // gone; this effect runs after the lock's cleanup in that same commit.
+  const pendingJumpRef = useRef<StatuteLinkPart | null>(null);
+  const chatShown = renderedChat !== null;
+  useEffect(() => {
+    if (chatShown) return;
+    const pending = pendingJumpRef.current;
+    pendingJumpRef.current = null;
+    if (pending) linkHandlersRef.current?.jump(pending);
+  }, [chatShown]);
   const linkHost = useMemo<DocumentLinkHost>(
     () => ({
       statuteSlug: slug,
       statuteTitle,
-      jump: (target) => linkHandlersRef.current?.jump(target) ?? false,
+      jump: (target) => {
+        const landed = linkHandlersRef.current?.jump(target) ?? false;
+        if (landed && phone && chatShown) pendingJumpRef.current = target;
+        return landed;
+      },
       peek: (target) => linkHandlersRef.current?.peek(target) ?? null,
       beforeJump: phone ? closeChat : undefined,
     }),
-    [slug, statuteTitle, phone, closeChat],
+    [slug, statuteTitle, phone, chatShown, closeChat],
   );
 
   if (!signedIn) {
