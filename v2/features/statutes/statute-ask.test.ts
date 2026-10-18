@@ -62,7 +62,10 @@ test('the Contents pill stands above the ask box, and takes over while the chat 
   assert.match(source, /onRestingHeight=\{keepDockHeight\}/);
   assert.match(source, /chatDocked=\{showDocked\}/);
   const ask = read('v2', 'features', 'cases', 'detail', 'CaseAsk.tsx');
-  assert.match(ask, /restingHeightRef\.current\?\.\(Math\.round\(height\)\);/);
+  // The resting pill's height only, never the open card's; 0 once the dock
+  // leaves (the chat docked to the side), so the Contents pill stays put.
+  assert.match(ask, /if \(!panelMountedRef\.current\) restingHeightRef\.current\?\.\(Math\.round\(height\)\);/);
+  assert.match(ask, /useEffect\(\(\) => \(\) => restingHeightRef\.current\?\.\(0\), \[\]\);/);
 });
 
 test('the docked chat animates on both pages: its keyframes load with the panel', () => {

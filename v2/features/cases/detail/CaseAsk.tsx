@@ -167,10 +167,16 @@ export function CaseAskDock({
   useEffect(() => {
     screenMountedRef.current = screenMounted;
   }, [screenMounted]);
+  // The host hears the RESTING height only: the pill alone, never the open card
+  // (which grows to the panel's height), and 0 once the dock leaves the page
+  // (the chat docked to the side), so what stands above the dock stays put.
   const restingHeightRef = useRef(onRestingHeight);
+  const panelMountedRef = useRef(panelMounted);
   useEffect(() => {
     restingHeightRef.current = onRestingHeight;
-  }, [onRestingHeight]);
+    panelMountedRef.current = panelMounted;
+  }, [onRestingHeight, panelMounted]);
+  useEffect(() => () => restingHeightRef.current?.(0), []);
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper || typeof ResizeObserver === 'undefined') return;
@@ -179,7 +185,7 @@ export function CaseAskDock({
       const box = entries[0]?.borderBoxSize?.[0];
       const height = box ? box.blockSize : wrapper.getBoundingClientRect().height;
       wrapper.style.setProperty('--v2-case-dock-h', `${Math.round(height)}px`);
-      restingHeightRef.current?.(Math.round(height));
+      if (!panelMountedRef.current) restingHeightRef.current?.(Math.round(height));
     });
     observer.observe(wrapper);
     return () => observer.disconnect();
