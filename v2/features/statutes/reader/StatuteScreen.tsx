@@ -9,10 +9,14 @@ import { CaseAskDock } from '@/v2/features/cases/detail/CaseAsk';
 import { CaseChatDocked } from '@/v2/features/cases/detail/CaseChatPanel';
 import type { ChatSubject } from '@/v2/features/cases/detail/chat-subject';
 import { useDocumentChat } from '@/v2/features/cases/detail/use-document-chat';
+import {
+  DocumentLinkContext,
+  type DocumentLinkHost,
+} from '@/v2/features/conversations/conversation/markdown/document-link-context';
 import { statutesQueries } from '../queries';
 import { useStatutePeek } from '../statute-peek';
 import { StatuteFallback } from './StatuteFallback';
-import { StatuteDocument } from './StatuteDocument';
+import { StatuteDocument, type StatuteLinkHandlers } from './StatuteDocument';
 import { StatuteHeader } from './StatuteHeader';
 import { StatuteNotesProvider } from '../notes/context';
 import {
@@ -137,6 +141,27 @@ function StatuteBody({
     columnRef.current?.style.setProperty('--v2-ask-dock-h', `${height}px`);
   }, []);
 
+  // THE CHAT'S LINKS TO THIS STATUTE LAND IN PLACE (Stay, 18 October 2026,
+  // 14:32 UTC), and their badge previews the part (Arthur, 15:06 UTC). The
+  // document registers its landing and its preview here and the chat's links
+  // reach them through `DocumentLinkContext`; on a phone the full-screen chat
+  // closes first so the part shows, at xl the chat stays beside the page.
+  const linkHandlersRef = useRef<StatuteLinkHandlers | null>(null);
+  const registerLinkHandlers = useCallback((handlers: StatuteLinkHandlers | null) => {
+    linkHandlersRef.current = handlers;
+  }, []);
+  const statuteTitle = detail?.title ?? '';
+  const linkHost = useMemo<DocumentLinkHost>(
+    () => ({
+      statuteSlug: slug,
+      statuteTitle,
+      jump: (target) => linkHandlersRef.current?.jump(target) ?? false,
+      peek: (target) => linkHandlersRef.current?.peek(target) ?? null,
+      beforeJump: phone ? closeChat : undefined,
+    }),
+    [slug, statuteTitle, phone, closeChat],
+  );
+
   if (!signedIn) {
     return (
       <div className={STATUTE_COLUMN}>
@@ -180,70 +205,78 @@ function StatuteBody({
     // the reading typography. The notes provider shares researchers' notes
     // between the header's Notes button and the document's underlines.
     <StatuteNotesProvider slug={slug} statuteId={detail.id}>
-      {/* With the docked chat open (≥xl) this is a row: the reading column
-          centres in the remaining space, the panel takes 26rem on the right
-          (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
-          never mints a horizontal scrollbar. */}
-      <div className="flex min-h-full w-full overflow-x-clip">
-        <div
-          ref={columnRef}
-          className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8"
-        >
-          <article
-            aria-label={detail.title}
-            inert={pageUnderChat}
-            className={cn(
-              'flex flex-col gap-8 pb-8',
-              arrival === 'peeked'
-                ? 'v2-statute-arrive-peeked'
-                : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-            )}
+      <DocumentLinkContext.Provider value={linkHost}>
+        {/* With the docked chat open (≥xl) this is a row: the reading column
+            centres in the remaining space, the panel takes 26rem on the right
+            (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
+            never mints a horizontal scrollbar. */}
+        <div className="flex min-h-full w-full overflow-x-clip">
+          <div
+            ref={columnRef}
+            className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8"
           >
-            <StatuteHeader detail={detail} />
-            {/* KEYED BY SLUG: a statute→statute navigation reuses this component
-                instance, and an inherited `mountedCount` ≥ the new document's
-                block count would mount the entire second document in ONE
-                synchronous commit — the exact jank the progressive mount exists
-                to prevent — and skip its deep link. The key resets the engine. */}
-            <StatuteDocument key={slug} slug={slug} provision={provision} chatDocked={showDocked} />
-          </article>
-          {/* THE composer's dock: on a phone and at xl-floating it is the whole
-              chat (one card, three states); it steps aside only while the
-              docked column, chosen at xl, owns the composer. */}
-          {showDock ? (
-            <CaseAskDock
+            <article
+              aria-label={detail.title}
+              inert={pageUnderChat}
+              className={cn(
+                'flex flex-col gap-8 pb-8',
+                arrival === 'peeked'
+                  ? 'v2-statute-arrive-peeked'
+                  : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+              )}
+            >
+              <StatuteHeader detail={detail} />
+              {/* KEYED BY SLUG: a statute→statute navigation reuses this component
+                  instance, and an inherited `mountedCount` ≥ the new document's
+                  block count would mount the entire second document in ONE
+                  synchronous commit — the exact jank the progressive mount exists
+                  to prevent — and skip its deep link. The key resets the engine. */}
+              <StatuteDocument
+                key={slug}
+                slug={slug}
+                provision={provision}
+                chatDocked={showDocked}
+                registerLinkHandlers={registerLinkHandlers}
+              />
+            </article>
+            {/* THE composer's dock: on a phone and at xl-floating it is the whole
+                chat (one card, three states); it steps aside only while the
+                docked column, chosen at xl, owns the composer. */}
+            {showDock ? (
+              <CaseAskDock
+                subject={subject}
+                signedIn={signedIn}
+                viewerId={userId}
+                start={start}
+                view={dockOwnsChat ? renderedChat : null}
+                panelOpen={chat !== null && dockOwnsChat}
+                screen={phone}
+                onEngage={() => {
+                  if (chat === null) openChat('new');
+                }}
+                onClose={closeChat}
+                onDock={() => setDockedPref(true)}
+                onOpenChat={switchChat}
+                onRestingHeight={keepDockHeight}
+              />
+            ) : null}
+          </div>
+
+          {showDocked && renderedChat !== null ? (
+            <CaseChatDocked
+              chatId={renderedChat}
+              closing={chatClosing}
               subject={subject}
               signedIn={signedIn}
               viewerId={userId}
               start={start}
-              view={dockOwnsChat ? renderedChat : null}
-              panelOpen={chat !== null && dockOwnsChat}
-              screen={phone}
-              onEngage={() => {
-                if (chat === null) openChat('new');
-              }}
               onClose={closeChat}
-              onDock={() => setDockedPref(true)}
-              onOpenChat={switchChat}
-              onRestingHeight={keepDockHeight}
+              onSwitchChat={switchChat}
+              onFloat={() => setDockedPref(false)}
             />
           ) : null}
         </div>
-
-        {showDocked && renderedChat !== null ? (
-          <CaseChatDocked
-            chatId={renderedChat}
-            closing={chatClosing}
-            subject={subject}
-            signedIn={signedIn}
-            viewerId={userId}
-            start={start}
-            onClose={closeChat}
-            onSwitchChat={switchChat}
-            onFloat={() => setDockedPref(false)}
-          />
-        ) : null}
-      </div>
+      </DocumentLinkContext.Provider>
     </StatuteNotesProvider>
   );
 }

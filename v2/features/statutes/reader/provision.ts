@@ -210,6 +210,66 @@ export function provisionCrumb(
   );
 }
 
+/* ── The preview pane's text (a chat link's badge) ───────────────────────── */
+
+/** What a statute link's preview pane shows for a part of this document. */
+export interface ProvisionPeek {
+  /** "Section 18", "Section 18(2)": the part the reader would land on. */
+  label: string;
+  /** The section's heading, its closing full stop gone; '' when it has none. */
+  heading: string;
+  /** The part's opening words, cut at a word near `max` characters. */
+  text: string;
+}
+
+const PEEK_MAX = 320;
+
+/**
+ * The preview of `citation` in a parsed document (Arthur, 18 October 2026: the
+ * statute badge gets "the preview pane, the stuff that shows when you hover
+ * over the badge", as a case's does). Read from the document already on the
+ * page, so a hover fetches nothing. A subsection the document holds shows its
+ * own words; one it lacks shows the section the reader would land on, as the
+ * reader's notice does. `null` when the citation points nowhere.
+ */
+export function provisionPeek(
+  index: ReadonlyMap<string, SectionTarget>,
+  citation: ProvisionCitation,
+  max: number = PEEK_MAX,
+): ProvisionPeek | null {
+  const section = index.get(citation.section);
+  const resolution = resolveCitation(index, citation);
+  if (!section || resolution.matched === 'none') return null;
+  const part =
+    resolution.matched === 'provision' && citation.subsection
+      ? findSubsection(section.element, citation.subsection)
+      : null;
+  const shown = part ? citation : { ...citation, subsection: null };
+  return {
+    label: formatProvisionLabel(shown),
+    heading: collapsedText(childByLocal(section.element, 'heading')).replace(/[.:;,\s]+$/, ''),
+    text: clipWords(partText(part ?? section.element), max),
+  };
+}
+
+/** A part's words without its own num and heading (the pane prints those). */
+function partText(el: Element): string {
+  const words: string[] = [];
+  for (const node of Array.from(el.childNodes)) {
+    if (node.nodeType === 1) {
+      const name = localName(node as Element);
+      if (name === 'num' || name === 'heading') continue;
+    }
+    words.push(node.textContent ?? '');
+  }
+  return words.join(' ').replace(/\s+/g, ' ').trim();
+}
+
+function clipWords(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max).replace(/\s+\S*$/, '').trimEnd()}…`;
+}
+
 function findNestedSubsection(el: Element, num: string): Element | null {
   for (const child of el.children) {
     if (

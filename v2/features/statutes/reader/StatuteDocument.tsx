@@ -23,7 +23,9 @@ import {
   indexSections,
   parseProvisionSegment,
   provisionCrumb,
+  provisionPeek,
   resolveCitation,
+  type ProvisionPeek,
 } from './provision';
 import {
   SectionLinkContext,
@@ -141,10 +143,25 @@ const NO_OUTLINE: AknOutlineDivision[] = [];
 /** The reader publishes a breadcrumb part and no menu rows of its own. */
 const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
 
+/** A chat link's part of this statute: its citation segment, or an exact anchor. */
+export interface StatuteLinkPart {
+  provision: string | null;
+  anchor: string | null;
+}
+
+/** What this document does for the statute chat's links to it. */
+export interface StatuteLinkHandlers {
+  /** Lands the reader on the part; false when the statute has no such part. */
+  jump: (target: StatuteLinkPart) => boolean;
+  /** The part's preview pane text, read from this document; null when it has none. */
+  peek: (target: StatuteLinkPart) => ProvisionPeek | null;
+}
+
 export function StatuteDocument({
   slug,
   provision,
   chatDocked = false,
+  registerLinkHandlers,
 }: {
   slug: string;
   /** The citation path segment from the URL (`section-54-2`), or null. */
@@ -153,6 +170,9 @@ export function StatuteDocument({
    *  reader's choice): the rail steps out and the Contents pill shows at every
    *  width, so exactly one contents control exists at every width still. */
   chatDocked?: boolean;
+  /** Takes this document's landing and preview for the statute chat's links
+   *  (`DocumentLinkHost`), and null when the document goes. */
+  registerLinkHandlers?: (handlers: StatuteLinkHandlers | null) => void;
 }) {
   const { role, signedIn } = useV2Session();
   const query = useQuery(statutesQueries.akn(slug));
@@ -510,6 +530,66 @@ export function StatuteDocument({
       if (!ran) window.clearTimeout(timer);
     };
   }, [arrival, provision, blocks.length]);
+
+  /* ── A chat link to a part of this statute (18 October 2026) ──────────── */
+
+  // An answer in the statute chat that links a part of THIS statute lands the
+  // reader there in place (Stay: "suppose to jump to that part of the page
+  // instead it reloads the page"), by the arrival's own rules: an exact anchor
+  // first, then the citation; a part beyond a partial document's cut lands on
+  // the upgrade card. No navigation runs (a history write on this rewritten
+  // route wakes the restore loop `url-params.ts` describes), so the URL stays
+  // as it is, as with a Contents jump. False when the statute has no such
+  // part: the link then navigates to the citation and the page's notice says so.
+  // The badge's preview pane reads the same document (`provisionPeek`), so a
+  // hover fetches nothing.
+  useEffect(() => {
+    if (!registerLinkHandlers) return;
+    const land = (mountThrough: number, id: string, block: ScrollLogicalPosition) => {
+      setMountedCount((prev) => Math.max(prev, mountThrough));
+      requestAnimationFrame(() => {
+        document.getElementById(id)?.scrollIntoView({ block });
+        requestAnimationFrame(() => {
+          document.getElementById(id)?.scrollIntoView({ block });
+        });
+      });
+    };
+    const jump = ({ provision: segment, anchor }: StatuteLinkPart) => {
+      if (anchor) {
+        const index = blockIndexById.get(anchor) ?? holderBlockIndex(blocks, anchor);
+        if (index !== null && index !== undefined) {
+          land(index + 1, anchor, 'start');
+          return true;
+        }
+        if (serverOutline?.lockedAnchorIds.has(anchor)) {
+          land(blocks.length, STATUTE_PAYWALL_ID, 'center');
+          return true;
+        }
+      }
+      const cited = segment ? parseProvisionSegment(segment) : null;
+      if (cited) {
+        const target = resolveCitation(sectionIndex, cited);
+        if (target.matched !== 'none') {
+          const index = blockIndexById.get(target.blockId);
+          if (index !== undefined) {
+            land(index + 1, target.anchorId, 'start');
+            return true;
+          }
+        }
+        if (outlineData && findLockedCitation(outlineData, cited)) {
+          land(blocks.length, STATUTE_PAYWALL_ID, 'center');
+          return true;
+        }
+      }
+      return false;
+    };
+    const peek = ({ provision: segment }: StatuteLinkPart) => {
+      const cited = segment ? parseProvisionSegment(segment) : null;
+      return cited ? provisionPeek(sectionIndex, cited) : null;
+    };
+    registerLinkHandlers({ jump, peek });
+    return () => registerLinkHandlers(null);
+  }, [registerLinkHandlers, blockIndexById, blocks, serverOutline, sectionIndex, outlineData]);
 
   // The honest word when an arrival did not (fully) land. Suppressed when an
   // explicit hash won the arrival — the reader stands where the link's minter

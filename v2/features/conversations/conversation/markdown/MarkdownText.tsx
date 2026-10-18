@@ -91,9 +91,11 @@ const REHYPE_PLAIN: Options['rehypePlugins'] = [];
  * Stable module-level component overrides, defined once so every kept block's
  * elements reference the same components. It overrides only `a`, routing
  * case-mention links through the preview (hover-card on pointer devices, tap
- * popover on touch); every other anchor renders exactly as react-markdown's
- * default. {@link CaseMentionLink} holds no data hook, so a token flush never
- * fetches or re-renders beyond the block already re-parsing.
+ * popover on touch); every other anchor renders as react-markdown's default,
+ * except that a link to one of our statute pages stays in the app (and lands
+ * in place on the statute the chat is about). {@link CaseMentionLink} holds no
+ * data hook, so a token flush never fetches or re-renders beyond the block
+ * already re-parsing.
  *
  * `pre` routes fenced blocks through {@link FencedBlock}: a fence the AI used
  * for a document (a court form, a letter) renders as a document block, real

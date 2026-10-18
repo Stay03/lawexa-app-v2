@@ -13,6 +13,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { usePointerCapability } from './use-pointer-capability';
 import { CasePreview } from './CasePreview';
+import { MENTION_CONTENT_WIDTH, MENTION_TRIGGER_CLASS } from './mention-styles';
+import { DocumentLink } from './StatuteMentionLink';
 
 /**
  * CaseMentionLink — the `a` renderer for assistant markdown (§C KEEP, ported
@@ -24,7 +26,9 @@ import { CasePreview } from './CasePreview';
  * data-case-slug>` HTML (the TipTap note-editor variant, `components/notes/mention/
  * CaseMention.ts`) never parses into an element here. So href-pattern matching on
  * `/cases/{slug}` (absolute or relative) is both reliable and complete for this
- * surface; a non-case anchor renders exactly as react-markdown's default `<a>`.
+ * surface; a non-case anchor renders as react-markdown's default `<a>`, or as a
+ * statute's badge and pane when it is one of our statute pages
+ * ({@link DocumentLink}).
  *
  * MEMO SAFETY: this is referenced from a MODULE-STABLE `components` map in
  * MarkdownText, so it never defeats the per-block `React.memo` streaming
@@ -74,17 +78,6 @@ export function extractCaseSlug(href: string | undefined): string | null {
   }
 }
 
-// v1's global `.case-mention` rule (unlayered, so it beats Tailwind's layer)
-// makes the link an inline-flex box with nowrap: a long case name cannot wrap
-// and runs off a phone screen. The `!` utilities let it wrap like text, and
-// box-decoration-clone keeps the tinted pill on each line it spans.
-const TRIGGER_CLASS =
-  'case-mention inline! whitespace-normal! box-decoration-clone v2-interactive text-primary focus-visible:ring-ring focus-visible:ring-offset-background -mx-0.5 rounded-sm px-0.5 font-medium transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1';
-
-/** Shared width cap: ~450px, but never wider than the viewport minus the
- *  collision padding (16px each side), so it fits a 320px screen. */
-const CONTENT_WIDTH = 'w-[min(28rem,calc(100vw-2rem))]';
-
 export function CaseMentionLink({
   href,
   title,
@@ -92,11 +85,12 @@ export function CaseMentionLink({
 }: ComponentProps<'a'> & ExtraProps) {
   const slug = extractCaseSlug(href);
   if (!slug) {
-    // Non-case anchor — react-markdown's default output (href + optional title).
+    // Not a case: react-markdown's default anchor, or a statute's badge when it
+    // is one of our statute pages (`DocumentLink`).
     return (
-      <a href={href} title={title}>
+      <DocumentLink href={href} title={title}>
         {children}
-      </a>
+      </DocumentLink>
     );
   }
   return <CaseMention slug={slug}>{children}</CaseMention>;
@@ -111,7 +105,7 @@ function CaseMention({ slug, children }: { slug: string; children: ReactNode }) 
   // on the client the anchor upgrades in place to its interactive variant.
   if (pointer === null) {
     return (
-      <Link href={casePath} className={TRIGGER_CLASS}>
+      <Link href={casePath} className={MENTION_TRIGGER_CLASS}>
         {children}
       </Link>
     );
@@ -150,11 +144,11 @@ function DesktopCaseHoverCard({
   return (
     <HoverCard openDelay={350} closeDelay={250}>
       <HoverCardTrigger asChild>
-        <Link href={casePath} className={TRIGGER_CLASS}>
+        <Link href={casePath} className={MENTION_TRIGGER_CLASS}>
           {children}
         </Link>
       </HoverCardTrigger>
-      <HoverCardContent side="top" align="start" className={CONTENT_WIDTH}>
+      <HoverCardContent side="top" align="start" className={MENTION_CONTENT_WIDTH}>
         <CasePreview slug={slug} href={casePath} />
       </HoverCardContent>
     </HoverCard>
@@ -185,7 +179,7 @@ function TouchCasePopover({
       <PopoverTrigger asChild>
         <a
           href={casePath}
-          className={TRIGGER_CLASS}
+          className={MENTION_TRIGGER_CLASS}
           onClick={(event) => {
             // Tap previews rather than navigates; "Open case" navigates.
             event.preventDefault();
@@ -205,7 +199,7 @@ function TouchCasePopover({
         // instant, symmetric open/close there (owner #24). Normal motion keeps the
         // primitive's symmetric fade+zoom.
         className={cn(
-          CONTENT_WIDTH,
+          MENTION_CONTENT_WIDTH,
           'gap-0 overflow-hidden p-0 motion-reduce:animate-none!',
         )}
       >
