@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { CaseAskDock } from '@/v2/features/cases/detail/CaseAsk';
+import { useIdlePreloadCaseChat } from '@/v2/features/cases/detail/CaseChatCore';
 import { CaseChatDocked } from '@/v2/features/cases/detail/CaseChatPanel';
 import type { ChatSubject } from '@/v2/features/cases/detail/chat-subject';
 import { useDocumentChat } from '@/v2/features/cases/detail/use-document-chat';
@@ -132,6 +133,8 @@ function StatuteBody({
     pageUnderChat,
     setDockedPref,
   } = useDocumentChat(subject, signedIn);
+  // The chat's code arrives while the page is idle, so the tap does not wait for it.
+  useIdlePreloadCaseChat(signedIn);
 
   // The resting dock's height, on the column for the Contents pill to stand
   // above (StatuteContentsSheet). Written to the DOM only, so a measure

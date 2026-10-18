@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/* The statute page's text stops mounting while the phone chat covers it
+/* Fixes A and B for the ACJL freeze (techlead's scope, 18 October 2026).
+ * The statute page's text stops mounting while the phone chat covers it
  * (Arthur, 18 October 2026: on the ACJL the whole iPhone screen froze and the
  * app had to be force-closed). The chat makes the page under it inert, and
  * WebKit slows down with every batch inserted into an inert subtree; with the
@@ -28,4 +29,29 @@ test('the statute page pauses exactly while its column is inert under the chat',
   const screen = read('StatuteScreen.tsx');
   assert.match(screen, /inert=\{pageUnderChat\}/);
   assert.match(screen, /pauseMount=\{pageUnderChat\}/);
+});
+
+/* The ACJL's parse is one 1.13 s task (Chromium, CPU 4x). Run in the render
+ * that received the text, it landed on the tap that opened the chat. */
+test('the text is parsed in its own idle task, after the chat has opened', () => {
+  const document = read('StatuteDocument.tsx');
+  // Text already cached at mount parses at once; new text waits for the idle task.
+  assert.match(document, /const \[parsedXml, setParsedXml\] = useState<string \| null>\(\(\) => xml\);/);
+  assert.match(
+    document,
+    /return afterIdle\(\(\) => setParsedXml\(xml\), pauseMount \? CHAT_OPEN_MS : 0\);\s*\}, \[xml, parsedXml, pauseMount\]\);/,
+  );
+  assert.match(document, /useMemo\(\(\) => \(parsedXml !== null \? parseAkn\(parsedXml\) : null\), \[parsedXml\]\)/);
+  assert.doesNotMatch(document, /parseAkn\(xml\)/);
+  // Until it has run, the reader sees the text's skeleton, never "can't be displayed".
+  assert.match(document, /if \(query\.isPending \|\| parsing\) \{\s*return <DocumentBodySkeleton \/>;/);
+});
+
+test("the chat's code is fetched while the statute page is idle, before any tap", () => {
+  const screen = read('StatuteScreen.tsx');
+  assert.match(screen, /useIdlePreloadCaseChat\(signedIn\);/);
+  const core = readFileSync(join(here, '..', '..', 'cases', 'detail', 'CaseChatCore.tsx'), 'utf8');
+  assert.match(core, /if \(!preloadAllowed\(connection\)\) return;/);
+  assert.match(core, /window\.requestIdleCallback\(preloadCaseChat, \{ timeout: IDLE_PRELOAD_TIMEOUT_MS \}\)/);
+  assert.match(core, /window\.setTimeout\(preloadCaseChat, PRELOAD_FALLBACK_MS\)/);
 });

@@ -27,6 +27,11 @@ import {
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { TranscriptSkeleton } from '@/v2/features/conversations/conversation/skeletons';
 import {
+  PRELOAD_FALLBACK_MS,
+  preloadAllowed,
+  type ConnectionHints,
+} from '@/v2/features/conversations/preload-conversation-screen';
+import {
   CHAT_SUBJECT_NOUN,
   CHAT_SUBJECT_PROMPTS,
   chatDraftScope,
@@ -93,6 +98,30 @@ const loadStartConversation = () =>
 function preloadCaseChat() {
   void loadConversationScreen();
   void loadStartConversation();
+}
+
+/** The longest the idle preload may wait on a page that is never idle. */
+const IDLE_PRELOAD_TIMEOUT_MS = 3000;
+
+/**
+ * Fetches the chat's heavy half while the page is idle, before any tap. On
+ * the statute page the open itself paid for it: on the ACJL (Chromium, CPU
+ * 4×, 18 October 2026) the tap's task ran the preload's 9 chunks (119 KB)
+ * with the first section batch, 856 ms. Not for a reader who asked for less
+ * data or is on 2G (`preloadAllowed`); they still get it when the chat opens.
+ */
+export function useIdlePreloadCaseChat(enabled: boolean): void {
+  useEffect(() => {
+    if (!enabled) return;
+    const connection = (navigator as Navigator & { connection?: ConnectionHints }).connection;
+    if (!preloadAllowed(connection)) return;
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(preloadCaseChat, { timeout: IDLE_PRELOAD_TIMEOUT_MS });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(preloadCaseChat, PRELOAD_FALLBACK_MS);
+    return () => window.clearTimeout(id);
+  }, [enabled]);
 }
 
 /**

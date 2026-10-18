@@ -137,6 +137,27 @@ const INITIAL_BLOCKS = 16;
 const MOUNT_BATCH = 40;
 /** The yield between batches — a macrotask, so the browser paints. */
 const MOUNT_YIELD_MS = 16;
+/** The phone chat's rise (CaseAsk's sheet, 300 ms) and a frame's slack. */
+const CHAT_OPEN_MS = 350;
+/** The longest the parse waits for an idle moment on a busy page. */
+const PARSE_IDLE_TIMEOUT_MS = 500;
+
+/** Runs `run` once the browser is idle, `delay` ms from now at the earliest.
+ *  Safari has no idle callback; a timer stands in. Returns the cancel. */
+function afterIdle(run: () => void, delay: number): () => void {
+  let idle: number | null = null;
+  const timer = window.setTimeout(() => {
+    if (typeof window.requestIdleCallback === 'function') {
+      idle = window.requestIdleCallback(run, { timeout: PARSE_IDLE_TIMEOUT_MS });
+    } else {
+      run();
+    }
+  }, delay);
+  return () => {
+    window.clearTimeout(timer);
+    if (idle !== null) window.cancelIdleCallback(idle);
+  };
+}
 
 const NO_BLOCKS: AknBlock[] = [];
 const NO_OUTLINE: AknOutlineDivision[] = [];
@@ -187,7 +208,22 @@ export function StatuteDocument({
 
   // ONE parse per document string (see docblock). `parseAkn` returns null for
   // unparseable XML — rendered as the designed "can't be displayed" state.
-  const model = useMemo(() => (xml !== null ? parseAkn(xml) : null), [xml]);
+  //
+  // THE PARSE IS ITS OWN TASK, AFTER THE CHAT HAS OPENED. On the ACJL it is
+  // one 1.13 s task (Chromium, CPU 4×, 18 October 2026), and parsing in the
+  // render that received the text put it in the same moment as a tap on the
+  // chat box, which then waited for it. The text is now handed to the parse
+  // from an idle callback, so a tap already queued goes first; while the phone
+  // chat covers the page it waits until the chat has finished opening.
+  // Text already in the cache at mount (a revisit) parses at once, as before:
+  // nothing can be tapped before the first paint.
+  const [parsedXml, setParsedXml] = useState<string | null>(() => xml);
+  useEffect(() => {
+    if (xml === null || xml === parsedXml) return;
+    return afterIdle(() => setParsedXml(xml), pauseMount ? CHAT_OPEN_MS : 0);
+  }, [xml, parsedXml, pauseMount]);
+  const parsing = xml !== null && parsedXml !== xml;
+  const model = useMemo(() => (parsedXml !== null ? parseAkn(parsedXml) : null), [parsedXml]);
   const blocks = model?.blocks ?? NO_BLOCKS;
   const outline = model?.outline ?? NO_OUTLINE;
 
@@ -695,7 +731,7 @@ export function StatuteDocument({
 
   /* ── States ───────────────────────────────────────────────────────────── */
 
-  if (query.isPending) {
+  if (query.isPending || parsing) {
     return <DocumentBodySkeleton />;
   }
 
