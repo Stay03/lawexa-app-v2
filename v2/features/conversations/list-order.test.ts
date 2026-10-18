@@ -223,10 +223,10 @@ test('the chat screen moves its chat up on an answer and on a turn the poll sees
   assert.equal(controller.match(/conversationsCache\.touch\(/g)?.length, 3);
 });
 
-test('the case page’s own chats ask for the same order', () => {
+test('a document page’s own chats (a case, a statute) ask for the same order', () => {
   assert.match(
-    read('v2', 'features', 'cases', 'queries.ts'),
-    /listContentConversations\('case', slug, \{\s*per_page: 5,[^}]*sort_by: 'last_message_at',\s*sort_order: 'desc',\s*\}\)/,
+    read('v2', 'features', 'cases', 'detail', 'chat-subject.ts'),
+    /listContentConversations\(subject\.kind, subject\.slug, \{\s*per_page: 5,[^}]*sort_by: 'last_message_at',\s*sort_order: 'desc',\s*\}\)/,
   );
 });
 

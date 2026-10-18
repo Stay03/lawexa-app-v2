@@ -1,0 +1,21 @@
+/* The docked document chat (CaseChatPanel), on the case page and the statute
+   page alike, so its keyframes load with the panel, not with a page's own
+   reading stylesheet (18 October 2026). */
+
+/**
+ * The panel opens by WIDTH behind `overflow-x-clip`, not by sliding in from
+ * outside the viewport — a translated entry poked past the right edge and
+ * flashed a horizontal scrollbar (owner, July 30). Width also moves the
+ * reading column continuously (flex re-centres every frame of the reveal).
+ */
+@keyframes v2-case-chat-open {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes v2-case-chat-close {
+  to {
+    width: 0;
+  }
+}

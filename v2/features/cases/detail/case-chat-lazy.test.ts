@@ -31,7 +31,7 @@ test('the case page does not download the transcript or the streaming engine', (
 test('the composer the reader taps is part of the case page itself', () => {
   assert.ok(caseRoute.includes('v2/features/conversations/conversation/ConversationComposer.tsx'));
   assert.match(core, /import \{\s*ConversationComposer,/);
-  for (const file of ['CaseAsk.tsx', 'CaseChatPanel.tsx', 'CaseScreen.tsx']) {
+  for (const file of ['CaseAsk.tsx', 'CaseChatPanel.tsx', 'CaseScreen.tsx', 'use-document-chat.ts']) {
     const source = detail(file);
     // CaseScreen's one lazy import is the ?kbdebug=1 readout (da7be8d), which renders
     // only under that flag and never holds the composer; nothing else may be lazy.
@@ -39,7 +39,10 @@ test('the composer the reader taps is part of the case page itself', () => {
     const allowed = file === 'CaseScreen.tsx' ? ['./KeyboardDebugReadout'] : [];
     assert.deepEqual(lazyTargets, allowed, `${file} loads nothing lazily but what is allowed`);
     assert.doesNotMatch(source, /\blazy\(/, `${file} uses no React.lazy`);
-    assert.match(source, /from '\.\/CaseChatCore'/, `${file} imports the chat core statically`);
+    // The screen hosts the chat through `useDocumentChat`, which carries the
+    // core; every other file imports it itself.
+    const core = file === 'CaseScreen.tsx' ? /from '\.\/use-document-chat'/ : /from '\.\/CaseChatCore'/;
+    assert.match(source, core, `${file} imports the chat core statically`);
   }
 });
 

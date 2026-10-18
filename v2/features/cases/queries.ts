@@ -1,7 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { casesApi } from '@/lib/api/cases';
 import { noteCountedRead, noteReadAhead } from './case-view';
-import { chatApi } from '@/lib/api/chat';
 import { trendingApi } from '@/lib/api/trending';
 import type { CaseListParams } from '@/types/case';
 import type { TrendingParams } from '@/types/trending';
@@ -316,28 +315,4 @@ export const casesQueries = {
       gcTime: GC_TIMES.list,
     });
   },
-
-  /**
-   * The reader's OWN conversations about this case (`GET /cases/{slug}/conversations`,
-   * owner-scoped). Powers the case page's "Your chats about this case" section, so
-   * asking a follow-up a week later means resuming a thread rather than starting a
-   * fresh one.
-   *
-   * `standard` tier and NOT keyed under `lists()`: this is conversation data that
-   * happens to be indexed by a case, and a case-list invalidation has no business
-   * dropping it. Asking a new question about the case invalidates it explicitly.
-   */
-  conversations: (slug: string, { viewerId }: ViewerScoped) =>
-    queryOptions({
-      queryKey: [...casesQueries.all, 'conversations', slug, { viewerId }] as const,
-      queryFn: () =>
-        chatApi.listContentConversations('case', slug, {
-          per_page: 5,
-          // Newest message first, as every chat list (backend 6f776f0).
-          sort_by: 'last_message_at',
-          sort_order: 'desc',
-        }),
-      staleTime: STALE_TIMES.standard,
-      gcTime: GC_TIMES.list,
-    }),
 };

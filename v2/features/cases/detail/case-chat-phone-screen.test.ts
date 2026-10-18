@@ -18,6 +18,9 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[
 const detail = (file: string) => strip(read('v2', 'features', 'cases', 'detail', file));
 const ask = detail('CaseAsk.tsx');
 const screen = detail('CaseScreen.tsx');
+// The chat a document page hosts (open/close, holdover, presentation): the case
+// page's, shared with the statute page since 18 October 2026.
+const host = detail('use-document-chat.ts');
 const panel = detail('CaseChatPanel.tsx');
 const core = detail('CaseChatCore.tsx');
 const composer = strip(read('v2', 'features', 'conversations', 'conversation', 'ConversationComposer.tsx'));
@@ -40,9 +43,9 @@ test('no box is read-only or focused by code: the tap itself focuses the compose
 test('the phone sheet is gone; the dock owns the chat on a phone, with one composer', () => {
   assert.doesNotMatch(panel, /CaseChatSheet/);
   assert.doesNotMatch(screen, /CaseChatSheet|showSheet/);
-  assert.match(screen, /const phone = isDesktopPanel === false;/);
-  assert.match(screen, /const dockOwnsChat = phone \|\| floatingContext;/);
-  assert.match(screen, /const showDock = dockOwnsChat \|\| renderedChat === null;/);
+  assert.match(host, /const phone = isDesktopPanel === false;/);
+  assert.match(host, /const dockOwnsChat = phone \|\| \(isDesktopPanel === true && !docked\);/);
+  assert.match(host, /const showDock = dockOwnsChat \|\| renderedChat === null;/);
   assert.match(screen, /screen=\{phone\}/);
   assert.equal(ask.match(/<CaseChatComposerDock/g)?.length, 1, 'one composer in the dock');
   assert.equal(panel.match(/<CaseChatComposerDock/g)?.length, 1, 'one composer in the docked column');
@@ -276,7 +279,7 @@ test("the phone bar's controls are 44 px targets; every other bar keeps its 32 p
   // A conversation shows the back button; the new-chat view its spacer.
   assert.match(
     bar,
-    /\{isConversation \? \(\s*<button\s+type="button"\s+onClick=\{onBack\}\s+aria-label="Back to your chats about this case"\s+className=\{button\}\s*>[\s\S]*?<\/button>\s*\) : \(\s*<span aria-hidden className=\{target\} \/>\s*\)\}/,
+    /\{isConversation \? \(\s*<button\s+type="button"\s+onClick=\{onBack\}\s+aria-label=\{`Back to your chats about this \$\{noun\}`\}\s+className=\{button\}\s*>[\s\S]*?<\/button>\s*\) : \(\s*<span aria-hidden className=\{target\} \/>\s*\)\}/,
   );
   // Only the phone screen asks for them; the floating card and the docked column
   // keep the pointer size.
@@ -298,10 +301,10 @@ test('the bars come back on every way out: each close, a route change, an unmoun
   // is CaseScreen's `closeChat`; Back adopts the URL without `chat`. (The composer's
   // X that also called it is gone; see the tests at the end.)
   assert.match(ask, /if \(event\.key === 'Escape'\) \{\s*event\.stopPropagation\(\);\s*onClose\(\);/);
-  assert.match(ask, /<CaseChatBar\s+view=\{view\}\s+onBack=\{\(\) => onOpenChat\('new'\)\}\s+onClose=\{onClose\}\s+tall/);
+  assert.match(ask, /<CaseChatBar\s+subject=\{subject\}\s+view=\{view\}\s+onBack=\{\(\) => onOpenChat\('new'\)\}\s+onClose=\{onClose\}\s+tall/);
   assert.match(screen, /onClose=\{closeChat\}/);
-  assert.match(screen, /const closeChat = useCallback\(\(\) => \{\s*setChat\(null\);/);
-  assert.match(screen, /setChat\(new URLSearchParams\(window\.location\.search\)\.get\('chat'\)\);/);
+  assert.match(host, /const closeChat = useCallback\(\(\) => \{\s*setChat\(null\);/);
+  assert.match(host, /setChat\(new URLSearchParams\(window\.location\.search\)\.get\('chat'\)\);/);
   // The dock's open screen is the held-over chat on a phone, so a closed chat ends it.
   assert.match(screen, /view=\{dockOwnsChat \? renderedChat : null\}/);
   assert.match(ask, /const screenMounted = screen && panelMounted;/);
@@ -319,7 +322,7 @@ test("the bar X is the open chat's one close, always there", () => {
   assert.match(bar, /\) : null\}\s*<button\s+type="button"\s+onClick=\{onClose\}\s+aria-label="Close the chat"/);
   assert.doesNotMatch(bar, /v2-keyboard|keyboard/i);
   // The phone screen renders the bar in every open state, with no keyboard condition.
-  assert.match(ask, /\{screenMounted \? \(\s*<div[\s\S]*?<CaseChatBar\s+view=\{view\}/);
+  assert.match(ask, /\{screenMounted \? \(\s*<div[\s\S]*?<CaseChatBar\s+subject=\{subject\}\s+view=\{view\}/);
   assert.doesNotMatch(ask, /v2-keyboard/);
 });
 
@@ -389,7 +392,7 @@ test('the dock, the page bars and the scroll lock come back only after the fade'
   assert.match(ask, /const panelMounted = view !== null;/);
   assert.match(ask, /const screenMounted = screen && panelMounted;/);
   assert.match(screen, /view=\{dockOwnsChat \? renderedChat : null\}/);
-  assert.match(screen, /window\.setTimeout\(\(\) => setRenderedChat\(null\), 240\)/);
+  assert.match(host, /window\.setTimeout\(\(\) => setRenderedChat\(null\), 240\)/);
   // The fixed card, the bars' hiding and the scroll lock all hang on screenMounted,
   // never on panelOpen, so none of them changes when the fade starts.
   assert.match(ask, /className=\{cn\(\s*'outline-none',\s*screenMounted\s*\?/);

@@ -1,10 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { CaseAskDock } from '@/v2/features/cases/detail/CaseAsk';
+import { CaseChatDocked } from '@/v2/features/cases/detail/CaseChatPanel';
+import type { ChatSubject } from '@/v2/features/cases/detail/chat-subject';
+import { useDocumentChat } from '@/v2/features/cases/detail/use-document-chat';
 import { statutesQueries } from '../queries';
 import { useStatutePeek } from '../statute-peek';
 import { StatuteFallback } from './StatuteFallback';
@@ -40,15 +44,34 @@ import {
  * `provision` is the citation path segment (`/statutes/{slug}/section-54-2`
  * → "section-54-2"), carried through untouched: resolving it needs the parsed
  * document, which only `StatuteDocument` holds.
+ *
+ * ASK ABOUT THIS STATUTE (Stay, 18 October 2026, 01:31 UTC). The case page's
+ * chat, the same in every part (`useDocumentChat`, `CaseAskDock`,
+ * `CaseChatDocked`), about the statute: one box for the whole Act, and a
+ * section question goes in the same box ("What does section 2 require?"; the
+ * model reads the statute it was started with, Arthur, 07:20 UTC). Statutes
+ * are free, so the box is there for every signed-in reader. The box rests at
+ * the column's end, sticky over the reading; the Contents pill stands above
+ * it (`--v2-ask-dock-h`).
  */
-export function StatuteScreen({
+export function StatuteScreen(props: { slug: string; provision: string | null }) {
+  return (
+    // The chat reads `?chat=` (`useSearchParams`), which needs a boundary; the
+    // fallback is the route's own loading shape.
+    <Suspense fallback={<StatuteFallback />}>
+      <StatuteBody {...props} />
+    </Suspense>
+  );
+}
+
+function StatuteBody({
   slug,
   provision,
 }: {
   slug: string;
   provision: string | null;
 }) {
-  const { signedIn } = useV2Session();
+  const { signedIn, userId } = useV2Session();
 
   const query = useQuery({
     ...statutesQueries.detail(slug),
@@ -87,6 +110,32 @@ export function StatuteScreen({
    * status and what repealed it around it; the bar keeps the way back and
    * nothing else. See `PushedTitle` in `v2/shell/pushed-route.ts`.
    */
+
+  // The chat this page hosts, the case page's own (`useDocumentChat`).
+  const subject = useMemo<ChatSubject>(() => ({ kind: 'statute', slug }), [slug]);
+  const {
+    chat,
+    renderedChat,
+    chatClosing,
+    openChat,
+    closeChat,
+    switchChat,
+    start,
+    phone,
+    dockOwnsChat,
+    showDock,
+    showDocked,
+    pageUnderChat,
+    setDockedPref,
+  } = useDocumentChat(subject, signedIn);
+
+  // The resting dock's height, on the column for the Contents pill to stand
+  // above (StatuteContentsSheet). Written to the DOM only, so a measure
+  // re-renders nothing.
+  const columnRef = useRef<HTMLDivElement>(null);
+  const keepDockHeight = useCallback((height: number) => {
+    columnRef.current?.style.setProperty('--v2-ask-dock-h', `${height}px`);
+  }, []);
 
   if (!signedIn) {
     return (
@@ -131,24 +180,69 @@ export function StatuteScreen({
     // the reading typography. The notes provider shares researchers' notes
     // between the header's Notes button and the document's underlines.
     <StatuteNotesProvider slug={slug} statuteId={detail.id}>
-      <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-24 pt-5 sm:pt-8">
-        <article
-          aria-label={detail.title}
-          className={cn(
-            'flex flex-col gap-8',
-            arrival === 'peeked'
-              ? 'v2-statute-arrive-peeked'
-              : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-          )}
+      {/* With the docked chat open (≥xl) this is a row: the reading column
+          centres in the remaining space, the panel takes 26rem on the right
+          (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
+          never mints a horizontal scrollbar. */}
+      <div className="flex min-h-full w-full overflow-x-clip">
+        <div
+          ref={columnRef}
+          className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8"
         >
-          <StatuteHeader detail={detail} />
-          {/* KEYED BY SLUG: a statute→statute navigation reuses this component
-              instance, and an inherited `mountedCount` ≥ the new document's
-              block count would mount the entire second document in ONE
-              synchronous commit — the exact jank the progressive mount exists
-              to prevent — and skip its deep link. The key resets the engine. */}
-          <StatuteDocument key={slug} slug={slug} provision={provision} />
-        </article>
+          <article
+            aria-label={detail.title}
+            inert={pageUnderChat}
+            className={cn(
+              'flex flex-col gap-8 pb-8',
+              arrival === 'peeked'
+                ? 'v2-statute-arrive-peeked'
+                : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+            )}
+          >
+            <StatuteHeader detail={detail} />
+            {/* KEYED BY SLUG: a statute→statute navigation reuses this component
+                instance, and an inherited `mountedCount` ≥ the new document's
+                block count would mount the entire second document in ONE
+                synchronous commit — the exact jank the progressive mount exists
+                to prevent — and skip its deep link. The key resets the engine. */}
+            <StatuteDocument key={slug} slug={slug} provision={provision} chatDocked={showDocked} />
+          </article>
+          {/* THE composer's dock: on a phone and at xl-floating it is the whole
+              chat (one card, three states); it steps aside only while the
+              docked column, chosen at xl, owns the composer. */}
+          {showDock ? (
+            <CaseAskDock
+              subject={subject}
+              signedIn={signedIn}
+              viewerId={userId}
+              start={start}
+              view={dockOwnsChat ? renderedChat : null}
+              panelOpen={chat !== null && dockOwnsChat}
+              screen={phone}
+              onEngage={() => {
+                if (chat === null) openChat('new');
+              }}
+              onClose={closeChat}
+              onDock={() => setDockedPref(true)}
+              onOpenChat={switchChat}
+              onRestingHeight={keepDockHeight}
+            />
+          ) : null}
+        </div>
+
+        {showDocked && renderedChat !== null ? (
+          <CaseChatDocked
+            chatId={renderedChat}
+            closing={chatClosing}
+            subject={subject}
+            signedIn={signedIn}
+            viewerId={userId}
+            start={start}
+            onClose={closeChat}
+            onSwitchChat={switchChat}
+            onFloat={() => setDockedPref(false)}
+          />
+        ) : null}
       </div>
     </StatuteNotesProvider>
   );

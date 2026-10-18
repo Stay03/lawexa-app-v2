@@ -144,10 +144,15 @@ const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
 export function StatuteDocument({
   slug,
   provision,
+  chatDocked = false,
 }: {
   slug: string;
   /** The citation path segment from the URL (`section-54-2`), or null. */
   provision: string | null;
+  /** The statute chat is docked in the margin the rail uses (≥xl, by the
+   *  reader's choice): the rail steps out and the Contents pill shows at every
+   *  width, so exactly one contents control exists at every width still. */
+  chatDocked?: boolean;
 }) {
   const { role, signedIn } = useV2Session();
   const query = useQuery(statutesQueries.akn(slug));
@@ -747,6 +752,7 @@ export function StatuteDocument({
           // server outline; on the full-document path the prop is false and
           // the DOM is exactly what it was before the paywall existed.
           entrance={spyIds.length < 4}
+          alwaysShown={chatDocked}
         />
       ) : null}
 
@@ -765,7 +771,7 @@ export function StatuteDocument({
 
           Below 96rem the mobile Contents pill + sheet take over (their
           breakpoint mirrors this one). */}
-      {showContents ? (
+      {showContents && !chatDocked ? (
         <aside className="absolute inset-y-0 left-full ml-10 hidden w-48 min-[102rem]:w-60 min-[96rem]:block">
           {/* Keyed by outline source: when the server outline replaces the
               client one (a partial document's map growing to full size), the

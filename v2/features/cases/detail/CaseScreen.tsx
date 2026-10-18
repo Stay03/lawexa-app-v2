@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -8,25 +8,17 @@ import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { extractViewLimitError, isNotFoundError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
-import {
-  quietPushUrlParams,
-  quietReplaceUrlParams,
-} from '@/v2/runtime/url-params';
-import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { useCasePeek } from '../case-peek';
 import { countOpen } from '../case-view';
 import { casesQueries, searchTermOf } from '../queries';
 import { CaseAskDock } from './CaseAsk';
-import { useStartCaseChat, type CaseChatStart } from './CaseChatCore';
+import type { ChatSubject } from './chat-subject';
 import { CaseChatDocked } from './CaseChatPanel';
 import { CaseFallback } from './CaseFallback';
 import { buildCaseOutline, CaseDocument } from './CaseDocument';
 import { CaseOutline } from './CaseOutline';
 import { ReadingProgress } from './ReadingProgress';
-import { usePanelBreakpoint } from './use-panel-breakpoint';
-
-/** The reader's docked-vs-floating chat preference, remembered per device. */
-const DOCK_PREF_KEY = 'v2-case-chat-docked';
+import { useDocumentChat } from './use-document-chat';
 import {
   CASE_COLUMN,
   CaseErrorState,
@@ -75,101 +67,24 @@ function CaseBody({ slug }: { slug: string }) {
   const searchQuery = searchParams.get('q')?.trim() || undefined;
   const keyboardDebug = searchParams.get('kbdebug') === '1';
 
-  // ── The side chat: LOCAL STATE is the source of truth; the URL is a
-  // mirror and an entry point, written QUIETLY. ──
-  //
-  // Two implementations died here; the autopsy is in `url-params.ts`. Short
-  // version: on a soft-navigated case page (served through the v2 rewrite
-  // proxy), ANY history write the App Router notices dispatches its Next-16
-  // restore machinery, whose segment walk trips over the rewritten `[slug]`
-  // param and spirals into an endless `/cases/undefined` refetch loop — and
-  // those background commits kept resurrecting the closing panel ("closes,
-  // pops open, closes again"). Deriving the panel from `useSearchParams()`
-  // (impl 1) made every loop commit re-toggle it; plain local state (impl 2)
-  // still re-initialised on the loop's remounts. The cure is upstream of
-  // both: the QUIET writes below change the URL without waking the router at
-  // all, so the loop never starts and nothing ever re-renders the panel but
-  // the reader.
-  //
-  //  - `chat` changes ONLY on user action (open / close / switch / Back);
-  //  - state initialises from the URL once, on mount (direct `?chat=` links);
-  //  - open quiet-PUSHES the param (Back closes the panel);
-  //  - close and in-panel hops quiet-REPLACE it (the panel stays ONE history
-  //    entry, so Back closes in one step and never walks internal hops);
-  //  - one popstate listener adopts the real URL on Back/Forward.
-  const [chat, setChat] = useState<string | null>(
-    () => searchParams.get('chat'),
-  );
-  const openChat = useCallback((id: string) => {
-    setChat(id);
-    quietPushUrlParams({ chat: id });
-  }, []);
-  const closeChat = useCallback(() => {
-    setChat(null);
-    quietReplaceUrlParams({ chat: null });
-  }, []);
-  const switchChat = useCallback((id: string) => {
-    setChat(id);
-    quietReplaceUrlParams({ chat: id });
-  }, []);
-  useEffect(() => {
-    const onPopState = () => {
-      setChat(new URLSearchParams(window.location.search).get('chat'));
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
-
-  // ── Presence holdover: every chat presentation animates OUT before its
-  // unmount. The render-phase adopt of a new id is the sanctioned
-  // adjust-during-render reset. ──
-  const [renderedChat, setRenderedChat] = useState(chat);
-  if (chat !== null && chat !== renderedChat) setRenderedChat(chat);
-  const chatClosing = chat === null && renderedChat !== null;
-  useEffect(() => {
-    if (!chatClosing) return;
-    // A shade past the 200ms exit animation, whose last frame is held by
-    // `fill-mode-forwards` (the tw-animate-css VARIABLE mechanism — see the
-    // exit-animation note in CaseChatPanel; the arbitrary-property spelling
-    // silently never applied) — the unmount happens strictly AFTER the
-    // animation lands, and the held fill covers the gap between them.
-    const timer = window.setTimeout(() => setRenderedChat(null), 240);
-    return () => window.clearTimeout(timer);
-  }, [chatClosing]);
-
-  // Which presentation: the dock's full-screen card below xl; the floating
-  // card (default) or the docked column (the reader's persisted choice) at xl. A JS decision, not a CSS
-  // one — exactly ONE container may mount, or one conversation would run two
-  // live controllers.
-  const isDesktopPanel = usePanelBreakpoint();
-  const [docked, setDocked] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.localStorage.getItem(DOCK_PREF_KEY) === '1',
-  );
-  const setDockedPref = useCallback((next: boolean) => {
-    setDocked(next);
-    try {
-      window.localStorage.setItem(DOCK_PREF_KEY, next ? '1' : '0');
-    } catch {
-      // Preference only — losing it costs a click, never the chat.
-    }
-  }, []);
-
-  // ── The CREATE state, lifted here so every presentation shares one
-  // submission (a double submit is impossible across surfaces) and the list
-  // state's jurisdiction survives presentation swaps. The DRAFT is not here:
-  // the one composer owns it, persisted per case (`case:{slug}`), which is
-  // what lets the composer be the same element in every state. ──
-  const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({
-    mode: 'auto',
-  });
-  const startState = useStartCaseChat(slug, signedIn, switchChat, jurisdiction);
-  const start: CaseChatStart = {
-    ...startState,
-    jurisdiction,
-    onJurisdictionChange: setJurisdiction,
-  };
+  // The chat this page hosts: open/close/switch, the presentation, and the
+  // one create state (`useDocumentChat`, shared with the statute page).
+  const subject = useMemo<ChatSubject>(() => ({ kind: 'case', slug }), [slug]);
+  const {
+    chat,
+    renderedChat,
+    chatClosing,
+    openChat,
+    closeChat,
+    switchChat,
+    start,
+    phone,
+    dockOwnsChat,
+    showDock,
+    showDocked,
+    pageUnderChat,
+    setDockedPref,
+  } = useDocumentChat(subject, signedIn);
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
@@ -245,21 +160,6 @@ function CaseBody({ slug }: { slug: string }) {
 
   const outline = buildCaseOutline(detail);
 
-  // The DOCK is the whole chat on a phone and at xl-floating: closed pill,
-  // new-chat panel and the embedded conversation are three states of ONE
-  // card (full screen below xl). Only the docked column, by choice at xl, is
-  // a separate presentation.
-  const phone = isDesktopPanel === false;
-  const floatingContext = isDesktopPanel === true && !docked;
-  const dockOwnsChat = phone || floatingContext;
-  const showDocked = renderedChat !== null && isDesktopPanel === true && docked;
-  // The dock stays mounted through every state it owns so the composer
-  // element is never remounted across closed ⇄ open: focus survives, and on
-  // a phone the tap's own focus is what raises the keyboard.
-  const showDock = dockOwnsChat || renderedChat === null;
-  // While the phone chat covers the screen the page under it leaves the tab
-  // order and the accessibility tree (the shell's bars: see CaseAskDock).
-  const pageUnderChat = phone && renderedChat !== null;
 
   return (
     // With the side chat open (≥xl) this is a row: the reading column centres
@@ -300,7 +200,7 @@ function CaseBody({ slug }: { slug: string }) {
             docked column, chosen at xl, owns the composer. */}
         {showDock ? (
           <CaseAskDock
-            slug={slug}
+            subject={subject}
             signedIn={signedIn}
             viewerId={userId}
             start={start}
@@ -322,7 +222,7 @@ function CaseBody({ slug }: { slug: string }) {
         <CaseChatDocked
           chatId={renderedChat}
           closing={chatClosing}
-          slug={slug}
+          subject={subject}
           signedIn={signedIn}
           viewerId={userId}
           start={start}

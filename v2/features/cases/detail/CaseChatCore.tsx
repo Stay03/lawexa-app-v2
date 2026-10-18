@@ -26,7 +26,14 @@ import {
 } from '@/v2/features/conversations/conversation/embedded-composer';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { TranscriptSkeleton } from '@/v2/features/conversations/conversation/skeletons';
-import { casesQueries } from '../queries';
+import {
+  CHAT_SUBJECT_NOUN,
+  CHAT_SUBJECT_PROMPTS,
+  chatDraftScope,
+  subjectConversationsKey,
+  subjectConversationsQuery,
+  type ChatSubject,
+} from './chat-subject';
 
 /**
  * CaseChatCore — the case chat's ONE SCREEN (owner, July 31: "everything on the
@@ -52,6 +59,10 @@ import { casesQueries } from '../queries';
  * store, and {@link CaseChatComposerDock} rewires the SAME element to it. The
  * brief gap between "conversation open" and "surface published" reads as
  * disabled, so a send can never fall into the void or create a duplicate.
+ *
+ * ONE CHAT, TWO DOCUMENTS (18 October 2026). The statute page mounts this same
+ * chat; `subject` (`chat-subject.ts`) names what it is about, and every word,
+ * reference and list here that names the document reads it from there.
  *
  * The three presentations arrange these pieces but never reimplement them; the
  * only geometry a presentation owns is its own frame (the card's grow/collapse,
@@ -116,12 +127,6 @@ const ConversationScreen = dynamic(
   { ssr: false, loading: CaseChatTranscriptFallback },
 );
 
-export const CASE_PROMPTS = [
-  'Explain this case in plain language',
-  'What is the ratio decidendi?',
-  'How has this case been treated since?',
-] as const;
-
 /** The lifted create-state bundle — ONE instance lives in `CaseScreen`, shared
  *  by every presentation, so a double submit is impossible across surfaces. */
 export interface CaseChatStart {
@@ -136,11 +141,11 @@ export interface CaseChatStart {
 }
 
 /**
- * The one way a case chat starts: message + attachments in, conversation out,
- * with the "your chats about this case" query refreshed.
+ * The one way a document chat starts: message + attachments in, conversation
+ * out, with the reader's earlier chats about the document refreshed.
  */
 export function useStartCaseChat(
-  slug: string,
+  subject: ChatSubject,
   signedIn: boolean,
   onOpened: (conversationId: string) => void,
   jurisdiction: JurisdictionChoice,
@@ -166,15 +171,13 @@ export function useStartCaseChat(
           message,
           attachments,
           jurisdiction,
-          references: [{ type: 'case', id: slug }],
+          references: [{ type: subject.kind, id: subject.slug }],
         },
         { queryClient },
       );
-      // Refresh "your chats about this case" so the new thread is listed the
-      // next time the new-chat view opens.
-      void queryClient.invalidateQueries({
-        queryKey: [...casesQueries.all, 'conversations', slug],
-      });
+      // Refresh the reader's earlier chats about the document, so the new
+      // thread is listed the next time the new-chat view opens.
+      void queryClient.invalidateQueries({ queryKey: subjectConversationsKey(subject) });
       // The embedded controller consumes the `conv_init` handoff
       // `startConversation` just wrote, so the stream attaches in the middle.
       onOpened(result.conversationId);
@@ -201,6 +204,7 @@ const BAR_BUTTON =
  * only) · close. The bones never change between the two middle states.
  */
 export function CaseChatBar({
+  subject,
   view,
   onBack,
   onClose,
@@ -208,6 +212,7 @@ export function CaseChatBar({
   tall = false,
   screen = false,
 }: {
+  subject: ChatSubject;
   /** `'new'` or a conversation id — the bar is only rendered while open. */
   view: string;
   onBack: () => void;
@@ -223,6 +228,7 @@ export function CaseChatBar({
   screen?: boolean;
 }) {
   const isConversation = view !== 'new';
+  const noun = CHAT_SUBJECT_NOUN[subject.kind];
   const target = screen ? 'size-11' : 'size-8';
   const button = cn(BAR_BUTTON, target, FOCUS_RING);
   return (
@@ -236,7 +242,7 @@ export function CaseChatBar({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Back to your chats about this case"
+          aria-label={`Back to your chats about this ${noun}`}
           className={button}
         >
           <ArrowLeft aria-hidden className="size-4" />
@@ -245,7 +251,7 @@ export function CaseChatBar({
         <span aria-hidden className={target} />
       )}
       <p className="flex-1 truncate px-1 text-center text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-        Chat · this case
+        Chat · this {noun}
       </p>
       {presentationAction}
       {isConversation ? (
@@ -278,7 +284,7 @@ export function CaseChatBar({
  */
 export function CaseChatMiddle({
   view,
-  slug,
+  subject,
   signedIn,
   viewerId,
   onOpenChat,
@@ -286,7 +292,7 @@ export function CaseChatMiddle({
   onStage,
 }: {
   view: string;
-  slug: string;
+  subject: ChatSubject;
   signedIn: boolean;
   viewerId: number | null;
   onOpenChat: (conversationId: string) => void;
@@ -312,7 +318,7 @@ export function CaseChatMiddle({
       ) : (
         <div className="v2-quiet-scroll h-full min-h-0 overflow-y-auto overscroll-contain px-4 py-4">
           <CaseChatNewContent
-            slug={slug}
+            subject={subject}
             signedIn={signedIn}
             viewerId={viewerId}
             onOpenChat={onOpenChat}
@@ -329,13 +335,13 @@ export function CaseChatMiddle({
  * into the one composer; they never own an input of their own.
  */
 export function CaseChatNewContent({
-  slug,
+  subject,
   signedIn,
   viewerId,
   onOpenChat,
   onStage,
 }: {
-  slug: string;
+  subject: ChatSubject;
   signedIn: boolean;
   viewerId: number | null;
   onOpenChat: (conversationId: string) => void;
@@ -345,7 +351,7 @@ export function CaseChatNewContent({
     <div className="flex flex-col gap-5">
       {signedIn ? (
         <RecentCaseChats
-          slug={slug}
+          subject={subject}
           viewerId={viewerId}
           onOpenChat={onOpenChat}
           limit={5}
@@ -357,7 +363,7 @@ export function CaseChatNewContent({
           Start with
         </p>
         <ul className="flex flex-wrap gap-1.5">
-          {CASE_PROMPTS.map((prompt) => (
+          {CHAT_SUBJECT_PROMPTS[subject.kind].map((prompt) => (
             <li key={prompt}>
               <button
                 type="button"
@@ -378,24 +384,24 @@ export function CaseChatNewContent({
 }
 
 /**
- * The reader's recent threads about this case. Owner-scoped on the server and
+ * The reader's recent threads about this document. Owner-scoped on the server and
  * viewer-partitioned in the cache; renders nothing when there are none and
  * fails quiet — the threads are still reachable from /conversations. Rows
  * open in the chat surface (buttons, not links): resuming a thread about the
- * case keeps the case.
+ * document keeps the document.
  */
 export function RecentCaseChats({
-  slug,
+  subject,
   viewerId,
   onOpenChat,
   limit = 3,
 }: {
-  slug: string;
+  subject: ChatSubject;
   viewerId: number | null;
   onOpenChat: (conversationId: string) => void;
   limit?: number;
 }) {
-  const query = useQuery(casesQueries.conversations(slug, { viewerId }));
+  const query = useQuery(subjectConversationsQuery(subject, viewerId));
   const [now] = useState(() => Date.now());
   const rows = (query.data?.data ?? []).slice(0, limit);
 
@@ -457,7 +463,7 @@ export function RecentCaseChats({
  */
 export function CaseChatComposerDock({
   view,
-  slug,
+  subject,
   signedIn,
   start,
   showMeta = true,
@@ -467,7 +473,7 @@ export function CaseChatComposerDock({
 }: {
   /** null = the closed dock pill; `'new'` = list state; else a conversation id. */
   view: string | null;
-  slug: string;
+  subject: ChatSubject;
   signedIn: boolean;
   start: CaseChatStart;
   /** False collapses the jurisdiction row — the closed resting pill. */
@@ -550,8 +556,8 @@ export function CaseChatComposerDock({
       >
         <div className="min-h-0 overflow-hidden">
           <ConversationComposer
-            draftScopeId={`case:${slug}`}
-            placeholder="Ask about this case"
+            draftScopeId={chatDraftScope(subject)}
+            placeholder={`Ask about this ${CHAT_SUBJECT_NOUN[subject.kind]}`}
             signedIn={signedIn}
             showMeta={showMeta}
             animateMeta={animateMeta}

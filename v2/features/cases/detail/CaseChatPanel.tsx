@@ -12,6 +12,8 @@ import {
   CaseChatMiddle,
   type CaseChatStart,
 } from './CaseChatCore';
+import { CHAT_SUBJECT_NOUN, type ChatSubject } from './chat-subject';
+import './case-chat-panel.css';
 
 /**
  * The case chat's docked presentation. It renders the SAME one screen
@@ -54,7 +56,7 @@ import {
 interface CaseChatCommonProps {
   chatId: string;
   closing: boolean;
-  slug: string;
+  subject: ChatSubject;
   signedIn: boolean;
   viewerId: number | null;
   /** The lifted create bundle — ONE instance in `CaseScreen`, every surface. */
@@ -71,7 +73,7 @@ export function CaseChatDocked({
 }: CaseChatCommonProps & { onFloat: () => void }) {
   return (
     <aside
-      aria-label="Chat about this case"
+      aria-label={`Chat about this ${CHAT_SUBJECT_NOUN[props.subject.kind]}`}
       data-state={props.closing ? 'closed' : 'open'}
       className={cn(
         // The RAIL — transparent flow space (panel + right gutter). The
@@ -106,7 +108,7 @@ export function CaseChatDocked({
 
 function CaseChatBody({
   chatId,
-  slug,
+  subject,
   signedIn,
   viewerId,
   start,
@@ -121,6 +123,7 @@ function CaseChatBody({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <CaseChatBar
+        subject={subject}
         view={chatId}
         onBack={() => onSwitchChat('new')}
         onClose={onClose}
@@ -142,7 +145,7 @@ function CaseChatBody({
       />
       <CaseChatMiddle
         view={chatId}
-        slug={slug}
+        subject={subject}
         signedIn={signedIn}
         viewerId={viewerId}
         onOpenChat={onSwitchChat}
@@ -153,7 +156,7 @@ function CaseChatBody({
           open: the keyboard comes up only when the reader taps it. */}
       <CaseChatComposerDock
         view={chatId}
-        slug={slug}
+        subject={subject}
         signedIn={signedIn}
         start={start}
         stageRef={stageRef}

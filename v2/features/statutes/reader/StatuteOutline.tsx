@@ -341,6 +341,7 @@ export function StatuteContentsSheet({
   activeId,
   onJump,
   entrance = false,
+  alwaysShown = false,
 }: OutlineHandle & {
   /**
    * True when this affordance appeared AFTER the document painted (a partial
@@ -349,6 +350,8 @@ export function StatuteContentsSheet({
    * full-document path's DOM byte-identical to before the paywall existed.
    */
   entrance?: boolean;
+  /** Shown at every width: the statute chat is docked where the rail sits. */
+  alwaysShown?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const activeDivision = activeDivisionOf(outline, activeId);
@@ -376,10 +379,14 @@ export function StatuteContentsSheet({
           ≥96rem, where the rail takes over — the SAME threshold the rail
           computes from sidebar + column + gutter + rail widths (see the
           arithmetic in StatuteDocument), so the handoff is truthful: at
-          every width exactly one contents affordance exists. */}
+          every width exactly one contents affordance exists. It stands
+          1.5rem above the ask dock, whose resting height the statute screen
+          keeps in `--v2-ask-dock-h` on the column (0 with no dock). */}
       <div
+        style={{ bottom: 'calc(var(--v2-ask-dock-h, 0px) + 1.5rem)' }}
         className={cn(
-          'pointer-events-none sticky bottom-6 z-10 -mx-1 flex justify-end min-[96rem]:hidden',
+          'pointer-events-none sticky z-10 -mx-1 flex justify-end',
+          !alwaysShown && 'min-[96rem]:hidden',
           entrance &&
             'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
         )}

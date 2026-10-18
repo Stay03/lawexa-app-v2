@@ -13,6 +13,7 @@ import {
   CaseChatMiddle,
   type CaseChatStart,
 } from './CaseChatCore';
+import { CHAT_SUBJECT_NOUN, type ChatSubject } from './chat-subject';
 import { guardChatDrags } from './case-chat-drag-guard';
 import {
   CHROMIUM_IOS_ACCESSORY_RESERVE_PX,
@@ -100,7 +101,7 @@ const SLOT_RIDE_FADE_MS = 200;
  * effect below).
  */
 export function CaseAskDock({
-  slug,
+  subject,
   signedIn,
   viewerId,
   start,
@@ -111,9 +112,10 @@ export function CaseAskDock({
   onClose,
   onDock,
   onOpenChat,
+  onRestingHeight,
   arrive = true,
 }: {
-  slug: string;
+  subject: ChatSubject;
   signedIn: boolean;
   viewerId: number | null;
   start: CaseChatStart;
@@ -135,8 +137,15 @@ export function CaseAskDock({
   onClose: () => void;
   onDock: () => void;
   onOpenChat: (conversationId: string) => void;
+  /**
+   * The resting dock's height in px, each time it changes (never while the
+   * phone screen is open). The statute page lifts its Contents pill clear of
+   * the dock with it. Called from a ResizeObserver, so it must not set state.
+   */
+  onRestingHeight?: (height: number) => void;
 }) {
   const panelMounted = view !== null;
+  const noun = CHAT_SUBJECT_NOUN[subject.kind];
   const screenMounted = screen && panelMounted;
   const stageRef = useRef<ConversationComposerHandle | null>(null);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -158,6 +167,10 @@ export function CaseAskDock({
   useEffect(() => {
     screenMountedRef.current = screenMounted;
   }, [screenMounted]);
+  const restingHeightRef = useRef(onRestingHeight);
+  useEffect(() => {
+    restingHeightRef.current = onRestingHeight;
+  }, [onRestingHeight]);
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper || typeof ResizeObserver === 'undefined') return;
@@ -166,6 +179,7 @@ export function CaseAskDock({
       const box = entries[0]?.borderBoxSize?.[0];
       const height = box ? box.blockSize : wrapper.getBoundingClientRect().height;
       wrapper.style.setProperty('--v2-case-dock-h', `${Math.round(height)}px`);
+      restingHeightRef.current?.(Math.round(height));
     });
     observer.observe(wrapper);
     return () => observer.disconnect();
@@ -542,7 +556,7 @@ export function CaseAskDock({
 
       {screenMounted ? (
         <span role="status" className="sr-only">
-          {panelOpen ? 'Chat about this case opened' : 'Chat about this case closed'}
+          {panelOpen ? `Chat about this ${noun} opened` : `Chat about this ${noun} closed`}
         </span>
       ) : null}
 
@@ -551,7 +565,7 @@ export function CaseAskDock({
         tabIndex={-1}
         role={screenMounted ? 'dialog' : panelMounted ? 'complementary' : undefined}
         aria-modal={screenMounted ? true : undefined}
-        aria-label={panelMounted ? 'Chat about this case' : undefined}
+        aria-label={panelMounted ? `Chat about this ${noun}` : undefined}
         data-state={screenMounted ? (panelOpen ? 'open' : 'closed') : undefined}
         onKeyDown={
           screenMounted
@@ -637,6 +651,7 @@ export function CaseAskDock({
             }
           >
             <CaseChatBar
+              subject={subject}
               view={view}
               onBack={() => onOpenChat('new')}
               onClose={onClose}
@@ -645,7 +660,7 @@ export function CaseAskDock({
             />
             <CaseChatMiddle
               view={view}
-              slug={slug}
+              subject={subject}
               signedIn={signedIn}
               viewerId={viewerId}
               onOpenChat={onOpenChat}
@@ -665,6 +680,7 @@ export function CaseAskDock({
                   nothing. */}
               <div className="flex h-[min(30rem,calc(100dvh-14rem))] flex-col">
                 <CaseChatBar
+                  subject={subject}
                   view={view}
                   onBack={() => onOpenChat('new')}
                   onClose={onClose}
@@ -685,7 +701,7 @@ export function CaseAskDock({
                 />
                 <CaseChatMiddle
                   view={view}
-                  slug={slug}
+                  subject={subject}
                   signedIn={signedIn}
                   viewerId={viewerId}
                   onOpenChat={onOpenChat}
@@ -705,7 +721,7 @@ export function CaseAskDock({
             so the dock comes back with the row already collapsed. */}
         <CaseChatComposerDock
           view={view}
-          slug={slug}
+          subject={subject}
           signedIn={signedIn}
           start={start}
           showMeta={screen ? screenMounted : panelMounted && panelOpen}

@@ -134,7 +134,8 @@ export function writeBookmarkEverywhere(
   next: boolean,
 ): [readonly unknown[], CaseCache | undefined][] {
   // `lists()` and `details()`, never the `all` root: the cases namespace ALSO
-  // holds `casesQueries.conversations`, whose rows are conversations, not cases.
+  // holds a case's chats (`subjectConversationsQuery`, cases/detail/chat-subject),
+  // whose rows are conversations, not cases.
   // Walking them would be harmless at runtime (a string id never equals a number
   // one, so every row returns unchanged) and dishonest in the types — so the
   // fan-out names exactly the two families that carry the flag.
