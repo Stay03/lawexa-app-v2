@@ -104,13 +104,25 @@ export const CHAT_PROMPTS = 'order-3 mt-auto pt-8 md:order-4 md:mt-3 md:pt-0';
  */
 export const HOME_SECTIONS = 'order-2 mt-6 flex flex-col gap-7 md:order-5 md:mt-8';
 
-/** Chat's mobile-only quick-jump nav row (owner #20 — the sidebar covers desktop). */
-export const CHAT_QUICK_JUMP =
-  'mt-6 flex flex-wrap items-center justify-center gap-1.5 md:hidden';
+/**
+ * Chat's mobile-only quick-jump nav row (owner #20 — the sidebar covers desktop).
+ *
+ * ONE LINE ON EVERY PHONE (Arthur, 18 October 2026: on some phones Quiz
+ * dropped under the other three; "smaller pills", icon and word side by side).
+ * The four pills need about 296 px at the base size: a 360 px phone's column
+ * holds them, and so does a 390 px one at 120 % text. Below that the row never
+ * wraps: it slides sideways in its one line (`data-v2-strip` hides the bar, as
+ * on every strip). The inner row is `w-max` and centred, so a row that fits
+ * sits in the middle and one that does not starts at its first pill.
+ */
+export const CHAT_QUICK_JUMP = 'mt-6 overflow-x-auto overscroll-x-contain md:hidden';
+
+/** The pills' one line inside {@link CHAT_QUICK_JUMP}. */
+export const CHAT_QUICK_JUMP_ROW = 'mx-auto flex w-max flex-nowrap items-center gap-0.5';
 
 /** One quick-jump pill. 44px tall (`min-h-11`) so it clears the touch floor. */
 export const CHAT_QUICK_JUMP_ITEM =
-  'inline-flex min-h-11 items-center gap-2 rounded-full px-3 text-sm text-muted-foreground transition-colors';
+  'inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[0.8125rem] text-muted-foreground transition-colors';
 
 /* ── Shared furniture ─────────────────────────────────────────────────────── */
 

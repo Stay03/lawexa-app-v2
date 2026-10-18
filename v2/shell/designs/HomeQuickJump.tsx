@@ -8,7 +8,7 @@ import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
 import type { UserRole } from '@/types/auth';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from './modules';
-import { CHAT_QUICK_JUMP, CHAT_QUICK_JUMP_ITEM } from './home-frame';
+import { CHAT_QUICK_JUMP, CHAT_QUICK_JUMP_ITEM, CHAT_QUICK_JUMP_ROW } from './home-frame';
 
 /**
  * HomeQuickJump — the Chat tab's quiet MOBILE-ONLY quick-jump row (owner #20:
@@ -25,20 +25,20 @@ import { CHAT_QUICK_JUMP, CHAT_QUICK_JUMP_ITEM } from './home-frame';
  * to become on the day those screens moved.
  *
  * EXTRACTED from `ChatHome` so the route-level fallback can reserve this row at
- * its EXACT geometry. That matters more than it looks: the pills wrap, and where
- * they wrap depends on the label text, so a hand-drawn approximation would be one
- * row tall on some viewports and two on others — a guaranteed jump at hand-off.
- * Sharing the one component makes the reserved row and the real row identical by
- * construction.
+ * its EXACT geometry. The pills used to wrap, so a hand-drawn approximation
+ * would have been one row tall on some viewports and two on others; they keep
+ * to one line now (`CHAT_QUICK_JUMP`), and sharing the one component still
+ * makes the reserved row and the real row identical by construction.
  *
  * ── WHY IT READS THE SESSION ITSELF (it used to be hook-free) ───────────────
- * Quiz is in soft launch for research accounts, so its pill must not appear for
- * anyone else — the same "no trace" rule the sidebar and drawer apply through
- * `visibleNavItems`. The obvious implementation, a `role` PROP, would have
- * broken the geometry contract above: `ChatHome` has a role to pass but
- * `HomeFallback` has none (it is drawn while the session is still resolving), so
- * the reserved row and the real row would disagree by one pill — exactly the
- * one-vs-two-line wrap this component exists to prevent.
+ * Quiz is for registered accounts only (`canAccessQuizPlayer`: not guests, not
+ * bots; it opened to every registered account on 3 August 2026), so its pill
+ * must not appear for a guest — the same "no trace" rule the sidebar and drawer
+ * apply through `visibleNavItems`. The obvious implementation, a `role` PROP,
+ * would have broken the geometry contract above: `ChatHome` has a role to pass
+ * but `HomeFallback` has none (it is drawn while the session is still
+ * resolving), so the reserved row and the real row would disagree by one
+ * pill.
  *
  * Reading `useV2Session()` removes the divergence at the source: the snapshot is
  * published by `app/v2/layout.tsx`, which sits ABOVE both the page and its
@@ -74,22 +74,24 @@ export function HomeQuickJump() {
   );
 
   return (
-    <nav aria-label="Quick links" className={CHAT_QUICK_JUMP}>
-      {actions.map(({ href, label, Icon }) => (
-        <Link
-          key={href}
-          href={href}
-          className={cn(
-            'v2-interactive',
-            CHAT_QUICK_JUMP_ITEM,
-            'hover:bg-secondary hover:text-foreground',
-            FOCUS_RING,
-          )}
-        >
-          <Icon className="size-4 shrink-0" aria-hidden />
-          {label}
-        </Link>
-      ))}
+    <nav aria-label="Quick links" data-v2-strip="" className={CHAT_QUICK_JUMP}>
+      <div className={CHAT_QUICK_JUMP_ROW}>
+        {actions.map(({ href, label, Icon }) => (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              'v2-interactive',
+              CHAT_QUICK_JUMP_ITEM,
+              'hover:bg-secondary hover:text-foreground',
+              FOCUS_RING,
+            )}
+          >
+            <Icon className="size-3.5 shrink-0" aria-hidden />
+            {label}
+          </Link>
+        ))}
+      </div>
     </nav>
   );
 }

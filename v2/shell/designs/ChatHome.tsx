@@ -58,8 +58,8 @@ import {
  * FRAME: every container class below comes from `home-frame.ts` — the ONE
  * definition the route-level fallback (`HomeFallback`) also consumes, so the
  * loading shape and this surface cannot drift apart. The quick-jump row moved to
- * `HomeQuickJump` for the same reason (its pills wrap, so only the real component
- * reserves the real height). Nothing about the design changed in the extraction.
+ * `HomeQuickJump` for the same reason (only the real component reserves the
+ * real height; its pills keep to one line). Nothing about the design changed in the extraction.
  */
 
 export function ChatHome({
