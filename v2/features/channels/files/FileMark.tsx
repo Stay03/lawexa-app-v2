@@ -147,8 +147,9 @@ function ImageThumb({ url, box }: { url: string; box: string }) {
 /** Everything the mark actually reads. Typed as the fields rather than as
  *  `ChannelFile` so a {@link MessageAttachment} — the same row without an
  *  `uploader` — wears the same mark in the feed, with no cast and no second
- *  component. */
-export type MarkableFile = Pick<ChannelFile, 'mime_type' | 'original_name' | 'url'>;
+ *  component. `url` may be null, as a space's file (`UserFile`) has it: the
+ *  mark then draws the type's glyph. */
+export type MarkableFile = Pick<ChannelFile, 'mime_type' | 'original_name'> & { url: string | null };
 
 export function FileMark({
   file,
