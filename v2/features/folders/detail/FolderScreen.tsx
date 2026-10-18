@@ -3,14 +3,13 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Boxes, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Boxes, Pencil, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
-import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
 import {
   clearScreenContext,
   setScreenContext,
@@ -18,7 +17,7 @@ import {
   type ScreenBack,
 } from '@/v2/shell/screen-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
+import { formatRelativeTime } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { foldersQueries } from '../queries';
@@ -48,9 +47,17 @@ import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { FolderRow } from '../list/FolderRow';
 import { FoldersSignedOutState } from '../list/states';
 import { FolderBreadcrumb } from './FolderBreadcrumb';
+import {
+  FolderAddButtons,
+  FolderAddMenu,
+  SpaceFilesDialog,
+  useFolderUpload,
+  type AddChoices,
+} from './FolderAdd';
 import { FolderDetailFallback } from './FolderDetailFallback';
 import { FolderItemRow } from './FolderItemRow';
 import { ItemTypeTabs } from './ItemTypeTabs';
+import { useScrolledTitle } from './use-scrolled-title';
 import { parseFolderItemTab, type FolderItemTab } from './item-tabs';
 import { folderStreamState } from './stream-state';
 import {
@@ -158,6 +165,8 @@ function FolderBody({ uuid }: { uuid: string }) {
   // Move to space (Spaces F3). Held after closing so the dialog's exit plays;
   // each open bumps the key, so it starts clean.
   const [move, setMove] = useState({ open: false, key: 0 });
+  // Files from this space (item 8), held the same way.
+  const [spaceFiles, setSpaceFiles] = useState({ open: false, key: 0 });
 
   const folderQuery = useQuery({
     ...foldersQueries.detail({ uuid, viewerId }),
@@ -280,23 +289,19 @@ function FolderBody({ uuid }: { uuid: string }) {
     [],
   );
 
-  // Publish the folder's name to the header centre once it is known — through
-  // the ROW MODEL, so a folder saved with a blank name reads "Untitled folder"
-  // in the header exactly as it does in the h1, instead of leaving the header
-  // empty (L6). `folderRow` is pure, so memoising it here costs one object.
+  // The folder's name through the ROW MODEL, so a folder saved with a blank
+  // name reads "Untitled folder" in the bar exactly as it does in the h1 (L6).
+  // `folderRow` is pure, so memoising it here costs one object.
   const headerRow = useMemo(() => (folder ? folderRow(folder) : null), [folder]);
-  // Before the folder answers, a tapped row's name (`folder-peek.ts`, speed
-  // step 5): on a phone the bar is where the name is read, so it shows at once.
+  // The name is the page's heading at every width; the phone bar carries it
+  // only once that heading has scrolled away (item 7, `use-scrolled-title.ts`).
+  const headingRef = useScrolledTitle(headerRow?.name ?? null);
+  // The tapped row's tile and name (`folder-peek.ts`, speed step 5), drawn by
+  // the loading frame where the header puts them. They stay still when the
+  // folder arrives; everything else fades (`folder-arrive.css`). Decided once,
+  // at mount.
   const peek = useFolderPeek(uuid);
-  const headerTitle = headerRow?.name ?? peek?.name ?? null;
-  // The tile and the name already drawn stay still when the folder arrives;
-  // everything else fades (`folder-arrive.css`). Decided once, at mount.
   const [arrival] = useState(() => (folderQuery.isPending && peek !== null ? 'peeked' : 'fade'));
-  useEffect(() => {
-    if (!headerTitle) return;
-    setHeaderContext({ title: headerTitle, confidential: false });
-  }, [headerTitle]);
-  useEffect(() => () => clearHeaderContext(), []);
 
   /**
    * ── THE FOLDER'S OWN CONTROLS LIVE IN THE BAR NOW (phase 7) ───────────────
@@ -334,6 +339,14 @@ function FolderBody({ uuid }: { uuid: string }) {
     [parentFolder],
   );
   const deleteFolder = useDeleteFolderWithUndo();
+  // Only the folder's creator may add to it (`FolderService::canEdit`); a
+  // member of the folder's space who did not make it is refused with a 403.
+  const canAdd = viewerId !== null && folder?.user?.id === viewerId;
+  const upload = useFolderUpload({
+    uuid,
+    name: headerRow?.name ?? '',
+    space: folder?.space ?? null,
+  });
   const actions = useMemo<readonly ScreenAction[]>(() => {
     if (!folder || !headerRow) return NO_SCREEN_ACTIONS;
     const target: DeletableFolder = {
@@ -433,6 +446,15 @@ function FolderBody({ uuid }: { uuid: string }) {
 
   const row = folderRow(folder);
   const trail = formatRelativeTime(row.trailAt, now);
+  const space = folder.space ?? null;
+  // The ways into this folder (items 8 and 9), for whoever may add.
+  const addChoices: AddChoices | null = canAdd
+    ? {
+        newSubfolder: () => setCreatingSubfolder(true),
+        fromSpace: space ? () => setSpaceFiles((previous) => ({ open: true, key: previous.key + 1 })) : null,
+        upload: upload.pick,
+      }
+    : null;
   const showTabs = typesPresent.size > 1 || tab !== 'all';
   const showSubfolders = tab === 'all';
 
@@ -500,17 +522,16 @@ function FolderBody({ uuid }: { uuid: string }) {
           <FolderTile tint={row.tint} size="header" />
 
           <div className="min-w-0 flex-1">
-            {/* ONE TITLE PER SCREEN, AT EVERY WIDTH (phase 7). Below `md:` the
-                shell's bar prints the folder's name, so printing it again here
-                would be the same word twice, an inch apart. The heading is
-                still stated — a document whose only `h1` changed with the
-                viewport would be a different document at every width — it is
-                simply not drawn at the width where the bar has it. From `md:`
-                up the bar's title is `display:none` and this is the only one.
-                Same contract the channel screen already runs on. */}
+            {/* THE NAME IS THE PAGE'S HEADING AT EVERY WIDTH (Arthur, 17
+                October 2026, item 7: "make it clear on the page which folder
+                you're in"). It wraps to two lines rather than being cut, and
+                the phone bar stays empty while it is on screen, so the name is
+                never printed twice (`useScrolledTitle`). */}
             <h1
+              ref={headingRef}
+              title={row.name}
               className={cn(
-                'sr-only md:not-sr-only md:text-xl md:font-semibold md:tracking-tight',
+                'line-clamp-2 break-words text-xl font-semibold leading-snug tracking-tight',
                 row.hasName ? 'text-foreground' : 'italic text-muted-foreground',
               )}
             >
@@ -555,25 +576,19 @@ function FolderBody({ uuid }: { uuid: string }) {
               the bar's single overflow menu (see the `actions` memo above). */}
         </header>
 
-        <div className="mt-4 flex items-center justify-between gap-3">
-          {showTabs ? (
-            <ItemTypeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
-          ) : (
-            <span />
-          )}
-
-          <button
-            type="button"
-            onClick={() => setCreatingSubfolder(true)}
-            className={cn(
-              'v2-interactive inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border border-border px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
-              FOCUS_RING,
+        {/* The type strip and the folder's "Add" (items 8 and 9: the "+"
+            had no word, and only made subfolders). Only its creator adds. */}
+        {showTabs || addChoices ? (
+          <div className="mt-4 flex items-center justify-between gap-3">
+            {showTabs ? (
+              <ItemTypeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
+            ) : (
+              <span />
             )}
-          >
-            <Plus aria-hidden className="size-4" />
-            <span className="sr-only sm:not-sr-only">New subfolder</span>
-          </button>
-        </div>
+            {addChoices ? <FolderAddMenu choices={addChoices} /> : null}
+          </div>
+        ) : null}
+        {addChoices ? upload.input : null}
 
         {/* The ONE live region for this surface — polite, text-only, and
             derived purely from render values, so it can never announce
@@ -655,6 +670,8 @@ function FolderBody({ uuid }: { uuid: string }) {
             <FolderEmptyState
               tab={tab}
               onShowAll={tab === 'all' ? undefined : () => setTab('all')}
+              add={addChoices ? <FolderAddButtons choices={addChoices} /> : null}
+              inSpace={space !== null}
             />
           ) : null}
 
@@ -727,6 +744,15 @@ function FolderBody({ uuid }: { uuid: string }) {
             if (!open) setRenameTarget(null);
           }}
           intent={{ mode: 'rename', folder: renameTarget }}
+        />
+      ) : null}
+      {spaceFiles.key > 0 && space ? (
+        <SpaceFilesDialog
+          key={spaceFiles.key}
+          open={spaceFiles.open}
+          onOpenChange={(open) => setSpaceFiles((previous) => ({ ...previous, open }))}
+          folder={{ uuid: folder.uuid, name: row.name, space }}
+          space={space}
         />
       ) : null}
       {move.key > 0 ? (

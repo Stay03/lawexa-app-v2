@@ -22,42 +22,57 @@ test('the tap keeps the row\'s tile and name, for that folder only, one entry', 
   assert.equal(folderPeekFor('f-2')?.hasName, false);
 });
 
-test('the row leaves its facts on the tap, and both waits draw the tile and, from md:, the name', () => {
+test('the row leaves its facts on the tap, and both waits draw the tile and the name at every width', () => {
   assert.match(read('list', 'FolderRow.tsx'), /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\}/);
   const fallback = read('detail', 'FolderDetailFallback.tsx');
   assert.match(fallback, /const peek = useFolderPeek\(uuidOf\(usePathname\(\)\)\);/);
   assert.match(fallback, /tile=\{peek \? <FolderTile tint=\{peek\.tint\} size="header" \/> : undefined\}/);
-  assert.match(fallback, /'hidden text-xl font-semibold tracking-tight md:block'/);
+  // Item 7 (Arthur, 17 October 2026): the name is the page's heading on a
+  // phone too, so the wait draws it there, in the live heading's type.
+  assert.match(fallback, /'line-clamp-2 break-words text-xl font-semibold leading-snug tracking-tight'/);
+  assert.doesNotMatch(fallback, /hidden text-xl|md:block/);
   assert.doesNotMatch(fallback, /from '\.\/FolderScreen'/);
   assert.match(read('detail', 'FolderScreen.tsx'), /if \(folderQuery\.isPending\) return <FolderDetailFallback \/>;/);
 });
 
-test('on a phone the bar shows the tapped row\'s name before the folder answers', () => {
+test('the folder’s name is the page heading at every width, and the bar stays empty while it shows', () => {
   const screen = read('detail', 'FolderScreen.tsx');
-  assert.match(screen, /const headerTitle = headerRow\?\.name \?\? peek\?\.name \?\? null;/);
-  // The page's own clear on unmount still runs, so no name is left behind.
-  assert.match(screen, /useEffect\(\(\) => \(\) => clearHeaderContext\(\), \[\]\);/);
+  assert.match(screen, /const headingRef = useScrolledTitle\(headerRow\?\.name \?\? null\);/);
+  assert.match(screen, /<h1\s+ref=\{headingRef\}/);
+  assert.match(screen, /'line-clamp-2 break-words text-xl font-semibold leading-snug tracking-tight'/);
+  assert.doesNotMatch(screen, /sr-only md:not-sr-only/);
+  // Neither the wait nor the screen puts the name in the bar on arrival.
+  assert.doesNotMatch(read('detail', 'FolderDetailFallback.tsx'), /setHeaderContext/);
+  assert.doesNotMatch(screen, /setHeaderContext|clearHeaderContext/);
+  // The bar's slot for a folder never shimmers.
+  const pushed = read('..', '..', 'shell', 'pushed-route.ts');
+  assert.match(pushed, /backLabel: 'Back to folders',\s*title: SCROLLED_TITLE,/);
+  assert.doesNotMatch(pushed, /kind: 'published'/);
+  assert.match(read('..', '..', 'shell', 'V2Header.tsx'), /expectsContext=\{false\}/);
 });
 
-test('the wait itself puts the name in the bar, under its own name, before the screen\'s code arrives', () => {
-  const fallback = read('detail', 'FolderDetailFallback.tsx');
-  assert.match(fallback, /setHeaderContext\(\{ title: peek\.name, confidential: false \}, FALLBACK_PUBLISHER\);/);
-  assert.match(fallback, /return \(\) => clearHeaderContext\(FALLBACK_PUBLISHER\);/);
-  assert.match(fallback, /export const FALLBACK_PUBLISHER = 'folder-detail-fallback';/);
-  // The screen publishes with no name of its own, which is what lets the
-  // wait's clear leave the screen's title alone (next test).
-  assert.match(read('detail', 'FolderScreen.tsx'), /setHeaderContext\(\{ title: headerTitle, confidential: false \}\);/);
+test('the bar shows the name once the heading scrolls away, and takes it back on return', () => {
+  const hook = read('detail', 'use-scrolled-title.ts');
+  assert.match(hook, /const \[onScreen, setOnScreen\] = useState\(true\);/);
+  assert.match(hook, /new IntersectionObserver\(\(\[entry\]\) => setOnScreen\(entry\.isIntersecting\), \{\s*root: document\.getElementById\(V2_SHELL_CONTENT_ID\),/);
+  assert.match(
+    hook,
+    /if \(title !== null && !onScreen\) setHeaderContext\(\{ title, confidential: false \}, FOLDER_TITLE_PUBLISHER\);\s*else clearHeaderContext\(FOLDER_TITLE_PUBLISHER\);/,
+  );
+  assert.match(hook, /useEffect\(\(\) => \(\) => clearHeaderContext\(FOLDER_TITLE_PUBLISHER\), \[\]\);/);
 });
 
-test('the hand-off: the wait goes and the screen\'s title stays', () => {
-  const publisher = 'folder-detail-fallback';
+test('the folder’s clear is owned: a title another screen published since stays', () => {
+  const publisher = 'folder-screen';
   setHeaderContext({ title: 'Tenancy', confidential: false }, publisher);
   assert.equal(snapshotHeaderContext().context.title, 'Tenancy');
-  // The screen mounts and publishes; the wait is deleted and clears.
-  setHeaderContext({ title: 'Tenancy', confidential: false });
+  // A chat tapped from the folder publishes its own title; the folder then
+  // unmounts and clears under its own name, which leaves the chat's alone.
+  setHeaderContext({ title: 'Lease question', confidential: false }, 'conversation-1');
   clearHeaderContext(publisher);
-  assert.equal(snapshotHeaderContext().context.title, 'Tenancy');
-  // A wait left alone (the tap went nowhere) takes its own title with it.
+  assert.equal(snapshotHeaderContext().context.title, 'Lease question');
+  clearHeaderContext('conversation-1');
+  // A folder left alone takes its own title with it.
   setHeaderContext({ title: 'Lease', confidential: false }, publisher);
   clearHeaderContext(publisher);
   assert.equal(snapshotHeaderContext().context.title, null);

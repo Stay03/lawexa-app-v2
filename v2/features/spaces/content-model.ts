@@ -254,22 +254,31 @@ const ACCEPTED_EXTENSIONS: readonly string[] = ACCEPTED_FILE_TYPES.split(',').ma
  * its 422 is shown in place too; this only spares the reader a wait to be
  * told something knowable now. The extension is checked as well as the
  * type, because some systems send `.rtf` with no type.
+ *
+ * `place` names where the file is going in the refusal: a folder's upload
+ * (Arthur, 17 October 2026, item 8) runs the same rules, since a space folder
+ * uploads to the space and a personal one to `POST /files/documents` or, for
+ * a picture, `POST /files`.
  */
-export function uploadPrecheck(file: Pick<File, 'name' | 'type' | 'size'>): string | null {
+export function uploadPrecheck(
+  file: Pick<File, 'name' | 'type' | 'size'>,
+  place: 'a space' | 'a folder' = 'a space',
+): string | null {
   const extension = file.name.toLowerCase().split('.').pop() ?? '';
   const typeKnown = file.type !== '' && ALLOWED_FILE_TYPES.includes(file.type);
   if (!typeKnown && !ACCEPTED_EXTENSIONS.includes(extension)) {
-    return `“${file.name}” can’t be added. A space takes PDF, Word, RTF and image files (JPG, PNG, WebP).`;
+    const takes = place === 'a space' ? 'A space takes' : 'A folder takes';
+    return `“${file.name}” can’t be added. ${takes} PDF, Word, RTF and image files (JPG, PNG, WebP).`;
   }
   // A picture is capped at 5 MB, as the server's rule caps it. A file the
   // system sent with no type is judged a picture by its name.
   const picture =
     isImageAttachment(file) || (file.type === '' && PICTURE_EXTENSIONS.includes(extension));
   if (picture && file.size > MAX_IMAGE_SIZE) {
-    return `“${file.name}” is larger than 5 MB, the most a space takes for a picture.`;
+    return `“${file.name}” is larger than 5 MB, the most ${place} takes for a picture.`;
   }
   if (file.size > MAX_DOCUMENT_SIZE) {
-    return `“${file.name}” is larger than 10 MB, the most a space takes.`;
+    return `“${file.name}” is larger than 10 MB, the most ${place} takes.`;
   }
   return null;
 }

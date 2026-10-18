@@ -42,7 +42,7 @@ import { spacesQueries } from './queries';
  * level and search under the one prefix), its detail (the counts), and the
  * `/spaces` rows (which say what each space holds).
  */
-function invalidateSpaceContents(
+export function invalidateSpaceContents(
   queryClient: QueryClient,
   spaceUuid: string,
 ): Promise<unknown> {

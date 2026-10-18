@@ -580,10 +580,9 @@ function PushedCentre({
       <RouteContext
         title={slot.kind === 'fixed' ? slot.text : title}
         confidential={false}
-        // A fixed title is known before the first paint and never shimmers; a
-        // published one is genuinely late, so it gets the title-shaped skeleton
-        // rather than an empty centre that pops.
-        expectsContext={slot.kind === 'published'}
+        // A fixed title is known before the first paint; a scrolled one is the
+        // page heading's while that heading is on screen. Neither shimmers.
+        expectsContext={false}
       />
     </div>
   );

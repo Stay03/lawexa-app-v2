@@ -32,9 +32,9 @@ import type { BackReach } from '@/v2/runtime/back-to';
  * Two things, and only two:
  *
  *  1. The TITLE, where it is a fact about the data (a folder's name). That is
- *     {@link PushedTitle} kind `published`: the screen publishes it through
- *     `header-context.ts` exactly as it always did, and the bar draws it
- *     skeleton-first.
+ *     {@link PushedTitle} kind `scrolled`: the page prints it as its heading,
+ *     and the screen publishes it through `header-context.ts` only once that
+ *     heading has scrolled away.
  *  2. The PARENT, where the reader came from a place the address does not name
  *     (a folder nested in another folder; a draft note that lives only in the
  *     My notes tab). That is `screen-context.ts`, which OVERRIDES the default
@@ -62,9 +62,15 @@ import type { BackReach } from '@/v2/runtime/back-to';
 export type PushedTitle =
   /** The address knows the title. A screen name, never a record's name. */
   | { kind: 'fixed'; text: string }
-  /** A fact about the DATA. The screen publishes it (`header-context.ts`) and
-   *  the bar shimmers a title-shaped bar until it lands. */
-  | { kind: 'published' }
+  /**
+   * A fact about the DATA that the PAGE prints as its heading at every width
+   * (a folder's name, Arthur, 17 October 2026, item 7: "make it clear on the
+   * page which folder you're in"). The bar stays empty while the heading is on
+   * screen and shows the name once it has scrolled away, as a Space's does;
+   * the screen publishes it only then. No shimmer: an empty centre here is
+   * the page's heading doing the job, not a title still loading.
+   */
+  | { kind: 'scrolled' }
   /**
    * NOTHING, deliberately.
    *
@@ -85,7 +91,7 @@ export type PushedTitle =
 
 /** Frozen singletons, so a table entry never mints a new object per call. */
 const NO_TITLE: PushedTitle = { kind: 'none' };
-const PUBLISHED_TITLE: PushedTitle = { kind: 'published' };
+const SCROLLED_TITLE: PushedTitle = { kind: 'scrolled' };
 
 function fixed(text: string): PushedTitle {
   return { kind: 'fixed', text };
@@ -206,14 +212,15 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       return null;
 
     case 'folders':
-      // The name is the folder's own, so the screen publishes it. The ADDRESS
-      // is overridden too when the folder is nested (see `FolderScreen`): the
-      // library is the right default and the parent folder is the right answer.
+      // The name is the folder's own heading on the page, and the bar shows it
+      // once that heading scrolls away (`FolderScreen`). The ADDRESS is
+      // overridden too when the folder is nested: the library is the right
+      // default and the parent folder is the right answer.
       if (depth === 2) {
         return {
           backHref: '/folders',
           backLabel: 'Back to folders',
-          title: PUBLISHED_TITLE,
+          title: SCROLLED_TITLE,
         };
       }
       return null;

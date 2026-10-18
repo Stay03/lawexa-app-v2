@@ -129,17 +129,17 @@ export function FolderDetailSkeleton({
 } = {}) {
   return (
     <div aria-hidden className="flex flex-col">
-      {/* THE SILHOUETTE FOLLOWS THE LIVE HEADER, WHICH LOST TWO THINGS ON A
-          PHONE (phase 7): the trail is `sm:` and up (the shell's bar carries the
-          way back below it), the name is `md:` and up (the bar carries it), and
-          the kebab has gone entirely — Rename and Delete are published to the
-          bar's one menu. Reserving any of the three here would have left the
-          rows below them jumping at the hand-off. */}
+      {/* THE SILHOUETTE FOLLOWS THE LIVE HEADER: the trail is `sm:` and up
+          (the shell's bar carries the way back below it), the name is drawn at
+          every width (item 7, 17 October 2026), and the kebab has gone
+          entirely — Rename and Delete are published to the bar's one menu.
+          Reserving anything else here would leave the rows below jumping at
+          the hand-off. */}
       <Skeleton className="hidden h-4 w-40 rounded sm:block" />
       <div className="flex items-start gap-3 sm:mt-4">
         {tile ?? <Skeleton className="size-11 shrink-0 rounded-xl" />}
         <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-          {name ?? <Skeleton className="hidden h-6 w-3/5 rounded md:block" />}
+          {name ?? <Skeleton className="h-6 w-3/5 rounded" />}
           <Skeleton className="h-3.5 w-40 rounded" />
         </div>
       </div>
@@ -338,18 +338,29 @@ export function SubfolderGapNote({
  * Empty — tab-aware, because "this folder is empty" and "there are no statutes
  * in it" are different facts that want different ways forward.
  *
- * THE EMPTY-FOLDER COPY NAMES WHERE FILING HAPPENS. Nothing is added from this
- * page: a case, a statute or a note is filed from the DOCUMENT, with the "Add
- * to folder" control beside its bookmark star. Saying so is the difference
- * between an empty screen and an instruction.
+ * THE EMPTY FOLDER SAYS ANYTHING CAN GO IN, AND STARTS IT FROM HERE (Arthur,
+ * 17 October 2026, item 9: "Browse cases" was too narrow, and sent the reader
+ * out of the space to file things). Its creator gets the folder's own ways in
+ * as buttons (`FolderAddButtons`, passed in by the screen so this file, which
+ * the loading frame imports, carries none of the upload code); a case, a
+ * statute or a note is still filed
+ * from its page, with "Add to folder" beside its bookmark star, until the
+ * library picker lands. Anyone else is told who adds, with no button, since
+ * the server refuses them.
  */
 export function FolderEmptyState({
   tab,
   onShowAll,
+  add,
+  inSpace,
 }: {
   tab: FolderItemTab;
   /** Offered on a filtered tab only — the way back to the whole folder. */
   onShowAll?: () => void;
+  /** The folder's ways in as buttons, for its creator; `null` for anyone else. */
+  add: ReactNode | null;
+  /** The folder is in a space: its files are one of the ways in. */
+  inSpace: boolean;
 }) {
   if (tab !== 'all') {
     const noun = FOLDER_ITEM_NOUN[tab];
@@ -369,16 +380,17 @@ export function FolderEmptyState({
     );
   }
 
+  const files = inSpace ? 'Files from this space, uploads' : 'Uploads';
   return (
     <PageState
       icon={FolderOpen}
-      title="Nothing filed here yet"
-      description="Open a case, a statute or a note and choose “Add to folder” to file it here."
-      action={
-        <Button asChild variant="outline" size="sm">
-          <Link href="/cases">Browse cases</Link>
-        </Button>
+      title="Nothing in this folder yet"
+      description={
+        add
+          ? `Anything can go in a folder. ${files} and subfolders start here; for a case, a statute or a note, open it and choose “Add to folder”.`
+          : 'Anything can go in a folder. Only the person who made it adds to it.'
       }
+      action={add ?? undefined}
     />
   );
 }
