@@ -73,18 +73,20 @@ export const statutesQueries = {
    * preserves loaded pages (and therefore scroll position) across an
    * intra-session detour into a statute and back.
    *
-   * A TO Z BY DEFAULT (Stay, 18 October 2026). The API orders a list by title
-   * only when it is asked (`sort=title`; without it, newest first), so the
-   * default is set here, in the key: the RSC prefetch reads its request off
-   * this key, and the server and the client stay one query.
+   * A TO Z BY DEFAULT, BUT NOT FOR A SEARCH (Stay, 18 October 2026). The API
+   * orders a list by title only when it is asked (`sort=title`; without it,
+   * newest first). A search is ranked by the server (the named Act first,
+   * c236acb4), and an explicit sort overrides that ranking, so a search sends
+   * no sort unless its caller names one. The default is set here, in the key:
+   * the RSC prefetch reads its request off this key, and the server and the
+   * client stay one query.
    */
   infiniteList: ({
     viewerId,
-    sort = 'title',
-    order = 'asc',
     ...rest
   }: Omit<StatuteListParams, 'page' | 'per_page'> & ViewerScoped) => {
-    const params = { ...rest, sort, order };
+    const params =
+      rest.search || rest.sort ? rest : { ...rest, sort: 'title' as const, order: 'asc' as const };
     return infiniteQueryOptions({
       meta: { persist: 'list' },
       queryKey: [
