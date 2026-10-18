@@ -50,8 +50,10 @@ test('the ⋮ is the vertical dots, named for its file', () => {
 
 test('the list holds one card, keeps its file while it closes, and gives it the row rules', () => {
   const source = panel();
-  assert.match(source, /const \[card, setCard\] = useState<\{ file: SpaceFile; row: HTMLElement; open: boolean \} \| null>\(null\);/);
-  assert.match(source, /const openFile = useCallback\(\(file: SpaceFile, row: HTMLElement\) => setCard\(\{ file, row, open: true \}\), \[\]\);/);
+  assert.match(source, /useState<\{ file: SpaceFile; row: HTMLElement; bottomClearance: number; open: boolean \} \| null>\(\s*null,\s*\)/);
+  assert.match(source, /setCard\(\{ file, row, bottomClearance, open: true \}\);/);
+  // The card keeps clear of the space's floating message box (measured at the tap).
+  assert.match(source, /document\.querySelector\('\[data-space-chat-dock\]'\)/);
   assert.match(source, /anchor=\{card\?\.row \?\? null\}/);
   assert.match(source, /onOpenChange=\{\(open\) => setCard\(\(previous\) => \(previous \? \{ \.\.\.previous, open \} : previous\)\)\}/);
   assert.match(source, /actions=\{card \? fileActions\(card\.file\) : \{\}\}/);
@@ -73,6 +75,8 @@ test('on a computer the card hangs from the tapped row: 22rem, no overlay, one f
   assert.match(source, /<PopoverAnchor virtualRef=\{anchorRef\} \/>/);
   assert.match(source, /side="bottom"\s+align="start"/);
   assert.match(source, /w-\[22rem\]/);
+  assert.match(source, /collisionPadding=\{\{ top: 16, right: 16, bottom: bottomClearance, left: 16 \}\}/);
+  assert.match(read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileMenu.tsx'), /<DropdownMenuContent align="end" collisionPadding=\{16\}>/);
   // The phone keeps the sheet; a popover has no overlay.
   assert.match(source, /<SheetContent\s+side="bottom"/);
   assert.doesNotMatch(source, /SheetOverlay|PopoverOverlay/);

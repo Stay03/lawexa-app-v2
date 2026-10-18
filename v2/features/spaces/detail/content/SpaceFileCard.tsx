@@ -28,8 +28,9 @@ import { useCardBreakpoint } from './use-card-breakpoint';
  * bottom sheet. From `md` up the sheet was a white band across the whole window
  * over a dimmed, blurred app ("horrible on web"), so there it is a small card
  * under the tapped row: 22rem, no overlay, the list still readable. It flips
- * above the row when the row is near the window's bottom (the popover's own
- * collision handling), and the ⋮'s menu keeps itself on screen the same way.
+ * above the row when the room under it, short of the space's floating message
+ * box (`bottomClearance`), is too small (the popover's own collision
+ * handling), and the ⋮'s menu keeps 16px off the window's edges.
  * Esc or a click outside closes it. Only one frame is in the tree at a time
  * (`useCardBreakpoint`).
  *
@@ -48,6 +49,7 @@ import { useCardBreakpoint } from './use-card-breakpoint';
 export function SpaceFileCard({
   file,
   anchor,
+  bottomClearance,
   open,
   onOpenChange,
   actions,
@@ -56,6 +58,8 @@ export function SpaceFileCard({
   file: SpaceFile | null;
   /** The row that was tapped: the small card hangs from it on a computer. */
   anchor: HTMLElement | null;
+  /** Px the small card keeps clear above the window's bottom (the space's message box). */
+  bottomClearance: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** What this reader may do to it (the feed's own rules). */
@@ -77,7 +81,7 @@ export function SpaceFileCard({
           side="bottom"
           align="start"
           sideOffset={6}
-          collisionPadding={16}
+          collisionPadding={{ top: 16, right: 16, bottom: bottomClearance, left: 16 }}
           aria-label={file ? `File: ${file.original_name}` : undefined}
           className="w-[22rem] max-w-[calc(100vw-2rem)] gap-0 overflow-hidden rounded-2xl p-0"
         >

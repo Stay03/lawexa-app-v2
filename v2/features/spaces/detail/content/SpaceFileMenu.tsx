@@ -48,7 +48,8 @@ export function SpaceFileMenu({
       >
         <MoreVertical aria-hidden className="size-4" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      {/* 16px off the window's edges, so the last row is never cut at the bottom. */}
+      <DropdownMenuContent align="end" collisionPadding={16}>
         {/* A copy the reader keeps, separate from the space's file (Stay,
             15 October 2026: a space file belongs to the space). */}
         {onCopyToMine ? (

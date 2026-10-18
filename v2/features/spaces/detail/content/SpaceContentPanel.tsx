@@ -447,8 +447,17 @@ function SpaceFeed({
   });
   // The one card of this list: the file it shows stays while it closes, so its
   // exit plays over the same text.
-  const [card, setCard] = useState<{ file: SpaceFile; row: HTMLElement; open: boolean } | null>(null);
-  const openFile = useCallback((file: SpaceFile, row: HTMLElement) => setCard({ file, row, open: true }), []);
+  // The room the card keeps clear at the window's bottom: the space's own
+  // message box floats there, and the card flips above its row rather than
+  // cover it. Read at the tap (an event, not a render).
+  const [card, setCard] = useState<{ file: SpaceFile; row: HTMLElement; bottomClearance: number; open: boolean } | null>(
+    null,
+  );
+  const openFile = useCallback((file: SpaceFile, row: HTMLElement) => {
+    const dock = document.querySelector('[data-space-chat-dock]');
+    const bottomClearance = dock ? Math.max(16, Math.round(window.innerHeight - dock.getBoundingClientRect().top) + 8) : 16;
+    setCard({ file, row, bottomClearance, open: true });
+  }, []);
   // The feed cut into days, newest first.
   const days = useMemo(() => {
     const groups: { label: string; entries: SpaceItem[] }[] = [];
@@ -520,6 +529,7 @@ function SpaceFeed({
       <SpaceFileCard
         file={card?.file ?? null}
         anchor={card?.row ?? null}
+        bottomClearance={card?.bottomClearance ?? 16}
         open={card?.open ?? false}
         onOpenChange={(open) => setCard((previous) => (previous ? { ...previous, open } : previous))}
         actions={card ? fileActions(card.file) : {}}
