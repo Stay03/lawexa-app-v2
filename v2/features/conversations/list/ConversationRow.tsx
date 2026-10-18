@@ -247,7 +247,7 @@ const MENU_ICONS: Readonly<Record<ConversationMenuItem, typeof Trash2>> = {
 
 /** The row's actions menu. The trigger is `FolderActionsMenu`'s, so every v2
  *  list row's menu looks and behaves the same. Delete is last, below a rule. */
-export function ConversationRowMenu({
+function ConversationRowMenu({
   title,
   actions,
 }: {

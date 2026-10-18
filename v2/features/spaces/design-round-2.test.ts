@@ -120,7 +120,7 @@ test('the file row body is the open control, at least 44px tall', () => {
   assert.match(file, /This file is no longer available\./);
   // The menu is the right column, a sibling of the body, never inside it.
   assert.match(file, /menu: <SpaceFileMenu file=\{file\} \{\.\.\.menus\.file\(file\)\} \/>,/);
-  assert.match(rows, /\{render\(BODY, content\)\}\s*\{\/\*[^*]*\*\/\}\s*<span className="flex size-9 shrink-0 items-center justify-center">/);
+  assert.match(rows, /\{render\(BODY, content\)\}\s*\{\/\*[^*]*\*\/\}\s*\{line\.menu \? <span className="flex size-9 shrink-0 items-center justify-center">\{line\.menu\}<\/span> : null\}/);
   // The failure line, with its own Try again button, sits under the row,
   // outside the body.
   assert.match(file, /note: gone \? \([\s\S]*?Couldn&rsquo;t open it\.[\s\S]*?Try again/);

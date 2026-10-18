@@ -132,11 +132,11 @@ test('the home: a Viewer sees no add control, only the space Owner sees Remove f
   assert.match(panel, /\{access\.canAdd && tab !== 'people' \? \(\s*<FileDropZone/);
   // Remove from space on the folder and file rows, for the space's Owner
   // only; a chat's row follows its `can` (the shared conversation menu).
-  assert.equal(panel.match(/onRemoveFromSpace: canRemove \?/g)?.length, 2);
-  assert.match(panel, /conversation: menu\.actionsFor,/);
-  assert.match(read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx'), /const actions = menus\.conversation\(conversation\);/);
+  // Since 18 October 2026 only a file row has a menu (Stay: no row dots);
+  // a chat's and a folder's actions are in their own page's ⋮.
+  assert.equal(panel.match(/onRemoveFromSpace: canRemove \?/g)?.length, 1);
+  assert.doesNotMatch(read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx'), /menus\.conversation|menus\.folder\(/);
   // Move on the folder and file rows, for the item's owner only.
-  assert.match(panel, /onMove: ownsItem\(entry\.item\.user\?\.id, viewerId\) \? moveFolder : undefined/);
   assert.match(panel, /onMove: ownsItem\(file\.uploader\.id, viewerId\) \? moveFile : undefined/);
   // The empty state hands its action on only to someone who may add.
   const states = read('v2', 'features', 'spaces', 'detail', 'content', 'states.tsx');
@@ -153,7 +153,8 @@ test('the folder and file menus carry the space rows only when the host passes t
   // Rename (with Delete) on the reader's own folders only (Arthur, 17
   // October 2026, item 6). Delete is in a file's menu since 15 October 2026
   // (a space's file belongs to the space).
-  assert.match(panel, /onRename: ownsItem\(entry\.item\.user\?\.id, viewerId\) \? renameFolder : undefined,/);
+  // A folder's rename is on its page now, for its creator (FolderScreen).
+  assert.doesNotMatch(panel, /renameFolder/);
   assert.equal((panel.match(/onDelete:/g) ?? []).length, 1);
   assert.match(panel, /onCopyToMine: copyFile,\s*onDelete: canDeleteSpaceFile\(/);
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');

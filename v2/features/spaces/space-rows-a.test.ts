@@ -26,13 +26,18 @@ test('every kind is one row: a plain icon, the name and time, one fact under the
   assert.doesNotMatch(source, /FolderTile|FileMark|rounded-lg bg-secondary/);
 });
 
-test('a folder in a space: rename for its owner, and the move reads "Change space" (item 6)', () => {
-  assert.match(rows(), /moveLabel="Change space"/);
-  const menu = read('v2', 'features', 'folders', 'FolderActionsMenu.tsx');
-  assert.match(menu, /moveLabel = 'Move to space',/);
-  assert.match(menu, /<Boxes \/>\s*\{moveLabel\}/);
-  const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /intent=\{\{ mode: 'rename', folder: \{ uuid: renaming\.uuid, name: renaming\.name \} \}\}/);
+test('a folder in a space: its page ⋮ holds what its row did (item 6; Stay, 18 October 2026)', () => {
+  const page = read('v2', 'features', 'folders', 'detail', 'FolderScreen.tsx');
+  // Rename and Delete for the folder's creator only; the move reads "Change
+  // space" for a folder in a space; Remove from space for the space's Owner.
+  assert.match(page, /const ownerActions: ScreenAction\[\] = owned\s*\?/);
+  assert.match(page, /label: folder\.space \? 'Change space' : 'Move to space',/);
+  assert.match(page, /folder\.space && ownsSpace\s*\?\s*\[\s*\{\s*id: 'remove-from-space',/);
+  assert.match(page, /const ownsSpace = spaceDetail !== null && canRemoveFromSpace\(spaceDetail\);/);
+  assert.match(page, /const deleteAction: ScreenAction\[\] = owned\s*\?/);
+  assert.match(page, /<RemoveFromSpaceDialog\s+key=\{`remove-\$\{removing\.key\}`\}/);
+  // The row has no menu any more.
+  assert.doesNotMatch(rows(), /FolderActionsMenu/);
   // A rename or delete shows in the space's list at once: the space reads are
   // marked stale with the folder reads.
   const mutations = read('v2', 'features', 'folders', 'folder-mutations.ts');

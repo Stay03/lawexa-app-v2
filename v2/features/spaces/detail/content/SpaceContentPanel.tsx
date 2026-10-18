@@ -25,9 +25,8 @@ import {
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { ACCEPTED_FILE_TYPES } from '@/v2/features/conversations/attachment-rules';
-import { useConversationMenu } from '@/v2/features/conversations/list/use-conversation-menu';
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
-import { folderRow, type FolderRowModel } from '@/v2/features/folders/folder-row-model';
+import { folderRow } from '@/v2/features/folders/folder-row-model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { HomeComposerHandle } from '@/v2/shell/designs/HomeComposer';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -98,9 +97,9 @@ import {
  * The feed is newest first (`sort_at`), so the list is cut into days with the
  * transcript's day words (`formatDayLabel`). Every kind is the same row
  * (`feed-rows`, version A, Stay, 17 October 2026, 22:19 UTC). A folder opens
- * its own page. Every row keeps the menu it had in the tabs
- * (`useConversationMenu`; move, remove, copy and delete for a file; rename,
- * change space and remove for a folder), as each role allows.
+ * its own page. No chat or folder row has a menu (Stay, 18 October 2026):
+ * their actions are in their own page's ⋮. A file row keeps its menu (move,
+ * remove, copy and delete, as each role allows) until a file has a page.
  *
  * ── PAGING ─────────────────────────────────────────────────────────────────
  * The feed is cursor-paged; the next page loads 320px before the end of the
@@ -384,42 +383,24 @@ function SpaceFeed({
   const [now] = useState(() => Date.now());
   const { openMove, openRemove, dialogs } = useItemDialogs(access);
 
-  // The "…" menu of each conversation: the items its `can` allows (rename,
-  // move, remove, share, delete), with the same dialogs as the conversations
-  // list.
-  const menu = useConversationMenu({ viewerId, place: { uuid: spaceUuid, name: spaceName } });
-
+  // No chat or folder row has a menu (Stay, 18 October 2026): their actions
+  // live in the ⋮ of the chat's page and the folder's page. A file has no page
+  // yet, so its row keeps its menu, and the dialogs it opens stay here.
   const targetOf = useCallback(
-    (entry: { type: 'folder'; uuid: string; name: string } | { type: 'file'; id: number; name: string }): SpaceItemTarget =>
-      entry.type === 'folder'
-        ? { type: 'folder', id: entry.uuid, name: entry.name, space: { uuid: spaceUuid, name: spaceName } }
-        : { type: 'file', id: entry.id, name: entry.name, space: { uuid: spaceUuid, name: spaceName } },
+    (file: { id: number; name: string }): SpaceItemTarget => ({
+      type: 'file',
+      id: file.id,
+      name: file.name,
+      space: { uuid: spaceUuid, name: spaceName },
+    }),
     [spaceUuid, spaceName],
   );
-  // Stable across renders, so the rows' `memo` holds.
-  const moveFolder = useCallback(
-    (row: FolderRowModel) => openMove(targetOf({ type: 'folder', uuid: row.uuid, name: row.name })),
-    [openMove, targetOf],
-  );
-  // Rename (and Delete, which the menu pairs with it) for the reader's own
-  // folders only (Arthur, 17 October 2026, item 6): other members' folders are
-  // not theirs to change.
-  const [renaming, setRenaming] = useState<{ uuid: string; name: string; key: number } | null>(null);
-  const renameFolder = useCallback(
-    (row: FolderRowModel) =>
-      setRenaming((previous) => ({ uuid: row.uuid, name: row.name, key: (previous?.key ?? 0) + 1 })),
-    [],
-  );
-  const removeFolder = useCallback(
-    (row: FolderRowModel) => openRemove(targetOf({ type: 'folder', uuid: row.uuid, name: row.name })),
-    [openRemove, targetOf],
-  );
   const moveFile = useCallback(
-    (file: SpaceFile) => openMove(targetOf({ type: 'file', id: file.id, name: file.original_name })),
+    (file: SpaceFile) => openMove(targetOf({ id: file.id, name: file.original_name })),
     [openMove, targetOf],
   );
   const removeFile = useCallback(
-    (file: SpaceFile) => openRemove(targetOf({ type: 'file', id: file.id, name: file.original_name })),
+    (file: SpaceFile) => openRemove(targetOf({ id: file.id, name: file.original_name })),
     [openRemove, targetOf],
   );
 
@@ -452,12 +433,7 @@ function SpaceFeed({
     [],
   );
 
-  // What each row's menu holds for this reader, decided once per row.
-  const folderMenu = (entry: Extract<SpaceItem, { type: 'folder' }>) => ({
-    onRename: ownsItem(entry.item.user?.id, viewerId) ? renameFolder : undefined,
-    onMove: ownsItem(entry.item.user?.id, viewerId) ? moveFolder : undefined,
-    onRemoveFromSpace: canRemove ? removeFolder : undefined,
-  });
+  // What a file row's menu holds for this reader.
   const fileMenu = (file: SpaceFile) => ({
     onMove: ownsItem(file.uploader.id, viewerId) ? moveFile : undefined,
     onRemoveFromSpace: canRemove ? removeFile : undefined,
@@ -479,8 +455,6 @@ function SpaceFeed({
   }, [items]);
 
   const rowMenus: FeedRowMenus = {
-    conversation: menu.actionsFor,
-    folder: folderMenu,
     file: fileMenu,
     folderRow: (entry) => folderRow(entry.item),
     byline: (item) => lastMessageLine(item.last_message, viewerUuid) ?? 'No messages yet',
@@ -536,18 +510,7 @@ function SpaceFeed({
         </div>
       </PagedContent>
 
-      {menu.dialogs}
       {dialogs}
-      {renaming ? (
-        <FolderNameDialog
-          key={`rename-${renaming.key}`}
-          open
-          onOpenChange={(open) => {
-            if (!open) setRenaming(null);
-          }}
-          intent={{ mode: 'rename', folder: { uuid: renaming.uuid, name: renaming.name } }}
-        />
-      ) : null}
       {deleting ? (
         <DeleteSpaceFileDialog
           key={`delete-${deleting.key}`}

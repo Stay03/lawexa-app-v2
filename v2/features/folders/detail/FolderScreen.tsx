@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Boxes, Pencil, Trash2 } from 'lucide-react';
+import { Boxes, FolderOutput, Pencil, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,9 @@ import { useFolderPeek } from '../folder-peek';
 import './folder-arrive.css';
 import { FolderNameDialog } from '../FolderNameDialog';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
+import { canRemoveFromSpace } from '@/v2/features/spaces/content-model';
+import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { FolderRow } from '../list/FolderRow';
 import { FoldersSignedOutState } from '../list/states';
 import { FolderBreadcrumb } from './FolderBreadcrumb';
@@ -322,6 +325,13 @@ function FolderBody({ uuid }: { uuid: string }) {
    * space can open another member's folder here, and moving it is not theirs
    * to do, so the row waits for `folder.user` to name the viewer.
    *
+   * THIS MENU IS THE FOLDER'S ONE MENU NOW (Stay, 18 October 2026: no "…" on a
+   * space's rows; each item's actions live in its own page's ⋮). So it holds
+   * everything the space row's menu did, by the same rules: Rename and Delete
+   * for the folder's creator only (another member of the space was offered
+   * both and refused with a 403), the move worded "Change space" for a folder
+   * in a space, and "Remove from space" for the space's Owner.
+   *
    * THE WAY BACK IS PUBLISHED WITH THEM, because a nested folder's parent is a
    * fact about the payload and not about the address. `null` until the folder
    * lands, which leaves the route default (`/folders`) standing rather than
@@ -339,6 +349,17 @@ function FolderBody({ uuid }: { uuid: string }) {
     [parentFolder],
   );
   const deleteFolder = useDeleteFolderWithUndo();
+  // The space a folder sits in, for whether this reader is its Owner (who may
+  // take any folder out of it). The folder's own `space` block names it only.
+  const folderSpace = folder?.space ?? null;
+  const spaceQuery = useQuery({
+    ...spacesQueries.detail(folderSpace?.uuid ?? '', { viewerId }),
+    enabled: signedIn && folderSpace !== null,
+  });
+  const spaceDetail = folderSpace ? (spaceQuery.data?.data ?? null) : null;
+  const ownsSpace = spaceDetail !== null && canRemoveFromSpace(spaceDetail);
+  // Remove from space, held after closing so the dialog's exit plays.
+  const [removing, setRemoving] = useState({ open: false, key: 0 });
   // Only the folder's creator may add to it (`FolderService::canEdit`); a
   // member of the folder's space who did not make it is refused with a 403.
   const canAdd = viewerId !== null && folder?.user?.id === viewerId;
@@ -359,38 +380,52 @@ function FolderBody({ uuid }: { uuid: string }) {
     // empty field to type into rather than the words "Untitled folder".
     const editableName = headerRow.hasName ? headerRow.name : '';
     const owned = viewerId !== null && folder.user?.id === viewerId;
-    return [
-      {
-        id: 'rename',
-        label: 'Rename',
-        icon: Pencil,
-        onSelect: () =>
-          setRenameTarget({ uuid: target.uuid, name: editableName }),
-      },
-      ...(owned
+    const ownerActions: ScreenAction[] = owned
+      ? [
+          {
+            id: 'rename',
+            label: 'Rename',
+            icon: Pencil,
+            onSelect: () => setRenameTarget({ uuid: target.uuid, name: editableName }),
+          },
+          {
+            id: 'move-to-space',
+            // A folder already in a space changes space (Arthur, item 6).
+            label: folder.space ? 'Change space' : 'Move to space',
+            icon: Boxes,
+            onSelect: () => setMove((previous) => ({ open: true, key: previous.key + 1 })),
+          },
+        ]
+      : [];
+    const spaceActions: ScreenAction[] =
+      folder.space && ownsSpace
         ? [
             {
-              id: 'move-to-space',
-              label: 'Move to space',
-              icon: Boxes,
-              onSelect: () => setMove((previous) => ({ open: true, key: previous.key + 1 })),
+              id: 'remove-from-space',
+              label: 'Remove from space',
+              icon: FolderOutput,
+              onSelect: () => setRemoving((previous) => ({ open: true, key: previous.key + 1 })),
             },
           ]
-        : []),
-      {
-        id: 'delete',
-        label: 'Delete folder',
-        icon: Trash2,
-        destructive: true,
-        onSelect: () => {
-          deleteFolder(target);
-          // The route is about to stop existing, so go up one level — to the
-          // parent when there is one, otherwise to the library.
-          router.push(parentFolder ? folderHref(parentFolder.uuid) : '/folders');
-        },
-      },
-    ];
-  }, [folder, headerRow, parentFolder, deleteFolder, router, viewerId]);
+        : [];
+    const deleteAction: ScreenAction[] = owned
+      ? [
+          {
+            id: 'delete',
+            label: 'Delete folder',
+            icon: Trash2,
+            destructive: true,
+            onSelect: () => {
+              deleteFolder(target);
+              // The route is about to stop existing, so go up one level — to the
+              // parent when there is one, otherwise to the library.
+              router.push(parentFolder ? folderHref(parentFolder.uuid) : '/folders');
+            },
+          },
+        ]
+      : [];
+    return [...ownerActions, ...spaceActions, ...deleteAction];
+  }, [folder, headerRow, parentFolder, deleteFolder, router, viewerId, ownsSpace]);
 
   useEffect(() => {
     setScreenContext({ pathname, back, actions });
@@ -753,6 +788,16 @@ function FolderBody({ uuid }: { uuid: string }) {
           onOpenChange={(open) => setSpaceFiles((previous) => ({ ...previous, open }))}
           folder={{ uuid: folder.uuid, name: row.name, space }}
           space={space}
+        />
+      ) : null}
+      {removing.key > 0 && folder.space ? (
+        <RemoveFromSpaceDialog
+          key={`remove-${removing.key}`}
+          spaceUuid={folder.space.uuid}
+          spaceName={folder.space.name}
+          item={{ type: 'folder', id: folder.uuid, name: row.name, space: folder.space }}
+          open={removing.open}
+          onOpenChange={(open) => setRemoving((previous) => ({ ...previous, open }))}
         />
       ) : null}
       {move.key > 0 ? (

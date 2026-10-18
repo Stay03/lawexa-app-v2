@@ -215,7 +215,7 @@ test('the content feed: its own key under spaces, read-only rows', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   // Rename on the reader's own folders only (Arthur, 17 October 2026, item
   // 6). Delete is in a file's menu since 15 October 2026.
-  assert.equal((panel.match(/onRename: ownsItem\(/g) ?? []).length, 1);
+  assert.doesNotMatch(panel, /onRename/);
   assert.equal((panel.match(/onDelete:/g) ?? []).length, 1);
   assert.match(panel, /onCopyToMine: copyFile,\s*onDelete: /);
   assert.doesNotMatch(panel, /FilesTab/);

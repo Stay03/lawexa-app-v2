@@ -40,10 +40,6 @@ import { useDeleteFolderWithUndo, type DeletableFolder } from './folder-mutation
  * host's dialogs. Rename and Delete are the owner's pair and appear together,
  * exactly when the host passes `onRename`: a space's tab lists other members'
  * folders, and renaming or deleting those is not the viewer's to do.
- *
- * Inside a space the move reads "Change space" (`moveLabel`; Arthur, 17
- * October 2026, item 6): "Move to space" read oddly for a folder already in
- * one. The Folders library keeps its own wording.
  */
 export function FolderActionsMenu({
   folder,
@@ -51,7 +47,6 @@ export function FolderActionsMenu({
   onMove,
   onRemoveFromSpace,
   onDeleted,
-  moveLabel = 'Move to space',
   className,
 }: {
   folder: DeletableFolder;
@@ -64,8 +59,6 @@ export function FolderActionsMenu({
   /** Where to go once the delete is queued — the folder page's route is about
    *  to stop existing. Omitted on the list, which simply loses a row. */
   onDeleted?: () => void;
-  /** The move's words: "Change space" for a folder shown inside a space. */
-  moveLabel?: string;
   /** The trigger's classes (the row and the header sit on different baselines). */
   className?: string;
 }) {
@@ -96,7 +89,7 @@ export function FolderActionsMenu({
         {onMove ? (
           <DropdownMenuItem onSelect={onMove}>
             <Boxes />
-            {moveLabel}
+            Move to space
           </DropdownMenuItem>
         ) : null}
         {onRemoveFromSpace ? (

@@ -86,9 +86,10 @@ test('the lists, the space home and the header all build the menu from `can`', (
   const list = read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx');
   assert.match(list, /const menu = useConversationMenu\(\{/);
   assert.match(list, /\{menu\.dialogs\}/);
+  // A space's list draws no chat menu (Stay, 18 October 2026): a chat's
+  // actions are in its page's ⋮, built below from the same `can`.
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  assert.match(panel, /useConversationMenu\(\{\s*viewerId,\s*place: \{ uuid: spaceUuid, name: spaceName \},?\s*\}\)/);
-  assert.match(panel, /\{menu\.dialogs\}/);
+  assert.doesNotMatch(panel, /useConversationMenu/);
   const header = read('v2', 'features', 'conversations', 'conversation', 'ConversationActions.tsx');
   assert.match(header, /conversationMenuItems\(detail\.can, detail\.space != null\)/);
   assert.match(header, /route=\{conversationRemoveRoute\(detail\.user_id, viewerId\)\}/);

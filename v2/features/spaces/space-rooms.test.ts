@@ -64,11 +64,13 @@ test('the home asks for rooms by the rail’s own rule, and draws them in the fe
   assert.equal(rooms.match(/mentions: grammar\.mentions,/g)?.length, 2);
 });
 
-test('every row has one right column of the same width, and rooms keep it empty', () => {
+test('no row has a menu column but a file’s, so rows end at one edge (Stay, 18 October 2026)', () => {
   const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
-  // The "…" menu, or an empty 36px column, so every row's time and count end
-  // at the same edge (version A; Stay, 18 October 2026, after WhatsApp).
-  assert.match(rows, /<span className="flex size-9 shrink-0 items-center justify-center">\{line\.menu \?\? null\}<\/span>/);
+  // Only a row with a menu draws the 36px column, and only a file row has
+  // one until a file has a page; every other row's time and count end at
+  // the same edge.
+  assert.match(rows, /\{line\.menu \? <span className="flex size-9 shrink-0 items-center justify-center">\{line\.menu\}<\/span> : null\}/);
+  assert.doesNotMatch(rows, /FolderActionsMenu|ConversationRowMenu/);
   // A thread's status: the dot and the word, after its name.
   assert.match(rows, /<ThreadStatusDot value=\{status\.value\} \/>\s*<span className="truncate">\{threadStatusLabel\(status\.value\)\}<\/span>/);
   assert.match(rows, /status: <ThreadStatus thread=\{thread\} \/>,/);

@@ -28,11 +28,6 @@ import {
 import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { ThreadStatusDot } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { lastActivityAt } from '@/v2/features/conversations/activity';
-import {
-  ConversationRowMenu,
-  type ConversationMenuAction,
-} from '@/v2/features/conversations/list/ConversationRow';
-import { FolderActionsMenu } from '@/v2/features/folders/FolderActionsMenu';
 import { rememberFolderPeek } from '@/v2/features/folders/folder-peek';
 import { folderCountsLabel, type FolderRowModel } from '@/v2/features/folders/folder-row-model';
 import { CountBadge, FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
@@ -56,22 +51,19 @@ import { SpaceFileMenu } from './SpaceFileMenu';
  * word after its name, and a channel's thread counts sit there too, so line 2
  * is free for what was last said.
  *
- * ONE RIGHT COLUMN OF THE SAME WIDTH ON EVERY ROW, for the "…" of a chat, a
- * file or a folder. A room has no menu and keeps the column empty, so every
- * row's time and count end at the same edge.
+ * NO "…" ON A ROW (Stay, 18 October 2026, 10:46 UTC: the dots on the right
+ * "create lack of uniformity"; the options belong in "the three dots on top
+ * right of each page"). A chat's actions are in its page's ⋮, a folder's in
+ * the folder page's, so every row's time and count end at the same edge. A
+ * file has no page yet, so its row keeps its "…" until Stay picks where a
+ * file's actions live; only a row with a menu draws the column.
  *
  * A folder's time sits on its name line with its counts under it, one unit
  * like every other row (Arthur, 17 October 2026, item 5).
  */
 
-/** What each row's menu holds, decided by the feed (the live rows' own rules). */
+/** What the feed decides for its rows: a file's menu, a folder's model, a chat's byline. */
 export interface FeedRowMenus {
-  conversation: (item: ConversationListItem) => readonly ConversationMenuAction[];
-  folder: (entry: Extract<SpaceItem, { type: 'folder' }>) => {
-    onRename?: (row: FolderRowModel) => void;
-    onMove?: (row: FolderRowModel) => void;
-    onRemoveFromSpace?: (row: FolderRowModel) => void;
-  };
   file: (file: SpaceFile) => {
     onMove?: (file: SpaceFile) => void;
     onRemoveFromSpace?: (file: SpaceFile) => void;
@@ -169,8 +161,8 @@ function Line({
     <li>
       <div className="flex min-w-0 items-center gap-1">
         {render(BODY, content)}
-        {/* The one right column: the "…" menu, or empty on a room. */}
-        <span className="flex size-9 shrink-0 items-center justify-center">{line.menu ?? null}</span>
+        {/* A file's "…" while files have no page of their own; no other row has one. */}
+        {line.menu ? <span className="flex size-9 shrink-0 items-center justify-center">{line.menu}</span> : null}
       </div>
       {/* Indented to the name: the body's px-3, the 20px icon and its gap-3. */}
       {line.note ? <div className="pb-1 pl-11 text-[11px] text-muted-foreground">{line.note}</div> : null}
@@ -290,7 +282,6 @@ export function renderFeedRow({
     case 'conversation': {
       const conversation = entry.item;
       const title = stripPastedTags(conversation.title);
-      const actions = menus.conversation(conversation);
       return (
         <Line
           key={key}
@@ -299,7 +290,6 @@ export function renderFeedRow({
             title,
             meta: conversation.is_confidential ? 'Confidential' : menus.byline(conversation),
             time: formatRelativeTime(lastActivityAt(conversation), now),
-            menu: actions.length > 0 && !conversation.is_confidential ? <ConversationRowMenu title={title} actions={actions} /> : null,
           }}
           render={(className, content) => (
             <MoveFirstLink
@@ -320,7 +310,6 @@ export function renderFeedRow({
       return <FeedFileRow key={key} file={entry.item} now={now} menus={menus} />;
     case 'folder': {
       const row = menus.folderRow(entry);
-      const { onRename, onMove, onRemoveFromSpace } = menus.folder(entry);
       return (
         <Line
           key={key}
@@ -330,16 +319,6 @@ export function renderFeedRow({
             quiet: !row.hasName,
             meta: folderCountsLabel(row.itemsCount, row.childrenCount),
             time: formatRelativeTime(row.trailAt, now),
-            menu:
-              onRename || onMove || onRemoveFromSpace ? (
-                <FolderActionsMenu
-                  folder={{ uuid: row.uuid, name: row.name, itemsCount: row.itemsCount, childrenCount: row.childrenCount }}
-                  onRename={onRename ? () => onRename(row) : undefined}
-                  onMove={onMove ? () => onMove(row) : undefined}
-                  onRemoveFromSpace={onRemoveFromSpace ? () => onRemoveFromSpace(row) : undefined}
-                  moveLabel="Change space"
-                />
-              ) : null,
           }}
           // The folder page draws this row's name at once, before any request
           // answers (`folder-peek.ts`, speed step 5).
