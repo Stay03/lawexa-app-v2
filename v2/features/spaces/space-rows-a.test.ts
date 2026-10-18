@@ -16,10 +16,10 @@ const rows = () => read('v2', 'features', 'spaces', 'detail', 'content', 'feed-r
 test('every kind is one row: a plain icon, the name and time, one fact under them', () => {
   const source = rows();
   assert.match(source, /<Icon\s+aria-hidden\s+className=\{cn\(\s*'size-5 shrink-0',/);
-  // The time sits on the name line for every kind, a folder's too (item 5).
+  // The time ends the name line for every kind, a folder's too (item 5).
   assert.match(
     source,
-    /\{line\.title\}\s*<\/span>\s*\{line\.time \? \(\s*<span className="shrink-0 text-xs tabular-nums text-muted-foreground">\{line\.time\}<\/span>/,
+    /\{line\.time \? \(\s*<span className="ml-auto shrink-0 pl-1 text-xs tabular-nums text-muted-foreground">\{line\.time\}<\/span>/,
   );
   assert.match(source, /meta: folderCountsLabel\(row\.itemsCount, row\.childrenCount\),\s*time: formatRelativeTime\(row\.trailAt, now\),/);
   // No tile behind any icon.

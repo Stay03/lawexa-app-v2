@@ -25,6 +25,7 @@ import {
   knownThreadStatus,
   threadStatusLabel,
 } from '@/v2/features/channels/thread-status-model';
+import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { ThreadStatusDot } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { lastActivityAt } from '@/v2/features/conversations/activity';
 import {
@@ -46,13 +47,18 @@ import { SpaceFileMenu } from './SpaceFileMenu';
  *
  * EVERY KIND IS THE SAME ROW. A plain icon (no tile behind it), the name and
  * the time on the first line, and one quiet fact under it: the last message of
- * a chat, a file's type, size and uploader, a folder's counts, a channel's
- * threads that need someone, a thread's status word and its channel.
+ * a chat, a channel or a thread ("Sender: text"), a file's type, size and
+ * uploader, a folder's counts.
  *
- * ONE RIGHT COLUMN OF THE SAME WIDTH ON EVERY ROW. A chat, file or folder puts
- * its "…" there; a channel or thread puts its mention count there, or leaves
- * it empty. So every row's text ends at the same edge: the empty strip Stay saw
- * beside the channel and thread rows is gone.
+ * THE TIME AND THE @YOU COUNT SHARE ONE EDGE (Stay, 18 October 2026, 01:50
+ * UTC, after WhatsApp's list: "no weird look"). The time ends line 1 and the
+ * count sits right under it, ending line 2. A thread's status is a dot and a
+ * word after its name, and a channel's thread counts sit there too, so line 2
+ * is free for what was last said.
+ *
+ * ONE RIGHT COLUMN OF THE SAME WIDTH ON EVERY ROW, for the "…" of a chat, a
+ * file or a folder. A room has no menu and keeps the column empty, so every
+ * row's time and count end at the same edge.
  *
  * A folder's time sits on its name line with its counts under it, one unit
  * like every other row (Arthur, 17 October 2026, item 5).
@@ -85,9 +91,12 @@ interface LineModel {
   strong?: boolean;
   /** Muted ink: a thread the reader does not follow, a Closed one, an unnamed folder. */
   quiet?: boolean;
+  /** After the name on line 1: a thread's status, a channel's thread counts. */
+  status?: ReactNode;
   /** The second line. */
   meta?: ReactNode;
   time: string;
+  /** The @you count, under the time. */
   mentions?: number;
   menu?: ReactNode;
   /** The icon turns: a file opening. */
@@ -111,6 +120,7 @@ function Line({
   render: (className: string, content: ReactNode) => ReactNode;
 }) {
   const Icon = line.icon;
+  const mentions = line.mentions ?? 0;
   const content = (
     <>
       <Icon
@@ -122,23 +132,34 @@ function Line({
         )}
       />
       <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-baseline gap-2">
+        <span className="flex min-w-0 items-center gap-2">
           <span
             title={line.title}
             className={cn(
-              'min-w-0 flex-1 truncate text-sm',
+              'min-w-0 truncate text-sm',
               line.strong ? 'font-semibold' : 'font-medium',
               line.quiet ? 'text-muted-foreground' : 'text-foreground',
             )}
           >
             {line.title}
           </span>
+          {line.status ? (
+            <span className="flex max-w-[55%] shrink-0 items-center text-xs text-muted-foreground">{line.status}</span>
+          ) : null}
           {line.time ? (
-            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{line.time}</span>
+            <span className="ml-auto shrink-0 pl-1 text-xs tabular-nums text-muted-foreground">{line.time}</span>
           ) : null}
         </span>
-        {line.meta ? (
-          <span className="mt-0.5 block min-w-0 truncate text-xs text-muted-foreground">{line.meta}</span>
+        {line.meta || mentions > 0 ? (
+          <span className="mt-0.5 flex min-w-0 items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{line.meta}</span>
+            {mentions > 0 ? (
+              <CountBadge
+                count={mentions}
+                label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${line.title}`}
+              />
+            ) : null}
+          </span>
         ) : null}
       </span>
     </>
@@ -148,16 +169,8 @@ function Line({
     <li>
       <div className="flex min-w-0 items-center gap-1">
         {render(BODY, content)}
-        {/* The one right column: the menu, else the mention count, else empty. */}
-        <span className="flex size-9 shrink-0 items-center justify-center">
-          {line.menu ??
-            ((line.mentions ?? 0) > 0 ? (
-              <CountBadge
-                count={line.mentions ?? 0}
-                label={`${line.mentions} unread ${line.mentions === 1 ? 'mention' : 'mentions'} in ${line.title}`}
-              />
-            ) : null)}
-        </span>
+        {/* The one right column: the "…" menu, or empty on a room. */}
+        <span className="flex size-9 shrink-0 items-center justify-center">{line.menu ?? null}</span>
       </div>
       {/* Indented to the name: the body's px-3, the 20px icon and its gap-3. */}
       {line.note ? <div className="pb-1 pl-11 text-[11px] text-muted-foreground">{line.note}</div> : null}
@@ -165,22 +178,28 @@ function Line({
   );
 }
 
-/** A thread's second line, "● Needs Action · #general". */
-function ThreadMeta({ thread }: { thread: Channel }) {
+/** A thread's status after its name, "● Working": the dot and the word. */
+function ThreadStatus({ thread }: { thread: Channel }) {
   const status = knownThreadStatus(thread.status);
-  const parent = thread.parent_channel_name?.trim();
+  if (!status) return null;
   return (
-    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
-      {status ? (
-        <>
-          <ThreadStatusDot value={status.value} />
-          <span className="shrink-0">{threadStatusLabel(status.value)}</span>
-        </>
-      ) : null}
-      {status && parent ? <span aria-hidden className="text-muted-foreground/50">·</span> : null}
-      {parent ? <span className="min-w-0 truncate">#{parent}</span> : null}
+    <span className="inline-flex min-w-0 items-center gap-1.5">
+      <ThreadStatusDot value={status.value} />
+      <span className="truncate">{threadStatusLabel(status.value)}</span>
     </span>
   );
+}
+
+/**
+ * A room's second line: what was last said, "Sender: text". The feed carries
+ * it on thread rows, and on channel rows once the backend loads it there
+ * (18 October 2026); it is optional on both (the resource withholds it on a
+ * metadata-only read). Without it a channel says what it is for, and an empty
+ * room says so.
+ */
+function roomLastLine(room: Channel, fallback: string | null): ReactNode {
+  if (room.last_message) return <LastMessagePreview preview={room.last_message} />;
+  return fallback ?? 'No messages yet';
 }
 
 function roomLink(href: string) {
@@ -343,10 +362,13 @@ export function renderFeedRow({
             warm: grammar.unread || grammar.mentions > 0,
             title: channel.name,
             strong: grammar.unread,
-            // A muted channel reads quiet; its @you count stays loud in the
-            // right column (a mute never hides a direct mention).
+            // A muted channel reads quiet; its @you count stays loud under the
+            // time (a mute never hides a direct mention).
             quiet: grammar.muted,
-            meta: channelStatusCountsLine(channel.thread_status_counts) ?? channel.description ?? null,
+            // Its threads that need someone sit after its name, so line 2 is
+            // free for what was last said.
+            status: channelStatusCountsLine(channel.thread_status_counts) ?? undefined,
+            meta: roomLastLine(channel, channel.description?.trim() || null),
             time: now > 0 ? formatRelativeTime(channel.last_message_at ?? channel.created_at, now) : '',
             mentions: grammar.mentions,
           }}
@@ -368,7 +390,8 @@ export function renderFeedRow({
             title: channelDisplayName(thread),
             strong: behind,
             quiet: state === 'none' || grammar.muted || knownThreadStatus(thread.status)?.value === 'closed',
-            meta: <ThreadMeta thread={thread} />,
+            status: <ThreadStatus thread={thread} />,
+            meta: roomLastLine(thread, null),
             time: now > 0 ? formatRelativeTime(thread.last_message_at ?? thread.created_at, now) : '',
             mentions: grammar.mentions,
           }}

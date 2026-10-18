@@ -64,17 +64,14 @@ test('the home asks for rooms by the rail’s own rule, and draws them in the fe
   assert.equal(rooms.match(/mentions: grammar\.mentions,/g)?.length, 2);
 });
 
-test('every row has one right column of the same width (version A, Stay, 17 October 2026)', () => {
+test('every row has one right column of the same width, and rooms keep it empty', () => {
   const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
-  // The menu, else the mention count, else an empty 36px column, so every
-  // row's text ends at the same edge.
-  assert.match(
-    rows,
-    /<span className="flex size-9 shrink-0 items-center justify-center">\s*\{line\.menu \?\?\s*\(\(line\.mentions \?\? 0\) > 0 \? \(\s*<CountBadge/,
-  );
-  // A thread's second line: its status word, then its channel.
-  assert.match(rows, /<ThreadStatusDot value=\{status\.value\} \/>\s*<span className="shrink-0">\{threadStatusLabel\(status\.value\)\}<\/span>/);
-  assert.match(rows, /\{parent \? <span className="min-w-0 truncate">#\{parent\}<\/span> : null\}/);
+  // The "…" menu, or an empty 36px column, so every row's time and count end
+  // at the same edge (version A; Stay, 18 October 2026, after WhatsApp).
+  assert.match(rows, /<span className="flex size-9 shrink-0 items-center justify-center">\{line\.menu \?\? null\}<\/span>/);
+  // A thread's status: the dot and the word, after its name.
+  assert.match(rows, /<ThreadStatusDot value=\{status\.value\} \/>\s*<span className="truncate">\{threadStatusLabel\(status\.value\)\}<\/span>/);
+  assert.match(rows, /status: <ThreadStatus thread=\{thread\} \/>,/);
   // The lobby keeps its own rows, with no feed layout left in them.
   for (const file of ['SpaceChannelRow.tsx', 'SpaceThreadRow.tsx']) {
     const row = read('v2', 'features', 'spaces', 'detail', file);
