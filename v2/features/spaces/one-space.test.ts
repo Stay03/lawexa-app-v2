@@ -213,9 +213,9 @@ test('the content feed: its own key under spaces, read-only rows', () => {
   const api = read('lib', 'api', 'collab.ts');
   assert.match(api, /`\/spaces\/\$\{spaceUuid\}\/items`/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  // Rename stays the owner's: never in a space's menu. Delete is in it for
-  // files alone since 15 October 2026 (a space's file belongs to the space).
-  assert.doesNotMatch(panel, /onRename/);
+  // Rename on the reader's own folders only (Arthur, 17 October 2026, item
+  // 6). Delete is in a file's menu since 15 October 2026.
+  assert.equal((panel.match(/onRename: ownsItem\(/g) ?? []).length, 1);
   assert.equal((panel.match(/onDelete:/g) ?? []).length, 1);
   assert.match(panel, /onCopyToMine: copyFile,\s*onDelete: /);
   assert.doesNotMatch(panel, /FilesTab/);
@@ -227,7 +227,7 @@ test('the content feed: its own key under spaces, read-only rows', () => {
     /const itemKey = \(entry: SpaceItem\): string =>\s*entry\.type === 'folder' \|\| entry\.type === 'channel' \|\| entry\.type === 'thread'\s*\? `\$\{entry\.type\}:\$\{entry\.item\.uuid\}`\s*: `\$\{entry\.type\}:\$\{entry\.item\.id\}`;/,
   );
   // Files open through the tap-first opener, never the channel download hook.
-  const fileRow = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
+  const fileRow = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
   assert.match(fileRow, /const \{ open, opening, failed, gone \} = useOpenFileInNewTab\(\);/);
   assert.doesNotMatch(fileRow, /useDownloadChannelFile/);
   // Deleting or leaving a space drops its cached contents with it.

@@ -17,8 +17,6 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import {
   canAskToContribute,
   isSharedSpace,
-  memberCountLabel,
-  rosterCountLabel,
   splitRoster,
 } from '../../model';
 import { spacesQueries } from '../../queries';
@@ -32,7 +30,7 @@ import { useSpaceRosterRow } from './use-roster-row';
  * and those pending to join in"). The members moved here from the top of the
  * space, and Invite with them.
  *
- * - Everyone sees the members, under a count line.
+ * - Everyone sees the members (the count is the header's, not repeated here).
  * - Whoever may manage the space's people (`scope.canManage`: the Owner of a
  *   shared space; the owner and admins of a team space) also gets Invite
  *   people and Invite links, and two more lists when they have anyone in
@@ -76,17 +74,15 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
   const roster = splitRoster(membersQuery.data?.data ?? []);
   const joined = roster.joined;
   const invited = canManage ? invitedRows(roster.invited, pendingQuery.data?.data ?? []) : [];
-  const countLine = membersQuery.isSuccess
-    ? rosterCountLabel(joined.length, invited.length)
-    : memberCountLabel(space.active_members_count);
   const waiting = requests.data?.data.length ?? 0;
   // The reader's own row carries their open ask, if any (RoleRequests).
   const ownRow = joined.find((member) => member.user.uuid === viewerUuid) ?? null;
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{countLine}</p>
+      {/* No count line: the space's header already says how many members it
+          has (Arthur, 17 October 2026, item 1: "Keep one"). */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         {canManage && scope ? (
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" className="v2-interactive" onClick={scope.openInviteLinks}>

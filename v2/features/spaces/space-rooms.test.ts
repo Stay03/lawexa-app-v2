@@ -43,51 +43,47 @@ test('the call sends include, and the feed rows carry the two room kinds', () =>
   assert.match(types, /export type SpaceItemsInclude = 'channels,threads';/);
 });
 
-test('the home asks for rooms by the rail’s own rule, and draws them with the lobby’s rows', () => {
+test('the home asks for rooms by the rail’s own rule, and draws them in the feed’s one row', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /const rooms = spaceShowsChannels\(space, session\);/);
-  assert.match(panel, /spacesQueries\.items\(space\.uuid, \{ viewerId, type, search: search\.term, rooms \}\)/);
-  // The rail's unread grammar, so a muted room sinks and its @you stays loud.
-  assert.match(
-    panel,
-    /<SpaceChannelRow\s+key=\{itemKey\(entry\)\}\s+row=\{\{ channel: entry\.item, grammar: channelUnreadGrammar\(entry\.item\), preview: entry\.item\.last_message \}\}/,
-  );
-  assert.match(panel, /grammar: channelUnreadGrammar\(entry\.item\),\s*state: threadUnreadState\(entry\.item\),/);
-  assert.equal(panel.match(/layout="feed"/g)?.length, 3, 'folders, channels and threads');
-  // A room's menu lives in the room.
-  assert.match(panel, /case 'channel':\s*case 'thread':\s*\/\/[^\n]*\n\s*return false;/);
-  // With rooms the All field's placeholder fits a 390px phone; the label names
-  // every kind, and a reader without rooms keeps today's copy.
-  assert.match(panel, /all: \{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*placeholder: 'Search this Space',\s*label: "Search this space's conversations, files, channels and threads",/);
-  assert.match(panel, /placeholder: 'Search conversations and files',/);
+  // No search since 17 October 2026 (Stay 19:11 UTC, Arthur 22:31 UTC).
+  assert.match(panel, /spacesQueries\.items\(space\.uuid, \{ viewerId, type, rooms \}\)/);
+  assert.doesNotMatch(panel, /placeholder:|SearchField/);
   // Rows are told apart by uuid, as their lists do.
   assert.match(panel, /entry\.type === 'folder' \|\| entry\.type === 'channel' \|\| entry\.type === 'thread'/);
+  // The rail's unread grammar, so a muted room goes quiet and its @you stays
+  // loud in the right column.
+  const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
+  assert.equal(rows.match(/const grammar = channelUnreadGrammar\((channel|thread)\);/g)?.length, 2);
+  assert.match(rows, /const state = threadUnreadState\(thread\);/);
+  assert.match(rows, /quiet: grammar\.muted,/);
+  assert.match(rows, /const behind = state === 'behind' && !grammar\.muted;/);
+  // A room's menu lives in the room: its rows carry a count, never a menu.
+  const rooms = rows.slice(rows.indexOf("case 'channel': {"));
+  assert.doesNotMatch(rooms, /menu:/);
+  assert.equal(rooms.match(/mentions: grammar\.mentions,/g)?.length, 2);
 });
 
-test('in the feed the room rows take the conversation row’s box and keep the menu column', () => {
+test('every row has one right column of the same width (version A, Stay, 17 October 2026)', () => {
+  const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
+  // The menu, else the mention count, else an empty 36px column, so every
+  // row's text ends at the same edge.
+  assert.match(
+    rows,
+    /<span className="flex size-9 shrink-0 items-center justify-center">\s*\{line\.menu \?\?\s*\(\(line\.mentions \?\? 0\) > 0 \? \(\s*<CountBadge/,
+  );
+  // A thread's second line: its status word, then its channel.
+  assert.match(rows, /<ThreadStatusDot value=\{status\.value\} \/>\s*<span className="shrink-0">\{threadStatusLabel\(status\.value\)\}<\/span>/);
+  assert.match(rows, /\{parent \? <span className="min-w-0 truncate">#\{parent\}<\/span> : null\}/);
+  // The lobby keeps its own rows, with no feed layout left in them.
   for (const file of ['SpaceChannelRow.tsx', 'SpaceThreadRow.tsx']) {
     const row = read('v2', 'features', 'spaces', 'detail', file);
-    assert.match(row, /layout = 'list',\s*menuColumn = false,/, file);
-    assert.match(row, /feed \? 'min-h-14 flex-1 items-center' : 'items-start',/, file);
-    assert.match(row, /feed \? 'text-sm' : 'text-\[15px\]',/, file);
-    assert.match(row, /\{menuColumn \? <span aria-hidden className="size-9 shrink-0" \/> : null\}/, file);
-    // The lobby keeps its own row.
-    assert.match(row, /\) : \(\s*<li>\{link\}<\/li>\s*\);/, file);
+    assert.doesNotMatch(row, /layout|menuColumn/, file);
+    assert.match(row, /return <li>\{link\}<\/li>;/, file);
   }
-  // The channel's second line: no top margin in the feed (rows 56px, not 58),
-  // and no empty preview span before the status counts (they lead the line).
   const channel = read('v2', 'features', 'spaces', 'detail', 'SpaceChannelRow.tsx');
-  assert.match(channel, /'flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground',\s*!feed && 'mt-0\.5',/);
   assert.match(channel, /\{preview \? \(\s*<span className="min-w-0 truncate">\s*<ChannelPreviewText line=\{preview\} \/>/);
-  // A thread's status chip leads the second line on a phone, so the title
-  // has the whole row (techlead, 17 October 2026); from md: up it stays by
-  // the title. The pill overlaps its 16px line, so the row stays 56px.
   const thread = read('v2', 'features', 'spaces', 'detail', 'SpaceThreadRow.tsx');
-  assert.match(thread, /className=\{feed \? 'max-md:hidden' : undefined\}/);
-  assert.match(thread, /\{feed && status \? \(\s*<div className="flex min-w-0 items-center gap-2">\s*<ThreadStatusChip[^>]*className="-my-0\.5 md:hidden"\s*\/>\s*\{meta\}/);
-  // Beside the phone's chip, "No messages yet" goes, so where the thread
-  // branched from keeps its room; the age still dates the row.
-  assert.match(thread, /const noMessages = feed && status \? \(\s*<span className="shrink-0 max-md:hidden">No messages yet<\/span>/);
   assert.equal(thread.match(/\? noMessages : null/g)?.length, 2);
 });
 

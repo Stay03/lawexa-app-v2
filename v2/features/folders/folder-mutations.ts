@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { foldersApi } from './api';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { foldersQueries } from './queries';
 import type { FolderCreateInput, FolderEnvelope } from './types';
 
@@ -78,6 +79,10 @@ export function useCreateFolder() {
 }
 
 /* ── Rename ───────────────────────────────────────────────────────────────── */
+/* Rename and delete also mark the spaces' data stale (`spacesQueries.all`): a
+ * folder can sit in a space's list, which keeps its own copy of the name
+ * (the space feed, version A, 17 October 2026). Only the space queries on
+ * screen read again. */
 
 /**
  * Rename one folder. The endpoint also re-parents (`parent_id`), which v2 does
@@ -91,7 +96,7 @@ export function useRenameFolder(uuid: string) {
     // parallel — the last write is the last one the server sees.
     scope: { id: `folder-rename-${uuid}` },
     meta: {
-      invalidates: [foldersQueries.lists(), foldersQueries.details()],
+      invalidates: [foldersQueries.lists(), foldersQueries.details(), spacesQueries.all],
     },
   });
 }
@@ -130,7 +135,7 @@ export function useDeleteFolder() {
     // impossible while the first hides the row.
     meta: {
       silentError: true,
-      invalidates: [foldersQueries.lists(), foldersQueries.details()],
+      invalidates: [foldersQueries.lists(), foldersQueries.details(), spacesQueries.all],
     },
     onError: (error, { name }) => {
       toast.error(`Couldn’t delete “${name}”`, {

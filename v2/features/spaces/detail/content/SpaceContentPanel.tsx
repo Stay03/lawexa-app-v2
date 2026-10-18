@@ -14,7 +14,6 @@ import type {
   Space,
   SpaceFile,
   SpaceItem,
-  SpaceItemsParams,
   SpaceItemsResponse,
   SpaceItemsType,
 } from '@/types/collab';
@@ -26,17 +25,12 @@ import {
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { ACCEPTED_FILE_TYPES } from '@/v2/features/conversations/attachment-rules';
-import { ConversationRow } from '@/v2/features/conversations/list/ConversationRow';
 import { useConversationMenu } from '@/v2/features/conversations/list/use-conversation-menu';
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
 import { folderRow, type FolderRowModel } from '@/v2/features/folders/folder-row-model';
-import { FolderRow } from '@/v2/features/folders/list/FolderRow';
-import { channelUnreadGrammar } from '@/v2/features/channels/model';
-import { threadUnreadState } from '@/v2/features/channels/thread-model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { HomeComposerHandle } from '@/v2/shell/designs/HomeComposer';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { SearchField } from '@/v2/shell/SearchField';
 import { TabRow } from '@/v2/shell/TabRow';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useCopySpaceFileToMine, useUploadSpaceFile } from '../../content-mutations';
@@ -61,65 +55,56 @@ import {
 } from '../../model';
 import { MoveToSpaceDialog } from '../../move/MoveToSpaceDialog';
 import { spacesQueries } from '../../queries';
-import { useServerSearch, type ServerSearch } from '../../use-server-search';
 import { LobbySection, SPACE_PILL_BAR } from '../lobby-parts';
 import { SpacePeoplePanel } from '../people/SpacePeoplePanel';
-import { SpaceChannelRow } from '../SpaceChannelRow';
-import { SpaceThreadRow } from '../SpaceThreadRow';
 import { DeleteSpaceFileDialog } from './DeleteSpaceFileDialog';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceChatDock } from './SpaceChatDock';
-import { SpaceFileRow } from './SpaceFileRow';
+import { renderFeedRow, type FeedRowMenus } from './feed-rows';
 import {
   SpaceContentEmptyState,
   SpaceContentErrorState,
   SpaceContentMoreErrorState,
   SpaceContentNextPageSkeleton,
-  SpaceContentNoMatchState,
   SpaceContentSkeleton,
 } from './states';
 
 /**
  * SpaceContentPanel — everything under a space's header (design B4, Arthur
- * 11:32Z and Stay 11:50Z, 17 October 2026): the pills, the search, one list
- * of the space's conversations, files and folders, and the message box.
+ * 11:32Z and Stay 11:50Z, 17 October 2026): the pills, one list of the
+ * space's conversations, files and folders, and the message box.
  *
  * ── THE PILLS (`?tab=`, `SpaceScreen` holds it) ────────────────────────────
  * All, Conversations, Files, Folders, People. The first four are one feed
  * (`GET /spaces/{uuid}/items`, `spacesQueries.items`): All with no `type`,
  * each kind with its own. People is the members page (`SpacePeoplePanel`) in
- * the list's place, with no search, as it has nothing to search. Channels are
- * not a pill; the space rail keeps them.
+ * the list's place. Channels are not a pill; the space rail keeps them.
  *
- * ── HELD AT THE TOP OF THE PANE ────────────────────────────────────────────
- * The pills and the search stay at the top of the pane while the list
- * scrolls under them (the pane is the scroller, `CollabFrame`'s
- * `data-v2-scroller`). On a phone they stack; from `md:` they share one row.
+ * ── NO SEARCH ──────────────────────────────────────────────────────────────
+ * Stay, 17 October 2026, 19:11 UTC, and Arthur, 22:31 UTC: "remove it". The
+ * pills stay at the top of the pane while the list scrolls under them (the
+ * pane is the scroller, `CollabFrame`'s `data-v2-scroller`).
  *
  * ── WHERE ADDING WENT ──────────────────────────────────────────────────────
- * With no tabs, the add controls sit on their kind's pill, beside the search:
- * Files shows "Upload files", Folders shows "New folder", each for the Owner
- * and Contributors only (`canAddContent`; a Viewer would get a 403). Files
- * dragged from the desktop onto the list upload into the space on every
- * pill but People. A new conversation starts from the box docked at the
- * bottom (Stay and Arthur, 15 October 2026).
+ * The add controls sit at the end of the pill bar: Files shows "Upload
+ * files", Folders shows "New folder", each for the Owner and Contributors
+ * only (`canAddContent`; a Viewer would get a 403). Files dragged from the
+ * desktop onto the list upload into the space on every pill but People. A new
+ * conversation starts from the box docked at the bottom (Stay and Arthur, 15
+ * October 2026), on All, Conversations and Files only (Arthur, 17 October
+ * 2026, item 2).
  *
  * ── ONE LIST, BY DAY ───────────────────────────────────────────────────────
  * The feed is newest first (`sort_at`), so the list is cut into days with the
- * transcript's day words (`formatDayLabel`). The rows are the source lists'
- * own (`ConversationRow`, `SpaceFileRow`, `FolderRow`), all in the
- * conversation row's box, so a folder's tile and name start where a
- * conversation's do. A folder opens its own page. Every row keeps the menu it
- * had in the tabs (`useConversationMenu`; move, remove, copy and delete for a
- * file; move and remove for a folder), as each role allows.
+ * transcript's day words (`formatDayLabel`). Every kind is the same row
+ * (`feed-rows`, version A, Stay, 17 October 2026, 22:19 UTC). A folder opens
+ * its own page. Every row keeps the menu it had in the tabs
+ * (`useConversationMenu`; move, remove, copy and delete for a file; rename,
+ * change space and remove for a folder), as each role allows.
  *
- * ── PAGING AND SEARCH ──────────────────────────────────────────────────────
+ * ── PAGING ─────────────────────────────────────────────────────────────────
  * The feed is cursor-paged; the next page loads 320px before the end of the
- * pane. A new search on the same pill keeps the rows on screen, dimmed, until
- * its answer lands; a new pill does not, because one kind's rows under
- * another pill's name would be wrong, so it shows its skeleton. With no
- * `type`, the server searches conversation titles and file names; under
- * Folders it searches folder names.
+ * pane. A new pill is a new list and shows its skeleton.
  */
 export function SpaceContentPanel({
   space,
@@ -149,23 +134,15 @@ export function SpaceContentPanel({
   // Conversations (Stay, 17 October 2026, approved 15:46 UTC), for a reader
   // who has team channels, in a team space: the rail's own rule.
   const rooms = spaceShowsChannels(space, session);
-  // The search, the feed's read, the uploads and the new-folder dialog live
-  // here and not in the list, which a new pill remounts: the bar keeps the
-  // pill that has focus, a typed search carries to the next pill, and a file
-  // still uploading keeps its row in the tray.
-  const search = useServerSearch();
+  // The feed's read, the uploads and the new-folder dialog live here and not
+  // in the list, which a new pill remounts: a file still uploading keeps its
+  // row in the tray. No search (Stay, 17 October 2026, 19:11 UTC; Arthur,
+  // 22:31 UTC: "remove it").
   const listTab: SpaceContentTab = tab === 'people' ? 'all' : tab;
   const type = FEED_TYPE[listTab];
   const query = useInfiniteQuery({
-    ...spacesQueries.items(space.uuid, { viewerId, type, search: search.term, rooms }),
+    ...spacesQueries.items(space.uuid, { viewerId, type, rooms }),
     enabled: enabled && tab !== 'people',
-    // A new search on this pill keeps its rows on screen until the answer
-    // lands; a new pill does not. The key's params are its fifth part
-    // (`spacesQueries.items`).
-    placeholderData: (previous, previousQuery) =>
-      previousQuery && (previousQuery.queryKey[4] as SpaceItemsParams).type === type
-        ? previous
-        : undefined,
   });
   const { queue, pickFiles, picker } = useSpaceUploads(space.uuid);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -186,9 +163,6 @@ export function SpaceContentPanel({
         New folder
       </PillButton>
     ) : null;
-  // With rooms in the list, the server's search covers channel names and
-  // thread titles too, so the field says so.
-  const copy = rooms && (listTab === 'all' || listTab === 'conversations') ? ROOMS_SEARCH_COPY[listTab] : SEARCH_COPY[listTab];
 
   const list =
     tab === 'people' ? (
@@ -200,7 +174,6 @@ export function SpaceContentPanel({
         tab={tab}
         query={query}
         access={access}
-        search={search}
         onUpload={pickFiles}
         onNewFolder={startFolder}
         onAttach={() => dock.current?.attach()}
@@ -221,21 +194,8 @@ export function SpaceContentPanel({
         >
           {(pill) => pill.label}
         </TabRow>
-        {/* People has nothing to search. */}
-        {tab === 'people' ? null : (
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <SearchField
-              className="min-w-0 flex-1"
-              value={search.value}
-              onChange={search.setValue}
-              onClear={search.clear}
-              placeholder={copy.placeholder}
-              label={copy.label}
-              busy={query.isPlaceholderData}
-            />
-            {action}
-          </div>
-        )}
+        {/* The pill's add control, Upload files or New folder, at the bar's end. */}
+        {action ? <div className="flex justify-end md:ml-auto">{action}</div> : null}
       </div>
       {access.canAdd ? picker : null}
 
@@ -258,7 +218,10 @@ export function SpaceContentPanel({
           intent={{ mode: 'create', space: { uuid: space.uuid, name: space.name } }}
         />
       ) : null}
-      {access.canAdd ? (
+      {/* The Space's message box on the pills that hold chats and files; not on
+          Folders or People, where a question to Lawexa has nothing to start
+          from (Arthur, 17 October 2026, item 2). */}
+      {access.canAdd && DOCK_TABS.has(tab) ? (
         <SpaceChatDock space={{ uuid: space.uuid, name: space.name }} handle={dock} />
       ) : null}
     </div>
@@ -296,28 +259,8 @@ const FEED_TYPE: Readonly<Record<SpaceContentTab, SpaceItemsType | undefined>> =
   folders: 'folders',
 };
 
-const SEARCH_COPY: Readonly<Record<SpaceContentTab, { placeholder: string; label: string }>> = {
-  all: {
-    placeholder: 'Search conversations and files',
-    label: "Search this space's conversations and files",
-  },
-  conversations: { placeholder: 'Search conversations', label: "Search this space's conversations" },
-  files: { placeholder: 'Search files', label: "Search this space's files by name" },
-  folders: { placeholder: 'Search folders', label: "Search this space's folders" },
-};
-
-const ROOMS_SEARCH_COPY: Readonly<Record<'all' | 'conversations', { placeholder: string; label: string }>> = {
-  all: {
-    // A list of four kinds overflows a 390px field ("…and channe", techlead,
-    // 17 October 2026); the label still names them.
-    placeholder: 'Search this Space',
-    label: "Search this space's conversations, files, channels and threads",
-  },
-  conversations: {
-    placeholder: 'Search conversations and channels',
-    label: "Search this space's conversations, channels and threads",
-  },
-};
+/** The pills the Space's message box shows on. */
+const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations', 'files']);
 
 const PILLS = SPACE_TABS.map((id) => ({ id, label: SPACE_TAB_LABELS[id] }));
 
@@ -415,7 +358,6 @@ function SpaceFeed({
   tab,
   query,
   access,
-  search,
   onUpload,
   onNewFolder,
   onAttach,
@@ -423,7 +365,6 @@ function SpaceFeed({
   tab: SpaceContentTab;
   query: FeedQuery;
   access: ContentAccess;
-  search: ServerSearch;
   /** Opens the upload picker (the Files pill's empty state). */
   onUpload: () => void;
   /** Opens the new-folder dialog (the Folders pill's empty state). */
@@ -441,9 +382,6 @@ function SpaceFeed({
   const items = useMemo(() => (pages ? uniqueRowsById(pages, itemKey) : NO_ITEMS), [pages]);
   // Captured once, so no clock read runs in render (React Compiler purity).
   const [now] = useState(() => Date.now());
-  // Rows fade in only on a first load; a list that mounts from cache shows
-  // them in place (the conversations list's rule, 8 October 2026).
-  const [reveal] = useState(() => query.isPending);
   const { openMove, openRemove, dialogs } = useItemDialogs(access);
 
   // The "…" menu of each conversation: the items its `can` allows (rename,
@@ -462,6 +400,15 @@ function SpaceFeed({
   const moveFolder = useCallback(
     (row: FolderRowModel) => openMove(targetOf({ type: 'folder', uuid: row.uuid, name: row.name })),
     [openMove, targetOf],
+  );
+  // Rename (and Delete, which the menu pairs with it) for the reader's own
+  // folders only (Arthur, 17 October 2026, item 6): other members' folders are
+  // not theirs to change.
+  const [renaming, setRenaming] = useState<{ uuid: string; name: string; key: number } | null>(null);
+  const renameFolder = useCallback(
+    (row: FolderRowModel) =>
+      setRenaming((previous) => ({ uuid: row.uuid, name: row.name, key: (previous?.key ?? 0) + 1 })),
+    [],
   );
   const removeFolder = useCallback(
     (row: FolderRowModel) => openRemove(targetOf({ type: 'folder', uuid: row.uuid, name: row.name })),
@@ -507,6 +454,7 @@ function SpaceFeed({
 
   // What each row's menu holds for this reader, decided once per row.
   const folderMenu = (entry: Extract<SpaceItem, { type: 'folder' }>) => ({
+    onRename: ownsItem(entry.item.user?.id, viewerId) ? renameFolder : undefined,
     onMove: ownsItem(entry.item.user?.id, viewerId) ? moveFolder : undefined,
     onRemoveFromSpace: canRemove ? removeFolder : undefined,
   });
@@ -518,102 +466,27 @@ function SpaceFeed({
       ? deleteFile
       : undefined,
   });
-  // One menu column for the whole list, so the rows' right edges line up. A
-  // file always has one (every member may save a copy).
-  const menuColumn = items.some((entry) => {
-    switch (entry.type) {
-      case 'conversation':
-        return menu.actionsFor(entry.item).length > 0;
-      case 'file':
-        return true;
-      case 'folder': {
-        const actions = folderMenu(entry);
-        return actions.onMove !== undefined || actions.onRemoveFromSpace !== undefined;
-      }
-      case 'channel':
-      case 'thread':
-        // A room's own menu lives in the room.
-        return false;
-    }
-  });
-
-  // The feed cut into days, newest first, each item keeping its place in the
-  // whole list for the entrance's stagger.
+  // The feed cut into days, newest first.
   const days = useMemo(() => {
-    const groups: { label: string; entries: { entry: SpaceItem; index: number }[] }[] = [];
-    items.forEach((entry, index) => {
+    const groups: { label: string; entries: SpaceItem[] }[] = [];
+    for (const entry of items) {
       const label = formatDayLabel(entry.sort_at);
       const last = groups[groups.length - 1];
-      if (last && last.label === label) last.entries.push({ entry, index });
-      else groups.push({ label, entries: [{ entry, index }] });
-    });
+      if (last && last.label === label) last.entries.push(entry);
+      else groups.push({ label, entries: [entry] });
+    }
     return groups;
   }, [items]);
 
-  const renderRow = ({ entry, index }: { entry: SpaceItem; index: number }) => {
-    switch (entry.type) {
-      case 'conversation':
-        return (
-          <ConversationRow
-            key={itemKey(entry)}
-            conversation={entry.item}
-            now={now}
-            index={index}
-            exiting={false}
-            reveal={reveal}
-            // A chat with no message to preview says so; it never falls back
-            // to whose chat it is, which read as a message ("You").
-            byline={lastMessageLine(entry.item.last_message, viewerUuid) ?? 'No messages yet'}
-            actions={menu.actionsFor(entry.item)}
-            menuColumn={menuColumn}
-          />
-        );
-      case 'file':
-        return <SpaceFileRow key={itemKey(entry)} file={entry.item} index={index} {...fileMenu(entry.item)} />;
-      case 'folder':
-        return (
-          <FolderRow
-            key={itemKey(entry)}
-            row={folderRow(entry.item)}
-            index={index}
-            now={now}
-            layout="feed"
-            menuColumn={menuColumn}
-            {...folderMenu(entry)}
-          />
-        );
-      case 'channel':
-        // The rail's own row model, so the unread, mute and mention grammar
-        // is the rail's (channelUnreadGrammar).
-        return (
-          <SpaceChannelRow
-            key={itemKey(entry)}
-            row={{ channel: entry.item, grammar: channelUnreadGrammar(entry.item), preview: entry.item.last_message }}
-            now={now}
-            layout="feed"
-            menuColumn={menuColumn}
-          />
-        );
-      case 'thread':
-        return (
-          <SpaceThreadRow
-            key={itemKey(entry)}
-            row={{
-              kind: 'thread',
-              thread: entry.item,
-              grammar: channelUnreadGrammar(entry.item),
-              state: threadUnreadState(entry.item),
-            }}
-            // The thread's channel, as the lobby names it, so a thread reads
-            // as a room inside the space and not as a chat.
-            showProvenance
-            now={now}
-            layout="feed"
-            menuColumn={menuColumn}
-          />
-        );
-    }
+  const rowMenus: FeedRowMenus = {
+    conversation: menu.actionsFor,
+    folder: folderMenu,
+    file: fileMenu,
+    folderRow: (entry) => folderRow(entry.item),
+    byline: (item) => lastMessageLine(item.last_message, viewerUuid) ?? 'No messages yet',
   };
+
+  const renderRow = (entry: SpaceItem) => renderFeedRow({ entry, now, menus: rowMenus, key: itemKey(entry) });
 
   const emptyAction =
     tab === 'files' ? (
@@ -640,17 +513,10 @@ function SpaceFeed({
   return (
     <>
       <PagedContent
-      tab={tab}
-      query={query}
-      count={items.length}
-      dim={query.isPlaceholderData}
-      empty={
-        search.term ? (
-          <SpaceContentNoMatchState
-            query={search.term}
-            action={<ClearSearchButton onClear={search.clear} />}
-          />
-        ) : (
+        tab={tab}
+        query={query}
+        count={items.length}
+        empty={
           <SpaceContentEmptyState
             tab={tab}
             canAdd={canAdd}
@@ -659,20 +525,29 @@ function SpaceFeed({
             // Upload files already.
             onInvite={tab === 'files' || tab === 'folders' ? (access.onInvite ?? undefined) : undefined}
           />
-        )
-      }
-    >
-      <div className="flex flex-col gap-5">
-        {days.map((day) => (
-          <LobbySection key={day.label} title={day.label}>
-            <ul className="flex flex-col">{day.entries.map(renderRow)}</ul>
-          </LobbySection>
-        ))}
-      </div>
-    </PagedContent>
+        }
+      >
+        <div className="flex flex-col gap-5">
+          {days.map((day) => (
+            <LobbySection key={day.label} title={day.label}>
+              <ul className="flex flex-col">{day.entries.map(renderRow)}</ul>
+            </LobbySection>
+          ))}
+        </div>
+      </PagedContent>
 
       {menu.dialogs}
       {dialogs}
+      {renaming ? (
+        <FolderNameDialog
+          key={`rename-${renaming.key}`}
+          open
+          onOpenChange={(open) => {
+            if (!open) setRenaming(null);
+          }}
+          intent={{ mode: 'rename', folder: { uuid: renaming.uuid, name: renaming.name } }}
+        />
+      ) : null}
       {deleting ? (
         <DeleteSpaceFileDialog
           key={`delete-${deleting.key}`}
@@ -802,8 +677,8 @@ function FileDropZone({
 
 /* ── Shared parts ─────────────────────────────────────────────────────────── */
 
-/** A pill's add control beside the search, the folders list's own "New
- *  folder" pill, with its word at every width: it is where the Files and
+/** A pill's add control at the end of the pill bar, the folders list's own
+ *  "New folder" pill, with its word at every width: it is where the Files and
  *  Folders tabs' add buttons went, so it names itself (B4). */
 function PillButton({
   icon: Icon,
@@ -852,14 +727,6 @@ function EmptyStateAddButton({
   );
 }
 
-function ClearSearchButton({ onClear }: { onClear: () => void }) {
-  return (
-    <Button type="button" size="sm" variant="outline" onClick={onClear}>
-      Clear search
-    </Button>
-  );
-}
-
 /** What the shared body reads off an infinite query: its states and pager. */
 interface PagedQuery {
   isPending: boolean;
@@ -874,15 +741,13 @@ interface PagedQuery {
 
 /**
  * The list's body, so its states cannot drift: skeleton on a first load, the
- * failure panel when nothing loaded, the pill's empty state (`empty`: teaching
- * or no match), or the rows with the next-page sentinel under them, dimmed
- * while a new search is on its way.
+ * failure panel when nothing loaded, the pill's empty state (`empty`), or the
+ * rows with the next-page sentinel under them.
  */
 function PagedContent({
   tab,
   query,
   count,
-  dim,
   empty,
   children,
 }: {
@@ -890,8 +755,6 @@ function PagedContent({
   query: PagedQuery;
   /** How many rows are loaded: every state decision reads this. */
   count: number;
-  /** A new search is loading behind the rows on screen. */
-  dim: boolean;
   /** What the pill shows with no rows. */
   empty: ReactNode;
   children: ReactNode;
@@ -938,12 +801,7 @@ function PagedContent({
       ) : count === 0 ? (
         empty
       ) : (
-        <div
-          className={cn(
-            'transition-opacity duration-200 motion-reduce:transition-none',
-            dim && 'pointer-events-none opacity-60',
-          )}
-        >
+        <div>
           {children}
           <div ref={sentinelRef} className="pt-1">
             {query.isFetchingNextPage ? <SpaceContentNextPageSkeleton /> : null}

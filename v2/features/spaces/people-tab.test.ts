@@ -115,10 +115,12 @@ test('the manager-only lists are asked for as the space opens, and fade in (insi
 test('the home draws the People pill, and the silhouette has its shape', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /tab === 'people' \? \(\s*<SpacePeoplePanel space=\{space\} \/>/);
-  // People has nothing to search.
-  assert.match(panel, /\{tab === 'people' \? null : \(\s*<div className="flex min-w-0 flex-1 items-center gap-2">\s*<SearchField/);
+  // No search on any pill (Stay, 17 October 2026, 19:11 UTC; Arthur, 22:31
+  // UTC: "remove it"), and none in the silhouette.
+  assert.doesNotMatch(panel, /SearchField|useServerSearch|search\.term/);
+  assert.doesNotMatch(read('v2', 'features', 'spaces', 'detail', 'states.tsx'), /rounded-4xl/);
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
-  assert.match(states, /tab === 'people' \? \([\s\S]{0,200}<RosterSkeleton \/>/);
+  assert.match(states, /\{tab === 'people' \? <RosterSkeleton \/> : <SpaceContentSkeleton \/>\}/);
   // The members call passes the status through.
   assert.match(read('lib', 'api', 'collab.ts'), /page: params\.page \?\? 1,\s*status: params\.status,/);
 });
@@ -147,6 +149,6 @@ test('a space chat row says its last message and who sent it (Stay, 15 October 2
   assert.equal(lastMessageLine({ role: 'user', preview: '  ', created_at: at }, 'u1'), null);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   // No message to preview: say so, never "You" (techlead, 15 October 2026).
-  assert.match(panel, /byline=\{lastMessageLine\(entry\.item\.last_message, viewerUuid\) \?\? 'No messages yet'\}/);
+  assert.match(panel, /byline: \(item\) => lastMessageLine\(item\.last_message, viewerUuid\) \?\? 'No messages yet',/);
   assert.doesNotMatch(panel, /spaceChatByline/);
 });

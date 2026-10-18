@@ -49,13 +49,10 @@ test('the list row is two lines at every width: name and icons, then the newest 
 /* ── MUST 3: on a phone only the uploader truncates ──────────────────────── */
 
 test('a file row holds its type and size together and lets the uploader truncate', () => {
-  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
-  assert.match(row, /<span key="kind" className="flex shrink-0 items-center gap-2">/);
-  // The uploader is the one plain string, the fact `MetaLine` truncates.
-  assert.match(row, /<\/span>,\s*file\.uploader\.name,\s*\]\}/);
-  const line = read('v2', 'features', 'collab', 'kit', 'MetaLine.tsx');
-  assert.match(line, /export function MetaSeparator\(\)/);
-  assert.match(line, /\{index > 0 \? <MetaSeparator \/> : null\}/);
+  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
+  assert.match(row, /<span className="flex min-w-0 gap-1">\s*<span className="shrink-0">/);
+  // The uploader is the one part that truncates.
+  assert.match(row, /<span className="min-w-0 truncate">\{file\.uploader\.name\}<\/span>/);
 });
 
 /* ── MUST 4: the empty state's add action has its word ───────────────────── */
@@ -109,21 +106,25 @@ test('the move dialog puts an outlined Cancel first in the DOM, reversed on a de
 /* ── SHOULD 7: the file row's body opens the file ────────────────────────── */
 
 test('the file row body is the open control, at least 44px tall', () => {
-  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
+  // Version A's one row (Stay, 17 October 2026, 22:19 UTC): the body is
+  // `min-h-14` (56px) for every kind.
+  const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
+  assert.match(rows, /'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2\.5 text-left',/);
+  const file = rows.slice(rows.indexOf('function FeedFileRow('), rows.indexOf('/** One row of the feed, for any kind. */'));
   assert.match(
-    row,
-    /<button\s+type="button"\s+onClick=\{\(\) => open\(file\.id\)\}\s+disabled=\{opening\}\s+className=\{cn\(\s*IDENTITY_CLASS,/,
+    file,
+    /<button\s+type="button"\s+onClick=\{\(\) => open\(file\.id\)\}\s+disabled=\{opening\}\s+className=\{cn\(className, 'disabled:cursor-progress'\)\}\s*>\s*<span className="sr-only">Open <\/span>/,
   );
-  // The conversation row's box since B4: `min-h-14` (56px), the 36px mark.
-  assert.match(row, /const IDENTITY_CLASS =\s*'flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2\.5 text-left';/);
-  assert.match(row, /<FileMark file=\{\{ \.\.\.file, url: file\.url \?\? '' \}\} size="sm" \/>/);
-  // The meta line is phrasing content inside the button.
-  assert.match(row, /<MetaLine\s+as="span"/);
-  // The 32px open button is gone; the menu stays a sibling of the body.
-  assert.doesNotMatch(row, /aria-label=\{`Open \$\{file\.original_name\}`\}/);
-  assert.match(row, /<\/button>\s*\)\}\s*\{onMove \|\| onRemoveFromSpace \|\| onCopyToMine \|\| onDelete \? \(/);
-  // The failure line, with its own Try again button, sits outside the body.
-  assert.ok(row.indexOf("Couldn&rsquo;t open it.") > row.indexOf('</DropdownMenu>'));
+  // A file that is gone has nothing to open: plain text, and it says so.
+  assert.match(file, /gone \? \(\s*<div className=\{className\}>\{content\}<\/div>/);
+  assert.match(file, /This file is no longer available\./);
+  // The menu is the right column, a sibling of the body, never inside it.
+  assert.match(file, /menu: <SpaceFileMenu file=\{file\} \{\.\.\.menus\.file\(file\)\} \/>,/);
+  assert.match(rows, /\{render\(BODY, content\)\}\s*\{\/\*[^*]*\*\/\}\s*<span className="flex size-9 shrink-0 items-center justify-center">/);
+  // The failure line, with its own Try again button, sits under the row,
+  // outside the body.
+  assert.match(file, /note: gone \? \([\s\S]*?Couldn&rsquo;t open it\.[\s\S]*?Try again/);
+  assert.match(rows, /\{line\.note \? <div className="pb-1 pl-11 text-\[11px\] text-muted-foreground">\{line\.note\}<\/div> : null\}/);
 });
 
 /* ── SHOULD 8 and round 0 #2: the bar menu's rules ───────────────────────── */
@@ -228,7 +229,9 @@ test('a folder in the space opens its own page, as everywhere else (B4)', () => 
   // list opens the folder page instead, so the level bar went.
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.doesNotMatch(panel, /FolderLevelBar|onOpen=/);
-  assert.match(panel, /<FolderRow[\s\S]{0,200}?layout="feed"/);
+  // The feed's folder row links to the page and leaves the peek behind it.
+  const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
+  assert.match(rows, /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\} className=\{className\}>/);
   const row = read('v2', 'features', 'folders', 'list', 'FolderRow.tsx');
   assert.match(row, /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\} className=\{identityClass\}>/);
   assert.doesNotMatch(row, /onOpen/);

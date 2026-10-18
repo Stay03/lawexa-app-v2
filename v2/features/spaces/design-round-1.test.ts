@@ -283,12 +283,13 @@ test('the members sheet counts the people in and the people invited apart', () =
   assert.match(sheet, />\s*Invite sent\s*</);
   const row = read('v2', 'features', 'collab', 'membership', 'RosterRow.tsx');
   assert.match(row, /\{member\.is_pending \? 'Cancel invitation' : 'Remove'\}/);
-  // The faces left the header for the People tab (Stay, 15 October 2026),
-  // which counts the people in and the invited apart the same way.
+  // The faces left the header for the People tab (Stay, 15 October 2026).
+  // The tab has no count line: the header already counts (Arthur, 17
+  // October 2026, item 1: "Keep one").
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
   assert.doesNotMatch(header, /PresenceStack/);
   const people = read('v2', 'features', 'spaces', 'detail', 'people', 'SpacePeoplePanel.tsx');
-  assert.match(people, /rosterCountLabel\(joined\.length, invited\.length\)/);
+  assert.doesNotMatch(people, /rosterCountLabel|memberCountLabel/);
 });
 
 /* ── Move to space: kinds, search, no silent cut (techlead 1 and 2) ──────── */

@@ -14,20 +14,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
 import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
-import {
-  ConversationsListSkeleton,
-  NextPageSkeleton as ConversationsNextPageSkeleton,
-} from '@/v2/features/conversations/list/states';
+import { Skeleton } from '@/components/ui/skeleton';
 import { spaceEmptyCopy, type SpaceContentTab } from '../../content-model';
 
 /**
  * The states of a space home's list (Spaces F2, 11 October 2026; one list
  * since B4, 17 October 2026): All, Conversations, Files, Folders.
  *
- * ONE SKELETON FOR EVERY PILL. The three rows share the conversation row's box
- * in the list (`ConversationRow`; `SpaceFileRow`; `FolderRow` with
- * `layout="feed"`), so the conversations list's own skeleton is the geometry
- * of whatever is about to land, and the swap is content resolving rather than
+ * ONE SKELETON FOR EVERY PILL. Every kind is the same row (`feed-rows`), so
+ * the skeleton is that row: the 20px icon, the name and time over the meta
+ * line, and the 36px right column. The swap is content resolving rather than
  * a layout change.
  *
  * EMPTY IS NOT A FAILURE, AND IT SAYS WHAT COMES NEXT (Spaces F3; design
@@ -45,14 +41,48 @@ import { spaceEmptyCopy, type SpaceContentTab } from '../../content-model';
 
 export type { SpaceContentTab };
 
-/** The first load of the list: rows at the real geometry. */
+/** One feed row at its real geometry (`feed-rows`' `Line`). */
+function FeedRowSkeleton() {
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 px-3 py-2.5">
+        <Skeleton className="size-5 shrink-0 rounded" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-3.5 w-1/2 rounded" />
+            <Skeleton className="ml-auto h-3 w-8 shrink-0 rounded" />
+          </div>
+          <Skeleton className="h-3 w-1/3 rounded" />
+        </div>
+      </div>
+      <span aria-hidden className="size-9 shrink-0" />
+    </div>
+  );
+}
+
+/** The first load of the list, fading down the stack like the other lists. */
 export function SpaceContentSkeleton() {
-  return <ConversationsListSkeleton rows={6} />;
+  return (
+    <div aria-hidden className="flex flex-col">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.12) }}>
+          <FeedRowSkeleton />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 /** The next page in flight, at the sentinel. */
 export function SpaceContentNextPageSkeleton() {
-  return <ConversationsNextPageSkeleton />;
+  return (
+    <div aria-hidden className="flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+      <FeedRowSkeleton />
+      <div style={{ opacity: 0.5 }}>
+        <FeedRowSkeleton />
+      </div>
+    </div>
+  );
 }
 
 const EMPTY_ICON: Readonly<Record<SpaceContentTab, LucideIcon>> = {

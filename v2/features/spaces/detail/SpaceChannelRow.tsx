@@ -62,19 +62,8 @@ import {
 export const SpaceChannelRow = memo(function SpaceChannelRow({
   row,
   now,
-  layout = 'list',
-  menuColumn = false,
 }: {
   row: RailRow;
-  /** `feed`: the row in a space's one list (Stay, 17 October 2026: channels
-   *  and threads inside the All and Conversations pills), in the conversation
-   *  row's box (`px-3`, `py-2.5`, `min-h-14`, the 36px tile centred, a
-   *  14px name), so it lines up with the chats, files and folders around it.
-   *  `list`: the lobby's own row. */
-  layout?: 'list' | 'feed';
-  /** Some other row in the list has a menu: keep its column (`ConversationRow`'s
-   *  prop), so the rows' right edges line up. This row has no menu. */
-  menuColumn?: boolean;
   /**
    * The shared minute clock. `0` is its pre-hydration value and means "no age
    * yet" — handing it to the formatter would date every row as "now".
@@ -97,7 +86,6 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
   const dim = muted
     ? 'opacity-60 transition-opacity duration-150 group-hover:opacity-100 motion-reduce:transition-none'
     : undefined;
-  const feed = layout === 'feed';
 
   // NO `aria-current` HERE. This row only ever appears on the space's own
   // page, where no channel is open — the ACTIVE-row state belongs to the
@@ -106,19 +94,17 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
     <Link
       href={`/channels/${channel.uuid}`}
       className={cn(
-        'group flex min-w-0 gap-3 rounded-xl px-3 py-2.5',
-        feed ? 'min-h-14 flex-1 items-center' : 'items-start',
+        'group flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5',
         'transition-colors duration-150 motion-reduce:transition-none v2-interactive',
         'hover:bg-secondary/50',
         FOCUS_RING,
       )}
     >
-      <span className={cn('flex min-w-0 flex-1 gap-3', feed ? 'items-center' : 'items-start', dim)}>
+      <span className={cn('flex min-w-0 flex-1 items-start gap-3', dim)}>
         <span
           aria-hidden
           className={cn(
-            'flex size-9 shrink-0 items-center justify-center rounded-lg',
-            !feed && 'mt-0.5',
+            'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg',
             'transition-colors duration-150 motion-reduce:transition-none',
             // The SAME activity test every other collab row uses, so a
             // muted-with-@you channel is warm on every surface.
@@ -135,8 +121,7 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
             <span
               title={channel.name}
               className={cn(
-                'min-w-0 truncate text-foreground',
-                feed ? 'text-sm' : 'text-[15px]',
+                'min-w-0 truncate text-[15px] text-foreground',
                 'transition-colors duration-150 group-hover:text-primary motion-reduce:transition-none',
                 unread ? 'font-semibold' : 'font-medium',
               )}
@@ -156,12 +141,7 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
               working", Arthur, 16 October 2026) hold their width after the
               preview, which is the part that truncates. With no preview the
               counts lead the line, so no empty span holds a gap before them. */}
-          <span
-            className={cn(
-              'flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground',
-              !feed && 'mt-0.5',
-            )}
-          >
+          <span className="mt-0.5 flex min-w-0 items-baseline gap-1 text-xs text-muted-foreground">
             {preview ? (
               <span className="min-w-0 truncate">
                 <ChannelPreviewText line={preview} />
@@ -176,7 +156,7 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
         </span>
       </span>
 
-      <span className={cn('flex shrink-0 items-center gap-2', !feed && 'mt-1')}>
+      <span className="mt-1 flex shrink-0 items-center gap-2">
         {/* OUTSIDE the dim wrapper, which is the only way it can stay at full
             strength on a muted row (Ruling A's one guaranteed-loud signal). */}
         {mentions > 0 ? (
@@ -194,14 +174,5 @@ export const SpaceChannelRow = memo(function SpaceChannelRow({
     </Link>
   );
 
-  return feed ? (
-    <li>
-      <div className="flex min-w-0 items-center gap-1">
-        {link}
-        {menuColumn ? <span aria-hidden className="size-9 shrink-0" /> : null}
-      </div>
-    </li>
-  ) : (
-    <li>{link}</li>
-  );
+  return <li>{link}</li>;
 });

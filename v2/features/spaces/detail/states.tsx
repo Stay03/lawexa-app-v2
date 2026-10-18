@@ -150,22 +150,15 @@ export function SpaceScreenFrame({
         )}
       </div>
 
-      {/* The live pill bar's box: the five pills, then the search. */}
+      {/* The live pill bar's box: the five pills (no search since 17 October
+          2026; the add control is the reader's role, so it is not reserved). */}
       <div aria-hidden className={SPACE_PILL_BAR}>
         <Skeleton className="h-9 w-[21rem] max-w-full shrink-0 rounded-full" />
-        {tab === 'people' ? null : <Skeleton className="h-11 min-w-0 flex-1 rounded-4xl" />}
       </div>
 
       <div className="mt-4">
-        {tab === 'people' ? (
-          // The People pill's own pending shape: the count line, then the rows.
-          <div className="flex flex-col gap-6">
-            <Skeleton className="h-4 w-24 rounded" />
-            <RosterSkeleton />
-          </div>
-        ) : (
-          <SpaceContentSkeleton />
-        )}
+        {/* People has no count line since item 1 (the header counts). */}
+        {tab === 'people' ? <RosterSkeleton /> : <SpaceContentSkeleton />}
       </div>
     </div>
   );

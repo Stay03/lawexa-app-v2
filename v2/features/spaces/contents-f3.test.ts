@@ -133,7 +133,8 @@ test('the home: a Viewer sees no add control, only the space Owner sees Remove f
   // Remove from space on the folder and file rows, for the space's Owner
   // only; a chat's row follows its `can` (the shared conversation menu).
   assert.equal(panel.match(/onRemoveFromSpace: canRemove \?/g)?.length, 2);
-  assert.match(panel, /actions=\{menu\.actionsFor\(entry\.item\)\}/);
+  assert.match(panel, /conversation: menu\.actionsFor,/);
+  assert.match(read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx'), /const actions = menus\.conversation\(conversation\);/);
   // Move on the folder and file rows, for the item's owner only.
   assert.match(panel, /onMove: ownsItem\(entry\.item\.user\?\.id, viewerId\) \? moveFolder : undefined/);
   assert.match(panel, /onMove: ownsItem\(file\.uploader\.id, viewerId\) \? moveFile : undefined/);
@@ -149,9 +150,10 @@ test('the folder and file menus carry the space rows only when the host passes t
   // Rename and Delete stay the owner's pair: never in a space tab's menu.
   assert.match(menu, /\{onRename \? \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuItem\s+variant="destructive"/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  // Rename stays the owner's: never in a space's menu. Delete is in it for
-  // files alone since 15 October 2026 (a space's file belongs to the space).
-  assert.doesNotMatch(panel, /onRename/);
+  // Rename (with Delete) on the reader's own folders only (Arthur, 17
+  // October 2026, item 6). Delete is in a file's menu since 15 October 2026
+  // (a space's file belongs to the space).
+  assert.match(panel, /onRename: ownsItem\(entry\.item\.user\?\.id, viewerId\) \? renameFolder : undefined,/);
   assert.equal((panel.match(/onDelete:/g) ?? []).length, 1);
   assert.match(panel, /onCopyToMine: copyFile,\s*onDelete: canDeleteSpaceFile\(/);
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
@@ -301,13 +303,12 @@ test('a file row names its type', () => {
   assert.equal(fileTypeLabel({ mime_type: 'image/png', original_name: 'scan.png' }), 'Image');
   assert.equal(fileTypeLabel({ mime_type: 'application/octet-stream', original_name: 'notes.txt' }), 'TXT');
   assert.equal(fileTypeLabel({ mime_type: 'application/octet-stream', original_name: 'README' }), 'File');
-  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
+  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
   // Design round 2: type and size are one element that holds its width, and
-  // only the uploader truncates (was
-  // `lead={[fileTypeLabel(file), formatBytes(file.size), file.uploader.name]}`).
+  // only the uploader truncates (kept in version A's row).
   assert.match(
     row,
-    /<span key="kind" className="flex shrink-0 items-center gap-2">\s*<span>\{fileTypeLabel\(file\)\}<\/span>\s*<MetaSeparator \/>\s*<span>\{formatBytes\(file\.size\)\}<\/span>\s*<\/span>,\s*file\.uploader\.name,/,
+    /<span className="shrink-0">\s*\{fileTypeLabel\(file\)\} · \{formatBytes\(file\.size\)\} ·\s*<\/span>\s*<span className="min-w-0 truncate">\{file\.uploader\.name\}<\/span>/,
   );
 });
 

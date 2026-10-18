@@ -31,7 +31,7 @@ test('the calls, the menu rows and the delete confirm', () => {
   const api = read('lib', 'api', 'collab.ts');
   assert.match(api, /apiClient\.post<ApiResponse<UserFile>>\(\s*`\/spaces\/\$\{spaceUuid\}\/files\/\$\{fileId\}\/copy-to-mine`\s*\)/);
   assert.match(api, /await apiClient\.delete\(`\/spaces\/\$\{spaceUuid\}\/files\/\$\{fileId\}`\);/);
-  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
+  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileMenu.tsx');
   assert.match(row, /<DropdownMenuItem onSelect=\{\(\) => onCopyToMine\(file\)\}>\s*<Copy \/>\s*Save a copy to my files/);
   assert.match(row, /<DropdownMenuItem variant="destructive" onSelect=\{\(\) => onDelete\(file\)\}>\s*<Trash2 \/>\s*Delete file/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');

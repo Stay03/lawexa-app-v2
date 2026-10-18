@@ -129,7 +129,9 @@ test('a picture file shows its thumbnail, else the picture glyph on the neutral 
   assert.match(mark, /if \(settled === 'failed'\) return <GlyphMark kind="image" box=\{box\} \/>;/);
   assert.match(mark, /const GROUND = 'bg-secondary text-muted-foreground';/);
   assert.match(mark, /<span className=\{cn\(box, 'relative block bg-secondary'\)\}>/);
-  // The space's file row wears the 36px box, the conversation row's tile (B4).
-  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileRow.tsx');
-  assert.match(row, /<FileMark file=\{\{ \.\.\.file, url: file\.url \?\? '' \}\} size="sm" \/>/);
+  // A space's list draws every kind with a plain icon and no tile (version
+  // A, Stay, 17 October 2026, 22:19 UTC), so its file rows wear no mark.
+  const row = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
+  assert.match(row, /icon: opening \? Loader2 : FileText,/);
+  assert.doesNotMatch(row, /FileMark/);
 });
