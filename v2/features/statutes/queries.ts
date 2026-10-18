@@ -72,12 +72,20 @@ export const statutesQueries = {
    * The `/statutes` browse list. Reference tier; the long gcTime also
    * preserves loaded pages (and therefore scroll position) across an
    * intra-session detour into a statute and back.
+   *
+   * A TO Z BY DEFAULT (Stay, 18 October 2026). The API orders a list by title
+   * only when it is asked (`sort=title`; without it, newest first), so the
+   * default is set here, in the key: the RSC prefetch reads its request off
+   * this key, and the server and the client stay one query.
    */
   infiniteList: ({
     viewerId,
-    ...params
-  }: Omit<StatuteListParams, 'page' | 'per_page'> & ViewerScoped) =>
-    infiniteQueryOptions({
+    sort = 'title',
+    order = 'asc',
+    ...rest
+  }: Omit<StatuteListParams, 'page' | 'per_page'> & ViewerScoped) => {
+    const params = { ...rest, sort, order };
+    return infiniteQueryOptions({
       meta: { persist: 'list' },
       queryKey: [
         ...statutesQueries.lists(),
@@ -98,7 +106,8 @@ export const statutesQueries = {
       },
       staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.list,
-    }),
+    });
+  },
 
   /**
    * The country facets behind the tabs — live endpoint first, seed fallback.
