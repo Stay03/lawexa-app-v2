@@ -342,11 +342,9 @@ export function SubfolderGapNote({
  * 17 October 2026, item 9: "Browse cases" was too narrow, and sent the reader
  * out of the space to file things). Its creator gets the folder's own ways in
  * as buttons (`FolderAddButtons`, passed in by the screen so this file, which
- * the loading frame imports, carries none of the upload code); a case, a
- * statute or a note is still filed
- * from its page, with "Add to folder" beside its bookmark star, until the
- * library picker lands. Anyone else is told who adds, with no button, since
- * the server refuses them.
+ * the loading frame imports, carries none of the upload code), cases,
+ * statutes and notes among them. Anyone else is told who adds, with no
+ * button, since the server refuses them.
  */
 export function FolderEmptyState({
   tab,
@@ -380,14 +378,14 @@ export function FolderEmptyState({
     );
   }
 
-  const files = inSpace ? 'Files from this space, uploads' : 'Uploads';
+  const files = inSpace ? 'files from this space, uploads,' : 'uploads,';
   return (
     <PageState
       icon={FolderOpen}
       title="Nothing in this folder yet"
       description={
         add
-          ? `Anything can go in a folder. ${files} and subfolders start here; for a case, a statute or a note, open it and choose “Add to folder”.`
+          ? `Anything can go in a folder: ${files} cases, statutes, notes and subfolders. Start here.`
           : 'Anything can go in a folder. Only the person who made it adds to it.'
       }
       action={add ?? undefined}

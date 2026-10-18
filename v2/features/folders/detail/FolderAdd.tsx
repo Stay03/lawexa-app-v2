@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Boxes, Check, FileText, FolderPlus, Loader2, Plus, Upload } from 'lucide-react';
+import { BookOpen, Boxes, Check, FileText, FolderPlus, Loader2, Plus, Upload, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -24,7 +24,6 @@ import { filesApi } from '@/lib/api/files';
 import { spacesApi } from '@/lib/api/collab';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatBytes } from '@/lib/utils/format-bytes';
-import type { SpaceFile } from '@/types/collab';
 import { ACCEPTED_FILE_TYPES, isImageAttachment } from '@/v2/features/conversations/attachment-rules';
 import { fileTypeLabel, uploadPrecheck } from '@/v2/features/spaces/content-model';
 import { invalidateSpaceContents } from '@/v2/features/spaces/content-mutations';
@@ -32,7 +31,12 @@ import { spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { foldersApi } from '../api';
-import { FOLDER_ITEM_INVALIDATES, isAlreadyInFolder, useAddItemToFolder } from '../item-mutations';
+import {
+  FOLDER_ITEM_INVALIDATES,
+  isAlreadyInFolder,
+  useAddItemToFolder,
+  type FolderItemTarget,
+} from '../item-mutations';
 
 /**
  * FolderAdd — how things get INTO a folder from the folder itself (Arthur, 17
@@ -51,8 +55,9 @@ import { FOLDER_ITEM_INVALIDATES, isAlreadyInFolder, useAddItemToFolder } from '
  *    (`POST /spaces/{uuid}/files`), so every member has it, and is then filed
  *    here; in a personal folder it goes to the reader's own files
  *    (`POST /files/documents`, or `POST /files` for a picture), then is filed.
- * Cases, statutes and notes are added from their own pages ("Add to folder")
- * until the library picker lands (the second push).
+ *  - Cases, statutes and notes: the library picker (`LibraryPicker`), the
+ *    cases and statutes lists and the reader's own notes, searched by the
+ *    server, each row with its own Add (the second push, 18 October 2026).
  *
  * ── ONLY THE FOLDER'S CREATOR ADDS ─────────────────────────────────────────
  * The server lets only the folder's creator add (`FolderService::canEdit`):
@@ -72,6 +77,7 @@ export interface AddChoices {
   newSubfolder: () => void;
   fromSpace: (() => void) | null;
   upload: () => void;
+  library: () => void;
 }
 
 const ADD_PILL = cn(
@@ -98,6 +104,10 @@ export function FolderAddMenu({ choices }: { choices: AddChoices }) {
           <Upload />
           Upload a file
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={choices.library}>
+          <BookOpen />
+          Cases, statutes and notes
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={choices.newSubfolder}>
           <FolderPlus />
           New subfolder
@@ -120,6 +130,10 @@ export function FolderAddButtons({ choices }: { choices: AddChoices }) {
       <Button type="button" size="sm" variant={choices.fromSpace ? 'outline' : 'default'} onClick={choices.upload}>
         <Upload aria-hidden className="size-4" />
         Upload a file
+      </Button>
+      <Button type="button" size="sm" variant="outline" onClick={choices.library}>
+        <BookOpen aria-hidden className="size-4" />
+        Cases, statutes and notes
       </Button>
       <Button type="button" size="sm" variant="outline" onClick={choices.newSubfolder}>
         <FolderPlus aria-hidden className="size-4" />
@@ -265,7 +279,14 @@ export function SpaceFilesDialog({
           ) : (
             <ul className="flex flex-col px-2">
               {files.map((file) => (
-                <SpaceFileChoice key={file.id} file={file} folderUuid={folder.uuid} />
+                <AddChoiceRow
+                  key={file.id}
+                  target={{ type: 'file', contentId: file.id }}
+                  icon={FileText}
+                  title={file.original_name}
+                  meta={`${fileTypeLabel(file)} · ${formatBytes(file.size)}`}
+                  folderUuid={folder.uuid}
+                />
               ))}
             </ul>
           )}
@@ -289,24 +310,38 @@ export function SpaceFilesDialog({
   );
 }
 
-function SpaceFileChoice({ file, folderUuid }: { file: SpaceFile; folderUuid: string }) {
-  const add = useAddItemToFolder({ type: 'file', contentId: file.id }, { silentError: true });
+/**
+ * One thing to add, with its own Add: a space's file, a case, a statute, a
+ * note. Filed by its numeric id. A thing the folder already holds answers
+ * "already in the folder" (a 422 with no `errors`), shown as done, not as a
+ * failure.
+ */
+export function AddChoiceRow({
+  target,
+  icon: Icon,
+  title,
+  meta,
+  folderUuid,
+}: {
+  target: FolderItemTarget;
+  icon: LucideIcon;
+  title: string;
+  meta: string;
+  folderUuid: string;
+}) {
+  const add = useAddItemToFolder(target, { silentError: true });
   const [state, setState] = useState<'idle' | 'added' | 'already' | 'failed'>('idle');
   const done = state === 'added' || state === 'already';
 
   return (
     <li className="flex min-h-14 items-center gap-3 rounded-xl px-1 py-2">
-      <FileText aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+      <Icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium text-foreground" title={file.original_name}>
-          {file.original_name}
+        <span className="block truncate text-sm font-medium text-foreground" title={title}>
+          {title}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
-          {state === 'already'
-            ? 'Already in this folder'
-            : state === 'failed'
-              ? 'Couldn’t add it. Try again.'
-              : `${fileTypeLabel(file)} · ${formatBytes(file.size)}`}
+          {state === 'already' ? 'Already in this folder' : state === 'failed' ? 'Couldn’t add it. Try again.' : meta}
         </span>
       </span>
       <Button
@@ -314,7 +349,7 @@ function SpaceFileChoice({ file, folderUuid }: { file: SpaceFile; folderUuid: st
         size="sm"
         variant={done ? 'ghost' : 'outline'}
         disabled={done || add.isPending}
-        aria-label={done ? `${file.original_name} is in this folder` : `Add ${file.original_name}`}
+        aria-label={done ? `${title} is in this folder` : `Add ${title}`}
         onClick={() =>
           add.mutate(
             { folderUuid },

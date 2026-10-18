@@ -58,6 +58,7 @@ import {
   type AddChoices,
 } from './FolderAdd';
 import { FolderDetailFallback } from './FolderDetailFallback';
+import { LibraryPicker } from './LibraryPicker';
 import { FolderItemRow } from './FolderItemRow';
 import { ItemTypeTabs } from './ItemTypeTabs';
 import { useScrolledTitle } from './use-scrolled-title';
@@ -173,8 +174,9 @@ function FolderBody({ uuid }: { uuid: string }) {
   // Move to space (Spaces F3). Held after closing so the dialog's exit plays;
   // each open bumps the key, so it starts clean.
   const [move, setMove] = useState({ open: false, key: 0 });
-  // Files from this space (item 8), held the same way.
+  // Files from this space and the library picker (item 8), held the same way.
   const [spaceFiles, setSpaceFiles] = useState({ open: false, key: 0 });
+  const [library, setLibrary] = useState({ open: false, key: 0 });
 
   const folderQuery = useQuery({
     ...foldersQueries.detail({ uuid, viewerId }),
@@ -497,6 +499,7 @@ function FolderBody({ uuid }: { uuid: string }) {
         newSubfolder: () => setCreatingSubfolder(true),
         fromSpace: space ? () => setSpaceFiles((previous) => ({ open: true, key: previous.key + 1 })) : null,
         upload: upload.pick,
+        library: () => setLibrary((previous) => ({ open: true, key: previous.key + 1 })),
       }
     : null;
   const showTabs = typesPresent.size > 1 || tab !== 'all';
@@ -808,6 +811,14 @@ function FolderBody({ uuid }: { uuid: string }) {
           item={{ type: 'folder', id: folder.uuid, name: row.name, space: folder.space }}
           open={removing.open}
           onOpenChange={(open) => setRemoving((previous) => ({ ...previous, open }))}
+        />
+      ) : null}
+      {library.key > 0 ? (
+        <LibraryPicker
+          key={library.key}
+          open={library.open}
+          onOpenChange={(open) => setLibrary((previous) => ({ ...previous, open }))}
+          folder={{ uuid: folder.uuid, name: row.name }}
         />
       ) : null}
       {move.key > 0 ? (

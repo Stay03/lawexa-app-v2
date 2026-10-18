@@ -76,10 +76,31 @@ test('files from the space are offered, chats are not', () => {
 test('the empty folder says anything can go in and starts from there', () => {
   const states = read('detail', 'states.tsx');
   assert.match(states, /title="Nothing in this folder yet"/);
-  assert.match(states, /`Anything can go in a folder\. \$\{files\} and subfolders start here; for a case, a statute or a note, open it and choose “Add to folder”\.`/);
+  assert.match(states, /`Anything can go in a folder: \$\{files\} cases, statutes, notes and subfolders\. Start here\.`/);
   assert.match(states, /'Anything can go in a folder\. Only the person who made it adds to it\.'/);
   assert.doesNotMatch(states, /<Link href="\/cases">Browse cases<\/Link>/);
   // The loading frame imports this file, so the buttons come from the screen.
   assert.doesNotMatch(states, /from '\.\/FolderAdd'/);
   assert.match(read('detail', 'FolderScreen.tsx'), /add=\{addChoices \? <FolderAddButtons choices=\{addChoices\} \/> : null\}/);
+});
+
+test('cases, statutes and notes are added from the folder too (the second push)', () => {
+  const add = read('detail', 'FolderAdd.tsx');
+  assert.match(add, /<DropdownMenuItem onSelect=\{choices\.library\}>\s*<BookOpen \/>\s*Cases, statutes and notes/);
+  assert.match(add, /<Button type="button" size="sm" variant="outline" onClick=\{choices\.library\}>/);
+  const picker = read('detail', 'LibraryPicker.tsx');
+  // The three libraries v2 already reads, searched by the server.
+  assert.match(picker, /casesQueries\.infiniteList\(\{ viewerId, search: term \|\| undefined \}\)/);
+  assert.match(picker, /statutesQueries\.infiniteList\(\{ viewerId, search: term \|\| undefined \}\)/);
+  assert.match(picker, /notesQueries\.mine\(\{ viewerId, search: term \|\| undefined \}\)/);
+  assert.match(picker, /const search = useServerSearch\(\);/);
+  // Every row files itself with its own numeric id, the same row the space's
+  // files use; a duplicate reads as done.
+  assert.match(picker, /target=\{\{ type, contentId: row\.id \}\}/);
+  assert.match(add, /export function AddChoiceRow\(/);
+  assert.match(add, /setState\(isAlreadyInFolder\(error\) \? 'already' : 'failed'\)/);
+  // A new tab is a fresh list, so no rows of the last kind show under its name.
+  assert.match(picker, /<CaseResults key="case"/);
+  // The screen opens it only for whoever may add.
+  assert.match(read('detail', 'FolderScreen.tsx'), /library: \(\) => setLibrary\(\(previous\) => \(\{ open: true, key: previous\.key \+ 1 \}\)\),/);
 });
