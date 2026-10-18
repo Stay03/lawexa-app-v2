@@ -254,6 +254,7 @@ function StatuteBody({
                 slug={slug}
                 provision={provision}
                 chatDocked={showDocked}
+                pauseMount={pageUnderChat}
                 registerLinkHandlers={registerLinkHandlers}
               />
             </article>

@@ -161,6 +161,7 @@ export function StatuteDocument({
   slug,
   provision,
   chatDocked = false,
+  pauseMount = false,
   registerLinkHandlers,
 }: {
   slug: string;
@@ -170,6 +171,9 @@ export function StatuteDocument({
    *  reader's choice): the rail steps out and the Contents pill shows at every
    *  width, so exactly one contents control exists at every width still. */
   chatDocked?: boolean;
+  /** Stop adding sections for now: the phone's full-screen chat covers the
+   *  page (and makes it inert). Resumes where it stopped when it goes. */
+  pauseMount?: boolean;
   /** Takes this document's landing and preview for the statute chat's links
    *  (`DocumentLinkHost`), and null when the document goes. */
   registerLinkHandlers?: (handlers: StatuteLinkHandlers | null) => void;
@@ -215,13 +219,21 @@ export function StatuteDocument({
   // then re-runs. `setState` lives in the timer callback, never the effect
   // body — the async escape the React Compiler lint permits — and the yield
   // between commits is what keeps the main thread responsive.
+  //
+  // IT WAITS WHILE THE PHONE CHAT COVERS THE PAGE (Arthur, 18 October 2026:
+  // on the ACJL "the whole screen freezes … force exit"). The chat makes the
+  // page under it `inert`, and WebKit (every iPhone browser) gets slower with
+  // each batch inserted into an inert subtree: 3.7 s, then 26 s, then 65 s a
+  // batch on the ACJL's 1194 parts, until the tab crashed. Measured live: the
+  // same open with the page not made inert mounted in about 5 s. Nobody can
+  // see the page under a full-screen chat, so the rest mounts after it closes.
   useEffect(() => {
-    if (blocks.length === 0 || mountedCount >= blocks.length) return;
+    if (pauseMount || blocks.length === 0 || mountedCount >= blocks.length) return;
     const timer = window.setTimeout(() => {
       setMountedCount((prev) => Math.min(prev + MOUNT_BATCH, blocks.length));
     }, MOUNT_YIELD_MS);
     return () => window.clearTimeout(timer);
-  }, [mountedCount, blocks.length]);
+  }, [pauseMount, mountedCount, blocks.length]);
 
   /* ── Researchers' notes (researcher and up; see notes/context.tsx) ────── */
 
