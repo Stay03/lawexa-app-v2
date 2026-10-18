@@ -27,10 +27,20 @@ test('the "+" is a labelled Add with the folder’s ways in', () => {
 
 test('only the folder’s creator gets Add, as the server allows', () => {
   const screen = read('detail', 'FolderScreen.tsx');
-  assert.match(screen, /const canAdd = viewerId !== null && folder\?\.user\?\.id === viewerId;/);
-  assert.match(screen, /const addChoices: AddChoices \| null = canAdd\s*\?/);
+  assert.match(screen, /const canEdit = viewerId !== null && folder\?\.user\?\.id === viewerId;/);
+  assert.match(screen, /const addChoices: AddChoices \| null = canEdit\s*\?/);
   // "Files from this space" only for a folder in a space.
   assert.match(screen, /fromSpace: space \? \(\) => setSpaceFiles\(/);
+});
+
+test('only the folder’s creator gets "Remove from folder" on its rows, as the server allows', () => {
+  // `FolderService::canEdit` authorises add and remove alike: a member of the
+  // folder's space who did not make it gets a 403 (techlead, 18 October 2026).
+  const screen = read('detail', 'FolderScreen.tsx');
+  assert.match(screen, /<FolderItemRow[\s\S]*?canRemove=\{canEdit\}/);
+  const row = read('detail', 'FolderItemRow.tsx');
+  assert.match(row, /canRemove: boolean;/);
+  assert.match(row, /\{canRemove \? <RemoveFromFolderButton row=\{row\} folderUuid=\{folderUuid\} \/> : null\}/);
 });
 
 test('an upload goes to its store first, then into the folder', () => {

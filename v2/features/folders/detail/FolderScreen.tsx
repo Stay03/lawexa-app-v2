@@ -360,9 +360,11 @@ function FolderBody({ uuid }: { uuid: string }) {
   const ownsSpace = spaceDetail !== null && canRemoveFromSpace(spaceDetail);
   // Remove from space, held after closing so the dialog's exit plays.
   const [removing, setRemoving] = useState({ open: false, key: 0 });
-  // Only the folder's creator may add to it (`FolderService::canEdit`); a
-  // member of the folder's space who did not make it is refused with a 403.
-  const canAdd = viewerId !== null && folder?.user?.id === viewerId;
+  // Only the folder's creator may add to it or take an item out of it
+  // (`FolderService::canEdit`, which authorises both); a member of the
+  // folder's space who did not make it is refused with a 403, so neither
+  // control is offered to them.
+  const canEdit = viewerId !== null && folder?.user?.id === viewerId;
   const upload = useFolderUpload({
     uuid,
     name: headerRow?.name ?? '',
@@ -483,7 +485,7 @@ function FolderBody({ uuid }: { uuid: string }) {
   const trail = formatRelativeTime(row.trailAt, now);
   const space = folder.space ?? null;
   // The ways into this folder (items 8 and 9), for whoever may add.
-  const addChoices: AddChoices | null = canAdd
+  const addChoices: AddChoices | null = canEdit
     ? {
         newSubfolder: () => setCreatingSubfolder(true),
         fromSpace: space ? () => setSpaceFiles((previous) => ({ open: true, key: previous.key + 1 })) : null,
@@ -687,6 +689,7 @@ function FolderBody({ uuid }: { uuid: string }) {
                   key={`${item.type}-${item.itemId}`}
                   row={item}
                   folderUuid={uuid}
+                  canRemove={canEdit}
                   index={(showSubfolders ? childRows.length : 0) + index}
                   now={now}
                 />

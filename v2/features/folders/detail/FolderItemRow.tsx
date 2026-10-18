@@ -72,12 +72,16 @@ const TYPE_ICON: Record<FolderItemRowModel['type'], LucideIcon> = {
 export const FolderItemRow = memo(function FolderItemRow({
   row,
   folderUuid,
+  canRemove,
   index,
   now,
 }: {
   row: FolderItemRowModel;
   /** The folder this row is filed in — what the removal addresses. */
   folderUuid: string;
+  /** The folder's creator only (`FolderService::canEdit`): anyone else's
+   *  removal is refused with a 403, so they are not offered one. */
+  canRemove: boolean;
   /** Staggers the entrance for the first screenful only. */
   index: number;
   /** Frozen clock for the relative "added" label — threaded from the browser's
@@ -155,7 +159,7 @@ export const FolderItemRow = memo(function FolderItemRow({
           </div>
         )}
 
-        <RemoveFromFolderButton row={row} folderUuid={folderUuid} />
+        {canRemove ? <RemoveFromFolderButton row={row} folderUuid={folderUuid} /> : null}
       </div>
     </li>
   );
