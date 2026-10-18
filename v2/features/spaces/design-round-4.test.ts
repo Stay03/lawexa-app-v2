@@ -130,8 +130,11 @@ test('a picture file shows its thumbnail, else the picture glyph on the neutral 
   assert.match(mark, /const GROUND = 'bg-secondary text-muted-foreground';/);
   assert.match(mark, /<span className=\{cn\(box, 'relative block bg-secondary'\)\}>/);
   // A space's list draws every kind with a plain icon and no tile (version
-  // A, Stay, 17 October 2026, 22:19 UTC), so its file rows wear no mark.
+  // A, Stay, 17 October 2026, 22:19 UTC), so its file rows wear no mark; the
+  // file's card does (option a, 18 October 2026).
   const row = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
-  assert.match(row, /icon: opening \? Loader2 : FileText,/);
+  assert.match(row, /icon: FileText,/);
   assert.doesNotMatch(row, /FileMark/);
+  const card = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileCard.tsx');
+  assert.match(card, /<FileMark file=\{file\} \/>/);
 });

@@ -226,10 +226,12 @@ test('the content feed: its own key under spaces, read-only rows', () => {
     panel,
     /const itemKey = \(entry: SpaceItem\): string =>\s*entry\.type === 'folder' \|\| entry\.type === 'channel' \|\| entry\.type === 'thread'\s*\? `\$\{entry\.type\}:\$\{entry\.item\.uuid\}`\s*: `\$\{entry\.type\}:\$\{entry\.item\.id\}`;/,
   );
-  // Files open through the tap-first opener, never the channel download hook.
-  const fileRow = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
-  assert.match(fileRow, /const \{ open, opening, failed, gone \} = useOpenFileInNewTab\(\);/);
-  assert.doesNotMatch(fileRow, /useDownloadChannelFile/);
+  // Files open through the tap-first opener, from the file's card (its row
+  // opens the card), never the channel download hook.
+  const card = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileCard.tsx');
+  assert.match(card, /const \{ open, opening, failed, gone \} = useOpenFileInNewTab\(\);/);
+  assert.doesNotMatch(card, /useDownloadChannelFile/);
+  assert.doesNotMatch(read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx'), /useOpenFileInNewTab|useDownloadChannelFile/);
   // Deleting or leaving a space drops its cached contents with it.
   const mutations = read('v2', 'features', 'spaces', 'mutations.ts');
   assert.equal(

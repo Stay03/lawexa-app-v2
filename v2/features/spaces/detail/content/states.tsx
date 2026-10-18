@@ -41,10 +41,10 @@ import { spaceEmptyCopy, type SpaceContentTab } from '../../content-model';
 
 export type { SpaceContentTab };
 
-/** One feed row at its real geometry (`feed-rows`' `Line`). */
+/** One feed row at its real geometry (`feed-rows`' `Line`; no row has a menu column). */
 function FeedRowSkeleton() {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex min-w-0">
       <div className="flex min-h-14 min-w-0 flex-1 items-center gap-3 px-3 py-2.5">
         <Skeleton className="size-5 shrink-0 rounded" />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -55,7 +55,6 @@ function FeedRowSkeleton() {
           <Skeleton className="h-3 w-1/3 rounded" />
         </div>
       </div>
-      <span aria-hidden className="size-9 shrink-0" />
     </div>
   );
 }

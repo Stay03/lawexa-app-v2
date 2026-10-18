@@ -6,7 +6,6 @@ import {
   FileText,
   Folder,
   GitBranch,
-  Loader2,
   MessageSquare,
   ShieldCheck,
   type LucideIcon,
@@ -18,7 +17,6 @@ import type { Channel, SpaceFile, SpaceItem } from '@/types/collab';
 import type { ConversationListItem } from '@/types/chat';
 import { channelVisibilityFace } from '@/lib/collab/visibility';
 import { channelUnreadGrammar } from '@/v2/features/channels/model';
-import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { channelDisplayName, threadUnreadState } from '@/v2/features/channels/thread-model';
 import {
   channelStatusCountsLine,
@@ -33,7 +31,6 @@ import { folderCountsLabel, type FolderRowModel } from '@/v2/features/folders/fo
 import { CountBadge, FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { MoveFirstLink } from '@/v2/shell/move-first';
 import { fileTypeLabel } from '../../content-model';
-import { SpaceFileMenu } from './SpaceFileMenu';
 
 /**
  * feed-rows — the rows of a space's one list (Stay picked version A, 17
@@ -54,22 +51,18 @@ import { SpaceFileMenu } from './SpaceFileMenu';
  * NO "…" ON A ROW (Stay, 18 October 2026, 10:46 UTC: the dots on the right
  * "create lack of uniformity"; the options belong in "the three dots on top
  * right of each page"). A chat's actions are in its page's ⋮, a folder's in
- * the folder page's, so every row's time and count end at the same edge. A
- * file has no page yet, so its row keeps its "…" until Stay picks where a
- * file's actions live; only a row with a menu draws the column.
+ * the folder page's, and a file's in the card its row opens (`SpaceFileCard`,
+ * Stay, 18 October 2026, 12:50 UTC, option a), so every row's time and count
+ * end at the same edge.
  *
  * A folder's time sits on its name line with its counts under it, one unit
  * like every other row (Arthur, 17 October 2026, item 5).
  */
 
-/** What the feed decides for its rows: a file's menu, a folder's model, a chat's byline. */
+/** What the feed decides for its rows: a file's card, a folder's model, a chat's byline. */
 export interface FeedRowMenus {
-  file: (file: SpaceFile) => {
-    onMove?: (file: SpaceFile) => void;
-    onRemoveFromSpace?: (file: SpaceFile) => void;
-    onCopyToMine?: (file: SpaceFile) => void;
-    onDelete?: (file: SpaceFile) => void;
-  };
+  /** Opens the file's card (its name, "Open file" and its ⋮). */
+  openFile: (file: SpaceFile) => void;
   folderRow: (entry: Extract<SpaceItem, { type: 'folder' }>) => FolderRowModel;
   byline: (item: ConversationListItem) => string;
 }
@@ -90,11 +83,6 @@ interface LineModel {
   time: string;
   /** The @you count, under the time. */
   mentions?: number;
-  menu?: ReactNode;
-  /** The icon turns: a file opening. */
-  busy?: boolean;
-  /** A line under the row, indented to the name: a file's failed open. */
-  note?: ReactNode;
 }
 
 const BODY = cn(
@@ -119,7 +107,6 @@ function Line({
         aria-hidden
         className={cn(
           'size-5 shrink-0',
-          line.busy && 'animate-spin',
           line.warm ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
         )}
       />
@@ -158,15 +145,7 @@ function Line({
   );
 
   return (
-    <li>
-      <div className="flex min-w-0 items-center gap-1">
-        {render(BODY, content)}
-        {/* A file's "…" while files have no page of their own; no other row has one. */}
-        {line.menu ? <span className="flex size-9 shrink-0 items-center justify-center">{line.menu}</span> : null}
-      </div>
-      {/* Indented to the name: the body's px-3, the 20px icon and its gap-3. */}
-      {line.note ? <div className="pb-1 pl-11 text-[11px] text-muted-foreground">{line.note}</div> : null}
-    </li>
+    <li className="flex min-w-0">{render(BODY, content)}</li>
   );
 }
 
@@ -205,20 +184,15 @@ function roomLink(href: string) {
 }
 
 /**
- * A file opens through the tap-first opener (`useOpenFileInNewTab`), which
- * reports only a real refusal (`failed`) or a file that no longer exists
- * (`gone`, a 404). A gone file has nothing to open, so its body is plain text
- * and says so; a refused open offers a fresh tap, which an engine that refused
- * the first one will honour.
+ * A file's row opens its card (`SpaceFileCard`): the open itself, with its
+ * "Couldn't open it" and "no longer available", and the file's actions live
+ * there, so the row is one plain button like every other row's one link.
  */
 function FeedFileRow({ file, now, menus }: { file: SpaceFile; now: number; menus: FeedRowMenus }) {
-  // Per row: one opener shared by the list would turn every row's icon at once.
-  const { open, opening, failed, gone } = useOpenFileInNewTab();
   return (
     <Line
       line={{
-        icon: opening ? Loader2 : FileText,
-        busy: opening,
+        icon: FileText,
         title: file.original_name,
         // The type and size hold their width; only the uploader's name
         // truncates on a phone (design round 2).
@@ -231,37 +205,12 @@ function FeedFileRow({ file, now, menus }: { file: SpaceFile; now: number; menus
           </span>
         ),
         time: formatRelativeTime(file.created_at, now),
-        menu: <SpaceFileMenu file={file} {...menus.file(file)} />,
-        note: gone ? (
-          <p role="status">This file is no longer available.</p>
-        ) : failed ? (
-          <p role="status" className="flex items-center gap-2">
-            <span>Couldn&rsquo;t open it.</span>
-            <button
-              type="button"
-              onClick={() => open(file.id)}
-              className={cn('rounded font-medium text-foreground underline underline-offset-2', FOCUS_RING)}
-            >
-              Try again
-            </button>
-          </p>
-        ) : null,
       }}
-      render={(className, content) =>
-        gone ? (
-          <div className={className}>{content}</div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => open(file.id)}
-            disabled={opening}
-            className={cn(className, 'disabled:cursor-progress')}
-          >
-            <span className="sr-only">Open </span>
-            {content}
-          </button>
-        )
-      }
+      render={(className, content) => (
+        <button type="button" onClick={() => menus.openFile(file)} aria-haspopup="dialog" className={className}>
+          {content}
+        </button>
+      )}
     />
   );
 }

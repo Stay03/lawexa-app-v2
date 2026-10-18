@@ -103,7 +103,7 @@ test('the move dialog puts an outlined Cancel first in the DOM, reversed on a de
   assert.doesNotMatch(footer, /variant="ghost"|<span aria-hidden \/>/);
 });
 
-/* ── SHOULD 7: the file row's body opens the file ────────────────────────── */
+/* ── SHOULD 7: the file row's body is its one control ───────────────────── */
 
 test('the file row body is the open control, at least 44px tall', () => {
   // Version A's one row (Stay, 17 October 2026, 22:19 UTC): the body is
@@ -111,20 +111,13 @@ test('the file row body is the open control, at least 44px tall', () => {
   const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
   assert.match(rows, /'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2\.5 text-left',/);
   const file = rows.slice(rows.indexOf('function FeedFileRow('), rows.indexOf('/** One row of the feed, for any kind. */'));
+  // Since 18 October 2026 (Stay, option a) it opens the file's card; the open
+  // itself, its failure line and "no longer available" are in the card.
   assert.match(
     file,
-    /<button\s+type="button"\s+onClick=\{\(\) => open\(file\.id\)\}\s+disabled=\{opening\}\s+className=\{cn\(className, 'disabled:cursor-progress'\)\}\s*>\s*<span className="sr-only">Open <\/span>/,
+    /<button type="button" onClick=\{\(\) => menus\.openFile\(file\)\} aria-haspopup="dialog" className=\{className\}>/,
   );
-  // A file that is gone has nothing to open: plain text, and it says so.
-  assert.match(file, /gone \? \(\s*<div className=\{className\}>\{content\}<\/div>/);
-  assert.match(file, /This file is no longer available\./);
-  // The menu is the right column, a sibling of the body, never inside it.
-  assert.match(file, /menu: <SpaceFileMenu file=\{file\} \{\.\.\.menus\.file\(file\)\} \/>,/);
-  assert.match(rows, /\{render\(BODY, content\)\}\s*\{\/\*[^*]*\*\/\}\s*\{line\.menu \? <span className="flex size-9 shrink-0 items-center justify-center">\{line\.menu\}<\/span> : null\}/);
-  // The failure line, with its own Try again button, sits under the row,
-  // outside the body.
-  assert.match(file, /note: gone \? \([\s\S]*?Couldn&rsquo;t open it\.[\s\S]*?Try again/);
-  assert.match(rows, /\{line\.note \? <div className="pb-1 pl-11 text-\[11px\] text-muted-foreground">\{line\.note\}<\/div> : null\}/);
+  assert.doesNotMatch(file, /menu:|note:|open\(file\.id\)/);
 });
 
 /* ── SHOULD 8 and round 0 #2: the bar menu's rules ───────────────────────── */

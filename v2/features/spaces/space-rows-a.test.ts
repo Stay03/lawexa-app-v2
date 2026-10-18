@@ -62,6 +62,7 @@ test('the People tab has no count line of its own (item 1)', () => {
 test('the skeleton is the feed row, so the list lands without moving', () => {
   const states = read('v2', 'features', 'spaces', 'detail', 'content', 'states.tsx');
   assert.match(states, /<Skeleton className="size-5 shrink-0 rounded" \/>/);
-  assert.match(states, /<span aria-hidden className="size-9 shrink-0" \/>/);
+  // No row has a menu column (Stay, 18 October 2026), so neither does the skeleton.
+  assert.doesNotMatch(states, /size-9 shrink-0/);
   assert.doesNotMatch(states, /ConversationsListSkeleton/);
 });
