@@ -22,6 +22,7 @@ import {
   NoteUnavailableState,
   isNoteUnavailable,
 } from './states';
+import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 
 /**
  * NoteScreen — the `/notes/[slug]` client root.
@@ -52,6 +53,9 @@ import {
  */
 export function NoteScreen({ slug }: { slug: string }) {
   const { signedIn, userId } = useV2Session();
+  // A visitor who is not signed in gets a guest pass in a moment
+  // (guest-pass.tsx); until then this is a load, not a sign-in wall.
+  const guestPassFailed = useGuestPassFailed();
   const pathname = usePathname() ?? '';
 
   const query = useQuery({
@@ -92,6 +96,7 @@ export function NoteScreen({ slug }: { slug: string }) {
   }, [pathname, own]);
   useEffect(() => () => clearScreenContext(), []);
 
+  if (!signedIn && !guestPassFailed) return <NoteFallback />;
   if (!signedIn) {
     return (
       <div className={NOTE_COLUMN}>

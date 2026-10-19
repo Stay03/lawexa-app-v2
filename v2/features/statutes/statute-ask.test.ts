@@ -37,7 +37,8 @@ test('a statute chat starts with a statute reference and keeps its own draft and
 test('the statute page hosts the case page’s chat, the same in every part', () => {
   const source = screen();
   assert.match(source, /const subject = useMemo<ChatSubject>\(\(\) => \(\{ kind: 'statute', slug \}\), \[slug\]\);/);
-  assert.match(source, /\} = useDocumentChat\(subject, signedIn\);/);
+  // The chat belongs to an account; a guest pass reads the statute (guest-pass.test.ts).
+  assert.match(source, /\} = useDocumentChat\(subject, hasAccount\);/);
   assert.match(source, /<CaseAskDock\s+subject=\{subject\}/);
   assert.match(source, /<CaseChatDocked\s+chatId=\{renderedChat\}/);
   // The chat reads `?chat=`, so the screen has its own boundary.

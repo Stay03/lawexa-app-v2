@@ -69,5 +69,6 @@ test('the conversation list and the home mount it for a signed-in reader', () =>
   const list = read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx');
   assert.match(list, /usePreloadConversationScreen\(signedIn\);/);
   const home = read('app', 'v2', 'home.tsx');
-  assert.match(home, /const \{ name, signedIn, role, userId \} = useV2Session\(\);[\s\S]*?usePreloadConversationScreen\(signedIn\);/);
+  // An account's home only: a guest pass has no chats (v2/runtime/account.ts).
+  assert.match(home, /const signedIn = sessionSignedIn && isAccountRole\(role\);[\s\S]*?usePreloadConversationScreen\(signedIn\);/);
 });

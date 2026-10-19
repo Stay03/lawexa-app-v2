@@ -33,6 +33,8 @@ import {
   NotesListSkeleton,
   NotesSignedOutState,
 } from './states';
+import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
+import { NotesFallback } from './NotesFallback';
 
 /**
  * NotesBrowser — the `/notes` body, and the `useSearchParams` consumer (so it
@@ -100,6 +102,9 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 export function NotesBrowser() {
   const { signedIn, userId: viewerId, role } = useV2Session();
+  // A visitor who is not signed in gets a guest pass in a moment
+  // (guest-pass.tsx); until then this is a load, not a sign-in wall.
+  const guestPassFailed = useGuestPassFailed();
   const searchParams = useSearchParams();
   const tab = parseNotesTab(searchParams.get('tab'));
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
@@ -180,6 +185,7 @@ export function NotesBrowser() {
   // query can never strand the list at reduced opacity.
   const dim = query.isPlaceholderData && query.isFetching;
 
+  if (!signedIn && !guestPassFailed) return <NotesFallback />;
   if (!signedIn) {
     return (
       <PageShell>

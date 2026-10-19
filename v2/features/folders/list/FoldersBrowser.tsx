@@ -32,6 +32,8 @@ import {
   FoldersNextPageSkeleton,
   FoldersSignedOutState,
 } from './states';
+import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
+import { FoldersFallback } from './FoldersFallback';
 
 /**
  * FoldersBrowser — the `/folders` body, and the `useSearchParams` consumer (so
@@ -86,6 +88,9 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 export function FoldersBrowser() {
   const { signedIn, userId: viewerId } = useV2Session();
+  // A visitor who is not signed in gets a guest pass in a moment
+  // (guest-pass.tsx); until then this is a load, not a sign-in wall.
+  const guestPassFailed = useGuestPassFailed();
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
   const activeSearch = committedSearch.trim();
   // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
@@ -197,6 +202,7 @@ export function FoldersBrowser() {
   const total =
     typeof serverTotal === 'number' ? Math.max(0, serverTotal - hiddenLoaded) : null;
 
+  if (!signedIn && !guestPassFailed) return <FoldersFallback />;
   if (!signedIn) {
     return (
       <PageShell>

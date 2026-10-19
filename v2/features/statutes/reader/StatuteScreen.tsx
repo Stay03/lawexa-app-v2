@@ -30,6 +30,8 @@ import {
   isNotFound,
   isRateLimited,
 } from './states';
+import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
+import { isAccountRole } from '@/v2/runtime/account';
 
 /** Focus that lands in the text under the phone chat goes back to the chat. */
 function returnFocusToChat(event: FocusEvent<HTMLElement>) {
@@ -84,7 +86,13 @@ function StatuteBody({
   slug: string;
   provision: string | null;
 }) {
-  const { signedIn, userId } = useV2Session();
+  const { signedIn, userId, role } = useV2Session();
+  // The chat belongs to an account; a guest pass reads the statute and meets
+  // the chat as a visitor (v2/runtime/account.ts).
+  const hasAccount = signedIn && isAccountRole(role);
+  // A visitor who is not signed in gets a guest pass in a moment
+  // (guest-pass.tsx); until then this is a load, not a sign-in wall.
+  const guestPassFailed = useGuestPassFailed();
 
   const query = useQuery({
     ...statutesQueries.detail(slug),
@@ -140,9 +148,9 @@ function StatuteBody({
     showDocked,
     pageUnderChat,
     setDockedPref,
-  } = useDocumentChat(subject, signedIn);
+  } = useDocumentChat(subject, hasAccount);
   // The chat's code arrives while the page is idle, so the tap does not wait for it.
-  useIdlePreloadCaseChat(signedIn);
+  useIdlePreloadCaseChat(hasAccount);
 
   // The resting dock's height, for the Contents pill to stand above. Written on
   // the pill itself and outside React, so a measure re-renders nothing and
@@ -189,6 +197,7 @@ function StatuteBody({
     [slug, statuteTitle, phone, chatShown, closeChat],
   );
 
+  if (!signedIn && !guestPassFailed) return <StatuteFallback />;
   if (!signedIn) {
     return (
       <div className={STATUTE_COLUMN}>
@@ -283,7 +292,7 @@ function StatuteBody({
               {showDock ? (
                 <CaseAskDock
                   subject={subject}
-                  signedIn={signedIn}
+                  signedIn={hasAccount}
                   viewerId={userId}
                   start={start}
                   view={dockOwnsChat ? renderedChat : null}
@@ -305,7 +314,7 @@ function StatuteBody({
                 chatId={renderedChat}
                 closing={chatClosing}
                 subject={subject}
-                signedIn={signedIn}
+                signedIn={hasAccount}
                 viewerId={userId}
                 start={start}
                 onClose={closeChat}

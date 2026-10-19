@@ -5,6 +5,7 @@ import { Landmark, SearchX, WifiOff, type LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { retryGuestPass } from '@/v2/runtime/guest-pass';
 
 /**
  * The `/statutes` page states — the same three-state contract every v2 query
@@ -143,21 +144,26 @@ export function StatutesEmptyState({
 }
 
 /**
- * Signed-out state — the query is gated off, so this replaces a 401 error.
+ * No guest pass — shown only when one could not be had.
  * MEASURED July 31, 2026: `GET /api/statutes` answers **401** with no bearer
  * token (a guest token reads it; no token does not). Same reasoning as the
- * cases list's signed-out state.
+ * cases list's panel.
  */
 export function StatutesSignedOutState() {
   return (
     <PageState
       icon={Landmark}
-      title="Sign in to browse statutes"
-      description="The statute library is available once you're signed in."
+      title="Couldn't open the statute library"
+      description="Reading starts without an account. Try again, or sign in."
       action={
-        <Button asChild size="sm">
-          <Link href="/login">Sign in</Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button size="sm" onClick={retryGuestPass}>
+            Try again
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/login">Sign in</Link>
+          </Button>
+        </div>
       }
     />
   );

@@ -50,6 +50,7 @@ import {
 } from './nav.config';
 import { MoveFirstLink } from './move-first';
 import { RecentChatLabel, recentSpaceName } from './recent-chat-label';
+import { isAccountRole } from '@/v2/runtime/account';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
@@ -151,7 +152,8 @@ function SidebarNavGroup({
 export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const isMobile = useIsMobile();
   const pathname = usePathname();
-  const signedIn = !!user;
+  // Recents belong to an account; a guest pass has none (v2/runtime/account.ts).
+  const signedIn = !!user && isAccountRole(user.role);
   // The cache PARTITION for the recents key (see `ViewerScoped`). Taken from the
   // SERVER-verified user the layout already threads in here — no hook needed, and
   // it is the same id `V2SessionProvider` publishes.

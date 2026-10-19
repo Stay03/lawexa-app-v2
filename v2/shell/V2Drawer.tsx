@@ -43,6 +43,7 @@ import {
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 import { MoveFirstLink } from './move-first';
 import { RecentChatLabel, recentSpaceName } from './recent-chat-label';
+import { isAccountRole } from '@/v2/runtime/account';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -135,7 +136,8 @@ function DrawerNavGroup({
 export function V2Drawer({ user }: { user: SessionUser | null }) {
   const { openMobile, setOpenMobile } = useSidebar();
   const pathname = usePathname();
-  const signedIn = !!user;
+  // Recents belong to an account; a guest pass has none (v2/runtime/account.ts).
+  const signedIn = !!user && isAccountRole(user.role);
   // The cache PARTITION for the recents key (see `ViewerScoped`). Taken from the
   // SERVER-verified user the layout already threads in here — no hook needed, and
   // it is the same id `V2SessionProvider` publishes.

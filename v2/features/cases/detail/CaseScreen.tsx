@@ -25,6 +25,7 @@ import {
   CaseHardLimitState,
   CaseNotFoundState,
 } from './states';
+import { isAccountRole } from '@/v2/runtime/account';
 
 // TEMPORARY, with its file: live viewport numbers for an iPhone recording,
 // loaded only with `?kbdebug=1` on the address (see KeyboardDebugReadout).
@@ -62,7 +63,10 @@ export function CaseScreen({ slug }: { slug: string }) {
 }
 
 function CaseBody({ slug }: { slug: string }) {
-  const { signedIn, userId } = useV2Session();
+  const { signedIn: sessionSignedIn, userId, role } = useV2Session();
+  // The chat belongs to an account; a guest pass reads the case and meets the
+  // chat as a visitor (v2/runtime/account.ts).
+  const signedIn = sessionSignedIn && isAccountRole(role);
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('q')?.trim() || undefined;
   const keyboardDebug = searchParams.get('kbdebug') === '1';

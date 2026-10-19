@@ -30,6 +30,8 @@ import { V2PushLifecycle } from '@/v2/runtime/push/lifecycle';
 import { V2PushTapListener } from '@/v2/runtime/push/tap-listener';
 import { ServiceWorkerMount } from '@/v2/runtime/sw/ServiceWorkerMount';
 import { RealtimeSpine } from '@/v2/runtime/realtime/spine';
+import { isAccountRole } from '@/v2/runtime/account';
+import { GuestPass } from '@/v2/runtime/guest-pass';
 import { SessionSync } from './session-sync';
 import '@/v2/shell/shell.css';
 /* v2-only colour corrections, scoped to `html.v2-document-lock` for the same
@@ -181,6 +183,10 @@ export default async function V2Layout({
           only when — its sync actually changed the identity the server can see.
           The no-loop argument lives in that module's docblock. */}
       <SessionSync serverSignedIn={!!session} serverUserId={user?.id ?? null} />
+      {/* A visitor who is not signed in reads as a guest, as in v1: this mints
+          the guest pass in the browser, and SessionSync above carries it to the
+          server. Renders nothing. See v2/runtime/guest-pass.tsx. */}
+      <GuestPass serverSignedIn={!!session} />
       {/* Keyboard-inset sync — writes `--keyboard-inset` for the shell height
           (foundation-standards.md §4). Renders null. Self-calibrating: ≈0 on
           browsers that resize the layout viewport; the real keyboard height on
@@ -234,7 +240,7 @@ export default async function V2Layout({
         {/* The pages kept on the device are dropped when the reader's plan
             changes, so a case kept under a paid plan never paints under a free
             one. Reads the query the account row already runs. Renders null. */}
-        <PlanCacheWatch userId={user?.id ?? null} />
+        <PlanCacheWatch userId={user && isAccountRole(user.role) ? user.id : null} />
         {/* THE SAME BOUNDARY, FOR THE DEVICE. The cache guard above owns what is
             in memory in the query client; this owns what the channels feature
             left on `localStorage` — the previous reader's half-written messages

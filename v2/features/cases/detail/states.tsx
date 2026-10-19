@@ -145,7 +145,8 @@ export function CaseNotFoundState() {
  * Gold, not red. A limit is an invitation to upgrade, not a failure — the same
  * distinction the composer's block banner draws.
  */
-export function ViewLimitNotice({ message }: { message?: string }) {
+export function ViewLimitNotice({ message, guest = false }: { message?: string; guest?: boolean }) {
+  if (guest) return <GuestSummaryNotice />;
   return (
     <div className="flex flex-col items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-5">
       <span
@@ -173,6 +174,54 @@ export function ViewLimitNotice({ message }: { message?: string }) {
         Upgrade plan
         <ArrowUpRight aria-hidden className="size-4" />
       </Link>
+    </div>
+  );
+}
+
+/**
+ * A GUEST's case (v2 Stage 1, item 1): the API sends a visitor without an
+ * account the case with no summary (`limit_exceeded`, principles kept). That
+ * is not a monthly limit, so it does not say so; it says what an account gives
+ * and offers one, with the way in for someone who already has one. The same
+ * door as the statute paywall's guest copy (`StatutePaywall`).
+ */
+function GuestSummaryNotice() {
+  return (
+    <div className="flex flex-col items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-5">
+      <span
+        aria-hidden
+        className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
+      >
+        <Lock className="size-5" />
+      </span>
+      <div className="space-y-1">
+        <p className="text-sm font-semibold text-foreground">Create a free account to read the summary</p>
+        <p className="max-w-md text-sm text-muted-foreground">
+          The principles are open to everyone. The full case summary comes with a free Lawexa
+          account.
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href="/register"
+          className={cn(
+            'v2-interactive inline-flex min-h-9 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+            FOCUS_RING,
+          )}
+        >
+          Create an account
+          <ArrowUpRight aria-hidden className="size-4" />
+        </Link>
+        <Link
+          href="/login"
+          className={cn(
+            'v2-interactive inline-flex min-h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+            FOCUS_RING,
+          )}
+        >
+          Sign in
+        </Link>
+      </div>
     </div>
   );
 }

@@ -32,6 +32,8 @@ import {
   NextPageSkeleton,
   TrendingEmptyState,
 } from './states';
+import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
+import { CasesFallback } from './CasesFallback';
 
 /**
  * CasesBrowser — the `/cases` body, and the `useSearchParams` consumer (so it
@@ -90,6 +92,9 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 export function CasesBrowser() {
   const { signedIn, userId: viewerId, role } = useV2Session();
+  // A visitor who is not signed in gets a guest pass in a moment
+  // (guest-pass.tsx); until then this is a load, not a sign-in wall.
+  const guestPassFailed = useGuestPassFailed();
   const searchParams = useSearchParams();
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
   const [requestOpen, setRequestOpen] = useState(false);
@@ -169,6 +174,7 @@ export function CasesBrowser() {
   // query can never strand the list at reduced opacity with pointer-events off.
   const dim = query.isPlaceholderData && query.isFetching;
 
+  if (!signedIn && !guestPassFailed) return <CasesFallback />;
   if (!signedIn) {
     return (
       <PageShell>

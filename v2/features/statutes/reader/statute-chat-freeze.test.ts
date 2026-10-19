@@ -67,7 +67,7 @@ test('the text is parsed in its own idle task, after the chat has opened', () =>
 
 test("the chat's code is fetched while the statute page is idle, before any tap", () => {
   const screen = read('StatuteScreen.tsx');
-  assert.match(screen, /useIdlePreloadCaseChat\(signedIn\);/);
+  assert.match(screen, /useIdlePreloadCaseChat\(hasAccount\);/);
   const core = readFileSync(join(here, '..', '..', 'cases', 'detail', 'CaseChatCore.tsx'), 'utf8');
   assert.match(core, /if \(!preloadAllowed\(connection\)\) return;/);
   assert.match(core, /window\.requestIdleCallback\(preloadCaseChat, \{ timeout: IDLE_PRELOAD_TIMEOUT_MS \}\)/);

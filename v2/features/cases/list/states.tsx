@@ -5,6 +5,7 @@ import { FileQuestion, Scale, SearchX, TrendingUp, WifiOff, type LucideIcon } fr
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { retryGuestPass } from '@/v2/runtime/guest-pass';
 
 /**
  * The `/cases` page states. Same three-state contract every v2 query region
@@ -173,24 +174,30 @@ export function TrendingEmptyState() {
 }
 
 /**
- * Signed-out state — the query is gated off, so this replaces a 401 error.
+ * No guest pass — shown only when one could not be had.
  *
  * MEASURED, not assumed (July 25, 2026): `GET /api/cases` answers **401** with
- * no bearer token. v1 never shows that because it silently mints a GUEST token
- * for every visitor (`useGuestAuth`); v2 has no equivalent yet, so a v2 session
- * with no token would otherwise land on "Couldn't load cases", which blames the
- * network for an auth wall. This says the true thing instead.
+ * no bearer token and 200 with a guest token. A visitor who is not signed in
+ * gets that guest token (`v2/runtime/guest-pass.tsx`, as v1's `useGuestAuth`
+ * does) and reads; until it arrives the browser shows the library's loading
+ * shape. This panel is for the mint that failed: it says so, offers the retry,
+ * and the way in for someone with an account.
  */
 export function CasesSignedOutState() {
   return (
     <PageState
       icon={Scale}
-      title="Sign in to browse cases"
-      description="The case library is available once you're signed in."
+      title="Couldn't open the case library"
+      description="Reading starts without an account. Try again, or sign in."
       action={
-        <Button asChild size="sm">
-          <Link href="/login">Sign in</Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button size="sm" onClick={retryGuestPass}>
+            Try again
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/login">Sign in</Link>
+          </Button>
+        </div>
       }
     />
   );

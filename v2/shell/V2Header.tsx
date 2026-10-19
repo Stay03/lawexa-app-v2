@@ -34,6 +34,7 @@ import { hasOpenBar } from './top-level-route';
 import { useScreenContext } from './screen-context';
 import { NO_BREADCRUMB_DATA, breadcrumbTrail } from './breadcrumb-trail';
 import { V2Breadcrumb } from './V2Breadcrumb';
+import { isAccountRole } from '@/v2/runtime/account';
 
 /**
  * THE SEE-THROUGH BAR'S CONTROLS, on a top-level screen below `md:` — a SOLID
@@ -201,7 +202,8 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // the collab frame publishes it. `null` everywhere else, and every branch
   // below falls back to exactly what it did before.
   const collab = useCollabHeader();
-  const signedIn = !!user;
+  // The bell belongs to an account; a guest pass has no notifications.
+  const signedIn = !!user && isAccountRole(user.role);
   const railCollapsed = state === 'collapsed';
 
   // Every home ROUTE shows the tab control, not just the root — Work and Study are

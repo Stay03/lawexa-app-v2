@@ -6,6 +6,7 @@ import { getSessionToken } from '@/v2/runtime/session-token';
 import { verifySession } from '@/v2/runtime/session';
 import { getServerQueryClient } from '@/v2/runtime/query';
 import { conversationsQueries, INFINITE_RECENTS_PARAMS } from './queries';
+import { isAccountRole } from '@/v2/runtime/account';
 
 /**
  * conversations — server prefetch (wave-4 RSC hydration).
@@ -153,6 +154,8 @@ export async function prefetchRecentsState(): Promise<DehydratedState | undefine
     // A cookie that no longer resolves to a user: hydrate nothing. Writing under a
     // `null` partition would seed the GUEST entry with a signed-in user's rows.
     if (!session) return undefined;
+    // A guest pass has no chats: nothing to seed (v2/runtime/account.ts).
+    if (!isAccountRole(session.user.role)) return undefined;
     const viewerId = session.user.id;
 
     queryClient.setQueryData(

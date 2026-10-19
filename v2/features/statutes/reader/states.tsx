@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { retryGuestPass } from '@/v2/runtime/guest-pass';
 
 /** The reading column every statute surface shares — heading, document, states. */
 export const STATUTE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
@@ -192,17 +193,22 @@ export function StatuteNotFoundState() {
   );
 }
 
-/** The signed-out gate — same measured fact as the list (401 without a token). */
+/** No guest pass — same measured fact as the list (401 without a token, 200 with a guest's). */
 export function StatuteSignedOutState() {
   return (
     <PageState
       icon={Landmark}
-      title="Sign in to read this statute"
-      description="Statute texts are available once you're signed in."
+      title="Couldn't open this statute"
+      description="Reading starts without an account. Try again, or sign in."
       action={
-        <Button asChild size="sm">
-          <Link href="/login">Sign in</Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button size="sm" onClick={retryGuestPass}>
+            Try again
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/login">Sign in</Link>
+          </Button>
+        </div>
       }
     />
   );

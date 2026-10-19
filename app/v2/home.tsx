@@ -6,6 +6,7 @@ import type { HomeTab } from '@/v2/shell/home-tabs';
 import { ChatHome } from '@/v2/shell/designs/ChatHome';
 import { WorkHome } from '@/v2/shell/designs/WorkHome';
 import { StudyHome } from '@/v2/shell/designs/StudyHome';
+import { isAccountRole } from '@/v2/runtime/account';
 
 /**
  * V2Home — the shared body of the three home ROUTES. Each route (`/`, `/work`,
@@ -55,7 +56,10 @@ import { StudyHome } from '@/v2/shell/designs/StudyHome';
  * the marker present.
  */
 export function V2Home({ tab }: { tab: HomeTab }) {
-  const { name, signedIn, role, userId } = useV2Session();
+  const { name, signedIn: sessionSignedIn, role, userId } = useV2Session();
+  // The home's chats and its composer belong to an account. A guest pass reads
+  // the libraries but meets the home as a visitor (v2/runtime/account.ts).
+  const signedIn = sessionSignedIn && isAccountRole(role);
   // Every tab opens chats (its recents, the rail and the drawer over it), so the
   // chat screen's code loads while the home sits idle (preload-conversation-screen.ts).
   usePreloadConversationScreen(signedIn);

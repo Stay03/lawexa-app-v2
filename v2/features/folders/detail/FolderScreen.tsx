@@ -74,6 +74,7 @@ import {
   HiddenItemsNote,
   SubfolderGapNote,
 } from './states';
+import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 
 /**
  * FolderScreen — `/folders/[uuid]`: one folder, and everything in it.
@@ -136,6 +137,9 @@ export function FolderScreen({ uuid }: { uuid: string }) {
 
 function FolderBody({ uuid }: { uuid: string }) {
   const { signedIn, userId: viewerId } = useV2Session();
+  // A visitor who is not signed in gets a guest pass in a moment
+  // (guest-pass.tsx); until then this is a load, not a sign-in wall.
+  const guestPassFailed = useGuestPassFailed();
   const router = useRouter();
   const pathname = usePathname() ?? '';
   const searchParams = useSearchParams();
@@ -434,6 +438,7 @@ function FolderBody({ uuid }: { uuid: string }) {
   }, [pathname, back, actions]);
   useEffect(() => () => clearScreenContext(), []);
 
+  if (!signedIn && !guestPassFailed) return <FolderDetailFallback />;
   if (!signedIn) {
     return (
       <div className={LIST_COLUMN}>

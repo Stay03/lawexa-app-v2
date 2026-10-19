@@ -34,6 +34,8 @@ import {
   StatutesListSkeleton,
   StatutesSignedOutState,
 } from './states';
+import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
+import { StatutesFallback } from './StatutesFallback';
 
 /**
  * StatutesBrowser — the `/statutes` body, and the `useSearchParams` consumer
@@ -83,6 +85,9 @@ function PageShell({ children }: { children: React.ReactNode }) {
 
 export function StatutesBrowser() {
   const { signedIn, userId: viewerId } = useV2Session();
+  // A visitor who is not signed in gets a guest pass in a moment
+  // (guest-pass.tsx); until then this is a load, not a sign-in wall.
+  const guestPassFailed = useGuestPassFailed();
   const searchParams = useSearchParams();
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
   // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
@@ -156,6 +161,7 @@ export function StatutesBrowser() {
   // query can never strand the list at reduced opacity.
   const dim = query.isPlaceholderData && query.isFetching;
 
+  if (!signedIn && !guestPassFailed) return <StatutesFallback />;
   if (!signedIn) {
     return (
       <PageShell>

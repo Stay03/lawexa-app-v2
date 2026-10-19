@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { NotesTab } from './NoteTabs';
+import { retryGuestPass } from '@/v2/runtime/guest-pass';
 
 /**
  * The `/notes` library states — the three-state contract every v2 query region
@@ -251,17 +252,22 @@ export function NotesErrorState({
   );
 }
 
-/** Signed out — the queries are gated off, so this replaces a 401 screen. */
+/** No guest pass — the reads answer 401 without a token, so this replaces that screen. */
 export function NotesSignedOutState() {
   return (
     <PageState
       icon={NotebookPen}
-      title="Sign in to read notes"
-      description="Notes shared by the Lawexa community — and your own — are available once you're signed in."
+      title="Couldn't open the notes"
+      description="Reading starts without an account. Try again, or sign in."
       action={
-        <Button asChild size="sm">
-          <Link href="/login">Sign in</Link>
-        </Button>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button size="sm" onClick={retryGuestPass}>
+            Try again
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/login">Sign in</Link>
+          </Button>
+        </div>
       }
     />
   );

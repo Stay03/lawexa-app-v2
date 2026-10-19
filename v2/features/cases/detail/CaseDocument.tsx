@@ -14,6 +14,7 @@ import type {
   RelatedCase,
   ReportPrinciple,
 } from '@/types/case';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { TabRow } from '@/v2/shell/TabRow';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -153,6 +154,8 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const name = formatCaseName(raw);
   const date = formatCaseDate(detail.judgment_date, 'long');
   const isLimited = detail.limit_exceeded === true;
+  // A guest's case comes without its summary: the notice offers an account.
+  const guest = useV2Session().role === 'guest';
   const countryCode = toAlpha2(detail.country?.code, detail.country?.abbreviation);
 
   const principles = [...(detail.report_principles ?? [])].sort(
@@ -308,7 +311,7 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       >
         <SectionHeading label="Case summary" />
         {isLimited ? (
-          <ViewLimitNotice message={detail.limit_message} />
+          <ViewLimitNotice message={detail.limit_message} guest={guest} />
         ) : summary ? (
           <div className="doc-prose">
             <CaseText value={summary} />
