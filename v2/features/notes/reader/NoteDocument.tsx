@@ -1,12 +1,8 @@
 'use client';
 
-import Link from 'next/link';
-import { Boxes } from 'lucide-react';
-
 import { cn } from '@/lib/utils';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { NoteRecord } from '../types';
-import { noteCopyLine } from '../note-copy';
+import { noteSpace } from '../note-copy';
 import { formatNoteDate, noteDisplayTitle, noteHasTitle } from '../note-text';
 import { NoteActions } from './NoteActions';
 import { NoteContent } from './NoteContent';
@@ -26,8 +22,6 @@ import './note-document.css';
  *   title       the note's name, or "Untitled" in a quieter ink
  *   draft mark  ONLY on the author's own unpublished note, and it says what
  *               being a draft actually means rather than just labelling it
- *   copy line   ONLY on a Space's copy: the Space it belongs to, and, for
- *               the original's owner, the note it was copied from
  *   actions     save · copy link · export · edit
  *
  * v1's `NoteDetailHeader` put a thumbnail, a tag row, a price and a status
@@ -61,7 +55,11 @@ export function NoteDocument({
   const body = note.content?.trim() ?? '';
   const isOwn = editHref !== null;
   const isOwnDraft = isOwn && note.status !== 'published';
-  const copy = noteCopyLine(note);
+  // A Space's copy reads as a plain note (Stay, 19 October 2026: "No need
+  // for all that", like a copied file in a file explorer): no Space label,
+  // no link to the original. It only offers no "Add to folder", since the
+  // server files a copy in its own Space's folders alone.
+  const isSpaceCopy = noteSpace(note) !== null;
 
   // THE WAY BACK LEFT THIS BLOCK (phase 7). It was an "← Notes" chip at y76
   // under a bar that already showed this note's name and the hamburger. The
@@ -107,39 +105,6 @@ export function NoteDocument({
           </p>
         ) : null}
 
-        {/* A Space's copy says whose it is, so nobody takes it for the original:
-            an edit here changes the Space's note, and the original stays
-            as it was. */}
-        {copy ? (
-          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-            <p className="flex items-center gap-2">
-              <Boxes aria-hidden className="size-4 shrink-0" />
-              <span className="min-w-0">
-                In{' '}
-                <Link
-                  href={copy.spaceHref}
-                  className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
-                >
-                  {copy.spaceName}
-                </Link>
-              </span>
-            </p>
-            {/* Its own line, so a long title never leaves a separator
-                hanging at the end of the space's line. */}
-            {copy.original ? (
-              <p className="pl-6">
-                Copied from your note{' '}
-                <Link
-                  href={copy.original.href}
-                  className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
-                >
-                  {copy.original.title}
-                </Link>
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
         <NoteActions
           noteId={note.id}
           slug={note.slug}
@@ -148,7 +113,7 @@ export function NoteDocument({
           bookmarksCount={note.bookmarks_count}
           canExport={body.length > 0}
           editHref={editHref}
-          canAddToFolder={copy === null}
+          canAddToFolder={!isSpaceCopy}
         />
       </header>
 

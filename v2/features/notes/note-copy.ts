@@ -11,8 +11,9 @@ import type { NoteRecord } from './types';
  *  - A copy stays private to the Space. The server refuses to publish it,
  *    make it public or price it (a 422, "A Space note stays private to the
  *    Space."), so no copy shows those controls.
- *  - `copied_from` reaches the original's owner only; anyone else gets
- *    `null`, so a private original's name never reaches the Space.
+ *  - A copy reads as a plain note (Stay, 19 October 2026: "No need for all
+ *    that", as a copied file in a file explorer): no Space label and no link
+ *    to the original, though the server sends `copied_from` to its owner.
  */
 
 /** The Space a note is a copy for, or `null` for every other note. */
@@ -31,20 +32,4 @@ export function mayEditNote(
 ): boolean {
   if (note.is_space_copy === true) return note.can_edit === true;
   return viewerId !== null && note.user?.id === viewerId;
-}
-
-/** The copy line for a Space note: where it lives, and, for its author, what it came from. */
-export function noteCopyLine(note: Pick<NoteRecord, 'is_space_copy' | 'space' | 'copied_from'>): {
-  spaceName: string;
-  spaceHref: string;
-  original: { href: string; title: string } | null;
-} | null {
-  const space = noteSpace(note);
-  if (!space) return null;
-  const from = note.copied_from ?? null;
-  return {
-    spaceName: space.name,
-    spaceHref: `/spaces/${space.uuid}`,
-    original: from ? { href: `/notes/${from.slug}`, title: from.title?.trim() || 'Untitled' } : null,
-  };
 }

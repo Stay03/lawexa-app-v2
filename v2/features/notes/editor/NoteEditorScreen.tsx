@@ -433,16 +433,9 @@ export function NoteEditorScreen({
               "Published" that reopens the same sheet. */}
           {/* A Space's copy stays private to the Space: the server refuses to
               publish it, make it public or price it (422), so it has no
-              Publish, only where it lives. */}
-          {record && copySpace ? (
-            <span
-              className="inline-flex min-h-9 max-w-48 items-center gap-2 rounded-full border border-border px-3 text-sm text-muted-foreground"
-              title={`Private to ${copySpace.name}`}
-            >
-              <Lock aria-hidden className="size-4 shrink-0" />
-              <span className="truncate">{copySpace.name}</span>
-            </span>
-          ) : record ? (
+              Publish. And it reads as a plain note (Stay, 19 October 2026: "No
+              need for all that"), so nothing takes the slot. */}
+          {record && copySpace ? null : record ? (
             record.status === 'published' ? (
               <button
                 type="button"
