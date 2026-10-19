@@ -66,17 +66,9 @@ test('a guest pass and a crawler have no sign-up to finish', () => {
   }
 });
 
-test('done means what v1 means: a completion date or a profession', () => {
+test('the session reads the onboarding rule from onboarding-finished.ts', () => {
   const session = read('v2', 'runtime', 'session.ts');
-  assert.match(
-    session,
-    /onboarding_complete: !!\(user\.profile\?\.onboarding_completed_at \|\| user\.profile\?\.profession\),/,
-  );
-  // v1's own rule, the one the onboarding page agrees with.
-  assert.match(
-    read('lib', 'stores', 'authStore.ts'),
-    /const hasCompletedOnboarding = !!\(user\.profile\?\.onboarding_completed_at \|\| user\.profile\?\.profession\);/,
-  );
+  assert.match(session, /onboarding_complete: onboardingFinished\(user\.profile\),/);
 });
 
 test('the layout sends an unfinished account away before any page of the new design renders', () => {

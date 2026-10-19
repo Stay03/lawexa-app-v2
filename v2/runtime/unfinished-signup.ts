@@ -15,10 +15,11 @@ import type { SessionUser } from './session';
  * they are done, which is the new design again. Guests and crawlers have no
  * sign-up to finish.
  *
- * DONE MEANS WHAT v1 MEANS, EXACTLY: a completion date or a profession on the
- * profile (`lib/stores/authStore.ts`). The onboarding page sends a reader it
- * considers done straight back to `/`; a stricter rule here than there would
- * bounce that reader between the two.
+ * DONE: a completion date, or a profession on an account that never started
+ * the current onboarding (`onboarding-finished.ts`; v1's "date or
+ * profession" let a lawyer who stopped part-way in, 19 October 2026). The
+ * onboarding page sends a reader to `/` only when the server says completed,
+ * which this rule always agrees with, so no reader bounces between the two.
  *
  * Null: nothing to finish.
  */

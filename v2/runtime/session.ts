@@ -5,6 +5,7 @@ import type { AuthProvider, User, UserRole } from '@/types/auth';
 import { apiFetch } from './api-server';
 import { resolveSessionWith, type SessionResolution } from './session-resolve';
 import { getSessionToken } from './session-token';
+import { onboardingFinished } from './onboarding-finished';
 
 export { getSessionToken };
 
@@ -85,10 +86,10 @@ export interface SessionUser {
    */
   can_access_team_channels: boolean;
   /**
-   * Has the account finished onboarding? v1's rule exactly: a completion date
-   * or a profession on the profile (`lib/stores/authStore.ts`). The layout
-   * sends an unfinished account to the onboarding steps
-   * (`unfinished-signup.ts`).
+   * Has the account finished onboarding? A completion date, or, for an
+   * account that never started the current onboarding, a profession
+   * (`onboarding-finished.ts`). The layout sends an unfinished account to
+   * the onboarding steps (`unfinished-signup.ts`).
    */
   onboarding_complete: boolean;
 }
@@ -122,7 +123,7 @@ function toSessionDTO(
       // Beside the user, like `is_ambassador`, never inside it: the user
       // resource also describes other people (backend, 11 October 2026).
       can_access_team_channels: data?.can_access_team_channels === true,
-      onboarding_complete: !!(user.profile?.onboarding_completed_at || user.profile?.profession),
+      onboarding_complete: onboardingFinished(user.profile),
     },
   };
 }
