@@ -171,8 +171,10 @@ export const AknBlockView = memo(function AknBlockView({
       // `akn-cv` = content-visibility: auto — offscreen body blocks skip
       // layout and paint entirely (the big-document lever, with progressive
       // mounting). Division headings stay always-rendered: they are tiny,
-      // and keeping them laid out makes outline jumps land exactly.
-      className="akn-block akn-cv"
+      // and keeping them laid out makes outline jumps land exactly. An
+      // oversized block (`OVERSIZED_BLOCK_ELEMENTS`, akn.ts) stays laid out
+      // too: skipping it froze the iPhone chat on the ISA 2025.
+      className={block.oversized ? 'akn-block' : 'akn-block akn-cv'}
     >
       {renderElement(block.element, 0, true)}
     </div>

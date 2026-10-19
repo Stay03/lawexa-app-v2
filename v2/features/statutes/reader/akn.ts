@@ -38,6 +38,46 @@
 
 export type AknBlockKind = 'division' | 'crossheading' | 'body';
 
+/**
+ * The most elements a body block may hold and still skip its layout while
+ * offscreen (`content-visibility: auto`, the `.akn-cv` rule in
+ * statute-document.css).
+ *
+ * A skipped block stands in at an 18rem placeholder until it is laid out.
+ * One section far larger than that estimate costs WebKit a full layout of it
+ * every time the page around it changes size, even 70,000 px away: the
+ * Investments and Securities Act 2025's s.357 (987 source elements, 113 KB,
+ * 43,847 px tall on a phone) made the iPhone chat take 8.5-10.4 s to open and
+ * 16 s to close; without the skip it was 1.1-1.2 s and 2.2 s (measured on
+ * lawexa.com, 19 October 2026). An oversized block is laid out once, like
+ * any visible block, and stays laid out.
+ *
+ * The count is of source elements below the block's root. 400 sits well
+ * above every ordinary section (CAMA's largest has 110; the next largest ISA
+ * section is a fifth of s.357 by size) and well below s.357, so only outliers
+ * change.
+ */
+export const OVERSIZED_BLOCK_ELEMENTS = 400;
+
+/**
+ * Whether an element holds more than `OVERSIZED_BLOCK_ELEMENTS` elements
+ * below it. Walks `children` only, and stops as soon as the count passes the
+ * limit, so an ordinary section costs a few hundred steps at most.
+ */
+export function isOversizedBlock(element: Pick<Element, 'children'>): boolean {
+  let count = 0;
+  const stack: Pick<Element, 'children'>[] = [element];
+  while (stack.length > 0) {
+    const next = stack.pop()!;
+    for (const child of Array.from(next.children)) {
+      count += 1;
+      if (count > OVERSIZED_BLOCK_ELEMENTS) return true;
+      stack.push(child);
+    }
+  }
+  return false;
+}
+
 export interface AknBlock {
   /** Stable React key within one parsed document. */
   key: string;
@@ -52,6 +92,12 @@ export interface AknBlock {
   element: Element;
   /** Structural nesting depth (0 = top-level part/chapter) — heading scale. */
   depth: number;
+  /**
+   * A body block too large to skip while offscreen (`isOversizedBlock`): it
+   * renders without `content-visibility`. Always `false` for divisions and
+   * crossheadings.
+   */
+  oversized: boolean;
 }
 
 export interface AknOutlineSection {
@@ -276,8 +322,12 @@ class ModelBuilder {
     return `akn-x${this.serial}`;
   }
 
-  private push(block: Omit<AknBlock, 'key'>): void {
-    this.blocks.push({ ...block, key: block.id ?? `b${this.blocks.length}` });
+  private push(block: Omit<AknBlock, 'key' | 'oversized'>): void {
+    this.blocks.push({
+      ...block,
+      key: block.id ?? `b${this.blocks.length}`,
+      oversized: block.kind === 'body' && isOversizedBlock(block.element),
+    });
   }
 
   /**
