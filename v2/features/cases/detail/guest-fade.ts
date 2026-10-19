@@ -24,6 +24,41 @@ export function guestFadesPrinciples(
 }
 
 /**
+ * A guest's case without its summary ends at the account offer: nothing is
+ * drawn under it, and the outline rail has nothing to map (Stay, 19 October
+ * 2026, 14:57 UTC: "There should be nothing under the create account area at
+ * the bottom").
+ */
+export function guestEndsAtTheOffer(
+  detail: Pick<CaseDetail, 'limit_exceeded'>,
+  role: string | null | undefined,
+): boolean {
+  return role === 'guest' && detail.limit_exceeded === true;
+}
+
+/**
+ * Which ONE block of principles a guest reads before the offer (Stay, 19
+ * October 2026, 14:57 UTC: "only one piece of text that should show and
+ * fade. Either principle only or editorial principles only"). The preferred
+ * kind when the case has it, else the other. One setting, so the pick can
+ * change in one place: {@link GUEST_PRINCIPLES_FIRST}.
+ */
+export type GuestPrinciplesSource = 'editorial' | 'report';
+
+/** The kind a guest reads when a case has both. */
+export const GUEST_PRINCIPLES_FIRST: GuestPrinciplesSource = 'editorial';
+
+export function guestPrinciplesSource(
+  detail: GuestFadeCase,
+  first: GuestPrinciplesSource = GUEST_PRINCIPLES_FIRST,
+): GuestPrinciplesSource | null {
+  const editorial = !!detail.principles?.trim();
+  const report = (detail.report_principles?.length ?? 0) > 0;
+  if (first === 'editorial') return editorial ? 'editorial' : report ? 'report' : null;
+  return report ? 'report' : editorial ? 'editorial' : null;
+}
+
+/**
  * What a guest's "Full judgment" button does. A guest's case carries no
  * report text (`full_report` null, backend, 19 October 2026), so the button
  * leads to the account offer, never to an empty report page (Stay, 14:07 UTC:

@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { fullReportAction, guestFadesPrinciples } from './guest-fade';
+import {
+  GUEST_PRINCIPLES_FIRST,
+  fullReportAction,
+  guestEndsAtTheOffer,
+  guestFadesPrinciples,
+  guestPrinciplesSource,
+} from './guest-fade';
 
 /* v2 Stage 1, item 1, A2 (Stay, 19 October 2026: 13:06 UTC picked A2; 14:07
  * "1. Remove the chat text area 2. Make sure full report button is there
@@ -48,11 +54,11 @@ test('the guest’s principles: the first whole, the next fading, then the offer
   assert.match(doc, /const faded = entries\.length > 1 \? entries\[1\] : entries\[0\];/);
   assert.match(doc, /<NumberedPrinciple key=\{faded\.key\} index=\{full \? 1 : 0\} className="doc-guest-fade">/);
   assert.match(doc, /<\/ol>\s*<GuestOffer \/>\s*<\/section>/);
-  // Report principles (Stay, 14:17 UTC): the editorial headnote stays whole above them.
-  assert.match(doc, /overview=\{principles\.length > 0 \? detail\.principles\?\.trim\(\) \|\| null : null\}/);
-  assert.match(doc, /\{overview \? \(\s*<>\s*<div className="doc-prose">\s*<CaseText value=\{overview\} \/>/);
+  // One block only (Stay, 14:57 UTC), the kind the switch picks.
+  assert.match(doc, /const guestSource = guestFade \? guestPrinciplesSource\(detail\) : null;/);
+  assert.match(doc, /entries=\{\s*guestSource === 'report'\s*\? principles\.map/);
+  assert.doesNotMatch(doc, /function GuestPrinciples\(\{\s*overview/);
   assert.match(doc, /\{guestFade \? null : \(\s*<section\s*id=\{SECTION\.summary\}/);
-  assert.match(doc, /if \(!guestFadesPrinciples\(detail, role\)\) sections\.push\(\{ id: SECTION\.summary, label: 'Summary' \}\);/);
   assert.match(detail('CaseScreen.tsx'), /const outline = buildCaseOutline\(detail, role\);/);
   // A mask, so the fade works on either theme's ground.
   const css = detail('case-document.css');
@@ -60,6 +66,28 @@ test('the guest’s principles: the first whole, the next fading, then the offer
   const states = detail('states.tsx');
   assert.match(states, /title="Create a free account to read the case"\s*body="The full principles and the case summary come with a free Lawexa account\."/);
   assert.match(states, /className="flex scroll-mt-6 flex-col items-start gap-3 border-t border-border\/60 pt-5"/);
+});
+
+test('one block of principles: editorial first, report principles when there is no editorial text', () => {
+  const both = { principles: 'FIXTURE.', report_principles: [principle] };
+  assert.equal(GUEST_PRINCIPLES_FIRST, 'editorial');
+  assert.equal(guestPrinciplesSource(both), 'editorial');
+  assert.equal(guestPrinciplesSource({ principles: ' ', report_principles: [principle] }), 'report');
+  assert.equal(guestPrinciplesSource({ principles: 'FIXTURE.' }), 'editorial');
+  assert.equal(guestPrinciplesSource({}), null);
+  // The switch, should the pick change to report principles first.
+  assert.equal(guestPrinciplesSource(both, 'report'), 'report');
+  assert.equal(guestPrinciplesSource({ principles: 'FIXTURE.' }, 'report'), 'editorial');
+});
+
+test('a guest’s page ends at the offer: nothing under it, and no outline rail', () => {
+  assert.equal(guestEndsAtTheOffer({ limit_exceeded: true }, 'guest'), true);
+  assert.equal(guestEndsAtTheOffer({ limit_exceeded: true }, 'user'), false);
+  assert.equal(guestEndsAtTheOffer({ limit_exceeded: false }, 'guest'), false);
+  const doc = detail('CaseDocument.tsx');
+  assert.match(doc, /\{guestEndsAtOffer \? null : \(\s*<>\s*\{\/\* ── Depth/);
+  assert.match(doc, /<AboutThisCase detail=\{detail\} countryCode=\{countryCode\} \/>\s*<\/>\s*\)\}\s*<\/article>/);
+  assert.match(doc, /if \(guestEndsAtTheOffer\(detail, role\)\) return \[\];/);
 });
 
 test('a visitor without an account has no chat box on a case', () => {

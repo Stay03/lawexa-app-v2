@@ -37,7 +37,13 @@ import { CitedBySection } from './CitedBySection';
 import { CaseText, caseTextParagraphs } from './case-text';
 import type { OutlineSection } from './CaseOutline';
 import { SectionHeading } from './SectionHeading';
-import { fullReportAction, guestFadesPrinciples, hasPrinciples } from './guest-fade';
+import {
+  fullReportAction,
+  guestEndsAtTheOffer,
+  guestFadesPrinciples,
+  guestPrinciplesSource,
+  hasPrinciples,
+} from './guest-fade';
 import { GuestOffer, ViewLimitNotice } from './states';
 import './case-masthead.css';
 import './case-document.css';
@@ -125,9 +131,11 @@ export function buildCaseOutline(
   detail: CaseDetail,
   role: string | null | undefined,
 ): OutlineSection[] {
+  // A guest's page is one block and the offer: there is nothing to map.
+  if (guestEndsAtTheOffer(detail, role)) return [];
   const sections: OutlineSection[] = [];
   if (hasPrinciples(detail)) sections.push({ id: SECTION.principles, label: 'Principles' });
-  if (!guestFadesPrinciples(detail, role)) sections.push({ id: SECTION.summary, label: 'Summary' });
+  sections.push({ id: SECTION.summary, label: 'Summary' });
   if ((detail.court_history?.length ?? 0) > 0)
     sections.push({ id: SECTION.history, label: 'Case history' });
   if (groupStatutes(detail.statutes_cited ?? []).length > 0)
@@ -160,6 +168,8 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const role = useV2Session().role;
   const guest = role === 'guest';
   const guestFade = guestFadesPrinciples(detail, role);
+  const guestSource = guestFade ? guestPrinciplesSource(detail) : null;
+  const guestEndsAtOffer = guestEndsAtTheOffer(detail, role);
   const countryCode = toAlpha2(detail.country?.code, detail.country?.abbreviation);
 
   const principles = [...(detail.report_principles ?? [])].sort(
@@ -295,14 +305,9 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       {/* ── The law. ────────────────────────────────────────────────────── */}
       {guestFade ? (
         <GuestPrinciples
-          overview={principles.length > 0 ? detail.principles?.trim() || null : null}
-          sub={
-            principles.length > 0 && !detail.principles?.trim()
-              ? 'Verbatim from the judgment.'
-              : undefined
-          }
+          sub={guestSource === 'report' ? 'Verbatim from the judgment.' : undefined}
           entries={
-            principles.length > 0
+            guestSource === 'report'
               ? principles.map((principle) => ({
                   key: String(principle.id),
                   text: principle.principle,
@@ -357,37 +362,43 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
         </section>
       )}
 
-      {/* ── Depth: the chain, the authorities. ──────────────────────────── */}
-      {history.length > 0 ? <CaseHistory steps={history} /> : null}
+      {/* A guest's page ends at the offer (Stay, 14:57 UTC: "There should be
+          nothing under the create account area at the bottom"). */}
+      {guestEndsAtOffer ? null : (
+        <>
+          {/* ── Depth: the chain, the authorities. ──────────────────────────── */}
+          {history.length > 0 ? <CaseHistory steps={history} /> : null}
 
-      <AuthorityList
-        id={SECTION.statutes}
-        label="Statutes cited"
-        sub="Legislation this judgment applied."
-        items={statuteItems}
-      />
-      <AuthorityList
-        id={SECTION.cited}
-        label="Cases cited"
-        sub="Authorities this judgment relied on."
-        items={citedItems}
-      />
-      <CitedBySection
-        id={SECTION.citedBy}
-        slug={detail.slug}
-        total={citedByTotal(detail)}
-        caseName={name}
-        payloadItems={citedByItems}
-      />
-      <AuthorityList
-        id={SECTION.similar}
-        label="Similar cases"
-        sub="Cases on comparable facts or points of law."
-        items={similarItems}
-      />
+          <AuthorityList
+            id={SECTION.statutes}
+            label="Statutes cited"
+            sub="Legislation this judgment applied."
+            items={statuteItems}
+          />
+          <AuthorityList
+            id={SECTION.cited}
+            label="Cases cited"
+            sub="Authorities this judgment relied on."
+            items={citedItems}
+          />
+          <CitedBySection
+            id={SECTION.citedBy}
+            slug={detail.slug}
+            total={citedByTotal(detail)}
+            caseName={name}
+            payloadItems={citedByItems}
+          />
+          <AuthorityList
+            id={SECTION.similar}
+            label="Similar cases"
+            sub="Cases on comparable facts or points of law."
+            items={similarItems}
+          />
 
-      {/* ── Reference data, where reference data belongs. ───────────────── */}
-      <AboutThisCase detail={detail} countryCode={countryCode} />
+          {/* ── Reference data, where reference data belongs. ───────────────── */}
+          <AboutThisCase detail={detail} countryCode={countryCode} />
+        </>
+      )}
     </article>
   );
 }
@@ -845,21 +856,18 @@ function FlatPrinciples({ text }: { text: string }) {
 }
 
 /**
- * A guest's principles (A2, {@link guestFadesPrinciples}). A case with report
- * principles reads as a signed-in reader's does, cut short: the editorial
- * headnote in full when it has one, then the first report principle in full
- * with its passage and caption, then the second fading out. A case with only
- * the flat string shows its first entry in full and the second fading. Then
- * the account offer, inline under a thin rule. The rest are not drawn; the
- * heading's count says how many there are. A case with one principle shows it
+ * A guest's principles (A2, {@link guestFadesPrinciples}): ONE block, the
+ * kind {@link guestPrinciplesSource} picks (Stay, 14:57 UTC: "only one piece
+ * of text that should show and fade"). Its first entry in full (a report
+ * principle with its passage and caption), the second fading out, then the
+ * account offer inline under a thin rule. The rest are not drawn; the
+ * heading's count says how many there are. A block with one entry shows it
  * fading. No tabs and no fold: there is nothing left to filter or unfold.
  */
 function GuestPrinciples({
-  overview,
   sub,
   entries,
 }: {
-  overview: string | null;
   sub?: string;
   entries: Array<{ key: string; text: string; after?: React.ReactNode }>;
 }) {
@@ -873,16 +881,6 @@ function GuestPrinciples({
       className="flex scroll-mt-6 flex-col gap-3"
     >
       <SectionHeading label="Legal principles" count={entries.length} sub={sub} />
-      {overview ? (
-        <>
-          <div className="doc-prose">
-            <CaseText value={overview} />
-          </div>
-          <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
-            From the judgment
-          </p>
-        </>
-      ) : null}
       <ol className="flex flex-col gap-7">
         {full ? (
           <NumberedPrinciple key={full.key} index={0}>
