@@ -80,6 +80,37 @@ test('the reset line: the block’s time, else the limits’ time, else the serv
   assert.equal(formatResetMoment(null), null);
 });
 
+test('a lapsed plan, or one that ends before the reset, gets no "come back" line', () => {
+  // Backend's run, 19 October 2026: ends 13 Nov, would have read "come back on 14 Nov".
+  const lapsed = outOfMessagesView({
+    blocked: block({ reason: 'cancelled_grace_exhausted', resets_at: '2026-11-14T05:33:00+00:00', subscription_ends_at: '2026-11-13T00:00:00+00:00' }),
+    resetMessage: 'Limit resets on 14 November.',
+    timeZone: 'UTC',
+  });
+  assert.equal(lapsed.reset, null);
+  const endsFirst = outOfMessagesView({
+    blocked: block({ reason: 'plan_exhausted', resets_at: '2026-11-14T05:33:00+00:00', subscription_ends_at: '2026-11-13T00:00:00+00:00' }),
+    timeZone: 'UTC',
+  });
+  assert.equal(endsFirst.reset, null);
+});
+
+test('a known reason gets the notice’s own sentence, so the date shows once', () => {
+  const view = outOfMessagesView({
+    blocked: block({ message: 'Limit resets on Saturday, November 14, 2026 (in 26 days).', resets_at: '2026-11-14T05:33:00+00:00' }),
+    timeZone: 'UTC',
+  });
+  assert.equal(view.body, 'You have used every message your plan includes for now.');
+  assert.equal(view.reset, 'Your messages come back on 14 Nov 2026, 05:33.');
+  assert.doesNotMatch(view.body, /November|Nov|2026/);
+  for (const reason of ['free_no_subscription', 'plan_exhausted', 'account_flagged', 'cancelled_grace_exhausted', 'hard_limit'] as const) {
+    assert.doesNotMatch(outOfMessagesView({ blocked: block({ reason }) }).body, /server|undefined/, reason);
+  }
+  // A reason this build does not know keeps the server's words.
+  const unknown = outOfMessagesView({ blocked: block({ reason: 'something_new' as IBlockedReason['reason'], message: 'Server words.' }) });
+  assert.equal(unknown.body, 'Server words.');
+});
+
 test('without a block object the words given are shown, with a spent plan’s doors', () => {
   const view = outOfMessagesView({ blocked: null, fallbackMessage: 'You are out of messages.', timeZone: 'UTC' });
   assert.equal(view.body, 'You are out of messages.');

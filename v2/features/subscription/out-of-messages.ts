@@ -20,9 +20,18 @@ import type { IBlockedReason, TBlockedReasonCode } from '@/types/message-pack';
  * A reason this build does not know reads as `plan_exhausted`. A flagged
  * account reads like plain exhaustion, never "flagged" (v1's rule).
  *
- * THE RESET TIME, IN ONE FORMAT. Date and time in the reader's own zone
+ * THE RESET TIME, ONCE, IN ONE FORMAT. Date and time in the reader's own zone
  * ("15 Mar 2026, 01:00"); without a time, the server's own reset sentence;
- * without either, no line at all, never "Invalid Date".
+ * without either, no line at all, never "Invalid Date". A lapsed plan gets no
+ * reset line at all: its messages come back only if it is reactivated, and a
+ * plan that ends before the reset never reaches it (backend's run, 19 October
+ * 2026: "Subscription ends on 13 November" over "come back on 14 Nov").
+ *
+ * OUR OWN SENTENCE FOR A REASON WE KNOW. The server's message names the reset
+ * date too, so with our reset line the date read twice; for the five reasons
+ * above the notice says its own sentence and the date shows once, in the
+ * reset line. The server's words stay for a reason this build does not know,
+ * and for a refusal that came with words only.
  *
  * Pure, no JSX, so the tests pin it.
  */
@@ -59,6 +68,17 @@ function reasonOf(blocked: Pick<IBlockedReason, 'reason'> | null): TBlockedReaso
   const reason = blocked?.reason;
   return reason && KNOWN.includes(reason) ? reason : 'plan_exhausted';
 }
+
+/** The notice's own sentence for each reason it knows. */
+const BODY: Record<TBlockedReasonCode, string> = {
+  free_no_subscription:
+    'Your free messages are used up. Choose a plan for a monthly allowance, or buy a message pack.',
+  plan_exhausted: 'You have used every message your plan includes for now.',
+  account_flagged: 'You have used every message your plan includes for now.',
+  cancelled_grace_exhausted:
+    'Your plan has ended, so it no longer includes messages. Reactivate it, or buy a message pack.',
+  hard_limit: 'You have reached the most messages this account can send for now.',
+};
 
 /** "15 Mar 2026, 01:00" in the reader's zone, or null for a missing or broken time. */
 export function formatResetMoment(iso: string | null | undefined, timeZone?: string): string | null {
@@ -104,9 +124,17 @@ export function outOfMessagesView({
         : reason === 'free_no_subscription'
           ? 'You’ve used your free messages'
           : 'You’ve used your messages for now';
-  const body = blocked?.message?.trim() || fallbackMessage?.trim() || '';
-  const moment = formatResetMoment(blocked?.resets_at ?? resetsAt ?? null, timeZone);
-  const reset = moment ? `Your messages come back on ${moment}.` : resetMessage?.trim() || null;
+  const known = !!blocked?.reason && KNOWN.includes(blocked.reason);
+  const body = known ? BODY[reason] : blocked?.message?.trim() || fallbackMessage?.trim() || '';
+  // Nothing comes back to a lapsed plan, nor to one that ends before the reset.
+  const resetIso = blocked?.resets_at ?? resetsAt ?? null;
+  const endsFirst =
+    !!blocked?.subscription_ends_at &&
+    !!resetIso &&
+    Date.parse(blocked.subscription_ends_at) < Date.parse(resetIso);
+  const comesBack = reason !== 'cancelled_grace_exhausted' && !endsFirst;
+  const moment = comesBack ? formatResetMoment(resetIso, timeZone) : null;
+  const reset = moment ? `Your messages come back on ${moment}.` : comesBack ? resetMessage?.trim() || null : null;
   const doors =
     reason === 'hard_limit'
       ? []
