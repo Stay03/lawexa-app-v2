@@ -172,6 +172,9 @@ export const V2_ROUTES = [
   // the files in no folder under the folders (build 6; see
   // `app/v2/files/page.tsx`).
   '/files',
+  // The ambassador approval email's address, a v2-only redirect shell onto
+  // `/settings/referrals` (see `app/v2/ambassadors/referrals/page.tsx`).
+  '/ambassadors/referrals',
 ] as const;
 
 /**
