@@ -152,6 +152,12 @@ export default function OnboardingStep8Page() {
   // Form state
   const [callNumber, setCallNumber] = useState(verificationData.callNumber || '');
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  // One try per visit (Tester Claude, 19 October 2026: on a failure this
+  // effect re-ran itself and POSTed about 16 times a second). A failure shows
+  // its message with "Try again", and only that button tries once more.
+  const createAttempted = useRef(false);
+  const [createFailed, setCreateFailed] = useState(false);
+  const [createRound, setCreateRound] = useState(0);
   const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
   const [profileCreated, setProfileCreated] = useState(!!verificationData.lawyerProfileId);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -165,7 +171,8 @@ export default function OnboardingStep8Page() {
   // Create lawyer profile on mount
   useEffect(() => {
     const createProfile = async () => {
-      if (profileCreated || isCreatingProfile) return;
+      if (profileCreated || createAttempted.current) return;
+      createAttempted.current = true;
 
       try {
         setIsCreatingProfile(true);
@@ -174,14 +181,14 @@ export default function OnboardingStep8Page() {
           lawyerProfileId: response.data.id,
         });
         setProfileCreated(true);
-      } catch (error: any) {
+      } catch (error) {
         // If profile already exists (403), that's okay
-        if (error.response?.status === 403) {
+        if ((error as { response?: { status?: number } }).response?.status === 403) {
           console.log('[Step 8] Lawyer profile already exists');
           setProfileCreated(true);
         } else {
           console.error('[Step 8] Failed to create lawyer profile:', error);
-          toast.error('Failed to initialize verification profile');
+          setCreateFailed(true);
         }
       } finally {
         setIsCreatingProfile(false);
@@ -191,7 +198,7 @@ export default function OnboardingStep8Page() {
     if (userType === 'lawyer' && communicationStyle) {
       createProfile();
     }
-  }, [userType, communicationStyle, profileCreated, isCreatingProfile, setVerificationData]);
+  }, [userType, communicationStyle, profileCreated, createRound, setVerificationData]);
 
   // Redirect if previous steps not completed or not a lawyer
   useEffect(() => {
@@ -386,6 +393,28 @@ export default function OnboardingStep8Page() {
             </div>
           ) : (
             <>
+              {/* The profile could not be set up: say so, and offer one more try. */}
+              {createFailed && !profileCreated && (
+                <div className="flex flex-col items-start gap-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>We couldn&apos;t set up your verification profile.</span>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      createAttempted.current = false;
+                      setCreateFailed(false);
+                      setCreateRound((round) => round + 1);
+                    }}
+                  >
+                    Try again
+                  </Button>
+                </div>
+              )}
+
               {/* Error message */}
               {uploadError && (
                 <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
