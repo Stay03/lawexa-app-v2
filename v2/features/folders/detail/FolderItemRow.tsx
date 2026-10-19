@@ -1,6 +1,6 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
   BookText,
@@ -16,6 +16,7 @@ import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { formatCaseDate } from '@/v2/features/cases/case-row-model';
 import { statuteStatusTone } from '@/v2/features/statutes/statute-row-model';
 import { StatuteStatusMark } from '@/v2/features/statutes/list/StatuteRow';
+import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { useRemoveFolderItem } from '../item-mutations';
 import type { FolderItemRowModel } from '../item-row-model';
 
@@ -43,9 +44,9 @@ import type { FolderItemRowModel } from '../item-row-model';
  *  1. IT SHOWED A TYPE CHIP ("Case", "Note") on every row. The tile already
  *     says the type, and the per-type meta says it again in words that are
  *     actually useful. The chip was a label for a shape that needed none.
- *  2. IT LINKED A FILE TO `#` when it could not build a href. A row with no
- *     destination is now plain text — see `item-row-model.ts` for why a file
- *     has none.
+ *  2. IT LINKED A FILE TO `#` when it could not build a href. A file row is
+ *     a button that opens the file in a new tab, minting a fresh link in the
+ *     tap, as a file in a space does (`FileOpenRow`; v2 Stage 1, item 4).
  *  3. ITS REMOVE BUTTON was inside the row's link — a `<button>` nested in an
  *     `<a>`, which is invalid HTML v1 then had to cancel with a
  *     `preventDefault` — and it sent `Number(uuid)`. Here the control is a
@@ -104,7 +105,7 @@ export const FolderItemRow = memo(function FolderItemRow({
         <span
           className={cn(
             'block truncate text-[15px] font-medium transition-colors',
-            row.href && 'group-hover:text-primary',
+            (row.href || row.type === 'file') && 'group-hover:text-primary',
             row.hasTitle ? 'text-foreground' : 'italic text-muted-foreground',
           )}
           title={row.type === 'case' ? row.rawTitle : row.title}
@@ -140,7 +141,9 @@ export const FolderItemRow = memo(function FolderItemRow({
       style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
     >
       <div className="group relative flex min-w-0 items-start gap-2">
-        {row.href ? (
+        {row.type === 'file' ? (
+          <FileOpenRow fileId={row.contentId}>{identity}</FileOpenRow>
+        ) : row.href ? (
           <Link
             href={row.href}
             className={cn(
@@ -151,9 +154,8 @@ export const FolderItemRow = memo(function FolderItemRow({
             {identity}
           </Link>
         ) : (
-          // No destination this build can honestly produce (a file's presigned
-          // URL expires). The row still records what is filed here rather than
-          // offering a link that works for an hour.
+          // A row with no destination (a type the API names but v2 does not
+          // open) records what is filed here and offers nothing false.
           <div className="flex min-w-0 flex-1 items-start gap-3 px-2 py-3">
             {identity}
           </div>
@@ -164,6 +166,50 @@ export const FolderItemRow = memo(function FolderItemRow({
     </li>
   );
 });
+
+/**
+ * A file filed here opens on tap, in a new tab (v2 Stage 1, item 4: "today the
+ * row opens nothing"). The tab opens inside the tap and the fresh link follows,
+ * so an iPhone home-screen app lets it through (`useOpenFileInNewTab`, the
+ * same open a file in a space uses). Its refusals read under the name: a file
+ * that no longer exists says so, a refused open offers to try again.
+ */
+function FileOpenRow({ fileId, children }: { fileId: number; children: ReactNode }) {
+  const { open, opening, failed, gone } = useOpenFileInNewTab();
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      <button
+        type="button"
+        onClick={() => open(fileId)}
+        disabled={opening || gone}
+        aria-busy={opening || undefined}
+        className={cn(
+          'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 text-left transition-colors hover:bg-secondary/50 disabled:cursor-progress',
+          gone && 'disabled:cursor-default',
+          FOCUS_RING,
+        )}
+      >
+        {children}
+      </button>
+      {gone ? (
+        <p role="status" className="px-2 pb-2 pl-14 text-xs text-muted-foreground">
+          This file is no longer available.
+        </p>
+      ) : failed ? (
+        <p role="status" className="px-2 pb-2 pl-14 text-xs text-muted-foreground">
+          Couldn&rsquo;t open it.{' '}
+          <button
+            type="button"
+            onClick={() => open(fileId)}
+            className={cn('rounded font-medium text-foreground underline underline-offset-2', FOCUS_RING)}
+          >
+            Try again
+          </button>
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 /**
  * Take this one thing out of this one folder.

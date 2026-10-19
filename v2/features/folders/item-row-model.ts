@@ -198,12 +198,10 @@ export function folderItemRow(item: FolderItemRecord): FolderItemRowModel | null
         ...base,
         type: 'file',
         contentId: content.id,
-        // NO DESTINATION, DELIBERATELY. v2 has no file surface, and the `url`
-        // on this payload is a PRESIGNED link with a documented ~1-hour TTL
-        // (v1 refetches a fresh one per click through a hook the v2 import
-        // boundary blocks). Linking to it would ship a row that works for an
-        // hour and 404s afterwards, which is worse than a row that is honest
-        // about being a record of what is filed here.
+        // NO LINK: the `url` on this payload is a PRESIGNED link with a
+        // ~1-hour TTL, so a row linking to it would 404 after an hour. The row
+        // OPENS the file instead, asking for a fresh link in the tap
+        // (`FolderItemRow`, `useOpenFileInNewTab`; v2 Stage 1, item 4).
         href: null,
         title: name || 'File',
         hasTitle: !!name,
