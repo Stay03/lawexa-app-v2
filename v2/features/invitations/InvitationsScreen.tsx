@@ -233,7 +233,7 @@ export function InvitationsScreen() {
       ) : presented.length === 0 ? (
         <>
           {someFailed ? <PartialFailureNote onRetry={retryAll} /> : null}
-          <InvitationsEmptyState />
+          <InvitationsEmptyState channels={channelsOn} />
         </>
       ) : (
         <>

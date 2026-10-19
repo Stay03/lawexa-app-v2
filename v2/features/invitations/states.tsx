@@ -109,14 +109,19 @@ function InvitationCardGhost() {
  * The designed empty inbox — it says the true thing (nothing is waiting) and
  * it says what to do about it, in the tone the brief asks for: an invitation
  * is something another person sends you, so the way onward is to ask them.
+ *
+ * It names channels only to a reader who can open Team Channels: everyone else
+ * is never asked into one, and is not asked about them on this screen
+ * (`InvitationsScreen`, v2 Stage 1, item 3).
  */
-export function InvitationsEmptyState() {
+export function InvitationsEmptyState({ channels }: { channels: boolean }) {
+  const places = channels ? 'organization, space or channel' : 'organization or space';
   return (
     <CollabEmpty
       icon={MailOpen}
       tone="neutral"
       title="No invitations"
-      description="Nothing is waiting for you. Ask a colleague to invite you to their organization, space or channel — it lands here the moment they do."
+      description={`Nothing is waiting for you. Ask a colleague to invite you to their ${places} — it lands here the moment they do.`}
       ghost={<InvitationCardGhost />}
       action={
         <Button asChild variant="outline" size="sm">

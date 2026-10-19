@@ -32,3 +32,9 @@ test('an inbox that is not asked for neither holds the skeleton nor counts as fa
   assert.match(screen, /const allFailed = failed\.length === asked\.length;/);
   assert.doesNotMatch(screen, /failed\.length === 3/);
 });
+
+test('the empty inbox names channels only to a reader who can open them', () => {
+  const states = read('v2', 'features', 'invitations', 'states.tsx');
+  assert.match(states, /const places = channels \? 'organization, space or channel' : 'organization or space';/);
+  assert.match(read('v2', 'features', 'invitations', 'InvitationsScreen.tsx'), /<InvitationsEmptyState channels=\{channelsOn\} \/>/);
+});
