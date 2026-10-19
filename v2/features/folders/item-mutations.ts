@@ -16,6 +16,7 @@ import { foldersApi } from './api';
 import { foldersQueries } from './queries';
 import type {
   FolderEnvelope,
+  FolderItemAddResponse,
   FolderItemRecord,
   FolderItemsEnvelope,
   FolderItemType,
@@ -65,7 +66,7 @@ import type {
  * Always `mutate`, never `mutateAsync` (standards §2).
  */
 
-/** What both endpoints answer with. `addItem` also returns the created row; v2 does not read it. */
+/** What both endpoints answer with. `addItem` also names what it filed (`FolderItemAddResponse`). */
 export interface FolderItemWriteResponse {
   success: boolean;
   message: string;
@@ -394,7 +395,7 @@ export function useAddItemToFolder(
   target: FolderItemTarget,
   options: AddItemOptions = {},
 ): UseMutationResult<
-  FolderItemWriteResponse,
+  FolderItemAddResponse,
   Error,
   AddToFolderVariables,
   { write: FolderCountWrite }

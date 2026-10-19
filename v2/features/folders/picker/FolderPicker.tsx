@@ -24,6 +24,7 @@ import {
   useRemoveFolderItem,
   type FolderItemTarget,
 } from '../item-mutations';
+import { filedContentId } from '../filed-content';
 import type { FolderRecord } from '../types';
 import { useCreateFolderAndAdd } from './create-and-add';
 import { PickerBody } from './PickerBody';
@@ -187,7 +188,10 @@ export function FolderPicker({
     setNotice(null);
   };
 
-  const confirmAdded = (folder: FolderRecord) => {
+  // Undo removes what the add FILED, named by its 201: in a space folder a
+  // note is filed as the space's copy, whose id is not the pressed note's
+  // (`filed-content.ts`). Elsewhere the two ids are the same.
+  const confirmAdded = (folder: FolderRecord, filedId: number) => {
     toast.success(`Added to “${folder.name}”`, {
       duration: 8000,
       action: {
@@ -195,7 +199,7 @@ export function FolderPicker({
         onClick: () =>
           undoAdd.mutate({
             type: target.type,
-            contentId: target.contentId,
+            contentId: filedId,
             folderUuid: folder.uuid,
             label: null,
           }),
@@ -214,9 +218,9 @@ export function FolderPicker({
     add.mutate(
       { folderUuid: folder.uuid },
       {
-        onSuccess: () => {
+        onSuccess: (response) => {
           changeOpen(false);
-          confirmAdded(folder);
+          confirmAdded(folder, filedContentId(response, target.contentId));
         },
         onError: (error) => {
           if (isAlreadyInFolder(error)) {
@@ -242,7 +246,7 @@ export function FolderPicker({
         onSuccess: (result) => {
           if (result.status === 'added') {
             changeOpen(false);
-            confirmAdded(result.folder);
+            confirmAdded(result.folder, result.contentId);
             return;
           }
           // Half a success, said as half a success — and the field is emptied

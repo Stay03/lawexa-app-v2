@@ -2,6 +2,7 @@ import { apiClient } from '@/lib/api/client';
 import type {
   FolderCreateInput,
   FolderEnvelope,
+  FolderItemAddResponse,
   FolderItemInput,
   FolderItemsEnvelope,
   FolderListEnvelope,
@@ -110,9 +111,12 @@ export const foldersApi = {
     return response.data;
   },
 
-  /** Add one item. A duplicate is a 422, not a silent no-op. */
-  addItem: async (uuid: string, data: FolderItemInput): Promise<{ success: boolean; message: string }> => {
-    const response = await apiClient.post<{ success: boolean; message: string }>(
+  /**
+   * Add one item. A duplicate is a 422, not a silent no-op. The 201 names what
+   * was filed, which in a space folder is a copy of a note (`filed-content.ts`).
+   */
+  addItem: async (uuid: string, data: FolderItemInput): Promise<FolderItemAddResponse> => {
+    const response = await apiClient.post<FolderItemAddResponse>(
       `/folders/${encodeURIComponent(uuid)}/items`,
       data,
     );

@@ -212,6 +212,17 @@ export interface FolderItemInput {
   id: number | string;
 }
 
+/**
+ * An add's 201. `data.content` is what was filed: the content itself, or, for
+ * a note filed into a space folder, the space's copy of it (`filed-content.ts`).
+ * Only the id is read; the rest of the row is the list's to fetch.
+ */
+export interface FolderItemAddResponse {
+  success: boolean;
+  message: string;
+  data?: { content?: { id?: number; slug?: string } };
+}
+
 export interface FolderListEnvelope {
   success: boolean;
   message: string;

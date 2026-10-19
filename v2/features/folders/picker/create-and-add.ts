@@ -4,6 +4,7 @@ import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 
 import { getErrorMessage } from '@/v2/runtime/query';
 import { foldersApi } from '../api';
+import { filedContentId } from '../filed-content';
 import {
   FOLDER_ITEM_INVALIDATES,
   folderItemScopeId,
@@ -41,7 +42,8 @@ import type { FolderRecord } from '../types';
  */
 
 export type CreateAndAddResult =
-  | { status: 'added'; folder: FolderRecord }
+  /** `contentId`: what was filed, from the add's 201 (`filed-content.ts`). */
+  | { status: 'added'; folder: FolderRecord; contentId: number }
   | { status: 'created-not-added'; folder: FolderRecord; message: string };
 
 export interface CreateAndAddVariables {
@@ -66,11 +68,11 @@ export function useCreateFolderAndAdd(
       });
       const folder = created.data;
       try {
-        await foldersApi.addItem(folder.uuid, {
+        const added = await foldersApi.addItem(folder.uuid, {
           type: target.type,
           id: target.contentId,
         });
-        return { status: 'added', folder };
+        return { status: 'added', folder, contentId: filedContentId(added, target.contentId) };
       } catch (error) {
         return { status: 'created-not-added', folder, message: getErrorMessage(error) };
       }
