@@ -94,12 +94,16 @@ export function outOfMessagesView({
   timeZone?: string;
 }): OutOfMessagesView {
   const reason = reasonOf(blocked);
+  // A free allowance is for life (no reset time), so its heading promises
+  // nothing back; "for now" is for a plan that renews.
   const heading =
     reason === 'hard_limit'
       ? 'You’ve hit your usage limit'
       : reason === 'cancelled_grace_exhausted'
         ? 'Your plan access has ended'
-        : 'You’ve used your messages for now';
+        : reason === 'free_no_subscription'
+          ? 'You’ve used your free messages'
+          : 'You’ve used your messages for now';
   const body = blocked?.message?.trim() || fallbackMessage?.trim() || '';
   const moment = formatResetMoment(blocked?.resets_at ?? resetsAt ?? null, timeZone);
   const reset = moment ? `Your messages come back on ${moment}.` : resetMessage?.trim() || null;

@@ -31,8 +31,17 @@ test('a plan or free allowance spent: Upgrade plan first, then Buy message pack'
   for (const reason of ['plan_exhausted', 'free_no_subscription', 'account_flagged'] as const) {
     const view = outOfMessagesView({ blocked: block({ reason }), timeZone: 'UTC' });
     assert.deepEqual(doors(view), ['Upgrade plan /pricing (primary)', 'Buy message pack /settings/message-packs'], reason);
-    assert.equal(view.heading, 'You’ve used your messages for now', reason);
   }
+  assert.equal(outOfMessagesView({ blocked: block({ reason: 'plan_exhausted' }) }).heading, 'You’ve used your messages for now');
+  assert.equal(outOfMessagesView({ blocked: block({ reason: 'account_flagged' }) }).heading, 'You’ve used your messages for now');
+});
+
+test('a free allowance has no reset time, and nothing promises one', () => {
+  // Backend, 19 October 2026: the free limit is lifetime, resets_at null.
+  const view = outOfMessagesView({ blocked: block({ reason: 'free_no_subscription', resets_at: null }) });
+  assert.equal(view.heading, 'You’ve used your free messages');
+  assert.equal(view.reset, null);
+  assert.doesNotMatch(`${view.heading} ${view.reset ?? ''}`, /for now|come back|reset/i);
 });
 
 test('a lapsed plan: Reactivate plan, then Buy message pack', () => {
