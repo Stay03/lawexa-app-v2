@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
 import type { ChatRatingTrigger } from '@/types/feedback';
+import { conversationIdOf } from '@/v2/features/conversations/warm';
 import type { ChatMoment } from './model';
 
 /**
@@ -11,10 +12,8 @@ import type { ChatMoment } from './model';
  * so none of this outlives one.
  */
 
-/** The offer on screen: the moment it is about, in the chat it appeared in. */
-export interface ActiveOffer extends ChatMoment {
-  conversationId: string;
-}
+/** The offer on screen: the moment it is about, in the chat it is about. */
+export type ActiveOffer = ChatMoment;
 
 let moment: ChatMoment | null = null;
 let askedThisSession = false;
@@ -34,16 +33,18 @@ const subscribe = (listener: () => void) => {
 };
 
 /** A moment happened: the reader copied an answer, opened a cited case, or asked again. */
-export function noteChatMoment(trigger: ChatRatingTrigger, messageId: number | null): void {
+export function noteChatMoment(
+  trigger: ChatRatingTrigger,
+  messageId: number | null,
+  pathname: string = typeof window === 'undefined' ? '' : window.location.pathname,
+): void {
   if (askedThisSession) return;
+  // Only a chat's own page: `/c/{id}` (or its internal `/v2/c/{id}` form).
+  const conversationId = conversationIdOf(pathname.startsWith('/v2/') ? pathname.slice(3) : pathname);
+  if (conversationId === null) return;
   seq += 1;
-  moment = { trigger, messageId, awaitsNewAnswer: trigger === 'regenerate', streamed: false, seq };
+  moment = { trigger, messageId, awaitsNewAnswer: trigger === 'regenerate', streamed: false, conversationId, seq };
   emit();
-}
-
-/** The latest moment's number; a message box keeps the value it mounted with. */
-export function currentMomentSeq(): number {
-  return seq;
 }
 
 /** The message box saw an answer being written: an Ask again moment may now complete. */
@@ -57,12 +58,12 @@ export function noteAnswerStreaming(): void {
 /**
  * The banner appears in this chat: it is the session's one ask, and it stays
  * until the reader rates or closes it (`endOffer`). False when the session
- * has asked already or there is no moment to ask about.
+ * has asked already or there is no moment in this chat to ask about.
  */
 export function beginOffer(conversationId: string): boolean {
-  if (askedThisSession || moment === null) return false;
+  if (askedThisSession || moment === null || moment.conversationId !== conversationId) return false;
   askedThisSession = true;
-  active = { ...moment, conversationId };
+  active = moment;
   moment = null;
   emit();
   return true;

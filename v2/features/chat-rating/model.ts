@@ -46,7 +46,14 @@ export interface ChatMoment {
    */
   awaitsNewAnswer: boolean;
   streamed: boolean;
-  /** Its place in the page's sequence of moments (`noteChatMoment`). */
+  /**
+   * The chat it happened in, read from the address (`/c/{id}`). Opening a
+   * cited case leaves the chat, so the banner appears when the reader comes
+   * back to that chat; a moment anywhere else (a case page's side chat) is
+   * not recorded.
+   */
+  conversationId: string;
+  /** Its place in the page's sequence of moments, for the banner's key. */
   seq: number;
 }
 
@@ -59,12 +66,8 @@ export interface OfferInputs {
   isStreaming: boolean;
   quizInProgress: boolean;
   moment: ChatMoment | null;
-  /**
-   * The last moment before this chat's message box appeared. Only a later
-   * one counts: a moment in a case page's side chat, or in another chat, is
-   * not about this one.
-   */
-  seqAtMount: number;
+  /** The chat whose message box asks: only a moment in it counts. */
+  conversationId: string;
 }
 
 /** Whether the banner appears now. */
@@ -72,7 +75,7 @@ export function mayOffer(inputs: OfferInputs): boolean {
   const { isAccount, eligible, askedThisSession, isStreaming, quizInProgress, moment } = inputs;
   if (!isAccount || eligible !== true || askedThisSession) return false;
   if (isStreaming || quizInProgress || moment === null) return false;
-  if (moment.seq <= inputs.seqAtMount) return false;
+  if (moment.conversationId !== inputs.conversationId) return false;
   // Ask again: only once the new answer has started and finished.
   if (moment.awaitsNewAnswer && !moment.streamed) return false;
   return true;

@@ -14,7 +14,6 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { CHAT_RATING_QUESTION, CHAT_RATING_TEXT_MAX, POOR_REASONS, mayOffer, reasonReady } from './model';
 import {
   beginOffer,
-  currentMomentSeq,
   endOffer,
   noteAnswerStreaming,
   useActiveOffer,
@@ -34,13 +33,13 @@ import {
 export function ChatRatingSlot({ conversationId, isStreaming }: { conversationId: string; isStreaming: boolean }) {
   const { signedIn, role, userId } = useV2Session();
   const isAccount = signedIn && role !== null && role !== 'guest' && role !== 'bot';
-  // Only moments after this box appeared are about this chat.
-  const [seqAtMount] = useState(currentMomentSeq);
   const moment = useChatMoment();
   const askedThisSession = useAskedThisSession();
   const quizInProgress = useQuizUnderWay();
   const active = useActiveOffer();
-  const hasMoment = moment !== null && moment.seq > seqAtMount;
+  // Only a moment in this chat (a cited case opened from it counts when the
+  // reader comes back).
+  const hasMoment = moment !== null && moment.conversationId === conversationId;
 
   // The server's answer (14 days, new user), asked once a session, and only
   // after a moment: most chats never need it.
@@ -61,7 +60,7 @@ export function ChatRatingSlot({ conversationId, isStreaming }: { conversationId
     isStreaming,
     quizInProgress,
     moment,
-    seqAtMount,
+    conversationId,
   });
 
   // Ask again waits for its new answer: tell the moment once it is being written.

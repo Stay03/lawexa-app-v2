@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { POOR_REASONS, mayOffer, reasonReady, type ChatMoment, type OfferInputs } from './model';
-import { beginOffer, currentMomentSeq, endOffer, noteAnswerStreaming, noteChatMoment } from './store';
+import { beginOffer, endOffer, noteAnswerStreaming, noteChatMoment } from './store';
 
 /* "How is Lawexa doing?" (Arthur, 19 October 2026; build go 09:59 UTC).
  * Choices: rephrase left out; Space chats in; closing or ignoring counts as
@@ -17,6 +17,7 @@ const moment = (over: Partial<ChatMoment> = {}): ChatMoment => ({
   messageId: 42,
   awaitsNewAnswer: false,
   streamed: false,
+  conversationId: 'conv-1',
   seq: 5,
   ...over,
 });
@@ -27,7 +28,7 @@ const ready = (over: Partial<OfferInputs> = {}): OfferInputs => ({
   isStreaming: false,
   quizInProgress: false,
   moment: moment(),
-  seqAtMount: 0,
+  conversationId: 'conv-1',
   ...over,
 });
 
@@ -47,10 +48,8 @@ test('never during an answer, never mid-quiz, never without a moment in this cha
   assert.equal(mayOffer(ready({ isStreaming: true })), false);
   assert.equal(mayOffer(ready({ quizInProgress: true })), false);
   assert.equal(mayOffer(ready({ moment: null })), false);
-  // A moment from before this chat's box appeared (a case page's side chat,
-  // another chat) is not about this one.
-  assert.equal(mayOffer(ready({ seqAtMount: 5 })), false);
-  assert.equal(mayOffer(ready({ seqAtMount: 4 })), true);
+  // A moment in another chat is not about this one.
+  assert.equal(mayOffer(ready({ conversationId: 'conv-2' })), false);
 });
 
 test('Ask again waits for the new answer to be written', () => {
@@ -79,16 +78,23 @@ test('Poor’s reasons are Arthur’s, in his order, and only "Something else" n
   assert.equal(reasonReady(null, 'anything'), false);
 });
 
-test('one ask a session: the first offer takes the moment, later moments wait for the next session', () => {
-  const before = currentMomentSeq();
-  noteChatMoment('regenerate', 7);
-  assert.equal(currentMomentSeq(), before + 1);
-  noteAnswerStreaming();
-  assert.equal(beginOffer('conv-1'), true);
+test('a moment belongs to the chat whose page it happened on; anywhere else it is not recorded', () => {
+  // A case page's side chat: no chat page, no moment.
+  noteChatMoment('copy', 3, '/cases/okafor-v-ade');
+  assert.equal(beginOffer('okafor-v-ade'), false);
+  // The chat's page, public or internal form.
+  noteChatMoment('cited_case', 4, '/v2/c/conv-9');
+  // Another chat's box does not take it; its own does.
   assert.equal(beginOffer('conv-1'), false);
-  noteChatMoment('copy', 8);
-  assert.equal(currentMomentSeq(), before + 1, 'a moment after the ask is not recorded');
+  assert.equal(beginOffer('conv-9'), true);
   endOffer();
+});
+
+test('one ask a session: later moments are not recorded', () => {
+  noteChatMoment('regenerate', 7, '/c/conv-1');
+  noteAnswerStreaming();
+  // The session asked already (previous test): nothing more is offered.
+  assert.equal(beginOffer('conv-1'), false);
 });
 
 test('the moments are hooked where they happen, and only inside an answer', () => {
