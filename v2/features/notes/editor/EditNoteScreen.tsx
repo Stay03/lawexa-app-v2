@@ -9,7 +9,7 @@ import { notesQueries } from '../queries';
 import { writeNoteEverywhere } from '../mutations';
 import { NoteEditorScreen } from './NoteEditorScreen';
 import { noteDisplayTitle } from '../note-text';
-import { TabTitle } from '@/v2/shell/TabTitle';
+import { useTabTitle } from '@/v2/shell/use-tab-title';
 import {
   NOTE_PAPER_COLUMN,
   NoteEditorErrorState,
@@ -49,6 +49,7 @@ export function EditNoteScreen({ slug }: { slug: string }) {
     enabled: mayWrite,
   });
   const envelope = note.data;
+  useTabTitle(envelope?.data ? `Edit ${noteDisplayTitle(envelope.data.title)}` : null);
 
   // Seed the editor's canonical key from the fetch we already made. An effect
   // with a cache write and no state — the editor below reads its subject from
@@ -110,10 +111,5 @@ export function EditNoteScreen({ slug }: { slug: string }) {
   // Keyed by id so the editor is one instance for one note. A later refetch of
   // the same note re-renders this component but must never rebuild the editor
   // under the reader — `NoteEditorScreen` reads `initialRecord` at mount only.
-  return (
-    <>
-      <TabTitle name={`Edit ${noteDisplayTitle(record.title)}`} />
-      <NoteEditorScreen key={record.id} initialRecord={record} />
-    </>
-  );
+  return <NoteEditorScreen key={record.id} initialRecord={record} />;
 }

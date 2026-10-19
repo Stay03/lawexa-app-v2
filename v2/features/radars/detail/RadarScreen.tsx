@@ -55,7 +55,7 @@ import {
 } from '../list/states';
 import { ScanInProgressRow, ScanRow } from './ScanRow';
 import { SettingsSheet } from './SettingsSheet';
-import { TabTitle } from '@/v2/shell/TabTitle';
+import { useTabTitle } from '@/v2/shell/use-tab-title';
 import {
   RadarDetailSkeleton,
   RadarErrorState,
@@ -181,6 +181,7 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
 
   // Publish the radar's name to the header centre once known.
   const headerTitle = radar?.name ?? null;
+  useTabTitle(headerTitle);
   useEffect(() => {
     if (!headerTitle) return;
     setHeaderContext({ title: headerTitle, confidential: false });
@@ -358,7 +359,6 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
 
   return (
     <div className={LIST_COLUMN}>
-      <TabTitle name={radar.name} />
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         {/* ── Header: identity + actions ─────────────────────────────────── */}
         <header className="flex flex-col gap-2 border-b border-border/60 pb-5">

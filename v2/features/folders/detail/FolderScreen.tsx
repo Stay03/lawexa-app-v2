@@ -75,7 +75,7 @@ import {
   SubfolderGapNote,
 } from './states';
 import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
-import { TabTitle } from '@/v2/shell/TabTitle';
+import { useTabTitle } from '@/v2/shell/use-tab-title';
 
 /**
  * FolderScreen — `/folders/[uuid]`: one folder, and everything in it.
@@ -301,6 +301,7 @@ function FolderBody({ uuid }: { uuid: string }) {
   // name reads "Untitled folder" in the bar exactly as it does in the h1 (L6).
   // `folderRow` is pure, so memoising it here costs one object.
   const headerRow = useMemo(() => (folder ? folderRow(folder) : null), [folder]);
+  useTabTitle(headerRow?.name);
   // The name is the page's heading at every width; the phone bar carries it
   // only once that heading has scrolled away (item 7, `use-scrolled-title.ts`).
   const headingRef = useScrolledTitle(headerRow?.name ?? null);
@@ -549,7 +550,6 @@ function FolderBody({ uuid }: { uuid: string }) {
 
   return (
     <div className={LIST_COLUMN}>
-      <TabTitle name={headerRow?.name} />
       <div
         className={
           arrival === 'peeked'

@@ -102,7 +102,7 @@ import {
   ThreadClosedState,
 } from './states';
 import { LawexaMark } from '../ui/avatars';
-import { TabTitle } from '@/v2/shell/TabTitle';
+import { useTabTitle } from '@/v2/shell/use-tab-title';
 
 /**
  * ChannelScreen — the W2 channel client root: detail three-state, ONE header
@@ -261,6 +261,8 @@ export function ChannelScreen({
      every access ruling still waits for the detail (see `CachedChannelFrame`). */
   const cachedIdentity = useCachedChannelIdentity(channelUuid);
   const channel = detailQuery.data?.data;
+  // The tab carries the channel's shown name (a channel's `name` is a slug).
+  useTabTitle(channel ? channelDisplayName(channel) : null);
   const isThread = channel?.is_thread === true;
   const parentUuid = channel?.parent_channel_uuid ?? null;
 
@@ -1038,7 +1040,6 @@ export function ChannelScreen({
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
-      <TabTitle name={displayName} />
       {/* EVERYTHING THE GAME MODE COVERS lives inside this one wrapper so it
           can be made `inert` in one place. Covering the channel visually is
           not enough: without this, Shift+Tab out of the game walks straight

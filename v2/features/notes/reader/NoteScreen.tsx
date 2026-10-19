@@ -10,7 +10,7 @@ import {
   setScreenContext,
   type ScreenBack,
 } from '@/v2/shell/screen-context';
-import { TabTitle } from '@/v2/shell/TabTitle';
+import { useTabTitle } from '@/v2/shell/use-tab-title';
 import { notesQueries } from '../queries';
 import { noteDisplayTitle } from '../note-text';
 import { useNotePeek } from '../note-peek';
@@ -30,7 +30,7 @@ import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
  * NoteScreen — the `/notes/[slug]` client root.
  *
  * The server shell above it owns the page title until the note arrives; then
- * the tab carries the note's own name (`TabTitle`). Everything a reader sees is
+ * the tab carries the note's own name (`useTabTitle`). Everything a reader sees is
  * here, on a client query that carries their session — which is what makes the
  * bookmark star, the draft mark and the Edit affordance correct per viewer. A
  * note read is per-reader by nature (a draft is visible to exactly one
@@ -66,6 +66,7 @@ export function NoteScreen({ slug }: { slug: string }) {
     enabled: signedIn,
   });
   const note = query.data?.data ?? null;
+  useTabTitle(note ? noteDisplayTitle(note.title) : null);
   // A tapped row's name already on screen (`note-peek.ts`, speed step 5) stays
   // still when the note arrives: the kicker and the name do not fade,
   // everything else does (`v2-note-arrive-peeked` in note-document.css).
@@ -167,7 +168,6 @@ export function NoteScreen({ slug }: { slug: string }) {
       >
         <NoteDocument note={note} editHref={editHref} />
       </div>
-      <TabTitle name={noteDisplayTitle(note.title)} />
     </div>
   );
 }

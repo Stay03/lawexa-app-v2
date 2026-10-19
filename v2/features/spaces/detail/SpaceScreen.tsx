@@ -32,7 +32,7 @@ import { SPACE_PAGE_COLUMN } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import { useCachedSpaceIdentity } from './cached-identity';
-import { TabTitle } from '@/v2/shell/TabTitle';
+import { useTabTitle } from '@/v2/shell/use-tab-title';
 import {
   SpaceAccessDeniedState,
   SpaceErrorState,
@@ -92,6 +92,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   const session = useV2Session();
 
   const space = scope?.space ?? null;
+  useTabTitle(space?.name);
   const canManage = scope?.canManage ?? false;
 
   /* ── The pill (see the docblock) ─────────────────────────────────────────
@@ -324,7 +325,6 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
 
   return (
     <div className={SPACE_PAGE_COLUMN}>
-      <TabTitle name={space.name} />
       <SpacePlaceHeader
         space={space}
         membership={scope.membership}
