@@ -16,7 +16,7 @@ import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { formatCaseDate } from '@/v2/features/cases/case-row-model';
 import { statuteStatusTone } from '@/v2/features/statutes/statute-row-model';
 import { StatuteStatusMark } from '@/v2/features/statutes/list/StatuteRow';
-import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
+import { useShowFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { useRemoveFolderItem } from '../item-mutations';
 import type { FolderItemRowModel } from '../item-row-model';
 
@@ -170,12 +170,13 @@ export const FolderItemRow = memo(function FolderItemRow({
 /**
  * A file filed here opens on tap, in a new tab (v2 Stage 1, item 4: "today the
  * row opens nothing"). The tab opens inside the tap and the fresh link follows,
- * so an iPhone home-screen app lets it through (`useOpenFileInNewTab`, the
- * same open a file in a space uses). Its refusals read under the name: a file
- * that no longer exists says so, a refused open offers to try again.
+ * so an iPhone home-screen app lets it through (`useShowFileInNewTab`, the
+ * open a file in a space uses, asking for a link that shows the file). Its
+ * refusals read under the name: a file that no longer exists says so, a
+ * refused open offers to try again.
  */
 function FileOpenRow({ fileId, children }: { fileId: number; children: ReactNode }) {
-  const { open, opening, failed, gone } = useOpenFileInNewTab();
+  const { open, opening, failed, gone } = useShowFileInNewTab();
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <button

@@ -69,8 +69,15 @@ export const filesApi = {
   /**
    * Get download URL for a file (signed URL for S3)
    */
-  getDownloadUrl: async (id: number): Promise<FileDownloadResponse> => {
-    const response = await apiClient.get<FileDownloadResponse>(`/files/${id}/download`);
+  getDownloadUrl: async (
+    id: number,
+    options: { inline?: boolean } = {},
+  ): Promise<FileDownloadResponse> => {
+    // `inline=1`: a PDF or a picture is served to show in the tab rather than
+    // to download; every other type still downloads.
+    const response = await apiClient.get<FileDownloadResponse>(`/files/${id}/download`, {
+      params: options.inline ? { inline: 1 } : undefined,
+    });
     return response.data;
   },
 };

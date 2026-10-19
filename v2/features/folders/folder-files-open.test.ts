@@ -27,7 +27,22 @@ test('the Library group has no Files row, for anyone', () => {
 test('a file in a folder is a button that opens it with a fresh link, and says why when it cannot', () => {
   const row = read('detail', 'FolderItemRow.tsx');
   assert.match(row, /\{row\.type === 'file' \? \(\s*<FileOpenRow fileId=\{row\.contentId\}>\{identity\}<\/FileOpenRow>/);
-  assert.match(row, /const \{ open, opening, failed, gone \} = useOpenFileInNewTab\(\);/);
+  // A link that SHOWS a PDF or a picture in the tab (Tester, 20:51Z: the PDF
+  // downloaded into a blank tab); a Download control keeps the plain link.
+  assert.match(row, /const \{ open, opening, failed, gone \} = useShowFileInNewTab\(\);/);
+  const urls = readFileSync(join(here, '..', 'channels', 'feed', 'use-file-url.ts'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(urls, /export function useShowFileInNewTab\(\): OpenInNewTab \{\s*return useOpenUrlInNewTab\(mintInlineFileUrl\);/);
+  assert.match(urls, /filesApi\.getDownloadUrl\(id, \{ inline: true \}\)/);
+  assert.match(urls, /async function mintFileUrl\(id: number\): Promise<string \| null> \{\s*return \(await filesApi\.getDownloadUrl\(id\)\)/);
+  const api = readFileSync(join(here, '..', '..', '..', 'lib', 'api', 'files.ts'), 'utf8');
+  assert.match(api, /params: options\.inline \? \{ inline: 1 \} : undefined,/);
+  // v1's folder card opens the same way; v1's Download buttons keep the plain link.
+  const root = (...parts: string[]) => readFileSync(join(here, '..', '..', '..', ...parts), 'utf8');
+  assert.match(root('components', 'folders', 'FolderItemCard.tsx'), /const downloadFile = useDownloadFile\(\{ inline: true \}\);/);
+  assert.match(root('lib', 'hooks', 'useFiles.ts'), /mutationFn: \(id: number\) => filesApi\.getDownloadUrl\(id, \{ inline \}\),/);
+  for (const plain of [['components', 'collab', 'files', 'FileRow.tsx'], ['app', '(main)', 'files', 'page.tsx']]) {
+    assert.match(root(...plain), /useDownloadFile\(\)/, plain.join('/'));
+  }
   assert.match(row, /<button\s+type="button"\s+onClick=\{\(\) => open\(fileId\)\}/);
   assert.match(row, /This file is no longer available\./);
   assert.match(row, /Couldn&rsquo;t open it\.[\s\S]*?Try again/);

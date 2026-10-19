@@ -97,6 +97,21 @@ export function useOpenFileInNewTab(): OpenInNewTab {
   return useOpenUrlInNewTab(mintFileUrl);
 }
 
+/**
+ * The same open, asking for a link that SHOWS the file (`?inline=1`): a PDF
+ * or a picture opens in the tab instead of downloading into a blank one
+ * (Tester Claude, 19 October 2026, 20:51Z: a folder's PDF downloaded, the tab
+ * stayed empty). Other types still download. A file's row in a folder opens
+ * this way; a Download control keeps `useOpenFileInNewTab`.
+ */
+export function useShowFileInNewTab(): OpenInNewTab {
+  return useOpenUrlInNewTab(mintInlineFileUrl);
+}
+
+async function mintInlineFileUrl(id: number): Promise<string | null> {
+  return (await filesApi.getDownloadUrl(id, { inline: true })).data?.url ?? null;
+}
+
 /** {@link useShareSheetSave} for a channel file, minted by its id. */
 export function useFileShareSheetSave(): ShareSheetSave {
   return useShareSheetSave(mintFileUrl);

@@ -92,10 +92,15 @@ export function useDeleteFile() {
  * Safari answers with a bare `null` rather than an exception. Discarding that
  * return meant a tap that did nothing at all and said nothing either. It is
  * read, and a blocked open lands in v1's own error channel.
+ *
+ * `inline`: ask for a link that shows a PDF or a picture in the tab instead
+ * of downloading it (a folder's file row opens this way; a Download button
+ * does not pass it).
  */
-export function useDownloadFile() {
+export function useDownloadFile(options: { inline?: boolean } = {}) {
+  const inline = options.inline === true;
   return useMutation({
-    mutationFn: (id: number) => filesApi.getDownloadUrl(id),
+    mutationFn: (id: number) => filesApi.getDownloadUrl(id, { inline }),
     onSuccess: (data) => {
       if (!data.data?.url) return;
       if (!window.open(data.data.url, '_blank')) {

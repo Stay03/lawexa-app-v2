@@ -72,8 +72,9 @@ function FolderItemCard({
 }: FolderItemCardProps) {
   const removeItem = useRemoveFolderItem();
   // File items open via a fresh signed URL fetched on click (the cached
-  // presigned URL on `content.url` can outlive its 1-hour TTL).
-  const downloadFile = useDownloadFile();
+  // presigned URL on `content.url` can outlive its 1-hour TTL). `inline`: a PDF
+  // or a picture shows in the tab rather than downloading.
+  const downloadFile = useDownloadFile({ inline: true });
 
   const Icon =
     item.type === 'file'
