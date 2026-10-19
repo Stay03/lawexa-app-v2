@@ -133,7 +133,18 @@ export function isChatRoute(pathname: string): boolean {
   return /^\/c\/[^/]+$/.test(cleanPath(pathname));
 }
 
-/** The see-through bar: every top-level screen, and a conversation. */
+/**
+ * A case, `/cases/{slug}` (not its sub-pages, such as the full report). It
+ * wears the open bar too (Stay, 19 October 2026: "The case page seems to have
+ * a black empty header remove it so It looks like the top of case list page"):
+ * its title is in the page, so a bar with only a back control was an empty
+ * black band.
+ */
+export function isCaseRoute(pathname: string): boolean {
+  return /^\/cases\/[^/]+$/.test(cleanPath(pathname));
+}
+
+/** The see-through bar: every top-level screen, a conversation and a case. */
 export function hasOpenBar(pathname: string): boolean {
-  return isTopLevelRoute(pathname) || isChatRoute(pathname);
+  return isTopLevelRoute(pathname) || isChatRoute(pathname) || isCaseRoute(pathname);
 }

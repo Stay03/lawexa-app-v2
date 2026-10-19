@@ -331,7 +331,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
                on `/spaces/{uuid}` it is `/spaces` either way;
              - anything else: the compact brand mark, exactly as before. */}
         {pushed ? (
-          <PushedBack screen={pushed} override={back} />
+          <PushedBack screen={pushed} override={back} open={isTopLevel} />
         ) : collabRoute.kind !== 'none' ? (
           collab ? (
             <CollabHeaderBack context={collab} />
@@ -422,9 +422,12 @@ export function V2Header({ user }: { user: SessionUser | null }) {
 function PushedBack({
   screen,
   override,
+  open = false,
 }: {
   screen: PushedScreen;
   override: { href: string; label: string } | null;
+  /** On an open bar (a case) it is a round solid button, as the bar's others are. */
+  open?: boolean;
 }) {
   const back = useBackTo(override?.href ?? screen.backHref, screen.reach ?? 'parent');
   return (
@@ -432,7 +435,7 @@ function PushedBack({
       asChild
       variant="ghost"
       size="icon"
-      className="size-11 shrink-0 rounded-full text-muted-foreground md:size-9"
+      className={cn('size-11 shrink-0 rounded-full text-muted-foreground md:size-9', open && OPEN_BAR_CONTROL)}
     >
       <Link {...back} aria-label={override?.label ?? screen.backLabel}>
         <ChevronLeft aria-hidden className="size-5" />

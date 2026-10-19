@@ -27,7 +27,12 @@ test('a conversation has the open bar, and is not a top-level screen', () => {
     assert.equal(isChatRoute(path), false, path);
   }
   assert.equal(hasOpenBar('/conversations'), true);
-  assert.equal(hasOpenBar('/cases/abc'), false);
+  // A case wears it too (Stay, 19 October 2026: the case page's empty black
+  // header goes, so its top looks like the case list's); its sub-pages do not.
+  assert.equal(hasOpenBar('/cases/abc'), true);
+  assert.equal(hasOpenBar('/v2/cases/abc'), true);
+  assert.equal(hasOpenBar('/cases/abc/report'), false);
+  assert.equal(hasOpenBar('/statutes/abc'), false);
 });
 
 test('the shell frame and the bar read the open-bar predicate', () => {
