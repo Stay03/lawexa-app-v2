@@ -120,4 +120,25 @@ export const notesQueries = {
       gcTime: GC_TIMES.list,
       retry: retrySettledClientErrors,
     }),
+
+  /**
+   * The editor's OPEN read, by address: always the server, never the device.
+   *
+   * NO `meta.persist`, and its own key outside `details()`, on purpose. The
+   * device persister answers a persisted leaf's fetch from IndexedDB when the
+   * cache is empty (a fresh load), and that answer counts as "fetched after
+   * mount"; so the editor opened on the kept copy, and the persister's own
+   * server refetch was folded into the fetch already running (Tester Claude,
+   * 19 October 2026, 20:51Z: 2 of 3 fresh loads opened an old copy). This
+   * leaf is never kept, so its fetch is the server's answer. `gcTime: 0`: no
+   * later open can start from this one's copy either.
+   */
+  editorOpen: ({ slug, viewerId }: { slug: string } & ViewerScoped) =>
+    queryOptions({
+      queryKey: [...notesQueries.all, 'editor-open', slug, { viewerId }] as const,
+      queryFn: () => notesApi.bySlug(slug),
+      staleTime: 0,
+      gcTime: 0,
+      retry: retrySettledClientErrors,
+    }),
 };

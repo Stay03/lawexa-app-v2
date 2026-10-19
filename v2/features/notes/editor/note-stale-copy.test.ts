@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { AxiosError, AxiosHeaders } from 'axios';
 
+import { persistModeOf } from '@/v2/runtime/persist/policy';
+import { notesQueries } from '../queries';
 import { initialAutosaveState, reduceAutosave, updateInputFor } from './autosave-machine';
 import { classifySaveFailure } from './save-failure';
 import { pickRestoreCandidate } from './use-draft-mirror';
@@ -23,6 +25,9 @@ const OPENED = { id: 1968, draft: { title: 'TEST', content: '<p>P</p>' }, update
 
 test('(a) the editor opens only on the copy fetched during this open', () => {
   const screen = editor('EditNoteScreen.tsx');
+  // The open read is the leaf the device persister never answers (Tester,
+  // 20:51Z: on the kept leaf a fresh load's fetch came back from IndexedDB).
+  assert.match(screen, /const note = useQuery\(\{\s*\.\.\.notesQueries\.editorOpen\(\{ slug, viewerId \}\),/);
   assert.match(screen, /refetchOnMount: 'always',/);
   assert.match(screen, /const fresh = note\.isFetchedAfterMount && note\.isSuccess;/);
   assert.match(screen, /const envelope = fresh \? note\.data : undefined;/);
@@ -33,10 +38,33 @@ test('(a) the editor opens only on the copy fetched during this open', () => {
 
 test('(a) offline: a cached copy is shown read-only, with the line that the latest could not load', () => {
   const screen = editor('EditNoteScreen.tsx');
-  assert.match(screen, /if \(!settled && note\.data\) \{/);
+  // The kept copy is asked for only when the open read failed, and not for a settled 403/404.
+  assert.match(
+    screen,
+    /const kept = useQuery\(\{\s*\.\.\.notesQueries\.detail\(\{ slug, viewerId \}\),\s*enabled: mayWrite && note\.isError && openStatus !== 403 && openStatus !== 404,/,
+  );
+  assert.match(screen, /if \(!settled && kept\.data\) \{/);
   assert.match(screen, /Can&apos;t load the latest copy\./);
   // The reader's document, not the editor: nothing to type into.
-  assert.match(screen, /<NoteDocument note=\{note\.data\.data\} editHref=\{null\} \/>/);
+  assert.match(screen, /<NoteDocument note=\{kept\.data\.data\} editHref=\{null\} \/>/);
+});
+
+test('(a) the open read is never kept on the device, nor answered from it', () => {
+  const open = notesQueries.editorOpen({ slug: 'tenancy-memo', viewerId: 93 });
+  assert.equal(open.meta?.persist, undefined);
+  assert.equal(persistModeOf(open.meta), null);
+  assert.equal(open.gcTime, 0);
+  assert.equal(open.staleTime, 0);
+  // Its own key, outside `details()`, so no write to the kept leaves lands in it.
+  assert.deepEqual(open.queryKey, ['notes', 'editor-open', 'tenancy-memo', { viewerId: 93 }]);
+  assert.notDeepEqual(open.queryKey.slice(0, 2), notesQueries.details());
+  // The reader's leaf stays kept: the fallback reads it.
+  assert.equal(notesQueries.detail({ slug: 'tenancy-memo', viewerId: 93 }).meta?.persist, 'gated');
+  // Why: a kept leaf with an empty cache is answered from the device (the persister's restore).
+  assert.match(
+    read('v2', 'runtime', 'persist', 'persister.ts'),
+    /if \(query\.state\.data === undefined\) \{\s*const restored = await core\.retrieveQuery/,
+  );
 });
 
 test('(b) a local draft is only ever offered, and never over a newer server copy', () => {
