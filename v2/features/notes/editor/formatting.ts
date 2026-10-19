@@ -2,6 +2,8 @@
 
 import { useEditorState, type Editor } from '@tiptap/react';
 
+import type { BlockStyle } from './toolbar-verbs';
+
 /**
  * formatting — the editor's toolbar VERBS and the toolbar's live state.
  *
@@ -37,7 +39,13 @@ export type FormatVerb =
   | 'h3'
   | 'bulletList'
   | 'orderedList'
-  | 'blockquote';
+  | 'blockquote'
+  // The style dropdown's Normal text, and Clear formatting (Arthur's step 1).
+  | 'paragraph'
+  | 'clearFormatting';
+
+/** A verb a toolbar button toggles, whose lit state is `state[verb]`. */
+export type ToggleVerb = Exclude<FormatVerb, 'paragraph' | 'clearFormatting'>;
 
 export interface FormatState {
   bold: boolean;
@@ -50,6 +58,8 @@ export interface FormatState {
   bulletList: boolean;
   orderedList: boolean;
   blockquote: boolean;
+  /** What the block under the caret is, for the style dropdown's label. */
+  blockStyle: BlockStyle;
   /** A link mark covers the selection — the link button then OFFERS to remove it. */
   link: boolean;
   /** The caret sits inside a code block, where a formatting bubble is nonsense. */
@@ -69,6 +79,7 @@ const NOTHING_ACTIVE: FormatState = {
   bulletList: false,
   orderedList: false,
   blockquote: false,
+  blockStyle: 'paragraph',
   link: false,
   inCodeBlock: false,
   canUndo: false,
@@ -109,7 +120,53 @@ export function runFormat(editor: Editor, verb: FormatVerb): void {
     case 'blockquote':
       chain.toggleBlockquote().run();
       return;
+    case 'paragraph':
+      chain.setParagraph().run();
+      return;
+    case 'clearFormatting':
+      clearFormatting(editor);
+      return;
   }
+}
+
+/**
+ * Clear formatting: the bold, italic, underline, strike and code marks come
+ * off the selection and a heading goes back to normal text. A list, a quote
+ * and a link stay, since they are what the text is rather than how it looks
+ * (`CLEAR_FORMATTING` in `toolbar-verbs.ts`). Returns whether it ran, for the
+ * keyboard shortcut.
+ */
+export function clearFormatting(editor: Editor): boolean {
+  const chain = editor
+    .chain()
+    .focus()
+    .unsetBold()
+    .unsetItalic()
+    .unsetUnderline()
+    .unsetStrike()
+    .unsetCode();
+  if (editor.isActive('heading')) chain.setParagraph();
+  return chain.run();
+}
+
+/**
+ * The style dropdown SETS a style; it never toggles. Choosing Heading on a
+ * heading keeps it a heading (a toggle would turn it back into text), and
+ * Normal text turns any heading into a paragraph.
+ */
+export function applyStyle(editor: Editor, style: 'paragraph' | 'h2' | 'h3'): void {
+  const chain = editor.chain().focus();
+  if (style === 'paragraph') chain.setParagraph().run();
+  else chain.setHeading({ level: style === 'h2' ? 2 : 3 }).run();
+}
+
+/** The block under the caret, as the style dropdown names it. */
+function blockStyleOf(editor: Editor): BlockStyle {
+  if (editor.isActive('heading', { level: 1 })) return 'h1';
+  if (editor.isActive('heading', { level: 2 })) return 'h2';
+  if (editor.isActive('heading', { level: 3 })) return 'h3';
+  if (editor.isActive('paragraph')) return 'paragraph';
+  return 'other';
 }
 
 /**
@@ -161,6 +218,7 @@ export function useFormatState(editor: Editor | null): FormatState {
         bulletList: instance.isActive('bulletList'),
         orderedList: instance.isActive('orderedList'),
         blockquote: instance.isActive('blockquote'),
+        blockStyle: blockStyleOf(instance),
         link: instance.isActive('link'),
         inCodeBlock: instance.isActive('codeBlock'),
         canUndo: instance.can().undo(),

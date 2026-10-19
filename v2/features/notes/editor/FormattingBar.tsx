@@ -1,13 +1,36 @@
 'use client';
 
+import { useRef } from 'react';
 import type { Editor } from '@tiptap/react';
-import { AtSign, ImagePlus, Link2, Link2Off, Loader2, Redo2, Undo2 } from 'lucide-react';
+import {
+  AtSign,
+  ImagePlus,
+  Link2,
+  Link2Off,
+  Loader2,
+  MoreHorizontal,
+  Redo2,
+  RemoveFormatting,
+  Undo2,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DockPortal } from '@/v2/shell/Dock';
-import { runFormat, type FormatState } from './formatting';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { applyStyle, runFormat, type FormatState } from './formatting';
 import { ToolbarButton, ToolbarDivider } from './ToolbarButton';
-import { BLOCK_VERBS, CODE_VERB, TEXT_VERBS } from './toolbar-verbs';
+import { BLOCK_VERBS, CLEAR_FORMATTING, CODE_VERB, STYLE_OPTIONS, TEXT_VERBS } from './toolbar-verbs';
 import { OVERFLOW_LEFT, OVERFLOW_RIGHT, useOverflowEdges } from './use-overflow-edges';
 
 /**
@@ -32,24 +55,23 @@ import { OVERFLOW_LEFT, OVERFLOW_RIGHT, useOverflowEdges } from './use-overflow-
  * the document under them each time. It is present for the whole editing
  * session instead: one stable strip, no reflow.
  *
- * ── REACH ORDER, NOT SPEC ORDER ─────────────────────────────────────────────
- * The row scrolls horizontally on narrow phones rather than wrapping into two
- * rows, so the LEFT end is prime reach and the tail is a swipe away. The order
- * therefore deviates from the shared arrays' spec order, deliberately:
- * undo/redo first (the two verbs a touch keyboard has no shortcut for), then
- * marks, lists, and the three insert actions; the structure verbs (headings,
- * quote, code) take the tail. On a 390px phone the cut lands mid-button, and a
- * geometry-driven edge fade ({@link useOverflowEdges}) marks the hidden rest —
- * a scrollable row must never cut on a clean edge that reads as complete.
+ * ── NINE BUTTONS AND "MORE" (Arthur's editor step 1, 19 October 2026) ────────
+ * The row used to scroll sideways, with headings, quote and code a swipe away.
+ * It now holds what a thumb reaches for and fits a 390px phone without
+ * scrolling: undo · redo | bold · italic | the two lists | image · @case |
+ * More. "More" opens a menu above the bar with the rest: the style (Normal
+ * text, Heading, Subheading), underline, strikethrough, link, quote, inline
+ * code and clear formatting. On a narrower phone the row still scrolls, and a
+ * geometry-driven edge fade ({@link useOverflowEdges}) marks the hidden rest.
  */
 
-/** Reach-ordered slices of the shared vocabulary (see docblock). */
+/** The marks the row keeps; underline and strike are in More. */
+const ROW_TEXT_VERBS = TEXT_VERBS.filter(({ verb }) => verb === 'bold' || verb === 'italic');
+const MORE_TEXT_VERBS = TEXT_VERBS.filter(({ verb }) => verb === 'underline' || verb === 'strike');
 const LIST_VERBS = BLOCK_VERBS.filter(
   ({ verb }) => verb === 'bulletList' || verb === 'orderedList',
 );
-const STRUCTURE_VERBS = BLOCK_VERBS.filter(
-  ({ verb }) => verb === 'h2' || verb === 'h3' || verb === 'blockquote',
-);
+const QUOTE_VERB = BLOCK_VERBS.find(({ verb }) => verb === 'blockquote');
 
 export function FormattingBar({
   editor,
@@ -79,8 +101,7 @@ export function FormattingBar({
           aria-orientation="horizontal"
           className="v2-quiet-scroll flex items-center gap-0.5 overflow-x-auto overscroll-x-contain px-2 py-1.5"
         >
-          {/* Undo/redo are MOBILE-ONLY (a physical keyboard has ⌘Z / ⌘⇧Z, a
-              touch keyboard has nothing) and sit FIRST — prime reach. */}
+          {/* Undo/redo first: a touch keyboard has no shortcut for either. */}
           <ToolbarButton
             icon={Undo2}
             label="Undo"
@@ -96,7 +117,7 @@ export function FormattingBar({
 
           <ToolbarDivider />
 
-          {TEXT_VERBS.map(({ verb, icon, label }) => (
+          {ROW_TEXT_VERBS.map(({ verb, icon, label }) => (
             <ToolbarButton
               key={verb}
               icon={icon}
@@ -121,12 +142,6 @@ export function FormattingBar({
           <ToolbarDivider />
 
           <ToolbarButton
-            icon={state.link ? Link2Off : Link2}
-            label={state.link ? 'Remove link' : 'Add link'}
-            active={state.link}
-            onPress={onLink}
-          />
-          <ToolbarButton
             icon={imageBusy ? Loader2 : ImagePlus}
             label={imageBusy ? 'Uploading image' : 'Insert image'}
             tone="accent"
@@ -143,25 +158,11 @@ export function FormattingBar({
 
           <ToolbarDivider />
 
-          {STRUCTURE_VERBS.map(({ verb, icon, label }) => (
-            <ToolbarButton
-              key={verb}
-              icon={icon}
-              label={label}
-              active={state[verb]}
-              onPress={() => runFormat(editor, verb)}
-            />
-          ))}
-          <ToolbarButton
-            icon={CODE_VERB.icon}
-            label={CODE_VERB.label}
-            active={state.code}
-            onPress={() => runFormat(editor, CODE_VERB.verb)}
-          />
+          <MoreMenu editor={editor} state={state} onLink={onLink} />
         </div>
 
         {/* Scroll-cut affordances — drawn only while geometry says content is
-            hidden on that side, so neither fade can lie on a wide tablet. */}
+            hidden on that side, so neither fade can lie on a wide phone. */}
         <span
           aria-hidden
           className={cn(
@@ -178,5 +179,109 @@ export function FormattingBar({
         />
       </div>
     </DockPortal>
+  );
+}
+
+/**
+ * "More": the verbs the row has no room for, in a menu that opens above the
+ * bar. The style is a choice (one is ticked), the marks show whether they are
+ * on, and closing the menu hands focus back to the editor so the caret stays
+ * where it was.
+ */
+function MoreMenu({
+  editor,
+  state,
+  onLink,
+}: {
+  editor: Editor;
+  state: FormatState;
+  onLink: () => void;
+}) {
+  // Add link opens the link dialog, which takes focus itself: the menu must not
+  // pull focus back to the editor as it closes.
+  const toDialog = useRef(false);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label="More formatting"
+        onMouseDown={(event) => event.preventDefault()}
+        className={cn(
+          'v2-interactive inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-secondary/70 hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground',
+          FOCUS_RING,
+        )}
+      >
+        <MoreHorizontal aria-hidden className="size-4" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side="top"
+        align="end"
+        sideOffset={8}
+        className="w-60"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          if (!toDialog.current) editor.commands.focus();
+          toDialog.current = false;
+        }}
+      >
+        <DropdownMenuLabel>Style</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={state.blockStyle}>
+          {STYLE_OPTIONS.map((option) => (
+            <DropdownMenuRadioItem
+              key={option.style}
+              value={option.style}
+              disabled={state.inCodeBlock}
+              onSelect={() => applyStyle(editor, option.style)}
+            >
+              {option.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+
+        <DropdownMenuSeparator />
+
+        {MORE_TEXT_VERBS.map(({ verb, icon: Icon, label }) => (
+          <DropdownMenuCheckboxItem
+            key={verb}
+            checked={state[verb]}
+            onSelect={() => runFormat(editor, verb)}
+          >
+            <Icon aria-hidden className="size-4" />
+            {label}
+          </DropdownMenuCheckboxItem>
+        ))}
+        {QUOTE_VERB ? (
+          <DropdownMenuCheckboxItem
+            checked={state.blockquote}
+            onSelect={() => runFormat(editor, QUOTE_VERB.verb)}
+          >
+            <QUOTE_VERB.icon aria-hidden className="size-4" />
+            {QUOTE_VERB.label}
+          </DropdownMenuCheckboxItem>
+        ) : null}
+        <DropdownMenuCheckboxItem
+          checked={state.code}
+          onSelect={() => runFormat(editor, CODE_VERB.verb)}
+        >
+          <CODE_VERB.icon aria-hidden className="size-4" />
+          {CODE_VERB.label}
+        </DropdownMenuCheckboxItem>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          onSelect={() => {
+            toDialog.current = true;
+            onLink();
+          }}
+        >
+          {state.link ? <Link2Off aria-hidden className="size-4" /> : <Link2 aria-hidden className="size-4" />}
+          {state.link ? 'Remove link' : 'Add link'}
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => runFormat(editor, CLEAR_FORMATTING.verb)}>
+          <RemoveFormatting aria-hidden className="size-4" />
+          {CLEAR_FORMATTING.label}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

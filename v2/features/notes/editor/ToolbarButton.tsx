@@ -3,6 +3,7 @@
 import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
@@ -31,6 +32,7 @@ export function ToolbarButton({
   onPress,
   tone = 'default',
   spin = false,
+  shortcut,
 }: {
   icon: LucideIcon;
   /** The accessible name AND the native tooltip. Never an icon alone. */
@@ -42,11 +44,18 @@ export function ToolbarButton({
   tone?: 'default' | 'accent';
   /** Turns the icon into a live spinner — for a control whose work is in flight. */
   spin?: boolean;
+  /**
+   * The key binding as the reader's keyboard writes it ("⌘B", "Ctrl+B"). With
+   * it, the button shows a tooltip with the name and the keys in place of the
+   * native title (Arthur's editor step 1). The touch bar passes none: a phone
+   * has no hover and no shortcuts.
+   */
+  shortcut?: string;
 }) {
-  return (
+  const button = (
     <button
       type="button"
-      title={label}
+      title={shortcut ? undefined : label}
       aria-label={label}
       aria-pressed={active}
       disabled={disabled}
@@ -68,6 +77,17 @@ export function ToolbarButton({
         className={cn('size-4', spin && 'motion-safe:animate-spin')}
       />
     </button>
+  );
+
+  if (!shortcut) return button;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={6}>
+        <span>{label}</span>
+        <kbd className="ml-2 font-sans text-[11px] opacity-70">{shortcut}</kbd>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

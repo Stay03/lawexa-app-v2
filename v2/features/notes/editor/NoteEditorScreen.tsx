@@ -6,11 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
 import {
-  AtSign,
   BookOpen,
   Globe,
-  ImagePlus,
-  Loader2,
   Lock,
   MoreHorizontal,
   Trash2,
@@ -40,6 +37,7 @@ import {
   noteMirrorKey,
 } from './draft-mirror';
 import { DeleteNoteDialog } from './DeleteNoteDialog';
+import { DesktopToolbar } from './DesktopToolbar';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
 import { createNoteExtensions } from './extensions';
 import { FormattingBar } from './FormattingBar';
@@ -51,7 +49,6 @@ import { stripPastedPresentation } from './paste-sanitizer';
 import { RestoreDraftBar } from './RestoreDraftBar';
 import { SaveIndicator } from './SaveIndicator';
 import { NOTE_PAPER_COLUMN } from './states';
-import { ToolbarButton } from './ToolbarButton';
 import { noteDisplayTitle } from '../note-text';
 import { useTabTitle } from '@/v2/shell/use-tab-title';
 import { useAutosavePause } from './use-autosave-pause';
@@ -70,11 +67,13 @@ import { IMAGE_INPUT_ACCEPT, useNoteImageUploads } from './use-image-uploads';
  * are not two screens.
  *
  * ── NO CHROME THAT ISN'T EARNED ─────────────────────────────────────────────
- * A title in the document's own type, the body beneath it, and nothing else at
- * rest. No fixed toolbar (v1 had one permanently above every note, plus a second
- * one in "writer mode"), no save button, no publish bar, no character counter,
- * no price fields. Formatting appears where it is asked for: over a selection on
- * a pointer device, in the shell dock on a touch one.
+ * A title in the document's own type, the body beneath it, and one formatting
+ * bar. No save button, no publish bar, no character counter, no price fields.
+ * On a computer the bar sits above the note (DesktopToolbar, Arthur's editor
+ * step 1, 19 October 2026: undo, redo, styles and every verb with its key
+ * binding), with the selection bubble as a quick reach; on touch it is the
+ * shell's dock bar with a More menu. v1 had TWO fixed toolbars (one above every
+ * note, one in "writer mode"); v2 has one per kind of device.
  *
  * ── WHY TYPING DOES NOT RE-RENDER THIS COMPONENT ────────────────────────────
  * The body lives in ProseMirror and the title in one `<textarea>`; neither is
@@ -392,34 +391,15 @@ export function NoteEditorScreen({
           library. What is left is the writing status and the note's own verbs,
           so the row is `justify-end` rather than a bar with one thing at each
           edge. */}
-      <div className="mb-6 flex min-h-9 items-center justify-end gap-3">
+      <div
+        className={cn(
+          'flex min-h-9 items-center justify-end gap-3',
+          editor && coarsePointer === false ? 'mb-3' : 'mb-6',
+        )}
+      >
         <div className="flex items-center gap-1.5">
-          {/* THE ONE PIECE OF PERSISTENT DESKTOP CHROME, and only because the
-              alternative is a dead end. Inserting an image or an `@case` puts
-              something NEW at the caret, so neither belongs in a bubble that
-              only exists over a selection — and on an empty note there is no
-              selection to summon one with. Two icons in the page's own header
-              row (beside the back link, above the paper) keep both reachable
-              without putting a toolbar over the document. Touch has them in the
-              dock bar and does not need these. */}
-          {editor && coarsePointer === false ? (
-            <span className="mr-1 flex items-center gap-0.5">
-              <ToolbarButton
-                icon={images.busy ? Loader2 : ImagePlus}
-                label={images.busy ? 'Uploading image' : 'Insert image'}
-                tone="accent"
-                spin={images.busy}
-                disabled={images.busy}
-                onPress={handleImage}
-              />
-              <ToolbarButton
-                icon={AtSign}
-                label="Mention a case"
-                tone="accent"
-                onPress={handleMention}
-              />
-            </span>
-          ) : null}
+          {/* Image and @case used to sit here as the only desktop chrome; they
+              live in the desktop bar below now (Arthur's editor step 1). */}
           <SaveIndicator
             status={autosave.status}
             savedAt={autosave.savedAt}
@@ -496,6 +476,19 @@ export function NoteEditorScreen({
           ) : null}
         </div>
       </div>
+
+      {/* The computer's formatting bar (Arthur's editor step 1); touch has the
+          dock bar below instead. */}
+      {editor && coarsePointer === false ? (
+        <DesktopToolbar
+          editor={editor}
+          state={formatState}
+          onLink={handleLink}
+          onImage={handleImage}
+          onMention={handleMention}
+          imageBusy={images.busy}
+        />
+      ) : null}
 
       {candidate ? (
         <RestoreDraftBar

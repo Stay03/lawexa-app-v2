@@ -1,4 +1,4 @@
-import type { Extensions } from '@tiptap/core';
+import { Extension, type Extensions } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 import Image from '@tiptap/extension-image';
@@ -41,6 +41,31 @@ export interface NoteExtensionsConfig {
   mentionStore: CaseMentionStore;
 }
 
+/**
+ * Clear formatting on `Mod-\`, as in Google Docs (Arthur's editor step 1). The
+ * same rule as the toolbar's button (`clearFormatting` in `formatting.ts`): the
+ * text marks come off and a heading goes back to normal text; lists, quotes and
+ * links stay.
+ */
+const ClearFormattingShortcut = Extension.create({
+  name: 'clearFormattingShortcut',
+  addKeyboardShortcuts() {
+    return {
+      'Mod-\\': () => {
+        const chain = this.editor
+          .chain()
+          .unsetBold()
+          .unsetItalic()
+          .unsetUnderline()
+          .unsetStrike()
+          .unsetCode();
+        if (this.editor.isActive('heading')) chain.setParagraph();
+        return chain.run();
+      },
+    };
+  },
+});
+
 export function createNoteExtensions({
   placeholder,
   mentionStore,
@@ -67,5 +92,6 @@ export function createNoteExtensions({
       HTMLAttributes: { class: 'rounded-xl max-w-full h-auto' },
     }),
     createCaseMentionExtension(mentionStore),
+    ClearFormattingShortcut,
   ];
 }
