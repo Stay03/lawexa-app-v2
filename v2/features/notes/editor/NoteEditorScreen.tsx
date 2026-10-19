@@ -51,6 +51,8 @@ import { RestoreDraftBar } from './RestoreDraftBar';
 import { SaveIndicator } from './SaveIndicator';
 import { NOTE_PAPER_COLUMN } from './states';
 import { ToolbarButton } from './ToolbarButton';
+import { noteDisplayTitle } from '../note-text';
+import { useTabTitle } from '@/v2/shell/use-tab-title';
 import { useAutosavePause } from './use-autosave-pause';
 import { useNoteAutosave } from './use-autosave';
 import { useCoarsePointer } from './use-coarse-pointer';
@@ -94,6 +96,9 @@ export function NoteEditorScreen({
 
   const [record, setRecord] = useState<NoteRecord | null>(initialRecord);
   const recordRef = useRef(record);
+  // The tab follows the SAVED note: a new note names itself once its first
+  // save gives it an address, and a rename shows once it is saved.
+  useTabTitle(record ? `Edit ${noteDisplayTitle(record.title)}` : null);
 
   // One client id for this editing session, minted before the note has one.
   const [draftId] = useState(newDraftId());

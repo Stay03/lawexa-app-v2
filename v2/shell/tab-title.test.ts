@@ -44,13 +44,17 @@ test('the hook holds the title only on its own address, and only while mounted',
   assert.match(hook, /const hold = \(\) => \{\s*if \(window\.location\.pathname !== path\) return;/);
   assert.match(hook, /observer\.observe\(document\.head, \{ childList: true, subtree: true, characterData: true \}\);/);
   assert.match(hook, /return \(\) => \{\s*observer\.disconnect\(\);\s*if \(window\.location\.pathname !== path\) return;/);
-  assert.match(hook, /\}, \[text\]\);/);
+  // A new note's first save moves the address under the mounted editor
+  // (replaceState): the hold restarts on the new address.
+  assert.match(hook, /const routePath = usePathname\(\);/);
+  assert.match(hook, /\}, \[text, routePath\]\);/);
 });
 
 test('each per-user page names itself in the tab', () => {
   const screens: Array<[string[], RegExp]> = [
     [['v2', 'features', 'notes', 'reader', 'NoteScreen.tsx'], /useTabTitle\(note \? noteDisplayTitle\(note\.title\) : null\);/],
-    [['v2', 'features', 'notes', 'editor', 'EditNoteScreen.tsx'], /useTabTitle\(envelope\?\.data \? `Edit \$\{noteDisplayTitle\(envelope\.data\.title\)\}` : null\);/],
+    // The editor names itself from the SAVED note, so a new note follows its first save.
+    [['v2', 'features', 'notes', 'editor', 'NoteEditorScreen.tsx'], /useTabTitle\(record \? `Edit \$\{noteDisplayTitle\(record\.title\)\}` : null\);/],
     [['v2', 'features', 'folders', 'detail', 'FolderScreen.tsx'], /useTabTitle\(headerRow\?\.name\);/],
     [['v2', 'features', 'radars', 'detail', 'RadarScreen.tsx'], /useTabTitle\(headerTitle\);/],
     [['v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx'], /useTabTitle\(space\?\.name\);/],
@@ -58,6 +62,8 @@ test('each per-user page names itself in the tab', () => {
     [['v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx'], /useTabTitle\(channel \? channelDisplayName\(channel\) : null\);/],
   ];
   for (const [path, pattern] of screens) assert.match(read(...path), pattern, path.join('/'));
+  // One writer for the editor's tab: the edit page leaves it to the editor.
+  assert.doesNotMatch(read('v2', 'features', 'notes', 'editor', 'EditNoteScreen.tsx'), /useTabTitle/);
 });
 
 test('app-badge writes no title while the page has none, so it never leaves a stray one', () => {
