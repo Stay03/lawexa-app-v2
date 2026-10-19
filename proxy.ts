@@ -1,14 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { isMigratedToV2 } from '@/v2/routes.manifest';
-import { UI_COOKIE, V2_COOKIE_VALUE } from '@/v2/cookie';
+import { UI_COOKIE } from '@/v2/cookie';
+import { servesV2, v2DefaultFromEnv } from '@/v2/ui-choice';
 
 const V2_PREFIX = '/v2';
 
 /**
  * The v1 ⇆ v2 switch — Next 16's middleware successor (runs on the Node runtime;
  * do not pin a runtime). This is Vercel's documented cookie-keyed strangler-fig
- * rewrite: opted-in users get the hidden `app/v2/` tree at the same URL, while
- * everyone else stays on v1, byte-for-byte.
+ * rewrite: a browser in the new design gets the hidden `app/v2/` tree at the
+ * same URL, while everyone else stays on v1, byte-for-byte. WHO IS IN THE NEW
+ * DESIGN is `servesV2` (`v2/ui-choice.ts`): the reader's own choice, else the
+ * deploy's `V2_DEFAULT`, and never a crawler without a choice (the switch, v2
+ * Stage 1, item 9).
  *
  * Behaviour:
  *  - Inert unless `V2_ENABLED === 'true'` — an env kill switch that rolls the
@@ -30,7 +34,11 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   const { pathname } = request.nextUrl;
-  const hasV2Cookie = request.cookies.get(UI_COOKIE)?.value === V2_COOKIE_VALUE;
+  const hasV2Cookie = servesV2({
+    uiCookie: request.cookies.get(UI_COOKIE)?.value,
+    v2Default: v2DefaultFromEnv(),
+    userAgent: request.headers.get('user-agent'),
+  });
 
   // Direct hits on the internal /v2 tree are only allowed with the cookie;
   // otherwise strip the prefix so the canonical (v1) URL is the one users see.

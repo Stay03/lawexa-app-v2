@@ -1,11 +1,13 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { V2_COOKIE_CLEAR } from '@/v2/cookie';
+import { V1_COOKIE_SET } from '@/v2/cookie';
 import { removeServiceWorker } from '@/v2/runtime/sw/register';
 
 /**
- * Clears the v2 opt-in cookie and hard-navigates home. A full page load (not a
+ * Chooses the classic design (`lawexa-ui=v1`: with the new design the default
+ * for everyone, clearing the opt-in would only land back in it) and
+ * hard-navigates home. A full page load (not a
  * router transition) is required so no prefetched v2 RSC payload survives the
  * switch back to v1. Exported so the sidebar/drawer footer button AND the header
  * overflow menu (`V2HeaderMenu`) share ONE definition of the exit.
@@ -15,7 +17,7 @@ import { removeServiceWorker } from '@/v2/runtime/sw/register';
  * worker's own route removes it on the next load if this does not finish.
  */
 export function switchBackToV1() {
-  document.cookie = V2_COOKIE_CLEAR;
+  document.cookie = V1_COOKIE_SET;
   void removeServiceWorker().then(() => window.location.assign('/'));
 }
 

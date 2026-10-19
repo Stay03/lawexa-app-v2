@@ -12,13 +12,24 @@ import {
 } from './serve';
 
 const REAL = '/* the real worker */';
-const inside: WorkerGate = { uiCookie: 'v2', perfValue: undefined, v2Enabled: true, swSetting: undefined };
+const inside: WorkerGate = {
+  uiCookie: 'v2',
+  perfValue: undefined,
+  v2Enabled: true,
+  swSetting: undefined,
+  v2Default: false,
+  userAgent: 'Mozilla/5.0 (Linux; Android 14) Chrome/140.0.0.0 Mobile Safari/537.36',
+};
 
 test('the real worker goes only to a browser inside v2 with the sw layer on', () => {
   assert.equal(serviceWorkerBodyFor(inside, REAL), REAL);
   // Other layers off do not affect it.
   assert.equal(serviceWorkerBodyFor({ ...inside, perfValue: 'ssr,idb' }, REAL), REAL);
   assert.equal(serviceWorkerBodyFor({ ...inside, perfValue: '' }, REAL), REAL);
+});
+
+test('with the new design the default, a browser with no choice gets the real worker', () => {
+  assert.equal(serviceWorkerBodyFor({ ...inside, uiCookie: undefined, v2Default: true }, REAL), REAL);
 });
 
 test('everyone else gets the worker that removes itself', () => {
@@ -30,6 +41,9 @@ test('everyone else gets the worker that removes itself', () => {
     ['every layer off', { ...inside, perfValue: 'off' }],
     ['v2 disabled on the server', { ...inside, v2Enabled: false }],
     ['the operator switch LAWEXA_SW=off', { ...inside, swSetting: 'off' }],
+    // The switch (v2 Stage 1, item 9): the same rule the proxy serves pages by.
+    ['classic chosen, with the new design the default', { ...inside, uiCookie: 'v1', v2Default: true }],
+    ['a crawler with no choice, with the new design the default', { ...inside, uiCookie: undefined, v2Default: true, userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1)' }],
   ];
   for (const [name, gate] of cases) {
     assert.equal(serviceWorkerWanted(gate), false, name);

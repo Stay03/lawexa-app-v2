@@ -15,6 +15,15 @@ export const V2_COOKIE_SET = `${UI_COOKIE}=${V2_COOKIE_VALUE}; path=/; max-age=$
 export const V2_COOKIE_CLEAR = `${UI_COOKIE}=; path=/; max-age=0; samesite=lax`;
 
 /**
+ * "Switch to classic Lawexa" as a CHOICE, not the absence of one: once the new
+ * design is the default for everyone (`V2_DEFAULT`, `v2/ui-choice.ts`), no
+ * cookie means the new design, so going back to the old one has to be said.
+ * A year, like the opt-in; with the default off it reads the same as no cookie.
+ */
+export const V1_COOKIE_VALUE = 'v1';
+export const V1_COOKIE_SET = `${UI_COOKIE}=${V1_COOKIE_VALUE}; path=/; max-age=${V2_COOKIE_MAX_AGE}; samesite=lax`;
+
+/**
  * Whether a raw `document.cookie` string contains the exact opt-in entry.
  * Exact-entry match — immune to `xlawexa-ui=v2` / `lawexa-ui=v2preview`
  * false positives.

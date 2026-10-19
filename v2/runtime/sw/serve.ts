@@ -1,4 +1,5 @@
-import { UI_COOKIE, V2_COOKIE_VALUE } from '@/v2/cookie';
+import { UI_COOKIE } from '@/v2/cookie';
+import { servesV2 } from '@/v2/ui-choice';
 import { layerOffValue, PERF_COOKIE } from '@/v2/runtime/perf-switch';
 
 /**
@@ -54,6 +55,10 @@ export interface WorkerGate {
   perfValue: string | undefined;
   /** `V2_ENABLED === 'true'` on the server. */
   v2Enabled: boolean;
+  /** `V2_DEFAULT === 'true'` on the server: the new design for a browser that has not chosen. */
+  v2Default: boolean;
+  /** The request's User-Agent: a crawler without a choice stays in v1. */
+  userAgent: string | null | undefined;
   /** The server's `LAWEXA_SW` value. */
   swSetting: string | undefined;
 }
@@ -63,7 +68,7 @@ export function serviceWorkerWanted(gate: WorkerGate): boolean {
   return (
     gate.v2Enabled &&
     gate.swSetting !== 'off' &&
-    gate.uiCookie === V2_COOKIE_VALUE &&
+    servesV2({ uiCookie: gate.uiCookie, v2Default: gate.v2Default, userAgent: gate.userAgent }) &&
     !layerOffValue(gate.perfValue, 'sw')
   );
 }

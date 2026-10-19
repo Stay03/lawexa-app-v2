@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { V2_COOKIE_CLEAR, V2_COOKIE_SET, hasV2Cookie } from '@/v2/cookie';
+import { V1_COOKIE_SET, V2_COOKIE_SET, hasV2Cookie } from '@/v2/cookie';
 import { readStreamStyle, setStreamStyle } from '@/v2/stream-style';
 import { readSearchPosition, setSearchPosition } from '@/v2/search-position';
 import { BarTuningControls } from './BarTuningControls';
@@ -38,7 +38,9 @@ export function DeveloperSettings() {
   const [topSearch, setTopSearch] = useState(() => readSearchPosition() === 'top');
 
   function handleToggle(next: boolean) {
-    document.cookie = next ? V2_COOKIE_SET : V2_COOKIE_CLEAR;
+    // Off is the classic CHOICE: once the new design is everyone's default,
+    // clearing the opt-in would only land back in it (v2/ui-choice.ts).
+    document.cookie = next ? V2_COOKIE_SET : V1_COOKIE_SET;
     // Hard navigation (not a router transition): a client push would keep stale
     // prefetched RSC payloads from the other variant. A full load re-runs the
     // proxy with the new cookie so the whole app switches cleanly.

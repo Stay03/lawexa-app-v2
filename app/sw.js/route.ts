@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 import { serviceWorkerBodyFor, SW_ENV, SW_GATE_COOKIES } from '@/v2/runtime/sw/serve';
+import { v2DefaultFromEnv } from '@/v2/ui-choice';
 
 /**
  * /sw.js — the v2 service worker's script, served per request so it can be
@@ -30,11 +31,15 @@ function realWorker(): string {
 
 export async function GET(): Promise<Response> {
   const store = await cookies();
+  const request = await headers();
   const body = serviceWorkerBodyFor(
     {
       uiCookie: store.get(SW_GATE_COOKIES.ui)?.value,
       perfValue: store.get(SW_GATE_COOKIES.perf)?.value,
       v2Enabled: process.env.V2_ENABLED === 'true',
+      // The same rule the proxy serves the page by (v2/ui-choice.ts).
+      v2Default: v2DefaultFromEnv(),
+      userAgent: request.get('user-agent'),
       swSetting: process.env[SW_ENV],
     },
     realWorker(),
