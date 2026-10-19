@@ -26,10 +26,40 @@ export function discoverAction(
   return space.my_status === 'pending' ? 'pending' : 'ask';
 }
 
-/** Why an ask was refused, in plain words. */
-export function askRefusal(status: number | undefined): string {
-  if (status === 409) return 'You are already in this space.';
-  if (status === 404) return 'This space is no longer public.';
-  if (status === 403) return 'You need a Lawexa account to ask to join.';
-  return "That didn't work. Try again in a moment.";
+/**
+ * Why a join or an ask was refused, in plain words, and whether to offer an
+ * account. Only a visitor without one is offered one, and only for the
+ * server's 403, which is how the server says "an account is needed". A
+ * signed-in reader who meets a 403 is told the space does not let them in;
+ * every other failure says what it is. (The card used to put "Create an
+ * account" under every failure, for everyone: Tester Claude's walk, 18
+ * October 2026; v2 Stage 1, item 3.)
+ */
+export interface Refusal {
+  text: string;
+  offerAccount: boolean;
+}
+
+/** Why an ask was refused. */
+export function askRefusal(status: number | undefined, hasAccount: boolean): Refusal {
+  if (status === 409) return { text: 'You are already in this space.', offerAccount: false };
+  if (status === 404) return { text: 'This space is no longer public.', offerAccount: false };
+  if (status === 403) {
+    return hasAccount
+      ? { text: "This space isn't taking requests from your account.", offerAccount: false }
+      : { text: 'You need a Lawexa account to ask to join.', offerAccount: true };
+  }
+  return { text: "That didn't work. Try again in a moment.", offerAccount: false };
+}
+
+/** Why a join was refused. */
+export function joinRefusal(status: number | undefined, hasAccount: boolean): Refusal {
+  if (status === 409) return { text: 'You are already in this space.', offerAccount: false };
+  if (status === 404) return { text: 'This space is no longer public.', offerAccount: false };
+  if (status === 403) {
+    return hasAccount
+      ? { text: "This space doesn't let your account join.", offerAccount: false }
+      : { text: 'You need a Lawexa account to join. You can keep reading without one.', offerAccount: true };
+  }
+  return { text: "That didn't work. Try again in a moment.", offerAccount: false };
 }

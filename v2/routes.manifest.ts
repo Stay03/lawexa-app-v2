@@ -34,9 +34,9 @@
  * `/statutes/*` is the second public library surface (list + AKN reader), on the
  * same audience argument as `/cases/*`. `/radars/*` is private (list, create,
  * detail, scan reports); the scan-report leaf can be opened by a share link, and
- * v1's separate `/settings` and `/scan-log` sub-routes intentionally do NOT come
- * along — v2 folds both into the detail screen, and an old link falls through
- * this same wildcard to the v2 detail's not-found handling rather than to v1.
+ * v1's separate `/settings` and `/scan-log` sub-routes are folded into the
+ * detail screen; their old addresses redirect to `?settings=1` and
+ * `?tab=activity` on it (v2 Stage 1, item 3).
  */
 /**
  * `/bookmarks` is EXACT, not a wildcard — the page has no sub-routes, and any
@@ -44,11 +44,9 @@
  * private, per-account surface (noindex; guests included — guest bookmarks are
  * real and writable). `/quiz/*` covers the hub, player, results, history and
  * stats; private, open to every registered account in the UI (guests and bots
- * excluded), with the guest block on the server a pending backend ask. v1's `/quiz/play?s=` query-param
- * route shape deliberately dies here: the wildcard claims `/quiz/play` too,
- * where the `[sessionUuid]` segment treats "play" as an unknown session and the
- * player renders its designed error state — the same one-way door as radar's
- * `/settings`.
+ * excluded), with the guest block on the server a pending backend ask. v1's
+ * `/quiz/play?s=` resume link redirects to `/quiz/{session}` (v2 Stage 1,
+ * item 3).
  */
 /**
  * `/notes/*` covers the library, the note page, and authoring (`/create`,

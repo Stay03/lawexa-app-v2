@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from 'next';
+import type { Viewport } from 'next';
 import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { HydrationBoundary } from '@tanstack/react-query';
@@ -53,14 +53,11 @@ import '@/v2/shell/tokens.css';
  *  - OG images fall back to the site-wide `app/opengraph-image.tsx`; a route
  *    with its own share card sets `openGraph.images`, which overrides the
  *    default.
+ *  - THIS LAYOUT SETS NO TITLE OR DESCRIPTION OF ITS OWN. A page without one
+ *    reads the root's ("Lawexa - Where Modern Legal Work Happens"), as every
+ *    v1 page does. It used to say "Lawexa v2 preview" in every tab (Tester
+ *    Claude's walk, 18 October 2026; v2 Stage 1, item 3).
  */
-export const metadata: Metadata = {
-  // `absolute` — "Lawexa v2 preview" already names the brand; the "%s | Lawexa"
-  // template would double-brand it.
-  title: { absolute: 'Lawexa v2 preview' },
-  description:
-    'Preview of the next-generation Lawexa experience — Nigerian legal research, cases, statutes, and notes.',
-};
 
 /**
  * v2 viewport — the mobile shell contract (foundation-standards.md §4).

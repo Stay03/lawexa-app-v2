@@ -162,7 +162,11 @@ export function SpacesBrowser() {
   // "You:" on a row's message line when the reader sent it.
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
 
-  const pendingInvitations = usePendingInvitationCount({ viewerId, enabled: eligible });
+  const pendingInvitations = usePendingInvitationCount({
+    viewerId,
+    enabled: eligible,
+    channelsEnabled: eligible && session.canAccessTeamChannels,
+  });
 
   const setFilter = (next: SpaceFilter) => {
     replaceUrlParams({ type: next === 'all' ? null : next });

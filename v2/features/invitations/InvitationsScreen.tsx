@@ -85,6 +85,12 @@ export function InvitationsScreen() {
   const session = useV2Session();
   const viewerId = session.userId;
   const eligible = collabAccessState(session) === 'eligible';
+  // CHANNEL INVITATIONS ARE TEAM CHANNELS' (researchers and up, the server's
+  // flag). For everyone else the endpoint answers 403, and asking it made every
+  // load of this screen say "Some invitations couldn't be checked" (Tester
+  // Claude's walk, 18 October 2026). A reader who cannot open channels has no
+  // channel invitations to see, so the section is not asked for at all.
+  const channelsOn = eligible && session.canAccessTeamChannels;
   const router = useRouter();
 
   // Frozen at mount for the relative ages — the inboxes refetch on arrival, so
@@ -111,7 +117,7 @@ export function InvitationsScreen() {
   });
   const channelsQuery = useQuery({
     ...invitationsQueries.channels({ viewerId }),
-    enabled: eligible,
+    enabled: channelsOn,
   });
 
   const respond = useRespondToInvitation();
@@ -175,18 +181,18 @@ export function InvitationsScreen() {
     [presented, beginExit, respondMutate, router],
   );
 
-  const isPending =
-    organizationsQuery.isPending || spacesQuery.isPending || channelsQuery.isPending;
-  const failed = [organizationsQuery, spacesQuery, channelsQuery].filter(
-    (query) => query.isError,
-  );
-  const allFailed = failed.length === 3;
+  // Only the inboxes this reader is asked for count: a query that is switched
+  // off stays `isPending` for ever, and would hold the skeleton.
+  const asked = channelsOn
+    ? [organizationsQuery, spacesQuery, channelsQuery]
+    : [organizationsQuery, spacesQuery];
+  const isPending = asked.some((query) => query.isPending);
+  const failed = asked.filter((query) => query.isError);
+  const allFailed = failed.length === asked.length;
   const someFailed = failed.length > 0 && !allFailed;
 
   const retryAll = () => {
-    void organizationsQuery.refetch();
-    void spacesQuery.refetch();
-    void channelsQuery.refetch();
+    for (const query of asked) void query.refetch();
   };
 
   return (

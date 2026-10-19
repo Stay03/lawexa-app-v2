@@ -12,9 +12,10 @@ import { RadarScreen } from '@/v2/features/radars/detail/RadarScreen';
  * and a Laravel round trip in front of every hard load.
  *
  * The old `/radars/[uuid]/settings` and `/radars/[uuid]/scan-log` routes are
- * deliberately NOT recreated: settings is the `?settings=1` quiet-URL sheet
- * and the scan log is the "All activity" tab (owner decision D3), both inside
- * this one route.
+ * not screens of their own: settings is the `?settings=1` quiet-URL sheet and
+ * the scan log is the "All activity" tab (owner decision D3), both inside this
+ * one route. Their addresses redirect here (`settings/`, `scan-log/`), so a
+ * saved link still opens the right view.
  */
 interface RadarPageProps {
   params: Promise<{ radarUuid: string }>;

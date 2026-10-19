@@ -29,18 +29,22 @@ import { invitationsQueries } from './queries';
 export function usePendingInvitationCount({
   viewerId,
   enabled,
+  channelsEnabled,
 }: {
   viewerId: number | null;
   /** Gated on the collab access state — never fetch for a viewer the door
    *  has already refused. */
   enabled: boolean;
+  /** Channel invitations, for a reader who can open Team Channels only (the
+   *  endpoint 403s for everyone else; `InvitationsScreen`). */
+  channelsEnabled: boolean;
 }): number {
   const organizations = useQuery({
     ...invitationsQueries.organizations({ viewerId }),
     enabled,
   });
   const spaces = useQuery({ ...invitationsQueries.spaces({ viewerId }), enabled });
-  const channels = useQuery({ ...invitationsQueries.channels({ viewerId }), enabled });
+  const channels = useQuery({ ...invitationsQueries.channels({ viewerId }), enabled: channelsEnabled });
 
   // MEASURED 2026-08-04: the three invitation endpoints ship `{success,
   // message, data}` with NO pagination block, despite the shared type claiming

@@ -10,13 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
+import { useV2Session } from '@/v2/runtime/session-context';
 import type { DiscoverableSpace } from '@/types/collab';
 import {
   useAskToJoinSpace,
   useDiscoverSpaces,
   useJoinPublicSpace,
 } from '@/v2/features/invites/queries';
-import { askRefusal, discoverAction } from './discover-model';
+import { askRefusal, discoverAction, joinRefusal, type Refusal } from './discover-model';
 
 /**
  * DiscoverScreen — the public spaces anybody can find, and the way in.
@@ -45,8 +46,11 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
   const router = useRouter();
   const join = useJoinPublicSpace();
   const ask = useAskToJoinSpace();
-  const [refusal, setRefusal] = useState<string | null>(null);
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
   const action = discoverAction(space);
+  // A guest pass is signed in too; it is not an account.
+  const { signedIn, role } = useV2Session();
+  const hasAccount = signedIn && role !== 'guest' && role !== 'bot';
 
   const sendAsk = (asking: boolean) => {
     setRefusal(null);
@@ -54,7 +58,7 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
       { spaceUuid: space.uuid, ask: asking },
       {
         onError: (error) =>
-          setRefusal(askRefusal(isAxiosError(error) ? error.response?.status : undefined)),
+          setRefusal(askRefusal(isAxiosError(error) ? error.response?.status : undefined, hasAccount)),
       },
     );
   };
@@ -63,14 +67,8 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
     setRefusal(null);
     join.mutate(space.uuid, {
       onSuccess: () => router.push(`/spaces/${space.uuid}`),
-      onError: (error) => {
-        const status = isAxiosError(error) ? error.response?.status : undefined;
-        setRefusal(
-          status === 403
-            ? 'You need a Lawexa account to join. You can keep reading without one.'
-            : "That didn't work. Try again in a moment.",
-        );
-      },
+      onError: (error) =>
+        setRefusal(joinRefusal(isAxiosError(error) ? error.response?.status : undefined, hasAccount)),
     });
   };
 
@@ -155,10 +153,15 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
         )}
         {refusal ? (
           <p role="alert" className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            {refusal}{' '}
-            <Link href="/register" className="font-medium text-primary underline">
-              Create an account
-            </Link>
+            {refusal.text}
+            {refusal.offerAccount ? (
+              <>
+                {' '}
+                <Link href="/register" className="font-medium text-primary underline">
+                  Create an account
+                </Link>
+              </>
+            ) : null}
           </p>
         ) : null}
       </div>

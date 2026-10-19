@@ -21,7 +21,7 @@ export default function V2Error({
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-4 px-6 py-16 text-center">
       <p className="text-sm text-muted-foreground">
-        Something went wrong in the v2 preview.
+        Something went wrong on this page.
       </p>
       <Button variant="outline" onClick={reset}>
         Try again
