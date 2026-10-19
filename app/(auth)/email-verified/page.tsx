@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LogOutButton } from '@/components/auth/LogOutButton';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { emailVerifiedState, pathAfterVerified, resendWaitAfterError } from '@/lib/utils/signup-flow';
@@ -127,6 +128,7 @@ function EmailVerifiedContent() {
               )}
             </Button>
           </div>
+          <LogOutButton />
         </CardFooter>
       </Card>
     </div>

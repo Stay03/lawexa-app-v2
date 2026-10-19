@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { LogOutButton } from '@/components/auth/LogOutButton';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
@@ -156,13 +157,14 @@ function CheckEmailContent() {
           </Button>
         </CardContent>
 
-        <CardFooter className="flex justify-center">
+        <CardFooter className="flex flex-col items-center gap-2">
           <p className="text-sm text-muted-foreground">
             Wrong email?{' '}
             <a href="/register" className="text-primary hover:underline">
               Sign up again
             </a>
           </p>
+          <LogOutButton />
         </CardFooter>
       </Card>
     </div>

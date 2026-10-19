@@ -7,6 +7,7 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { onboardingApi } from '@/lib/api/onboarding';
 import { useMounted } from '@/lib/hooks/useMounted';
+import { LogOutButton } from '@/components/auth/LogOutButton';
 import type { OnboardingProgressResponse } from '@/types/onboarding';
 
 export default function OnboardingLayout({
@@ -141,8 +142,11 @@ export default function OnboardingLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Main content - no header, content starts from top */}
+    <div className="relative min-h-screen bg-background">
+      {/* No header; the one control above the steps is the way out. */}
+      <div className="absolute right-3 top-3 z-10">
+        <LogOutButton />
+      </div>
       <main>{children}</main>
     </div>
   );
