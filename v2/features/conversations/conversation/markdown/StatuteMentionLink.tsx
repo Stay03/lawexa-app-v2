@@ -9,9 +9,11 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, BookText, CornerDownRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { statutesApi } from '@/lib/api/statutes';
 import {
   HoverCard,
   HoverCardContent,
@@ -22,6 +24,7 @@ import { formatProvisionLabel, parseProvisionSegment } from '@/v2/features/statu
 import { useDocumentLinkHost } from './document-link-context';
 import { statuteLinkTarget, type StatuteLinkTarget } from './document-links';
 import { MENTION_CONTENT_WIDTH, MENTION_FOOTER_CLASS, MENTION_TRIGGER_CLASS } from './mention-styles';
+import { PREVIEW_STALE_MS, previewPath, sectionPreview } from './statute-preview';
 import { usePointerCapability } from './use-pointer-capability';
 
 /**
@@ -38,11 +41,14 @@ import { usePointerCapability } from './use-pointer-capability';
  * IT WEARS THE CASE BADGE AND ITS PANE (Arthur, 15:06 UTC), with the same
  * gestures: hover on a pointer device, a tap on touch, where the pane's own
  * button is the way on ("Go to section 18" on the statute's page, else "Open
- * statute"). The pane fetches nothing. On the statute's own page it reads the
- * part from the document already parsed there; for another statute it shows the
- * link's words and the part's number, because the statute's own read counts a
- * view and the part's read spends the reader's 10-a-minute statute allowance
- * (backend, 18 October 2026), and a hover must cost neither.
+ * statute"). On the statute's own page the pane reads the part from the
+ * document already parsed there, and fetches nothing. For another statute, and
+ * in any chat with no statute page open, it reads the section from the server
+ * when it opens (Arthur, 19 October 2026: the pane gave only "Section 334"):
+ * one request per pane opened, marked as a prefetch so the server logs no view
+ * and spends none of the reader's statute opens (`statutesApi.previewSection`),
+ * kept an hour. While it loads the pane shows a line; if it fails the pane is
+ * the bare one it always was, and "Open statute" still goes.
  *
  * WHOSE LINK IT IS depends on the page's origin, which the server cannot know:
  * the server and the first client render draw the relative and lawexa.com
@@ -256,8 +262,23 @@ function StatutePreview({
   const pageHost = onPage ? host : null;
   const peek = pageHost && hasPart ? pageHost.peek(target) : null;
   const cited = target.provision ? parseProvisionSegment(target.provision) : null;
+  // Another statute's section: read from the server, only now that the pane is open.
+  const path = onPage ? null : previewPath(target);
+  const fetched = useQuery({
+    queryKey: ['statute-section-preview', target.slug, path],
+    queryFn: async () => sectionPreview((await statutesApi.previewSection(target.slug, path as string)).data),
+    enabled: path !== null,
+    staleTime: PREVIEW_STALE_MS,
+    gcTime: PREVIEW_STALE_MS,
+    retry: false,
+    meta: { silentError: true },
+  });
+  const remote = path !== null ? (fetched.data ?? null) : null;
+  const loading = path !== null && fetched.isPending;
   const label = peek?.label ?? (cited ? formatProvisionLabel(cited) : null);
-  const name = pageHost ? pageHost.statuteTitle || linkText : linkText;
+  const name = pageHost ? pageHost.statuteTitle || linkText : remote?.name || linkText;
+  const heading = peek?.heading ?? remote?.heading ?? null;
+  const text = peek?.text ?? remote?.text ?? null;
   const action = onPage
     ? hasPart && label
       ? `Go to ${label.charAt(0).toLowerCase()}${label.slice(1)}`
@@ -274,17 +295,22 @@ function StatutePreview({
           <div
             className={cn(
               'text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs',
-              peek?.text ? 'border-border border-b pb-2.5' : null,
+              text || loading ? 'border-border border-b pb-2.5' : null,
             )}
           >
             <BookText aria-hidden className="size-3.5 shrink-0" />
-            <span className="min-w-0 truncate">{peek?.heading ? `${label} · ${peek.heading}` : label}</span>
+            <span className="min-w-0 truncate">{heading ? `${label} · ${heading}` : label}</span>
           </div>
         ) : null}
-        {peek?.text ? (
-          <p className="text-popover-foreground/90 max-h-[280px] overflow-y-auto overscroll-contain pr-1 text-[0.8125rem] leading-relaxed">
-            {peek.text}
+        {text ? (
+          <p className="text-popover-foreground/90 max-h-[280px] overflow-y-auto overscroll-contain pr-1 text-[0.8125rem] leading-relaxed motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+            {text}
           </p>
+        ) : loading ? (
+          <div aria-hidden className="flex flex-col gap-1.5 pt-0.5">
+            <span className="h-3 w-full animate-pulse rounded bg-muted" />
+            <span className="h-3 w-4/5 animate-pulse rounded bg-muted" />
+          </div>
         ) : null}
       </div>
       {action ? (

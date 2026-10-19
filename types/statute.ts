@@ -233,6 +233,8 @@ export interface StatuteNavigateResponse {
   data: {
     node: StatuteNode;
     total_count: number;
+    /** The statute the node is in (backend, 19 October 2026: for a badge's pane). */
+    statute?: { slug: string; title: string; short_title: string | null };
   };
 }
 

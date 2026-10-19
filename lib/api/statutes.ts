@@ -192,6 +192,22 @@ export const statutesApi = {
   },
 
   /**
+   * One section, for a chat badge's preview pane (19 October 2026): the same
+   * read as {@link statutesApi.navigate}, marked as a prefetch
+   * (`X-Lawexa-Prefetch: 1`), which the server counts in its own bucket and
+   * logs no view for, so opening a pane never spends the reader's statute
+   * opens. `path` is the link's own segment, `section-{num}`; on a duplicate
+   * number the server takes the first in document order, as the reader does.
+   */
+  previewSection: async (slug: string, path: string): Promise<StatuteNavigateResponse> => {
+    const response = await apiClient.get<StatuteNavigateResponse>(
+      `/statutes/${slug}/navigate/${path}`,
+      { headers: { 'X-Lawexa-Prefetch': '1' } },
+    );
+    return response.data;
+  },
+
+  /**
    * The reader's document fetch: the AKN 3.0 XML plus the paywall marker read
    * from the response headers (see the contract block above). `partial: null`
    * means "render the full document exactly as always" — the off-switch
