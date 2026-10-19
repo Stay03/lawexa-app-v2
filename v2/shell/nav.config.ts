@@ -11,6 +11,7 @@ import {
   Radar,
   Scale,
   BookText,
+  Tag,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -194,7 +195,23 @@ export const v2NavItems: V2NavItem[] = [
     // route gate instead of a dead entry point here.
     canAccess: canAccessQuizPlayer,
   },
+  {
+    // FOR VISITORS ONLY (Stay, 19 October 2026, 20:59Z: "Add the link"). A
+    // visitor can open the plans without an account (item 8), and nothing led
+    // there: Tester found no Pricing link on a visitor's home. A signed-in
+    // account reaches its plan from Usage and the out-of-messages doors, so
+    // the row is for those without one.
+    label: 'Pricing',
+    href: '/pricing',
+    icon: Tag,
+    canAccess: isVisitor,
+  },
 ];
+
+/** No account yet: signed out, or browsing on a guest pass. */
+function isVisitor(role: UserRole | null): boolean {
+  return role === null || role === 'guest';
+}
 
 /**
  * The nav rows THIS viewer may see. Both surfaces call it with the session the

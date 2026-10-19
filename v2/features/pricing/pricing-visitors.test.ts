@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { visibleNavItems } from '@/v2/shell/nav.config';
+
+test('a visitor finds Pricing in the menu; an account does not (Stay, 20:59Z: "Add the link")', () => {
+  const pricingRow = (role: Parameters<typeof visibleNavItems>[0]['role']) =>
+    visibleNavItems({ role, canAccessTeamChannels: false }).find((item) => item.href === '/pricing');
+  for (const role of [null, 'guest'] as const) {
+    assert.equal(pricingRow(role)?.label, 'Pricing', String(role));
+  }
+  for (const role of ['user', 'lawyer', 'researcher', 'admin', 'superadmin', 'bot'] as const) {
+    assert.equal(pricingRow(role as never), undefined, role);
+  }
+});
+
 /* v2 Stage 1, item 8: a visitor who is not signed in opens Pricing and sees
  * the plans. GET /subscriptions/plans needs no token (backend 3da88635). */
 
