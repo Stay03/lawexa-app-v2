@@ -9,6 +9,7 @@ import {
   emailVerifiedState,
   pathAfterVerified,
   resendLabel,
+  resendSaysVerified,
   resendWaitAfterError,
 } from '../../lib/utils/signup-flow';
 
@@ -47,7 +48,13 @@ test('row 3: Resend waits a minute after a send, and the server’s own time on 
   assert.equal(RESEND_WAIT_SECONDS, 60);
   assert.equal(resendLabel(0), 'Resend verification email');
   assert.equal(resendLabel(42), 'Resend in 42 s');
+  // The server's own count, in the body (backend 4e18e778), comes first.
+  assert.equal(resendWaitAfterError({ response: { status: 429, data: { errors: { retry_after_seconds: 42 } }, headers: { 'retry-after': '37' } } }), 42);
   assert.equal(resendWaitAfterError({ response: { status: 429, headers: { 'retry-after': '37' } } }), 37);
+  // Verified meanwhile: the answer moves the reader on, not into a countdown.
+  assert.equal(resendSaysVerified('Email already verified.'), true);
+  assert.equal(resendSaysVerified('Verification link sent.'), false);
+  assert.equal(resendSaysVerified(undefined), false);
   assert.equal(resendWaitAfterError({ response: { status: 429, headers: {} } }), 60);
   assert.equal(resendWaitAfterError({ response: { status: 500 } }), 0);
   assert.equal(resendWaitAfterError(new Error('network')), 0);

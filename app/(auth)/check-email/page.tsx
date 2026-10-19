@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Loader2 } from 'lucide-react';
 import {
@@ -18,6 +18,7 @@ import {
   RESEND_WAIT_SECONDS,
   pathAfterVerified,
   resendLabel,
+  resendSaysVerified,
   resendWaitAfterError,
 } from '@/lib/utils/signup-flow';
 
@@ -41,34 +42,36 @@ function CheckEmailContent() {
     return () => clearTimeout(timer);
   }, [secondsLeft]);
 
-  // Verified elsewhere (another tab, another device): this screen moves on
-  // when it opens and whenever it is shown again (row 10), to onboarding when
-  // it is unfinished, else the app.
+  // A verified account moves on, to onboarding when it is unfinished, else
+  // the app.
+  const moveOnIfVerified = useCallback(async () => {
+    if (checking.current) return;
+    checking.current = true;
+    try {
+      const response = await authApi.me();
+      const user = response.data?.user;
+      if (user?.is_verified) {
+        useAuthStore.getState().updateUser(user);
+        router.replace(pathAfterVerified(user.profile));
+      }
+    } catch {
+      // Not known yet: the screen stays, and the next look tries again.
+    } finally {
+      checking.current = false;
+    }
+  }, [router]);
+
+  // Verified elsewhere (another tab, another device): this screen checks when
+  // it opens and whenever it is shown again (row 10).
   useEffect(() => {
     if (!isAuthenticated || isGuest) return;
-    const check = async () => {
-      if (checking.current) return;
-      checking.current = true;
-      try {
-        const response = await authApi.me();
-        const user = response.data?.user;
-        if (user?.is_verified) {
-          useAuthStore.getState().updateUser(user);
-          router.replace(pathAfterVerified(user.profile));
-        }
-      } catch {
-        // Not known yet: the screen stays, and the next look tries again.
-      } finally {
-        checking.current = false;
-      }
-    };
-    void check();
+    void moveOnIfVerified();
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void check();
+      if (document.visibilityState === 'visible') void moveOnIfVerified();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [isAuthenticated, isGuest, router]);
+  }, [isAuthenticated, isGuest, moveOnIfVerified]);
 
   const handleResend = async () => {
     setIsResending(true);
@@ -76,7 +79,13 @@ function CheckEmailContent() {
     setResendError(null);
 
     try {
-      await authApi.resendVerification();
+      const response = await authApi.resendVerification();
+      // Verified meanwhile: the server says so (200, "Email already
+      // verified."), and the screen moves on instead of counting down.
+      if (resendSaysVerified(response.message)) {
+        void moveOnIfVerified();
+        return;
+      }
       setResendMessage('Verification email sent! Please check your inbox.');
       setSecondsLeft(RESEND_WAIT_SECONDS);
     } catch (error) {
