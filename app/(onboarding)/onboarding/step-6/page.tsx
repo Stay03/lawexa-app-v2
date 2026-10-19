@@ -88,8 +88,9 @@ export default function OnboardingStep6Page() {
     if (!userType || !communicationStyle) {
       router.replace('/onboarding/step-1');
     } else if (!shouldShowEducationStep(userType, profileData.profession)) {
-      // Skip education step for non-students who aren't lawyers
-      router.replace('/onboarding/step-4');
+      // No education step here: a lawyer goes on to expertise, anyone else
+      // back to the profile.
+      router.replace(userType === 'lawyer' ? '/onboarding/step-7' : '/onboarding/step-4');
     }
   }, [userType, communicationStyle, profileData.profession, router]);
 

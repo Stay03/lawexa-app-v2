@@ -86,6 +86,12 @@ export default function OnboardingStep7Page() {
   const isLawStudent = userType === 'law_student';
 
   const handleBack = () => {
+    // A lawyer has no education step: back is the profile, or the location
+    // when the profile was skipped.
+    if (userType === 'lawyer') {
+      router.push(skipProfile ? '/onboarding/step-3' : '/onboarding/step-4');
+      return;
+    }
     router.push('/onboarding/step-6');
   };
 
@@ -118,7 +124,7 @@ export default function OnboardingStep7Page() {
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress
-          currentStep={(skipProfile ? 5 : 6) + (isLawStudent ? 1 : 0)}
+          currentStep={userType === 'lawyer' ? (skipProfile ? 4 : 5) : (skipProfile ? 5 : 6) + (isLawStudent ? 1 : 0)}
           totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
         />
 

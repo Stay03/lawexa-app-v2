@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Loader2 } from 'lucide-react';
 import {
   Card,
@@ -13,6 +13,13 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { authApi } from '@/lib/api/auth';
+import { useAuthStore } from '@/lib/stores/authStore';
+import {
+  RESEND_WAIT_SECONDS,
+  pathAfterVerified,
+  resendLabel,
+  resendWaitAfterError,
+} from '@/lib/utils/signup-flow';
 
 function CheckEmailContent() {
   const searchParams = useSearchParams();
@@ -20,6 +27,48 @@ function CheckEmailContent() {
   const [isResending, setIsResending] = useState(false);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
   const [resendError, setResendError] = useState<string | null>(null);
+  // After a send, the button waits (row 3 of the sign-up test, 19 October
+  // 2026: it had no cooldown); a 429 waits the server's own retry time.
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const router = useRouter();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isGuest = useAuthStore((state) => state.isGuest);
+  const checking = useRef(false);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const timer = setTimeout(() => setSecondsLeft((left) => left - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [secondsLeft]);
+
+  // Verified elsewhere (another tab, another device): this screen moves on
+  // when it opens and whenever it is shown again (row 10), to onboarding when
+  // it is unfinished, else the app.
+  useEffect(() => {
+    if (!isAuthenticated || isGuest) return;
+    const check = async () => {
+      if (checking.current) return;
+      checking.current = true;
+      try {
+        const response = await authApi.me();
+        const user = response.data?.user;
+        if (user?.is_verified) {
+          useAuthStore.getState().updateUser(user);
+          router.replace(pathAfterVerified(user.profile));
+        }
+      } catch {
+        // Not known yet: the screen stays, and the next look tries again.
+      } finally {
+        checking.current = false;
+      }
+    };
+    void check();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void check();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [isAuthenticated, isGuest, router]);
 
   const handleResend = async () => {
     setIsResending(true);
@@ -29,8 +78,15 @@ function CheckEmailContent() {
     try {
       await authApi.resendVerification();
       setResendMessage('Verification email sent! Please check your inbox.');
-    } catch {
-      setResendError('Failed to resend verification email. Please try again.');
+      setSecondsLeft(RESEND_WAIT_SECONDS);
+    } catch (error) {
+      const wait = resendWaitAfterError(error);
+      if (wait > 0) {
+        setResendError(`Please wait ${wait} seconds before asking for another email.`);
+        setSecondsLeft(wait);
+      } else {
+        setResendError('Failed to resend verification email. Please try again.');
+      }
     } finally {
       setIsResending(false);
     }
@@ -84,10 +140,10 @@ function CheckEmailContent() {
             variant="outline"
             className="w-full"
             onClick={handleResend}
-            disabled={isResending}
+            disabled={isResending || secondsLeft > 0}
           >
             {isResending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Resend verification email
+            <span className="tabular-nums">{resendLabel(secondsLeft)}</span>
           </Button>
         </CardContent>
 

@@ -349,7 +349,7 @@ export default function OnboardingStep8Page() {
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress
-          currentStep={skipProfile ? 6 : 7}
+          currentStep={skipProfile ? 5 : 6}
           totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
         />
 

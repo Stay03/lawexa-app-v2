@@ -117,12 +117,15 @@ export default function OnboardingStep4Page() {
     saveStep({ step: 4, ...stepFields });
 
     // Determine next step based on user type and profession
-    if (shouldShowEducationStep(userType, finalProfession)) {
+    if (userType === 'lawyer') {
+      // Lawyers go on to their areas of expertise; they have no education step.
+      router.push('/onboarding/step-7');
+    } else if (shouldShowEducationStep(userType, finalProfession)) {
       if (userType === 'law_student') {
         // Law students go to education level selection (step-5)
         router.push('/onboarding/step-5');
       } else {
-        // Lawyers and other+student go to education form (step-6)
+        // Other+student go to the education form (step-6)
         router.push('/onboarding/step-6');
       }
     } else {
@@ -280,7 +283,7 @@ export default function OnboardingStep4Page() {
             onBack={handleBack}
             onNext={handleNext}
             nextLabel={
-              shouldShowEducationStep(userType, profession) ? 'Next' : 'Complete'
+              userType === 'lawyer' || shouldShowEducationStep(userType, profession) ? 'Next' : 'Complete'
             }
             isLoading={isSubmitting}
             isNextDisabled={!isValid()}
