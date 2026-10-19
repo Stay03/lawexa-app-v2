@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import type { StatuteDetail } from '@/types/statute';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
+import { FeedbackButton } from '@/v2/features/feedback/FeedbackButton';
 import { StatuteBookmarkButton } from '../bookmark/StatuteBookmarkButton';
 import {
   formatStatuteDate,
@@ -187,6 +188,7 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
         />
         <AddToFolderButton target={{ type: 'statute', contentId: detail.id }} />
         <NotesButton />
+        <FeedbackButton type="statute" contentId={detail.id} />
       </div>
     </header>
   );

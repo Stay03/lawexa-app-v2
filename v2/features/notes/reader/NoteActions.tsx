@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
+import { FeedbackButton } from '@/v2/features/feedback/FeedbackButton';
 import { notesApi } from '../api';
 import { NoteBookmarkButton } from '../bookmark/NoteBookmarkButton';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
@@ -74,6 +75,7 @@ export function NoteActions({
           Edit
         </Link>
       ) : null}
+      <FeedbackButton type="note" contentId={noteId} />
     </div>
   );
 }

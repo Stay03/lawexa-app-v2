@@ -8,6 +8,7 @@ import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
+import { FeedbackButton } from '@/v2/features/feedback/FeedbackButton';
 
 /**
  * The case action row — save, share, and the full judgment when one exists.
@@ -25,9 +26,8 @@ import { ShareButton } from '@/v2/features/sharing/ShareButton';
  *
  * ADD TO FOLDER landed with the phase-4 folders wave and sits beside the
  * bookmark, which is its nearest relative: both file the case somewhere the
- * reader can find it again. FEEDBACK is still absent — a whole v1 feature
- * behind the v2 import boundary — and stays a recorded gap rather than a button
- * that opens nothing.
+ * reader can find it again. FEEDBACK closes the row (v2 Stage 1, item 5): the
+ * one shared report the statute and the note pages offer too.
  */
 export function CaseActions({
   caseId,
@@ -63,6 +63,7 @@ export function CaseActions({
       />
       <AddToFolderButton target={{ type: 'case', contentId: caseId }} />
       <ShareButton title={title} label="Share this case" />
+      <FeedbackButton type="case" contentId={caseId} />
     </div>
   );
 }
