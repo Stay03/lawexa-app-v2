@@ -100,6 +100,11 @@ function PricingPage() {
   const { signedIn, role } = useV2Session();
   const searchParams = useSearchParams();
   const tab = parsePricingTab(searchParams.get('tab'));
+  // PLANS ARE OPEN TO VISITORS (v2 Stage 1, item 8): the plan list needs no
+  // token (backend, 19 October 2026), so a visitor sees what a guest sees, the
+  // plans with a "Create an account" button on each, never a checkout. Message
+  // packs are bought and priced on an account, so that tab still asks first.
+  const planViewer = signedIn && role !== 'guest' ? 'account' : 'guest';
   const viewer = !signedIn ? null : role === 'guest' ? 'guest' : 'account';
 
   return (
@@ -115,16 +120,7 @@ function PricingPage() {
         aria-labelledby={`${PANEL_ID}-tab-${tab}`}
         className="pt-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
       >
-        {tab === 'plans' ? (
-          viewer ? (
-            <Plans viewer={viewer} offersDaily={role === 'superadmin'} />
-          ) : (
-            <SignedOut
-              title="Sign in to see plans"
-              description="The plans and prices on offer depend on your account, so they show once you sign in."
-            />
-          )
-        ) : null}
+        {tab === 'plans' ? <Plans viewer={planViewer} offersDaily={role === 'superadmin'} /> : null}
         {tab === 'payg' ? (
           viewer ? (
             <Packs viewer={viewer} />
@@ -311,6 +307,18 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
             />
           ) : null}
         </div>
+      ) : null}
+
+      {/* No account on this device: every plan button opens registration, so
+          the way in for someone who already has one is said once, here. */}
+      {!isAccount ? (
+        <p className="mb-6 px-1 text-[13px] leading-snug text-muted-foreground">
+          Already have an account?{' '}
+          <Link href={SIGN_IN_HREF} className="font-medium text-foreground underline underline-offset-2">
+            Sign in
+          </Link>{' '}
+          to choose a plan.
+        </p>
       ) : null}
 
       {notices.length > 0 ? (
