@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import { ChatRatingSlot } from '@/v2/features/chat-rating/ChatRatingBanner';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useMoveFirstPending } from '@/v2/shell/move-first';
 import { conversationIdOf } from '../warm';
@@ -148,26 +149,31 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
     content = !surface.isOwnerResolved ? (
       surface.holdingSkeleton ? null : <ComposerSkeleton />
     ) : surface.canSend ? (
-      <ConversationComposer
-        holdSend={surface.holdSend}
-        draftScopeId={conversationId}
-        stageRef={composerRef}
-        jurisdiction={surface.jurisdiction}
-        onJurisdictionChange={surface.setJurisdiction}
-        isConfidential={surface.isConfidential}
-        isRedacted={surface.isRedacted}
-        showMeta={surface.showMeta}
-        isStreaming={surface.isStreaming}
-        isCancelling={surface.isCancelling}
-        sendHeldBy={surface.sendHeldBy}
-        canStop={surface.canStop}
-        onSubmit={surface.submit}
-        onStop={surface.stop}
-        viewerId={userId}
-        mentionOptions={surface.mentionOptions}
-        quoteToneOf={surface.quoteToneOf}
-        spaceUuid={surface.spaceUuid}
-      />
+      <>
+        {/* "How is Lawexa doing?" sits above the box, in every chat a reader
+            may send in, a Space chat's included (Arthur, 19 October 2026). */}
+        <ChatRatingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />
+        <ConversationComposer
+          holdSend={surface.holdSend}
+          draftScopeId={conversationId}
+          stageRef={composerRef}
+          jurisdiction={surface.jurisdiction}
+          onJurisdictionChange={surface.setJurisdiction}
+          isConfidential={surface.isConfidential}
+          isRedacted={surface.isRedacted}
+          showMeta={surface.showMeta}
+          isStreaming={surface.isStreaming}
+          isCancelling={surface.isCancelling}
+          sendHeldBy={surface.sendHeldBy}
+          canStop={surface.canStop}
+          onSubmit={surface.submit}
+          onStop={surface.stop}
+          viewerId={userId}
+          mentionOptions={surface.mentionOptions}
+          quoteToneOf={surface.quoteToneOf}
+          spaceUuid={surface.spaceUuid}
+        />
+      </>
     ) : (
       <ViewOnlyPill reason={surface.viewOnlyReason} />
     );

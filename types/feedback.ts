@@ -94,3 +94,38 @@ export interface FeedbackContext {
   contentId: number;
   contentTitle: string;
 }
+
+/* ── Chat rating: "How is Lawexa doing?" (Arthur, 19 October 2026) ──────── */
+
+/** The banner's three answers. */
+export type ChatRating = 'poor' | 'fine' | 'great';
+
+/** Why an answer was poor; `text` goes with `something_else` only. */
+export type ChatRatingReason =
+  | 'wrong_citation'
+  | 'missed_case_or_statute'
+  | 'outdated_law'
+  | 'didnt_answer'
+  | 'too_slow'
+  | 'something_else';
+
+/** The moment that brought the banner up. */
+export type ChatRatingTrigger = 'copy' | 'cited_case' | 'regenerate';
+
+/** POST /api/feedback, as a chat rating. */
+export interface SubmitChatRatingData {
+  rating: ChatRating;
+  reason?: ChatRatingReason;
+  text?: string;
+  conversationId: string;
+  /** The rated answer's saved id; never a question's. Omitted when unknown. */
+  messageId: number | null;
+  trigger: ChatRatingTrigger;
+}
+
+/** GET /api/feedback/chat-prompt. `next_at` is null when eligible, and also
+ *  when the reader is too new to be asked (check again next session). */
+export interface ChatPromptEligibility {
+  eligible: boolean;
+  next_at: string | null;
+}

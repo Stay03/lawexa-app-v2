@@ -11,6 +11,7 @@ import { rememberCasePeek } from '@/v2/features/cases/case-peek';
 import { toAlpha2 } from '@/v2/features/cases/case-row-model';
 import { casesQueries } from '@/v2/features/cases/queries';
 import { MoveFirstLink } from '@/v2/shell/move-first';
+import { useNoteAnswerMoment } from '@/v2/features/chat-rating/answer-scope';
 
 /**
  * CasePreview — the body of a case-mention preview (desktop hover-card + touch
@@ -109,6 +110,8 @@ function PreviewBody({
   const date = formatJudgmentDate(detail.judgment_date);
   const summary = useMemo(() => buildSummary(detail), [detail]);
   const hasMeta = court !== '' || date !== '';
+  // "Open case" from an answer's citation is a chat rating moment.
+  const noteMoment = useNoteAnswerMoment();
 
   return (
     <div className="flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
@@ -147,7 +150,8 @@ function PreviewBody({
         title={title}
         // The case's frame draws this name, court and date at once, as a case
         // row's tap does (case-peek.ts).
-        onClick={() =>
+        onClick={() => {
+          noteMoment('cited_case');
           rememberCasePeek({
             id: detail.id,
             slug,
@@ -165,8 +169,8 @@ function PreviewBody({
             hasFullReport: detail.has_full_report === true,
             outcome: detail.outcome ?? null,
             suitNo: detail.suit_no?.trim() || null,
-          })
-        }
+          });
+        }}
         onMove={onOpen}
         className="text-primary border-border v2-interactive focus-visible:ring-ring flex min-h-11 items-center justify-between gap-2 border-t px-4 py-2.5 text-xs font-medium transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset"
       >
@@ -198,6 +202,7 @@ function PreviewSkeleton() {
 }
 
 function PreviewError({ href, onRetry, onOpen }: { href: string; onRetry: () => void; onOpen?: () => void }) {
+  const noteMoment = useNoteAnswerMoment();
   return (
     <div
       className="flex flex-col items-start gap-2 p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
@@ -218,6 +223,7 @@ function PreviewError({ href, onRetry, onOpen }: { href: string; onRetry: () => 
         <MoveFirstLink
           href={href}
           kind="case"
+          onClick={() => noteMoment('cited_case')}
           onMove={onOpen}
           className="text-primary v2-interactive focus-visible:ring-ring rounded-md px-2.5 py-1 text-xs font-medium transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2"
         >

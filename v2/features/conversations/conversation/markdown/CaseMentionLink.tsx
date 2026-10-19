@@ -15,6 +15,7 @@ import { usePointerCapability } from './use-pointer-capability';
 import { CasePreview } from './CasePreview';
 import { MENTION_CONTENT_WIDTH, MENTION_TRIGGER_CLASS } from './mention-styles';
 import { DocumentLink } from './StatuteMentionLink';
+import { useNoteAnswerMoment } from '@/v2/features/chat-rating/answer-scope';
 
 /**
  * CaseMentionLink — the `a` renderer for assistant markdown (§C KEEP, ported
@@ -99,13 +100,16 @@ export function CaseMentionLink({
 function CaseMention({ slug, children }: { slug: string; children: ReactNode }) {
   const pointer = usePointerCapability();
   const casePath = `/cases/${slug}`;
+  // Opening a case the answer cites is a chat rating moment ("Open case" in
+  // the touch preview reports its own, in CasePreview).
+  const noteMoment = useNoteAnswerMoment();
 
   // Pre-mount (SSR + first hydration render): a plain, navigable anchor with no
   // preview wrapper, so server and client agree. Once the pointer type resolves
   // on the client the anchor upgrades in place to its interactive variant.
   if (pointer === null) {
     return (
-      <MoveFirstLink href={casePath} kind="case" className={MENTION_TRIGGER_CLASS}>
+      <MoveFirstLink href={casePath} kind="case" onClick={() => noteMoment('cited_case')} className={MENTION_TRIGGER_CLASS}>
         {children}
       </MoveFirstLink>
     );
@@ -113,7 +117,7 @@ function CaseMention({ slug, children }: { slug: string; children: ReactNode }) 
 
   if (pointer === 'fine') {
     return (
-      <DesktopCaseHoverCard slug={slug} casePath={casePath}>
+      <DesktopCaseHoverCard slug={slug} casePath={casePath} onOpen={() => noteMoment('cited_case')}>
         {children}
       </DesktopCaseHoverCard>
     );
@@ -135,10 +139,13 @@ function CaseMention({ slug, children }: { slug: string; children: ReactNode }) 
 function DesktopCaseHoverCard({
   slug,
   casePath,
+  onOpen,
   children,
 }: {
   slug: string;
   casePath: string;
+  /** The link was followed to the case page. */
+  onOpen: () => void;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -147,7 +154,7 @@ function DesktopCaseHoverCard({
       <HoverCardTrigger asChild>
         {/* Moves first: the case's frame paints in the click, as a case row's
             does ("a case opens at once", 17 October 2026). */}
-        <MoveFirstLink href={casePath} kind="case" onMove={() => setOpen(false)} className={MENTION_TRIGGER_CLASS}>
+        <MoveFirstLink href={casePath} kind="case" onClick={onOpen} onMove={() => setOpen(false)} className={MENTION_TRIGGER_CLASS}>
           {children}
         </MoveFirstLink>
       </HoverCardTrigger>

@@ -1,5 +1,11 @@
 import { apiClient } from './client';
-import type { SubmitFeedbackData, FeedbackResponse, QuizQuestionFeedbackBody } from '@/types/feedback';
+import type {
+  ChatPromptEligibility,
+  FeedbackResponse,
+  QuizQuestionFeedbackBody,
+  SubmitChatRatingData,
+  SubmitFeedbackData,
+} from '@/types/feedback';
 
 /**
  * Feedback API service for Phase 13 endpoints
@@ -38,5 +44,33 @@ export const feedbackApi = {
   submitQuizQuestion: async (body: QuizQuestionFeedbackBody): Promise<FeedbackResponse> => {
     const response = await apiClient.post<FeedbackResponse>('/feedback', body);
     return response.data;
+  },
+
+  /**
+   * A chat rating from the "How is Lawexa doing?" banner. Same endpoint as a
+   * report; the rating, reason and trigger are its own fields.
+   */
+  submitChatRating: async (data: SubmitChatRatingData): Promise<FeedbackResponse> => {
+    const response = await apiClient.post<FeedbackResponse>('/feedback', {
+      rating: data.rating,
+      ...(data.reason ? { reason: data.reason } : {}),
+      ...(data.reason === 'something_else' && data.text ? { text: data.text } : {}),
+      content_type: 'conversation',
+      content_id: data.conversationId,
+      ...(data.messageId !== null ? { message_id: data.messageId } : {}),
+      trigger: data.trigger,
+    });
+    return response.data;
+  },
+
+  /** Whether the banner may ask this reader now (the 14 days and the new-user rule). */
+  chatPrompt: async (): Promise<ChatPromptEligibility> => {
+    const response = await apiClient.get<{ data: ChatPromptEligibility }>('/feedback/chat-prompt');
+    return response.data.data;
+  },
+
+  /** The banner appeared ("shown") or was closed ("closed"): either starts the 14 days. */
+  chatPromptSeen: async (action: 'shown' | 'closed'): Promise<void> => {
+    await apiClient.post('/feedback/chat-prompt/seen', { action });
   },
 };

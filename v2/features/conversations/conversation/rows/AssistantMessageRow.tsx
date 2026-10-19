@@ -11,6 +11,7 @@ import {
   type StreamingSource,
 } from '@/v2/runtime/chat-engine';
 import type { ChatMessage, MessageReplyTo } from '@/types/chat';
+import { AnswerScope, useNoteAnswerMoment } from '@/v2/features/chat-rating/answer-scope';
 import { ChatContent } from '../markdown/ChatContent';
 import { MessageDocumentScope } from '../markdown/document-export';
 import { savedMessageId } from '../markdown/export-target';
@@ -92,79 +93,84 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   // Only a saved, finished answer can be replied to (replyTargetOf).
   const target = onReply && showActions ? replyTargetOf(message as ReplyableRow) : null;
   const reply = target && onReply ? () => onReply(target) : null;
+  // The answer's saved id, for the chat rating's moments (a copy, a cited
+  // case opened from it, Ask again) and the document export alike.
+  const savedId = message.savedId ?? savedMessageId(message.id);
 
   return (
     <SwipeToReply onReply={reply}>
-      <div className="w-full">
-        <ReasoningTrace text={reasoningText} isStreaming={isStreaming} reasoningMs={message.reasoningMs} />
+      <AnswerScope messageId={savedId}>
+        <div className="w-full">
+          <ReasoningTrace text={reasoningText} isStreaming={isStreaming} reasoningMs={message.reasoningMs} />
 
-        {/* A report the Radar scan wrote, not a reply to a question: a quiet grey
-            label says so (no colour; gold is for actions). */}
-        {radarReport && (
-          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Radar aria-hidden className="h-3.5 w-3.5" />
-            <span>Radar report</span>
-          </div>
-        )}
+          {/* A report the Radar scan wrote, not a reply to a question: a quiet grey
+              label says so (no colour; gold is for actions). */}
+          {radarReport && (
+            <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Radar aria-hidden className="h-3.5 w-3.5" />
+              <span>Radar report</span>
+            </div>
+          )}
 
-        {/* Rendered while STREAMING even with no text yet: in the `line` release style
-            the first unit is deliberately held until it is complete, and ChatContent's
-            skeleton bar is what stands in for it. Gating on `text` alone left that
-            opening beat blank (the transcript's activity status has already stepped
-            aside once the assistant placeholder exists). With empty text and the
-            `flow` style this renders a zero-height prose container, so nothing about
-            the current look changes. */}
-        {(text || isStreaming) && (
-          // The two gates are passed SEPARATELY because they want different answers
-          // during a drain: the per-word fade and the "generating" pill stay on (text
-          // is still appearing; a half-revealed card tag must not flash raw XML), but
-          // the `line` stand-in bar must not — the answer is complete, so a pulsing
-          // placeholder under it would promise a line that is never coming.
-          <MessageDocumentScope
-            messageId={message.savedId ?? savedMessageId(message.id)}
-            content={message.content}
-            landed={!isStreaming && !draining}
-          >
-            <ChatContent
-              content={shownText}
-              messageId={message.id}
-              isStreaming={isStreaming}
-              isDraining={draining}
-              isInteracted={isInteracted}
+          {/* Rendered while STREAMING even with no text yet: in the `line` release style
+              the first unit is deliberately held until it is complete, and ChatContent's
+              skeleton bar is what stands in for it. Gating on `text` alone left that
+              opening beat blank (the transcript's activity status has already stepped
+              aside once the assistant placeholder exists). With empty text and the
+              `flow` style this renders a zero-height prose container, so nothing about
+              the current look changes. */}
+          {(text || isStreaming) && (
+            // The two gates are passed SEPARATELY because they want different answers
+            // during a drain: the per-word fade and the "generating" pill stay on (text
+            // is still appearing; a half-revealed card tag must not flash raw XML), but
+            // the `line` stand-in bar must not — the answer is complete, so a pulsing
+            // placeholder under it would promise a line that is never coming.
+            <MessageDocumentScope
+              messageId={savedId}
+              content={message.content}
+              landed={!isStreaming && !draining}
+            >
+              <ChatContent
+                content={shownText}
+                messageId={message.id}
+                isStreaming={isStreaming}
+                isDraining={draining}
+                isInteracted={isInteracted}
+              />
+            </MessageDocumentScope>
+          )}
+
+          {partial && (
+            <div
+              className={cn(
+                'mt-1 flex items-center gap-1.5 text-xs',
+                partial.reason === 'cancelled' ? 'text-muted-foreground' : 'text-destructive',
+              )}
+            >
+              {partial.reason === 'cancelled' ? (
+                <>
+                  <Square className="h-3 w-3" />
+                  <span>Stopped</span>
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="h-3 w-3" />
+                  <span>Interrupted</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {showActions && (
+            <MessageActions
+              text={text}
+              showRegenerate={isLast && canRegenerate}
+              onRegenerate={onRegenerate}
+              onReply={reply}
             />
-          </MessageDocumentScope>
-        )}
-
-        {partial && (
-          <div
-            className={cn(
-              'mt-1 flex items-center gap-1.5 text-xs',
-              partial.reason === 'cancelled' ? 'text-muted-foreground' : 'text-destructive',
-            )}
-          >
-            {partial.reason === 'cancelled' ? (
-              <>
-                <Square className="h-3 w-3" />
-                <span>Stopped</span>
-              </>
-            ) : (
-              <>
-                <AlertCircle className="h-3 w-3" />
-                <span>Interrupted</span>
-              </>
-            )}
-          </div>
-        )}
-
-        {showActions && (
-          <MessageActions
-            text={text}
-            showRegenerate={isLast && canRegenerate}
-            onRegenerate={onRegenerate}
-            onReply={reply}
-          />
-        )}
-      </div>
+          )}
+        </div>
+      </AnswerScope>
     </SwipeToReply>
   );
 });
@@ -195,10 +201,12 @@ function MessageActions({
   onReply: (() => void) | null;
 }) {
   const [copied, setCopied] = useState(false);
+  const noteMoment = useNoteAnswerMoment();
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(text);
+      noteMoment('copy');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -231,7 +239,10 @@ function MessageActions({
       {showRegenerate && (
         <button
           type="button"
-          onClick={onRegenerate}
+          onClick={() => {
+            noteMoment('regenerate');
+            onRegenerate();
+          }}
           aria-label="Ask again"
           title="Ask this question again (adds a new turn)"
           className="v2-interactive text-muted-foreground hover:text-foreground hover:bg-muted flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors"

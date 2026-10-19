@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useId } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import {
   Card,
@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { QuizInfo } from '@/lib/utils/parse-quiz-xml';
+import { setQuizUnderWay } from '@/v2/features/chat-rating/store';
 import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
 import { useSavedMessageId } from '@/v2/features/conversations/conversation/markdown/document-export';
 import { QuestionFeedbackButton } from '@/v2/features/quiz/feedback/QuestionFeedbackButton';
@@ -242,6 +243,15 @@ export function QuizCardList({ quizzes }: QuizCardListProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  // Mid-quiz (an answer picked, not yet submitted), the chat rating banner
+  // waits: it never asks during a quiz (Arthur, 19 October 2026).
+  const quizId = useId();
+  const underWay = Object.keys(answers).length > 0 && !isSubmitted;
+  useEffect(() => {
+    setQuizUnderWay(quizId, underWay);
+    return () => setQuizUnderWay(quizId, false);
+  }, [quizId, underWay]);
 
   // Track current slide index
   useEffect(() => {
