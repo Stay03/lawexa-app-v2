@@ -75,11 +75,14 @@ test('a statute link is a badge that stays in the app, and lands in place on its
   assert.match(link, /<Popover open=\{open\} onOpenChange=\{setOpen\}>/);
 });
 
-test('the pane fetches nothing: the page’s own document, else the link’s words and the part', () => {
+test('the pane reads the page’s own document; only another statute’s section is fetched, once the pane opens', () => {
   const link = read('StatuteMentionLink.tsx');
-  assert.doesNotMatch(link, /useQuery|statutesQueries|statutesApi|apiClient/);
+  // On the statute's own page: the document in hand, no request.
   assert.match(link, /const peek = pageHost && hasPart \? pageHost\.peek\(target\) : null;/);
-  assert.match(link, /const name = pageHost \? pageHost\.statuteTitle \|\| linkText : linkText;/);
+  assert.match(link, /const path = onPage \? null : previewPath\(target\);/);
+  assert.match(link, /enabled: path !== null,/);
+  // Elsewhere (another statute, a normal chat): the server's name, else the link's words.
+  assert.match(link, /const name = pageHost \? pageHost\.statuteTitle \|\| linkText : remote\?\.name \|\| linkText;/);
   assert.match(link, /\? `Go to \$\{label\.charAt\(0\)\.toLowerCase\(\)\}\$\{label\.slice\(1\)\}`/);
   assert.match(link, /: 'Open statute';/);
   const provision = read('..', '..', '..', 'statutes', 'reader', 'provision.ts');
