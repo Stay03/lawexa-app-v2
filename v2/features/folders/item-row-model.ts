@@ -242,7 +242,7 @@ export const FOLDER_ITEM_TAB_LABEL: Record<FolderItemFilter, string> = {
  * still the file's own word rather than an invented one. No mime type means no
  * kind — the row simply does not claim one.
  */
-function fileKind(mime: string | undefined): string | null {
+export function fileKind(mime: string | undefined): string | null {
   const value = mime?.trim().toLowerCase();
   if (!value) return null;
   if (value === 'application/pdf') return 'PDF';
@@ -272,7 +272,7 @@ const SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
  * negative, `Infinity` — because a size is the one field on this row that would
  * otherwise render "NaN undefined" without anything failing.
  */
-function fileSize(bytes: number | undefined): string | null {
+export function fileSize(bytes: number | undefined): string | null {
   if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes < 0) return null;
   if (bytes < 1024) return `${Math.round(bytes)} B`;
   let value = bytes;

@@ -56,8 +56,8 @@ export function invalidateSpaceContents(
 /**
  * What changes in the item's OWN family when it enters or leaves a space: a
  * chat's rows in its owner's lists and its open transcript (both carry the
- * space label), a folder's rows and detail. A file has no list of its own in
- * v2 beyond the space's, so nothing more.
+ * space label), a folder's rows and detail. A file leaves or joins the
+ * owner's loose files on the Folders page, which list only files in no space.
  */
 function invalidateItemFamily(
   queryClient: QueryClient,
@@ -77,7 +77,7 @@ function invalidateItemFamily(
         queryClient.invalidateQueries({ queryKey: foldersQueries.details() }),
       ]);
     case 'file':
-      return Promise.resolve();
+      return queryClient.invalidateQueries({ queryKey: foldersQueries.looseFilesKey() });
   }
 }
 
@@ -122,12 +122,13 @@ export function useUploadSpaceFile(spaceUuid: string) {
 /**
  * Save a copy of a space's file to the reader's own files (POST
  * /spaces/{uuid}/files/{id}/copy-to-mine). The space is unchanged, so nothing
- * of the space's is dirtied, and v2 has no own-files list to refresh yet.
+ * of the space's is dirtied; the copy is in no folder, so it joins the loose
+ * files on the Folders page.
  */
 export function useCopySpaceFileToMine(spaceUuid: string) {
   return useMutation({
     mutationFn: (fileId: number) => spacesApi.copyFileToMine(spaceUuid, fileId),
-    meta: { silentError: true },
+    meta: { silentError: true, invalidates: [foldersQueries.looseFilesKey()] },
   });
 }
 

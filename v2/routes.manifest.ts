@@ -166,6 +166,10 @@ export const V2_ROUTES = [
   // v1's lawyer verification address, a v2-only redirect shell onto
   // `/settings/verification` (see `app/v2/lawyer-verification/page.tsx`).
   '/lawyer-verification',
+  // v1's Files page, a v2-only redirect shell onto `/folders`, which lists
+  // the files in no folder under the folders (build 6; see
+  // `app/v2/files/page.tsx`).
+  '/files',
 ] as const;
 
 /**

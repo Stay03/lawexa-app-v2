@@ -75,11 +75,15 @@ const EMPTY_HELD: ReadonlySet<string> = new Set<string>();
 
 export function FolderPicker({
   target,
+  title = 'Add to folder',
   open,
   onOpenChange,
 }: {
   /** WHAT is being filed — the content type and that content's own id. */
   target: FolderItemTarget;
+  /** The heading. A loose file on the Folders page is "Move to folder" (build
+   *  6): filing it takes it off that list. */
+  title?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -306,7 +310,7 @@ export function FolderPicker({
       <Dialog open={open} onOpenChange={changeOpen}>
         <DialogContent className="gap-4 sm:max-w-lg" onEscapeKeyDown={escape}>
           <DialogHeader className="pr-8">
-            <DialogTitle>Add to folder</DialogTitle>
+            <DialogTitle>{title}</DialogTitle>
             <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           {renderBody('dialog')}
@@ -342,7 +346,7 @@ export function FolderPicker({
         style={{ bottom: 'var(--keyboard-inset, 0px)' }}
       >
         <SheetHeader className="gap-1 p-0 pb-3 pr-10">
-          <SheetTitle>Add to folder</SheetTitle>
+          <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
         {renderBody('sheet')}

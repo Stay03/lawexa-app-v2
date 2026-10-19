@@ -21,6 +21,7 @@ export const filesApi = {
         page: params.page ?? 1,
         per_page: params.per_page ?? 15,
         category: params.category || undefined,
+        unfiled: params.unfiled ? 1 : undefined,
       },
     });
     return response.data;

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import type { FolderRecord } from '../types';
 import type { SpaceItemTarget } from '@/v2/features/spaces/content-model';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { FolderRow } from './FolderRow';
+import { LooseFilesSection, useLooseFileUpload } from './LooseFilesSection';
 import {
   FoldersEmptyState,
   FoldersErrorState,
@@ -110,6 +111,10 @@ export function FoldersBrowser() {
     open: boolean;
     key: number;
   } | null>(null);
+
+  // "Upload a file" (build 6): to the viewer's own files, in no folder, which
+  // the section under the folders lists.
+  const upload = useLooseFileUpload();
 
   const query = useInfiniteQuery({
     ...foldersQueries.level({
@@ -238,22 +243,41 @@ export function FoldersBrowser() {
               : `${total} ${total === 1 ? 'folder' : 'folders'}`}
         </p>
 
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className={cn(
-            // 44px, the touch floor and the height of the same pill on a
-            // space's tabs (design round 2).
-            'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
-            FOCUS_RING,
-          )}
-        >
-          <Plus aria-hidden className="size-4" />
-          {/* The label is the affordance on a desktop; on a phone the row has
-              to hold the count too, so the icon carries it and the accessible
-              name comes from the visually-hidden word. */}
-          <span className="sr-only sm:not-sr-only">New folder</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={upload.pick}
+            className={cn(
+              'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+              FOCUS_RING,
+            )}
+          >
+            <Upload aria-hidden className="size-4" />
+            {/* One flex item, so the pill's gap never opens inside the label:
+                "Upload" on a phone, "Upload a file" from `sm:` up. */}
+            <span>
+              Upload<span className="sr-only sm:not-sr-only"> a file</span>
+            </span>
+          </button>
+          {upload.input}
+
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className={cn(
+              // 44px, the touch floor and the height of the same pill on a
+              // space's tabs (design round 2).
+              'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+              FOCUS_RING,
+            )}
+          >
+            <Plus aria-hidden className="size-4" />
+            {/* The label is the affordance on a desktop; on a phone the row has
+                to hold the count too, so the icon carries it and the accessible
+                name comes from the visually-hidden word. */}
+            <span className="sr-only sm:not-sr-only">New folder</span>
+          </button>
+        </div>
       </div>
 
       {/* The ONE live region for this surface. The route fallback's
@@ -330,6 +354,14 @@ export function FoldersBrowser() {
           </div>
         </div>
       )}
+
+      {/* The viewer's files in no folder, under the folders (build 6). */}
+      <LooseFilesSection
+        viewerId={viewerId}
+        now={now}
+        enabled={!activeSearch}
+        held={showSkeleton}
+      />
 
       {/* Mounted only while open, so each dialog initialises from the folder it
           is actually naming (see `FolderNameDialog`). */}

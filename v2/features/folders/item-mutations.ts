@@ -94,11 +94,16 @@ export function folderItemScopeId({ type, contentId }: FolderItemTarget): string
   return `folder-item-${type}-${contentId}`;
 }
 
-/** The three folder caches a membership change dirties, in ONE place. */
+/**
+ * The folder caches a membership change dirties, in ONE place. The loose
+ * files are among them (build 6): filing a file takes it off that list, and
+ * taking it out of its last folder puts it back.
+ */
 export const FOLDER_ITEM_INVALIDATES = [
   foldersQueries.lists(),
   foldersQueries.details(),
   foldersQueries.itemLists(),
+  foldersQueries.looseFilesKey(),
 ] as const;
 
 /**

@@ -27,9 +27,12 @@ test('the Library group has no Files row, for anyone', () => {
 test('a file in a folder is a button that opens it with a fresh link, and says why when it cannot', () => {
   const row = read('detail', 'FolderItemRow.tsx');
   assert.match(row, /\{row\.type === 'file' \? \(\s*<FileOpenRow fileId=\{row\.contentId\}>\{identity\}<\/FileOpenRow>/);
+  // The open is its own file, shared with the Folders page's loose files (build 6).
+  assert.match(row, /import \{ FileOpenRow \} from '\.\.\/FileOpenRow';/);
+  const open = read('FileOpenRow.tsx');
   // A link that SHOWS a PDF or a picture in the tab (Tester, 20:51Z: the PDF
   // downloaded into a blank tab); a Download control keeps the plain link.
-  assert.match(row, /const \{ open, opening, failed, gone \} = useShowFileInNewTab\(\);/);
+  assert.match(open, /const \{ open, opening, failed, gone \} = useShowFileInNewTab\(\);/);
   const urls = readFileSync(join(here, '..', 'channels', 'feed', 'use-file-url.ts'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(urls, /export function useShowFileInNewTab\(\): OpenInNewTab \{\s*return useOpenUrlInNewTab\(mintInlineFileUrl\);/);
   assert.match(urls, /filesApi\.getDownloadUrl\(id, \{ inline: true \}\)/);
@@ -43,9 +46,9 @@ test('a file in a folder is a button that opens it with a fresh link, and says w
   for (const plain of [['components', 'collab', 'files', 'FileRow.tsx'], ['app', '(main)', 'files', 'page.tsx']]) {
     assert.match(root(...plain), /useDownloadFile\(\)/, plain.join('/'));
   }
-  assert.match(row, /<button\s+type="button"\s+onClick=\{\(\) => open\(fileId\)\}/);
-  assert.match(row, /This file is no longer available\./);
-  assert.match(row, /Couldn&rsquo;t open it\.[\s\S]*?Try again/);
+  assert.match(open, /<button\s+type="button"\s+onClick=\{\(\) => open\(fileId\)\}/);
+  assert.match(open, /This file is no longer available\./);
+  assert.match(open, /Couldn&rsquo;t open it\.[\s\S]*?Try again/);
   // Still never a link to the payload's presigned URL, which expires.
   assert.doesNotMatch(read('item-row-model.ts'), /href: content\.url/);
 });

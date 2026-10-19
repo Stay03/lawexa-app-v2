@@ -41,9 +41,15 @@ test('a folder in a space: its page ⋮ holds what its row did (item 6; Stay, 18
   // A rename or delete shows in the space's list at once: the space reads are
   // marked stale with the folder reads.
   const mutations = read('v2', 'features', 'folders', 'folder-mutations.ts');
+  // The rename; the delete also re-asks the loose files, since a deleted
+  // folder's files are loose again (build 6).
   assert.equal(
     mutations.match(/invalidates: \[foldersQueries\.lists\(\), foldersQueries\.details\(\), spacesQueries\.all\],/g)?.length,
-    2,
+    1,
+  );
+  assert.match(
+    mutations,
+    /invalidates: \[\s*foldersQueries\.lists\(\),\s*foldersQueries\.details\(\),\s*foldersQueries\.looseFilesKey\(\),\s*spacesQueries\.all,\s*\],/,
   );
 });
 

@@ -134,15 +134,10 @@ export const v2NavItems: V2NavItem[] = [
       { label: 'Statutes', href: '/statutes', icon: BookText },
       { label: 'Notes', href: '/notes', icon: NotebookPen },
       { label: 'Folders', href: '/folders', icon: FolderClosed },
-      // FILES IS DELIBERATELY NOT HERE. `/files` has no v2 route, so the proxy
-      // fell through to v1 and the row landed the reader on v1's onboarding
-      // wall, "What best describes you?", with no header and no way back into
-      // v2. Measured on production, 15 August 2026, on the phone audit.
-      //
-      // Taken out rather than repaired on the owner's instruction the same day:
-      // "Remove files, we'll work on vault and unify files and folders with new
-      // features later." So the row comes back with that work, and pointing it
-      // at a v1 page in the meantime would only teach people the app is broken.
+      // FILES HAS NO ROW OF ITS OWN. The owner asked on 15 August 2026 to
+      // "unify files and folders", and build 6 (19 October 2026) does it: the
+      // Folders page lists the files in no folder under the folders, and
+      // v1's `/files` address redirects there (`app/v2/files/page.tsx`).
     ],
   },
   { label: 'Saved', href: '/bookmarks', icon: Bookmark },

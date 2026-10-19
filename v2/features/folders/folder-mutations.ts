@@ -133,9 +133,16 @@ export function useDeleteFolder() {
     // would queue deletes of DIFFERENT folders behind each other for no reason.
     // Two deletes of the same folder cannot race either: the second press is
     // impossible while the first hides the row.
+    // A deleted folder's files are loose again unless another folder holds
+    // them, so the loose list re-asks too (build 6).
     meta: {
       silentError: true,
-      invalidates: [foldersQueries.lists(), foldersQueries.details(), spacesQueries.all],
+      invalidates: [
+        foldersQueries.lists(),
+        foldersQueries.details(),
+        foldersQueries.looseFilesKey(),
+        spacesQueries.all,
+      ],
     },
     onError: (error, { name }) => {
       toast.error(`Couldn’t delete “${name}”`, {

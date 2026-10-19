@@ -72,4 +72,6 @@ export interface FileListParams {
   page?: number;
   per_page?: number;
   category?: FileCategory;
+  /** Only the files in none of the owner's own live folders (`?unfiled=1`). */
+  unfiled?: boolean;
 }

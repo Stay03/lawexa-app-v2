@@ -125,6 +125,22 @@ export function FoldersNextPageSkeleton() {
 }
 
 /**
+ * The loose files' skeleton (build 6): a file row has the folder row's
+ * geometry, so the same rows, fewer of them, fading the same way.
+ */
+export function LooseFilesSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div aria-hidden className="flex flex-col">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.25) }}>
+          <FolderRowSkeleton />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Empty — search-aware, because "no folder matches mareva" and "you have not
  * made one yet" are different facts that want different ways forward.
  *

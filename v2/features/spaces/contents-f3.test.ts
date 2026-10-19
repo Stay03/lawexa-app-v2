@@ -353,8 +353,18 @@ test('each write invalidates the space lists, the item’s own list and the coun
     /onSuccess: \(_response, \{ item \}\) =>\s*Promise\.all\(\[\s*queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.contents\(\) \}\),\s*queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.details\(\) \}\),\s*queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.lists\(\) \}\),\s*invalidateItemFamily\(queryClient, item\),/,
   );
   // Every write explains its own refusal in place.
-  // (Six with the space file's copy and delete, 15 October 2026.)
-  assert.equal(mutations.match(/meta: \{ silentError: true \}/g)?.length, 6);
+  // (Six with the space file's copy and delete, 15 October 2026; the copy
+  // also re-asks the owner's loose files, build 6.)
+  assert.equal(mutations.match(/meta: \{ silentError: true \}/g)?.length, 5);
+  assert.match(
+    mutations,
+    /spacesApi\.copyFileToMine\(spaceUuid, fileId\),\s*meta: \{ silentError: true, invalidates: \[foldersQueries\.looseFilesKey\(\)\] \},/,
+  );
+  // A file entering or leaving a space leaves or joins the loose files.
+  assert.match(
+    mutations,
+    /case 'file':\s*return queryClient\.invalidateQueries\(\{ queryKey: foldersQueries\.looseFilesKey\(\) \}\);/,
+  );
   // The prefix a move invalidates is the one every space's contents sit under.
   const queries = read('v2', 'features', 'spaces', 'queries.ts');
   assert.match(queries, /contents: \(\) => \[\.\.\.spacesQueries\.all, 'contents'\] as const,/);

@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
+import { filesApi } from '@/lib/api/files';
 import { foldersApi } from './api';
 
 /**
@@ -40,6 +41,7 @@ export const foldersQueries = {
   lists: () => [...foldersQueries.all, 'list'] as const,
   details: () => [...foldersQueries.all, 'detail'] as const,
   itemLists: () => [...foldersQueries.all, 'items'] as const,
+  looseFilesKey: () => [...foldersQueries.all, 'loose-files'] as const,
 
   /**
    * ONE LEVEL of the viewer's tree: the root when `parentUuid` is null, or one
@@ -117,6 +119,31 @@ export const foldersQueries = {
       ] as const,
       queryFn: ({ pageParam }) =>
         foldersApi.items(uuid, { type, per_page: FOLDERS_PAGE_SIZE, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: (lastPage) => {
+        const { current_page, last_page } = lastPage.pagination;
+        return current_page < last_page ? current_page + 1 : undefined;
+      },
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+      retry: retrySettledClientErrors,
+    }),
+
+  /**
+   * The viewer's own files that sit in none of their own live folders
+   * (`GET /files?unfiled=1`; build 6, the Folders page is the top level and
+   * these are the files under it). A file whose only folder was deleted, or
+   * that sits only in someone else's folder, is loose; it is filed again when
+   * that folder is restored. Every write that changes a folder's contents
+   * invalidates this key (`FOLDER_ITEM_INVALIDATES`).
+   */
+  looseFiles: ({ viewerId }: ViewerScoped) =>
+    infiniteQueryOptions({
+      meta: { persist: 'list' },
+      queryKey: [...foldersQueries.looseFilesKey(), { viewerId }] as const,
+      queryFn: ({ pageParam }) =>
+        filesApi.getList({ unfiled: true, per_page: FOLDERS_PAGE_SIZE, page: pageParam }),
       initialPageParam: 1,
       getNextPageParam: (lastPage) => {
         const { current_page, last_page } = lastPage.pagination;

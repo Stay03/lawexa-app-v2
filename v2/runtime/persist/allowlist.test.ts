@@ -35,6 +35,7 @@ const EXPECTED: Record<string, 'list' | 'gated'> = {
   'folders.detail': 'gated',
   'folders.items': 'gated',
   'folders.level': 'list',
+  'folders.looseFiles': 'list',
   'jurisdictions.list': 'list',
   'notes.byId': 'gated',
   'notes.detail': 'gated',
