@@ -69,7 +69,7 @@ import {
 import { JurisdictionField } from './composer/JurisdictionField';
 import { WorkflowField } from './composer/WorkflowField';
 import { useWorkflowSelection } from './composer/useWorkflowSelection';
-import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
+import { OutOfMessagesStrip } from '@/v2/features/subscription/OutOfMessagesStrip';
 
 /**
  * HomeComposer — the ONE v2-native composer both home designs share, now WIRED to
@@ -397,7 +397,16 @@ export function HomeComposer({
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     const message = value.trim();
-    if (!message || isSubmitting || isUploading || hasFailedUpload || refusedByMode.length > 0) {
+    // A refusal for messages holds Send until the text changes (Enter alone
+    // would only ask again and be refused again).
+    if (
+      !message ||
+      blocked ||
+      isSubmitting ||
+      isUploading ||
+      hasFailedUpload ||
+      refusedByMode.length > 0
+    ) {
       return;
     }
 
@@ -534,17 +543,6 @@ export function HomeComposer({
         </div>
       ) : null}
 
-      {/* The send was refused for messages: the shared out-of-messages notice
-          (`OutOfMessagesNotice`, v2 Stage 1, item 6), from the refusal's own
-          block. Cleared on the next keystroke. */}
-      {blocked ? (
-        <OutOfMessagesNotice
-          tight
-          blocked={blocked}
-          className="mb-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200"
-        />
-      ) : null}
-
       {/* The jurisdiction stands above the box, as on the chat screen, so the
           model name keeps the box's control row to itself on a narrow phone
           (owner, 3 October 2026). */}
@@ -582,6 +580,12 @@ export function HomeComposer({
           variant={confidential ? 'confidential' : 'default'}
           className={className}
         >
+          {/* The send was refused for messages: a strip joined to the top of
+              the box (C4, v2 Stage 1 item 6; Stay, 19 October 2026), from the
+              refusal's own block. The question stays below it and Send waits.
+              Cleared on the next keystroke. */}
+          {blocked ? <OutOfMessagesStrip blocked={blocked} /> : null}
+
           {/* Attachment chips — one per selected file, with live upload status. */}
           {signedIn && uploads.length > 0 ? (
             <div className="flex flex-wrap gap-2 px-2 pt-2">
@@ -759,6 +763,7 @@ export function HomeComposer({
                 onClick={handleSubmit}
                 disabled={
                   !canSend ||
+                  blocked !== null ||
                   isUploading ||
                   isSubmitting ||
                   hasFailedUpload ||

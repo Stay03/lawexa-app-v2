@@ -38,6 +38,8 @@ import type { IBlockedReason, TBlockedReasonCode } from '@/types/message-pack';
 
 export interface NoticeAction {
   label: string;
+  /** The strip's word for it (C4): "Upgrade", "Reactivate", "Buy pack". */
+  shortLabel: string;
   href: string;
   /** The first, filled button; the rest are outlined. */
   primary: boolean;
@@ -45,6 +47,10 @@ export interface NoticeAction {
 
 export interface OutOfMessagesView {
   heading: string;
+  /** The strip's one line (C4, Stay 19 October 2026 20:12Z): "Free messages used". */
+  short: string;
+  /** The strip's reset line: "Back on 15 Mar 2026, 01:00", or null as for `reset`. */
+  resetShort: string | null;
   /** The server's own sentence, which already names the plan and the date. */
   body: string;
   /** When the messages come back, or null when nobody knows. */
@@ -52,9 +58,9 @@ export interface OutOfMessagesView {
   actions: NoticeAction[];
 }
 
-const UPGRADE = { label: 'Upgrade plan', href: '/pricing' };
-const REACTIVATE = { label: 'Reactivate plan', href: '/pricing' };
-const BUY_PACK = { label: 'Buy message pack', href: '/settings/message-packs' };
+const UPGRADE = { label: 'Upgrade plan', shortLabel: 'Upgrade', href: '/pricing' };
+const REACTIVATE = { label: 'Reactivate plan', shortLabel: 'Reactivate', href: '/pricing' };
+const BUY_PACK = { label: 'Buy message pack', shortLabel: 'Buy pack', href: '/settings/message-packs' };
 
 const KNOWN: readonly TBlockedReasonCode[] = [
   'free_no_subscription',
@@ -124,6 +130,14 @@ export function outOfMessagesView({
         : reason === 'free_no_subscription'
           ? 'You’ve used your free messages'
           : 'You’ve used your messages for now';
+  const short =
+    reason === 'hard_limit'
+      ? 'Usage limit reached'
+      : reason === 'cancelled_grace_exhausted'
+        ? 'Plan access ended'
+        : reason === 'free_no_subscription'
+          ? 'Free messages used'
+          : 'Messages used for now';
   const known = !!blocked?.reason && KNOWN.includes(blocked.reason);
   const body = known ? BODY[reason] : blocked?.message?.trim() || fallbackMessage?.trim() || '';
   // Nothing comes back to a lapsed plan, nor to one that ends before the reset.
@@ -134,7 +148,9 @@ export function outOfMessagesView({
     Date.parse(blocked.subscription_ends_at) < Date.parse(resetIso);
   const comesBack = reason !== 'cancelled_grace_exhausted' && !endsFirst;
   const moment = comesBack ? formatResetMoment(resetIso, timeZone) : null;
-  const reset = moment ? `Your messages come back on ${moment}.` : comesBack ? resetMessage?.trim() || null : null;
+  const serverReset = comesBack ? resetMessage?.trim() || null : null;
+  const reset = moment ? `Your messages come back on ${moment}.` : serverReset;
+  const resetShort = moment ? `Back on ${moment}` : serverReset;
   const doors =
     reason === 'hard_limit'
       ? []
@@ -143,6 +159,8 @@ export function outOfMessagesView({
         : [UPGRADE, BUY_PACK];
   return {
     heading,
+    short,
+    resetShort,
     body,
     reset,
     actions: doors.map((door, index) => ({ ...door, primary: index === 0 })),

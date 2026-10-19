@@ -122,7 +122,8 @@ test('the same notice on all four surfaces, and the chat keeps the server’s bl
     read('v2', 'features', 'conversations', 'conversation', 'rows', 'ErrorRow.tsx'),
     /<OutOfMessagesNotice tight blocked=\{message\.blocked\} fallbackMessage=\{message\.content\} \/>/,
   );
-  assert.match(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /<OutOfMessagesNotice\s+tight\s+blocked=\{blocked\}/);
+  // The Home box says it in its own strip (C4), with the same words and doors.
+  assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /OutOfMessagesNotice/);
   assert.match(read('v2', 'features', 'settings', 'usage', 'UsageScreen.tsx'), /\{blocked \? <OutOfMessagesNotice blocked=\{blocked\} \/> : null\}/);
   assert.match(
     read('v2', 'features', 'radars', 'create', 'CreateRadarScreen.tsx'),
@@ -131,6 +132,66 @@ test('the same notice on all four surfaces, and the chat keeps the server’s bl
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.equal(engine.match(/addErrorMessage\(blocked\.message, 'MESSAGES_EXHAUSTED', false, null, blocked\);/g)?.length, 2);
   assert.match(read('types', 'chat.ts'), /blocked\?: IBlockedReason \| null;/);
+});
+
+/* C4 (Stay, 19 October 2026, 20:12Z): on the Home box the notice is a thin
+ * strip joined to the top of the box; the question stays and Send waits. */
+
+const strip = (view: ReturnType<typeof outOfMessagesView>) => ({
+  line: view.short,
+  reset: view.resetShort,
+  // In the strip's order: the filled door last.
+  doors: [...view.actions].reverse().map((a) => `${a.shortLabel} ${a.href}`),
+});
+
+test('C4: each state in one line, with its two doors', () => {
+  assert.deepEqual(strip(outOfMessagesView({ blocked: block({ reason: 'free_no_subscription', resets_at: null }) })), {
+    line: 'Free messages used',
+    reset: null,
+    doors: ['Buy pack /settings/message-packs', 'Upgrade /pricing'],
+  });
+  // A paid plan keeps its reset date, under the line, once.
+  assert.deepEqual(
+    strip(outOfMessagesView({ blocked: block({ reason: 'plan_exhausted', resets_at: '2026-11-14T05:33:00+00:00' }), timeZone: 'UTC' })),
+    { line: 'Messages used for now', reset: 'Back on 14 Nov 2026, 05:33', doors: ['Buy pack /settings/message-packs', 'Upgrade /pricing'] },
+  );
+  assert.deepEqual(
+    strip(outOfMessagesView({ blocked: block({ reason: 'cancelled_grace_exhausted' }), timeZone: 'UTC' })),
+    { line: 'Plan access ended', reset: null, doors: ['Buy pack /settings/message-packs', 'Reactivate /pricing'] },
+  );
+  assert.deepEqual(strip(outOfMessagesView({ blocked: block({ reason: 'hard_limit' }), timeZone: 'UTC' })), {
+    line: 'Usage limit reached',
+    reset: 'Back on 1 Nov 2026, 00:00',
+    doors: [],
+  });
+  // No time, the server's sentence; a plan that ends first, nothing.
+  assert.equal(outOfMessagesView({ blocked: block({ resets_at: null }), resetMessage: 'Resets monthly.' }).resetShort, 'Resets monthly.');
+  assert.equal(
+    outOfMessagesView({ blocked: block({ resets_at: '2026-11-14T05:33:00+00:00', subscription_ends_at: '2026-11-13T00:00:00+00:00' }) }).resetShort,
+    null,
+  );
+});
+
+test('C4: the Home box draws the strip at its top, and Send waits while it shows', () => {
+  const composer = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
+  assert.match(composer, /<PromptInput[\s\S]*?\{blocked \? <OutOfMessagesStrip blocked=\{blocked\} \/> : null\}[\s\S]*?<PromptInputTextarea/);
+  assert.match(composer, /disabled=\{\s*!canSend \|\|\s*blocked !== null \|\|/);
+  assert.match(composer, /!message \|\|\s*blocked \|\|/);
+  // The next keystroke clears it, so a new question can be sent.
+  assert.match(composer, /if \(blocked\) setBlocked\(null\);/);
+  const source = read('v2', 'features', 'subscription', 'OutOfMessagesStrip.tsx');
+  // Joined to the card's edges: every host passes p-2.5.
+  assert.match(source, /-mx-2\.5 -mt-2\.5 mb-2 flex items-center justify-between gap-3 rounded-t-3xl border-b border-border/);
+  for (const host of [
+    ['v2', 'shell', 'designs', 'ChatHome.tsx'],
+    ['v2', 'shell', 'designs', 'StudyHome.tsx'],
+    ['v2', 'shell', 'designs', 'WorkHome.tsx'],
+    ['v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx'],
+  ]) {
+    assert.match(read(...host), /<HomeComposer[\s\S]*?className="p-2\.5 shadow-lg"/, host.join('/'));
+  }
+  // The visible words are the links' names (no aria-label over them).
+  assert.doesNotMatch(source, /aria-label/);
 });
 
 test('a purchase refreshes the limits the notice and Usage read', () => {
