@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type FocusEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ import { StatuteFallback } from './StatuteFallback';
 import { StatuteDocument, type StatuteLinkHandlers, type StatuteLinkPart } from './StatuteDocument';
 import { StatuteHeader } from './StatuteHeader';
 import { StatuteNotesProvider } from '../notes/context';
+import { DockClearanceContext, createDockClearance } from './dock-clearance';
 import {
   STATUTE_COLUMN,
   StatuteErrorState,
@@ -29,6 +30,13 @@ import {
   isNotFound,
   isRateLimited,
 } from './states';
+
+/** Focus that lands in the text under the phone chat goes back to the chat. */
+function returnFocusToChat(event: FocusEvent<HTMLElement>) {
+  event.currentTarget.parentElement
+    ?.querySelector<HTMLElement>('[aria-modal="true"]')
+    ?.focus({ preventScroll: true });
+}
 
 /**
  * StatuteScreen — the `/statutes/[slug]` client root.
@@ -57,7 +65,7 @@ import {
  * model reads the statute it was started with, Arthur, 07:20 UTC). Statutes
  * are free, so the box is there for every signed-in reader. The box rests at
  * the column's end, sticky over the reading; the Contents pill stands above
- * it (`--v2-ask-dock-h`).
+ * it (`dock-clearance.ts`).
  */
 export function StatuteScreen(props: { slug: string; provision: string | null }) {
   return (
@@ -136,13 +144,11 @@ function StatuteBody({
   // The chat's code arrives while the page is idle, so the tap does not wait for it.
   useIdlePreloadCaseChat(signedIn);
 
-  // The resting dock's height, on the column for the Contents pill to stand
-  // above (StatuteContentsSheet). Written to the DOM only, so a measure
-  // re-renders nothing.
-  const columnRef = useRef<HTMLDivElement>(null);
-  const keepDockHeight = useCallback((height: number) => {
-    columnRef.current?.style.setProperty('--v2-ask-dock-h', `${height}px`);
-  }, []);
+  // The resting dock's height, for the Contents pill to stand above. Written on
+  // the pill itself and outside React, so a measure re-renders nothing and
+  // restyles nothing else (`dock-clearance.ts`).
+  const [clearance] = useState(createDockClearance);
+  const keepDockHeight = clearance.set;
 
   // THE CHAT'S LINKS TO THIS STATUTE LAND IN PLACE (Stay, 18 October 2026,
   // 14:32 UTC), and their badge previews the part (Arthur, 15:06 UTC). The
@@ -227,77 +233,88 @@ function StatuteBody({
     // between the header's Notes button and the document's underlines.
     <StatuteNotesProvider slug={slug} statuteId={detail.id}>
       <DocumentLinkContext.Provider value={linkHost}>
-        {/* With the docked chat open (≥xl) this is a row: the reading column
-            centres in the remaining space, the panel takes 26rem on the right
-            (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
-            never mints a horizontal scrollbar. */}
-        <div className="flex min-h-full w-full overflow-x-clip">
-          <div
-            ref={columnRef}
-            className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8"
-          >
-            <article
-              aria-label={detail.title}
-              inert={pageUnderChat}
-              className={cn(
-                'flex flex-col gap-8 pb-8',
-                arrival === 'peeked'
-                  ? 'v2-statute-arrive-peeked'
-                  : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-              )}
-            >
-              <StatuteHeader detail={detail} />
-              {/* KEYED BY SLUG: a statute→statute navigation reuses this component
-                  instance, and an inherited `mountedCount` ≥ the new document's
-                  block count would mount the entire second document in ONE
-                  synchronous commit — the exact jank the progressive mount exists
-                  to prevent — and skip its deep link. The key resets the engine. */}
-              <StatuteDocument
-                key={slug}
-                slug={slug}
-                provision={provision}
-                chatDocked={showDocked}
-                pauseMount={pageUnderChat}
-                registerLinkHandlers={registerLinkHandlers}
-              />
-            </article>
-            {/* THE composer's dock: on a phone and at xl-floating it is the whole
-                chat (one card, three states); it steps aside only while the
-                docked column, chosen at xl, owns the composer. */}
-            {showDock ? (
-              <CaseAskDock
+        <DockClearanceContext.Provider value={clearance}>
+          {/* With the docked chat open (≥xl) this is a row: the reading column
+              centres in the remaining space, the panel takes 26rem on the right
+              (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
+              never mints a horizontal scrollbar. */}
+          <div className="flex min-h-full w-full overflow-x-clip">
+            <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+              {/* UNDER THE PHONE CHAT THE TEXT LEAVES THE SCREEN READER AND
+                  THE TAB ORDER, BUT STAYS PAINTED (18 October 2026). The open
+                  chat sets the root's background (CaseAsk), and WebKit repaints
+                  a long statute that is inert or hidden very slowly when that
+                  colour changes: 45 to 50 s on the ACJL's 1194 parts, a frozen
+                  iPhone, on the open with `inert` and on the close with
+                  `visibility: hidden`. Painted, the same change costs 0.7 s.
+                  `aria-hidden` takes the text out of the accessibility tree, and
+                  focus that lands in it (Tab, Shift+Tab past the chat) goes back
+                  to the chat, which is a modal dialog in the same column. The
+                  case page, whose judgment is one block, keeps `inert`. */}
+              <article
+                aria-label={detail.title}
+                aria-hidden={pageUnderChat || undefined}
+                onFocusCapture={pageUnderChat ? returnFocusToChat : undefined}
+                className={cn(
+                  'flex flex-col gap-8 pb-8',
+                  arrival === 'peeked'
+                    ? 'v2-statute-arrive-peeked'
+                    : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+                )}
+              >
+                <StatuteHeader detail={detail} />
+                {/* KEYED BY SLUG: a statute→statute navigation reuses this component
+                    instance, and an inherited `mountedCount` ≥ the new document's
+                    block count would mount the entire second document in ONE
+                    synchronous commit — the exact jank the progressive mount exists
+                    to prevent — and skip its deep link. The key resets the engine. */}
+                <StatuteDocument
+                  key={slug}
+                  slug={slug}
+                  provision={provision}
+                  chatDocked={showDocked}
+                  pauseMount={pageUnderChat}
+                  registerLinkHandlers={registerLinkHandlers}
+                />
+              </article>
+              {/* THE composer's dock: on a phone and at xl-floating it is the whole
+                  chat (one card, three states); it steps aside only while the
+                  docked column, chosen at xl, owns the composer. */}
+              {showDock ? (
+                <CaseAskDock
+                  subject={subject}
+                  signedIn={signedIn}
+                  viewerId={userId}
+                  start={start}
+                  view={dockOwnsChat ? renderedChat : null}
+                  panelOpen={chat !== null && dockOwnsChat}
+                  screen={phone}
+                  onEngage={() => {
+                    if (chat === null) openChat('new');
+                  }}
+                  onClose={closeChat}
+                  onDock={() => setDockedPref(true)}
+                  onOpenChat={switchChat}
+                  onRestingHeight={keepDockHeight}
+                />
+              ) : null}
+            </div>
+
+            {showDocked && renderedChat !== null ? (
+              <CaseChatDocked
+                chatId={renderedChat}
+                closing={chatClosing}
                 subject={subject}
                 signedIn={signedIn}
                 viewerId={userId}
                 start={start}
-                view={dockOwnsChat ? renderedChat : null}
-                panelOpen={chat !== null && dockOwnsChat}
-                screen={phone}
-                onEngage={() => {
-                  if (chat === null) openChat('new');
-                }}
                 onClose={closeChat}
-                onDock={() => setDockedPref(true)}
-                onOpenChat={switchChat}
-                onRestingHeight={keepDockHeight}
+                onSwitchChat={switchChat}
+                onFloat={() => setDockedPref(false)}
               />
             ) : null}
           </div>
-
-          {showDocked && renderedChat !== null ? (
-            <CaseChatDocked
-              chatId={renderedChat}
-              closing={chatClosing}
-              subject={subject}
-              signedIn={signedIn}
-              viewerId={userId}
-              start={start}
-              onClose={closeChat}
-              onSwitchChat={switchChat}
-              onFloat={() => setDockedPref(false)}
-            />
-          ) : null}
-        </div>
+        </DockClearanceContext.Provider>
       </DocumentLinkContext.Provider>
     </StatuteNotesProvider>
   );

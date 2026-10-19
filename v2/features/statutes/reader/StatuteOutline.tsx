@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { Lock, TableOfContents } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import {
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import type { AknOutlineDivision, SpyTarget } from './akn';
+import { DockClearanceContext } from './dock-clearance';
 
 /**
  * StatuteOutline — the reader's wayfinding, in the outline grammar the case
@@ -354,6 +355,7 @@ export function StatuteContentsSheet({
   alwaysShown?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const clearance = useContext(DockClearanceContext);
   const activeDivision = activeDivisionOf(outline, activeId);
   // The full tree is long; when the sheet opens, start the reader at the
   // division they are currently inside rather than at Part I.
@@ -380,12 +382,12 @@ export function StatuteContentsSheet({
           computes from sidebar + column + gutter + rail widths (see the
           arithmetic in StatuteDocument), so the handoff is truthful: at
           every width exactly one contents affordance exists. It stands
-          1.5rem above the ask dock, whose resting height the statute screen
-          keeps in `--v2-ask-dock-h` on the column (0 with no dock). */}
+          1.5rem above the ask dock, whose height the statute screen writes
+          on this element (`dock-clearance.ts`). */}
       <div
-        style={{ bottom: 'calc(var(--v2-ask-dock-h, 0px) + 1.5rem)' }}
+        ref={clearance?.attach}
         className={cn(
-          'pointer-events-none sticky z-10 -mx-1 flex justify-end',
+          'pointer-events-none sticky bottom-6 z-10 -mx-1 flex justify-end',
           !alwaysShown && 'min-[96rem]:hidden',
           entrance &&
             'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',

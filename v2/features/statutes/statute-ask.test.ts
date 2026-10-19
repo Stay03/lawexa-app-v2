@@ -42,8 +42,9 @@ test('the statute page hosts the case page’s chat, the same in every part', ()
   assert.match(source, /<CaseChatDocked\s+chatId=\{renderedChat\}/);
   // The chat reads `?chat=`, so the screen has its own boundary.
   assert.match(source, /<Suspense fallback=\{<StatuteFallback \/>\}>\s*<StatuteBody \{\.\.\.props\} \/>/);
-  // Behind the phone's open chat the statute leaves the tab order.
-  assert.match(source, /aria-label=\{detail\.title\}\s+inert=\{pageUnderChat\}/);
+  // Behind the phone's open chat the statute leaves the screen reader and the
+  // tab order (not inert: statute-chat-freeze.test.ts).
+  assert.match(source, /aria-hidden=\{pageUnderChat \|\| undefined\}/);
   // One box only: no section menu.
   assert.doesNotMatch(source, /Ask about section/);
   // The case page runs on the same hook.
@@ -52,13 +53,17 @@ test('the statute page hosts the case page’s chat, the same in every part', ()
 
 test('the Contents pill stands above the ask box, and takes over while the chat is docked', () => {
   const outline = read('v2', 'features', 'statutes', 'reader', 'StatuteOutline.tsx');
-  assert.match(outline, /style=\{\{ bottom: 'calc\(var\(--v2-ask-dock-h, 0px\) \+ 1\.5rem\)' \}\}/);
+  // The dock's height is written on the pill, never on a parent of the text (dock-clearance.ts).
+  assert.match(outline, /ref=\{clearance\?\.attach\}/);
+  assert.match(outline, /'pointer-events-none sticky bottom-6 z-10 -mx-1 flex justify-end',/);
   assert.match(outline, /!alwaysShown && 'min-\[96rem\]:hidden',/);
   const document = read('v2', 'features', 'statutes', 'reader', 'StatuteDocument.tsx');
   assert.match(document, /alwaysShown=\{chatDocked\}/);
   assert.match(document, /\{showContents && !chatDocked \? \(\s*<aside/);
   const source = screen();
-  assert.match(source, /columnRef\.current\?\.style\.setProperty\('--v2-ask-dock-h', `\$\{height\}px`\);/);
+  assert.doesNotMatch(source, /--v2-ask-dock-h/);
+  assert.match(source, /const \[clearance\] = useState\(createDockClearance\);\s*const keepDockHeight = clearance\.set;/);
+  assert.match(source, /<DockClearanceContext\.Provider value=\{clearance\}>/);
   assert.match(source, /onRestingHeight=\{keepDockHeight\}/);
   assert.match(source, /chatDocked=\{showDocked\}/);
   const ask = read('v2', 'features', 'cases', 'detail', 'CaseAsk.tsx');

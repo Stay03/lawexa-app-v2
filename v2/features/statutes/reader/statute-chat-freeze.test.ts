@@ -25,10 +25,28 @@ test('the batch loop waits while the page is under the phone chat, and resumes a
   assert.match(document, /\}, \[pauseMount, mountedCount, blocks\.length\]\);/);
 });
 
-test('the statute page pauses exactly while its column is inert under the chat', () => {
+test('under the phone chat the statute text leaves the screen reader and Tab, stays painted, and stops mounting', () => {
   const screen = read('StatuteScreen.tsx');
-  assert.match(screen, /inert=\{pageUnderChat\}/);
+  // WebKit repaints a long statute that is inert or hidden very slowly when the
+  // open chat changes the root's colour: 45 to 50 s on the ACJL.
+  assert.doesNotMatch(screen, /\binert=/);
+  assert.doesNotMatch(screen, /'invisible'/);
+  assert.match(
+    screen,
+    /<article\s+aria-label=\{detail\.title\}\s+aria-hidden=\{pageUnderChat \|\| undefined\}\s+onFocusCapture=\{pageUnderChat \? returnFocusToChat : undefined\}/,
+  );
+  // Focus that lands in it goes back to the chat, the modal dialog in the same column.
+  assert.match(screen, /event\.currentTarget\.parentElement\s*\?\.querySelector<HTMLElement>\('\[aria-modal="true"\]'\)\s*\?\.focus\(\{ preventScroll: true \}\);/);
   assert.match(screen, /pauseMount=\{pageUnderChat\}/);
+});
+
+test("the dock's height reaches the Contents pill without restyling the text", () => {
+  const clearance = read('dock-clearance.ts');
+  assert.match(clearance, /target\?\.style\.setProperty\('bottom', `calc\(\$\{height\}px \+ \$\{GAP\}\)`\);/);
+  assert.match(clearance, /if \(next === height\) return;/);
+  const outline = read('StatuteOutline.tsx');
+  assert.match(outline, /const clearance = useContext\(DockClearanceContext\);/);
+  assert.doesNotMatch(outline, /--v2-ask-dock-h/);
 });
 
 /* The ACJL's parse is one 1.13 s task (Chromium, CPU 4x). Run in the render
