@@ -84,6 +84,13 @@ export interface SessionUser {
    * no flag, no door, the same as the routes the server then refuses.
    */
   can_access_team_channels: boolean;
+  /**
+   * Has the account finished onboarding? v1's rule exactly: a completion date
+   * or a profession on the profile (`lib/stores/authStore.ts`). The layout
+   * sends an unfinished account to the onboarding steps
+   * (`unfinished-signup.ts`).
+   */
+  onboarding_complete: boolean;
 }
 
 export interface SessionDTO {
@@ -115,6 +122,7 @@ function toSessionDTO(
       // Beside the user, like `is_ambassador`, never inside it: the user
       // resource also describes other people (backend, 11 October 2026).
       can_access_team_channels: data?.can_access_team_channels === true,
+      onboarding_complete: !!(user.profile?.onboarding_completed_at || user.profile?.profession),
     },
   };
 }

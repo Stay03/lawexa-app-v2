@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Suspense } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { HydrationBoundary } from '@tanstack/react-query';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { V2QueryProvider } from '@/v2/runtime/query-provider';
@@ -23,6 +23,7 @@ import { MoveFirstProvider } from '@/v2/shell/move-first';
 import { ChatDock } from '@/v2/features/conversations/conversation/ChatDock';
 import { ScrollMemory } from '@/v2/shell/scroll-memory';
 import { resolveSession } from '@/v2/runtime/session';
+import { unfinishedSignupPath } from '@/v2/runtime/unfinished-signup';
 import { V2Unreachable } from '@/v2/runtime/session-recovery';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
 import { V2PushLifecycle } from '@/v2/runtime/push/lifecycle';
@@ -156,6 +157,14 @@ export default async function V2Layout({
     );
   }
   const session = resolution.kind === 'signed-in' ? resolution.user : null;
+
+  // AN UNFINISHED SIGN-UP FINISHES FIRST, on every page, as in v1: an email
+  // signup that has not verified goes to "check your email", an account that
+  // has not finished onboarding to the onboarding steps. Both are v1 screens
+  // and both return the reader to `/` when done. Decided here, on the server,
+  // so no page of the new design paints first (v2/runtime/unfinished-signup.ts).
+  const unfinished = session ? unfinishedSignupPath(session.user) : null;
+  if (unfinished) redirect(unfinished);
 
   // Server-verified identity for the shell chrome (footer avatar/name/plan gate,
   // notification bell visibility).
