@@ -6,6 +6,7 @@ import { FolderPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { useGuestSignIn } from '@/v2/runtime/sign-in-first';
 import type { FolderItemTarget } from '../item-mutations';
 import { FolderPicker } from './FolderPicker';
 
@@ -25,9 +26,10 @@ import { FolderPicker } from './FolderPicker';
  * that can only 401 — but the inconsistency is real and belongs to those
  * buttons, which are outside this wave's boundary. Filed, not papered over.
  *
- * GUESTS ARE NOT SIGNED OUT: a guest session is a real session with real
- * folders (probed), so guests get the pill and the full picker, with no upsell
- * panel in the way.
+ * A GUEST GETS THE PILL, AND IT GOES TO SIGN IN (Stay, 19 October 2026: "Add
+ * the folder button that send to sign in", as in the old design). A guest
+ * session could hold folders, but they would belong to a throwaway pass, so
+ * the tap asks for an account instead (`useGuestSignIn`).
  *
  * The picker component stays mounted while closed, so its confirmation toast
  * can still perform the Undo it promises after the surface has gone.
@@ -36,6 +38,7 @@ import { FolderPicker } from './FolderPicker';
 export function AddToFolderButton({ target }: { target: FolderItemTarget }) {
   const { signedIn } = useV2Session();
   const [open, setOpen] = useState(false);
+  const signIn = useGuestSignIn();
 
   if (!signedIn) return null;
 
@@ -43,9 +46,9 @@ export function AddToFolderButton({ target }: { target: FolderItemTarget }) {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
+        onClick={() => (signIn ? signIn() : setOpen(true))}
+        aria-haspopup={signIn ? undefined : 'dialog'}
+        aria-expanded={signIn ? undefined : open}
         className={cn(ACTION_PILL, FOCUS_RING)}
       >
         <FolderPlus
@@ -54,7 +57,7 @@ export function AddToFolderButton({ target }: { target: FolderItemTarget }) {
         />
         <span>Add to folder</span>
       </button>
-      <FolderPicker target={target} open={open} onOpenChange={setOpen} />
+      {signIn ? null : <FolderPicker target={target} open={open} onOpenChange={setOpen} />}
     </>
   );
 }

@@ -5,6 +5,7 @@ import { Bookmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useToggleNoteBookmark } from './mutations';
+import { useGuestSignIn } from '@/v2/runtime/sign-in-first';
 
 /**
  * NoteBookmarkButton — save / unsave a note. The case `BookmarkButton`'s two
@@ -32,11 +33,17 @@ export function NoteBookmarkButton({
   className?: string;
 }) {
   const toggle = useToggleNoteBookmark(noteId);
+  // A visitor's Save goes to sign in, as in the old design (sign-in-first.ts).
+  const signIn = useGuestSignIn();
 
   const press = (event: React.MouseEvent) => {
     // A row is a link; the star inside it must not navigate.
     event.preventDefault();
     event.stopPropagation();
+    if (signIn) {
+      signIn();
+      return;
+    }
     toggle.mutate({ next: !isBookmarked });
   };
 

@@ -5,6 +5,7 @@ import { Bookmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useToggleCaseBookmark } from './mutations';
+import { useGuestSignIn } from '@/v2/runtime/sign-in-first';
 
 /**
  * BookmarkButton — save / unsave a case.
@@ -39,11 +40,17 @@ export function BookmarkButton({
   className?: string;
 }) {
   const toggle = useToggleCaseBookmark(caseId);
+  // A visitor's Save goes to sign in, as in the old design (sign-in-first.ts).
+  const signIn = useGuestSignIn();
 
   const press = (event: React.MouseEvent) => {
     // A row is a link; the star inside it must not navigate.
     event.preventDefault();
     event.stopPropagation();
+    if (signIn) {
+      signIn();
+      return;
+    }
     toggle.mutate({ next: !isBookmarked });
   };
 
