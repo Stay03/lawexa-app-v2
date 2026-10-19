@@ -35,6 +35,11 @@ import { AddChoiceRow } from './FolderAdd';
  * statutes list, and the reader's own notes. Each row has its own Add
  * (`AddChoiceRow`, the same row "Files from this space" uses), which files it
  * with its numeric id; one the folder already holds reads as done.
+ *
+ * In a space folder a note goes in as the SPACE'S COPY (Stay, 18 October
+ * 2026: "adding a note from my notes to space creates a copy of that note so
+ * my original one remains as is"), and the My notes tab says so before the
+ * tap.
  */
 
 type LibraryTab = 'case' | 'statute' | 'note';
@@ -69,7 +74,7 @@ export function LibraryPicker({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  folder: { uuid: string; name: string };
+  folder: { uuid: string; name: string; space: { uuid: string; name: string } | null };
 }) {
   const [tab, setTab] = useState<LibraryTab>('case');
   const search = useServerSearch();
@@ -78,8 +83,10 @@ export function LibraryPicker({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add to {folder.name}</DialogTitle>
-          <DialogDescription>Cases, statutes and your notes. Search, then add.</DialogDescription>
+          <DialogTitle>Add from Library</DialogTitle>
+          <DialogDescription>
+            Cases, statutes and your notes, into {folder.name}. Search, then add.
+          </DialogDescription>
         </DialogHeader>
         <TabRow
           tabs={TABS}
@@ -102,6 +109,9 @@ export function LibraryPicker({
           placeholder={PLACEHOLDER[tab]}
           label={PLACEHOLDER[tab]}
         />
+        {tab === 'note' && folder.space ? (
+          <p className="text-sm text-muted-foreground">Adds a copy to the space. Your note stays yours.</p>
+        ) : null}
         <div
           id={PANEL_ID}
           role="tabpanel"

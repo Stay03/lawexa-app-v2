@@ -1,7 +1,12 @@
 'use client';
 
+import Link from 'next/link';
+import { Boxes } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { NoteRecord } from '../types';
+import { noteCopyLine } from '../note-copy';
 import { formatNoteDate, noteDisplayTitle, noteHasTitle } from '../note-text';
 import { NoteActions } from './NoteActions';
 import { NoteContent } from './NoteContent';
@@ -21,6 +26,8 @@ import './note-document.css';
  *   title       the note's name, or "Untitled" in a quieter ink
  *   draft mark  ONLY on the author's own unpublished note, and it says what
  *               being a draft actually means rather than just labelling it
+ *   copy line   ONLY on a Space's copy: the Space it belongs to, and, for
+ *               the original's owner, the note it was copied from
  *   actions     save · copy link · export · edit
  *
  * v1's `NoteDetailHeader` put a thumbnail, a tag row, a price and a status
@@ -54,6 +61,7 @@ export function NoteDocument({
   const body = note.content?.trim() ?? '';
   const isOwn = editHref !== null;
   const isOwnDraft = isOwn && note.status !== 'published';
+  const copy = noteCopyLine(note);
 
   // THE WAY BACK LEFT THIS BLOCK (phase 7). It was an "← Notes" chip at y76
   // under a bar that already showed this note's name and the hamburger. The
@@ -96,6 +104,40 @@ export function NoteDocument({
             <span className="inline-flex min-h-6 items-center rounded-full bg-amber-500/15 px-2.5 text-xs font-medium text-amber-700 dark:text-amber-400">
               Draft · only you can see this
             </span>
+          </p>
+        ) : null}
+
+        {/* A Space's copy says whose it is, so nobody takes it for the original:
+            an edit here changes the Space's note, and the original stays
+            as it was. */}
+        {copy ? (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <Boxes aria-hidden className="size-4 shrink-0" />
+            <span>
+              In{' '}
+              <Link
+                href={copy.spaceHref}
+                className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
+              >
+                {copy.spaceName}
+              </Link>
+            </span>
+            {copy.original ? (
+              <>
+                <span aria-hidden className="text-muted-foreground/40">
+                  ·
+                </span>
+                <span>
+                  Copied from your note{' '}
+                  <Link
+                    href={copy.original.href}
+                    className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
+                  >
+                    {copy.original.title}
+                  </Link>
+                </span>
+              </>
+            ) : null}
           </p>
         ) : null}
 

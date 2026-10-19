@@ -74,6 +74,18 @@ export interface NoteRecord {
    */
   price_ngn?: string | number | null;
   price_usd?: string | number | null;
+  /**
+   * A Space's copy of a note (Stay, 18 October 2026: adding my note to a
+   * Space folder makes a copy, and my note stays mine). Absent on servers
+   * from before the copies, so read through `note-copy.ts`, never directly.
+   */
+  is_space_copy?: boolean;
+  /** The Space a copy belongs to; `null` for any other note. */
+  space?: { uuid: string; name: string } | null;
+  /** Whether this viewer may edit: for a copy, the Space's Owner and Contributors. */
+  can_edit?: boolean;
+  /** The original a copy was made from, sent to the original's owner only. */
+  copied_from?: { slug: string; title: string | null } | null;
 }
 
 export interface NoteListEnvelope {

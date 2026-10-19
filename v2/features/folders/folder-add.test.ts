@@ -25,19 +25,28 @@ test('the "+" is a labelled Add with the folder’s ways in', () => {
   assert.match(screen, /\{addChoices \? <FolderAddMenu choices=\{addChoices\} \/> : null\}/);
 });
 
-test('only the folder’s creator gets Add, as the server allows', () => {
+test('Add is for whoever the server lets add: a personal folder’s creator, a space’s Owner and Contributors', () => {
+  // Stay, 18 October 2026: "a space is a cowork place so any contributor can
+  // 'contribute' so add is allowed" (`FolderService::canManageItems`).
   const screen = read('detail', 'FolderScreen.tsx');
-  assert.match(screen, /const canEdit = viewerId !== null && folder\?\.user\?\.id === viewerId;/);
-  assert.match(screen, /const addChoices: AddChoices \| null = canEdit\s*\?/);
+  assert.match(
+    screen,
+    /const canManageItems =\s*viewerId !== null &&\s*\(folderSpace === null \? folder\?\.user\?\.id === viewerId : spaceDetail !== null && canAddContent\(spaceDetail\)\);/,
+  );
+  assert.match(screen, /const addChoices: AddChoices \| null = canManageItems\s*\?/);
+  // Rename, move and delete of the folder stay with its creator.
+  assert.match(screen, /const owned = viewerId !== null && folder\.user\?\.id === viewerId;\s*const ownerActions: ScreenAction\[\] = owned/);
+  assert.match(screen, /const deleteAction: ScreenAction\[\] = owned/);
   // "Files from this space" only for a folder in a space.
   assert.match(screen, /fromSpace: space \? \(\) => setSpaceFiles\(/);
 });
 
-test('only the folder’s creator gets "Remove from folder" on its rows, as the server allows', () => {
-  // `FolderService::canEdit` authorises add and remove alike: a member of the
-  // folder's space who did not make it gets a 403 (techlead, 18 October 2026).
+test('whoever may add also gets "Remove from folder" on its rows, as the server allows', () => {
+  // `FolderService::canManageItems` authorises add and remove alike: in a
+  // space, any Contributor removes (Stay, 18 October 2026).
   const screen = read('detail', 'FolderScreen.tsx');
-  assert.match(screen, /<FolderItemRow[\s\S]*?canRemove=\{canEdit\}/);
+  assert.match(screen, /<FolderItemRow[\s\S]*?canRemove=\{canManageItems\}/);
+  assert.doesNotMatch(screen, /canEdit/);
   const row = read('detail', 'FolderItemRow.tsx');
   assert.match(row, /canRemove: boolean;/);
   assert.match(row, /\{canRemove \? <RemoveFromFolderButton row=\{row\} folderUuid=\{folderUuid\} \/> : null\}/);
@@ -78,15 +87,18 @@ test('the empty folder says anything can go in and starts from there', () => {
   assert.match(states, /title="Nothing in this folder yet"/);
   assert.match(states, /`Anything can go in a folder: \$\{files\} cases, statutes, notes and subfolders\. Start here\.`/);
   assert.match(states, /'Anything can go in a folder\. Only the person who made it adds to it\.'/);
+  assert.match(states, /'Anything can go in a folder\. The space’s Owner and Contributors add to it\.'/);
   assert.doesNotMatch(states, /<Link href="\/cases">Browse cases<\/Link>/);
   // The loading frame imports this file, so the buttons come from the screen.
   assert.doesNotMatch(states, /from '\.\/FolderAdd'/);
   assert.match(read('detail', 'FolderScreen.tsx'), /add=\{addChoices \? <FolderAddButtons choices=\{addChoices\} \/> : null\}/);
 });
 
-test('cases, statutes and notes are added from the folder too (the second push)', () => {
+test('cases, statutes and notes are added From Library (the second push)', () => {
   const add = read('detail', 'FolderAdd.tsx');
-  assert.match(add, /<DropdownMenuItem onSelect=\{choices\.library\}>\s*<BookOpen \/>\s*Cases, statutes and notes/);
+  assert.match(add, /<DropdownMenuItem onSelect=\{choices\.library\}>\s*<BookOpen \/>\s*From Library/);
+  assert.match(add, /<BookOpen aria-hidden className="size-4" \/>\s*From Library/);
+  assert.doesNotMatch(add, /Cases, statutes and notes/);
   assert.match(add, /<Button type="button" size="sm" variant="outline" onClick=\{choices\.library\}>/);
   const picker = read('detail', 'LibraryPicker.tsx');
   // The three libraries v2 already reads, searched by the server.
@@ -103,4 +115,15 @@ test('cases, statutes and notes are added from the folder too (the second push)'
   assert.match(picker, /<CaseResults key="case"/);
   // The screen opens it only for whoever may add.
   assert.match(read('detail', 'FolderScreen.tsx'), /library: \(\) => setLibrary\(\(previous\) => \(\{ open: true, key: previous\.key \+ 1 \}\)\),/);
+});
+
+test('the picker is "Add from Library", and in a space My notes says the note is copied', () => {
+  const picker = read('detail', 'LibraryPicker.tsx');
+  assert.match(picker, /<DialogTitle>Add from Library<\/DialogTitle>/);
+  // Said before the tap (Stay, 18 October 2026: "my original one remains as is").
+  assert.match(
+    picker,
+    /\{tab === 'note' && folder\.space \? \(\s*<p className="text-sm text-muted-foreground">Adds a copy to the space\. Your note stays yours\.<\/p>\s*\) : null\}/,
+  );
+  assert.match(read('detail', 'FolderScreen.tsx'), /<LibraryPicker[\s\S]*?folder=\{\{ uuid: folder\.uuid, name: row\.name, space \}\}/);
 });

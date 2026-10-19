@@ -28,6 +28,7 @@ import {
 import { useV2Session } from '@/v2/runtime/session-context';
 import { quietReplaceUrlPath } from '@/v2/runtime/url-params';
 import { ACTION_PILL, CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
+import { noteSpace } from '../note-copy';
 import type { NoteRecord } from '../types';
 import { NOTE_CONTENT_LIMIT, type NoteDraft } from './autosave-machine';
 import { CaseMentionList, MENTION_LISTBOX_ID, mentionOptionId } from './CaseMentionList';
@@ -95,6 +96,8 @@ export function NoteEditorScreen({
   const { userId: viewerId, canSetPrice } = useV2Session();
 
   const [record, setRecord] = useState<NoteRecord | null>(initialRecord);
+  // A Space's copy (`note-copy.ts`): no Publish and no Delete, see below.
+  const copySpace = record ? noteSpace(record) : null;
   const recordRef = useRef(record);
   // The tab follows the SAVED note: a new note names itself once its first
   // save gives it an address, and a rename shows once it is saved.
@@ -428,7 +431,18 @@ export function NoteEditorScreen({
               note exists, and only while its text is saved, so what goes out is
               what is on screen. Published notes keep the button as a quieter
               "Published" that reopens the same sheet. */}
-          {record ? (
+          {/* A Space's copy stays private to the Space: the server refuses to
+              publish it, make it public or price it (422), so it has no
+              Publish, only where it lives. */}
+          {record && copySpace ? (
+            <span
+              className="inline-flex min-h-9 max-w-48 items-center gap-2 rounded-full border border-border px-3 text-sm text-muted-foreground"
+              title={`Private to ${copySpace.name}`}
+            >
+              <Lock aria-hidden className="size-4 shrink-0" />
+              <span className="truncate">{copySpace.name}</span>
+            </span>
+          ) : record ? (
             record.status === 'published' ? (
               <button
                 type="button"
@@ -473,13 +487,17 @@ export function NoteEditorScreen({
                     Read note
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={() => setDeleteOpen(true)}
-                >
-                  <Trash2 aria-hidden className="size-4" />
-                  Delete note
-                </DropdownMenuItem>
+                {/* A Space's copy leaves the Space by being removed from its
+                    folder, which deletes it once no folder holds it. */}
+                {copySpace ? null : (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={() => setDeleteOpen(true)}
+                  >
+                    <Trash2 aria-hidden className="size-4" />
+                    Delete note
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
@@ -590,7 +608,7 @@ export function NoteEditorScreen({
         onSubmit={applyLink}
       />
 
-      {record ? (
+      {record && !copySpace ? (
         <PublishSheet
           open={publishOpen}
           onOpenChange={setPublishOpen}

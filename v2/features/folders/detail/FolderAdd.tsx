@@ -55,13 +55,16 @@ import {
  *    (`POST /spaces/{uuid}/files`), so every member has it, and is then filed
  *    here; in a personal folder it goes to the reader's own files
  *    (`POST /files/documents`, or `POST /files` for a picture), then is filed.
- *  - Cases, statutes and notes: the library picker (`LibraryPicker`), the
- *    cases and statutes lists and the reader's own notes, searched by the
- *    server, each row with its own Add (the second push, 18 October 2026).
+ *  - From Library: the library picker (`LibraryPicker`), the cases and
+ *    statutes lists and the reader's own notes, searched by the server, each
+ *    row with its own Add (the second push, 18 October 2026). In a space
+ *    folder a note goes in as the space's copy, and the reader's note stays
+ *    theirs (Stay, 18 October 2026).
  *
- * ── ONLY THE FOLDER'S CREATOR ADDS ─────────────────────────────────────────
- * The server lets only the folder's creator add (`FolderService::canEdit`):
- * another member of the space is refused with a 403. So the host renders none
+ * ── WHO ADDS ────────────────────────────────────────────────────────────────
+ * The server's rule (`FolderService::canManageItems`): a personal folder's
+ * creator; in a space folder, the space's Owner and every Contributor, with
+ * all four choices. A Viewer only reads. The host decides and renders none
  * of this for anyone else; nothing here widens who may add.
  */
 
@@ -106,7 +109,7 @@ export function FolderAddMenu({ choices }: { choices: AddChoices }) {
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={choices.library}>
           <BookOpen />
-          Cases, statutes and notes
+          From Library
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={choices.newSubfolder}>
           <FolderPlus />
@@ -133,7 +136,7 @@ export function FolderAddButtons({ choices }: { choices: AddChoices }) {
       </Button>
       <Button type="button" size="sm" variant="outline" onClick={choices.library}>
         <BookOpen aria-hidden className="size-4" />
-        Cases, statutes and notes
+        From Library
       </Button>
       <Button type="button" size="sm" variant="outline" onClick={choices.newSubfolder}>
         <FolderPlus aria-hidden className="size-4" />

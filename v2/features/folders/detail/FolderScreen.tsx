@@ -45,6 +45,7 @@ import './folder-arrive.css';
 import { FolderNameDialog } from '../FolderNameDialog';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { canRemoveFromSpace } from '@/v2/features/spaces/content-model';
+import { canAddContent } from '@/v2/features/spaces/model';
 import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { FolderRow } from '../list/FolderRow';
@@ -368,11 +369,16 @@ function FolderBody({ uuid }: { uuid: string }) {
   const ownsSpace = spaceDetail !== null && canRemoveFromSpace(spaceDetail);
   // Remove from space, held after closing so the dialog's exit plays.
   const [removing, setRemoving] = useState({ open: false, key: 0 });
-  // Only the folder's creator may add to it or take an item out of it
-  // (`FolderService::canEdit`, which authorises both); a member of the
-  // folder's space who did not make it is refused with a 403, so neither
-  // control is offered to them.
-  const canEdit = viewerId !== null && folder?.user?.id === viewerId;
+  // Who may add to the folder and take items out of it
+  // (`FolderService::canManageItems`): outside a space, its creator; in a
+  // space, the space's Owner and every Contributor (Stay, 18 October 2026:
+  // "a space is a cowork place so any contributor can contribute"). A Viewer
+  // only reads. Renaming, moving and deleting the folder stay with its
+  // creator (`owned`, below). While the space's own answer is on its way the
+  // controls wait rather than appear and vanish.
+  const canManageItems =
+    viewerId !== null &&
+    (folderSpace === null ? folder?.user?.id === viewerId : spaceDetail !== null && canAddContent(spaceDetail));
   const upload = useFolderUpload({
     uuid,
     name: headerRow?.name ?? '',
@@ -494,7 +500,7 @@ function FolderBody({ uuid }: { uuid: string }) {
   const trail = formatRelativeTime(row.trailAt, now);
   const space = folder.space ?? null;
   // The ways into this folder (items 8 and 9), for whoever may add.
-  const addChoices: AddChoices | null = canEdit
+  const addChoices: AddChoices | null = canManageItems
     ? {
         newSubfolder: () => setCreatingSubfolder(true),
         fromSpace: space ? () => setSpaceFiles((previous) => ({ open: true, key: previous.key + 1 })) : null,
@@ -699,7 +705,7 @@ function FolderBody({ uuid }: { uuid: string }) {
                   key={`${item.type}-${item.itemId}`}
                   row={item}
                   folderUuid={uuid}
-                  canRemove={canEdit}
+                  canRemove={canManageItems}
                   index={(showSubfolders ? childRows.length : 0) + index}
                   now={now}
                 />
@@ -818,7 +824,7 @@ function FolderBody({ uuid }: { uuid: string }) {
           key={library.key}
           open={library.open}
           onOpenChange={(open) => setLibrary((previous) => ({ ...previous, open }))}
-          folder={{ uuid: folder.uuid, name: row.name }}
+          folder={{ uuid: folder.uuid, name: row.name, space }}
         />
       ) : null}
       {move.key > 0 ? (

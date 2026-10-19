@@ -355,7 +355,7 @@ export function FolderEmptyState({
   tab: FolderItemTab;
   /** Offered on a filtered tab only — the way back to the whole folder. */
   onShowAll?: () => void;
-  /** The folder's ways in as buttons, for its creator; `null` for anyone else. */
+  /** The folder's ways in as buttons, for whoever may add; `null` for anyone else. */
   add: ReactNode | null;
   /** The folder is in a space: its files are one of the ways in. */
   inSpace: boolean;
@@ -386,7 +386,9 @@ export function FolderEmptyState({
       description={
         add
           ? `Anything can go in a folder: ${files} cases, statutes, notes and subfolders. Start here.`
-          : 'Anything can go in a folder. Only the person who made it adds to it.'
+          : inSpace
+            ? 'Anything can go in a folder. The space’s Owner and Contributors add to it.'
+            : 'Anything can go in a folder. Only the person who made it adds to it.'
       }
       action={add ?? undefined}
     />

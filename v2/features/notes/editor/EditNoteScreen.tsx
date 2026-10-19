@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { mayEditNote } from '../note-copy';
 import { notesQueries } from '../queries';
 import { writeNoteEverywhere } from '../mutations';
 import { NoteDocument } from '../reader/NoteDocument';
@@ -142,7 +143,9 @@ export function EditNoteScreen({ slug }: { slug: string }) {
 
   const record = envelope.data;
 
-  if (viewerId === null || record.user.id !== viewerId) {
+  // The author, or for a Space's copy whoever the server's `can_edit` names
+  // (the Space's Owner and Contributors, `note-copy.ts`).
+  if (!mayEditNote(record, viewerId)) {
     return (
       <div className={NOTE_PAPER_COLUMN}>
         <NoteNotYoursState slug={record.slug} />

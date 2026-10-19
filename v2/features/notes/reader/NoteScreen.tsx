@@ -12,6 +12,7 @@ import {
 } from '@/v2/shell/screen-context';
 import { useTabTitle } from '@/v2/shell/use-tab-title';
 import { notesQueries } from '../queries';
+import { mayEditNote, noteSpace } from '../note-copy';
 import { noteDisplayTitle } from '../note-text';
 import { useNotePeek } from '../note-peek';
 import { NoteDocument } from './NoteDocument';
@@ -92,12 +93,20 @@ export function NoteScreen({ slug }: { slug: string }) {
    * one that is missing while a request is in flight.
    */
   const own = note !== null && userId !== null && userId === note.user?.id;
+  // A Space's copy is the Space's, not its adder's: it is in no list of
+  // theirs, so the way back is the Space it belongs to.
+  const copySpace = note ? noteSpace(note) : null;
+  const copySpaceUuid = copySpace?.uuid ?? null;
+  const copySpaceName = copySpace?.name ?? null;
   useEffect(() => {
-    const back: ScreenBack | null = own
-      ? { href: '/notes?tab=mine', label: 'Back to your notes' }
-      : null;
+    const back: ScreenBack | null =
+      copySpaceUuid !== null
+        ? { href: `/spaces/${copySpaceUuid}`, label: `Back to ${copySpaceName ?? 'the space'}` }
+        : own
+          ? { href: '/notes?tab=mine', label: 'Back to your notes' }
+          : null;
     setScreenContext({ pathname, back, actions: [] });
-  }, [pathname, own]);
+  }, [pathname, own, copySpaceUuid, copySpaceName]);
   useEffect(() => () => clearScreenContext(), []);
 
   if (!signedIn && !guestPassFailed) return <NoteFallback />;
@@ -154,7 +163,9 @@ export function NoteScreen({ slug }: { slug: string }) {
   // have their own gates. It decides whether the Edit link is DRAWN, and a link
   // that leads only to a refusal should not be. The same answer chooses the
   // bar's way back, so the two can never disagree about whose note this is.
-  const editHref = own ? `/notes/${note.slug}/edit` : null;
+  // A Space's copy is the exception: the server's `can_edit` answers for it
+  // (`note-copy.ts`), so every Contributor edits it and a Viewer does not.
+  const editHref = mayEditNote(note, userId) ? `/notes/${note.slug}/edit` : null;
 
   return (
     // `.v2-note-doc` scopes the reading typography (note-document.css).
