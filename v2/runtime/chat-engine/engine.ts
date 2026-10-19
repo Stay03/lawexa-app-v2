@@ -76,6 +76,7 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { adoptServerFields } from './server-fields';
 import { largestSavedId, savedTurnId } from './saved-turn';
+import type { IBlockedReason } from '@/types/message-pack';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -517,6 +518,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     errorCode: string,
     retryable: boolean,
     retryAfterMs: number | null,
+    blocked: IBlockedReason | null = null,
   ) {
     const message: ErrorMessage = {
       id: generateId(),
@@ -527,6 +529,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       errorCode,
       retryable,
       retryAfterMs,
+      // The out-of-messages notice reads the reason and the reset time from it.
+      blocked,
     };
     setState((prev) => ({
       ...prev,
@@ -2043,7 +2047,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       const blocked = extractBlockedReason(err);
       if (blocked) {
         removeMessage(optimisticMsg.id);
-        addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null);
+        addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null, blocked);
         return null;
       }
 
@@ -2190,7 +2194,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       }
       const blocked = extractBlockedReason(err);
       if (blocked) {
-        addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null);
+        addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null, blocked);
         return;
       }
       setState((prev) => ({

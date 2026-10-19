@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowUpRight, CheckCircle2, Hourglass } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import {
 } from '../list/states';
 import { RadarForm, type RadarFormHelpers } from './RadarForm';
 import { useCreateRadar } from './use-create-radar';
+import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
 
 /**
  * CreateRadarScreen — the `/radars/new` client root.
@@ -136,8 +137,6 @@ function BlockedFirstScanState({
   radar: Radar;
   reason: IBlockedReason;
 }) {
-  const resets = formatResetDate(reason.resets_at);
-
   return (
     <div className="flex flex-col gap-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -155,44 +154,17 @@ function BlockedFirstScanState({
         </div>
       </div>
 
-      <div className="flex flex-col items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-5">
-        <span
-          aria-hidden
-          className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
-        >
-          <Hourglass className="size-5" />
-        </span>
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-foreground">
-            First scan skipped — no message balance
-          </p>
-          <p className="max-w-md text-sm text-muted-foreground">
-            {reason.message}
-            {resets ? ` Your plan messages reset ${resets}.` : ''}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
+      {/* The shared out-of-messages notice (v2 Stage 1, item 6), the same one a
+          chat and Usage show, with this screen's own way on first. */}
+      <OutOfMessagesNotice
+        blocked={reason}
+        heading="First scan skipped — no message balance"
+        leading={
           <Button asChild size="sm">
             <Link href={`/radars/${radar.uuid}`}>Go to radar</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link href="/settings/message-packs">
-              Get more messages
-              <ArrowUpRight aria-hidden className="size-4" />
-            </Link>
-          </Button>
-        </div>
-      </div>
+        }
+      />
     </div>
   );
-}
-
-function formatResetDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const parsed = Date.parse(iso);
-  if (Number.isNaN(parsed)) return null;
-  return new Date(parsed).toLocaleDateString(undefined, {
-    month: 'long',
-    day: 'numeric',
-  });
 }

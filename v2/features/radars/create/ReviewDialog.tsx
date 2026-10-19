@@ -16,7 +16,7 @@ import { describeCron, estimateScansPerMonth } from '@/lib/utils/cron';
 import { jurisdictionsQueries } from '@/v2/features/jurisdictions/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { RadarFormValues } from './form-model';
-import { userLimitsQuery } from './user-limits';
+import { userLimitsQuery } from '@/v2/features/subscription/limits';
 
 /**
  * ReviewDialog — the pre-create confirmation: a read-only summary of the

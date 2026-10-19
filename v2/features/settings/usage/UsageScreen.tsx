@@ -23,6 +23,7 @@ import { SettingsState } from '../SettingsState';
 import { aiMessagesView, barTone, formatUsageDate, limitView, type LimitView } from './model';
 import { usageQueries } from './queries';
 import { UsageFallback } from './states';
+import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
 
 /**
  * UsageScreen — v2 `/settings/usage`: the plan, what is left to send, and the
@@ -69,12 +70,9 @@ export function UsageScreen() {
     <div className={SETTINGS_COLUMN}>
       <Heading />
       <div className="flex flex-col gap-5">
-        {blocked ? (
-          <p role="status" className="rounded-2xl bg-destructive/10 px-4 py-3 text-[13px] leading-snug text-destructive">
-            {blocked.message}
-            {blocked.resets_at ? ` Your messages come back on ${formatUsageDate(blocked.resets_at)}.` : ''}
-          </p>
-        ) : null}
+        {/* Out of messages: the shared notice (v2 Stage 1, item 6), the same one
+            a chat and New radar show. */}
+        {blocked ? <OutOfMessagesNotice blocked={blocked} /> : null}
 
         <SettingsFormGroup id="usage-plan" label="Plan">
           <PlanRow plan={data.plan} />

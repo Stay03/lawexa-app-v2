@@ -13,6 +13,7 @@ import { extractPaymentRef, refValue } from '@/lib/utils/payment-callback';
 import { SETTINGS_COLUMN } from '../SettingsList';
 import { SettingsState } from '../SettingsState';
 import { messagePacksQueries, useVerifyPurchase } from './queries';
+import { usageQueries } from '@/v2/features/settings/usage/queries';
 
 /**
  * PaymentCallback — where the payment provider sends a v2 buyer back
@@ -46,6 +47,10 @@ export function PaymentCallback() {
     verify.mutate(reference, {
       onSuccess: (response) => {
         void queryClient.invalidateQueries({ queryKey: messagePacksQueries.all });
+        // The balance moved: the limits every out-of-messages notice and Usage
+        // read must not say "out" for another minute (v2 Stage 1, item 6).
+        void queryClient.invalidateQueries({ queryKey: ['user-limits'] });
+        void queryClient.invalidateQueries({ queryKey: usageQueries.all });
         toast.success(response.message || 'Message packs added');
         router.replace('/settings/message-packs');
       },

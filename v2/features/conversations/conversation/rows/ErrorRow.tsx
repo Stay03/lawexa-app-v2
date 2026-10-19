@@ -1,20 +1,18 @@
 'use client';
 
-import Link from 'next/link';
 import { AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ErrorMessage } from '@/types/chat';
+import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
 
 /**
  * ErrorRow — v2-native render of a backend ErrorMessage (§C KEEP: error banners +
- * retry). A message-cap / plan-gate exhaustion gets its own gold-tinted banner with
- * the upgrade path (an invitation, not a failure); every other error is a
- * destructive banner with an inline Retry when the server marks it retryable.
- *
- * NOTE: v1's plan-aware `MessageBlockBanner` also showed the plan tier + reset time
- * pulled from the `useUserLimits` query (a v1 hook, boundary-blocked). Those extras
- * are deferred until a v2 limits query exists; the server's own message + the
- * upgrade CTA carry the essential UX.
+ * retry). Running out of messages is the shared out-of-messages notice
+ * (`OutOfMessagesNotice`, v2 Stage 1, item 6): Upgrade or Reactivate, Buy message
+ * pack, and when the messages come back, from the refused send's own block, or
+ * from the account's limits when the refusal came mid-stream with words only.
+ * Every other error is a destructive banner with an inline Retry when the server
+ * marks it retryable.
  */
 const EXHAUSTED_CODES = new Set([
   'MESSAGES_EXHAUSTED',
@@ -32,18 +30,7 @@ export function ErrorRow({
   isStreaming: boolean;
 }) {
   if (EXHAUSTED_CODES.has(message.errorCode)) {
-    return (
-      <div className="border-primary/40 bg-primary/10 flex items-start gap-2 rounded-xl border px-3 py-2.5 text-sm">
-        <AlertCircle className="text-primary mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-        <span className="text-foreground min-w-0 flex-1">{message.content}</span>
-        <Link
-          href="/pricing"
-          className="text-primary shrink-0 text-sm font-medium hover:underline"
-        >
-          Upgrade
-        </Link>
-      </div>
-    );
+    return <OutOfMessagesNotice tight blocked={message.blocked} fallbackMessage={message.content} />;
   }
 
   return (

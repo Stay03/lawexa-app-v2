@@ -1,4 +1,5 @@
 import type { JurisdictionChoice } from './jurisdiction';
+import type { IBlockedReason } from './message-pack';
 
 // Message role types
 export type MessageRole = 'user' | 'assistant' | 'tool';
@@ -143,6 +144,9 @@ export interface ErrorMessage extends ChatMessage {
   errorCode: string;
   retryable: boolean;
   retryAfterMs: number | null;
+  /** The server's block when the send was refused for messages (the reason,
+   *  the reset time); absent for every other error. */
+  blocked?: IBlockedReason | null;
 }
 
 // Narration message - orchestrator commentary saved between phases

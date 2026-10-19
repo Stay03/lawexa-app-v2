@@ -16,6 +16,7 @@ import type { PaymentVerifyRef } from '@/types/payment';
 import { billingQueries } from '@/v2/features/settings/billing/queries';
 import { SettingsState } from '@/v2/features/settings/SettingsState';
 import { PRICING_COLUMN } from './states';
+import { usageQueries } from '@/v2/features/settings/usage/queries';
 
 type Kind = 'subscribe' | 'upgrade' | 'trial';
 
@@ -62,6 +63,10 @@ export function PlanPaymentCallback({ kind }: { kind: Kind }) {
     verify.mutate(ref, {
       onSuccess: (response) => {
         void queryClient.invalidateQueries({ queryKey: billingQueries.all });
+        // The plan changed: the limits every out-of-messages notice and Usage
+        // read must not say "out" for another minute (v2 Stage 1, item 6).
+        void queryClient.invalidateQueries({ queryKey: ['user-limits'] });
+        void queryClient.invalidateQueries({ queryKey: usageQueries.all });
         toast.success(response.message || DONE[kind]);
         router.replace('/settings/billing');
       },

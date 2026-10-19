@@ -37,7 +37,6 @@ import {
   PromptInputActions,
   PromptInputTextarea,
 } from '@/components/ui/prompt-input';
-import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
@@ -70,6 +69,7 @@ import {
 import { JurisdictionField } from './composer/JurisdictionField';
 import { WorkflowField } from './composer/WorkflowField';
 import { useWorkflowSelection } from './composer/useWorkflowSelection';
+import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
 
 /**
  * HomeComposer — the ONE v2-native composer both home designs share, now WIRED to
@@ -534,30 +534,15 @@ export function HomeComposer({
         </div>
       ) : null}
 
-      {/* Server-block banner (message cap / plan gate) — reason-aware, with the
-          upgrade path + reset time when the server provides one. Gold-tinted (an
-          invitation, not a failure); cleared on the next keystroke. */}
+      {/* The send was refused for messages: the shared out-of-messages notice
+          (`OutOfMessagesNotice`, v2 Stage 1, item 6), from the refusal's own
+          block. Cleared on the next keystroke. */}
       {blocked ? (
-        <div
-          role="alert"
-          className="mb-2 flex items-start gap-2 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-sm motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200"
-        >
-          <AlertCircle className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden />
-          <span className="min-w-0 flex-1 text-foreground">
-            {blocked.message}
-            {blocked.resets_at ? (
-              <span className="block text-xs text-muted-foreground">
-                Resets {new Date(blocked.resets_at).toLocaleString()}
-              </span>
-            ) : null}
-          </span>
-          <Link
-            href="/pricing"
-            className="shrink-0 text-sm font-medium text-primary hover:underline"
-          >
-            Upgrade
-          </Link>
-        </div>
+        <OutOfMessagesNotice
+          tight
+          blocked={blocked}
+          className="mb-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200"
+        />
       ) : null}
 
       {/* The jurisdiction stands above the box, as on the chat screen, so the
