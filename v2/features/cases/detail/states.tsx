@@ -2,12 +2,14 @@
 
 import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ArrowUpRight, Lock, Scale, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { CaseViewLimitError } from '@/types/case';
+import { signInHref } from '@/v2/runtime/sign-in-href';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatCaseDate } from '../case-row-model';
 
@@ -184,10 +186,52 @@ export function ViewLimitNotice({ message, guest = false }: { message?: string; 
  * is not a monthly limit, so it does not say so; it says what an account gives
  * and offers one, with the way in for someone who already has one. The same
  * door as the statute paywall's guest copy (`StatutePaywall`).
+ *
+ * The card is for a case with no principles; with principles, the offer sits
+ * inline under their fade ({@link GuestOffer}).
  */
 function GuestSummaryNotice() {
   return (
-    <div className="flex flex-col items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-5">
+    <div
+      id={GUEST_OFFER_ID}
+      className="flex scroll-mt-6 flex-col items-start gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-5"
+    >
+      <GuestOfferContent
+        title="Create a free account to read the summary"
+        body="The case summary comes with a free Lawexa account."
+      />
+    </div>
+  );
+}
+
+/** The offer's anchor, for the guest's "Full judgment" button. */
+export const GUEST_OFFER_ID = 'case-guest-offer';
+
+/**
+ * The account offer under a guest's fading principles (A2, the pick of 19
+ * October 2026, 13:06 UTC): inline under a thin rule, no card, so the fade
+ * runs straight into it.
+ */
+export function GuestOffer() {
+  return (
+    <div
+      id={GUEST_OFFER_ID}
+      className="flex scroll-mt-6 flex-col items-start gap-3 border-t border-border/60 pt-5"
+    >
+      <GuestOfferContent
+        title="Create a free account to read the case"
+        body="The full principles and the case summary come with a free Lawexa account."
+      />
+    </div>
+  );
+}
+
+function GuestOfferContent({ title, body }: { title: string; body: string }) {
+  // Signing in comes back to this case; signing up goes through the email
+  // check and onboarding first, so it has nothing to come back to.
+  const pathname = usePathname();
+  return (
+    <>
       <span
         aria-hidden
         className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary"
@@ -195,11 +239,8 @@ function GuestSummaryNotice() {
         <Lock className="size-5" />
       </span>
       <div className="space-y-1">
-        <p className="text-sm font-semibold text-foreground">Create a free account to read the summary</p>
-        <p className="max-w-md text-sm text-muted-foreground">
-          The principles are open to everyone. The full case summary comes with a free Lawexa
-          account.
-        </p>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="max-w-md text-sm text-muted-foreground">{body}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Link
@@ -213,7 +254,7 @@ function GuestSummaryNotice() {
           <ArrowUpRight aria-hidden className="size-4" />
         </Link>
         <Link
-          href="/login"
+          href={signInHref(pathname)}
           className={cn(
             'v2-interactive inline-flex min-h-9 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
             FOCUS_RING,
@@ -222,7 +263,7 @@ function GuestSummaryNotice() {
           Sign in
         </Link>
       </div>
-    </div>
+    </>
   );
 }
 

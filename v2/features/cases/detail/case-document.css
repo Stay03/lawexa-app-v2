@@ -92,6 +92,19 @@
   }
 }
 
+/**
+ * A guest's last drawn principle, fading out above the account offer (A2,
+ * 19 October 2026). A mask, not a gradient painted over the text, so it fades
+ * to whatever ground is behind it in either theme. Capped in height, so a long
+ * principle fades over the same few lines as a short one.
+ */
+.v2-case-doc .doc-guest-fade {
+  max-height: 11rem;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 15%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 15%, transparent 100%);
+}
+
 /* The `.doc-holding` gold left rule is RETIRED (owner, July 30: "it has a
    gold line on the left. I don't like that") — every principles shape now
    renders as numbered entries, and the hanging gold numerals carry the

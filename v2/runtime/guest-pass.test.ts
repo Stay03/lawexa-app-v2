@@ -86,10 +86,10 @@ test('what belongs to an account stays off for a guest pass', () => {
 
 test('a guest’s case offers an account where a reader over the limit is offered an upgrade', () => {
   const doc = read('v2', 'features', 'cases', 'detail', 'CaseDocument.tsx');
-  assert.match(doc, /const guest = useV2Session\(\)\.role === 'guest';/);
+  assert.match(doc, /const role = useV2Session\(\)\.role;\s*const guest = role === 'guest';/);
   assert.match(doc, /<ViewLimitNotice message=\{detail\.limit_message\} guest=\{guest\} \/>/);
   const states = read('v2', 'features', 'cases', 'detail', 'states.tsx');
   assert.match(states, /if \(guest\) return <GuestSummaryNotice \/>;/);
   assert.match(states, /Create a free account to read the summary/);
-  assert.match(states, /href="\/register"[\s\S]*?Create an account[\s\S]*?href="\/login"[\s\S]*?Sign in/);
+  assert.match(states, /href="\/register"[\s\S]*?Create an account[\s\S]*?href=\{signInHref\(pathname\)\}[\s\S]*?Sign in/);
 });

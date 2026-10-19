@@ -37,7 +37,8 @@ import { CitedBySection } from './CitedBySection';
 import { CaseText, caseTextParagraphs } from './case-text';
 import type { OutlineSection } from './CaseOutline';
 import { SectionHeading } from './SectionHeading';
-import { ViewLimitNotice } from './states';
+import { fullReportAction, guestFadesPrinciples, hasPrinciples } from './guest-fade';
+import { GuestOffer, ViewLimitNotice } from './states';
 import './case-masthead.css';
 import './case-document.css';
 
@@ -120,12 +121,13 @@ const SECTION = {
 
 /** The outline rail's entries, derived from the same checks that gate each
  *  section below — `CaseScreen` renders the rail from this. */
-export function buildCaseOutline(detail: CaseDetail): OutlineSection[] {
+export function buildCaseOutline(
+  detail: CaseDetail,
+  role: string | null | undefined,
+): OutlineSection[] {
   const sections: OutlineSection[] = [];
-  const hasPrinciples =
-    (detail.report_principles?.length ?? 0) > 0 || !!detail.principles?.trim();
-  if (hasPrinciples) sections.push({ id: SECTION.principles, label: 'Principles' });
-  sections.push({ id: SECTION.summary, label: 'Summary' });
+  if (hasPrinciples(detail)) sections.push({ id: SECTION.principles, label: 'Principles' });
+  if (!guestFadesPrinciples(detail, role)) sections.push({ id: SECTION.summary, label: 'Summary' });
   if ((detail.court_history?.length ?? 0) > 0)
     sections.push({ id: SECTION.history, label: 'Case history' });
   if (groupStatutes(detail.statutes_cited ?? []).length > 0)
@@ -155,7 +157,9 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
   const date = formatCaseDate(detail.judgment_date, 'long');
   const isLimited = detail.limit_exceeded === true;
   // A guest's case comes without its summary: the notice offers an account.
-  const guest = useV2Session().role === 'guest';
+  const role = useV2Session().role;
+  const guest = role === 'guest';
+  const guestFade = guestFadesPrinciples(detail, role);
   const countryCode = toAlpha2(detail.country?.code, detail.country?.abbreviation);
 
   const principles = [...(detail.report_principles ?? [])].sort(
@@ -284,12 +288,40 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
           title={name}
           isBookmarked={detail.is_bookmarked}
           bookmarksCount={detail.bookmarks_count}
-          hasFullReport={detail.has_full_report === true && !isLimited}
+          fullReport={fullReportAction(detail, role)}
         />
       </header>
 
       {/* ── The law. ────────────────────────────────────────────────────── */}
-      {principles.length > 0 ? (
+      {guestFade ? (
+        <GuestPrinciples
+          overview={principles.length > 0 ? detail.principles?.trim() || null : null}
+          sub={
+            principles.length > 0 && !detail.principles?.trim()
+              ? 'Verbatim from the judgment.'
+              : undefined
+          }
+          entries={
+            principles.length > 0
+              ? principles.map((principle) => ({
+                  key: String(principle.id),
+                  text: principle.principle,
+                  after: (
+                    <>
+                      {principle.verbatim_window ? (
+                        <JudgmentPassage text={principle.verbatim_window} href={null} />
+                      ) : null}
+                      <PrincipleCaption principle={principle} showLawType />
+                    </>
+                  ),
+                }))
+              : flatPrincipleEntries(detail.principles ?? '').map((text, index) => ({
+                  key: String(index),
+                  text,
+                }))
+          }
+        />
+      ) : principles.length > 0 ? (
         <StructuredPrinciples
           principles={principles}
           overview={detail.principles?.trim() || null}
@@ -304,24 +336,26 @@ export function CaseDocument({ detail }: { detail: CaseDetail }) {
       ) : null}
 
       {/* ── What happened. ──────────────────────────────────────────────── */}
-      <section
-        id={SECTION.summary}
-        aria-label="Case summary"
-        className="flex scroll-mt-6 flex-col gap-3"
-      >
-        <SectionHeading label="Case summary" />
-        {isLimited ? (
-          <ViewLimitNotice message={detail.limit_message} guest={guest} />
-        ) : summary ? (
-          <div className="doc-prose">
-            <CaseText value={summary} />
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            This case has no written summary yet.
-          </p>
-        )}
-      </section>
+      {guestFade ? null : (
+        <section
+          id={SECTION.summary}
+          aria-label="Case summary"
+          className="flex scroll-mt-6 flex-col gap-3"
+        >
+          <SectionHeading label="Case summary" />
+          {isLimited ? (
+            <ViewLimitNotice message={detail.limit_message} guest={guest} />
+          ) : summary ? (
+            <div className="doc-prose">
+              <CaseText value={summary} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              This case has no written summary yet.
+            </p>
+          )}
+        </section>
+      )}
 
       {/* ── Depth: the chain, the authorities. ──────────────────────────── */}
       {history.length > 0 ? <CaseHistory steps={history} /> : null}
@@ -768,11 +802,15 @@ function LawTypeTabs({
  * citation. A passage too fused to split at all stays plain prose — a lone
  * "01" would be decoration.
  */
-function FlatPrinciples({ text }: { text: string }) {
+function flatPrincipleEntries(text: string): string[] {
   const paragraphs = caseTextParagraphs(text);
-  if (paragraphs.length === 0) return null;
-  const entries =
-    paragraphs.length > 1 ? paragraphs : splitPrincipleStatements(paragraphs[0]);
+  if (paragraphs.length === 0) return [];
+  return paragraphs.length > 1 ? paragraphs : splitPrincipleStatements(paragraphs[0]);
+}
+
+function FlatPrinciples({ text }: { text: string }) {
+  const entries = flatPrincipleEntries(text);
+  if (entries.length === 0) return null;
 
   return (
     <section
@@ -802,6 +840,67 @@ function FlatPrinciples({ text }: { text: string }) {
           </div>
         </>
       )}
+    </section>
+  );
+}
+
+/**
+ * A guest's principles (A2, {@link guestFadesPrinciples}). A case with report
+ * principles reads as a signed-in reader's does, cut short: the editorial
+ * headnote in full when it has one, then the first report principle in full
+ * with its passage and caption, then the second fading out. A case with only
+ * the flat string shows its first entry in full and the second fading. Then
+ * the account offer, inline under a thin rule. The rest are not drawn; the
+ * heading's count says how many there are. A case with one principle shows it
+ * fading. No tabs and no fold: there is nothing left to filter or unfold.
+ */
+function GuestPrinciples({
+  overview,
+  sub,
+  entries,
+}: {
+  overview: string | null;
+  sub?: string;
+  entries: Array<{ key: string; text: string; after?: React.ReactNode }>;
+}) {
+  if (entries.length === 0) return null;
+  const full = entries.length > 1 ? entries[0] : null;
+  const faded = entries.length > 1 ? entries[1] : entries[0];
+  return (
+    <section
+      id={SECTION.principles}
+      aria-label="Legal principles"
+      className="flex scroll-mt-6 flex-col gap-3"
+    >
+      <SectionHeading label="Legal principles" count={entries.length} sub={sub} />
+      {overview ? (
+        <>
+          <div className="doc-prose">
+            <CaseText value={overview} />
+          </div>
+          <p className="mt-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">
+            From the judgment
+          </p>
+        </>
+      ) : null}
+      <ol className="flex flex-col gap-7">
+        {full ? (
+          <NumberedPrinciple key={full.key} index={0}>
+            <div className="doc-prose">
+              <CaseText value={full.text} />
+            </div>
+            {full.after}
+          </NumberedPrinciple>
+        ) : null}
+        {/* The principle alone, without its passage: the passage travels only
+            with the full principle (JudgmentPassage's rule). */}
+        <NumberedPrinciple key={faded.key} index={full ? 1 : 0} className="doc-guest-fade">
+          <div className="doc-prose">
+            <CaseText value={faded.text} />
+          </div>
+        </NumberedPrinciple>
+      </ol>
+      <GuestOffer />
     </section>
   );
 }

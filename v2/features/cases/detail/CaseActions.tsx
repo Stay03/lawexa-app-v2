@@ -9,6 +9,7 @@ import { BookmarkButton } from '@/v2/features/bookmarks/BookmarkButton';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { FeedbackButton } from '@/v2/features/feedback/FeedbackButton';
+import { GUEST_OFFER_ID } from './states';
 
 /**
  * The case action row — save, share, and the full judgment when one exists.
@@ -35,25 +36,30 @@ export function CaseActions({
   title,
   isBookmarked,
   bookmarksCount,
-  hasFullReport,
+  fullReport,
 }: {
   caseId: number;
   slug: string;
   title: string;
   isBookmarked: boolean;
   bookmarksCount: number;
-  hasFullReport: boolean;
+  /** `open` goes to the judgment; `offer` (a guest, who gets no report text)
+   *  goes to the account offer on this page; null draws no button. */
+  fullReport: 'open' | 'offer' | null;
 }) {
+  const pill = cn(ACTION_PILL, 'border-primary/40 text-foreground hover:border-primary/60', FOCUS_RING);
   return (
     <div className="flex flex-wrap items-center gap-2">
-      {hasFullReport ? (
-        <Link
-          href={`/cases/${slug}/report`}
-          className={cn(ACTION_PILL, 'border-primary/40 text-foreground hover:border-primary/60', FOCUS_RING)}
-        >
+      {fullReport === 'open' ? (
+        <Link href={`/cases/${slug}/report`} className={pill}>
           <FileText aria-hidden className="size-4 text-primary" />
           Full judgment
         </Link>
+      ) : fullReport === 'offer' ? (
+        <button type="button" onClick={showGuestOffer} className={pill}>
+          <FileText aria-hidden className="size-4 text-primary" />
+          Full judgment
+        </button>
       ) : null}
       <BookmarkButton
         caseId={caseId}
@@ -66,5 +72,15 @@ export function CaseActions({
       <FeedbackButton type="case" contentId={caseId} />
     </div>
   );
+}
+
+/** Brings the account offer into view and puts focus on its first link, so a
+ *  keyboard reader lands where a sighted one looks. */
+function showGuestOffer() {
+  const offer = document.getElementById(GUEST_OFFER_ID);
+  if (!offer) return;
+  const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  offer.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+  offer.querySelector<HTMLElement>('a')?.focus({ preventScroll: true });
 }
 

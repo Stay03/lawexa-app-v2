@@ -162,7 +162,7 @@ function CaseBody({ slug }: { slug: string }) {
     );
   }
 
-  const outline = buildCaseOutline(detail);
+  const outline = buildCaseOutline(detail, role);
 
 
   return (
@@ -177,7 +177,15 @@ function CaseBody({ slug }: { slug: string }) {
           pill dock is pinned to the bottom edge and floats over the reading.
           `.v2-case-doc` scopes the reading typography (case-document.css).
           `relative` anchors the outline rail beside the column. */}
-      <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+      {/* A visitor without an account has no chat box at all (Stay, 19 October
+          2026, 14:07 UTC: "Remove the chat text area"), so the column keeps
+          the reading column's own bottom room that the dock gave it. */}
+      <div
+        className={cn(
+          'v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8',
+          !signedIn && 'pb-24',
+        )}
+      >
         <ReadingProgress />
         <div className={arrive} inert={pageUnderChat}>
           <CaseDocument detail={detail} />
@@ -202,7 +210,7 @@ function CaseBody({ slug }: { slug: string }) {
         {/* THE composer's dock — on a phone and at xl-floating it is the
             entire chat (one card, three states). It hides only while the
             docked column, chosen at xl, owns the composer. */}
-        {showDock ? (
+        {signedIn && showDock ? (
           <CaseAskDock
             subject={subject}
             signedIn={signedIn}
@@ -222,7 +230,7 @@ function CaseBody({ slug }: { slug: string }) {
         ) : null}
       </div>
 
-      {showDocked && renderedChat !== null ? (
+      {signedIn && showDocked && renderedChat !== null ? (
         <CaseChatDocked
           chatId={renderedChat}
           closing={chatClosing}
