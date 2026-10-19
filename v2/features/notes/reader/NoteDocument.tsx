@@ -111,34 +111,33 @@ export function NoteDocument({
             an edit here changes the Space's note, and the original stays
             as it was. */}
         {copy ? (
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-            <Boxes aria-hidden className="size-4 shrink-0" />
-            <span>
-              In{' '}
-              <Link
-                href={copy.spaceHref}
-                className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
-              >
-                {copy.spaceName}
-              </Link>
-            </span>
+          <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+            <p className="flex items-center gap-2">
+              <Boxes aria-hidden className="size-4 shrink-0" />
+              <span className="min-w-0">
+                In{' '}
+                <Link
+                  href={copy.spaceHref}
+                  className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
+                >
+                  {copy.spaceName}
+                </Link>
+              </span>
+            </p>
+            {/* Its own line, so a long title never leaves a separator
+                hanging at the end of the space's line. */}
             {copy.original ? (
-              <>
-                <span aria-hidden className="text-muted-foreground/40">
-                  ·
-                </span>
-                <span>
-                  Copied from your note{' '}
-                  <Link
-                    href={copy.original.href}
-                    className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
-                  >
-                    {copy.original.title}
-                  </Link>
-                </span>
-              </>
+              <p className="pl-6">
+                Copied from your note{' '}
+                <Link
+                  href={copy.original.href}
+                  className={cn('rounded-sm font-medium text-foreground underline-offset-4 hover:underline', FOCUS_RING)}
+                >
+                  {copy.original.title}
+                </Link>
+              </p>
             ) : null}
-          </p>
+          </div>
         ) : null}
 
         <NoteActions
