@@ -81,6 +81,8 @@ export interface NoteAutosave extends AutosaveView {
   flush: () => void;
   /** The reader pressed the retry chip. Clears the backoff ladder. */
   retry: () => void;
+  /** Our own other write (publish) moved the version: the next save's base. */
+  rebase: (updatedAt: string | null | undefined) => void;
 }
 
 function viewOf(state: AutosaveState): AutosaveView {
@@ -114,7 +116,7 @@ export interface UseNoteAutosaveOptions {
    * mount: after that the editor is the source of truth and a changed prop must
    * not silently replace what the reader is writing.
    */
-  initial: { id: number; draft: NoteDraft } | null;
+  initial: { id: number; draft: NoteDraft; updatedAt?: string | null } | null;
   /**
    * The server's record after every successful save (slug, timestamps, id).
    * May be async — the editor's handler awaits an IndexedDB re-key on the first
@@ -206,6 +208,7 @@ export function useNoteAutosave({
             type: 'saved',
             noteId: record.id,
             draft: request.draft,
+            updatedAt: record.updated_at ?? null,
             at: Date.now(),
           });
           void onSavedRef.current?.(record);
@@ -299,5 +302,11 @@ export function useNoteAutosave({
     };
   }, [clearTimer]);
 
-  return { ...view, change, flush, retry };
+  const rebase = useCallback(
+    (updatedAt: string | null | undefined) =>
+      dispatch({ type: 'rebase', updatedAt: updatedAt ?? null, at: Date.now() }),
+    [dispatch],
+  );
+
+  return { ...view, change, flush, retry, rebase };
 }

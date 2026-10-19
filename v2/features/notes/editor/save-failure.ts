@@ -104,6 +104,12 @@ export function classifySaveFailure(
     };
   }
 
+  // The note changed elsewhere since this editor's base version: settled, and
+  // never retried (a retry would carry the same stale base).
+  if (status === 409) {
+    return { kind: 'conflict', message };
+  }
+
   // `extractApiError` reports 0 for a request that never got a response —
   // offline, DNS, a dropped connection. Worth retrying; so is any 5xx.
   if (status === 0 || status >= 500) {

@@ -219,6 +219,8 @@ export function NoteEditorScreen({
               title: initialRecord.title,
               content: initialRecord.content ?? '',
             },
+            // The opened copy's version: each save says what it was made on.
+            updatedAt: initialRecord.updated_at ?? null,
           },
     onSaved: handleSaved,
     paused: overLimit,
@@ -492,6 +494,20 @@ export function NoteEditorScreen({
         />
       ) : null}
 
+      {autosave.status === 'conflict' ? (
+        <EditorNotice tone="alert" title="This note was changed elsewhere">
+          Reload to see the latest. What you typed here since then is not saved; it
+          stays on this page, so copy it first if you need it.{' '}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className={cn('font-medium text-foreground underline underline-offset-2', FOCUS_RING)}
+          >
+            Reload
+          </button>
+        </EditorNotice>
+      ) : null}
+
       {autosave.status === 'blocked' ? (
         <EditorNotice tone="alert" title="You've reached your note limit">
           {autosave.failure?.message ??
@@ -583,6 +599,8 @@ export function NoteEditorScreen({
           onPublished={(next) => {
             recordRef.current = next;
             setRecord(next);
+            // Our own publish moved the version: the next save is made on it.
+            autosave.rebase(next.updated_at);
           }}
         />
       ) : null}

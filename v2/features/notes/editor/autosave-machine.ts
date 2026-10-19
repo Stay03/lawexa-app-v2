@@ -106,7 +106,13 @@ export type AutosaveStatus =
   /** The last attempt failed. `wakeAt` non-null ⇒ a retry is scheduled. */
   | 'error'
   /** The plan's note-creation quota. No note can be created; editing is local. */
-  | 'blocked';
+  | 'blocked'
+  /**
+   * The server's copy changed since this editor's base (a 409): another tab or
+   * device saved first. Saving stops for good, so this copy can never write
+   * over the newer one; the text stays on screen for the reader to copy.
+   */
+  | 'conflict';
 
 /** Why a save failed, in the only four flavours that change what we do next. */
 export type AutosaveFailure =
@@ -117,7 +123,9 @@ export type AutosaveFailure =
   /** Network / 5xx — worth retrying on a backoff ladder. */
   | { kind: 'transient'; message: string }
   /** A settled refusal (422, 403). Retrying it would fail identically. */
-  | { kind: 'rejected'; message: string };
+  | { kind: 'rejected'; message: string }
+  /** 409: the note changed elsewhere since this editor's base version. */
+  | { kind: 'conflict'; message: string };
 
 export interface AutosaveState {
   readonly status: AutosaveStatus;
@@ -125,6 +133,13 @@ export interface AutosaveState {
   readonly noteId: number | null;
   /** What the server last confirmed. `null` ⇒ nothing has ever been saved. */
   readonly confirmed: NoteDraft | null;
+  /**
+   * The server's `updated_at` for the copy this editor is based on: the one it
+   * opened, then each save's answer. Every update sends it, so the server can
+   * refuse a save made on top of an older copy (409) instead of overwriting
+   * newer text. `null` before the note exists.
+   */
+  readonly base: string | null;
   /** What the reader has now — always the freshest full snapshot. */
   readonly working: NoteDraft;
   /** The snapshot the in-flight request carries, or `null` when nothing is in flight. */
@@ -156,7 +171,13 @@ export interface AutosaveState {
  */
 export type SaveRequest =
   | { readonly mode: 'create'; readonly draft: NoteDraft }
-  | { readonly mode: 'update'; readonly noteId: number; readonly draft: NoteDraft };
+  | {
+      readonly mode: 'update';
+      readonly noteId: number;
+      readonly draft: NoteDraft;
+      /** The base version (`base_updated_at`), see `AutosaveState.base`. */
+      readonly base: string | null;
+    };
 
 export type AutosaveEvent =
   /** The reader changed the title or the body. Carries the FULL new draft. */
@@ -166,11 +187,18 @@ export type AutosaveEvent =
   /** Save now if there is anything to save (tab hidden, page hiding, save-now). */
   | { type: 'flush'; at: number }
   /** The request succeeded; the server's record is authoritative. */
-  | { type: 'saved'; noteId: number; draft: NoteDraft; at: number }
+  | { type: 'saved'; noteId: number; draft: NoteDraft; updatedAt: string | null; at: number }
   /** The request failed. */
   | { type: 'failed'; failure: AutosaveFailure; at: number }
   /** The reader pressed the retry chip. */
-  | { type: 'retry'; at: number };
+  | { type: 'retry'; at: number }
+  /**
+   * Another write of OUR OWN moved the server's version (publish, unpublish):
+   * its answer's `updated_at` is the next save's base, or that save would be
+   * refused as made on an older copy. Never fed from a background refetch,
+   * which could carry someone else's change.
+   */
+  | { type: 'rebase'; updatedAt: string | null; at: number };
 
 /** A transition: the next state, and the one request the driver should send. */
 export interface AutosaveTransition {
@@ -238,7 +266,7 @@ function deadlineFor(state: AutosaveState, at: number): number {
 function requestFor(state: AutosaveState): SaveRequest {
   return state.noteId === null
     ? { mode: 'create', draft: state.working }
-    : { mode: 'update', noteId: state.noteId, draft: state.working };
+    : { mode: 'update', noteId: state.noteId, draft: state.working, base: state.base };
 }
 
 /** Move to `saving` and hand the driver the request. */
@@ -273,12 +301,13 @@ function settleClean(state: AutosaveState): AutosaveTransition {
 
 /** The starting state for an editor, with or without an existing note. */
 export function initialAutosaveState(
-  note: { id: number; draft: NoteDraft } | null,
+  note: { id: number; draft: NoteDraft; updatedAt?: string | null } | null,
 ): AutosaveState {
   return {
     status: 'clean',
     noteId: note?.id ?? null,
     confirmed: note?.draft ?? null,
+    base: note?.updatedAt ?? null,
     working: note?.draft ?? { title: null, content: EMPTY_CONTENT },
     inFlight: null,
     lastChangeAt: null,
@@ -313,8 +342,11 @@ export function reduceAutosave(
       if (state.status === 'saving') return { state: next, save: null };
 
       // The create quota is not a timing problem, so nothing is scheduled.
-      // Editing continues; the local mirror is what holds the work.
-      if (state.status === 'blocked') return { state: next, save: null };
+      // Editing continues; the local mirror is what holds the work. A conflict
+      // is the same: nothing more is ever sent from this copy.
+      if (state.status === 'blocked' || state.status === 'conflict') {
+        return { state: next, save: null };
+      }
 
       // Typed back to what the server already has (an undo, a deleted keystroke)
       // — there is nothing to send, so stand down rather than save a no-op.
@@ -355,7 +387,7 @@ export function reduceAutosave(
       if (state.holdUntil !== null && event.at < state.holdUntil) {
         return { state, save: null };
       }
-      if (state.status === 'blocked') return { state, save: null };
+      if (state.status === 'blocked' || state.status === 'conflict') return { state, save: null };
       if (!hasUnsavedWork(state)) {
         return state.status === 'clean' ? { state, save: null } : settleClean(state);
       }
@@ -367,6 +399,9 @@ export function reduceAutosave(
         ...state,
         noteId: event.noteId,
         confirmed: event.draft,
+        // The answer's version is the next save's base; a missing stamp keeps
+        // the old one rather than sending none.
+        base: event.updatedAt ?? state.base,
         inFlight: null,
         savedAt: event.at,
         attempt: 0,
@@ -423,6 +458,15 @@ export function reduceAutosave(
         };
       }
 
+      if (failure.kind === 'conflict') {
+        // Never again from this copy: a retry would carry the same stale base
+        // and, if it ever passed, overwrite the newer text.
+        return {
+          state: { ...base, status: 'conflict', wakeAt: null, holdUntil: null },
+          save: null,
+        };
+      }
+
       if (failure.kind === 'rejected') {
         // Retrying an identical refusal is theatre. The chip stays until the
         // reader acts (usually by fixing what was refused).
@@ -451,10 +495,17 @@ export function reduceAutosave(
       };
     }
 
+    case 'rebase': {
+      if (!event.updatedAt) return { state, save: null };
+      return { state: { ...state, base: event.updatedAt }, save: null };
+    }
+
     case 'retry': {
       // A deliberate act clears the ladder and any hold — including the create
       // quota, which a reader may have freed up elsewhere.
       if (state.status === 'saving') return { state, save: null };
+      // A conflict is settled by reloading the newer copy, not by retrying.
+      if (state.status === 'conflict') return { state, save: null };
       const cleared: AutosaveState = {
         ...state,
         attempt: 0,
@@ -478,6 +529,8 @@ export function createInputFor(draft: NoteDraft): NoteCreateInput {
  * is absent because {@link NoteUpdateInput} cannot express it — sending a
  * changed slug is the one save that breaks every existing link to a note.
  */
-export function updateInputFor(draft: NoteDraft): NoteUpdateInput {
-  return { title: draft.title, content: draft.content };
+export function updateInputFor(draft: NoteDraft, base: string | null = null): NoteUpdateInput {
+  return base
+    ? { title: draft.title, content: draft.content, base_updated_at: base }
+    : { title: draft.title, content: draft.content };
 }

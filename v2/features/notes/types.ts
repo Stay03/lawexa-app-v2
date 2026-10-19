@@ -113,6 +113,12 @@ export interface NoteUpdateInput {
   /** `null` clears the title (allowed); omit to leave it alone. */
   title?: string | null;
   content?: string;
+  /**
+   * The `updated_at` of the copy this save was made on. The server answers 409
+   * (with its current note) when its copy is newer, so a stale editor cannot
+   * overwrite text saved elsewhere (19 October 2026).
+   */
+  base_updated_at?: string;
 }
 
 /**

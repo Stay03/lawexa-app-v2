@@ -56,7 +56,7 @@ export function useSaveNote(scopeId: string) {
     mutationFn: (request) =>
       request.mode === 'create'
         ? notesApi.create(createInputFor(request.draft))
-        : notesApi.update(request.noteId, updateInputFor(request.draft)),
+        : notesApi.update(request.noteId, updateInputFor(request.draft, request.base)),
     scope: { id: `note-save-${scopeId}` },
     meta: {
       silentError: true,

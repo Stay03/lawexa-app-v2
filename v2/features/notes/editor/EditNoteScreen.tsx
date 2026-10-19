@@ -3,10 +3,12 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { notesQueries } from '../queries';
 import { writeNoteEverywhere } from '../mutations';
+import { NoteDocument } from '../reader/NoteDocument';
 import { NoteEditorScreen } from './NoteEditorScreen';
 import {
   NOTE_PAPER_COLUMN,
@@ -36,6 +38,17 @@ import {
  * v1 never handled: it rendered the form, let the reader type, and only failed
  * at the save. Here the ownership check runs before the editor exists and the
  * answer offers the thing they can actually do, which is read it.
+ *
+ * ── THE EDITOR OPENS ONLY ON THE SERVER'S LATEST COPY ──────────────────────
+ * The note is kept on the device (`persist: 'gated'`) and the editor reads its
+ * subject once, at mount, so whatever the cache held at open became what the
+ * reader typed on, and the first save wrote that older copy over newer text
+ * saved elsewhere (Tester Claude, 19 October 2026, note 1968: line P saved on a
+ * computer, then lost to a phone that opened its cached copy). So the read is
+ * made again on every open, and the editor waits for it: until a copy fetched
+ * during THIS open arrives it shows the skeleton. If that fetch fails with a
+ * cached copy in hand, the copy is shown READ-ONLY with a line saying the
+ * latest could not be loaded, never as an editor.
  */
 export function EditNoteScreen({ slug }: { slug: string }) {
   const { signedIn, userId: viewerId, role } = useV2Session();
@@ -45,8 +58,12 @@ export function EditNoteScreen({ slug }: { slug: string }) {
   const note = useQuery({
     ...notesQueries.detail({ slug, viewerId }),
     enabled: mayWrite,
+    // Every open asks the server, whatever the cache holds (see the header).
+    refetchOnMount: 'always',
   });
-  const envelope = note.data;
+  // A copy fetched from the server during this open, and only that.
+  const fresh = note.isFetchedAfterMount && note.isSuccess;
+  const envelope = fresh ? note.data : undefined;
 
   // Seed the editor's canonical key from the fetch we already made. An effect
   // with a cache write and no state — the editor below reads its subject from
@@ -72,18 +89,26 @@ export function EditNoteScreen({ slug }: { slug: string }) {
     );
   }
 
-  if (note.isPending) {
-    return (
-      <div className={NOTE_PAPER_COLUMN}>
-        <NoteEditorSkeleton />
-      </div>
-    );
-  }
-
   if (note.isError) {
     const { status } = extractApiError(note.error);
     // 403/404 are settled ANSWERS about this note, not failures of ours.
     const settled = status === 403 || status === 404;
+    // The latest could not be loaded, but this device has a copy: show it to
+    // read, never to edit (see the header).
+    if (!settled && note.data) {
+      return (
+        <div className={NOTE_PAPER_COLUMN}>
+          <p role="status" className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+            Can&apos;t load the latest copy. This is the copy saved on this device, to
+            read only.
+            <Button type="button" size="sm" variant="outline" onClick={() => void note.refetch()}>
+              Try again
+            </Button>
+          </p>
+          <NoteDocument note={note.data.data} editHref={null} />
+        </div>
+      );
+    }
     return (
       <div className={NOTE_PAPER_COLUMN}>
         {settled ? (
@@ -95,7 +120,16 @@ export function EditNoteScreen({ slug }: { slug: string }) {
     );
   }
 
-  const record = note.data.data;
+  // Still waiting for this open's copy: a cached one is never edited.
+  if (!envelope) {
+    return (
+      <div className={NOTE_PAPER_COLUMN}>
+        <NoteEditorSkeleton />
+      </div>
+    );
+  }
+
+  const record = envelope.data;
 
   if (viewerId === null || record.user.id !== viewerId) {
     return (
