@@ -75,6 +75,7 @@ import {
   SubfolderGapNote,
 } from './states';
 import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
+import { TabTitle } from '@/v2/shell/TabTitle';
 
 /**
  * FolderScreen — `/folders/[uuid]`: one folder, and everything in it.
@@ -548,6 +549,7 @@ function FolderBody({ uuid }: { uuid: string }) {
 
   return (
     <div className={LIST_COLUMN}>
+      <TabTitle name={headerRow?.name} />
       <div
         className={
           arrival === 'peeked'

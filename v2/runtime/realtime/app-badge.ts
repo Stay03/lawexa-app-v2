@@ -48,6 +48,10 @@ function desiredTitle(): string {
 }
 
 function syncTitle(): void {
+  // No <title> yet (a streamed page between its loading state and its
+  // metadata): setting document.title now would make an unowned <title> that
+  // nothing ever removes, and later it would be the tab's title in every gap.
+  if (!document.querySelector('title')) return;
   const next = desiredTitle();
   if (document.title !== next) document.title = next;
 }

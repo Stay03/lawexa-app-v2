@@ -32,6 +32,7 @@ import { SPACE_PAGE_COLUMN } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import { useCachedSpaceIdentity } from './cached-identity';
+import { TabTitle } from '@/v2/shell/TabTitle';
 import {
   SpaceAccessDeniedState,
   SpaceErrorState,
@@ -323,6 +324,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
 
   return (
     <div className={SPACE_PAGE_COLUMN}>
+      <TabTitle name={space.name} />
       <SpacePlaceHeader
         space={space}
         membership={scope.membership}

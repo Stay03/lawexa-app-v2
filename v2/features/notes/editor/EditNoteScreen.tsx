@@ -8,6 +8,8 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { notesQueries } from '../queries';
 import { writeNoteEverywhere } from '../mutations';
 import { NoteEditorScreen } from './NoteEditorScreen';
+import { noteDisplayTitle } from '../note-text';
+import { TabTitle } from '@/v2/shell/TabTitle';
 import {
   NOTE_PAPER_COLUMN,
   NoteEditorErrorState,
@@ -108,5 +110,10 @@ export function EditNoteScreen({ slug }: { slug: string }) {
   // Keyed by id so the editor is one instance for one note. A later refetch of
   // the same note re-renders this component but must never rebuild the editor
   // under the reader — `NoteEditorScreen` reads `initialRecord` at mount only.
-  return <NoteEditorScreen key={record.id} initialRecord={record} />;
+  return (
+    <>
+      <TabTitle name={`Edit ${noteDisplayTitle(record.title)}`} />
+      <NoteEditorScreen key={record.id} initialRecord={record} />
+    </>
+  );
 }

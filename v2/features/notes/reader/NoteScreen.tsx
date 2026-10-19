@@ -10,7 +10,9 @@ import {
   setScreenContext,
   type ScreenBack,
 } from '@/v2/shell/screen-context';
+import { TabTitle } from '@/v2/shell/TabTitle';
 import { notesQueries } from '../queries';
+import { noteDisplayTitle } from '../note-text';
 import { useNotePeek } from '../note-peek';
 import { NoteDocument } from './NoteDocument';
 import { NoteFallback } from './NoteFallback';
@@ -27,7 +29,8 @@ import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 /**
  * NoteScreen — the `/notes/[slug]` client root.
  *
- * The server shell above it owns the page title; everything a reader sees is
+ * The server shell above it owns the page title until the note arrives; then
+ * the tab carries the note's own name (`TabTitle`). Everything a reader sees is
  * here, on a client query that carries their session — which is what makes the
  * bookmark star, the draft mark and the Edit affordance correct per viewer. A
  * note read is per-reader by nature (a draft is visible to exactly one
@@ -164,6 +167,7 @@ export function NoteScreen({ slug }: { slug: string }) {
       >
         <NoteDocument note={note} editHref={editHref} />
       </div>
+      <TabTitle name={noteDisplayTitle(note.title)} />
     </div>
   );
 }
