@@ -58,3 +58,8 @@ test('one button on all three pages, sending through v1’s feedback call', () =
   assert.match(button, /if \(!text\) \{\s*setProblem\('Tick an issue or tell us in your own words\.'\);/);
   assert.match(button, /const \{ signedIn \} = useV2Session\(\);\s*if \(!signedIn\) return null;/);
 });
+
+test('a send that never reached the server says so, and keeps the report', () => {
+  const button = read('v2', 'features', 'feedback', 'FeedbackButton.tsx');
+  assert.match(button, /isAxiosError\(error\) && !error\.response\s*\? "Couldn't reach Lawexa, so nothing was sent\. Your report is still here: try again\."\s*: getErrorMessage\(error\)/);
+});

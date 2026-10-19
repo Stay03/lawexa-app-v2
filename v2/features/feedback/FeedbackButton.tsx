@@ -4,6 +4,7 @@ import { useId, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { ImagePlus, Loader2, MessageSquarePlus, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { isAxiosError } from 'axios';
 
 import { cn } from '@/lib/utils';
 import { feedbackApi } from '@/lib/api/feedback';
@@ -186,7 +187,14 @@ function FeedbackForm({
         toast.success('Feedback sent', { description: 'Thank you for helping us improve Lawexa.' });
         onSent();
       },
-      onError: (error) => setProblem(getErrorMessage(error)),
+      // No answer at all (offline, a dropped connection) is not the server's
+      // word, so it is said plainly; a refusal keeps the server's own words.
+      onError: (error) =>
+        setProblem(
+          isAxiosError(error) && !error.response
+            ? "Couldn't reach Lawexa, so nothing was sent. Your report is still here: try again."
+            : getErrorMessage(error),
+        ),
     });
   };
 
