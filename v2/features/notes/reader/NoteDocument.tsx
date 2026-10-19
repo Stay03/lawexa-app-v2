@@ -148,6 +148,7 @@ export function NoteDocument({
           bookmarksCount={note.bookmarks_count}
           canExport={body.length > 0}
           editHref={editHref}
+          canAddToFolder={copy === null}
         />
       </header>
 

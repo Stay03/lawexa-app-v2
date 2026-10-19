@@ -52,6 +52,12 @@ test('the reader and the editor follow the copy rules', () => {
   const doc = read('reader', 'NoteDocument.tsx');
   assert.match(doc, /const copy = noteCopyLine\(note\);/);
   assert.match(doc, /Copied from your note\{' '\}/);
+  // No "Add to folder" on a copy: the server files it only in its own Space's folders.
+  assert.match(doc, /canAddToFolder=\{copy === null\}/);
+  assert.match(
+    read('reader', 'NoteActions.tsx'),
+    /\{canAddToFolder \? <AddToFolderButton target=\{\{ type: 'note', contentId: noteId \}\} \/> : null\}/,
+  );
   const edit = read('editor', 'EditNoteScreen.tsx');
   assert.match(edit, /if \(!mayEditNote\(record, viewerId\)\) \{/);
   const editor = read('editor', 'NoteEditorScreen.tsx');

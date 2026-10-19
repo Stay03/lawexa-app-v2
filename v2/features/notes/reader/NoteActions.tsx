@@ -45,6 +45,7 @@ export function NoteActions({
   bookmarksCount,
   canExport,
   editHref,
+  canAddToFolder,
 }: {
   noteId: number;
   slug: string;
@@ -57,6 +58,10 @@ export function NoteActions({
   canExport: boolean;
   /** `/notes/{slug}/edit` for the author, `null` for everyone else. */
   editHref: string | null;
+  /** Off for a Space's copy: the server files a copy only in its own Space's
+   *  folders (422 "A note from another Space cannot be added here."), so the
+   *  picker would offer folders that refuse it. */
+  canAddToFolder: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -66,7 +71,7 @@ export function NoteActions({
         count={bookmarksCount}
         variant="full"
       />
-      <AddToFolderButton target={{ type: 'note', contentId: noteId }} />
+      {canAddToFolder ? <AddToFolderButton target={{ type: 'note', contentId: noteId }} /> : null}
       <ShareButton path={`/notes/${slug}`} title={title} label="Share this note" />
       {canExport ? <ExportDocxButton slug={slug} /> : null}
       {editHref ? (
