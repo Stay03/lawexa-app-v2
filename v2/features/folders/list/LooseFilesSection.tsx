@@ -35,6 +35,7 @@ export function LooseFilesSection({
   now,
   enabled,
   held,
+  selection,
 }: {
   viewerId: number | null;
   /** The browser's frozen clock, for "added N ago". */
@@ -44,6 +45,8 @@ export function LooseFilesSection({
   /** The folders are still loading: the files load too, but wait to show, so
    *  the page never draws a second skeleton under the first. */
   held: boolean;
+  /** Bulk select (the Folders page's `useFoldersBulk`): the rows tick instead of opening. */
+  selection?: { isSelected: (id: number) => boolean; onToggle: (id: number) => void };
 }) {
   const query = useInfiniteQuery({ ...foldersQueries.looseFiles({ viewerId }), enabled });
 
@@ -113,6 +116,8 @@ export function LooseFilesSection({
                     now={now}
                     onMove={openMove}
                     onDelete={openDelete}
+                    selected={selection?.isSelected(row.id)}
+                    onToggleSelect={selection?.onToggle}
                   />
                 ))}
               </ul>

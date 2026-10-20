@@ -6,6 +6,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { Boxes, FolderOutput, Pencil, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -47,6 +48,7 @@ import { canAddContent } from '@/v2/features/spaces/model';
 import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { FolderRow } from '../list/FolderRow';
+import { useFolderItemsBulk } from './folder-items-bulk';
 import { SpaceFolderLine } from '../space-mark';
 import { FoldersSignedOutState } from '../list/states';
 import { FolderBreadcrumb } from './FolderBreadcrumb';
@@ -374,6 +376,14 @@ function FolderBody({ uuid }: { uuid: string }) {
     name: headerRow?.name ?? '',
     space: folder?.space ?? null,
   });
+  // Bulk select (Arthur, 20 October 2026): the folder's items, for those who
+  // may take them out (`canManageItems`).
+  const bulk = useFolderItemsBulk({ folderUuid: uuid, items: itemRows });
+  const { toggle: toggleSelected, isSelected, selecting } = bulk;
+  const toggleItem = useCallback(
+    (row: FolderItemRowModel) => toggleSelected(`${row.type}:${row.contentId}`),
+    [toggleSelected],
+  );
   const actions = useMemo<readonly ScreenAction[]>(() => {
     if (!folder || !headerRow) return NO_SCREEN_ACTIONS;
     const target: DeletableFolder = {
@@ -555,6 +565,14 @@ function FolderBody({ uuid }: { uuid: string }) {
             {row.name}
           </h1>
           {/* Only those who may add (items 8 and 9). */}
+          {canManageItems && itemRows.length > 0 && !selecting
+            ? bulk.startButton(
+                cn(
+                  'v2-interactive inline-flex min-h-9 shrink-0 items-center rounded-full border border-border px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+                  FOCUS_RING,
+                ),
+              )
+            : null}
           {addChoices ? <FolderAddMenu choices={addChoices} /> : null}
         </header>
 
@@ -577,6 +595,10 @@ function FolderBody({ uuid }: { uuid: string }) {
           </div>
         ) : null}
         {addChoices ? upload.input : null}
+        {/* Room under the last row for the bar while it is up. */}
+        {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
+        {bulk.bar}
+        {bulk.dialogs}
 
         {/* The ONE live region for this surface — polite, text-only, and
             derived purely from render values, so it can never announce
@@ -646,6 +668,8 @@ function FolderBody({ uuid }: { uuid: string }) {
                     canRemove={canManageItems}
                     index={(showSubfolders ? childRows.length : 0) + index}
                     now={now}
+                    selected={selecting ? isSelected(`${item.type}:${item.contentId}`) : undefined}
+                    onToggleSelect={selecting ? toggleItem : undefined}
                   />
                 ))}
               </ul>

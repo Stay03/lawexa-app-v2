@@ -395,7 +395,8 @@ test('the move dialog lists the spaces the viewer can add to and explains refusa
   assert.match(dialog, /setError\(moveRefusal\(item\.type, apiError\.status, apiError\.message\)\);/);
   // Back out is offered only for an item that names its space (techlead
   // decision 3, 12 October 2026; was: unless known to be the owner's alone).
-  assert.match(dialog, /const inSpace = offersRemoveFromSpace\(item\);/);
+  // (Bulk select's pick mode always offers it: some of the ticked items may sit in one.)
+  assert.match(dialog, /const inSpace = pick \? true : offersRemoveFromSpace\(item\);/);
   assert.match(dialog, /\{inSpace \? \(/);
   assert.match(dialog, /disabled=\{isCurrent \|\| move\.isPending\}/);
 });

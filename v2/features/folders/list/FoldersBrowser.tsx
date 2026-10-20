@@ -27,6 +27,7 @@ import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { FileListHead } from '../file-list/FileListRow';
 import { FolderRow } from './FolderRow';
 import { LooseFilesSection, useLooseFileUpload } from './LooseFilesSection';
+import { fileKey, folderKey, useFoldersBulk } from './folders-bulk';
 import {
   FoldersEmptyState,
   FoldersErrorState,
@@ -160,6 +161,22 @@ export function FoldersBrowser() {
     return { rows: mapped, spaceOf: spaces };
   }, [pages, hidden]);
 
+  // Bulk select (Arthur, 20 October 2026): the folders above and the files in
+  // no folder below, ticked together. The files' ids come from the same query
+  // the section reads (one cache entry, no second request).
+  const looseQuery = useInfiniteQuery({ ...foldersQueries.looseFiles({ viewerId }), enabled: signedIn && !activeSearch });
+  const folderUuids = useMemo(() => rows.map((row) => row.uuid), [rows]);
+  const loosePages = looseQuery.data?.pages;
+  const fileIds = useMemo(() => (loosePages ?? []).flatMap((page) => page.data.map((file) => file.id)), [loosePages]);
+  const bulk = useFoldersBulk({ folderUuids, fileIds });
+  const { toggle: toggleSelected, isSelected, selecting } = bulk;
+  const toggleFolder = useCallback((uuid: string) => toggleSelected(folderKey(uuid)), [toggleSelected]);
+  const toggleFile = useCallback((id: number) => toggleSelected(fileKey(id)), [toggleSelected]);
+  const looseSelection = useMemo(
+    () => (selecting ? { isSelected: (id: number) => isSelected(fileKey(id)), onToggle: toggleFile } : undefined),
+    [selecting, isSelected, toggleFile],
+  );
+
   const scrollRootRef = useShellScrollRoot();
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
     hasNextPage: query.hasNextPage && !query.isPlaceholderData,
@@ -231,6 +248,14 @@ export function FoldersBrowser() {
 
   const actions = (
     <div className="flex shrink-0 items-center gap-2">
+      {selecting
+        ? null
+        : bulk.startButton(
+            cn(
+              'v2-interactive inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+              FOCUS_RING,
+            ),
+          )}
       <button
         type="button"
         onClick={upload.pick}
@@ -330,6 +355,8 @@ export function FoldersBrowser() {
                 onRename={openRename}
                 onMove={openMove}
                 markSpace
+                selected={selecting ? isSelected(folderKey(row.uuid)) : undefined}
+                onToggleSelect={selecting ? toggleFolder : undefined}
               />
             ))}
           </ul>
@@ -348,7 +375,12 @@ export function FoldersBrowser() {
         now={now}
         enabled={!activeSearch}
         held={showSkeleton}
+        selection={looseSelection}
       />
+      {/* Room under the last row for the bar while it is up. */}
+      {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
+      {bulk.bar}
+      {bulk.dialogs}
 
       {/* Mounted only while open, so each dialog initialises from the folder it
           is actually naming (see `FolderNameDialog`). */}

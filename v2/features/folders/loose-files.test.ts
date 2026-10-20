@@ -79,7 +79,7 @@ test('every write that files, unfiles or deletes a file re-asks the loose list',
 
 test('the files continue the folder list, open on tap, and offer Move to folder and Delete', () => {
   const browser = read('list', 'FoldersBrowser.tsx');
-  assert.match(browser, /<LooseFilesSection\s+viewerId=\{viewerId\}\s+now=\{now\}\s+enabled=\{!activeSearch\}\s+held=\{showSkeleton\}\s+\/>/);
+  assert.match(browser, /<LooseFilesSection\s+viewerId=\{viewerId\}\s+now=\{now\}\s+enabled=\{!activeSearch\}\s+held=\{showSkeleton\}\s+selection=\{looseSelection\}\s+\/>/);
   // The upload pill sits before "New folder" in the same row.
   // "Upload a file" is one flex item, so the pill's gap never splits it.
   assert.match(browser, /onClick=\{upload\.pick\}[\s\S]*?<span>\s*Upload<span className="sr-only sm:not-sr-only"> a file<\/span>\s*<\/span>[\s\S]*?New folder/);

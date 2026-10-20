@@ -90,10 +90,18 @@ export function MoveToSpaceDialog({
   item,
   open,
   onOpenChange,
+  pick,
 }: {
   item: SpaceItemTarget;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Bulk select: the dialog moves nothing itself and hands the choice back (a
+   * Space, or `null` for "out of its Space"); the screen sends one bulk request
+   * for every ticked item. `count` words the dialog for them, and "Take out of
+   * the space" is offered because some of them may sit in one.
+   */
+  pick?: { count: number; onPick: (to: Space | null) => void };
 }) {
   const session = useV2Session();
   const move = useMoveToSpace();
@@ -121,10 +129,15 @@ export function MoveToSpaceDialog({
   );
 
   const noun = SPACE_ITEM_NOUN[item.type];
-  const currentUuid = item.space?.uuid ?? null;
-  const inSpace = offersRemoveFromSpace(item);
+  const currentUuid = pick ? null : (item.space?.uuid ?? null);
+  const inSpace = pick ? true : offersRemoveFromSpace(item);
 
   const send = (to: Space | null) => {
+    if (pick) {
+      onOpenChange(false);
+      pick.onPick(to);
+      return;
+    }
     setError(null);
     setPickedUuid(to?.uuid ?? null);
     move.mutate(
@@ -152,7 +165,9 @@ export function MoveToSpaceDialog({
         <DialogHeader>
           <DialogTitle>Move to a space</DialogTitle>
           <DialogDescription>
-            {`Everyone in the space you pick can open “${item.name}”. It stays yours.`}
+            {pick
+              ? `Everyone in the space you pick can open the ${pick.count} selected. They stay yours.`
+              : `Everyone in the space you pick can open “${item.name}”. It stays yours.`}
           </DialogDescription>
         </DialogHeader>
 

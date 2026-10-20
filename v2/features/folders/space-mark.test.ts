@@ -43,7 +43,7 @@ test('the Folders page marks Space folders, with the tooltip and the screen-read
   assert.match(row, /const space = markSpace \? row\.spaceName : null;/);
   assert.match(row, /iconMark=\{space \? <SpaceFolderMark spaceName=\{space\} ground="row" tooltip \/> : undefined\}/);
   assert.match(row, /srNote=\{space \? spaceFolderNote\(space\) : undefined\}/);
-  assert.match(read('list', 'FoldersBrowser.tsx'), /onMove=\{openMove\}\s*markSpace\s*\/>/);
+  assert.match(read('list', 'FoldersBrowser.tsx'), /onMove=\{openMove\}\s*markSpace\s/);
   // The folder's own page lists its subfolders without the mark: they are all the Space's.
   assert.doesNotMatch(read('detail', 'FolderScreen.tsx'), /markSpace/);
 

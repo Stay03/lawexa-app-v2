@@ -33,6 +33,8 @@ export const LooseFileRow = memo(function LooseFileRow({
   now,
   onMove,
   onDelete,
+  selected,
+  onToggleSelect,
 }: {
   row: LooseFileRowModel;
   /** Staggers the entrance for the first screenful only. */
@@ -41,6 +43,9 @@ export const LooseFileRow = memo(function LooseFileRow({
   now: number;
   onMove: (row: LooseFileRowModel) => void;
   onDelete: (row: LooseFileRowModel) => void;
+  /** Bulk select: the row ticks instead of opening. `onToggleSelect` must be stable. */
+  selected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) {
   return (
     <FileEntryRow
@@ -50,6 +55,7 @@ export const LooseFileRow = memo(function LooseFileRow({
       named={row.hasTitle}
       date={formatEntryDate(row.createdAt, now)}
       index={index}
+      select={onToggleSelect ? { checked: selected === true, onToggle: () => onToggleSelect(row.id) } : undefined}
       menu={
         <DropdownMenu>
           <DropdownMenuTrigger

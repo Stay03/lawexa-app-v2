@@ -41,7 +41,7 @@ test('a row is one line: the glyph, the name, the computer date column and the "
   const row = read('file-list', 'FileListRow.tsx');
   assert.match(row, /'v2-interactive flex h-13 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left sm:h-10'/);
   // One hover tint for the whole row, with the "⋯" inside it (first pictures, 20 October 2026).
-  assert.match(row, /<div className="group flex min-w-0 items-center gap-1 rounded-lg transition-colors hover:bg-secondary\/50">/);
+  assert.match(row, /'group flex min-w-0 items-center gap-1 rounded-lg transition-colors hover:bg-secondary\/50',/);
   assert.match(row, /'hidden text-xs text-muted-foreground tabular-nums sm:block'/);
   // The "⋯" shows on hover where the pointer can hover, and always on touch.
   assert.match(row, /\[@media\(hover:hover\)\]:opacity-0 \[@media\(hover:hover\)\]:group-hover:opacity-100/);

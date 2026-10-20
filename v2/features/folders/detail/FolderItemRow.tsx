@@ -40,6 +40,8 @@ export const FolderItemRow = memo(function FolderItemRow({
   canRemove,
   index,
   now,
+  selected,
+  onToggleSelect,
 }: {
   row: FolderItemRowModel;
   /** The folder this row is filed in — what the removal addresses. */
@@ -51,9 +53,13 @@ export const FolderItemRow = memo(function FolderItemRow({
   index: number;
   /** Frozen clock for the date column, so no `Date.now()` runs in render. */
   now: number;
+  /** Bulk select: the row ticks instead of opening. `onToggleSelect` must be stable. */
+  selected?: boolean;
+  onToggleSelect?: (row: FolderItemRowModel) => void;
 }) {
   const date = formatEntryDate(row.addedAt, now);
   const menu = canRemove ? <ItemMenu row={row} folderUuid={folderUuid} /> : undefined;
+  const select = onToggleSelect ? { checked: selected === true, onToggle: () => onToggleSelect(row) } : undefined;
 
   if (row.type === 'file') {
     return (
@@ -65,6 +71,7 @@ export const FolderItemRow = memo(function FolderItemRow({
         date={date}
         index={index}
         menu={menu}
+        select={select}
       />
     );
   }
@@ -78,6 +85,7 @@ export const FolderItemRow = memo(function FolderItemRow({
       date={date}
       index={index}
       menu={menu}
+      select={select}
       renderOpen={(className, content) =>
         href ? (
           <Link href={href} className={className}>

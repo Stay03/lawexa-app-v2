@@ -29,6 +29,7 @@ export function FileEntryRow({
   date,
   index,
   menu,
+  select,
 }: {
   fileId: number;
   /** `fileKind`'s word ("PDF", "Word"), which picks the glyph's colour. */
@@ -38,6 +39,8 @@ export function FileEntryRow({
   date: string;
   index: number;
   menu?: ReactNode;
+  /** Bulk select (`FileListRow`). */
+  select?: { checked: boolean; onToggle: () => void };
 }) {
   const { open, opening, failed, gone } = useShowFileInNewTab();
   return (
@@ -48,6 +51,7 @@ export function FileEntryRow({
       date={date}
       index={index}
       menu={menu}
+      select={select}
       renderOpen={(className, content) => (
         <button
           type="button"

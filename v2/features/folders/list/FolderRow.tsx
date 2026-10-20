@@ -41,6 +41,8 @@ export const FolderRow = memo(function FolderRow({
   onMove,
   onRemoveFromSpace,
   markSpace = false,
+  selected,
+  onToggleSelect,
 }: {
   row: FolderRowModel;
   /** Mark a folder that sits in a Space (the personal Folders page). */
@@ -57,6 +59,9 @@ export const FolderRow = memo(function FolderRow({
   onMove?: (row: FolderRowModel) => void;
   /** Opens the Remove from Space confirm. Stable, like `onRename`. */
   onRemoveFromSpace?: (row: FolderRowModel) => void;
+  /** Bulk select: the row ticks instead of opening. `onToggleSelect` must be stable. */
+  selected?: boolean;
+  onToggleSelect?: (uuid: string) => void;
 }) {
   const hasMenu =
     onRename !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
@@ -71,6 +76,7 @@ export const FolderRow = memo(function FolderRow({
       index={index}
       iconMark={space ? <SpaceFolderMark spaceName={space} ground="row" tooltip /> : undefined}
       srNote={space ? spaceFolderNote(space) : undefined}
+      select={onToggleSelect ? { checked: selected === true, onToggle: () => onToggleSelect(row.uuid) } : undefined}
       // The folder page draws this row's name at once, before any request
       // answers (`folder-peek.ts`, speed step 5).
       renderOpen={(className, content) => (

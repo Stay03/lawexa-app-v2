@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 
+import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -48,6 +49,7 @@ export function FileListRow({
   below,
   iconMark,
   srNote,
+  select,
 }: {
   look: EntryLook;
   name: string;
@@ -66,6 +68,12 @@ export function FileListRow({
   iconMark?: ReactNode;
   /** Words a screen reader hears after the name, never shown (", in <Space>"). */
   srNote?: string;
+  /**
+   * The list is being ticked (bulk select): the row is its tick box, a tap
+   * ticks it instead of opening it, and the "⋯" steps aside for the bar's
+   * actions.
+   */
+  select?: { checked: boolean; onToggle: () => void };
 }) {
   const Icon = look.icon;
   const content = (
@@ -101,9 +109,28 @@ export function FileListRow({
       // Capped at 14 so a deep page never staggers into a visible delay.
       style={{ animationDelay: `${Math.min(index, 14) * 20}ms` }}
     >
-      <div className="group flex min-w-0 items-center gap-1 rounded-lg transition-colors hover:bg-secondary/50">
-        {renderOpen(FILE_LIST_OPEN_CLASS, content)}
-        {menu ? (
+      <div
+        className={cn(
+          'group flex min-w-0 items-center gap-1 rounded-lg transition-colors hover:bg-secondary/50',
+          select?.checked && 'bg-secondary/60',
+        )}
+      >
+        {select ? (
+          <label className={cn(FILE_LIST_OPEN_CLASS, 'cursor-pointer')}>
+            <Checkbox
+              checked={select.checked}
+              onCheckedChange={select.onToggle}
+              aria-label={`Select ${name}`}
+              className="shrink-0"
+            />
+            {content}
+          </label>
+        ) : (
+          renderOpen(FILE_LIST_OPEN_CLASS, content)
+        )}
+        {select ? (
+          <span aria-hidden className="size-9 shrink-0" />
+        ) : menu ? (
           <span className="flex size-9 shrink-0 items-center justify-center transition-opacity duration-150 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:has-[[data-state=open]]:opacity-100">
             {menu}
           </span>
