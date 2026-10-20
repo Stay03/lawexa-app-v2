@@ -96,9 +96,13 @@ const THANKS_MS = 2200;
 /** The leave transition, matched to `duration-200` below. */
 const LEAVE_MS = 200;
 
-const CARD = 'rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg';
+/* Compact and quiet (Arthur, 20 October 2026, 21:17Z: "more compact ... reduce
+   its visual prominence, padding and overall height"): one row on a computer,
+   question and close over the three answers on a phone, a light border and a
+   small shadow, so the answer above stays the thing on screen. */
+const CARD = 'rounded-xl border border-border/70 bg-popover text-popover-foreground shadow-sm';
 const PILL = cn(
-  'v2-interactive inline-flex min-h-10 flex-1 items-center justify-center rounded-full border border-border px-3 text-sm font-medium transition-colors hover:bg-secondary disabled:opacity-50',
+  'v2-interactive inline-flex min-h-8 flex-1 items-center justify-center rounded-full border border-border px-3 text-xs font-medium transition-colors hover:bg-secondary disabled:opacity-50 sm:flex-none sm:px-3.5',
   FOCUS_RING,
 );
 
@@ -150,63 +154,66 @@ export function ChatRatingBanner({ offer }: { offer: ActiveOffer }) {
       aria-label={CHAT_RATING_QUESTION}
       className={cn(
         CARD,
-        'mb-2 px-3.5 py-3 transition-[opacity,transform] duration-200 motion-reduce:transition-none',
+        'mb-2 px-3 py-2 transition-[opacity,transform] duration-200 motion-reduce:transition-none',
         'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2',
         leaving && 'translate-y-1 opacity-0',
       )}
     >
       {phase.kind === 'thanks' ? (
-        <p role="status" className="py-1 text-center text-sm font-medium">
+        <p role="status" className="py-0.5 text-center text-xs font-medium">
           Thanks for telling us.
         </p>
       ) : (
         <>
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <p className="min-w-0 flex-1 text-[0.8125rem] font-medium text-popover-foreground/90">
               {phase.kind === 'ask' ? CHAT_RATING_QUESTION : 'What went wrong?'}
             </p>
+            {/* The three answers sit beside the question on a computer, and on
+                their own line under it on a phone (order-last, full width). */}
+            {phase.kind === 'ask' ? (
+              <div className="order-last flex w-full gap-1.5 sm:order-none sm:w-auto">
+                <button
+                  type="button"
+                  className={PILL}
+                  disabled={rate.isPending}
+                  onClick={() => setPhase({ kind: 'reasons', reason: null, text: '' })}
+                >
+                  Poor
+                </button>
+                {(['fine', 'great'] as const).map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    className={PILL}
+                    disabled={rate.isPending}
+                    onClick={() => rate.mutate({ rating })}
+                  >
+                    {rate.isPending && rate.variables?.rating === rating ? (
+                      <Loader2 aria-hidden className="size-3.5 animate-spin" />
+                    ) : rating === 'fine' ? (
+                      'Fine'
+                    ) : (
+                      'Great'
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             <button
               type="button"
               onClick={close}
               aria-label="Close"
               className={cn(
-                'v2-interactive -mr-1.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+                'v2-interactive -mr-1 inline-flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
                 FOCUS_RING,
               )}
             >
-              <X aria-hidden className="size-4" />
+              <X aria-hidden className="size-3.5" />
             </button>
           </div>
 
-          {phase.kind === 'ask' ? (
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                className={PILL}
-                disabled={rate.isPending}
-                onClick={() => setPhase({ kind: 'reasons', reason: null, text: '' })}
-              >
-                Poor
-              </button>
-              {(['fine', 'great'] as const).map((rating) => (
-                <button
-                  key={rating}
-                  type="button"
-                  className={PILL}
-                  disabled={rate.isPending}
-                  onClick={() => rate.mutate({ rating })}
-                >
-                  {rate.isPending && rate.variables?.rating === rating ? (
-                    <Loader2 aria-hidden className="size-4 animate-spin" />
-                  ) : rating === 'fine' ? (
-                    'Fine'
-                  ) : (
-                    'Great'
-                  )}
-                </button>
-              ))}
-            </div>
-          ) : (
+          {phase.kind === 'reasons' ? (
             <PoorReasons
               phase={phase}
               sending={rate.isPending}
@@ -217,7 +224,7 @@ export function ChatRatingBanner({ offer }: { offer: ActiveOffer }) {
               onText={(text) => setPhase({ ...phase, text })}
               onSend={() => rate.mutate({ rating: 'poor', reason: 'something_else', text: phase.text.trim() })}
             />
-          )}
+          ) : null}
 
           {failed ? (
             <p role="alert" className="mt-2 text-xs text-destructive">
@@ -256,7 +263,7 @@ function PoorReasons({
             aria-pressed={phase.reason === key}
             onClick={() => onPick(key)}
             className={cn(
-              'v2-interactive inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium transition-colors disabled:opacity-50',
+              'v2-interactive inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-medium transition-colors disabled:opacity-50',
               phase.reason === key
                 ? 'border-foreground bg-foreground text-background'
                 : 'border-border hover:bg-secondary',
