@@ -136,10 +136,10 @@ function SidebarProvider({
             ...style,
           } as React.CSSProperties
         }
-        className={cn(
-          "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
-          className
-        )}
+        // No `has-data-[variant=inset]:bg-sidebar`: no sidebar here is the inset
+        // variant, and that :has() made Chrome recheck the whole page under this
+        // wrapper on every DOM change (the Android statute chat's Close, 20 Oct 2026).
+        className={cn("group/sidebar-wrapper flex min-h-svh w-full", className)}
         {...props}
       >
         {children}
