@@ -25,13 +25,13 @@ test('the shell has a case frame, and it is the case page\'s own loading shape',
 
 test('the loading shape ends in the ask box, in the page\'s own column, so nothing moves at the hand-off', () => {
   const fallback = read('v2', 'features', 'cases', 'detail', 'CaseFallback.tsx');
-  assert.match(fallback, /<CaseDocumentSkeleton masthead=\{peek \? <PeekMasthead peek=\{peek\} \/> : undefined\} \/>\s*<CaseAskShell \/>/);
-  // CaseScreen's column: a full-height flex column, the box pinned at its bottom.
-  assert.match(fallback, /className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8"/);
-  assert.match(
-    read('v2', 'features', 'cases', 'detail', 'CaseScreen.tsx'),
-    /className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8"/,
-  );
+  // A visitor without an account gets no box, on the page or in the frame (19 October 2026).
+  assert.match(fallback, /<CaseDocumentSkeleton masthead=\{peek \? <PeekMasthead peek=\{peek\} \/> : undefined\} \/>\s*\{signedIn \? <CaseAskShell \/> : null\}/);
+  // CaseScreen's column: a full-height flex column, the box pinned at its
+  // bottom, and the visitor's bottom room in place of the box.
+  const column = /'v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8',\s*!signedIn && 'pb-24',/;
+  assert.match(fallback, column);
+  assert.match(read('v2', 'features', 'cases', 'detail', 'CaseScreen.tsx'), column);
   // CaseAskDock's resting wrapper and the composer's box, inert.
   assert.match(fallback, /<div className="sticky bottom-0 z-10 -mx-4 mt-auto px-4 pb-3 pt-10">/);
   assert.match(read('v2', 'features', 'cases', 'detail', 'CaseAsk.tsx'), /'sticky bottom-0 -mx-4 mt-auto px-4 pb-3 pt-10'/);

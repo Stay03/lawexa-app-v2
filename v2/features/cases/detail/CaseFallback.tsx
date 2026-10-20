@@ -2,6 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import { ArrowUp, Plus } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { useCasePeek, type CasePeek } from '../case-peek';
 import { formatCaseDate } from '../case-row-model';
@@ -41,19 +43,27 @@ export function CaseFallback() {
  * case" box; drawing it here too means the frame, this boundary and the page
  * all show it in the same place, so it never appears late or blinks between
  * them. The column is the page's own (`CaseScreen`): a full-height flex
- * column with the box pinned to its bottom.
+ * column with the box pinned to its bottom. A visitor without an account has
+ * no box on the page (Stay, 19 October 2026), so the frame draws none for them
+ * either and keeps the page's bottom room instead.
  */
 export function CaseFallbackFor({ slug }: { slug: string | undefined }) {
   const peek = useCasePeek(slug);
+  const { signedIn } = useV2Session();
   return (
     <>
       <span role="status" className="sr-only">
         Loading case
       </span>
       <div aria-hidden inert className="flex min-h-full w-full">
-        <div className="v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+        <div
+          className={cn(
+            'v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8',
+            !signedIn && 'pb-24',
+          )}
+        >
           <CaseDocumentSkeleton masthead={peek ? <PeekMasthead peek={peek} /> : undefined} />
-          <CaseAskShell />
+          {signedIn ? <CaseAskShell /> : null}
         </div>
       </div>
     </>
