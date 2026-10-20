@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
+import { scrollOnPathChange } from './push-scroll';
 
 /**
  * ScrollMemory — back/forward + reload scroll restoration for the shell's ONE
@@ -19,9 +20,12 @@ import { V2_SHELL_CONTENT_ID } from './shell-content';
  * module is that owner.
  *
  * ── THE OWNERSHIP CONTRACT (one owner per motion — keep it this way) ───────
- *   - PUSH navigations: Next's layout router already scrolls the new segment
- *     into view (measured: every push lands the div at top). This module
- *     NEVER touches a push.
+ *   - PUSH navigations to a new path: this module sets the shell scroller to
+ *     its top as the page commits. Next's own scroll cannot see a nested
+ *     scroller: it measures against the window, and it skipped every v2
+ *     loading screen (20 October 2026; the "measured: every push lands the div
+ *     at top" this line used to say was the loading screen's clamp, not Next).
+ *     A push that changes only the query keeps its place.
  *   - BACK/FORWARD (popstate) and RELOAD: this module restores the entry's
  *     saved offset. Nothing else in v2 may write scrollTop across a
  *     navigation boundary.
@@ -195,9 +199,43 @@ let activeKey: string | null = null;
  */
 let stampingSuspended = false;
 
+/**
+ * Raised when Back, Forward or a reload is under way, so the path change it
+ * brings keeps the place this module restores; lowered by any click, which
+ * comes before every push. No timeout: a slow traversal must still keep its
+ * place. One known gap, named so it is not mistaken for a bug: a push made by
+ * code with no click right after a Back (a notification tap's listener) keeps
+ * the offset once, as every push did before.
+ */
+let traversing = false;
+
 export function ScrollMemory() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const renderedPath = useRef<string | null>(null);
+
+  /* ── A PUSH STARTS AT THE TOP ─────────────────────────────────────────────
+     Next scrolls a pushed page into view only when the page's first element
+     is off screen, measured against the WINDOW. The shell scroller is not the
+     window, and every v2 loading screen starts with a screen-reader label
+     (`sr-only`, position: absolute) that does not move when the scroller
+     does. So Next read the label as on screen and skipped, and the new page
+     kept the list's offset, clamped to what its loading screen could hold.
+     The case frame (16702e1f) made that loading screen tall enough for most
+     of the offset to survive. Set here, in a layout effect on the PATH only:
+     before Next's own check runs (this sits before the page in the tree), and
+     never on a query-only change (`?chat=`, a search box, a tab), which keeps
+     its place as before. The shell's scroller only: a collab pane
+     (`data-v2-scroller`) belongs to its own feed. */
+  useLayoutEffect(() => {
+    const firstRender = renderedPath.current === null;
+    renderedPath.current = pathname;
+    const traversal = traversing;
+    traversing = false;
+    if (scrollOnPathChange({ firstRender, traversal }) === 'keep') return;
+    const shell = document.getElementById(V2_SHELL_CONTENT_ID);
+    if (shell && shell.scrollTop !== 0) shell.scrollTop = 0;
+  }, [pathname]);
 
   // The settle effect: after every committed navigation (and after loud
   // filter writes rebuild the entry's state), keep the entry stamped. A
@@ -286,6 +324,7 @@ export function ScrollMemory() {
       // unstamped, so its offset could never be named on return).
       if (event.navigationType === 'replace') return;
       stampingSuspended = true;
+      if (event.navigationType === 'traverse' || event.navigationType === 'reload') traversing = true;
       // A snapshot here is timing-safe ONLY for traverse/reload/cross-doc:
       // those fire before anything changes. An App Router 'push' reaches
       // `pushState` — and therefore this event — AFTER the new page has
@@ -347,6 +386,7 @@ export function ScrollMemory() {
     // reader's real position is valid at any moment, so over-recording on
     // non-navigating clicks costs one map write and can never corrupt.
     const onAnyClick = () => {
+      traversing = false;
       reassertStamp();
       if (restorePending) return;
       const el = activeScroller();
@@ -465,7 +505,10 @@ export function ScrollMemory() {
       frame = window.requestAnimationFrame(tick);
     };
 
-    const onPopState = () => restore(readKey(window.history.state as HistoryState));
+    const onPopState = () => {
+      traversing = true;
+      restore(readKey(window.history.state as HistoryState));
+    };
     const onPageHide = () => persistNow();
 
     /* ── Wiring ──────────────────────────────────────────────────────────── */
