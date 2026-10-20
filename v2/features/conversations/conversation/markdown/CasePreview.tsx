@@ -162,6 +162,9 @@ function PreviewBody({
             isVerified: detail.is_verified === true,
             isBookmarked: detail.is_bookmarked,
             bookmarksCount: detail.bookmarks_count,
+            hasFullReport: detail.has_full_report === true,
+            outcome: detail.outcome ?? null,
+            suitNo: detail.suit_no?.trim() || null,
           })
         }
         onMove={onOpen}

@@ -114,9 +114,10 @@ function CaseAskShell() {
 
 /**
  * The page's heading block, drawn from the tapped row's facts by the page's own
- * `CaseHeader` (Stay, 20 October 2026: "The loading is jumpy"). What the row
- * does not carry (the suit number, the outcome, whether there is a full
- * judgment) is left out, and only those can add height when the case arrives.
+ * `CaseHeader` (Stay, 20 October 2026: "The loading is jumpy"). Both lists
+ * carry every fact the header shows; one the list did not send is left out
+ * until the case arrives. "Full judgment" is drawn when the case has a report:
+ * the page leaves it off only past the view limit, which the row cannot know.
  */
 function PeekHeader({ peek }: { peek: CasePeek }) {
   return (
@@ -130,13 +131,13 @@ function PeekHeader({ peek }: { peek: CasePeek }) {
         name: peek.title,
         rawTitle: peek.rawTitle,
         citation: peek.fullCitation,
-        suitNo: null,
+        suitNo: peek.suitNo,
         topic: peek.topic,
-        outcome: null,
+        outcome: peek.outcome,
       }}
       actions={
         <CaseActionsShape
-          fullReport={false}
+          fullReport={peek.hasFullReport}
           isBookmarked={peek.isBookmarked}
           bookmarksCount={peek.bookmarksCount}
         />

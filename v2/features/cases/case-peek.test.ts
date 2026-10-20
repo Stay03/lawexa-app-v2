@@ -29,6 +29,9 @@ const ROW: CaseRowModel = {
   topic: 'Tenancy',
   isVerified: true,
   bookmarksCount: 3,
+  hasFullReport: true,
+  outcome: 'appeal_dismissed',
+  suitNo: 'CA/L/12/2019',
 };
 
 test('the tap keeps the row\'s own facts, for that case only', () => {
@@ -47,6 +50,9 @@ test('the tap keeps the row\'s own facts, for that case only', () => {
     isVerified: true,
     isBookmarked: false,
     bookmarksCount: 3,
+    hasFullReport: true,
+    outcome: 'appeal_dismissed',
+    suitNo: 'CA/L/12/2019',
   });
   // Another case, or no case, draws the plain skeleton.
   assert.equal(casePeekFor('other-case'), null);
@@ -71,7 +77,9 @@ test('the row leaves its facts on the tap, and both waits draw them', () => {
   assert.match(fallback, /citation: peek\.fullCitation,/);
   assert.match(fallback, /topic: peek\.topic,/);
   assert.match(fallback, /isVerified: peek\.isVerified,/);
-  assert.match(fallback, /<CaseActionsShape\s*fullReport=\{false\}\s*isBookmarked=\{peek\.isBookmarked\}\s*bookmarksCount=\{peek\.bookmarksCount\}/);
+  assert.match(fallback, /suitNo: peek\.suitNo,/);
+  assert.match(fallback, /outcome: peek\.outcome,/);
+  assert.match(fallback, /<CaseActionsShape\s*fullReport=\{peek\.hasFullReport\}\s*isBookmarked=\{peek\.isBookmarked\}\s*bookmarksCount=\{peek\.bookmarksCount\}/);
   assert.match(read('detail', 'CaseDocument.tsx'), /<CaseHeader\s*facts=\{\{/);
   assert.match(fallback, /import '\.\/case-masthead\.css';/);
   // The still actions row has the real one's pills and words, and none of its weight.

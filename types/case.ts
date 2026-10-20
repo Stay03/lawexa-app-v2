@@ -453,6 +453,12 @@ export interface Case {
    * than "not verified".
    */
   is_verified?: boolean;
+  /** The case page's header facts, on the library list too (backend, 20 October
+   *  2026), so the frame a tap paints draws the header the page will. Optional:
+   *  absent is "not known here", never "none". */
+  has_full_report?: boolean;
+  outcome?: CaseOutcome | null;
+  suit_no?: string | null;
 }
 
 // View limit error from 429 response

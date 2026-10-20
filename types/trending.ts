@@ -34,6 +34,14 @@ export interface TrendingCaseItem extends TrendingItemBase {
 // --- Trending case from /api/trending/cases (dedicated endpoint) ---
 export interface TrendingCaseDetailItem extends TrendingCaseItem {
   court: string | null;
+  /** The case page's header facts (API 8153a015, 20 October 2026). Optional:
+   *  the trending answer is cached for five minutes, so an older one lacks them. */
+  topic?: string | null;
+  is_verified?: boolean;
+  bookmarks_count?: number;
+  has_full_report?: boolean;
+  outcome?: string | null;
+  suit_no?: string | null;
   country: {
     name: string;
     code: string;

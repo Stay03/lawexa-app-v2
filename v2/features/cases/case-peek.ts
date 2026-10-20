@@ -31,6 +31,9 @@ export type CasePeek = Pick<
   | 'isVerified'
   | 'isBookmarked'
   | 'bookmarksCount'
+  | 'hasFullReport'
+  | 'outcome'
+  | 'suitNo'
 >;
 
 let last: CasePeek | null = null;
@@ -51,6 +54,9 @@ export function rememberCasePeek(row: CasePeek): void {
     isVerified: row.isVerified,
     isBookmarked: row.isBookmarked,
     bookmarksCount: row.bookmarksCount,
+    hasFullReport: row.hasFullReport,
+    outcome: row.outcome,
+    suitNo: row.suitNo,
   };
   for (const listener of listeners) listener();
 }

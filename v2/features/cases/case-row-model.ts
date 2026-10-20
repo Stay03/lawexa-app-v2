@@ -56,13 +56,17 @@ export interface CaseRowModel {
   /**
    * The case page's own header facts, as far as the list knows them, so the
    * frame a tap paints draws the header the page will (`CaseHeader.tsx`). The
-   * citation is the whole field, as the page prints it; null is "not known
-   * here" (the trending list carries none of the last three).
+   * citation is the whole field, as the page prints it. A fact the list did
+   * not send is null (or false), which the frame reads as "not known here" and
+   * leaves out, as the page does when the case has none.
    */
   fullCitation: string | null;
   topic: string | null;
   isVerified: boolean;
   bookmarksCount: number | null;
+  hasFullReport: boolean;
+  outcome: string | null;
+  suitNo: string | null;
 }
 
 export function browseRow(item: Case): CaseRowModel {
@@ -84,6 +88,9 @@ export function browseRow(item: Case): CaseRowModel {
     topic: item.topic?.trim() || null,
     isVerified: item.is_verified === true,
     bookmarksCount: item.bookmarks_count,
+    hasFullReport: item.has_full_report === true,
+    outcome: item.outcome ?? null,
+    suitNo: item.suit_no?.trim() || null,
   };
 }
 
@@ -103,9 +110,12 @@ export function trendingRow(item: TrendingCaseDetailItem): CaseRowModel {
     tags: item.tags ?? [],
     isBookmarked: item.is_bookmarked,
     fullCitation: item.citation?.trim() || null,
-    topic: null,
-    isVerified: false,
-    bookmarksCount: null,
+    topic: item.topic?.trim() || null,
+    isVerified: item.is_verified === true,
+    bookmarksCount: item.bookmarks_count ?? null,
+    hasFullReport: item.has_full_report === true,
+    outcome: item.outcome ?? null,
+    suitNo: item.suit_no?.trim() || null,
   };
 }
 
