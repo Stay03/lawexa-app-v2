@@ -9,8 +9,13 @@ import type {
   SuggestedTagsEnvelope,
 } from './types';
 
-/** The longest the publish step waits for suggested tags before it shows the empty box. */
-export const SUGGESTED_TAGS_TIMEOUT_MS = 8_000;
+/**
+ * The longest the publish step waits for suggested tags before it shows the
+ * empty box. The model answers in 1 to 3 s; when it fails, the server retries
+ * and then answers from its tag list, about 10 to 11 s in all (backend, 20
+ * October 2026). The box stays usable while it waits.
+ */
+export const SUGGESTED_TAGS_TIMEOUT_MS = 15_000;
 
 /**
  * The v2 notes wire layer. Thin on purpose: same axios client and endpoints as
