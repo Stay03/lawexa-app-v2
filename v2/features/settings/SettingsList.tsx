@@ -162,12 +162,13 @@ export function SettingsLinkRow({
 
 /**
  * One height per block, at the live row height (`min-h-14`, 3.5rem) times the
- * signed-in row count: 3, 4, 2, 1, then 1 for Sign out (Your account gained
- * Signed-in devices on 28 September 2026; Sign out came on 29 September).
- * Written as literal classes rather than computed, because Tailwind v4 scans
- * source TEXT and would never see a class assembled at runtime.
+ * signed-in row count: 4, 4, 2, 1, then 1 for Sign out (Your account gained
+ * Signed-in devices on 28 September 2026, Sign out on 29 September, and Your
+ * stats on 20 October). Written as literal classes rather than computed,
+ * because Tailwind v4 scans source TEXT and would never see a class assembled
+ * at runtime.
  */
-const FALLBACK_BLOCK_HEIGHTS = ['h-42', 'h-56', 'h-28', 'h-14', 'h-14'] as const;
+const FALLBACK_BLOCK_HEIGHTS = ['h-56', 'h-56', 'h-28', 'h-14', 'h-14'] as const;
 
 /**
  * The screen's silhouette, drawn by `app/v2/settings/loading.tsx` while the

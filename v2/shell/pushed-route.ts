@@ -312,14 +312,22 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       }
       return null;
 
-    // The reader's own questions. Opened from Settings, as v1 opened it from the
-    // account menu beside Usage, so Settings is where "up" goes.
+    // The reader's own questions, and their stats. Both are opened from
+    // Settings, as v1 opened Activity from the account menu beside Usage, so
+    // Settings is where "up" goes.
     case 'activity':
       if (depth === 1) {
         return {
           backHref: '/settings',
           backLabel: 'Back to settings',
           title: fixed('Activity'),
+        };
+      }
+      if (depth === 2 && second === 'stats') {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('Your stats'),
         };
       }
       return null;

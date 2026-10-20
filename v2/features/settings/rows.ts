@@ -1,6 +1,7 @@
 import {
   Bell,
   Building2,
+  ChartColumn,
   CreditCard,
   FlaskConical,
   Gauge,
@@ -169,6 +170,16 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         label: 'Activity',
         icon: History,
         href: '/activity',
+      },
+      {
+        // NEW IN v2 (Stay, 29 September 2026: "I also want a page like this"):
+        // totals, streaks and active days. Account-only: the server keeps
+        // them per account (`GET /me/activity`).
+        id: 'stats',
+        label: 'Your stats',
+        icon: ChartColumn,
+        href: '/activity/stats',
+        requiresAccount: true,
       },
       {
         // REBUILT 5 October 2026 from v1's `/lawyer-verification`, which was a
