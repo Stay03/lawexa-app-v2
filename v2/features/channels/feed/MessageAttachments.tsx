@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import type { MessageAttachment } from '@/types/collab';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { isRenderableImage } from '../files/file-model';
+import { isRenderableImage, playableKind } from '../files/file-model';
 import { FileMark } from '../files/FileMark';
 import { ARCHIVE_NOTE, isArchiveFile } from '../model';
 import { useFreshFileUrl, useOpenFileInNewTab } from './use-file-url';
@@ -154,7 +154,10 @@ export function MessageAttachments({
 }) {
   if (attachments.length === 0) return null;
   const images = attachments.filter((attachment) => isRenderableImage(attachment));
-  const files = attachments.filter((attachment) => !isRenderableImage(attachment));
+  const media = attachments.filter((attachment) => playableKind(attachment) !== null);
+  const files = attachments.filter(
+    (attachment) => !isRenderableImage(attachment) && playableKind(attachment) === null,
+  );
   const layout: ImageRowLayout =
     images.length === 1 ? 'single' : images.length === 2 ? 'pair' : 'strip';
   return (
@@ -172,6 +175,15 @@ export function MessageAttachments({
                 eager={layout !== 'strip' || index < EAGER_STRIP_TILES}
                 onOpen={() => onOpenImage(attachment.id)}
               />
+            </li>
+          ))}
+        </ul>
+      )}
+      {media.length > 0 && (
+        <ul className="flex flex-col gap-1.5">
+          {media.map((attachment) => (
+            <li key={attachment.id}>
+              <MediaAttachment attachment={attachment} />
             </li>
           ))}
         </ul>
@@ -495,6 +507,79 @@ function ImageAttachment({
  * people rather than generated, so the front of the name is where the meaning
  * is; the full string is one hover (or one screen-reader pass) away in `title`.
  */
+/**
+ * A video or an audio file, played in the message (Stay, 20 October 2026:
+ * media uploads in channels and threads). The browser's own controls, no
+ * autoplay, and `preload="metadata"` so a feed full of videos fetches only
+ * their first bytes until one is played. A video fills the message's width up
+ * to the single picture's 15rem-wide box, and its height follows the video.
+ * The file's row stays under the player, so Download is one tap away as it is
+ * for any file.
+ *
+ * The link is the message's own signed one, minted when the list loaded. An
+ * hour later it has expired: the player then reports an error, mints a fresh
+ * link once (the picture tile's rule) and tries again; a second failure says
+ * so in place, and the row under it still downloads.
+ */
+function MediaAttachment({ attachment }: { attachment: MessageAttachment }) {
+  const kind = playableKind(attachment);
+  const refresh = useFreshFileUrl();
+  const [src, setSrc] = useState(attachment.url);
+  const [failed, setFailed] = useState(false);
+  const refreshedRef = useRef(false);
+
+  const handleError = () => {
+    if (refreshedRef.current) {
+      setFailed(true);
+      return;
+    }
+    refreshedRef.current = true;
+    refresh.mutate(attachment.id, {
+      onSuccess: (response) => {
+        const url = response.data?.url;
+        if (!url || url === src) {
+          setFailed(true);
+          return;
+        }
+        setSrc(url);
+      },
+      onError: () => setFailed(true),
+    });
+  };
+
+  return (
+    <div className="flex w-full max-w-sm flex-col gap-1.5">
+      {failed ? (
+        <p className="text-[11px] text-muted-foreground">
+          This {kind === 'audio' ? 'recording' : 'video'} didn&rsquo;t play here. Download it below.
+        </p>
+      ) : kind === 'audio' ? (
+        <audio
+          key={src}
+          src={src}
+          controls
+          preload="metadata"
+          onError={handleError}
+          aria-label={attachment.original_name}
+          className="w-full"
+        />
+      ) : (
+        <video
+          key={src}
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          onError={handleError}
+          aria-label={attachment.original_name}
+          className={cn(TILE, 'h-auto max-h-80 w-full bg-black')}
+        />
+      )}
+      <FileAttachment attachment={attachment} />
+    </div>
+  );
+}
+
 function FileAttachment({ attachment }: { attachment: MessageAttachment }) {
   const { open, opening, failed, ready, save } = useOpenFileInNewTab();
   const isArchive = isArchiveFile(attachment.mime_type, attachment.original_name);

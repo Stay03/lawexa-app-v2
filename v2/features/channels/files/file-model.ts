@@ -15,6 +15,8 @@ import { isArchiveFile } from '../model';
 
 export type FileKind =
   | 'image'
+  | 'video'
+  | 'audio'
   | 'document'
   | 'spreadsheet'
   | 'presentation'
@@ -42,6 +44,33 @@ export function isRenderableImage(file: Pick<ChannelFile, 'mime_type' | 'origina
   );
 }
 
+/**
+ * The server's video and audio types for channel uploads (backend, 20
+ * October 2026), with their extensions as the fallback for a generic mime.
+ */
+const VIDEO_MIMES = ['video/mp4', 'video/quicktime', 'video/webm'];
+const AUDIO_MIMES = ['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg', 'audio/webm'];
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm'];
+const AUDIO_EXTENSIONS = ['mp3', 'm4a', 'wav', 'ogg'];
+
+/**
+ * Whether a file plays in the message, and as what: `video` or `audio`, else
+ * null. Mime first; a generic mime falls back to the extension.
+ */
+export function playableKind(
+  file: Pick<ChannelFile, 'mime_type' | 'original_name'>,
+): 'video' | 'audio' | null {
+  const mime = file.mime_type.toLowerCase();
+  if (VIDEO_MIMES.includes(mime)) return 'video';
+  if (AUDIO_MIMES.includes(mime)) return 'audio';
+  if (mime.startsWith('video/') || mime.startsWith('audio/') || mime === 'application/octet-stream' || mime === '') {
+    const ext = extensionOf(file.original_name);
+    if (VIDEO_EXTENSIONS.includes(ext)) return 'video';
+    if (AUDIO_EXTENSIONS.includes(ext)) return 'audio';
+  }
+  return null;
+}
+
 /** Which bucket a file belongs to. Archive is decided by the shared rule in
  *  `../model`, because the same predicate also governs the zip obligations. */
 export function fileKind(file: Pick<ChannelFile, 'mime_type' | 'original_name'>): FileKind {
@@ -49,6 +78,8 @@ export function fileKind(file: Pick<ChannelFile, 'mime_type' | 'original_name'>)
   const ext = extensionOf(file.original_name);
 
   if (isRenderableImage(file) || mime.startsWith('image/')) return 'image';
+  const playable = playableKind(file);
+  if (playable) return playable;
   if (isArchiveFile(file.mime_type, file.original_name)) return 'archive';
   if (
     mime.includes('spreadsheet') ||
@@ -80,6 +111,8 @@ export function fileKind(file: Pick<ChannelFile, 'mime_type' | 'original_name'>)
 /** The plural label a filter tab wears. */
 export const FILE_KIND_LABEL: Record<FileKind, string> = {
   image: 'Images',
+  video: 'Videos',
+  audio: 'Audio',
   document: 'Documents',
   spreadsheet: 'Sheets',
   presentation: 'Slides',
@@ -91,6 +124,8 @@ export const FILE_KIND_LABEL: Record<FileKind, string> = {
 const KIND_ORDER: readonly FileKind[] = [
   'document',
   'image',
+  'video',
+  'audio',
   'spreadsheet',
   'presentation',
   'archive',

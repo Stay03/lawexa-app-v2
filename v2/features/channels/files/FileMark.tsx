@@ -4,6 +4,8 @@ import { useState } from 'react';
 import {
   File as FileIcon,
   FileArchive,
+  FileMusic,
+  FilePlay,
   FileSpreadsheet,
   FileText,
   ImageIcon,
@@ -91,6 +93,10 @@ function KindGlyph({ kind }: { kind: FileKind }) {
   switch (kind) {
     case 'image':
       return <ImageIcon aria-hidden className={className} />;
+    case 'video':
+      return <FilePlay aria-hidden className={className} />;
+    case 'audio':
+      return <FileMusic aria-hidden className={className} />;
     case 'spreadsheet':
       return <FileSpreadsheet aria-hidden className={className} />;
     case 'presentation':

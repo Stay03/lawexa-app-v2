@@ -372,10 +372,25 @@ export const FILE_ALLOWED_EXTENSIONS = [
   'png',
   'gif',
   'webp',
+  // Video and audio, up to MEDIA_MAX_SIZE_BYTES (Stay, 20 October 2026;
+  // backend's rule for channel and thread uploads).
+  'mp4',
+  'mov',
+  'webm',
+  'mp3',
+  'm4a',
+  'wav',
+  'ogg',
 ] as const;
 
-/** 15 MB server cap. */
+/** The video and audio extensions, which take the larger cap. */
+export const MEDIA_EXTENSIONS: ReadonlySet<string> = new Set(['mp4', 'mov', 'webm', 'mp3', 'm4a', 'wav', 'ogg']);
+
+/** 15 MB server cap for documents, pictures and zips. */
 export const FILE_MAX_SIZE_BYTES = 15 * 1024 * 1024;
+
+/** 100 MB server cap for video and audio (Laravel's 102400 KiB). */
+export const MEDIA_MAX_SIZE_BYTES = 100 * 1024 * 1024;
 
 /** `accept` attribute for the hidden file input. */
 export const FILE_ACCEPT_ATTR = FILE_ALLOWED_EXTENSIONS.map((ext) => `.${ext}`).join(',');
@@ -456,6 +471,10 @@ export function validateChannelFile(file: File): string | null {
   const ext = file.name.toLowerCase().split('.').pop() ?? '';
   if (!(FILE_ALLOWED_EXTENSIONS as readonly string[]).includes(ext)) {
     return `"${file.name}" isn't a supported file type.`;
+  }
+  if (MEDIA_EXTENSIONS.has(ext)) {
+    // The server's own sentence for an oversized video or audio file.
+    return file.size > MEDIA_MAX_SIZE_BYTES ? `"${file.name}" is larger than 100 MB.` : null;
   }
   if (file.size > FILE_MAX_SIZE_BYTES) {
     return `"${file.name}" is larger than 15 MB.`;
