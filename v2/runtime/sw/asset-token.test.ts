@@ -14,7 +14,14 @@ import { serviceWorkerBodyFor, SELF_DESTRUCT_SOURCE, SW_TOKEN_PLACEHOLDER, type 
 const read = (...parts: string[]) =>
   readFileSync(join(process.cwd(), ...parts), 'utf8').replace(/\r\n/g, '\n');
 
-const inside: WorkerGate = { uiCookie: 'v2', perfValue: undefined, v2Enabled: true, swSetting: undefined };
+const inside: WorkerGate = {
+  uiCookie: 'v2',
+  perfValue: undefined,
+  v2Enabled: true,
+  v2Default: false,
+  userAgent: undefined,
+  swSetting: undefined,
+};
 
 test('the asset tag is a token that holds across pushes, and one setting changes it', () => {
   const config = read('next.config.ts');
