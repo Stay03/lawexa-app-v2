@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
 import { scrollOnPathChange } from './push-scroll';
@@ -209,10 +209,18 @@ let stampingSuspended = false;
  */
 let traversing = false;
 
+/**
+ * The path the shell last showed, kept outside the component on purpose: a
+ * ref is lost when this boundary remounts during a navigation, and then every
+ * push read as the first render and was skipped (measured on the first build
+ * of this fix: the path changed and no reset was ever written). `null` only
+ * before the first render of the page's life.
+ */
+let shownPathname: string | null = null;
+
 export function ScrollMemory() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const renderedPath = useRef<string | null>(null);
 
   /* ── A PUSH STARTS AT THE TOP ─────────────────────────────────────────────
      Next scrolls a pushed page into view only when the page's first element
@@ -228,8 +236,10 @@ export function ScrollMemory() {
      its place as before. The shell's scroller only: a collab pane
      (`data-v2-scroller`) belongs to its own feed. */
   useLayoutEffect(() => {
-    const firstRender = renderedPath.current === null;
-    renderedPath.current = pathname;
+    // A remount on the same path is not a navigation.
+    if (shownPathname === pathname) return;
+    const firstRender = shownPathname === null;
+    shownPathname = pathname;
     const traversal = traversing;
     traversing = false;
     if (scrollOnPathChange({ firstRender, traversal }) === 'keep') return;
