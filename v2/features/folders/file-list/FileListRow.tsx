@@ -64,11 +64,7 @@ export function FileListRow({
   const Icon = look.icon;
   const content = (
     <>
-      <Icon
-        aria-hidden
-        className={cn('size-[18px] shrink-0', look.tone)}
-        style={look.color ? { color: look.color } : undefined}
-      />
+      <Icon aria-hidden className={cn('size-[18px] shrink-0', look.tone)} />
       <span
         title={name}
         className={cn(

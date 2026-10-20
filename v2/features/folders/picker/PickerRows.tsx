@@ -5,6 +5,7 @@ import { Check, ChevronRight, Folder, FolderPlus, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { entryLook } from '../file-list/entry-look';
 import type { FolderRecord } from '../types';
 import { folderAncestorAddress, folderContentsLine } from './picker-model';
 
@@ -28,9 +29,9 @@ import { folderAncestorAddress, folderContentsLine } from './picker-model';
  * list, a real `<button>` for the destination and a second, separately named
  * `<button>` ("Open Contract law") for the way in, at a 44px touch target.
  *
- * NO COLOUR, NO ICON PICKER (owner decision 2): one monochrome glyph. A legacy
- * folder's stored `color` tints its tile and nothing else, so v1's palette
- * still reads without v2 minting a single new swatch.
+ * NO COLOUR PICKER, NO ICON PICKER (owner decision 2). The glyph wears the one
+ * folder colour every folder list uses (Stay, 20 October 2026: "The colour
+ * should be for the types"); a folder's stored `color` is not shown.
  */
 
 /** The `data-` flag the DIALOG row's click handler hit-tests to tell drill from choose. */
@@ -55,10 +56,7 @@ function FolderRowContent({ folder, busy, alreadyHolds, showAddress }: FolderRow
     <>
       <span
         aria-hidden
-        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground"
-        // Legacy tint only — v2 mints no colours. Gated on a real string so an
-        // absent/`null` colour never becomes an inline style.
-        style={folder.color ? { color: folder.color } : undefined}
+        className={cn('flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary', entryLook({ type: 'folder' }).tone)}
       >
         <Folder className="size-[18px]" />
       </span>

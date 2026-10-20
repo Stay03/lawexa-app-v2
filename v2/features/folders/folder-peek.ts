@@ -12,13 +12,13 @@ import type { FolderRowModel } from './folder-row-model';
  * name to the bar (a phone's title) before its own read answers. The counts
  * line is left to the folder: it depends on the tab and on rows withheld.
  */
-export type FolderPeek = Pick<FolderRowModel, 'uuid' | 'name' | 'hasName' | 'tint'>;
+export type FolderPeek = Pick<FolderRowModel, 'uuid' | 'name' | 'hasName'>;
 
 let last: FolderPeek | null = null;
 const listeners = new Set<() => void>();
 
 export function rememberFolderPeek(row: FolderPeek): void {
-  last = { uuid: row.uuid, name: row.name, hasName: row.hasName, tint: row.tint };
+  last = { uuid: row.uuid, name: row.name, hasName: row.hasName };
   for (const listener of listeners) listener();
 }
 

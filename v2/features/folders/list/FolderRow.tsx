@@ -15,9 +15,9 @@ import { FileListRow } from '../file-list/FileListRow';
  * UTC): the folder glyph, the name, and on a computer the date. No counts and
  * no Public mark under it; what a folder holds shows when it opens.
  *
- * The glyph is the folder colour every file manager uses, or the folder's own
- * legacy colour when it has one (v2 mints none), so a colour-coded shelf stays
- * recognisable to the person who built it.
+ * The glyph is the one folder colour every folder shares: colour says the
+ * type, on every list (Stay, 20 October 2026: "The colour should be for the
+ * types. So there's consistency."). A folder's own legacy colour is not shown.
  *
  * The link wraps the line and the menu is its SIBLING, a control with its own
  * accessible name rather than a click the row has to swallow. The menu carries
@@ -53,7 +53,7 @@ export const FolderRow = memo(function FolderRow({
 
   return (
     <FileListRow
-      look={{ ...entryLook({ type: 'folder' }), color: row.tint }}
+      look={entryLook({ type: 'folder' })}
       name={row.name}
       named={row.hasName}
       date={formatEntryDate(row.trailAt, now)}

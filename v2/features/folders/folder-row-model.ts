@@ -79,36 +79,6 @@ export interface FolderRowModel {
   trailAt: string;
   /** Which of the two {@link FolderRowModel.trailAt} actually is. */
   trailKind: 'updated' | 'created';
-  /**
-   * A legacy colour, validated and expanded to 6 digits, or `null`.
-   * v2 mints no colours (decision 2 — one monochrome glyph); a folder that
-   * already carries one keeps its tint so a colour-coded shelf stays
-   * recognisable to the person who built it.
-   */
-  tint: string | null;
-}
-
-/**
- * Only a plain hex colour may tint a tile — the value is user-authored folder
- * settings going into an inline style, so anything that is not obviously a
- * colour is simply not used.
- */
-const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-
-/**
- * The tint as a 6-DIGIT hex, so an alpha suffix always produces a valid 8-digit
- * colour. The 3-digit form is the trap `BookmarkRow` documents: `#abc` + `1f` is
- * five digits, which is not a colour at all — the declaration is dropped, and
- * because a truthy tint suppresses the fallback background the tile ends up with
- * none. Expanding first means a malformed value can only ever land on the
- * fallback tile, never on a blank one.
- */
-export function folderTint(color: string | null | undefined): string | null {
-  if (!color || !HEX_COLOR.test(color)) return null;
-  const digits = color.slice(1);
-  return digits.length === 3
-    ? `#${digits[0]}${digits[0]}${digits[1]}${digits[1]}${digits[2]}${digits[2]}`
-    : color;
 }
 
 /**
@@ -154,7 +124,6 @@ export function folderRow(record: FolderNode | FolderRecord): FolderRowModel {
     isPublic: record.is_private === false,
     trailAt: updatedAt || record.created_at,
     trailKind: updatedAt ? 'updated' : 'created',
-    tint: folderTint(record.color),
   };
 }
 

@@ -29,8 +29,6 @@ export interface EntryLook {
   icon: LucideIcon;
   /** Text-colour classes for the glyph. */
   tone: string;
-  /** A legacy folder's own colour (`folderTint`), which wins over the tone. */
-  color?: string | null;
 }
 
 const MUTED = 'text-muted-foreground';

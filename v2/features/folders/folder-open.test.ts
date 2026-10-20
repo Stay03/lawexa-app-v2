@@ -12,12 +12,12 @@ import { folderPeekFor, rememberFolderPeek } from './folder-peek';
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...parts: string[]) => readFileSync(join(here, ...parts), 'utf8').replace(/\r\n/g, '\n');
 
-test('the tap keeps the row\'s tile and name, for that folder only, one entry', () => {
-  rememberFolderPeek({ uuid: 'f-1', name: 'Tenancy', hasName: true, tint: '#3366ff' });
-  assert.deepEqual(folderPeekFor('f-1'), { uuid: 'f-1', name: 'Tenancy', hasName: true, tint: '#3366ff' });
+test('the tap keeps the row\'s name, for that folder only, one entry', () => {
+  rememberFolderPeek({ uuid: 'f-1', name: 'Tenancy', hasName: true });
+  assert.deepEqual(folderPeekFor('f-1'), { uuid: 'f-1', name: 'Tenancy', hasName: true });
   assert.equal(folderPeekFor('f-2'), null);
   assert.equal(folderPeekFor(undefined), null);
-  rememberFolderPeek({ uuid: 'f-2', name: 'Untitled folder', hasName: false, tint: null });
+  rememberFolderPeek({ uuid: 'f-2', name: 'Untitled folder', hasName: false });
   assert.equal(folderPeekFor('f-1'), null);
   assert.equal(folderPeekFor('f-2')?.hasName, false);
 });

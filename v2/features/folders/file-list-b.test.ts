@@ -53,9 +53,12 @@ test('a row is one line: the glyph, the name, the computer date column and the "
   }
 });
 
-test('a folder keeps its legacy colour, and every menu keeps its actions', () => {
+test('every folder wears the one folder colour, and every menu keeps its actions', () => {
   const folder = read('list', 'FolderRow.tsx');
-  assert.match(folder, /look=\{\{ \.\.\.entryLook\(\{ type: 'folder' \}\), color: row\.tint \}\}/);
+  // Colour says the type (Stay, 20 October 2026): no folder's own colour shows.
+  assert.match(folder, /look=\{entryLook\(\{ type: 'folder' \}\)\}/);
+  assert.doesNotMatch(folder, /tint/);
+  assert.doesNotMatch(read('folder-row-model.ts'), /tint|folderTint/);
   assert.match(folder, /<FolderActionsMenu/);
   const item = read('detail', 'FolderItemRow.tsx');
   assert.match(item, /aria-label=\{`Actions for \$\{row\.title\}`\}/);
