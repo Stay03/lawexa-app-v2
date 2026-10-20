@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { entryLook } from '../file-list/entry-look';
+import { SpaceFolderMark, spaceFolderNote } from '../space-mark';
 import type { FolderRecord } from '../types';
 import { folderAncestorAddress, folderContentsLine } from './picker-model';
 
@@ -58,13 +59,18 @@ function FolderRowContent({ folder, busy, alreadyHolds, showAddress }: FolderRow
         aria-hidden
         className={cn('flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary', entryLook({ type: 'folder' }).tone)}
       >
-        <Folder className="size-[18px]" />
+        {/* A folder in a Space wears the Folders page's mark (C1), on the tile's ground. */}
+        <span className="relative flex">
+          <Folder className="size-[18px]" />
+          {folder.space ? <SpaceFolderMark spaceName={folder.space.name} ground="tile" /> : null}
+        </span>
       </span>
 
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-medium text-foreground">
             {folder.name}
+            {folder.space ? <span className="sr-only">{spaceFolderNote(folder.space.name)}</span> : null}
           </span>
           {/* v2 creates every folder private, so the mark worth making is the
               LEGACY exception: a folder that is publicly listed. Gated on

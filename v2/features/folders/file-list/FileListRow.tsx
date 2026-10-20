@@ -46,6 +46,8 @@ export function FileListRow({
   renderOpen,
   menu,
   below,
+  iconMark,
+  srNote,
 }: {
   look: EntryLook;
   name: string;
@@ -60,11 +62,18 @@ export function FileListRow({
   menu?: ReactNode;
   /** A line under the row, only for a status the row must say (a file that is gone). */
   below?: ReactNode;
+  /** A mark on the icon's corner (a Space folder's, `space-mark.tsx`). */
+  iconMark?: ReactNode;
+  /** Words a screen reader hears after the name, never shown (", in <Space>"). */
+  srNote?: string;
 }) {
   const Icon = look.icon;
   const content = (
     <>
-      <Icon aria-hidden className={cn('size-[18px] shrink-0', look.tone)} />
+      <span className="relative flex shrink-0">
+        <Icon aria-hidden className={cn('size-[18px] shrink-0', look.tone)} />
+        {iconMark}
+      </span>
       <span
         title={name}
         className={cn(
@@ -73,6 +82,7 @@ export function FileListRow({
         )}
       >
         {name}
+        {srNote ? <span className="sr-only">{srNote}</span> : null}
       </span>
       <span
         className={cn(

@@ -329,6 +329,7 @@ export function FoldersBrowser() {
                 now={now}
                 onRename={openRename}
                 onMove={openMove}
+                markSpace
               />
             ))}
           </ul>

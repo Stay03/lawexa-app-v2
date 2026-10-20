@@ -8,6 +8,7 @@ import type { FolderRowModel } from '../folder-row-model';
 import { rememberFolderPeek } from '../folder-peek';
 import { entryLook, formatEntryDate } from '../file-list/entry-look';
 import { FileListRow } from '../file-list/FileListRow';
+import { SpaceFolderMark, spaceFolderNote } from '../space-mark';
 
 /**
  * FolderRow — one folder, as one line of a file list (folder page B, Stay, 20
@@ -24,6 +25,12 @@ import { FileListRow } from '../file-list/FileListRow';
  * the actions its host passes: `onRename` (Rename and Delete), `onMove` (the
  * folder's owner) and `onRemoveFromSpace`. No actions, no menu.
  *
+ * `markSpace` (the personal Folders page): a folder in a Space wears the C1
+ * mark, "In <Space>" on hover over it on a computer, and ", in <Space>" for a
+ * screen reader (Stay picked C1, 20 October 2026). Inside a Space, or a Space
+ * folder's own page, every folder is the Space's, so the mark would say nothing
+ * and those lists leave it off.
+ *
  * `memo` holds because every prop is a value or a callback the list memoises.
  */
 export const FolderRow = memo(function FolderRow({
@@ -33,8 +40,11 @@ export const FolderRow = memo(function FolderRow({
   onRename,
   onMove,
   onRemoveFromSpace,
+  markSpace = false,
 }: {
   row: FolderRowModel;
+  /** Mark a folder that sits in a Space (the personal Folders page). */
+  markSpace?: boolean;
   /** Staggers the entrance for the first screenful only. */
   index: number;
   /** Frozen clock for the date column — threaded from the browser's lazy
@@ -50,6 +60,7 @@ export const FolderRow = memo(function FolderRow({
 }) {
   const hasMenu =
     onRename !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
+  const space = markSpace ? row.spaceName : null;
 
   return (
     <FileListRow
@@ -58,6 +69,8 @@ export const FolderRow = memo(function FolderRow({
       named={row.hasName}
       date={formatEntryDate(row.trailAt, now)}
       index={index}
+      iconMark={space ? <SpaceFolderMark spaceName={space} ground="row" tooltip /> : undefined}
+      srNote={space ? spaceFolderNote(space) : undefined}
       // The folder page draws this row's name at once, before any request
       // answers (`folder-peek.ts`, speed step 5).
       renderOpen={(className, content) => (

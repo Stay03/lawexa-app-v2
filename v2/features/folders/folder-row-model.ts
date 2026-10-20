@@ -79,6 +79,10 @@ export interface FolderRowModel {
   trailAt: string;
   /** Which of the two {@link FolderRowModel.trailAt} actually is. */
   trailKind: 'updated' | 'created';
+  /** The Space the folder sits in, by name, or null for the reader's own
+   *  folder (and for a nested node, which carries no `space`). The Folders
+   *  page marks such a folder (`space-mark.tsx`). */
+  spaceName: string | null;
 }
 
 /**
@@ -124,6 +128,7 @@ export function folderRow(record: FolderNode | FolderRecord): FolderRowModel {
     isPublic: record.is_private === false,
     trailAt: updatedAt || record.created_at,
     trailKind: updatedAt ? 'updated' : 'created',
+    spaceName: 'space' in record ? (record.space?.name ?? null) : null,
   };
 }
 

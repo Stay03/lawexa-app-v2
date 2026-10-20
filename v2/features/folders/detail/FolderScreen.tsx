@@ -47,6 +47,7 @@ import { canAddContent } from '@/v2/features/spaces/model';
 import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { FolderRow } from '../list/FolderRow';
+import { SpaceFolderLine } from '../space-mark';
 import { FoldersSignedOutState } from '../list/states';
 import { FolderBreadcrumb } from './FolderBreadcrumb';
 import {
@@ -556,6 +557,10 @@ function FolderBody({ uuid }: { uuid: string }) {
           {/* Only those who may add (items 8 and 9). */}
           {addChoices ? <FolderAddMenu choices={addChoices} /> : null}
         </header>
+
+        {/* A folder in a Space says which one, under its name, as a link to the
+            Space (Stay picked C1, 20 October 2026). */}
+        {folder.space ? <SpaceFolderLine space={folder.space} /> : null}
 
         {/* A legacy field: v2 has no description control, so this is only
             ever shown, never written. */}
