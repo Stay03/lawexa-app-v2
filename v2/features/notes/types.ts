@@ -152,6 +152,18 @@ export interface NotePublishInput {
   price_usd?: number | null;
 }
 
+/**
+ * `GET /api/notes/{slug}/suggested-tags` (backend 0084b71c). Only the note's
+ * writer may call it (anyone else gets 404). 0 to 6 tags, each at most 50
+ * characters, existing tags spelled as the library spells them. An empty list
+ * is a normal answer: the note has no text yet, or nothing matched.
+ */
+export interface SuggestedTagsEnvelope {
+  success: boolean;
+  message: string;
+  data: { tags: string[] };
+}
+
 /** Response envelope for a content-image upload (`POST /api/files`). */
 export interface NoteImageUpload {
   success: boolean;

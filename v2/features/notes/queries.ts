@@ -141,4 +141,20 @@ export const notesQueries = {
       gcTime: 0,
       retry: retrySettledClientErrors,
     }),
+
+  /**
+   * Tags the server suggests at the publish step. Keyed on the saved version
+   * (`updatedAt`): the sheet opens only while autosave is clean, so one open
+   * of one version asks once, and reopening it unchanged reuses that answer.
+   * No retry: a failure or a slow answer shows the empty tag box, as before.
+   * Never kept on the device (no `meta.persist`).
+   */
+  suggestedTags: ({ id, slug, updatedAt }: { id: number; slug: string; updatedAt: string | null }) =>
+    queryOptions({
+      queryKey: [...notesQueries.all, 'suggested-tags', id, updatedAt] as const,
+      queryFn: () => notesApi.suggestedTags(slug),
+      staleTime: Infinity,
+      retry: false,
+      refetchOnWindowFocus: false,
+    }),
 };

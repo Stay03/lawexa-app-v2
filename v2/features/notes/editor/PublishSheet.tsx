@@ -1,21 +1,31 @@
 'use client';
 
 import { useState, type KeyboardEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { Globe, Lock, X } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { Globe, Lock, Sparkles, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { DialogClose } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { notesApi } from '../api';
+import { notesQueries } from '../queries';
 import type { NotePublishInput, NoteRecord } from '../types';
+import {
+  MAX_TAG_LENGTH,
+  MAX_TAGS,
+  cleanSuggestions,
+  isSuggested,
+  shownTags,
+  wantsSuggestions,
+} from './publish-tags';
 
 /**
  * PublishSheet — publish a note, from the v2 editor.
@@ -36,18 +46,24 @@ import type { NotePublishInput, NoteRecord } from '../types';
  * The editor's Publish button is on only while autosave is `clean`, so the
  * note that goes out is the note the author is looking at, never the version
  * from a few keystrokes ago.
+ *
+ * ── SUGGESTED TAGS ────────────────────────────────────────────────────────
+ * A note with no tags asks the server for some as the sheet opens, and they
+ * arrive as chips marked as suggestions (`publish-tags.ts`). The server saves
+ * nothing; Publish sends what is on screen. A failed or slow answer leaves the
+ * empty box, exactly as before.
  */
 
-const MAX_TAGS = 10;
-/** v1's limit; the API allows 100, so a v1 and a v2 tag fit the same box. */
-const MAX_TAG_LENGTH = 50;
+/** Three placeholder chips while the server suggests tags (about 1 to 3 s). */
+const SUGGESTING_WIDTHS = ['5.5rem', '7rem', '4.5rem'] as const;
 /** The API's defaults (`lawexa.max_note_price_ngn`, and 10,000 for USD). */
 const MAX_NGN = 100_000;
 const MAX_USD = 10_000;
 
 interface PublishDraft {
   isPublic: boolean;
-  tags: string[];
+  /** `null` until the writer changes a tag (see `shownTags`). */
+  tags: string[] | null;
   tagInput: string;
   isPaid: boolean;
   priceNgn: string;
@@ -70,7 +86,7 @@ function draftFrom(record: NoteRecord): PublishDraft {
     // September 2026), so a first publish opens on "Anyone", as v1's publish
     // page did. A record without the field opens on "Only you".
     isPublic: record.is_private === false,
-    tags: record.tags ?? [],
+    tags: null,
     tagInput: '',
     isPaid: ngn > 0 || usd > 0,
     priceNgn: ngn > 0 ? String(ngn) : '',
@@ -99,6 +115,21 @@ export function PublishSheet({
   const isPublished = record.status === 'published';
 
   const change = (patch: Partial<PublishDraft>) => setDraft({ ...current, ...patch });
+
+  const savedTags = record.tags ?? [];
+  const suggestQuery = useQuery({
+    ...notesQueries.suggestedTags({
+      id: record.id,
+      slug: record.slug,
+      updatedAt: record.updated_at ?? null,
+    }),
+    enabled: wantsSuggestions(open, savedTags),
+  });
+  const suggestions = savedTags.length > 0 ? [] : cleanSuggestions(suggestQuery.data?.data.tags);
+  const tags = shownTags(current.tags, savedTags, suggestions);
+  // Placeholder chips only while the box is still the server's to fill.
+  const suggesting = current.tags === null && savedTags.length === 0 && suggestQuery.isFetching;
+  const showsSuggestion = tags.some((tag) => isSuggested(tag, suggestions));
 
   const handleOpenChange = (next: boolean) => {
     if (!next) setDraft(null);
@@ -133,12 +164,12 @@ export function PublishSheet({
 
   const addTag = () => {
     const tag = current.tagInput.trim();
-    if (!tag || current.tags.length >= MAX_TAGS) return;
-    if (current.tags.some((existing) => existing.toLowerCase() === tag.toLowerCase())) {
+    if (!tag || tags.length >= MAX_TAGS) return;
+    if (tags.some((existing) => existing.toLowerCase() === tag.toLowerCase())) {
       change({ tagInput: '' });
       return;
     }
-    change({ tags: [...current.tags, tag.slice(0, MAX_TAG_LENGTH)], tagInput: '' });
+    change({ tags: [...tags, tag.slice(0, MAX_TAG_LENGTH)], tagInput: '' });
   };
 
   const onTagKey = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -152,11 +183,11 @@ export function PublishSheet({
     if (invalid || save.isPending) return;
     // A tag still in the box counts: nobody expects Publish to drop it.
     const pending = current.tagInput.trim();
-    const tags =
-      pending && current.tags.length < MAX_TAGS && !current.tags.includes(pending)
-        ? [...current.tags, pending.slice(0, MAX_TAG_LENGTH)]
-        : current.tags;
-    const input: NotePublishInput = { status, is_private: !current.isPublic, tags };
+    const sent =
+      pending && tags.length < MAX_TAGS && !tags.includes(pending)
+        ? [...tags, pending.slice(0, MAX_TAG_LENGTH)]
+        : [...tags];
+    const input: NotePublishInput = { status, is_private: !current.isPublic, tags: sent };
     if (canSetPrice) {
       input.price_ngn = pricing ? ngn : null;
       input.price_usd = pricing && current.hasUsd ? usd : null;
@@ -249,33 +280,53 @@ export function PublishSheet({
             onChange={(event) => change({ tagInput: event.target.value })}
             onKeyDown={onTagKey}
             onBlur={addTag}
-            placeholder={current.tags.length >= MAX_TAGS ? 'Ten tags is the most' : 'Add a tag, then Enter'}
-            disabled={current.tags.length >= MAX_TAGS}
+            placeholder={tags.length >= MAX_TAGS ? 'Ten tags is the most' : 'Add a tag, then Enter'}
+            disabled={tags.length >= MAX_TAGS}
             maxLength={MAX_TAG_LENGTH}
             autoComplete="off"
           />
-          {current.tags.length > 0 ? (
-            <ul className="flex flex-wrap gap-1.5" aria-label="Added tags">
-              {current.tags.map((tag) => (
-                <li
-                  key={tag}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary/10 py-1 pr-1 pl-3 text-sm text-primary"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => change({ tags: current.tags.filter((value) => value !== tag) })}
-                    aria-label={`Remove tag ${tag}`}
-                    className="v2-interactive rounded-full p-1 hover:bg-primary/15"
-                  >
-                    <X aria-hidden className="size-3" />
-                  </button>
-                </li>
+          {suggesting ? (
+            // Chip-sized placeholders, so the chips arrive without moving the sheet.
+            <div className="flex flex-wrap gap-1.5" role="status" aria-label="Suggesting tags from your note">
+              {SUGGESTING_WIDTHS.map((width) => (
+                <Skeleton key={width} className="h-7 rounded-full" style={{ width }} />
               ))}
+            </div>
+          ) : tags.length > 0 ? (
+            <ul
+              className="flex flex-wrap gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+              aria-label="Added tags"
+            >
+              {tags.map((tag) => {
+                const suggested = isSuggested(tag, suggestions);
+                return (
+                  <li
+                    key={tag}
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full py-1 pr-1 text-sm text-primary',
+                      suggested
+                        ? 'border border-dashed border-primary/45 bg-primary/5 pl-2.5'
+                        : 'bg-primary/10 pl-3',
+                    )}
+                  >
+                    {suggested ? <Sparkles aria-hidden className="size-3 shrink-0" /> : null}
+                    {tag}
+                    <button
+                      type="button"
+                      onClick={() => change({ tags: tags.filter((value) => value !== tag) })}
+                      aria-label={suggested ? `Remove suggested tag ${tag}` : `Remove tag ${tag}`}
+                      className="v2-interactive rounded-full p-1 hover:bg-primary/15"
+                    >
+                      <X aria-hidden className="size-3" />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
           <p className="text-xs text-muted-foreground">
-            {current.tags.length} of {MAX_TAGS}
+            {showsSuggestion ? 'Suggested from your note. Remove any that do not fit. ' : null}
+            {tags.length} of {MAX_TAGS}
           </p>
         </section>
 

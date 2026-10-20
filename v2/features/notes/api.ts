@@ -6,7 +6,11 @@ import type {
   NoteListEnvelope,
   NotePublishInput,
   NoteUpdateInput,
+  SuggestedTagsEnvelope,
 } from './types';
+
+/** The longest the publish step waits for suggested tags before it shows the empty box. */
+export const SUGGESTED_TAGS_TIMEOUT_MS = 8_000;
 
 /**
  * The v2 notes wire layer. Thin on purpose: same axios client and endpoints as
@@ -85,6 +89,19 @@ export const notesApi = {
    *  publish fields only (see `NotePublishInput`). */
   publish: async (id: number, data: NotePublishInput): Promise<NoteEnvelope> => {
     const response = await apiClient.put<NoteEnvelope>(`/notes/${id}`, data);
+    return response.data;
+  },
+
+  /**
+   * Tags the server suggests for the writer's own note (backend 0084b71c): 0
+   * to 6, saved nowhere. An LLM call takes 1 to 3 s, so the wait is capped at
+   * `SUGGESTED_TAGS_TIMEOUT_MS`; a slow answer counts as no answer.
+   */
+  suggestedTags: async (slug: string): Promise<SuggestedTagsEnvelope> => {
+    const response = await apiClient.get<SuggestedTagsEnvelope>(
+      `/notes/${encodeURIComponent(slug)}/suggested-tags`,
+      { timeout: SUGGESTED_TAGS_TIMEOUT_MS },
+    );
     return response.data;
   },
 
