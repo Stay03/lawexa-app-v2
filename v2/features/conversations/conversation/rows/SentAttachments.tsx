@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { FileText, ImageOff } from 'lucide-react';
 
@@ -19,7 +19,9 @@ import {
 } from '@/v2/features/channels/feed/image-target';
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
+import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { isPictureAttachment } from '../../attachment-rules';
+import { useV2ChatContext } from '../chat-context';
 
 /**
  * SentAttachments — the files under a message the person sent to the AI.
@@ -233,6 +235,19 @@ function PictureTile({
   /** One new link per failure. A paint re-arms it, and that cannot loop: an
    *  `<img>` that loaded a src never fires `onError` for the same src. */
   const [armed, setArmed] = useState(true);
+  const conversationId = useV2ChatContext()?.conversationId ?? null;
+
+  // A picture that does not show is reported (`chat-errors/report.ts`); a
+  // deleted file (`gone`) is not an error.
+  useEffect(() => {
+    if (failed) {
+      reportChatError({ code: 'picture_load_failed', message: "The picture's link did not load.", conversationId });
+    }
+  }, [failed, conversationId]);
+  const markBroken = () => {
+    setBroken(true);
+    reportChatError({ code: 'picture_load_failed', message: 'The picture did not paint, even from a new link.', conversationId });
+  };
 
   const box = cn(
     'relative flex shrink-0 overflow-hidden rounded-2xl bg-muted',
@@ -299,13 +314,13 @@ function PictureTile({
           }}
           onError={() => {
             if (!armed) {
-              setBroken(true);
+              markBroken();
               return;
             }
             setArmed(false);
             void onRelink().then((next) => {
               // The same link again cannot paint differently.
-              if (!next || next === url) setBroken(true);
+              if (!next || next === url) markBroken();
             });
           }}
           className={cn(

@@ -44,8 +44,10 @@ test('reconnected with nothing: no progress for 5 s after a reconnect, even with
 const engine = readFileSync(join(process.cwd(), 'v2', 'runtime', 'chat-engine', 'engine.ts'), 'utf8').replace(/\r\n/g, '\n');
 
 test('the engine checks every second, and a stall follows the turn by its status at once', () => {
-  assert.match(engine, /if \(verdict !== 'live'\) recoverFromStall\(\);\s*\}, STALL_CHECK_MS\);/);
-  const recover = engine.slice(engine.indexOf('function recoverFromStall()'), engine.indexOf('// ─── Stale-stream check'));
+  assert.match(engine, /if \(verdict !== 'live'\) recoverFromStall\(verdict\);\s*\}, STALL_CHECK_MS\);/);
+  const recover = engine.slice(engine.indexOf('function recoverFromStall('), engine.indexOf('// ─── Stale-stream check'));
+  // The server cannot see a stall: the app reports it.
+  assert.match(recover, /reportChatError\(\{\s*code: 'stream_stall'/);
   assert.match(recover, /eventSource\.close\(\);/);
   assert.match(recover, /pollForCompletion\(convId\);/);
   // Not a reconnect: the server cannot replay what the dead connection took.

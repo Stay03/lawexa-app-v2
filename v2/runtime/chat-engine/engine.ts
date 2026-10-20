@@ -76,7 +76,8 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { adoptServerFields } from './server-fields';
 import { largestSavedId, savedTurnId } from './saved-turn';
-import { STALL_CHECK_MS, stallVerdict } from './stall';
+import { STALL_CHECK_MS, stallVerdict, type StallVerdict } from './stall';
+import { reportChatError } from '../chat-errors/report';
 import type { IBlockedReason } from '@/types/message-pack';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -768,7 +769,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         lastProgressAt,
         reconnectingSince,
       });
-      if (verdict !== 'live') recoverFromStall();
+      if (verdict !== 'live') recoverFromStall(verdict);
     }, STALL_CHECK_MS);
   }
 
@@ -779,14 +780,24 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * reconnect: only the server's v2_stream path replays what a dead connection
    * missed (Last-Event-ID); the older path cannot, and a reconnect there waits on
    * an answer that never comes. The status works on both. The turn stays
-   * "working" on screen meanwhile.
+   * "working" on screen meanwhile. The server cannot see a stall, so the app
+   * reports it (`../chat-errors/report.ts`).
    */
-  function recoverFromStall() {
+  function recoverFromStall(verdict: Exclude<StallVerdict, 'live'>) {
     stopWatchdog();
     if (eventSource) {
       eventSource.close();
       eventSource = null;
     }
+    const quietMs = Date.now() - (verdict === 'silent' ? lastEventTime : reconnectingSince);
+    reportChatError({
+      code: 'stream_stall',
+      message:
+        verdict === 'silent'
+          ? `No stream event for ${Math.round(quietMs / 1000)} s; followed the turn by its status.`
+          : `Reconnected, then no progress for ${Math.round(quietMs / 1000)} s; followed the turn by its status.`,
+      conversationId,
+    });
     reconnectingSince = 0;
     reconnectCount = 0;
     const convId = conversationId;
@@ -2163,6 +2174,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // A new chat has nothing to read, and a confidential or redacted one's
       // words cannot be matched: those go straight back.
       if (err instanceof AxiosError && (!err.response || err.response.status >= 500)) {
+        // No answer at all is the one failure the server never saw (it records
+        // its own 5xx), so the app reports it.
+        if (!err.response) {
+          reportChatError({
+            code: 'send_network',
+            message: `The send got no answer from the server (${err.code ?? 'no code'}).`,
+            conversationId: convId,
+          });
+        }
         let savedId: number | null = null;
         if (convId && !isConfidentialTurnN && !isRedactedTurnN) {
           try {
