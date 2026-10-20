@@ -1643,8 +1643,12 @@
    and shadow — so this is deliberately a wash of colour rather than a box.
    Painted via CSS.highlights, which adds no elements to the judgment: nothing
    may be written into full_report, because the same text feeds the search index
-   and the AI's view of the case. */
-::highlight(judgment-passage) {
+   and the AI's view of the case.
+   Scoped to the two readers that paint it (the v2 case report and the admin
+   judgment sheet): unscoped, Chrome tested it on every element of every page
+   it restyled (the Android statute chat's Close, 20 October 2026). */
+.v2-case-doc ::highlight(judgment-passage),
+.judgment-sheet-body ::highlight(judgment-passage) {
   background-color: color-mix(in oklab, var(--primary) 26%, transparent);
   color: var(--foreground);
 }

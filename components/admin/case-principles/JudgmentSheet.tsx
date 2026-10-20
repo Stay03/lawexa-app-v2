@@ -192,7 +192,7 @@ export function JudgmentSheet({
                raw tags beginning `<p style="line-height: 150%;">`. It read
                cleanly for as long as this sheet was fetching the case SUMMARY,
                which is plain prose — a data bug hiding a rendering one. */
-            <div ref={attachBody} className="space-y-3 text-sm leading-relaxed">
+            <div ref={attachBody} className="judgment-sheet-body space-y-3 text-sm leading-relaxed">
               {paragraphs.map((paragraph, index) => (
                 <p key={index} className="whitespace-pre-line">
                   {paragraph}

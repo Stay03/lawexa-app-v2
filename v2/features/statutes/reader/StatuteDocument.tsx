@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
+import { cn } from '@/lib/utils';
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
   clearScreenContext,
@@ -776,7 +777,14 @@ export function StatuteDocument({
       <SectionLinkContext.Provider value={sectionLinks}>
         <div
           ref={docRef}
-          className="akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+          // `akn-doc--painted` only while there are notes or annotations to
+          // paint: the ::highlight rules require it, so on a statute without
+          // any, Chrome skips them for every element (the Android chat's
+          // Close restyled ~12,000 elements against them, 20 October 2026).
+          className={cn(
+            'akn-doc motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+            (statuteNotes.notes.length > 0 || annotations.length > 0) && 'akn-doc--painted',
+          )}
           // A tap on the reader's own annotation opens it; a tap on an
           // underlined print note opens the notes at that place. A drag that
           // selected text is a selection, not a tap.

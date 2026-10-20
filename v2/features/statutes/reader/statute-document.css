@@ -653,7 +653,7 @@
  * scanning for them, quiet enough to read through. A jump from the notes list
  * lands on a brief wash of the same colour.
  */
-.v2-statute-doc ::highlight(statute-note) {
+.akn-doc--painted ::highlight(statute-note) {
   text-decoration-line: underline;
   text-decoration-style: dotted;
   text-decoration-thickness: 2px;
@@ -661,7 +661,7 @@
   text-underline-offset: 0.2em;
 }
 
-.v2-statute-doc ::highlight(statute-note-active) {
+.akn-doc--painted ::highlight(statute-note-active) {
   background-color: color-mix(in oklab, var(--primary) 28%, transparent);
   color: var(--foreground);
 }
@@ -680,23 +680,23 @@ html.dark .v2-statute-doc {
   --annotation-strength: 30%;
 }
 
-.v2-statute-doc ::highlight(reader-annotation-yellow) {
+.akn-doc--painted ::highlight(reader-annotation-yellow) {
   background-color: color-mix(in oklab, #facc15 var(--annotation-strength), transparent);
 }
 
-.v2-statute-doc ::highlight(reader-annotation-green) {
+.akn-doc--painted ::highlight(reader-annotation-green) {
   background-color: color-mix(in oklab, #4ade80 var(--annotation-strength), transparent);
 }
 
-.v2-statute-doc ::highlight(reader-annotation-blue) {
+.akn-doc--painted ::highlight(reader-annotation-blue) {
   background-color: color-mix(in oklab, #60a5fa var(--annotation-strength), transparent);
 }
 
-.v2-statute-doc ::highlight(reader-annotation-pink) {
+.akn-doc--painted ::highlight(reader-annotation-pink) {
   background-color: color-mix(in oklab, #f472b6 var(--annotation-strength), transparent);
 }
 
-.v2-statute-doc ::highlight(reader-annotation-purple) {
+.akn-doc--painted ::highlight(reader-annotation-purple) {
   background-color: color-mix(in oklab, #c084fc var(--annotation-strength), transparent);
 }
 
