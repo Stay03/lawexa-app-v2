@@ -28,6 +28,7 @@ const SIBLING_LINKS = [
   { title: 'Argument Review', href: '/admin/cases/argument-review' },
   { title: 'Quiz Generation', href: '/admin/quiz/generation' },
   { title: 'Scheduled Tasks', href: '/admin/operations/scheduled-tasks' },
+  { title: 'Chat Errors', href: '/admin/operations/chat-errors' },
 ];
 
 export default function OperationsDashboardPage() {

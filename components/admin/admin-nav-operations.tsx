@@ -10,6 +10,7 @@ import {
   Radar,
   FileCode2,
   CalendarClock,
+  MessageSquareWarning,
   ChevronRight,
 } from 'lucide-react';
 import {
@@ -48,6 +49,12 @@ const opsNavItems: OpsNavItem[] = [
     title: 'Scheduled Tasks',
     url: '/admin/operations/scheduled-tasks',
     icon: CalendarClock,
+    superadminOnly: true,
+  },
+  {
+    title: 'Chat Errors',
+    url: '/admin/operations/chat-errors',
+    icon: MessageSquareWarning,
     superadminOnly: true,
   },
 ];
