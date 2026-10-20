@@ -2,9 +2,15 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Download, Loader2, Pencil } from 'lucide-react';
+import { Download, FileText, FileType2, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
@@ -73,7 +79,7 @@ export function NoteActions({
       />
       {canAddToFolder ? <AddToFolderButton target={{ type: 'note', contentId: noteId }} /> : null}
       <ShareButton path={`/notes/${slug}`} title={title} label="Share this note" />
-      {canExport ? <ExportDocxButton slug={slug} /> : null}
+      {canExport ? <ExportMenu slug={slug} /> : null}
       {editHref ? (
         <Link href={editHref} className={cn(ACTION_PILL, FOCUS_RING)}>
           <Pencil aria-hidden className="size-4" />
@@ -85,8 +91,15 @@ export function NoteActions({
   );
 }
 
+/** The two files a note exports to (Stay chose PDF next to Word, 20 October 2026). */
+const EXPORT_FORMATS = {
+  docx: { label: 'Word document', extension: 'docx', fetch: notesApi.exportDocx, icon: FileText },
+  pdf: { label: 'PDF', extension: 'pdf', fetch: notesApi.exportPdf, icon: FileType2 },
+} as const;
+type ExportFormat = keyof typeof EXPORT_FORMATS;
+
 /**
- * Download the note as DOCX.
+ * Download the note as a Word document or a PDF, from one Export menu.
  *
  * THE ROUTE IS GONE, THE BUTTON REMAINS. v1 had a whole PAGE at
  * `/notes/{slug}/export-docx` whose only job was to fire this request on mount
@@ -104,7 +117,7 @@ export function NoteActions({
  * this one", which is a different sentence from "the download failed", and a
  * reader who sees the generic one will try again forever.
  */
-function ExportDocxButton({ slug }: { slug: string }) {
+function ExportMenu({ slug }: { slug: string }) {
   const [exporting, setExporting] = useState(false);
   const revokeRef = useRef<number | null>(null);
 
@@ -115,15 +128,15 @@ function ExportDocxButton({ slug }: { slug: string }) {
     [],
   );
 
-  const download = async () => {
+  const download = async (format: ExportFormat) => {
     if (exporting) return;
     setExporting(true);
     try {
-      const blob = await notesApi.exportDocx(slug);
+      const blob = await EXPORT_FORMATS[format].fetch(slug);
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `${slug}.docx`;
+      anchor.download = `${slug}.${EXPORT_FORMATS[format].extension}`;
       anchor.rel = 'noreferrer noopener';
       document.body.append(anchor);
       anchor.click();
@@ -147,24 +160,38 @@ function ExportDocxButton({ slug }: { slug: string }) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={() => void download()}
-      // `aria-disabled`, not `disabled`: a real `disabled` would yank focus to
-      // `<body>` the instant the press lands. The guard in the handler is what
-      // actually stops a second request.
-      aria-disabled={exporting}
-      className={cn(ACTION_PILL, FOCUS_RING)}
-    >
-      {exporting ? (
-        <Loader2
-          aria-hidden
-          className="size-4 motion-safe:animate-spin motion-reduce:opacity-60"
-        />
-      ) : (
-        <Download aria-hidden className="size-4" />
-      )}
-      <span aria-live="polite">{exporting ? 'Exporting…' : 'Export'}</span>
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          // `aria-disabled`, not `disabled`: a real `disabled` would yank focus to
+          // `<body>` the instant the press lands. The guard in the handler is what
+          // actually stops a second request.
+          aria-disabled={exporting}
+          className={cn(ACTION_PILL, FOCUS_RING)}
+        >
+          {exporting ? (
+            <Loader2
+              aria-hidden
+              className="size-4 motion-safe:animate-spin motion-reduce:opacity-60"
+            />
+          ) : (
+            <Download aria-hidden className="size-4" />
+          )}
+          <span aria-live="polite">{exporting ? 'Exporting…' : 'Export'}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-48">
+        {(Object.keys(EXPORT_FORMATS) as ExportFormat[]).map((format) => {
+          const { label, icon: Icon } = EXPORT_FORMATS[format];
+          return (
+            <DropdownMenuItem key={format} disabled={exporting} onSelect={() => void download(format)}>
+              <Icon aria-hidden className="size-4" />
+              {label}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

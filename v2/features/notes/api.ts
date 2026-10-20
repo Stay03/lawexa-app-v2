@@ -105,6 +105,16 @@ export const notesApi = {
     return response.data;
   },
 
+  /** Download the note as PDF (server renders from the stored HTML, with the
+   *  same access rules as DOCX; backend e39c8367). */
+  exportPdf: async (slug: string): Promise<Blob> => {
+    const response = await apiClient.get(
+      `/notes/${encodeURIComponent(slug)}/export-pdf`,
+      { responseType: 'blob' },
+    );
+    return response.data;
+  },
+
   /** Upload an image for embedding in note content (jpg/png/gif/webp, ≤5MB). */
   uploadImage: async (file: File): Promise<NoteImageUpload> => {
     const formData = new FormData();
