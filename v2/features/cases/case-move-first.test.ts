@@ -55,6 +55,7 @@ test('the case links move first, and the list still does not prefetch', () => {
   const preview = read('v2', 'features', 'conversations', 'conversation', 'markdown', 'CasePreview.tsx');
   assert.equal(preview.match(/<MoveFirstLink\s+href=\{href\}\s+kind="case"/g)?.length, 2);
   // The preview's "Open case" leaves the case's name for the frame, as a row does.
-  assert.match(preview, /onClick=\{\(\) =>\s*rememberCasePeek\(\{\s*id: detail\.id,\s*slug,\s*title,/);
+  // (The click reports the chat rating moment first, chat-rating.test.ts.)
+  assert.match(preview, /onClick=\{\(\) => \{\s*noteMoment\('cited_case'\);\s*rememberCasePeek\(\{\s*id: detail\.id,\s*slug,\s*title,/);
   assert.match(preview, /onMove=\{onOpen\}/);
 });

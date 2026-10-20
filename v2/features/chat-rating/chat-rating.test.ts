@@ -106,7 +106,10 @@ test('the moments are hooked where they happen, and only inside an answer', () =
   assert.match(link, /onClick=\{\(\) => noteMoment\('cited_case'\)\}/);
   assert.match(link, /onOpen=\{\(\) => noteMoment\('cited_case'\)\}/);
   const preview = read('v2', 'features', 'conversations', 'conversation', 'markdown', 'CasePreview.tsx');
-  assert.equal(preview.match(/onClick=\{\(\) => noteMoment\('cited_case'\)\}/g)?.length, 2);
+  // "Open case" in the preview's body reports the moment, then leaves the
+  // case's name for the move-first frame; the error state's "Open case" reports it alone.
+  assert.match(preview, /onClick=\{\(\) => \{\s*noteMoment\('cited_case'\);\s*rememberCasePeek\(/);
+  assert.equal(preview.match(/onClick=\{\(\) => noteMoment\('cited_case'\)\}/g)?.length, 1);
   // A note's case link uses the same component: outside an answer, nothing is reported.
   const scope = read('v2', 'features', 'chat-rating', 'answer-scope.tsx');
   assert.match(scope, /createContext<number \| null \| undefined>\(undefined\)/);
