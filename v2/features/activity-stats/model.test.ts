@@ -16,8 +16,8 @@ import {
 } from './model';
 
 /* The Activity stats page (Stay, 29 September 2026; built 20 October 2026 on
- * backend's GET /me/activity): lifetime totals, streaks, a daily grid, and a
- * switch between 12, 6 and 3 months and 30 days. */
+ * backend's GET /me/activity): streaks, a daily grid, and a switch between 12,
+ * 6 and 3 months and 30 days. */
 
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8').replace(/\r\n/g, '\n');
 
@@ -60,11 +60,13 @@ test('numbers and dates read the way the page prints them', () => {
   assert.equal(streakSpan(0, null), '');
 });
 
-test('the page shows all-time totals, both streaks, the switch, the grid and the period’s counts', () => {
+test('the page opens on both streaks, then the switch, the grid and the period’s counts', () => {
   const screen = read('v2', 'features', 'activity-stats', 'StatsScreen.tsx');
-  assert.match(screen, /<TotalsGrid totals=\{data\.lifetime\} \/>/);
-  // Exact numbers: "1,973", never "2k" (first pictures, 20 October 2026).
-  assert.match(screen, /\{value\.toLocaleString\('en-GB'\)\}/);
+  // No all-time totals (Stay, 20 October 2026: "remove them only keep the two streak").
+  assert.doesNotMatch(screen, /lifetime|All time|TotalsGrid/);
+  assert.match(screen, /<StatsHeading \/>\s*<section aria-label="Streaks" className="grid grid-cols-2 gap-3">/);
+  // Exact numbers: "1,672", never "1.7k" (first pictures, 20 October 2026).
+  assert.match(screen, /typeof value === 'number' \? value\.toLocaleString\('en-GB'\) : value/);
   // A year fits a computer's column: 10 px squares, 2 px gaps.
   assert.match(screen, /className=\{cn\('size-2\.5 rounded-\[2px\]', LEVEL\[cell\.level\]\)\}/);
   assert.match(screen, /label="Current streak"/);

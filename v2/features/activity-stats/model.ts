@@ -42,10 +42,8 @@ export interface StatsData {
   from: string;
   to: string;
   timezone: string;
-  /** For the chosen period. */
+  /** For the chosen period. (The server also sends `lifetime`, which the page does not show.) */
   totals: StatsTotals;
-  /** Over the reader's whole history. */
-  lifetime: StatsTotals;
   /** Over the whole history, whatever the period; today with nothing yet keeps a streak. */
   streak: {
     current: number;

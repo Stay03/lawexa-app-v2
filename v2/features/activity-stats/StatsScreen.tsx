@@ -28,16 +28,16 @@ const PANEL_ID = 'stats-period-panel';
 
 /**
  * StatsScreen — `/activity/stats`: the reader's own record in Lawexa (Stay,
- * 29 September 2026: "I also want a page like this"; the ask: lifetime totals,
- * streaks, a daily grid, and a switch between 12, 6 and 3 months and 30 days).
+ * 29 September 2026: "I also want a page like this"; the ask: streaks, a daily
+ * grid, and a switch between 12, 6 and 3 months and 30 days).
  *
- * THREE PARTS, TOP DOWN. All time: what the reader has done since they joined.
- * Streaks: current and longest, which cover the whole history whatever the
- * period says. Then the period: the switch, a grid of active days, and the
- * period's own counts. Every number is the server's (`GET /me/activity`).
+ * TWO PARTS, TOP DOWN. The streaks: current and longest, which cover the
+ * whole history whatever the period says. Then the period: the switch, a grid
+ * of active days, and the period's own counts. Every number is the server's
+ * (`GET /me/activity`).
  *
- * The server's `top_tools` and `insights` are left out: Stay's ask did not
- * name them, and the page reads cleaner without them.
+ * Left out: the all-time totals (Stay, 20 October 2026: "remove them only keep
+ * the two streak"), and the server's `top_tools` and `insights`.
  */
 export function StatsScreen() {
   const { signedIn, role, userId: viewerId } = useV2Session();
@@ -85,14 +85,7 @@ export function StatsScreen() {
     <div className={cn(STATS_COLUMN, 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200')}>
       <StatsHeading />
 
-      <section aria-labelledby="stats-all-time">
-        <h2 id="stats-all-time" className="mb-3 text-[15px] font-semibold text-foreground">
-          All time
-        </h2>
-        <TotalsGrid totals={data.lifetime} />
-      </section>
-
-      <section aria-label="Streaks" className="mt-4 grid grid-cols-2 gap-3">
+      <section aria-label="Streaks" className="grid grid-cols-2 gap-3">
         <StreakCard
           label="Current streak"
           value={dayCount(data.streak.current)}
@@ -153,29 +146,6 @@ export function StatsScreen() {
         </div>
       </section>
     </div>
-  );
-}
-
-/** Six all-time numbers, three across on a computer and two on a phone. */
-function TotalsGrid({ totals }: { totals: StatsTotals }) {
-  const cells = [
-    ['Chats', totals.chats_started],
-    ['Messages', totals.messages_sent],
-    ['Cases read', totals.cases_read],
-    ['Statutes read', totals.statutes_read],
-    ['Notes written', totals.notes_written],
-    ['Active days', totals.active_days],
-  ] as const;
-  return (
-    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-border/40 sm:grid-cols-3">
-      {cells.map(([label, value]) => (
-        // The number reads first; the term comes first in the markup, as a `dl` needs.
-        <div key={label} className="flex flex-col-reverse gap-0.5 bg-card px-4 py-3">
-          <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="text-xl font-semibold tracking-tight text-foreground tabular-nums">{value.toLocaleString('en-GB')}</dd>
-        </div>
-      ))}
-    </dl>
   );
 }
 

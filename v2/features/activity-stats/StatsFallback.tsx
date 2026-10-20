@@ -27,9 +27,7 @@ export function StatsFallback() {
       </span>
       <div aria-hidden inert className={STATS_COLUMN}>
         <Skeleton className="mb-5 hidden h-8 w-36 rounded-lg md:block" />
-        <Skeleton className="mb-3 h-5 w-16 rounded" />
-        <Skeleton className="h-[10.25rem] w-full rounded-2xl sm:h-[6.875rem]" />
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <Skeleton className="h-[5.25rem] rounded-2xl" />
           <Skeleton className="h-[5.25rem] rounded-2xl" />
         </div>
