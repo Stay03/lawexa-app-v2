@@ -53,6 +53,16 @@ export interface CaseRowModel {
   holding: string | null;
   tags: string[];
   isBookmarked: boolean;
+  /**
+   * The case page's own header facts, as far as the list knows them, so the
+   * frame a tap paints draws the header the page will (`CaseHeader.tsx`). The
+   * citation is the whole field, as the page prints it; null is "not known
+   * here" (the trending list carries none of the last three).
+   */
+  fullCitation: string | null;
+  topic: string | null;
+  isVerified: boolean;
+  bookmarksCount: number | null;
 }
 
 export function browseRow(item: Case): CaseRowModel {
@@ -70,6 +80,10 @@ export function browseRow(item: Case): CaseRowModel {
     holding: item.principles?.trim() || item.excerpt?.trim() || null,
     tags: item.tags ?? [],
     isBookmarked: item.is_bookmarked,
+    fullCitation: item.citation?.trim() || null,
+    topic: item.topic?.trim() || null,
+    isVerified: item.is_verified === true,
+    bookmarksCount: item.bookmarks_count,
   };
 }
 
@@ -88,6 +102,10 @@ export function trendingRow(item: TrendingCaseDetailItem): CaseRowModel {
     holding: item.principles?.trim() || null,
     tags: item.tags ?? [],
     isBookmarked: item.is_bookmarked,
+    fullCitation: item.citation?.trim() || null,
+    topic: null,
+    isVerified: false,
+    bookmarksCount: null,
   };
 }
 

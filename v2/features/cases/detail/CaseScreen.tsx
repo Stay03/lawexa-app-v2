@@ -106,9 +106,10 @@ function CaseBody({ slug }: { slug: string }) {
   // otherwise replay the fade and blink the whole case once (measured on the
   // option 2 prototype, 7 October 2026).
   //
-  // A tapped row's name already on screen (`case-peek.ts`, speed step 4) stays
-  // still: the kicker and the name do not fade, everything else does
-  // (`v2-case-arrive-peeked` in case-document.css).
+  // A tapped row's heading block already on screen (`case-peek.ts`, drawn by
+  // the same `CaseHeader`) stays still, and so does the ask box the frame drew:
+  // only the body fades in (`v2-case-arrive-peeked` in case-document.css; Stay,
+  // 20 October 2026: "The loading is jumpy").
   const peeked = useCasePeek(slug) !== null;
   const [arrival] = useState(() => (query.isPending ? (peeked ? 'peeked' : 'fade') : 'none'));
   const arrive =
@@ -225,7 +226,7 @@ function CaseBody({ slug }: { slug: string }) {
             onClose={closeChat}
             onDock={() => setDockedPref(true)}
             onOpenChat={switchChat}
-            arrive={arrival !== 'none'}
+            arrive={arrival === 'fade'}
           />
         ) : null}
       </div>

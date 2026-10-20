@@ -18,7 +18,19 @@ import type { CaseRowModel } from './case-row-model';
  */
 export type CasePeek = Pick<
   CaseRowModel,
-  'slug' | 'title' | 'rawTitle' | 'court' | 'countryCode' | 'countryName' | 'judgmentDate'
+  | 'id'
+  | 'slug'
+  | 'title'
+  | 'rawTitle'
+  | 'court'
+  | 'countryCode'
+  | 'countryName'
+  | 'judgmentDate'
+  | 'fullCitation'
+  | 'topic'
+  | 'isVerified'
+  | 'isBookmarked'
+  | 'bookmarksCount'
 >;
 
 let last: CasePeek | null = null;
@@ -26,6 +38,7 @@ const listeners = new Set<() => void>();
 
 export function rememberCasePeek(row: CasePeek): void {
   last = {
+    id: row.id,
     slug: row.slug,
     title: row.title,
     rawTitle: row.rawTitle,
@@ -33,6 +46,11 @@ export function rememberCasePeek(row: CasePeek): void {
     countryCode: row.countryCode,
     countryName: row.countryName,
     judgmentDate: row.judgmentDate,
+    fullCitation: row.fullCitation,
+    topic: row.topic,
+    isVerified: row.isVerified,
+    isBookmarked: row.isBookmarked,
+    bookmarksCount: row.bookmarksCount,
   };
   for (const listener of listeners) listener();
 }

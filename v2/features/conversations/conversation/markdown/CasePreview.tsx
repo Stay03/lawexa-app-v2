@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { CaseDetail } from '@/types/case';
 import { formatCaseName } from '@/v2/features/cases/case-name';
 import { rememberCasePeek } from '@/v2/features/cases/case-peek';
+import { toAlpha2 } from '@/v2/features/cases/case-row-model';
 import { casesQueries } from '@/v2/features/cases/queries';
 import { MoveFirstLink } from '@/v2/shell/move-first';
 
@@ -148,13 +149,19 @@ function PreviewBody({
         // row's tap does (case-peek.ts).
         onClick={() =>
           rememberCasePeek({
+            id: detail.id,
             slug,
             title,
             rawTitle: detail.display_title || detail.title,
             court: court || null,
-            countryCode: null,
-            countryName: null,
+            countryCode: toAlpha2(detail.country?.code, detail.country?.abbreviation),
+            countryName: detail.country?.name ?? null,
             judgmentDate: detail.judgment_date ?? null,
+            fullCitation: detail.citation?.trim() || null,
+            topic: detail.topic?.trim() || null,
+            isVerified: detail.is_verified === true,
+            isBookmarked: detail.is_bookmarked,
+            bookmarksCount: detail.bookmarks_count,
           })
         }
         onMove={onOpen}

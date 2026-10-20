@@ -3,10 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { ArrowUp, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isAccountRole } from '@/v2/runtime/account';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { FlagIcon } from '@/v2/shell/FlagIcon';
 import { useCasePeek, type CasePeek } from '../case-peek';
-import { formatCaseDate } from '../case-row-model';
+import { CaseActionsShape } from './CaseActionsShape';
+import { CaseHeader } from './CaseHeader';
 import { CaseDocumentSkeleton } from './states';
 import './case-masthead.css';
 
@@ -49,7 +50,10 @@ export function CaseFallback() {
  */
 export function CaseFallbackFor({ slug }: { slug: string | undefined }) {
   const peek = useCasePeek(slug);
-  const { signedIn } = useV2Session();
+  const { signedIn: sessionSignedIn, role } = useV2Session();
+  // The page's own rule (`CaseScreen`): the ask box is an account's, and a
+  // guest pass reads the case as a visitor.
+  const signedIn = sessionSignedIn && isAccountRole(role);
   return (
     <>
       <span role="status" className="sr-only">
@@ -62,7 +66,7 @@ export function CaseFallbackFor({ slug }: { slug: string | undefined }) {
             !signedIn && 'pb-24',
           )}
         >
-          <CaseDocumentSkeleton masthead={peek ? <PeekMasthead peek={peek} /> : undefined} />
+          <CaseDocumentSkeleton header={peek ? <PeekHeader peek={peek} /> : undefined} />
           {signedIn ? <CaseAskShell /> : null}
         </div>
       </div>
@@ -108,32 +112,35 @@ function CaseAskShell() {
   );
 }
 
-/** The kicker and the name exactly as `CaseDocument`'s header sets them. The
- *  verified mark is left out: the row does not know it, and it joins the end
- *  of the kicker when the case arrives. */
-function PeekMasthead({ peek }: { peek: CasePeek }) {
-  const date = formatCaseDate(peek.judgmentDate, 'long');
+/**
+ * The page's heading block, drawn from the tapped row's facts by the page's own
+ * `CaseHeader` (Stay, 20 October 2026: "The loading is jumpy"). What the row
+ * does not carry (the suit number, the outcome, whether there is a full
+ * judgment) is left out, and only those can add height when the case arrives.
+ */
+function PeekHeader({ peek }: { peek: CasePeek }) {
   return (
-    <div className="v2-case-doc contents">
-      <p className="doc-kicker flex flex-wrap items-center gap-x-2 gap-y-1">
-        {peek.countryCode ? (
-          <FlagIcon code={peek.countryCode} title={peek.countryName ?? undefined} className="-mt-px" />
-        ) : null}
-        {peek.court ? <span>{peek.court}</span> : null}
-        {date ? (
-          <>
-            {peek.court ? (
-              <span aria-hidden className="text-muted-foreground/40">
-                ·
-              </span>
-            ) : null}
-            <span className="tabular-nums">{date}</span>
-          </>
-        ) : null}
-      </p>
-      <h1 className="doc-title text-foreground" title={peek.rawTitle}>
-        {peek.title}
-      </h1>
-    </div>
+    <CaseHeader
+      facts={{
+        countryCode: peek.countryCode,
+        countryName: peek.countryName,
+        court: peek.court,
+        judgmentDate: peek.judgmentDate,
+        isVerified: peek.isVerified,
+        name: peek.title,
+        rawTitle: peek.rawTitle,
+        citation: peek.fullCitation,
+        suitNo: null,
+        topic: peek.topic,
+        outcome: null,
+      }}
+      actions={
+        <CaseActionsShape
+          fullReport={false}
+          isBookmarked={peek.isBookmarked}
+          bookmarksCount={peek.bookmarksCount}
+        />
+      }
+    />
   );
 }

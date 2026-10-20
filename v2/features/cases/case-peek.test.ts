@@ -25,11 +25,16 @@ const ROW: CaseRowModel = {
   holding: 'A holding.',
   tags: [],
   isBookmarked: false,
+  fullCitation: '(2020) LPELR-1; (2020) 4 NWLR (Pt. 1700) 1',
+  topic: 'Tenancy',
+  isVerified: true,
+  bookmarksCount: 3,
 };
 
 test('the tap keeps the row\'s own facts, for that case only', () => {
   rememberCasePeek(ROW);
   assert.deepEqual(casePeekFor('ada-v-obi'), {
+    id: 9,
     slug: 'ada-v-obi',
     title: 'Ada v Obi',
     rawTitle: 'ADA V. OBI',
@@ -37,6 +42,11 @@ test('the tap keeps the row\'s own facts, for that case only', () => {
     countryCode: 'NG',
     countryName: 'Nigeria',
     judgmentDate: '2020-03-04',
+    fullCitation: '(2020) LPELR-1; (2020) 4 NWLR (Pt. 1700) 1',
+    topic: 'Tenancy',
+    isVerified: true,
+    isBookmarked: false,
+    bookmarksCount: 3,
   });
   // Another case, or no case, draws the plain skeleton.
   assert.equal(casePeekFor('other-case'), null);
@@ -54,11 +64,20 @@ test('the row leaves its facts on the tap, and both waits draw them', () => {
   // The route's boundary reads the slug from the address; the tap's frame passes its own.
   assert.match(fallback, /return <CaseFallbackFor slug=\{slugOf\(usePathname\(\)\)\} \/>;/);
   assert.match(fallback, /const peek = useCasePeek\(slug\);/);
-  assert.match(fallback, /<CaseDocumentSkeleton masthead=\{peek \? <PeekMasthead peek=\{peek\} \/> : undefined\} \/>/);
-  // The masthead's own classes and type, so the case arriving moves nothing.
-  assert.match(fallback, /<p className="doc-kicker flex flex-wrap items-center gap-x-2 gap-y-1">/);
-  assert.match(fallback, /<h1 className="doc-title text-foreground" title=\{peek\.rawTitle\}>/);
+  assert.match(fallback, /<CaseDocumentSkeleton header=\{peek \? <PeekHeader peek=\{peek\} \/> : undefined\} \/>/);
+  // The page's own heading block, from the row's facts, so the case arriving moves nothing
+  // (Stay, 20 October 2026: "The loading is jumpy").
+  assert.match(fallback, /<CaseHeader\s*facts=\{\{/);
+  assert.match(fallback, /citation: peek\.fullCitation,/);
+  assert.match(fallback, /topic: peek\.topic,/);
+  assert.match(fallback, /isVerified: peek\.isVerified,/);
+  assert.match(fallback, /<CaseActionsShape\s*fullReport=\{false\}\s*isBookmarked=\{peek\.isBookmarked\}\s*bookmarksCount=\{peek\.bookmarksCount\}/);
+  assert.match(read('detail', 'CaseDocument.tsx'), /<CaseHeader\s*facts=\{\{/);
   assert.match(fallback, /import '\.\/case-masthead\.css';/);
+  // The still actions row has the real one's pills and words, and none of its weight.
+  const shape = read('detail', 'CaseActionsShape.tsx');
+  for (const word of ['Full judgment', "'Saved' : 'Save'", 'Add to folder', 'Share', 'Feedback']) assert.ok(shape.includes(word), word);
+  assert.doesNotMatch(shape, /FolderPicker|FeedbackButton|AddToFolderButton/);
   // Still no screen behind the loading boundary.
   assert.doesNotMatch(fallback, /from '\.\/Case(Screen|Document|Ask|ChatCore|ChatPanel)'/);
   // The screen's own wait is the same shape.
@@ -66,11 +85,12 @@ test('the row leaves its facts on the tap, and both waits draw them', () => {
   assert.match(screen, /if \(query\.isPending\) return <CaseFallback \/>;/);
 });
 
-test('the kicker and the name do not fade when the case arrives under them', () => {
+test('the heading block and the ask box do not fade when the case arrives under them', () => {
   const screen = read('detail', 'CaseScreen.tsx');
   assert.match(screen, /arrival === 'peeked'\s*\? 'v2-case-arrive-peeked'/);
+  assert.match(screen, /arrive=\{arrival === 'fade'\}/);
   const css = read('detail', 'case-document.css');
-  assert.match(css, /\.v2-case-arrive-peeked :where\(article > :not\(header\), article > header > :not\(\.doc-kicker, \.doc-title\)\)/);
+  assert.match(css, /\.v2-case-arrive-peeked :where\(article > :not\(header\)\)/);
   // The masthead's type lives in its own file, loaded by both.
   assert.match(read('detail', 'CaseDocument.tsx'), /import '\.\/case-masthead\.css';/);
   const masthead = read('detail', 'case-masthead.css');

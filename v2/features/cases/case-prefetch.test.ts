@@ -74,7 +74,8 @@ test('a case screen that mounts with the case in hand does not replay its fade (
   assert.match(screen, /const \[arrival\] = useState\(\(\) => \(query\.isPending \? \(peeked \? 'peeked' : 'fade'\) : 'none'\)\);/);
   // The document wrapper also goes inert under the phone chat (11 October 2026).
   assert.match(screen, /<div className=\{arrive\} inert=\{pageUnderChat\}>\s*<CaseDocument/);
-  assert.match(screen, /arrive=\{arrival !== 'none'\}/);
+  // The ask box fades in only when nothing drew it before (a peeked frame did).
+  assert.match(screen, /arrive=\{arrival === 'fade'\}/);
   assert.doesNotMatch(screen, /className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">\s*<CaseDocument/);
   // The dock skips its arrival fade while the phone chat is open: the fade's
   // transform would make the dock the containing block of the fixed screen.

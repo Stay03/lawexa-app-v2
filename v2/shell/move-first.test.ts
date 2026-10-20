@@ -72,9 +72,11 @@ test('the layer slides in opaque: its keyframe moves, it never fades', () => {
   assert.doesNotMatch(body, /opacity/);
 });
 
-test('the layer covers the region below the bar, where the destination draws', () => {
-  assert.match(moveFirst, /const barInset = parseFloat\(getComputedStyle\(region\)\.paddingTop\) \|\| 0;/);
-  assert.match(moveFirst, /top: box\.top \+ barInset, left: box\.left, width: box\.width, height: box\.height - barInset/);
+test('the layer covers the whole region, the band under the bar too, and pads its content down to where the destination draws', () => {
+  // Stay, 20 October 2026: "Top part of the list stays in the view case page".
+  assert.match(moveFirst, /const inset = parseFloat\(getComputedStyle\(region\)\.paddingTop\) \|\| 0;/);
+  assert.match(moveFirst, /return \{ top: box\.top, left: box\.left, width: box\.width, height: box\.height, inset \};/);
+  assert.match(moveFirst, /height: move\.rect\.height,\s*paddingTop: move\.rect\.inset,/);
 });
 
 test('the destination header is published in the tap, before the frame', () => {

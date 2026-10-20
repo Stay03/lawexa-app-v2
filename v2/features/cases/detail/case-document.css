@@ -136,12 +136,12 @@
 /* ── A first open that drew the tapped row's name (speed step 4) ────────── */
 
 /**
- * The case arriving after the loading screen drew the tapped row's kicker and
- * name (`CaseFallback`): those two stay as they are, and everything else in
- * the document fades in, so the name does not blink out and back in.
+ * The case arriving after the loading screen drew the tapped row's heading
+ * block (`CaseFallback`, the same `CaseHeader`): the header stays as it is and
+ * the body fades in, so nothing already on screen blinks out and back in.
  */
 @media (prefers-reduced-motion: no-preference) {
-  .v2-case-arrive-peeked :where(article > :not(header), article > header > :not(.doc-kicker, .doc-title)) {
+  .v2-case-arrive-peeked :where(article > :not(header)) {
     animation: v2-case-arrive 300ms ease-out both;
   }
 }

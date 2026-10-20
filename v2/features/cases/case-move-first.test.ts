@@ -26,7 +26,9 @@ test('the shell has a case frame, and it is the case page\'s own loading shape',
 test('the loading shape ends in the ask box, in the page\'s own column, so nothing moves at the hand-off', () => {
   const fallback = read('v2', 'features', 'cases', 'detail', 'CaseFallback.tsx');
   // A visitor without an account gets no box, on the page or in the frame (19 October 2026).
-  assert.match(fallback, /<CaseDocumentSkeleton masthead=\{peek \? <PeekMasthead peek=\{peek\} \/> : undefined\} \/>\s*\{signedIn \? <CaseAskShell \/> : null\}/);
+  assert.match(fallback, /<CaseDocumentSkeleton header=\{peek \? <PeekHeader peek=\{peek\} \/> : undefined\} \/>\s*\{signedIn \? <CaseAskShell \/> : null\}/);
+  // The page's own rule for who gets the box: an account, not a guest pass.
+  assert.match(fallback, /const signedIn = sessionSignedIn && isAccountRole\(role\);/);
   // CaseScreen's column: a full-height flex column, the box pinned at its
   // bottom, and the visitor's bottom room in place of the box.
   const column = /'v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8',\s*!signedIn && 'pb-24',/;
@@ -53,6 +55,6 @@ test('the case links move first, and the list still does not prefetch', () => {
   const preview = read('v2', 'features', 'conversations', 'conversation', 'markdown', 'CasePreview.tsx');
   assert.equal(preview.match(/<MoveFirstLink\s+href=\{href\}\s+kind="case"/g)?.length, 2);
   // The preview's "Open case" leaves the case's name for the frame, as a row does.
-  assert.match(preview, /onClick=\{\(\) =>\s*rememberCasePeek\(\{\s*slug,\s*title,/);
+  assert.match(preview, /onClick=\{\(\) =>\s*rememberCasePeek\(\{\s*id: detail\.id,\s*slug,\s*title,/);
   assert.match(preview, /onMove=\{onOpen\}/);
 });

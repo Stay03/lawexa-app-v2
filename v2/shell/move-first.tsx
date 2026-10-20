@@ -117,8 +117,9 @@ interface PendingMove {
   href: string;
   kind: MoveFirstKind;
   title?: string;
-  /** Where the content region sat at the tap; the layer covers exactly that. */
-  rect: { top: number; left: number; width: number; height: number };
+  /** Where the content region sat at the tap; the layer covers exactly that.
+   *  `inset` is the region's own top padding (the see-through bar's height). */
+  rect: { top: number; left: number; width: number; height: number; inset: number };
   /** `painting` until the navigation starts; the same transition that commits
    *  the new screen moves it to `navigating`, so the layer's last frame is the
    *  frame before the new screen's first. */
@@ -193,16 +194,19 @@ const PENDING_MOVE_KEY = '__v2PendingMove';
 const PENDING_KIND_KEY = '__v2PendingKind';
 
 /**
- * Where the layer goes: the content region BELOW the bar. On a top-level screen
- * the region starts under a see-through bar and pads itself down by the bar's
- * height; the screens a tap goes to have an opaque bar above their region.
- * Copying the raw rect put the frame 56 px too high, over the bar, and the real
- * screen then dropped it 56 px (frame strip, 8 October 2026).
+ * Where the layer goes: the whole content region, padded down by the region's
+ * own top padding. On a top-level screen the region starts under a see-through
+ * bar and pads itself down by the bar's height, and the list scrolls under that
+ * bar. The layer covers the band too, so nothing of the list shows through it
+ * (Stay, 20 October 2026, 15:09Z: "Top part of the list stays in the view case
+ * page"), and its padding keeps the frame's content where the screen it opens
+ * puts its own: copying the raw rect without the padding put the frame 56 px
+ * too high (frame strip, 8 October 2026).
  */
 function layerRect(region: HTMLElement): PendingMove['rect'] {
   const box = region.getBoundingClientRect();
-  const barInset = parseFloat(getComputedStyle(region).paddingTop) || 0;
-  return { top: box.top + barInset, left: box.left, width: box.width, height: box.height - barInset };
+  const inset = parseFloat(getComputedStyle(region).paddingTop) || 0;
+  return { top: box.top, left: box.left, width: box.width, height: box.height, inset };
 }
 
 /**
@@ -437,7 +441,13 @@ function PendingScreen({ move }: { move: PendingMove }) {
   return (
     <div
       className="v2-move-first fixed z-40 flex flex-col overflow-hidden bg-background"
-      style={{ top: move.rect.top, left: move.rect.left, width: move.rect.width, height: move.rect.height }}
+      style={{
+        top: move.rect.top,
+        left: move.rect.left,
+        width: move.rect.width,
+        height: move.rect.height,
+        paddingTop: move.rect.inset,
+      }}
     >
       <span role="status" className="sr-only">
         {move.title ? `Opening ${move.title}` : 'Opening'}

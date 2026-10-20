@@ -26,55 +26,52 @@ export const CASE_COLUMN = 'mx-auto w-full max-w-3xl px-4 pb-24 pt-5 sm:pt-8';
  * two different appearances only prints a seam into the middle of the load.
  */
 export function CaseDocumentSkeleton({
-  masthead,
+  header,
 }: {
-  /** The kicker and the name already known (a tapped row's, `CaseFallback`),
-   *  drawn in place of their two bars. */
-  masthead?: ReactNode;
+  /** The heading block already known (a tapped row's `CaseHeader`,
+   *  `CaseFallback`), drawn in place of its silhouette. */
+  header?: ReactNode;
 } = {}) {
   return (
     <div aria-hidden className="flex flex-col gap-9">
-      {/* The header silhouette: kicker · name · citation · topic · outcome ·
-          actions. */}
-      <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
-        {masthead ?? (
-          <>
-            <Skeleton className="h-3 w-48 rounded" />
-            <Skeleton className="h-8 w-4/5 rounded-lg md:h-9" />
-          </>
-        )}
-        <Skeleton className="h-3.5 w-2/5 rounded" />
-        <Skeleton className="h-4 w-3/5 rounded" />
-        <Skeleton className="h-6 w-28 rounded-full" />
-        <div className="flex gap-2">
-          <Skeleton className="h-9 w-24 rounded-full" />
-          <Skeleton className="h-9 w-24 rounded-full" />
-        </div>
-      </div>
-
-      {/* The principles silhouette: numeral gutter + two lines of law. */}
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-4 w-32 rounded" />
-        <div className="flex gap-4">
-          <Skeleton className="mt-1 h-3 w-6 shrink-0 rounded" />
-          <div className="min-w-0 flex-1 space-y-2">
-            <Skeleton className="h-4 w-full rounded" />
-            <Skeleton className="h-4 w-11/12 rounded" />
+      {/* The header silhouette: kicker · name · citation · topic · actions. */}
+      {header ?? (
+        <div className="flex flex-col gap-3 border-b border-border/60 pb-6">
+          <Skeleton className="h-4 w-48 rounded" />
+          <Skeleton className="h-[1.2em] w-4/5 rounded-lg doc-title" />
+          <Skeleton className="h-6 w-2/5 rounded" />
+          <Skeleton className="h-[1.4375rem] w-3/5 rounded" />
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-9 w-[5.6rem] rounded-full" />
+            <Skeleton className="h-9 w-[8.3rem] rounded-full" />
+            <Skeleton className="h-9 w-[5.5rem] rounded-full" />
+            <Skeleton className="h-9 w-[6.9rem] rounded-full" />
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-4 w-28 rounded" />
-        <div className="space-y-2">
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Skeleton
-              key={index}
-              className="h-4 rounded"
-              style={{ width: `${[100, 97, 99, 92, 100, 68][index]}%` }}
-            />
-          ))}
-        </div>
+      {/* The principles and the summary: a section heading, then lines at the
+          reading text's own pitch (`.doc-prose`, 17px/1.75, 18px/1.8 from md),
+          so the text starts where the bars did. */}
+      <SkeletonSection lines={[100, 96, 99, 70]} />
+      <SkeletonSection lines={[100, 97, 99, 92, 100, 68]} />
+    </div>
+  );
+}
+
+/** A section heading bar and its lines, spaced as `CaseDocument` spaces them. */
+function SkeletonSection({ lines }: { lines: readonly number[] }) {
+  return (
+    <div className="flex flex-col gap-3">
+      <Skeleton className="h-4 w-32 rounded" />
+      <div className="space-y-[0.8rem] md:space-y-[0.9rem]">
+        {lines.map((width, index) => (
+          <Skeleton
+            key={index}
+            className="h-[1.0625rem] rounded md:h-[1.125rem]"
+            style={{ width: `${width}%` }}
+          />
+        ))}
       </div>
     </div>
   );
