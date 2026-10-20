@@ -22,7 +22,9 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  *     cannot say it.
  *
  * Sized at 36px (`size-9`) — above the 24px floor everywhere and comfortable on
- * the dock bar, where the row is the primary way to format.
+ * the dock bar, where the row is the primary way to format. `compact` is the
+ * computer bar's 32px (`size-8`), a pointer's size, which keeps that bar on one
+ * row (`DesktopToolbar.tsx`).
  */
 export function ToolbarButton({
   icon: Icon,
@@ -33,6 +35,7 @@ export function ToolbarButton({
   tone = 'default',
   spin = false,
   shortcut,
+  compact = false,
 }: {
   icon: LucideIcon;
   /** The accessible name AND the native tooltip. Never an icon alone. */
@@ -51,6 +54,8 @@ export function ToolbarButton({
    * has no hover and no shortcuts.
    */
   shortcut?: string;
+  /** The computer bar's 32px size. */
+  compact?: boolean;
 }) {
   const button = (
     <button
@@ -62,7 +67,8 @@ export function ToolbarButton({
       onMouseDown={(event) => event.preventDefault()}
       onClick={onPress}
       className={cn(
-        'v2-interactive inline-flex size-9 shrink-0 items-center justify-center rounded-lg',
+        'v2-interactive inline-flex shrink-0 items-center justify-center rounded-lg',
+        compact ? 'size-8' : 'size-9',
         'text-muted-foreground transition-colors duration-150',
         'disabled:pointer-events-none disabled:opacity-40',
         active
@@ -90,6 +96,16 @@ export function ToolbarButton({
     </Tooltip>
   );
 }
+
+/**
+ * The computer bar's menu buttons (alignment, table, More): a 32px icon button
+ * like a compact `ToolbarButton`, lit while its menu is open.
+ */
+export const DESKTOP_MENU_TRIGGER = cn(
+  'v2-interactive inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground',
+  'transition-colors duration-150 hover:bg-secondary/70 hover:text-foreground',
+  'disabled:pointer-events-none disabled:opacity-40 data-[state=open]:bg-secondary data-[state=open]:text-foreground',
+);
 
 /** A hairline between groups of verbs. Decorative — hidden from assistive tech. */
 export function ToolbarDivider() {

@@ -2,7 +2,7 @@
 
 import { Fragment } from 'react';
 import type { Editor } from '@tiptap/react';
-import { ChevronDown, Table } from 'lucide-react';
+import { Table } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -15,6 +15,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { runTableAction, type FormatState } from './formatting';
+import { DESKTOP_MENU_TRIGGER } from './ToolbarButton';
 import { TABLE_EDITS, TABLE_INSERT } from './toolbar-verbs';
 
 /**
@@ -34,16 +35,9 @@ export function TableMenu({ editor, state }: { editor: Editor; state: FormatStat
             disabled={state.inCodeBlock}
             aria-label="Table"
             onMouseDown={(event) => event.preventDefault()}
-            className={cn(
-              'v2-interactive inline-flex h-9 shrink-0 items-center gap-0.5 rounded-lg px-2 text-muted-foreground',
-              'transition-colors duration-150 hover:bg-secondary/70 hover:text-foreground',
-              'disabled:pointer-events-none disabled:opacity-40 data-[state=open]:bg-secondary data-[state=open]:text-foreground',
-              state.inTable && 'bg-secondary text-foreground',
-              FOCUS_RING,
-            )}
+            className={cn(DESKTOP_MENU_TRIGGER, state.inTable && 'bg-secondary text-foreground', FOCUS_RING)}
           >
             <Table aria-hidden className="size-4" />
-            <ChevronDown aria-hidden className="size-3.5" />
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom" sideOffset={6}>

@@ -44,7 +44,7 @@ export function StyleSelect({
         aria-label={`Text style: ${styleLabel(state.blockStyle)}`}
         onMouseDown={(event) => event.preventDefault()}
         className={cn(
-          'v2-interactive inline-flex h-9 w-32 shrink-0 items-center justify-between gap-1 rounded-lg px-2.5 text-sm text-foreground',
+          'v2-interactive inline-flex h-8 w-28 shrink-0 items-center justify-between gap-1 rounded-lg px-2 text-sm text-foreground',
           'transition-colors duration-150 hover:bg-secondary/70 disabled:pointer-events-none disabled:opacity-40',
           'data-[state=open]:bg-secondary',
           FOCUS_RING,

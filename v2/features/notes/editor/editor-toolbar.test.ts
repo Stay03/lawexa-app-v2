@@ -146,7 +146,18 @@ test('a computer gets the bar above the note, with tooltips; touch keeps the doc
   assert.match(bar, /<StyleSelect editor=\{editor\} state=\{state\} mac=\{mac\} \/>/);
   assert.match(bar, /<AlignMenu editor=\{editor\} state=\{state\} mac=\{mac\} \/>/);
   assert.match(bar, /<TableMenu editor=\{editor\} state=\{state\} \/>/);
-  assert.match(bar, /label=\{CLEAR_FORMATTING\.label\}\s*shortcut=\{keys\(CLEAR_FORMATTING\.keys\)\}/);
+  // One row at 1440 px (techlead, 20 October 2026): 32 px controls, menu icons without a chevron,
+  // and inline code and clear formatting in a More menu with their keys.
+  assert.equal((bar.match(/<ToolbarButton\s+compact/g) ?? []).length, (bar.match(/<ToolbarButton/g) ?? []).length);
+  for (const menu of ['AlignMenu.tsx', 'TableMenu.tsx']) {
+    assert.doesNotMatch(read(menu), /ChevronDown/);
+    assert.match(read(menu), /DESKTOP_MENU_TRIGGER/);
+  }
+  const more = bar.slice(bar.indexOf('function DesktopMoreMenu'));
+  assert.match(more, /runFormat\(editor, CODE_VERB\.verb\)/);
+  assert.match(more, /runFormat\(editor, CLEAR_FORMATTING\.verb\)/);
+  assert.match(more, /shortcutLabel\(CLEAR_FORMATTING\.keys, mac\)/);
+  assert.match(read('ToolbarButton.tsx'), /compact \? 'size-8' : 'size-9'/);
   // The tooltip names the control and its keys; without a shortcut the native title stays.
   const button = read('ToolbarButton.tsx');
   assert.match(button, /title=\{shortcut \? undefined : label\}/);
