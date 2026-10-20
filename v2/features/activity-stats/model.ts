@@ -115,13 +115,6 @@ export function statsGrid(days: readonly StatsDay[]): StatsGrid {
   return { weeks, months };
 }
 
-/** "1.2k" from a thousand, the number itself below. */
-export function compactCount(value: number): string {
-  if (value < 1000) return String(value);
-  const thousands = value / 1000;
-  return `${thousands >= 10 ? Math.round(thousands) : Math.round(thousands * 10) / 10}k`;
-}
-
 /** "1 day", "12 days". */
 export function dayCount(value: number): string {
   return `${value} ${value === 1 ? 'day' : 'days'}`;

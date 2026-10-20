@@ -8,7 +8,6 @@ import { V2_ROUTES } from '@/v2/routes.manifest';
 import { SETTINGS_GROUPS } from '@/v2/features/settings/rows';
 import {
   STATS_PERIODS,
-  compactCount,
   dayCount,
   longDate,
   shortDate,
@@ -43,9 +42,6 @@ test('the grid puts each day on its weekday row, Sunday first, and shades agains
 });
 
 test('numbers and dates read the way the page prints them', () => {
-  assert.equal(compactCount(999), '999');
-  assert.equal(compactCount(1234), '1.2k');
-  assert.equal(compactCount(35115), '35k');
   assert.equal(dayCount(1), '1 day');
   assert.equal(dayCount(12), '12 days');
   assert.equal(shortDate('2026-10-03'), '3 Oct');
@@ -60,6 +56,10 @@ test('numbers and dates read the way the page prints them', () => {
 test('the page shows all-time totals, both streaks, the switch, the grid and the period’s counts', () => {
   const screen = read('v2', 'features', 'activity-stats', 'StatsScreen.tsx');
   assert.match(screen, /<TotalsGrid totals=\{data\.lifetime\} \/>/);
+  // Exact numbers: "1,973", never "2k" (first pictures, 20 October 2026).
+  assert.match(screen, /\{value\.toLocaleString\('en-GB'\)\}/);
+  // A year fits a computer's column: 10 px squares, 2 px gaps.
+  assert.match(screen, /className=\{cn\('size-2\.5 rounded-\[2px\]', LEVEL\[cell\.level\]\)\}/);
   assert.match(screen, /label="Current streak"/);
   assert.match(screen, /label="Longest streak"/);
   assert.match(screen, /<TabRow\s+tabs=\{STATS_PERIODS\}/);

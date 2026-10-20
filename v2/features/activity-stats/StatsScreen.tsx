@@ -12,7 +12,6 @@ import { TabRow } from '@/v2/shell/TabRow';
 import {
   DEFAULT_STATS_PERIOD,
   STATS_PERIODS,
-  compactCount,
   dayCount,
   longDate,
   shortDate,
@@ -173,7 +172,7 @@ function TotalsGrid({ totals }: { totals: StatsTotals }) {
         // The number reads first; the term comes first in the markup, as a `dl` needs.
         <div key={label} className="flex flex-col-reverse gap-0.5 bg-card px-4 py-3">
           <dt className="text-xs text-muted-foreground">{label}</dt>
-          <dd className="text-xl font-semibold tracking-tight text-foreground tabular-nums">{compactCount(value)}</dd>
+          <dd className="text-xl font-semibold tracking-tight text-foreground tabular-nums">{value.toLocaleString('en-GB')}</dd>
         </div>
       ))}
     </dl>
@@ -210,8 +209,9 @@ function quizLine(totals: StatsTotals): string {
 const LEVEL = ['bg-foreground/[0.07]', 'bg-primary/30', 'bg-primary/55', 'bg-primary/80', 'bg-primary'] as const;
 
 /**
- * The period as week columns, Sunday at the top. On a phone a year scrolls
- * sideways rather than shrinking its squares, and it opens on the latest weeks.
+ * The period as week columns, Sunday at the top. A year is 53 columns of 12 px
+ * (a 10 px square and a 2 px gap), 636 px, so it fits the column on a computer;
+ * on a phone it scrolls sideways and opens on the latest weeks.
  */
 function ActiveDays({ grid, label }: { grid: StatsGrid; label: string }) {
   return (
@@ -222,28 +222,28 @@ function ActiveDays({ grid, label }: { grid: StatsGrid; label: string }) {
       }}
     >
       <div className="inline-flex min-w-full flex-col gap-1.5">
-        <div className="flex gap-[3px]" aria-hidden>
+        <div className="flex gap-0.5" aria-hidden>
           {grid.weeks.map((_, index) => {
             const month = grid.months.find((entry) => entry.week === index);
             return (
-              <span key={index} className="w-3 shrink-0 text-[10px] leading-none text-muted-foreground">
+              <span key={index} className="w-2.5 shrink-0 text-[10px] leading-none text-muted-foreground">
                 {month ? <span className="whitespace-nowrap">{month.label}</span> : null}
               </span>
             );
           })}
         </div>
-        <div className="flex gap-[3px]" role="img" aria-label={label}>
+        <div className="flex gap-0.5" role="img" aria-label={label}>
           {grid.weeks.map((week, index) => (
-            <div key={index} className="flex flex-col gap-[3px]">
+            <div key={index} className="flex flex-col gap-0.5">
               {week.map((cell, row) =>
                 cell ? (
                   <span
                     key={cell.date}
                     title={`${shortDate(cell.date)}: ${cell.count} ${cell.count === 1 ? 'action' : 'actions'}`}
-                    className={cn('size-3 rounded-[3px]', LEVEL[cell.level])}
+                    className={cn('size-2.5 rounded-[2px]', LEVEL[cell.level])}
                   />
                 ) : (
-                  <span key={`pad-${row}`} className="size-3" />
+                  <span key={`pad-${row}`} className="size-2.5" />
                 ),
               )}
             </div>
