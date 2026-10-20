@@ -71,6 +71,9 @@ export interface StatsGrid {
 
 const MONTH = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'UTC' });
 
+/** The week columns a month label needs before the next one may start. */
+const MONTH_LABEL_COLUMNS = 3;
+
 /**
  * The days as week columns, Sunday first, the first column padded so every
  * day sits on its own weekday row. The shade is set against the reader's own
@@ -104,9 +107,10 @@ export function statsGrid(days: readonly StatsDay[]): StatsGrid {
     if (at.getUTCMonth() !== lastMonth) {
       lastMonth = at.getUTCMonth();
       const week = weeks.length;
-      // A month starting in the same column as the previous label would
-      // overlap it, so the earlier one gives way.
-      if (months.length > 0 && months[months.length - 1].week === week) months.pop();
+      // A label is about three columns wide ("Sept"), so a month starting
+      // within three columns of the previous label would overlap it; the
+      // earlier one, a part-month at the grid's start, gives way.
+      if (months.length > 0 && week - months[months.length - 1].week < MONTH_LABEL_COLUMNS) months.pop();
       months.push({ week, label: MONTH.format(at) });
     }
     column.push({ date: day.date, count: day.count, level: level(day.count) });

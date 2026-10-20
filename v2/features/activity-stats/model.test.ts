@@ -37,6 +37,13 @@ test('the grid puts each day on its weekday row, Sunday first, and shades agains
   assert.equal(grid.weeks[0][4]?.level, 0);
   assert.equal(grid.weeks[1][5]?.level, 4);
   assert.deepEqual(grid.months, [{ week: 0, label: 'Oct' }]);
+  // A month that starts within three columns of the last label takes its
+  // place, so "Sept" and "Oct" never print over each other (30 days from 21 Sept).
+  const thirty = Array.from({ length: 30 }, (_, i) => {
+    const at = new Date(Date.UTC(2026, 8, 21 + i));
+    return { date: at.toISOString().slice(0, 10), count: 1 };
+  });
+  assert.deepEqual(statsGrid(thirty).months, [{ week: 1, label: 'Oct' }]);
   // Nothing at all: every square is the empty shade.
   assert.ok(statsGrid([{ date: '2026-10-01', count: 0 }]).weeks[0].every((cell) => cell === null || cell.level === 0));
 });
