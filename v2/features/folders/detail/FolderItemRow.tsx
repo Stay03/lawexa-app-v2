@@ -86,7 +86,7 @@ export const FolderItemRow = memo(function FolderItemRow({
         ) : (
           // A row with no destination records what is filed here and offers
           // nothing false.
-          <div className={cn(className, 'hover:bg-transparent')}>{content}</div>
+          <div className={className}>{content}</div>
         )
       }
     />

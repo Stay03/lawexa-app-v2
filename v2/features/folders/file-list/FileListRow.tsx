@@ -23,9 +23,10 @@ import type { EntryLook } from './entry-look';
  * long list reads as names and dates; on a touch screen it always shows.
  */
 
-/** The open control's classes: 52 px tall on a phone, 40 px on a computer. */
+/** The open control's classes: 52 px tall on a phone, 40 px on a computer.
+ *  The hover tint is the whole row's (below), so the "⋯" sits inside it. */
 export const FILE_LIST_OPEN_CLASS = cn(
-  'v2-interactive flex h-13 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left transition-colors hover:bg-secondary/50 sm:h-10',
+  'v2-interactive flex h-13 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 text-left sm:h-10',
   FOCUS_RING,
 );
 
@@ -94,7 +95,7 @@ export function FileListRow({
       // Capped at 14 so a deep page never staggers into a visible delay.
       style={{ animationDelay: `${Math.min(index, 14) * 20}ms` }}
     >
-      <div className="group flex min-w-0 items-center gap-1">
+      <div className="group flex min-w-0 items-center gap-1 rounded-lg transition-colors hover:bg-secondary/50">
         {renderOpen(FILE_LIST_OPEN_CLASS, content)}
         {menu ? (
           <span className="flex size-9 shrink-0 items-center justify-center transition-opacity duration-150 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:has-[[data-state=open]]:opacity-100">
