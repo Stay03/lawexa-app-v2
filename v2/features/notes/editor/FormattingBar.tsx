@@ -28,9 +28,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DockPortal } from '@/v2/shell/Dock';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { applyStyle, runFormat, type FormatState } from './formatting';
+import { applyAlign, applyStyle, runFormat, type FormatState } from './formatting';
+import { TableMenuItems } from './TableMenu';
 import { ToolbarButton, ToolbarDivider } from './ToolbarButton';
-import { BLOCK_VERBS, CLEAR_FORMATTING, CODE_VERB, STYLE_OPTIONS, TEXT_VERBS } from './toolbar-verbs';
+import {
+  ALIGN_OPTIONS,
+  BLOCK_VERBS,
+  CLEAR_FORMATTING,
+  CODE_VERB,
+  STYLE_OPTIONS,
+  TEXT_VERBS,
+} from './toolbar-verbs';
 import { OVERFLOW_LEFT, OVERFLOW_RIGHT, useOverflowEdges } from './use-overflow-edges';
 
 /**
@@ -60,14 +68,16 @@ import { OVERFLOW_LEFT, OVERFLOW_RIGHT, useOverflowEdges } from './use-overflow-
  * It now holds what a thumb reaches for and fits a 390px phone without
  * scrolling: undo · redo | bold · italic | the two lists | image · @case |
  * More. "More" opens a menu above the bar with the rest: the style (Normal
- * text, Heading, Subheading), underline, strikethrough, link, quote, inline
- * code and clear formatting. On a narrower phone the row still scrolls, and a
+ * text, Large heading, Heading, Subheading), underline, strikethrough,
+ * highlight, quote, inline code, alignment, the table actions, link and clear
+ * formatting (highlight, alignment, tables and Large heading since Arthur's
+ * step 2, 20 October 2026). On a narrower phone the row still scrolls, and a
  * geometry-driven edge fade ({@link useOverflowEdges}) marks the hidden rest.
  */
 
-/** The marks the row keeps; underline and strike are in More. */
+/** The marks the row keeps; underline, strike and highlight are in More. */
 const ROW_TEXT_VERBS = TEXT_VERBS.filter(({ verb }) => verb === 'bold' || verb === 'italic');
-const MORE_TEXT_VERBS = TEXT_VERBS.filter(({ verb }) => verb === 'underline' || verb === 'strike');
+const MORE_TEXT_VERBS = TEXT_VERBS.filter(({ verb }) => verb !== 'bold' && verb !== 'italic');
 const LIST_VERBS = BLOCK_VERBS.filter(
   ({ verb }) => verb === 'bulletList' || verb === 'orderedList',
 );
@@ -265,6 +275,28 @@ function MoreMenu({
           <CODE_VERB.icon aria-hidden className="size-4" />
           {CODE_VERB.label}
         </DropdownMenuCheckboxItem>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuLabel>Alignment</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={state.align}>
+          {ALIGN_OPTIONS.map(({ align, icon: Icon, label }) => (
+            <DropdownMenuRadioItem
+              key={align}
+              value={align}
+              disabled={state.inCodeBlock}
+              onSelect={() => applyAlign(editor, align)}
+            >
+              <Icon aria-hidden className="size-4" />
+              {label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuLabel>Table</DropdownMenuLabel>
+        <TableMenuItems editor={editor} state={state} />
 
         <DropdownMenuSeparator />
 

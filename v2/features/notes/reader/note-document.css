@@ -159,6 +159,19 @@
   line-height: 0;
 }
 
+/** The one highlight (Arthur's editor step 2, 20 October 2026): the brand
+ *  gold, thin enough that the text keeps its own colour and reads in both
+ *  themes. The same rule is the editor's, so a highlight looks the same
+ *  written and read. */
+.v2-note-doc .v2-note-body mark {
+  background: color-mix(in oklch, var(--primary) 28%, transparent);
+  color: inherit;
+  border-radius: 0.2em;
+  padding: 0 0.1em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 /* ── Lists ──────────────────────────────────────────────────────────────── */
 
 .v2-note-doc .v2-note-body ul,
@@ -227,6 +240,55 @@
   background: none;
   padding: 0;
   font-size: 1em;
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+
+/**
+ * A table the editor wrote. The box scrolls sideways on its own when the
+ * table is wider than the column, so the page never does. Cells set in the
+ * sans at a smaller size, as a table is for scanning; a header row or column
+ * (`th`) gets the secondary ground.
+ */
+.v2-note-doc .v2-note-body .v2-note-table {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.v2-note-doc .v2-note-body table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
+  font-variation-settings: normal;
+  font-size: 0.875em;
+  line-height: 1.5;
+}
+
+.v2-note-doc .v2-note-body caption {
+  caption-side: top;
+  padding-bottom: 0.5em;
+  text-align: left;
+  color: var(--muted-foreground);
+}
+
+.v2-note-doc .v2-note-body th,
+.v2-note-doc .v2-note-body td {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.75em;
+  text-align: left;
+  vertical-align: top;
+  min-width: 6em;
+}
+
+.v2-note-doc .v2-note-body th {
+  background: var(--secondary);
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+/* A cell holds paragraphs; they sit closer than the body's. */
+.v2-note-doc .v2-note-body :is(th, td) > * + * {
+  margin-top: 0.5em;
 }
 
 /* ── Rules ──────────────────────────────────────────────────────────────── */

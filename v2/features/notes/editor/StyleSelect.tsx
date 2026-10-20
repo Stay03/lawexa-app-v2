@@ -19,7 +19,8 @@ import { STYLE_OPTIONS, styleLabel } from './toolbar-verbs';
 
 /**
  * StyleSelect — the desktop bar's style dropdown (Arthur's editor step 1):
- * Normal text, Heading, Subheading, each with its key binding. The trigger
+ * Normal text, Large heading (step 2), Heading, Subheading, each with its key
+ * binding. The trigger
  * names the block under the caret, so it reads like a word processor's style
  * box. A choice SETS the style (`applyStyle`); it never toggles.
  *
@@ -67,6 +68,7 @@ export function StyleSelect({
               value={option.style}
               onSelect={() => applyStyle(editor, option.style)}
               className={cn(
+                option.style === 'h1' && 'text-lg font-semibold',
                 option.style === 'h2' && 'text-base font-semibold',
                 option.style === 'h3' && 'font-semibold',
               )}

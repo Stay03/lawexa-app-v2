@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { CaseMentionLink } from '@/v2/features/conversations/conversation/markdown/CaseMentionLink';
 import { parseNoteHtml, type NoteNode, type NoteTag } from '@/lib/notes/note-html';
+import { NOTE_ALIGN_CLASS } from '@/lib/notes/note-elements';
 
 /**
  * NoteContent — the note body, as REACT ELEMENTS.
@@ -26,10 +27,12 @@ import { parseNoteHtml, type NoteNode, type NoteTag } from '@/lib/notes/note-htm
  * form of the owner's invisible-text fix — there is no attribute channel left
  * for a foreign colour to arrive through.
  *
- * The three node kinds that DO carry props are the three the parser validated:
- * a case mention (a slug), a link (a URL and how to open it), an image (a URL
- * and its alt text). Each is rendered by the component that owns that
- * behaviour, so this file holds no policy of its own.
+ * The node kinds that DO carry props are the ones the parser validated: a case
+ * mention (a slug), a link (a URL and how to open it), an image (a URL and its
+ * alt text), a table cell (its spans, whole numbers), and an aligned block,
+ * whose word becomes a class from a closed table (`NOTE_ALIGN_CLASS`). Each is
+ * rendered by the component that owns that behaviour, so this file holds no
+ * policy of its own.
  *
  * ── THE PARSE IS MEMOISED ON THE HTML STRING ────────────────────────────────
  * One `DOMParser` pass per content string, not per render — a note re-renders
@@ -70,9 +73,29 @@ function renderNode(node: NoteNode): ReactNode {
       return node.text;
 
     case 'element':
-      return VOID_TAGS.has(node.tag)
-        ? createElement(node.tag, { key: node.key })
-        : createElement(node.tag, { key: node.key }, renderNodes(node.children));
+      if (VOID_TAGS.has(node.tag)) return createElement(node.tag, { key: node.key });
+      // A wide table scrolls inside its own box, so the page never scrolls
+      // sideways on a phone.
+      if (node.tag === 'table') {
+        return (
+          <div key={node.key} className="v2-note-table">
+            <table>{renderNodes(node.children)}</table>
+          </div>
+        );
+      }
+      return createElement(
+        node.tag,
+        node.align ? { key: node.key, className: NOTE_ALIGN_CLASS[node.align] } : { key: node.key },
+        renderNodes(node.children),
+      );
+
+    // A cell's spans are the only attributes it has, both checked numbers.
+    case 'cell':
+      return createElement(
+        node.tag,
+        { key: node.key, colSpan: node.colSpan, rowSpan: node.rowSpan },
+        renderNodes(node.children),
+      );
 
     // The SAME component the assistant transcript uses for a case reference —
     // hover-card on a fine pointer, tap-to-preview popover on touch, a plain

@@ -2,6 +2,9 @@ import { Extension, type Extensions } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 import Image from '@tiptap/extension-image';
+import Highlight from '@tiptap/extension-highlight';
+import { TableKit } from '@tiptap/extension-table';
+import TextAlign from '@tiptap/extension-text-align';
 
 import { createCaseMentionExtension } from './case-mention';
 import type { CaseMentionStore } from './mention-store';
@@ -11,13 +14,20 @@ import type { CaseMentionStore } from './mention-store';
  * "no colour, ever" promise.
  *
  * ── WHAT IS DELIBERATELY ABSENT ─────────────────────────────────────────────
- * No `@tiptap/extension-color`, no `text-style`, no highlight, no font family or
- * size. The owner's decision (August 2026) is that notes have never had colour —
- * coloured notes came from pasting — and the v2 reader strips inline styles at
- * parse. This is the writing half of the same decision, and it is enforced by
- * ABSENCE rather than by a rule: a mark that is not in the schema cannot be
- * created by a shortcut, restored by a paste, or resurrected by stored HTML. The
+ * No `@tiptap/extension-color`, no `text-style`, no font family or size. The
+ * owner's decision (August 2026) is that notes have never had colour — coloured
+ * notes came from pasting — and the v2 reader strips inline styles at parse.
+ * This is the writing half of the same decision, and it is enforced by ABSENCE
+ * rather than by a rule: a mark that is not in the schema cannot be created by
+ * a shortcut, restored by a paste, or resurrected by stored HTML. The
  * invisible-text bug has nowhere to live.
+ *
+ * ── ONE HIGHLIGHT, ALIGNMENT, TABLES (Arthur's editor step 2, 20 October 2026)
+ * The highlight is Tiptap's `Highlight` with `multicolor` off: a plain `<mark>`
+ * with no colour of its own, painted by the page in one colour, so it adds no
+ * attribute a colour could ride on (`Mod-Shift-h`). Alignment is `text-align` on paragraphs and headings, the one style
+ * value the reader keeps (as one of three words). Tables are `TableKit` without
+ * column resizing, since a dragged width is a style the reader would drop.
  *
  * ── WHAT STARTERKIT v3 ALREADY BRINGS ───────────────────────────────────────
  * Bold, italic, STRIKE, UNDERLINE, LINK, code, code block, blockquote, both
@@ -26,12 +36,10 @@ import type { CaseMentionStore } from './mention-store';
  * packages in v2 and are bundled now, so nothing here imports them — the
  * duplicate registration that would cause is a real error, not a style point.
  *
- * ── HEADINGS: THREE IN THE SCHEMA, TWO ON THE TOOLBAR ───────────────────────
- * The toolbar offers H2 and H3 only (a note's title is the H1 of its page). The
- * SCHEMA still allows H1, because v1 notes contain them and a schema that
- * refused would silently flatten someone's existing headings into paragraphs the
- * first time they opened the note to fix a typo. Offering less than the document
- * can hold is a choice; destroying what it already holds is not.
+ * ── HEADINGS: THREE LEVELS ──────────────────────────────────────────────────
+ * H1 to H3, all three in the style menu since step 2 (Large heading, Heading,
+ * Subheading). The reader shows them one level down, under the page's own
+ * title, so a note never has a second H1 when read.
  */
 
 export interface NoteExtensionsConfig {
@@ -44,8 +52,8 @@ export interface NoteExtensionsConfig {
 /**
  * Clear formatting on `Mod-\`, as in Google Docs (Arthur's editor step 1). The
  * same rule as the toolbar's button (`clearFormatting` in `formatting.ts`): the
- * text marks come off and a heading goes back to normal text; lists, quotes and
- * links stay.
+ * text marks and the highlight come off and a heading goes back to normal text;
+ * lists, quotes, links and alignment stay.
  */
 const ClearFormattingShortcut = Extension.create({
   name: 'clearFormattingShortcut',
@@ -58,7 +66,8 @@ const ClearFormattingShortcut = Extension.create({
           .unsetItalic()
           .unsetUnderline()
           .unsetStrike()
-          .unsetCode();
+          .unsetCode()
+          .unsetHighlight();
         if (this.editor.isActive('heading')) chain.setParagraph();
         return chain.run();
       },
@@ -93,5 +102,11 @@ export function createNoteExtensions({
     }),
     createCaseMentionExtension(mentionStore),
     ClearFormattingShortcut,
+    Highlight.configure({ multicolor: false }),
+    TextAlign.configure({
+      types: ['heading', 'paragraph'],
+      alignments: ['left', 'center', 'right', 'justify'],
+    }),
+    TableKit.configure({ table: { resizable: false } }),
   ];
 }

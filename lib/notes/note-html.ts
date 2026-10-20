@@ -43,9 +43,11 @@ import { htmlToPlainText } from './plain-text';
  *   (b) ALLOWLIST, NOT DENYLIST, ON BOTH AXES. Every element gets exactly one
  *       of three dispositions ({@link RENDER_AS}, {@link DROP_SUBTREE}, and
  *       "everything else"), and attributes are dropped WHOLESALE except the
- *       three the model actually carries (`href`, `src`, `alt`), each of which
- *       is re-validated here. There is no "strip the dangerous ones" step to
- *       fall behind a new attack; an attribute survives only by being named.
+ *       ones the model actually carries (`href`, `src`, `alt`, a cell's
+ *       `colspan`/`rowspan`, and a block's `text-align`), each of which is
+ *       re-validated here into a URL, a small whole number or one of three
+ *       words. There is no "strip the dangerous ones" step to fall behind a new
+ *       attack; an attribute survives only by being named.
  *
  *   (c) THE OUTPUT CANNOT CARRY MARKUP. A {@link NoteNode} holds text, a tag
  *       from a closed union, and validated URLs. The renderer builds React
@@ -56,7 +58,7 @@ import { htmlToPlainText } from './plain-text';
  * ── UNKNOWN MARKUP DEGRADES TO TEXT ─────────────────────────────────────────
  * An element that is neither rendered nor dropped is UNWRAPPED: it disappears
  * and its children take its place. That is what makes a `<div>`, a `<font>`, a
- * pasted `<table>` or a custom element render as the reading it contains
+ * `<dl>` or a custom element render as the reading it contains
  * rather than as either a broken box or nothing at all. Only the genuinely
  * dangerous or genuinely non-textual elements ({@link DROP_SUBTREE}) take
  * their contents with them.
@@ -101,8 +103,20 @@ export type NoteTag =
   | 's'
   | 'sub'
   | 'sup'
+  | 'mark'
   | 'br'
-  | 'hr';
+  | 'hr'
+  // A table (Arthur's editor step 2, 20 October 2026). Its cells are the
+  // `cell` node below, since they carry their spans.
+  | 'table'
+  | 'caption'
+  | 'thead'
+  | 'tbody'
+  | 'tr';
+
+/** A block's alignment, from the editor's `text-align`. Left is the page's
+ *  own and is never stored, so it is not a value. */
+export type NoteAlign = 'center' | 'right' | 'justify';
 
 /** How a validated link is navigated. See {@link safeHref}. */
 export type NoteLinkMode =
@@ -115,7 +129,16 @@ export type NoteLinkMode =
 
 export type NoteNode =
   | { kind: 'text'; key: string; text: string }
-  | { kind: 'element'; key: string; tag: NoteTag; children: NoteNode[] }
+  | { kind: 'element'; key: string; tag: NoteTag; align?: NoteAlign; children: NoteNode[] }
+  /** A table cell. A span is there only when it is more than one. */
+  | {
+      kind: 'cell';
+      key: string;
+      tag: 'th' | 'td';
+      colSpan?: number;
+      rowSpan?: number;
+      children: NoteNode[];
+    }
   | { kind: 'link'; key: string; href: string; mode: NoteLinkMode; children: NoteNode[] }
   /** A v1 case mention (or any link that resolves to a case page) — rendered
    *  with the shared case hover/tap preview instead of as a bare link. */
@@ -146,14 +169,16 @@ const RENDER_AS: Readonly<Record<string, NoteTag>> = {
   ul: 'ul',
   ol: 'ol',
   li: 'li',
-  // A pasted TABLE ROW becomes a paragraph (review F4). We do not render
-  // tables — they are not in the wave's verb list and a note is prose — but
-  // unwrapping `tr` along with everything else ran a whole table together into
-  // one word ("CaseYearDonoghue1932Carlill1893"). Promoting the ROW to a
-  // paragraph keeps the table's only structure that survives translation to
-  // prose: one line per row. The cells inside it separate with spaces (see
-  // `SEPARATE_AFTER_UNWRAP`).
-  tr: 'p',
+  // Tables render as tables since the editor writes them (Arthur's editor step
+  // 2, 20 October 2026). The browser's parser has already put every row in a
+  // section, so a footer is one more body section; `th`/`td` are cells, see
+  // `pushCell`. A `colgroup` unwraps to nothing: its `col`s hold no text.
+  table: 'table',
+  caption: 'caption',
+  thead: 'thead',
+  tbody: 'tbody',
+  tfoot: 'tbody',
+  tr: 'tr',
   blockquote: 'blockquote',
   pre: 'pre',
   code: 'code',
@@ -167,6 +192,9 @@ const RENDER_AS: Readonly<Record<string, NoteTag>> = {
   del: 's',
   sub: 'sub',
   sup: 'sup',
+  // The editor's one highlight (Arthur's step 2). Its colour is the page's,
+  // as every attribute is dropped.
+  mark: 'mark',
   br: 'br',
   hr: 'hr',
 };
@@ -240,9 +268,10 @@ const DROP_SUBTREE: ReadonlySet<string> = new Set([
  * Unwrapped elements that must leave a SPACE behind them (review F4).
  *
  * Unwrapping is what makes unknown markup degrade to its reading, but it also
- * deletes the element boundary — and for a cell, a term or a caption, that
- * boundary was the only thing separating two words. A pasted table came out as
- * one run-on token. These are the unwrap targets whose contents are
+ * deletes the element boundary — and for a term, a definition or a figure's
+ * caption, that boundary was the only thing separating two words (a pasted
+ * table once came out as one run-on token, before tables rendered). These are
+ * the unwrap targets whose contents are
  * SIBLING PHRASES rather than continuous prose, so each contributes a single
  * space after its children.
  *
@@ -251,9 +280,6 @@ const DROP_SUBTREE: ReadonlySet<string> = new Set([
  * after every `</div>` would litter the text.
  */
 const SEPARATE_AFTER_UNWRAP: ReadonlySet<string> = new Set([
-  'td',
-  'th',
-  'caption',
   'dt',
   'dd',
   'figcaption',
@@ -549,13 +575,12 @@ export function parseNoteHtml(html: string | null | undefined): NoteNode[] {
 /**
  * Tags that may not legally nest inside a `<p>`, and would if left alone.
  *
- * `p` is the whole list today, and it earns its place because of the `tr: 'p'`
- * promotion (review F4): a pasted `<td><p>x</p></td>` is a perfectly legal
- * source tree, but with the row rendered as a paragraph its cell's paragraph
- * would land inside one. React does not re-parse, so the invalid nesting would
- * survive into the DOM (plus a dev-mode `validateDOMNesting` warning). Inside
- * a paragraph these UNWRAP with a trailing space instead, which reads as the
- * same line — exactly what a table row flattened to prose should be.
+ * `p` is the whole list today. The parse runs in quirks mode (the stored
+ * value has no doctype), where a `<table>` does not close an open `<p>`, so a
+ * pasted `<p>…<table>…<td><p>x</p>` puts a cell's paragraph inside another.
+ * React does not re-parse, so the invalid nesting would survive into the DOM
+ * (plus a dev-mode `validateDOMNesting` warning). Inside a paragraph these
+ * UNWRAP with a trailing space instead, which reads as the same line.
  */
 const NOT_INSIDE_PARAGRAPH: ReadonlySet<NoteTag> = new Set<NoteTag>(['p']);
 
@@ -660,22 +685,34 @@ function pushConverted(
     return;
   }
 
+  if (tag === 'th' || tag === 'td') {
+    const children = convertChildren(element, keys, depth + 1, false);
+    out.push({ kind: 'cell', key: keys.take(), tag, ...cellSpans(element), children });
+    return;
+  }
+
   const rendered = RENDER_AS[tag];
   // A paragraph inside a paragraph is invalid nesting React would faithfully
   // reproduce, so it falls through to the unwrap below instead.
   if (rendered && !(inParagraph && NOT_INSIDE_PARAGRAPH.has(rendered))) {
     // `br` and `hr` are void: they have no children by definition, and asking
     // for them would be a lie in the model.
-    const children =
+    let children =
       rendered === 'br' || rendered === 'hr'
         ? []
         : convertChildren(element, keys, depth + 1, inParagraph || rendered === 'p');
-    out.push({ kind: 'element', key: keys.take(), tag: rendered, children });
+    // The parser keeps the indentation between a table's rows and cells as
+    // text, and React refuses text directly inside a table, a section or a row.
+    if (TABLE_STRUCTURE.has(rendered)) {
+      children = children.filter((child) => child.kind !== 'text');
+    }
+    const align = ALIGNABLE.has(rendered) ? textAlign(element) : undefined;
+    out.push({ kind: 'element', key: keys.take(), tag: rendered, ...(align && { align }), children });
     return;
   }
 
   // UNWRAP — the element disappears, its reading stays. `div`, `span`, `font`,
-  // `table` and its cells, a custom element, anything at all: the note's words
+  // `colgroup`, a custom element, anything at all: the note's words
   // are what the reader came for.
   for (const child of Array.from(element.childNodes)) {
     pushConverted(child, keys, depth + 1, inParagraph, out);
@@ -686,6 +723,41 @@ function pushConverted(
   if (SEPARATE_AFTER_UNWRAP.has(tag) || rendered === 'p') {
     out.push({ kind: 'text', key: keys.take(), text: ' ' });
   }
+}
+
+/** The tags that hold only other table parts, never text of their own. */
+const TABLE_STRUCTURE: ReadonlySet<NoteTag> = new Set<NoteTag>(['table', 'thead', 'tbody', 'tr']);
+
+/** The blocks the editor can align: paragraphs and headings. */
+const ALIGNABLE: ReadonlySet<NoteTag> = new Set<NoteTag>(['p', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+/**
+ * The one value read out of a `style` attribute: `text-align`, as the editor
+ * writes it (`style="text-align: center"`). Only the three words it can mean
+ * survive; `left`, `start` and anything else are the page's default, so they
+ * say nothing. The attribute is read by the parser's own CSS declaration, so a
+ * `color` beside it is never looked at.
+ */
+function textAlign(element: Element): NoteAlign | undefined {
+  const value = (element as HTMLElement).style?.textAlign?.trim().toLowerCase();
+  return value === 'center' || value === 'right' || value === 'justify' ? value : undefined;
+}
+
+/** The most rows or columns one cell may span. A real table spans a few; the
+ *  cap keeps a hostile `colspan="99999"` from widening the page. */
+const MAX_SPAN = 50;
+
+/** A cell's `colspan`/`rowspan`, kept only as a whole number from 2 to {@link MAX_SPAN}. */
+function cellSpans(element: Element): { colSpan?: number; rowSpan?: number } {
+  const span = (name: string): number | undefined => {
+    const raw = element.getAttribute(name)?.trim() ?? '';
+    if (!/^\d{1,3}$/.test(raw)) return undefined;
+    const value = Number(raw);
+    return value > 1 ? Math.min(value, MAX_SPAN) : undefined;
+  };
+  const colSpan = span('colspan');
+  const rowSpan = span('rowspan');
+  return { ...(colSpan && { colSpan }), ...(rowSpan && { rowSpan }) };
 }
 
 function pushAnchor(

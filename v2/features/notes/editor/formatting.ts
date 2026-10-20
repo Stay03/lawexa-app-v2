@@ -2,7 +2,7 @@
 
 import { useEditorState, type Editor } from '@tiptap/react';
 
-import type { BlockStyle } from './toolbar-verbs';
+import type { Alignment, BlockStyle, StyleChoice, TableAction } from './toolbar-verbs';
 
 /**
  * formatting — the editor's toolbar VERBS and the toolbar's live state.
@@ -34,7 +34,9 @@ export type FormatVerb =
   | 'italic'
   | 'underline'
   | 'strike'
+  | 'highlight'
   | 'code'
+  | 'h1'
   | 'h2'
   | 'h3'
   | 'bulletList'
@@ -52,7 +54,9 @@ export interface FormatState {
   italic: boolean;
   underline: boolean;
   strike: boolean;
+  highlight: boolean;
   code: boolean;
+  h1: boolean;
   h2: boolean;
   h3: boolean;
   bulletList: boolean;
@@ -60,6 +64,10 @@ export interface FormatState {
   blockquote: boolean;
   /** What the block under the caret is, for the style dropdown's label. */
   blockStyle: BlockStyle;
+  /** The alignment of the block under the caret. */
+  align: Alignment;
+  /** The caret is in a table, so the table menu offers rows and columns. */
+  inTable: boolean;
   /** A link mark covers the selection — the link button then OFFERS to remove it. */
   link: boolean;
   /** The caret sits inside a code block, where a formatting bubble is nonsense. */
@@ -73,13 +81,17 @@ const NOTHING_ACTIVE: FormatState = {
   italic: false,
   underline: false,
   strike: false,
+  highlight: false,
   code: false,
+  h1: false,
   h2: false,
   h3: false,
   bulletList: false,
   orderedList: false,
   blockquote: false,
   blockStyle: 'paragraph',
+  align: 'left',
+  inTable: false,
   link: false,
   inCodeBlock: false,
   canUndo: false,
@@ -102,8 +114,14 @@ export function runFormat(editor: Editor, verb: FormatVerb): void {
     case 'strike':
       chain.toggleStrike().run();
       return;
+    case 'highlight':
+      chain.toggleHighlight().run();
+      return;
     case 'code':
       chain.toggleCode().run();
+      return;
+    case 'h1':
+      chain.toggleHeading({ level: 1 }).run();
       return;
     case 'h2':
       chain.toggleHeading({ level: 2 }).run();
@@ -130,11 +148,11 @@ export function runFormat(editor: Editor, verb: FormatVerb): void {
 }
 
 /**
- * Clear formatting: the bold, italic, underline, strike and code marks come
- * off the selection and a heading goes back to normal text. A list, a quote
- * and a link stay, since they are what the text is rather than how it looks
- * (`CLEAR_FORMATTING` in `toolbar-verbs.ts`). Returns whether it ran, for the
- * keyboard shortcut.
+ * Clear formatting: the bold, italic, underline, strike, highlight and code
+ * marks come off the selection and a heading goes back to normal text. A
+ * list, a quote, a link and the alignment stay, since they are what the text
+ * is rather than how it looks (`CLEAR_FORMATTING` in `toolbar-verbs.ts`).
+ * Returns whether it ran, for the keyboard shortcut.
  */
 export function clearFormatting(editor: Editor): boolean {
   const chain = editor
@@ -144,7 +162,8 @@ export function clearFormatting(editor: Editor): boolean {
     .unsetItalic()
     .unsetUnderline()
     .unsetStrike()
-    .unsetCode();
+    .unsetCode()
+    .unsetHighlight();
   if (editor.isActive('heading')) chain.setParagraph();
   return chain.run();
 }
@@ -154,10 +173,65 @@ export function clearFormatting(editor: Editor): boolean {
  * heading keeps it a heading (a toggle would turn it back into text), and
  * Normal text turns any heading into a paragraph.
  */
-export function applyStyle(editor: Editor, style: 'paragraph' | 'h2' | 'h3'): void {
+export function applyStyle(editor: Editor, style: StyleChoice): void {
   const chain = editor.chain().focus();
   if (style === 'paragraph') chain.setParagraph().run();
-  else chain.setHeading({ level: style === 'h2' ? 2 : 3 }).run();
+  else chain.setHeading({ level: style === 'h1' ? 1 : style === 'h2' ? 2 : 3 }).run();
+}
+
+/** Align the paragraph or heading under the caret. Left is the default, so
+ *  choosing it removes the alignment rather than storing `left`. */
+export function applyAlign(editor: Editor, align: Alignment): void {
+  const chain = editor.chain().focus();
+  if (align === 'left') chain.unsetTextAlign().run();
+  else chain.setTextAlign(align).run();
+}
+
+/**
+ * The table menu's actions. A new table is three by three with a header row,
+ * the shape most notes want (a comparison of cases, a list of dates); rows and
+ * columns are added from inside it.
+ */
+export function runTableAction(editor: Editor, action: TableAction): void {
+  const chain = editor.chain().focus();
+  switch (action) {
+    case 'insert':
+      chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+      return;
+    case 'rowBefore':
+      chain.addRowBefore().run();
+      return;
+    case 'rowAfter':
+      chain.addRowAfter().run();
+      return;
+    case 'columnBefore':
+      chain.addColumnBefore().run();
+      return;
+    case 'columnAfter':
+      chain.addColumnAfter().run();
+      return;
+    case 'headerRow':
+      chain.toggleHeaderRow().run();
+      return;
+    case 'deleteRow':
+      chain.deleteRow().run();
+      return;
+    case 'deleteColumn':
+      chain.deleteColumn().run();
+      return;
+    case 'deleteTable':
+      chain.deleteTable().run();
+      return;
+  }
+}
+
+/** The alignment under the caret. Tiptap answers `isActive({ textAlign })`
+ *  for the paragraph or heading the selection is in. */
+function alignOf(editor: Editor): Alignment {
+  if (editor.isActive({ textAlign: 'center' })) return 'center';
+  if (editor.isActive({ textAlign: 'right' })) return 'right';
+  if (editor.isActive({ textAlign: 'justify' })) return 'justify';
+  return 'left';
 }
 
 /** The block under the caret, as the style dropdown names it. */
@@ -212,13 +286,17 @@ export function useFormatState(editor: Editor | null): FormatState {
         italic: instance.isActive('italic'),
         underline: instance.isActive('underline'),
         strike: instance.isActive('strike'),
+        highlight: instance.isActive('highlight'),
         code: instance.isActive('code'),
+        h1: instance.isActive('heading', { level: 1 }),
         h2: instance.isActive('heading', { level: 2 }),
         h3: instance.isActive('heading', { level: 3 }),
         bulletList: instance.isActive('bulletList'),
         orderedList: instance.isActive('orderedList'),
         blockquote: instance.isActive('blockquote'),
         blockStyle: blockStyleOf(instance),
+        align: alignOf(instance),
+        inTable: instance.isActive('table'),
         link: instance.isActive('link'),
         inCodeBlock: instance.isActive('codeBlock'),
         canUndo: instance.can().undo(),

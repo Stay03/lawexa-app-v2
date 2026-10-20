@@ -1,8 +1,13 @@
 import {
+  AlignCenter,
+  AlignJustify,
+  AlignLeft,
+  AlignRight,
   Bold,
   Code,
   Heading2,
   Heading3,
+  Highlighter,
   Italic,
   List,
   ListOrdered,
@@ -23,9 +28,10 @@ import type { FormatVerb, ToggleVerb } from './formatting';
  * than toggling a mark, so they carry no shared state), and since Arthur's
  * editor step 1 (19 October 2026) a style dropdown (Normal text, Heading,
  * Subheading), Clear formatting, and each control's key binding for its
- * tooltip. Nothing else exists: no colour, no highlight, no font family, no
- * size. See `extensions.ts` for why that is enforced by the schema and not by
- * this list.
+ * tooltip. Step 2 (20 October 2026) adds Large heading to the style, one
+ * highlight, alignment and tables. Nothing else exists: no colour, no font
+ * family, no size. See `extensions.ts` for why that is enforced by the schema
+ * and not by this list.
  *
  * Every toolbar (the desktop bar, the desktop selection bubble and the touch
  * dock bar with its More menu) renders from these arrays, so a verb added here
@@ -51,6 +57,7 @@ export const TEXT_VERBS: readonly ToolbarVerb[] = [
   { verb: 'italic', icon: Italic, label: 'Italic', keys: 'Mod-i' },
   { verb: 'underline', icon: Underline, label: 'Underline', keys: 'Mod-u' },
   { verb: 'strike', icon: Strikethrough, label: 'Strikethrough', keys: 'Mod-Shift-s' },
+  { verb: 'highlight', icon: Highlighter, label: 'Highlight', keys: 'Mod-Shift-h' },
 ];
 
 /** Block shapes — what this paragraph IS. */
@@ -75,23 +82,25 @@ export const UNDO_KEYS = 'Mod-z';
 export const REDO_KEYS = 'Mod-Shift-z';
 
 /**
- * Clear formatting: the bold, italic, underline, strike and code marks come
- * off and a heading goes back to normal text. Lists, quotes and links stay:
- * they are what the text is, not how it looks. `Mod-\` as in Google Docs,
- * registered by `extensions.ts`.
+ * Clear formatting: the bold, italic, underline, strike, highlight and code
+ * marks come off and a heading goes back to normal text. Lists, quotes, links
+ * and alignment stay: they are what the text is, not how it looks. `Mod-\` as
+ * in Google Docs, registered by `extensions.ts`.
  */
 export const CLEAR_FORMATTING = { verb: 'clearFormatting', label: 'Clear formatting', keys: 'Mod-\\' } as const;
 
 /**
- * The style dropdown (Arthur's step 1). Normal, Heading and Subheading; a
- * note's title is the page's H1, so the H1 style is not offered until Stay
- * says otherwise (techlead, 19 October 2026). A legacy H1 already in a note
- * still shows its name in the dropdown, so the reader can see what it is.
+ * The style dropdown. Normal text, Large heading, Heading and Subheading.
+ * Large heading (H1) joined in Arthur's step 2 (20 October 2026). The reader
+ * shows a note's headings one level down, under the page's own title, so the
+ * three sizes stay three sizes when read.
  */
 export type BlockStyle = 'paragraph' | 'h1' | 'h2' | 'h3' | 'other';
 
+export type StyleChoice = 'paragraph' | 'h1' | 'h2' | 'h3';
+
 export interface StyleOption {
-  style: 'paragraph' | 'h2' | 'h3';
+  style: StyleChoice;
   verb: FormatVerb;
   label: string;
   keys: string;
@@ -99,8 +108,64 @@ export interface StyleOption {
 
 export const STYLE_OPTIONS: readonly StyleOption[] = [
   { style: 'paragraph', verb: 'paragraph', label: 'Normal text', keys: 'Mod-Alt-0' },
+  { style: 'h1', verb: 'h1', label: 'Large heading', keys: 'Mod-Alt-1' },
   { style: 'h2', verb: 'h2', label: 'Heading', keys: 'Mod-Alt-2' },
   { style: 'h3', verb: 'h3', label: 'Subheading', keys: 'Mod-Alt-3' },
+];
+
+/** Alignment of a paragraph or heading (Arthur's step 2). */
+export type Alignment = 'left' | 'center' | 'right' | 'justify';
+
+export interface AlignOption {
+  align: Alignment;
+  icon: LucideIcon;
+  label: string;
+  /** Tiptap TextAlign's own bindings. */
+  keys: string;
+}
+
+export const ALIGN_OPTIONS: readonly AlignOption[] = [
+  { align: 'left', icon: AlignLeft, label: 'Align left', keys: 'Mod-Shift-l' },
+  { align: 'center', icon: AlignCenter, label: 'Align centre', keys: 'Mod-Shift-e' },
+  { align: 'right', icon: AlignRight, label: 'Align right', keys: 'Mod-Shift-r' },
+  { align: 'justify', icon: AlignJustify, label: 'Justify', keys: 'Mod-Shift-j' },
+];
+
+/** The table menu (Arthur's step 2): insert outside a table, the rest inside one. */
+export type TableAction =
+  | 'insert'
+  | 'rowBefore'
+  | 'rowAfter'
+  | 'columnBefore'
+  | 'columnAfter'
+  | 'headerRow'
+  | 'deleteRow'
+  | 'deleteColumn'
+  | 'deleteTable';
+
+export interface TableItem {
+  action: TableAction;
+  label: string;
+  /** A removal, drawn in the destructive colour and kept last. */
+  removes?: boolean;
+}
+
+export const TABLE_INSERT: TableItem = { action: 'insert', label: 'Insert table' };
+
+/** Inside a table, in groups: add, the header row, remove. */
+export const TABLE_EDITS: readonly (readonly TableItem[])[] = [
+  [
+    { action: 'rowBefore', label: 'Add row above' },
+    { action: 'rowAfter', label: 'Add row below' },
+    { action: 'columnBefore', label: 'Add column left' },
+    { action: 'columnAfter', label: 'Add column right' },
+  ],
+  [{ action: 'headerRow', label: 'Header row on or off' }],
+  [
+    { action: 'deleteRow', label: 'Delete row', removes: true },
+    { action: 'deleteColumn', label: 'Delete column', removes: true },
+    { action: 'deleteTable', label: 'Delete table', removes: true },
+  ],
 ];
 
 /** The dropdown's own label for the block under the caret. */

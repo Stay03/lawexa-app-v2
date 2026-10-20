@@ -5,11 +5,14 @@ import { join } from 'node:path';
 
 import { isMacPlatform, shortcutLabel } from './shortcut-label';
 import {
+  ALIGN_OPTIONS,
   BLOCK_VERBS,
   CLEAR_FORMATTING,
   CODE_VERB,
   REDO_KEYS,
   STYLE_OPTIONS,
+  TABLE_EDITS,
+  TABLE_INSERT,
   TEXT_VERBS,
   UNDO_KEYS,
   styleLabel,
@@ -18,7 +21,9 @@ import {
 /* Arthur's editor step 1 (go 19 October 2026, 17:36Z; thread e04e8a92), the
  * toolbar part: undo and redo on a computer, a style dropdown, clear
  * formatting, tooltips with shortcuts, and a More menu on the phone. No new
- * package. H1 stays out of the dropdown until Stay says otherwise. */
+ * package. Step 2 (20 October 2026) adds Large heading (H1) to the style,
+ * one highlight, alignment and tables, with @tiptap/extension-table,
+ * @tiptap/extension-text-align and @tiptap/extension-highlight, all 3.15.3. */
 
 const read = (...parts: string[]) =>
   readFileSync(join(process.cwd(), 'v2', 'features', 'notes', 'editor', ...parts), 'utf8').replace(/\r\n/g, '\n');
@@ -43,6 +48,7 @@ test('every tooltip promises a key the editor answers (Tiptap 3.15.3 bindings)',
     italic: 'Mod-i',
     underline: 'Mod-u',
     strike: 'Mod-Shift-s',
+    highlight: 'Mod-Shift-h',
     h2: 'Mod-Alt-2',
     h3: 'Mod-Alt-3',
     bulletList: 'Mod-Shift-8',
@@ -56,27 +62,76 @@ test('every tooltip promises a key the editor answers (Tiptap 3.15.3 bindings)',
   assert.equal(CLEAR_FORMATTING.keys, 'Mod-\\');
   const extensions = read('extensions.ts');
   assert.match(extensions, /'Mod-\\\\': \(\) => \{/);
-  assert.match(extensions, /ClearFormattingShortcut,\n  \];/);
+  // Highlight's own binding is Mod-Shift-h (Tiptap 3.15.3), and TextAlign's four.
+  assert.match(extensions, /ClearFormattingShortcut,\n    Highlight\.configure\(\{ multicolor: false \}\),/);
+  assert.deepEqual(ALIGN_OPTIONS.map((o) => `${o.align} ${o.keys}`), [
+    'left Mod-Shift-l',
+    'center Mod-Shift-e',
+    'right Mod-Shift-r',
+    'justify Mod-Shift-j',
+  ]);
 });
 
-test('the style dropdown offers Normal text, Heading and Subheading, never H1, and sets rather than toggles', () => {
+test('the style dropdown offers Normal text, Large heading, Heading and Subheading, and sets rather than toggles', () => {
   assert.deepEqual(STYLE_OPTIONS.map((o) => `${o.style} ${o.label} ${o.keys}`), [
     'paragraph Normal text Mod-Alt-0',
+    'h1 Large heading Mod-Alt-1',
     'h2 Heading Mod-Alt-2',
     'h3 Subheading Mod-Alt-3',
   ]);
-  // A legacy H1 in a note still shows its name.
   assert.equal(styleLabel('h1'), 'Large heading');
   assert.equal(styleLabel('paragraph'), 'Normal text');
   const formatting = read('formatting.ts');
-  assert.match(formatting, /if \(style === 'paragraph'\) chain\.setParagraph\(\)\.run\(\);\s*else chain\.setHeading\(\{ level: style === 'h2' \? 2 : 3 \}\)\.run\(\);/);
+  assert.match(
+    formatting,
+    /if \(style === 'paragraph'\) chain\.setParagraph\(\)\.run\(\);\s*else chain\.setHeading\(\{ level: style === 'h1' \? 1 : style === 'h2' \? 2 : 3 \}\)\.run\(\);/,
+  );
   assert.match(read('StyleSelect.tsx'), /onSelect=\{\(\) => applyStyle\(editor, option\.style\)\}/);
 });
 
-test('clear formatting takes off the text marks and a heading, and keeps lists, quotes and links', () => {
+test('clear formatting takes off the text marks, the highlight and a heading, and keeps lists, quotes, links and alignment', () => {
   const formatting = read('formatting.ts');
-  assert.match(formatting, /\.unsetBold\(\)\s*\.unsetItalic\(\)\s*\.unsetUnderline\(\)\s*\.unsetStrike\(\)\s*\.unsetCode\(\);\s*if \(editor\.isActive\('heading'\)\) chain\.setParagraph\(\);/);
-  assert.doesNotMatch(formatting, /unsetAllMarks|clearNodes|unsetLink/);
+  assert.match(
+    formatting,
+    /\.unsetBold\(\)\s*\.unsetItalic\(\)\s*\.unsetUnderline\(\)\s*\.unsetStrike\(\)\s*\.unsetCode\(\)\s*\.unsetHighlight\(\);\s*if \(editor\.isActive\('heading'\)\) chain\.setParagraph\(\);/,
+  );
+  // The keyboard shortcut follows the same rule as the button.
+  assert.match(
+    read('extensions.ts'),
+    /\.unsetCode\(\)\s*\.unsetHighlight\(\);\s*if \(this\.editor\.isActive\('heading'\)\) chain\.setParagraph\(\);/,
+  );
+  const clear = formatting.slice(formatting.indexOf('export function clearFormatting'), formatting.indexOf('export function applyStyle'));
+  assert.doesNotMatch(clear, /unsetAllMarks|clearNodes|unsetLink|unsetTextAlign/);
+});
+
+test('the highlight is a plain mark with one colour, and alignment never stores left', () => {
+  const extensions = read('extensions.ts');
+  // One colour: multicolor off, so a <mark> carries no colour attribute.
+  assert.match(extensions, /import Highlight from '@tiptap\/extension-highlight';/);
+  assert.doesNotMatch(extensions, /multicolor: true/);
+  // Still no colour, text-style or font package.
+  assert.doesNotMatch(extensions, /from '@tiptap\/extension-(color|text-style|font)/);
+  assert.match(extensions, /TextAlign\.configure\(\{\s*types: \['heading', 'paragraph'\],/);
+  // A dragged column width is a style the reader drops, so tables do not resize.
+  assert.match(extensions, /TableKit\.configure\(\{ table: \{ resizable: false \} \}\)/);
+  assert.match(
+    read('formatting.ts'),
+    /if \(align === 'left'\) chain\.unsetTextAlign\(\)\.run\(\);\s*else chain\.setTextAlign\(align\)\.run\(\);/,
+  );
+});
+
+test('the table menu inserts outside a table and edits inside one, removals last', () => {
+  assert.equal(TABLE_INSERT.action, 'insert');
+  assert.deepEqual(
+    TABLE_EDITS.map((group) => group.map((item) => item.action)),
+    [['rowBefore', 'rowAfter', 'columnBefore', 'columnAfter'], ['headerRow'], ['deleteRow', 'deleteColumn', 'deleteTable']],
+  );
+  assert.ok(TABLE_EDITS[2].every((item) => item.removes));
+  assert.ok(TABLE_EDITS.slice(0, 2).flat().every((item) => !item.removes));
+  assert.match(read('formatting.ts'), /chain\.insertTable\(\{ rows: 3, cols: 3, withHeaderRow: true \}\)\.run\(\);/);
+  const menu = read('TableMenu.tsx');
+  assert.match(menu, /if \(!state\.inTable\) \{/);
+  assert.match(menu, /variant=\{item\.removes \? 'destructive' : 'default'\}/);
 });
 
 test('a computer gets the bar above the note, with tooltips; touch keeps the dock bar', () => {
@@ -89,6 +144,8 @@ test('a computer gets the bar above the note, with tooltips; touch keeps the doc
   assert.match(bar, /label="Undo"\s*shortcut=\{keys\(UNDO_KEYS\)\}/);
   assert.match(bar, /label="Redo"\s*shortcut=\{keys\(REDO_KEYS\)\}/);
   assert.match(bar, /<StyleSelect editor=\{editor\} state=\{state\} mac=\{mac\} \/>/);
+  assert.match(bar, /<AlignMenu editor=\{editor\} state=\{state\} mac=\{mac\} \/>/);
+  assert.match(bar, /<TableMenu editor=\{editor\} state=\{state\} \/>/);
   assert.match(bar, /label=\{CLEAR_FORMATTING\.label\}\s*shortcut=\{keys\(CLEAR_FORMATTING\.keys\)\}/);
   // The tooltip names the control and its keys; without a shortcut the native title stays.
   const button = read('ToolbarButton.tsx');
@@ -103,12 +160,22 @@ test('the phone bar holds nine controls and the rest is in More', () => {
   // marks and the lists each render from one map, so the source has six tags.
   assert.equal((row.match(/<ToolbarButton/g) ?? []).length, 6);
   assert.match(bar, /const ROW_TEXT_VERBS = TEXT_VERBS\.filter\(\(\{ verb \}\) => verb === 'bold' \|\| verb === 'italic'\);/);
+  assert.match(bar, /const MORE_TEXT_VERBS = TEXT_VERBS\.filter\(\(\{ verb \}\) => verb !== 'bold' && verb !== 'italic'\);/);
   assert.match(bar, /\{ROW_TEXT_VERBS\.map/);
   assert.match(bar, /\{LIST_VERBS\.map/);
   assert.match(bar, /<MoreMenu editor=\{editor\} state=\{state\} onLink=\{onLink\} \/>/);
-  // More: the style, underline and strike, quote, code, link and clear formatting.
+  // More: the style, underline, strike and highlight, quote, code, alignment, the table, link and clear formatting.
   const more = bar.slice(bar.indexOf('function MoreMenu'));
-  for (const piece of [/STYLE_OPTIONS\.map/, /MORE_TEXT_VERBS\.map/, /QUOTE_VERB\.verb/, /CODE_VERB\.verb/, /'Add link'/, /CLEAR_FORMATTING\.label/]) {
+  for (const piece of [
+    /STYLE_OPTIONS\.map/,
+    /MORE_TEXT_VERBS\.map/,
+    /QUOTE_VERB\.verb/,
+    /CODE_VERB\.verb/,
+    /ALIGN_OPTIONS\.map/,
+    /<TableMenuItems editor=\{editor\} state=\{state\} \/>/,
+    /'Add link'/,
+    /CLEAR_FORMATTING\.label/,
+  ]) {
     assert.match(more, piece);
   }
   // It opens above the bar, and hands focus back to the editor unless the link dialog takes it.

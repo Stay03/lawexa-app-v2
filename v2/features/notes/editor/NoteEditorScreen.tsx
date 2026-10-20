@@ -160,6 +160,15 @@ export function NoteEditorScreen({
             '[&_.case-mention]:font-medium [&_.case-mention]:text-primary [&_.case-mention]:no-underline',
             // The live `@query` while the picker is open.
             '[&_.v2-mention-trigger]:rounded [&_.v2-mention-trigger]:bg-primary/10 [&_.v2-mention-trigger]:text-primary',
+            // The one highlight, the same gold the reader paints (`note-document.css`).
+            '[&_mark]:rounded-[0.2em] [&_mark]:bg-primary/28 [&_mark]:px-[0.1em] [&_mark]:text-inherit',
+            // A table fills the column and its cells wrap, so it never pushes the
+            // page sideways while writing; the reader's own box scrolls instead.
+            // `selectedCell` is a cell inside a drag selection across cells.
+            '[&_table]:my-4 [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse',
+            '[&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top',
+            '[&_th]:border [&_th]:border-border [&_th]:bg-secondary [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:align-top',
+            '[&_:is(td,th)>p]:my-0 [&_.selectedCell]:bg-primary/10',
           ),
         },
       },

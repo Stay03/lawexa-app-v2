@@ -3,9 +3,11 @@
 import type { Editor } from '@tiptap/react';
 import { AtSign, ImagePlus, Link2, Link2Off, Loader2, Redo2, RemoveFormatting, Undo2 } from 'lucide-react';
 
+import { AlignMenu } from './AlignMenu';
 import { runFormat, type FormatState } from './formatting';
 import { shortcutLabel, useIsMac } from './shortcut-label';
 import { StyleSelect } from './StyleSelect';
+import { TableMenu } from './TableMenu';
 import { ToolbarButton, ToolbarDivider } from './ToolbarButton';
 import { BLOCK_VERBS, CLEAR_FORMATTING, CODE_VERB, REDO_KEYS, TEXT_VERBS, UNDO_KEYS } from './toolbar-verbs';
 
@@ -20,7 +22,10 @@ const SHAPE_VERBS = BLOCK_VERBS.filter(
  * insert icons in the header, so undo, redo and a heading needed a shortcut the
  * reader had to know. The bar holds every verb, in a word processor's order:
  *
- *   undo · redo | style | B I U S | lists · quote | link · image · @case | code · clear formatting
+ *   undo · redo | style | B I U S highlight | align | lists · quote · table | link · image · @case | code · clear formatting
+ *
+ * Highlight, the alignment menu and the table menu joined in Arthur's step 2
+ * (20 October 2026).
  *
  * Each button's tooltip names it and its key binding (⌘ on a Mac, Ctrl
  * elsewhere). The bar sticks to the top of the page while the note scrolls
@@ -86,6 +91,10 @@ export function DesktopToolbar({
 
       <ToolbarDivider />
 
+      <AlignMenu editor={editor} state={state} mac={mac} />
+
+      <ToolbarDivider />
+
       {SHAPE_VERBS.map(({ verb, icon, label, keys: binding }) => (
         <ToolbarButton
           key={verb}
@@ -96,6 +105,7 @@ export function DesktopToolbar({
           onPress={() => runFormat(editor, verb)}
         />
       ))}
+      <TableMenu editor={editor} state={state} />
 
       <ToolbarDivider />
 

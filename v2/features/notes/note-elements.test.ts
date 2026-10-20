@@ -40,3 +40,65 @@ test('void tags and images carry nothing but what the walker checked', () => {
   ]);
   assert.equal(html, '<div><br/><img src="https://cdn.example.org/a.png" alt="Court" loading="lazy"/></div>');
 });
+
+/* Arthur's editor step 2 (20 October 2026): tables, one highlight and
+ * alignment are read as well as written. */
+const text = (key: string, value: string): NoteNode => ({ kind: 'text', key, text: value });
+
+test('a table keeps its rows and cells, and a cell carries only a span over one', () => {
+  const html = markup([
+    {
+      kind: 'element',
+      key: 't',
+      tag: 'table',
+      children: [
+        {
+          kind: 'element',
+          key: 'b',
+          tag: 'tbody',
+          children: [
+            {
+              kind: 'element',
+              key: 'r1',
+              tag: 'tr',
+              children: [
+                { kind: 'cell', key: 'h', tag: 'th', colSpan: 2, children: [text('x', 'Case')] },
+              ],
+            },
+            {
+              kind: 'element',
+              key: 'r2',
+              tag: 'tr',
+              children: [
+                { kind: 'cell', key: 'a', tag: 'td', children: [text('y', 'Donoghue')] },
+                { kind: 'cell', key: 'c', tag: 'td', children: [text('z', '1932')] },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ]);
+  assert.equal(
+    html,
+    '<div><table><tbody><tr><th colSpan="2">Case</th></tr><tr><td>Donoghue</td><td>1932</td></tr></tbody></table></div>',
+  );
+});
+
+test('an aligned block gets a class from the closed table, never a style; a highlight is a bare mark', () => {
+  const html = markup([
+    { kind: 'element', key: 'p', tag: 'p', align: 'center', children: [text('t', 'Held')] },
+    { kind: 'element', key: 'h', tag: 'h2', align: 'justify', children: [text('u', 'Facts')] },
+    {
+      kind: 'element',
+      key: 'q',
+      tag: 'p',
+      children: [{ kind: 'element', key: 'm', tag: 'mark', children: [text('v', 'ratio')] }],
+    },
+  ]);
+  assert.equal(
+    html,
+    '<div><p class="text-center">Held</p><h2 class="text-justify">Facts</h2><p><mark>ratio</mark></p></div>',
+  );
+  assert.doesNotMatch(html, /style=/);
+});

@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
 
-import type { NoteNode, NoteTag } from './note-html';
+import type { NoteAlign, NoteNode, NoteTag } from './note-html';
 
 /**
  * note-elements — the walker's node tree as plain React elements, for v1's note
@@ -19,11 +19,23 @@ import type { NoteNode, NoteTag } from './note-html';
  * it. The href is rebuilt from the walker's validated slug, never the author's.
  *
  * Built with `createElement`, not JSX, so the node test runner can import it.
- * v2's reader has its own renderer, which uses v2's case preview component.
+ * v2's reader has its own renderer, which uses v2's case preview component and
+ * shares {@link NOTE_ALIGN_CLASS} from here.
  */
 
 /** Tags React must create without children. */
 const VOID_TAGS: ReadonlySet<NoteTag> = new Set<NoteTag>(['br', 'hr']);
+
+/**
+ * A block's alignment as a class from this closed table, never as the author's
+ * `style`: the walker read `text-align` into one of three words, and both
+ * readers turn the word back into a class.
+ */
+export const NOTE_ALIGN_CLASS: Readonly<Record<NoteAlign, string>> = {
+  center: 'text-center',
+  right: 'text-right',
+  justify: 'text-justify',
+};
 
 export function renderNoteNodes(nodes: readonly NoteNode[]): ReactNode[] {
   return nodes.map(renderNoteNode);
@@ -37,7 +49,18 @@ function renderNoteNode(node: NoteNode): ReactNode {
     case 'element':
       return VOID_TAGS.has(node.tag)
         ? createElement(node.tag, { key: node.key })
-        : createElement(node.tag, { key: node.key }, ...renderNoteNodes(node.children));
+        : createElement(
+            node.tag,
+            node.align ? { key: node.key, className: NOTE_ALIGN_CLASS[node.align] } : { key: node.key },
+            ...renderNoteNodes(node.children),
+          );
+
+    case 'cell':
+      return createElement(
+        node.tag,
+        { key: node.key, colSpan: node.colSpan, rowSpan: node.rowSpan },
+        ...renderNoteNodes(node.children),
+      );
 
     case 'case':
       return createElement(
