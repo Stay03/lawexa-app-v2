@@ -18,7 +18,8 @@ import { outOfMessagesView } from './out-of-messages';
  *   free used up     "Free messages used"       Buy pack · Upgrade
  *   plan used up     "Messages used for now"    Buy pack · Upgrade
  *                    "Back on 14 Nov 2026, 01:00" under it, when known
- *   plan ended       "Plan access ended"        Buy pack · Reactivate
+ *   plan cancelled   "Plan cancelled · messages used up"   Buy pack · Reactivate
+ *                    (Stay, 20 October 2026, 00:51Z: the plan may still run; only its messages are used up)
  *   hard limit       "Usage limit reached"      the reset line only
  *
  * The words and doors are the shared notice's (`out-of-messages.ts`), in
@@ -41,7 +42,9 @@ export function OutOfMessagesStrip({ blocked }: { blocked: IBlockedReason }) {
       <span className="flex min-w-0 items-start gap-2 text-foreground">
         <Hourglass aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
         <span className="min-w-0">
-          <span className="block truncate">{view.short}</span>
+          {/* Wraps rather than cuts: "Plan cancelled · messages used up" beside its two
+              doors is wider than a 390px phone's strip. */}
+          <span className="block">{view.short}</span>
           {view.resetShort ? (
             <span className="block truncate text-xs text-muted-foreground tabular-nums">
               {view.resetShort}

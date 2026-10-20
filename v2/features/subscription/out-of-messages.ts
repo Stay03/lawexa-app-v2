@@ -134,7 +134,7 @@ export function outOfMessagesView({
     reason === 'hard_limit'
       ? 'Usage limit reached'
       : reason === 'cancelled_grace_exhausted'
-        ? 'Plan access ended'
+        ? 'Plan cancelled · messages used up'
         : reason === 'free_no_subscription'
           ? 'Free messages used'
           : 'Messages used for now';

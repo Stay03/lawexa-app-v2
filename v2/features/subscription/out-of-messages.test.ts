@@ -157,7 +157,7 @@ test('C4: each state in one line, with its two doors', () => {
   );
   assert.deepEqual(
     strip(outOfMessagesView({ blocked: block({ reason: 'cancelled_grace_exhausted' }), timeZone: 'UTC' })),
-    { line: 'Plan access ended', reset: null, doors: ['Buy pack /settings/message-packs', 'Reactivate /pricing'] },
+    { line: 'Plan cancelled · messages used up', reset: null, doors: ['Buy pack /settings/message-packs', 'Reactivate /pricing'] },
   );
   assert.deepEqual(strip(outOfMessagesView({ blocked: block({ reason: 'hard_limit' }), timeZone: 'UTC' })), {
     line: 'Usage limit reached',
