@@ -24,7 +24,6 @@ import {
 } from '@/v2/features/channels/files/use-upload-queue';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
-import { ACCEPTED_FILE_TYPES } from '@/v2/features/conversations/attachment-rules';
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
 import { folderRow } from '@/v2/features/folders/folder-row-model';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -34,6 +33,7 @@ import { TabRow } from '@/v2/shell/TabRow';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useCopySpaceFileToMine, useUploadSpaceFile } from '../../content-mutations';
 import {
+  FILES_ACCEPT,
   canDeleteSpaceFile,
   canRemoveFromSpace,
   ownsItem,
@@ -579,7 +579,7 @@ function useSpaceUploads(spaceUuid: string) {
         ref={inputRef}
         type="file"
         multiple
-        accept={ACCEPTED_FILE_TYPES}
+        accept={FILES_ACCEPT}
         className="sr-only"
         tabIndex={-1}
         aria-hidden

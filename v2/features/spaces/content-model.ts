@@ -13,6 +13,7 @@ import {
   MAX_IMAGE_SIZE,
   PICTURE_EXTENSIONS,
 } from '@/v2/features/conversations/attachment-rules';
+import { MEDIA_EXTENSIONS, MEDIA_MAX_SIZE_BYTES } from '@/v2/features/channels/model';
 import { canAddContent, type SpaceTab } from './model';
 
 /**
@@ -247,6 +248,35 @@ const ACCEPTED_EXTENSIONS: readonly string[] = ACCEPTED_FILE_TYPES.split(',').ma
 );
 
 /**
+ * Video and audio, which a space and a folder take as well (Stay, 20 October
+ * 2026: "Yes all files"; backend: `POST /spaces/{space}/files` and
+ * `POST /files/documents` take mp4, mov, webm, mp3, m4a, wav and ogg up to
+ * 100 MB). The same seven and the same cap a channel takes (channels/model.ts).
+ * The chat composer does NOT take them: a chat send refuses a media file, so
+ * its picker keeps {@link ACCEPTED_FILE_TYPES}.
+ */
+const MEDIA_UPLOAD_TYPES: readonly string[] = [
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
+  'audio/mpeg',
+  'audio/mp4',
+  'audio/x-m4a',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/ogg',
+];
+
+/** The file picker's `accept` for a space and a folder: documents, pictures, video and audio. */
+export const FILES_ACCEPT = `${ACCEPTED_FILE_TYPES},${[...MEDIA_EXTENSIONS].map((extension) => `.${extension}`).join(',')}`;
+
+/** Is this a video or audio file, by its type or, when the system sent none, its name? */
+export function isMediaUpload(file: Pick<File, 'name' | 'type'>): boolean {
+  const extension = file.name.toLowerCase().split('.').pop() ?? '';
+  return MEDIA_UPLOAD_TYPES.includes(file.type) || MEDIA_EXTENSIONS.has(extension);
+}
+
+/**
  * Check a file against the document upload rules before it is sent (B3:
  * "the document upload rules", the ones `POST /files/documents` runs; the
  * space's `POST /spaces/{uuid}/files` request extends that one, backend
@@ -265,10 +295,15 @@ export function uploadPrecheck(
   place: 'a space' | 'a folder' = 'a space',
 ): string | null {
   const extension = file.name.toLowerCase().split('.').pop() ?? '';
+  if (isMediaUpload(file)) {
+    return file.size > MEDIA_MAX_SIZE_BYTES
+      ? `“${file.name}” is larger than 100 MB, the most ${place} takes for a video or audio file.`
+      : null;
+  }
   const typeKnown = file.type !== '' && ALLOWED_FILE_TYPES.includes(file.type);
   if (!typeKnown && !ACCEPTED_EXTENSIONS.includes(extension)) {
     const takes = place === 'a space' ? 'A space takes' : 'A folder takes';
-    return `“${file.name}” can’t be added. ${takes} PDF, Word, RTF and image files (JPG, PNG, WebP).`;
+    return `“${file.name}” can’t be added. ${takes} PDF, Word, RTF, image (JPG, PNG, WebP), video and audio files.`;
   }
   // A picture is capped at 5 MB, as the server's rule caps it. A file the
   // system sent with no type is judged a picture by its name.
@@ -292,6 +327,8 @@ export function fileTypeLabel(file: { mime_type: string; original_name: string }
   if (extension === 'pdf' || mime === 'application/pdf') return 'PDF';
   if (['doc', 'docx'].includes(extension) || mime.includes('word')) return 'Word';
   if (extension === 'rtf' || mime.includes('rtf')) return 'RTF';
+  if (mime.startsWith('video/') || ['mp4', 'mov', 'webm'].includes(extension)) return 'Video';
+  if (mime.startsWith('audio/') || ['mp3', 'm4a', 'wav', 'ogg'].includes(extension)) return 'Audio';
   if (mime.startsWith('image/') || ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(extension)) {
     return 'Image';
   }

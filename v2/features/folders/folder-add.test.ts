@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { uploadPrecheck } from '../spaces/content-model';
+import { FILES_ACCEPT, fileTypeLabel, uploadPrecheck } from '../spaces/content-model';
+import { ACCEPTED_FILE_TYPES } from '../conversations/attachment-rules';
 
 /* Arthur's folder page items 8 and 9 (17 October 2026): one labelled "Add"
  * with the ways into a folder, and an empty folder that starts adding from
@@ -68,10 +69,42 @@ test('an upload goes to its store first, then into the folder', () => {
 
 test('the refusal names a folder when the upload is a folder’s', () => {
   const file = (name: string, type: string, size: number) => ({ name, type, size });
-  assert.match(uploadPrecheck(file('setup.exe', 'application/x-msdownload', 1), 'a folder') ?? '', /A folder takes PDF, Word, RTF and image files/);
+  assert.match(uploadPrecheck(file('setup.exe', 'application/x-msdownload', 1), 'a folder') ?? '', /A folder takes PDF, Word, RTF, image \(JPG, PNG, WebP\), video and audio files/);
   assert.match(uploadPrecheck(file('big.pdf', 'application/pdf', 11 * 1024 * 1024), 'a folder') ?? '', /the most a folder takes\./);
   // A space's own upload keeps its words.
   assert.match(uploadPrecheck(file('setup.exe', 'application/x-msdownload', 1)) ?? '', /A space takes PDF/);
+});
+
+test('a space and a folder take video and audio up to 100 MB; the chat composer does not', () => {
+  const file = (name: string, type: string, size: number) => ({ name, type, size });
+  const MB = 1024 * 1024;
+  // Stay, 20 October 2026: "Yes all files" (backend: the space and document routes take them).
+  for (const [name, type] of [
+    ['hearing.mp4', 'video/mp4'],
+    ['call.mov', 'video/quicktime'],
+    ['clip.webm', 'video/webm'],
+    ['note.mp3', 'audio/mpeg'],
+    ['memo.m4a', 'audio/x-m4a'],
+    ['record.wav', 'audio/wav'],
+    ['voice.ogg', 'audio/ogg'],
+  ]) {
+    assert.equal(uploadPrecheck(file(name, type, 90 * MB), 'a folder'), null, name);
+    assert.equal(uploadPrecheck(file(name, type, 90 * MB)), null, name);
+  }
+  // A media file a system sent with no type is judged by its name.
+  assert.equal(uploadPrecheck(file('hearing.mp4', '', 5 * MB), 'a folder'), null);
+  assert.match(uploadPrecheck(file('long.mp4', 'video/mp4', 101 * MB), 'a folder') ?? '', /larger than 100 MB, the most a folder takes for a video or audio file/);
+  // Documents and pictures keep their caps.
+  assert.match(uploadPrecheck(file('big.pdf', 'application/pdf', 11 * MB), 'a folder') ?? '', /larger than 10 MB/);
+  // The pickers: a space and a folder offer media; the chat composer keeps documents and pictures.
+  assert.match(FILES_ACCEPT, /\.mp4/);
+  assert.match(FILES_ACCEPT, /\.ogg/);
+  assert.doesNotMatch(ACCEPTED_FILE_TYPES, /\.mp4|\.mp3/);
+  assert.match(read('detail', 'FolderAdd.tsx'), /accept=\{FILES_ACCEPT\}/);
+  assert.match(read('list', 'LooseFilesSection.tsx'), /accept=\{FILES_ACCEPT\}/);
+  // Their rows say what they are.
+  assert.equal(fileTypeLabel({ mime_type: 'video/mp4', original_name: 'hearing.mp4' }), 'Video');
+  assert.equal(fileTypeLabel({ mime_type: 'audio/mpeg', original_name: 'note.mp3' }), 'Audio');
 });
 
 test('files from the space are offered, chats are not', () => {

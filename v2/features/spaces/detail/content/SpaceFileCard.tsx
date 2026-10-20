@@ -1,8 +1,10 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Loader2 } from 'lucide-react';
 
+import { filesApi } from '@/lib/api/files';
 import { cn } from '@/lib/utils';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import type { SpaceFile } from '@/types/collab';
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { FileMark } from '@/v2/features/channels/files/FileMark';
+import { playableKind } from '@/v2/features/channels/files/file-model';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { fileTypeLabel } from '../../content-model';
 import { SpaceFileMenu, type SpaceFileActions } from './SpaceFileMenu';
@@ -182,6 +185,7 @@ function CardBody({
         </p>
       ) : (
         <div className="flex flex-col gap-2">
+          <SpaceMediaPlayer file={file} />
           <Button
             type="button"
             size="lg"
@@ -207,5 +211,79 @@ function CardBody({
         </div>
       )}
     </div>
+  );
+}
+
+/** A minted download link holds for an hour; the player reuses one for 50 minutes. */
+const MEDIA_URL_STALE_MS = 50 * 60 * 1000;
+
+/**
+ * A video or audio file plays in its card, as it does in a channel's message
+ * (Stay, 20 October 2026: "Yes all files"). The link is minted when the card
+ * opens (`GET /files/{id}/download`, the same gated route "Open file" uses). A
+ * player that fails asks for one fresh link, since a link can expire while the
+ * card is open; a second failure says so, and "Open file" below still works.
+ * Any other file draws nothing here.
+ */
+function SpaceMediaPlayer({ file }: { file: SpaceFile }) {
+  const kind = playableKind(file);
+  const [retried, setRetried] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const link = useQuery({
+    queryKey: ['files', 'download-url', file.id],
+    queryFn: () => filesApi.getDownloadUrl(file.id),
+    enabled: kind !== null,
+    staleTime: MEDIA_URL_STALE_MS,
+    retry: false,
+    meta: { silentError: true },
+  });
+  if (kind === null) return null;
+
+  const src = link.data?.data?.url ?? null;
+  const onError = () => {
+    if (retried) {
+      setFailed(true);
+      return;
+    }
+    setRetried(true);
+    void link.refetch();
+  };
+
+  if (failed || link.isError) {
+    return (
+      <p role="status" className="text-xs text-muted-foreground">
+        This {kind === 'audio' ? 'recording' : 'video'} didn&rsquo;t play here. Open it below.
+      </p>
+    );
+  }
+  if (!src) {
+    return (
+      <div
+        aria-hidden
+        className={cn('w-full animate-pulse rounded-lg bg-muted', kind === 'audio' ? 'h-12' : 'aspect-video')}
+      />
+    );
+  }
+  return kind === 'audio' ? (
+    <audio
+      key={src}
+      src={src}
+      controls
+      preload="metadata"
+      onError={onError}
+      aria-label={file.original_name}
+      className="w-full"
+    />
+  ) : (
+    <video
+      key={src}
+      src={src}
+      controls
+      playsInline
+      preload="metadata"
+      onError={onError}
+      aria-label={file.original_name}
+      className="aspect-video w-full rounded-lg bg-black object-contain"
+    />
   );
 }

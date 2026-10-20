@@ -6,8 +6,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import { ACCEPTED_FILE_TYPES } from '@/v2/features/conversations/attachment-rules';
-import { uploadPrecheck } from '@/v2/features/spaces/content-model';
+import { FILES_ACCEPT, uploadPrecheck } from '@/v2/features/spaces/content-model';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { FolderPicker } from '../picker/FolderPicker';
@@ -178,7 +177,7 @@ export function useLooseFileUpload(): { pick: () => void; input: ReactNode } {
       ref={inputRef}
       type="file"
       multiple
-      accept={ACCEPTED_FILE_TYPES}
+      accept={FILES_ACCEPT}
       className="sr-only"
       tabIndex={-1}
       aria-hidden

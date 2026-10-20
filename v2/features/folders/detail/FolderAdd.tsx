@@ -24,8 +24,8 @@ import { filesApi } from '@/lib/api/files';
 import { spacesApi } from '@/lib/api/collab';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatBytes } from '@/lib/utils/format-bytes';
-import { ACCEPTED_FILE_TYPES, isImageAttachment } from '@/v2/features/conversations/attachment-rules';
-import { fileTypeLabel, uploadPrecheck } from '@/v2/features/spaces/content-model';
+import { isImageAttachment } from '@/v2/features/conversations/attachment-rules';
+import { FILES_ACCEPT, fileTypeLabel, uploadPrecheck } from '@/v2/features/spaces/content-model';
 import { invalidateSpaceContents } from '@/v2/features/spaces/content-mutations';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -210,7 +210,7 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
       ref={inputRef}
       type="file"
       multiple
-      accept={ACCEPTED_FILE_TYPES}
+      accept={FILES_ACCEPT}
       className="sr-only"
       tabIndex={-1}
       aria-hidden

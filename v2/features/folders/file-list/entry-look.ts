@@ -2,6 +2,8 @@ import {
   BookText,
   File,
   FileImage,
+  FileMusic,
+  FilePlay,
   FileSpreadsheet,
   FileText,
   Folder,
@@ -47,6 +49,10 @@ const FILE_LOOK: Record<string, EntryLook> = {
   Spreadsheet: { icon: FileSpreadsheet, tone: 'text-green-600 dark:text-green-400' },
   Slides: { icon: Presentation, tone: 'text-orange-600 dark:text-orange-400' },
   Image: { icon: FileImage, tone: 'text-pink-600 dark:text-pink-400' },
+  // Video and audio (a folder takes them since 20 October 2026), with the
+  // channel feed's glyphs for the same files (channels/files/FileMark.tsx).
+  Video: { icon: FilePlay, tone: 'text-indigo-600 dark:text-indigo-400' },
+  Audio: { icon: FileMusic, tone: 'text-teal-600 dark:text-teal-400' },
 };
 
 export function entryLook(entry: FileListEntry): EntryLook {
