@@ -115,7 +115,7 @@ const isServerRowId = (id: string): boolean => id.startsWith(SERVER_ROW_PREFIX);
 // ─── Resilience constants (ported verbatim from v1, with their rationale) ───
 
 // SSE watchdog: when the stream stops carrying the answer (`./stall.ts`: no event
-// at all for 10 s, or a reconnected stream with no progress for 5 s), stop waiting
+// at all for 15 s, or a reconnected stream with no progress for 5 s), stop waiting
 // on it and ask the server for the turn's status instead. It was 60 s, checked
 // every 10 s, which left a phone on one narration line for a minute while the
 // server finished the answer (Lucy, 20 October 2026).
@@ -700,6 +700,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         const response = await chatApi.getStatus(convId, { withoutMessages: true });
         if (response.data.status !== 'pending') {
           stopPolling();
+          endTurnForServerCopy();
           try {
             const conv = await chatApi.getConversation(convId, { lazyResults: true });
             if (conv.success && conv.data.messages) {
@@ -730,6 +731,23 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     pollInterval = setInterval(() => void tick(), POLL_INTERVAL_MS);
   }
 
+  /**
+   * The turn is over and the server's copy of the conversation replaces the
+   * screen (a recovery by status). Nothing of the live turn is left to finish, so
+   * its streaming refs go: left set, the next turn's first text found the old
+   * placeholder's id, wrote into a row the reload had removed, and its answer
+   * never showed. The turn's saved ids are in the server copy, so it is settled.
+   */
+  function endTurnForServerCopy(): void {
+    streamingMessageId = null;
+    currentIteration = null;
+    executionId = null;
+    isCancelling = false;
+    toolCallQueue.clear();
+    resetStreamingBuffers();
+    turnsAwaitingIds = 0;
+  }
+
   // ─── Watchdog ─────────────────────────────────────────────────────────────
 
   function stopWatchdog() {
@@ -758,9 +776,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * The stream stopped carrying the answer (`./stall.ts`). Close it and follow
    * the turn by its status, as a reopen does: checked at once, then every few
    * seconds, and the finished conversation loaded when it is done. Not a
-   * reconnect: the server's stream cannot replay what the dead connection had
-   * already taken, so a reconnect can wait on an answer that never comes.
-   * The turn stays "working" on screen meanwhile.
+   * reconnect: only the server's v2_stream path replays what a dead connection
+   * missed (Last-Event-ID); the older path cannot, and a reconnect there waits on
+   * an answer that never comes. The status works on both. The turn stays
+   * "working" on screen meanwhile.
    */
   function recoverFromStall() {
     stopWatchdog();
@@ -785,15 +804,19 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     const convId = conversationId;
     if (!convId || staleCheckInFlight) return;
     staleCheckInFlight = true;
+    const checked = eventSource;
     try {
       const response = await chatApi.getStatus(convId, { withoutMessages: true });
+      // The stream finished the turn itself while the status was on its way:
+      // its terminal already drew the answer, so nothing is reloaded over it.
+      if (eventSource !== checked) return;
       if (response.data.status !== 'pending') {
         stopWatchdog();
         if (eventSource) {
           eventSource.close();
           eventSource = null;
         }
-        executionId = null;
+        endTurnForServerCopy();
         try {
           const conv = await chatApi.getConversation(convId, { lazyResults: true });
           if (conv.success && conv.data.messages) {

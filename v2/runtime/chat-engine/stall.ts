@@ -7,14 +7,16 @@
  * Two signs, both measured, never counted:
  *
  * 1. SILENT: no event of any kind, heartbeats included, for
- *    {@link STALL_SILENCE_MS}. The server sends a heartbeat at least every 5 s
- *    while it works, so ten seconds of nothing is a dead connection (a phone's
- *    radio or network dropped it without the socket being told).
+ *    {@link STALL_SILENCE_MS}. The server sends a heartbeat every 5 s while
+ *    nothing else is going out (ChatStreamController: XREAD BLOCK 5000, then a
+ *    heartbeat), so fifteen seconds of nothing, three missed heartbeats, is a dead
+ *    connection (a phone's radio or network dropped it without the socket being
+ *    told).
  * 2. RECONNECT WITH NOTHING: the transport noticed a drop and reconnected, and
  *    no progress event (text, a tool step, the end) has come for
- *    {@link STALL_RECONNECT_MS} since. The server's stream cannot replay what
- *    the dropped connection had already taken, so a reconnected stream can
- *    carry heartbeats and never the rest of the answer.
+ *    {@link STALL_RECONNECT_MS} since. The server's older stream path cannot
+ *    replay what the dropped connection had already taken, so there a
+ *    reconnected stream can carry heartbeats and never the rest of the answer.
  *
  * Either way the engine asks the server for the turn's status at once and
  * then every few seconds, and loads the finished conversation when it is done:
@@ -23,8 +25,8 @@
  * Pure, so it is tested with plain numbers.
  */
 
-/** No event at all for this long is a dead connection. */
-export const STALL_SILENCE_MS = 10_000;
+/** No event at all for this long is a dead connection: 3x the 5 s heartbeat. */
+export const STALL_SILENCE_MS = 15_000;
 
 /** A reconnected stream with no progress for this long cannot finish the answer. */
 export const STALL_RECONNECT_MS = 5_000;

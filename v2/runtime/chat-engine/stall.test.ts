@@ -19,10 +19,10 @@ const clock = (over: Partial<Parameters<typeof stallVerdict>[0]>) => ({
   ...over,
 });
 
-test('silent: no event of any kind for 10 s is a dead connection; a heartbeat keeps it alive', () => {
-  assert.equal(STALL_SILENCE_MS, 10_000);
-  assert.equal(stallVerdict(clock({ lastEventAt: T - 9_999 })), 'live');
-  assert.equal(stallVerdict(clock({ lastEventAt: T - 10_000 })), 'silent');
+test('silent: no event of any kind for 15 s, three missed heartbeats, is a dead connection; a heartbeat keeps it alive', () => {
+  assert.equal(STALL_SILENCE_MS, 15_000);
+  assert.equal(stallVerdict(clock({ lastEventAt: T - 14_999 })), 'live');
+  assert.equal(stallVerdict(clock({ lastEventAt: T - 15_000 })), 'silent');
   // A long tool step with heartbeats flowing and no text is alive: only the
   // last event of any kind counts here.
   assert.equal(stallVerdict(clock({ lastEventAt: T - 2_000, lastProgressAt: T - 50_000 })), 'live');
