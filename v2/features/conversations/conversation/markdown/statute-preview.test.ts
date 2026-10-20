@@ -46,6 +46,21 @@ test('the pane names the statute, the section’s heading and its opening', () =
   // A section with subsections opens with its own lead-in.
   const withIntro = { ...(data as object), node: { title: null, content: null, intro: 'The duties of a secretary include:' } } as never;
   assert.deepEqual(sectionPreview(withIntro), { name: 'CAMA 2020', heading: null, text: 'The duties of a secretary include:' });
+  // A section whose words sit in its subsections (Evidence Act s.84, live 20
+  // October 2026): no intro, no content, and the server's excerpt carries them.
+  const s84 = {
+    node: { title: 'Admissibility of statement in documents produced by computers', content: null, intro: null },
+    total_count: 1,
+    statute: { slug: 'evidence-act-2011-as-amended', title: 'Evidence Act, 2011 (as amended)', short_title: null },
+    excerpt: 'In any proceeding a statement contained in a document produced by a computer shall be admissible as evidence',
+  } as never;
+  assert.equal(
+    sectionPreview(s84).text,
+    'In any proceeding a statement contained in a document produced by a computer shall be admissible as evidence',
+  );
+  // The excerpt wins over the section's own words; a blank one does not.
+  assert.equal(sectionPreview({ ...(data as object), excerpt: 'From the server.' } as never).text, 'From the server.');
+  assert.equal(sectionPreview({ ...(data as object), excerpt: '  ' } as never).text, 'A secretary shall not use for his own benefit…');
   // An older server without the statute block: the link's words stay the name.
   const bare = { node, total_count: 1 } as never;
   assert.equal(sectionPreview(bare).name, null);

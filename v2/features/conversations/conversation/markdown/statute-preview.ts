@@ -65,6 +65,10 @@ export function sectionPreview(data: StatuteNavigateResponse['data']): SectionPr
   const statute = data.statute ?? null;
   const name = statute ? (statute.short_title?.trim() || statute.title?.trim() || null) : null;
   const heading = data.node.title?.trim() || null;
-  const text = openingWords(data.node.intro?.trim() ? data.node.intro : data.node.content);
+  // The server's excerpt first: it reaches into the subsections when the
+  // section has no words of its own (Evidence Act s.84). An older server sends
+  // none, so the section's own lead-in or text stays the fallback.
+  const own = data.node.intro?.trim() ? data.node.intro : data.node.content;
+  const text = openingWords(data.excerpt?.trim() ? data.excerpt : own);
   return { name, heading, text };
 }

@@ -235,6 +235,12 @@ export interface StatuteNavigateResponse {
     total_count: number;
     /** The statute the node is in (backend, 19 October 2026: for a badge's pane). */
     statute?: { slug: string; title: string; short_title: string | null };
+    /**
+     * The section's opening words as plain text, about 300 characters: its own
+     * intro or content, else the first text inside it (a section whose words sit
+     * in its subsections). Null when it has none (backend, 20 October 2026).
+     */
+    excerpt?: string | null;
   };
 }
 
