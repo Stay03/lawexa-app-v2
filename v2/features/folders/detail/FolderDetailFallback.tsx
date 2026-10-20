@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { FolderTile } from '../folder-bits';
+import { FOLDER_HEADING_TYPE } from '../folder-bits';
 import { useFolderPeek } from '../folder-peek';
 import { FolderDetailSkeleton } from './states';
 
@@ -21,9 +21,9 @@ import { FolderDetailSkeleton } from './states';
  * and dialogs) behind the folders LIST's loading screen. Nothing in this file
  * may import a screen.
  *
- * THE TAPPED ROW'S TILE AND NAME, AT ONCE (speed step 5, 17 October 2026).
- * When the reader came from a folder row, the row left its tile colour and name
- * (`folder-peek.ts`), drawn where the header puts them, at every width: the
+ * THE TAPPED ROW'S NAME, AT ONCE (speed step 5, 17 October 2026). When the
+ * reader came from a folder row, the row left its name (`folder-peek.ts`),
+ * drawn where the header puts it, at every width: the
  * name is the page's heading on a phone too since item 7 (17 October 2026),
  * so the wait shows it there and the bar stays empty, as on the live page.
  */
@@ -39,12 +39,12 @@ export function FolderDetailFallback() {
           in here would lose focus and caret mid-interaction. */}
       <div aria-hidden inert className={LIST_COLUMN}>
         <FolderDetailSkeleton
-          tile={peek ? <FolderTile tint={peek.tint} size="header" /> : undefined}
           name={
             peek ? (
               <p
                 className={cn(
-                  'line-clamp-2 break-words text-xl font-semibold leading-snug tracking-tight',
+                  'line-clamp-2 break-words',
+                  FOLDER_HEADING_TYPE,
                   peek.hasName ? 'text-foreground' : 'italic text-muted-foreground',
                 )}
               >

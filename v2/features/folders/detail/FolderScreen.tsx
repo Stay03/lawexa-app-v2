@@ -17,19 +17,16 @@ import {
   type ScreenBack,
 } from '@/v2/shell/screen-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { formatRelativeTime } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { foldersQueries } from '../queries';
 import {
-  folderCountsLabel,
   folderDepth,
   folderHref,
   folderRow,
   type FolderRowModel,
 } from '../folder-row-model';
 import {
-  FOLDER_ITEM_NOUN,
   folderItemRow,
   type FolderItemRowModel,
 } from '../item-row-model';
@@ -39,8 +36,9 @@ import {
   useHiddenFolderUuids,
   type DeletableFolder,
 } from '../folder-mutations';
-import { FolderPublicMark, FolderTile } from '../folder-bits';
 import { useFolderPeek } from '../folder-peek';
+import { FOLDER_HEADING_TYPE } from '../folder-bits';
+import { FileListHead } from '../file-list/FileListRow';
 import './folder-arrive.css';
 import { FolderNameDialog } from '../FolderNameDialog';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
@@ -101,7 +99,7 @@ import { useTabTitle } from '@/v2/shell/use-tab-title';
  * ── WHAT THE PAGE KNOWS, AND WHERE THAT KNOWLEDGE STOPS ─────────────────────
  * Two derived facts read the LOADED PAGES ONLY, and neither pretends otherwise:
  * which types the folder holds (so the strip can appear) and how many rows the
- * mapper dropped (so the note can explain the header count). A type that first
+ * mapper dropped (so the note can say what is not shown). A type that first
  * occurs on page three brings its tab with it when page three loads; a drop on
  * an unloaded page is not counted until it arrives. The alternative — a
  * per-type count endpoint — does not exist on this wire, and guessing from a
@@ -271,18 +269,9 @@ function FolderBody({ uuid }: { uuid: string }) {
 
   const folder = folderQuery.data?.data;
   const children = folder?.children;
-  const { childRows, hiddenChildren } = useMemo(() => {
-    if (!children) return { childRows: NO_FOLDER_ROWS, hiddenChildren: 0 };
-    const mapped: FolderRowModel[] = [];
-    let queuedForDelete = 0;
-    for (const child of children) {
-      if (hidden.has(child.uuid)) {
-        queuedForDelete += 1;
-        continue;
-      }
-      mapped.push(folderRow(child));
-    }
-    return { childRows: mapped, hiddenChildren: queuedForDelete };
+  const childRows = useMemo(() => {
+    if (!children) return NO_FOLDER_ROWS;
+    return children.filter((child) => !hidden.has(child.uuid)).map((child) => folderRow(child));
   }, [children, hidden]);
 
   const scrollRootRef = useShellScrollRoot();
@@ -497,7 +486,6 @@ function FolderBody({ uuid }: { uuid: string }) {
   }
 
   const row = folderRow(folder);
-  const trail = formatRelativeTime(row.trailAt, now);
   const space = folder.space ?? null;
   // The ways into this folder (items 8 and 9), for whoever may add.
   const addChoices: AddChoices | null = canManageItems
@@ -535,28 +523,6 @@ function FolderBody({ uuid }: { uuid: string }) {
     isFetchingNextPage: itemsQuery.isFetchingNextPage,
   });
 
-  // ── THE HEADER COUNT, MADE TO AGREE WITH THE ROWS ────────────────────────
-  // Three ways it used to contradict them, and what each one costs:
-  //  - a subfolder queued for delete is off the screen but still counted, so
-  //    the server's `children_count` is corrected by the rows this page has
-  //    actually withheld (the list page's own `hiddenLoaded` subtraction);
-  //  - under a type filter no subfolder renders at all and the items shown are
-  //    one type, so the whole-folder sentence is replaced by the FILTERED
-  //    total the server itself reports for that type;
-  //  - a dropped type is still in `items_count`, which the note below explains
-  //    rather than the header quietly subtracting a number that would then
-  //    change as the reader scrolls.
-  const filteredTotal = itemsQuery.data?.pages[0]?.pagination.total;
-  const countLabel =
-    tab === 'all'
-      ? folderCountsLabel(
-          folder.items_count,
-          Math.max(0, folder.children_count - hiddenChildren),
-        )
-      : filteredTotal === undefined
-        ? null
-        : `${filteredTotal} ${FOLDER_ITEM_NOUN[tab]}${filteredTotal === 1 ? '' : 's'}`;
-
   return (
     <div className={LIST_COLUMN}>
       <div
@@ -568,77 +534,41 @@ function FolderBody({ uuid }: { uuid: string }) {
       >
         <FolderBreadcrumb folder={folder} />
 
-        {/* `sm:mt-3` — below `sm:` the trail above renders nothing (the shell's
-            bar carries the way back), so the header starts at the top rather
-            than under a gap where a crumb used to be. */}
-        <header className="flex items-start gap-3 border-b border-border/60 pb-5 sm:mt-3">
-          <FolderTile tint={row.tint} size="header" />
-
-          <div className="min-w-0 flex-1">
-            {/* THE NAME IS THE PAGE'S HEADING AT EVERY WIDTH (Arthur, 17
-                October 2026, item 7: "make it clear on the page which folder
-                you're in"). It wraps to two lines rather than being cut, and
-                the phone bar stays empty while it is on screen, so the name is
-                never printed twice (`useScrolledTitle`). */}
-            <h1
-              ref={headingRef}
-              title={row.name}
-              className={cn(
-                'line-clamp-2 break-words text-xl font-semibold leading-snug tracking-tight',
-                row.hasName ? 'text-foreground' : 'italic text-muted-foreground',
-              )}
-            >
-              {row.name}
-            </h1>
-
-            {/* ONE COUNT, and it describes what the stream below is showing —
-                see `countLabel` for the three ways it used to disagree. */}
-            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-              {/* Each separator is owned by the part that FOLLOWS it, so a
-                  missing count (a filtered tab whose total is still in flight)
-                  can never leave the line opening on a dot. */}
-              {countLabel ? (
-                <span className="tabular-nums">{countLabel}</span>
-              ) : null}
-              {row.isPublic ? (
-                <>
-                  {countLabel ? <Dot /> : null}
-                  <FolderPublicMark />
-                </>
-              ) : null}
-              {trail ? (
-                <>
-                  {countLabel || row.isPublic ? <Dot /> : null}
-                  <span className="tabular-nums">
-                    {row.trailKind} {trail}
-                  </span>
-                </>
-              ) : null}
-            </p>
-
-            {/* A legacy field: v2 has no description control, so this is only
-                ever shown, never written. */}
-            {folder.description ? (
-              <p className="mt-2 max-w-prose text-sm text-muted-foreground">
-                {folder.description}
-              </p>
-            ) : null}
-          </div>
-
-          {/* The header's own kebab has gone: Rename and Delete are published to
-              the bar's single overflow menu (see the `actions` memo above). */}
+        {/* THE HEADER IS THE FOLDER'S NAME AND ITS ADD (folder page B, Stay, 20
+            October 2026, 00:49 UTC). No tile, no counts, no Public mark and no
+            times: the list below says what the folder holds. The name is the
+            page's heading at every width (Arthur, item 7) and wraps to two
+            lines rather than being cut; the phone bar stays empty while it is
+            on screen (`useScrolledTitle`). Rename and Delete are in the bar's
+            one menu. `sm:mt-3`: below `sm:` the trail above renders nothing. */}
+        <header className="flex items-start gap-3 pb-3 sm:mt-3">
+          <h1
+            ref={headingRef}
+            title={row.name}
+            className={cn(
+              'line-clamp-2 min-w-0 flex-1 break-words',
+              FOLDER_HEADING_TYPE,
+              row.hasName ? 'text-foreground' : 'italic text-muted-foreground',
+            )}
+          >
+            {row.name}
+          </h1>
+          {/* Only those who may add (items 8 and 9). */}
+          {addChoices ? <FolderAddMenu choices={addChoices} /> : null}
         </header>
 
-        {/* The type strip and the folder's "Add" (items 8 and 9: the "+"
-            had no word, and only made subfolders). Only its creator adds. */}
-        {showTabs || addChoices ? (
-          <div className="mt-4 flex items-center justify-between gap-3">
-            {showTabs ? (
-              <ItemTypeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
-            ) : (
-              <span />
-            )}
-            {addChoices ? <FolderAddMenu choices={addChoices} /> : null}
+        {/* A legacy field: v2 has no description control, so this is only
+            ever shown, never written. */}
+        {folder.description ? (
+          <p className="-mt-1 mb-3 max-w-prose text-sm text-muted-foreground">
+            {folder.description}
+          </p>
+        ) : null}
+
+        {/* The type strip, only once the folder holds more than one type. */}
+        {showTabs ? (
+          <div className="mb-3">
+            <ItemTypeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
           </div>
         ) : null}
         {addChoices ? upload.input : null}
@@ -686,31 +616,35 @@ function FolderBody({ uuid }: { uuid: string }) {
               The tree paints, and the skeleton below it covers only what is
               genuinely still in flight. */}
           {hasRows ? (
-            <ul className="flex flex-col divide-y divide-border/60">
-              {/* The tree first, complete: `children` is unpaginated. */}
-              {showSubfolders
-                ? childRows.map((child, index) => (
-                    <FolderRow
-                      key={child.uuid}
-                      row={child}
-                      index={index}
-                      now={now}
-                      onRename={openRename}
-                    />
-                  ))
-                : null}
+            <>
+              {/* "Name" and "Added" over the columns, on a computer. */}
+              <FileListHead />
+              <ul className="mt-1 flex flex-col divide-y divide-border/40">
+                {/* The tree first, complete: `children` is unpaginated. */}
+                {showSubfolders
+                  ? childRows.map((child, index) => (
+                      <FolderRow
+                        key={child.uuid}
+                        row={child}
+                        index={index}
+                        now={now}
+                        onRename={openRename}
+                      />
+                    ))
+                  : null}
 
-              {itemRows.map((item, index) => (
-                <FolderItemRow
-                  key={`${item.type}-${item.itemId}`}
-                  row={item}
-                  folderUuid={uuid}
-                  canRemove={canManageItems}
-                  index={(showSubfolders ? childRows.length : 0) + index}
-                  now={now}
-                />
-              ))}
-            </ul>
+                {itemRows.map((item, index) => (
+                  <FolderItemRow
+                    key={`${item.type}-${item.itemId}`}
+                    row={item}
+                    folderUuid={uuid}
+                    canRemove={canManageItems}
+                    index={(showSubfolders ? childRows.length : 0) + index}
+                    now={now}
+                  />
+                ))}
+              </ul>
+            </>
           ) : null}
 
           {showStreamSkeleton ? (
@@ -844,14 +778,5 @@ function FolderBody({ uuid }: { uuid: string }) {
         />
       ) : null}
     </div>
-  );
-}
-
-/** The header meta line's separator — decorative, never a word to a reader. */
-function Dot() {
-  return (
-    <span aria-hidden className="text-muted-foreground/40">
-      ·
-    </span>
   );
 }

@@ -26,10 +26,10 @@ test('the Library group has no Files row, for anyone', () => {
 
 test('a file in a folder is a button that opens it with a fresh link, and says why when it cannot', () => {
   const row = read('detail', 'FolderItemRow.tsx');
-  assert.match(row, /\{row\.type === 'file' \? \(\s*<FileOpenRow fileId=\{row\.contentId\}>\{identity\}<\/FileOpenRow>/);
+  assert.match(row, /if \(row\.type === 'file'\) \{\s*return \(\s*<FileEntryRow\s+fileId=\{row\.contentId\}/);
   // The open is its own file, shared with the Folders page's loose files (build 6).
-  assert.match(row, /import \{ FileOpenRow \} from '\.\.\/FileOpenRow';/);
-  const open = read('FileOpenRow.tsx');
+  assert.match(row, /import \{ FileEntryRow \} from '\.\.\/file-list\/FileEntryRow';/);
+  const open = read('file-list', 'FileEntryRow.tsx');
   // A link that SHOWS a PDF or a picture in the tab (Tester, 20:51Z: the PDF
   // downloaded into a blank tab); a Download control keeps the plain link.
   assert.match(open, /const \{ open, opening, failed, gone \} = useShowFileInNewTab\(\);/);

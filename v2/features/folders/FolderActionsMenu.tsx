@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useDeleteFolderWithUndo, type DeletableFolder } from './folder-mutations';
+import { ROW_MENU_TRIGGER_CLASS } from './file-list/FileListRow';
 
 /**
  * FolderActionsMenu — the two things you can do TO a folder, in one menu, in
@@ -68,7 +69,7 @@ export function FolderActionsMenu({
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
-          'v2-interactive flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground',
+          ROW_MENU_TRIGGER_CLASS,
           FOCUS_RING,
           className,
         )}

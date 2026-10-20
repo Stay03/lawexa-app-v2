@@ -7,6 +7,8 @@ import { FolderOpen, FolderX, Search, WifiOff, type LucideIcon } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FOLDER_ITEM_NOUN } from '../item-row-model';
+import { FileListHead, FileListRowSkeleton } from '../file-list/FileListRow';
+import { FOLDER_HEADING_TYPE } from '../folder-bits';
 import type { FolderItemTab } from './item-tabs';
 
 /**
@@ -53,31 +55,6 @@ function PageState({
   );
 }
 
-/**
- * One skeleton row for the stream, mirroring `FolderItemRow`'s geometry exactly
- * (`gap-3 px-2 py-3`, a `size-9` tile, a two-zone meta line), so nothing
- * reflows on hand-off.
- *
- * TWO TEXT LINES, the stream's MEDIAN: cases, statutes, files and subfolders
- * are two lines and only notes add a preview clamp. Reserving at the tall end
- * would defend against a settle that rarely happens while making the common one
- * — collapsing onto a two-line row — worse.
- */
-function StreamRowSkeleton() {
-  return (
-    <div className="flex min-w-0 items-start gap-3 px-2 py-3">
-      <Skeleton className="mt-0.5 size-9 shrink-0 rounded-lg" />
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <Skeleton className="h-4 w-3/5 rounded" />
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-3 w-2/5 rounded" />
-          <Skeleton className="ml-auto h-3 w-16 shrink-0 rounded" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** The stream's initial-load skeleton — progressive opacity down the stack, the
  *  shared v2 list fade. */
 export function FolderStreamSkeleton({ rows = 5 }: { rows?: number }) {
@@ -85,7 +62,7 @@ export function FolderStreamSkeleton({ rows = 5 }: { rows?: number }) {
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.16) }}>
-          <StreamRowSkeleton />
+          <FileListRowSkeleton />
         </div>
       ))}
     </div>
@@ -99,9 +76,9 @@ export function FolderNextPageSkeleton() {
       aria-hidden
       className="flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
     >
-      <StreamRowSkeleton />
+      <FileListRowSkeleton />
       <div style={{ opacity: 0.5 }}>
-        <StreamRowSkeleton />
+        <FileListRowSkeleton />
       </div>
     </div>
   );
@@ -118,32 +95,27 @@ export function FolderNextPageSkeleton() {
  * turns out to hold, and reserving space for a control that may never arrive
  * would leave a permanent gap above every single-type folder.
  */
-export function FolderDetailSkeleton({
-  tile,
-  name,
-}: {
-  /** The tile and the name already known (a tapped row's,
-   *  `FolderDetailFallback`), drawn in place of their bars. */
-  tile?: ReactNode;
+export function FolderDetailSkeleton({ name }: {
+  /** The name already known (a tapped row's, `FolderDetailFallback`), drawn
+   *  in place of its bar. */
   name?: ReactNode;
 } = {}) {
   return (
     <div aria-hidden className="flex flex-col">
-      {/* THE SILHOUETTE FOLLOWS THE LIVE HEADER: the trail is `sm:` and up
-          (the shell's bar carries the way back below it), the name is drawn at
-          every width (item 7, 17 October 2026), and the kebab has gone
-          entirely — Rename and Delete are published to the bar's one menu.
-          Reserving anything else here would leave the rows below jumping at
-          the hand-off. */}
+      {/* THE SILHOUETTE FOLLOWS THE LIVE PAGE: the trail is `sm:` and up
+          (the shell's bar carries the way back below it), the name is the
+          heading at every width, then the column head and the rows. Rename
+          and Delete are in the bar's one menu, so nothing else is reserved. */}
       <Skeleton className="hidden h-4 w-40 rounded sm:block" />
-      <div className="flex items-start gap-3 sm:mt-4">
-        {tile ?? <Skeleton className="size-11 shrink-0 rounded-xl" />}
-        <div className="min-w-0 flex-1 space-y-2 pt-0.5">
-          {name ?? <Skeleton className="h-6 w-3/5 rounded" />}
-          <Skeleton className="h-3.5 w-40 rounded" />
-        </div>
+      <div className="pb-3 sm:mt-3">
+        {name ?? (
+          <p className={FOLDER_HEADING_TYPE}>
+            <Skeleton className="inline-block h-[0.9em] w-3/5 rounded align-middle" />
+          </p>
+        )}
       </div>
-      <div className="mt-6 border-t border-border/60 pt-2">
+      <FileListHead />
+      <div className="mt-1">
         <FolderStreamSkeleton />
       </div>
     </div>
@@ -252,13 +224,12 @@ export function FolderItemsErrorState({
 /**
  * The honest footnote for items the stream deliberately did not render.
  *
- * ── WHY A COUNT NEEDS A NOTE AT ALL ─────────────────────────────────────────
- * The header count is the SERVER's `items_count`, and the server counts things
- * v2 does not render: a chat filed by v1 (never shown — the items endpoint
- * serves other people's private conversation titles, which is the wave's urgent
- * backend ask) and a folder filed as an ITEM rather than nested. Leaving that
- * gap unexplained is exactly v1's defect — a stat line contradicting the rows
- * underneath it — so the difference is stated quietly, only when there is one.
+ * ── WHY THE STREAM NEEDS A NOTE AT ALL ──────────────────────────────────────
+ * The server files things v2 does not render: a chat filed by v1 (never shown —
+ * the items endpoint serves other people's private conversation titles, which
+ * is the wave's urgent backend ask) and a folder filed as an ITEM rather than
+ * nested. The note says what is filed here and not shown, quietly, only when
+ * there is something.
  * When the whole page maps to nothing, this note IS the answer: a folder that
  * holds three chats is not an empty folder, and must not be told it is.
  *

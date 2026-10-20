@@ -5,7 +5,7 @@ import { FolderOpen, Plus, Search, WifiOff, type LucideIcon } from 'lucide-react
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
+import { FileListHead, FileListRowSkeleton } from '../file-list/FileListRow';
 
 /**
  * The `/folders` states — the three-state contract every v2 query region owns
@@ -61,31 +61,10 @@ function PageState({
 }
 
 /**
- * One skeleton row, mirroring `FolderRow`'s geometry EXACTLY — the same nesting
- * (`gap-2` between the identity block and the menu, `gap-3 px-2 py-3` inside
- * it), so the tile, the text column and the trigger land on the pixels the
- * resolved row will use and nothing reflows on hand-off.
- *
- * TWO TEXT LINES, which is the folder row's median AND its maximum: a folder is
- * a name and a meta line, never a preview.
+ * The column head the list page puts over its folders and files: a folder's
+ * date is when it last changed, a loose file's when it was uploaded.
  */
-function FolderRowSkeleton() {
-  return (
-    <div className="flex items-start gap-2">
-      <div className="flex min-w-0 flex-1 items-start gap-3 px-2 py-3">
-        <Skeleton className="mt-0.5 size-9 shrink-0 rounded-lg" />
-        <div className="min-w-0 flex-1 space-y-1.5">
-          <Skeleton className="h-4 w-2/5 rounded" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-3 w-24 rounded" />
-            <Skeleton className="ml-auto h-3 w-16 shrink-0 rounded" />
-          </div>
-        </div>
-      </div>
-      <Skeleton className="mt-3.5 size-9 shrink-0 rounded-full" />
-    </div>
-  );
-}
+export const FOLDERS_DATE_LABEL = 'Modified';
 
 /**
  * The initial-load skeleton — rows with progressive opacity down the stack, the
@@ -100,9 +79,11 @@ function FolderRowSkeleton() {
 export function FoldersListSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
+      <FileListHead dateLabel={FOLDERS_DATE_LABEL} />
+      <div className="mt-1" />
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.14) }}>
-          <FolderRowSkeleton />
+          <FileListRowSkeleton />
         </div>
       ))}
     </div>
@@ -116,24 +97,24 @@ export function FoldersNextPageSkeleton() {
       aria-hidden
       className="flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
     >
-      <FolderRowSkeleton />
+      <FileListRowSkeleton />
       <div style={{ opacity: 0.5 }}>
-        <FolderRowSkeleton />
+        <FileListRowSkeleton />
       </div>
     </div>
   );
 }
 
 /**
- * The loose files' skeleton (build 6): a file row has the folder row's
- * geometry, so the same rows, fewer of them, fading the same way.
+ * The loose files' skeleton (build 6): a file is a line of the same list as
+ * a folder, so the same rows, fewer of them, fading the same way.
  */
 export function LooseFilesSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div aria-hidden className="flex flex-col">
       {Array.from({ length: rows }).map((_, index) => (
         <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.25) }}>
-          <FolderRowSkeleton />
+          <FileListRowSkeleton />
         </div>
       ))}
     </div>

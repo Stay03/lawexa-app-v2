@@ -1,12 +1,11 @@
 /**
- * A folder arriving after the loading screen drew the tapped row's tile and
- * name (`FolderDetailFallback`, speed step 5, 17 October 2026): those two stay
- * as they are, and everything else fades in, so the name does not blink out
- * and back in.
+ * A folder arriving after the loading screen drew the tapped row's name
+ * (`FolderDetailFallback`, speed step 5, 17 October 2026): the name stays as
+ * it is, and everything else fades in, so it does not blink out and back in.
  */
 @media (prefers-reduced-motion: no-preference) {
   .v2-folder-arrive-peeked > :not(header),
-  .v2-folder-arrive-peeked > header > div > :not(h1) {
+  .v2-folder-arrive-peeked > header > :not(h1) {
     animation: v2-folder-arrive 300ms ease-out both;
   }
 }

@@ -22,14 +22,15 @@ test('the tap keeps the row\'s tile and name, for that folder only, one entry', 
   assert.equal(folderPeekFor('f-2')?.hasName, false);
 });
 
-test('the row leaves its facts on the tap, and both waits draw the tile and the name at every width', () => {
+test('the row leaves its facts on the tap, and both waits draw the name at every width', () => {
   assert.match(read('list', 'FolderRow.tsx'), /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\}/);
   const fallback = read('detail', 'FolderDetailFallback.tsx');
   assert.match(fallback, /const peek = useFolderPeek\(uuidOf\(usePathname\(\)\)\);/);
-  assert.match(fallback, /tile=\{peek \? <FolderTile tint=\{peek\.tint\} size="header" \/> : undefined\}/);
+  // Folder page B (20 October 2026): the header has no tile, so neither has the wait.
+  assert.doesNotMatch(fallback, /FolderTile|tile=/);
   // Item 7 (Arthur, 17 October 2026): the name is the page's heading on a
   // phone too, so the wait draws it there, in the live heading's type.
-  assert.match(fallback, /'line-clamp-2 break-words text-xl font-semibold leading-snug tracking-tight'/);
+  assert.match(fallback, /'line-clamp-2 break-words',\s*FOLDER_HEADING_TYPE,/);
   assert.doesNotMatch(fallback, /hidden text-xl|md:block/);
   assert.doesNotMatch(fallback, /from '\.\/FolderScreen'/);
   assert.match(read('detail', 'FolderScreen.tsx'), /if \(folderQuery\.isPending\) return <FolderDetailFallback \/>;/);
@@ -39,7 +40,7 @@ test('the folder’s name is the page heading at every width, and the bar stays 
   const screen = read('detail', 'FolderScreen.tsx');
   assert.match(screen, /const headingRef = useScrolledTitle\(headerRow\?\.name \?\? null\);/);
   assert.match(screen, /<h1\s+ref=\{headingRef\}/);
-  assert.match(screen, /'line-clamp-2 break-words text-xl font-semibold leading-snug tracking-tight'/);
+  assert.match(screen, /'line-clamp-2 min-w-0 flex-1 break-words',\s*FOLDER_HEADING_TYPE,/);
   assert.doesNotMatch(screen, /sr-only md:not-sr-only/);
   // Neither the wait nor the screen puts the name in the bar on arrival.
   assert.doesNotMatch(read('detail', 'FolderDetailFallback.tsx'), /setHeaderContext/);
@@ -78,10 +79,10 @@ test('the folder’s clear is owned: a title another screen published since stay
   assert.equal(snapshotHeaderContext().context.title, null);
 });
 
-test('the tile and the name do not fade when the folder arrives under them', () => {
+test('the name does not fade when the folder arrives under it', () => {
   assert.match(read('detail', 'FolderScreen.tsx'), /arrival === 'peeked'\s*\? 'v2-folder-arrive-peeked'/);
   assert.match(
     read('detail', 'folder-arrive.css'),
-    /\.v2-folder-arrive-peeked > :not\(header\),\s*\.v2-folder-arrive-peeked > header > div > :not\(h1\)/,
+    /\.v2-folder-arrive-peeked > :not\(header\),\s*\.v2-folder-arrive-peeked > header > :not\(h1\)/,
   );
 });

@@ -49,7 +49,8 @@ test('whoever may add also gets "Remove from folder" on its rows, as the server 
   assert.doesNotMatch(screen, /canEdit/);
   const row = read('detail', 'FolderItemRow.tsx');
   assert.match(row, /canRemove: boolean;/);
-  assert.match(row, /\{canRemove \? <RemoveFromFolderButton row=\{row\} folderUuid=\{folderUuid\} \/> : null\}/);
+  assert.match(row, /const menu = canRemove \? <ItemMenu row=\{row\} folderUuid=\{folderUuid\} \/> : undefined;/);
+  assert.match(row, /<FolderMinus \/>\s*Remove from this folder/);
 });
 
 test('an upload goes to its store first, then into the folder', () => {

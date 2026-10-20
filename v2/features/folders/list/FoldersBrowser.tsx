@@ -24,6 +24,7 @@ import { FolderNameDialog, type FolderNameDialogIntent } from '../FolderNameDial
 import type { FolderRecord } from '../types';
 import type { SpaceItemTarget } from '@/v2/features/spaces/content-model';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
+import { FileListHead } from '../file-list/FileListRow';
 import { FolderRow } from './FolderRow';
 import { LooseFilesSection, useLooseFileUpload } from './LooseFilesSection';
 import {
@@ -32,6 +33,7 @@ import {
   FoldersListSkeleton,
   FoldersNextPageSkeleton,
   FoldersSignedOutState,
+  FOLDERS_DATE_LABEL,
 } from './states';
 import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 import { FoldersFallback } from './FoldersFallback';
@@ -78,10 +80,18 @@ const NO_ROWS: readonly FolderRowModel[] = [];
  * The screen's `h1` is drawn here, so the signed-out panel is under a page that
  * still says what it is and every state carries exactly one heading.
  */
-function PageShell({ children }: { children: React.ReactNode }) {
+/**
+ * The page's column: the "Folders" heading, with the page's own actions on
+ * its line when there are any (Stay, 20 October 2026, 00:54 UTC: the header is
+ * "Folders" with New folder and Upload), then the page.
+ */
+function PageShell({ actions, children }: { actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className={LIST_COLUMN_DOCKED}>
-      <ScreenTitle />
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <ScreenTitle className="mb-0 min-w-0 truncate" />
+        {actions}
+      </div>
       {children}
     </div>
   );
@@ -134,24 +144,20 @@ export function FoldersBrowser() {
   const hidden = useHiddenFolderUuids();
 
   const pages = query.data?.pages;
-  const { rows, hiddenLoaded, spaceOf } = useMemo(() => {
+  const { rows, spaceOf } = useMemo(() => {
     const spaces = new Map<string, FolderRecord['space']>();
-    if (!pages) return { rows: NO_ROWS, hiddenLoaded: 0, spaceOf: spaces };
+    if (!pages) return { rows: NO_ROWS, spaceOf: spaces };
     const mapped: FolderRowModel[] = [];
-    let dropped = 0;
     for (const page of pages) {
       for (const record of page.data) {
-        if (hidden.has(record.uuid)) {
-          dropped += 1;
-          continue;
-        }
+        if (hidden.has(record.uuid)) continue;
         mapped.push(folderRow(record));
         // The space each folder is in, for the move dialog: the row model
         // carries no space, and absent stays absent ("not known").
         spaces.set(record.uuid, record.space);
       }
     }
-    return { rows: mapped, hiddenLoaded: dropped, spaceOf: spaces };
+    return { rows: mapped, spaceOf: spaces };
   }, [pages, hidden]);
 
   const scrollRootRef = useShellScrollRoot();
@@ -200,13 +206,6 @@ export function FoldersBrowser() {
   // query can never strand the list at reduced opacity.
   const dim = query.isPlaceholderData && query.isFetching;
 
-  // ONE HONEST COUNT: the server's total for this level, less the rows a queued
-  // delete has already taken off the screen. Nothing else on this page claims a
-  // number, so there is nothing for it to contradict.
-  const serverTotal = pages?.[0]?.pagination.total;
-  const total =
-    typeof serverTotal === 'number' ? Math.max(0, serverTotal - hiddenLoaded) : null;
-
   if (!signedIn && !guestPassFailed) return <FoldersFallback />;
   if (!signedIn) {
     return (
@@ -230,55 +229,47 @@ export function FoldersBrowser() {
     />
   );
 
+  const actions = (
+    <div className="flex shrink-0 items-center gap-2">
+      <button
+        type="button"
+        onClick={upload.pick}
+        className={cn(
+          'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+          FOCUS_RING,
+        )}
+      >
+        <Upload aria-hidden className="size-4" />
+        {/* One flex item, so the pill's gap never opens inside the label:
+            "Upload" on a phone, "Upload a file" from `sm:` up. */}
+        <span>
+          Upload<span className="sr-only sm:not-sr-only"> a file</span>
+        </span>
+      </button>
+      {upload.input}
+
+      <button
+        type="button"
+        onClick={() => setCreating(true)}
+        className={cn(
+          // 44px, the touch floor and the height of the same pill on a
+          // space's tabs (design round 2).
+          'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+          FOCUS_RING,
+        )}
+      >
+        <Plus aria-hidden className="size-4" />
+        {/* The label is the affordance on a desktop; on a phone the line
+            holds the heading too, so the icon carries it and the accessible
+            name comes from the visually-hidden word. */}
+        <span className="sr-only sm:not-sr-only">New folder</span>
+      </button>
+    </div>
+  );
+
   return (
-    <PageShell>
+    <PageShell actions={actions}>
       {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
-
-      <div className="mb-3 flex min-h-11 items-center justify-between gap-3">
-        <p className="min-w-0 truncate text-xs text-muted-foreground tabular-nums">
-          {total === null
-            ? ''
-            : activeSearch
-              ? `${total} ${total === 1 ? 'match' : 'matches'}`
-              : `${total} ${total === 1 ? 'folder' : 'folders'}`}
-        </p>
-
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={upload.pick}
-            className={cn(
-              'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
-              FOCUS_RING,
-            )}
-          >
-            <Upload aria-hidden className="size-4" />
-            {/* One flex item, so the pill's gap never opens inside the label:
-                "Upload" on a phone, "Upload a file" from `sm:` up. */}
-            <span>
-              Upload<span className="sr-only sm:not-sr-only"> a file</span>
-            </span>
-          </button>
-          {upload.input}
-
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className={cn(
-              // 44px, the touch floor and the height of the same pill on a
-              // space's tabs (design round 2).
-              'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
-              FOCUS_RING,
-            )}
-          >
-            <Plus aria-hidden className="size-4" />
-            {/* The label is the affordance on a desktop; on a phone the row has
-                to hold the count too, so the icon carries it and the accessible
-                name comes from the visually-hidden word. */}
-            <span className="sr-only sm:not-sr-only">New folder</span>
-          </button>
-        </div>
-      </div>
 
       {/* The ONE live region for this surface. The route fallback's
           announcement is gone by the time an in-page fetch happens and the
@@ -327,7 +318,9 @@ export function FoldersBrowser() {
             </div>
           ) : null}
 
-          <ul className="flex flex-col divide-y divide-border/60">
+          {/* "Name" and "Modified" over the columns, on a computer. */}
+          <FileListHead dateLabel={FOLDERS_DATE_LABEL} />
+          <ul className="mt-1 flex flex-col divide-y divide-border/40">
             {rows.map((row, index) => (
               <FolderRow
                 key={row.uuid}
@@ -340,17 +333,10 @@ export function FoldersBrowser() {
             ))}
           </ul>
 
-          {/* Sentinel + end-cap: while more pages exist this sits at the end of
-              the scroll region; once fully loaded the quiet end-cap replaces
-              it. */}
-          <div ref={sentinelRef} className="pt-1">
-            {query.isFetchingNextPage ? (
-              <FoldersNextPageSkeleton />
-            ) : !query.hasNextPage ? (
-              <p className="py-6 text-center text-xs text-muted-foreground/70">
-                No more folders
-              </p>
-            ) : null}
+          {/* The sentinel, with no end-cap: the files in no folder continue
+              the list below it. */}
+          <div ref={sentinelRef}>
+            {query.isFetchingNextPage ? <FoldersNextPageSkeleton /> : null}
           </div>
         </div>
       )}

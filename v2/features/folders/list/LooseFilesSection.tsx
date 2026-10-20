@@ -19,14 +19,14 @@ import { LooseFileRow } from './LooseFileRow';
 import { LooseFilesSkeleton } from './states';
 
 /**
- * LooseFilesSection — "Files · not in a folder", under the folders (build 6,
- * picture 6: the Folders page is the top level for the viewer's own things,
- * and replaces the old Files page). The files are the viewer's own uploads in
- * none of their own live folders (`GET /files?unfiled=1`), newest first.
+ * LooseFilesSection — the viewer's files in no folder, listed after the
+ * folders as the rest of one file list (build 6: the Folders page is the top
+ * level for the viewer's own things, and replaces the old Files page). The
+ * files are the viewer's own uploads in none of their own live folders
+ * (`GET /files?unfiled=1`), newest first.
  *
- * NOTHING SHOWS WHEN THERE IS NOTHING LOOSE: a heading over an empty list
- * would be a second empty state under the folders' own. The first upload
- * brings the section in.
+ * NOTHING SHOWS WHEN THERE IS NOTHING LOOSE. The first upload brings the
+ * files in.
  *
  * Its own query, sentinel and dialogs, so the folder list above it keeps its
  * own states and none of this code reaches the page's loading frame.
@@ -75,7 +75,6 @@ export function LooseFilesSection({
   );
   const openDelete = useCallback((row: LooseFileRowModel) => setDeleting(row), [setDeleting]);
 
-  const total = pages?.[0]?.pagination.total;
   // A 4xx is the server refusing this viewer the list (a guest's access to
   // `/files` is unprobed), not a blip: there is nothing to retry, so the
   // section stays away rather than show an error under the folders.
@@ -90,21 +89,11 @@ export function LooseFilesSection({
   return (
     <>
       {showList ? (
-        <section aria-labelledby="loose-files-heading" className="mt-6">
-          <h2
-            id="loose-files-heading"
-            className="flex items-center gap-2 border-b border-border/60 px-2 pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-          >
-            <span>Files</span>
-            <span aria-hidden className="text-muted-foreground/40">
-              ·
-            </span>
-            <span>not in a folder</span>
-            {typeof total === 'number' ? (
-              <span className="ml-auto font-normal normal-case tracking-normal tabular-nums">{total}</span>
-            ) : null}
-          </h2>
-
+        // NO HEADING: the files continue the folders' list, one line each, the
+        // way a file manager lists a folder's folders and then its files (Stay,
+        // 20 October 2026, 00:54 UTC: "a clean file system"). The top rule
+        // continues the list's dividers.
+        <section aria-label="Files in no folder" className="border-t border-border/40">
           {query.isPending ? (
             <LooseFilesSkeleton />
           ) : query.isError && rows.length === 0 ? (
@@ -116,7 +105,7 @@ export function LooseFilesSection({
             </div>
           ) : (
             <>
-              <ul className="flex flex-col divide-y divide-border/60">
+              <ul className="flex flex-col divide-y divide-border/40">
                 {rows.map((row, index) => (
                   <LooseFileRow
                     key={row.id}
@@ -161,7 +150,7 @@ export function LooseFilesSection({
 
 /**
  * "Upload a file" on the Folders page: the picked files go to the viewer's own
- * files, in no folder, and appear under "Files · not in a folder". Each file
+ * files, in no folder, and appear in the list under the folders. Each file
  * is checked against the upload rules first, and its toast walks from
  * "Uploading" to its outcome in place.
  */

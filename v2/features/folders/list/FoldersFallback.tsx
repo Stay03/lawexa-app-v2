@@ -8,9 +8,9 @@ import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { FoldersListSkeleton } from './states';
 
 /**
- * The folders library's loading shape — the title, the count row and the
+ * The folders library's loading shape — the title with its two actions and the
  * search field as reserved shapes for the real controls (chrome, not content:
- * the live screen puts the real field and the real count on those pixels), over
+ * the live screen puts the real controls on those pixels), over
  * the list skeleton, which pulses here exactly as it does on the live screen
  * (standards §8i). A wait is a wait, and the reader cannot tell an RSC payload
  * from a query. `FoldersScreen` renders it as its Suspense fallback and both
@@ -22,7 +22,7 @@ import { FoldersListSkeleton } from './states';
  * Nothing in this file may import a screen.
  *
  * The "New folder" pill IS reserved here, unlike the notes library's "New
- * note". Both are inline controls in the row above the list; the difference is
+ * note". Both are inline controls above the list; the difference is
  * who gets them. This one exists for every signed-in reader, so reserving it
  * prevents a jump, while "New note" depends on the viewer's role and reserving
  * it would hold a permanent gap for every guest.
@@ -38,13 +38,15 @@ export function FoldersFallback() {
           DELETED, not reconciled, when content arrives — so anything focusable
           in here would lose focus and caret mid-interaction. */}
       <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
-        <ScreenTitle />
-        {searchAtTop ? <SearchFieldShape className="mb-3" /> : null}
-        <div className="mb-3 flex min-h-11 items-center justify-end gap-2">
-          {/* "Upload a file" (build 6), then "New folder". */}
-          <div className="h-11 w-24 rounded-full border border-border sm:w-36" />
-          <div className="h-11 w-11 rounded-full bg-primary/60 sm:w-32" />
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <ScreenTitle className="mb-0 min-w-0 truncate" />
+          <div className="flex shrink-0 items-center gap-2">
+            {/* "Upload a file" (build 6), then "New folder", on the heading's line. */}
+            <div className="h-11 w-24 rounded-full border border-border sm:w-36" />
+            <div className="h-11 w-11 rounded-full bg-primary/60 sm:w-32" />
+          </div>
         </div>
+        {searchAtTop ? <SearchFieldShape className="mb-3" /> : null}
         <FoldersListSkeleton />
         {searchAtTop ? null : (
           <ScreenDock>

@@ -226,7 +226,7 @@ test('a folder in the space opens its own page, as everywhere else (B4)', () => 
   const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
   assert.match(rows, /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\} className=\{className\}>/);
   const row = read('v2', 'features', 'folders', 'list', 'FolderRow.tsx');
-  assert.match(row, /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\} className=\{identityClass\}>/);
+  assert.match(row, /<Link href=\{row\.href\} onClick=\{\(\) => rememberFolderPeek\(row\)\} className=\{className\}>/);
   assert.doesNotMatch(row, /onOpen/);
 });
 

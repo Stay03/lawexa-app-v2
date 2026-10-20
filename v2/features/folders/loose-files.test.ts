@@ -77,7 +77,7 @@ test('every write that files, unfiles or deletes a file re-asks the loose list',
   );
 });
 
-test('the section sits under the folders, opens a file on tap, and offers Move to folder and Delete', () => {
+test('the files continue the folder list, open on tap, and offer Move to folder and Delete', () => {
   const browser = read('list', 'FoldersBrowser.tsx');
   assert.match(browser, /<LooseFilesSection\s+viewerId=\{viewerId\}\s+now=\{now\}\s+enabled=\{!activeSearch\}\s+held=\{showSkeleton\}\s+\/>/);
   // The upload pill sits before "New folder" in the same row.
@@ -85,7 +85,9 @@ test('the section sits under the folders, opens a file on tap, and offers Move t
   assert.match(browser, /onClick=\{upload\.pick\}[\s\S]*?<span>\s*Upload<span className="sr-only sm:not-sr-only"> a file<\/span>\s*<\/span>[\s\S]*?New folder/);
 
   const section = read('list', 'LooseFilesSection.tsx');
-  assert.match(section, /<span>Files<\/span>[\s\S]*?<span>not in a folder<\/span>/);
+  // No heading over them (Stay, 20 October 2026: "a clean file system").
+  assert.match(section, /<section aria-label="Files in no folder" className="border-t border-border\/40">/);
+  assert.doesNotMatch(section, /<h2|not in a folder<\/span>/);
   // Nothing loose, a search, or the folders still loading: no section.
   assert.match(
     section,
@@ -99,7 +101,7 @@ test('the section sits under the folders, opens a file on tap, and offers Move t
   assert.match(section, /uploadAsync\(file\)\.then\(/);
 
   const row = read('list', 'LooseFileRow.tsx');
-  assert.match(row, /<FileOpenRow fileId=\{row\.id\}>/);
+  assert.match(row, /<FileEntryRow\s+fileId=\{row\.id\}/);
   assert.match(row, /<DropdownMenuItem onSelect=\{\(\) => onMove\(row\)\}>\s*<FolderInput \/>\s*Move to folder/);
   assert.match(row, /<DropdownMenuItem variant="destructive" onSelect=\{\(\) => onDelete\(row\)\}>\s*<Trash2 \/>\s*Delete file/);
 
