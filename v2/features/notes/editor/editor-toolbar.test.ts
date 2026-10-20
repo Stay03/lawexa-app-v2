@@ -113,7 +113,17 @@ test('the highlight is a plain mark with one colour, and alignment never stores 
   assert.doesNotMatch(extensions, /from '@tiptap\/extension-(color|text-style|font)/);
   assert.match(extensions, /TextAlign\.configure\(\{\s*types: \['heading', 'paragraph'\],/);
   // A dragged column width is a style the reader drops, so tables do not resize.
-  assert.match(extensions, /TableKit\.configure\(\{ table: \{ resizable: false \} \}\)/);
+  assert.match(extensions, /TableKit\.configure\(\{ table: false \}\),\s*EditorTable\.configure\(\{ resizable: false \}\),/);
+  // The table is drawn by Tiptap's TableView, which redraws its columns after a
+  // column is deleted and gives a wide table its own sideways scroll (Tester,
+  // 20 October 2026).
+  assert.match(extensions, /addNodeView\(\) \{\s*return \(\{ node \}\) => new TableView\(node, this\.options\.cellMinWidth\);/);
+  const screen = read('NoteEditorScreen.tsx');
+  assert.match(screen, /\[&_\.tableWrapper\]:overflow-x-auto/);
+  assert.match(screen, /\[&_td\]:min-w-\[6em\]/);
+  assert.doesNotMatch(screen, /\[&_table\]:table-fixed/);
+  // Inline code shows no backticks (the typography plugin adds them).
+  assert.match(screen, /\[&_code\]:before:content-none \[&_code\]:after:content-none/);
   assert.match(
     read('formatting.ts'),
     /if \(align === 'left'\) chain\.unsetTextAlign\(\)\.run\(\);\s*else chain\.setTextAlign\(align\)\.run\(\);/,
@@ -158,10 +168,19 @@ test('a computer gets the bar above the note, with tooltips; touch keeps the doc
   assert.match(more, /runFormat\(editor, CLEAR_FORMATTING\.verb\)/);
   assert.match(more, /shortcutLabel\(CLEAR_FORMATTING\.keys, mac\)/);
   assert.match(read('ToolbarButton.tsx'), /compact \? 'size-8' : 'size-9'/);
-  // The tooltip names the control and its keys; without a shortcut the native title stays.
+  // Every computer-bar button has a tooltip naming it, with its keys when it has
+  // any (Tester, 20 October 2026: Link, Image and @case had none). Only the
+  // phone bar, which passes neither, keeps the native title.
   const button = read('ToolbarButton.tsx');
-  assert.match(button, /title=\{shortcut \? undefined : label\}/);
-  assert.match(button, /<TooltipContent side="bottom" sideOffset=\{6\}>\s*<span>\{label\}<\/span>\s*<kbd/);
+  assert.match(button, /const tooltip = compact \|\| shortcut !== undefined;/);
+  assert.match(button, /title=\{tooltip \? undefined : label\}/);
+  assert.match(button, /<TooltipContent side="bottom" sideOffset=\{6\}>\s*<span>\{label\}<\/span>\s*\{shortcut \? <kbd/);
+  // A greyed Redo still shows its tooltip: `aria-disabled` keeps the pointer.
+  assert.match(button, /disabled=\{tooltip \? undefined : disabled\}/);
+  assert.match(button, /aria-disabled=\{tooltip && disabled \? true : undefined\}/);
+  assert.match(button, /onClick=\{disabled \? undefined : onPress\}/);
+  // The style box fits its longest name ("Large heading") without an ellipsis.
+  assert.match(read('StyleSelect.tsx'), /h-8 w-36 shrink-0/);
 });
 
 test('the phone bar holds nine controls and the rest is in More', () => {

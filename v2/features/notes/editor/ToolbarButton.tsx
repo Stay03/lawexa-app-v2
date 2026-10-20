@@ -57,23 +57,31 @@ export function ToolbarButton({
   /** The computer bar's 32px size. */
   compact?: boolean;
 }) {
+  // Every button on the computer bar names itself in a tooltip, with or without
+  // keys (Tester, 20 October 2026: Link, Image and @case showed only the slow
+  // native title). A disabled one is `aria-disabled` rather than `disabled`, so
+  // the pointer still reaches it and a greyed Redo still says what it is.
+  const tooltip = compact || shortcut !== undefined;
   const button = (
     <button
       type="button"
-      title={shortcut ? undefined : label}
+      title={tooltip ? undefined : label}
       aria-label={label}
       aria-pressed={active}
-      disabled={disabled}
+      disabled={tooltip ? undefined : disabled}
+      aria-disabled={tooltip && disabled ? true : undefined}
       onMouseDown={(event) => event.preventDefault()}
-      onClick={onPress}
+      onClick={disabled ? undefined : onPress}
       className={cn(
         'v2-interactive inline-flex shrink-0 items-center justify-center rounded-lg',
         compact ? 'size-8' : 'size-9',
         'text-muted-foreground transition-colors duration-150',
-        'disabled:pointer-events-none disabled:opacity-40',
-        active
-          ? 'bg-secondary text-foreground'
-          : 'hover:bg-secondary/70 hover:text-foreground',
+        'disabled:pointer-events-none disabled:opacity-40 aria-disabled:cursor-default aria-disabled:opacity-40',
+        disabled
+          ? null
+          : active
+            ? 'bg-secondary text-foreground'
+            : 'hover:bg-secondary/70 hover:text-foreground',
         tone === 'accent' && !active && 'text-muted-foreground',
         FOCUS_RING,
       )}
@@ -85,13 +93,13 @@ export function ToolbarButton({
     </button>
   );
 
-  if (!shortcut) return button;
+  if (!tooltip) return button;
   return (
     <Tooltip>
       <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent side="bottom" sideOffset={6}>
         <span>{label}</span>
-        <kbd className="ml-2 font-sans text-[11px] opacity-70">{shortcut}</kbd>
+        {shortcut ? <kbd className="ml-2 font-sans text-[11px] opacity-70">{shortcut}</kbd> : null}
       </TooltipContent>
     </Tooltip>
   );

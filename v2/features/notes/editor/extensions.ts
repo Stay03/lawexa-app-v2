@@ -3,7 +3,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 import Image from '@tiptap/extension-image';
 import Highlight from '@tiptap/extension-highlight';
-import { TableKit } from '@tiptap/extension-table';
+import { Table, TableKit, TableView } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 
 import { createCaseMentionExtension } from './case-mention';
@@ -107,6 +107,21 @@ export function createNoteExtensions({
       types: ['heading', 'paragraph'],
       alignments: ['left', 'center', 'right', 'justify'],
     }),
-    TableKit.configure({ table: { resizable: false } }),
+    TableKit.configure({ table: false }),
+    EditorTable.configure({ resizable: false }),
   ];
 }
+
+/**
+ * The table, drawn by Tiptap's own `TableView` (which the package installs only
+ * with column resizing on). Without a node view ProseMirror keeps the table's
+ * first `<colgroup>`, so deleted columns stayed as empty width until a reload
+ * (Tester, 20 October 2026); `TableView.update` redraws the columns on every
+ * change. It also puts the table in a `.tableWrapper` box, which scrolls a wide
+ * table sideways. Editor only: the stored HTML is `renderHTML`'s, unchanged.
+ */
+const EditorTable = Table.extend({
+  addNodeView() {
+    return ({ node }) => new TableView(node, this.options.cellMinWidth);
+  },
+});

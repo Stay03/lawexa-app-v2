@@ -291,6 +291,14 @@
   margin-top: 0.5em;
 }
 
+/* An empty cell is one line tall, as in the editor. The editor saves it as
+   `<td><p></p></td>`, and an empty paragraph has no line, so a row of empty
+   cells shrank to its padding (Tester, 20 October 2026: about 17 px). */
+.v2-note-doc .v2-note-body :is(th, td):empty::before,
+.v2-note-doc .v2-note-body :is(th, td) > p:only-child:empty::before {
+  content: '\00a0';
+}
+
 /* ── Rules ──────────────────────────────────────────────────────────────── */
 
 .v2-note-doc .v2-note-body hr {

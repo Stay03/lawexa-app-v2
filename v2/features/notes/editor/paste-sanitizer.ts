@@ -23,11 +23,23 @@
  * against a class of invisible-text bugs. It is also why this is explicitly NOT
  * the guarantee: the SCHEMA is, and the schema is exact.
  *
+ * ── ONE STYLE IS READ FIRST: GOOGLE DOCS' NOT-BOLD WRAPPER ──────────────────
+ * Google Docs wraps its whole clipboard in `<b style="font-weight:normal"
+ * id="docs-internal-guid-…">`. Tiptap's Bold mark skips a `<b>` whose weight
+ * is normal, so once the style was stripped the wrapper read as bold and every
+ * pasted cell turned bold (Tester and Arthur, 20 October 2026). A `<b>` whose
+ * own style says `font-weight: normal` (or 400) is dropped before the style
+ * strip runs. Its `</b>` is left behind with no `<b>` open, and the HTML parser
+ * ignores a stray end tag.
+ *
  * PURE and string-only (no DOM), so it runs identically in a test.
  */
 
 /** `style="…"` / `style='…'` on any element. */
 const STYLE_ATTRIBUTE = /\sstyle\s*=\s*("[^"]*"|'[^']*')/gi;
+
+/** A `<b>` whose own style says it is not bold: Google Docs' clipboard wrapper. */
+const NOT_BOLD_OPEN = /<b\b(?=[^>]*\sstyle\s*=\s*["'][^"']*font-weight\s*:\s*(?:normal|400)\b)[^>]*>/gi;
 
 /** The pre-CSS presentation attributes Word and old CMS exports still emit. */
 const PRESENTATION_ATTRIBUTES = /\s(?:color|bgcolor|face|background)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi;
@@ -37,6 +49,7 @@ const FONT_TAGS = /<\/?font\b[^>]*>/gi;
 
 export function stripPastedPresentation(html: string): string {
   return html
+    .replace(NOT_BOLD_OPEN, '')
     .replace(FONT_TAGS, '')
     .replace(STYLE_ATTRIBUTE, '')
     .replace(PRESENTATION_ATTRIBUTES, '');

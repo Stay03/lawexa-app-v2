@@ -44,7 +44,9 @@ export function StyleSelect({
         aria-label={`Text style: ${styleLabel(state.blockStyle)}`}
         onMouseDown={(event) => event.preventDefault()}
         className={cn(
-          'v2-interactive inline-flex h-8 w-28 shrink-0 items-center justify-between gap-1 rounded-lg px-2 text-sm text-foreground',
+          // 144 px holds "Large heading", the longest name, without an ellipsis
+          // (Tester, 20 October 2026: "Normal t…" at 112 px).
+          'v2-interactive inline-flex h-8 w-36 shrink-0 items-center justify-between gap-1 rounded-lg px-2 text-sm text-foreground',
           'transition-colors duration-150 hover:bg-secondary/70 disabled:pointer-events-none disabled:opacity-40',
           'data-[state=open]:bg-secondary',
           FOCUS_RING,
