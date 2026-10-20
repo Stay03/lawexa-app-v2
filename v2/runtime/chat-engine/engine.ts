@@ -76,6 +76,7 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { adoptServerFields } from './server-fields';
 import { largestSavedId, savedTurnId } from './saved-turn';
+import { STALL_CHECK_MS, stallVerdict } from './stall';
 import type { IBlockedReason } from '@/types/message-pack';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -113,10 +114,11 @@ const isServerRowId = (id: string): boolean => id.startsWith(SERVER_ROW_PREFIX);
 
 // ─── Resilience constants (ported verbatim from v1, with their rationale) ───
 
-// SSE watchdog: if no events arrive for this long, the stream is presumed dead
-// and we reconnect/poll. Checked on a coarser interval to keep the timer cheap.
-const WATCHDOG_SILENCE_MS = 60_000;
-const WATCHDOG_CHECK_MS = 10_000;
+// SSE watchdog: when the stream stops carrying the answer (`./stall.ts`: no event
+// at all for 10 s, or a reconnected stream with no progress for 5 s), stop waiting
+// on it and ask the server for the turn's status instead. It was 60 s, checked
+// every 10 s, which left a phone on one narration line for a minute while the
+// server finished the answer (Lucy, 20 October 2026).
 
 // Polling fallback: after reconnects are exhausted, poll status every 5s, giving
 // up after 10 minutes (a hard cap so a stuck execution can't poll forever).
@@ -423,6 +425,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   /** When the last DATA (non-heartbeat) event arrived. 0 = no stream open. */
   let lastDataEventTime = 0;
   let staleCheckInFlight = false;
+  /** The last progress event (text, a tool step, the end), for `stallVerdict`. */
+  let lastProgressAt = 0;
+  /** Set when the transport reconnects after a drop, then to the moment it is back. */
+  let reconnectingSince = 0;
+  let pollTickInFlight = false;
   let dedupKeys = new Set<number>();
   // v2_stream token-streaming placeholder tracking (per v1):
   let streamingMessageId: string | null = null;
@@ -667,7 +674,16 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function pollForCompletion(convId: string) {
     stopPolling();
     const startTime = Date.now();
-    pollInterval = setInterval(async () => {
+    const tick = async () => {
+      if (pollTickInFlight) return;
+      pollTickInFlight = true;
+      try {
+        await pollOnce();
+      } finally {
+        pollTickInFlight = false;
+      }
+    };
+    const pollOnce = async () => {
       if (Date.now() - startTime > POLL_MAX_DURATION_MS) {
         stopPolling();
         setState((prev) => ({
@@ -707,7 +723,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       } catch {
         // Transient failure — keep polling.
       }
-    }, POLL_INTERVAL_MS);
+    };
+    // The first check goes out at once: a stall has already cost the reader the
+    // seconds that found it.
+    void tick();
+    pollInterval = setInterval(() => void tick(), POLL_INTERVAL_MS);
   }
 
   // ─── Watchdog ─────────────────────────────────────────────────────────────
@@ -722,17 +742,40 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function startWatchdog() {
     stopWatchdog();
     lastEventTime = Date.now();
+    reconnectingSince = 0;
     watchdog = setInterval(() => {
-      if (Date.now() - lastEventTime > WATCHDOG_SILENCE_MS) {
-        stopWatchdog();
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
-        // Try SSE reconnection first; it falls back to polling after max retries.
-        reconnectStream();
-      }
-    }, WATCHDOG_CHECK_MS);
+      const verdict = stallVerdict({
+        now: Date.now(),
+        lastEventAt: lastEventTime,
+        lastProgressAt,
+        reconnectingSince,
+      });
+      if (verdict !== 'live') recoverFromStall();
+    }, STALL_CHECK_MS);
+  }
+
+  /**
+   * The stream stopped carrying the answer (`./stall.ts`). Close it and follow
+   * the turn by its status, as a reopen does: checked at once, then every few
+   * seconds, and the finished conversation loaded when it is done. Not a
+   * reconnect: the server's stream cannot replay what the dead connection had
+   * already taken, so a reconnect can wait on an answer that never comes.
+   * The turn stays "working" on screen meanwhile.
+   */
+  function recoverFromStall() {
+    stopWatchdog();
+    if (eventSource) {
+      eventSource.close();
+      eventSource = null;
+    }
+    reconnectingSince = 0;
+    reconnectCount = 0;
+    const convId = conversationId;
+    if (convId) {
+      pollForCompletion(convId);
+    } else {
+      setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: 'Connection lost' }));
+    }
   }
 
   // ─── Stale-stream check ──────────────────────────────────────────────────────
@@ -1126,6 +1169,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     lastDataEventTime = Date.now();
     const markDataEvent = () => {
       lastDataEventTime = Date.now();
+      lastProgressAt = lastDataEventTime;
     };
 
     // connected — on reconnect the backend may replay `accumulated_text` so the
@@ -1134,6 +1178,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       lastEventTime = Date.now();
       reconnectCount = 0; // reset on successful connection
       markDataEvent();
+      // Back after a drop: the handshake is not progress, so the reconnect's
+      // own clock starts now (`stallVerdict`, 'reconnected-empty').
+      if (reconnectingSince > 0) reconnectingSince = Date.now();
       const data = parseEvent<ConnectedEvent>((e as MessageEvent).data);
       if (data?.accumulated_text) {
         const iteration = currentIteration ?? 0;
@@ -1664,7 +1711,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // EventSource is permanently CLOSED (readyState 2).
     es.onerror = () => {
       if (eventSource !== es) return;
-      if (es.readyState === CONNECTING) return; // reconnecting on its own, with Last-Event-ID
+      if (es.readyState === CONNECTING) {
+        // Reconnecting on its own, with Last-Event-ID. The watchdog gives the
+        // reconnected stream a few seconds to carry progress (`./stall.ts`).
+        reconnectingSince = Date.now();
+        return;
+      }
       const loginRejected = es.readyState === CLOSED && es.status === 401;
       stopWatchdog();
       es.close();
@@ -1809,6 +1861,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     executionId = null;
     reconnectCount = 0;
     lastDataEventTime = 0;
+    lastProgressAt = 0;
+    reconnectingSince = 0;
     dedupKeys = new Set();
     // Clear text accumulators on FULL disconnect (but never on SSE reconnect — the
     // placeholder must persist so `completed` can replace it).
