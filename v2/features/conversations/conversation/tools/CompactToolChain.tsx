@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ToolMessage } from '@/types/chat';
 import { ToolStepItem, ToolStepMarker } from './ToolStepItem';
+import { chainSummaryLabel } from './chain-summary';
 
 /**
  * CompactToolChain — REDESIGNED (fix round §A7-41) for the shared module design
@@ -71,7 +72,6 @@ export function CompactToolChain({
   // into the summary rather than as a redraw.
   const earlierMessages = messages.slice(0, -1);
   const currentMessage = messages[messages.length - 1];
-  const hiddenCount = earlierMessages.length;
   // ≤2 steps stay fully open with no toggle (the approved taxonomy, unchanged);
   // beyond that the earlier steps collapse behind the summary.
   const collapsible = messages.length > 2;
@@ -92,9 +92,7 @@ export function CompactToolChain({
           >
             <ToolStepMarker status="success" />
             <span className="text-sm">
-              {showAll
-                ? 'Collapse steps'
-                : `${hiddenCount} tool ${hiddenCount === 1 ? 'call' : 'calls'} completed`}
+              {showAll ? 'Collapse steps' : chainSummaryLabel(messages)}
             </span>
             {/* "· show all" is an AFFORDANCE, not a status. It used to be gated on
                 every step in the chain having finished, so the moment a new tool
