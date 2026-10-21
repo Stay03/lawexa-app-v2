@@ -52,6 +52,12 @@ export interface ChatError {
   user: ChatErrorUserRef | null;
   /** Internal numeric conversation id, not the uuid. */
   conversation_id: number | null;
+  /** The chat's uuid; `null` when the chat was deleted or the row has none
+   *  (backend chat-error-links, 21 October 2026). */
+  conversation_uuid?: string | null;
+  /** True only for a chat in no Space and no channel: those open in the admin
+   *  chat view. Any other chat 404s there. */
+  admin_viewable?: boolean;
   space_id: number | null;
   agent_id: number | null;
   model_id: number | null;

@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { format } from 'date-fns';
+import { MessageSquare } from 'lucide-react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -11,6 +13,7 @@ import {
   ErrorCell,
   type ObservabilityColumn,
 } from '@/components/admin/observability';
+import { chatErrorChat } from './chat-error-chat';
 import { chatErrorStageMeta } from './chat-error-stage';
 import type { ChatError } from '@/types/admin-chat-errors';
 
@@ -66,6 +69,25 @@ function RefsLine({ error }: { error: ChatError }) {
   );
 }
 
+/** The way to the chat: "Open chat" when the admin chat view can show it,
+ *  else why it cannot. */
+function ChatLine({ error }: { error: ChatError }) {
+  const chat = chatErrorChat(error);
+  if (!chat) return null;
+  return (
+    <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+      <MessageSquare aria-hidden className="h-3 w-3 shrink-0" />
+      {chat.kind === 'link' ? (
+        <Link href={chat.href} className="font-medium text-foreground hover:underline">
+          Open chat
+        </Link>
+      ) : (
+        <span className="truncate">{chat.text}</span>
+      )}
+    </p>
+  );
+}
+
 interface ChatErrorsTableProps {
   errors: ChatError[];
   isLoading: boolean;
@@ -110,6 +132,7 @@ export function ChatErrorsTable({ errors, isLoading }: ChatErrorsTableProps) {
           <TableCell className="w-full max-w-0">
             <ErrorCell error={error.message} className="text-foreground" />
             <RefsLine error={error} />
+            <ChatLine error={error} />
           </TableCell>
           <TableCell className="max-w-[110px]">
             {error.tool_name ? (
