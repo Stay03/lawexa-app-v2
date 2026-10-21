@@ -10,6 +10,7 @@ import type {
   UpdateSpaceMemberRolePayload,
 } from '@/types/collab';
 import type { ConversationMessagePreview } from '@/types/chat';
+import { plainPreview } from '@/v2/features/conversations/plain-preview';
 import {
   CONTENT_ROLE_LABELS,
   contentRoleOf,
@@ -216,7 +217,8 @@ export function lastMessageLine(
   last: ConversationMessagePreview | null | undefined,
   viewerUuid: string | null,
 ): string | null {
-  const preview = last?.preview?.replace(/\s+/g, ' ').trim();
+  // Plain text: an answer's preview is markdown, and its marks read as noise in a row.
+  const preview = last?.preview ? plainPreview(last.preview) : '';
   if (!last || !preview) return null;
   const who =
     last.role === 'assistant'

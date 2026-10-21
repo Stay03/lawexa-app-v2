@@ -2,6 +2,7 @@ import type { MessageMention, MessageReplyTo } from '@/types/chat';
 import type { DraftCodec } from './draft-store';
 import { savedMessageId } from './markdown/export-target';
 import { UNNAMED_ASKER } from './space-turn';
+import { plainPreview } from '../plain-preview';
 
 /**
  * reply-target — the pure rules of a reply in a space chat (Stay, 14 October
@@ -88,12 +89,7 @@ export function replyAuthorLabel(replyTo: MessageReplyTo, viewerId: number | nul
 /** The quote's one line: the preview without markdown marks, tags or line breaks. */
 export function replySnippet(replyTo: MessageReplyTo): string {
   if (replyTo.is_unavailable || replyTo.preview === null) return '';
-  return replyTo.preview
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
-    .replace(/(\*\*|__|`)/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return plainPreview(replyTo.preview);
 }
 
 /** A quote's colour: the quoted person's member colour index, Lawexa's gold, or plain grey. */
