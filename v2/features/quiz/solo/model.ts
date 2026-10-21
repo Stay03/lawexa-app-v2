@@ -7,6 +7,7 @@ import type {
   SubmitQuizAttemptAnswerPayload,
 } from '@/types/channel-quiz';
 import { formatResponseTime } from '@/v2/features/channels/quiz/model';
+import type { OptionState } from '@/v2/features/channels/quiz/ui';
 import { isAccountRole } from '@/v2/runtime/account';
 import type { V2SessionSnapshot } from '@/v2/runtime/session-context';
 
@@ -231,6 +232,92 @@ export function withAnswer(
     },
   };
 }
+
+/** How many questions have no answer — the number Finish names before it
+ *  scores them as wrong. */
+export function unansweredCount(attempt: QuizAttempt): number {
+  return attempt.questions.filter((question) => !question.answered).length;
+}
+
+/** Points so far on an `each` attempt: the sum the receipts have handed back.
+ *  Never computed from the clock — the server scores, this only adds. */
+export function attemptPoints(attempt: QuizAttempt): number {
+  return attempt.questions.reduce((sum, question) => sum + (question.points ?? 0), 0);
+}
+
+/* ── The player's steps ───────────────────────────────────────────────────── */
+
+/**
+ * Where the question on screen is, read from the SERVER's state of it plus
+ * two local facts: a send in flight, and the app's own clock having run out.
+ *
+ *  - `open`       unanswered, time left: the tiles take a tap;
+ *  - `sending`    the tap is locked and on the wire;
+ *  - `revealed`   answered on an `each` attempt, with its verdict in the cache
+ *                 (the receipt, or the resume read);
+ *  - `answered`   answered with no verdict to show — an `end` attempt, where
+ *                 the verdict waits for the results;
+ *  - `timed-out`  unanswered and out of time: locked, nothing recorded.
+ *
+ * THE SERVER'S WORD COMES FIRST. An answer that lands after the clock ran out
+ * (the POST was in flight at zero) still reads `answered`, because the server
+ * took it — the clamp costs points, never the answer. Only a question the
+ * server has NOT got is ever `timed-out`.
+ */
+export type PlayStep = 'open' | 'sending' | 'revealed' | 'answered' | 'timed-out';
+
+export function playStep(
+  question: QuizAttemptQuestion,
+  revealMode: QuizRevealMode,
+  sending: boolean,
+  timedOut: boolean,
+): PlayStep {
+  if (question.answered) {
+    return revealMode === 'each' && question.correct_option_id != null
+      ? 'revealed'
+      : 'answered';
+  }
+  if (sending) return 'sending';
+  if (timedOut) return 'timed-out';
+  return 'open';
+}
+
+/**
+ * What one tile says about itself at this step — the channel game's own
+ * vocabulary (`OptionTile`), so a reader who plays both reads one language.
+ * A reveal paints from the SERVER's `your_option_id` and `correct_option_id`,
+ * never from the local tap; the tap only locks the grid while it is in flight.
+ */
+export function optionTileState(
+  optionId: number,
+  question: QuizAttemptQuestion,
+  step: PlayStep,
+  pendingPick: number | null,
+): OptionState {
+  switch (step) {
+    case 'revealed': {
+      if (optionId === question.correct_option_id) return 'correct';
+      if (optionId === question.your_option_id) return 'wrong-pick';
+      return 'missed';
+    }
+    case 'answered':
+      return optionId === question.your_option_id ? 'picked' : 'locked-other';
+    case 'sending':
+      return optionId === pendingPick ? 'picked' : 'locked-other';
+    case 'timed-out':
+      return 'locked-other';
+    case 'open':
+    default:
+      return 'idle';
+  }
+}
+
+/**
+ * How long an `end` attempt holds the locked tile before the next question —
+ * long enough to see the pick land, short enough that nothing is being
+ * waited for. An `each` attempt waits for the reader instead (Next).
+ */
+export const END_MODE_ADVANCE_MS = 350;
 
 /* ── The player's own clock ───────────────────────────────────────────────── */
 
