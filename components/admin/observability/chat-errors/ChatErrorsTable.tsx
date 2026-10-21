@@ -14,21 +14,22 @@ import {
 import { chatErrorStageMeta } from './chat-error-stage';
 import type { ChatError } from '@/types/admin-chat-errors';
 
+/* Seven columns, so the list fits a 1440 px screen beside the admin rail: the
+ * source sits under the stage, and the platform under the user. Nine columns
+ * pushed User and Platform past the card's edge. */
 const COLUMNS: ObservabilityColumn[] = [
-  { key: 'time', label: 'Time', className: 'w-[130px]' },
-  { key: 'source', label: 'Source', className: 'w-[90px]' },
-  { key: 'stage', label: 'Stage', className: 'w-[120px]' },
-  { key: 'code', label: 'Code', className: 'w-[170px]' },
-  { key: 'http', label: 'HTTP', className: 'w-[70px]' },
+  { key: 'time', label: 'Time', className: 'w-[104px]' },
+  { key: 'stage', label: 'Stage', className: 'w-[112px]' },
+  { key: 'code', label: 'Code', className: 'w-[150px]' },
+  { key: 'http', label: 'HTTP', className: 'w-[56px]' },
   { key: 'message', label: 'Message' },
-  { key: 'tool', label: 'Tool', className: 'w-[130px]' },
-  { key: 'user', label: 'User', className: 'w-[170px]' },
-  { key: 'platform', label: 'Platform', className: 'w-[120px]' },
+  { key: 'tool', label: 'Tool', className: 'w-[110px]' },
+  { key: 'user', label: 'User', className: 'w-[160px]' },
 ];
 
 const EMPTY = <span className="text-sm text-muted-foreground">—</span>;
 
-/** The clock time, since an error is read against a log; the full date in the tooltip. */
+/** The clock time over the day, since an error is read against a log; the full date in the tooltip. */
 function OccurredAtCell({ value }: { value: string }) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -37,7 +38,10 @@ function OccurredAtCell({ value }: { value: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className="cursor-help text-sm tabular-nums">{format(date, 'd MMM HH:mm:ss')}</span>
+        <span className="block cursor-help tabular-nums">
+          <span className="block text-sm">{format(date, 'HH:mm:ss')}</span>
+          <span className="block text-xs text-muted-foreground">{format(date, 'd MMM')}</span>
+        </span>
       </TooltipTrigger>
       <TooltipContent side="top">
         <p>{format(date, 'PPpp')}</p>
@@ -81,14 +85,12 @@ export function ChatErrorsTable({ errors, isLoading }: ChatErrorsTableProps) {
             <OccurredAtCell value={error.occurred_at} />
           </TableCell>
           <TableCell>
-            <Badge variant="secondary" className="font-normal capitalize">
+            <StatusBadge meta={chatErrorStageMeta(error.stage)} />
+            <Badge variant="secondary" className="mt-1 flex w-fit font-normal capitalize">
               {error.source}
             </Badge>
           </TableCell>
-          <TableCell>
-            <StatusBadge meta={chatErrorStageMeta(error.stage)} />
-          </TableCell>
-          <TableCell className="max-w-[170px]">
+          <TableCell className="max-w-[150px]">
             {error.error_code ? (
               <span className="block truncate font-mono text-xs">{error.error_code}</span>
             ) : (
@@ -105,36 +107,32 @@ export function ChatErrorsTable({ errors, isLoading }: ChatErrorsTableProps) {
               EMPTY
             )}
           </TableCell>
-          <TableCell className="max-w-[360px]">
+          <TableCell className="w-full max-w-0">
             <ErrorCell error={error.message} className="text-foreground" />
             <RefsLine error={error} />
           </TableCell>
-          <TableCell className="max-w-[130px]">
+          <TableCell className="max-w-[110px]">
             {error.tool_name ? (
               <span className="block truncate font-mono text-xs">{error.tool_name}</span>
             ) : (
               EMPTY
             )}
           </TableCell>
-          <TableCell className="max-w-[170px]">
+          <TableCell className="max-w-[160px]">
             {error.user ? (
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{error.user.name}</p>
-                <p className="text-xs tabular-nums text-muted-foreground">#{error.user.id}</p>
-              </div>
+              <p className="truncate text-sm font-medium">{error.user.name}</p>
             ) : (
               EMPTY
             )}
-          </TableCell>
-          <TableCell>
-            {error.platform ? (
-              <span className="text-sm">{error.platform}</span>
-            ) : (
-              EMPTY
-            )}
-            {error.app_version && (
-              <p className="text-xs tabular-nums text-muted-foreground">{error.app_version}</p>
-            )}
+            <p className="truncate text-xs tabular-nums text-muted-foreground">
+              {[
+                error.user ? `#${error.user.id}` : null,
+                error.platform,
+                error.app_version,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
           </TableCell>
         </TableRow>
       ))}
