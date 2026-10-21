@@ -216,7 +216,7 @@ test('a send that never reached the server gives the words and the quote back (t
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),/);
   assert.doesNotMatch(controller, /refusal\.kind === 'unsent' && \{ dropReply/);
-  assert.match(controller, /\} else if \(refusal\.kind !== 'unsent'\) \{/);
+  assert.match(controller, /\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked'\) \{/);
 });
 
 test('a 5xx or a lost connection reads the chat first: a saved question stays, an unsaved one comes back', async () => {
