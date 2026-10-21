@@ -183,6 +183,22 @@ export function useMoveFirstPending(): MoveFirstPending | null {
   return useContext(MoveFirstPendingContext);
 }
 
+/**
+ * The path the shell's chrome draws for: the tap's destination while its frame
+ * shows, else the router's pathname. The phone bar read the pathname alone, so
+ * after a tap on a case the case's frame was on screen for the whole server
+ * round trip (about 1 s on live) under the list's menu button and Lawexa mark,
+ * and only then did the back arrow replace them (Stay, 20 October 2026: "the
+ * lawexa logo at the top is slow to go off"). Read here, the bar and the frame
+ * change in the same commit; a cancelled tap clears the destination, so the bar
+ * goes back with it. Parsed against a fixed base, so it runs on the server too.
+ */
+export function useShownPathname(): string {
+  const pathname = usePathname() ?? '';
+  const pending = useContext(MoveFirstPendingContext);
+  return pending ? new URL(pending.href, 'http://x').pathname : pathname;
+}
+
 /** The path of an in-app href, for comparing with `usePathname()`. */
 function pathOf(href: string): string {
   return new URL(href, window.location.href).pathname;

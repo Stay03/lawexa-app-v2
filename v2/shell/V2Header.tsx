@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { Boxes, ChevronLeft, Menu, ShieldCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -31,6 +30,7 @@ import { useHeaderPlace, type HeaderPlace } from './header-place';
 import { FOCUS_RING } from './designs/modules';
 import { pushedScreenFor, type PushedScreen } from './pushed-route';
 import { hasOpenBar } from './top-level-route';
+import { useShownPathname } from './move-first';
 import { useScreenContext } from './screen-context';
 import { NO_BREADCRUMB_DATA, breadcrumbTrail } from './breadcrumb-trail';
 import { V2Breadcrumb } from './V2Breadcrumb';
@@ -190,7 +190,9 @@ const OPEN_BAR_CONTROL =
  */
 export function V2Header({ user }: { user: SessionUser | null }) {
   const { setOpenMobile, state } = useSidebar();
-  const pathname = usePathname();
+  // The tap's destination while a move-first frame shows, so the bar changes
+  // with the frame and not a round trip later (`useShownPathname`).
+  const pathname = useShownPathname();
   // CONSUMES the route context another feature PUBLISHES (header-context.ts): the
   // conversation screen sets {title, confidential} once its history resolves, and
   // may update the title later (async name generation). `title` is null until then.

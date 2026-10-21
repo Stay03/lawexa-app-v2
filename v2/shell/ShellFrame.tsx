@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 
+import { useShownPathname } from './move-first';
 import { hasOpenBar, isChatRoute } from './top-level-route';
 
 /**
@@ -41,10 +42,15 @@ import { hasOpenBar, isChatRoute } from './top-level-route';
  */
 export function ShellFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
+  // The bar's see-through ground follows the same path the bar draws for
+  // (`useShownPathname`), so the two never disagree during a move-first tap.
+  // The chat flag stays on the committed path: it moves the scroller, and the
+  // screen under the tap's frame is still the old one.
+  const shown = useShownPathname();
   return (
     <div
       className="v2-shell"
-      data-v2-open-bar={hasOpenBar(pathname) ? '' : undefined}
+      data-v2-open-bar={hasOpenBar(shown) ? '' : undefined}
       // A conversation scrolls in its own transcript, not in the content
       // region, so the bar's room moves into that scroller (shell.css).
       data-v2-chat={isChatRoute(pathname) ? '' : undefined}
