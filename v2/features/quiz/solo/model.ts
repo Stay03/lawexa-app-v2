@@ -338,6 +338,19 @@ export function questionDeadlineMs(openedAtMs: number, limitSeconds: number): nu
 
 /* ── Results vocabulary ───────────────────────────────────────────────────── */
 
+/**
+ * How one question of a FINISHED attempt went. A question never answered
+ * comes back `is_correct: false` with `your_option_id: null` — the same
+ * false as a wrong pick on the wire, and a different fact to the reader, so
+ * it gets its own word rather than "Incorrect".
+ */
+export type QuestionVerdict = 'correct' | 'incorrect' | 'unanswered';
+
+export function questionVerdict(question: QuizAttemptQuestion): QuestionVerdict {
+  if (!question.answered || question.your_option_id == null) return 'unanswered';
+  return question.is_correct === true ? 'correct' : 'incorrect';
+}
+
 /** "1,375" — points as a reader counts them. */
 export function pointsLabel(points: number): string {
   return points.toLocaleString();

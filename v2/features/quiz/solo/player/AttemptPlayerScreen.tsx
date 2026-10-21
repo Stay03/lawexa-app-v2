@@ -19,6 +19,7 @@ import {
   quizFrontHref,
 } from '../model';
 import { soloQuizQueries } from '../queries';
+import { AttemptResultsSkeleton } from '../results/states';
 import { AttemptPlay } from './AttemptPlay';
 import { AttemptPlayerSkeleton } from './states';
 
@@ -68,12 +69,21 @@ export function AttemptPlayerScreen({ attemptUuid }: { attemptUuid: string }) {
     if (finished) router.replace(attemptResultsHref(attemptUuid));
   }, [finished, router, attemptUuid]);
 
-  // Pending, or on the way to the results — the same shape either way, so the
-  // redirect reads as a continuation rather than a flash of something else.
-  if (query.isPending || finished) {
+  if (query.isPending) {
     return (
       <div className={PLAYER_COLUMN}>
         <AttemptPlayerSkeleton />
+      </div>
+    );
+  }
+
+  // On the way to the results: their shape, so the redirect reads as a
+  // continuation of the wait rather than a flash of a question that is not
+  // coming.
+  if (finished) {
+    return (
+      <div className={LIST_COLUMN}>
+        <AttemptResultsSkeleton />
       </div>
     );
   }
