@@ -11,11 +11,12 @@ import type {
 
 /**
  * The longest the publish step waits for suggested tags before it shows the
- * empty box. The model answers in 1 to 3 s; when it fails, the server retries
- * and then answers from its tag list, about 10 to 11 s in all (backend, 20
+ * empty box. The model (Jev) answers in about 2 s; it gets one try of 4 s,
+ * and then the server answers from its own word matching at once, about 4 s
+ * at worst, a little more when its tag list is being rebuilt (backend, 21
  * October 2026). The box stays usable while it waits.
  */
-export const SUGGESTED_TAGS_TIMEOUT_MS = 15_000;
+export const SUGGESTED_TAGS_TIMEOUT_MS = 8_000;
 
 /**
  * The v2 notes wire layer. Thin on purpose: same axios client and endpoints as
