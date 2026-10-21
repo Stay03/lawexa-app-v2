@@ -147,10 +147,14 @@ export const statutesApi = {
 
   /**
    * Get the countries that have statutes, with per-country counts.
-   * Drives the country tabs on the statute library.
+   * Drives the country tabs on the statute library. With `search` (the same
+   * text the list sends), the counts cover only the statutes that search
+   * finds, and countries with none are left out (backend 6d218a29).
    */
-  getCountryFacets: async (): Promise<StatuteFacetsResponse> => {
-    const response = await apiClient.get<StatuteFacetsResponse>('/statutes/countries');
+  getCountryFacets: async (search?: string): Promise<StatuteFacetsResponse> => {
+    const response = await apiClient.get<StatuteFacetsResponse>('/statutes/countries', {
+      params: search ? { search } : undefined,
+    });
     return response.data;
   },
 

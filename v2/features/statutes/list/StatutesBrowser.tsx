@@ -26,6 +26,7 @@ import {
 import { resolveCountryId, statuteRow, type StatuteRowModel } from '../statute-row-model';
 import { useReaderCountry } from '../use-reader-country';
 import { CountryTabs } from './CountryTabs';
+import { facetsForSearch } from './search-facets';
 import { StatuteRow } from './StatuteRow';
 import {
   NextPageSkeleton,
@@ -105,6 +106,14 @@ export function StatutesBrowser() {
     placeholderData: STATUTE_COUNTRIES_PLACEHOLDER,
   });
   const facets = countries.data ?? STATUTE_COUNTRIES_PLACEHOLDER;
+  // While a search is on screen the tabs count its matches (findings 12, 28).
+  // Only the tabs read these: the tab set and the country filter stay the
+  // library's, so no tab vanishes under the reader mid-search.
+  const searchCountries = useQuery({
+    ...statutesQueries.countriesForSearch(activeSearch),
+    enabled: signedIn && activeSearch !== '',
+  });
+  const tabFacets = facetsForSearch(facets, searchCountries.data, activeSearch !== '');
   // The tab: the URL's, else the reader's own country, else All (#7).
   const readerSlug = readerCountrySlug(facets, readerCountry);
   const countrySlug = countryTabFromParam(countryParam, readerSlug);
@@ -189,7 +198,7 @@ export function StatutesBrowser() {
 
       <div className="mb-3">
         <CountryTabs
-          facets={facets}
+          facets={tabFacets}
           value={!countryParam?.trim() && !readerSettled ? null : countrySlug}
           onChange={setCountry}
         />

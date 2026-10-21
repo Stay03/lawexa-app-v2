@@ -63,6 +63,31 @@ export const STATUTE_COUNTRIES_PLACEHOLDER: StatuteCountries = {
   source: 'seed',
 };
 
+/** The country facets, for the whole library or for one search. */
+async function fetchCountryFacets(search?: string): Promise<StatuteCountries> {
+  try {
+    const res = await statutesApi.getCountryFacets(search);
+    // A search that finds nothing answers an empty list: no country has a match.
+    if (search && Array.isArray(res.data) && res.data.length === 0) {
+      return { total: 0, countries: [], source: 'live' };
+    }
+    // SHAPE-CHECK a 200 before trusting it: these facets feed
+    // `facets.countries.map(...)` in the tab row, so a well-formed
+    // error page or a drifted payload answering 200 would crash the
+    // whole list screen. A response without a countries ARRAY is not
+    // facets — fall back to the seed exactly like a failed request.
+    // Either the documented shape or the flat list the live endpoint
+    // returns since 3 October 2026 (`normaliseCountryFacets`).
+    const facets = normaliseCountryFacets(res.data, res.meta?.total);
+    if (!facets) {
+      return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
+    }
+    return { ...facets, source: 'live' };
+  } catch {
+    return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
+  }
+}
+
 export const statutesQueries = {
   all: ['statutes'] as const,
 
@@ -127,27 +152,22 @@ export const statutesQueries = {
     queryOptions({
       meta: { persist: 'list' },
       queryKey: [...statutesQueries.all, 'countries'] as const,
-      queryFn: async (): Promise<StatuteCountries> => {
-        try {
-          const res = await statutesApi.getCountryFacets();
-          // SHAPE-CHECK a 200 before trusting it: these facets feed
-          // `facets.countries.map(...)` in the tab row, so a well-formed
-          // error page or a drifted payload answering 200 would crash the
-          // whole list screen. A response without a countries ARRAY is not
-          // facets — fall back to the seed exactly like a failed request.
-          // Either the documented shape or the flat list the live endpoint
-          // returns since 3 October 2026 (`normaliseCountryFacets`).
-          const facets = normaliseCountryFacets(res.data, res.meta?.total);
-          if (!facets) {
-            return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
-          }
-          return { ...facets, source: 'live' };
-        } catch {
-          return { ...STATUTE_COUNTRIES_FALLBACK, source: 'seed' };
-        }
-      },
+      queryFn: () => fetchCountryFacets(),
       staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.reference,
+    }),
+
+  /**
+   * The same counts for one search (Tester, 20 October 2026, findings 12 and
+   * 28: the tabs counted the whole library while the list showed a search).
+   * Not kept on the device: one entry per search would fill it.
+   */
+  countriesForSearch: (search: string) =>
+    queryOptions({
+      queryKey: [...statutesQueries.all, 'countries', { search }] as const,
+      queryFn: () => fetchCountryFacets(search),
+      staleTime: STALE_TIMES.reference,
+      gcTime: GC_TIMES.list,
     }),
 
   details: () => [...statutesQueries.all, 'detail'] as const,
