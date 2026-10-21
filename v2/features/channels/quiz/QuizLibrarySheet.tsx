@@ -5,12 +5,12 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Library,
   Loader2,
-  Lock,
   MoreHorizontal,
   Pencil,
   Play,
   Plus,
   Radio,
+  Share2,
   Trash2,
   Trophy,
   WifiOff,
@@ -22,9 +22,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -37,25 +34,28 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatDayLabel } from '@/lib/utils/collab';
-import type { ChannelQuiz, ChannelQuizVisibility } from '@/types/channel-quiz';
+import type { ChannelQuiz } from '@/types/channel-quiz';
 import type { Channel } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { canPublishPublicly, quizFrontHref } from '@/v2/features/quiz/solo/model';
+import { useShareAction } from '@/v2/features/sharing/use-share-action';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { TabRow } from '@/v2/shell/TabRow';
 import { canManageChannel } from '../model';
 import { LawexaMark, MemberAvatar } from '../ui/avatars';
 import { useHeldValue } from '../use-held-value';
 import { DeleteQuizDialog } from './DeleteQuizDialog';
-import { useGoLive, useSetQuizVisibility } from './mutations';
+import { useGoLive } from './mutations';
 import {
   canHostQuiz,
   goLiveTarget,
   HOST_POLICY_LIBRARY_NOTE,
   HOST_POLICY_REFUSAL,
-  VISIBILITY_CHOICES,
-  VISIBILITY_FOOTNOTE,
 } from './model';
 import { channelQuizQueries } from './queries';
 import { QuizFormDialog } from './QuizFormDialog';
+import { VisibilityChip } from './VisibilityChip';
+import { VisibilityGroup } from './VisibilityGroup';
 
 /**
  * QuizLibrarySheet — the quizzes a reader can reach from this room: the ones
@@ -118,6 +118,15 @@ import { QuizFormDialog } from './QuizFormDialog';
  *    merely been PLAYED here belongs to its author and to no room, so a channel
  *    admin is offered nothing on it — the affordance is hidden where it is
  *    confidently refused, never shown where it is confidently allowed.
+ *
+ * ── WHO CAN FIND IT SPEAKS THE FULL VOCABULARY (2026-10-21) ────────────────
+ * The switch is the shared `VisibilityGroup` — the same four answers the
+ * library page and the form offer (`shared`, `private`, `link`, `public`,
+ * with "Everyone" waiting on a verified author), the same words, the same
+ * refusal under the row. A row wears its chip for anything but `shared`,
+ * which is the room's own answer and needs no label here, and a `link` or
+ * `public` quiz can be shared from its menu: the link opens the quiz's front
+ * (`/quiz/q/{uuid}`), where anyone signed in can take it alone.
  */
 
 const SOURCES = [
@@ -142,6 +151,8 @@ export function QuizLibrarySheet({
   onOpenGame: (gameUuid: string) => void;
 }) {
   const [source, setSource] = useState<SourceId>('room');
+  /** Whether "Everyone" is live in a row's visibility switch. */
+  const canPublish = canPublishPublicly(useV2Session());
   const [formOpen, setFormOpen] = useState(false);
   const [editingUuid, setEditingUuid] = useState<string | undefined>(undefined);
   /** Which source the open form is writing into — captured when it opens, so
@@ -413,6 +424,7 @@ export function QuizLibrarySheet({
                         (governs && quiz.channel_uuid === channel.uuid)
                       }
                       hasLiveGame={liveGame !== null}
+                      canPublish={canPublish}
                       onEdit={() => openForm(quiz.uuid)}
                       onDelete={() => setDeleting(quiz)}
                       onLive={onOpenGame}
@@ -464,6 +476,7 @@ function QuizRow({
   mayHost,
   mayManage,
   hasLiveGame,
+  canPublish,
   onEdit,
   onDelete,
   onLive,
@@ -476,6 +489,8 @@ function QuizRow({
   /** Authorship, or governance over a quiz written in this channel. */
   mayManage: boolean;
   hasLiveGame: boolean;
+  /** `canPublishPublicly(session)` — whether "Everyone" is live. */
+  canPublish: boolean;
   onEdit: () => void;
   onDelete: () => void;
   onLive: (gameUuid: string) => void;
@@ -484,7 +499,11 @@ function QuizRow({
 }) {
   const goLive = useGoLive(channelUuid, quiz.uuid);
   const count = quiz.question_count ?? quiz.questions?.length ?? 0;
-  const isPrivate = quiz.visibility === 'private';
+  const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
+  const share = useShareAction({ path: quizFrontHref(quiz.uuid), title: quiz.title });
+  /** The visibility switch's refusal, said under the row it was pressed on.
+   *  There are no toasts on these surfaces and the write is `silentError`. */
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   return (
     <li className="flex items-start gap-3 rounded-xl border bg-card px-3 py-3">
@@ -560,22 +579,29 @@ function QuizRow({
           <span className="hidden shrink-0 sm:inline">
             · {formatDayLabel(quiz.created_at)}
           </span>
-          {/* The switch's state, legible without opening the menu. Owner-only,
-              because nobody else can see a private quiz in the first place.
+          {/* The switch's state, legible without opening the menu. Owner-only
+              — nobody else can see a private quiz in the first place — and for
+              anything but `shared`, which is the room's own answer and needs
+              no label here.
 
               IT IS THE ONE THING HERE BESIDES THE NAME THAT CAN GIVE, and it
               has to be: on the narrowest phone the avatar, the question count
               and this chip alone are wider than the column, so if every one of
               them held its width the line would spill sideways over the Go live
-              button — which is worse than the wrap it replaced. The lock never
-              shrinks, so the mark survives whatever happens to the words. */}
-          {quiz.is_mine && isPrivate && (
-            <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-secondary px-1.5 py-0.5">
-              <Lock aria-hidden className="size-3 shrink-0" />
-              <span className="truncate">Only me</span>
-            </span>
+              button — which is worse than the wrap it replaced. The mark never
+              shrinks, so it survives whatever happens to the words. */}
+          {quiz.is_mine && quiz.visibility !== 'shared' && (
+            <VisibilityChip visibility={quiz.visibility} />
           )}
         </div>
+        {(refusal || share.copied) && (
+          <p
+            role={refusal ? 'alert' : 'status'}
+            className="mt-2 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          >
+            {refusal ?? 'Link copied'}
+          </p>
+        )}
       </div>
 
       {(mayHost || mayManage) && (
@@ -637,9 +663,21 @@ function QuizRow({
               <DropdownMenuContent align="end" className="w-72">
                 {quiz.is_mine && (
                   <>
-                    <VisibilityGroup quiz={quiz} />
+                    <VisibilityGroup
+                      quiz={quiz}
+                      canPublish={canPublish}
+                      onRefused={setRefusal}
+                    />
                     <DropdownMenuSeparator />
                   </>
+                )}
+                {/* Only where a link can open it: the quiz's front, where
+                    anyone signed in takes it alone. */}
+                {shareable && (
+                  <DropdownMenuItem onClick={() => void share.share()}>
+                    <Share2 aria-hidden className="size-4" />
+                    Share
+                  </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={onEdit}>
                   <Pencil aria-hidden className="size-4" />
@@ -655,53 +693,6 @@ function QuizRow({
         </div>
       )}
     </li>
-  );
-}
-
-/**
- * WHO CAN FIND THIS QUIZ — the owner's switch, and the sentence that keeps it
- * honest.
- *
- * The copy does the work `visibility` actually does and no more: it changes
- * whose LISTS the quiz appears on. It does not retract a game, hide a lobby,
- * withdraw a result or unpost a card, and the footnote says so in the same
- * breath as the choice rather than in a help article nobody opens.
- *
- * The write is optimistic with a real rollback (see `useSetQuizVisibility`),
- * because the menu closes on the press and the row is the only feedback left.
- * A refusal is not silent: the row snaps back to what the server still says.
- */
-function VisibilityGroup({ quiz }: { quiz: ChannelQuiz }) {
-  const setVisibility = useSetQuizVisibility(quiz.uuid);
-
-  return (
-    <>
-      <DropdownMenuLabel>Who can find it</DropdownMenuLabel>
-      <DropdownMenuRadioGroup
-        value={quiz.visibility}
-        onValueChange={(value) =>
-          setVisibility.mutate(value as ChannelQuizVisibility)
-        }
-      >
-        {VISIBILITY_CHOICES.map((choice) => (
-          <DropdownMenuRadioItem
-            key={choice.id}
-            value={choice.id}
-            className="items-start"
-          >
-            <span className="flex flex-col gap-0.5">
-              <span className="text-sm text-foreground">{choice.label}</span>
-              <span className="text-xs text-muted-foreground">
-                {choice.hint}
-              </span>
-            </span>
-          </DropdownMenuRadioItem>
-        ))}
-      </DropdownMenuRadioGroup>
-      <p className="px-3 pt-1 pb-2 text-xs text-muted-foreground/80">
-        {VISIBILITY_FOOTNOTE}
-      </p>
-    </>
   );
 }
 

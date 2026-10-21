@@ -97,29 +97,15 @@ export function goLiveTarget(channelUuid: string): GoLiveChannelQuizPayload {
 /* ── Visibility (a DISCOVERY switch, not an access one) ───────────────────── */
 
 /**
- * What the owner is actually choosing, in the words the menu uses.
- *
- * THE SECOND SENTENCE IS THE HONEST HALF and it is not optional: `private` hides
- * the quiz from other people's channel lists and does NOTHING ELSE. Every game
+ * THE SECOND SENTENCE IS THE HONEST HALF and it is not optional: `private`
+ * hides the quiz from other people's lists and does NOTHING ELSE. Every game
  * that has already been played stays exactly where it is — its lobby, its
  * results and its card in the transcript are all still open to the room. A
- * switch that reads like a retraction, and is not one, is the single worst thing
- * this surface could say.
+ * switch that reads like a retraction, and is not one, is the single worst
+ * thing a quiz surface could say. So this line sits under the choice on every
+ * surface that offers it ({@link QUIZ_VISIBILITY_CHOICES} below is the choice
+ * itself; the two-entry list that preceded it went with the solo quiz).
  */
-export const VISIBILITY_CHOICES = [
-  {
-    id: 'shared',
-    label: 'Anyone in the room',
-    hint: 'Shows on the quiz list of every channel it has been played in.',
-  },
-  {
-    id: 'private',
-    label: 'Only me',
-    hint: 'Hides it from those lists. You can still run it anywhere.',
-  },
-] as const;
-
-/** The one line under the choice, on every surface that offers it. */
 export const VISIBILITY_FOOTNOTE =
   'Either way, games already played keep their scores and stay visible to everyone who was there.';
 
