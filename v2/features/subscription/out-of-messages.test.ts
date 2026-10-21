@@ -204,3 +204,22 @@ test('a purchase refreshes the limits the notice and Usage read', () => {
     assert.match(source, /invalidateQueries\(\{ queryKey: usageQueries\.all \}\)/, file.join('/'));
   }
 });
+
+/* Tester, 20 October 2026 (finding 21): after buying a message pack, the
+ * notice still said "free messages". Backend 6d218a29 adds
+ * `last_message_from_pack` to the block. */
+test('a free account that used a message pack is not told its free messages ran out', () => {
+  const view = outOfMessagesView({ blocked: block({ reason: 'free_no_subscription', resets_at: null, last_message_from_pack: true }) });
+  assert.equal(view.heading, 'You’ve used your messages');
+  assert.equal(view.short, 'Messages used up');
+  assert.match(view.body, /^Your free messages and your message pack are used up\./);
+  assert.doesNotMatch(`${view.heading} ${view.short}`, /free/i);
+  // The same doors: a pack first for a free account, then a plan.
+  assert.deepEqual(doors(view), doors(outOfMessagesView({ blocked: block({ reason: 'free_no_subscription', resets_at: null }) })));
+});
+
+test('without the flag, or on a paid plan, the wording is as before', () => {
+  assert.equal(outOfMessagesView({ blocked: block({ reason: 'free_no_subscription', resets_at: null }) }).heading, 'You’ve used your free messages');
+  assert.equal(outOfMessagesView({ blocked: block({ reason: 'free_no_subscription', resets_at: null, last_message_from_pack: false }) }).short, 'Free messages used');
+  assert.equal(outOfMessagesView({ blocked: block({ reason: 'plan_exhausted', last_message_from_pack: true }) }).short, 'Messages used for now');
+});

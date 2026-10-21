@@ -96,6 +96,10 @@ export interface IBlockedReason {
   payg_remaining: number;
   resets_at: string | null;
   subscription_ends_at: string | null;
+  /** The user's most recent paid-for message came from a message pack (bought
+   *  or granted). With `free_no_subscription`, the messages used up were not
+   *  only the free ones (backend 6d218a29). Absent from an older API. */
+  last_message_from_pack?: boolean;
 }
 
 // AI messages limit from GET /users/limits

@@ -86,6 +86,10 @@ const BODY: Record<TBlockedReasonCode, string> = {
   hard_limit: 'You have reached the most messages this account can send for now.',
 };
 
+/** The free reason's sentence once a message pack has been used up too. */
+const FROM_PACK_BODY =
+  'Your free messages and your message pack are used up. Buy another message pack, or choose a plan for a monthly allowance.';
+
 /** "15 Mar 2026, 01:00" in the reader's zone, or null for a missing or broken time. */
 export function formatResetMoment(iso: string | null | undefined, timeZone?: string): string | null {
   if (!iso) return null;
@@ -120,6 +124,10 @@ export function outOfMessagesView({
   timeZone?: string;
 }): OutOfMessagesView {
   const reason = reasonOf(blocked);
+  // A user without a plan who bought (or was given) a message pack has used
+  // more than free messages: the notice no longer calls them free (Tester, 20
+  // October 2026, finding 21; backend's `last_message_from_pack`).
+  const fromPack = reason === 'free_no_subscription' && blocked?.last_message_from_pack === true;
   // A free allowance is for life (no reset time), so its heading promises
   // nothing back; "for now" is for a plan that renews.
   const heading =
@@ -127,19 +135,27 @@ export function outOfMessagesView({
       ? 'You’ve hit your usage limit'
       : reason === 'cancelled_grace_exhausted'
         ? 'Your plan access has ended'
-        : reason === 'free_no_subscription'
-          ? 'You’ve used your free messages'
-          : 'You’ve used your messages for now';
+        : fromPack
+          ? 'You’ve used your messages'
+          : reason === 'free_no_subscription'
+            ? 'You’ve used your free messages'
+            : 'You’ve used your messages for now';
   const short =
     reason === 'hard_limit'
       ? 'Usage limit reached'
       : reason === 'cancelled_grace_exhausted'
         ? 'Plan cancelled · messages used up'
-        : reason === 'free_no_subscription'
-          ? 'Free messages used'
-          : 'Messages used for now';
+        : fromPack
+          ? 'Messages used up'
+          : reason === 'free_no_subscription'
+            ? 'Free messages used'
+            : 'Messages used for now';
   const known = !!blocked?.reason && KNOWN.includes(blocked.reason);
-  const body = known ? BODY[reason] : blocked?.message?.trim() || fallbackMessage?.trim() || '';
+  const body = fromPack
+    ? FROM_PACK_BODY
+    : known
+      ? BODY[reason]
+      : blocked?.message?.trim() || fallbackMessage?.trim() || '';
   // Nothing comes back to a lapsed plan, nor to one that ends before the reset.
   const resetIso = blocked?.resets_at ?? resetsAt ?? null;
   const endsFirst =
