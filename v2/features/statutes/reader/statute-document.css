@@ -82,8 +82,12 @@
   scroll-margin-top: 1.5rem;
 }
 
+/* The step between provisions, phone first. On a 390 px phone each provision
+   is a few lines, so a 28 px step read as gaps between paragraphs (Tester, 20
+   October 2026, finding 11); 18 px matches the note reader's rhythm. A
+   computer keeps 28 px (the block below the nested-section rule). */
 .v2-statute-doc .akn-block + .akn-block {
-  margin-top: 1.75rem;
+  margin-top: 1.125rem;
 }
 
 .v2-statute-doc .akn-block + .akn-division {
@@ -106,7 +110,18 @@
 .v2-statute-doc .akn-section + .akn-numbered,
 .v2-statute-doc .akn-section + .akn-unnumbered,
 .v2-statute-doc .akn-section + .akn-anchor > :first-child {
-  margin-top: 1.75rem;
+  margin-top: 1.125rem;
+}
+
+@media (min-width: 768px) {
+  .v2-statute-doc .akn-block + .akn-block,
+  .v2-statute-doc .akn-section + .akn-section,
+  .v2-statute-doc .akn-section + .akn-p,
+  .v2-statute-doc .akn-section + .akn-numbered,
+  .v2-statute-doc .akn-section + .akn-unnumbered,
+  .v2-statute-doc .akn-section + .akn-anchor > :first-child {
+    margin-top: 1.75rem;
+  }
 }
 
 /* ── Divisions (part / chapter / schedule headings) ─────────────────────── */
@@ -260,7 +275,7 @@
   display: grid;
   grid-template-columns: minmax(2.25rem, max-content) minmax(0, 1fr);
   column-gap: 0.625rem;
-  margin: 0.625rem 0;
+  margin: 0.5rem 0;
 }
 
 .v2-statute-doc .akn-num {
@@ -269,7 +284,15 @@
 }
 
 .v2-statute-doc .akn-unnumbered {
-  margin: 0.625rem 0;
+  margin: 0.5rem 0;
+}
+
+/* A computer keeps the wider provision rhythm. */
+@media (min-width: 768px) {
+  .v2-statute-doc .akn-numbered,
+  .v2-statute-doc .akn-unnumbered {
+    margin: 0.625rem 0;
+  }
 }
 
 .v2-statute-doc .akn-p + .akn-p {
