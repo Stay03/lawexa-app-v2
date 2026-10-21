@@ -24,33 +24,51 @@ import type {
   ChannelQuiz,
   ChannelQuizResponse,
   ChannelQuizSettings,
+  ChannelQuizVisibility,
   QuizQuestionInput,
   QuizQuestionType,
 } from '@/types/channel-quiz';
+import { canPublishPublicly } from '@/v2/features/quiz/solo/model';
+import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { useCreateLibraryQuiz, useCreateQuiz, useUpdateQuiz } from './mutations';
 import { channelQuizQueries } from './queries';
 import {
   optionLetter,
+  PUBLIC_NEEDS_VERIFIED_AUTHOR,
   QUIZ_DEFAULT_SECONDS,
   QUIZ_DEFAULT_SETTINGS,
   QUIZ_DESCRIPTION_MAX,
   QUIZ_MAX_OPTIONS,
-  QUIZ_MAX_QUESTIONS,
   QUIZ_MIN_OPTIONS,
   QUIZ_OPTION_MAX,
   QUIZ_QUESTION_MAX,
   QUIZ_SECOND_CHOICES,
   QUIZ_TITLE_MAX,
+  quizHasRoom,
+  visibilityChoicesFor,
 } from './model';
+import { VISIBILITY_MARKS } from './VisibilityChip';
 
 /**
  * QuizFormDialog — write a quiz, or edit one that hasn't been played.
  *
- * Phase-5 W6; rules from `docs/api/channel-quiz.md` (backend repo): 1–20
- * questions · 2–4 options with exactly one correct · `true_false` is exactly
- * two · 5–60 second timers. Every one of them is checked here as well as
- * server-side, because a validation error that costs a round trip on question
- * seventeen is a bad way to learn about question three.
+ * Phase-5 W6; rules from `docs/api/channel-quiz.md` (backend repo): at least
+ * one question (the 20-question cap went with the solo quiz, 2026-10-21) ·
+ * 2–4 options with exactly one correct · `true_false` is exactly two · 5–60
+ * second timers. Every one of them is checked here as well as server-side,
+ * because a validation error that costs a round trip on question seventeen is
+ * a bad way to learn about question three.
+ *
+ * ── WHO CAN FIND IT IS CHOSEN HERE TOO (2026-10-21) ─────────────────────────
+ * The four visibilities (`visibilityChoicesFor`: `shared` only where a room is
+ * in the picture) as the sharing feature's choice cards, owner only on an
+ * edit. A new quiz for a channel opens on `shared`, the server's default; one
+ * for the library on `private`. "Everyone" is drawn disabled with its reason
+ * for an author the session has not verified, and when the server refuses a
+ * public save anyway (`403`, a stale snapshot) the same sentence appears under
+ * the cards and the form stays open on the choice, so the reader picks
+ * another and saves again — a refusal, never a lost draft.
  *
  * A DIALOG, NOT A BUILDER SCREEN (the brief's "keep authoring lean"). A quiz
  * here is a handful of questions written between messages — it is not a course
@@ -225,11 +243,17 @@ export function QuizFormDialog({
   const createQuiz = useCreateQuiz();
   const createLibraryQuiz = useCreateLibraryQuiz();
   const updateQuiz = useUpdateQuiz(quizUuid ?? '');
+  const canPublish = canPublishPublicly(useV2Session());
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [settings, setSettings] = useState<ChannelQuizSettings>(
     QUIZ_DEFAULT_SETTINGS,
+  );
+  // The server's default for a room, the quiz's own for a library — see the
+  // docblock. `room` is fixed for this mount (the dialog is keyed per opening).
+  const [visibility, setVisibility] = useState<ChannelQuizVisibility>(
+    room ? 'shared' : 'private',
   );
   const [questions, setQuestions] = useState<QuestionDraft[]>(() => [
     newQuestion(),
@@ -237,6 +261,9 @@ export function QuizFormDialog({
   const [error, setError] = useState<string | null>(null);
   /** Set when the server refuses a question change on a played quiz. */
   const [frozen, setFrozen] = useState(false);
+  /** Set when the server refuses `public` for this author (a stale snapshot
+   *  said otherwise). Cleared by choosing again. */
+  const [publicRefused, setPublicRefused] = useState(false);
 
   // Adopt the loaded quiz ONCE, in render (the sanctioned adjust-on-prop-change
   // pattern) — an effect would paint one frame of an empty form over a quiz the
@@ -247,8 +274,10 @@ export function QuizFormDialog({
     setTitle(loaded.title);
     setDescription(loaded.description ?? '');
     setSettings({ ...QUIZ_DEFAULT_SETTINGS, ...loaded.settings });
+    setVisibility(loaded.visibility);
     setQuestions(draftsFromQuiz(loaded));
     setFrozen(false);
+    setPublicRefused(false);
   }
 
   const submitting =
@@ -261,6 +290,13 @@ export function QuizFormDialog({
     (loaded.questions ?? []).some((question) =>
       question.options.some((option) => option.is_correct !== undefined),
     );
+  /** Who can find a quiz is its OWNER's to say (a channel admin editing a
+   *  quiz born in their room may change its title, never its visibility). */
+  const mayEditVisibility = !isEdit || loaded?.is_mine === true;
+  /** `shared` is offered only where a room is in the picture. */
+  const visibilityChoices = visibilityChoicesFor(
+    room !== null || (loaded !== null && quizHasRoom(loaded)),
+  );
 
   const updateQuestion = (key: string, patch: Partial<QuestionDraft>) => {
     setQuestions((prev) =>
@@ -310,6 +346,13 @@ export function QuizFormDialog({
         setError(null);
         return;
       }
+      if (status === 403 && mayEditVisibility && visibility === 'public') {
+        // "Everyone" is for verified authors — a rule, said under the choice,
+        // with the draft kept and the form open.
+        setPublicRefused(true);
+        setError(null);
+        return;
+      }
       setError(message);
     };
 
@@ -319,6 +362,7 @@ export function QuizFormDialog({
           title: title.trim(),
           description: description.trim() || undefined,
           settings,
+          visibility: mayEditVisibility ? visibility : undefined,
           questions:
             metadataOnly || !mayEditQuestions ? undefined : toPayload(questions),
         },
@@ -336,6 +380,7 @@ export function QuizFormDialog({
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
+      visibility,
       settings,
       questions: toPayload(questions),
     };
@@ -364,8 +409,8 @@ export function QuizFormDialog({
       }
       description={
         <>
-          Up to {QUIZ_MAX_QUESTIONS} questions. Everyone answers on their own
-          device, and faster right answers score more.
+          As many questions as you like, each on its own timer. Everyone
+          answers on their own device, and faster right answers score more.
           {/* THE CONSEQUENCE, STATED — one line, only while it is still a
               choice. An edit cannot move a quiz, so it says nothing. It is a
               `span` and not a `p` because `DialogDescription` IS a paragraph,
@@ -456,6 +501,45 @@ export function QuizFormDialog({
               />
             </div>
 
+            {mayEditVisibility && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Who can find it</p>
+                <div
+                  role="group"
+                  aria-label="Who can find this quiz"
+                  className="flex flex-col gap-2"
+                >
+                  {visibilityChoices.map((choice) => {
+                    const locked = choice.needsVerifiedAuthor && !canPublish;
+                    return (
+                      <VisibilityOption
+                        key={choice.id}
+                        icon={VISIBILITY_MARKS[choice.id]}
+                        title={choice.label}
+                        description={locked ? PUBLIC_NEEDS_VERIFIED_AUTHOR : choice.hint}
+                        selected={visibility === choice.id}
+                        busy={false}
+                        disabled={locked}
+                        onSelect={() => {
+                          setVisibility(choice.id);
+                          setPublicRefused(false);
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+                {publicRefused && (
+                  <p
+                    role="alert"
+                    className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+                  >
+                    {PUBLIC_NEEDS_VERIFIED_AUTHOR} Choose another option, then
+                    save again.
+                  </p>
+                )}
+              </div>
+            )}
+
             {!mayEditQuestions && (
               <p className="rounded-lg border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">
                 You can change this quiz&rsquo;s title, description and
@@ -474,6 +558,12 @@ export function QuizFormDialog({
 
             {mayEditQuestions && !frozen && (
               <div className="space-y-4">
+                <p className="text-sm font-medium text-foreground">
+                  Questions{' '}
+                  <span className="font-normal tabular-nums text-muted-foreground">
+                    · {questions.length}
+                  </span>
+                </p>
                 {questions.map((question, index) => (
                   <QuestionCard
                     key={question.key}
@@ -494,13 +584,12 @@ export function QuizFormDialog({
                   type="button"
                   variant="outline"
                   className="w-full"
-                  disabled={questions.length >= QUIZ_MAX_QUESTIONS}
                   onClick={() =>
                     setQuestions((prev) => [...prev, newQuestion()])
                   }
                 >
                   <Plus aria-hidden className="size-4" />
-                  Add question ({questions.length}/{QUIZ_MAX_QUESTIONS})
+                  Add a question
                 </Button>
               </div>
             )}

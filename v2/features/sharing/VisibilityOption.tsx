@@ -19,6 +19,7 @@ export function VisibilityOption({
   description,
   selected,
   busy,
+  disabled = false,
   onSelect,
 }: {
   icon: LucideIcon;
@@ -26,6 +27,10 @@ export function VisibilityOption({
   description: string;
   selected: boolean;
   busy: boolean;
+  /** A choice the reader may see but not take (a quiz's "Everyone" for an
+   *  author the server has not verified). Drawn, dimmed, with its reason in
+   *  `description`; a hidden choice would leave them wondering why. */
+  disabled?: boolean;
   onSelect: () => void;
 }) {
   return (
@@ -33,12 +38,13 @@ export function VisibilityOption({
       type="button"
       aria-pressed={selected}
       onClick={onSelect}
-      disabled={busy}
+      disabled={busy || disabled}
       className={cn(
         'v2-interactive flex w-full items-center gap-3 rounded-xl border p-4 text-left transition-colors',
         selected
           ? 'border-primary bg-primary/5'
           : 'border-border hover:bg-muted/50',
+        disabled && 'opacity-60 hover:bg-transparent',
       )}
     >
       <span

@@ -218,12 +218,16 @@ export function visibilityFace(visibility: ChannelQuizVisibility): string {
 
 /* ── Authoring limits (server-validated; mirrored to save a round trip) ───── */
 
+/* THERE IS NO QUESTION CAP ANY MORE. `QUIZ_MAX_QUESTIONS = 20` mirrored a
+   server rule that was dropped with the solo quiz (backend
+   quiz-part1-publish-and-solo, 2026-10-21: no limit on the wire), so the
+   constant, the disabled Add button and the "n/20" counter went with it. */
+
 export const QUIZ_TITLE_MAX = 255;
 export const QUIZ_DESCRIPTION_MAX = 2000;
 export const QUIZ_QUESTION_MAX = 500;
 export const QUIZ_OPTION_MAX = 200;
 export const QUIZ_MIN_QUESTIONS = 1;
-export const QUIZ_MAX_QUESTIONS = 20;
 export const QUIZ_MIN_OPTIONS = 2;
 export const QUIZ_MAX_OPTIONS = 4;
 export const QUIZ_MIN_SECONDS = 5;

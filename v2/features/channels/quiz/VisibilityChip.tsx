@@ -11,7 +11,9 @@ import { visibilityFace } from './model';
  * one word (`visibilityFace`), and the mark never shrinks, so it survives
  * whatever a narrow row does to the word.
  */
-const MARKS: Record<ChannelQuizVisibility, LucideIcon> = {
+/** One mark per answer, shared with the form's choice cards so a chip and the
+ *  card that set it wear the same glyph. */
+export const VISIBILITY_MARKS: Record<ChannelQuizVisibility, LucideIcon> = {
   shared: Users,
   private: Lock,
   link: Link2,
@@ -25,7 +27,7 @@ export function VisibilityChip({
   visibility: ChannelQuizVisibility;
   className?: string;
 }) {
-  const Mark = MARKS[visibility];
+  const Mark = VISIBILITY_MARKS[visibility];
   return (
     <span
       className={cn(
