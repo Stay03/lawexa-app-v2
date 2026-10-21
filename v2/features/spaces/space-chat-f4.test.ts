@@ -70,10 +70,11 @@ test('an empty All or Conversations pill reads Arthur’s words to those who may
 test('the home has the message box at its bottom, for the Owner and Contributors, and no New conversation (Stay, 15 October 2026)', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   // On All, Conversations and Files; not on Folders or People (Arthur, 17
-  // October 2026, item 2).
+  // October 2026, item 2). Hidden, still mounted, while files are ticked
+  // (bulk select part 3).
   assert.match(
     panel,
-    /\{access\.canAdd && DOCK_TABS\.has\(tab\) \? \(\s*<SpaceChatDock space=\{\{ uuid: space\.uuid, name: space\.name \}\} handle=\{dock\} \/>\s*\) : null\}/,
+    /\{access\.canAdd && DOCK_TABS\.has\(tab\) \? \([\s\S]{0,240}?<div className=\{selecting \? 'hidden' : 'contents'\}>\s*<SpaceChatDock space=\{\{ uuid: space\.uuid, name: space\.name \}\} handle=\{dock\} \/>\s*<\/div>\s*\) : null\}/,
   );
   assert.match(panel, /const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>\(\['all', 'conversations', 'files'\]\);/);
   assert.doesNotMatch(panel, /New conversation|StartConversationDialog|startChat/);

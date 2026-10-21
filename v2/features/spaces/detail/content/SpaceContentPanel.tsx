@@ -162,7 +162,9 @@ export function SpaceContentPanel({
   const files = useMemo(
     () =>
       tab === 'files' && pages
-        ? uniqueRowsById(pages, itemKey).flatMap((entry) => (entry.type === 'file' ? [entry.item] : []))
+        ? uniqueRowsById(pages, itemKey)
+            .filter((entry): entry is Extract<SpaceItem, { type: 'file' }> => entry.type === 'file')
+            .map((entry) => entry.item)
         : NO_FILES,
     [tab, pages],
   );
