@@ -250,6 +250,53 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Your progress'),
         };
       }
+      // The solo quiz (21 October 2026). Both lists are opened from the hub.
+      if (depth === 2 && second === 'library') {
+        return {
+          backHref: '/quiz',
+          backLabel: 'Back to Quiz',
+          title: fixed('My quizzes'),
+        };
+      }
+      if (depth === 2 && second === 'explore') {
+        return {
+          backHref: '/quiz',
+          backLabel: 'Back to Quiz',
+          title: fixed('Explore quizzes'),
+        };
+      }
+      // A quiz's front is reached from the library, from Explore, from a
+      // shared link and from its own results, so its chevron means OUT: the
+      // history step whenever any screen of ours is behind, and the hub for a
+      // cold arrival. It opens on a masthead (the title, the author, the
+      // count), so the bar carries no title.
+      if (depth === 3 && second === 'q') {
+        return {
+          backHref: '/quiz',
+          backLabel: 'Back to Quiz',
+          title: NO_TITLE,
+          reach: 'anywhere',
+        };
+      }
+      // An attempt in play, and its results. The quiz they belong to is a fact
+      // about the DATA, so the screens override the address (`screen-context`)
+      // with the quiz's own front once the attempt has loaded; the hub is the
+      // honest default until then. The player keeps the quiz title in its own
+      // page, over the question, so its bar carries none.
+      if (depth === 3 && second === 'attempts') {
+        return {
+          backHref: '/quiz',
+          backLabel: 'Back to Quiz',
+          title: NO_TITLE,
+        };
+      }
+      if (depth === 4 && second === 'attempts' && segments[3] === 'results') {
+        return {
+          backHref: '/quiz',
+          backLabel: 'Back to Quiz',
+          title: fixed('Results'),
+        };
+      }
       return null;
 
     case 'spaces':

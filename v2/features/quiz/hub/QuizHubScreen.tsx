@@ -5,7 +5,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { BarChart3, ChevronRight, Loader2, Play, RotateCcw } from 'lucide-react';
+import {
+  BarChart3,
+  ChevronRight,
+  Compass,
+  Library,
+  Loader2,
+  Play,
+  RotateCcw,
+  type LucideIcon,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +29,7 @@ import {
 } from '../model';
 import { useStartQuizSession } from '../mutations';
 import { quizQueries } from '../queries';
+import { EXPLORE_HREF, LIBRARY_HREF } from '../solo/model';
 import { SessionRow } from '../ui/SessionRow';
 import { QuizErrorState, SessionListSkeleton } from '../ui/states';
 import { VerifyEmailState } from '../ui/VerifyEmailState';
@@ -53,8 +63,13 @@ import { TopicChips } from './TopicChips';
  * back (the snapshot can be stale — it is resolved once per full page load).
  * Both paths land on the same designed panel.
  *
- * The AUDIENCE gate is not here: `app/v2/quiz/layout.tsx` decides that once,
- * above every quiz surface.
+ * The AUDIENCE gate is not here: `app/v2/quiz/(practice)/layout.tsx` decides
+ * that once, above every practice surface.
+ *
+ * ── TWO DOORS TO THE SOLO QUIZ (21 October 2026) ────────────────────────────
+ * Under the hero, two tiles: the reader's own quizzes (`/quiz/library`) and the
+ * public ones (`/quiz/explore`). Static chrome — they wait on nothing — so the
+ * route fallback draws them for real too.
  *
  * ── IT PUBLISHES NO BAR TITLE ANY MORE ──────────────────────────────────────
  * `/quiz` is a TOP-LEVEL screen, and on one of those the bar carries no title:
@@ -176,6 +191,8 @@ export function QuizHubScreen() {
         )}
       </section>
 
+      <SoloDoors />
+
       {verificationBlocked ? null : (
         <RecentSessions
           sessions={sessions}
@@ -185,6 +202,73 @@ export function QuizHubScreen() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The two doors to the solo quiz: the reader's own, and everyone's. Side by
+ * side from `sm:`, stacked on a phone; each tile is one honest link.
+ */
+function SoloDoors() {
+  return (
+    <section aria-label="Quizzes" className="mt-9">
+      <h2 className="px-1 pb-1 text-xs font-medium text-muted-foreground">
+        Quizzes
+      </h2>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <SoloDoor
+          href={LIBRARY_HREF}
+          icon={Library}
+          title="My quizzes"
+          description="Write a quiz, take it, and share it by link."
+        />
+        <SoloDoor
+          href={EXPLORE_HREF}
+          icon={Compass}
+          title="Explore"
+          description="Public quizzes from verified authors."
+        />
+      </div>
+    </section>
+  );
+}
+
+function SoloDoor({
+  href,
+  icon: Icon,
+  title,
+  description,
+}: {
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        'v2-interactive group flex items-center gap-3 rounded-xl border border-border bg-card px-3.5 py-3 transition-colors hover:bg-secondary/50',
+        FOCUS_RING,
+      )}
+    >
+      <span
+        aria-hidden
+        className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
+      >
+        <Icon className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[15px] font-medium text-foreground transition-colors group-hover:text-primary">
+          {title}
+        </span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
+      </span>
+      <ChevronRight
+        aria-hidden
+        className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
+      />
+    </Link>
   );
 }
 
@@ -337,6 +421,8 @@ export function QuizHubFallback() {
         <div className="mt-6">
           <HeroReservation />
         </div>
+
+        <SoloDoors />
 
         <div className="mt-9">
           <div className="flex items-center justify-between gap-2 px-1 pb-1">

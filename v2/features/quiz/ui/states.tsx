@@ -175,8 +175,9 @@ export function QuizCreateAccountState() {
   );
 }
 
-/** Signed out — the queries are gated off, so this replaces a 401 screen. */
-export function QuizSignedOutState() {
+/** Signed out — the queries are gated off, so this replaces a 401 screen.
+ *  The way in returns to the address the reader was on. */
+export function QuizSignedOutState({ signInHref }: { signInHref: string }) {
   return (
     <QuizMessage
       icon={GraduationCap}
@@ -185,7 +186,7 @@ export function QuizSignedOutState() {
       description="Quiz turns your study conversations into multiple-choice practice, and keeps your score history. Sign in to start a session."
       action={
         <Button asChild size="sm">
-          <Link href="/login">Sign in</Link>
+          <Link href={signInHref}>Sign in</Link>
         </Button>
       }
     />

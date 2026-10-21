@@ -59,7 +59,13 @@ apiClient.interceptors.response.use(
           window.location.pathname.startsWith('/shared') ||
           // Shared radar scan reports — /radars/{uuid}/scans/{uuid} (not the
           // inbox or /scan-log) are publicly readable when published.
-          /\/radars\/[^/]+\/scans\/[^/]+/.test(window.location.pathname)
+          /\/radars\/[^/]+\/scans\/[^/]+/.test(window.location.pathname) ||
+          // The public quiz pages (21 October 2026): the explore list and a
+          // quiz's front read without a token, so a stale token's 401 on
+          // either must not end the visit at /login — the screens show their
+          // own sign-in door for the one action (Start) that needs one.
+          window.location.pathname.startsWith('/quiz/explore') ||
+          window.location.pathname.startsWith('/quiz/q/')
         );
 
       // Guest token refresh: re-acquire and retry the original request once
