@@ -23,7 +23,9 @@ test("an old radar scan-log link opens the radar's All activity tab", () => {
 });
 
 test('an old quiz resume link resumes the session; one without a session goes to the hub', () => {
-  const page = read('app', 'v2', 'quiz', 'play', 'page.tsx');
+  // The redirect moved into the practice route group with its gate
+  // (21 October 2026); the address it serves is unchanged.
+  const page = read('app', 'v2', 'quiz', '(practice)', 'play', 'page.tsx');
   assert.match(page, /const session = Array\.isArray\(s\) \? s\[0\] : s;/);
   assert.match(page, /redirect\(session \? `\/quiz\/\$\{encodeURIComponent\(session\)\}` : '\/quiz'\);/);
 });
