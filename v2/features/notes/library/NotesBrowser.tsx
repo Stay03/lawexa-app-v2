@@ -25,6 +25,7 @@ import { canWriteNotes } from '../note-access';
 import { isLibraryListable, noteRow, type NoteRowModel } from '../note-row-model';
 import { NoteRow } from './NoteRow';
 import { NoteTabs, parseNotesTab, type NotesTab } from './NoteTabs';
+import { useNotesBulk } from './notes-bulk';
 import {
   NextPageSkeleton,
   NotesCreateAccountState,
@@ -153,6 +154,11 @@ export function NotesBrowser() {
     return mapped;
   }, [pages, tab]);
 
+  // Bulk select (Arthur, 20 October 2026): My notes only, the reader's own.
+  const bulk = useNotesBulk({ rows: tab === 'mine' ? rows : NO_ROWS });
+  const { toggle: toggleNote, isSelected } = bulk;
+  const selecting = bulk.selecting && tab === 'mine';
+
   const scrollRootRef = useShellScrollRoot();
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
     hasNextPage: query.hasNextPage && !query.isPlaceholderData,
@@ -163,6 +169,8 @@ export function NotesBrowser() {
   });
 
   const setTab = (next: NotesTab) => {
+    // Ticks belong to the list they were made on.
+    bulk.stop();
     replaceUrlParams({ tab: next === 'all' ? null : next });
   };
 
@@ -228,10 +236,20 @@ export function NotesBrowser() {
             author a note (`canWriteNotes`), so they are shown no create
             affordance at all rather than one that would refuse them. */}
         {canWrite ? (
-          <Link href="/notes/create" className={cn(CREATE_PILL, FOCUS_RING)}>
-            <Plus aria-hidden className="size-4" />
-            New note
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            {tab === 'mine' && rows.length > 0 && !selecting
+              ? bulk.startButton(
+                  cn(
+                    'v2-interactive inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+                    FOCUS_RING,
+                  ),
+                )
+              : null}
+            <Link href="/notes/create" className={cn(CREATE_PILL, FOCUS_RING)}>
+              <Plus aria-hidden className="size-4" />
+              New note
+            </Link>
+          </div>
         ) : null}
       </div>
 
@@ -294,6 +312,8 @@ export function NotesBrowser() {
                   index={index}
                   now={now}
                   showStatus={tab === 'mine'}
+                  selected={selecting ? isSelected(row.id) : undefined}
+                  onToggleSelect={selecting ? toggleNote : undefined}
                 />
               ))}
             </ul>
@@ -313,6 +333,11 @@ export function NotesBrowser() {
           </div>
         )}
       </div>
+
+      {/* Room under the last row for the bar while it is up. */}
+      {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
+      {selecting ? bulk.bar : null}
+      {bulk.dialogs}
 
       {/* The floating layer, and the search pill is now all it carries. With
           the field switched to the top there is nothing left to float, so no

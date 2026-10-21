@@ -36,6 +36,13 @@ export type FileBulkAction =
   | { action: 'space'; spaceUuid: string | null }
   | { action: 'add_to_folder'; folder: string };
 
+export type NoteBulkAction =
+  | { action: 'delete' }
+  | { action: 'publish' }
+  /** Back to a draft. */
+  | { action: 'unpublish' }
+  | { action: 'privacy'; isPrivate: boolean };
+
 export const bulkApi = {
   /** The Folders page's folders (uuids). */
   folders: (ids: readonly string[], action: FolderBulkAction) =>
@@ -58,5 +65,13 @@ export const bulkApi = {
       if (action.action === 'space') body.space_uuid = action.spaceUuid;
       if (action.action === 'add_to_folder') body.folder = action.folder;
       return post('/bulk/files', body);
+    }),
+
+  /** The reader's own notes (ids). */
+  notes: (ids: readonly number[], action: NoteBulkAction) =>
+    inBatches(ids, (batch) => {
+      const body: Record<string, unknown> = { action: action.action, ids: batch };
+      if (action.action === 'privacy') body.is_private = action.isPrivate;
+      return post('/bulk/notes', body);
     }),
 };

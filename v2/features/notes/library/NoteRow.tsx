@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { NotebookPen } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { NoteBookmarkButton } from '../bookmark/NoteBookmarkButton';
 import type { NoteRowModel } from '../note-row-model';
@@ -48,6 +49,8 @@ export const NoteRow = memo(function NoteRow({
   index,
   now,
   showStatus,
+  selected,
+  onToggleSelect,
 }: {
   row: NoteRowModel;
   /** Staggers the entrance for the first screenful only. */
@@ -58,8 +61,67 @@ export const NoteRow = memo(function NoteRow({
   now: number;
   /** My notes: the LEAD is the draft/published mark. All notes: the author. */
   showStatus: boolean;
+  /**
+   * Bulk select on My notes: the row is its tick box, a tap ticks it instead
+   * of opening the note, and the star steps aside for the bar's actions.
+   * `onToggleSelect` must be stable, like the row itself.
+   */
+  selected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }) {
   const updated = formatRelativeTime(row.updatedAt, now);
+  const selecting = onToggleSelect !== undefined;
+
+  const identity = (
+    <>
+      <span
+        aria-hidden
+        className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-colors group-hover:text-foreground"
+      >
+        <NotebookPen className="size-[18px]" />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span
+          className={cn(
+            'block truncate text-[15px] font-medium transition-colors group-hover:text-primary',
+            // An untitled note wears its fallback in a quieter voice: the
+            // word "Untitled" is the absence of a name, not a name.
+            row.hasTitle
+              ? 'text-foreground'
+              : 'italic text-muted-foreground',
+          )}
+          title={row.title}
+        >
+          {row.title}
+        </span>
+
+        <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+          {/* LEAD. */}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            {showStatus ? (
+              <NoteStatusMark isDraft={row.isDraft} />
+            ) : row.author ? (
+              <span className="min-w-0 truncate">{row.author}</span>
+            ) : null}
+          </span>
+
+          {/* TRAIL — right-anchored on both tabs. */}
+          {updated ? (
+            <span className="shrink-0 tabular-nums">updated {updated}</span>
+          ) : null}
+        </span>
+
+        {row.preview ? (
+          <span className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+            {row.preview}
+          </span>
+        ) : null}
+      </span>
+    </>
+  );
+
+  const rowClass = 'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50';
 
   return (
     <li
@@ -68,61 +130,27 @@ export const NoteRow = memo(function NoteRow({
       style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
     >
       <div className="group relative flex items-start gap-2">
-        <Link
-          href={row.href}
-          // The reader draws this row's name at once on a first open, before any
-          // request answers (`note-peek.ts`, speed step 5).
-          onClick={() => rememberNotePeek(row)}
-          className={cn(
-            'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
-            FOCUS_RING,
-          )}
-        >
-          <span
-            aria-hidden
-            className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-colors group-hover:text-foreground"
+        {selecting ? (
+          <label className={cn(rowClass, 'cursor-pointer', selected && 'bg-secondary/60')}>
+            <Checkbox
+              checked={selected === true}
+              onCheckedChange={() => onToggleSelect(row.id)}
+              aria-label={`Select ${row.title}`}
+              className="mt-2.5 shrink-0"
+            />
+            {identity}
+          </label>
+        ) : (
+          <Link
+            href={row.href}
+            // The reader draws this row's name at once on a first open, before any
+            // request answers (`note-peek.ts`, speed step 5).
+            onClick={() => rememberNotePeek(row)}
+            className={cn(rowClass, FOCUS_RING)}
           >
-            <NotebookPen className="size-[18px]" />
-          </span>
-
-          <span className="min-w-0 flex-1">
-            <span
-              className={cn(
-                'block truncate text-[15px] font-medium transition-colors group-hover:text-primary',
-                // An untitled note wears its fallback in a quieter voice: the
-                // word "Untitled" is the absence of a name, not a name.
-                row.hasTitle
-                  ? 'text-foreground'
-                  : 'italic text-muted-foreground',
-              )}
-              title={row.title}
-            >
-              {row.title}
-            </span>
-
-            <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
-              {/* LEAD. */}
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                {showStatus ? (
-                  <NoteStatusMark isDraft={row.isDraft} />
-                ) : row.author ? (
-                  <span className="min-w-0 truncate">{row.author}</span>
-                ) : null}
-              </span>
-
-              {/* TRAIL — right-anchored on both tabs. */}
-              {updated ? (
-                <span className="shrink-0 tabular-nums">updated {updated}</span>
-              ) : null}
-            </span>
-
-            {row.preview ? (
-              <span className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                {row.preview}
-              </span>
-            ) : null}
-          </span>
-        </Link>
+            {identity}
+          </Link>
+        )}
 
         {/* Outside the link, so the star is its own control with its own
             accessible name rather than a click the row has to swallow.
@@ -131,12 +159,19 @@ export const NoteRow = memo(function NoteRow({
             `mt-0.5` (2px), so the star and the tile sit on exactly the same
             baseline and the row reads as one bar between two anchors —
             `BookmarkRow` documents the same arithmetic. It was `mt-2`, which
-            floated the star 6px high on every row (review F6). */}
-        <NoteBookmarkButton
-          noteId={row.id}
-          isBookmarked={row.isBookmarked}
-          className="mt-3.5"
-        />
+            floated the star 6px high on every row (review F6).
+
+            While ticking, the star's place stays empty, so the rows keep
+            their width and the bar holds the actions. */}
+        {selecting ? (
+          <span aria-hidden className="mt-3.5 size-9 shrink-0" />
+        ) : (
+          <NoteBookmarkButton
+            noteId={row.id}
+            isBookmarked={row.isBookmarked}
+            className="mt-3.5"
+          />
+        )}
       </div>
     </li>
   );
