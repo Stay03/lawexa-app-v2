@@ -65,3 +65,13 @@ export function homeTabForPath(pathname: string): HomeTab | null {
   const match = HOME_TABS.find((tab) => tab.href === path);
   return match?.value ?? null;
 }
+
+/**
+ * The quiet place label in the computer bar for a home tab: "Home" on the Chat
+ * tab, and the tab's own name on Work and Study, which read "Home" too until
+ * Tester's run (20 October 2026, finding 16).
+ */
+export function homeBarLabel(tab: HomeTab): string {
+  if (tab === 'chat') return 'Home';
+  return HOME_TABS.find((def) => def.value === tab)?.label ?? 'Home';
+}

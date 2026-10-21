@@ -24,7 +24,7 @@ import { LogoMark, LogoWordmark } from './Logo';
 import { V2NotificationBell } from './V2NotificationBell';
 import { V2HeaderMenu } from './V2HeaderMenu';
 import { HomeTabs } from './HomeTabs';
-import { homeTabForPath } from './home-tabs';
+import { homeBarLabel, homeTabForPath } from './home-tabs';
 import { useHeaderContext } from './header-context';
 import { useHeaderPlace, type HeaderPlace } from './header-place';
 import { FOCUS_RING } from './designs/modules';
@@ -210,7 +210,8 @@ export function V2Header({ user }: { user: SessionUser | null }) {
 
   // Every home ROUTE shows the tab control, not just the root — Work and Study are
   // their own paths now (see v2/shell/home-tabs.ts).
-  const isHome = homeTabForPath(pathname ?? '') !== null;
+  const homeTab = homeTabForPath(pathname ?? '');
+  const isHome = homeTab !== null;
   // Routes that EXPECT context show a title skeleton while it's null (skeleton-first)
   // instead of an empty centre. A route opts in when its title is LATE — fetched
   // rather than known — which is true of a conversation and of a case, and false
@@ -275,7 +276,8 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // 2026: a chat should look like the list page), and its title is the masthead.
   // A trail takes this slot where there is one (below), so "Case" now shows
   // only on a case's sub-pages (its report), which have no trail.
-  const leftLabel = isHome ? 'Home' : isCase ? 'Case' : null;
+  // A home tab names itself: Work and Study are not "Home" (finding 16).
+  const leftLabel = homeTab ? homeBarLabel(homeTab) : isCase ? 'Case' : null;
   // Whether this address carries a breadcrumb trail. It depends on the route
   // alone, never on a name, so the bar's shape does not change as the names
   // land.
