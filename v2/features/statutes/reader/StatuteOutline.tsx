@@ -1,7 +1,7 @@
 'use client';
 
-import { useContext, useEffect, useRef, useState } from 'react';
-import { Lock, TableOfContents } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -13,7 +13,6 @@ import {
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import type { AknOutlineDivision, SpyTarget } from './akn';
-import { DockClearanceContext } from './dock-clearance';
 
 /**
  * StatuteOutline — the reader's wayfinding, in the outline grammar the case
@@ -335,27 +334,26 @@ function ActiveBar() {
   );
 }
 
-/* ── The mobile affordance: floating pill + full-tree sheet ──────────────── */
+/* ── The contents sheet: the full tree, opened from the bar ─────────────── */
 
+/**
+ * The full tree in a sheet, opened by the Contents button in the bar (the
+ * statute screen publishes it, `StatuteDocument`). It used to be a pill
+ * floating at the column's bottom edge, which sat over the text for the whole
+ * read (Tester, 20 October 2026, finding 10; Stay chose the bar). From 96rem
+ * the rail in the margin shows the same tree and the bar button hides, unless
+ * the chat is docked where the rail sits.
+ */
 export function StatuteContentsSheet({
   outline,
   activeId,
   onJump,
-  entrance = false,
-  alwaysShown = false,
+  open,
+  onOpenChange,
 }: OutlineHandle & {
-  /**
-   * True when this affordance appeared AFTER the document painted (a partial
-   * document whose contents only became showable once the server outline
-   * resolved) — it fades in instead of popping. False (the default) keeps the
-   * full-document path's DOM byte-identical to before the paywall existed.
-   */
-  entrance?: boolean;
-  /** Shown at every width: the statute chat is docked where the rail sits. */
-  alwaysShown?: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const clearance = useContext(DockClearanceContext);
   const activeDivision = activeDivisionOf(outline, activeId);
   // The full tree is long; when the sheet opens, start the reader at the
   // division they are currently inside rather than at Part I.
@@ -370,43 +368,13 @@ export function StatuteContentsSheet({
   }, [open]);
 
   const select = (id: string) => {
-    setOpen(false);
+    onOpenChange(false);
     onJump(id);
   };
 
   return (
     <>
-      {/* Sticky at the column's bottom edge (the CaseAskDock mechanic), so
-          the map is one thumb-reach away for the whole read. Hidden at
-          ≥96rem, where the rail takes over — the SAME threshold the rail
-          computes from sidebar + column + gutter + rail widths (see the
-          arithmetic in StatuteDocument), so the handoff is truthful: at
-          every width exactly one contents affordance exists. It stands
-          1.5rem above the ask dock, whose height the statute screen writes
-          on this element (`dock-clearance.ts`). */}
-      <div
-        ref={clearance?.attach}
-        className={cn(
-          'pointer-events-none sticky bottom-6 z-10 -mx-1 flex justify-end',
-          !alwaysShown && 'min-[96rem]:hidden',
-          entrance &&
-            'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-        )}
-      >
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className={cn(
-            'v2-interactive pointer-events-auto inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-background/95 px-4 text-sm font-medium text-foreground shadow-lg backdrop-blur transition-colors hover:bg-secondary',
-            FOCUS_RING,
-          )}
-        >
-          <TableOfContents aria-hidden className="size-4" />
-          Contents
-        </button>
-      </div>
-
-      <Sheet open={open} onOpenChange={setOpen}>
+      <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent side="left" className="w-[85vw] max-w-sm">
           {/* px-7 (28px) aligns the TITLE'S text with the ENTRIES' text —
               nav px-4 (16px) + item button px-3 (12px) = 28px. The list's

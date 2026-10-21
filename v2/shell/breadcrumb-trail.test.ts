@@ -316,7 +316,7 @@ test('the space and the statute publish the part only they know', () => {
   assert.match(space, /setScreenContext\(\{ pathname, back: null, actions, crumb \}\);/);
   const statute = read('v2', 'features', 'statutes', 'reader', 'StatuteDocument.tsx');
   assert.match(statute, /\(\) => \(citation \? provisionCrumb\(sectionIndex, citation\) : null\),/);
-  assert.match(statute, /setScreenContext\(\{ pathname, back: null, actions: NO_SCREEN_ACTIONS, crumb \}\);/);
+  assert.match(statute, /setScreenContext\(\{ pathname, back: null, actions: NO_SCREEN_ACTIONS, crumb, barAction: contentsBar \}\);/);
   assert.match(statute, /useEffect\(\(\) => \(\) => clearScreenContext\(\), \[\]\);/);
   // An equal crumb is a no-op publish, like the rest of the context.
   assert.match(read('v2', 'shell', 'screen-context.ts'), /\(left\.crumb \?\? null\) === \(right\.crumb \?\? null\)/);

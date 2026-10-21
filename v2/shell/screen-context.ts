@@ -97,6 +97,20 @@ export interface ScreenContext {
    * draws a skeleton or the address's own label (Arthur, 16 October 2026).
    */
   crumb?: string | null;
+  /**
+   * One control the screen puts in the bar itself, beside the bell: an icon
+   * button whose label is its name and its tooltip. For a verb the reader
+   * needs at any point of a long read, where a floating button would cover the
+   * text (a statute's Contents: Tester, 20 October 2026, finding 10).
+   */
+  barAction?: ScreenBarAction | null;
+}
+
+/** A screen's one bar control. `wide: false` hides it from 96rem up, where the
+ *  screen shows the same thing in the margin (a statute's contents rail). */
+export interface ScreenBarAction {
+  action: ScreenAction;
+  wide: boolean;
 }
 
 const NO_ACTIONS: readonly ScreenAction[] = [];
@@ -147,12 +161,18 @@ function sameActions(
   });
 }
 
+function sameBarAction(left: ScreenBarAction | null, right: ScreenBarAction | null): boolean {
+  if (left === null || right === null) return left === right;
+  return left.wide === right.wide && sameActions([left.action], [right.action]);
+}
+
 function isSame(left: ScreenContext, right: ScreenContext): boolean {
   return (
     left.pathname === right.pathname &&
     sameBack(left.back, right.back) &&
     (left.crumb ?? null) === (right.crumb ?? null) &&
-    sameActions(left.actions, right.actions)
+    sameActions(left.actions, right.actions) &&
+    sameBarAction(left.barAction ?? null, right.barAction ?? null)
   );
 }
 

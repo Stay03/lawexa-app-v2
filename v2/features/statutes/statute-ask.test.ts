@@ -52,26 +52,25 @@ test('the statute page hosts the case page’s chat, the same in every part', ()
   assert.match(read('v2', 'features', 'cases', 'detail', 'CaseScreen.tsx'), /\} = useDocumentChat\(subject, signedIn\);/);
 });
 
-test('the Contents pill stands above the ask box, and takes over while the chat is docked', () => {
+test('Contents is a button in the bar, not a pill over the text, and stays at every width while the chat is docked', () => {
+  // Tester, 20 October 2026 (finding 10): the floating pill covered the text.
   const outline = read('v2', 'features', 'statutes', 'reader', 'StatuteOutline.tsx');
-  // The dock's height is written on the pill, never on a parent of the text (dock-clearance.ts).
-  assert.match(outline, /ref=\{clearance\?\.attach\}/);
-  assert.match(outline, /'pointer-events-none sticky bottom-6 z-10 -mx-1 flex justify-end',/);
-  assert.match(outline, /!alwaysShown && 'min-\[96rem\]:hidden',/);
+  assert.doesNotMatch(outline, /sticky bottom-6/);
+  assert.doesNotMatch(outline, /DockClearanceContext/);
+  assert.match(outline, /<Sheet open=\{open\} onOpenChange=\{onOpenChange\}>/);
   const document = read('v2', 'features', 'statutes', 'reader', 'StatuteDocument.tsx');
-  assert.match(document, /alwaysShown=\{chatDocked\}/);
+  assert.match(document, /action: \{ id: CONTENTS_ACTION_ID, label: 'Contents', icon: TableOfContents, onSelect: openContents \},\s*wide: chatDocked,/);
+  // Only once the document itself is drawn: the sheet the button opens exists then.
+  assert.match(document, /showContents && documentShown/);
+  assert.match(document, /setScreenContext\(\{ pathname, back: null, actions: NO_SCREEN_ACTIONS, crumb, barAction: contentsBar \}\);/);
   assert.match(document, /\{showContents && !chatDocked \? \(\s*<aside/);
+  const header = read('v2', 'shell', 'V2Header.tsx');
+  assert.match(header, /!barAction\.wide && 'min-\[96rem\]:hidden',/);
+  assert.match(header, /aria-label=\{barAction\.action\.label\}/);
   const source = screen();
-  assert.doesNotMatch(source, /--v2-ask-dock-h/);
-  assert.match(source, /const \[clearance\] = useState\(createDockClearance\);\s*const keepDockHeight = clearance\.set;/);
-  assert.match(source, /<DockClearanceContext\.Provider value=\{clearance\}>/);
-  assert.match(source, /onRestingHeight=\{keepDockHeight\}/);
+  assert.doesNotMatch(source, /--v2-ask-dock-h|DockClearance|onRestingHeight/);
   assert.match(source, /chatDocked=\{showDocked\}/);
-  const ask = read('v2', 'features', 'cases', 'detail', 'CaseAsk.tsx');
-  // The resting pill's height only, never the open card's; 0 once the dock
-  // leaves (the chat docked to the side), so the Contents pill stays put.
-  assert.match(ask, /if \(!panelMountedRef\.current\) restingHeightRef\.current\?\.\(Math\.round\(height\)\);/);
-  assert.match(ask, /useEffect\(\(\) => \(\) => restingHeightRef\.current\?\.\(0\), \[\]\);/);
+  assert.doesNotMatch(read('v2', 'features', 'cases', 'detail', 'CaseAsk.tsx'), /onRestingHeight|restingHeightRef/);
 });
 
 test('the docked chat animates on both pages: its keyframes load with the panel', () => {

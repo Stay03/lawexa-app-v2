@@ -20,7 +20,6 @@ import { StatuteFallback } from './StatuteFallback';
 import { StatuteDocument, type StatuteLinkHandlers, type StatuteLinkPart } from './StatuteDocument';
 import { StatuteHeader } from './StatuteHeader';
 import { StatuteNotesProvider } from '../notes/context';
-import { DockClearanceContext, createDockClearance } from './dock-clearance';
 import {
   STATUTE_COLUMN,
   StatuteErrorState,
@@ -66,8 +65,8 @@ function returnFocusToChat(event: FocusEvent<HTMLElement>) {
  * section question goes in the same box ("What does section 2 require?"; the
  * model reads the statute it was started with, Arthur, 07:20 UTC). Statutes
  * are free, so the box is there for every signed-in reader. The box rests at
- * the column's end, sticky over the reading; the Contents pill stands above
- * it (`dock-clearance.ts`).
+ * the column's end, sticky over the reading. Contents is a button in the bar
+ * (`StatuteDocument`), so nothing else floats over the text.
  */
 export function StatuteScreen(props: { slug: string; provision: string | null }) {
   return (
@@ -151,12 +150,6 @@ function StatuteBody({
   } = useDocumentChat(subject, hasAccount);
   // The chat's code arrives while the page is idle, so the tap does not wait for it.
   useIdlePreloadCaseChat(hasAccount);
-
-  // The resting dock's height, for the Contents pill to stand above. Written on
-  // the pill itself and outside React, so a measure re-renders nothing and
-  // restyles nothing else (`dock-clearance.ts`).
-  const [clearance] = useState(createDockClearance);
-  const keepDockHeight = clearance.set;
 
   // THE CHAT'S LINKS TO THIS STATUTE LAND IN PLACE (Stay, 18 October 2026,
   // 14:32 UTC), and their badge previews the part (Arthur, 15:06 UTC). The
@@ -242,7 +235,6 @@ function StatuteBody({
     // between the header's Notes button and the document's underlines.
     <StatuteNotesProvider slug={slug} statuteId={detail.id}>
       <DocumentLinkContext.Provider value={linkHost}>
-        <DockClearanceContext.Provider value={clearance}>
           {/* With the docked chat open (≥xl) this is a row: the reading column
               centres in the remaining space, the panel takes 26rem on the right
               (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
@@ -304,7 +296,6 @@ function StatuteBody({
                   onClose={closeChat}
                   onDock={() => setDockedPref(true)}
                   onOpenChat={switchChat}
-                  onRestingHeight={keepDockHeight}
                 />
               ) : null}
             </div>
@@ -323,7 +314,6 @@ function StatuteBody({
               />
             ) : null}
           </div>
-        </DockClearanceContext.Provider>
       </DocumentLinkContext.Provider>
     </StatuteNotesProvider>
   );

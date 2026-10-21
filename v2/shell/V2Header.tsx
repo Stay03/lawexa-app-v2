@@ -271,6 +271,8 @@ export function V2Header({ user }: { user: SessionUser | null }) {
   // for, so nothing here can outlive its screen.
   const screen = useScreenContext(path);
   const back = screen?.back ?? null;
+  const barAction = screen?.barAction ?? null;
+  const BarIcon = barAction?.action.icon ?? null;
   // Quiet orientation label for the left cluster — a category, NOT the title.
   // None on a chat: its bar matches the chats list page's (Stay, 13 October
   // 2026: a chat should look like the list page), and its title is the masthead.
@@ -397,6 +399,25 @@ export function V2Header({ user }: { user: SessionUser | null }) {
           On a see-through bar both wear the solid circle: with no plate behind
           them a bare glyph reads as part of whatever is scrolling past. */}
       <div className="flex min-w-0 items-center justify-end gap-1">
+        {/* The screen's one bar control (a statute's Contents), before the
+            bell: always on screen, so nothing it opens has to float over the
+            page. Its name is its tooltip and its accessible label. */}
+        {barAction && BarIcon ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              'size-11 rounded-full text-muted-foreground md:size-9',
+              !barAction.wide && 'min-[96rem]:hidden',
+              isTopLevel && OPEN_BAR_CONTROL,
+            )}
+            aria-label={barAction.action.label}
+            title={barAction.action.label}
+            onClick={barAction.action.onSelect}
+          >
+            <BarIcon aria-hidden className="size-5 md:size-4" />
+          </Button>
+        ) : null}
         <V2NotificationBell
           signedIn={signedIn}
           className={isTopLevel ? OPEN_BAR_CONTROL : undefined}

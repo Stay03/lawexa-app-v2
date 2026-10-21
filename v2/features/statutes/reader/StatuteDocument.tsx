@@ -6,10 +6,12 @@ import { useQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { TableOfContents } from 'lucide-react';
 import {
   clearScreenContext,
   setScreenContext,
   type ScreenAction,
+  type ScreenBarAction,
 } from '@/v2/shell/screen-context';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import { statutesQueries } from '../queries';
@@ -164,6 +166,7 @@ const NO_BLOCKS: AknBlock[] = [];
 const NO_OUTLINE: AknOutlineDivision[] = [];
 /** The reader publishes a breadcrumb part and no menu rows of its own. */
 const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
+const CONTENTS_ACTION_ID = 'contents';
 
 /** A chat link's part of this statute: its citation segment, or an exact anchor. */
 export interface StatuteLinkPart {
@@ -460,9 +463,37 @@ export function StatuteDocument({
     [sectionIndex, citation],
   );
   const pathname = usePathname() ?? '';
+
+  // The rendered excerpt's outline is the floor; the SERVER outline (partial
+  // documents, once resolved) replaces it with the full map. `showContents`
+  // therefore also honours a server outline whose excerpt alone would be too
+  // short to earn the affordance — the full list of what lies beyond the cut
+  // is exactly what a paywalled reader needs to see.
+  const railOutline = serverOutline?.divisions ?? outline;
+  const showContents = serverOutline !== null || spyIds.length >= 4;
+  // The document itself is on screen (not its loading, error or empty state),
+  // so the sheet the bar button opens exists.
+  const documentShown = !query.isPending && !parsing && !query.isError && model !== null && blocks.length > 0;
+
+  // CONTENTS IN THE BAR (Tester, 20 October 2026, finding 10; Stay chose the
+  // bar): a button beside the bell opens the contents sheet, where a pill used
+  // to float over the text. From 96rem the rail shows the tree and the button
+  // hides, unless the chat is docked where the rail sits.
+  const [contentsOpen, setContentsOpen] = useState(false);
+  const openContents = useCallback(() => setContentsOpen(true), []);
+  const contentsBar = useMemo<ScreenBarAction | null>(
+    () =>
+      showContents && documentShown
+        ? {
+            action: { id: CONTENTS_ACTION_ID, label: 'Contents', icon: TableOfContents, onSelect: openContents },
+            wide: chatDocked,
+          }
+        : null,
+    [showContents, documentShown, chatDocked, openContents],
+  );
   useEffect(() => {
-    setScreenContext({ pathname, back: null, actions: NO_SCREEN_ACTIONS, crumb });
-  }, [pathname, crumb]);
+    setScreenContext({ pathname, back: null, actions: NO_SCREEN_ACTIONS, crumb, barAction: contentsBar });
+  }, [pathname, crumb, contentsBar]);
   useEffect(() => () => clearScreenContext(), []);
   const provisionTarget = useMemo(
     () => (citation ? resolveCitation(sectionIndex, citation) : null),
@@ -753,14 +784,6 @@ export function StatuteDocument({
     return <DocumentEmptyState />;
   }
 
-  // The rendered excerpt's outline is the floor; the SERVER outline (partial
-  // documents, once resolved) replaces it with the full map. `showContents`
-  // therefore also honours a server outline whose excerpt alone would be too
-  // short to earn the affordance — the full list of what lies beyond the cut
-  // is exactly what a paywalled reader needs to see.
-  const railOutline = serverOutline?.divisions ?? outline;
-  const showContents = serverOutline !== null || spyIds.length >= 4;
-
   return (
     <>
       {provisionNotice && !noticeDismissed ? (
@@ -885,11 +908,8 @@ export function StatuteDocument({
           outline={railOutline}
           activeId={activeId}
           onJump={jump}
-          // The pill fades in ONLY when it owes its existence to the late
-          // server outline; on the full-document path the prop is false and
-          // the DOM is exactly what it was before the paywall existed.
-          entrance={spyIds.length < 4}
-          alwaysShown={chatDocked}
+          open={contentsOpen}
+          onOpenChange={setContentsOpen}
         />
       ) : null}
 

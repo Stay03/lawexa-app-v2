@@ -40,15 +40,6 @@ test('under the phone chat the statute text leaves the screen reader and Tab, st
   assert.match(screen, /pauseMount=\{pageUnderChat\}/);
 });
 
-test("the dock's height reaches the Contents pill without restyling the text", () => {
-  const clearance = read('dock-clearance.ts');
-  assert.match(clearance, /target\?\.style\.setProperty\('bottom', `calc\(\$\{height\}px \+ \$\{GAP\}\)`\);/);
-  assert.match(clearance, /if \(next === height\) return;/);
-  const outline = read('StatuteOutline.tsx');
-  assert.match(outline, /const clearance = useContext\(DockClearanceContext\);/);
-  assert.doesNotMatch(outline, /--v2-ask-dock-h/);
-});
-
 /* The ACJL's parse is one 1.13 s task (Chromium, CPU 4x). Run in the render
  * that received the text, it landed on the tap that opened the chat. */
 test('the text is parsed in its own idle task, after the chat has opened', () => {

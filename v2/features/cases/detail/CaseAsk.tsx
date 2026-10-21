@@ -112,7 +112,6 @@ export function CaseAskDock({
   onClose,
   onDock,
   onOpenChat,
-  onRestingHeight,
   arrive = true,
 }: {
   subject: ChatSubject;
@@ -137,12 +136,6 @@ export function CaseAskDock({
   onClose: () => void;
   onDock: () => void;
   onOpenChat: (conversationId: string) => void;
-  /**
-   * The resting dock's height in px, each time it changes (never while the
-   * phone screen is open). The statute page lifts its Contents pill clear of
-   * the dock with it. Called from a ResizeObserver, so it must not set state.
-   */
-  onRestingHeight?: (height: number) => void;
 }) {
   const panelMounted = view !== null;
   const noun = CHAT_SUBJECT_NOUN[subject.kind];
@@ -167,16 +160,6 @@ export function CaseAskDock({
   useEffect(() => {
     screenMountedRef.current = screenMounted;
   }, [screenMounted]);
-  // The host hears the RESTING height only: the pill alone, never the open card
-  // (which grows to the panel's height), and 0 once the dock leaves the page
-  // (the chat docked to the side), so what stands above the dock stays put.
-  const restingHeightRef = useRef(onRestingHeight);
-  const panelMountedRef = useRef(panelMounted);
-  useEffect(() => {
-    restingHeightRef.current = onRestingHeight;
-    panelMountedRef.current = panelMounted;
-  }, [onRestingHeight, panelMounted]);
-  useEffect(() => () => restingHeightRef.current?.(0), []);
   useEffect(() => {
     const wrapper = wrapperRef.current;
     if (!wrapper || typeof ResizeObserver === 'undefined') return;
@@ -185,7 +168,6 @@ export function CaseAskDock({
       const box = entries[0]?.borderBoxSize?.[0];
       const height = box ? box.blockSize : wrapper.getBoundingClientRect().height;
       wrapper.style.setProperty('--v2-case-dock-h', `${Math.round(height)}px`);
-      if (!panelMountedRef.current) restingHeightRef.current?.(Math.round(height));
     });
     observer.observe(wrapper);
     return () => observer.disconnect();
