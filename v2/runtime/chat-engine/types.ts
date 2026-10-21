@@ -165,7 +165,13 @@ export type SendRefusal =
   | { kind: 'reply-gone' }
   /** The send never reached the server (no answer at all: the signal dropped,
    *  the network is down). The words and the quote go back to the box. */
-  | { kind: 'unsent' };
+  | { kind: 'unsent' }
+  /** The server would not take a message from this account now: no messages
+   *  left, or a flagged account. The row under the chat already says why and
+   *  offers the plans, so the composer adds no line of its own; the words go
+   *  back to the box, so buying messages does not mean typing the question
+   *  again (Tester, 20 October 2026, finding 20). */
+  | { kind: 'blocked' };
 
 // ─── Engine handlers (hot-swappable callbacks + mode resolvers) ─────────────
 /**

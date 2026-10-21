@@ -355,11 +355,14 @@ export function ConversationComposer({
       stage: setInput,
       refuse: (text, sentence) => {
         updateInput((current) => draftWithRefused(current, text));
+        // An empty sentence: the chat's own row already says why (no messages left).
+        if (!sentence) return;
         setErrorText(sentence);
         setErrorTone('notice');
         setErrorOpen(true);
       },
       explain: (sentence) => {
+        if (!sentence) return;
         setErrorText(sentence);
         setErrorTone('notice');
         setErrorOpen(true);
@@ -590,7 +593,8 @@ export function ConversationComposer({
     // …and the reply, unless the reader has picked another since, or its
     // original is what was refused (it is gone: the words alone come back).
     if (draft.reply && !outcome.dropReply) updateReply((current) => current ?? draft.reply);
-    showError(outcome.refused, 'notice');
+    // No messages left: the row under the chat already says so (finding 20).
+    if (outcome.refused) showError(outcome.refused, 'notice');
   };
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();

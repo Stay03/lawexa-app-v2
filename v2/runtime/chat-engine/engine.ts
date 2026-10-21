@@ -2131,12 +2131,13 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return null;
       }
 
-      // Server-side block (messages exhausted, account flagged) — inline soft banner.
+      // Server-side block (messages exhausted, account flagged) — inline soft
+      // banner, and the words go back to the box (`blocked`).
       const blocked = extractBlockedReason(err);
       if (blocked) {
         removeMessage(optimisticMsg.id);
         addErrorMessage(blocked.message, 'MESSAGES_EXHAUSTED', false, null, blocked);
-        return null;
+        return { kind: 'blocked' };
       }
 
       // 403 — this reader may not send here (backend B4: a space's Viewer,

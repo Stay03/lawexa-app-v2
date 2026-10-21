@@ -319,7 +319,7 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
     /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*seenStatusRef\.current = null;\s*setRefusedTurn\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
   );
   assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{\s*refused: sendRefusal\(refusal, serverUserId\),\s*\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),\s*\};/);
-  assert.match(controller, /\} else if \(refusal\.kind !== 'unsent'\) \{\s*(\/\/[^\n]*\n\s*)?void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
+  assert.match(controller, /\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked'\) \{\s*(\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
   assert.match(controller, /const heldBy = turn\.kind === 'colleague' \? turn\.name : null;/);
 });
 
@@ -329,7 +329,7 @@ test('the composer gives a refused message back, with its pasted cards and files
   assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot, draft\.reply\);/);
   assert.match(
     composer,
-    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)*if \(draft\.reply && !outcome\.dropReply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*showError\(outcome\.refused, 'notice'\);/,
+    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)*if \(draft\.reply && !outcome\.dropReply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*(\/\/[^\n]*\n\s*)*if \(outcome\.refused\) showError\(outcome\.refused, 'notice'\);/,
   );
   // A held send is a wait, not a fault: a muted status with a clock, never the red
   // alert (Stay, 13 October 2026). File errors keep the red box.
@@ -435,7 +435,7 @@ test('a refused follow-up (409 or 403) comes back to the composer with the compo
   );
   assert.match(dock, /draftScopeId=\{conversationId\}\s*stageRef=\{composerRef\}/);
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /refuse: \(text, sentence\) => \{\s*updateInput\(\(current\) => draftWithRefused\(current, text\)\);\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);
+  assert.match(composer, /refuse: \(text, sentence\) => \{\s*updateInput\(\(current\) => draftWithRefused\(current, text\)\);\s*(\/\/[^\n]*\n\s*)*if \(!sentence\) return;\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);
   // The draft keeps what the reader typed, and the follow-up after it.
   assert.equal(draftWithRefused('', 'Explain the next step'), 'Explain the next step');
   assert.equal(draftWithRefused('  ', 'Explain the next step'), 'Explain the next step');
@@ -483,7 +483,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
   // Both refusals change the screen as a refused send does.
   assert.match(
     controller,
-    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);[\s\S]*?void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId, true\);\s*\} else if \(refusal\.kind !== 'unsent'\) \{\s*(\/\/[^\n]*\n\s*)?void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
+    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);[\s\S]*?void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId, true\);\s*\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked'\) \{\s*(\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
   );
   const screen = readHere('ConversationScreen.tsx');
   assert.match(
@@ -491,7 +491,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
     /const outcome = await regenerate\(\);\s*if \(!outcome\) return;\s*reportFollowUpRefusal\(\{ conversationId, text: null, sentence: outcome\.refused \}\);/,
   );
   assert.match(screen, /onRegenerate=\{askAgain\}/);
-  assert.match(readHere('ConversationComposer.tsx'), /explain: \(sentence\) => \{\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);
+  assert.match(readHere('ConversationComposer.tsx'), /explain: \(sentence\) => \{\s*if \(!sentence\) return;\s*setErrorText\(sentence\);\s*setErrorTone\('notice'\);\s*setErrorOpen\(true\);/);
 });
 
 /* ── The activity row sits above the answer being written, not a finished one ─ */

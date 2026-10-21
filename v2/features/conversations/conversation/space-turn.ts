@@ -174,6 +174,8 @@ export const REPLY_GONE_COPY = 'The message you replied to is no longer availabl
  * view-only pill's own reason, since the pill replaces the composer next.
  */
 export function sendRefusal(refusal: SendRefusal, viewerId: number | null): string {
+  // The out-of-messages row under the chat already says why: no second line.
+  if (refusal.kind === 'blocked') return '';
   if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
   if (refusal.kind === 'reply-gone') return REPLY_GONE_COPY;
   if (refusal.kind === 'unsent') return UNSENT_COPY;
@@ -190,6 +192,7 @@ export function sendRefusal(refusal: SendRefusal, viewerId: number | null): stri
  * instead of promising a kept message. A refusal by role reads as for a send.
  */
 export function askAgainRefusal(refusal: SendRefusal, viewerId: number | null): string {
+  if (refusal.kind === 'blocked') return '';
   if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
   // "Ask again" never replies to anything; said plainly should it ever happen.
   if (refusal.kind === 'reply-gone') return 'That message is no longer available.';
