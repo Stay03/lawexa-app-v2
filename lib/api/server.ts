@@ -700,3 +700,85 @@ function readPodiumRow(value: unknown): PublicQuizPodiumRow | null {
     avatar_url: typeof avatar_url === 'string' ? avatar_url : null,
   };
 }
+
+/**
+ * Lightweight quiz data for the quiz front's metadata (`/quiz/q/{uuid}`,
+ * 2026-10-21) — the public PREVIEW, read with no credentials, so a pasted
+ * link unfurls with the quiz's own title whoever opens it.
+ *
+ * `null` for everything the preview refuses — a private or `shared` quiz and
+ * an unknown uuid are ONE `404` — for a body that is not the shape below, and
+ * for a network failure: the page then falls back to the site card and
+ * `noindex`, never a broken card. The same reasons as
+ * {@link fetchPublicQuizResults} keep this out of `lib/api/channel-quiz.ts`:
+ * it runs in a server component, and a public link must never be able to end
+ * someone's session.
+ *
+ * Sixty seconds of `revalidate`: a title edit is rare, and a link that travels
+ * is read by many strangers from one address.
+ */
+export interface QuizPreviewMetadata {
+  title: string;
+  description: string | null;
+  /** The author's display name, or `null` when the account is gone. */
+  author: string | null;
+  question_count: number;
+  /** `link` or `public` — the only two the preview answers for. */
+  visibility: string;
+}
+
+export async function fetchQuizPreviewForMetadata(
+  quizUuid: string,
+): Promise<QuizPreviewMetadata | null> {
+  const apiUrl = getApiUrl().replace(/\/$/, '');
+
+  try {
+    const response = await fetch(
+      `${apiUrl}/api/channel-quizzes/${encodeURIComponent(quizUuid)}/preview`,
+      {
+        headers: { Accept: 'application/json' },
+        next: { revalidate: 60 },
+      },
+    );
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return readQuizPreview(await response.json());
+  } catch {
+    return null;
+  }
+}
+
+/** The preview envelope's fields the metadata reads, proved one by one. */
+function readQuizPreview(body: unknown): QuizPreviewMetadata | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const { success, data } = body as { success?: unknown; data?: unknown };
+  if (success !== true || typeof data !== 'object' || data === null) return null;
+
+  const { title, description, creator, questions, visibility } = data as {
+    title?: unknown;
+    description?: unknown;
+    creator?: unknown;
+    questions?: unknown;
+    visibility?: unknown;
+  };
+  if (typeof title !== 'string' || typeof visibility !== 'string') return null;
+  if (!Array.isArray(questions)) return null;
+
+  const author =
+    typeof creator === 'object' &&
+    creator !== null &&
+    typeof (creator as { name?: unknown }).name === 'string'
+      ? (creator as { name: string }).name
+      : null;
+
+  return {
+    title,
+    description: typeof description === 'string' && description.trim() ? description : null,
+    author,
+    question_count: questions.length,
+    visibility,
+  };
+}
