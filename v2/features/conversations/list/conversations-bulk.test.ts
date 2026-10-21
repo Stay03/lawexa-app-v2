@@ -76,4 +76,6 @@ test('a ticked chat row is its own tick box, and the menu steps aside', () => {
   const list = read('ConversationsList.tsx');
   assert.match(list, /useConversationsBulk\(\{ rows: visibleRows \}\)/);
   assert.match(list, /bulk\.hasSelectable && !bulk\.selecting\s*\? bulk\.startButton\(/);
+  // The floating search pill steps aside for the bar.
+  assert.match(list, /\{searchAtTop \|\| bulk\.selecting \? null : \(\s*<ScreenDock>/);
 });

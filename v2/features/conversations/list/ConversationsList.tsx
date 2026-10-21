@@ -336,7 +336,9 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
 
       {/* The floating search pill, and nothing else: a conversation is started
           from the home composer, never from this list. */}
-      {searchAtTop ? null : (
+      {/* Not while ticking: the bar holds the foot of the screen, and the
+          pill would show under it. */}
+      {searchAtTop || bulk.selecting ? null : (
         <ScreenDock>
           <ScreenDockSearch>{searchBar}</ScreenDockSearch>
         </ScreenDock>

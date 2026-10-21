@@ -43,6 +43,15 @@ test('only My notes can be ticked, and a tab change drops the ticks', () => {
   assert.match(page, /const selecting = bulk\.selecting && tab === 'mine';/);
   assert.match(page, /\{tab === 'mine' && rows\.length > 0 && !selecting\s*\? bulk\.startButton\(/);
   assert.match(page, /const setTab = \(next: NotesTab\) => \{\s*\/\/ [^\n]*\n\s*bulk\.stop\(\);/);
+  // The floating search pill steps aside for the bar.
+  assert.match(page, /\{searchAtTop \|\| selecting \? null : \(\s*<ScreenDock>/);
+});
+
+test('the outcome says which way the privacy went', () => {
+  const bulk = read('notes-bulk.tsx');
+  assert.match(bulk, /verb: \{ past: 'Made', pastLower: 'made private', after: 'private' \}/);
+  assert.match(bulk, /verb: \{ past: 'Made', pastLower: 'made public', after: 'public' \}/);
+  assert.doesNotMatch(bulk, /past: 'Changed'/);
 });
 
 test('a ticked note row is its own tick box, and the star steps aside', () => {

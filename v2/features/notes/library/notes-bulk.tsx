@@ -54,8 +54,10 @@ export function useNotesBulk({ rows }: { rows: readonly NoteRowModel[] }) {
   const remove = useBulkAction({ verb: { past: 'Deleted', pastLower: 'deleted' }, noun: NOUN, onSettled: refresh, keepFailed });
   const publish = useBulkAction({ verb: { past: 'Published', pastLower: 'published' }, noun: NOUN, onSettled: refresh, keepFailed });
   const unpublish = useBulkAction({ verb: { past: 'Unpublished', pastLower: 'unpublished' }, noun: NOUN, onSettled: refresh, keepFailed });
-  const privacy = useBulkAction({ verb: { past: 'Changed', pastLower: 'changed' }, noun: NOUN, onSettled: refresh, keepFailed });
-  const busy = remove.isPending || publish.isPending || unpublish.isPending || privacy.isPending;
+  // Two verbs, so the outcome says which way: "Made 2 notes private."
+  const makePrivate = useBulkAction({ verb: { past: 'Made', pastLower: 'made private', after: 'private' }, noun: NOUN, onSettled: refresh, keepFailed });
+  const makePublic = useBulkAction({ verb: { past: 'Made', pastLower: 'made public', after: 'public' }, noun: NOUN, onSettled: refresh, keepFailed });
+  const busy = remove.isPending || publish.isPending || unpublish.isPending || makePrivate.isPending || makePublic.isPending;
   const off = select.count === 0 || busy;
 
   const startButton = useCallback(
@@ -96,13 +98,13 @@ export function useNotesBulk({ rows }: { rows: readonly NoteRowModel[] }) {
         icon={Lock}
         label="Make private"
         disabled={off}
-        onClick={() => privacy.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: true }))}
+        onClick={() => makePrivate.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: true }))}
       />
       <BulkBarAction
         icon={Globe}
         label="Make public"
         disabled={off}
-        onClick={() => privacy.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: false }))}
+        onClick={() => makePublic.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: false }))}
       />
       <BulkBarAction icon={Trash2} label="Delete" destructive disabled={off} onClick={() => setConfirmDelete(true)} />
     </BulkBar>

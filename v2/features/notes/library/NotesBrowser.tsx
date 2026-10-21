@@ -343,7 +343,9 @@ export function NotesBrowser() {
           the field switched to the top there is nothing left to float, so no
           dock renders at all and the column's own `pb-16` is the list's bottom
           breathing room (see `LIST_COLUMN_DOCKED`). */}
-      {searchAtTop ? null : (
+      {/* Not while ticking: the bar holds the foot of the screen, and the
+          pill would show under it. */}
+      {searchAtTop || selecting ? null : (
         <ScreenDock>
           <ScreenDockSearch>{searchField}</ScreenDockSearch>
         </ScreenDock>
