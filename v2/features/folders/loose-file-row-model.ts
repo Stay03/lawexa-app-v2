@@ -1,4 +1,5 @@
 import type { UserFile } from '@/types/file';
+import { viewKind, type ViewKind } from '@/v2/features/files/viewable';
 import { fileKind, fileSize } from './item-row-model';
 
 /**
@@ -16,6 +17,9 @@ export interface LooseFileRowModel {
   size: string | null;
   /** When it was uploaded: the list's sort key. */
   createdAt: string | null;
+  /** How a tap opens it here (a picture in the viewer, media in the player),
+   *  or `null` for a new tab (`files/viewable.ts`, 21 October 2026). */
+  view: ViewKind | null;
 }
 
 export const UNNAMED_FILE = 'Unnamed file';
@@ -29,5 +33,6 @@ export function looseFileRow(file: UserFile): LooseFileRowModel {
     kind: fileKind(file.mime_type),
     size: fileSize(file.size),
     createdAt: file.created_at || null,
+    view: viewKind(file),
   };
 }

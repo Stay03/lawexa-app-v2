@@ -71,6 +71,7 @@ export function NoteImages({ note, slug }: { note: StatuteAnnotation; slug: stri
 
   const source: PictureSource = {
     freshUrl: (image) => freshUrl(image.id),
+    linkKey: 'print-note',
     download: false,
     detail: noteImageDetail,
     words: VIEWER_WORDS,

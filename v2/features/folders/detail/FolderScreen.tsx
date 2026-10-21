@@ -29,8 +29,13 @@ import {
 } from '../folder-row-model';
 import {
   folderItemRow,
+  type FolderItemFileRow,
   type FolderItemRowModel,
 } from '../item-row-model';
+import type { ViewerImage } from '@/v2/features/channels/feed/image-target';
+import { FileViewers } from '@/v2/features/files/FileViewers';
+import { useFileViewer } from '@/v2/features/files/use-file-viewer';
+import { viewerImage } from '@/v2/features/files/viewable';
 import { folderItemKey, usePendingFolderItemRemovals } from '../item-mutations';
 import {
   useDeleteFolderWithUndo,
@@ -126,6 +131,7 @@ import { useTabTitle } from '@/v2/shell/use-tab-title';
 
 /** Stable empty references — a fresh `[]` per render would churn the memos. */
 const NO_ITEM_ROWS: readonly FolderItemRowModel[] = [];
+const NO_PICTURES: readonly ViewerImage[] = [];
 const NO_FOLDER_ROWS: readonly FolderRowModel[] = [];
 const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
 
@@ -179,6 +185,10 @@ function FolderBody({ uuid }: { uuid: string }) {
   // Files from this space and the library picker (item 8), held the same way.
   const [spaceFiles, setSpaceFiles] = useState({ open: false, key: 0 });
   const [library, setLibrary] = useState({ open: false, key: 0 });
+  // The folder's picture viewer and player (Stay, 21 October 2026: "should
+  // work in folders and space folders"); `FileViewers` draws them.
+  const viewer = useFileViewer();
+  const { view } = viewer;
 
   const folderQuery = useQuery({
     ...foldersQueries.detail({ uuid, viewerId }),
@@ -226,16 +236,19 @@ function FolderBody({ uuid }: { uuid: string }) {
   }, [allPages]);
 
   const activePages = itemsQuery.data?.pages;
-  const { itemRows, hiddenChats, hiddenFolderItems, hiddenUnknown } = useMemo(() => {
+  const { itemRows, pictures, hiddenChats, hiddenFolderItems, hiddenUnknown } = useMemo(() => {
     if (!activePages) {
       return {
         itemRows: NO_ITEM_ROWS,
+        pictures: NO_PICTURES,
         hiddenChats: 0,
         hiddenFolderItems: 0,
         hiddenUnknown: 0,
       };
     }
     const mapped: FolderItemRowModel[] = [];
+    // The stream's pictures, in its order: what the viewer swipes through.
+    const shownPictures: ViewerImage[] = [];
     let chats = 0;
     let folderItems = 0;
     let unknown = 0;
@@ -251,6 +264,9 @@ function FolderBody({ uuid }: { uuid: string }) {
           // same way).
           if (!pendingRemovals.has(folderItemKey(row.type, row.contentId))) {
             mapped.push(row);
+            if (item.type === 'file' && row.type === 'file' && row.view === 'picture') {
+              shownPictures.push(viewerImage(item.content, row.title));
+            }
           }
           continue;
         }
@@ -264,6 +280,7 @@ function FolderBody({ uuid }: { uuid: string }) {
     }
     return {
       itemRows: mapped,
+      pictures: shownPictures,
       hiddenChats: chats,
       hiddenFolderItems: folderItems,
       hiddenUnknown: unknown,
@@ -290,6 +307,13 @@ function FolderBody({ uuid }: { uuid: string }) {
     (row: FolderRowModel) =>
       setRenameTarget({ uuid: row.uuid, name: row.hasName ? row.name : '' }),
     [],
+  );
+  // A file row that shows here: a picture in the viewer, media in the player.
+  const openView = useCallback(
+    (row: FolderItemFileRow) => {
+      if (row.view) view({ id: row.contentId, name: row.title, kind: row.view });
+    },
+    [view],
   );
 
   // The folder's name through the ROW MODEL, so a folder saved with a blank
@@ -668,6 +692,7 @@ function FolderBody({ uuid }: { uuid: string }) {
                     canRemove={canManageItems}
                     index={(showSubfolders ? childRows.length : 0) + index}
                     now={now}
+                    onView={openView}
                     selected={selecting ? isSelected(`${item.type}:${item.contentId}`) : undefined}
                     onToggleSelect={selecting ? toggleItem : undefined}
                   />
@@ -737,6 +762,9 @@ function FolderBody({ uuid }: { uuid: string }) {
           ) : null}
         </div>
       </div>
+
+      {/* The folder's picture viewer and player, over the list. */}
+      <FileViewers viewer={viewer} pictures={pictures} place="folder" />
 
       {/* Mounted only while open, so each dialog initialises from the folder it
           is actually naming (see `FolderNameDialog`). */}

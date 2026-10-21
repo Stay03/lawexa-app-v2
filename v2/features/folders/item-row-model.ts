@@ -1,5 +1,6 @@
 import type { StatuteStatus } from '@/types/statute';
 import { firstCitation, formatCaseName } from '@/v2/features/cases/case-name';
+import { viewKind, type ViewKind } from '@/v2/features/files/viewable';
 import { noteHasTitle, notePreviewText, noteDisplayTitle } from '@/v2/features/notes/note-text';
 import type { FolderItemRecord } from './types';
 
@@ -94,7 +95,14 @@ export type FolderItemRowModel =
       kind: string | null;
       /** "1.2 MB", or `null` when the payload carried no size. */
       size: string | null;
+      /** How a tap opens it here (a picture in the viewer, media in the
+       *  player), or `null` for a new tab: no mime, no claim
+       *  (`files/viewable.ts`, 21 October 2026). */
+      view: ViewKind | null;
     });
+
+/** A file's row, for the hosts that open one here. */
+export type FolderItemFileRow = Extract<FolderItemRowModel, { type: 'file' }>;
 
 /** The four types v2 renders — the type filter's ids, in the strip's order. */
 export const FOLDER_ITEM_TYPES = ['case', 'statute', 'note', 'file'] as const;
@@ -207,6 +215,7 @@ export function folderItemRow(item: FolderItemRecord): FolderItemRowModel | null
         hasTitle: !!name,
         kind: fileKind(content.mime_type),
         size: fileSize(content.size),
+        view: viewKind(content),
       };
     }
 

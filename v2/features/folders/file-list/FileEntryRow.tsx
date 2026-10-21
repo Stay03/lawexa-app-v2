@@ -15,6 +15,12 @@ import { FileListRow } from './FileListRow';
  * (`useShowFileInNewTab`, the open a file in a space uses, asking for a link
  * that shows the file).
  *
+ * A FILE THAT SHOWS HERE OPENS HERE (Stay, 21 October 2026: "images should
+ * open a gallery, videos should open gallery with 'play'"). The host passes
+ * `onView` for a picture, a video or a recording, and the tap runs that
+ * instead: the list's own viewer or player, over the list. Every other file
+ * keeps its tab.
+ *
  * Its refusals are the one line a file row may carry under its name: a file
  * that no longer exists says so, a refused open offers to try again.
  *
@@ -30,6 +36,7 @@ export function FileEntryRow({
   index,
   menu,
   select,
+  onView,
 }: {
   fileId: number;
   /** `fileKind`'s word ("PDF", "Word"), which picks the glyph's colour. */
@@ -39,8 +46,12 @@ export function FileEntryRow({
   date: string;
   index: number;
   menu?: ReactNode;
-  /** Bulk select (`FileListRow`). */
+  /** Bulk select (`FileListRow`): the row is its tick box and a tap ticks it,
+   *  so neither the tab nor `onView` runs while the list is being ticked. */
   select?: { checked: boolean; onToggle: () => void };
+  /** Open the file here (a viewer or a player over the list) instead of in a
+   *  new tab; absent for a file that only a tab can show. */
+  onView?: () => void;
 }) {
   const { open, opening, failed, gone } = useShowFileInNewTab();
   return (
@@ -55,7 +66,8 @@ export function FileEntryRow({
       renderOpen={(className, content) => (
         <button
           type="button"
-          onClick={() => open(fileId)}
+          onClick={onView ?? (() => open(fileId))}
+          aria-haspopup={onView ? 'dialog' : undefined}
           disabled={opening || gone}
           aria-busy={opening || undefined}
           className={cn(className, 'disabled:cursor-progress', gone && 'disabled:cursor-default')}

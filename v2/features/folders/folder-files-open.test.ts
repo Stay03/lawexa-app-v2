@@ -46,7 +46,9 @@ test('a file in a folder is a button that opens it with a fresh link, and says w
   for (const plain of [['components', 'collab', 'files', 'FileRow.tsx'], ['app', '(main)', 'files', 'page.tsx']]) {
     assert.match(root(...plain), /useDownloadFile\(\)/, plain.join('/'));
   }
-  assert.match(open, /<button\s+type="button"\s+onClick=\{\(\) => open\(fileId\)\}/);
+  // A picture or media opens here instead, when the host passes `onView`
+  // (`files/viewable.ts`, 21 October 2026); the tab stays for the rest.
+  assert.match(open, /<button\s+type="button"\s+onClick=\{onView \?\? \(\(\) => open\(fileId\)\)\}/);
   assert.match(open, /This file is no longer available\./);
   assert.match(open, /Couldn&rsquo;t open it\.[\s\S]*?Try again/);
   // Still never a link to the payload's presigned URL, which expires.

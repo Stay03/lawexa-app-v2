@@ -71,9 +71,10 @@ export function parseImageTarget(value: string): ImageTarget | null {
  * Narrower than a channel attachment ON PURPOSE: the AI chat shows its sent
  * pictures in the same viewer (24 September 2026), and a chat file carries an
  * id, a name and a size, never a MIME category or an upload status. `url` may
- * be empty there, because the chat payload carries no link: the frame then
- * fails its first paint and mints one through `GET /files/{id}/download`,
- * exactly as it does for a channel link that expired.
+ * be empty there, because the chat payload carries no link (the file lists'
+ * can lack one too): the frame then mints one through the source's
+ * `freshUrl` BEFORE its first paint, since an `<img>` with no `src` fails
+ * nothing (`ViewerFrame`).
  *
  * `caption` and `added_by` are the print notes' (10 October 2026): when a
  * picture has a caption, the viewer names the picture by it, and the bar says

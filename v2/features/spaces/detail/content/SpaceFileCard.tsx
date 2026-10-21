@@ -1,10 +1,8 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { useMemo, type ReactNode } from 'react';
+import { ExternalLink, Eye, Loader2, Play } from 'lucide-react';
 
-import { filesApi } from '@/lib/api/files';
 import { cn } from '@/lib/utils';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import { Button } from '@/components/ui/button';
@@ -14,6 +12,8 @@ import type { SpaceFile } from '@/types/collab';
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { FileMark } from '@/v2/features/channels/files/FileMark';
 import { playableKind } from '@/v2/features/channels/files/file-model';
+import { MediaPlayer } from '@/v2/features/files/MediaPlayer';
+import { viewKind, type ViewKind } from '@/v2/features/files/viewable';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { fileTypeLabel } from '../../content-model';
 import { SpaceFileMenu, type SpaceFileActions } from './SpaceFileMenu';
@@ -44,6 +44,14 @@ import { useCardBreakpoint } from './use-card-breakpoint';
  * dialog, and a dialog over a card over the list is two layers for one
  * question; the card is done once the reader picked what to do.
  *
+ * A FILE THAT SHOWS HERE GETS "VIEW" OR "PLAY" FIRST (Stay, 21 October 2026:
+ * "images should open a gallery, videos should open gallery with 'play'"). A
+ * picture's View opens the space's picture viewer over the list, swiping
+ * through the list's pictures; a video's or a recording's Play opens the
+ * player dialog. Both close the card first, like an action, and the viewer or
+ * player is the feed's (`FileViewers`), reached through `onView`. "Open file"
+ * stays under them, as the plain open; for any other file it is the one button.
+ *
  * THE OPEN STAYS IN THE TAP (`useOpenFileInNewTab`): the empty tab opens
  * synchronously and the fresh URL follows, so an iPhone home-screen app lets
  * it through. Its refusals read here, under the button: a file that no longer
@@ -56,6 +64,7 @@ export function SpaceFileCard({
   open,
   onOpenChange,
   actions,
+  onView,
 }: {
   /** The file shown; kept while the card closes. */
   file: SpaceFile | null;
@@ -67,13 +76,22 @@ export function SpaceFileCard({
   onOpenChange: (open: boolean) => void;
   /** What this reader may do to it (the feed's own rules). */
   actions: SpaceFileActions;
+  /** Open the file in the feed's viewer or player (View / Play). */
+  onView: (file: SpaceFile, kind: ViewKind) => void;
 }) {
   const wide = useCardBreakpoint();
   // The popover measures the row through this; a new row is a new anchor.
   const anchorRef = useMemo(() => (anchor ? { current: anchor } : null), [anchor]);
   const shown = open && file !== null;
   const body = file ? (
-    <CardBody key={file.id} file={file} actions={actions} close={() => onOpenChange(false)} frame={wide ? 'popover' : 'sheet'} />
+    <CardBody
+      key={file.id}
+      file={file}
+      actions={actions}
+      onView={onView}
+      close={() => onOpenChange(false)}
+      frame={wide ? 'popover' : 'sheet'}
+    />
   ) : null;
 
   if (wide && anchorRef) {
@@ -115,16 +133,20 @@ export function SpaceFileCard({
 function CardBody({
   file,
   actions,
+  onView,
   close,
   frame,
 }: {
   file: SpaceFile;
   actions: SpaceFileActions;
+  onView: (file: SpaceFile, kind: ViewKind) => void;
   close: () => void;
   frame: 'sheet' | 'popover';
 }) {
   const { open, opening, failed, gone } = useOpenFileInNewTab();
   const type = fileTypeLabel(file);
+  // View for a picture, Play for a video or a recording, nothing for the rest.
+  const kind = viewKind(file);
   // Close first, then act: the action's own dialog opens over the list.
   const then = (act?: (file: SpaceFile) => void) =>
     act
@@ -186,9 +208,26 @@ function CardBody({
       ) : (
         <div className="flex flex-col gap-2">
           <SpaceMediaPlayer file={file} />
+          {kind ? (
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => {
+                // Close first, then open: the viewer or player opens over the
+                // list, not over the card.
+                close();
+                onView(file, kind);
+              }}
+              className="w-full"
+            >
+              {kind === 'picture' ? <Eye aria-hidden className="size-4" /> : <Play aria-hidden className="size-4" />}
+              {kind === 'picture' ? 'View' : 'Play'}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="lg"
+            variant={kind ? 'outline' : 'default'}
             onClick={() => open(file.id)}
             disabled={opening}
             className="w-full disabled:cursor-progress"
@@ -214,76 +253,26 @@ function CardBody({
   );
 }
 
-/** A minted download link holds for an hour; the player reuses one for 50 minutes. */
-const MEDIA_URL_STALE_MS = 50 * 60 * 1000;
-
 /**
  * A video or audio file plays in its card, as it does in a channel's message
- * (Stay, 20 October 2026: "Yes all files"). The link is minted when the card
- * opens (`GET /files/{id}/download`, the same gated route "Open file" uses). A
- * player that fails asks for one fresh link, since a link can expire while the
- * card is open; a second failure says so, and "Open file" below still works.
- * Any other file draws nothing here.
+ * (Stay, 20 October 2026: "Yes all files"). The player and its link are the
+ * shared `MediaPlayer` (`files/MediaPlayer.tsx`, 21 October 2026), so the
+ * dialog that Play opens reads the link this card already minted. A player
+ * that will not play here says so, and "Open file" below still works. Any
+ * other file draws nothing here.
  */
 function SpaceMediaPlayer({ file }: { file: SpaceFile }) {
   const kind = playableKind(file);
-  const [retried, setRetried] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const link = useQuery({
-    queryKey: ['files', 'download-url', file.id],
-    queryFn: () => filesApi.getDownloadUrl(file.id),
-    enabled: kind !== null,
-    staleTime: MEDIA_URL_STALE_MS,
-    retry: false,
-    meta: { silentError: true },
-  });
   if (kind === null) return null;
-
-  const src = link.data?.data?.url ?? null;
-  const onError = () => {
-    if (retried) {
-      setFailed(true);
-      return;
-    }
-    setRetried(true);
-    void link.refetch();
-  };
-
-  if (failed || link.isError) {
-    return (
-      <p role="status" className="text-xs text-muted-foreground">
-        This {kind === 'audio' ? 'recording' : 'video'} didn&rsquo;t play here. Open it below.
-      </p>
-    );
-  }
-  if (!src) {
-    return (
-      <div
-        aria-hidden
-        className={cn('w-full animate-pulse rounded-lg bg-muted', kind === 'audio' ? 'h-12' : 'aspect-video')}
-      />
-    );
-  }
-  return kind === 'audio' ? (
-    <audio
-      key={src}
-      src={src}
-      controls
-      preload="metadata"
-      onError={onError}
-      aria-label={file.original_name}
-      className="w-full"
-    />
-  ) : (
-    <video
-      key={src}
-      src={src}
-      controls
-      playsInline
-      preload="metadata"
-      onError={onError}
-      aria-label={file.original_name}
-      className="aspect-video w-full rounded-lg bg-black object-contain"
+  return (
+    <MediaPlayer
+      file={file}
+      kind={kind}
+      failure={
+        <p role="status" className="text-xs text-muted-foreground">
+          This {kind === 'audio' ? 'recording' : 'video'} didn&rsquo;t play here. Open it below.
+        </p>
+      }
     />
   );
 }

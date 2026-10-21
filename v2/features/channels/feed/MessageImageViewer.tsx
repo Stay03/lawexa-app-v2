@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import {
   ChevronLeft,
   ChevronRight,
@@ -70,7 +70,10 @@ import { useFileShareSheetSave, useOpenUrlInNewTab } from './use-file-url';
  * `onError` — the shape an expiry takes in an `<img>` — mints a fresh one and
  * retries ONCE per failure, re-arming on every successful paint so a tab left
  * open for three hours recovers three times. That is the tile's rule, applied
- * per frame. The two do NOT share state: the viewer owns its own `src` and its
+ * per frame. A row that carried NO url (the AI chat's and the file lists'
+ * payloads can name a picture without one) is minted its first link BEFORE
+ * the first paint instead, since an `<img>` with no `src` fails nothing (see
+ * {@link ViewerFrame}). The two do NOT share state: the viewer owns its own `src` and its
  * own retry budget, so opening a picture can never disturb the tile behind it,
  * and the worst case is one extra mint on a picture whose tile had already
  * refreshed. What IS shared, between the frames, is the RESULT: a minted URL is
@@ -153,6 +156,9 @@ const SLIDE_MS = 200;
 /** How long a blob download URL is kept alive after the anchor is clicked.
  *  Revoking in the same task aborts the save on some engines. */
 const BLOB_RELEASE_MS = 1000;
+/** A minted link is signed for an hour; a first link is kept under that, so
+ *  a frame that comes back after a swipe finds it rather than mints again. */
+const FIRST_LINK_FRESH_MS = 50 * 60 * 1000;
 
 /* ── The strip's three knobs ───────────────────────────────────────────────
       `--v2-image-i` is the SETTLED index and React owns it; the other two are
@@ -267,6 +273,7 @@ export function MessageImageViewer({
       resolving={resolving}
       onSelect={onSelect}
       onClose={onClose}
+      closesOnBack
     />
   );
 }
@@ -288,6 +295,8 @@ export function PictureViewer({
   onSelect,
   onClose,
   source = CHANNEL_FILE_SOURCE,
+  closesOnBack = false,
+  returnFocusTo = null,
 }: {
   open: boolean;
   /** The pictures and the place in them; `null` when nothing resolves. Hold
@@ -301,6 +310,14 @@ export function PictureViewer({
    *  files when omitted, so the channel and the AI chat read as before; the
    *  print notes pass their own (see `./picture-source.ts`). */
   source?: PictureSource;
+  /** Back closes this viewer: it is one value of the address (`?image=`,
+   *  {@link MessageImageViewer}), so the viewer may say so. A viewer held in
+   *  state must not, since Back there leaves the page. */
+  closesOnBack?: boolean;
+  /** Where focus goes back on close, for an opener that closes with its own
+   *  frame (a space file card's View button) and so cannot be returned to:
+   *  the row the card hung from. The pressed control itself otherwise. */
+  returnFocusTo?: HTMLElement | null;
 }) {
   /**
    * THE URLS THAT HAVE BEEN MINTED, KEPT ABOVE THE FRAMES THAT MINTED THEM.
@@ -347,6 +364,8 @@ export function PictureViewer({
           onSelect={onSelect}
           onClose={onClose}
           source={source}
+          closesOnBack={closesOnBack}
+          returnFocusTo={returnFocusTo}
         />
       </DialogPortal>
     </Dialog>
@@ -375,6 +394,8 @@ function ViewerStage({
   onSelect,
   onClose,
   source,
+  closesOnBack,
+  returnFocusTo,
 }: {
   /** The message's pictures and the place in them; `null` when the value on
    *  screen names nothing we hold. */
@@ -385,6 +406,8 @@ function ViewerStage({
   onSelect: (next: string) => void;
   onClose: () => void;
   source: PictureSource;
+  closesOnBack: boolean;
+  returnFocusTo: HTMLElement | null;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<Drag | null>(null);
@@ -534,6 +557,7 @@ function ViewerStage({
   const stripStyle: React.CSSProperties & Record<typeof VAR_INDEX, string> = {
     [VAR_INDEX]: String(index),
   };
+  const dismiss = closesOnBack ? 'Escape or Back' : 'Escape';
 
   /* ── Focus goes back to the tile it came from ──────────────────────────────
         RADIX WILL NOT DO IT HERE. Its modal content captures the previously
@@ -549,10 +573,15 @@ function ViewerStage({
         BEFORE the scope moves focus (verified in
         `@radix-ui/react-focus-scope@1.1.7`), so `document.activeElement` is
         still the tile that was pressed. Nothing is prevented there, so the
-        scope goes on to focus the Close button as it should. */
+        scope goes on to focus the Close button as it should.
+
+        A CALLER CAN NAME THE ELEMENT INSTEAD (`returnFocusTo`), for a press
+        that is still the active element here but will not be by the close: a
+        space file card's View button closes its card as it opens this, so the
+        row the card hung from is where the reader came from. */
 
   const captureOpener = () => {
-    const opener = document.activeElement;
+    const opener = returnFocusTo ?? document.activeElement;
     openerRef.current = opener instanceof HTMLElement ? opener : null;
   };
 
@@ -684,10 +713,14 @@ function ViewerStage({
         />
       )}
 
+      {/* Back is promised only where it is true: the channel's viewer is in
+          the address, and Back leaves it; a viewer held in state (the file
+          lists', the AI chat's, the print notes') is left by Back along with
+          the page. */}
       <DialogDescription className="sr-only">
         {images.length > 1
-          ? `Picture ${index + 1} of ${images.length} in this ${source.words.set}. Swipe, or use the left and right arrow keys, to see the others. Press Escape or Back to return to ${source.words.returnTo}.`
-          : `Press Escape or Back to return to ${source.words.returnTo}.`}
+          ? `Picture ${index + 1} of ${images.length} in this ${source.words.set}. Swipe, or use the left and right arrow keys, to see the others. Press ${dismiss} to return to ${source.words.returnTo}.`
+          : `Press ${dismiss} to return to ${source.words.returnTo}.`}
       </DialogDescription>
     </DialogSurface>
   );
@@ -735,6 +768,10 @@ function ViewerChrome({
   const readyHere = pressedHere && download.ready;
   const opening = pressedHere && openOriginal.opening;
   const failedHere = pressedHere && (download.failed || openOriginal.failed);
+  /** The line under the title. Empty for a source with nothing to say about
+   *  this picture (a file list whose payload carried no size), and then the
+   *  count stands alone rather than end in a separator. */
+  const detail = image ? (source.detail ? source.detail(image) : formatBytes(image.size)) : '';
 
   return (
     <div className="v2-safe-top v2-safe-left v2-safe-right shrink-0">
@@ -757,10 +794,10 @@ function ViewerChrome({
             {count > 1 && (
               <span aria-live="polite">
                 {index + 1} of {count}
-                {image ? ' · ' : ''}
+                {detail ? ' · ' : ''}
               </span>
             )}
-            {image ? (source.detail ? source.detail(image) : formatBytes(image.size)) : ''}
+            {detail}
           </p>
         </div>
 
@@ -922,6 +959,18 @@ function usePictureDownload() {
  * minting and decoding all over again. What does NOT survive is the paint state
  * itself, so a picture the reader swipes back to shows its skeleton for as long
  * as the browser takes to hand back bytes it has already cached.
+ *
+ * A ROW THAT CARRIED NO LINK IS MINTED ONE BEFORE THE FIRST PAINT. The AI
+ * chat's and the file lists' payloads can name a picture without a link, and
+ * the refresh above cannot be what mints it: an `<img>` whose `src` is empty
+ * has no attribute at all (React drops it), so it fires neither `load` nor
+ * `error`, and the skeleton would pulse for ever. So an empty `src` asks a
+ * QUERY for the first link, keyed by the source and the picture, which is to
+ * the first link what `mintedUrls` is to the refreshes: a frame that comes
+ * back after a swipe finds it in the cache. The `<img>` is only ever given a
+ * real link, and `src` adopts the first one ONCE, by React's guarded
+ * render-adjust (the `useHeldValue` idiom); from then on it is the frame's,
+ * as above, and a later refetch of the query changes nothing on screen.
  */
 function ViewerFrame({
   image,
@@ -947,6 +996,23 @@ function ViewerFrame({
    *  successful paint re-arms it, and that cannot loop — an `<img>` that fired
    *  `onLoad` for a src never fires `onError` for the same one. */
   const refreshedRef = useRef(false);
+  /** The first link, for a row that carried none (see the docblock). `retry:
+   *  false` and no toast: a frame that cannot get a link says so where it
+   *  stands, with Open original under it. */
+  const firstLink = useQuery({
+    queryKey: ['picture-viewer', 'first-link', source.linkKey, image.id] as const,
+    queryFn: async () => {
+      const url = await source.freshUrl(image);
+      if (!url) throw new Error('The link came back empty.');
+      return url;
+    },
+    enabled: src === '',
+    staleTime: FIRST_LINK_FRESH_MS,
+    gcTime: FIRST_LINK_FRESH_MS,
+    retry: false,
+    meta: { silentError: true },
+  });
+  if (src === '' && firstLink.data !== undefined) setSrc(firstLink.data);
 
   const handleError = () => {
     if (refreshedRef.current) {
@@ -977,7 +1043,7 @@ function ViewerFrame({
     });
   };
 
-  if (paint === 'failed') {
+  if (paint === 'failed' || firstLink.isError) {
     // The designed end state. It names the file, because the picture that
     // would have identified it is the thing that is missing. NOT ground: every
     // press in here is a press on something, and dismissing under the reader's
@@ -1032,24 +1098,28 @@ function ViewerFrame({
           className="absolute aspect-[4/3] w-full max-w-3xl animate-pulse rounded-xl bg-white/5"
         />
       )}
-      {/* eslint-disable-next-line @next/next/no-img-element -- remote URL on the API host; the app declares no images.remotePatterns, so next/image would throw at runtime. */}
-      <img
-        key={src}
-        src={src}
-        alt={image.caption || image.original_name}
-        draggable={false}
-        decoding="async"
-        onLoad={() => {
-          refreshedRef.current = false;
-          setPaint('shown');
-        }}
-        onError={handleError}
-        className={cn(
-          'max-h-full max-w-full object-contain',
-          'transition-opacity duration-200 motion-reduce:transition-none',
-          paint === 'shown' ? 'opacity-100' : 'opacity-0',
-        )}
-      />
+      {/* A frame still waiting on its first link shows the skeleton alone: the
+          `<img>` is only ever given a link (see the docblock). */}
+      {src !== '' && (
+        // eslint-disable-next-line @next/next/no-img-element -- remote URL on the API host; the app declares no images.remotePatterns, so next/image would throw at runtime.
+        <img
+          key={src}
+          src={src}
+          alt={image.caption || image.original_name}
+          draggable={false}
+          decoding="async"
+          onLoad={() => {
+            refreshedRef.current = false;
+            setPaint('shown');
+          }}
+          onError={handleError}
+          className={cn(
+            'max-h-full max-w-full object-contain',
+            'transition-opacity duration-200 motion-reduce:transition-none',
+            paint === 'shown' ? 'opacity-100' : 'opacity-0',
+          )}
+        />
+      )}
     </div>
   );
 }

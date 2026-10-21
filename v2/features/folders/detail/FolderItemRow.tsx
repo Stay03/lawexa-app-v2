@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useRemoveFolderItem } from '../item-mutations';
-import type { FolderItemRowModel } from '../item-row-model';
+import type { FolderItemFileRow, FolderItemRowModel } from '../item-row-model';
 import { entryLook, formatEntryDate } from '../file-list/entry-look';
 import { FileEntryRow } from '../file-list/FileEntryRow';
 import { FileListRow, ROW_MENU_TRIGGER_CLASS } from '../file-list/FileListRow';
@@ -27,12 +27,15 @@ import { FileListRow, ROW_MENU_TRIGGER_CLASS } from '../file-list/FileListRow';
  *
  * A FILE OPENS IN A NEW TAB with a fresh link (`FileEntryRow`). v1 linked it to
  * `#`, and the payload's own `url` is presigned and expires within the hour.
+ * A picture, a video or a recording opens HERE instead, in the folder's own
+ * viewer or player (`row.view`, Stay, 21 October 2026: "should work in
+ * folders and space folders").
  *
  * THE VERB IS "REMOVE FROM THIS FOLDER", NEVER "DELETE". Taking a case out of a
  * folder leaves the case where it was, so nothing here (icon, label or toast)
  * may suggest otherwise. The glyph is a folder losing something, not a bin.
  *
- * `memo` holds because every prop is a value.
+ * `memo` holds because every prop is a value or a stable callback.
  */
 export const FolderItemRow = memo(function FolderItemRow({
   row,
@@ -40,6 +43,7 @@ export const FolderItemRow = memo(function FolderItemRow({
   canRemove,
   index,
   now,
+  onView,
   selected,
   onToggleSelect,
 }: {
@@ -53,7 +57,10 @@ export const FolderItemRow = memo(function FolderItemRow({
   index: number;
   /** Frozen clock for the date column, so no `Date.now()` runs in render. */
   now: number;
-  /** Bulk select: the row ticks instead of opening. `onToggleSelect` must be stable. */
+  /** Open a file row whose `view` is set, here. */
+  onView: (row: FolderItemFileRow) => void;
+  /** Bulk select: the row ticks instead of opening (in a tab or in the
+   *  viewer). `onToggleSelect` must be stable. */
   selected?: boolean;
   onToggleSelect?: (row: FolderItemRowModel) => void;
 }) {
@@ -72,6 +79,7 @@ export const FolderItemRow = memo(function FolderItemRow({
         index={index}
         menu={menu}
         select={select}
+        onView={row.view ? () => onView(row) : undefined}
       />
     );
   }

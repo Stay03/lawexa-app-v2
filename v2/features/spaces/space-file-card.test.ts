@@ -30,7 +30,7 @@ test('the open: the tap-first opener, its refusals under the button', () => {
   assert.match(source, /\{gone \? \(\s*<p role="status"[^>]*>\s*This file is no longer available\./);
   assert.match(source, /\{failed \? \([\s\S]*?Couldn&rsquo;t open it\.[\s\S]*?Try again/);
   // A fresh opener per file, so one file's failure never shows on the next.
-  assert.match(source, /<CardBody key=\{file\.id\}/);
+  assert.match(source, /<CardBody\s+key=\{file\.id\}/);
 });
 
 test('an action closes the card before its own dialog opens', () => {

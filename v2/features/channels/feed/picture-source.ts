@@ -15,6 +15,15 @@ import type { ViewerImage } from './image-target';
 export interface PictureSource {
   /** A link that works now, or null when none can be had. */
   freshUrl: (image: ViewerImage) => Promise<string | null>;
+  /**
+   * What the links `freshUrl` mints are cached under. A picture whose row
+   * carried no link is minted one before its first paint (`ViewerFrame`), and
+   * that link is kept under this name and the picture's id. A source that
+   * mints from another route, or for another kind of id (a print note's
+   * pictures are not files), names its own, so two pictures that share a
+   * number never share a link.
+   */
+  linkKey: string;
   /** Offer Download in the bar. */
   download: boolean;
   /** The bar's line under the title, after "2 of 3 · ". The file's size when
@@ -24,7 +33,7 @@ export interface PictureSource {
   words: {
     /** "Picture 2 of 3 in this {set}." */
     set: string;
-    /** "Press Escape or Back to return to {returnTo}." */
+    /** "Press Escape to return to {returnTo}." */
     returnTo: string;
     /** Said when the picture named is not there. */
     missing: string;
@@ -36,6 +45,7 @@ export interface PictureSource {
 /** Channel files and the AI chat's sent pictures: the viewer as it always was. */
 export const CHANNEL_FILE_SOURCE: PictureSource = {
   freshUrl: async (image) => (await filesApi.getDownloadUrl(image.id)).data?.url ?? null,
+  linkKey: 'file',
   download: true,
   words: {
     set: 'message',

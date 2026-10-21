@@ -178,6 +178,7 @@ export function ResponsiveOverlay({
   size = 'fill',
   guardUnsaved = false,
   anchor = 'center',
+  returnFocusTo = null,
   children,
 }: {
   open: boolean;
@@ -227,6 +228,17 @@ export function ResponsiveOverlay({
    * The phone shape is unaffected.
    */
   anchor?: 'center' | 'top';
+  /**
+   * The element focus returns to when this closes. Radix returns it to the
+   * `DialogTrigger`, and an overlay opened from state or from the URL has
+   * none: the restore it prevents is replaced by nothing, and focus lands on
+   * `<body>`, so a keyboard reader who opened a player from a row loses the
+   * row. The caller names the control that opened it, or, when that control
+   * closes with its own frame (a space file card's Play), the row the card
+   * hung from. An element no longer in the page is left alone, as the picture
+   * viewer leaves it (`MessageImageViewer`). Omitted, Radix's own rule stands.
+   */
+  returnFocusTo?: HTMLElement | null;
   children: ReactNode;
 }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
@@ -278,6 +290,14 @@ export function ResponsiveOverlay({
             event.preventDefault();
             surfaceRef.current?.focus();
           }}
+          onCloseAutoFocus={
+            returnFocusTo
+              ? (event) => {
+                  event.preventDefault();
+                  if (returnFocusTo.isConnected) returnFocusTo.focus();
+                }
+              : undefined
+          }
           /* THE SPREAD IS THE POINT, not a ternary returning `undefined`.
              Radix points `aria-describedby` at the id its own
              `DialogDescription` will carry, then warns if nothing ever renders

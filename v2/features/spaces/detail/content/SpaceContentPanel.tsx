@@ -24,6 +24,9 @@ import {
 } from '@/v2/features/channels/files/use-upload-queue';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
+import { FileViewers } from '@/v2/features/files/FileViewers';
+import { useFileViewer } from '@/v2/features/files/use-file-viewer';
+import { listPictures, type ViewKind } from '@/v2/features/files/viewable';
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
 import { folderRow } from '@/v2/features/folders/folder-row-model';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -103,7 +106,9 @@ import {
  * its own page. No row has a menu (Stay, 18 October 2026): a chat's and a
  * folder's actions are in their own page's ⋮, and a file's row opens its card
  * (`SpaceFileCard`), whose ⋮ holds move, remove, copy and delete, as each role
- * allows.
+ * allows. The card's View opens a picture in the list's own viewer, over the
+ * list's loaded pictures, and its Play opens a video or a recording in the
+ * player (`FileViewers`; Stay, 21 October 2026).
  *
  * ── PAGING ─────────────────────────────────────────────────────────────────
  * The feed is cursor-paged; the next page loads 320px before the end of the
@@ -516,6 +521,22 @@ function SpaceFeed({
     const bottomClearance = dock ? Math.max(16, Math.round(window.innerHeight - dock.getBoundingClientRect().top) + 8) : 16;
     setCard({ file, row, bottomClearance, open: true });
   }, []);
+  // The list's picture viewer and player (the card's View and Play), over the
+  // list's loaded pictures in its order.
+  const viewer = useFileViewer();
+  const { view } = viewer;
+  const pictures = useMemo(() => {
+    const files: SpaceFile[] = [];
+    for (const entry of items) if (entry.type === 'file') files.push(entry.item);
+    return listPictures(files, 'File');
+  }, [items]);
+  // The card's View or Play closes the card as it opens the viewer, so focus
+  // goes back to the row the card hung from, not to a button that is gone.
+  const cardRow = card?.row ?? null;
+  const viewFile = useCallback(
+    (file: SpaceFile, kind: ViewKind) => view({ id: file.id, name: file.original_name, kind }, cardRow),
+    [view, cardRow],
+  );
   // The feed cut into days, newest first.
   const days = useMemo(() => {
     const groups: { label: string; entries: SpaceItem[] }[] = [];
@@ -592,7 +613,9 @@ function SpaceFeed({
         open={card?.open ?? false}
         onOpenChange={(open) => setCard((previous) => (previous ? { ...previous, open } : previous))}
         actions={card ? fileActions(card.file) : {}}
+        onView={viewFile}
       />
+      <FileViewers viewer={viewer} pictures={pictures} place="space" />
       {dialogs}
       {deleting ? (
         <DeleteSpaceFileDialog

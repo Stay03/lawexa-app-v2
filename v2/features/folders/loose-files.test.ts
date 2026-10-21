@@ -42,6 +42,8 @@ test('a loose file reads as its name, its kind and size, and when it was added',
     kind: 'Word',
     size: '1.2 MB',
     createdAt: '2026-10-19T10:00:00Z',
+    // A Word file opens in a tab; a picture or media would open here (21 October 2026).
+    view: null,
   });
   // No name: the fallback, marked as one. No usable size or type: not claimed.
   const bare = looseFileRow(file({ original_name: '  ', mime_type: '', size: Number.NaN, created_at: '' }));
@@ -50,6 +52,7 @@ test('a loose file reads as its name, its kind and size, and when it was added',
   assert.equal(bare.kind, null);
   assert.equal(bare.size, null);
   assert.equal(bare.createdAt, null);
+  assert.equal(bare.view, null);
 });
 
 test('the list asks for the unfiled files, under its own key, kept on the device', () => {
