@@ -127,6 +127,11 @@ test('a number matches section numbers by prefix, across parts', () => {
     matchOutline(outline, '12a').flatMap((group) => group.sections.map((s) => s.id)),
     ['s-12a'],
   );
+  // The number inside a longer label ("12. Composition") is not a match for "2".
+  assert.deepEqual(
+    matchOutline(outline, '2').flatMap((group) => group.sections.map((s) => s.id)),
+    ['s-2'],
+  );
 });
 
 test('words match titles in any order, ignoring case; a part heading can match on its own', () => {

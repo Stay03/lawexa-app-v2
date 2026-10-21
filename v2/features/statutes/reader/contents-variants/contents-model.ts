@@ -153,8 +153,9 @@ export function matchOutline(
     return words.every((word) => text.includes(word));
   };
   const matchesSection = (label: string) => {
-    if (matchesTitle(label)) return true;
-    if (numeric === null) return false;
+    // A number is looked up by the section's number alone: the label carries
+    // the number too ("12 Application …"), so "2" would otherwise find 12.
+    if (numeric === null) return matchesTitle(label);
     const { num } = splitSectionLabel(label);
     return num !== null && num.toLowerCase().replace(/^art\.\s+/, '').startsWith(numeric);
   };
