@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import type { Channel, SpaceFile, SpaceItem } from '@/types/collab';
 import type { ConversationListItem } from '@/types/chat';
@@ -67,6 +68,11 @@ export interface FeedRowMenus {
   openFile: (file: SpaceFile, row: HTMLElement) => void;
   folderRow: (entry: Extract<SpaceItem, { type: 'folder' }>) => FolderRowModel;
   byline: (item: ConversationListItem) => string;
+  /**
+   * The Files tab is being ticked (bulk select): a file's row is its tick box
+   * and a tap ticks it instead of opening its card.
+   */
+  fileSelect?: { isSelected: (id: number) => boolean; toggle: (id: number) => void };
 }
 
 interface LineModel {
@@ -195,6 +201,7 @@ function roomLink(href: string) {
  * there, so the row is one plain button like every other row's one link.
  */
 function FeedFileRow({ file, now, menus }: { file: SpaceFile; now: number; menus: FeedRowMenus }) {
+  const select = menus.fileSelect;
   return (
     <Line
       line={{
@@ -212,11 +219,23 @@ function FeedFileRow({ file, now, menus }: { file: SpaceFile; now: number; menus
         ),
         time: formatRelativeTime(file.created_at, now),
       }}
-      render={(className, content) => (
-        <button type="button" onClick={(event) => menus.openFile(file, event.currentTarget)} aria-haspopup="dialog" className={className}>
-          {content}
-        </button>
-      )}
+      render={(className, content) =>
+        select ? (
+          <label className={cn(className, 'cursor-pointer', select.isSelected(file.id) && 'bg-secondary/60')}>
+            <Checkbox
+              checked={select.isSelected(file.id)}
+              onCheckedChange={() => select.toggle(file.id)}
+              aria-label={`Select ${file.original_name}`}
+              className="shrink-0"
+            />
+            {content}
+          </label>
+        ) : (
+          <button type="button" onClick={(event) => menus.openFile(file, event.currentTarget)} aria-haspopup="dialog" className={className}>
+            {content}
+          </button>
+        )
+      }
     />
   );
 }

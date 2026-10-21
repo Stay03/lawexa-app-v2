@@ -94,4 +94,11 @@ export const bulkApi = {
    *  (a folder's id, not its uuid), the pair the one-item toggle takes. */
   bookmarks: (items: readonly { type: string; id: number }[]) =>
     inBatches(items, (batch) => post('/bulk/bookmarks', { action: 'remove', items: batch })),
+
+  /** A Space's files (numeric ids): taken out of the Space (its Owner),
+   *  deleted for every member, or copied into the reader's own files. */
+  spaceFiles: (space: string, ids: readonly number[], action: 'remove' | 'delete' | 'copy_to_mine') =>
+    inBatches(ids, (batch) =>
+      post('/bulk/space-items', { action, space, items: batch.map((id) => ({ type: 'file', id })) }),
+    ),
 };

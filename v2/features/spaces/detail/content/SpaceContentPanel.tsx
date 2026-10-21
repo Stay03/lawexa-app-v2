@@ -32,6 +32,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { TabRow } from '@/v2/shell/TabRow';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useCopySpaceFileToMine, useUploadSpaceFile } from '../../content-mutations';
+import { useSpaceFilesBulk } from './space-files-bulk';
 import {
   FILES_ACCEPT,
   canDeleteSpaceFile,
@@ -155,7 +156,37 @@ export function SpaceContentPanel({
   // 2026: "no indication where it went").
   const dock = useRef<HomeComposerHandle>(null);
 
-  const action =
+  // Bulk select on the Files pill (Arthur, 20 October 2026): its files, from
+  // the same read the list shows (one cache entry, no second request).
+  const pages = query.data?.pages;
+  const files = useMemo(
+    () =>
+      tab === 'files' && pages
+        ? uniqueRowsById(pages, itemKey).flatMap((entry) => (entry.type === 'file' ? [entry.item] : []))
+        : NO_FILES,
+    [tab, pages],
+  );
+  const bulk = useSpaceFilesBulk({ space, files, canRemove: access.canRemove, viewerId });
+  const selecting = bulk.selecting && tab === 'files';
+  const { isSelected, toggle } = bulk;
+  const fileSelect = useMemo(() => (selecting ? { isSelected, toggle } : undefined), [selecting, isSelected, toggle]);
+  const changeTab = (next: SpaceTab) => {
+    // Ticks belong to the list they were made on.
+    bulk.stop();
+    onTabChange(next);
+  };
+
+  const selectButton =
+    tab === 'files' && files.length > 0 && !selecting
+      ? bulk.startButton(
+          cn(
+            'v2-interactive inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+            FOCUS_RING,
+          ),
+        )
+      : null;
+
+  const addAction =
     access.canAdd && tab === 'files' ? (
       <PillButton icon={Upload} onClick={pickFiles}>
         Upload files
@@ -165,6 +196,15 @@ export function SpaceContentPanel({
         New folder
       </PillButton>
     ) : null;
+  const action =
+    selectButton && addAction ? (
+      <div className="flex items-center gap-2">
+        {selectButton}
+        {addAction}
+      </div>
+    ) : (
+      (selectButton ?? addAction)
+    );
 
   const list =
     tab === 'people' ? (
@@ -179,6 +219,7 @@ export function SpaceContentPanel({
         onUpload={pickFiles}
         onNewFolder={startFolder}
         onAttach={() => dock.current?.attach()}
+        fileSelect={fileSelect}
       />
     );
 
@@ -188,7 +229,7 @@ export function SpaceContentPanel({
         <TabRow
           tabs={PILLS}
           value={tab}
-          onChange={onTabChange}
+          onChange={changeTab}
           ariaLabel="Show in this space"
           panelId={PANEL_ID}
           className={PILLS_CLASS}
@@ -220,11 +261,22 @@ export function SpaceContentPanel({
           intent={{ mode: 'create', space: { uuid: space.uuid, name: space.name } }}
         />
       ) : null}
+      {/* Room under the last row for the bar while it is up. */}
+      {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
+      {selecting ? bulk.bar : null}
+      {bulk.dialogs}
+
       {/* The Space's message box on the pills that hold chats and files; not on
           Folders or People, where a question to Lawexa has nothing to start
-          from (Arthur, 17 October 2026, item 2). */}
+          from (Arthur, 17 October 2026, item 2). While files are being
+          ticked, the bar holds the foot of the screen: the box is hidden, not
+          unmounted, so a half-typed question is still there after Done. */}
       {access.canAdd && DOCK_TABS.has(tab) ? (
-        <SpaceChatDock space={{ uuid: space.uuid, name: space.name }} handle={dock} />
+        // `contents`, so the box stays a child of this column for its `sticky`
+        // and `mt-auto`; `hidden` takes it off screen without unmounting it.
+        <div className={selecting ? 'hidden' : 'contents'}>
+          <SpaceChatDock space={{ uuid: space.uuid, name: space.name }} handle={dock} />
+        </div>
       ) : null}
     </div>
   );
@@ -277,6 +329,7 @@ const pillClass = (selected: boolean): string =>
 
 /** Stable empty rows, so a pending list does not mint a new array per render. */
 const NO_ITEMS: readonly SpaceItem[] = [];
+const NO_FILES: readonly SpaceFile[] = [];
 
 /** A feed row's identity across pages: the kind and that kind's own id. */
 const itemKey = (entry: SpaceItem): string =>
@@ -363,6 +416,7 @@ function SpaceFeed({
   onUpload,
   onNewFolder,
   onAttach,
+  fileSelect,
 }: {
   tab: SpaceContentTab;
   query: FeedQuery;
@@ -373,6 +427,8 @@ function SpaceFeed({
   onNewFolder: () => void;
   /** Opens the docked box's picker (the All and Conversations empty states). */
   onAttach: () => void;
+  /** Bulk select on the Files pill: the ticks, while they are being made. */
+  fileSelect?: FeedRowMenus['fileSelect'];
 }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId } = useContentReadGate();
@@ -474,6 +530,7 @@ function SpaceFeed({
     openFile,
     folderRow: (entry) => folderRow(entry.item),
     byline: (item) => lastMessageLine(item.last_message, viewerUuid) ?? 'No messages yet',
+    fileSelect,
   };
 
   const renderRow = (entry: SpaceItem) => renderFeedRow({ entry, now, menus: rowMenus, key: itemKey(entry) });
