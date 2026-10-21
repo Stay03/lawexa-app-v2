@@ -179,6 +179,28 @@ export function visibilityChoicesFor(hasRoom: boolean): readonly QuizVisibilityC
     : QUIZ_VISIBILITY_CHOICES.filter((choice) => choice.id !== 'shared');
 }
 
+/**
+ * Is a room in this quiz's picture, for {@link visibilityChoicesFor}? Born in
+ * a channel (`channel_uuid`, provenance — the room may since be gone, and the
+ * choice still reads right), or already `shared`, which only a room can mean.
+ */
+export function quizHasRoom(quiz: {
+  channel_uuid: string | null;
+  visibility: ChannelQuizVisibility;
+}): boolean {
+  return quiz.channel_uuid !== null || quiz.visibility === 'shared';
+}
+
+/** Narrows a menu's string value to the vocabulary, so no cast is needed. */
+export function isQuizVisibility(value: string): value is ChannelQuizVisibility {
+  return QUIZ_VISIBILITY_CHOICES.some((choice) => choice.id === value);
+}
+
+/** The one line under a disabled "Everyone" choice, and the answer to the
+ *  `403` a public save gets from an author the server has not verified. */
+export const PUBLIC_NEEDS_VERIFIED_AUTHOR =
+  'Public quizzes are for verified authors. Anyone can still share one by link.';
+
 /** The chip a row wears for its visibility, legible without opening a menu. */
 export function visibilityFace(visibility: ChannelQuizVisibility): string {
   switch (visibility) {

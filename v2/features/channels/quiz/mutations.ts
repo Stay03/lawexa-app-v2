@@ -69,11 +69,22 @@ function invalidateQuizLists(queryClient: QueryClient): void {
   });
 }
 
-export function useCreateQuiz(channelUuid: string) {
+/**
+ * Write a quiz FOR a channel. The room rides the variables rather than the
+ * hook (2026-10-21): the form that calls this now opens outside any channel
+ * too, and a hook that took the room up front would have had to be given an
+ * empty string there.
+ */
+export function useCreateQuiz() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateChannelQuizPayload) =>
-      channelQuizApi.create(channelUuid, payload),
+    mutationFn: ({
+      channelUuid,
+      payload,
+    }: {
+      channelUuid: string;
+      payload: CreateChannelQuizPayload;
+    }) => channelQuizApi.create(channelUuid, payload),
     meta: { silentError: true },
     onSuccess: () => invalidateQuizLists(queryClient),
   });

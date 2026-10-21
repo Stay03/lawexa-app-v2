@@ -61,10 +61,6 @@ export function canPublishPublicly(session: V2SessionSnapshot): boolean {
   return session.signedIn && session.isVerifiedAuthor;
 }
 
-/** The one line under a disabled "Public" choice, and the answer to its 403. */
-export const PUBLIC_NEEDS_VERIFIED_AUTHOR =
-  'Public quizzes are for verified authors. Anyone can still share one by link.';
-
 /**
  * May this viewer START an attempt? An account, and nothing less: the server
  * answers `401` to a visitor and `403` to a guest pass (Arthur's option B,

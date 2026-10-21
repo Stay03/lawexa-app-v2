@@ -6,7 +6,10 @@ import { join } from 'node:path';
 import type { UserRole } from '@/types/auth';
 import type { QuizAttempt, QuizAttemptResponse } from '@/types/channel-quiz';
 import {
+  isQuizVisibility,
+  PUBLIC_NEEDS_VERIFIED_AUTHOR,
   QUIZ_VISIBILITY_CHOICES,
+  quizHasRoom,
   visibilityChoicesFor,
   visibilityFace,
 } from '@/v2/features/channels/quiz/model';
@@ -23,7 +26,6 @@ import {
   nextUnanswered,
   orderedQuestions,
   pointsLabel,
-  PUBLIC_NEEDS_VERIFIED_AUTHOR,
   questionCountLabel,
   questionDeadlineMs,
   quizFrontHref,
@@ -167,6 +169,12 @@ test('the four visibilities have words, public needs a verified author, and shar
   assert.equal(visibilityFace('link'), 'By link');
   assert.equal(visibilityFace('public'), 'Public');
   assert.equal(visibilityFace('shared'), 'In channels');
+  // A room is in the picture when the quiz was born in one or already says so.
+  assert.equal(quizHasRoom({ channel_uuid: 'c1', visibility: 'private' }), true);
+  assert.equal(quizHasRoom({ channel_uuid: null, visibility: 'shared' }), true);
+  assert.equal(quizHasRoom({ channel_uuid: null, visibility: 'link' }), false);
+  assert.equal(isQuizVisibility('public'), true);
+  assert.equal(isQuizVisibility('everyone'), false);
 });
 
 test('the reveal choice offers each and end, opening on each', () => {

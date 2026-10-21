@@ -19,16 +19,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -54,7 +44,8 @@ import { TabRow } from '@/v2/shell/TabRow';
 import { canManageChannel } from '../model';
 import { LawexaMark, MemberAvatar } from '../ui/avatars';
 import { useHeldValue } from '../use-held-value';
-import { useDeleteQuiz, useGoLive, useSetQuizVisibility } from './mutations';
+import { DeleteQuizDialog } from './DeleteQuizDialog';
+import { useGoLive, useSetQuizVisibility } from './mutations';
 import {
   canHostQuiz,
   goLiveTarget,
@@ -711,81 +702,6 @@ function VisibilityGroup({ quiz }: { quiz: ChannelQuiz }) {
         {VISIBILITY_FOOTNOTE}
       </p>
     </>
-  );
-}
-
-function DeleteQuizDialog({
-  quiz,
-  onClose,
-}: {
-  quiz: ChannelQuiz | null;
-  onClose: () => void;
-}) {
-  /** The quiz this dialog is ABOUT, held through its own exit (the house
-   *  primitive, same as the composer's reply bar). `quiz` goes null the instant
-   *  the delete succeeds or the reader cancels, and the heading is written from
-   *  it — so without this the title read "Delete ?" for the length of the fade,
-   *  which is the last thing a destructive confirmation should say on its way
-   *  out. It also keeps the mutation pointed at a stable uuid across that frame. */
-  const shown = useHeldValue(quiz);
-  const deleteQuiz = useDeleteQuiz(shown?.uuid ?? '');
-  const [error, setError] = useState<string | null>(null);
-  /** The refusal held through the same exit, for the same reason the title is:
-   *  it is cleared on close, so a dialog dismissed after a failed delete would
-   *  drop its explanation a frame before it finished fading. An OPEN dialog
-   *  always reads the live value, so pressing Delete again clears it at once. */
-  const heldError = useHeldValue(error);
-  const shownError = quiz !== null ? error : heldError;
-
-  return (
-    <AlertDialog
-      open={quiz !== null}
-      onOpenChange={(next) => {
-        if (!next) {
-          setError(null);
-          onClose();
-        }
-      }}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete {shown?.title}?</AlertDialogTitle>
-          <AlertDialogDescription>
-            The quiz goes away for everyone, in every channel it has run in.
-            Games already played keep their results.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        {shownError && <p className="text-sm text-destructive">{shownError}</p>}
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleteQuiz.isPending}>
-            Keep it
-          </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={(event) => {
-              event.preventDefault();
-              deleteQuiz.mutate(undefined, {
-                onSuccess: onClose,
-                onError: (mutationError) => {
-                  const { status, message } = extractApiError(mutationError);
-                  setError(
-                    status === 409
-                      ? 'This quiz is live right now — end the game first, then it can be deleted.'
-                      : message,
-                  );
-                },
-              });
-            }}
-            disabled={deleteQuiz.isPending}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            {deleteQuiz.isPending && (
-              <Loader2 aria-hidden className="mr-1 size-4 animate-spin" />
-            )}
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
   );
 }
 

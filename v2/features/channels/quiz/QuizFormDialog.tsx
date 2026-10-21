@@ -22,6 +22,7 @@ import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { extractApiError } from '@/lib/utils/api-error';
 import type {
   ChannelQuiz,
+  ChannelQuizResponse,
   ChannelQuizSettings,
   QuizQuestionInput,
   QuizQuestionType,
@@ -76,6 +77,12 @@ import {
  * one line under the title rather than offering a second, silent control that
  * would only be able to contradict the first. Editing has no destination at
  * all — a quiz's home is fixed once it exists.
+ *
+ * ── IT OPENS OUTSIDE A CHANNEL TOO (2026-10-21) ─────────────────────────────
+ * The library page (`/quiz/library`) writes quizzes with no room anywhere in
+ * sight, so `channelUuid` and `channelName` are optional and a form with
+ * neither can only file into the library: `destination` is read only when
+ * there is a channel to file into.
  */
 
 interface OptionDraft {
@@ -182,17 +189,20 @@ export function QuizFormDialog({
   onOpenChange,
   channelUuid,
   channelName,
-  destination,
+  destination = 'library',
   viewerId,
   quizUuid,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  channelUuid: string;
+  /** The room a new quiz may be written FOR. Absent outside a channel. */
+  channelUuid?: string;
   /** Named in the destination line, so "this channel" is never abstract. */
-  channelName: string;
-  destination: QuizDestination;
+  channelName?: string;
+  /** Read only when there is a channel; with none, the library is the only
+   *  place a quiz can go. */
+  destination?: QuizDestination;
   viewerId: number | null;
   /** Present = edit an existing quiz; absent = write a new one. */
   quizUuid?: string;
@@ -205,7 +215,14 @@ export function QuizFormDialog({
   });
   const loaded = detailQuery.data?.data ?? null;
 
-  const createQuiz = useCreateQuiz(channelUuid);
+  // Where a NEW quiz lands. A room to file into, and the tab that asked for
+  // it; otherwise the library, which is the only answer there is.
+  const room =
+    channelUuid !== undefined && destination === 'channel'
+      ? { uuid: channelUuid, name: channelName ?? 'this channel' }
+      : null;
+
+  const createQuiz = useCreateQuiz();
   const createLibraryQuiz = useCreateLibraryQuiz();
   const updateQuiz = useUpdateQuiz(quizUuid ?? '');
 
@@ -316,22 +333,21 @@ export function QuizFormDialog({
       return;
     }
 
-    const create = destination === 'library' ? createLibraryQuiz : createQuiz;
-    create.mutate(
-      {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        settings,
-        questions: toPayload(questions),
+    const payload = {
+      title: title.trim(),
+      description: description.trim() || undefined,
+      settings,
+      questions: toPayload(questions),
+    };
+    const onCreated = {
+      onSuccess: (response: ChannelQuizResponse) => {
+        onOpenChange(false);
+        onSaved?.(response.data);
       },
-      {
-        onSuccess: (response) => {
-          onOpenChange(false);
-          onSaved?.(response.data);
-        },
-        onError,
-      },
-    );
+      onError,
+    };
+    if (room) createQuiz.mutate({ channelUuid: room.uuid, payload }, onCreated);
+    else createLibraryQuiz.mutate(payload, onCreated);
   };
 
   return (
@@ -342,9 +358,9 @@ export function QuizFormDialog({
       title={
         isEdit
           ? 'Edit quiz'
-          : destination === 'library'
-            ? 'New quiz in your library'
-            : `New quiz in ${channelName}`
+          : room
+            ? `New quiz in ${room.name}`
+            : 'New quiz in your library'
       }
       description={
         <>
@@ -358,9 +374,9 @@ export function QuizFormDialog({
               orphaned outside the element the dialog is described by. */}
           {!isEdit && (
             <span className="mt-1 block text-xs">
-              {destination === 'library'
-                ? 'It stays yours and appears in no channel until you run it in one — then that channel can see it too.'
-                : `It belongs to ${channelName} and to you, and it is in your library either way.`}
+              {room
+                ? `It belongs to ${room.name} and to you, and it is in your library either way.`
+                : 'It stays yours and appears in no channel until you run it in one — then that channel can see it too.'}
             </span>
           )}
         </>
