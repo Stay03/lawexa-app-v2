@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { BookmarkType } from '@/types/bookmark';
 import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { formatCaseDate } from '@/v2/features/cases/case-row-model';
@@ -93,6 +94,8 @@ export const BookmarkRow = memo(function BookmarkRow({
   now,
   exiting,
   onExit,
+  selected,
+  onToggleSelect,
 }: {
   row: BookmarkRowModel;
   /** Staggers the entrance for the first screenful only. */
@@ -105,8 +108,16 @@ export const BookmarkRow = memo(function BookmarkRow({
   /** Hands the row to the list's presence holdover. MUST be stable, or the
    *  `memo` above stops holding. */
   onExit: (row: BookmarkRowModel, index: number) => void;
+  /**
+   * Bulk select: the row is its tick box, a tap ticks it instead of opening
+   * it, and the star steps aside for the bar. `onToggleSelect` MUST be stable,
+   * like `onExit`.
+   */
+  selected?: boolean;
+  onToggleSelect?: (row: BookmarkRowModel) => void;
 }) {
   const Icon = TYPE_ICON[row.type];
+  const selecting = onToggleSelect !== undefined;
   const saved = formatRelativeTime(row.savedAt, now);
   const tint = row.type === 'folder' ? tileTint(row.color) : null;
 
@@ -203,7 +214,22 @@ export const BookmarkRow = memo(function BookmarkRow({
           exiting && 'overflow-hidden',
         )}
       >
-        {row.href ? (
+        {selecting ? (
+          <label
+            className={cn(
+              'v2-interactive flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
+              selected && 'bg-secondary/60',
+            )}
+          >
+            <Checkbox
+              checked={selected === true}
+              onCheckedChange={() => onToggleSelect(row)}
+              aria-label={`Select ${row.title}`}
+              className="mt-2.5 shrink-0"
+            />
+            {identity}
+          </label>
+        ) : row.href ? (
           <Link
             href={row.href}
             className={cn(
@@ -223,8 +249,13 @@ export const BookmarkRow = memo(function BookmarkRow({
         )}
 
         {/* Outside the link, so the star is its own control with its own
-            accessible name rather than a click the row has to swallow. */}
-        <UnsaveButton row={row} index={index} exiting={exiting} onExit={onExit} />
+            accessible name rather than a click the row has to swallow. While
+            ticking, its place stays empty so the rows keep their width. */}
+        {selecting ? (
+          <span aria-hidden className="mt-3.5 size-9 shrink-0" />
+        ) : (
+          <UnsaveButton row={row} index={index} exiting={exiting} onExit={onExit} />
+        )}
       </div>
     </li>
   );

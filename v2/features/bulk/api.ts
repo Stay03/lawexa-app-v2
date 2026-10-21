@@ -89,4 +89,9 @@ export const bulkApi = {
       if (action.action === 'space') body.space_uuid = action.spaceUuid;
       return post('/bulk/conversations', body);
     }),
+
+  /** Saved items, out of Saved: each by its kind and the CONTENT's numeric id
+   *  (a folder's id, not its uuid), the pair the one-item toggle takes. */
+  bookmarks: (items: readonly { type: string; id: number }[]) =>
+    inBatches(items, (batch) => post('/bulk/bookmarks', { action: 'remove', items: batch })),
 };

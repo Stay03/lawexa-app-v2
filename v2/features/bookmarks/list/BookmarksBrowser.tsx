@@ -1,10 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { extractApiError } from '@/lib/utils/api-error';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
@@ -17,6 +19,8 @@ import { bookmarkTargetKey, usePendingBookmarkRemovals } from '../mutations';
 import { bookmarkRow, type BookmarkRowModel } from '../bookmark-row-model';
 import { BookmarkRow } from './BookmarkRow';
 import { useExitingRows } from './use-exiting-rows';
+import { useBookmarksBulk } from './bookmarks-bulk';
+import { savedKey } from './bookmarks-bulk-model';
 import { TypeTabs, parseBookmarkTab, type BookmarkTab } from './TypeTabs';
 import {
   BookmarksEmptyState,
@@ -156,6 +160,11 @@ export function BookmarksBrowser() {
   // enough to collapse out instead of vanishing between frames (review F6).
   const { presented, beginExit } = useExitingRows(rows, rowKey);
 
+  // Bulk select (Arthur, 20 October 2026): the saved items on this tab.
+  const bulk = useBookmarksBulk({ rows });
+  const { toggle: toggleSelected, isSelected, selecting } = bulk;
+  const toggleRow = useCallback((row: BookmarkRowModel) => toggleSelected(savedKey(row)), [toggleSelected]);
+
   const scrollRootRef = useShellScrollRoot();
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
     hasNextPage: query.hasNextPage,
@@ -166,6 +175,8 @@ export function BookmarksBrowser() {
   });
 
   const setTab = (next: BookmarkTab) => {
+    // Ticks belong to the list they were made on ("limited to the current list").
+    bulk.stop();
     replaceUrlParams({ type: next === 'all' ? null : next });
   };
 
@@ -205,8 +216,16 @@ export function BookmarksBrowser() {
       {/* Static chrome: the tab strip renders on the first frame and never
           waits on data (standards §8i — v1 hid its tabs behind the list's
           loading state, which is exactly what that rule forbids). */}
-      <div className="mb-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <TypeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
+        {rows.length > 0 && !selecting
+          ? bulk.startButton(
+              cn(
+                'v2-interactive inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+                FOCUS_RING,
+              ),
+            )
+          : null}
       </div>
 
       {/* The ONE live region for this surface (review F8). The route fallback's
@@ -264,6 +283,8 @@ export function BookmarksBrowser() {
                   now={now}
                   exiting={exiting}
                   onExit={beginExit}
+                  selected={selecting ? isSelected(savedKey(row)) : undefined}
+                  onToggleSelect={selecting ? toggleRow : undefined}
                 />
               ))}
             </ul>
@@ -283,6 +304,11 @@ export function BookmarksBrowser() {
           </>
         )}
       </div>
+
+      {/* Room under the last row for the bar while it is up. */}
+      {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
+      {bulk.bar}
+      {bulk.dialogs}
     </PageShell>
   );
 }
