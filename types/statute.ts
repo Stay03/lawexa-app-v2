@@ -65,8 +65,13 @@ export interface Statute {
   // no existing consumer's expectations change.
   /** The enacting formula ("AN ACT to …"), usually mirrored by `preamble`. */
   long_title?: string | null;
-  /** AKN document type, e.g. `"act"`. */
+  /** AKN document type, e.g. `"act"`. The same for every statute; the label
+   *  reads `kind`. */
   document_type?: string | null;
+  /** The kind of law, read from the title by the server, in title case: "Act",
+   *  "Rules", "Regulations", "Order" and so on (backend, 21 October 2026).
+   *  Absent on a server from before it. */
+  kind?: string | null;
   /** FRBR work URI, e.g. `"/akn/gh/act/1993/459"`. */
   frbr_uri?: string | null;
   /** Date of assent (ISO date). */

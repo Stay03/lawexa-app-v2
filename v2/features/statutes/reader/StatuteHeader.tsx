@@ -17,6 +17,7 @@ import {
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { NotesButton } from '../notes/NotesButton';
 import { incompleteNotice, statuteSource } from './statute-source';
+import { statuteKindLabel } from '../statute-kind';
 import './statute-masthead.css';
 
 /**
@@ -57,7 +58,7 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
   const countryCode = toAlpha2(detail.country?.code, detail.country?.abbreviation);
   const tone = statuteStatusTone(detail.status);
   const commenced = formatStatuteDate(detail.commencement_date);
-  const documentType = formatDocumentType(detail.document_type);
+  const documentType = statuteKindLabel(detail);
   const source = statuteSource(detail);
   const incomplete = incompleteNotice(detail);
 
@@ -192,13 +193,6 @@ export function StatuteHeader({ detail }: { detail: StatuteDetail }) {
       </div>
     </header>
   );
-}
-
-/** 'act' → 'Act'. Tolerates types newer than this build. */
-function formatDocumentType(value: string | null | undefined): string | null {
-  const trimmed = value?.trim();
-  if (!trimmed) return null;
-  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).replace(/_/g, ' ');
 }
 
 function Dot() {

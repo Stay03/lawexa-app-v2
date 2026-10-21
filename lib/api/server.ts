@@ -333,6 +333,8 @@ export interface StatuteMetadata {
   status: StatuteStatus;
   /** AKN document type, e.g. `"act"` — lowercase as the API ships it. */
   documentType: string | null;
+  /** The kind of law ("Rules", "Order"), or `null` from a server without it. */
+  kind: string | null;
   /** One-line description material, already collapsed and capped. */
   summary: string;
   /** The backend's SEO block. `canonical` is NEVER used — ours wins. */
@@ -352,6 +354,7 @@ interface PublicStatuteSummary {
   status: StatuteStatus;
   status_label: string;
   document_type: string | null;
+  kind?: string | null;
   country: { name: string; code: string } | null;
   description: string | null;
   meta: SeoMeta | null;
@@ -421,6 +424,7 @@ export async function fetchStatuteForMetadata(
       year: data.year,
       status: data.status,
       documentType: data.document_type ?? null,
+      kind: data.kind?.trim() || null,
       summary: toBlurb(data.description, 300),
       meta: data.meta ?? null,
     };

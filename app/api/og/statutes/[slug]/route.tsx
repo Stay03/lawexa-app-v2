@@ -107,7 +107,7 @@ export async function GET(
   const kicker = [
     detail.country,
     detail.year ? String(detail.year) : '',
-    detail.documentType,
+    detail.kind ?? detail.documentType,
   ]
     .filter(Boolean)
     .join('  ·  ');
