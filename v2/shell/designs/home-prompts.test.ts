@@ -1,0 +1,20 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { promptText } from './home-prompt-text';
+
+/* Tester, 20 October 2026 (finding 19): a tapped suggestion put "Find a case
+ * on" in the box with no space, so the typed word ran on. */
+
+test('a tapped prompt leaves one space after the stub', () => {
+  assert.equal(promptText('Find a case on'), 'Find a case on ');
+  assert.equal(`${promptText('Find a case on')}tenancy`, 'Find a case on tenancy');
+});
+
+test('both presentations insert promptText, never the bare label', () => {
+  const source = readFileSync(join(process.cwd(), 'v2', 'shell', 'designs', 'HomePrompts.tsx'), 'utf8');
+  assert.equal((source.match(/onClick=\{\(\) => onSelect\(promptText\(label\)\)\}/g) ?? []).length, 2);
+  assert.doesNotMatch(source, /onSelect\(label\)/);
+});

@@ -16,6 +16,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import type { HomeTab } from '@/v2/shell/home-tabs';
+import { promptText } from './home-prompt-text';
 
 /**
  * HomePrompts — the ONE suggested-prompts surface both home designs share, so
@@ -44,13 +45,13 @@ import type { HomeTab } from '@/v2/shell/home-tabs';
  *  • work  — practice work: a matter, a document, a deadline, a counterparty.
  *  • study — learning: understand, compare, test yourself, revise.
  *
- * Clicking fills the stub (without the trailing "…") into the composer and focuses
+ * Clicking fills the stub (without the trailing "…", with one space after it) into the composer and focuses
  * the textarea — the `composerAreaRef` fill-and-focus pattern already in the
  * surfaces; the caller passes that behaviour in as `onSelect`.
  */
 
 interface HomePrompt {
-  /** v1's exact prompt stub — inserted verbatim (the trailing "…" is display only). */
+  /** v1's exact prompt stub, inserted with one trailing space (`promptText`); the "…" is display only. */
   label: string;
   /** Desktop-list leading icon (a consistent lucide set). */
   icon: LucideIcon;
@@ -108,7 +109,7 @@ export function HomePrompts({
           <button
             key={label}
             type="button"
-            onClick={() => onSelect(label)}
+            onClick={() => onSelect(promptText(label))}
             className={cn(
               'v2-interactive min-h-11 rounded-2xl border border-border px-4 py-3 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
               FOCUS_RING,
@@ -128,7 +129,7 @@ export function HomePrompts({
         <li key={label}>
           <button
             type="button"
-            onClick={() => onSelect(label)}
+            onClick={() => onSelect(promptText(label))}
             className={cn(
               'group v2-interactive flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
               FOCUS_RING,
