@@ -1,22 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { Users } from 'lucide-react';
+import { Boxes } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
- * The mark of a folder that sits in a Space (Stay picked C1, 20 October 2026,
- * 14:24Z): a disc in the folder's own yellow, with the people glyph cut out of
- * it, on the bottom right of the folder icon. The yellow keeps the type colour
- * rule ("The colour should be for the types"): the mark says "folder" in the
- * same colour and adds no new one.
+ * The mark of a folder that sits in a Space (Arthur picked 2a, 21 October
+ * 2026, 13:07Z): the Space glyph (the cubes, as a Space wears everywhere else)
+ * in the folder's own yellow, pulled in to sit about half over the folder
+ * icon's bottom-right corner. No disc: Arthur, "It doesn't need the gold disc
+ * around it". It replaces Stay's C1 of 20 October, a yellow disc with the
+ * people glyph, which read as "shared". The yellow keeps the type colour rule
+ * ("The colour should be for the types"): the mark adds no new colour.
  *
- * The disc sits in a ring of the ground behind it, so it reads as cut out of
- * the icon at phone size. `ground` names that ground: a list row (the page, and
- * the row's hover tint under the pointer) or the picker's grey tile.
+ * The cubes sit on a small square of the ground behind them, so their lines
+ * do not run into the folder's outline where they cross it. `ground` names
+ * that ground: a list row (the page, and the row's hover tint under the
+ * pointer) or the picker's grey tile.
  *
  * The Space's name costs no row space. A screen reader hears
  * {@link spaceFolderNote} after the folder's name (the row puts it there). With
@@ -32,23 +35,23 @@ export function SpaceFolderMark({
   ground: 'row' | 'tile';
   tooltip?: boolean;
 }) {
-  const disc = (
+  const glyph = (
     <span
       className={cn(
-        'absolute -bottom-1 -right-1.5 flex size-3.5 items-center justify-center rounded-full ring-2',
-        'bg-amber-500 text-background dark:bg-amber-400',
+        'absolute -bottom-0.5 -right-0.5 flex size-[11px] items-center justify-center rounded-[2px] p-px',
+        'text-amber-500 dark:text-amber-400',
         ground === 'row'
-          ? 'ring-background group-hover:ring-[color-mix(in_oklch,var(--secondary)_50%,var(--background))]'
-          : 'ring-secondary',
+          ? 'bg-background group-hover:bg-[color-mix(in_oklch,var(--secondary)_50%,var(--background))]'
+          : 'bg-secondary',
       )}
     >
-      <Users aria-hidden className="size-2.5 stroke-[2.75]" />
+      <Boxes aria-hidden className="size-full stroke-[2.6]" />
     </span>
   );
-  if (!tooltip) return <span aria-hidden>{disc}</span>;
+  if (!tooltip) return <span aria-hidden>{glyph}</span>;
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{disc}</TooltipTrigger>
+      <TooltipTrigger asChild>{glyph}</TooltipTrigger>
       <TooltipContent side="top" sideOffset={6}>
         In {spaceName}
       </TooltipContent>
@@ -63,17 +66,12 @@ export function spaceFolderNote(spaceName: string): string {
 
 /**
  * A Space folder's page, under its name: "In <Space>", the Space a link. Quiet
- * type, with the same yellow disc as the list's mark so the two read as one.
+ * type, led by the same yellow cubes as the list's mark so the two read as one.
  */
 export function SpaceFolderLine({ space }: { space: { uuid: string; name: string } }) {
   return (
     <p className="-mt-1 mb-3 flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-      <span
-        aria-hidden
-        className="flex size-3.5 shrink-0 items-center justify-center rounded-full bg-amber-500 text-background dark:bg-amber-400"
-      >
-        <Users className="size-2.5 stroke-[2.75]" />
-      </span>
+      <Boxes aria-hidden className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
       <span className="shrink-0">In</span>
       <Link
         href={`/spaces/${space.uuid}`}

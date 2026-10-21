@@ -6,11 +6,12 @@ import { join } from 'node:path';
 import { folderRow } from './folder-row-model';
 import type { FolderRecord } from './types';
 
-/* The Space folder mark (Stay picked C1, 20 October 2026, 14:24Z): on the
- * personal Folders page, a folder in a Space wears a folder-yellow disc with
- * the people glyph cut out; "In <Space>" on hover on a computer; ", in
- * <Space>" for a screen reader; and the folder's own page says which Space,
- * as a link. A personal folder has no mark. */
+/* The Space folder mark (Arthur picked 2a, 21 October 2026, 13:07Z, in place
+ * of Stay's C1 disc): on the personal Folders page, a folder in a Space wears
+ * the Space cubes in folder yellow, about half over the folder's bottom-right
+ * corner, with no disc; "In <Space>" on hover on a computer; ", in <Space>"
+ * for a screen reader; and the folder's own page says which Space, as a link.
+ * A personal folder has no mark. */
 
 const read = (...parts: string[]) =>
   readFileSync(join(process.cwd(), 'v2', 'features', 'folders', ...parts), 'utf8').replace(/\r\n/g, '\n');
@@ -50,10 +51,13 @@ test('the Folders page marks Space folders, with the tooltip and the screen-read
   const mark = read('space-mark.tsx');
   assert.match(mark, /<TooltipContent side="top" sideOffset=\{6\}>\s*In \{spaceName\}\s*<\/TooltipContent>/);
   assert.match(mark, /return `, in \$\{spaceName\}`;/);
-  // The folder's own yellow, the people glyph, and a ring of the ground behind it.
-  assert.match(mark, /bg-amber-500 text-background dark:bg-amber-400/);
-  assert.match(mark, /<Users aria-hidden/);
-  assert.match(mark, /ring-background group-hover:ring-\[color-mix/);
+  // The Space cubes in the folder's own yellow, half over the corner, on a
+  // square of the ground behind them; no disc and no people glyph.
+  assert.match(mark, /<Boxes aria-hidden className="size-full stroke-\[2\.6\]" \/>/);
+  assert.match(mark, /absolute -bottom-0\.5 -right-0\.5 flex size-\[11px\]/);
+  assert.match(mark, /'text-amber-500 dark:text-amber-400'/);
+  assert.match(mark, /bg-background group-hover:bg-\[color-mix/);
+  assert.doesNotMatch(mark, /rounded-full|Users/);
   // The words come after the name, never before it.
   const fileRow = read('file-list', 'FileListRow.tsx');
   assert.match(fileRow, /\{name\}\s*\{srNote \? <span className="sr-only">\{srNote\}<\/span> : null\}/);
