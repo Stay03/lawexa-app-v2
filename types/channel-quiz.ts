@@ -46,11 +46,33 @@
  * The public results endpoint (`GET /public/quiz-games/{game}/results`) landed
  * in the same wave; see {@link PublicQuizGameResults}.
  *
- * NOT the solo `/quiz` product (`types/quiz.ts`, `/api/quizzes`). The two share
- * a word and nothing else — no shapes, no screens, no code. Kept in its own
- * module rather than appended to `types/collab.ts` for exactly that reason: a
- * self-contained surface with its own contract doc, its own client and its own
- * feature folder.
+ * ── 2026-10-21: A QUIZ CAN BE TAKEN ALONE, AND FOUND BY LINK ────────────────
+ * Backend branch `quiz-part1-publish-and-solo` (tip 45a8f711, test bodies in
+ * `~/.lawexa/tools/frontend/contracts/quiz-45a8f711.json` and the two
+ * `quiz-part1-*` files beside it). What the bodies show, and what this file
+ * therefore encodes:
+ *  - `visibility` grew `link` and `public` ({@link ChannelQuizVisibility});
+ *    `public` is for verified authors only (`user.is_verified_author` on
+ *    `/auth/me`), anyone else gets `403 "This action is unauthorized."` on
+ *    create and on update alike;
+ *  - `GET /channel-quizzes/explore` lists public quizzes (works signed out,
+ *    `is_mine: false` there) and `GET /channel-quizzes/{quiz}/preview` serves a
+ *    link or public quiz to anyone, never with `is_correct`, `404` otherwise;
+ *  - a quiz is played alone through an ATTEMPT ({@link QuizAttempt}): started
+ *    with a {@link QuizRevealMode}, answered one question at a time with the
+ *    app's own `response_ms`, finished explicitly; `GET` on the attempt is the
+ *    resume. The server clamps `response_ms` to the question's limit and never
+ *    refuses a late answer: the APP runs the timer;
+ *  - a quiz may carry SCENARIOS (fact patterns its questions point at,
+ *    {@link QuizScenario}); typed here, not yet drawn by any screen;
+ *  - the 20-question cap is gone (no limit on the wire).
+ *
+ * NOT the practice `/quiz` product (`types/quiz.ts`, `/api/quizzes`). The two
+ * share a word and nothing else — no shapes, no screens, no code. Kept in its
+ * own module rather than appended to `types/collab.ts` for exactly that
+ * reason: a self-contained surface with its own contract doc, its own client
+ * and its own feature folder. The solo player (`v2/features/quiz/solo`) is THIS
+ * surface, played by one person.
  *
  * CONVENTIONS THAT BITE (digest §F.4):
  *  - quizzes, questions and games are addressed by `uuid`; OPTIONS use a
@@ -78,18 +100,30 @@ export type QuizQuestionType = 'multiple_choice' | 'true_false';
 
 /**
  * Who can FIND a quiz — discovery only, never access to what has already been
- * played (backend, 2026-08-05).
+ * played (backend, 2026-08-05; `link` and `public` added 2026-10-21).
  *
  *  - `shared`  everyone in a channel the quiz has been played in sees it on
- *              that channel's list;
- *  - `private` only the owner sees it there.
+ *              that channel's list. The server's default when a create omits
+ *              the field;
+ *  - `private` only the owner sees it anywhere;
+ *  - `link`    anyone SIGNED IN who holds the uuid can open and take it
+ *              (`GET /channel-quizzes/{quiz}` and `/preview` both answer), and
+ *              no list shows it;
+ *  - `public`  `link`, plus a row on `GET /channel-quizzes/explore`. Verified
+ *              authors only: the server answers `403` to everyone else, on
+ *              create and on update alike, so a screen offers it disabled with
+ *              the reason and treats the 403 as a designed line.
  *
  * A GAME THAT HAS ALREADY RUN IS UNAFFECTED, and the UI must say so: its lobby,
  * its results and its chat card stay fully visible to the room even after the
  * owner makes the quiz private. The flag may also be changed WHILE A GAME IS
  * LIVE — unlike the questions, which freeze at the first real play (`409`).
  */
-export type ChannelQuizVisibility = 'shared' | 'private';
+export type ChannelQuizVisibility = 'shared' | 'private' | 'link' | 'public';
+
+/** The two ways a solo attempt shows its answers: after each question, or
+ *  only at the end (`POST /channel-quizzes/{quiz}/attempts`). */
+export type QuizRevealMode = 'each' | 'end';
 
 /** `lobby → countdown → question_open ⇄ reveal → finished`, with `cancelled`
  *  terminal from any non-terminal state. */
@@ -128,7 +162,38 @@ export interface QuizQuestion {
   time_limit_seconds: number;
   position: number;
   options: QuizOption[];
+  /**
+   * The scenario this question is about, or `null` for a free-standing one.
+   * Optional because bodies from before 2026-10-21 carry no such key at all;
+   * a reader treats absent and `null` alike.
+   */
+  scenario_uuid?: string | null;
 }
+
+/**
+ * A FACT PATTERN the questions after it refer to (2026-10-21). Questions about
+ * one scenario arrive one after another (the server refuses a split set with
+ * `422 "The questions about scenario N must come one after another."`), so a
+ * player can show the passage once, above its run of questions.
+ *
+ * TYPED, NOT YET DRAWN: no screen renders scenarios today. The sizing of that
+ * work is in the solo quiz report; until then a quiz with scenarios plays as
+ * plain questions.
+ */
+export interface QuizScenario {
+  uuid: string;
+  title: string | null;
+  passage: string;
+  position: number;
+}
+
+/**
+ * The person who wrote a quiz, as every quiz body publishes them: a uuid, a
+ * name and a face. NOT a {@link SlimUser}: the bodies measured on 2026-10-21
+ * carry no `username`, and a type that promised one would be a lie the first
+ * mention picker believed.
+ */
+export type QuizAuthor = Pick<SlimUser, 'uuid' | 'name' | 'avatar_url'>;
 
 export interface ChannelQuiz {
   uuid: string;
@@ -176,7 +241,7 @@ export interface ChannelQuiz {
    * it as its creator (measured) — {@link is_ai_generated} is what says Lawexa
    * wrote the questions.
    */
-  creator: SlimUser | null;
+  creator: QuizAuthor | null;
   /** Lawexa drafted the questions. The quiz still belongs to the person who
    *  asked — `creator` is them and `is_mine` is true for them (measured
    *  2026-08-05 by asking Lawexa for a quiz and reading the row back). */
@@ -188,8 +253,12 @@ export interface ChannelQuiz {
    *  from `creator.uuid` but governance (channel admin, space governor,
    *  platform admin) cannot. */
   is_mine: boolean;
-  /** Present on detail (`GET /channel-quizzes/{quiz}`) and create/update. */
+  /** Present on detail (`GET /channel-quizzes/{quiz}`, `/preview`) and
+   *  create/update. */
   questions?: QuizQuestion[];
+  /** Present on detail beside `questions`, and only when the quiz has any.
+   *  Absent on index rows and on bodies from before 2026-10-21. */
+  scenarios?: QuizScenario[];
   /** Present on index rows (which never embed questions). */
   question_count?: number;
   created_at: string;
@@ -207,13 +276,26 @@ export interface QuizQuestionInput {
   question: string;
   time_limit_seconds: number;
   options: QuizOptionInput[];
+  /** Index into the body's `scenarios`, for a question about one of them.
+   *  Questions sharing an index must be consecutive (server rule, `422`). */
+  scenario_index?: number;
+}
+
+/** One scenario in a create/update body; the title is optional. */
+export interface QuizScenarioInput {
+  title?: string;
+  passage: string;
 }
 
 export interface CreateChannelQuizPayload {
   title: string;
   description?: string;
+  /** Omitted ⇒ `shared` (server default). `public` is refused with `403` for
+   *  anyone who is not a verified author. */
+  visibility?: ChannelQuizVisibility;
   settings?: Partial<ChannelQuizSettings>;
   questions: QuizQuestionInput[];
+  scenarios?: QuizScenarioInput[];
 }
 
 /** `PUT /channel-quizzes/{quiz}`. A `questions` array is a FULL REPLACEMENT
@@ -224,9 +306,122 @@ export interface UpdateChannelQuizPayload {
   description?: string;
   settings?: Partial<ChannelQuizSettings>;
   questions?: QuizQuestionInput[];
+  /** Sent with `questions` when the replacement has scenarios. */
+  scenarios?: QuizScenarioInput[];
   /** Owner only, and the ONE field on this payload that a live game does not
-   *  freeze (measured 2026-08-05) — so it can be sent on its own at any time. */
+   *  freeze (measured 2026-08-05) — so it can be sent on its own at any time.
+   *  `public` is `403` for anyone who is not a verified author. */
   visibility?: ChannelQuizVisibility;
+}
+
+/******************************************************************************
+                              Solo attempts (2026-10-21)
+******************************************************************************/
+
+/** `POST /channel-quizzes/{quiz}/attempts`. `401` signed out, `403` a guest. */
+export interface StartQuizAttemptPayload {
+  reveal_mode: QuizRevealMode;
+}
+
+/**
+ * `POST /channel-quiz-attempts/{attempt}/answers` — one answer, once.
+ *
+ * `response_ms` is the APP's measurement from the moment the question was
+ * shown to the tap (`performance.now()` on both ends). The server clamps it to
+ * the question's `time_limit_seconds × 1000` (measured: 90 000 on a 20 s
+ * question was stored as 20 000) and treats a missing value as the full limit,
+ * so a stale or absent clock costs points, never the answer.
+ *
+ * `409` is "This question has already been answered." or "This attempt is
+ * already finished." (same status, different sentences); `404` a question or
+ * option that is not this attempt's.
+ */
+export interface SubmitQuizAttemptAnswerPayload {
+  question_uuid: string;
+  option_id: number;
+  response_ms: number;
+}
+
+/**
+ * What an answer comes back with. The counts always; the four verdict fields
+ * ONLY on an `each` attempt — an `end` attempt learns nothing until it is
+ * finished, by design, so they are optional and a reader must branch on the
+ * attempt's `reveal_mode`, not on their presence.
+ */
+export interface QuizAttemptAnswerReceipt {
+  answered_count: number;
+  question_count: number;
+  is_correct?: boolean;
+  correct_option_id?: number;
+  points?: number;
+  /** As stored, after the clamp. */
+  response_ms?: number;
+}
+
+/** The quiz as an attempt carries it: enough to head the screen, no questions
+ *  of its own (they ride the attempt, with the viewer's answers on them). */
+export interface QuizAttemptQuiz {
+  uuid: string;
+  title: string;
+  description: string | null;
+  creator: QuizAuthor | null;
+}
+
+/**
+ * One question inside an attempt: the player view of the question, plus what
+ * this viewer did with it.
+ *
+ * WHICH FIELDS ARE THERE DEPENDS ON THE MOMENT (all measured 2026-10-21):
+ *  - unanswered, attempt running: `answered: false` and nothing else;
+ *  - answered, `each` attempt running: `your_option_id`, `correct_option_id`,
+ *    `is_correct`, `points`, `response_ms`;
+ *  - answered, `end` attempt running: `your_option_id` and no verdict;
+ *  - finished attempt, every question: all five, with `your_option_id: null`
+ *    and `response_ms: null` on a question that was never answered (and
+ *    `is_correct: false`, `points: 0` for it).
+ * So every verdict field is optional, and the one place a screen may read them
+ * as a set is a finished attempt.
+ */
+export interface QuizAttemptQuestion extends QuizQuestion {
+  answered: boolean;
+  your_option_id?: number | null;
+  correct_option_id?: number;
+  is_correct?: boolean;
+  points?: number;
+  response_ms?: number | null;
+}
+
+/**
+ * A solo attempt — `POST .../attempts` (201), `GET /channel-quiz-attempts/{a}`
+ * (the RESUME: the same shape, with the answers so far) and `POST .../finish`
+ * (the same shape, scored).
+ *
+ * THE SCORE FIELDS ARRIVE AT THE FINISH. `correct_count`, `score_percent`,
+ * `points`, `max_points` (`question_count × 1000`) and `avg_response_ms` are
+ * absent while the attempt is running and present once `finished_at` is set;
+ * `finished_at` is the ONE honest "is it over" read, and the score fields are
+ * optional so nothing can print a score the server has not computed.
+ *
+ * `reveal_mode` is on every attempt body from tip 45a8f711; an earlier body
+ * (7778376f) had none, which is why the preview of the player assumed `end`.
+ * It is typed required against the tip, which is the contract.
+ */
+export interface QuizAttempt {
+  uuid: string;
+  quiz: QuizAttemptQuiz;
+  reveal_mode: QuizRevealMode;
+  question_count: number;
+  answered_count: number;
+  correct_count?: number;
+  score_percent?: number;
+  points?: number;
+  max_points?: number;
+  /** Mean over the ANSWERED questions; `null` when none were. */
+  avg_response_ms?: number | null;
+  started_at: string;
+  finished_at: string | null;
+  scenarios?: QuizScenario[];
+  questions: QuizAttemptQuestion[];
 }
 
 /**
@@ -577,6 +772,8 @@ export interface QuizCancelledPayload {
 
 export type ChannelQuizListResponse = LengthAwareResponse<ChannelQuiz>;
 export type ChannelQuizResponse = ItemResponse<ChannelQuiz>;
+export type QuizAttemptResponse = ItemResponse<QuizAttempt>;
+export type QuizAttemptAnswerResponse = ItemResponse<QuizAttemptAnswerReceipt>;
 export type QuizGameListResponse = LengthAwareResponse<QuizGame>;
 export type QuizGameResponse = ItemResponse<QuizGame>;
 export type QuizGameStateResponse = ItemResponse<QuizGameState>;

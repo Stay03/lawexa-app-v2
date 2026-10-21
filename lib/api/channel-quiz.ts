@@ -15,9 +15,15 @@
  *
  * ERROR VOCABULARY (all four are DESIGNED STATES on the surfaces above, never
  * raw errors): 403 membership / host-policy / joined-too-late / a library quiz
- * asked to go live with no room named / an unknown target room · 404 unknown
- * uuid · 409 wrong state (a second live game, a stale question, an already
- * answered question, editing a played quiz) · 422 validation.
+ * asked to go live with no room named / an unknown target room / `public` from
+ * an author the server has not verified · 404 unknown uuid, or a private quiz
+ * asked for through the public preview · 409 wrong state (a second live game,
+ * a stale question, an already answered question, editing a played quiz, an
+ * answer to a finished attempt) · 422 validation.
+ *
+ * THE PUBLIC READS (`explore`, `preview`; 2026-10-21) work with no token at
+ * all, and `apiClient` sends none when the store holds none. They are throttled
+ * at 60 a minute per address, which no screen here comes near.
  */
 
 import { apiClient } from '@/lib/api/client';
@@ -29,11 +35,15 @@ import type {
   CreateChannelQuizPayload,
   GoLiveChannelQuizPayload,
   QuizAnswerResponse,
+  QuizAttemptAnswerResponse,
+  QuizAttemptResponse,
   QuizGameListResponse,
   QuizGameResponse,
   QuizGameResultsResponse,
   QuizGameStateResponse,
+  StartQuizAttemptPayload,
   SubmitQuizAnswerPayload,
+  SubmitQuizAttemptAnswerPayload,
   UpdateChannelQuizPayload,
 } from '@/types/channel-quiz';
 
@@ -77,6 +87,40 @@ export const channelQuizApi = {
           page: params.page ?? 1,
         },
       },
+    );
+    return response.data;
+  },
+
+  /**
+   * EVERY PUBLIC QUIZ — the explore list (2026-10-21). Works signed out, where
+   * every row reads `is_mine: false`; rows carry `question_count` and embed no
+   * questions. `per_page` 1–50, server default 15.
+   */
+  explore: async (
+    params: ChannelQuizListParams = {},
+  ): Promise<ChannelQuizListResponse> => {
+    const response = await apiClient.get<ChannelQuizListResponse>(
+      '/channel-quizzes/explore',
+      {
+        params: {
+          per_page: params.per_page ?? 15,
+          page: params.page ?? 1,
+        },
+      },
+    );
+    return response.data;
+  },
+
+  /**
+   * A `link` or `public` quiz for anyone, signed in or not, and NEVER with
+   * `is_correct` on an option. Everything else — a private quiz, a `shared`
+   * one, an unknown uuid — is the same `404`, so this cannot be used to probe
+   * which uuids exist. The read for a visitor and a guest; an account reads
+   * {@link channelQuizApi.show}, which also says whether the quiz is theirs.
+   */
+  preview: async (quizUuid: string): Promise<ChannelQuizResponse> => {
+    const response = await apiClient.get<ChannelQuizResponse>(
+      `/channel-quizzes/${quizUuid}/preview`,
     );
     return response.data;
   },
@@ -153,6 +197,64 @@ export const channelQuizApi = {
     const response = await apiClient.post<QuizGameResponse>(
       `/channel-quizzes/${quizUuid}/go-live`,
       payload,
+    );
+    return response.data;
+  },
+};
+
+/**
+ * Solo attempts (2026-10-21) — one person, one quiz, their own clock.
+ *
+ * THE SERVER KEEPS THE SCORE AND THE APP KEEPS THE TIME. An attempt is a row
+ * the server owns: which questions are answered, with what, and (once
+ * finished) the score. The timer is the app's: there is no `opens_at` on the
+ * wire, the server clamps whatever `response_ms` arrives and never refuses a
+ * late answer, so "time's up" is a rule this client enforces on its own
+ * screen. A reload mid-question therefore restarts that question's clock — a
+ * known soft spot, named in the solo quiz report.
+ */
+export const quizAttemptsApi = {
+  /** `201` a fresh attempt with every question `answered: false`. `401`
+   *  signed out, `403` a guest pass. */
+  start: async (
+    quizUuid: string,
+    payload: StartQuizAttemptPayload,
+  ): Promise<QuizAttemptResponse> => {
+    const response = await apiClient.post<QuizAttemptResponse>(
+      `/channel-quizzes/${quizUuid}/attempts`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /** THE RESUME — the attempt with the viewer's answers so far, or its score
+   *  once finished. Owner only (`404` for anyone else). */
+  show: async (attemptUuid: string): Promise<QuizAttemptResponse> => {
+    const response = await apiClient.get<QuizAttemptResponse>(
+      `/channel-quiz-attempts/${attemptUuid}`,
+    );
+    return response.data;
+  },
+
+  /** One answer per question, once. See {@link SubmitQuizAttemptAnswerPayload}
+   *  for the clamp and the two `409`s. */
+  answer: async (
+    attemptUuid: string,
+    payload: SubmitQuizAttemptAnswerPayload,
+  ): Promise<QuizAttemptAnswerResponse> => {
+    const response = await apiClient.post<QuizAttemptAnswerResponse>(
+      `/channel-quiz-attempts/${attemptUuid}/answers`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /** Scores the attempt. Unanswered questions count as wrong, and the body is
+   *  the finished attempt in full. `409` once it is already finished. */
+  finish: async (attemptUuid: string): Promise<QuizAttemptResponse> => {
+    const response = await apiClient.post<QuizAttemptResponse>(
+      `/channel-quiz-attempts/${attemptUuid}/finish`,
+      {},
     );
     return response.data;
   },
