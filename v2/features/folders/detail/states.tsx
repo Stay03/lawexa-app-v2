@@ -108,10 +108,15 @@ export function FolderDetailSkeleton({ name }: {
           and Delete are in the bar's one menu, so nothing else is reserved. */}
       <Skeleton className="hidden h-4 w-40 rounded sm:block" />
       <div className="pb-3 sm:mt-3">
+        {/* A <div>, not a <p>: the bar is a <div>, and a <p> around it is
+            closed early by the browser's HTML parser, so the page the
+            browser builds no longer matches the server's and React throws
+            #418 on every load of a folder page (21 October 2026). The type
+            classes keep the line box the live heading's height. */}
         {name ?? (
-          <p className={FOLDER_HEADING_TYPE}>
+          <div className={FOLDER_HEADING_TYPE}>
             <Skeleton className="inline-block h-[0.9em] w-3/5 rounded align-middle" />
-          </p>
+          </div>
         )}
       </div>
       <FileListHead />
