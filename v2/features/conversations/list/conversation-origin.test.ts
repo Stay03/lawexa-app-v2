@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ConversationReference } from '@/types/chat';
+import type { ConversationReference, NoteReferenceContent } from '@/types/chat';
 import { conversationOrigin, fullTime } from './conversation-origin';
 
 /* Tester, 20 October 2026 (finding 4): two chats with the same name in the
@@ -21,7 +21,9 @@ const kase: ConversationReference = {
 test('a chat names the case, statute or note it was started from', () => {
   assert.equal(conversationOrigin([statute]), 'Tenancy Law 2011');
   assert.equal(conversationOrigin([kase]), 'Adeyemi v State');
-  assert.equal(conversationOrigin([{ type: 'note', content: { id: 3, title: ' My  notes ', read_at: null, created_at: '' } }]), 'My notes');
+  // Only the title matters here; the rest of the note summary is left out.
+  const note: ConversationReference = { type: 'note', content: { id: 3, title: ' My  notes ' } as NoteReferenceContent };
+  assert.equal(conversationOrigin([note]), 'My notes');
 });
 
 test('a deleted item, a radar, or no references give no second line', () => {
