@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import { Check, Share2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
-import { useShareUrl } from './useShareUrl';
+import { useShareAction } from './use-share-action';
 
 /**
  * ShareButton — the one share control for the pages a reader shares from.
@@ -19,11 +17,10 @@ import { useShareUrl } from './useShareUrl';
  * fallback rather than the act. Where there is no share sheet (most desktops)
  * the link is copied, and the button says so for two seconds.
  *
- * A cancelled share sheet throws `AbortError`. That is the reader deciding, not
- * a failure, so it is swallowed rather than reported.
- *
- * An ambassador's code rides the shared link ({@link useShareUrl}), so a sign-up
- * from it credits them. Everybody else shares the plain address.
+ * The behaviour lives in {@link useShareAction} since 21 October 2026, so a
+ * control that is not this pill (a quiz row's menu) shares the same way; a
+ * cancelled sheet, the clipboard fallback and the ambassador's code are all
+ * described there.
  */
 export function ShareButton({
   path,
@@ -39,42 +36,7 @@ export function ShareButton({
   /** The accessible name, e.g. "Share this case". */
   label: string;
 }) {
-  const shareUrl = useShareUrl();
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-    },
-    [],
-  );
-
-  const share = async () => {
-    const url = shareUrl(path ? `${window.location.origin}${path}` : window.location.href);
-
-    if ('share' in navigator) {
-      try {
-        await navigator.share(title ? { title, url } : { url });
-        return;
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        // Anything else falls through to copying the link.
-      }
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
-      timerRef.current = window.setTimeout(() => {
-        timerRef.current = null;
-        setCopied(false);
-      }, 2000);
-    } catch {
-      toast.error("Couldn't copy the link.");
-    }
-  };
+  const { share, copied } = useShareAction({ path, title });
 
   return (
     <button

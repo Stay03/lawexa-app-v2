@@ -9,6 +9,7 @@ import {
   MoreHorizontal,
   Pencil,
   Plus,
+  Share2,
   Trash2,
 } from 'lucide-react';
 
@@ -29,6 +30,7 @@ import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
 import { VisibilityChip } from '@/v2/features/channels/quiz/VisibilityChip';
 import { VisibilityGroup } from '@/v2/features/channels/quiz/VisibilityGroup';
 import { LawexaMark } from '@/v2/features/channels/ui/avatars';
+import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
@@ -52,8 +54,10 @@ import { soloQuizQueries } from '../queries';
  * ── THE ROW'S MENU IS THE OWNER'S, ALWAYS ──────────────────────────────────
  * Every row here is `is_mine` by the endpoint's definition, so every row
  * carries the visibility switch (`VisibilityGroup`, the one the sheet uses),
- * Edit and Delete. Nothing is gated on a channel's host policy: a library is
- * not a room.
+ * Share where a link can open the quiz (`link` or `public`; the same share
+ * behaviour as the pill on the quiz front, `useShareAction`), Edit and
+ * Delete. Nothing is gated on a channel's host policy: a library is not a
+ * room.
  *
  * ── ROWS ARE THE LIST GRAMMAR ──────────────────────────────────────────────
  * The `SessionRow` shape: one honest link per row, a hairline between rows,
@@ -225,6 +229,8 @@ const LibraryRow = memo(function LibraryRow({
   /** The visibility switch's refusal, said under the row it was pressed on.
    *  There are no toasts on this surface and the write is `silentError`. */
   const [refusal, setRefusal] = useState<string | null>(null);
+  const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
+  const share = useShareAction({ path: quizFrontHref(quiz.uuid), title: quiz.title });
 
   return (
     <li
@@ -292,6 +298,14 @@ const LibraryRow = memo(function LibraryRow({
           <DropdownMenuContent align="end" className="w-72">
             <VisibilityGroup quiz={quiz} canPublish={canPublish} onRefused={setRefusal} />
             <DropdownMenuSeparator />
+            {/* Only where a link can open it: sharing a private quiz's address
+                would hand out a 404. The chip above the menu says why. */}
+            {shareable && (
+              <DropdownMenuItem onClick={() => void share.share()}>
+                <Share2 aria-hidden className="size-4" />
+                Share
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onEdit}>
               <Pencil aria-hidden className="size-4" />
               Edit
@@ -310,6 +324,16 @@ const LibraryRow = memo(function LibraryRow({
           className="px-2 pb-3 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
         >
           {refusal}
+        </p>
+      )}
+      {/* The menu has closed by the time the clipboard answers, so the row
+          says it — for a reader who cannot see it too. */}
+      {share.copied && !refusal && (
+        <p
+          role="status"
+          className="px-2 pb-3 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+        >
+          Link copied
         </p>
       )}
     </li>
