@@ -40,7 +40,9 @@ test('the shell frame and the bar read the open-bar predicate', () => {
   // Data attributes on a fixed class (ShellFrame's docblock: a class change on
   // the root restyled the whole page).
   assert.match(frame, /className="v2-shell"/);
-  assert.match(frame, /data-v2-open-bar=\{hasOpenBar\(pathname\) \? '' : undefined\}/);
+  // The see-through ground reads the shown path, the one the bar draws for
+  // during a move-first tap (header-move-first.test.ts).
+  assert.match(frame, /data-v2-open-bar=\{hasOpenBar\(shown\) \? '' : undefined\}/);
   assert.match(frame, /data-v2-chat=\{isChatRoute\(pathname\) \? '' : undefined\}/);
   // As code, not as the history the docblock tells.
   assert.doesNotMatch(frame, /'v2-shell--(open|chat)'/);
