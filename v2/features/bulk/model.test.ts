@@ -74,3 +74,11 @@ test('the outcome is one sentence, and a refusal reads as it would for one item'
   // A failure with no message still reads as a sentence.
   assert.equal(bulkOutcome(result(2, 1, ''), verb, noun), "Moved 2 of 3 items. 1 couldn't be moved.");
 });
+
+test('a verb that wraps the count puts its last words after it', () => {
+  const madePrivate = { past: 'Made', pastLower: 'made private', after: 'private' };
+  const chats = { one: 'chat', many: 'chats' };
+  assert.equal(bulkOutcome(result(3, 0, ''), madePrivate, chats), 'Made 3 chats private.');
+  assert.equal(bulkOutcome(result(2, 1, ''), madePrivate, chats), "Made 2 of 3 chats private. 1 couldn't be made private.");
+  assert.equal(bulkOutcome(result(0, 2, ''), madePrivate, chats), 'None of the 2 chats could be made private.');
+});

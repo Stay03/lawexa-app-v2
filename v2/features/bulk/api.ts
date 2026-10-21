@@ -43,6 +43,13 @@ export type NoteBulkAction =
   | { action: 'unpublish' }
   | { action: 'privacy'; isPrivate: boolean };
 
+export type ConversationBulkAction =
+  | { action: 'delete' }
+  /** Into a Space, or out of one with `spaceUuid: null`. */
+  | { action: 'space'; spaceUuid: string | null }
+  /** A chat shared by link goes back to its owner alone. */
+  | { action: 'make_private' };
+
 export const bulkApi = {
   /** The Folders page's folders (uuids). */
   folders: (ids: readonly string[], action: FolderBulkAction) =>
@@ -73,5 +80,13 @@ export const bulkApi = {
       const body: Record<string, unknown> = { action: action.action, ids: batch };
       if (action.action === 'privacy') body.is_private = action.isPrivate;
       return post('/bulk/notes', body);
+    }),
+
+  /** The reader's own chats (ids). */
+  conversations: (ids: readonly string[], action: ConversationBulkAction) =>
+    inBatches(ids, (batch) => {
+      const body: Record<string, unknown> = { action: action.action, ids: batch };
+      if (action.action === 'space') body.space_uuid = action.spaceUuid;
+      return post('/bulk/conversations', body);
     }),
 };

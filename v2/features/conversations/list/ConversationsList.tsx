@@ -24,6 +24,9 @@ import { useConversationsSearch } from './useConversationsSearch';
 import { ConversationsSearchBar } from './ConversationsSearchBar';
 import { ConversationRow } from './ConversationRow';
 import { useConversationMenu } from './use-conversation-menu';
+import { useConversationsBulk } from './conversations-bulk';
+import { isBulkSelectable } from './conversations-bulk-model';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   ConversationsEmptyState,
   ConversationsErrorState,
@@ -41,10 +44,19 @@ import {
  * The screen's `h1` is drawn here, so the guest panel is under a page that
  * still says what it is and every state carries exactly one heading.
  */
-function PageShell({ children }: { children: React.ReactNode }) {
+function PageShell({ actions, children }: { actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className={LIST_COLUMN_DOCKED}>
-      <ScreenTitle />
+      {actions ? (
+        // The page's one action (bulk select's "Select") on the heading's line,
+        // as on the Folders page.
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <ScreenTitle className="mb-0 min-w-0 truncate" />
+          {actions}
+        </div>
+      ) : (
+        <ScreenTitle />
+      )}
       {children}
     </div>
   );
@@ -53,6 +65,9 @@ function PageShell({ children }: { children: React.ReactNode }) {
 /** Stable empty rows reference — a fresh `[]` per render would defeat the
  *  `useNewRows` carried-rows check and re-seed its baseline on every render. */
 const NO_ROWS: readonly ConversationListItem[] = [];
+
+/** A confidential row's box, shown off while ticking: nothing to do on a tap. */
+const NO_TOGGLE = () => {};
 
 /** Module-level (⇒ referentially stable) row accessors for `useNewRows`. */
 const conversationId = (row: ConversationListItem): string => row.id;
@@ -185,6 +200,9 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
   // that mounts with its rows already in the cache (coming back to it) shows
   // them in place; read once, at mount, so later pages do not change it.
   const [revealRows] = useState(() => query.isPending);
+
+  // Bulk select (Arthur, 20 October 2026): the rows on screen, the reader's own.
+  const bulk = useConversationsBulk({ rows: visibleRows });
   // And then only a row the list has not shown: a chat moving to the top must
   // not replay the rows it passed (use-fresh-ids.ts).
   const freshIds = useFreshIds(presented.map(({ row }) => row.id));
@@ -221,8 +239,18 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
     />
   );
 
+  const actions =
+    bulk.hasSelectable && !bulk.selecting
+      ? bulk.startButton(
+          cn(
+            'v2-interactive inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+            FOCUS_RING,
+          ),
+        )
+      : null;
+
   return (
-    <PageShell>
+    <PageShell actions={actions}>
       {searchAtTop ? <div className="mb-4">{searchBar}</div> : null}
 
       {/* Out-of-flow (`h-0`) overlay — mounted in every state so its exit tween
@@ -272,6 +300,13 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
                 // Every chat in the reader's own list is theirs, so the
                 // column is always there; a confidential row keeps a spacer.
                 menuColumn
+                select={
+                  bulk.selecting
+                    ? isBulkSelectable(conversation)
+                      ? { checked: bulk.isSelected(conversation.id), onToggle: () => bulk.toggle(conversation.id) }
+                      : { checked: false, onToggle: NO_TOGGLE, disabled: true }
+                    : undefined
+                }
               />
             ))}
           </ul>
@@ -293,6 +328,11 @@ export function ConversationsList({ signedIn }: { signedIn: boolean }) {
       )}
 
       {menu.dialogs}
+
+      {/* Room under the last row for the bar while it is up. */}
+      {bulk.selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
+      {bulk.bar}
+      {bulk.dialogs}
 
       {/* The floating search pill, and nothing else: a conversation is started
           from the home composer, never from this list. */}

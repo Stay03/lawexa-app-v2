@@ -17,6 +17,7 @@ import {
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -107,6 +108,7 @@ export function ConversationRow({
   showSpace = false,
   actions = NO_ACTIONS,
   menuColumn = false,
+  select,
 }: {
   conversation: ConversationListItem;
   now: number;
@@ -128,6 +130,13 @@ export function ConversationRow({
   actions?: readonly ConversationMenuAction[];
   /** Whether the list draws a menu column at all (see the docblock). */
   menuColumn?: boolean;
+  /**
+   * The list is being ticked (bulk select): the row is its tick box, a tap
+   * ticks it instead of opening the chat, and the menu steps aside for the
+   * bar's actions. `disabled` is a row no bulk action can reach (a
+   * confidential chat): its box shows, off.
+   */
+  select?: { checked: boolean; onToggle: () => void; disabled?: boolean };
 }) {
   const { id, title, status, is_confidential } = conversation;
   const cleanTitle = stripPastedTags(title);
@@ -137,6 +146,63 @@ export function ConversationRow({
   // (finding 4). Only where nothing else fills the second line.
   const origin = is_confidential ? null : conversationOrigin(conversation.references);
   const hasMenu = actions.length > 0 && !is_confidential;
+  const rowClass =
+    'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60';
+
+  const content = (
+    <>
+      {is_confidential ? (
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 transition-colors dark:text-emerald-400"
+        >
+          <ShieldCheck className="size-[18px]" />
+        </span>
+      ) : (
+        <RowIconTile icon={MessageSquare} />
+      )}
+
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="min-w-0 truncate text-sm font-medium text-foreground">
+          {cleanTitle}
+        </span>
+        {is_confidential ? (
+          <span className="truncate text-xs text-emerald-700 dark:text-emerald-400">
+            Confidential
+          </span>
+        ) : byline ? (
+          <span className="truncate text-xs text-muted-foreground">
+            {byline}
+          </span>
+        ) : spaceName ? (
+          <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+            <Boxes aria-hidden className="size-3 shrink-0" />
+            <span className="truncate">{spaceName}</span>
+          </span>
+        ) : origin ? (
+          <span className="truncate text-xs text-muted-foreground">{origin}</span>
+        ) : null}
+      </span>
+
+      <span className="flex shrink-0 items-center gap-2">
+        {isArchived ? (
+          <Badge variant="secondary" className="text-[11px]">
+            Archived
+          </Badge>
+        ) : null}
+        <span
+          className="text-xs tabular-nums text-muted-foreground/80"
+          title={fullTime(lastActivityAt(conversation))}
+        >
+          {formatRelativeTime(lastActivityAt(conversation), now)}
+        </span>
+        <ChevronRight
+          aria-hidden
+          className="size-4 text-muted-foreground/40 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-muted-foreground motion-reduce:transition-none"
+        />
+      </span>
+    </>
+  );
 
   return (
     <li
@@ -160,73 +226,42 @@ export function ConversationRow({
           exiting && 'overflow-hidden',
         )}
       >
-        {/* MoveFirstLink: the conversation's frame paints in the frame of the
-            tap, before any route work (v2/shell/move-first.tsx). */}
-        <MoveFirstLink
-          href={`/c/${id}`}
-          kind="conversation"
-          title={cleanTitle}
-          header={{ title: cleanTitle, confidential: Boolean(is_confidential) }}
-          headerOwner={id}
-          aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}${byline && !is_confidential ? `, ${byline}` : ''}${spaceName ? `, in ${spaceName}` : ''}${!byline && !spaceName && origin ? `, about ${origin}` : ''}`}
-          className={cn(
-            'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60',
-            FOCUS_RING,
-          )}
-        >
-          {is_confidential ? (
-            <span
-              aria-hidden
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-700 transition-colors dark:text-emerald-400"
-            >
-              <ShieldCheck className="size-[18px]" />
-            </span>
-          ) : (
-            <RowIconTile icon={MessageSquare} />
-          )}
-
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="min-w-0 truncate text-sm font-medium text-foreground">
-              {cleanTitle}
-            </span>
-            {is_confidential ? (
-              <span className="truncate text-xs text-emerald-700 dark:text-emerald-400">
-                Confidential
-              </span>
-            ) : byline ? (
-              <span className="truncate text-xs text-muted-foreground">
-                {byline}
-              </span>
-            ) : spaceName ? (
-              <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-                <Boxes aria-hidden className="size-3 shrink-0" />
-                <span className="truncate">{spaceName}</span>
-              </span>
-            ) : origin ? (
-              <span className="truncate text-xs text-muted-foreground">{origin}</span>
-            ) : null}
-          </span>
-
-          <span className="flex shrink-0 items-center gap-2">
-            {isArchived ? (
-              <Badge variant="secondary" className="text-[11px]">
-                Archived
-              </Badge>
-            ) : null}
-            <span
-              className="text-xs tabular-nums text-muted-foreground/80"
-              title={fullTime(lastActivityAt(conversation))}
-            >
-              {formatRelativeTime(lastActivityAt(conversation), now)}
-            </span>
-            <ChevronRight
-              aria-hidden
-              className="size-4 text-muted-foreground/40 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-muted-foreground motion-reduce:transition-none"
+        {select ? (
+          <label
+            className={cn(
+              rowClass,
+              select.disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+              select.checked && 'bg-secondary/60',
+            )}
+          >
+            <Checkbox
+              checked={select.checked}
+              onCheckedChange={select.onToggle}
+              disabled={select.disabled}
+              aria-label={select.disabled ? `${cleanTitle} can't be selected: it is confidential` : `Select ${cleanTitle}`}
+              className="shrink-0"
             />
-          </span>
-        </MoveFirstLink>
+            {content}
+          </label>
+        ) : (
+          /* MoveFirstLink: the conversation's frame paints in the frame of the
+             tap, before any route work (v2/shell/move-first.tsx). */
+          <MoveFirstLink
+            href={`/c/${id}`}
+            kind="conversation"
+            title={cleanTitle}
+            header={{ title: cleanTitle, confidential: Boolean(is_confidential) }}
+            headerOwner={id}
+            aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}${byline && !is_confidential ? `, ${byline}` : ''}${spaceName ? `, in ${spaceName}` : ''}${!byline && !spaceName && origin ? `, about ${origin}` : ''}`}
+            className={cn(rowClass, FOCUS_RING)}
+          >
+            {content}
+          </MoveFirstLink>
+        )}
 
-        {hasMenu ? (
+        {select ? (
+          <span aria-hidden className="size-9 shrink-0" />
+        ) : hasMenu ? (
           <ConversationRowMenu title={cleanTitle} actions={actions} />
         ) : menuColumn ? (
           <span aria-hidden className="size-9 shrink-0" />

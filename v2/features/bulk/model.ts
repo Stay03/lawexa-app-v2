@@ -91,6 +91,8 @@ export interface BulkVerb {
   past: string;
   /** "deleted", "moved", "removed": after "couldn't be". */
   pastLower: string;
+  /** Words after the count, for a verb that wraps it: "Made 3 chats private". */
+  after?: string;
 }
 
 /**
@@ -103,11 +105,12 @@ export function bulkOutcome(result: BulkResult, verb: BulkVerb, noun: { one: str
   const total = result.done + result.failed;
   const reason = result.results.find((item) => !item.ok && item.message.trim())?.message.trim();
   const tail = reason ? `: ${reason.replace(/\.$/, '')}.` : '.';
-  if (result.failed === 0) return `${verb.past} ${countOf(total, noun)}.`;
+  const after = verb.after ? ` ${verb.after}` : '';
+  if (result.failed === 0) return `${verb.past} ${countOf(total, noun)}${after}.`;
   if (result.done === 0) {
     return total === 1
       ? `The ${noun.one} couldn't be ${verb.pastLower}${tail}`
       : `None of the ${countOf(total, noun)} could be ${verb.pastLower}${tail}`;
   }
-  return `${verb.past} ${result.done} of ${countOf(total, noun)}. ${result.failed} couldn't be ${verb.pastLower}${tail}`;
+  return `${verb.past} ${result.done} of ${countOf(total, noun)}${after}. ${result.failed} couldn't be ${verb.pastLower}${tail}`;
 }
