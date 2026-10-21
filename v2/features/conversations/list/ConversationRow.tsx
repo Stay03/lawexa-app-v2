@@ -27,6 +27,7 @@ import {
 import type { ConversationListItem } from '@/types/chat';
 import { lastActivityAt } from '../activity';
 import { CONVERSATION_MENU_LABELS, type ConversationMenuItem } from './conversation-menu';
+import { conversationOrigin, fullTime } from './conversation-origin';
 import {
   FOCUS_RING,
   REVEAL,
@@ -132,6 +133,9 @@ export function ConversationRow({
   const cleanTitle = stripPastedTags(title);
   const isArchived = status === 'archived';
   const spaceName = showSpace && !is_confidential ? (conversation.space?.name ?? null) : null;
+  // What the chat was started from, so two chats of the same name differ
+  // (finding 4). Only where nothing else fills the second line.
+  const origin = is_confidential ? null : conversationOrigin(conversation.references);
   const hasMenu = actions.length > 0 && !is_confidential;
 
   return (
@@ -164,7 +168,7 @@ export function ConversationRow({
           title={cleanTitle}
           header={{ title: cleanTitle, confidential: Boolean(is_confidential) }}
           headerOwner={id}
-          aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}${byline && !is_confidential ? `, ${byline}` : ''}${spaceName ? `, in ${spaceName}` : ''}`}
+          aria-label={`${cleanTitle}${is_confidential ? ' (confidential)' : ''}${isArchived ? ' (archived)' : ''}${byline && !is_confidential ? `, ${byline}` : ''}${spaceName ? `, in ${spaceName}` : ''}${!byline && !spaceName && origin ? `, about ${origin}` : ''}`}
           className={cn(
             'group v2-interactive flex min-h-14 min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 transition-colors hover:bg-secondary/60',
             FOCUS_RING,
@@ -198,6 +202,8 @@ export function ConversationRow({
                 <Boxes aria-hidden className="size-3 shrink-0" />
                 <span className="truncate">{spaceName}</span>
               </span>
+            ) : origin ? (
+              <span className="truncate text-xs text-muted-foreground">{origin}</span>
             ) : null}
           </span>
 
@@ -207,7 +213,10 @@ export function ConversationRow({
                 Archived
               </Badge>
             ) : null}
-            <span className="text-xs tabular-nums text-muted-foreground/80">
+            <span
+              className="text-xs tabular-nums text-muted-foreground/80"
+              title={fullTime(lastActivityAt(conversation))}
+            >
               {formatRelativeTime(lastActivityAt(conversation), now)}
             </span>
             <ChevronRight
