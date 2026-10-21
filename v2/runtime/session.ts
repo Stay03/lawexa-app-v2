@@ -92,6 +92,15 @@ export interface SessionUser {
    * the onboarding steps (`unfinished-signup.ts`).
    */
   onboarding_complete: boolean;
+  /**
+   * May this account publish a quiz to everyone? `user.is_verified_author`
+   * on `/auth/me` (backend quiz-part1-publish-and-solo, 21 October 2026). A
+   * PRESENTATION fact like `can_set_price`: it decides whether the quiz form
+   * offers "Public" enabled, and the quiz API stays the authority (a `403`
+   * on save renders as a designed line either way). `false` when the server
+   * does not send it.
+   */
+  is_verified_author: boolean;
 }
 
 export interface SessionDTO {
@@ -124,6 +133,7 @@ function toSessionDTO(
       // resource also describes other people (backend, 11 October 2026).
       can_access_team_channels: data?.can_access_team_channels === true,
       onboarding_complete: onboardingFinished(user.profile),
+      is_verified_author: user.is_verified_author === true,
     },
   };
 }

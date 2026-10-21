@@ -287,6 +287,8 @@ export default async function V2Layout({
           isLawyer={user?.is_lawyer ?? false}
           // Whether Team Channels open (the server's flag, researchers and up).
           canAccessTeamChannels={user?.can_access_team_channels ?? false}
+          // Whether the quiz form offers "Public" (a verified author only).
+          isVerifiedAuthor={user?.is_verified_author ?? false}
         >
           {/* THE NOTIFICATION SPINE (phase-5 W1) — v2's one app-wide realtime
               mount: the users.{uuid} socket, the `.channel.unread` writers, the

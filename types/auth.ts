@@ -71,6 +71,13 @@ export interface User {
   role: UserRole;
   is_creator: boolean | null;
   is_verified: boolean;
+  /**
+   * May this account publish a quiz to everyone (`visibility: public`)? From
+   * `/auth/me` (backend quiz-part1-publish-and-solo, 21 October 2026). Optional
+   * for the same reason `uuid` is: sessions cached before the field existed
+   * do not carry it, and absent reads as `false`.
+   */
+  is_verified_author?: boolean;
   auth_provider: AuthProvider;
   avatar_url: string | null;
   profile: UserProfile | null;

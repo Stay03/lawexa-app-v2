@@ -150,6 +150,15 @@ export interface V2SessionSnapshot {
    * decides who gets them. `false` when signed out or not sent.
    */
   readonly canAccessTeamChannels: boolean;
+  /**
+   * May this account publish a quiz to everyone (`visibility: public`)? The
+   * server's `user.is_verified_author` from `/auth/me` (21 October 2026).
+   * Presentation only: it decides whether the quiz form and the visibility
+   * menus offer "Public" enabled, and the quiz API decides whether a public
+   * save is kept (`403` otherwise, shown as a designed line). `false` when
+   * signed out or not sent.
+   */
+  readonly isVerifiedAuthor: boolean;
 }
 
 /**
@@ -186,6 +195,7 @@ export function V2SessionProvider({
   profileCountryCode,
   isLawyer,
   canAccessTeamChannels,
+  isVerifiedAuthor,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
@@ -206,6 +216,7 @@ export function V2SessionProvider({
       profileCountryCode,
       isLawyer,
       canAccessTeamChannels,
+      isVerifiedAuthor,
     }),
     [
       signedIn,
@@ -224,6 +235,7 @@ export function V2SessionProvider({
       profileCountryCode,
       isLawyer,
       canAccessTeamChannels,
+      isVerifiedAuthor,
     ],
   );
 
