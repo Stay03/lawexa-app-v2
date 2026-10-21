@@ -1,20 +1,53 @@
+import type {
+  QuizAttempt,
+  QuizAttemptAnswerReceipt,
+  QuizAttemptQuestion,
+  QuizAttemptResponse,
+  QuizRevealMode,
+  SubmitQuizAttemptAnswerPayload,
+} from '@/types/channel-quiz';
+import { formatResponseTime } from '@/v2/features/channels/quiz/model';
+import { isAccountRole } from '@/v2/runtime/account';
 import type { V2SessionSnapshot } from '@/v2/runtime/session-context';
 
 /**
  * solo quiz model — the pure vocabulary of a quiz taken alone: who may publish
- * one, how it is found, how an attempt is read, and what the player's own
- * clock says. No hooks, no JSX, no browser APIs, so the library, the explore
- * list, the quiz front, the player and the results all read their rules from
- * one place and the node test runner can import it.
+ * one, who may take one, how it is found, how an attempt is read, and what the
+ * player's own clock says. No hooks, no JSX, no browser APIs, so the library,
+ * the explore list, the quiz front, the player and the results all read their
+ * rules from one place and the node test runner can import it.
  *
  * Source: backend branch quiz-part1-publish-and-solo (tip 45a8f711; bodies in
  * `~/.lawexa/tools/frontend/contracts/quiz-45a8f711.json`), 21 October 2026.
  * The channel game's own vocabulary stays in `channels/quiz/model.ts`; this
  * module imports from it where the two surfaces share a word (the option
- * letters, the response-time format) and never redefines it.
+ * letters, the response-time format, the scoring note) and never redefines it.
  */
 
-/* ── Who may publish ──────────────────────────────────────────────────────── */
+/* ── Where things are ─────────────────────────────────────────────────────── */
+
+/**
+ * The solo routes sit under `/quiz` beside the practice player, under FIXED
+ * prefixes: `app/v2/quiz/[sessionUuid]` catches any other `/quiz/{id}`, so a
+ * quiz lives at `/quiz/q/{uuid}` and an attempt at `/quiz/attempts/{uuid}`,
+ * never at `/quiz/{uuid}`.
+ */
+export const LIBRARY_HREF = '/quiz/library';
+export const EXPLORE_HREF = '/quiz/explore';
+
+export function quizFrontHref(quizUuid: string): string {
+  return `/quiz/q/${quizUuid}`;
+}
+
+export function attemptHref(attemptUuid: string): string {
+  return `/quiz/attempts/${attemptUuid}`;
+}
+
+export function attemptResultsHref(attemptUuid: string): string {
+  return `/quiz/attempts/${attemptUuid}/results`;
+}
+
+/* ── Who may do what ──────────────────────────────────────────────────────── */
 
 /**
  * May this viewer set a quiz to `public`? The server's own flag
@@ -31,3 +64,228 @@ export function canPublishPublicly(session: V2SessionSnapshot): boolean {
 /** The one line under a disabled "Public" choice, and the answer to its 403. */
 export const PUBLIC_NEEDS_VERIFIED_AUTHOR =
   'Public quizzes are for verified authors. Anyone can still share one by link.';
+
+/**
+ * May this viewer START an attempt? An account, and nothing less: the server
+ * answers `401` to a visitor and `403` to a guest pass (Arthur's option B,
+ * 21 October 2026 — anyone may browse and preview, taking needs sign-in). The
+ * quiz front shows the sign-in door instead of Start for everyone else.
+ */
+export function canTakeQuiz(session: V2SessionSnapshot): boolean {
+  return session.signedIn && isAccountRole(session.role);
+}
+
+/**
+ * Which read the quiz front makes. An account reads the authenticated `show`
+ * (it says `is_mine`, and carries `is_correct` for the author, which is what
+ * lets Edit open on the same entry); a visitor or a guest reads the public
+ * `preview`, the only read the server answers for them.
+ */
+export function readsPreview(session: V2SessionSnapshot): boolean {
+  return !canTakeQuiz(session);
+}
+
+/* ── The reveal choice ────────────────────────────────────────────────────── */
+
+export interface RevealModeChoice {
+  id: QuizRevealMode;
+  label: string;
+  hint: string;
+}
+
+/** The two ways to see the answers, in the words the quiz front uses. */
+export const REVEAL_MODE_CHOICES: readonly RevealModeChoice[] = [
+  {
+    id: 'each',
+    label: 'After each question',
+    hint: 'See the answer the moment you pick, then move on.',
+  },
+  {
+    id: 'end',
+    label: 'At the end',
+    hint: 'Answer everything first, then see how you did.',
+  },
+];
+
+/** What the quiz front opens on. */
+export const DEFAULT_REVEAL_MODE: QuizRevealMode = 'each';
+
+/* ── Reading a quiz ───────────────────────────────────────────────────────── */
+
+/**
+ * How long a quiz takes at most, from its timers: the sum of every question's
+ * limit, said in minutes because nobody plans in seconds. Rounded UP, so the
+ * promise is never shorter than the clock.
+ */
+export function quizLengthLabel(
+  questions: readonly { time_limit_seconds: number }[],
+): string {
+  const seconds = questions.reduce((sum, question) => sum + question.time_limit_seconds, 0);
+  if (seconds < 60) return 'under a minute';
+  return `about ${Math.ceil(seconds / 60)} min`;
+}
+
+/** "4 questions", "1 question". */
+export function questionCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'question' : 'questions'}`;
+}
+
+/* ── Reading an attempt ───────────────────────────────────────────────────── */
+
+/** The questions in play order. The server serves `position`; array order is
+ *  never trusted for a numbered list. */
+export function orderedQuestions(attempt: QuizAttempt): QuizAttemptQuestion[] {
+  return [...attempt.questions].sort((a, b) => a.position - b.position);
+}
+
+/**
+ * Where a resumed attempt picks up: the index (in play order) of the first
+ * unanswered question, or `null` when every question has an answer and the
+ * only move left is Finish.
+ */
+export function nextUnanswered(attempt: QuizAttempt): number | null {
+  const index = orderedQuestions(attempt).findIndex((question) => !question.answered);
+  return index === -1 ? null : index;
+}
+
+/** `finished_at` is the one honest "is it over" read — see the type. */
+export function isFinishedAttempt(attempt: QuizAttempt): boolean {
+  return attempt.finished_at !== null;
+}
+
+export interface AttemptScore {
+  correct: number;
+  answered: number;
+  total: number;
+  /** The server's `score_percent`, as sent. */
+  percent: number;
+  points: number;
+  /** `question_count × 1000` (server rule). */
+  maxPoints: number;
+  /** Mean over the answered questions; `null` when none were answered. */
+  avgResponseMs: number | null;
+}
+
+/**
+ * The score a FINISHED attempt carries, or `null` for one still running — or
+ * for a finished body that somehow lacks a score field, so nothing can print
+ * a number the server did not compute.
+ */
+export function attemptScore(attempt: QuizAttempt): AttemptScore | null {
+  if (!isFinishedAttempt(attempt)) return null;
+  const { correct_count, score_percent, points, max_points } = attempt;
+  if (
+    correct_count === undefined ||
+    score_percent === undefined ||
+    points === undefined ||
+    max_points === undefined
+  ) {
+    return null;
+  }
+  return {
+    correct: correct_count,
+    answered: attempt.answered_count,
+    total: attempt.question_count,
+    percent: score_percent,
+    points,
+    maxPoints: max_points,
+    avgResponseMs: attempt.avg_response_ms ?? null,
+  };
+}
+
+/**
+ * The cached attempt with one answer written onto it from its receipt — the
+ * same shape `GET` on the attempt now returns, so a reload after the write
+ * resumes on the same screen.
+ *
+ * ON AN `each` ATTEMPT THE RECEIPT IS THE REVEAL: the four verdict fields land
+ * on the question. On an `end` attempt the receipt carries counts only, so
+ * the question becomes `answered` with the viewer's option and nothing else;
+ * in particular the app's own `response_ms` is NOT written, because the
+ * server clamps it and the stored value is the server's to say.
+ */
+export function withAnswer(
+  response: QuizAttemptResponse,
+  payload: SubmitQuizAttemptAnswerPayload,
+  receipt: QuizAttemptAnswerReceipt,
+): QuizAttemptResponse {
+  const attempt = response.data;
+  const questions = attempt.questions.map((question) => {
+    if (question.uuid !== payload.question_uuid) return question;
+    const answered: QuizAttemptQuestion = {
+      ...question,
+      answered: true,
+      your_option_id: payload.option_id,
+    };
+    if (receipt.is_correct !== undefined) {
+      answered.is_correct = receipt.is_correct;
+      answered.correct_option_id = receipt.correct_option_id;
+      answered.points = receipt.points;
+      answered.response_ms = receipt.response_ms;
+    }
+    return answered;
+  });
+  return {
+    ...response,
+    data: {
+      ...attempt,
+      answered_count: receipt.answered_count,
+      question_count: receipt.question_count,
+      questions,
+    },
+  };
+}
+
+/* ── The player's own clock ───────────────────────────────────────────────── */
+
+/**
+ * The app's `response_ms`: how long the question was on screen before the
+ * tap, from two `performance.now()` readings (monotonic, so a clock change
+ * mid-question cannot make it negative or absurd). Whole milliseconds, never
+ * below zero. The server clamps it to the question's limit on its side.
+ */
+export function responseMsFor(openedPerfMs: number, nowPerfMs: number): number {
+  return Math.max(0, Math.round(nowPerfMs - openedPerfMs));
+}
+
+/** When the question's time runs out, on the wall clock the timer draws from. */
+export function questionDeadlineMs(openedAtMs: number, limitSeconds: number): number {
+  return openedAtMs + limitSeconds * 1000;
+}
+
+/* ── Results vocabulary ───────────────────────────────────────────────────── */
+
+/** "1,375" — points as a reader counts them. */
+export function pointsLabel(points: number): string {
+  return points.toLocaleString();
+}
+
+/** The mean answer time as a chip reads it, or `null` with nothing to say. */
+export function speedLabel(avgResponseMs: number | null): string | null {
+  if (avgResponseMs === null) return null;
+  return `${formatResponseTime(avgResponseMs)} per answer`;
+}
+
+/**
+ * Turn an answer failure into one honest sentence, or `null` when the screen
+ * has nothing to add.
+ *
+ * Keyed on STATUS, never on message text. A `409` is settled by re-reading the
+ * attempt (the mutation does that), so it needs no sentence of its own: the
+ * refreshed attempt shows the answer the server already had, or the results.
+ * A `404` is an option that is not this question's — the quiz changed under
+ * the attempt — and a failure with no response is the one case where nothing
+ * is known, so nothing is claimed.
+ */
+export function answerRefusalCopy(status: number, message: string): string | null {
+  switch (status) {
+    case 409:
+      return null;
+    case 404:
+      return "That answer doesn't match the question on screen. Pick again.";
+    case 0:
+      return "We didn't hear back about that answer — if it reached us, it still counts.";
+    default:
+      return message;
+  }
+}

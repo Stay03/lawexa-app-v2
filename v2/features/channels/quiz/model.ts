@@ -1,6 +1,7 @@
 import type { Channel } from '@/types/collab';
 import type {
   ChannelQuizSettings,
+  ChannelQuizVisibility,
   GoLiveChannelQuizPayload,
   QuizAnswerIn,
   QuizCurrentQuestion,
@@ -121,6 +122,77 @@ export const VISIBILITY_CHOICES = [
 /** The one line under the choice, on every surface that offers it. */
 export const VISIBILITY_FOOTNOTE =
   'Either way, games already played keep their scores and stay visible to everyone who was there.';
+
+/* ── The full vocabulary (2026-10-21: `link` and `public`) ────────────────── */
+
+export interface QuizVisibilityChoice {
+  id: ChannelQuizVisibility;
+  label: string;
+  hint: string;
+  /** `public` is for verified authors only (`403` to everyone else). */
+  needsVerifiedAuthor: boolean;
+}
+
+/**
+ * Who can FIND a quiz, all four answers, in the words every surface uses: the
+ * channel sheet's menu, the quiz form, the library page's menu. One list, so
+ * the same choice cannot be named two ways on two screens.
+ *
+ * `shared` is the room's answer and is listed only where there is a room
+ * ({@link visibilityChoicesFor}); the other three are the quiz's own.
+ */
+export const QUIZ_VISIBILITY_CHOICES: readonly QuizVisibilityChoice[] = [
+  {
+    id: 'shared',
+    label: 'Anyone in the room',
+    hint: 'Shows on the quiz list of every channel it has been played in.',
+    needsVerifiedAuthor: false,
+  },
+  {
+    id: 'private',
+    label: 'Only me',
+    hint: 'Only you can open it. You can still run it in any channel you host in.',
+    needsVerifiedAuthor: false,
+  },
+  {
+    id: 'link',
+    label: 'Anyone with the link',
+    hint: 'Anyone signed in who has the link can take it. It is listed nowhere.',
+    needsVerifiedAuthor: false,
+  },
+  {
+    id: 'public',
+    label: 'Everyone',
+    hint: 'Listed on Explore for everyone to take, and open by link.',
+    needsVerifiedAuthor: true,
+  },
+];
+
+/**
+ * The choices a surface offers. `shared` only makes sense where a room is in
+ * the picture — the channel sheet, a quiz written for a channel, or a quiz
+ * that already says `shared` — so a library quiz is offered the other three.
+ */
+export function visibilityChoicesFor(hasRoom: boolean): readonly QuizVisibilityChoice[] {
+  return hasRoom
+    ? QUIZ_VISIBILITY_CHOICES
+    : QUIZ_VISIBILITY_CHOICES.filter((choice) => choice.id !== 'shared');
+}
+
+/** The chip a row wears for its visibility, legible without opening a menu. */
+export function visibilityFace(visibility: ChannelQuizVisibility): string {
+  switch (visibility) {
+    case 'private':
+      return 'Only me';
+    case 'link':
+      return 'By link';
+    case 'public':
+      return 'Public';
+    case 'shared':
+    default:
+      return 'In channels';
+  }
+}
 
 /* ── Authoring limits (server-validated; mirrored to save a round trip) ───── */
 

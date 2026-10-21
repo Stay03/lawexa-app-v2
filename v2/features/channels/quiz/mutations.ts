@@ -10,7 +10,6 @@ import {
 import { channelQuizApi, quizGamesApi } from '@/lib/api/channel-quiz';
 import { extractApiError } from '@/lib/utils/api-error';
 import type {
-  ChannelQuizListResponse,
   ChannelQuizVisibility,
   CreateChannelQuizPayload,
   GoLiveChannelQuizPayload,
@@ -19,6 +18,7 @@ import type {
   UpdateChannelQuizPayload,
 } from '@/types/channel-quiz';
 import { noteThrottled } from '../engagement-throttle';
+import { isQuizListQuery, withVisibility, type QuizListCacheEntry } from './list-cache';
 import { channelQuizQueries } from './queries';
 
 /**
@@ -53,25 +53,20 @@ import { channelQuizQueries } from './queries';
 /* ── Authoring ────────────────────────────────────────────────────────────── */
 
 /**
- * A WRITE TO ONE QUIZ CAN CHANGE TWO LISTS. Since 2026-08-05 a quiz is the
+ * A WRITE TO ONE QUIZ CAN CHANGE FOUR LISTS. Since 2026-08-05 a quiz is the
  * author's and merely RUNS in rooms, so the same row appears on the reader's
- * library and on the list of every channel it has been played in. Every
- * authoring write therefore settles both, and the room list is settled across
- * ALL channels rather than only the one the sheet was opened in — a quiz that
- * has travelled is on more lists than the caller can name.
+ * library and on the list of every channel it has been played in — and since
+ * 2026-10-21 on the solo library page and, when public, on the explore list.
+ * Every authoring write therefore settles all of them, and the room list is
+ * settled across ALL channels rather than only the one the sheet was opened in
+ * — a quiz that has travelled is on more lists than the caller can name. The
+ * predicate (`./list-cache.ts`) names the row lists and never the live game or
+ * an attempt in play.
  */
 function invalidateQuizLists(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({
     predicate: isQuizListQuery,
   });
-}
-
-/** True for the room lists and the library, and for nothing else under the
- *  `channel-quiz` root — never the live game state, whose poll is this
- *  feature's transport and must not be disturbed by an authoring write. */
-function isQuizListQuery(query: { queryKey: QueryKey }): boolean {
-  const [root, kind] = query.queryKey;
-  return root === 'channel-quiz' && (kind === 'quizzes' || kind === 'my-quizzes');
 }
 
 export function useCreateQuiz(channelUuid: string) {
@@ -171,8 +166,10 @@ export function useSetQuizVisibility(quizUuid: string) {
       // which is both this feature's transport and its recovery.
       await queryClient.cancelQueries({ predicate: isQuizListQuery });
 
-      const snapshot: [QueryKey, ChannelQuizListResponse][] = [];
-      for (const [queryKey, rows] of queryClient.getQueriesData<ChannelQuizListResponse>(
+      // Flat pages and page-infinite entries alike — `withVisibility` reads
+      // the shape before the rows (`./list-cache.ts`).
+      const snapshot: [QueryKey, QuizListCacheEntry][] = [];
+      for (const [queryKey, rows] of queryClient.getQueriesData<QuizListCacheEntry>(
         { predicate: isQuizListQuery },
       )) {
         if (!rows) continue;
@@ -195,23 +192,6 @@ export function useSetQuizVisibility(quizUuid: string) {
       });
     },
   });
-}
-
-/** One list page with one quiz's `visibility` rewritten — and the SAME object
- *  back when the row is absent or already says this, so an untouched cache
- *  entry cannot re-render anything. */
-function withVisibility(
-  rows: ChannelQuizListResponse,
-  quizUuid: string,
-  visibility: ChannelQuizVisibility,
-): ChannelQuizListResponse {
-  let touched = false;
-  const data = rows.data.map((quiz) => {
-    if (quiz.uuid !== quizUuid || quiz.visibility === visibility) return quiz;
-    touched = true;
-    return { ...quiz, visibility };
-  });
-  return touched ? { ...rows, data } : rows;
 }
 
 export function useDeleteQuiz(quizUuid: string) {
