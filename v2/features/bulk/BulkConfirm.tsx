@@ -12,8 +12,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { buttonVariants } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 /**
  * The confirm before a delete or a removal of several items (Arthur: "a
@@ -54,7 +52,9 @@ export function BulkConfirm({
               event.preventDefault();
               onConfirm();
             }}
-            className={cn(buttonVariants({ variant: 'destructive' }))}
+            // The action's own variant: a class here merges with the default button's
+            // dark text and left "Delete" near unreadable on its red ground (the 21 Oct pictures).
+            variant="destructive"
           >
             {pending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
             {confirmLabel}
