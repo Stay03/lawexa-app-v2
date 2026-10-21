@@ -6,7 +6,8 @@ import { formatMessageTime } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
 import { ThreadStatusChip } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { statusChangeOf } from '../thread-status-model';
+import { useV2Session } from '@/v2/runtime/session-context';
+import { changeWaitsOnSomeoneElse, statusChangeOf } from '../thread-status-model';
 
 /**
  * FeedDivider — the transcript's non-message lines, WITH A HIERARCHY. Phase-5
@@ -206,6 +207,7 @@ function StatusChangeLine({
 }: {
   change: NonNullable<ReturnType<typeof statusChangeOf>>;
 }) {
+  const { userUuid } = useV2Session();
   const time = formatMessageTime(change.at);
   const label = time ? `${change.sentence} · ${time}` : change.sentence;
   /* THE SENTENCE WRAPS TO TWO LINES (techlead, 16 October 2026). On one
@@ -222,7 +224,12 @@ function StatusChangeLine({
     >
       {/* A `separator`'s children are presentational, so the chip's word is
           not read twice; the row's label carries the sentence. */}
-      {change.to && <ThreadStatusChip value={change.to} />}
+      {change.to && (
+        <ThreadStatusChip
+          value={change.to}
+          outline={changeWaitsOnSomeoneElse(change, userUuid)}
+        />
+      )}
       <span
         aria-hidden
         className="line-clamp-2 min-w-0 pt-0.5 text-[11px] leading-snug break-words text-muted-foreground"

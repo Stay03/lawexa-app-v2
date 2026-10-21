@@ -21,6 +21,7 @@ import {
   ThreadStatusChip,
   ThreadStatusDot,
 } from '@/v2/features/collab/kit/ThreadStatusChip';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { TabRow } from '@/v2/shell/TabRow';
@@ -42,6 +43,7 @@ import {
   threadStatusPerson,
   threadStatusQuiet,
   type ThreadStatusFilter,
+  waitsOnSomeoneElse,
 } from '../thread-status-model';
 import { RelativeTime } from '../ui/RelativeTime';
 import { useMinuteNow } from '../use-minute-now';
@@ -414,6 +416,7 @@ function ThreadRow({
   // `Date.now()` in render; it only feeds the stale suffix.
   const now = useMinuteNow();
   const status = knownThreadStatus(thread.status);
+  const { userUuid } = useV2Session();
   const closed = isClosedThread(thread);
   const quiet = threadStatusQuiet(thread, now);
 
@@ -457,6 +460,7 @@ function ThreadRow({
                 person={threadStatusPerson(status)}
                 quiet={quiet}
                 fold
+                outline={waitsOnSomeoneElse(status, userUuid)}
               />
             )}
           </div>

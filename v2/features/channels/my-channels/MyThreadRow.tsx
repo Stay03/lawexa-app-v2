@@ -9,6 +9,7 @@ import type { Channel } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { ThreadStatusChip } from '@/v2/features/collab/kit/ThreadStatusChip';
+import { useV2Session } from '@/v2/runtime/session-context';
 import {
   CountBadge,
   FOCUS_RING,
@@ -26,6 +27,7 @@ import {
   knownThreadStatus,
   threadStatusPerson,
   threadStatusQuiet,
+  waitsOnSomeoneElse,
 } from '../thread-status-model';
 
 /**
@@ -124,6 +126,7 @@ export const MyThreadRow = memo(function MyThreadRow({
   // The status chip after the title, a Closed title in muted ink (Stay, 16
   // October 2026). Absent on an older payload, which draws no chip.
   const status = knownThreadStatus(thread.status);
+  const { userUuid } = useV2Session();
   const closed = isClosedThread(thread);
   const quiet = threadStatusQuiet(thread, now);
   const dim = muted
@@ -196,6 +199,7 @@ export const MyThreadRow = memo(function MyThreadRow({
                   person={threadStatusPerson(status)}
                   quiet={quiet}
                   fold
+                  outline={waitsOnSomeoneElse(status, userUuid)}
                 />
               ) : null}
               {muted ? (

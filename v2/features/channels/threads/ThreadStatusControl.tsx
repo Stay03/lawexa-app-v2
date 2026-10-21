@@ -18,6 +18,7 @@ import {
   ThreadStatusChip,
   ThreadStatusDot,
 } from '@/v2/features/collab/kit/ThreadStatusChip';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   THREAD_STATUS_OPTIONS,
@@ -30,6 +31,7 @@ import {
   threadStatusTriggerLabel,
   type ThreadStatusChoice,
   type ThreadStatusOption,
+  waitsOnSomeoneElse,
 } from '../thread-status-model';
 import { useMinuteNow } from '../use-minute-now';
 import { useSetThreadStatus } from './mutations';
@@ -94,6 +96,7 @@ export function ThreadStatusControl({
   const now = useMinuteNow();
   // A value this app does not know reads as no status: no chip, no crash.
   const status = knownThreadStatus(rawStatus);
+  const { userUuid } = useV2Session();
   const quiet = threadStatusQuiet({ status, last_message_at: lastMessageAt }, now);
 
   if (!canSet) {
@@ -109,6 +112,7 @@ export function ThreadStatusControl({
           person={threadStatusHeaderPerson(status)}
           quiet={quiet}
           fit
+          outline={waitsOnSomeoneElse(status, userUuid)}
         />
       </span>
     ) : null;
@@ -178,6 +182,7 @@ function TriggerFace({
   quiet: string | null;
   compact?: boolean;
 }) {
+  const { userUuid } = useV2Session();
   const chevron = (
     <ChevronDown
       aria-hidden
@@ -192,6 +197,7 @@ function TriggerFace({
         person={threadStatusHeaderPerson(status)}
         quiet={quiet}
         fit
+        outline={waitsOnSomeoneElse(status, userUuid)}
       />
       {chevron}
     </>

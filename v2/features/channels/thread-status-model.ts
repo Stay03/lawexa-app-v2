@@ -109,6 +109,38 @@ export function threadStatusPerson(status: ThreadStatus | null): string | null {
 }
 
 /**
+ * Does this Needs Action wait on someone other than the viewer? Its dot then
+ * draws as an amber ring, and one waiting on the viewer keeps the filled dot,
+ * so "waiting for me" and "waiting for someone else" read apart (Stay, 21
+ * October 2026). A Needs Action that names nobody, or a viewer with no uuid,
+ * keeps the filled dot: nothing says it is someone else's.
+ */
+export function waitsOnSomeoneElse(
+  status: ThreadStatus | null,
+  viewerUuid: string | null,
+): boolean {
+  if (!status) return false;
+  return isSomeoneElsesAction(status.value, status.needs_action_from?.uuid ?? null, viewerUuid);
+}
+
+/** The same rule for a timeline's status-change line, whose chip shows `to`. */
+export function changeWaitsOnSomeoneElse(
+  change: ThreadStatusChange,
+  viewerUuid: string | null,
+): boolean {
+  if (!change.to) return false;
+  return isSomeoneElsesAction(change.to, change.needsActionFromUuid, viewerUuid);
+}
+
+function isSomeoneElsesAction(
+  value: ThreadStatusValue,
+  personUuid: string | null,
+  viewerUuid: string | null,
+): boolean {
+  return value === 'needs_action' && !!personUuid && !!viewerUuid && personUuid !== viewerUuid;
+}
+
+/**
  * The person in a thread HEADER's pill: the first word of their name ("User2"
  * for "User2 Tester"), a one-word name whole (Arthur, 17 October 2026: "first
  * name", so more of the title shows beside the pill). The status menu, the
@@ -320,6 +352,8 @@ export interface ThreadStatusChange {
   byName: string | null;
   /** Needs Action only: who needs to act. */
   needsActionFromName: string | null;
+  /** That person's uuid, so the chip can tell the viewer from someone else. */
+  needsActionFromUuid: string | null;
   via: 'app' | 'agent';
   at: string;
   /** The server's own sentence, shown as it came. */
@@ -344,6 +378,7 @@ export function statusChangeOf(message: Message): ThreadStatusChange | null {
     note: meta.note?.trim() || null,
     byName: meta.actor_name?.trim() || null,
     needsActionFromName: meta.needs_action_from_name?.trim() || null,
+    needsActionFromUuid: meta.needs_action_from_uuid || null,
     via: meta.via === 'agent' ? 'agent' : 'app',
     at: message.created_at,
     sentence: message.content.trim(),

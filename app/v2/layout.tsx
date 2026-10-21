@@ -260,6 +260,7 @@ export default async function V2Layout({
         <V2SessionProvider
           signedIn={!!session}
           userId={user?.id ?? null}
+          userUuid={user?.uuid ?? null}
           name={user?.name ?? null}
           // The account card on `/settings` names the ACCOUNT, not the person,
           // and shows the face beside it. Both are already on the DTO this

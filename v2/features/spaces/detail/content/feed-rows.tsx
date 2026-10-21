@@ -22,12 +22,14 @@ import {
   channelStatusCountsLine,
   knownThreadStatus,
   threadStatusLabel,
+  waitsOnSomeoneElse,
 } from '@/v2/features/channels/thread-status-model';
 import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { ThreadStatusDot } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { lastActivityAt } from '@/v2/features/conversations/activity';
 import { rememberFolderPeek } from '@/v2/features/folders/folder-peek';
 import { folderCountsLabel, type FolderRowModel } from '@/v2/features/folders/folder-row-model';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { CountBadge, FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { MoveFirstLink } from '@/v2/shell/move-first';
 import { fileTypeLabel } from '../../content-model';
@@ -152,10 +154,14 @@ function Line({
 /** A thread's status after its name, "● Working": the dot and the word. */
 function ThreadStatus({ thread }: { thread: Channel }) {
   const status = knownThreadStatus(thread.status);
+  const { userUuid } = useV2Session();
   if (!status) return null;
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">
-      <ThreadStatusDot value={status.value} />
+      <ThreadStatusDot
+        value={status.value}
+        outline={waitsOnSomeoneElse(status, userUuid)}
+      />
       <span className="truncate">{threadStatusLabel(status.value)}</span>
     </span>
   );

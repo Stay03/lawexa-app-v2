@@ -62,6 +62,13 @@ export interface V2SessionSnapshot {
   readonly signedIn: boolean;
   /** Server-verified user id, or `null` when signed out. */
   readonly userId: number | null;
+  /**
+   * The same user's uuid, or `null` when signed out (or an account the server
+   * sent without one). Server-verified like `userId`, so a surface that names
+   * people by uuid (a thread's Needs Action person) can tell the viewer apart
+   * on the first render, with no flip once the client store loads.
+   */
+  readonly userUuid: string | null;
   /** Full display name, or `null`. Call sites derive what they need from it. */
   readonly name: string | null;
   /**
@@ -165,6 +172,7 @@ const V2SessionContext = createContext<V2SessionSnapshot | null>(null);
 export function V2SessionProvider({
   signedIn,
   userId,
+  userUuid,
   name,
   email,
   avatarUrl,
@@ -184,6 +192,7 @@ export function V2SessionProvider({
     () => ({
       signedIn,
       userId,
+      userUuid,
       name,
       email,
       avatarUrl,
@@ -201,6 +210,7 @@ export function V2SessionProvider({
     [
       signedIn,
       userId,
+      userUuid,
       name,
       email,
       avatarUrl,

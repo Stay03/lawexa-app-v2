@@ -8,6 +8,7 @@ import {
   THREAD_STATUS_FILTERS,
   THREAD_STATUS_OPTIONS,
   buildSetThreadStatusBody,
+  changeWaitsOnSomeoneElse,
   channelStatusCountsLine,
   createTrailingCoalescer,
   isClosedThread,
@@ -28,6 +29,7 @@ import {
   threadStatusPerson,
   threadStatusQuiet,
   threadStatusTriggerLabel,
+  waitsOnSomeoneElse,
 } from './thread-status-model';
 
 /* Thread status (Stay, 15-16 October 2026, the design "locked in" from the
@@ -95,6 +97,34 @@ test('Needs Action names who needs to act; no other status does', () => {
   assert.equal(threadStatusPerson(status({ value: 'needs_action' })), null);
   assert.equal(threadStatusPerson(status({ value: 'working', needs_action_from: TOLU })), null);
   assert.equal(threadStatusPerson(null), null);
+});
+
+test('Needs Action for someone else draws a ring; for the viewer, or for nobody named, the filled dot', () => {
+  const forTolu = status({ value: 'needs_action', needs_action_from: TOLU });
+  assert.equal(waitsOnSomeoneElse(forTolu, 'u1'), true);
+  assert.equal(waitsOnSomeoneElse(forTolu, 'u2'), false);
+  assert.equal(waitsOnSomeoneElse(status({ value: 'needs_action' }), 'u1'), false);
+  // No viewer uuid: nothing says it is someone else's.
+  assert.equal(waitsOnSomeoneElse(forTolu, null), false);
+  assert.equal(waitsOnSomeoneElse(status({ value: 'working', needs_action_from: TOLU }), 'u1'), false);
+  assert.equal(waitsOnSomeoneElse(null, 'u1'), false);
+
+  // The timeline line reads the same rule from the change's `to` and person.
+  const change = {
+    from: 'working' as const,
+    to: 'needs_action' as const,
+    note: null,
+    byName: 'Ada',
+    needsActionFromName: 'Tolu',
+    needsActionFromUuid: 'u2',
+    via: 'app' as const,
+    at: '2026-10-16T14:43:00Z',
+    sentence: 'Ada set this thread to Needs Action for Tolu',
+  };
+  assert.equal(changeWaitsOnSomeoneElse(change, 'u1'), true);
+  assert.equal(changeWaitsOnSomeoneElse(change, 'u2'), false);
+  assert.equal(changeWaitsOnSomeoneElse({ ...change, to: 'working' }, 'u1'), false);
+  assert.equal(changeWaitsOnSomeoneElse({ ...change, needsActionFromUuid: null }, 'u1'), false);
 });
 
 test('the header pill names the person by first name only; everything else keeps the full name', () => {
@@ -278,6 +308,7 @@ test('a status line is read off metadata.type, never off the author', () => {
       note: 'review clause 4',
       byName: 'Ada',
       needsActionFromName: 'Tolu',
+      needsActionFromUuid: 'u2',
       via: 'app',
       at: '2026-10-16T14:43:00Z',
       sentence: 'Ada set this thread to Needs Action for Tolu: review clause 4',
@@ -435,7 +466,7 @@ test('on a phone a list row folds its chip so the title keeps about 20 character
     // `fold`, techlead, 17 October 2026); it still folds.
     assert.match(
       read(...parts),
-      /<ThreadStatusChip[^>]*quiet=\{quiet\}\s*fold(?:\s*\/\/[^\n]*)*(?:\s*className=(?:\{[^}]*\}|"[^"]*"))?\s*\/>/,
+      /<ThreadStatusChip[^>]*quiet=\{quiet\}\s*fold(?:\s*\/\/[^\n]*)*(?:\s*className=(?:\{[^}]*\}|"[^"]*"))?\s*outline=\{waitsOnSomeoneElse\(status, userUuid\)\}\s*\/>/,
       parts.at(-1),
     );
   }
@@ -456,7 +487,7 @@ test('the header status trims only its quiet suffix, never the word or the perso
   // The techlead's pictures, 16 October 2026: on a phone "· quiet 1d" ran
   // under the faces. The header's chip fits; a row's stays whole.
   const control = read('v2', 'features', 'channels', 'threads', 'ThreadStatusControl.tsx');
-  assert.equal(control.match(/\bfit\b\s*\/>/g)?.length, 2);
+  assert.equal(control.match(/\bfit\b\s*outline=\{waitsOnSomeoneElse\(status, userUuid\)\}\s*\/>/g)?.length, 2);
   // The floor is the word: no box from the header down to the chip may take
   // `min-w-0`, or the pill shrinks under its own label.
   assert.match(control, /'v2-interactive inline-flex items-center gap-1 rounded-full pr-1\.5'/);

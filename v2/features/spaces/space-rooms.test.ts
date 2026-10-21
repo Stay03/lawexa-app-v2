@@ -72,7 +72,7 @@ test('no row has a menu column, so rows end at one edge (Stay, 18 October 2026)'
   assert.doesNotMatch(rows, /line\.menu|SpaceFileMenu/);
   assert.doesNotMatch(rows, /FolderActionsMenu|ConversationRowMenu/);
   // A thread's status: the dot and the word, after its name.
-  assert.match(rows, /<ThreadStatusDot value=\{status\.value\} \/>\s*<span className="truncate">\{threadStatusLabel\(status\.value\)\}<\/span>/);
+  assert.match(rows, /<ThreadStatusDot\s*value=\{status\.value\}\s*outline=\{waitsOnSomeoneElse\(status, userUuid\)\}\s*\/>\s*<span className="truncate">\{threadStatusLabel\(status\.value\)\}<\/span>/);
   assert.match(rows, /status: <ThreadStatus thread=\{thread\} \/>,/);
   // The lobby keeps its own rows, with no feed layout left in them.
   for (const file of ['SpaceChannelRow.tsx', 'SpaceThreadRow.tsx']) {

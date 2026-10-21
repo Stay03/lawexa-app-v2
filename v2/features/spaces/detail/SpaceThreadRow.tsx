@@ -15,10 +15,12 @@ import {
   knownThreadStatus,
   threadStatusPerson,
   threadStatusQuiet,
+  waitsOnSomeoneElse,
 } from '@/v2/features/channels/thread-status-model';
 import { LastMessagePreview } from '@/v2/features/collab/kit/LastMessagePreview';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { ThreadStatusChip } from '@/v2/features/collab/kit/ThreadStatusChip';
+import { useV2Session } from '@/v2/runtime/session-context';
 import {
   CountBadge,
   FOCUS_RING,
@@ -89,6 +91,7 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
   // The status chip after the title, a Closed title in muted ink (Stay, 16
   // October 2026). Absent on an older payload, which draws no chip.
   const status = knownThreadStatus(thread.status);
+  const { userUuid } = useV2Session();
   const closed = isClosedThread(thread);
   const quiet = threadStatusQuiet(thread, now);
   // SCOPED, NEVER ON THE ANCHOR - see the docblock. The mention badge and the
@@ -184,6 +187,7 @@ export const SpaceThreadRow = memo(function SpaceThreadRow({
                 person={threadStatusPerson(status)}
                 quiet={quiet}
                 fold
+                outline={waitsOnSomeoneElse(status, userUuid)}
               />
             ) : null}
             {muted ? (

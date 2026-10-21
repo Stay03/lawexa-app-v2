@@ -44,6 +44,11 @@ import {
  * whole, never as a "· q…" stub. The box gives way fifty times faster than
  * the title, so the suffix goes before the title loses a letter. From `md:`
  * up the row is as before.
+ *
+ * `outline` is for a Needs Action that waits on someone else: its dot draws
+ * as an amber ring, and one that waits on the viewer keeps the filled dot
+ * (Stay, 21 October 2026). Callers decide with `waitsOnSomeoneElse`; any
+ * other status ignores it.
  */
 
 const TONE: Readonly<Record<ThreadStatusValue, { chip: string; dot: string }>> = {
@@ -84,18 +89,28 @@ const OPTION_DOT: Readonly<Record<ThreadStatusValue, string>> = {
   closed: TONE.closed.dot,
 };
 
+/** Needs Action's dot as a ring, the same amber as its filled dot. */
+const OUTLINE_DOT = 'border-[1.5px] border-amber-600 bg-transparent dark:border-amber-400';
+
+function dotTone(value: ThreadStatusValue, outline: boolean): string {
+  return outline && value === 'needs_action' ? OUTLINE_DOT : OPTION_DOT[value];
+}
+
 export function ThreadStatusDot({
   value,
+  outline = false,
   className,
 }: {
   value: ThreadStatusValue;
+  /** Needs Action that waits on someone else: a ring, not a filled dot. */
+  outline?: boolean;
   className?: string;
 }) {
   if (!isThreadStatusValue(value)) return null;
   return (
     <span
       aria-hidden
-      className={cn('size-1.5 shrink-0 rounded-full', OPTION_DOT[value], className)}
+      className={cn('size-1.5 shrink-0 rounded-full', dotTone(value, outline), className)}
     />
   );
 }
@@ -117,6 +132,7 @@ export function ThreadStatusChip({
   quiet = null,
   fit = false,
   fold = false,
+  outline = false,
   className,
 }: {
   value: ThreadStatusValue;
@@ -130,6 +146,8 @@ export function ThreadStatusChip({
   fit?: boolean;
   /** A list row: below `md:` the person hides and the suffix shows only whole. */
   fold?: boolean;
+  /** Needs Action that waits on someone else: the dot is a ring. */
+  outline?: boolean;
   className?: string;
 }) {
   if (!isThreadStatusValue(value)) return null;
@@ -148,7 +166,7 @@ export function ThreadStatusChip({
       <span className="inline-flex shrink-0 items-center gap-1.5">
         <span
           aria-hidden
-          className={cn('size-1.5 shrink-0 rounded-full', TONE[value].dot)}
+          className={cn('size-1.5 shrink-0 rounded-full', dotTone(value, outline))}
         />
         {threadStatusLabel(value)}
       </span>
