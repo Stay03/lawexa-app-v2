@@ -83,6 +83,6 @@ test('a colour that lands late eases in', () => {
 
 test('a chat’s desktop bar carries no category label, as the chats list page', () => {
   const header = read('v2', 'shell', 'V2Header.tsx');
-  assert.match(header, /const leftLabel = isHome \? 'Home' : isCase \? 'Case' : null;/);
+  assert.match(header, /const leftLabel = homeTab \? homeBarLabel\(homeTab\) : isCase \? 'Case' : null;/);
   assert.doesNotMatch(header, /'Conversation'/);
 });
