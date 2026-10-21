@@ -6,7 +6,10 @@ import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
- * "Add note", floating just under a researcher's selection in the statute.
+ * "Comment", floating just under a researcher's selection in the statute: a
+ * print note for the research team (Arthur picked the word, 21 October 2026;
+ * "Add print note" wrapped onto two lines at this width). Beside it, the
+ * reader's own "Annotate" stays as it is.
  *
  * It sits where the selection ends, kept inside the screen, and takes the
  * press without taking the selection: `onMouseDown` is cancelled so a click
@@ -33,7 +36,7 @@ export function AddNoteButton({ rect, onAdd }: { rect: DOMRect; onAdd: () => voi
       )}
     >
       <NotebookPen aria-hidden className="size-4" />
-      Add print note
+      Comment
     </button>
   );
 }

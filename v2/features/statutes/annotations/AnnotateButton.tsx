@@ -7,7 +7,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
  * "Annotate", floating just under a reader's selection in the statute. It
- * sits where the researchers' "Add print note" sits; when both show (a
+ * sits where the researchers' "Comment" (a print note) sits; when both show (a
  * researcher reading), this one stands to its left (`besideNote`).
  *
  * Like that button, it takes the press without taking the selection:
