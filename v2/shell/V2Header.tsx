@@ -31,7 +31,7 @@ import { FOCUS_RING } from './designs/modules';
 import { pushedScreenFor, type PushedScreen } from './pushed-route';
 import { hasOpenBar } from './top-level-route';
 import { useShownPathname } from './move-first';
-import { useScreenContext } from './screen-context';
+import { SCREEN_BAR_ACTION_ID, useScreenContext } from './screen-context';
 import { NO_BREADCRUMB_DATA, breadcrumbTrail } from './breadcrumb-trail';
 import { V2Breadcrumb } from './V2Breadcrumb';
 import { isAccountRole } from '@/v2/runtime/account';
@@ -404,6 +404,7 @@ export function V2Header({ user }: { user: SessionUser | null }) {
             page. Its name is its tooltip and its accessible label. */}
         {barAction && BarIcon ? (
           <Button
+            id={SCREEN_BAR_ACTION_ID}
             variant="ghost"
             size="icon"
             className={cn(

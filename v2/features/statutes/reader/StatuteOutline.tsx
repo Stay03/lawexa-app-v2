@@ -78,8 +78,9 @@ export interface OutlineHandle {
   onJump: (id: string) => void;
 }
 
-/** The locked mark: a quiet glyph for sighted readers, words for the rest. */
-function LockMark({ className }: { className?: string }) {
+/** The locked mark: a quiet glyph for sighted readers, words for the rest.
+ *  Shared with the Contents designs under `contents-variants/`. */
+export function LockMark({ className }: { className?: string }) {
   return (
     <>
       <Lock

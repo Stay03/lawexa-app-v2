@@ -113,6 +113,14 @@ export interface ScreenBarAction {
   wide: boolean;
 }
 
+/**
+ * The id the bar gives its one screen control, so a panel the control opens
+ * can anchor to it (the Contents design under `?contents=a` places a popover
+ * under the button on a computer). There is at most one bar control at a
+ * time, so one id is enough.
+ */
+export const SCREEN_BAR_ACTION_ID = 'v2-screen-bar-action';
+
 const NO_ACTIONS: readonly ScreenAction[] = [];
 
 let context: ScreenContext | null = null;
