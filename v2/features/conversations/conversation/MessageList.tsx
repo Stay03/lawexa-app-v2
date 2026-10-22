@@ -217,6 +217,8 @@ export interface MessageListProps {
   /** When the reader sent their running turn, in a redacted chat only: the
    *  clock runs from it, so the redaction wait before the stream counts. */
   sentAt?: number | null;
+  /** A redacted chat: each question shows "Sent as redacted" and what was hidden. */
+  redacted?: boolean;
   /** The chat's own heading (title and space) at the top of the transcript,
    *  where a list page carries its title; scrolls away with the messages. */
   masthead?: ReactNode;
@@ -257,6 +259,7 @@ export function MessageList({
   restingLabel,
   heldSince = null,
   sentAt = null,
+  redacted = false,
   masthead = null,
   underBar = false,
   memberColours = null,
@@ -769,6 +772,7 @@ export function MessageList({
                       onReply={onReply}
                       onJump={jumpFromQuote}
                       onHold={setHeld}
+                      redacted={redacted}
                     />
                   </Fragment>
                 ))}
@@ -895,6 +899,7 @@ const GroupRow = memo(function GroupRow({
   onReply,
   onJump,
   onHold,
+  redacted,
 }: {
   group: MessageGroup;
   virtualize: boolean;
@@ -918,6 +923,8 @@ const GroupRow = memo(function GroupRow({
   onReply: ((target: MessageReplyTo) => void) | null;
   onJump: (messageId: number) => void;
   onHold: (held: HeldTurn) => void;
+  /** A redacted chat: each question carries its "Sent as redacted" line. */
+  redacted: boolean;
 }) {
   // Native windowing for off-screen rows; `auto` remembers measured height so a
   // scrolled-away row returns to the exact same size (no jump).
@@ -954,6 +961,7 @@ const GroupRow = memo(function GroupRow({
           onReply={onReply}
           onJump={onJump}
           onHold={onHold}
+          redacted={redacted}
         />
       );
     } else {

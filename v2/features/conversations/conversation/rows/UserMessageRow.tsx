@@ -14,6 +14,7 @@ import { HoverReply } from './HoverReply';
 import { MentionText } from './MentionText';
 import { ReplyQuote } from './ReplyQuote';
 import { SentAttachments } from './SentAttachments';
+import { RedactionNote } from './RedactionNote';
 import { SpaceTurn } from './SpaceTurn';
 import { SwipeToReply } from './SwipeToReply';
 import type { HeldTurn } from './TurnActionsSheet';
@@ -131,6 +132,7 @@ export function UserMessageRow({
   onReply = null,
   onJump,
   onHold,
+  redacted = false,
 }: {
   message: ChatMessage;
   /** A space chat on a server with B4: name who asked (space-turn.ts). */
@@ -150,6 +152,8 @@ export function UserMessageRow({
   onJump?: (messageId: number) => void;
   /** Open the actions sheet for this question (a long press). */
   onHold?: (held: HeldTurn) => void;
+  /** A redacted chat: the question carries its "Sent as redacted" line. */
+  redacted?: boolean;
 }) {
   const [showTime, setShowTime] = useState(false);
   const tint = colourIndex === null ? 'plain' : 'member';
@@ -173,6 +177,10 @@ export function UserMessageRow({
   const quote = message.replyTo ? (
     <ReplyQuote replyTo={message.replyTo} viewerId={viewerId} tone={quoteTone} onJump={onJump} />
   ) : null;
+  // A redacted chat's question says what was hidden before the AI read it
+  // (option D, 22 October 2026). A summary alone also shows it, so a question
+  // whose chat flag has not resolved yet still carries its line.
+  const showsRedaction = redacted || message.redaction !== undefined;
 
   if (showAuthor) {
     // Only a saved question can be replied to (replyTargetOf).
@@ -209,6 +217,9 @@ export function UserMessageRow({
         )}
         {attachments.length > 0 && <SentAttachments attachments={attachments} />}
         {unmatched && <p className="text-muted-foreground mt-1 text-xs">{unmatched}</p>}
+        {showsRedaction && (
+          <RedactionNote summary={message.redaction} align={turnSide(message, viewerId) === 'mine' ? 'end' : 'start'} />
+        )}
       </>
     );
     return (
@@ -258,6 +269,7 @@ export function UserMessageRow({
       )}
 
       {attachments.length > 0 && <SentAttachments attachments={attachments} />}
+      {showsRedaction && <RedactionNote summary={message.redaction} align="end" />}
 
       <div
         className={cn(

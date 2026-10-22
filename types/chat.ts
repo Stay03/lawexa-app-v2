@@ -76,6 +76,24 @@ export interface ChatMessage {
   mentions?: MessageMention[];
   /** Handles the writer typed that matched nobody in the space: on their own rows only. */
   unmatchedHandles?: string[];
+  /**
+   * What redaction hid in this user turn, in a redacted chat: the POST's
+   * `redaction`, or the stored `metadata.redaction` on a reload. Absent in other
+   * chats and on redacted turns from before the server sent it.
+   */
+  redaction?: RedactionSummary;
+}
+
+/**
+ * What the server's redaction hid in one user turn (backend contract, 22
+ * October 2026). `details_hidden` is the count the reader sees; `by_type` maps
+ * a kind (PERSON, ADDRESS, PHONE, EMAIL, DOB, ACCOUNT, BVN, NIN, PASSPORT,
+ * LICENSE, TAX_ID, MEDICAL, ORG, CASE_NUMBER, OTHER) to how many of it.
+ */
+export interface RedactionSummary {
+  details_hidden: number;
+  places_replaced: number;
+  by_type: Record<string, number>;
 }
 
 /**
@@ -532,6 +550,8 @@ export interface ChatStartResponse {
     // turn. Use this in place of the raw input so the local store stays in
     // sync without a refetch.
     user_message_content?: string;
+    /** What redaction hid in that turn: redacted chats only (see {@link RedactionSummary}). */
+    redaction?: RedactionSummary;
     /**
      * The saved id of the user's message (backend, 2026-07-25). Belt-and-braces for
      * the cross-tab merge: the client draws the user's row optimistically, before
@@ -655,6 +675,8 @@ export interface ApiMessage {
     reason?: 'cancelled' | 'error' | 'timeout';
     /** The files on a user message, with their types. */
     files?: ApiMessageFile[];
+    /** What redaction hid in a user turn of a redacted chat (see {@link RedactionSummary}). */
+    redaction?: RedactionSummary;
   } | null;
   // Canonical multi-attachment shape (backend normalizes both legacy and new
   // storage shapes into this array). Always check `attachments` first.

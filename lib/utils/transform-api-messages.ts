@@ -6,6 +6,7 @@ import type {
   HandoverMessage,
   ErrorMessage,
 } from '@/types/chat';
+import { isRedactionSummary } from './redaction-summary';
 
 /**
  * Transform the server's persisted message shape (`ApiMessage[]`) into the
@@ -123,6 +124,8 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         ...(apiMsg.mentions && apiMsg.mentions.length > 0 && { mentions: apiMsg.mentions }),
         ...(apiMsg.unmatched_handles &&
           apiMsg.unmatched_handles.length > 0 && { unmatchedHandles: apiMsg.unmatched_handles }),
+        // What redaction hid, in a redacted chat (backend, 22 October 2026).
+        ...(isRedactionSummary(apiMsg.metadata?.redaction) && { redaction: apiMsg.metadata.redaction }),
       } as ChatMessage);
     }
     // Handover message - orchestrator delegating to sub-agent

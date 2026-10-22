@@ -17,8 +17,10 @@ const SERVER_ROW_PREFIX = 'msg_';
  * saw their own `@chidi` as plain text until they opened the chat again, while
  * everyone else saw the chip.
  *
- * The local row keeps its id, its text and everything else; only those three
- * fields are taken, and only when the server's copy has them. Returns the same
+ * The same holds for what redaction hid (`redaction`), on a row that has none.
+ *
+ * The local row keeps its id, its text and everything else; only those fields
+ * are taken, and only when the server's copy has them. Returns the same
  * array when nothing changed, so a merge that adds nothing still renders nothing.
  */
 export function adoptServerFields(
@@ -45,6 +47,10 @@ export function adoptServerFields(
     if (copy.unmatchedHandles !== undefined && copy.unmatchedHandles !== local.unmatchedHandles) {
       fields.unmatchedHandles = copy.unmatchedHandles;
     }
+    // What redaction hid (redacted chats, 22 October 2026), for a row that did
+    // not get it from its own send: the first question of a chat, which the home
+    // screen sends. A row that already has it keeps its own.
+    if (copy.redaction !== undefined && local.redaction === undefined) fields.redaction = copy.redaction;
     if (Object.keys(fields).length === 0) return row;
     changed = true;
     return { ...row, ...fields } as EngineMessage;

@@ -75,6 +75,7 @@ import type {
 } from './types';
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { adoptServerFields } from './server-fields';
+import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import { largestSavedId, savedTurnId } from './saved-turn';
 import { STALL_CHECK_MS, stallVerdict, type StallVerdict } from './stall';
 import { reportChatError } from '../chat-errors/report';
@@ -2069,6 +2070,13 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         // Redacted response carries the canonical (redacted) form of the user turn
         // so the local store stays in sync without a refetch.
         const redactedText = response.data.user_message_content;
+        // …and what redaction hid, for the "Sent as redacted" line under it
+        // (backend, 22 October 2026). Stored on the row whether or not the text
+        // changed: "nothing personal found" is an answer too.
+        const redaction = response.data.redaction;
+        if (isRedactedTurnN && isRedactionSummary(redaction)) {
+          setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, redaction } : m)));
+        }
         if (isRedactedTurnN && redactedText && redactedText !== message) {
           setMessages((msgs) =>
             msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, content: redactedText } : m)),
