@@ -29,6 +29,7 @@ import { useFileViewer } from '@/v2/features/files/use-file-viewer';
 import { listViewable, type ViewKind } from '@/v2/features/files/viewable';
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
 import { folderRow } from '@/v2/features/folders/folder-row-model';
+import { FolderPicker } from '@/v2/features/folders/picker/FolderPicker';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { HomeComposerHandle } from '@/v2/shell/designs/HomeComposer';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -65,6 +66,7 @@ import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceChatDock } from './SpaceChatDock';
 import { SpaceFileCard } from './SpaceFileCard';
 import type { SpaceFileActions } from './SpaceFileMenu';
+import { SpaceLooseFiles } from './SpaceLooseFiles';
 import { renderFeedRow, type FeedRowMenus } from './feed-rows';
 import {
   SpaceContentEmptyState,
@@ -113,6 +115,13 @@ import {
  * ── PAGING ─────────────────────────────────────────────────────────────────
  * The feed is cursor-paged; the next page loads 320px before the end of the
  * pane. A new pill is a new list and shows its skeleton.
+ *
+ * ── THE FOLDERS PILL IS THE SPACE'S TOP LEVEL ──────────────────────────────
+ * Under the folders it lists the space's files in none of them
+ * (`SpaceLooseFiles`; Stay, 22 October 2026: "Space files at the top level,
+ * like your Folders page"). Such a file's card adds "Move to folder" for the
+ * Owner and Contributors, which opens the folder picker on the space's own
+ * folders; filing it takes it off the top level.
  */
 export function SpaceContentPanel({
   space,
@@ -438,7 +447,7 @@ function SpaceFeed({
   fileSelect?: FeedRowMenus['fileSelect'];
 }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
-  const { viewerId } = useContentReadGate();
+  const { viewerId, enabled } = useContentReadGate();
   // "You:" on the last-message line when the reader sent it (`lastMessageLine`).
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
   const pages = query.data?.pages;
@@ -499,8 +508,21 @@ function SpaceFeed({
     [],
   );
 
-  // What a file card's ⋮ holds for this reader.
+  // Move to folder (Stay, 22 October 2026): the picker on the space's own
+  // folders. Held after closing so its exit plays; each open bumps the key.
+  const [filing, setFiling] = useState<{ fileId: number; open: boolean; key: number } | null>(null);
+  const moveToFolder = useCallback(
+    (file: SpaceFile) =>
+      setFiling((previous) => ({ fileId: file.id, open: true, key: (previous?.key ?? 0) + 1 })),
+    [],
+  );
+
+  // What a file card's ⋮ holds for this reader. Move to folder on the Folders
+  // pill, where every file listed is one in no folder, for whoever may add to
+  // the space: the Owner and Contributors, the server's rule for a space
+  // folder's items (backend, 22 October 2026), whoever uploaded it.
   const fileActions = (file: SpaceFile): SpaceFileActions => ({
+    onMoveToFolder: tab === 'folders' && canAdd ? moveToFolder : undefined,
     onMove: ownsItem(file.uploader.id, viewerId) ? moveFile : undefined,
     onRemoveFromSpace: canRemove ? removeFile : undefined,
     onCopyToMine: copyFile,
@@ -606,6 +628,19 @@ function SpaceFeed({
         </div>
       </PagedContent>
 
+      {/* The space's files in none of its folders, under the folders. They
+          wait while the folders load, so the pill draws one skeleton. */}
+      {tab === 'folders' ? (
+        <SpaceLooseFiles
+          spaceUuid={spaceUuid}
+          viewerId={viewerId}
+          enabled={enabled}
+          held={query.isPending}
+          now={now}
+          menus={rowMenus}
+        />
+      ) : null}
+
       <SpaceFileCard
         file={card?.file ?? null}
         anchor={card?.row ?? null}
@@ -617,6 +652,16 @@ function SpaceFeed({
       />
       <FileViewers viewer={viewer} pictures={pictures} place="space" />
       {dialogs}
+      {filing ? (
+        <FolderPicker
+          key={`folder-${filing.key}`}
+          target={{ type: 'file', contentId: filing.fileId }}
+          title="Move to folder"
+          space={{ uuid: spaceUuid, name: spaceName }}
+          open={filing.open}
+          onOpenChange={(open) => setFiling((previous) => (previous ? { ...previous, open } : previous))}
+        />
+      ) : null}
       {deleting ? (
         <DeleteSpaceFileDialog
           key={`delete-${deleting.key}`}

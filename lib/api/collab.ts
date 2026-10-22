@@ -277,6 +277,33 @@ export const spacesApi = {
   },
 
   /**
+   * The space's files in none of the space's live folders (backend e76a5957,
+   * confirmed 22 October 2026): `GET /spaces/{uuid}/files?unfiled=1`, the
+   * file list with the flag the viewer's own list takes
+   * (`GET /files?unfiled=1`), page-numbered, newest first. A member's
+   * personal folder does not count. The server works it out per request, so
+   * a file filed into one of the space's folders is gone on the next read,
+   * and one taken out of its last space folder is back. The Space's Folders
+   * view lists them under the folders (`SpaceLooseFiles`).
+   */
+  getUnfiledFiles: async (
+    spaceUuid: string,
+    params: PageParams = {}
+  ): Promise<SpaceFileListResponse> => {
+    const response = await apiClient.get<SpaceFileListResponse>(
+      `/spaces/${spaceUuid}/files`,
+      {
+        params: {
+          unfiled: 1,
+          per_page: params.per_page ?? 20,
+          page: params.page ?? 1,
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /**
    * ── ADDING TO A SPACE, AND TAKING OUT (backend B3, cb0fae8) ───────────────
    * Spaces F3, 12 October 2026. The Owner and Contributors add; a Viewer is
    * refused with 403. Only the space's Owner takes an item out (403 for

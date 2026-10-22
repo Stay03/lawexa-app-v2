@@ -1,6 +1,6 @@
 'use client';
 
-import { Boxes, Copy, FolderOutput, MoreVertical, Trash2 } from 'lucide-react';
+import { Boxes, Copy, FolderInput, FolderOutput, MoreVertical, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -15,6 +15,9 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /** What a reader may do to a space file; an absent handler is an absent item. */
 export interface SpaceFileActions {
+  /** File it in one of the space's folders: a file at the space's top level
+   *  (Stay, 22 October 2026), for the Owner and Contributors. */
+  onMoveToFolder?: (file: SpaceFile) => void;
   onMove?: (file: SpaceFile) => void;
   onRemoveFromSpace?: (file: SpaceFile) => void;
   onCopyToMine?: (file: SpaceFile) => void;
@@ -25,19 +28,21 @@ export interface SpaceFileActions {
  * SpaceFileMenu — a space file's ⋮ menu (Spaces F3, 12 October 2026), at the
  * top right of its card (`SpaceFileCard`, Stay, 18 October 2026: no row in the
  * list has a "…"; a file's actions are in its card's ⋮). An item appears
- * only when the host passes its handler: "Save a copy to my files" for every
- * member, "Move to space" for the file's uploader (its owner), "Remove from
- * space" for the space's Owner, and "Delete file" for the Owner or the
- * Contributor who uploaded it.
+ * only when the host passes its handler: "Move to folder" for a file in none
+ * of the space's folders, for whoever may add to the space (Stay, 22 October
+ * 2026), "Save a copy to my files" for every member, "Move to space" for the
+ * file's uploader (its owner), "Remove from space" for the space's Owner,
+ * and "Delete file" for the Owner or the Contributor who uploaded it.
  */
 export function SpaceFileMenu({
   file,
+  onMoveToFolder,
   onMove,
   onRemoveFromSpace,
   onCopyToMine,
   onDelete,
 }: SpaceFileActions & { file: SpaceFile }) {
-  return onMove || onRemoveFromSpace || onCopyToMine || onDelete ? (
+  return onMoveToFolder || onMove || onRemoveFromSpace || onCopyToMine || onDelete ? (
     <DropdownMenu>
       <DropdownMenuTrigger
         className={cn(
@@ -50,6 +55,14 @@ export function SpaceFileMenu({
       </DropdownMenuTrigger>
       {/* 16px off the window's edges, so the last row is never cut at the bottom. */}
       <DropdownMenuContent align="end" collisionPadding={16}>
+        {/* The file goes into one of the space's folders, and off the space's
+            top level (the Folders page's own words for its loose files). */}
+        {onMoveToFolder ? (
+          <DropdownMenuItem onSelect={() => onMoveToFolder(file)}>
+            <FolderInput />
+            Move to folder
+          </DropdownMenuItem>
+        ) : null}
         {/* A copy the reader keeps, separate from the space's file (Stay,
             15 October 2026: a space file belongs to the space). */}
         {onCopyToMine ? (

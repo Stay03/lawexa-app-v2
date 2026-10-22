@@ -184,6 +184,7 @@ function CardBody({
       </div>
       <SpaceFileMenu
         file={file}
+        onMoveToFolder={then(actions.onMoveToFolder)}
         onMove={then(actions.onMove)}
         onRemoveFromSpace={then(actions.onRemoveFromSpace)}
         onCopyToMine={then(actions.onCopyToMine)}

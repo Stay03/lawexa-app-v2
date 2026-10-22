@@ -142,6 +142,35 @@ export const spacesQueries = {
    *  pill or search: the handle its re-reads invalidate. */
   itemsOf: (spaceUuid: string) => [...spacesQueries.contentsOf(spaceUuid), 'items'] as const,
 
+  /** Every cached page set of one space's files in none of its folders. */
+  looseFilesOf: (spaceUuid: string) =>
+    [...spacesQueries.contentsOf(spaceUuid), 'loose-files'] as const,
+
+  /**
+   * The space's files in none of the space's folders
+   * (`GET /spaces/{uuid}/files?unfiled=1`, backend e76a5957), newest first:
+   * what the Folders pill lists under the folders (Stay, 22 October 2026,
+   * like the Folders page's loose files). Under the space's contents key, so
+   * an upload, a delete, a remove and a move re-read it, and
+   * `FOLDER_ITEM_INVALIDATES` names the prefix too: the server works the
+   * list out per request, so a filing takes a file off it and an unfiling
+   * puts it back.
+   */
+  looseFiles: (spaceUuid: string, { viewerId }: ViewerScoped) =>
+    infiniteQueryOptions({
+      queryKey: [...spacesQueries.looseFilesOf(spaceUuid), { viewerId }] as const,
+      queryFn: ({ pageParam }) =>
+        spacesApi.getUnfiledFiles(spaceUuid, { per_page: SPACE_CONTENT_PER_PAGE, page: pageParam }),
+      initialPageParam: 1,
+      getNextPageParam: (last) => {
+        const { current_page, last_page } = last.pagination;
+        return current_page < last_page ? current_page + 1 : undefined;
+      },
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
   /**
    * A space's conversations, files and root folders as one list, newest first
    * (the Space home, design B4; `GET /spaces/{uuid}/items`). One pill is one

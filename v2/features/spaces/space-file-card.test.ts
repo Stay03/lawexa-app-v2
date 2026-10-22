@@ -36,7 +36,7 @@ test('the open: the tap-first opener, its refusals under the button', () => {
 test('an action closes the card before its own dialog opens', () => {
   const source = card();
   assert.match(source, /\(target: SpaceFile\) => \{\s*close\(\);\s*act\(target\);\s*\}/);
-  for (const handler of ['onMove', 'onRemoveFromSpace', 'onCopyToMine', 'onDelete']) {
+  for (const handler of ['onMoveToFolder', 'onMove', 'onRemoveFromSpace', 'onCopyToMine', 'onDelete']) {
     assert.match(source, new RegExp(`${handler}=\\{then\\(actions\\.${handler}\\)\\}`));
   }
 });
