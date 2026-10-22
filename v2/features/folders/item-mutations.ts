@@ -530,9 +530,116 @@ export function useRemoveFolderItem(
   });
 }
 
+/* ── Move ────────────────────────────────────────────────────────────────── */
+
+/**
+ * A move's variables. The folder it LEAVES is named as the removal names it
+ * (`folderUuid`), so {@link usePendingFolderItemRemovals} reads a move in
+ * flight as a removal from that folder and the row stays off the page.
+ */
+export interface MoveFolderItemVariables extends FolderItemTarget {
+  folderUuid: string;
+  /** The folder it goes into. */
+  toFolderUuid: string;
+}
+
+const MOVE_FOLDER_ITEM_MUTATION_KEY = ['folders', 'item', 'move'] as const;
+
+/** The prefix a removal and a move share: both take the item OUT of
+ *  `folderUuid`, which is what the in-flight set is about. */
+const FOLDER_ITEM_LEAVE_KEY = ['folders', 'item'] as const;
+
+/**
+ * The move's first half landed and its second did not: the destination
+ * holds the item and the folder it was leaving still does. Its own error,
+ * so the picker can say exactly that, and so the caches re-ask now (the
+ * destination really changed).
+ */
+export class MoveHalfDoneError extends Error {
+  /** What the removal answered. A plain field, not a parameter property:
+   *  the test runner strips types only, and cannot run that syntax. */
+  readonly reason: unknown;
+
+  constructor(reason: unknown) {
+    super('It was added to the folder, but could not be taken out of the one it was in.');
+    this.name = 'MoveHalfDoneError';
+    this.reason = reason;
+  }
+}
+
+/**
+ * Move one item from one folder to another (Stay, 22 October 2026: "Moving a
+ * file between folders should work too"): `POST /folders/{to}/items`, then
+ * `DELETE /folders/{from}/items`, in that order (backend, the same day: if
+ * the second fails the item is in both folders and nothing is lost). A
+ * destination that already holds it (the 422, {@link isAlreadyInFolder}) is
+ * the first half done, so the second still runs. Optimistic as the removal
+ * is: the row leaves the folder it is in, that count drops and the
+ * destination's rises, and a failure puts all three back. No toast here: the
+ * picker words the outcome, and its undo is this same move the other way.
+ */
+export function useMoveFolderItem(
+  target: FolderItemTarget,
+  options: AddItemOptions = {},
+): UseMutationResult<
+  FolderItemWriteResponse,
+  Error,
+  MoveFolderItemVariables,
+  { rollback: () => void }
+> {
+  const queryClient = useQueryClient();
+  const { silentError = false } = options;
+
+  return useMutation({
+    mutationKey: MOVE_FOLDER_ITEM_MUTATION_KEY,
+    mutationFn: async ({ folderUuid, toFolderUuid, type, contentId }: MoveFolderItemVariables) => {
+      try {
+        await foldersApi.addItem(toFolderUuid, { type, id: contentId });
+      } catch (error) {
+        if (!isAlreadyInFolder(error)) throw error;
+      }
+      try {
+        return await foldersApi.removeItem(folderUuid, { type, id: contentId });
+      } catch (error) {
+        throw new MoveHalfDoneError(error);
+      }
+    },
+    scope: { id: folderItemScopeId(target) },
+    meta: { silentError, invalidates: FOLDER_ITEM_INVALIDATES },
+    onMutate: async ({ folderUuid, toFolderUuid, type, contentId }) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: foldersQueries.itemLists() }),
+        queryClient.cancelQueries({ queryKey: foldersQueries.lists() }),
+        queryClient.cancelQueries({ queryKey: foldersQueries.details() }),
+      ]);
+      const removal = removeItemFromFolderLists(queryClient, folderUuid, type, contentId);
+      const left = writeFolderItemCount(queryClient, folderUuid, -1);
+      const entered = writeFolderItemCount(queryClient, toFolderUuid, 1);
+      return {
+        rollback: () => {
+          revertFolderItemCount(queryClient, entered);
+          revertFolderItemCount(queryClient, left);
+          reinsertRemovedItem(queryClient, removal, type, contentId);
+        },
+      };
+    },
+    onError: (error, _variables, context) => {
+      context?.rollback();
+      // Half done: the destination changed on the server, so the folder
+      // caches re-ask now rather than on their next visit.
+      if (error instanceof MoveHalfDoneError) {
+        for (const queryKey of FOLDER_ITEM_INVALIDATES) {
+          void queryClient.invalidateQueries({ queryKey });
+        }
+      }
+    },
+  });
+}
+
 /* ── The in-flight removal set ───────────────────────────────────────────── */
 
-/** Narrow a mutation's `variables` (typed `unknown` here) to a removal, or null. */
+/** Narrow a mutation's `variables` (typed `unknown` here) to a removal, or a
+ *  move (which leaves `folderUuid` too), or null. */
 function pendingRemoval(
   variables: unknown,
 ): { folderUuid: string; key: string } | null {
@@ -573,10 +680,14 @@ const NO_PENDING: ReadonlySet<string> = new Set<string>();
  *
  * `useMutationState` structurally shares its result, so this returns a stable
  * reference while nothing changes.
+ *
+ * A MOVE COUNTS: it takes the item out of `folderUuid` too (the two share
+ * {@link FOLDER_ITEM_LEAVE_KEY}), so a file on its way to another folder is
+ * off this page from the press.
  */
 export function usePendingFolderItemRemovals(folderUuid: string): ReadonlySet<string> {
   const pending = useMutationState({
-    filters: { mutationKey: REMOVE_FOLDER_ITEM_MUTATION_KEY, status: 'pending' },
+    filters: { mutationKey: FOLDER_ITEM_LEAVE_KEY, status: 'pending' },
     select: (mutation) => pendingRemoval(mutation.state.variables),
   });
 

@@ -21,7 +21,9 @@ import type { ContentSpaceStub } from '@/types/collab';
 import { getErrorMessage } from '@/v2/runtime/query';
 import {
   isAlreadyInFolder,
+  MoveHalfDoneError,
   useAddItemToFolder,
+  useMoveFolderItem,
   useRemoveFolderItem,
   type FolderItemTarget,
 } from '../item-mutations';
@@ -67,9 +69,15 @@ import { usePickerBreakpoint } from './use-picker-breakpoint';
  * is kept (the row flips, politely announced) — and it is the honest signal the
  * plan asked for, not an error.
  *
- * ── THE VERB IS "ADD", NEVER "MOVE" ────────────────────────────────────────
+ * ── THE VERB IS "ADD", NEVER "MOVE", UNLESS `from` NAMES WHAT IT LEAVES ────
  * One case can sit in a matter folder, a topic folder and a reading list at
- * once. Nothing here removes it from anywhere.
+ * once. Nothing here removes it from anywhere, except in a move between
+ * folders (Stay, 22 October 2026: "Moving a file between folders should
+ * work too"): with `from`, the chosen folder gets the item first and `from`
+ * then lets go of it (`useMoveFolderItem`), the toast says "Moved to", and
+ * its Undo is the same move back. The folder being left is marked as holding
+ * the item from the start, and pressing it moves nothing: taking the item
+ * out of its only folder would file it nowhere.
  *
  * ── A SPACE'S FILE IS FILED AMONG THE SPACE'S FOLDERS ──────────────────────
  * With `space` the picker browses that space's folders (`PickerBody`), and
@@ -84,10 +92,28 @@ const SEARCH_DEBOUNCE_MS = 250;
 /** One stable reference for "we have been told nothing yet". */
 const EMPTY_HELD: ReadonlySet<string> = new Set<string>();
 
+/** What the picker knows before asking: in a move, the folder being left holds the item. */
+function heldAtStart(from: { uuid: string } | undefined): ReadonlySet<string> {
+  return from ? new Set([from.uuid]) : EMPTY_HELD;
+}
+
+/**
+ * Why a move did not finish, with the folders named. Half done: the new
+ * folder holds it and the old one still does, which the row behind the
+ * picker shows.
+ */
+function moveRefusal(error: unknown, to: { name: string }, from: { name: string }): string {
+  if (error instanceof MoveHalfDoneError) {
+    return `It’s in “${to.name}” now, but couldn’t be taken out of “${from.name}”. ${getErrorMessage(error.reason)}`;
+  }
+  return getErrorMessage(error);
+}
+
 export function FolderPicker({
   target,
   title = 'Add to folder',
   space,
+  from,
   open,
   onOpenChange,
 }: {
@@ -98,6 +124,9 @@ export function FolderPicker({
   title?: string;
   /** Browse and create in this space's folders, not the viewer's own. */
   space?: ContentSpaceStub;
+  /** The folder the item LEAVES: a move between folders, not an add. The
+   *  chosen folder gets it first, then this one lets go of it. */
+  from?: { uuid: string; name: string };
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -106,7 +135,7 @@ export function FolderPicker({
   const [trail, setTrail] = useState<readonly PickerCrumb[]>([]);
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
-  const [knownHeld, setKnownHeld] = useState<ReadonlySet<string>>(EMPTY_HELD);
+  const [knownHeld, setKnownHeld] = useState<ReadonlySet<string>>(() => heldAtStart(from));
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -133,7 +162,12 @@ export function FolderPicker({
   // which is a redo. Two true sentences about two things that really happened,
   // rather than an option flag whose only job was to silence one of them.
   const undoAdd = useRemoveFolderItem(target);
-  const create = useCreateFolderAndAdd(target, { space });
+  const create = useCreateFolderAndAdd(target, { space, from });
+  // The move between folders (`from`): silent, the picker words it. Its undo
+  // is the same move back, and NOT silent: an undo that quietly failed would
+  // leave the reader believing the file is back (the removal's rule).
+  const move = useMoveFolderItem(target, { silentError: true });
+  const undoMove = useMoveFolderItem(target);
 
   const stopDebounce = () => {
     if (debounceRef.current !== null) {
@@ -156,7 +190,7 @@ export function FolderPicker({
       setQuery('');
       setInlineError(null);
       setNotice(null);
-      setKnownHeld(EMPTY_HELD);
+      setKnownHeld(heldAtStart(from));
     }
     onOpenChange(next);
   };
@@ -225,14 +259,44 @@ export function FolderPicker({
     });
   };
 
+  /** The move's word, with its way back: the same move from the new folder to the old. */
+  const confirmMoved = (folder: PickerFolder, left: { uuid: string; name: string }) => {
+    toast.success(`Moved to “${folder.name}”`, {
+      duration: 8000,
+      action: {
+        label: 'Undo',
+        onClick: () => undoMove.mutate({ ...target, folderUuid: folder.uuid, toFolderUuid: left.uuid }),
+      },
+    });
+  };
+
   /** One destination at a time: a second press while a write is on the wire is
    *  a double-tap, not a second intention. */
-  const writing = add.isPending || create.isPending;
+  const writing = add.isPending || create.isPending || move.isPending;
 
   const choose = (folder: PickerFolder) => {
     if (writing) return;
     setInlineError(null);
     setNotice(null);
+    if (from) {
+      // The folder it is leaving is nowhere to move to, and letting it go
+      // from its only folder would file it nowhere.
+      if (folder.uuid === from.uuid) {
+        setNotice(`Already in ${folder.name}`);
+        return;
+      }
+      move.mutate(
+        { ...target, folderUuid: from.uuid, toFolderUuid: folder.uuid },
+        {
+          onSuccess: () => {
+            changeOpen(false);
+            confirmMoved(folder, from);
+          },
+          onError: (error) => setInlineError(moveRefusal(error, folder, from)),
+        },
+      );
+      return;
+    }
     add.mutate(
       { folderUuid: folder.uuid },
       {
@@ -264,7 +328,17 @@ export function FolderPicker({
         onSuccess: (result) => {
           if (result.status === 'added') {
             changeOpen(false);
-            confirmAdded(result.folder, result.contentId);
+            if (from) confirmMoved(result.folder, from);
+            else confirmAdded(result.folder, result.contentId);
+            return;
+          }
+          if (result.status === 'added-not-moved') {
+            // The new folder holds it and the old one still does: said as
+            // that, from the corner, since the picker's own job is done.
+            changeOpen(false);
+            toast.error(
+              `Added to “${result.folder.name}”, but it couldn’t be taken out of “${result.from.name}”. ${result.message}`,
+            );
             return;
           }
           // Half a success, said as half a success — and the field is emptied
@@ -306,14 +380,20 @@ export function FolderPicker({
       knownHeld={knownHeld}
       onChoose={choose}
       onCreate={createHere}
-      pendingFolderUuid={add.isPending ? (add.variables?.folderUuid ?? null) : null}
+      pendingFolderUuid={
+        add.isPending
+          ? (add.variables?.folderUuid ?? null)
+          : move.isPending
+            ? (move.variables?.toFolderUuid ?? null)
+            : null
+      }
       creating={create.isPending}
       inlineError={inlineError}
       notice={notice}
     />
   );
 
-  const description = pickerDescription(noun, { space });
+  const description = pickerDescription(noun, { space, from });
 
   // Unknown viewport (server render, or no `matchMedia`): draw neither surface
   // rather than guess which one. The picker only ever opens from a press, long

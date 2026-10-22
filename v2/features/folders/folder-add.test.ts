@@ -50,7 +50,8 @@ test('whoever may add also gets "Remove from folder" on its rows, as the server 
   assert.doesNotMatch(screen, /canEdit/);
   const row = read('detail', 'FolderItemRow.tsx');
   assert.match(row, /canRemove: boolean;/);
-  assert.match(row, /const menu = canRemove \? <ItemMenu row=\{row\} folderUuid=\{folderUuid\} \/> : undefined;/);
+  // The menu carries the file's move too (22 October 2026); still only for whoever may take items out.
+  assert.match(row, /const menu = canRemove \? \(\s*<ItemMenu row=\{row\} folderUuid=\{folderUuid\} onMoveToFolder=\{onMoveToFolder\} \/>\s*\) : undefined;/);
   assert.match(row, /<FolderMinus \/>\s*Remove from this folder/);
 });
 

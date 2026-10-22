@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
-import { FolderMinus, MoreHorizontal } from 'lucide-react';
+import { FolderInput, FolderMinus, MoreHorizontal } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -35,7 +35,12 @@ import { FileListRow, ROW_MENU_TRIGGER_CLASS } from '../file-list/FileListRow';
  * folder leaves the case where it was, so nothing here (icon, label or toast)
  * may suggest otherwise. The glyph is a folder losing something, not a bin.
  *
- * `memo` holds because every prop is a value or a stable callback.
+ * A FILE ALSO MOVES TO ANOTHER FOLDER (Stay, 22 October 2026): its menu
+ * opens the picker, which files it there and takes it out of this folder,
+ * for whoever may take items out. The other kinds sit in as many folders as
+ * they are added to, so they keep the one verb.
+ *
+ * `memo` holds because every prop is a value and the callbacks are stable.
  */
 export const FolderItemRow = memo(function FolderItemRow({
   row,
@@ -46,6 +51,7 @@ export const FolderItemRow = memo(function FolderItemRow({
   onView,
   selected,
   onToggleSelect,
+  onMoveToFolder,
 }: {
   row: FolderItemRowModel;
   /** The folder this row is filed in — what the removal addresses. */
@@ -63,9 +69,13 @@ export const FolderItemRow = memo(function FolderItemRow({
    *  viewer). `onToggleSelect` must be stable. */
   selected?: boolean;
   onToggleSelect?: (row: FolderItemRowModel) => void;
+  /** Move a file to another folder: opens the picker. Must be stable. */
+  onMoveToFolder?: (row: FolderItemRowModel) => void;
 }) {
   const date = formatEntryDate(row.addedAt, now);
-  const menu = canRemove ? <ItemMenu row={row} folderUuid={folderUuid} /> : undefined;
+  const menu = canRemove ? (
+    <ItemMenu row={row} folderUuid={folderUuid} onMoveToFolder={onMoveToFolder} />
+  ) : undefined;
   const select = onToggleSelect ? { checked: selected === true, onToggle: () => onToggleSelect(row) } : undefined;
 
   if (row.type === 'file') {
@@ -110,7 +120,8 @@ export const FolderItemRow = memo(function FolderItemRow({
 });
 
 /**
- * The row's "⋯": take this one thing out of this one folder.
+ * The row's "⋯": take this one thing out of this one folder, or, for a file,
+ * move it to another.
  *
  * ONE HOOK PER ROW: the mutation is scoped by the CONTENT
  * (`folder-item-case-11837`), so a removal, its undo and anything else touching
@@ -122,7 +133,15 @@ export const FolderItemRow = memo(function FolderItemRow({
  * the undo toast that re-files it. The guard only stops a second press from
  * sending a second DELETE, which the server answers 404.
  */
-function ItemMenu({ row, folderUuid }: { row: FolderItemRowModel; folderUuid: string }) {
+function ItemMenu({
+  row,
+  folderUuid,
+  onMoveToFolder,
+}: {
+  row: FolderItemRowModel;
+  folderUuid: string;
+  onMoveToFolder?: (row: FolderItemRowModel) => void;
+}) {
   const remove = useRemoveFolderItem({ type: row.type, contentId: row.contentId });
 
   return (
@@ -136,6 +155,13 @@ function ItemMenu({ row, folderUuid }: { row: FolderItemRowModel; folderUuid: st
         <MoreHorizontal aria-hidden className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
+        {/* The picker, which files it there and takes it out of here. */}
+        {row.type === 'file' && onMoveToFolder ? (
+          <DropdownMenuItem onSelect={() => onMoveToFolder(row)}>
+            <FolderInput />
+            Move to folder
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuItem
           onSelect={() => {
             if (remove.isPending) return;

@@ -79,9 +79,9 @@ test('the body asks one of two routes, and the picker hands the space down', () 
 
   const picker = read('picker', 'FolderPicker.tsx');
   assert.match(picker, /space\?: ContentSpaceStub;/);
-  assert.match(picker, /const create = useCreateFolderAndAdd\(target, \{ space \}\);/);
+  assert.match(picker, /const create = useCreateFolderAndAdd\(target, \{ space, from \}\);/);
   assert.match(picker, /<PickerBody\s+surface=\{surface\}\s+space=\{space\}/);
-  assert.match(picker, /const description = pickerDescription\(noun, \{ space \}\);/);
+  assert.match(picker, /const description = pickerDescription\(noun, \{ space, from \}\);/);
 
   // The create row makes a space folder in a space, the dialog's own request.
   const create = read('picker', 'create-and-add.ts');

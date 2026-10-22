@@ -36,7 +36,7 @@ import type { ViewerImage } from '@/v2/features/channels/feed/image-target';
 import { FileViewers } from '@/v2/features/files/FileViewers';
 import { useFileViewer } from '@/v2/features/files/use-file-viewer';
 import { viewerImage } from '@/v2/features/files/viewable';
-import { folderItemKey, usePendingFolderItemRemovals } from '../item-mutations';
+import { folderItemKey, usePendingFolderItemRemovals, type FolderItemTarget } from '../item-mutations';
 import {
   useDeleteFolderWithUndo,
   useHiddenFolderUuids,
@@ -47,6 +47,7 @@ import { FOLDER_HEADING_TYPE } from '../folder-bits';
 import { FileListHead } from '../file-list/FileListRow';
 import './folder-arrive.css';
 import { FolderNameDialog } from '../FolderNameDialog';
+import { FolderPicker } from '../picker/FolderPicker';
 import { MoveToSpaceDialog } from '@/v2/features/spaces/move/MoveToSpaceDialog';
 import { canRemoveFromSpace } from '@/v2/features/spaces/content-model';
 import { canAddContent } from '@/v2/features/spaces/model';
@@ -189,6 +190,24 @@ function FolderBody({ uuid }: { uuid: string }) {
   // work in folders and space folders"); `FileViewers` draws them.
   const viewer = useFileViewer();
   const { view } = viewer;
+  // Move a file to another folder (Stay, 22 October 2026): the picker on this
+  // folder's own list (the space's folders in a space folder), which files it
+  // there and takes it out of here. Held the same way; stable, so the rows'
+  // `memo` holds.
+  const [moveToFolder, setMoveToFolder] = useState<{
+    target: FolderItemTarget;
+    open: boolean;
+    key: number;
+  } | null>(null);
+  const openMoveToFolder = useCallback(
+    (item: FolderItemRowModel) =>
+      setMoveToFolder((previous) => ({
+        target: { type: item.type, contentId: item.contentId },
+        open: true,
+        key: (previous?.key ?? 0) + 1,
+      })),
+    [],
+  );
 
   const folderQuery = useQuery({
     ...foldersQueries.detail({ uuid, viewerId }),
@@ -690,6 +709,7 @@ function FolderBody({ uuid }: { uuid: string }) {
                     row={item}
                     folderUuid={uuid}
                     canRemove={canManageItems}
+                    onMoveToFolder={openMoveToFolder}
                     index={(showSubfolders ? childRows.length : 0) + index}
                     now={now}
                     onView={openView}
@@ -832,6 +852,18 @@ function FolderBody({ uuid }: { uuid: string }) {
           }}
           open={move.open}
           onOpenChange={(open) => setMove((previous) => ({ ...previous, open }))}
+        />
+      ) : null}
+      {moveToFolder ? (
+        <FolderPicker
+          key={`move-to-folder-${moveToFolder.key}`}
+          target={moveToFolder.target}
+          title="Move to folder"
+          // A space folder's file moves among the space's folders.
+          space={space ?? undefined}
+          from={{ uuid: folder.uuid, name: row.name }}
+          open={moveToFolder.open}
+          onOpenChange={(open) => setMoveToFolder((previous) => (previous ? { ...previous, open } : previous))}
         />
       ) : null}
     </div>

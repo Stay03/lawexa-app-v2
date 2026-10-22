@@ -49,12 +49,27 @@ import type { PickerFolder } from './picker-model';
  * too: `POST /spaces/{uuid}/folders`, the same request `FolderNameDialog`
  * sends for a space folder, so the folder is every member's and the space's
  * counts move with it.
+ *
+ * ── IN A MOVE, THE OLD FOLDER THEN LETS GO ─────────────────────────────────
+ * With `from` (the picker moving a file between folders) the new folder
+ * holds the item first, then `DELETE /folders/{from}/items` takes it out of
+ * the old one, the order backend set. A failed removal is a third half
+ * success, `added-not-moved`: the item is in both folders, nothing is lost,
+ * and the picker says so.
  */
 
 export type CreateAndAddResult =
   /** `contentId`: what was filed, from the add's 201 (`filed-content.ts`). */
   | { status: 'added'; folder: PickerFolder; contentId: number }
-  | { status: 'created-not-added'; folder: PickerFolder; message: string };
+  | { status: 'created-not-added'; folder: PickerFolder; message: string }
+  | {
+      status: 'added-not-moved';
+      folder: PickerFolder;
+      contentId: number;
+      /** The folder that still holds it. */
+      from: { uuid: string; name: string };
+      message: string;
+    };
 
 export interface CreateAndAddVariables {
   /** The typed name, already trimmed by the caller. */
@@ -67,6 +82,8 @@ export interface CreateAndAddOptions {
   /** Create in this space's folders (`POST /spaces/{uuid}/folders`), or
    *  omitted for one of the viewer's own. */
   space?: ContentSpaceStub;
+  /** A move: the folder the item leaves once the new one holds it. */
+  from?: { uuid: string; name: string };
 }
 
 /** A space folder changes the space's folder count on its detail and its row too. */
@@ -80,7 +97,7 @@ export function useCreateFolderAndAdd(
   target: FolderItemTarget,
   options: CreateAndAddOptions = {},
 ): UseMutationResult<CreateAndAddResult, Error, CreateAndAddVariables> {
-  const { space } = options;
+  const { space, from } = options;
   return useMutation({
     mutationFn: async ({
       name,
@@ -100,6 +117,19 @@ export function useCreateFolderAndAdd(
           type: target.type,
           id: target.contentId,
         });
+        if (from) {
+          try {
+            await foldersApi.removeItem(from.uuid, { type: target.type, id: target.contentId });
+          } catch (error) {
+            return {
+              status: 'added-not-moved',
+              folder,
+              contentId: filedContentId(added, target.contentId),
+              from,
+              message: getErrorMessage(error),
+            };
+          }
+        }
         return { status: 'added', folder, contentId: filedContentId(added, target.contentId) };
       } catch (error) {
         return { status: 'created-not-added', folder, message: getErrorMessage(error) };

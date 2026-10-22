@@ -76,9 +76,16 @@ export function pickerWords(space: ContentSpaceStub | undefined): PickerWords {
 /**
  * The line under the picker's title. Filing is an add ("it can sit in more
  * than one"); in a space the sentence names the space, since its folders are
- * the only ones offered.
+ * the only ones offered; a move (`from`, the folder being left) says what it
+ * leaves instead.
  */
-export function pickerDescription(noun: string, options: { space?: ContentSpaceStub } = {}): string {
+export function pickerDescription(
+  noun: string,
+  options: { space?: ContentSpaceStub; from?: { name: string } } = {},
+): string {
+  if (options.from) {
+    return `Pick the folder this ${noun} moves to. It leaves “${options.from.name}”.`;
+  }
   if (options.space) {
     return `Pick a folder in ${options.space.name} for this ${noun}. It can sit in more than one.`;
   }
