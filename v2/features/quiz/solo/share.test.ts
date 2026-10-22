@@ -12,7 +12,10 @@ const read = (...parts: string[]) =>
 
 test('the share behaviour is one hook, and the pill composes it unchanged', () => {
   const hook = read('v2', 'features', 'sharing', 'use-share-action.ts');
-  assert.match(hook, /await navigator\.share\(title \? \{ title, url \} : \{ url \}\);/);
+  // The sheet gets the link, the title where there is one, and the sentence
+  // where there is one; the clipboard fallback still copies the link alone.
+  assert.match(hook, /const data: ShareData = \{ url \};\s*if \(title\) data\.title = title;\s*if \(text\) data\.text = text;/);
+  assert.match(hook, /await navigator\.share\(data\);/);
   assert.match(hook, /if \(error instanceof DOMException && error\.name === 'AbortError'\) return;/);
   assert.match(hook, /await navigator\.clipboard\.writeText\(url\);/);
   assert.match(hook, /return \{ share, copied \};/);
