@@ -64,8 +64,22 @@ test('a new redacted chat says the same on the home screen, where its first mess
     home,
     /\{isSubmitting && redacted && submittedAt !== null \? \([\s\S]{0,300}?<ActivityStatus startTime=\{submittedAt\} narration=\{REDACTING_LABEL\} \/>/,
   );
-  // On a phone a long message lifts the docked box over the suggested prompts:
-  // the line has its own ground, or its words mix with a prompt's (backend's
-  // local picture, 22 October 2026).
-  assert.match(home, /<div className="inline-flex rounded-full bg-background px-3 py-1\.5">\s*<ActivityStatus startTime=\{submittedAt\}/);
+  // The wait is the box's own strip, inside PromptInput after the refusal
+  // strip, never a line among the suggested prompts (Stay, 22 October 2026:
+  // "it looks like a mess").
+  assert.match(home, /\{blocked \? <OutOfMessagesStrip blocked=\{blocked\} \/> : null\}[\s\S]{0,900}?\{isSubmitting && redacted && submittedAt !== null \? \(/);
+  assert.match(home, /Checked before the AI reads it/);
+  assert.doesNotMatch(home, /inline-flex rounded-full bg-background px-3 py-1\.5/);
+  // The host hears of it: on Send, and again when the send is refused.
+  assert.match(home, /setSubmittedAt\(Date\.now\(\)\);\s*if \(redacted\) onRedactingChange\?\.\(true\);/);
+  assert.match(home, /setIsSubmitting\(false\);\s*onRedactingChange\?\.\(false\);/);
+});
+
+test('every home fades its suggested prompts while a redacted send waits', () => {
+  assert.match(read('v2', 'shell', 'designs', 'home-frame.ts'), /export const CHAT_PROMPTS_HIDDEN = 'pointer-events-none opacity-0';/);
+  for (const surface of ['ChatHome.tsx', 'WorkHome.tsx', 'StudyHome.tsx']) {
+    const source = read('v2', 'shell', 'designs', surface);
+    assert.match(source, /onRedactingChange=\{setRedacting\}/, surface);
+    assert.match(source, /<div className=\{cn\(CHAT_PROMPTS, redacting && CHAT_PROMPTS_HIDDEN\)\} aria-hidden=\{redacting \|\| undefined\}>/, surface);
+  }
 });

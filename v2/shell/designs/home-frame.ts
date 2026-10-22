@@ -89,7 +89,12 @@ export const CHAT_COMPOSER_DOCK =
   'order-4 sticky bottom-0 z-10 -mx-4 px-4 pb-3 pt-6 md:order-3 md:static md:z-auto md:mx-0 md:mt-10 md:px-0 md:pb-0 md:pt-0';
 
 /** Chat's prompts — ABOVE the dock on mobile, BELOW the composer on desktop. */
-export const CHAT_PROMPTS = 'order-3 mt-auto pt-8 md:order-4 md:mt-3 md:pt-0';
+export const CHAT_PROMPTS = 'order-3 mt-auto pt-8 transition-opacity duration-200 motion-reduce:transition-none md:order-4 md:mt-3 md:pt-0';
+
+/** The prompts while a redacted send waits on this screen: faded out, so the
+ *  box that says "Removing personal details…" has nothing behind it (Stay,
+ *  22 October 2026: the old line among the prompts "looks like a mess"). */
+export const CHAT_PROMPTS_HIDDEN = 'pointer-events-none opacity-0';
 
 /**
  * The home's SECTION STACK — the ordered list of data sections under the compose

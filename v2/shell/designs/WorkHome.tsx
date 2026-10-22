@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 
+import { cn } from '@/lib/utils';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
@@ -11,6 +12,7 @@ import { useComposerDraft } from './composer/useComposerDraft';
 import {
   CHAT_COMPOSER_DOCK,
   CHAT_PROMPTS,
+  CHAT_PROMPTS_HIDDEN,
   DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
   HOME_SECTIONS,
@@ -68,6 +70,8 @@ export function WorkHome({
   const [input, setInput] = useComposerDraft();
   const { canAccessTeamChannels } = useV2Session();
   const [confidential, setConfidential] = useState(false);
+  // A redacted send waiting on this screen fades the prompts (`onRedactingChange`).
+  const [redacting, setRedacting] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
 
   // v1 parity: filling a prompt stub also focuses the textarea (places the cursor /
@@ -106,6 +110,7 @@ export function WorkHome({
             confidential={confidential}
             onConfidentialChange={setConfidential}
             className="p-2.5 shadow-lg"
+            onRedactingChange={setRedacting}
             textareaClassName="text-base md:text-lg"
             sendButtonClassName="md:size-10"
           />
@@ -114,7 +119,7 @@ export function WorkHome({
 
       {/* Suggested prompts — MOBILE: v1's stacked list sinking toward the thumb,
           just above the docked composer. DESKTOP: a quiet list under the composer. */}
-      <div className={CHAT_PROMPTS}>
+      <div className={cn(CHAT_PROMPTS, redacting && CHAT_PROMPTS_HIDDEN)} aria-hidden={redacting || undefined}>
         <div className="md:hidden">
           <HomePrompts variant="mobile" tab="work" onSelect={fillPrompt} />
         </div>

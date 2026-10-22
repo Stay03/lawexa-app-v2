@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { UserRole } from '@/types/auth';
@@ -13,6 +14,7 @@ import { useComposerDraft } from './composer/useComposerDraft';
 import {
   CHAT_COMPOSER_DOCK,
   CHAT_PROMPTS,
+  CHAT_PROMPTS_HIDDEN,
   DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
   HOME_SECTIONS,
@@ -66,6 +68,8 @@ export function StudyHome({
   const [input, setInput] = useComposerDraft();
   const { canAccessTeamChannels } = useV2Session();
   const [confidential, setConfidential] = useState(false);
+  // A redacted send waiting on this screen fades the prompts (`onRedactingChange`).
+  const [redacting, setRedacting] = useState(false);
   const [studyMode, setStudyMode] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
 
@@ -110,13 +114,14 @@ export function StudyHome({
             onConfidentialChange={setConfidential}
             studyMode={studyMode}
             className="p-2.5 shadow-lg"
+            onRedactingChange={setRedacting}
             textareaClassName="text-base md:text-lg"
             sendButtonClassName="md:size-10"
           />
         </div>
       </div>
 
-      <div className={CHAT_PROMPTS}>
+      <div className={cn(CHAT_PROMPTS, redacting && CHAT_PROMPTS_HIDDEN)} aria-hidden={redacting || undefined}>
         <div className="md:hidden">
           <HomePrompts variant="mobile" tab="study" onSelect={fillPrompt} />
         </div>

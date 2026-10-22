@@ -190,6 +190,11 @@ interface HomeComposerBaseProps {
    *  box's picker (Arthur, 15 October 2026: an upload from an empty space showed
    *  no sign of where it went; now it is a chip in the box until it is sent). */
   handle?: Ref<HomeComposerHandle>;
+  /** A redacted send started (`true`) or was refused (`false`). The host fades
+   *  its suggested prompts while it waits, so nothing sits behind the box
+   *  (Stay, 22 October 2026, of the old line among the prompts: "it looks like
+   *  a mess"). */
+  onRedactingChange?: (redacting: boolean) => void;
 }
 
 /**
@@ -228,6 +233,7 @@ export function HomeComposer({
   textareaClassName,
   sendButtonClassName,
   handle,
+  onRedactingChange,
 }: HomeComposerProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -425,6 +431,7 @@ export function HomeComposer({
     setError(null);
     setIsSubmitting(true);
     setSubmittedAt(Date.now());
+    if (redacted) onRedactingChange?.(true);
     try {
       const result = await startConversation(
         {
@@ -506,6 +513,7 @@ export function HomeComposer({
         setError('Something went wrong. Please try again.');
       }
       setIsSubmitting(false);
+      onRedactingChange?.(false);
     }
   };
 
@@ -548,21 +556,6 @@ export function HomeComposer({
         </div>
       ) : null}
 
-      {/* REDACTED MODE, THE WAIT BEFORE THE CHAT OPENS (Stay, 22 October 2026,
-          option A). A new redacted chat's first message is redacted inside the
-          create request, on this screen, before the chat page opens: 5 s for 12
-          pages, up to about 20 s for 50. The chat's own working row says what
-          is happening and counts from Send; it stays through the move to the
-          new chat (`isSubmitting` holds until this screen unmounts). On a
-          phone a long message lifts the docked box over the suggested prompts,
-          so the line has its own ground, as the jurisdiction does. */}
-      {isSubmitting && redacted && submittedAt !== null ? (
-        <div className="mb-2 px-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-          <div className="inline-flex rounded-full bg-background px-3 py-1.5">
-            <ActivityStatus startTime={submittedAt} narration={REDACTING_LABEL} />
-          </div>
-        </div>
-      ) : null}
 
       {/* The jurisdiction stands above the box, as on the chat screen, so the
           model name keeps the box's control row to itself on a narrow phone
@@ -606,6 +599,21 @@ export function HomeComposer({
               refusal's own block. The question stays below it and Send waits.
               Cleared on the next keystroke. */}
           {blocked ? <OutOfMessagesStrip blocked={blocked} /> : null}
+
+          {/* REDACTED MODE, THE WAIT BEFORE THE CHAT OPENS (Stay, 22 October
+              2026, option A). A new redacted chat's first message is redacted
+              inside the create request, on this screen, before the chat page
+              opens: 5 s for 12 pages, up to about 20 s for 50. The box itself
+              says so, in the strip a refused send uses, counting from Send; the
+              host fades its prompts (`onRedactingChange`), and the strip stays
+              through the move to the new chat (`isSubmitting` holds until this
+              screen unmounts). */}
+          {isSubmitting && redacted && submittedAt !== null ? (
+            <div className="-mx-2.5 -mt-2.5 mb-2 rounded-t-3xl border-b border-border bg-secondary/50 px-4 py-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+              <ActivityStatus startTime={submittedAt} narration={REDACTING_LABEL} />
+              <p className="mt-0.5 pl-7 text-xs text-muted-foreground">Checked before the AI reads it</p>
+            </div>
+          ) : null}
 
           {/* Attachment chips — one per selected file, with live upload status. */}
           {signedIn && uploads.length > 0 ? (

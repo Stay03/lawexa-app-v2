@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 
+import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
@@ -11,6 +12,7 @@ import { useComposerDraft } from './composer/useComposerDraft';
 import {
   CHAT_COMPOSER_DOCK,
   CHAT_PROMPTS,
+  CHAT_PROMPTS_HIDDEN,
   DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
   HOME_SURFACE_FOCUSED,
@@ -73,6 +75,8 @@ export function ChatHome({
 }) {
   const [input, setInput] = useComposerDraft();
   const [confidential, setConfidential] = useState(false);
+  // A redacted send waiting on this screen fades the prompts (`onRedactingChange`).
+  const [redacting, setRedacting] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
 
   // v1 parity: filling a prompt stub also focuses the textarea (places the
@@ -127,6 +131,7 @@ export function ChatHome({
             confidential={confidential}
             onConfidentialChange={setConfidential}
             className="p-2.5 shadow-lg"
+            onRedactingChange={setRedacting}
             textareaClassName="text-base md:text-lg"
             sendButtonClassName="md:size-10"
           />
@@ -137,7 +142,7 @@ export function ChatHome({
           (`mt-auto`), just above the docked composer (owner #27). DESKTOP: a quiet
           ChatGPT-style list directly under the composer. Exactly one shows per
           breakpoint. */}
-      <div className={CHAT_PROMPTS}>
+      <div className={cn(CHAT_PROMPTS, redacting && CHAT_PROMPTS_HIDDEN)} aria-hidden={redacting || undefined}>
         <div className="md:hidden">
           <HomePrompts variant="mobile" onSelect={fillPrompt} />
         </div>
