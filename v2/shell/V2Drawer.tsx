@@ -56,11 +56,17 @@ import { isAccountRole } from '@/v2/runtime/account';
  * `transition-colors` everywhere), a quiet uppercase Recents label, and a footer
  * set off by a hairline over the scrolling content.
  *
- * Reuses `components/ui/sheet` (a Radix Dialog): scrim, Esc / scrim close, focus
- * trap, and the 200ms `side="left"` slide for free. The pinned footer is a flex
- * column with the scroll region taking `flex-1`. Bound to the sidebar context's
- * `openMobile`; on mobile `V2Sidebar` renders `null`, so this is the sole consumer
- * of that state.
+ * Reuses `components/ui/sheet` (a Radix Dialog): scrim, Esc / scrim close and
+ * the focus trap. THE SLIDE IS ITS OWN (Stay, 22 October 2026: "The left
+ * sidebar doesn't feel very smooth when opening and closing I need a smooth,
+ * satisfying motion"): the stock sheet nudges 40px under a fade and its scrim
+ * fades on a separate, shorter clock. `.v2-drawer` on the panel and
+ * `.v2-drawer-scrim` on the overlay carry the drawer's motion in shell.css,
+ * the whole width in, 280 ms out of the edge and 220 ms back into it, the
+ * scrim on the same clock. The pinned footer is a flex column with the scroll
+ * region taking `flex-1`. Bound to the sidebar context's `openMobile`; on
+ * mobile `V2Sidebar` renders `null`, so this is the sole consumer of that
+ * state.
  */
 
 /** New-chat + primary nav share this base row shape so the drawer reads uniform. */
@@ -189,7 +195,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         // `data-[side=left]:w-3/4` + `data-[side=left]:sm:max-w-sm`, which beat
         // unprefixed utilities on specificity — so the overrides must carry the
         // same variant prefix or they're dead classes (reviewer finding).
-        className="gap-0 p-0 data-[side=left]:w-[min(85%,360px)] data-[side=left]:max-w-none data-[side=left]:sm:max-w-none"
+        // `v2-drawer` and `v2-drawer-scrim` are the drawer's motion (shell.css):
+        // unlayered rules on these two elements alone, so every other sheet
+        // keeps the stock motion.
+        className="v2-drawer gap-0 p-0 data-[side=left]:w-[min(85%,360px)] data-[side=left]:max-w-none data-[side=left]:sm:max-w-none"
+        overlayClassName="v2-drawer-scrim"
         // The drawer is opened by the external hamburger (no SheetTrigger), so
         // Radix has no trigger to restore focus to on close — without this,
         // focus lands on <body> and keyboard/AT users lose their place.

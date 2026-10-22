@@ -1141,6 +1141,88 @@ html.v2-document-lock[data-v2-sheet-cut] [data-slot='hover-card-content'] {
 }
 
 /* --------------------------------------------------------------------------
+   THE NAVIGATION DRAWER SLIDES (Stay, 22 October 2026: "The left sidebar
+   doesn't feel very smooth when opening and closing I need a smooth,
+   satisfying motion").
+
+   The stock sheet (components/ui/sheet.tsx) moves 40px (`slide-in-from-
+   left-10`) under a fade, 200 ms each way on `ease-in-out`, and its scrim
+   fades on its own 100 ms clock behind a backdrop blur: a fade with a nudge,
+   with the panel and the scrim out of step. The drawer's panel now travels
+   its whole width, from off the left edge to its place, and the scrim fades
+   on the panel's clock and curve, both ways. Transform and opacity only, and
+   no blur: nothing lays out, so the slide runs on the compositor while the
+   screen it uncovers commits under it.
+
+   OPEN 280 ms ON AN EASE-OUT, CLOSE 220 ms ON AN EASE-IN. The open curve is
+   the platform sheet's (fast off the edge, then settling); a close is shorter
+   and gathers speed, as a dismissed thing does.
+
+   IT IS SCOPED TO THE DRAWER. `V2Drawer` puts `.v2-drawer` on the panel and
+   `.v2-drawer-scrim` on its overlay (the sheet's `overlayClassName`), and
+   these rules are unlayered, so they beat tw-animate's layered `animate-in`
+   and `animate-out` on those two elements alone. Every other sheet keeps the
+   stock motion. The closed rules keep `forwards`, which the hold rule above
+   needs for this drawer most of all: its exit runs while the screen it opened
+   commits (drawer-close.ts).
+
+   UNDER REDUCED MOTION there is no slide: the panel and the scrim fade in
+   and out over 120 ms.
+   -------------------------------------------------------------------------- */
+@keyframes v2-drawer-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes v2-drawer-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+html.v2-document-lock .v2-drawer-scrim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes v2-drawer-in {
+    from {
+      transform: translate3d(-100%, 0, 0);
+    }
+  }
+  @keyframes v2-drawer-out {
+    to {
+      transform: translate3d(-100%, 0, 0);
+    }
+  }
+
+  html.v2-document-lock .v2-drawer[data-state='open'] {
+    animation: v2-drawer-in 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  html.v2-document-lock .v2-drawer-scrim[data-state='open'] {
+    animation: v2-drawer-fade-in 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  html.v2-document-lock .v2-drawer[data-state='closed'] {
+    animation: v2-drawer-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+  html.v2-document-lock .v2-drawer-scrim[data-state='closed'] {
+    animation: v2-drawer-fade-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.v2-document-lock .v2-drawer[data-state='open'],
+  html.v2-document-lock .v2-drawer-scrim[data-state='open'] {
+    animation: v2-drawer-fade-in 120ms ease-out;
+  }
+  html.v2-document-lock .v2-drawer[data-state='closed'],
+  html.v2-document-lock .v2-drawer-scrim[data-state='closed'] {
+    animation: v2-drawer-fade-out 120ms ease-in forwards;
+  }
+}
+
+/* --------------------------------------------------------------------------
    A DEFERRED ANSWER BLOCK BEFORE IT PARSES.
    On an open, a long answer parses its last blocks first and draws the ones
    above as their raw markdown until the swap, two frames later or 1 s at the
