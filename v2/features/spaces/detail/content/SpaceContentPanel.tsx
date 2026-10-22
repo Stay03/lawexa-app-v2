@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from '@tanstack/react-query';
 import { Plus, Upload, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -130,10 +131,13 @@ export function SpaceContentPanel({
   space,
   tab,
   onTabChange,
+  headerActions = null,
 }: {
   space: Space;
   tab: SpaceTab;
   onTabChange: (next: SpaceTab) => void;
+  /** The header's slot for the add control on a phone (`SpacePlaceHeader`). */
+  headerActions?: HTMLElement | null;
 }) {
   // A missing scope reads as the most careful answer: nobody to invite.
   const scope = useCollabSpaceScope();
@@ -246,10 +250,13 @@ export function SpaceContentPanel({
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* ONE ROW at every width: the pills, then the add control at the end.
-          On a phone the control is its icon alone and the pills scroll under
-          it, rather than the control taking a row of its own (Stay, 22
-          October 2026: "ridiculously big and wasting space"). */}
+      {/* ONE ROW, the pills alone on a phone. The add control (Upload files,
+          New folder, the Files pill's Select) sits at the row's end from
+          `md:` up, in the pills' scale, and on a phone at the end of the
+          space's header row, beside its name (`SpacePlaceHeader`'s slot):
+          beside the pills it cut the last one to "Peo…", and on its own line
+          it was "ridiculously big and wasting space" (Stay, 22 October 2026). */}
+      {action && headerActions ? createPortal(action, headerActions) : null}
       <div className={cn(SPACE_PILL_BAR, 'flex-row items-center gap-2')}>
         <TabRow
           tabs={PILLS}
@@ -262,8 +269,8 @@ export function SpaceContentPanel({
         >
           {(pill) => pill.label}
         </TabRow>
-        {/* The pill's add control, Upload files or New folder, at the bar's end. */}
-        {action ? <div className="ml-auto flex shrink-0 justify-end">{action}</div> : null}
+        {/* The pill's add control at the bar's end, from `md:` up. */}
+        {action ? <div className="ml-auto hidden shrink-0 justify-end md:flex">{action}</div> : null}
       </div>
       {access.canAdd ? picker : null}
 

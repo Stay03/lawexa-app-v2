@@ -56,7 +56,11 @@ export function SpacePlaceHeader({
   membership,
   onOpenAbout,
   onOpenRoster,
+  actionsRef,
 }: {
+  /** A phone's slot at the row's end for the open pill's add control
+   *  (`SpaceContentPanel` draws into it below `md:`). */
+  actionsRef?: (element: HTMLDivElement | null) => void;
   space: Space;
   /** The viewer's roles, the frame's one reading of them. */
   membership: MembershipSubject;
@@ -93,6 +97,8 @@ export function SpacePlaceHeader({
           <div className="mt-0.5">{facts}</div>
         )}
       </div>
+
+      {actionsRef ? <div ref={actionsRef} className="flex shrink-0 items-center gap-2 self-center md:hidden" /> : null}
     </header>
   );
 }

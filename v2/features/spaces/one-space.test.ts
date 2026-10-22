@@ -200,7 +200,7 @@ test('the space page: pills from the model, one panel, no channel read (B4)', ()
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /const tab = parseSpaceTab\(tabParam\);/);
   assert.match(screen, /quietReplaceUrlParams\(\{ tab: value \}\)/);
-  assert.match(screen, /<SpaceContentPanel space=\{space\} tab=\{tab\} onTabChange=\{setTab\} \/>/);
+  assert.match(screen, /<SpaceContentPanel space=\{space\} tab=\{tab\} onTabChange=\{setTab\} headerActions=\{headerActions\} \/>/);
   assert.doesNotMatch(screen, /SpaceTabs|threadsBySpace|showsChannels/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /<TabRow\s+tabs=\{PILLS\}/);
