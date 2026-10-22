@@ -824,6 +824,7 @@ export function StatuteDocument({
       {statuteNotes.enabled && selectionDraft && !statuteNotes.open ? (
         <AddNoteButton
           rect={selectionDraft.rect}
+          besideAnnotate={annotationsEnabled && !card}
           onAdd={() => {
             statuteNotes.startDraft({ kind: 'part', eid: selectionDraft.eid, quote: selectionDraft.quote });
             setSelectionDraft(null);

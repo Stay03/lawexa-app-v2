@@ -5,20 +5,18 @@ import { Highlighter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
+import { ANNOTATE_BUTTON_WIDTH, annotateButtonLeft } from '../reader/selection-buttons';
+
 /**
  * "Annotate", floating just under a reader's selection in the statute. It
- * sits where the researchers' "Comment" (a print note) sits; when both show (a
- * researcher reading), this one stands to its left (`besideNote`).
+ * sits where the researchers' "Print note" sits; when both show (a
+ * researcher reading), this one stands one gap to its left (`besideNote`); both are placed by
+ * `selection-buttons.ts`.
  *
  * Like that button, it takes the press without taking the selection:
  * `onMouseDown` is cancelled so a click does not collapse the words it is
  * about to mark. It fades in, never pops.
  */
-
-const MARGIN = 12;
-const WIDTH = 124;
-/** The print-note button's width and the gap between the two. */
-const NOTE_BUTTON = 124 + 8;
 
 export function AnnotateButton({
   rect,
@@ -29,8 +27,7 @@ export function AnnotateButton({
   besideNote: boolean;
   onAnnotate: () => void;
 }) {
-  const shift = besideNote ? NOTE_BUTTON : 0;
-  const left = Math.min(Math.max(MARGIN, rect.right - WIDTH - shift), window.innerWidth - WIDTH - shift - MARGIN);
+  const left = annotateButtonLeft(rect.right, window.innerWidth, besideNote);
   const top = Math.min(rect.bottom + 8, window.innerHeight - 56);
 
   return (
@@ -38,7 +35,7 @@ export function AnnotateButton({
       type="button"
       onMouseDown={(event) => event.preventDefault()}
       onClick={onAnnotate}
-      style={{ left, top, width: WIDTH }}
+      style={{ left, top, width: ANNOTATE_BUTTON_WIDTH }}
       className={cn(
         'v2-interactive fixed z-40 inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-border bg-background/95 px-4 text-sm font-medium text-foreground shadow-lg backdrop-blur',
         'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150',
