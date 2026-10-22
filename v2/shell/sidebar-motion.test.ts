@@ -33,7 +33,7 @@ const animationOf = (source: string, selector: string): string => {
   return match[1];
 };
 
-const drawerCss = between(css, 'THE NAVIGATION DRAWER SLIDES', 'A DEFERRED ANSWER BLOCK');
+const drawerCss = between(css, 'THE NAVIGATION DRAWER SLIDES', 'THE COMPUTER RAIL SLIDES');
 const motion = between(drawerCss, '@media (prefers-reduced-motion: no-preference)', '@media (prefers-reduced-motion: reduce)');
 const reduced = drawerCss.slice(drawerCss.indexOf('@media (prefers-reduced-motion: reduce)'));
 
@@ -76,6 +76,43 @@ test('under reduced motion both fade over 120 ms and nothing slides', () => {
   assert.doesNotMatch(reduced, /translate|v2-drawer-in|v2-drawer-out/);
   // The slide exists only where motion is welcome.
   assert.ok(motion.includes('@keyframes v2-drawer-in'));
+});
+
+const sidebar = read('components', 'ui', 'sidebar.tsx');
+// The rules alone, after the block's comment (which names the linear move it replaces).
+const railCss = between(css, 'THE COMPUTER RAIL SLIDES', 'A DEFERRED ANSWER BLOCK').replace(/^[\s\S]*?\*\//, '');
+const railMotion = railCss.slice(0, railCss.indexOf('@media (prefers-reduced-motion: reduce)'));
+const railReduced = railCss.slice(railCss.indexOf('@media (prefers-reduced-motion: reduce)'));
+const GAP = "html.v2-document-lock [data-slot='sidebar'][data-side='left'] > [data-slot='sidebar-gap'] {";
+const PANEL = "html.v2-document-lock [data-slot='sidebar'][data-side='left'] > [data-slot='sidebar-container'] {";
+const COLLAPSED = "html.v2-document-lock [data-slot='sidebar'][data-side='left'][data-collapsible='offExamples'] > [data-slot='sidebar-container'] {";
+
+test('the computer rail moves by transform and its gap by width, on one 260 ms ease-out, with no linear easing', () => {
+  assert.match(between(railMotion, GAP, '}'), new RegExp(`transition: width 260ms ${EASE_OUT.replace(/[().]/g, '\\$&')};`));
+  assert.match(between(railMotion, PANEL, '}'), new RegExp(`left: 0;\\s*transition: transform 260ms ${EASE_OUT.replace(/[().]/g, '\\$&')};`));
+  assert.match(between(railMotion, COLLAPSED, '}'), /transform: translate3d\(-100%, 0, 0\);/);
+  assert.doesNotMatch(railMotion, /linear|transition: left|transition-property/);
+  // The gap's width is the one layout the move keeps: the rail still pushes the content.
+  assert.doesNotMatch(railMotion, /position: absolute|z-index/);
+});
+
+test('under reduced motion the rail fades in place over 120 ms and the gap snaps', () => {
+  assert.match(between(railReduced, GAP, '}'), /transition: none;/);
+  assert.match(between(railReduced, PANEL, '}'), /transition: opacity 120ms ease-out, transform 0s;/);
+  assert.match(between(railReduced, COLLAPSED, '}'), /opacity: 0;\s*transition: opacity 120ms ease-in, transform 0s linear 120ms;/);
+  assert.doesNotMatch(railReduced, /260ms|cubic-bezier/);
+});
+
+test('the rail rules key on the primitive\'s own slots and the primitive keeps its stock move for v1', () => {
+  assert.match(sidebar, /data-slot="sidebar-gap"/);
+  assert.match(sidebar, /data-slot="sidebar-container"/);
+  assert.match(sidebar, /data-collapsible=\{state === "collapsed" \? collapsible : ""\}/);
+  assert.match(sidebar, /data-side=\{side\}\s*data-slot="sidebar"/);
+  assert.match(sidebar, /"transition-\[width\] duration-200 ease-linear relative w-\(--sidebar-width\) bg-transparent"/);
+  assert.match(sidebar, /transition-\[left,right,width\] duration-200 ease-linear md:flex/);
+  assert.match(sidebar, /"left-0 group-data-\[collapsible=offExamples\]:left-\[calc\(var\(--sidebar-width\)\*-1\)\]"/);
+  // The v2 rail is the off-canvas kind these rules move.
+  assert.match(read('v2', 'shell', 'V2Sidebar.tsx'), /<Sidebar\s*collapsible="offExamples"/);
 });
 
 test('the rules reach the drawer alone: its two classes, and the sheet primitive is as it was for every other sheet', () => {

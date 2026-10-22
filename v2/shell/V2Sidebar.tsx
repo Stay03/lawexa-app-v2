@@ -73,6 +73,13 @@ import { isAccountRole } from '@/v2/runtime/account';
  * SEAMLESS CHROME (owner #10): the rail's edge border is removed by overriding the
  * primitive's `group-data-[side=left]:border-r` from here — components/ui/sidebar
  * is v1-shared and must stay byte-identical.
+ *
+ * THE SLIDE IS OVERRIDDEN THE SAME WAY (Stay, 22 October 2026: "The left
+ * sidebar doesn't feel very smooth when opening and closing"): the primitive
+ * moves the panel's `left` and the gap's width on `ease-linear`. shell.css
+ * moves the panel by transform and runs the gap on the same 260 ms ease-out,
+ * keyed on the primitive's slots under `html.v2-document-lock`, so v1's rail
+ * is untouched.
  */
 
 /** Shared active-row tint (brand gold, low opacity) — one definition for the top

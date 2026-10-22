@@ -1228,6 +1228,55 @@ html.v2-document-lock .v2-drawer-scrim {
 }
 
 /* --------------------------------------------------------------------------
+   THE COMPUTER RAIL SLIDES AS ONE WITH THE CONTENT (the same ask, 22 October
+   2026, at `md:` and up).
+
+   The shadcn primitive (components/ui/sidebar.tsx) moves its fixed panel by
+   animating `left` and its content gap by animating `width`, both 200 ms on
+   `ease-linear`: a layout on every frame of the panel, and no ease at either
+   end. The panel now moves by transform, its `left` held at 0, and the gap's
+   width runs on the same 260 ms and the same ease-out, so the edge of the
+   panel and the edge of the content travel together and settle together.
+   The gap still lays out, because the rail still pushes the content rather
+   than covering it; that is the one layout the move keeps.
+
+   FROM HERE, NOT THE PRIMITIVE. `components/ui/sidebar` is v1-shared, and the
+   rail already overrides its border from outside (V2Sidebar.tsx); these
+   rules are scoped to the v2 document and keyed on the primitive's own
+   slots, so v1 keeps its linear move. `[data-side='left']` is the desktop
+   rail alone: the phone branch is a sheet with no side attribute, and v2
+   never renders it.
+
+   UNDER REDUCED MOTION nothing slides: the gap snaps, and the panel fades
+   over 120 ms in place, its transform snapping after the fade on a close and
+   before it on an open, so a collapsed rail ends where it always ends (its
+   grab handle at the screen's edge).
+   -------------------------------------------------------------------------- */
+html.v2-document-lock [data-slot='sidebar'][data-side='left'] > [data-slot='sidebar-gap'] {
+  transition: width 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+html.v2-document-lock [data-slot='sidebar'][data-side='left'] > [data-slot='sidebar-container'] {
+  left: 0;
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+html.v2-document-lock [data-slot='sidebar'][data-side='left'][data-collapsible='offExamples'] > [data-slot='sidebar-container'] {
+  transform: translate3d(-100%, 0, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.v2-document-lock [data-slot='sidebar'][data-side='left'] > [data-slot='sidebar-gap'] {
+    transition: none;
+  }
+  html.v2-document-lock [data-slot='sidebar'][data-side='left'] > [data-slot='sidebar-container'] {
+    transition: opacity 120ms ease-out, transform 0s;
+  }
+  html.v2-document-lock [data-slot='sidebar'][data-side='left'][data-collapsible='offExamples'] > [data-slot='sidebar-container'] {
+    opacity: 0;
+    transition: opacity 120ms ease-in, transform 0s linear 120ms;
+  }
+}
+
+/* --------------------------------------------------------------------------
    A DEFERRED ANSWER BLOCK BEFORE IT PARSES.
    On an open, a long answer parses its last blocks first and draws the ones
    above as their raw markdown until the swap, two frames later or 1 s at the
