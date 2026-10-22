@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Check, Flag, Loader2, Timer, X } from 'lucide-react';
+import { Check, Flag, Loader2, Timer } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
@@ -14,6 +14,7 @@ import {
   attemptPoints,
   attemptResultsHref,
   END_MODE_ADVANCE_MS,
+  REVEAL_HOLD_MS,
   nextUnanswered,
   optionTileState,
   orderedQuestions,
@@ -25,12 +26,11 @@ import {
   responseMsFor,
   scenarioFor,
   secondsLabel,
-  streakEndingAt,
   unansweredCount,
   type PlayStep,
 } from '../model';
 import { useAnswerAttempt, useFinishAttempt } from '../mutations';
-import { ProgressSegments, RaisedButton, StreakChip, TickBurst } from '../ui';
+import { ProgressSegments, RaisedButton } from '../ui';
 import { AttemptOptionTile } from './AttemptOptionTile';
 import { AttemptTimer, FrozenRail } from './AttemptTimer';
 import { SOLO_PLAY_COLUMN } from './states';
@@ -39,8 +39,8 @@ import '../solo-quiz.css';
 /**
  * AttemptPlay — the play loop of one attempt, from the question it resumes on
  * to Finish, drawn in design B1 (Arthur and Stay, 22 October 2026): the
- * segments and the thin clock over the question, raised tiles, and a sheet
- * that rises from the bottom with the verdict.
+ * segments and the thin clock over the question, and raised tiles that carry
+ * the verdict.
  *
  * ── THE SERVER HOLDS THE ANSWERS, THE SCREEN HOLDS THE PLACE ───────────────
  * Which questions are answered, with what, and (on an `each` attempt) whether
@@ -63,10 +63,12 @@ import '../solo-quiz.css';
  * stamp to restore it from (named in the report).
  *
  * ── AFTER EACH QUESTION, OR AT THE END ─────────────────────────────────────
- * On an `each` attempt the receipt is the reveal: the tiles turn, the clock
- * freezes at the time the answer took, and the sheet rises with the verdict,
- * the points, the streak (or the answer, when the pick was wrong) and
- * Continue. On an `end` attempt the receipt carries counts only, so the
+ * On an `each` attempt the receipt is the reveal: the tiles turn (green ✓ on
+ * the right answer, red ✗ on a wrong pick), the tapped tile shows its points,
+ * the clock freezes at the time the answer took, and after `REVEAL_HOLD_MS`
+ * the next question comes in by itself; a tap moves on sooner. No sheet and
+ * no Continue (Arthur, 22 October 2026); the answers, right and wrong, are
+ * reviewed on the results. On an `end` attempt the receipt carries counts only, so the
  * locked tile is held a beat and the next question arrives on its own; the
  * verdicts wait for the results, and only the last question gets a sheet,
  * with See results on it.
@@ -204,6 +206,28 @@ export function AttemptPlay({
     });
   };
 
+  // AN `each` VERDICT HOLDS, THEN MOVES ON BY ITSELF (Arthur, 22 October
+  // 2026: "no need for continue button as it should then be a tap to
+  // answer"). The tiles carry the verdict and the tapped tile its points; after
+  // `REVEAL_HOLD_MS` the next question comes in, or the last one goes to the
+  // results. A question lost to the clock moves on the same way: the server
+  // sends the right answer only with an answer, so its tiles stay as they were
+  // and the rail says "Time's up". A tap (or Enter or Space) during the hold
+  // moves on at once. An `end` attempt keeps its own beat and its sheet.
+  const holding =
+    attempt.reveal_mode === 'each' && (step === 'revealed' || step === 'timed-out');
+  const moveOn = () => {
+    if (finish.isPending) return;
+    if (isLast) finishNow();
+    else advance();
+  };
+  const moveOnAfterHold = useEffectEvent(moveOn);
+  useEffect(() => {
+    if (!holding) return;
+    const id = window.setTimeout(() => moveOnAfterHold(), REVEAL_HOLD_MS);
+    return () => window.clearTimeout(id);
+  }, [holding, cursor]);
+
   const finishing = finish.isPending;
   /** The sentence the one live region says after an answer in THIS mount. */
   const receipt = answer.isSuccess ? answer.data.data : null;
@@ -213,13 +237,27 @@ export function AttemptPlay({
       : `Answer recorded. ${receipt.is_correct ? 'Correct' : 'Not this time'}. ${pointsLabel(points)} points so far.`
     : '';
 
-  // The sheet rises for a verdict, for a question lost to the clock, and for
-  // the last answer of an `end` attempt, where See results is the only move.
+  // The sheet is the `end` attempt's alone now: its last answer, where See
+  // results is the only move, and a question it lost to the clock.
   const sheet =
-    step === 'revealed' || step === 'timed-out' || (step === 'answered' && isLast);
+    attempt.reveal_mode === 'end' && ((step === 'answered' && isLast) || step === 'timed-out');
 
   return (
-    <div className={SOLO_PLAY_COLUMN}>
+    <div
+      className={SOLO_PLAY_COLUMN}
+      // During an `each` hold the whole screen is the way on: the tiles are
+      // passive (not disabled), so their taps land here.
+      onClick={holding ? moveOn : undefined}
+      onKeyDown={
+        holding
+          ? (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              moveOn();
+            }
+          : undefined
+      }
+    >
       {/* STICKY, NOT FIXED — pins inside the shell's one scroll container.
           The quiz's name stays on the page: the bar carries no title for
           this address (`pushed-route.ts`). */}
@@ -287,14 +325,8 @@ export function AttemptPlay({
 
           <div className="mt-auto pt-6">
             {sheet ? (
-              <RevealSheet
+              <EndSheet
                 step={step}
-                question={question}
-                streak={
-                  question.is_correct === true
-                    ? streakEndingAt(questions, cursor)
-                    : streakEndingAt(questions, cursor - 1)
-                }
                 isLast={isLast}
                 unanswered={unanswered}
                 finishing={finishing}
@@ -427,8 +459,16 @@ function QuestionGroup({
               content={option.content}
               look={question.type === 'true_false' ? (index === 0 ? 'true' : 'false') : 'card'}
               state={optionTileState(option.id, question, step, pendingPick)}
-              disabled={step !== 'open'}
+              // Locked while a pick is in flight or held; PASSIVE (not
+              // disabled) during an `each` verdict, so a tap reaches the
+              // screen's "move on" rather than dying on a disabled button.
+              disabled={step === 'sending' || step === 'answered'}
               onSelect={step === 'open' ? () => onPick(option.id) : undefined}
+              badge={
+                step === 'revealed' && option.id === question.your_option_id
+                  ? `+${pointsLabel(question.points ?? 0)}`
+                  : null
+              }
             />
           ))}
         </div>
@@ -493,31 +533,15 @@ function Key({ children }: { children: React.ReactNode }) {
 
 /* ── The sheet ────────────────────────────────────────────────────────────── */
 
-type SheetTone = 'right' | 'wrong' | 'quiet';
-
-const SHEET_TONE: Record<SheetTone, string> = {
-  right: 'border-[var(--solo-right)] bg-[var(--solo-right-ink)]',
-  wrong: 'border-[var(--solo-wrong)] bg-[var(--solo-wrong-ink)]',
-  quiet: 'border-border bg-card',
-};
-
-const HEAD_TONE: Record<SheetTone, string> = {
-  right: 'text-[var(--solo-right)]',
-  wrong: 'text-[var(--solo-wrong)]',
-  quiet: 'text-foreground',
-};
-
 /**
- * The sheet that rises from the bottom once the question is over: the
- * verdict in a word and a mark (never colour alone), the points the server
- * awarded and how long the answer took, the streak when there is one or the
- * right answer when the pick was wrong, and the one way on. `aria-live`, so
- * the verdict is read out as it lands.
+ * The sheet an `end` attempt raises: after its last answer, where See results
+ * is the only move, and for a question lost to the clock. Quiet: an `end`
+ * attempt says nothing about right or wrong until the results. An `each`
+ * attempt has no sheet; its verdict is on the tiles and it moves on by itself
+ * (`REVEAL_HOLD_MS`). `aria-live`, so its words are read out as it lands.
  */
-function RevealSheet({
+function EndSheet({
   step,
-  question,
-  streak,
   isLast,
   unanswered,
   finishing,
@@ -525,84 +549,29 @@ function RevealSheet({
   onContinue,
 }: {
   step: PlayStep;
-  question: QuizAttemptQuestion;
-  /** The run of right answers ending here (right), or just before (wrong). */
-  streak: number;
   isLast: boolean;
   unanswered: number;
   finishing: boolean;
   note: string | null;
   onContinue: () => void;
 }) {
-  const revealed = step === 'revealed';
-  const tone: SheetTone = revealed ? (question.is_correct === true ? 'right' : 'wrong') : 'quiet';
-  const correctOption =
-    question.options.find((option) => option.id === question.correct_option_id) ?? null;
-  const took = secondsLabel(question.response_ms ?? 0);
-
+  const timedOut = step === 'timed-out';
   return (
     <section
       aria-live="polite"
-      className={cn(
-        'v2-solo-rise sticky bottom-0 z-10 -mx-4 -mb-6 rounded-t-3xl border-t-2 px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]',
-        SHEET_TONE[tone],
-      )}
+      className="v2-solo-rise sticky bottom-0 z-10 -mx-4 -mb-6 rounded-t-3xl border-t-2 border-border bg-card px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
     >
-      <div className="flex items-start justify-between gap-3">
-        <h2 className={cn('flex items-center gap-2.5 text-xl font-bold', HEAD_TONE[tone])}>
-          {tone === 'right' ? (
-            <TickBurst />
-          ) : tone === 'wrong' ? (
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--solo-wrong)] text-background"
-            >
-              <X className="size-4" strokeWidth={3} />
-            </span>
-          ) : (
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground"
-            >
-              {step === 'timed-out' ? <Timer className="size-4" /> : <Check className="size-4" />}
-            </span>
-          )}
-          {tone === 'right'
-            ? 'Correct'
-            : tone === 'wrong'
-              ? 'Not quite'
-              : step === 'timed-out'
-                ? "Time's up"
-                : 'All answered'}
-        </h2>
+      <h2 className="flex items-center gap-2.5 text-xl font-bold text-foreground">
+        <span
+          aria-hidden
+          className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground"
+        >
+          {timedOut ? <Timer className="size-4" /> : <Check className="size-4" />}
+        </span>
+        {timedOut ? "Time's up" : 'All answered'}
+      </h2>
 
-        {revealed && (
-          <div className="shrink-0 text-right">
-            <p
-              className={cn(
-                'font-comfortaa text-3xl leading-none font-bold tabular-nums',
-                HEAD_TONE[tone],
-              )}
-            >
-              +{pointsLabel(question.points ?? 0)}
-            </p>
-            <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
-              {tone === 'wrong' && streak >= 2 ? `streak ends at ${streak}` : `in ${took}`}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {tone === 'right' && streak >= 2 && <StreakChip className="mt-3.5" count={streak} />}
-
-      {tone === 'wrong' && correctOption && (
-        <p className="mt-2.5 text-[15px] leading-relaxed text-foreground">
-          <b className="font-bold text-[var(--solo-right)]">{correctOption.content}</b> was the
-          answer.
-        </p>
-      )}
-
-      {step === 'timed-out' && (
+      {timedOut && (
         <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">
           Out of time — nothing recorded for this one, and it counts as wrong.
         </p>

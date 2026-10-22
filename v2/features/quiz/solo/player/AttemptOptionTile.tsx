@@ -65,13 +65,18 @@ export function AttemptOptionTile({
   state,
   disabled,
   onSelect,
+  badge = null,
 }: {
   index: number;
   content: string;
   look: TileLook;
   state: OptionState;
+  /** Locked: a pick in flight or held. A tile with no `onSelect` that is not
+   *  disabled is PASSIVE: it takes no pick, and its tap reaches the screen. */
   disabled?: boolean;
   onSelect?: () => void;
+  /** The points this tile won, on the tapped tile of a verdict ("+853"). */
+  badge?: string | null;
 }) {
   const interactive = !!onSelect && !disabled;
   const tall = look !== 'card';
@@ -79,8 +84,10 @@ export function AttemptOptionTile({
   return (
     <button
       type="button"
-      onClick={onSelect}
-      disabled={!interactive}
+      onClick={interactive ? onSelect : undefined}
+      disabled={disabled === true}
+      aria-disabled={interactive ? undefined : true}
+      tabIndex={interactive ? undefined : -1}
       aria-pressed={state === 'picked' || state === 'wrong-pick' ? true : undefined}
       className={cn(
         'v2-interactive v2-solo-lip relative flex w-full items-center gap-4 rounded-2xl border-2 text-left',
@@ -109,6 +116,18 @@ export function AttemptOptionTile({
         {content}
         {REVEAL_LABEL[state] && <span className="sr-only">. {REVEAL_LABEL[state]}</span>}
       </span>
+
+      {badge && (
+        <span
+          aria-hidden
+          className={cn(
+            'shrink-0 font-comfortaa text-lg font-bold tabular-nums motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:duration-200',
+            tall ? 'text-white' : state === 'correct' ? 'text-[var(--solo-right)]' : 'text-[var(--solo-wrong)]',
+          )}
+        >
+          {badge}
+        </span>
+      )}
 
       {state === 'correct' || state === 'wrong-pick' ? (
         <span

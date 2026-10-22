@@ -324,9 +324,18 @@ export function optionTileState(
 /**
  * How long an `end` attempt holds the locked tile before the next question —
  * long enough to see the pick land, short enough that nothing is being
- * waited for. An `each` attempt waits for the reader instead (Next).
+ * waited for.
  */
 export const END_MODE_ADVANCE_MS = 350;
+
+/**
+ * How long an `each` attempt holds its verdict on the tiles (green ✓ on the
+ * right answer, red ✗ on a wrong pick, the points on the tapped tile) before
+ * the next question comes in by itself (Arthur, 22 October 2026: "no need for
+ * continue button as it should then be a tap to answer"). A tap anywhere
+ * moves on at once. The explanations wait for the results' review.
+ */
+export const REVEAL_HOLD_MS = 1200;
 
 /* ── The player's own clock ───────────────────────────────────────────────── */
 

@@ -112,16 +112,24 @@ test('the clock is read in handlers and initialisers, never in render, and respo
   assert.match(timer, /Time&rsquo;s up/);
 });
 
-test('each reveals on the receipt and waits for Continue; end holds a beat and moves on, with Finish last', () => {
+test('each holds its verdict on the tiles, then moves on by itself (a tap sooner); end holds a beat, with Finish last', () => {
   const play = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
   assert.match(play, /if \(step !== 'answered' \|\| isLast\) return;\s*const id = window\.setTimeout\(advance, END_MODE_ADVANCE_MS\);/);
+  // Arthur, 22 October 2026: "no need for continue button as it should then
+  // be a tap to answer". The hold, then the next question or the results.
+  assert.match(play, /const holding =\s*attempt\.reveal_mode === 'each' && \(step === 'revealed' \|\| step === 'timed-out'\);/);
+  assert.match(play, /const moveOn = \(\) => \{\s*if \(finish\.isPending\) return;\s*if \(isLast\) finishNow\(\);\s*else advance\(\);\s*\};/);
+  assert.match(play, /const id = window\.setTimeout\(\(\) => moveOnAfterHold\(\), REVEAL_HOLD_MS\);/);
+  assert.match(play, /onClick=\{holding \? moveOn : undefined\}/);
+  assert.match(play, /if \(event\.key !== 'Enter' && event\.key !== ' '\) return;/);
+  assert.match(play, /onSuccess: \(\) => router\.replace\(attemptResultsHref\(attempt\.uuid\)\),/);
+  // The sheet is the `end` attempt's alone: its last answer and a lost clock;
+  // unanswered questions are named before they are scored.
+  assert.match(play, /const sheet =\s*attempt\.reveal_mode === 'end' && \(\(step === 'answered' && isLast\) \|\| step === 'timed-out'\);/);
   assert.match(play, /onContinue=\{isLast \? finishNow : advance\}/);
   assert.match(play, /\{isLast \? 'See results' : 'Continue'\}/);
-  assert.match(play, /onSuccess: \(\) => router\.replace\(attemptResultsHref\(attempt\.uuid\)\),/);
-  // The sheet rises for a verdict, a lost clock, and the last answer of an
-  // `end` attempt; unanswered questions are named before they are scored.
-  assert.match(play, /step === 'revealed' \|\| step === 'timed-out' \|\| \(step === 'answered' && isLast\)/);
   assert.match(play, /\{unanswered\} unanswered — /);
+  assert.doesNotMatch(play, /RevealSheet|TickBurst|StreakChip|was the\s*answer/);
   // The tiles are B1's, in the channel game's states; the digits are scoped
   // to the group.
   assert.match(play, /<AttemptOptionTile\s*key=\{option\.id\}/);
@@ -133,7 +141,7 @@ test('each reveals on the receipt and waits for Continue; end holds a beat and m
   assert.match(play, /setNote\(answerRefusalCopy\(status, message\)\);/);
 });
 
-test('the question screen is drawn in B1: segments and the thin clock over the question, raised tiles, the sheet below', () => {
+test('the question screen is drawn in B1: segments and the thin clock over the question, raised tiles that carry the verdict', () => {
   const play = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
   assert.match(play, /import '\.\.\/solo-quiz\.css';/);
   // One segment per question, then the rail: live while open, frozen with
@@ -147,23 +155,21 @@ test('the question screen is drawn in B1: segments and the thin clock over the q
   assert.match(play, /<p className="whitespace-pre-line">\{scenario\.passage\}<\/p>/);
   // True or false is two tall tiles; everything else is a card.
   assert.match(play, /look=\{question\.type === 'true_false' \? \(index === 0 \? 'true' : 'false'\) : 'card'\}/);
-  // The sheet: the verdict in a word and a mark, the points, the time or the
-  // streak's end, the streak chip or the answer, and the one way on.
-  assert.match(play, /\{tone === 'right' \? \(\s*<TickBurst \/>/);
-  assert.match(play, /\+\{pointsLabel\(question\.points \?\? 0\)\}/);
-  assert.match(play, /\{tone === 'wrong' && streak >= 2 \? `streak ends at \$\{streak\}` : `in \$\{took\}`\}/);
-  assert.match(play, /\{tone === 'right' && streak >= 2 && <StreakChip className="mt-3\.5" count=\{streak\} \/>\}/);
-  assert.match(play, /\{correctOption\.content\}<\/b> was the\s*answer\./);
-  assert.match(play, /aria-live="polite"\s*className=\{cn\(\s*'v2-solo-rise sticky bottom-0/);
-  // The streak the sheet names ends at this question when it was right, and
-  // just before it when it was not.
-  assert.match(play, /question\.is_correct === true\s*\? streakEndingAt\(questions, cursor\)\s*: streakEndingAt\(questions, cursor - 1\)/);
+  // The verdict is the tiles': the tapped one shows its points, and during the
+  // hold the tiles are passive, so a tap reaches the screen's "move on".
+  assert.match(play, /badge=\{\s*step === 'revealed' && option\.id === question\.your_option_id\s*\? `\+\$\{pointsLabel\(question\.points \?\? 0\)\}`\s*: null\s*\}/);
+  assert.match(play, /disabled=\{step === 'sending' \|\| step === 'answered'\}/);
+  // The `end` sheet, quiet: no verdict before the results.
+  assert.match(play, /className="v2-solo-rise sticky bottom-0 z-10 -mx-4 -mb-6 rounded-t-3xl border-t-2 border-border bg-card/);
 
   const tile = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptOptionTile.tsx');
   // Never colour alone: the verdict is a sentence too, and the digit is for a pointer.
   assert.match(tile, /\{REVEAL_LABEL\[state\] && <span className="sr-only">\. \{REVEAL_LABEL\[state\]\}<\/span>\}/);
   assert.match(tile, /\[@media\(hover:hover\)_and_\(pointer:fine\)\]:inline-block/);
   assert.match(tile, /'v2-interactive v2-solo-lip relative flex w-full items-center gap-4 rounded-2xl border-2 text-left'/);
+  // A passive tile (no pick, not locked) is not disabled, so its tap bubbles.
+  assert.match(tile, /onClick=\{interactive \? onSelect : undefined\}\s*disabled=\{disabled === true\}\s*aria-disabled=\{interactive \? undefined : true\}/);
+  assert.match(tile, /\{badge && \(/);
 
   const timer = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptTimer.tsx');
   assert.match(timer, /\{clock\.seconds\} s/);
