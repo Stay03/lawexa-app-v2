@@ -168,6 +168,14 @@ export interface QuizQuestion {
    * a reader treats absent and `null` alike.
    */
   scenario_uuid?: string | null;
+  /**
+   * "Why this is the answer", written by the quiz's author (Arthur, 22 October
+   * 2026). Present ONLY for the quiz's creator (the form loads it) and on a
+   * FINISHED attempt's questions; absent everywhere else, and on any attempt
+   * still running, since an explanation gives the answer away. `null` when the
+   * author wrote none.
+   */
+  explanation?: string | null;
 }
 
 /**
@@ -279,6 +287,9 @@ export interface QuizQuestionInput {
   /** Index into the body's `scenarios`, for a question about one of them.
    *  Questions sharing an index must be consecutive (server rule, `422`). */
   scenario_index?: number;
+  /** "Why this is the answer", at most 1,000 characters; `null` for none.
+   *  The form always sends it, so clearing the box clears it. */
+  explanation?: string | null;
 }
 
 /** One scenario in a create/update body; the title is optional. */

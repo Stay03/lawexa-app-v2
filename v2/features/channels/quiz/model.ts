@@ -213,6 +213,10 @@ export const QUIZ_TITLE_MAX = 255;
 export const QUIZ_DESCRIPTION_MAX = 2000;
 export const QUIZ_QUESTION_MAX = 500;
 export const QUIZ_OPTION_MAX = 200;
+/** A question's explanation, "Why this is the answer" (backend, 22 October
+ *  2026: optional, at most 1,000 characters, shown only once an attempt is
+ *  finished). */
+export const QUIZ_EXPLANATION_MAX = 1000;
 export const QUIZ_MIN_QUESTIONS = 1;
 export const QUIZ_MIN_OPTIONS = 2;
 export const QUIZ_MAX_OPTIONS = 4;

@@ -39,6 +39,7 @@ import {
   QUIZ_DEFAULT_SECONDS,
   QUIZ_DEFAULT_SETTINGS,
   QUIZ_DESCRIPTION_MAX,
+  QUIZ_EXPLANATION_MAX,
   QUIZ_MAX_OPTIONS,
   QUIZ_MIN_OPTIONS,
   QUIZ_OPTION_MAX,
@@ -116,6 +117,8 @@ interface QuestionDraft {
   options: OptionDraft[];
   /** The `key` of the option marked correct — exactly one, or none yet. */
   correctKey: string | null;
+  /** "Why this is the answer", optional; `''` for none. */
+  explanation: string;
 }
 
 let draftCounter = 0;
@@ -136,6 +139,7 @@ function newQuestion(): QuestionDraft {
     seconds: QUIZ_DEFAULT_SECONDS,
     options: [newOption(), newOption()],
     correctKey: null,
+    explanation: '',
   };
 }
 
@@ -159,6 +163,7 @@ function draftsFromQuiz(quiz: ChannelQuiz): QuestionDraft[] {
       seconds: question.time_limit_seconds,
       options,
       correctKey: correctIndex >= 0 ? options[correctIndex].key : null,
+      explanation: question.explanation ?? '',
     };
   });
 }
@@ -196,6 +201,8 @@ function toPayload(questions: QuestionDraft[]): QuizQuestionInput[] {
         content: option.content.trim(),
         is_correct: option.key === question.correctKey,
       })),
+    // Always sent, so clearing the box clears the stored explanation.
+    explanation: question.explanation.trim() || null,
   }));
 }
 
@@ -769,6 +776,23 @@ function QuestionCard({
           </Button>
         )}
       </fieldset>
+
+      {/* WHY THIS IS THE ANSWER (Arthur, 22 October 2026): optional, shown to
+          a player only on the results, under the right answer, never while
+          the quiz runs. */}
+      <div className="space-y-1.5">
+        <label htmlFor={`explanation-${draft.key}`} className="text-xs text-muted-foreground">
+          Why this is the answer <span className="text-muted-foreground/70">(optional)</span>
+        </label>
+        <Textarea
+          id={`explanation-${draft.key}`}
+          rows={2}
+          maxLength={QUIZ_EXPLANATION_MAX}
+          placeholder="Shown with the answers on the results, never during the quiz."
+          value={draft.explanation}
+          onChange={(event) => onChange({ explanation: event.target.value })}
+        />
+      </div>
     </div>
   );
 }

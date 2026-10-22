@@ -8,7 +8,8 @@ import { pointsLabel, questionVerdict, type QuestionVerdict } from '../model';
 
 /**
  * AttemptQuestionCard — one question of a finished attempt, revealed: every
- * option graded, the verdict, the points it earned and how long it took.
+ * option graded, the verdict, the points it earned, how long it took, and the
+ * author's "why" under the answers when there is one.
  *
  * The practice review's card (`ResultItemCard`), in the attempt's shape: the
  * grade is the SERVER's (`is_correct`, `correct_option_id`), the time is the
@@ -36,6 +37,7 @@ export function AttemptQuestionCard({
   );
   const points = question.points ?? 0;
   const responseMs = question.response_ms ?? null;
+  const explanation = question.explanation?.trim() || null;
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -111,6 +113,16 @@ export function AttemptQuestionCard({
           );
         })}
       </ul>
+
+      {/* Why the right answer is right, in the author's words (Arthur, 22
+          October 2026). Sent only on a finished attempt; nothing when the
+          author wrote none. */}
+      {explanation ? (
+        <div className="mt-3 rounded-lg border-l-2 border-emerald-500/50 bg-secondary/40 px-3 py-2.5">
+          <p className="text-xs font-medium text-muted-foreground">Why</p>
+          <p className="mt-0.5 text-sm leading-relaxed whitespace-pre-line text-foreground">{explanation}</p>
+        </div>
+      ) : null}
     </div>
   );
 }
