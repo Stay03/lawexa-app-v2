@@ -2,7 +2,7 @@
 
 import { memo, useMemo } from 'react';
 import Link from 'next/link';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { ChevronRight, Compass } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -32,10 +32,10 @@ import { soloQuizQueries } from '../queries';
  * on the quiz front, not here (Arthur's option B).
  *
  * The guest pass that follows a visitor's first paint re-renders the layout
- * under the guest's id, and the cache guard drops the `null`-partition entry
- * on that edge; the rows paint again from a fresh read. One request, not a
- * skeleton: the entry was already in the client cache under the old key only
- * for a moment.
+ * under the guest's id, and the cache guard clears the cache on that edge, so
+ * the list re-reads under the new key. `keepPreviousData` keeps the rows
+ * already on screen while it does: the visitor sees one list, not rows, then
+ * the skeleton, then the same rows (checker, 22 October 2026).
  *
  * ── ROWS ARE THE LIST GRAMMAR, WITH A FACE ─────────────────────────────────
  * Every public quiz is somebody's, so the row leads with the author's face
@@ -46,7 +46,11 @@ import { soloQuizQueries } from '../queries';
 export function ExploreScreen() {
   const { userId: viewerId } = useV2Session();
 
-  const query = useInfiniteQuery(soloQuizQueries.explore({ viewerId }));
+  const query = useInfiniteQuery({
+    ...soloQuizQueries.explore({ viewerId }),
+    // Across the visitor-to-guest key change (see the docblock).
+    placeholderData: keepPreviousData,
+  });
 
   const pages = query.data?.pages;
   const quizzes = useMemo<ChannelQuiz[]>(
@@ -56,7 +60,8 @@ export function ExploreScreen() {
 
   const scrollRootRef = useShellScrollRoot();
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
-    hasNextPage: query.hasNextPage,
+    // Not from the outgoing key's pages: the next page belongs to the new read.
+    hasNextPage: query.hasNextPage && !query.isPlaceholderData,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,
     rootRef: scrollRootRef,

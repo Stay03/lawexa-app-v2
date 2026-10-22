@@ -211,8 +211,14 @@ export function useDeleteQuiz(quizUuid: string) {
     mutationFn: () => channelQuizApi.remove(quizUuid),
     meta: { silentError: true },
     onSuccess: () => {
-      queryClient.removeQueries({
+      // Marked stale, not removed: the quiz front is still mounted when this
+      // runs (it leaves for the library just after), and a removed entry with
+      // a mounted reader refetches at once and paints "couldn't find this
+      // quiz" for a beat (checker, 22 October 2026). Nothing reads the stale
+      // entry after the front leaves, and gc drops it.
+      void queryClient.invalidateQueries({
         queryKey: channelQuizQueries.quizDetailOf(quizUuid),
+        refetchType: 'none',
       });
       invalidateQuizLists(queryClient);
     },

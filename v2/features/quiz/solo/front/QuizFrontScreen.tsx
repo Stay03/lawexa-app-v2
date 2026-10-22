@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Compass,
   Eye,
@@ -99,6 +99,10 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const previewQuery = useQuery({
     ...soloQuizQueries.preview(quizUuid, { viewerId }),
     enabled: preview,
+    // A visitor's guest pass changes the key (null to the guest's id) and the
+    // cache guard clears the cache on that edge; the quiz already on screen
+    // stays while it re-reads, so the front never drops back to its skeleton.
+    placeholderData: keepPreviousData,
   });
   const query = preview ? previewQuery : detailQuery;
   const quiz = query.data?.data ?? null;

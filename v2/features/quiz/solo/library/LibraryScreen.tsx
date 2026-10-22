@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
@@ -99,11 +99,15 @@ export function LibraryScreen() {
     rootMargin: '320px',
   });
 
-  const openForm = (quizUuid?: string) => {
+  const openForm = useCallback((quizUuid?: string) => {
     setEditingUuid(quizUuid);
     setFormOpenings((openings) => openings + 1);
     setFormOpen(true);
-  };
+  }, []);
+  // One stable pair for every row, so `LibraryRow`'s `memo` holds when the
+  // list re-renders (a page loading under the sentinel, a refetch).
+  const editQuiz = useCallback((quiz: ChannelQuiz) => openForm(quiz.uuid), [openForm]);
+  const deleteQuiz = useCallback((quiz: ChannelQuiz) => setDeleting(quiz), []);
 
   const showSkeleton = query.isPending;
   const showError = query.isError && quizzes.length === 0;
@@ -150,8 +154,8 @@ export function LibraryScreen() {
                 quiz={quiz}
                 index={index}
                 canPublish={canPublish}
-                onEdit={() => openForm(quiz.uuid)}
-                onDelete={() => setDeleting(quiz)}
+                onEdit={editQuiz}
+                onDelete={deleteQuiz}
               />
             ))}
           </ul>
@@ -222,8 +226,9 @@ const LibraryRow = memo(function LibraryRow({
   /** Staggers the entrance for the first screenful only. */
   index: number;
   canPublish: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
+  /** Stable across renders (the list's `useCallback`s), so the `memo` holds. */
+  onEdit: (quiz: ChannelQuiz) => void;
+  onDelete: (quiz: ChannelQuiz) => void;
 }) {
   const count = quiz.question_count ?? quiz.questions?.length ?? 0;
   /** The visibility switch's refusal, said under the row it was pressed on.
@@ -306,11 +311,11 @@ const LibraryRow = memo(function LibraryRow({
                 Share
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={onEdit}>
+            <DropdownMenuItem onClick={() => onEdit(quiz)}>
               <Pencil aria-hidden className="size-4" />
               Edit
             </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={onDelete}>
+            <DropdownMenuItem variant="destructive" onClick={() => onDelete(quiz)}>
               <Trash2 aria-hidden className="size-4" />
               Delete
             </DropdownMenuItem>

@@ -118,9 +118,13 @@ export const soloQuizQueries = {
    * LIVE tier (staleTime 0) on purpose: this is the entry the player writes
    * its answers onto (the answer mutation patches it from the receipt) AND the
    * entry a reload resumes from, and the only thing that may win over a cached
-   * copy is the server's. The player cancels any read in flight before it
-   * writes an answer, so a focus refetch can never put an answered question
-   * back on screen.
+   * copy is the server's.
+   *
+   * NO REFETCH ON WINDOW FOCUS. The player cancels reads in flight when it
+   * sends an answer, but a focus read that STARTS while the answer is still
+   * on the wire lands after the receipt's write and puts the question back to
+   * open (checker, 22 October 2026). The player needs no focus read: it writes
+   * every answer from its receipt, and a `409` re-reads the attempt.
    */
   attempt: (attemptUuid: string, { viewerId }: ViewerScoped) =>
     queryOptions({
@@ -128,5 +132,6 @@ export const soloQuizQueries = {
       queryFn: () => quizAttemptsApi.show(attemptUuid),
       staleTime: STALE_TIMES.live,
       gcTime: GC_TIMES.list,
+      refetchOnWindowFocus: false,
     }),
 };
