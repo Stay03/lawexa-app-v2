@@ -24,6 +24,7 @@ import { conversationsCache, listedConversation, spaceOfListedChat } from '../ca
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { useSkeletonHold } from './skeleton-hold';
 import { computeTurnSentAt } from './stream-start';
+import { REDACTING_LABEL } from './redaction-wait';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
@@ -115,8 +116,6 @@ function historyErrorMessage(err: unknown): string {
 const CONV_INIT_PREFIX = 'conv_init_';
 /** Narration auto-expiry so the calm status line returns to its resting label. */
 const NARRATION_TTL_MS = 8000;
-/** The activity row while a redacted chat's message is being redacted. */
-export const REDACTING_LABEL = 'Removing personal details…';
 
 interface InitAttachment {
   file_id: number;

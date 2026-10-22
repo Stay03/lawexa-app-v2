@@ -42,11 +42,26 @@ test('the engine marks a send until its stream opens, and never while nothing st
 
 test('a redacted chat says it is removing personal details, and times the row from the send', () => {
   const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
-  assert.match(controller, /export const REDACTING_LABEL = 'Removing personal details…';/);
+  assert.match(
+    read('v2', 'features', 'conversations', 'conversation', 'redaction-wait.ts'),
+    /export const REDACTING_LABEL = 'Removing personal details…';/,
+  );
+  assert.match(controller, /import \{ REDACTING_LABEL \} from '\.\/redaction-wait';/);
   assert.match(controller, /const redacting = isRedacted && turn\.kind === 'own' && stream\.sending;/);
   assert.match(controller, /const sentAt = isRedacted && turn\.kind === 'own' \? computeTurnSentAt\(messages\) : null;/);
   assert.match(controller, /narration: redacting \? REDACTING_LABEL : narration,/);
   const list = read('v2', 'features', 'conversations', 'conversation', 'MessageList.tsx');
   assert.match(list, /const activityStart = heldSince \?\? sentAt \?\? streamStartTime;/);
   assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /sentAt=\{controller\.sentAt\}/);
+});
+
+test('a new redacted chat says the same on the home screen, where its first message is redacted', () => {
+  // The first message goes through the create request on the home screen, so
+  // the wait Stay saw (a document pasted into a new chat) happens there.
+  const home = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
+  assert.match(home, /setIsSubmitting\(true\);\s*setSubmittedAt\(Date\.now\(\)\);/);
+  assert.match(
+    home,
+    /\{isSubmitting && redacted && submittedAt !== null \? \([\s\S]{0,200}?<ActivityStatus startTime=\{submittedAt\} narration=\{REDACTING_LABEL\} \/>/,
+  );
 });

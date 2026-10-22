@@ -41,6 +41,8 @@ import {
 import { cn } from '@/lib/utils';
 import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
 import { seedEarlyRuling } from '@/v2/features/conversations/conversation/early-ruling';
+import { ActivityStatus } from '@/v2/features/conversations/conversation/ActivityStatus';
+import { REDACTING_LABEL } from '@/v2/features/conversations/conversation/redaction-wait';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { extractApiError, extractBlockedReason } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
@@ -238,6 +240,8 @@ export function HomeComposer({
   const [redacted, setRedacted] = useState(false);
   const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({ mode: 'auto' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** When Send was pressed (epoch ms), for the redaction wait's clock. */
+  const [submittedAt, setSubmittedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   // A server BLOCK (message cap / plan gate) is not a failure — it gets its own
   // reason-aware banner with the upgrade path, mirroring v1's MessageBlockBanner
@@ -420,6 +424,7 @@ export function HomeComposer({
 
     setError(null);
     setIsSubmitting(true);
+    setSubmittedAt(Date.now());
     try {
       const result = await startConversation(
         {
@@ -540,6 +545,18 @@ export function HomeComposer({
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span className="flex-1">{shownError}</span>
+        </div>
+      ) : null}
+
+      {/* REDACTED MODE, THE WAIT BEFORE THE CHAT OPENS (Stay, 22 October 2026,
+          option A). A new redacted chat's first message is redacted inside the
+          create request, on this screen, before the chat page opens: 5 s for 12
+          pages, up to about 20 s for 50. The chat's own working row says what
+          is happening and counts from Send; it stays through the move to the
+          new chat (`isSubmitting` holds until this screen unmounts). */}
+      {isSubmitting && redacted && submittedAt !== null ? (
+        <div className="mb-2 px-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+          <ActivityStatus startTime={submittedAt} narration={REDACTING_LABEL} />
         </div>
       ) : null}
 
