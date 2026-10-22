@@ -13,23 +13,28 @@ import { clearScreenContext, setScreenContext } from '@/v2/shell/screen-context'
 import { QuizMessage } from '../../ui/QuizMessage';
 import { QuizErrorState } from '../../ui/states';
 import {
+  attemptHighlights,
   attemptHref,
   attemptResultsHref,
   attemptScore,
+  challengeText,
   isFinishedAttempt,
   orderedQuestions,
   quizFrontHref,
 } from '../model';
 import { useStartAttempt } from '../mutations';
 import { soloQuizQueries } from '../queries';
-import { AttemptQuestionCard } from './AttemptQuestionCard';
+import { AnswersFold } from './AnswersFold';
 import { AttemptSummary } from './AttemptSummary';
-import { AttemptResultsSkeleton } from './states';
+import { ResultsActions } from './ResultsActions';
+import { AttemptResultsSkeleton, RESULTS_COLUMN } from './states';
+import '../solo-quiz.css';
 
 /**
  * AttemptResultsScreen — `/quiz/attempts/{uuid}/results`, the review of a
- * finished attempt: the score, the points, the speed, and every question
- * with its answer revealed.
+ * finished attempt in design B1: the greeting, the points, one row of
+ * stats and the comparison line; See your answers, folded; Take it again
+ * and Challenge a friend at the bottom.
  *
  * ── AN UNFINISHED ATTEMPT IS A ROUTE, NOT AN ERROR ─────────────────────────
  * `finished_at` null means the reader is looking at the wrong half of their
@@ -40,20 +45,22 @@ import { AttemptResultsSkeleton } from './states';
  * ── THE SCORE IS THE SERVER'S, OR NOTHING ──────────────────────────────────
  * `attemptScore` reads the five score fields a finished body carries and
  * returns `null` for a body without them; the screen then says the score
- * could not be read rather than printing a guess. Nothing here adds up
- * points from the questions to fill a gap.
+ * could not be read rather than printing a guess. The streak and the
+ * fastest answer are read off the server's per-question verdicts and
+ * times; the comparison line is the server's own block. Nothing here adds
+ * up points from the questions to fill a gap.
  *
  * ── RETAKE STARTS A NEW ATTEMPT WITH THE SAME REVEAL CHOICE ────────────────
  * An attempt is one-way once scored; "again" is a fresh one on the same quiz,
- * the way the reader took this one, straight into the player. Share hands on
- * the quiz's own link, and only where a link can open it: the quiz's
- * visibility is read from its detail, which the reader's visit to the front
- * has almost always cached.
+ * the way the reader took this one, straight into the player. Challenge a
+ * friend hands on the quiz's own link with the score, and only where a link
+ * can open it: the quiz's visibility is read from its detail, which the
+ * reader's visit to the front has almost always cached.
  */
 export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   const router = useRouter();
   const pathname = usePathname() ?? attemptResultsHref(attemptUuid);
-  const { userId: viewerId } = useV2Session();
+  const { userId: viewerId, name: viewerName } = useV2Session();
 
   const query = useQuery(soloQuizQueries.attempt(attemptUuid, { viewerId }));
   const attempt = query.data?.data ?? null;
@@ -69,7 +76,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   const shareable = visibility === 'link' || visibility === 'public';
 
   const startAttempt = useStartAttempt(quizUuid ?? '', viewerId);
-  /** A refusal of Retake, said under the card — this surface has no toasts. */
+  /** A refusal of Retake, said over the buttons — this surface has no toasts. */
   const [retakeError, setRetakeError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,7 +98,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   // Pending, or on the way back to the player — the same shape either way.
   if (query.isPending || unfinished) {
     return (
-      <div className={LIST_COLUMN}>
+      <div className={RESULTS_COLUMN}>
         <AttemptResultsSkeleton />
       </div>
     );
@@ -130,6 +137,8 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
     );
   }
 
+  const highlights = attemptHighlights(score, questions);
+
   const retake = () => {
     setRetakeError(null);
     startAttempt.mutate(attempt.reveal_mode, {
@@ -139,42 +148,33 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   };
 
   return (
-    <div className={LIST_COLUMN}>
-      <div className="flex flex-col gap-5">
-        <AttemptSummary
-          attempt={attempt}
-          score={score}
-          shareable={shareable}
-          retaking={startAttempt.isPending}
-          onRetake={retake}
-        />
+    <div className={RESULTS_COLUMN}>
+      <AttemptSummary
+        attempt={attempt}
+        score={score}
+        highlights={highlights}
+        viewerName={viewerName}
+      />
 
-        {retakeError && (
-          <p
-            role="alert"
-            className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-          >
-            {retakeError}
-          </p>
-        )}
+      <AnswersFold questions={questions} />
 
-        <section aria-labelledby="attempt-review-heading" className="flex flex-col gap-4">
-          <h2 id="attempt-review-heading" className="text-xs font-medium text-muted-foreground">
-            Your answers
-          </h2>
-          <ol className="flex flex-col gap-4">
-            {questions.map((question, index) => (
-              <li
-                key={question.uuid}
-                className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:fill-mode-both motion-safe:duration-200"
-                style={{ animationDelay: `${Math.min(index, 8) * 40}ms` }}
-              >
-                <AttemptQuestionCard question={question} index={index} />
-              </li>
-            ))}
-          </ol>
-        </section>
-      </div>
+      {retakeError && (
+        <p
+          role="alert"
+          className="mt-4 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+        >
+          {retakeError}
+        </p>
+      )}
+
+      <ResultsActions
+        quizUuid={attempt.quiz.uuid}
+        quizTitle={attempt.quiz.title}
+        challenge={challengeText(viewerName, score.points, attempt.quiz.title, highlights)}
+        shareable={shareable}
+        retaking={startAttempt.isPending}
+        onRetake={retake}
+      />
     </div>
   );
 }

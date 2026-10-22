@@ -6,9 +6,11 @@ import { join } from 'node:path';
 import type { QuizAttemptQuestion } from '@/types/channel-quiz';
 import { questionVerdict } from './model';
 
-/* The solo results (/quiz/attempts/{uuid}/results, 21 October 2026): the
- * server's score, points and speed, every question revealed, Retake and
- * Share. Pure rules first, then the wiring, pinned by source. */
+/* The solo results (/quiz/attempts/{uuid}/results, 21 October 2026; design
+ * B1 on 22 October): the points as the hero, one row of stats, the
+ * comparison line, every question revealed behind a fold, Take it again
+ * and Challenge a friend. Pure rules first, then the wiring, pinned by
+ * source. */
 
 const read = (...parts: string[]) =>
   readFileSync(join(process.cwd(), ...parts), 'utf8');
@@ -47,12 +49,19 @@ test('the review reads the score from the server, sends an unfinished attempt ba
   assert.doesNotMatch(screen, /from 'sonner'/);
 });
 
-test('the headline and the cards show the right, the wrong, the skipped, the points and the speed', () => {
+test('the headline leads with the greeting and the points, then one row of three stats and the comparison line', () => {
   const summary = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptSummary.tsx');
-  assert.match(summary, /label=\{`\$\{pointsLabel\(score\.points\)\} of \$\{pointsLabel\(score\.maxPoints\)\} pts`\}/);
-  assert.match(summary, /\{speed && <SummaryChip icon=\{Clock\} tone="quiet" label=\{speed\} \/>\}/);
-  assert.match(summary, /label=\{`\$\{unanswered\} unanswered`\}/);
-  assert.match(summary, /path=\{quizFrontHref\(attempt\.quiz\.uuid\)\}/);
+  assert.match(summary, /\{greeting\(runTone\(score\), viewerName\)\}/);
+  assert.match(summary, /\{pointsLabel\(score\.points\)\}/);
+  assert.match(summary, /<Stat value=\{`\$\{highlights\.correct\}\/\$\{highlights\.total\}`\} label="right" \/>/);
+  assert.match(summary, /<Stat value=\{String\(highlights\.streak\)\} label="in a row" \/>/);
+  assert.match(summary, /value=\{highlights\.fastestMs === null \? '—' : secondsLabel\(highlights\.fastestMs\)\}\s*label="fastest"/);
+  assert.match(summary, /const line = comparisonLine\(attempt\.comparison, score\.points\);/);
+  assert.match(summary, /\{line && <p className="mt-4 text-sm text-muted-foreground">\{line\}<\/p>\}/);
+  // No per-answer average, no chips, no ring: the points are the story.
+  assert.doesNotMatch(summary, /ScoreRing|SummaryChip|speedLabel|avgResponseMs|SPEED_SCORING_NOTE/);
+  assert.match(summary, /divide-x divide-border/);
+
   const card = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptQuestionCard.tsx');
   assert.match(card, /const verdict = questionVerdict\(question\);/);
   assert.match(card, /formatResponseTime\(responseMs\)/);
@@ -60,12 +69,38 @@ test('the headline and the cards show the right, the wrong, the skipped, the poi
   assert.match(card, /'Correct' : verdict === 'incorrect' \? 'Incorrect' : 'Unanswered'/);
 });
 
-test('the ring and the chips are shared with the practice review', () => {
+test('the answers sit behind one fold row, and the two buttons sit at the bottom', () => {
+  const fold = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersFold.tsx');
+  assert.match(fold, /const \[open, setOpen\] = useState\(false\);/);
+  assert.match(fold, /const subtitle = reviewSubtitle\(questions\.length, toReviewCount\(questions\)\);/);
+  assert.match(fold, /See your answers/);
+  assert.match(fold, /<CollapsibleContent className="v2-collapse">/);
+  assert.match(fold, /<AttemptQuestionCard question=\{question\} index=\{index\} \/>/);
+
+  const actions = read('v2', 'features', 'quiz', 'solo', 'results', 'ResultsActions.tsx');
+  assert.match(actions, /sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto/);
+  assert.match(actions, /Take it again/);
+  assert.match(actions, /\{share\.copied \? 'Link copied' : 'Challenge a friend'\}/);
+
+  const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
+  assert.match(screen, /import '\.\.\/solo-quiz\.css';/);
+  assert.match(screen, /const \{ userId: viewerId, name: viewerName \} = useV2Session\(\);/);
+  assert.match(screen, /const highlights = attemptHighlights\(score, questions\);/);
+  assert.match(screen, /challenge=\{challengeText\(viewerName, score\.points, attempt\.quiz\.title, highlights\)\}/);
+  assert.match(screen, /<AnswersFold questions=\{questions\} \/>/);
+  // The results column is a full-height flex column, so the row can sit on
+  // the bottom edge; the B1 tokens ride it.
+  const states = read('v2', 'features', 'quiz', 'solo', 'results', 'states.tsx');
+  assert.match(states, /export const RESULTS_COLUMN =\s*'v2-solo mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';/);
+  assert.match(screen, /<div className=\{RESULTS_COLUMN\}>\s*<AttemptSummary/);
+});
+
+test('the ring and the chips stay with the practice review; the solo results no longer draw them', () => {
   const practice = read('v2', 'features', 'quiz', 'results', 'ResultsSummary.tsx');
   assert.match(practice, /import \{ ScoreRing \} from '\.\/ScoreRing';/);
   assert.match(practice, /import \{ SummaryChip \} from '\.\/SummaryChip';/);
   assert.doesNotMatch(practice, /function ScoreRing|function Chip\(/);
-  assert.match(read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptSummary.tsx'), /from '\.\.\/\.\.\/results\/ScoreRing'/);
+  assert.doesNotMatch(read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptSummary.tsx'), /ScoreRing|SummaryChip/);
   const ring = read('v2', 'features', 'quiz', 'results', 'ScoreRing.tsx');
   assert.match(ring, /aria-label=\{empty \? emptyLabel : `Score: \$\{rounded\} percent`\}/);
 });
@@ -76,5 +111,5 @@ test('the routes are private, and the segment boundary draws the results shape f
   assert.match(read(...base, 'results', 'loading.tsx'), /return <AttemptResultsFallback \/>;/);
   assert.match(read(...base, 'loading.tsx'), /return <AttemptResultsFallback \/>;/);
   // The player draws the same shape while it sends a finished attempt on.
-  assert.match(read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlayerScreen.tsx'), /if \(finished\) \{\s*return \(\s*<div className=\{LIST_COLUMN\}>\s*<AttemptResultsSkeleton \/>/);
+  assert.match(read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlayerScreen.tsx'), /if \(finished\) \{\s*return \(\s*<div className=\{RESULTS_COLUMN\}>\s*<AttemptResultsSkeleton \/>/);
 });

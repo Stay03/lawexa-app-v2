@@ -9,7 +9,6 @@ import type {
   QuizScenario,
   SubmitQuizAttemptAnswerPayload,
 } from '@/types/channel-quiz';
-import { formatResponseTime } from '@/v2/features/channels/quiz/model';
 import type { OptionState } from '@/v2/features/channels/quiz/ui';
 import { isAccountRole } from '@/v2/runtime/account';
 import type { V2SessionSnapshot } from '@/v2/runtime/session-context';
@@ -365,13 +364,6 @@ export function questionVerdict(question: QuizAttemptQuestion): QuestionVerdict 
  *  comparison line and the hero number must agree on every device. */
 export function pointsLabel(points: number): string {
   return points.toLocaleString('en-US');
-}
-
-/** The mean answer time as a chip reads it, or `null` with nothing to say.
- *  Leaves with the old results card (B1 shows no per-answer average). */
-export function speedLabel(avgResponseMs: number | null): string | null {
-  if (avgResponseMs === null) return null;
-  return `${formatResponseTime(avgResponseMs)} per answer`;
 }
 
 /**

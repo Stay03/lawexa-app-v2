@@ -18,7 +18,7 @@ import {
   quizFrontHref,
 } from '../model';
 import { soloQuizQueries } from '../queries';
-import { AttemptResultsSkeleton } from '../results/states';
+import { AttemptResultsSkeleton, RESULTS_COLUMN } from '../results/states';
 import { AttemptPlay } from './AttemptPlay';
 import { AttemptPlayerSkeleton, SOLO_PLAY_COLUMN } from './states';
 
@@ -81,7 +81,7 @@ export function AttemptPlayerScreen({ attemptUuid }: { attemptUuid: string }) {
   // coming.
   if (finished) {
     return (
-      <div className={LIST_COLUMN}>
+      <div className={RESULTS_COLUMN}>
         <AttemptResultsSkeleton />
       </div>
     );

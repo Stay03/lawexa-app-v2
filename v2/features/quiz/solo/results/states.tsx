@@ -1,58 +1,47 @@
 import { Skeleton } from '@/components/ui/skeleton';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
 
 /**
- * The solo results surface's loading shapes: the headline card and two
- * question cards at their real geometry. Two cards is the honest median for
- * a quiz of a few questions (standards §8iv: reserve near the middle, never
- * at the cap). It pulses in every caller, the route and segment fallbacks
- * included.
+ * The solo results surface's column and loading shape, in design B1.
+ *
+ * THE COLUMN IS `LIST_COLUMN`'S MEASURE AS A FULL-HEIGHT FLEX COLUMN, so the
+ * bottom row (Take it again, Challenge a friend) can sit on the bottom edge
+ * however short the page is, and stick there once the review below is open
+ * (`LIST_COLUMN_DOCKED`'s note on `min-h-full`). `v2-solo` carries the B1
+ * tokens (`../solo-quiz.css`) to everything inside.
+ */
+export const RESULTS_COLUMN =
+  'v2-solo mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';
+
+/**
+ * The results skeleton at the live screen's geometry: the greeting, the big
+ * number, its label, the three-cell stat row, the comparison line, the fold
+ * row, and the two buttons at the bottom. It pulses in every caller, the
+ * route and segment fallbacks and the player's hand-off included.
  */
 export function AttemptResultsSkeleton() {
   return (
-    <div aria-hidden className="flex flex-col gap-5">
-      {/* Headline card: ring + headline + actions. */}
-      <div className="rounded-xl border border-border bg-card p-5 sm:p-6">
-        <div className="flex flex-col items-center gap-6 sm:flex-row">
-          <Skeleton className="size-28 shrink-0 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-5 w-32 rounded" />
-            <Skeleton className="h-4 w-56 max-w-full rounded" />
-            <Skeleton className="h-4 w-40 max-w-full rounded" />
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              <Skeleton className="h-5 w-20 rounded-full" />
-              <Skeleton className="h-5 w-24 rounded-full" />
-              <Skeleton className="h-5 w-28 rounded-full" />
+    <div aria-hidden className="flex flex-1 flex-col">
+      <div className="flex flex-col items-center pt-10 sm:pt-14">
+        <Skeleton className="h-6 w-48 rounded" />
+        <Skeleton className="mt-5 h-[84px] w-52 rounded-xl" />
+        <Skeleton className="mt-3 h-3 w-14 rounded" />
+        <div className="mt-8 flex w-full max-w-[330px] divide-x divide-border">
+          {[0, 1, 2].map((index) => (
+            <div key={index} className="flex flex-1 flex-col items-center gap-2 px-1.5">
+              <Skeleton className="h-6 w-10 rounded" />
+              <Skeleton className="h-3 w-12 rounded" />
             </div>
-          </div>
-          <div className="flex w-full shrink-0 gap-2 sm:w-auto sm:flex-col">
-            <Skeleton className="h-8 w-full rounded-4xl sm:w-32" />
-            <Skeleton className="h-9 w-full rounded-full sm:w-24" />
-          </div>
+          ))}
         </div>
+        <Skeleton className="mt-5 h-3.5 w-56 max-w-full rounded" />
       </div>
 
-      <Skeleton className="h-4 w-24 rounded" />
+      <Skeleton className="mt-11 h-[74px] w-full rounded-2xl" />
 
-      {[1, 0.6].map((opacity, index) => (
-        <div
-          key={index}
-          className="rounded-xl border border-border bg-card p-4 sm:p-5"
-          style={{ opacity }}
-        >
-          <Skeleton className="h-5 w-3/4 rounded" />
-          <Skeleton className="mt-2.5 h-3 w-24 rounded" />
-          <div className="mt-4 flex flex-col gap-2">
-            {[1, 0.85, 0.65].map((rowOpacity, rowIndex) => (
-              <Skeleton
-                key={rowIndex}
-                className="h-11 w-full rounded-lg"
-                style={{ opacity: rowOpacity }}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
+      <div className="mt-auto flex flex-wrap gap-2.5 pt-8">
+        <Skeleton className="h-14 flex-1 basis-40 rounded-2xl" />
+        <Skeleton className="h-14 flex-1 basis-40 rounded-2xl" />
+      </div>
     </div>
   );
 }
@@ -60,7 +49,7 @@ export function AttemptResultsSkeleton() {
 /**
  * The results route's fallback (`app/v2/quiz/(solo)/attempts/[attemptUuid]/
  * results/loading.tsx`, and the `[attemptUuid]` SEGMENT boundary): the
- * skeleton, in the shared column.
+ * skeleton, in the results column.
  */
 export function AttemptResultsFallback() {
   return (
@@ -70,7 +59,7 @@ export function AttemptResultsFallback() {
       </span>
       {/* `aria-hidden` + `inert` (standards §8ii): a Suspense fallback is
           DELETED when content arrives, so nothing in it may hold focus. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
+      <div aria-hidden inert className={RESULTS_COLUMN}>
         <AttemptResultsSkeleton />
       </div>
     </>
