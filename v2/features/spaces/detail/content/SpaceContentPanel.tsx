@@ -67,6 +67,9 @@ import { SpaceChatDock } from './SpaceChatDock';
 import { SpaceFileCard } from './SpaceFileCard';
 import type { SpaceFileActions } from './SpaceFileMenu';
 import { SpaceLooseFiles } from './SpaceLooseFiles';
+import { FileListHead } from '@/v2/features/folders/file-list/FileListRow';
+import { FolderRow } from '@/v2/features/folders/list/FolderRow';
+import { FOLDERS_DATE_LABEL } from '@/v2/features/folders/list/states';
 import { renderFeedRow, type FeedRowMenus } from './feed-rows';
 import {
   SpaceContentEmptyState,
@@ -619,13 +622,31 @@ function SpaceFeed({
           />
         }
       >
-        <div className="flex flex-col gap-5">
-          {days.map((day) => (
-            <LobbySection key={day.label} title={day.label}>
-              <ul className="flex flex-col">{day.entries.map(renderRow)}</ul>
-            </LobbySection>
-          ))}
-        </div>
+        {tab === 'folders' ? (
+          // THE FOLDERS PAGE'S OWN LIST (Stay, 22 October 2026: "Why didn't
+          // you make it consistent with folders as is already?"): "Name" and
+          // "Modified" over the columns on a computer, one folder per line,
+          // no day headings, and the files in no folder continuing it below
+          // (`SpaceLooseFiles`). A folder's actions are on its own page.
+          <>
+            <FileListHead dateLabel={FOLDERS_DATE_LABEL} />
+            <ul className="mt-1 flex flex-col divide-y divide-border/40">
+              {items.map((entry, index) =>
+                entry.type === 'folder' ? (
+                  <FolderRow key={itemKey(entry)} row={folderRow(entry.item)} index={index} now={now} />
+                ) : null,
+              )}
+            </ul>
+          </>
+        ) : (
+          <div className="flex flex-col gap-5">
+            {days.map((day) => (
+              <LobbySection key={day.label} title={day.label}>
+                <ul className="flex flex-col">{day.entries.map(renderRow)}</ul>
+              </LobbySection>
+            ))}
+          </div>
+        )}
       </PagedContent>
 
       {/* The space's files in none of its folders, under the folders. They
@@ -637,7 +658,7 @@ function SpaceFeed({
           enabled={enabled}
           held={query.isPending}
           now={now}
-          menus={rowMenus}
+          actionsFor={fileActions}
         />
       ) : null}
 

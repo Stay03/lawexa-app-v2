@@ -41,11 +41,14 @@ test('an action closes the card before its own dialog opens', () => {
   }
 });
 
-test('the ⋮ is the vertical dots, named for its file', () => {
+test("the card's ⋮ is the vertical dots, named for its file; a list row's is the row's ⋯", () => {
   const menu = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceFileMenu.tsx');
+  assert.match(menu, /look = 'card',/);
   assert.match(menu, /<MoreVertical aria-hidden className="size-4" \/>/);
   assert.match(menu, /aria-label=\{`More actions for \$\{file\.original_name\}`\}/);
-  assert.doesNotMatch(menu, /MoreHorizontal/);
+  // The files in no folder are drawn as the Folders page's rows (Stay, 22
+  // October 2026), so their trigger is a row's, as there.
+  assert.match(menu, /look === 'row' \? \(\s*<DropdownMenuTrigger\s+className=\{cn\(ROW_MENU_TRIGGER_CLASS, FOCUS_RING\)\}/);
 });
 
 test('the list holds one card, keeps its file while it closes, and gives it the row rules', () => {

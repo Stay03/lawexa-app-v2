@@ -84,23 +84,6 @@ export function SpaceContentNextPageSkeleton() {
   );
 }
 
-/**
- * The files in no folder loading under the folders (`SpaceLooseFiles`): the
- * same row, fewer of them, fading the same way, and no heading, so an empty
- * answer leaves nothing behind.
- */
-export function SpaceLooseFilesSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <div aria-hidden className="flex flex-col">
-      {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.25) }}>
-          <FeedRowSkeleton />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 const EMPTY_ICON: Readonly<Record<SpaceContentTab, LucideIcon>> = {
   all: LayoutList,
   conversations: MessageSquare,

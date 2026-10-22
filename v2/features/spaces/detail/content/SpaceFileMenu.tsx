@@ -1,6 +1,6 @@
 'use client';
 
-import { Boxes, Copy, FolderInput, FolderOutput, MoreVertical, Trash2 } from 'lucide-react';
+import { Boxes, Copy, FolderInput, FolderOutput, MoreHorizontal, MoreVertical, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import type { SpaceFile } from '@/types/collab';
+import { ROW_MENU_TRIGGER_CLASS } from '@/v2/features/folders/file-list/FileListRow';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /** What a reader may do to a space file; an absent handler is an absent item. */
@@ -41,18 +42,34 @@ export function SpaceFileMenu({
   onRemoveFromSpace,
   onCopyToMine,
   onDelete,
-}: SpaceFileActions & { file: SpaceFile }) {
+  look = 'card',
+}: SpaceFileActions & {
+  file: SpaceFile;
+  /** The trigger: the card's round ⋮, or a file list row's ⋯ (a space's files
+   *  in no folder, drawn as the Folders page draws its own; Stay, 22 October
+   *  2026: "consistent with folders as is already"). */
+  look?: 'card' | 'row';
+}) {
   return onMoveToFolder || onMove || onRemoveFromSpace || onCopyToMine || onDelete ? (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        className={cn(
-          'v2-interactive flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground',
-          FOCUS_RING,
-        )}
-        aria-label={`More actions for ${file.original_name}`}
-      >
-        <MoreVertical aria-hidden className="size-4" />
-      </DropdownMenuTrigger>
+      {look === 'row' ? (
+        <DropdownMenuTrigger
+          className={cn(ROW_MENU_TRIGGER_CLASS, FOCUS_RING)}
+          aria-label={`Actions for ${file.original_name}`}
+        >
+          <MoreHorizontal aria-hidden className="size-4" />
+        </DropdownMenuTrigger>
+      ) : (
+        <DropdownMenuTrigger
+          className={cn(
+            'v2-interactive flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground data-[state=open]:bg-secondary data-[state=open]:text-foreground',
+            FOCUS_RING,
+          )}
+          aria-label={`More actions for ${file.original_name}`}
+        >
+          <MoreVertical aria-hidden className="size-4" />
+        </DropdownMenuTrigger>
+      )}
       {/* 16px off the window's edges, so the last row is never cut at the bottom. */}
       <DropdownMenuContent align="end" collisionPadding={16}>
         {/* The file goes into one of the space's folders, and off the space's

@@ -1,51 +1,47 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { SpaceFile, SpaceItem } from '@/types/collab';
+import type { SpaceFile } from '@/types/collab';
+import { FileViewers } from '@/v2/features/files/FileViewers';
+import { useFileViewer } from '@/v2/features/files/use-file-viewer';
+import { listViewable } from '@/v2/features/files/viewable';
+import { FileEntryRow } from '@/v2/features/folders/file-list/FileEntryRow';
+import { formatEntryDate } from '@/v2/features/folders/file-list/entry-look';
+import { looseFileRow, UNNAMED_FILE } from '@/v2/features/folders/loose-file-row-model';
+import { LooseFilesSkeleton } from '@/v2/features/folders/list/states';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { uniqueRowsById } from '../../model';
 import { spacesQueries } from '../../queries';
-import { LobbySection } from '../lobby-parts';
-import { renderFeedRow, type FeedRowMenus } from './feed-rows';
-import { SpaceContentNextPageSkeleton, SpaceLooseFilesSkeleton } from './states';
+import { SpaceFileMenu, type SpaceFileActions } from './SpaceFileMenu';
 
 /**
  * SpaceLooseFiles — the space's files in none of its folders, under the
- * folders on the Folders pill (Stay, 22 October 2026: "Space files at the
- * top level, like your Folders page"). The Folders page lists the viewer's
- * own loose files under their folders (`LooseFilesSection`, build 6); this is
- * the same list for a space (`GET /spaces/{uuid}/files?unfiled=1`, backend
- * e76a5957), drawn in the feed's one row (`feed-rows`), so a file reads here
- * as it does on the Files pill, and a tap opens the same card, whose ⋮ adds
- * "Move to folder" for whoever may add to the space.
+ * folders on the Folders pill, drawn EXACTLY as the Folders page draws the
+ * viewer's own loose files (`LooseFilesSection`): no heading, the same file
+ * row (`FileEntryRow`: the kind's glyph, the name, the date on a computer),
+ * the same dividers continuing the folders' list, and the same tap (Stay, 22
+ * October 2026: "Why didn't you make it consistent with folders as is
+ * already?"). A picture, a video or a recording opens in the list's viewer;
+ * any other file opens in a new tab. The row's ⋯ holds the space's verbs for
+ * the file (`SpaceFileMenu`), "Move to folder" first for whoever may add.
  *
- * ITS OWN HEADING, unlike the Folders page's list: the folders above sit
- * under day headings, so a run of files with none would read as the last
- * day's. NOTHING SHOWS WHEN NOTHING IS LOOSE, and nothing shows while the
- * folders are still loading (`held`), so the pill never draws a second
- * skeleton under the first. A refusal (4xx: a reader the server refuses, or
- * a server without the list) hides the section; only a blip offers Try again.
- *
- * Its own query and sentinel, so the folders' list keeps its own states.
+ * The list is `GET /spaces/{uuid}/files?unfiled=1` (backend e76a5957). NOTHING
+ * SHOWS WHEN NOTHING IS LOOSE, and nothing shows while the folders are still
+ * loading (`held`), so the pill never draws a second skeleton under the
+ * first. A refusal (4xx: a reader the server refuses, or a server without the
+ * list) hides the section; only a blip offers Try again.
  */
-
-/** The heading over the files in none of the space's folders. */
-export const SPACE_LOOSE_FILES_TITLE = 'Files not in a folder';
-
-/** Stable empty rows, so a pending list does not mint a new array per render. */
-const NO_FILES: readonly SpaceFile[] = [];
-
 export function SpaceLooseFiles({
   spaceUuid,
   viewerId,
   enabled,
   held,
   now,
-  menus,
+  actionsFor,
 }: {
   spaceUuid: string;
   viewerId: number | null;
@@ -53,16 +49,28 @@ export function SpaceLooseFiles({
   enabled: boolean;
   /** The folders above are still loading: the files load too, but wait to show. */
   held: boolean;
-  /** The feed's frozen clock, for the rows' times. */
+  /** The pill's frozen clock, for the date column. */
   now: number;
-  /** The feed's row rules: the card a file's row opens. */
-  menus: FeedRowMenus;
+  /** What a file's ⋯ holds for this reader. */
+  actionsFor: (file: SpaceFile) => SpaceFileActions;
 }) {
   const query = useInfiniteQuery({ ...spacesQueries.looseFiles(spaceUuid, { viewerId }), enabled });
   const pages = query.data?.pages;
   // Each file once across pages: the list pages by offset while members
   // upload (`uniqueRowsById`'s reason).
-  const files = useMemo(() => (pages ? uniqueRowsById(pages, (file) => file.id) : NO_FILES), [pages]);
+  const { files, pictures } = useMemo(() => {
+    const unique = pages ? uniqueRowsById(pages, (file) => file.id) : [];
+    return { files: unique, pictures: listViewable(unique, UNNAMED_FILE) };
+  }, [pages]);
+  const viewer = useFileViewer();
+  const { view } = viewer;
+  const openView = useCallback(
+    (file: SpaceFile) => {
+      const row = looseFileRow(file);
+      if (row.view) view({ id: row.id, name: row.title, kind: row.view });
+    },
+    [view],
+  );
 
   // The pane this list scrolls in, found from the list's own element and set
   // before the sentinel's effect reads it (`PagedContent`'s way).
@@ -88,37 +96,52 @@ export function SpaceLooseFiles({
   const refused = status >= 400 && status < 500;
   const showList = enabled && !held && !refused && (query.isPending || query.isError || files.length > 0);
 
-  // The feed's file row, which opens the file's card.
-  const row = (file: SpaceFile) => {
-    const entry: SpaceItem = { type: 'file', sort_at: file.created_at, item: file };
-    return renderFeedRow({ entry, now, menus, key: `file:${file.id}` });
-  };
-
   // The anchor is always in the tree, so the pane is found once at mount
   // whether or not the list shows yet.
   return (
     <div ref={anchorRef}>
       {showList ? (
-        <div className="mt-5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+        // NO HEADING: the files continue the folders' list (the Folders page's
+        // "clean file system", Stay, 20 October 2026). The top rule continues
+        // the list's dividers.
+        <section aria-label="Files in no folder" className="border-t border-border/40">
           {query.isPending ? (
-            <SpaceLooseFilesSkeleton />
+            <LooseFilesSkeleton />
           ) : query.isError && files.length === 0 ? (
-            <div role="alert" className="flex items-center justify-between gap-3 px-3 py-4 text-sm text-muted-foreground">
-              <span>Couldn&rsquo;t load the files not in a folder.</span>
+            <div role="alert" className="flex items-center justify-between gap-3 px-2 py-4 text-sm text-muted-foreground">
+              <span>Couldn&rsquo;t load the space&rsquo;s files.</span>
               <Button variant="outline" size="sm" className="shrink-0" onClick={() => void query.refetch()}>
                 Try again
               </Button>
             </div>
           ) : (
-            <LobbySection title={SPACE_LOOSE_FILES_TITLE}>
-              <ul className="flex flex-col">{files.map(row)}</ul>
+            <>
+              <ul className="flex flex-col divide-y divide-border/40">
+                {files.map((file, index) => {
+                  const row = looseFileRow(file);
+                  return (
+                    <FileEntryRow
+                      key={file.id}
+                      fileId={row.id}
+                      kind={row.kind}
+                      name={row.title}
+                      named={row.hasTitle}
+                      date={formatEntryDate(row.createdAt, now)}
+                      index={index}
+                      onView={row.view ? () => openView(file) : undefined}
+                      menu={<SpaceFileMenu file={file} look="row" {...actionsFor(file)} />}
+                    />
+                  );
+                })}
+              </ul>
               <div ref={sentinelRef} className="pt-1">
-                {query.isFetchingNextPage ? <SpaceContentNextPageSkeleton /> : null}
+                {query.isFetchingNextPage ? <LooseFilesSkeleton rows={2} /> : null}
               </div>
-            </LobbySection>
+            </>
           )}
-        </div>
+        </section>
       ) : null}
+      <FileViewers viewer={viewer} pictures={pictures} place="space" />
     </div>
   );
 }
