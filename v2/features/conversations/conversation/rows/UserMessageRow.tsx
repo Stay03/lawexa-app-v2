@@ -13,6 +13,7 @@ import { turnSide } from '../space-turn';
 import { HoverReply } from './HoverReply';
 import { MentionText } from './MentionText';
 import { ReplyQuote } from './ReplyQuote';
+import { withoutAttachmentMarks } from './attachment-markers';
 import { SentAttachments } from './SentAttachments';
 import { RedactionNote } from './RedactionNote';
 import { SpaceTurn } from './SpaceTurn';
@@ -42,17 +43,6 @@ import type { HeldTurn } from './TurnActionsSheet';
  * writer's own question says which `@`s matched nobody in the space.
  */
 const USER_MESSAGE_TRUNCATE_LENGTH = 1000;
-
-/**
- * The marker the server writes into a message for each file it attached:
- * `<attached_image name="a1.png" />`, or `<attached_document name="scan.pdf"
- * pages_as_images="1" />` for a scan sent as pages. The message resource
- * removes only the paired `<attached_document>…</attached_document>` form, so
- * these single tags reached the bubble as text (seen 24 September 2026). The
- * files already show under the bubble, so the markers are removed here, and
- * only on a message that has files, which is when the server writes them.
- */
-const ATTACHMENT_MARKER = /\s*<attached_(?:image|document)\b[^>]*\/>/g;
 
 /** A colour that arrives late (the space's roster answering after the
  *  transcript, on a first open) eases in rather than popping. */
@@ -159,9 +149,7 @@ export function UserMessageRow({
   const tint = colourIndex === null ? 'plain' : 'member';
 
   const hasFiles = (message.attachments?.length ?? 0) > 0 || message.attachment !== undefined;
-  const displayContent = stripContextTags(
-    hasFiles ? message.content.replace(ATTACHMENT_MARKER, '') : message.content,
-  );
+  const displayContent = stripContextTags(withoutAttachmentMarks(message.content, hasFiles));
   const { pastedTexts, remainingText } = parsePastedContent(displayContent);
 
   // Prefer the canonical multi-attachment array; fall back to the legacy singular.
