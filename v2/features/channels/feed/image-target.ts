@@ -80,11 +80,26 @@ export function parseImageTarget(value: string): ImageTarget | null {
  * picture has a caption, the viewer names the picture by it, and the bar says
  * who added it. Channel files carry neither, so their viewer reads exactly as
  * before.
+ *
+ * `kind` marks a video or a recording in a file list's set (Stay, 22 October
+ * 2026: the picture viewer and the player "looks like different things ...
+ * There should be consistency"). It plays where a picture would sit, drawn by
+ * the source's `renderMedia`; without it the item is a picture, as every
+ * channel, chat and print-note picture is.
  */
 export type ViewerImage = Pick<MessageAttachment, 'id' | 'url' | 'original_name' | 'size'> & {
   caption?: string | null;
   added_by?: string | null;
+  kind?: 'video' | 'audio';
 };
+
+/** A video or a recording in a viewer's set. */
+export type ViewerMedia = ViewerImage & { kind: 'video' | 'audio' };
+
+/** Is this item one that plays, rather than a picture? */
+export function isViewerMedia(image: ViewerImage): image is ViewerMedia {
+  return image.kind === 'video' || image.kind === 'audio';
+}
 
 /** What the viewer shows: the message's pictures, and where in them to start. */
 export interface ImageSet {

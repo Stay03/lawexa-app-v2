@@ -13,10 +13,12 @@ import { isRenderableImage, playableKind } from '@/v2/features/channels/files/fi
  * folders and space folders"). Pure: no JSX, no hooks, so the Folders page, a
  * folder and a space's files decide a tap the same way.
  *
- * A PICTURE opens the channel's picture viewer over the list, and a swipe moves
- * between the pictures of THAT list. A VIDEO or a RECORDING opens the player
- * dialog. Anything else keeps the open it had: a new tab, or a space file's
- * card.
+ * A PICTURE, A VIDEO OR A RECORDING opens the one full-screen viewer over the
+ * list (the channel's picture viewer), and a swipe moves between the viewable
+ * files of THAT list; a video or a recording plays where a picture would sit
+ * (Stay, 22 October 2026: the viewer and the player "looks like different
+ * things ... There should be consistency"). Anything else keeps the open it
+ * had: a new tab, or a space file's card.
  *
  * THE CLASSIFIERS ARE THE CHANNEL'S (`channels/files/file-model.ts`): the same
  * mime and extension rules that decide what a message shows rather than names,
@@ -53,7 +55,7 @@ export function viewKind(file: ViewableFile): ViewKind | null {
   return playableKind(named);
 }
 
-/** Every picture of one list is one set, so the viewer needs no real message
+/** Every viewable file of one list is one set, so the viewer needs no real message
  *  id (the AI chat's sent pictures do the same, `SentAttachments.tsx`). */
 export const FILE_LIST_SET = 'files';
 
@@ -68,29 +70,34 @@ export function pictureTarget(fileId: number): string {
  * good for a first paint; empty when there is none, and the viewer's frame
  * then mints one before its first paint (`ViewerFrame`). A size the payload
  * did not carry is 0, which the file lists' picture source leaves unsaid
- * rather than print "0 B".
+ * rather than print "0 B". A video or a recording carries its `kind`, so the
+ * viewer plays it rather than paints it.
  */
-export function viewerImage(file: ViewableFile, name: string): ViewerImage {
+export function viewerImage(file: ViewableFile, name: string, kind: ViewKind = 'picture'): ViewerImage {
   const size = file.size;
   return {
     id: file.id,
     url: file.url ?? '',
     original_name: name,
     size: typeof size === 'number' && Number.isFinite(size) && size >= 0 ? size : 0,
+    ...(kind !== 'picture' && { kind }),
   };
 }
 
-/** The list's pictures, in the list's order: the set a tap on one swipes
- *  through. `unnamed` names a picture whose payload carries no name, in the
- *  list's own words. */
-export function listPictures(files: readonly ViewableFile[], unnamed: string): ViewerImage[] {
-  return files
-    .filter((file) => viewKind(file) === 'picture')
-    .map((file) => viewerImage(file, file.original_name?.trim() || unnamed));
+/** The list's viewable files (pictures, videos, recordings), in the list's
+ *  order: the set a tap on one swipes through. `unnamed` names a file whose
+ *  payload carries no name, in the list's own words. */
+export function listViewable(files: readonly ViewableFile[], unnamed: string): ViewerImage[] {
+  const viewable: ViewerImage[] = [];
+  for (const file of files) {
+    const kind = viewKind(file);
+    if (kind) viewable.push(viewerImage(file, file.original_name?.trim() || unnamed, kind));
+  }
+  return viewable;
 }
 
 /**
- * Where the open picture sits in the list's pictures NOW. Found by id on every
+ * Where the open file sits in the list's viewable files NOW. Found by id on every
  * render rather than kept as a number, so a page that loads behind the viewer,
  * or a row removed ahead of it, moves the index and not the picture. `null`
  * for no target, a malformed one, another set's, or a picture that is no
@@ -105,9 +112,3 @@ export function pictureSetAt(pictures: readonly ViewerImage[], target: string | 
   return { messageUuid: FILE_LIST_SET, images: pictures, index };
 }
 
-/** A video or a recording the player dialog is asked to play. */
-export interface PlayableFile {
-  id: number;
-  name: string;
-  kind: 'video' | 'audio';
-}

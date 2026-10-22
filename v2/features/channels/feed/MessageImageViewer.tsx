@@ -28,6 +28,7 @@ import type { Message } from '@/types/collab';
 import { useHeldValue } from '../use-held-value';
 import {
   formatImageTarget,
+  isViewerMedia,
   resolveImageSet,
   type ImageSet,
   type ViewerImage,
@@ -438,6 +439,9 @@ function ViewerStage({
   const images = set?.images ?? EMPTY_IMAGES;
   const index = set?.index ?? 0;
   const current = set ? images[index] : null;
+  /** A file list's set can hold videos and recordings beside pictures, and
+   *  then the words say "file" (Stay, 22 October 2026: one viewer for all). */
+  const noun = images.some(isViewerMedia) ? 'file' : 'picture';
 
   const goTo = (nextIndex: number) => {
     if (!set || nextIndex < 0 || nextIndex >= images.length) return;
@@ -459,6 +463,9 @@ function ViewerStage({
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     // A right-click is a menu, not a page turn.
     if (event.pointerType === 'mouse' && event.button !== 0) return;
+    // A press on a player is the player's: dragging its slider must seek, not
+    // turn the page. The arrows, the dots and the ground around it still do.
+    if (event.target instanceof Element && event.target.closest('video, audio')) return;
     // A second finger during a page turn is not a second page turn. Any OTHER
     // drag still on the ref is one whose release we never heard (see the move
     // handler), and a fresh press replaces it.
@@ -600,6 +607,8 @@ function ViewerStage({
       onOpenAutoFocus={captureOpener}
       onCloseAutoFocus={restoreOpener}
       onKeyDown={(event) => {
+        // A focused player keeps its own arrow keys: they seek.
+        if (event.target instanceof Element && event.target.closest('video, audio')) return;
         if (event.key === 'ArrowRight') {
           event.preventDefault();
           goTo(index + 1);
@@ -670,13 +679,20 @@ function ViewerStage({
                       fetched: a swipe then reveals bytes that are already
                       decoded, and a message carrying ten photos does not
                       download ten of them to show one. */}
-                  {Math.abs(position - index) <= 1 && (
-                    <ViewerFrame
-                      image={image}
-                      mintedUrls={mintedUrls}
-                      onMintedUrl={onMintedUrl}
-                      source={source}
-                    />
+                  {isViewerMedia(image) && source.renderMedia ? (
+                    // A video or a recording plays where a picture would sit.
+                    // Only the one on screen is mounted, so a swipe away stops
+                    // it and a neighbour never starts fetching.
+                    position === index && <div className="w-full max-w-3xl">{source.renderMedia(image)}</div>
+                  ) : (
+                    Math.abs(position - index) <= 1 && (
+                      <ViewerFrame
+                        image={image}
+                        mintedUrls={mintedUrls}
+                        onMintedUrl={onMintedUrl}
+                        source={source}
+                      />
+                    )
                   )}
                 </div>
               ))}
@@ -689,13 +705,13 @@ function ViewerStage({
               <>
                 <ViewerStep
                   side="left"
-                  label="Previous picture"
+                  label={`Previous ${noun}`}
                   atEnd={index === 0}
                   onClick={() => goTo(index - 1)}
                 />
                 <ViewerStep
                   side="right"
-                  label="Next picture"
+                  label={`Next ${noun}`}
                   atEnd={index === images.length - 1}
                   onClick={() => goTo(index + 1)}
                 />
@@ -719,7 +735,7 @@ function ViewerStage({
           the page. */}
       <DialogDescription className="sr-only">
         {images.length > 1
-          ? `Picture ${index + 1} of ${images.length} in this ${source.words.set}. Swipe, or use the left and right arrow keys, to see the others. Press ${dismiss} to return to ${source.words.returnTo}.`
+          ? `${noun === 'file' ? 'File' : 'Picture'} ${index + 1} of ${images.length} in this ${source.words.set}. Swipe, or use the left and right arrow keys, to see the others. Press ${dismiss} to return to ${source.words.returnTo}.`
           : `Press ${dismiss} to return to ${source.words.returnTo}.`}
       </DialogDescription>
     </DialogSurface>
@@ -853,8 +869,8 @@ function ViewerChrome({
       {failedHere && (
         <p role="status" className="px-4 pb-2 text-xs text-white/70">
           {download.failed
-            ? "Couldn't download this picture. Try again."
-            : "Couldn't open this picture. Try again."}
+            ? `Couldn't download this ${image && isViewerMedia(image) ? 'file' : 'picture'}. Try again.`
+            : `Couldn't open this ${image && isViewerMedia(image) ? 'file' : 'picture'}. Try again.`}
         </p>
       )}
       {/* The installed iPhone app's second tap: the picture is fetched, and the

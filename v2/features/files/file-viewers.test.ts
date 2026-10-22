@@ -4,9 +4,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/* The wiring behind `viewable.ts` (Stay, 21 October 2026): a picture opens
- * the channel's picture viewer over its list, a video or a recording opens
- * the player dialog, and every other file keeps the open it had, on the
+/* The wiring behind `viewable.ts` (Stay, 21 October 2026): a picture, a video
+ * and a recording open the ONE full-screen viewer over their list, the video
+ * or recording playing where a picture would sit (Stay, 22 October 2026: "The
+ * image viewer and video player looks like different things ... There should
+ * be consistency"), and every other file keeps the open it had, on the
  * Folders page, in a folder, and in a space's files and file card. */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -36,25 +38,27 @@ test('one player: the browser controls, no autoplay, one fresh link per failure,
   assert.match(player, /animate-pulse rounded-lg bg-muted motion-reduce:animate-none/);
 });
 
-test("the player dialog: a sheet or a card named by the file, with the row's old open as the way out", () => {
-  const dialog = read('MediaPlayerDialog.tsx');
-  assert.match(dialog, /<ResponsiveOverlay\s+open=\{open && file !== null\}/);
-  assert.match(dialog, /title=\{file\?\.name \?\? ''\}/);
-  assert.match(dialog, /size="content"/);
-  assert.match(dialog, /className=\{file\?\.kind === 'video' \? 'md:max-w-3xl' : undefined\}/);
-  // Focus goes back to where Play came from; Radix has no trigger to return to.
-  assert.match(dialog, /returnFocusTo=\{returnFocusTo\}/);
-  const overlay = read('..', '..', 'shell', 'overlay', 'ResponsiveOverlay.tsx');
-  assert.match(
-    overlay,
-    /onCloseAutoFocus=\{\s*returnFocusTo\s*\? \(event\) => \{\s*event\.preventDefault\(\);\s*if \(returnFocusTo\.isConnected\) returnFocusTo\.focus\(\);\s*\}\s*: undefined\s*\}/,
-  );
-  // A fresh body per file, so one file's failure never shows on the next.
-  assert.match(dialog, /<PlayerBody key=\{file\.id\} file=\{file\} \/>/);
-  assert.match(dialog, /const openInTab = useShowFileInNewTab\(\);/);
-  assert.match(dialog, /didn&rsquo;t play here\./);
-  assert.match(dialog, /Open in a new tab/);
-  assert.match(dialog, /This file is no longer available\./);
+test("a video or a recording plays inside the viewer, where a picture sits, with the row's old open as the way out", () => {
+  const media = read('ViewerMedia.tsx');
+  assert.match(media, /<MediaPlayer file=\{file\} kind="video" failure=\{failure\} className="max-h-\[calc\(100dvh-9rem\)\]" \/>/);
+  // A recording has no picture: a centred card with its name over the player.
+  assert.match(media, /if \(file\.kind === 'audio'\) \{[\s\S]*?mx-auto flex w-full max-w-md[\s\S]*?\{file\.original_name\}[\s\S]*?<MediaPlayer file=\{file\} kind="audio" failure=\{failure\} \/>/);
+  assert.match(media, /const openInTab = useShowFileInNewTab\(\);/);
+  assert.match(media, /didn&rsquo;t play here\./);
+  assert.match(media, /Open in a new tab/);
+  assert.match(media, /This file is no longer available\./);
+  // The separate player dialog is gone: one viewer for all.
+  assert.throws(() => read('MediaPlayerDialog.tsx'));
+
+  const viewer = readFeature('channels', 'feed', 'MessageImageViewer.tsx');
+  // Only the file on screen is mounted, so a swipe away stops it.
+  assert.match(viewer, /isViewerMedia\(image\) && source\.renderMedia \? \([\s\S]{0,300}?position === index && <div className="w-full max-w-3xl">\{source\.renderMedia\(image\)\}<\/div>/);
+  // The player keeps its own presses and arrow keys: its slider seeks, not swipes.
+  assert.match(viewer, /if \(event\.target instanceof Element && event\.target\.closest\('video, audio'\)\) return;\s*if \(event\.key === 'ArrowRight'\)/);
+  assert.match(viewer, /if \(event\.pointerType === 'mouse' && event\.button !== 0\) return;[\s\S]{0,200}?if \(event\.target instanceof Element && event\.target\.closest\('video, audio'\)\) return;/);
+  // A mixed set says "file"; a picture set still says "picture".
+  assert.match(viewer, /const noun = images\.some\(isViewerMedia\) \? 'file' : 'picture';/);
+  assert.match(viewer, /label=\{`Previous \$\{noun\}`\}/);
 });
 
 test("the viewers under a list: the channel's picture viewer with the list's words, and the player", () => {
@@ -63,10 +67,8 @@ test("the viewers under a list: the channel's picture viewer with the list's wor
     viewers,
     /<PictureViewer\s+open=\{viewer\.picture !== null\}\s+set=\{set\}\s+resolving=\{false\}\s+onSelect=\{viewer\.setPicture\}\s+onClose=\{\(\) => viewer\.setPicture\(null\)\}\s+source=\{PICTURE_SOURCE\[place\]\}\s+returnFocusTo=\{viewer\.returnTo\}/,
   );
-  assert.match(
-    viewers,
-    /<MediaPlayerDialog\s+file=\{viewer\.media\?\.file \?\? null\}\s+open=\{viewer\.media\?\.open \?\? false\}\s+onOpenChange=\{viewer\.setMediaOpen\}\s+returnFocusTo=\{viewer\.returnTo\}/,
-  );
+  assert.doesNotMatch(viewers, /MediaPlayerDialog/);
+  assert.match(viewers, /const renderMedia: PictureSource\['renderMedia'\] = \(file\) => <ViewerMedia file=\{file\} \/>;/);
   // Held in state, never bound to the address: the viewer must not promise Back.
   assert.doesNotMatch(viewers, /closesOnBack|useUrlOverlay/);
   // Held through the exit; the set follows the picture by id.
@@ -77,13 +79,14 @@ test("the viewers under a list: the channel's picture viewer with the list's wor
   for (const place of ['files', 'folder', 'space']) {
     assert.match(
       viewers,
-      new RegExp(`^  ${place}: \\{\\n    freshUrl: freshInlineUrl,\\n    linkKey: INLINE_LINK_KEY,\\n    download: true,\\n    detail: sizeDetail,`, 'm'),
+      new RegExp(`^  ${place}: \\{\\n    freshUrl: freshInlineUrl,\\n    linkKey: INLINE_LINK_KEY,\\n    download: true,\\n    detail: sizeDetail,\\n    renderMedia,`, 'm'),
       place,
     );
   }
   const hook = read('use-file-viewer.ts');
   assert.match(hook, /setPicture\(pictureTarget\(file\.id\)\);/);
-  assert.match(hook, /setMedia\(\{ file: \{ id: file\.id, name: file\.name, kind: file\.kind \}, open: true \}\);/);
+  // Every kind opens the same viewer: there is no second, media-only state.
+  assert.doesNotMatch(hook, /setMedia|media:/);
   // Where focus goes back: the element the host named, else the pressed control.
   assert.match(hook, /const pressed = returnFocusTo \?\? document\.activeElement;\s*setReturnTo\(pressed instanceof HTMLElement \? pressed : null\);/);
 });
@@ -127,21 +130,21 @@ test('a file row opens here when its host says how, and in a tab otherwise', () 
   assert.match(readFeature('folders', 'item-row-model.ts'), /view: viewKind\(content\),/);
 });
 
-test("the Folders page's loose files: one viewer over the list's pictures, in its order", () => {
+test("the Folders page's loose files: one viewer over the list's viewable files, in its order", () => {
   const section = readFeature('folders', 'list', 'LooseFilesSection.tsx');
   assert.match(section, /const viewer = useFileViewer\(\);/);
-  assert.match(section, /pictures: listPictures\(files, UNNAMED_FILE\)/);
+  assert.match(section, /pictures: listViewable\(files, UNNAMED_FILE\)/);
   assert.match(section, /if \(row\.view\) view\(\{ id: row\.id, name: row\.title, kind: row\.view \}\);/);
   assert.match(section, /<LooseFileRow[\s\S]*?onView=\{openView\}/);
   assert.match(section, /<FileViewers viewer=\{viewer\} pictures=\{pictures\} place="files" \/>/);
 });
 
-test("a folder, personal or a space's: the stream's pictures, less a removal in flight", () => {
+test("a folder, personal or a space's: the stream's viewable files, less a removal in flight", () => {
   const screen = readFeature('folders', 'detail', 'FolderScreen.tsx');
   assert.match(screen, /const viewer = useFileViewer\(\);/);
   assert.match(
     screen,
-    /mapped\.push\(row\);\s*if \(item\.type === 'file' && row\.type === 'file' && row\.view === 'picture'\) \{\s*shownPictures\.push\(viewerImage\(item\.content, row\.title\)\);/,
+    /mapped\.push\(row\);\s*if \(item\.type === 'file' && row\.type === 'file' && row\.view\) \{\s*shownPictures\.push\(viewerImage\(item\.content, row\.title, row\.view\)\);/,
   );
   assert.match(screen, /if \(row\.view\) view\(\{ id: row\.contentId, name: row\.title, kind: row\.view \}\);/);
   assert.match(screen, /<FolderItemRow[\s\S]*?onView=\{openView\}/);
@@ -161,7 +164,7 @@ test("a space's file card offers View or Play first, closes, and the feed opens 
 
   const panel = readFeature('spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /const viewer = useFileViewer\(\);/);
-  assert.match(panel, /for \(const entry of items\) if \(entry\.type === 'file'\) files\.push\(entry\.item\);\s*return listPictures\(files, 'File'\);/);
+  assert.match(panel, /for \(const entry of items\) if \(entry\.type === 'file'\) files\.push\(entry\.item\);\s*return listViewable\(files, 'File'\);/);
   assert.match(panel, /onView=\{viewFile\}\s*\/>\s*<FileViewers viewer=\{viewer\} pictures=\{pictures\} place="space" \/>/);
   // The card's button is gone by the close: focus goes back to the row it hung from.
   assert.match(panel, /const cardRow = card\?\.row \?\? null;/);

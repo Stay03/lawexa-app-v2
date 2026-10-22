@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
 import { FileViewers } from '@/v2/features/files/FileViewers';
 import { useFileViewer } from '@/v2/features/files/use-file-viewer';
-import { listPictures } from '@/v2/features/files/viewable';
+import { listViewable } from '@/v2/features/files/viewable';
 import { FILES_ACCEPT, uploadPrecheck } from '@/v2/features/spaces/content-model';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
@@ -63,7 +63,7 @@ export function LooseFilesSection({
   const pages = query.data?.pages;
   const { rows, pictures } = useMemo(() => {
     const files = (pages ?? []).flatMap((page) => page.data);
-    return { rows: files.map(looseFileRow), pictures: listPictures(files, UNNAMED_FILE) };
+    return { rows: files.map(looseFileRow), pictures: listViewable(files, UNNAMED_FILE) };
   }, [pages]);
   const viewer = useFileViewer();
   const { view } = viewer;

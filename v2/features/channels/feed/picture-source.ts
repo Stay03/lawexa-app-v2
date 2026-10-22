@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react';
+
 import { filesApi } from '@/lib/api/files';
-import type { ViewerImage } from './image-target';
+import type { ViewerImage, ViewerMedia } from './image-target';
 
 /**
  * picture-source — where the picture viewer gets a fresh link, and how it
@@ -29,6 +31,12 @@ export interface PictureSource {
   /** The bar's line under the title, after "2 of 3 · ". The file's size when
    *  omitted, as channel files have always shown it. */
   detail?: (image: ViewerImage) => string;
+  /**
+   * Draw a video or a recording where a picture would sit (a file list's set,
+   * 22 October 2026). A source that leaves it out shows pictures only, as the
+   * channel, the AI chat and the print notes do.
+   */
+  renderMedia?: (file: ViewerMedia) => ReactNode;
   /** The viewer's sentences about where the pictures come from. */
   words: {
     /** "Picture 2 of 3 in this {set}." */

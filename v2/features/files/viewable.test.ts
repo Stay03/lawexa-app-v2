@@ -8,7 +8,7 @@ import { looseFileRow } from '@/v2/features/folders/loose-file-row-model';
 import { filesQueries, MEDIA_URL_STALE_MS } from './queries';
 import {
   FILE_LIST_SET,
-  listPictures,
+  listViewable,
   pictureSetAt,
   pictureTarget,
   viewKind,
@@ -49,8 +49,8 @@ test('no mime, no claim: the unprobed folder payload keeps the open it had', () 
   assert.equal(viewKind({ id: 1, mime_type: 'image/jpeg' }), 'picture');
 });
 
-test("the list's pictures, in its order, named and sized from what the payload carried", () => {
-  const pictures = listPictures(
+test("the list's viewable files, in its order, named and sized from what the payload carried", () => {
+  const pictures = listViewable(
     [
       { id: 3, mime_type: 'application/pdf', original_name: 'bundle.pdf', size: 900, url: 'https://x/3' },
       { id: 5, mime_type: 'image/jpeg', original_name: ' exhibit a.jpg ', size: 2048, url: 'https://x/5' },
@@ -62,6 +62,9 @@ test("the list's pictures, in its order, named and sized from what the payload c
   );
   assert.deepEqual(pictures, [
     { id: 5, url: 'https://x/5', original_name: 'exhibit a.jpg', size: 2048 },
+    // A video is in the same set, marked so the viewer plays it (Stay, 22
+    // October 2026: one viewer for all, "There should be consistency").
+    { id: 8, url: 'https://x/8', original_name: 'hearing.mp4', size: 7, kind: 'video' },
     // No link: the viewer's frame mints one BEFORE its first paint (an empty
     // `src` fails nothing, so nothing later could). No size: nothing is claimed.
     { id: 9, url: '', original_name: 'Unnamed file', size: 0 },

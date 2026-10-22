@@ -247,7 +247,7 @@ function FolderBody({ uuid }: { uuid: string }) {
       };
     }
     const mapped: FolderItemRowModel[] = [];
-    // The stream's pictures, in its order: what the viewer swipes through.
+    // The stream's viewable files, in its order: what the viewer swipes through.
     const shownPictures: ViewerImage[] = [];
     let chats = 0;
     let folderItems = 0;
@@ -264,8 +264,8 @@ function FolderBody({ uuid }: { uuid: string }) {
           // same way).
           if (!pendingRemovals.has(folderItemKey(row.type, row.contentId))) {
             mapped.push(row);
-            if (item.type === 'file' && row.type === 'file' && row.view === 'picture') {
-              shownPictures.push(viewerImage(item.content, row.title));
+            if (item.type === 'file' && row.type === 'file' && row.view) {
+              shownPictures.push(viewerImage(item.content, row.title, row.view));
             }
           }
           continue;

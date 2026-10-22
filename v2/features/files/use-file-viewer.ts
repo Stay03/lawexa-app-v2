@@ -2,38 +2,35 @@
 
 import { useCallback, useState } from 'react';
 
-import { pictureTarget, type PlayableFile, type ViewKind } from './viewable';
+import { pictureTarget, type ViewKind } from './viewable';
 
 /**
- * use-file-viewer — what a file list holds for its viewers: which picture is
- * open, and which video or recording is in the player. One per list, never per
- * row, so a hundred rows share one picture viewer and one player, and the
+ * use-file-viewer — what a file list holds for its viewer: which file is open.
+ * One per list, never per row, so a hundred rows share one viewer, and the
  * row's callback is stable (the rows are memo'd). `FileViewers.tsx` draws it.
+ *
+ * A picture, a video and a recording all open the SAME viewer, at their place
+ * in the list's set (Stay, 22 October 2026: "There should be consistency").
  */
 export interface FileViewer {
   /**
-   * Open this file here: a picture in the viewer, media in the player.
-   * `returnFocusTo` names where focus goes back when it closes, for a press
-   * whose control closes with its own frame (a space file card's View or
-   * Play): the row the card hung from. Left out, it is the pressed control.
+   * Open this file here, in the viewer. `returnFocusTo` names where focus goes
+   * back when it closes, for a press whose control closes with its own frame
+   * (a space file card's View or Play): the row the card hung from. Left out,
+   * it is the pressed control.
    */
   view: (file: { id: number; name: string; kind: ViewKind }, returnFocusTo?: HTMLElement | null) => void;
-  /** The open picture, as the viewer spells it (`pictureTarget`); `null` when
+  /** The open file, as the viewer spells it (`pictureTarget`); `null` when
    *  closed. */
   picture: string | null;
   /** Move to a sibling, or close with `null`. */
   setPicture: (target: string | null) => void;
-  /** The player's file, kept while it closes so the exit plays over the same
-   *  title (the space file card's rule). */
-  media: { file: PlayableFile; open: boolean } | null;
-  setMediaOpen: (open: boolean) => void;
-  /** Where focus goes back when the open viewer or player closes (`view`). */
+  /** Where focus goes back when the viewer closes (`view`). */
   returnTo: HTMLElement | null;
 }
 
 export function useFileViewer(): FileViewer {
   const [picture, setPicture] = useState<string | null>(null);
-  const [media, setMedia] = useState<FileViewer['media']>(null);
   const [returnTo, setReturnTo] = useState<HTMLElement | null>(null);
 
   // Stable, so each row's `memo` holds. The setters are listed for the React
@@ -44,18 +41,10 @@ export function useFileViewer(): FileViewer {
       // unless the host named the element that outlives it.
       const pressed = returnFocusTo ?? document.activeElement;
       setReturnTo(pressed instanceof HTMLElement ? pressed : null);
-      if (file.kind === 'picture') {
-        setPicture(pictureTarget(file.id));
-        return;
-      }
-      setMedia({ file: { id: file.id, name: file.name, kind: file.kind }, open: true });
+      setPicture(pictureTarget(file.id));
     },
-    [setPicture, setMedia, setReturnTo],
-  );
-  const setMediaOpen = useCallback(
-    (open: boolean) => setMedia((previous) => (previous ? { ...previous, open } : previous)),
-    [setMedia],
+    [setPicture, setReturnTo],
   );
 
-  return { view, picture, setPicture, media, setMediaOpen, returnTo };
+  return { view, picture, setPicture, returnTo };
 }

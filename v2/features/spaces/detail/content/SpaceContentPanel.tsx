@@ -26,7 +26,7 @@ import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { FileViewers } from '@/v2/features/files/FileViewers';
 import { useFileViewer } from '@/v2/features/files/use-file-viewer';
-import { listPictures, type ViewKind } from '@/v2/features/files/viewable';
+import { listViewable, type ViewKind } from '@/v2/features/files/viewable';
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
 import { folderRow } from '@/v2/features/folders/folder-row-model';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -528,7 +528,7 @@ function SpaceFeed({
   const pictures = useMemo(() => {
     const files: SpaceFile[] = [];
     for (const entry of items) if (entry.type === 'file') files.push(entry.item);
-    return listPictures(files, 'File');
+    return listViewable(files, 'File');
   }, [items]);
   // The card's View or Play closes the card as it opens the viewer, so focus
   // goes back to the row the card hung from, not to a button that is gone.
