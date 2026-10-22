@@ -66,8 +66,11 @@ test('every write that files, unfiles or deletes a file re-asks the loose list',
   // a file out of its last folder.
   assert.ok(FOLDER_ITEM_INVALIDATES.some((key) => key.join('/') === 'folders/loose-files'));
   const mutations = read('file-mutations.ts');
-  // Upload: a picture to POST /files, anything else to /files/documents, in no folder.
-  assert.match(mutations, /isImageAttachment\(file\) \? filesApi\.uploadImage\(file\) : filesApi\.uploadDocument\(file\)/);
+  // Upload: every file, pictures included, to POST /files/documents, in no
+  // folder. POST /files saves a picture as a note's content image, which the
+  // Folders page never lists (backend's local run, 22 October 2026).
+  assert.match(mutations, /mutationFn: \(file: File\) => filesApi\.uploadDocument\(file\),/);
+  assert.doesNotMatch(mutations, /uploadImage/);
   assert.doesNotMatch(mutations, /addItem/);
   assert.match(mutations, /invalidates: \[foldersQueries\.looseFilesKey\(\)\] \}/);
   // Delete: the file leaves every folder that held it too.

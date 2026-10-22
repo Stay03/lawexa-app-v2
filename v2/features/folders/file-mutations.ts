@@ -3,7 +3,6 @@
 import { useMutation } from '@tanstack/react-query';
 
 import { filesApi } from '@/lib/api/files';
-import { isImageAttachment } from '@/v2/features/conversations/attachment-rules';
 import { foldersQueries } from './queries';
 
 /**
@@ -14,16 +13,18 @@ import { foldersQueries } from './queries';
  */
 
 /**
- * Upload one file to the viewer's own files, in no folder: a picture to
- * `POST /files`, anything else to `POST /files/documents`, as a folder's own
- * upload sends it. The caller uses `mutateAsync`, one promise per file: with
- * several files in flight, `mutate`'s per-call callbacks fire only for the
- * last (`useUploadChannelFile`'s note).
+ * Upload one file to the viewer's own files, in no folder, by
+ * `POST /files/documents`, pictures included: the server files a picture
+ * there as an image, which the Folders page lists. `POST /files` is the note
+ * editor's picture store; a picture sent there saved as a content image and
+ * showed nowhere (backend's local run, 22 October 2026). The caller uses
+ * `mutateAsync`, one promise per file: with several files in flight,
+ * `mutate`'s per-call callbacks fire only for the last
+ * (`useUploadChannelFile`'s note).
  */
 export function useUploadLooseFile() {
   return useMutation({
-    mutationFn: (file: File) =>
-      isImageAttachment(file) ? filesApi.uploadImage(file) : filesApi.uploadDocument(file),
+    mutationFn: (file: File) => filesApi.uploadDocument(file),
     meta: { silentError: true, invalidates: [foldersQueries.looseFilesKey()] },
   });
 }

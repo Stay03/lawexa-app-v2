@@ -24,7 +24,6 @@ import { filesApi } from '@/lib/api/files';
 import { spacesApi } from '@/lib/api/collab';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatBytes } from '@/lib/utils/format-bytes';
-import { isImageAttachment } from '@/v2/features/conversations/attachment-rules';
 import { FILES_ACCEPT, fileTypeLabel, uploadPrecheck } from '@/v2/features/spaces/content-model';
 import { invalidateSpaceContents } from '@/v2/features/spaces/content-mutations';
 import { spacesQueries } from '@/v2/features/spaces/queries';
@@ -167,11 +166,11 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
 
   const upload = useMutation({
     mutationFn: async (file: File) => {
+      // A picture goes to POST /files/documents too, which files it as an
+      // image; POST /files is the note editor's store (`file-mutations.ts`).
       const stored = folder.space
         ? await spacesApi.uploadFile(folder.space.uuid, file)
-        : isImageAttachment(file)
-          ? await filesApi.uploadImage(file)
-          : await filesApi.uploadDocument(file);
+        : await filesApi.uploadDocument(file);
       try {
         await foldersApi.addItem(folder.uuid, { type: 'file', id: stored.data.id });
       } catch (error) {
