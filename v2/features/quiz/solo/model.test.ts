@@ -313,6 +313,8 @@ test('the comparison line: a new best, a tie, a gap, nothing on a first attempt,
   assert.equal(comparisonLine(comparison({ is_personal_best: true }), 4858), 'New personal best, up from 4,120.');
   assert.equal(comparisonLine(comparison(), 4120), 'Equal to your best.');
   assert.equal(comparisonLine(comparison(), 3980), '140 points off your best here.');
+  // One is one point (backend's shots3: "1 points off your best here").
+  assert.equal(comparisonLine(comparison(), 4119), '1 point off your best here.');
   assert.equal(comparisonLine(comparison({ previous_best_points: 12400 }), 1964), '10,436 points off your best here.');
   // A first attempt: the server says personal best with no best before it.
   assert.equal(comparisonLine(comparison({ attempt_number: 1, previous_best_points: null, is_personal_best: true }), 4858), null);

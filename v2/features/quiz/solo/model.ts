@@ -403,7 +403,8 @@ export function comparisonLine(
   const best = comparison.previous_best_points;
   if (comparison.is_personal_best) return `New personal best, up from ${pointsLabel(best)}.`;
   if (points === best) return 'Equal to your best.';
-  return `${pointsLabel(best - points)} points off your best here.`;
+  const behind = best - points;
+  return `${pointsLabel(behind)} ${behind === 1 ? 'point' : 'points'} off your best here.`;
 }
 
 /** Good is at least half right (the greeting's rule, 22 October 2026). */
@@ -527,7 +528,7 @@ export function challengeText(
 ): string {
   const who = firstName(name);
   const opener = who ? `${who} scored` : 'I scored';
-  return `${opener} ${pointsLabel(points)} points on ${quizTitle}. ${statsLine(highlights)}. Can you beat me?`;
+  return `${opener} ${pointsLabel(points)} ${points === 1 ? 'point' : 'points'} on ${quizTitle}. ${statsLine(highlights)}. Can you beat me?`;
 }
 
 /* ── The question screen's words ──────────────────────────────────────────── */
