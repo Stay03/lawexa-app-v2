@@ -51,6 +51,7 @@ import {
   type TextResetEvent,
   type ConnectedEvent,
   type PendingResponseData,
+  type RedactionSummary,
 } from '@/types/chat';
 import {
   appendAssistantTurn,
@@ -461,6 +462,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     content: string,
     attachments?: MessageAttachment[] | MessageAttachment,
     replyTo?: MessageReplyTo,
+    redaction?: RedactionSummary,
   ): EngineMessage {
     const list: MessageAttachment[] | undefined = Array.isArray(attachments)
       ? attachments
@@ -474,6 +476,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       timestamp: new Date(),
       drawnHere: true,
       ...(replyTo && { replyTo }),
+      ...(redaction && { redaction }),
       ...(list && list.length > 0 && { attachments: list, attachment: list[0] }),
     };
     // A live turn is a transcript beginning too (the home handoff opens a brand-new
@@ -1150,6 +1153,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     execId: string,
     initialMessage?: string,
     initialAttachments?: MessageAttachment[] | MessageAttachment,
+    initialRedaction?: RedactionSummary,
   ) {
     const token = getToken();
     if (!token) {
@@ -1167,7 +1171,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       return;
     }
 
-    if (initialMessage) addUserMessage(initialMessage, initialAttachments);
+    if (initialMessage) addUserMessage(initialMessage, initialAttachments, undefined, initialRedaction);
 
     // A TURN BEGINS. Counted here rather than in `send()` because this is the one
     // door BOTH routes into a turn pass through — a `send()` from the composer and

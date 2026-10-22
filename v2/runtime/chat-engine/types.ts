@@ -27,6 +27,7 @@ import type {
   ConversationData,
   ConversationStatusResponse,
   ConversationTurnUser,
+  RedactionSummary,
 } from '@/types/chat';
 import type { StreamSmoothingConfig } from './stream-smoother';
 
@@ -336,6 +337,8 @@ export interface ChatEngine {
     executionId: string,
     initialMessage?: string,
     initialAttachments?: MessageAttachment[] | MessageAttachment,
+    /** What redaction hid in the handoff's message (a new redacted chat). */
+    initialRedaction?: RedactionSummary,
   ): void;
   /**
    * Adopt SERVER history the host fetched — from its cache or over the network.

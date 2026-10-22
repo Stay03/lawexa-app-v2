@@ -15,9 +15,11 @@ import type {
   ConversationTurnUser,
   MessageAttachment,
   MessageReplyTo,
+  RedactionSummary,
 } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
+import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache, listedConversation, spaceOfListedChat } from '../cache';
@@ -127,6 +129,8 @@ interface InitAttachment {
 interface StoredInit {
   msg?: string;
   exec?: string;
+  /** What redaction hid in the first message, in a redacted chat. */
+  redaction?: unknown;
   attachments?: InitAttachment[];
   file_id?: number;
   file_name?: string;
@@ -138,6 +142,7 @@ function readConvInit(conversationId: string): {
   message: string | null;
   executionId: string | null;
   attachments: MessageAttachment[] | undefined;
+  redaction?: RedactionSummary;
 } {
   if (typeof window === 'undefined') {
     return { message: null, executionId: null, attachments: undefined };
@@ -160,6 +165,7 @@ function readConvInit(conversationId: string): {
       message: parsed.msg ?? null,
       executionId: parsed.exec ?? null,
       attachments,
+      ...(isRedactionSummary(parsed.redaction) && { redaction: parsed.redaction }),
     };
   } catch {
     return { message: null, executionId: null, attachments: undefined };
@@ -532,13 +538,13 @@ export function useConversationController(
     let cancelled = false;
     liveRef.current = conversationId;
 
-    const { message, executionId, attachments } = readConvInit(conversationId);
+    const { message, executionId, attachments, redaction } = readConvInit(conversationId);
     setConversationId(conversationId);
 
     if (executionId && message) {
       // Fresh handoff from the home composer: attach to the live execution. The
       // creator is the owner (server-verified id threaded from the page).
-      connectToStream(executionId, message, attachments);
+      connectToStream(executionId, message, attachments, redaction);
       if (serverUserId != null) setLocalOwnerId(serverUserId);
       // Drop the ?init=1 marker so a manual reload takes the recovery path —
       // unless embedded, where the URL is the HOST's (`/cases/…?chat=…`, no

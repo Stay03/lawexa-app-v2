@@ -4,7 +4,8 @@ import { AxiosError } from 'axios';
 import { chatApi } from '@/lib/api/chat';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
-import type { ChatReference, MessageAttachment } from '@/types/chat';
+import { isRedactionSummary } from '@/lib/utils/redaction-summary';
+import type { ChatReference, MessageAttachment, RedactionSummary } from '@/types/chat';
 import {
   appendUserTurn,
   deleteTranscript,
@@ -145,11 +146,13 @@ function toAttachment(a: StartAttachment): MessageAttachment {
 
 /**
  * Write the BYTE-COMPATIBLE streaming handoff v1's conversation page reads on mount.
- * Shape is identical to v1's home write: `{ msg, exec, stream_mode, attachments? }`.
+ * Shape is identical to v1's home write: `{ msg, exec, stream_mode, attachments? }`,
+ * plus `redaction` in a redacted chat (what the send hid, for the "Sent as
+ * redacted" line under the first message; v1 ignores it).
  */
 function writeConvInit(
   conversationId: string,
-  data: { msg: string; exec: string; attachments: StartAttachment[] },
+  data: { msg: string; exec: string; attachments: StartAttachment[]; redaction?: RedactionSummary },
 ): void {
   if (typeof window === 'undefined') return;
   try {
@@ -162,6 +165,7 @@ function writeConvInit(
         ...(data.attachments.length > 0 && {
           attachments: data.attachments.map(toAttachment),
         }),
+        ...(data.redaction && { redaction: data.redaction }),
       }),
     );
   } catch {
@@ -347,7 +351,8 @@ export async function startConversation(
     }
 
     bridgeJurisdiction(conversationId, jurisdiction);
-    writeConvInit(conversationId, { msg: displayMessage, exec: executionId, attachments });
+    const redaction = redacted && isRedactionSummary(response.data.redaction) ? response.data.redaction : undefined;
+    writeConvInit(conversationId, { msg: displayMessage, exec: executionId, attachments, redaction });
 
     // Put the new conversation at the top of every recents cache IMMEDIATELY, so the
     // sidebar/drawer/home show it without waiting on a refetch (wave-4 acceptance b).
