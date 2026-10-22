@@ -62,6 +62,10 @@ test('a new redacted chat says the same on the home screen, where its first mess
   assert.match(home, /setIsSubmitting\(true\);\s*setSubmittedAt\(Date\.now\(\)\);/);
   assert.match(
     home,
-    /\{isSubmitting && redacted && submittedAt !== null \? \([\s\S]{0,200}?<ActivityStatus startTime=\{submittedAt\} narration=\{REDACTING_LABEL\} \/>/,
+    /\{isSubmitting && redacted && submittedAt !== null \? \([\s\S]{0,300}?<ActivityStatus startTime=\{submittedAt\} narration=\{REDACTING_LABEL\} \/>/,
   );
+  // On a phone a long message lifts the docked box over the suggested prompts:
+  // the line has its own ground, or its words mix with a prompt's (backend's
+  // local picture, 22 October 2026).
+  assert.match(home, /<div className="inline-flex rounded-full bg-background px-3 py-1\.5">\s*<ActivityStatus startTime=\{submittedAt\}/);
 });

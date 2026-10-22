@@ -553,10 +553,14 @@ export function HomeComposer({
           create request, on this screen, before the chat page opens: 5 s for 12
           pages, up to about 20 s for 50. The chat's own working row says what
           is happening and counts from Send; it stays through the move to the
-          new chat (`isSubmitting` holds until this screen unmounts). */}
+          new chat (`isSubmitting` holds until this screen unmounts). On a
+          phone a long message lifts the docked box over the suggested prompts,
+          so the line has its own ground, as the jurisdiction does. */}
       {isSubmitting && redacted && submittedAt !== null ? (
         <div className="mb-2 px-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-          <ActivityStatus startTime={submittedAt} narration={REDACTING_LABEL} />
+          <div className="inline-flex rounded-full bg-background px-3 py-1.5">
+            <ActivityStatus startTime={submittedAt} narration={REDACTING_LABEL} />
+          </div>
         </div>
       ) : null}
 
