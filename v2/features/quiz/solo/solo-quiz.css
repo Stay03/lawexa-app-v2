@@ -1,0 +1,131 @@
+/**
+ * solo-quiz.css — design B1's few things a utility class cannot say: the
+ * raised lip under a tile and a button, the sheet's rise, the tick's burst,
+ * and the colours the app's tokens do not carry (the true/false pair, the
+ * deep shades the lips are cut from, the inks the sheets sit on). Feature-
+ * local and imported by the player and the results, like
+ * `channels/quiz/quiz-game.css`. Every class is prefixed `v2-solo-` and the
+ * tokens live on `.v2-solo`, so nothing here reaches v1 or another screen.
+ *
+ * THE LIP IS THE DESIGN'S PRESS. A B1 tile sits 4px proud of the page on a
+ * darker shade of itself and drops flat under a finger; the shell's shared
+ * press (`[data-pressed]`, opacity) composes with it. The drop reads both
+ * `:active` and the shell's `data-pressed`, because iOS can skip `:active`
+ * on a fast tap (see `touch-press.tsx`).
+ *
+ * MOTION BUDGET: the sheet rises in 250ms and the tick pops in 400ms with a
+ * 500ms burst of dots, once, on the one moment the screen celebrates; every
+ * one of them is off under `prefers-reduced-motion`, where the same
+ * information is fully present in place.
+ */
+
+.v2-solo {
+  --solo-blue: oklch(0.62 0.17 255);
+  --solo-blue-deep: oklch(0.47 0.15 255);
+  --solo-coral: oklch(0.66 0.2 35);
+  --solo-coral-deep: oklch(0.5 0.16 35);
+  --solo-right: oklch(0.52 0.14 158);
+  --solo-right-deep: oklch(0.42 0.12 158);
+  --solo-right-ink: oklch(0.96 0.03 158);
+  --solo-wrong: var(--destructive);
+  --solo-wrong-deep: oklch(0.46 0.17 27);
+  --solo-wrong-ink: oklch(0.96 0.025 27);
+  --solo-gold-deep: oklch(0.47 0.11 85);
+  --solo-gold-text: oklch(0.47 0.11 85);
+  --solo-lip: oklch(0.86 0 0);
+  --solo-track: oklch(0.9 0 0);
+}
+
+.dark .v2-solo {
+  --solo-right: oklch(0.76 0.17 155);
+  --solo-right-deep: oklch(0.52 0.14 155);
+  --solo-right-ink: oklch(0.24 0.04 155);
+  --solo-wrong-deep: oklch(0.5 0.16 27);
+  --solo-wrong-ink: oklch(0.25 0.05 27);
+  --solo-gold-deep: oklch(0.52 0.11 82);
+  --solo-gold-text: var(--primary);
+  --solo-lip: oklch(0.36 0 0);
+  --solo-track: oklch(0.3 0 0);
+}
+
+/* The lip: a tile or a button raised on a darker shade of itself. */
+.v2-solo-lip {
+  box-shadow: 0 4px 0 0 var(--lip, var(--solo-lip));
+  transition-property: transform, box-shadow, border-color, background-color;
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
+}
+
+.v2-solo-lip:where(:active, [data-pressed]):not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: none;
+}
+
+/* Already down: a tile that is no longer in play sits flat. */
+.v2-solo-flat {
+  transform: translateY(4px);
+  box-shadow: none;
+}
+
+@keyframes v2-solo-rise {
+  from {
+    transform: translateY(32px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes v2-solo-pop {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes v2-solo-dot {
+  0% {
+    transform: rotate(var(--a)) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--a)) translateY(-28px);
+    opacity: 0;
+  }
+}
+
+.v2-solo-rise {
+  animation: v2-solo-rise 250ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+.v2-solo-pop {
+  animation: v2-solo-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.v2-solo-pop-late {
+  animation-delay: 450ms;
+}
+
+.v2-solo-dot {
+  animation: v2-solo-dot 500ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-solo-lip {
+    transition: none;
+  }
+  .v2-solo-rise,
+  .v2-solo-pop,
+  .v2-solo-dot {
+    animation: none !important;
+  }
+  .v2-solo-dot {
+    opacity: 0;
+  }
+}

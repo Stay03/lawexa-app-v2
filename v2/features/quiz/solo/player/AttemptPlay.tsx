@@ -5,34 +5,42 @@ import { useRouter } from 'next/navigation';
 import { Check, Flag, Loader2, Timer, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { QuizAttempt } from '@/types/channel-quiz';
-import { SPEED_SCORING_NOTE } from '@/v2/features/channels/quiz/model';
-import { OptionTile, PhaseRow } from '@/v2/features/channels/quiz/ui';
+import type { QuizAttempt, QuizAttemptQuestion, QuizScenario } from '@/types/channel-quiz';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { QuizMessage } from '../../ui/QuizMessage';
-import { PLAYER_COLUMN } from '../../player/states';
 import {
   answerRefusalCopy,
   attemptPoints,
   attemptResultsHref,
   END_MODE_ADVANCE_MS,
+  nextUnanswered,
   optionTileState,
   orderedQuestions,
-  nextUnanswered,
   playStep,
   pointsLabel,
+  progressSegments,
   questionDeadlineMs,
+  questionKicker,
   responseMsFor,
+  scenarioFor,
+  secondsLabel,
+  streakEndingAt,
   unansweredCount,
+  type PlayStep,
 } from '../model';
 import { useAnswerAttempt, useFinishAttempt } from '../mutations';
-import { AttemptTimer } from './AttemptTimer';
+import { ProgressSegments, RaisedButton, StreakChip, TickBurst } from '../ui';
+import { AttemptOptionTile } from './AttemptOptionTile';
+import { AttemptTimer, FrozenRail } from './AttemptTimer';
+import { SOLO_PLAY_COLUMN } from './states';
+import '../solo-quiz.css';
 
 /**
  * AttemptPlay — the play loop of one attempt, from the question it resumes on
- * to Finish.
+ * to Finish, drawn in design B1 (Arthur and Stay, 22 October 2026): the
+ * segments and the thin clock over the question, raised tiles, and a sheet
+ * that rises from the bottom with the verdict.
  *
  * ── THE SERVER HOLDS THE ANSWERS, THE SCREEN HOLDS THE PLACE ───────────────
  * Which questions are answered, with what, and (on an `each` attempt) whether
@@ -55,18 +63,20 @@ import { AttemptTimer } from './AttemptTimer';
  * stamp to restore it from (named in the report).
  *
  * ── AFTER EACH QUESTION, OR AT THE END ─────────────────────────────────────
- * On an `each` attempt the receipt is the reveal: the tiles turn (the channel
- * game's own `OptionTile` states), the verdict and the points land under
- * them, and the reader moves on when ready. On an `end` attempt the receipt
- * carries counts only, so the locked tile is held a beat and the next
- * question arrives on its own; the verdicts wait for the results.
+ * On an `each` attempt the receipt is the reveal: the tiles turn, the clock
+ * freezes at the time the answer took, and the sheet rises with the verdict,
+ * the points, the streak (or the answer, when the pick was wrong) and
+ * Continue. On an `end` attempt the receipt carries counts only, so the
+ * locked tile is held a beat and the next question arrives on its own; the
+ * verdicts wait for the results, and only the last question gets a sheet,
+ * with See results on it.
  *
  * ── A 409 IS NOT A FAILURE ─────────────────────────────────────────────────
  * The server already has this answer (a second tab), or has already scored
  * the attempt. The mutation re-reads the attempt; the question then shows its
  * verdict, or the screen above sends the reader to the results. No sentence
- * is printed for it (`answerRefusalCopy`). Everything else is said under the
- * grid, in place: this surface has no toasts.
+ * is printed for it (`answerRefusalCopy`). Everything else is said in the
+ * foot, in place: this surface has no toasts.
  *
  * ── KEYS 1–4, SCOPED TO FOCUS (WCAG 2.1.4) ─────────────────────────────────
  * The digit shortcuts are bound to the question GROUP, not the window, so
@@ -109,7 +119,7 @@ export function AttemptPlay({
   }));
   /** The tapped option, keyed to its cursor so a stale tap is never current. */
   const [pending, setPending] = useState<{ cursor: number; optionId: number } | null>(null);
-  /** The one sentence under the grid for a refusal, cleared on every move. */
+  /** The one sentence in the foot for a refusal, cleared on every move. */
   const [note, setNote] = useState<string | null>(null);
 
   const answer = useAnswerAttempt(attempt.uuid, viewerId);
@@ -123,6 +133,7 @@ export function AttemptPlay({
   const step = question ? playStep(question, attempt.reveal_mode, sending, place.timedOut) : null;
   const points = attemptPoints(attempt);
   const unanswered = unansweredCount(attempt);
+  const segments = progressSegments(questions, cursor);
 
   const advance = useCallback(() => {
     setNote(null);
@@ -202,137 +213,99 @@ export function AttemptPlay({
       : `Answer recorded. ${receipt.is_correct ? 'Correct' : 'Not this time'}. ${pointsLabel(points)} points so far.`
     : '';
 
-  return (
-    <div className={PLAYER_COLUMN}>
-      {/* The quiz's name stays on the page, over the question: the bar
-          carries no title for this address (`pushed-route.ts`). */}
-      <p className="truncate pt-4 text-sm text-muted-foreground">{attempt.quiz.title}</p>
+  // The sheet rises for a verdict, for a question lost to the clock, and for
+  // the last answer of an `end` attempt, where See results is the only move.
+  const sheet =
+    step === 'revealed' || step === 'timed-out' || (step === 'answered' && isLast);
 
-      {/* STICKY, NOT FIXED — pins inside the shell's one scroll container,
-          the practice player's bar. */}
-      <div className="sticky top-0 z-10 -mx-4 mt-2 flex items-center justify-between gap-2 border-b border-border/60 bg-background/85 px-4 py-2.5 backdrop-blur supports-backdrop-filter:bg-background/70">
-        <span className="text-sm font-semibold tabular-nums text-foreground">
-          {question ? `Question ${cursor + 1} of ${total}` : `${total} of ${total} answered`}
-        </span>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card px-2.5 py-1 text-xs tabular-nums">
-          {/* Mounted from the first frame, EMPTY until an answer is recorded in
-              this mount — a live region only reliably announces changes it is
-              present for (the practice `ScoreChip` rule). */}
-          <span role="status" aria-live="polite" className="sr-only">
-            {announcement}
-          </span>
-          {attempt.reveal_mode === 'each' ? (
-            <span aria-hidden className="flex items-center gap-1">
-              <span className="font-semibold text-foreground">{pointsLabel(points)}</span>
-              <span className="text-muted-foreground">pts</span>
+  return (
+    <div className={SOLO_PLAY_COLUMN}>
+      {/* STICKY, NOT FIXED — pins inside the shell's one scroll container.
+          The quiz's name stays on the page: the bar carries no title for
+          this address (`pushed-route.ts`). */}
+      <header className="sticky top-0 z-10 -mx-4 bg-background/85 px-4 pt-3 pb-2.5 backdrop-blur supports-backdrop-filter:bg-background/70">
+        <div className="flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-sm text-muted-foreground">{attempt.quiz.title}</p>
+          <p className="shrink-0 text-sm tabular-nums text-muted-foreground">
+            {/* Mounted from the first frame, EMPTY until an answer is recorded
+                in this mount — a live region only reliably announces changes
+                it is present for (the practice `ScoreChip` rule). */}
+            <span role="status" aria-live="polite" className="sr-only">
+              {announcement}
             </span>
-          ) : (
-            <span aria-hidden className="text-muted-foreground">
-              {attempt.answered_count}/{total} answered
-            </span>
-          )}
-        </span>
-      </div>
+            {attempt.reveal_mode === 'each' ? (
+              <span aria-hidden>
+                <span className="font-comfortaa text-base font-bold text-foreground">
+                  {pointsLabel(points)}
+                </span>{' '}
+                pts
+              </span>
+            ) : (
+              <span aria-hidden>
+                {attempt.answered_count}/{total} answered
+              </span>
+            )}
+          </p>
+        </div>
+
+        <ProgressSegments className="mt-3" segments={segments} current={cursor} total={total} />
+
+        {/* The one fixed-height rail under the segments: draining while the
+            question is open, frozen with the answer's time after. */}
+        {question && step && (
+          <div className="mt-2.5">
+            {step === 'open' || step === 'sending' ? (
+              <AttemptTimer
+                key={cursor}
+                openedAtMs={place.openedAtMs}
+                limitSeconds={question.time_limit_seconds}
+              />
+            ) : step === 'revealed' ? (
+              <FrozenRail
+                fraction={1 - (question.response_ms ?? 0) / (question.time_limit_seconds * 1000)}
+                label={secondsLabel(question.response_ms ?? 0)}
+              />
+            ) : step === 'timed-out' ? (
+              <FrozenRail fraction={0} label="Time's up" />
+            ) : (
+              <FrozenRail fraction={1} label="Locked in" />
+            )}
+          </div>
+        )}
+      </header>
 
       {question && step ? (
-        <div className="flex flex-col gap-5 pt-6">
-          {/* The one fixed-height row over the question: the draining bar
-              while it is open, and the word for what happened after. */}
-          {step === 'open' || step === 'sending' ? (
-            <AttemptTimer
-              key={cursor}
-              openedAtMs={place.openedAtMs}
-              limitSeconds={question.time_limit_seconds}
-            />
-          ) : (
-            <PhaseRow>
-              {step === 'timed-out' ? (
-                <Timer aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-              ) : (
-                <Check
-                  aria-hidden
-                  className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-                />
-              )}
-              <span className="text-sm text-muted-foreground">
-                {step === 'revealed'
-                  ? 'Answer revealed'
-                  : step === 'timed-out'
-                    ? "Time's up"
-                    : 'Answer locked in'}
-              </span>
-            </PhaseRow>
-          )}
-
+        <>
           <QuestionGroup
             cursor={cursor}
             question={question}
+            scenario={scenarioFor(attempt, question)}
             step={step}
             pendingPick={pendingPick}
             onPick={pick}
           />
 
-          {/* The line under the grid: one honest sentence per step, and the
-              way on when the step has one. */}
-          <div className="flex min-h-10 flex-wrap items-center gap-3">
-            {note ? (
-              <p
-                role="alert"
-                className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-              >
-                {note}
-              </p>
-            ) : step === 'sending' ? (
-              <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Loader2 aria-hidden className="size-4 animate-spin" />
-                Sending your answer…
-              </p>
-            ) : step === 'revealed' ? (
-              <VerdictChip
-                correct={question.is_correct === true}
-                points={question.points ?? 0}
+          <div className="mt-auto pt-6">
+            {sheet ? (
+              <RevealSheet
+                step={step}
+                question={question}
+                streak={
+                  question.is_correct === true
+                    ? streakEndingAt(questions, cursor)
+                    : streakEndingAt(questions, cursor - 1)
+                }
+                isLast={isLast}
+                unanswered={unanswered}
+                finishing={finishing}
+                note={note}
+                onContinue={isLast ? finishNow : advance}
               />
-            ) : step === 'answered' ? (
-              <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Check aria-hidden className="size-4 text-primary" />
-                Answer locked in
-              </p>
-            ) : step === 'timed-out' ? (
-              <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Timer aria-hidden className="size-4" />
-                Out of time — nothing recorded for this one.
-              </p>
             ) : (
-              <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Timer aria-hidden className="size-4" />
-                Pick one — the faster you answer, the more it scores.
-              </p>
-            )}
-
-            {(step === 'revealed' || step === 'timed-out' || (step === 'answered' && isLast)) && (
-              <div className="ml-auto flex items-center gap-3">
-                {isLast && unanswered > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {unanswered} unanswered — {unanswered === 1 ? 'it counts' : 'they count'} as
-                    wrong.
-                  </span>
-                )}
-                <Button
-                  size="sm"
-                  onClick={isLast ? finishNow : advance}
-                  disabled={finishing}
-                >
-                  {finishing ? (
-                    <Loader2 aria-hidden className="size-4 animate-spin" />
-                  ) : isLast ? (
-                    <Flag aria-hidden className="size-4" />
-                  ) : null}
-                  {isLast ? 'See results' : 'Next question'}
-                </Button>
-              </div>
+              <Foot step={step} note={note} optionCount={question.options.length} />
             )}
           </div>
-        </div>
+        </>
       ) : (
         // RESUMED WITH NOTHING LEFT TO ANSWER: every question has an answer and
         // only the score is missing.
@@ -347,14 +320,10 @@ export function AttemptPlay({
                 : 'Finish to see your score and every answer revealed.'
             }
             action={
-              <Button size="sm" onClick={finishNow} disabled={finishing}>
-                {finishing ? (
-                  <Loader2 aria-hidden className="size-4 animate-spin" />
-                ) : (
-                  <Flag aria-hidden className="size-4" />
-                )}
+              <RaisedButton onClick={finishNow} disabled={finishing}>
+                {finishing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
                 See results
-              </Button>
+              </RaisedButton>
             }
             footnote={note ?? undefined}
           />
@@ -373,13 +342,15 @@ export function AttemptPlay({
 function QuestionGroup({
   cursor,
   question,
+  scenario,
   step,
   pendingPick,
   onPick,
 }: {
   cursor: number;
-  question: QuizAttempt['questions'][number];
-  step: Exclude<ReturnType<typeof playStep>, never>;
+  question: QuizAttemptQuestion;
+  scenario: QuizScenario | null;
+  step: PlayStep;
   pendingPick: number | null;
   onPick: (optionId: number) => void;
 }) {
@@ -387,7 +358,7 @@ function QuestionGroup({
   const groupRef = useRef<HTMLElement>(null);
   const lastCursor = useRef<number | null>(null);
 
-  // The server serves `position`; never trust array order for a lettered list.
+  // The server serves `position`; never trust array order for a numbered list.
   const options = useMemo(
     () => [...question.options].sort((a, b) => a.position - b.position),
     [question.options],
@@ -417,70 +388,245 @@ function QuestionGroup({
       role="group"
       aria-labelledby={headingId}
       onKeyDown={handleKeyDown}
-      className={cn('rounded-xl outline-none', FOCUS_RING)}
+      className={cn('rounded-xl pt-7 outline-none', FOCUS_RING)}
     >
       <div
         key={cursor}
         className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-4 motion-safe:duration-300"
       >
+        <p className="text-[13px] font-semibold text-muted-foreground">
+          {questionKicker(question.type)}
+        </p>
+
+        {/* The fact pattern the question is about, once, over it. */}
+        {scenario && (
+          <div className="mt-3 border-l-[3px] border-primary pl-3.5 text-[15px] leading-relaxed text-muted-foreground">
+            {scenario.title && <p className="font-semibold text-foreground">{scenario.title}</p>}
+            <p className="whitespace-pre-line">{scenario.passage}</p>
+          </div>
+        )}
+
         <h1
           id={headingId}
-          className="text-xl leading-snug font-semibold text-balance text-foreground sm:text-2xl"
+          className={cn(
+            'mt-2.5 font-bold tracking-tight text-balance text-foreground',
+            scenario ? 'text-xl leading-snug sm:text-2xl' : 'text-2xl leading-tight sm:text-3xl',
+          )}
         >
           {question.question}
         </h1>
 
         <div
           aria-busy={step === 'sending' || undefined}
-          className={cn('mt-6 grid gap-3', options.length > 2 && 'sm:grid-cols-2')}
+          className="mt-7 grid gap-3.5 sm:grid-cols-2"
         >
           {options.map((option, index) => (
-            <OptionTile
+            <AttemptOptionTile
               key={option.id}
               index={index}
               content={option.content}
+              look={question.type === 'true_false' ? (index === 0 ? 'true' : 'false') : 'card'}
               state={optionTileState(option.id, question, step, pendingPick)}
               disabled={step !== 'open'}
               onSelect={step === 'open' ? () => onPick(option.id) : undefined}
             />
           ))}
         </div>
-
-        {/* Reinforcement, not the affordance — the lettered square on every
-            tile is the affordance. Gated on POINTER CAPABILITY, not width. */}
-        <p className="mt-4 hidden text-xs text-muted-foreground/80 [@media(hover:hover)_and_(pointer:fine)]:block">
-          Tap an answer, or press{' '}
-          <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-sans text-[11px] tabular-nums">
-            1
-          </kbd>
-          –
-          <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-sans text-[11px] tabular-nums">
-            {options.length}
-          </kbd>
-          . {SPEED_SCORING_NOTE}
-        </p>
       </div>
     </section>
   );
 }
 
-/** The reader's own verdict on an `each` attempt — the channel reveal's chip,
- *  with the points the server awarded. Icon AND word, never colour alone. */
-function VerdictChip({ correct, points }: { correct: boolean; points: number }) {
+/**
+ * The line at the foot while the question is open: how to answer, a send in
+ * flight, a pick locked in, or the one honest sentence for a refusal. Keyed
+ * on the pointer, not the width: a finger taps, a mouse clicks or presses.
+ */
+function Foot({
+  step,
+  note,
+  optionCount,
+}: {
+  step: PlayStep;
+  note: string | null;
+  optionCount: number;
+}) {
   return (
-    <p
+    <div className="flex min-h-10 items-center gap-3 text-[13px] text-muted-foreground">
+      {note ? (
+        <p
+          role="alert"
+          className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+        >
+          {note}
+        </p>
+      ) : step === 'sending' ? (
+        <p className="inline-flex items-center gap-1.5">
+          <Loader2 aria-hidden className="size-4 animate-spin" />
+          Sending your answer…
+        </p>
+      ) : step === 'answered' ? (
+        <p className="inline-flex items-center gap-1.5">
+          <Check aria-hidden className="size-4 text-primary" />
+          Locked in
+        </p>
+      ) : (
+        <p>
+          <span className="[@media(hover:hover)_and_(pointer:fine)]:hidden">Tap to answer</span>
+          <span className="hidden [@media(hover:hover)_and_(pointer:fine)]:inline">
+            Click an answer, or press <Key>1</Key> to <Key>{optionCount}</Key>. The first pick
+            counts.
+          </span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Key({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="rounded-md border border-border bg-secondary px-1.5 py-0.5 font-sans text-xs font-bold text-foreground tabular-nums">
+      {children}
+    </kbd>
+  );
+}
+
+/* ── The sheet ────────────────────────────────────────────────────────────── */
+
+type SheetTone = 'right' | 'wrong' | 'quiet';
+
+const SHEET_TONE: Record<SheetTone, string> = {
+  right: 'border-[var(--solo-right)] bg-[var(--solo-right-ink)]',
+  wrong: 'border-[var(--solo-wrong)] bg-[var(--solo-wrong-ink)]',
+  quiet: 'border-border bg-card',
+};
+
+const HEAD_TONE: Record<SheetTone, string> = {
+  right: 'text-[var(--solo-right)]',
+  wrong: 'text-[var(--solo-wrong)]',
+  quiet: 'text-foreground',
+};
+
+/**
+ * The sheet that rises from the bottom once the question is over: the
+ * verdict in a word and a mark (never colour alone), the points the server
+ * awarded and how long the answer took, the streak when there is one or the
+ * right answer when the pick was wrong, and the one way on. `aria-live`, so
+ * the verdict is read out as it lands.
+ */
+function RevealSheet({
+  step,
+  question,
+  streak,
+  isLast,
+  unanswered,
+  finishing,
+  note,
+  onContinue,
+}: {
+  step: PlayStep;
+  question: QuizAttemptQuestion;
+  /** The run of right answers ending here (right), or just before (wrong). */
+  streak: number;
+  isLast: boolean;
+  unanswered: number;
+  finishing: boolean;
+  note: string | null;
+  onContinue: () => void;
+}) {
+  const revealed = step === 'revealed';
+  const tone: SheetTone = revealed ? (question.is_correct === true ? 'right' : 'wrong') : 'quiet';
+  const correctOption =
+    question.options.find((option) => option.id === question.correct_option_id) ?? null;
+  const took = secondsLabel(question.response_ms ?? 0);
+
+  return (
+    <section
+      aria-live="polite"
       className={cn(
-        'inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
-        // `emerald-700` in light: text on a tinted chip, where 600 falls under
-        // 4.5:1 (the channel reveal's note).
-        correct
-          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-          : 'bg-destructive/10 text-destructive',
+        'v2-solo-rise sticky bottom-0 z-10 -mx-4 -mb-6 rounded-t-3xl border-t-2 px-4 pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]',
+        SHEET_TONE[tone],
       )}
     >
-      {correct ? <Check aria-hidden className="size-4" /> : <X aria-hidden className="size-4" />}
-      {correct ? 'Correct' : 'Not this time'}
-      {correct && <span className="tabular-nums">+{pointsLabel(points)}</span>}
-    </p>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className={cn('flex items-center gap-2.5 text-xl font-bold', HEAD_TONE[tone])}>
+          {tone === 'right' ? (
+            <TickBurst />
+          ) : tone === 'wrong' ? (
+            <span
+              aria-hidden
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--solo-wrong)] text-background"
+            >
+              <X className="size-4" strokeWidth={3} />
+            </span>
+          ) : (
+            <span
+              aria-hidden
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-muted-foreground"
+            >
+              {step === 'timed-out' ? <Timer className="size-4" /> : <Check className="size-4" />}
+            </span>
+          )}
+          {tone === 'right'
+            ? 'Correct'
+            : tone === 'wrong'
+              ? 'Not quite'
+              : step === 'timed-out'
+                ? "Time's up"
+                : 'All answered'}
+        </h2>
+
+        {revealed && (
+          <div className="shrink-0 text-right">
+            <p
+              className={cn(
+                'font-comfortaa text-3xl leading-none font-bold tabular-nums',
+                HEAD_TONE[tone],
+              )}
+            >
+              +{pointsLabel(question.points ?? 0)}
+            </p>
+            <p className="mt-1 text-[13px] font-semibold text-muted-foreground">
+              {tone === 'wrong' && streak >= 2 ? `streak ends at ${streak}` : `in ${took}`}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {tone === 'right' && streak >= 2 && <StreakChip className="mt-3.5" count={streak} />}
+
+      {tone === 'wrong' && correctOption && (
+        <p className="mt-2.5 text-[15px] leading-relaxed text-foreground">
+          <b className="font-bold text-[var(--solo-right)]">{correctOption.content}</b> was the
+          answer.
+        </p>
+      )}
+
+      {step === 'timed-out' && (
+        <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">
+          Out of time — nothing recorded for this one, and it counts as wrong.
+        </p>
+      )}
+
+      {isLast && unanswered > 0 && (
+        <p className="mt-2.5 text-[13px] text-muted-foreground">
+          {unanswered} unanswered — {unanswered === 1 ? 'it counts' : 'they count'} as wrong.
+        </p>
+      )}
+
+      {note && (
+        <p
+          role="alert"
+          className="mt-2.5 text-[13px] text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+        >
+          {note}
+        </p>
+      )}
+
+      <RaisedButton className="mt-4 w-full" onClick={onContinue} disabled={finishing}>
+        {finishing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+        {isLast ? 'See results' : 'Continue'}
+      </RaisedButton>
+    </section>
   );
 }

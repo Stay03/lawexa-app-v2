@@ -112,21 +112,74 @@ test('the clock is read in handlers and initialisers, never in render, and respo
   assert.match(timer, /Time&rsquo;s up/);
 });
 
-test('each reveals on the receipt and waits for Next; end holds a beat and moves on, with Finish last', () => {
+test('each reveals on the receipt and waits for Continue; end holds a beat and moves on, with Finish last', () => {
   const play = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
   assert.match(play, /if \(step !== 'answered' \|\| isLast\) return;\s*const id = window\.setTimeout\(advance, END_MODE_ADVANCE_MS\);/);
-  assert.match(play, /onClick=\{isLast \? finishNow : advance\}/);
-  assert.match(play, /\{isLast \? 'See results' : 'Next question'\}/);
+  assert.match(play, /onContinue=\{isLast \? finishNow : advance\}/);
+  assert.match(play, /\{isLast \? 'See results' : 'Continue'\}/);
   assert.match(play, /onSuccess: \(\) => router\.replace\(attemptResultsHref\(attempt\.uuid\)\),/);
-  // Unanswered questions are named before they are scored as wrong.
+  // The sheet rises for a verdict, a lost clock, and the last answer of an
+  // `end` attempt; unanswered questions are named before they are scored.
+  assert.match(play, /step === 'revealed' \|\| step === 'timed-out' \|\| \(step === 'answered' && isLast\)/);
   assert.match(play, /\{unanswered\} unanswered — /);
-  // The tiles are the channel game's, and the digits are scoped to the group.
-  assert.match(play, /<OptionTile\s*key=\{option\.id\}/);
+  // The tiles are B1's, in the channel game's states; the digits are scoped
+  // to the group.
+  assert.match(play, /<AttemptOptionTile\s*key=\{option\.id\}/);
+  assert.match(play, /state=\{optionTileState\(option\.id, question, step, pendingPick\)\}/);
   assert.match(play, /role="group"\s*aria-labelledby=\{headingId\}\s*onKeyDown=\{handleKeyDown\}/);
   assert.match(play, /if \(previous !== null && previous !== cursor\) groupRef\.current\?\.focus\(\);/);
-  // No toasts; a refusal is the one line under the grid.
+  // No toasts; a refusal is the one line in the foot or on the sheet.
   assert.doesNotMatch(play, /from 'sonner'/);
   assert.match(play, /setNote\(answerRefusalCopy\(status, message\)\);/);
+});
+
+test('the question screen is drawn in B1: segments and the thin clock over the question, raised tiles, the sheet below', () => {
+  const play = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
+  assert.match(play, /import '\.\.\/solo-quiz\.css';/);
+  // One segment per question, then the rail: live while open, frozen with
+  // the answer's time at the reveal, empty on a lost clock.
+  assert.match(play, /<ProgressSegments className="mt-3" segments=\{segments\} current=\{cursor\} total=\{total\} \/>/);
+  assert.match(play, /fraction=\{1 - \(question\.response_ms \?\? 0\) \/ \(question\.time_limit_seconds \* 1000\)\}\s*label=\{secondsLabel\(question\.response_ms \?\? 0\)\}/);
+  assert.match(play, /<FrozenRail fraction=\{0\} label="Time's up" \/>/);
+  // The kicker, the passage where there is one, and the question.
+  assert.match(play, /\{questionKicker\(question\.type\)\}/);
+  assert.match(play, /scenario=\{scenarioFor\(attempt, question\)\}/);
+  assert.match(play, /<p className="whitespace-pre-line">\{scenario\.passage\}<\/p>/);
+  // True or false is two tall tiles; everything else is a card.
+  assert.match(play, /look=\{question\.type === 'true_false' \? \(index === 0 \? 'true' : 'false'\) : 'card'\}/);
+  // The sheet: the verdict in a word and a mark, the points, the time or the
+  // streak's end, the streak chip or the answer, and the one way on.
+  assert.match(play, /\{tone === 'right' \? \(\s*<TickBurst \/>/);
+  assert.match(play, /\+\{pointsLabel\(question\.points \?\? 0\)\}/);
+  assert.match(play, /\{tone === 'wrong' && streak >= 2 \? `streak ends at \$\{streak\}` : `in \$\{took\}`\}/);
+  assert.match(play, /\{tone === 'right' && streak >= 2 && <StreakChip className="mt-3\.5" count=\{streak\} \/>\}/);
+  assert.match(play, /\{correctOption\.content\}<\/b> was the\s*answer\./);
+  assert.match(play, /aria-live="polite"\s*className=\{cn\(\s*'v2-solo-rise sticky bottom-0/);
+  // The streak the sheet names ends at this question when it was right, and
+  // just before it when it was not.
+  assert.match(play, /question\.is_correct === true\s*\? streakEndingAt\(questions, cursor\)\s*: streakEndingAt\(questions, cursor - 1\)/);
+
+  const tile = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptOptionTile.tsx');
+  // Never colour alone: the verdict is a sentence too, and the digit is for a pointer.
+  assert.match(tile, /\{REVEAL_LABEL\[state\] && <span className="sr-only">\. \{REVEAL_LABEL\[state\]\}<\/span>\}/);
+  assert.match(tile, /\[@media\(hover:hover\)_and_\(pointer:fine\)\]:inline-block/);
+  assert.match(tile, /'v2-interactive v2-solo-lip relative flex w-full items-center gap-4 rounded-2xl border-2 text-left'/);
+
+  const timer = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptTimer.tsx');
+  assert.match(timer, /\{clock\.seconds\} s/);
+  assert.match(timer, /export function FrozenRail/);
+
+  // The play column is a full-height flex column, so the sheet can stick to
+  // the bottom; the B1 tokens ride it.
+  const states = read('v2', 'features', 'quiz', 'solo', 'player', 'states.tsx');
+  assert.match(states, /export const SOLO_PLAY_COLUMN = 'v2-solo mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-6';/);
+  assert.match(read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlayerScreen.tsx'), /<div className=\{SOLO_PLAY_COLUMN\}>\s*<AttemptPlayerSkeleton \/>/);
+
+  // The kit: the raised button is the house Button underneath.
+  const kit = read('v2', 'features', 'quiz', 'solo', 'ui.tsx');
+  assert.match(kit, /import \{ Button \} from '@\/components\/ui\/button';/);
+  assert.match(kit, /variant=\{tone === 'primary' \? 'default' : 'outline'\}/);
+  assert.match(kit, /role="img"\s*aria-label=\{\s*current < total \? `Question \$\{current \+ 1\} of \$\{total\}` : `\$\{total\} of \$\{total\} answered`/);
 });
 
 test('the screen resumes from the read, sends a finished attempt to its results, and names the quiz as the way back', () => {

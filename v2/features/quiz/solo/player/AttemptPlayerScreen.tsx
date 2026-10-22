@@ -11,7 +11,6 @@ import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { clearScreenContext, setScreenContext } from '@/v2/shell/screen-context';
 import { QuizMessage } from '../../ui/QuizMessage';
 import { QuizErrorState } from '../../ui/states';
-import { PLAYER_COLUMN } from '../../player/states';
 import {
   attemptHref,
   attemptResultsHref,
@@ -21,7 +20,7 @@ import {
 import { soloQuizQueries } from '../queries';
 import { AttemptResultsSkeleton } from '../results/states';
 import { AttemptPlay } from './AttemptPlay';
-import { AttemptPlayerSkeleton } from './states';
+import { AttemptPlayerSkeleton, SOLO_PLAY_COLUMN } from './states';
 
 /**
  * AttemptPlayerScreen — `/quiz/attempts/{uuid}`: reads the attempt and hands
@@ -71,7 +70,7 @@ export function AttemptPlayerScreen({ attemptUuid }: { attemptUuid: string }) {
 
   if (query.isPending) {
     return (
-      <div className={PLAYER_COLUMN}>
+      <div className={SOLO_PLAY_COLUMN}>
         <AttemptPlayerSkeleton />
       </div>
     );
