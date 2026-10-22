@@ -1,9 +1,12 @@
 import type {
   QuizAttempt,
   QuizAttemptAnswerReceipt,
+  QuizAttemptComparison,
   QuizAttemptQuestion,
   QuizAttemptResponse,
+  QuizQuestionType,
   QuizRevealMode,
+  QuizScenario,
   SubmitQuizAttemptAnswerPayload,
 } from '@/types/channel-quiz';
 import { formatResponseTime } from '@/v2/features/channels/quiz/model';
@@ -19,10 +22,17 @@ import type { V2SessionSnapshot } from '@/v2/runtime/session-context';
  * rules from one place and the node test runner can import it.
  *
  * Source: backend branch quiz-part1-publish-and-solo (tip 45a8f711; bodies in
- * `~/.lawexa/tools/frontend/contracts/quiz-45a8f711.json`), 21 October 2026.
- * The channel game's own vocabulary stays in `channels/quiz/model.ts`; this
- * module imports from it where the two surfaces share a word (the option
- * letters, the response-time format, the scoring note) and never redefines it.
+ * `~/.lawexa/tools/frontend/contracts/quiz-45a8f711.json`), 21 October 2026;
+ * the comparison block from ed0f1469, 22 October 2026. The channel game's own
+ * vocabulary stays in `channels/quiz/model.ts`; this module imports from it
+ * where the two surfaces share a word (the option states, the scoring note)
+ * and never redefines it.
+ *
+ * The screens are drawn in design B1 (Arthur and Stay, 22 October 2026): the
+ * question with its segments and thin clock, the reveal sheet, and results
+ * that lead with the points. The sentences those screens say — the greeting,
+ * the streak, the fastest answer, the comparison line, the challenge — are
+ * all here, so the node test runner can hold each one to its words.
  */
 
 /* ── Where things are ─────────────────────────────────────────────────────── */
@@ -351,15 +361,208 @@ export function questionVerdict(question: QuizAttemptQuestion): QuestionVerdict 
   return question.is_correct === true ? 'correct' : 'incorrect';
 }
 
-/** "1,375" — points as a reader counts them. */
+/** "1,375" — points as a reader counts them. `en-US` on purpose: the server's
+ *  comparison line and the hero number must agree on every device. */
 export function pointsLabel(points: number): string {
-  return points.toLocaleString();
+  return points.toLocaleString('en-US');
 }
 
-/** The mean answer time as a chip reads it, or `null` with nothing to say. */
+/** The mean answer time as a chip reads it, or `null` with nothing to say.
+ *  Leaves with the old results card (B1 shows no per-answer average). */
 export function speedLabel(avgResponseMs: number | null): string | null {
   if (avgResponseMs === null) return null;
   return `${formatResponseTime(avgResponseMs)} per answer`;
+}
+
+/**
+ * "0.5 s", "12 s" — a duration as the B1 screens print it, with the space the
+ * design draws (the clock, the reveal's "in 1.6 s", the stat row's fastest).
+ * One decimal under ten seconds, whole seconds from there, the channel
+ * game's own rounding.
+ */
+export function secondsLabel(ms: number): string {
+  const seconds = Math.max(0, ms) / 1000;
+  return seconds < 10 ? `${seconds.toFixed(1)} s` : `${Math.round(seconds)} s`;
+}
+
+/* ── The results' sentences ───────────────────────────────────────────────── */
+
+/**
+ * The one small line under the stat row, from the server's comparison block
+ * (backend ed0f1469), or `null` when there is nothing to say: a first attempt
+ * has no best to beat, and a body without the block (an older server, an
+ * unfinished attempt) claims nothing. `better_than_percent` is unused for
+ * now, by agreement.
+ */
+export function comparisonLine(
+  comparison: QuizAttemptComparison | undefined,
+  points: number,
+): string | null {
+  if (!comparison || comparison.previous_best_points === null) return null;
+  const best = comparison.previous_best_points;
+  if (comparison.is_personal_best) return `New personal best, up from ${pointsLabel(best)}.`;
+  if (points === best) return 'Equal to your best.';
+  return `${pointsLabel(best - points)} points off your best here.`;
+}
+
+/** Good is at least half right (the greeting's rule, 22 October 2026). */
+export type RunTone = 'good' | 'poor';
+
+export function runTone(score: Pick<AttemptScore, 'correct' | 'total'>): RunTone {
+  return score.correct * 2 >= score.total ? 'good' : 'poor';
+}
+
+/** The first word of a display name, or `null` for an account without one. */
+export function firstName(name: string | null): string | null {
+  const first = name?.trim().split(/\s+/)[0];
+  return first ? first : null;
+}
+
+/** "Nice one, Ada." / "Getting there, Ada." — and without a name, the same
+ *  two words alone rather than a comma hanging on nothing. */
+export function greeting(tone: RunTone, name: string | null): string {
+  const opener = tone === 'good' ? 'Nice one' : 'Getting there';
+  const first = firstName(name);
+  return first ? `${opener}, ${first}.` : `${opener}.`;
+}
+
+/**
+ * The longest run of right answers, in PLAY order (pass `orderedQuestions`).
+ * A question never answered breaks a run like a wrong one does: the score
+ * counts it as wrong, and a streak that skipped over it would be a lie.
+ */
+export function bestStreak(questions: readonly QuizAttemptQuestion[]): number {
+  let best = 0;
+  let run = 0;
+  for (const question of questions) {
+    run = question.is_correct === true ? run + 1 : 0;
+    best = Math.max(best, run);
+  }
+  return best;
+}
+
+/** The run of right answers ending at `index` (play order): `0` when that
+ *  question was wrong, unanswered or past the end. */
+export function streakEndingAt(
+  questions: readonly QuizAttemptQuestion[],
+  index: number,
+): number {
+  let run = 0;
+  for (let position = 0; position <= index && position < questions.length; position += 1) {
+    run = questions[position].is_correct === true ? run + 1 : 0;
+  }
+  return run;
+}
+
+/**
+ * The quickest RIGHT answer, in ms, or `null` with none. Only right answers
+ * compete: speed scores nothing on a wrong one, so a fast miss is not a
+ * personal fastest. The time is the server's clamped `response_ms`.
+ */
+export function fastestCorrectMs(questions: readonly QuizAttemptQuestion[]): number | null {
+  let fastest: number | null = null;
+  for (const question of questions) {
+    if (question.is_correct !== true || question.response_ms == null) continue;
+    if (fastest === null || question.response_ms < fastest) fastest = question.response_ms;
+  }
+  return fastest;
+}
+
+/** How many questions the review is worth opening for: every one that was
+ *  not right — wrong picks and the ones never answered alike. */
+export function toReviewCount(questions: readonly QuizAttemptQuestion[]): number {
+  return questions.filter((question) => questionVerdict(question) !== 'correct').length;
+}
+
+/** The fold row's second line: "6 questions, 1 to look at again". */
+export function reviewSubtitle(total: number, toReview: number): string {
+  const count = questionCountLabel(total);
+  return toReview === 0 ? `${count}, all right` : `${count}, ${toReview} to look at again`;
+}
+
+/** The three numbers a finished attempt is summed up by, beside the points. */
+export interface AttemptHighlights {
+  correct: number;
+  total: number;
+  /** The best streak. */
+  streak: number;
+  fastestMs: number | null;
+}
+
+export function attemptHighlights(
+  score: Pick<AttemptScore, 'correct' | 'total'>,
+  questions: readonly QuizAttemptQuestion[],
+): AttemptHighlights {
+  return {
+    correct: score.correct,
+    total: score.total,
+    streak: bestStreak(questions),
+    fastestMs: fastestCorrectMs(questions),
+  };
+}
+
+/** "5 of 6 right · 4 in a row · fastest 0.5 s" — the share card's line, and
+ *  the challenge's. Fastest is left out when nothing was right. */
+export function statsLine(highlights: AttemptHighlights): string {
+  const parts = [
+    `${highlights.correct} of ${highlights.total} right`,
+    `${highlights.streak} in a row`,
+  ];
+  if (highlights.fastestMs !== null) parts.push(`fastest ${secondsLabel(highlights.fastestMs)}`);
+  return parts.join(' · ');
+}
+
+/**
+ * What Challenge a friend hands to the share sheet beside the quiz's link:
+ * who scored what on which quiz, the stat line, and the ask. The reader's
+ * first name where there is one; "I" otherwise, since the sender is the one
+ * speaking.
+ */
+export function challengeText(
+  name: string | null,
+  points: number,
+  quizTitle: string,
+  highlights: AttemptHighlights,
+): string {
+  const who = firstName(name);
+  const opener = who ? `${who} scored` : 'I scored';
+  return `${opener} ${pointsLabel(points)} points on ${quizTitle}. ${statsLine(highlights)}. Can you beat me?`;
+}
+
+/* ── The question screen's words ──────────────────────────────────────────── */
+
+/** The small line over the question: what kind of answer it takes. */
+export function questionKicker(type: QuizQuestionType): string {
+  return type === 'true_false' ? 'True or false' : 'Pick one';
+}
+
+/** The fact pattern a question is about, or `null` for a free-standing one
+ *  (and for a body that names a scenario it does not carry). */
+export function scenarioFor(
+  attempt: Pick<QuizAttempt, 'scenarios'>,
+  question: Pick<QuizAttemptQuestion, 'scenario_uuid'>,
+): QuizScenario | null {
+  if (question.scenario_uuid == null) return null;
+  return attempt.scenarios?.find((scenario) => scenario.uuid === question.scenario_uuid) ?? null;
+}
+
+/**
+ * One segment of the progress bar per question. `done` for an answer the
+ * server has, `miss` for one it has said was wrong (an `each` attempt only;
+ * an `end` attempt learns nothing until the results, so every answer there
+ * is `done`), `now` for the question on screen, `todo` for the rest — a
+ * question skipped on the clock included, since nothing was recorded for it.
+ */
+export type SegmentTone = 'done' | 'miss' | 'now' | 'todo';
+
+export function progressSegments(
+  questions: readonly QuizAttemptQuestion[],
+  cursor: number,
+): SegmentTone[] {
+  return questions.map((question, index) => {
+    if (question.answered) return question.is_correct === false ? 'miss' : 'done';
+    return index === cursor ? 'now' : 'todo';
+  });
 }
 
 /**

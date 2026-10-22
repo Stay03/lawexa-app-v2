@@ -4,7 +4,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { UserRole } from '@/types/auth';
-import type { QuizAttempt, QuizAttemptResponse } from '@/types/channel-quiz';
+import type {
+  QuizAttempt,
+  QuizAttemptComparison,
+  QuizAttemptResponse,
+} from '@/types/channel-quiz';
 import {
   isQuizVisibility,
   PUBLIC_NEEDS_VERIFIED_AUTHOR,
@@ -16,24 +20,39 @@ import {
 import type { V2SessionSnapshot } from '@/v2/runtime/session-context';
 import {
   answerRefusalCopy,
+  attemptHighlights,
   attemptHref,
   attemptResultsHref,
   attemptScore,
+  bestStreak,
   canPublishPublicly,
   canTakeQuiz,
+  challengeText,
+  comparisonLine,
   DEFAULT_REVEAL_MODE,
+  fastestCorrectMs,
+  firstName,
+  greeting,
   isFinishedAttempt,
   nextUnanswered,
   orderedQuestions,
   pointsLabel,
+  progressSegments,
   questionCountLabel,
   questionDeadlineMs,
+  questionKicker,
   quizFrontHref,
   quizLengthLabel,
   readsPreview,
   responseMsFor,
   REVEAL_MODE_CHOICES,
-  speedLabel,
+  reviewSubtitle,
+  runTone,
+  scenarioFor,
+  secondsLabel,
+  statsLine,
+  streakEndingAt,
+  toReviewCount,
   withAnswer,
 } from './model';
 
@@ -270,11 +289,132 @@ test('response_ms is a whole non-negative reading of the monotonic clock', () =>
 
 /* ── Results vocabulary ───────────────────────────────────────────────────── */
 
-test('points and speed read as a person counts them', () => {
+test('points and seconds read as a person counts them', () => {
   assert.equal(pointsLabel(1375), '1,375');
-  assert.equal(speedLabel(15000), '15s per answer');
-  assert.equal(speedLabel(4200), '4.2s per answer');
-  assert.equal(speedLabel(null), null);
+  assert.equal(pointsLabel(0), '0');
+  assert.equal(secondsLabel(500), '0.5 s');
+  assert.equal(secondsLabel(1640), '1.6 s');
+  assert.equal(secondsLabel(15000), '15 s');
+  assert.equal(secondsLabel(-5), '0.0 s');
+});
+
+/* ── The results' sentences (B1, 22 October 2026) ────────────────────────── */
+
+const comparison = (over: Partial<QuizAttemptComparison> = {}): QuizAttemptComparison => ({
+  players_compared: 12,
+  better_than_percent: 70,
+  attempt_number: 3,
+  previous_best_points: 4120,
+  is_personal_best: false,
+  ...over,
+});
+
+test('the comparison line: a new best, a tie, a gap, nothing on a first attempt, nothing without the block', () => {
+  assert.equal(comparisonLine(comparison({ is_personal_best: true }), 4858), 'New personal best, up from 4,120.');
+  assert.equal(comparisonLine(comparison(), 4120), 'Equal to your best.');
+  assert.equal(comparisonLine(comparison(), 3980), '140 points off your best here.');
+  assert.equal(comparisonLine(comparison({ previous_best_points: 12400 }), 1964), '10,436 points off your best here.');
+  // A first attempt: the server says personal best with no best before it.
+  assert.equal(comparisonLine(comparison({ attempt_number: 1, previous_best_points: null, is_personal_best: true }), 4858), null);
+  assert.equal(comparisonLine(undefined, 4858), null);
+  // `better_than_percent` says nothing yet, whatever it holds.
+  assert.equal(comparisonLine(comparison({ better_than_percent: null }), 4120), 'Equal to your best.');
+});
+
+test("the comparison line on the backend's own three runs of one quiz (local server, 22 October 2026)", () => {
+  // First try: 2,100 of 3,000, nobody else has finished it.
+  assert.equal(
+    comparisonLine({ players_compared: 0, better_than_percent: null, attempt_number: 1, previous_best_points: null, is_personal_best: true }, 2100),
+    null,
+  );
+  // Second try beats it.
+  assert.equal(
+    comparisonLine({ players_compared: 0, better_than_percent: null, attempt_number: 2, previous_best_points: 2100, is_personal_best: true }, 2889),
+    'New personal best, up from 2,100.',
+  );
+  // Third try falls short of the second.
+  assert.equal(
+    comparisonLine({ players_compared: 0, better_than_percent: null, attempt_number: 3, previous_best_points: 2889, is_personal_best: false }, 1900),
+    '989 points off your best here.',
+  );
+});
+
+test('the greeting is good at half right, and takes the first name or none', () => {
+  assert.equal(runTone({ correct: 3, total: 6 }), 'good');
+  assert.equal(runTone({ correct: 5, total: 6 }), 'good');
+  assert.equal(runTone({ correct: 2, total: 6 }), 'poor');
+  assert.equal(runTone({ correct: 2, total: 5 }), 'poor');
+  assert.equal(runTone({ correct: 0, total: 0 }), 'good');
+  assert.equal(firstName('Ada Author'), 'Ada');
+  assert.equal(firstName('  Banner  '), 'Banner');
+  assert.equal(firstName(''), null);
+  assert.equal(firstName(null), null);
+  assert.equal(greeting('good', 'Ada Author'), 'Nice one, Ada.');
+  assert.equal(greeting('poor', 'Banner'), 'Getting there, Banner.');
+  assert.equal(greeting('good', null), 'Nice one.');
+  assert.equal(greeting('poor', ' '), 'Getting there.');
+});
+
+test('the streak counts right answers in a row, and a skipped question breaks it', () => {
+  const right = (uuid: string, position: number, responseMs = 3000) =>
+    ({ ...trueFalse(uuid, position, 1), answered: true, your_option_id: 1, correct_option_id: 1, is_correct: true, points: 800, response_ms: responseMs });
+  const wrong = (uuid: string, position: number) =>
+    ({ ...trueFalse(uuid, position, 1), answered: true, your_option_id: 2, correct_option_id: 1, is_correct: false, points: 0, response_ms: 500 });
+  const skipped = (uuid: string, position: number) =>
+    ({ ...trueFalse(uuid, position, 1), answered: false, your_option_id: null, correct_option_id: 1, is_correct: false, points: 0, response_ms: null });
+  const rows = [right('a', 0), right('b', 1, 4200), wrong('c', 2), right('d', 3, 500), right('e', 4), right('f', 5, 9900)];
+  assert.equal(bestStreak(rows), 3);
+  assert.equal(bestStreak([right('a', 0), skipped('b', 1), right('c', 2)]), 1);
+  assert.equal(bestStreak([wrong('a', 0)]), 0);
+  assert.equal(bestStreak([]), 0);
+  // The run ending at a question, for the reveal sheet.
+  assert.equal(streakEndingAt(rows, 1), 2);
+  assert.equal(streakEndingAt(rows, 2), 0);
+  assert.equal(streakEndingAt(rows, 5), 3);
+  assert.equal(streakEndingAt(rows, -1), 0);
+  assert.equal(streakEndingAt(rows, 99), 3);
+  // Fastest is the quickest RIGHT answer; a fast miss does not count.
+  assert.equal(fastestCorrectMs(rows), 500);
+  assert.equal(fastestCorrectMs([wrong('a', 0), skipped('b', 1)]), null);
+  assert.equal(fastestCorrectMs([]), null);
+  // The review is worth opening for every question that was not right.
+  assert.equal(toReviewCount(rows), 1);
+  assert.equal(toReviewCount([right('a', 0), skipped('b', 1), wrong('c', 2)]), 2);
+  assert.equal(reviewSubtitle(6, 1), '6 questions, 1 to look at again');
+  assert.equal(reviewSubtitle(6, 4), '6 questions, 4 to look at again');
+  assert.equal(reviewSubtitle(6, 0), '6 questions, all right');
+  assert.equal(reviewSubtitle(1, 1), '1 question, 1 to look at again');
+  // The stat line and the challenge read the same numbers.
+  const highlights = attemptHighlights({ correct: 5, total: 6 }, rows);
+  assert.deepEqual(highlights, { correct: 5, total: 6, streak: 3, fastestMs: 500 });
+  assert.equal(statsLine(highlights), '5 of 6 right · 3 in a row · fastest 0.5 s');
+  assert.equal(statsLine({ correct: 0, total: 6, streak: 0, fastestMs: null }), '0 of 6 right · 0 in a row');
+  assert.equal(
+    challengeText('Banner Okoro', 4858, 'Land Law Problems', highlights),
+    'Banner scored 4,858 points on Land Law Problems. 5 of 6 right · 3 in a row · fastest 0.5 s. Can you beat me?',
+  );
+  assert.equal(
+    challengeText(null, 1964, 'Land Law Problems', { correct: 2, total: 6, streak: 2, fastestMs: 500 }),
+    'I scored 1,964 points on Land Law Problems. 2 of 6 right · 2 in a row · fastest 0.5 s. Can you beat me?',
+  );
+});
+
+test('the question screen names its kind, finds its passage, and lights one segment per question', () => {
+  assert.equal(questionKicker('true_false'), 'True or false');
+  assert.equal(questionKicker('multiple_choice'), 'Pick one');
+  const scenario = { uuid: 's1', title: null, passage: 'Adaeze buys a plot in Lekki.', position: 0 };
+  assert.equal(scenarioFor({ scenarios: [scenario] }, { scenario_uuid: 's1' }), scenario);
+  assert.equal(scenarioFor({ scenarios: [scenario] }, { scenario_uuid: 's2' }), null);
+  assert.equal(scenarioFor({ scenarios: [scenario] }, { scenario_uuid: null }), null);
+  assert.equal(scenarioFor({}, { scenario_uuid: 's1' }), null);
+  assert.equal(scenarioFor({ scenarios: [scenario] }, {}), null);
+  // Key 4c in play order: right, wrong, on screen, to come.
+  assert.deepEqual(progressSegments(orderedQuestions(inProgress()), 2), ['done', 'miss', 'now', 'todo']);
+  // An `end` attempt has no verdicts yet, so every answer is simply done;
+  // a question skipped on the clock is unlit, since nothing was recorded.
+  const end = orderedQuestions(inProgress()).map((question) => ({ ...question, is_correct: undefined }));
+  assert.deepEqual(progressSegments(end, 3), ['done', 'done', 'todo', 'now']);
+  assert.deepEqual(progressSegments(end, 4), ['done', 'done', 'todo', 'todo']);
 });
 
 test('a 409 has no sentence (the re-read answers it); a lost request claims nothing', () => {

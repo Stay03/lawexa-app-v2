@@ -422,6 +422,28 @@ export interface QuizAttempt {
   finished_at: string | null;
   scenarios?: QuizScenario[];
   questions: QuizAttemptQuestion[];
+  /** Present once the attempt is finished, absent before — see the type. */
+  comparison?: QuizAttemptComparison;
+}
+
+/**
+ * How a FINISHED attempt compares — the reader's own history on this quiz,
+ * and the field (backend ed0f1469, 22 October 2026). It rides `GET
+ * /channel-quiz-attempts/{a}` at `data.comparison` once `finish` has scored
+ * the attempt; an unfinished body carries no `comparison` key at all, which
+ * is why the field above is optional rather than nullable.
+ */
+export interface QuizAttemptComparison {
+  /** Other users with a finished attempt on this quiz, each counted once. */
+  players_compared: number;
+  /** 0–100; `null` while fewer than five others have finished it. */
+  better_than_percent: number | null;
+  /** This user's nth finished attempt on the quiz (1 = the first). */
+  attempt_number: number;
+  /** The best points before this attempt; `null` on a first attempt. */
+  previous_best_points: number | null;
+  /** True on a first attempt, or when `points` beats `previous_best_points`. */
+  is_personal_best: boolean;
 }
 
 /**
