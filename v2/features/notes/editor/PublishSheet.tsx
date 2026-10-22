@@ -81,11 +81,12 @@ function draftFrom(record: NoteRecord): PublishDraft {
   const ngn = priceOf(record.price_ngn);
   const usd = priceOf(record.price_usd);
   return {
-    // The sheet opens on what the server holds. A note created in v2 comes back
-    // from the server PUBLIC (`is_private: false`, measured on lawexa.com on 25
-    // September 2026), so a first publish opens on "Anyone", as v1's publish
-    // page did. A record without the field opens on "Only you".
-    isPublic: record.is_private === false,
+    // A FIRST publish opens on "Only you" (Stay, 22 October 2026: "Only you as
+    // default"). The server creates every note public (`is_private: false`,
+    // measured 25 September 2026), so reading the record would open a draft on
+    // "Anyone". A note already published opens on what it is now, so updating
+    // it never flips who can read it.
+    isPublic: record.status === 'published' && record.is_private === false,
     tags: null,
     tagInput: '',
     isPaid: ngn > 0 || usd > 0,
