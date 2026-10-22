@@ -611,7 +611,6 @@ export function HomeComposer({
           {isSubmitting && redacted && submittedAt !== null ? (
             <div className="-mx-2.5 -mt-2.5 mb-2 rounded-t-3xl border-b border-border bg-secondary/50 px-4 py-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
               <ActivityStatus startTime={submittedAt} narration={REDACTING_LABEL} />
-              <p className="mt-0.5 pl-7 text-xs text-muted-foreground">Checked before the AI reads it</p>
             </div>
           ) : null}
 

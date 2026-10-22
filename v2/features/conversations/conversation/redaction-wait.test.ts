@@ -68,7 +68,9 @@ test('a new redacted chat says the same on the home screen, where its first mess
   // strip, never a line among the suggested prompts (Stay, 22 October 2026:
   // "it looks like a mess").
   assert.match(home, /\{blocked \? <OutOfMessagesStrip blocked=\{blocked\} \/> : null\}[\s\S]{0,900}?\{isSubmitting && redacted && submittedAt !== null \? \(/);
-  assert.match(home, /Checked before the AI reads it/);
+  // The strip says only that, with its clock (Stay, 22 October 2026: "Remove
+  // that checked before the ai reads it").
+  assert.doesNotMatch(home, /Checked before the AI reads it/);
   assert.doesNotMatch(home, /inline-flex rounded-full bg-background px-3 py-1\.5/);
   // The host hears of it: on Send, and again when the send is refused.
   assert.match(home, /setSubmittedAt\(Date\.now\(\)\);\s*if \(redacted\) onRedactingChange\?\.\(true\);/);
