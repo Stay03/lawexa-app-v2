@@ -52,8 +52,10 @@ export function V2UserFooter({
   user: SessionUser | null;
   className?: string;
   /** The drawer's dismiss — its own nav rows call it on click, and this row is
-   *  a nav row now. The persistent sidebar passes nothing. */
-  onNavigate?: () => void;
+   *  a nav row now. It takes where the row goes: the drawer closes at once for
+   *  the page on screen and after another page has painted (drawer-close.ts).
+   *  The persistent sidebar passes nothing. */
+  onNavigate?: (href: string) => void;
 }) {
   /**
    * A GUEST IS NOT AN ACCOUNT, AND THIS ROW WAS TREATING IT AS ONE.
@@ -82,12 +84,12 @@ export function V2UserFooter({
     return (
       <div className={cn('grid gap-1.5', className)}>
         <Button asChild className="w-full">
-          <Link href="/register" onClick={onNavigate}>
+          <Link href="/register" onClick={() => onNavigate?.('/register')}>
             Create account
           </Link>
         </Button>
         <Button asChild variant="ghost" className="w-full">
-          <Link href="/login" onClick={onNavigate}>
+          <Link href="/login" onClick={() => onNavigate?.('/login')}>
             Sign in
           </Link>
         </Button>
@@ -102,7 +104,7 @@ export function V2UserFooter({
   return (
     <Link
       href="/settings/profile"
-      onClick={onNavigate}
+      onClick={() => onNavigate?.('/settings/profile')}
       // NO `aria-label`. The row's own content — name, handle (or "Set a
       // handle") and plan — is the honest accessible name; overriding it with a
       // tidier sentence would delete two of those three facts for the readers

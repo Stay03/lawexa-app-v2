@@ -149,6 +149,12 @@ type Navigate = (
  * (the drawer's close) runs in the task after the frame has painted. Radix sees
  * `display: none` and unmounts with no exit. The attribute lives for that one
  * task, so a sheet opened later in the move is untouched.
+ *
+ * THE DRAWER NO LONGER TAKES THE CUT (Stay, 22 October 2026: "the sidebar
+ * closes weird"). Its chat rows pass no `onMove`: the tap only arms a close,
+ * and the drawer slides away over the chat's frame once that frame has
+ * painted (V2Drawer.tsx, drawer-close.ts). The cut is now the popover's and
+ * the hover card's: a case citation's preview, whose "Open case" moves first.
  */
 const SHEET_CUT_ATTR = 'data-v2-sheet-cut';
 
@@ -481,9 +487,11 @@ type MoveFirstLinkProps = Omit<ComponentProps<typeof Link>, 'href'> & {
   header?: HeaderContext;
   /** Who owns that header once the destination mounts (its conversation id). */
   headerOwner?: string;
-  /** The sheet this link sits in closes after the frame has painted, with its
-   *  exit cut (see SHEET_CUT_ATTR). On the current page, or outside the
-   *  provider, it closes at once, as a plain link's onClick would. */
+  /** The popover, hover card or sheet this link sits in closes after the frame
+   *  has painted, with its exit cut (see SHEET_CUT_ATTR). On the current page,
+   *  or outside the provider, it closes at once, as a plain link's onClick
+   *  would. Not for a sheet that should be seen leaving: the navigation drawer
+   *  arms its own close instead (drawer-close.ts). */
   onMove?: () => void;
 };
 

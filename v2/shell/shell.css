@@ -1132,6 +1132,11 @@ html.v2-document-lock [data-slot='sheet-content'][data-state='closed'] {
    A popover or hover card counts too: a case citation's preview, whose "Open
    case" moves first, sits above the frame's layer (z-50 over z-40) and goes
    with it ("a case opens at once", 17 October 2026).
+   THE DRAWER NO LONGER TAKES IT (22 October 2026): its rows arm a close in
+   the tap and the drawer slides away over the frame once the frame has
+   painted (drawer-close.ts, the drawer's motion below). The rule stays for
+   the popover and the hover card, and the sheet selectors stay for any sheet
+   that passes `onMove`.
    -------------------------------------------------------------------------- */
 html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-overlay'],
 html.v2-document-lock[data-v2-sheet-cut] [data-slot='sheet-content'],

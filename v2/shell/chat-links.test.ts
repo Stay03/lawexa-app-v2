@@ -26,11 +26,12 @@ test('the rail and the drawer open chats with the move-first link', () => {
     assert.match(file, /<MoveFirstLink[^>]*href=\{`\/c\/\$\{conversation\.id\}`\}\s*kind="conversation"\s*title=\{title\}\s*header=\{\{ title: title \|\| null, confidential: Boolean\(conversation\.is_confidential\) \}\}\s*headerOwner=\{conversation\.id\}/);
     assert.doesNotMatch(file, plainChatLink);
   }
-  // The drawer still closes itself on the tap, after the chat's frame has
-  // painted (onMove), not in the click (onClick).
-  assert.match(drawer, /headerOwner=\{conversation\.id\}\s*(\/\/[^\n]*\n\s*)*onMove=\{close\}/);
+  // The drawer still closes itself on the tap: the click arms the close and the
+  // drawer leaves after the chat's frame has painted (drawer-close.ts), never
+  // in the click itself and never through the move-first cut (22 October 2026).
+  assert.match(drawer, /headerOwner=\{conversation\.id\}\s*(\/\/[^\n]*\n\s*)*onClick=\{\(\) => closeFor\(`\/c\/\$\{conversation\.id\}`\)\}/);
   const recentRow = drawer.slice(drawer.indexOf('recents.map((conversation)'), drawer.indexOf('</MoveFirstLink>'));
-  assert.doesNotMatch(recentRow, /onClick=\{close\}/);
+  assert.doesNotMatch(recentRow, /onClick=\{close\}|onMove=/);
 });
 
 test('the home rows open chats with the move-first link, other rows stay plain links', () => {

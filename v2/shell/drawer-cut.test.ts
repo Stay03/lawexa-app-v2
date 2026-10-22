@@ -4,11 +4,14 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Guard for the drawer cut (10 October 2026). A chat tapped in the side drawer
+// Guard for the sheet cut (10 October 2026). A chat tapped in the side drawer
 // closed the drawer in the click: the click task rendered the whole drawer and
 // Radix measured its exit, so the chat's frame came 155-218 ms after the tap
 // against 60-100 ms from the list, and the closing sheet covered it. Painting
 // cannot run under node:test; the film is in the commit.
+// 22 October 2026: the drawer no longer takes the cut (it arms a close in the
+// tap and slides away over the frame, drawer-close.test.ts); the mechanism
+// stays for the case preview's popover and hover card, and is pinned here.
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..');
 const read = (...parts: string[]) => readFileSync(join(here, ...parts), 'utf8');
@@ -48,10 +51,18 @@ test('a v2 rule hides every sheet while the attribute is set', () => {
   assert.match(css, /html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='sheet-overlay'\],\s*html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='sheet-content'\],\s*html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='popover-content'\],\s*html\.v2-document-lock\[data-v2-sheet-cut\] \[data-slot='hover-card-content'\] \{\s*display: none;\s*\}/);
 });
 
-test('the drawer\'s chat rows close the drawer through onMove, not in the click', () => {
+test('the drawer\'s chat rows take no cut: the tap arms a close and the drawer is seen leaving', () => {
   const recentRow = drawer.slice(drawer.indexOf('recents.map((conversation)'), drawer.indexOf('</MoveFirstLink>'));
-  assert.match(recentRow, /onMove=\{close\}/);
-  assert.doesNotMatch(recentRow, /onClick=\{close\}/);
+  assert.doesNotMatch(recentRow, /onMove=/);
+  assert.match(recentRow, /onClick=\{\(\) => closeFor\(`\/c\/\$\{conversation\.id\}`\)\}/);
+  assert.doesNotMatch(drawer, /onMove=/);
+});
+
+test('the case preview still takes the cut, so its popover goes in the frame it is tapped in', () => {
+  const preview = read('..', 'features', 'conversations', 'conversation', 'markdown', 'CasePreview.tsx');
+  assert.equal((preview.match(/onMove=\{onOpen\}/g) ?? []).length, 2);
+  const mention = read('..', 'features', 'conversations', 'conversation', 'markdown', 'CaseMentionLink.tsx');
+  assert.match(mention, /<MoveFirstLink href=\{casePath\} kind="case" onMove=\{\(\) => setOpen\(false\)\}/);
 });
 
 test('the library behaviour the cut relies on is still there', () => {

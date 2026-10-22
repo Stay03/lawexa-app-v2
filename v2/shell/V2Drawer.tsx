@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -41,9 +41,15 @@ import {
   type V2NavItem,
 } from './nav.config';
 import { V2_SHELL_CONTENT_ID } from './shell-content';
-import { MoveFirstLink } from './move-first';
+import { MoveFirstLink, useShownPathname } from './move-first';
 import { RecentChatLabel, recentSpaceName } from './recent-chat-label';
 import { isAccountRole } from '@/v2/runtime/account';
+import {
+  DRAWER_CLOSE_CAP_MS,
+  afterPaint,
+  drawerCloseStep,
+  type ArmedDrawerClose,
+} from './drawer-close';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -67,6 +73,16 @@ import { isAccountRole } from '@/v2/runtime/account';
  * region taking `flex-1`. Bound to the sidebar context's `openMobile`; on
  * mobile `V2Sidebar` renders `null`, so this is the sole consumer of that
  * state.
+ *
+ * A ROW CLOSES IT AFTER THE PAGE IT OPENS IS UP (Stay, the same day: "when I
+ * select an option from the sidebar and it's taking me to the page the
+ * sidebar closes weird"). Every row used to close it in the click that
+ * started the route change, so the exit stalled under the new screen's
+ * commit and cut. Now a row for another page arms a close (`closeFor`) and
+ * the drawer leaves once the shown path has changed and a frame has painted,
+ * or at a 600 ms cap; a row for the shown page closes it at once. The
+ * decision is `drawer-close.ts`. The chat rows no longer take the move-first
+ * cut: the drawer slides away over the chat's frame instead.
  */
 
 /** New-chat + primary nav share this base row shape so the drawer reads uniform. */
@@ -94,7 +110,8 @@ function DrawerNavGroup({
 }: {
   item: V2NavItem;
   isActive: (href: string) => boolean;
-  onNavigate: () => void;
+  /** The drawer's close for a child row, handed where the row goes. */
+  onNavigate: (href: string) => void;
 }) {
   const [hasToggled, setHasToggled] = useState(false);
   const Icon = item.icon;
@@ -121,7 +138,7 @@ function DrawerNavGroup({
               <Link
                 key={sub.label}
                 href={sub.href}
-                onClick={onNavigate}
+                onClick={() => onNavigate(sub.href)}
                 className={cn(
                   'flex h-10 items-center rounded-lg px-3 text-sm transition-colors',
                   subActive
@@ -142,6 +159,9 @@ function DrawerNavGroup({
 export function V2Drawer({ user }: { user: SessionUser | null }) {
   const { openMobile, setOpenMobile } = useSidebar();
   const pathname = usePathname();
+  // What is on screen: the tap's destination while a move-first frame shows,
+  // else the router's pathname (move-first.tsx). A row's close keys on it.
+  const shown = useShownPathname();
   // Recents belong to an account; a guest pass has none (v2/runtime/account.ts).
   const signedIn = !!user && isAccountRole(user.role);
   // The cache PARTITION for the recents key (see `ViewerScoped`). Taken from the
@@ -164,7 +184,48 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
     rootRef: scrollRef,
   });
 
-  const close = () => setOpenMobile(false);
+  // A tap on a row for another page is held here until that page is up, with
+  // the cap's timer (drawer-close.ts). Refs, not state: arming must not
+  // re-render the drawer in the click, which is the task the destination's
+  // first frame paints in.
+  const armedRef = useRef<ArmedDrawerClose | null>(null);
+  const capRef = useRef(0);
+
+  const disarm = () => {
+    window.clearTimeout(capRef.current);
+    capRef.current = 0;
+    armedRef.current = null;
+  };
+  const close = () => {
+    disarm();
+    setOpenMobile(false);
+  };
+  /** A row's tap. The shown page closes the drawer at once; another page
+   *  keeps it open until that page has painted, or until the cap. */
+  const closeFor = (href: string) => {
+    if (drawerCloseStep(armedRef.current, { kind: 'tap', href, pathname: shown }) === 'close') {
+      close();
+      return;
+    }
+    disarm();
+    armedRef.current = { from: shown };
+    capRef.current = window.setTimeout(() => {
+      if (drawerCloseStep(armedRef.current, { kind: 'cap' }) === 'close') close();
+    }, DRAWER_CLOSE_CAP_MS);
+  };
+  // The destination is up: close after one more painted frame, so the drawer
+  // slides away over a screen that is already drawn. An Effect Event, so the
+  // effect keys on the shown path alone (the shape of move-first's onPopState).
+  const leave = useEffectEvent(close);
+  useEffect(() => {
+    if (drawerCloseStep(armedRef.current, { kind: 'shown', pathname: shown }) !== 'close-after-paint') return;
+    return afterPaint(() => leave());
+  }, [shown]);
+  // The cap's timer does not outlive the drawer: a footer row to a v1 page
+  // unmounts the whole v2 shell before the cap.
+  const dropCap = useEffectEvent(disarm);
+  useEffect(() => () => dropCap(), []);
+
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(`${href}/`);
 
@@ -187,7 +248,9 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   const collabSignal = useCollabNavSignal();
 
   return (
-    <Sheet open={openMobile} onOpenChange={setOpenMobile}>
+    // A scrim tap or Esc closes through `close`, so an armed row's close is
+    // dropped with the drawer and cannot fire on the next open.
+    <Sheet open={openMobile} onOpenChange={(open) => (open ? setOpenMobile(true) : close())}>
       <SheetContent
         side="left"
         showCloseButton={false}
@@ -235,7 +298,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         <div className="v2-safe-top flex h-16 shrink-0 items-center gap-1 px-3">
           <Link
             href={v2NewChat.href}
-            onClick={close}
+            onClick={() => closeFor(v2NewChat.href)}
             aria-label="Lawexa home"
             className="inline-flex items-center rounded-md outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -268,7 +331,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                 every other row; only the label + icon carry the theme gold. */}
             <Link
               href={v2NewChat.href}
-              onClick={close}
+              onClick={() => closeFor(v2NewChat.href)}
               className={cn(ROW_BASE, 'font-medium text-primary hover:bg-muted')}
             >
               {NewChatIcon ? <NewChatIcon className="size-5 shrink-0" /> : null}
@@ -284,7 +347,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                     key={item.label}
                     item={item}
                     isActive={isActive}
-                    onNavigate={close}
+                    onNavigate={closeFor}
                   />
                 );
               }
@@ -300,7 +363,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                 <Link
                   key={item.label}
                   href={item.href}
-                  onClick={close}
+                  onClick={() => closeFor(item.href)}
                   className={cn(
                     ROW_BASE,
                     active
@@ -355,11 +418,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
                         title={title}
                         header={{ title: title || null, confidential: Boolean(conversation.is_confidential) }}
                         headerOwner={conversation.id}
-                        // Not onClick: the drawer is hidden in the tap's own
-                        // frame and closed after the chat's frame has painted
-                        // (move-first.tsx, `onMove`), so the click task stays
-                        // as light as a list tap's.
-                        onMove={close}
+                        // No `onMove`: that would cut the drawer in the tap's
+                        // frame (move-first.tsx). The tap only arms a close,
+                        // and the drawer slides away once the chat's frame is
+                        // up, so the click task stays as light as a list tap's.
+                        onClick={() => closeFor(`/c/${conversation.id}`)}
                         className={cn(
                           ROW_BASE,
                           freshIds.has(conversation.id) &&
@@ -398,7 +461,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
             hairline sets it off from the scroll region — this is a pinned bar over
             scrolling content, not a chrome edge. */}
         <div className="v2-safe-bottom flex shrink-0 flex-col gap-2 border-t border-border p-3">
-          <V2UserFooter user={user} onNavigate={close} />
+          <V2UserFooter user={user} onNavigate={closeFor} />
           <SwitchBackButton />
         </div>
       </SheetContent>
