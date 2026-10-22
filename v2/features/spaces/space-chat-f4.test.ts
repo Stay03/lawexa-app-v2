@@ -85,7 +85,21 @@ test('the home has the message box at its bottom, for the Owner and Contributors
   assert.match(dock, /className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto px-4 pt-6 v2-safe-bottom"/);
   const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
   assert.match(parts, /'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6'/);
-  assert.match(panel, /<div className="flex flex-1 flex-col">\s*<div className=\{SPACE_PILL_BAR\}>/);
+  assert.match(panel, /<div className="flex flex-1 flex-col">[\s\S]{0,500}?<div className=\{cn\(SPACE_PILL_BAR, 'flex-row items-center gap-2'\)\}>/);
+});
+
+test('the pill bar\'s add control is in the pills\' scale: one row, an icon on a phone (Stay, 22 October 2026)', () => {
+  const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
+  // "That new folder button is ridiculously big and wasting space and out of place."
+  assert.match(
+    panel,
+    /'v2-interactive relative inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary\/90 after:absolute after:-inset-1\.5 sm:w-auto sm:px-3'/,
+  );
+  assert.match(panel, /<span className="sr-only sm:not-sr-only">\{children\}<\/span>/);
+  assert.doesNotMatch(panel, /min-h-11/);
+  // The pills give way and scroll; the control keeps its place at the row's end.
+  assert.match(panel, /const PILLS_CLASS =\s*'inline-flex max-w-full min-w-0 items-center gap-0\.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary\/60 p-0\.5';/);
+  assert.match(panel, /\{action \? <div className="ml-auto flex shrink-0 justify-end">\{action\}<\/div> : null\}/);
 });
 
 test('the inviter and the invitee read one promise: a Contributor continues the space’s conversations', () => {

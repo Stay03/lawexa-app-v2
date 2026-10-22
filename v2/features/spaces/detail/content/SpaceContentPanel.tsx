@@ -199,7 +199,9 @@ export function SpaceContentPanel({
     tab === 'files' && files.length > 0 && !selecting
       ? bulk.startButton(
           cn(
-            'v2-interactive inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+            // The pill row's scale (Stay, 22 October 2026: the 44px pill was
+            // "ridiculously big … out of place"); the tap area reaches 44px.
+            'v2-interactive relative inline-flex min-h-8 shrink-0 items-center rounded-full border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-secondary after:absolute after:-inset-y-1.5 after:inset-x-0',
             FOCUS_RING,
           ),
         )
@@ -244,7 +246,11 @@ export function SpaceContentPanel({
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className={SPACE_PILL_BAR}>
+      {/* ONE ROW at every width: the pills, then the add control at the end.
+          On a phone the control is its icon alone and the pills scroll under
+          it, rather than the control taking a row of its own (Stay, 22
+          October 2026: "ridiculously big and wasting space"). */}
+      <div className={cn(SPACE_PILL_BAR, 'flex-row items-center gap-2')}>
         <TabRow
           tabs={PILLS}
           value={tab}
@@ -257,7 +263,7 @@ export function SpaceContentPanel({
           {(pill) => pill.label}
         </TabRow>
         {/* The pill's add control, Upload files or New folder, at the bar's end. */}
-        {action ? <div className="flex justify-end md:ml-auto">{action}</div> : null}
+        {action ? <div className="ml-auto flex shrink-0 justify-end">{action}</div> : null}
       </div>
       {access.canAdd ? picker : null}
 
@@ -339,7 +345,7 @@ const PILLS = SPACE_TABS.map((id) => ({ id, label: SPACE_TAB_LABELS[id] }));
 
 /** The spaces list's pill row. */
 const PILLS_CLASS =
-  'inline-flex max-w-full shrink-0 items-center gap-0.5 self-start overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5 md:self-auto';
+  'inline-flex max-w-full min-w-0 items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5';
 const pillClass = (selected: boolean): string =>
   cn(
     'v2-interactive min-h-8 shrink-0 rounded-full px-3.5 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
@@ -812,9 +818,14 @@ function FileDropZone({
 
 /* ── Shared parts ─────────────────────────────────────────────────────────── */
 
-/** A pill's add control at the end of the pill bar, the folders list's own
- *  "New folder" pill, with its word at every width: it is where the Files and
- *  Folders tabs' add buttons went, so it names itself (B4). */
+/**
+ * A pill's add control at the end of the pill bar: Upload files or New folder.
+ * IN THE PILLS' SCALE (Stay, 22 October 2026: "That new folder button is
+ * ridiculously big and wasting space and out of place"): 32px tall like the
+ * pills beside it, small type, the gold that says it adds. On a phone it is
+ * the icon alone, a 32px circle at the row's end, its word kept for a screen
+ * reader; from `sm:` up the word shows. The tap area reaches 44px either way.
+ */
 function PillButton({
   icon: Icon,
   onClick,
@@ -829,12 +840,12 @@ function PillButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'v2-interactive inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+        'v2-interactive relative inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 after:absolute after:-inset-1.5 sm:w-auto sm:px-3',
         FOCUS_RING,
       )}
     >
-      <Icon aria-hidden className="size-4" />
-      {children}
+      <Icon aria-hidden className="size-4 sm:size-3.5" />
+      <span className="sr-only sm:not-sr-only">{children}</span>
     </button>
   );
 }
