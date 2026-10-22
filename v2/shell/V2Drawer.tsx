@@ -46,7 +46,7 @@ import { RecentChatLabel, recentSpaceName } from './recent-chat-label';
 import { isAccountRole } from '@/v2/runtime/account';
 import {
   DRAWER_CLOSE_CAP_MS,
-  afterPaint,
+  afterContentDraws,
   drawerCloseStep,
   type ArmedDrawerClose,
 } from './drawer-close';
@@ -79,8 +79,10 @@ import {
  * sidebar closes weird"). Every row used to close it in the click that
  * started the route change, so the exit stalled under the new screen's
  * commit and cut. Now a row for another page arms a close (`closeFor`) and
- * the drawer leaves once the shown path has changed and a frame has painted,
- * or at a 600 ms cap; a row for the shown page closes it at once. The
+ * the drawer leaves once the shown path has changed AND the content area has
+ * drawn the page or its loading rows (a first visit commits the address before
+ * anything is drawn), or at a 600 ms cap; a row for the shown page closes it
+ * at once. The
  * decision is `drawer-close.ts`. The chat rows no longer take the move-first
  * cut: the drawer slides away over the chat's frame instead.
  */
@@ -213,13 +215,15 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
       if (drawerCloseStep(armedRef.current, { kind: 'cap' }) === 'close') close();
     }, DRAWER_CLOSE_CAP_MS);
   };
-  // The destination is up: close after one more painted frame, so the drawer
-  // slides away over a screen that is already drawn. An Effect Event, so the
-  // effect keys on the shown path alone (the shape of move-first's onPopState).
+  // The address is the destination's: close once the content area has drawn
+  // the page (or its loading rows) and that frame has painted, so the drawer
+  // never slides away over an empty screen (Tester, 22 October 2026). The cap
+  // above still closes it if nothing draws. An Effect Event, so the effect
+  // keys on the shown path alone (the shape of move-first's onPopState).
   const leave = useEffectEvent(close);
   useEffect(() => {
     if (drawerCloseStep(armedRef.current, { kind: 'shown', pathname: shown }) !== 'close-after-paint') return;
-    return afterPaint(() => leave());
+    return afterContentDraws(document.getElementById(V2_SHELL_CONTENT_ID), () => leave());
   }, [shown]);
   // The cap's timer does not outlive the drawer: a footer row to a v1 page
   // unmounts the whole v2 shell before the cap.

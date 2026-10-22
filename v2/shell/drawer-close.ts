@@ -11,12 +11,17 @@
  * it slides away over the screen the reader asked for. A row for the page
  * already on screen closes it at once, as before.
  *
- * "UP" IS THE SHOWN PATH CHANGING. `useShownPathname` (move-first.tsx) is the
- * router's pathname, or the tap's destination while a move-first frame shows,
- * so it changes in the tap's own commit for a chat row (the frame is the
- * screen) and at the route's commit for every other row. Either way the
- * drawer waits one more painted frame (`afterPaint`) before it starts to
- * leave, so what it uncovers is already drawn.
+ * "UP" IS THE SHOWN PATH CHANGING, AND THEN SOMETHING DRAWN. `useShownPathname`
+ * (move-first.tsx) is the router's pathname, or the tap's destination while a
+ * move-first frame shows, so it changes in the tap's own commit for a chat row
+ * (the frame is the screen) and at the route's commit for every other row. A
+ * route's commit is NOT its first picture, though: on a first visit Next
+ * commits the new address before the page, or even its loading screen, has
+ * drawn anything (Tester's live check, 22 October 2026: Notes showed the top
+ * bar alone from about 0.12 to 0.39 s while the drawer slid away over it). So
+ * after the path changes the drawer watches the shell's content area frame
+ * by frame (`afterContentDraws`) and leaves one painted frame after it holds
+ * text or a loading skeleton (`contentDrawn`), so what it uncovers is a page.
  *
  * A CAP, SO IT CAN NEVER HANG. A route that takes longer than
  * `DRAWER_CLOSE_CAP_MS` (a cold screen on a slow link) closes the drawer at
@@ -84,5 +89,48 @@ export function afterPaint(fn: () => void): () => void {
   return () => {
     window.cancelAnimationFrame(frame);
     window.clearTimeout(task);
+  };
+}
+
+/** The part of an element `contentDrawn` reads, so it is tested without a DOM. */
+export interface DrawnProbe {
+  readonly textContent: string | null;
+  querySelector(selector: string): unknown;
+}
+
+/** A loading skeleton (shadcn's `Skeleton`) counts as drawn: its rows are the
+ *  page's first picture. */
+const SKELETON = '[data-slot="skeleton"]';
+
+/**
+ * Whether the content area holds a page yet: any text, or a loading skeleton.
+ * An empty area (the address committed, nothing drawn) is not; a missing area
+ * counts as drawn, so the drawer never waits on something that cannot come.
+ */
+export function contentDrawn(region: DrawnProbe | null): boolean {
+  if (!region) return true;
+  if (region.querySelector(SKELETON)) return true;
+  return (region.textContent ?? '').trim().length > 0;
+}
+
+/**
+ * Runs `fn` one painted frame after `region` first holds a page
+ * (`contentDrawn`), checking once per animation frame. Returns the cancel.
+ * The drawer's cap (`DRAWER_CLOSE_CAP_MS`) bounds the wait from outside.
+ */
+export function afterContentDraws(region: HTMLElement | null, fn: () => void): () => void {
+  let frame = 0;
+  let cancelPaint: (() => void) | null = null;
+  const check = () => {
+    if (contentDrawn(region)) {
+      cancelPaint = afterPaint(fn);
+      return;
+    }
+    frame = window.requestAnimationFrame(check);
+  };
+  frame = window.requestAnimationFrame(check);
+  return () => {
+    window.cancelAnimationFrame(frame);
+    cancelPaint?.();
   };
 }
