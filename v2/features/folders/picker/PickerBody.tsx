@@ -6,11 +6,12 @@ import { ChevronRight, Search, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import type { ContentSpaceStub } from '@/types/collab';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { foldersQueries } from '../queries';
-import type { FolderRecord } from '../types';
 import {
   CreateOption,
   CreateRow,
@@ -21,7 +22,13 @@ import {
   type CreateRowView,
   type FolderRowView,
 } from './PickerRows';
-import { createDestinationLabel, type PickerCrumb } from './picker-model';
+import {
+  createDestinationLabel,
+  pickerWords,
+  type PickerCrumb,
+  type PickerFolder,
+  type PickerWords,
+} from './picker-model';
 import {
   CREATE_ACTIVE,
   enterAction,
@@ -74,11 +81,21 @@ import {
  * ── SKELETON-FIRST, NEVER PLACEHOLDER TEXT ─────────────────────────────────
  * A cold level draws four rows of exact final geometry; a level already in
  * cache paints instantly and refetches behind the pulsing field icon.
+ *
+ * ── WHOSE FOLDERS: THE VIEWER'S, OR ONE SPACE'S ────────────────────────────
+ * With `space` the levels are the space's folders (`spacesQueries.folders`,
+ * every member's), the trail's root is the space's name and the create row
+ * makes a space folder. A space's file is filed among them (Stay, 22 October
+ * 2026): the viewer's own list holds only the folders they made, so it is
+ * the wrong list to offer for one. Both queries are declared and one is
+ * enabled, the folder page's way of reading one of two sources.
  */
 
 export interface PickerBodyProps {
   /** Which interaction model this surface can be driven with. */
   surface: 'dialog' | 'sheet';
+  /** Browse this space's folders instead of the viewer's own. */
+  space?: ContentSpaceStub;
   /** The drilled path, root-first. Empty = the viewer's top level. */
   trail: readonly PickerCrumb[];
   /**
@@ -99,7 +116,7 @@ export interface PickerBodyProps {
   onCommitSearch: () => void;
   /** Folder uuids the server has told us already hold this item (422s). */
   knownHeld: ReadonlySet<string>;
-  onChoose: (folder: FolderRecord) => void;
+  onChoose: (folder: PickerFolder) => void;
   onCreate: (name: string) => void;
   /** The folder a write is currently on the wire for. */
   pendingFolderUuid: string | null;
@@ -110,8 +127,23 @@ export interface PickerBodyProps {
   notice: string | null;
 }
 
+/** What the body reads off either level query: its states and pager. */
+interface LevelQuery {
+  isPending: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => unknown;
+  refetch: () => unknown;
+}
+
+/** Stable empty rows, so a pending level does not mint a new array per render. */
+const NO_FOLDERS: readonly PickerFolder[] = [];
+
 export function PickerBody({
   surface,
+  space,
   trail,
   onNavigate,
   onSearchEverywhere,
@@ -138,19 +170,35 @@ export function PickerBody({
   const search = query.trim();
   const typedName = input.trim();
   const isDialog = surface === 'dialog';
+  const inSpace = space !== undefined;
+  const words: PickerWords = pickerWords(space);
 
-  const level = useInfiniteQuery(
-    foldersQueries.level({
+  // One level of the viewer's own folders, or of the space's: the same
+  // question to two routes, one of them asked.
+  const ownLevel = useInfiniteQuery({
+    ...foldersQueries.level({
       parentUuid,
       search: search || undefined,
       viewerId,
     }),
-  );
+    enabled: !inSpace,
+  });
+  const spaceLevel = useInfiniteQuery({
+    ...spacesQueries.folders(space?.uuid ?? '', {
+      parentUuid,
+      search: search || undefined,
+      viewerId,
+    }),
+    enabled: inSpace,
+  });
+  const level: LevelQuery = inSpace ? spaceLevel : ownLevel;
 
-  const folders = useMemo(
-    () => level.data?.pages.flatMap((page) => page.data) ?? [],
-    [level.data],
-  );
+  const ownPages = ownLevel.data?.pages;
+  const spacePages = spaceLevel.data?.pages;
+  const folders = useMemo((): readonly PickerFolder[] => {
+    const pages: readonly { data: readonly PickerFolder[] }[] | undefined = inSpace ? spacePages : ownPages;
+    return pages ? pages.flatMap((page) => page.data) : NO_FOLDERS;
+  }, [inSpace, spacePages, ownPages]);
 
   // The option ring is addressed by IDENTITY, never by index: the list grows
   // under the reader (the sentinel fetches the next page while they arrow), and
@@ -204,13 +252,13 @@ export function PickerBody({
     if (isDialog) inputRef.current?.focus();
   };
 
-  const drill = (folder: FolderRecord) => {
+  const drill = (folder: PickerFolder) => {
     goTo([...trail, { uuid: folder.uuid, name: folder.name }]);
   };
 
   const createRow: CreateRowView = {
     name: typedName,
-    destination: createDestinationLabel(trail),
+    destination: createDestinationLabel(trail, space),
     busy: creating,
   };
 
@@ -221,7 +269,7 @@ export function PickerBody({
     else inputRef.current?.focus();
   };
 
-  const rowView = (folder: FolderRecord): FolderRowView => ({
+  const rowView = (folder: PickerFolder): FolderRowView => ({
     folder,
     busy: pendingFolderUuid === folder.uuid,
     alreadyHolds: knownHeld.has(folder.uuid),
@@ -288,14 +336,14 @@ export function PickerBody({
   };
 
   const countAnnouncement = level.isPending
-    ? 'Loading your folders'
+    ? words.loading
     : level.isError
-      ? 'Your folders could not be loaded'
+      ? words.failed
       : `${folders.length} ${folders.length === 1 ? 'folder' : 'folders'}${
           search ? ` matching ${search}` : ''
         }`;
 
-  const fieldLabel = here ? `Search in ${here.name}` : 'Search your folders';
+  const fieldLabel = here ? `Search in ${here.name}` : words.field;
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
@@ -309,7 +357,7 @@ export function PickerBody({
           data-v2-strip=""
           className="-mx-1 flex items-center gap-0.5 overflow-x-auto overscroll-x-contain px-1 pb-0.5 text-xs"
         >
-          <TrailStep label="Your folders" onClick={() => goTo([])} />
+          <TrailStep label={words.root} onClick={() => goTo([])} />
           {trail.map((crumb, index) => {
             const last = index === trail.length - 1;
             return (
@@ -397,7 +445,7 @@ export function PickerBody({
           <PickerRowsSkeleton />
         ) : level.isError ? (
           <PickerNotice
-            title="Your folders could not be loaded."
+            title={`${words.failed}.`}
             detail="The connection may have dropped."
             action={{ label: 'Try again', onClick: () => void level.refetch() }}
           />
@@ -407,6 +455,7 @@ export function PickerBody({
               <EmptyLevel
                 here={here}
                 search={search}
+                words={words}
                 // Its button vanishes with the empty state it lives in, so the
                 // cursor is handed back to the field rather than dropped.
                 onSearchEverywhere={() => {
@@ -510,10 +559,13 @@ function TrailStep({ label, onClick }: { label: string; onClick: () => void }) {
 function EmptyLevel({
   here,
   search,
+  words,
   onSearchEverywhere,
 }: {
   here: PickerCrumb | null;
   search: string;
+  /** Whose folders were looked at (`pickerWords`). */
+  words: PickerWords;
   onSearchEverywhere: () => void;
 }) {
   if (search && here) {
@@ -521,7 +573,7 @@ function EmptyLevel({
       <PickerNotice
         title={`Nothing in “${here.name}” matches “${search}”.`}
         detail="Searching inside a folder looks at what it holds directly."
-        action={{ label: 'Search all your folders', onClick: onSearchEverywhere }}
+        action={{ label: words.searchAll, onClick: onSearchEverywhere }}
       />
     );
   }
@@ -531,10 +583,5 @@ function EmptyLevel({
   if (here) {
     return <PickerNotice title={`“${here.name}” has no folders inside it.`} />;
   }
-  return (
-    <PickerNotice
-      title="You have no folders yet."
-      detail="Group the cases, statutes and notes for one matter in one place."
-    />
-  );
+  return <PickerNotice title={words.none.title} detail={words.none.detail} />;
 }

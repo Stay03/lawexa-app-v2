@@ -12,6 +12,7 @@ import {
 import { isAxiosError } from 'axios';
 import { toast } from 'sonner';
 
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { foldersApi } from './api';
 import { foldersQueries } from './queries';
 import type {
@@ -97,13 +98,18 @@ export function folderItemScopeId({ type, contentId }: FolderItemTarget): string
 /**
  * The folder caches a membership change dirties, in ONE place. The loose
  * files are among them (build 6): filing a file takes it off that list, and
- * taking it out of its last folder puts it back.
+ * taking it out of its last folder puts it back. Every space's contents too
+ * (Stay, 22 October 2026): a space's folder rows carry the folder's counts,
+ * and its Folders view lists the files in none of its folders, which the
+ * server works out per request. Only a mounted list refetches; the rest are
+ * marked stale for their next visit.
  */
 export const FOLDER_ITEM_INVALIDATES = [
   foldersQueries.lists(),
   foldersQueries.details(),
   foldersQueries.itemLists(),
   foldersQueries.looseFilesKey(),
+  spacesQueries.contents(),
 ] as const;
 
 /**

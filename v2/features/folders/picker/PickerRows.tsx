@@ -7,8 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { entryLook } from '../file-list/entry-look';
 import { SpaceFolderMark, spaceFolderNote } from '../space-mark';
-import type { FolderRecord } from '../types';
-import { folderAncestorAddress, folderContentsLine } from './picker-model';
+import { folderAncestorAddress, folderContentsLine, type PickerFolder } from './picker-model';
 
 /**
  * PickerRows.tsx — one destination row, in the house two-zone grammar
@@ -38,9 +37,11 @@ import { folderAncestorAddress, folderContentsLine } from './picker-model';
 /** The `data-` flag the DIALOG row's click handler hit-tests to tell drill from choose. */
 const DRILL_ATTRIBUTE = 'data-picker-drill';
 
-/** Everything a row shows, whichever model it is wearing. */
+/** Everything a row shows, whichever model it is wearing. The folder is one
+ *  of the viewer's own or one of a space's (`PickerFolder`): the row reads
+ *  the same fields off both. */
 export interface FolderRowView {
-  folder: FolderRecord;
+  folder: PickerFolder;
   /** A write for THIS folder is on the wire. */
   busy: boolean;
   /** The server has told us this folder already holds the item (a 422). */

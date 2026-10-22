@@ -193,6 +193,47 @@ export const spacesQueries = {
     });
   },
 
+  /**
+   * One level of the space's folders: the root when `parentUuid` is null, one
+   * folder's children when it names one, filtered by `search`
+   * (`GET /spaces/{uuid}/folders`, backend B3). The "Move to folder" picker
+   * browses a space file's destinations here (Stay, 22 October 2026): the
+   * viewer's own list (`foldersQueries.level`) holds the folders they made,
+   * and a space's folders are every member's. Under the space's contents key,
+   * so a new folder or a filing re-reads it. Page-numbered, as the route is.
+   */
+  folders: (
+    spaceUuid: string,
+    {
+      viewerId,
+      parentUuid = null,
+      search,
+    }: ViewerScoped & { parentUuid?: string | null; search?: string },
+  ) =>
+    infiniteQueryOptions({
+      queryKey: [
+        ...spacesQueries.contentsOf(spaceUuid),
+        'folders',
+        { parentUuid, search: search ?? null },
+        { viewerId },
+      ] as const,
+      queryFn: ({ pageParam }) =>
+        spacesApi.getFolders(spaceUuid, {
+          parent_id: parentUuid ?? undefined,
+          search,
+          per_page: SPACE_CONTENT_PER_PAGE,
+          page: pageParam,
+        }),
+      initialPageParam: 1,
+      getNextPageParam: (last) => {
+        const { current_page, last_page } = last.pagination;
+        return current_page < last_page ? current_page + 1 : undefined;
+      },
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
   /** Invalidation handle for one space's member roster (all params variants). */
   membersOf: (spaceUuid: string) =>
     [...spacesQueries.all, 'members', spaceUuid] as const,

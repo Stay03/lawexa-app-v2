@@ -2,6 +2,10 @@
 
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 
+import { spacesApi } from '@/lib/api/collab';
+import type { ContentSpaceStub } from '@/types/collab';
+import { spaceFolderPayload } from '@/v2/features/spaces/content-model';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { getErrorMessage } from '@/v2/runtime/query';
 import { foldersApi } from '../api';
 import { filedContentId } from '../filed-content';
@@ -10,7 +14,7 @@ import {
   folderItemScopeId,
   type FolderItemTarget,
 } from '../item-mutations';
-import type { FolderRecord } from '../types';
+import type { PickerFolder } from './picker-model';
 
 /**
  * create-and-add.ts — the picker's last row, as a mutation: make a folder and
@@ -39,12 +43,18 @@ import type { FolderRecord } from '../types';
  * RESOLVES with `status: 'created-not-added'`, so `meta.invalidates` still runs
  * (the new folder is real and every list must show it) and the picker can say
  * exactly what happened and let the reader press the now-visible folder again.
+ *
+ * ── IN A SPACE, THE FOLDER IS THE SPACE'S ──────────────────────────────────
+ * A picker browsing one space's folders (Stay, 22 October 2026) creates there
+ * too: `POST /spaces/{uuid}/folders`, the same request `FolderNameDialog`
+ * sends for a space folder, so the folder is every member's and the space's
+ * counts move with it.
  */
 
 export type CreateAndAddResult =
   /** `contentId`: what was filed, from the add's 201 (`filed-content.ts`). */
-  | { status: 'added'; folder: FolderRecord; contentId: number }
-  | { status: 'created-not-added'; folder: FolderRecord; message: string };
+  | { status: 'added'; folder: PickerFolder; contentId: number }
+  | { status: 'created-not-added'; folder: PickerFolder; message: string };
 
 export interface CreateAndAddVariables {
   /** The typed name, already trimmed by the caller. */
@@ -53,20 +63,38 @@ export interface CreateAndAddVariables {
   parentUuid: string | null;
 }
 
+export interface CreateAndAddOptions {
+  /** Create in this space's folders (`POST /spaces/{uuid}/folders`), or
+   *  omitted for one of the viewer's own. */
+  space?: ContentSpaceStub;
+}
+
+/** A space folder changes the space's folder count on its detail and its row too. */
+const CREATE_IN_SPACE_INVALIDATES = [
+  ...FOLDER_ITEM_INVALIDATES,
+  spacesQueries.details(),
+  spacesQueries.lists(),
+] as const;
+
 export function useCreateFolderAndAdd(
   target: FolderItemTarget,
+  options: CreateAndAddOptions = {},
 ): UseMutationResult<CreateAndAddResult, Error, CreateAndAddVariables> {
+  const { space } = options;
   return useMutation({
     mutationFn: async ({
       name,
       parentUuid,
     }: CreateAndAddVariables): Promise<CreateAndAddResult> => {
-      const created = await foldersApi.create({
-        name,
-        is_private: true,
-        ...(parentUuid ? { parent_id: parentUuid } : {}),
-      });
-      const folder = created.data;
+      const folder: PickerFolder = space
+        ? (await spacesApi.createFolder(space.uuid, spaceFolderPayload(name, parentUuid))).data
+        : (
+            await foldersApi.create({
+              name,
+              is_private: true,
+              ...(parentUuid ? { parent_id: parentUuid } : {}),
+            })
+          ).data;
       try {
         const added = await foldersApi.addItem(folder.uuid, {
           type: target.type,
@@ -85,7 +113,7 @@ export function useCreateFolderAndAdd(
     meta: {
       // The picker is on screen and renders both outcomes itself.
       silentError: true,
-      invalidates: FOLDER_ITEM_INVALIDATES,
+      invalidates: space ? CREATE_IN_SPACE_INVALIDATES : FOLDER_ITEM_INVALIDATES,
     },
     // NOTHING IS WRITTEN INTO A CACHE BY HAND. The create response carries no
     // `children` and no `parent` (17 keys, not 19), so it must never seed a

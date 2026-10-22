@@ -10,9 +10,8 @@ import { getErrorMessage } from '@/v2/runtime/query';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useCreateFolder } from '@/v2/features/folders/folder-mutations';
 import { PickerBody } from '@/v2/features/folders/picker/PickerBody';
-import type { PickerCrumb } from '@/v2/features/folders/picker/picker-model';
+import type { PickerCrumb, PickerFolder } from '@/v2/features/folders/picker/picker-model';
 import { usePickerBreakpoint } from '@/v2/features/folders/picker/use-picker-breakpoint';
-import type { FolderRecord } from '@/v2/features/folders/types';
 
 const SEARCH_DEBOUNCE_MS = 250;
 const NOTHING_HELD: ReadonlySet<string> = new Set<string>();
@@ -154,7 +153,7 @@ export function FolderChooser({
           setQuery(input);
         }}
         knownHeld={NOTHING_HELD}
-        onChoose={(folder: FolderRecord) => choose({ uuid: folder.uuid, name: folder.name })}
+        onChoose={(folder: PickerFolder) => choose({ uuid: folder.uuid, name: folder.name })}
         onCreate={createHere}
         pendingFolderUuid={null}
         creating={create.isPending}

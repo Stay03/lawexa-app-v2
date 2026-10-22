@@ -17,6 +17,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import type { ContentSpaceStub } from '@/types/collab';
 import { getErrorMessage } from '@/v2/runtime/query';
 import {
   isAlreadyInFolder,
@@ -25,10 +26,14 @@ import {
   type FolderItemTarget,
 } from '../item-mutations';
 import { filedContentId } from '../filed-content';
-import type { FolderRecord } from '../types';
 import { useCreateFolderAndAdd } from './create-and-add';
 import { PickerBody } from './PickerBody';
-import { folderItemNoun, type PickerCrumb } from './picker-model';
+import {
+  folderItemNoun,
+  pickerDescription,
+  type PickerCrumb,
+  type PickerFolder,
+} from './picker-model';
 import { usePickerBreakpoint } from './use-picker-breakpoint';
 
 /**
@@ -65,6 +70,12 @@ import { usePickerBreakpoint } from './use-picker-breakpoint';
  * ── THE VERB IS "ADD", NEVER "MOVE" ────────────────────────────────────────
  * One case can sit in a matter folder, a topic folder and a reading list at
  * once. Nothing here removes it from anywhere.
+ *
+ * ── A SPACE'S FILE IS FILED AMONG THE SPACE'S FOLDERS ──────────────────────
+ * With `space` the picker browses that space's folders (`PickerBody`), and
+ * its create row makes a space folder (`create-and-add.ts`). Stay, 22 October
+ * 2026: the files at a space's top level get "Move to folder", like the
+ * Folders page's loose files.
  */
 
 /** How long the field waits before the level query re-runs on what was typed. */
@@ -76,6 +87,7 @@ const EMPTY_HELD: ReadonlySet<string> = new Set<string>();
 export function FolderPicker({
   target,
   title = 'Add to folder',
+  space,
   open,
   onOpenChange,
 }: {
@@ -84,6 +96,8 @@ export function FolderPicker({
   /** The heading. A loose file on the Folders page is "Move to folder" (build
    *  6): filing it takes it off that list. */
   title?: string;
+  /** Browse and create in this space's folders, not the viewer's own. */
+  space?: ContentSpaceStub;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -119,7 +133,7 @@ export function FolderPicker({
   // which is a redo. Two true sentences about two things that really happened,
   // rather than an option flag whose only job was to silence one of them.
   const undoAdd = useRemoveFolderItem(target);
-  const create = useCreateFolderAndAdd(target);
+  const create = useCreateFolderAndAdd(target, { space });
 
   const stopDebounce = () => {
     if (debounceRef.current !== null) {
@@ -195,7 +209,7 @@ export function FolderPicker({
   // Undo removes what the add FILED, named by its 201: in a space folder a
   // note is filed as the space's copy, whose id is not the pressed note's
   // (`filed-content.ts`). Elsewhere the two ids are the same.
-  const confirmAdded = (folder: FolderRecord, filedId: number) => {
+  const confirmAdded = (folder: PickerFolder, filedId: number) => {
     toast.success(`Added to “${folder.name}”`, {
       duration: 8000,
       action: {
@@ -215,7 +229,7 @@ export function FolderPicker({
    *  a double-tap, not a second intention. */
   const writing = add.isPending || create.isPending;
 
-  const choose = (folder: FolderRecord) => {
+  const choose = (folder: PickerFolder) => {
     if (writing) return;
     setInlineError(null);
     setNotice(null);
@@ -280,6 +294,7 @@ export function FolderPicker({
   const renderBody = (surface: 'dialog' | 'sheet') => (
     <PickerBody
       surface={surface}
+      space={space}
       trail={trail}
       onNavigate={navigate}
       onSearchEverywhere={searchEverywhere}
@@ -298,7 +313,7 @@ export function FolderPicker({
     />
   );
 
-  const description = `Pick a folder for this ${noun}. It can sit in more than one.`;
+  const description = pickerDescription(noun, { space });
 
   // Unknown viewport (server render, or no `matchMedia`): draw neither surface
   // rather than guess which one. The picker only ever opens from a press, long

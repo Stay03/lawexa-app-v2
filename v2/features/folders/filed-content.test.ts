@@ -37,7 +37,8 @@ test('a 201 without the content falls back to the pressed id', () => {
 
 test('the picker’s Undo removes what the add filed, on both ways in', () => {
   const picker = read('picker', 'FolderPicker.tsx');
-  assert.match(picker, /const confirmAdded = \(folder: FolderRecord, filedId: number\) => \{/);
+  // `PickerFolder` since the picker can browse a space's folders (22 October 2026).
+  assert.match(picker, /const confirmAdded = \(folder: PickerFolder, filedId: number\) => \{/);
   assert.match(picker, /undoAdd\.mutate\(\{\s*type: target\.type,\s*contentId: filedId,/);
   assert.doesNotMatch(picker, /contentId: target\.contentId/);
   // Pressing a folder in the list.
