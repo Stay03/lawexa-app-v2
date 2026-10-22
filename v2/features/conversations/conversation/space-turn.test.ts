@@ -537,7 +537,8 @@ test('the row’s clock runs from the turn’s own start, and the name stays in 
   );
   assert.match(read('v2', 'runtime', 'chat-engine', 'engine.ts'), /since: pendingData\?\.pending_since \?\? null,/);
   const list = readHere('MessageList.tsx');
-  assert.match(list, /const activityStart = heldSince \?\? streamStartTime;/);
+  // A colleague's turn first; a redacted chat's own send next (redaction-wait.test.ts).
+  assert.match(list, /const activityStart = heldSince \?\? sentAt \?\? streamStartTime;/);
   assert.equal((list.match(/<ActivityRow startTime=\{activityStart\}/g) ?? []).length, 3);
   assert.match(readHere('ConversationScreen.tsx'), /heldSince=\{controller\.heldSince\}/);
   const row = readHere('ActivityStatus.tsx');
@@ -729,7 +730,8 @@ test('rule 2: Stop only for a turn this tab started, or one the status says the 
   // The engine marks who started the turn: send, a retry and the handoff are
   // its own; the recovery attach is followed; a reconnect keeps what it had.
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
-  assert.match(engine, /isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own' \}\)\);/);
+  // `send` also marks the turn as still on the wire (redacted-wait label, 22 October 2026).
+  assert.match(engine, /isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own', sending: true \}\)\);/);
   assert.match(engine, /isStreaming: true, isCancelling: false, error: null, turnOrigin: 'followed' \}\)\);/);
   assert.match(
     engine,

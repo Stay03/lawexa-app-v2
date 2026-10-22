@@ -103,6 +103,14 @@ export interface ChatEngineSnapshot {
    * `null` while nothing streams.
    */
   turnOrigin: TurnOrigin;
+  /**
+   * A turn this engine SENT whose stream has not opened yet: `POST /chat` is
+   * on the wire. In a redacted chat that is the redaction itself (the server
+   * redacts the message before it answers the POST), so the activity row can
+   * say so (Stay, 22 October 2026). False once the stream opens, and never
+   * true while nothing streams (the engine enforces it in `setState`).
+   */
+  sending: boolean;
 }
 
 /** See {@link ChatEngineSnapshot.turnOrigin}. */

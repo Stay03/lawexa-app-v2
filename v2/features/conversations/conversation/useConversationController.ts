@@ -23,6 +23,7 @@ import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache, listedConversation, spaceOfListedChat } from '../cache';
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { useSkeletonHold } from './skeleton-hold';
+import { computeTurnSentAt } from './stream-start';
 import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
@@ -114,6 +115,8 @@ function historyErrorMessage(err: unknown): string {
 const CONV_INIT_PREFIX = 'conv_init_';
 /** Narration auto-expiry so the calm status line returns to its resting label. */
 const NARRATION_TTL_MS = 8000;
+/** The activity row while a redacted chat's message is being redacted. */
+export const REDACTING_LABEL = 'Removing personal details…';
 
 interface InitAttachment {
   file_id: number;
@@ -216,6 +219,10 @@ export interface ConversationController {
   /** When that colleague's turn started (epoch ms, from `pending_since`), for
    *  the activity row's clock; null when unknown or not held. */
   heldSince: number | null;
+  /** When the reader sent their running turn, in a redacted chat only: the
+   *  activity row's clock starts here, so the redaction wait counts. Null in
+   *  every other chat (the clock then starts with the stream, as before). */
+  sentAt: number | null;
   /** The activity row's resting label for a turn that is not the reader's:
    *  "{name} is asking", or a nameless one while whose it is is not known
    *  yet; undefined for the reader's own turn (its default label). */
@@ -972,6 +979,13 @@ export function useConversationController(
       : turn.kind === 'unknown'
         ? UNKNOWN_TURN_LABEL
         : undefined;
+  // REDACTED MODE, THE WAIT BEFORE THE ANSWER (Stay, 22 October 2026: "the
+  // wait time feels long"). The server redacts the message inside `POST /chat`,
+  // before any stream opens: about 5 s for 12 pages, up to about 20 s for 50.
+  // While the reader's own send is on the wire the row says what is happening,
+  // and the clock runs from the send, for the whole turn.
+  const redacting = isRedacted && turn.kind === 'own' && stream.sending;
+  const sentAt = isRedacted && turn.kind === 'own' ? computeTurnSentAt(messages) : null;
 
   // What a refused send or re-ask changes here: a 409's turn is followed, read
   // first (`followTurn`), and its sender holds Send meanwhile; a 403 re-reads
@@ -1123,6 +1137,7 @@ export function useConversationController(
     mentionOptions,
     sendHeldBy: heldBy,
     heldSince,
+    sentAt,
     turnLabel,
     canStop,
     isOwnerResolved: ownerId !== null,
@@ -1134,7 +1149,7 @@ export function useConversationController(
     references,
     jurisdiction,
     setJurisdiction,
-    narration,
+    narration: redacting ? REDACTING_LABEL : narration,
     submit,
     stop,
     regenerate,

@@ -27,3 +27,16 @@ export function computeStreamStart(messages: readonly EngineMessage[]): number |
   }
   return null;
 }
+
+/**
+ * When the reader sent the running turn: the last user message's time — pure.
+ * A redacted chat times its working row from here (Stay, 22 October 2026),
+ * because the server redacts the message before anything streams, so the
+ * stream's own start would leave the first seconds of the wait uncounted.
+ */
+export function computeTurnSentAt(messages: readonly EngineMessage[]): number | null {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role === 'user') return messages[i].timestamp.getTime();
+  }
+  return null;
+}

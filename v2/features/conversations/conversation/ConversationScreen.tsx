@@ -370,6 +370,7 @@ export function ConversationScreen({
             viewerId={serverUserId}
             restingLabel={controller.turnLabel}
             heldSince={controller.heldSince}
+            sentAt={controller.sentAt}
             // On its own route the chat carries its heading in the page, under the
             // open bar; embedded (the case chat) the host owns the heading.
             memberColours={memberColours}

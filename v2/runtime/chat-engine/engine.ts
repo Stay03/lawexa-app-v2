@@ -165,6 +165,7 @@ const INITIAL_SNAPSHOT: ChatEngineSnapshot = Object.freeze({
   conversationTitle: null,
   error: null,
   turnOrigin: null,
+  sending: false,
 });
 
 /** Boundary parse — returns null on malformed data instead of throwing (a v1
@@ -202,8 +203,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     structuralListeners.forEach((l) => l());
   }
   function setState(updater: (prev: ChatEngineSnapshot) => ChatEngineSnapshot) {
-    const next = updater(state);
+    let next = updater(state);
     if (next === state) return;
+    // A send ends when its stream opens or its turn does: every path that stops
+    // the stream (a refusal, a 503, a network error, a cancel) clears `sending`
+    // here, so no path can leave it standing.
+    if (next.sending && !next.isStreaming) next = { ...next, sending: false };
     state = next;
     // Commit through the injected wrapper (adapter passes startTransition). Per
     // React RFC 0214 this is inert for external-store updates, but honors §5 and
@@ -1178,6 +1183,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       isStreaming: true,
       isCancelling: false,
       error: null,
+      // The stream is open: the send is over (redaction included).
+      sending: false,
       turnOrigin: initialMessage
         ? 'own'
         : prev.isStreaming && prev.turnOrigin !== null
@@ -2007,7 +2014,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // (saved-turn.ts, for a send that fails after the server may have kept it).
     const savedBefore = largestSavedId(state.messages);
     const optimisticMsg = addUserMessage(message, attachmentsList, options.replyTo);
-    setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own' }));
+    setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own', sending: true }));
 
     try {
       streamMode = options.streamMode;

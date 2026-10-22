@@ -214,6 +214,9 @@ export interface MessageListProps {
   /** When that colleague's turn started (epoch ms): the row's clock runs from
    *  it rather than from the rows this screen drew. */
   heldSince?: number | null;
+  /** When the reader sent their running turn, in a redacted chat only: the
+   *  clock runs from it, so the redaction wait before the stream counts. */
+  sentAt?: number | null;
   /** The chat's own heading (title and space) at the top of the transcript,
    *  where a list page carries its title; scrolls away with the messages. */
   masthead?: ReactNode;
@@ -253,6 +256,7 @@ export function MessageList({
   viewerId,
   restingLabel,
   heldSince = null,
+  sentAt = null,
   masthead = null,
   underBar = false,
   memberColours = null,
@@ -419,7 +423,7 @@ export function MessageList({
   const marks = useMemo(() => (showAuthors ? spaceMarks(groups) : null), [groups, showAuthors]);
   const nowMinute = useNowMinute();
   const streamStartTime = useMemo(() => computeStreamStart(messages), [messages]);
-  const activityStart = heldSince ?? streamStartTime;
+  const activityStart = heldSince ?? sentAt ?? streamStartTime;
   const lastGroupIndex = groups.length - 1;
   /** Off-screen groups are only estimated where the browser can keep the
    *  reader's place while the estimate is corrected. See the module. */

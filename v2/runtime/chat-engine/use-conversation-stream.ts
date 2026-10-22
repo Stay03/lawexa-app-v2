@@ -76,6 +76,8 @@ export interface UseConversationStreamResult {
   conversationTitle: string | null;
   error: string | null;
   turnOrigin: ChatEngineSnapshot['turnOrigin'];
+  /** A sent turn whose stream has not opened yet (`ChatEngineSnapshot.sending`). */
+  sending: boolean;
   // ── Per-message live streaming sources (for wave-3 rows) ──
   streamingText: StreamingSource;
   reasoning: StreamingSource;
@@ -156,6 +158,7 @@ export function useConversationStream(
     conversationTitle: snapshot.conversationTitle,
     error: snapshot.error,
     turnOrigin: snapshot.turnOrigin,
+    sending: snapshot.sending,
     streamingText: engine.streamingText,
     reasoning: engine.reasoning,
     send: engine.send,
