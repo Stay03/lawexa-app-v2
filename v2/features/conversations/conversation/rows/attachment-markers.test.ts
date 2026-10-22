@@ -30,9 +30,20 @@ test('the wrapped form goes even when the row has no files yet', () => {
   assert.equal(withoutAttachmentMarks('<attached_document name="x.docx">body</attached_document>\nWhat now?', false), 'What now?');
 });
 
-test('the single markers go only on a message with files', () => {
+test('a scan sent as page images: its single tag goes, with or without files on the row', () => {
+  const sent = '<attached_document name="scan.pdf" pages_as_images="3" />\n\nWhat does page 2 say?';
+  assert.equal(withoutAttachmentMarks(sent, true), 'What does page 2 say?');
+  assert.equal(withoutAttachmentMarks(sent, false), 'What does page 2 say?');
+  assert.equal(withoutAttachmentMarks('Scan <attached_document name="scan.pdf" pages_as_images="1"/>', true), 'Scan');
+  // Next to a wrapped document, each goes whole and the words between stay.
+  assert.equal(
+    withoutAttachmentMarks('<attached_document name="scan.pdf" pages_as_images="2" />\nCompare.\n<attached_document name="a.docx">A</attached_document>', true),
+    'Compare.',
+  );
+});
+
+test('the picture marker goes only on a message with files', () => {
   assert.equal(withoutAttachmentMarks('Read this <attached_image name="a1.png" />', true), 'Read this');
-  assert.equal(withoutAttachmentMarks('Scan <attached_document name="scan.pdf" pages_as_images="1" />', true), 'Scan');
   assert.equal(withoutAttachmentMarks('Read this <attached_image name="a1.png" />', false), 'Read this <attached_image name="a1.png" />');
 });
 

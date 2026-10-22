@@ -11,18 +11,21 @@
  *   (Lucy's live check, 22 October 2026: the bubble showed the document's
  *   text between the raw tags). It is removed from every message: a person
  *   never types it.
- * - `<attached_image name="a1.png" />`, or `<attached_document name="scan.pdf"
- *   pages_as_images="1" />` for a scan sent as pages: single tags the
- *   resource leaves (seen 24 September 2026). They are removed only on a
- *   message that has files, which is when the server writes them.
+ * - `<attached_document name="scan.pdf" pages_as_images="3" />`: a scanned
+ *   PDF sent as page images, a single tag the resource leaves (seen 24
+ *   September 2026, and by backend again on 22 October). Removed from every
+ *   message, as the wrapped form is.
+ * - `<attached_image name="a1.png" />`: removed only on a message that has
+ *   files, which is when the server writes it.
  */
 const ATTACHED_DOCUMENT_BODY = /\s*<attached_document\b[^>]*(?<!\/)>[\s\S]*?<\/attached_document>/g;
-const ATTACHMENT_MARKER = /\s*<attached_(?:image|document)\b[^>]*\/>/g;
+const ATTACHED_DOCUMENT_TAG = /\s*<attached_document\b[^>]*\/>/g;
+const ATTACHED_IMAGE_TAG = /\s*<attached_image\b[^>]*\/>/g;
 
 /** A user message's text as its bubble shows it, without the attachment marks. */
 export function withoutAttachmentMarks(content: string, hasFiles: boolean): string {
-  const bodiless = content.replace(ATTACHED_DOCUMENT_BODY, '');
-  const shown = hasFiles ? bodiless.replace(ATTACHMENT_MARKER, '') : bodiless;
+  const bodiless = content.replace(ATTACHED_DOCUMENT_BODY, '').replace(ATTACHED_DOCUMENT_TAG, '');
+  const shown = hasFiles ? bodiless.replace(ATTACHED_IMAGE_TAG, '') : bodiless;
   // A document wrapped before the typed words leaves the line break between.
   return shown === content ? content : shown.trim();
 }
