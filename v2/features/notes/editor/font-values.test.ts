@@ -47,4 +47,7 @@ test('a finished draft opens in the editor with the font menus; one still being 
   const editor = readFileSync(join(here, '..', '..', 'conversations', 'conversation', 'draft', 'DraftEditor.tsx'), 'utf8');
   assert.match(editor, /<FontMenu editor=\{editor\} \/>\s*<SizeMenu editor=\{editor\} \/>/);
   assert.match(editor, /content: readDraftEdit\(conversationId, ordinal\) \?\? markdownToDoc\(markdown\),/);
+  // The toolbar wraps at every width, so size, bold and the rest are in sight on a phone too.
+  assert.match(editor, /role="toolbar"[\s\S]*?className="sticky top-0 z-10 flex shrink-0 flex-wrap /);
+  assert.doesNotMatch(editor, /overflow-x-auto border-b/);
 });

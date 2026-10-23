@@ -115,9 +115,11 @@ const MARK_VERBS = TEXT_VERBS.filter((verb) => verb.verb === 'bold' || verb.verb
 
 /**
  * The panel's one bar: it sticks to the panel's top while the draft scrolls.
- * On a phone it is one row that scrolls sideways, so the sheet keeps its text;
- * beside the chat on a computer it wraps onto a second row, so every control
- * is in sight (the first pictures had lists, alignment and Copy past the edge).
+ * It wraps onto more rows wherever it runs out of width, so every control is
+ * in sight: beside the chat on a computer (the first pictures had lists,
+ * alignment and Copy past the edge) and on a phone too, where a sideways row
+ * hid size, bold and the rest with no sign they were there (Lucy's live check,
+ * 23 October 2026).
  */
 function DraftToolbar({ editor }: { editor: Editor }) {
   const state = useFormatState(editor);
@@ -130,7 +132,7 @@ function DraftToolbar({ editor }: { editor: Editor }) {
       role="toolbar"
       aria-label="Formatting"
       aria-orientation="horizontal"
-      className="v2-quiet-scroll sticky top-0 z-10 flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border/70 bg-popover/95 px-3 py-1.5 backdrop-blur-sm xl:flex-wrap xl:gap-y-1 xl:overflow-visible xl:px-4"
+      className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-x-0.5 gap-y-1 border-b border-border/70 bg-popover/95 px-3 py-1.5 backdrop-blur-sm xl:px-4"
     >
       <ToolbarButton
         compact
