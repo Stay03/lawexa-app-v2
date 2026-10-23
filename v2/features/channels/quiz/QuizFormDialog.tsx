@@ -355,8 +355,11 @@ export function QuizFormDialog({
       }
       description={
         <>
-          As many questions as you like, each on its own timer. Everyone
-          answers on their own device, and faster right answers score more.
+          {/* The library's form says what a quiz taken alone is; a channel's
+              keeps the live game's sentence (backend's check, 23 October 2026). */}
+          {solo
+            ? 'As many questions as you like, each on its own timer, and faster right answers score more. Questions can stand on their own or share a scenario.'
+            : 'As many questions as you like, each on its own timer. Everyone answers on their own device, and faster right answers score more.'}
           {/* THE CONSEQUENCE, STATED — one line, only while it is still a
               choice. An edit cannot move a quiz, so it says nothing. It is a
               `span` and not a `p` because `DialogDescription` IS a paragraph,
