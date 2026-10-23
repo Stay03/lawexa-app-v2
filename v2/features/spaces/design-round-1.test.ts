@@ -93,11 +93,14 @@ test('the space header prints the type and privacy, not the role (Arthur, 15 Oct
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
   assert.doesNotMatch(row, /spaceRoleLabel/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  // The name first, the line under it, ending with the members count (B4).
+  // The name first, the line under it, ending with the members count (B4), all
+  // in one zone so a dot sits before the count too: "Work · Private · 2 members"
+  // (Tester, live, 23 October 2026: "Private 2 members").
   assert.match(
     header,
-    /<MetaLine\s+as="span"\s+className="text-sm"\s+lead=\{spaceHeaderFacts\(space\)\}\s+trail=\{\[spaceMembersLabel\(space\.active_members_count\)\]\}\s*\/>/,
+    /<MetaLine\s+as="span"\s+className="text-sm"\s+(?:\/\/[^\n]*\n\s*)*lead=\{\[\.\.\.spaceHeaderFacts\(space\), spaceMembersLabel\(space\.active_members_count\)\]\}\s*\/>/,
   );
+  assert.doesNotMatch(header, /trail=\{\[spaceMembersLabel/);
   assert.ok(
     header.indexOf('<SpaceHeading name={space.name}') < header.indexOf('{facts}'),
     'the name before the line',
@@ -106,7 +109,7 @@ test('the space header prints the type and privacy, not the role (Arthur, 15 Oct
   const frame = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
   assert.match(
     frame,
-    /<MetaLine\s+className="mt-0\.5 text-sm"\s+lead=\{identity\.facts\}\s+trail=\{\[spaceMembersLabel\(identity\.membersCount\)\]\}\s*\/>/,
+    /<MetaLine\s+className="mt-0\.5 text-sm"\s+lead=\{\[\.\.\.identity\.facts, spaceMembersLabel\(identity\.membersCount\)\]\}\s*\/>/,
   );
 });
 

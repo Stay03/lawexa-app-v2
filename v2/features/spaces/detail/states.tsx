@@ -138,8 +138,7 @@ export function SpaceScreenFrame({
             />
             <MetaLine
               className="mt-0.5 text-sm"
-              lead={identity.facts}
-              trail={[spaceMembersLabel(identity.membersCount)]}
+              lead={[...identity.facts, spaceMembersLabel(identity.membersCount)]}
             />
           </div>
         ) : (

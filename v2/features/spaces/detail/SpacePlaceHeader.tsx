@@ -74,8 +74,10 @@ export function SpacePlaceHeader({
     <MetaLine
       as="span"
       className="text-sm"
-      lead={spaceHeaderFacts(space)}
-      trail={[spaceMembersLabel(space.active_members_count)]}
+      // One zone, so a dot sits between every fact: "Work · Private · 2 members".
+      // A separate trail zone had no dot before the count (Tester, live, 23
+      // October 2026: "Private 2 members").
+      lead={[...spaceHeaderFacts(space), spaceMembersLabel(space.active_members_count)]}
     />
   );
 
