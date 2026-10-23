@@ -226,8 +226,12 @@ export function QuizFormDialog({
   /** `shared` is offered only where a room is in the picture. */
   const inRoom = room !== null || (loaded !== null && quizHasRoom(loaded));
   const visibilityChoices = visibilityChoicesFor(inRoom);
-  /** The library's form: scenarios on, the channel game's switches off. */
-  const solo = !inRoom;
+  /** The library's form: scenarios on, the channel game's switches off. Opened
+   *  from a channel (even to edit a library quiz there) it keeps the switches,
+   *  so a quiz's leaderboard and late-joiner choice can always be changed
+   *  somewhere: a game takes them from the quiz, and going live sends only the
+   *  room (`goLive`). */
+  const solo = !inRoom && channelUuid === undefined;
   const groups = groupQuestions(questions, scenarios);
 
   const updateScenario = (key: string, patch: Partial<ScenarioDraft>) => {

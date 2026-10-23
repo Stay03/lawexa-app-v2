@@ -89,7 +89,7 @@ test('a saved quiz loads with its scenarios, each question still pointing at its
 
 test('the library form has the scenario box and leaves out the game switches; a channel form keeps them', () => {
   const dialog = readFileSync(join(here, 'QuizFormDialog.tsx'), 'utf8');
-  assert.match(dialog, /const solo = !inRoom;/);
+  assert.match(dialog, /const solo = !inRoom && channelUuid === undefined;/);
   assert.match(dialog, /\{!solo && \(\s*<div className="space-y-3 rounded-lg border p-3">\s*<SettingRow/);
   assert.match(dialog, /\{solo && \(\s*<Button[\s\S]*?Add a scenario/);
   assert.match(dialog, /validate\(title, questions, scenarios\)/);
