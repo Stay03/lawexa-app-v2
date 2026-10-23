@@ -91,14 +91,14 @@ test('a Word file says Word and its size in whole KB', () => {
   assert.equal(r.meta, 'Word · 118 KB · Ada Okafor · Ikoyi lease');
 });
 
-test('several files: "<who> added N files to <Space>" with the files card', () => {
+test('several files: "<who> added N files", the Space on the grey line, with the files card', () => {
   const items = [
     file(1, 'SPA v3 (signed).pdf', PDF, 1.2 * 1024 * 1024),
     file(2, 'Disclosure letter.pdf', PDF, 840 * 1024),
     file(3, 'Board minutes, 14 October.docx', DOCX, 96 * 1024),
   ];
   const r = row({ kind: 'files_added', actor: ada, space: gray, count: 3, items });
-  assert.equal(r.title, 'Ada Okafor added 3 files to Gray Partners');
+  assert.equal(r.title, 'Ada Okafor added 3 files');
   assert.equal(r.meta, 'Gray Partners');
   assert.deepEqual(r.lead, { type: 'icon', icon: 'files' });
   assert.deepEqual(r.card, {

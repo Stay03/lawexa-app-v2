@@ -223,7 +223,8 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
       return {
         ...base,
         lead: { type: 'icon', icon: 'files' },
-        title: `${actor} added ${event.count} files to ${space}`,
+        // The Space is the grey line, so the title does not say it twice.
+        title: `${actor} added ${event.count} files`,
         meta: space,
         href: spaceHref(event.space),
         card: filesCard(event.items, event.count),
