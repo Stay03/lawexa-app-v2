@@ -28,7 +28,7 @@ test('who can find the quiz is chosen in the form, owner only, with the right de
   assert.match(source, /useState<ChannelQuizVisibility>\(\s*room \? 'shared' : 'private',\s*\)/);
   assert.match(source, /setVisibility\(loaded\.visibility\);/);
   assert.match(source, /const mayEditVisibility = !isEdit \|\| loaded\?\.is_mine === true;/);
-  assert.match(source, /visibilityChoicesFor\(\s*room !== null \|\| \(loaded !== null && quizHasRoom\(loaded\)\),\s*\)/);
+  assert.match(source, /const inRoom = room !== null \|\| \(loaded !== null && quizHasRoom\(loaded\)\);\s*const visibilityChoices = visibilityChoicesFor\(inRoom\);/);
   // Sent on create always, on update only by the owner.
   assert.match(source, /description: description\.trim\(\) \|\| undefined,\s*visibility,\s*settings,/);
   assert.match(source, /visibility: mayEditVisibility \? visibility : undefined,/);

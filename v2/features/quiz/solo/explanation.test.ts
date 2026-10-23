@@ -22,9 +22,11 @@ test('the contract: optional on a question and on the form\'s body, 1,000 charac
 
 test('the form: a box per question, loaded from the quiz, always sent (empty is null)', () => {
   const form = read('v2', 'features', 'channels', 'quiz', 'QuizFormDialog.tsx');
-  assert.match(form, /explanation: '',\s*\};/);
-  assert.match(form, /explanation: question\.explanation \?\? '',/);
-  assert.match(form, /explanation: question\.explanation\.trim\(\) \|\| null,/);
+  // The drafts and their payload live in form-model.ts (quiz piece 4).
+  const drafts = read('v2', 'features', 'channels', 'quiz', 'form-model.ts');
+  assert.match(drafts, /explanation: '',\s*scenarioKey,\s*\};/);
+  assert.match(drafts, /explanation: question\.explanation \?\? '',/);
+  assert.match(drafts, /explanation: question\.explanation\.trim\(\) \|\| null,/);
   assert.match(form, /Why this is the answer <span className="text-muted-foreground\/70">\(optional\)<\/span>/);
   assert.match(form, /maxLength=\{QUIZ_EXPLANATION_MAX\}/);
   assert.match(form, /placeholder="Shown with the answers on the results, never during the quiz\."/);

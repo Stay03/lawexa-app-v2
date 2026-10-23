@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,7 +25,6 @@ import type {
   ChannelQuizResponse,
   ChannelQuizSettings,
   ChannelQuizVisibility,
-  QuizQuestionInput,
   QuizQuestionType,
 } from '@/types/channel-quiz';
 import { canPublishPublicly } from '@/v2/features/quiz/solo/model';
@@ -34,9 +33,23 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { useCreateLibraryQuiz, useCreateQuiz, useUpdateQuiz } from './mutations';
 import { channelQuizQueries } from './queries';
 import {
+  addToScenario,
+  draftsFromQuiz,
+  groupQuestions,
+  newOption,
+  newQuestion,
+  newScenario,
+  QUIZ_SCENARIO_PASSAGE_MAX,
+  QUIZ_SCENARIO_TITLE_MAX,
+  toPayload,
+  trueFalseOptions,
+  validate,
+  type QuestionDraft,
+  type ScenarioDraft,
+} from './form-model';
+import {
   optionLetter,
   PUBLIC_NEEDS_VERIFIED_AUTHOR,
-  QUIZ_DEFAULT_SECONDS,
   QUIZ_DEFAULT_SETTINGS,
   QUIZ_DESCRIPTION_MAX,
   QUIZ_EXPLANATION_MAX,
@@ -102,109 +115,16 @@ import { VISIBILITY_MARKS } from './VisibilityChip';
  * sight, so `channelUuid` and `channelName` are optional and a form with
  * neither can only file into the library: `destination` is read only when
  * there is a channel to file into.
+ *
+ * ── SCENARIOS, IN THE LIBRARY'S FORM (quiz piece 4, 23 October 2026) ───────
+ * A quiz written outside a channel can share a passage between questions: a
+ * blue scenario card holds its title (optional) and its passage, with its
+ * questions inside it, and "Add a scenario" sits beside "Add a question". The
+ * drafts and their rules are `form-model.ts`. The two game switches (the
+ * leaderboard, late joiners) belong to a channel game, so the library's form
+ * leaves them out and the quiz keeps their defaults (picture 6). A channel's
+ * form keeps them, and no scenario box: a game does not show passages yet.
  */
-
-interface OptionDraft {
-  key: string;
-  content: string;
-}
-
-interface QuestionDraft {
-  key: string;
-  type: QuizQuestionType;
-  question: string;
-  seconds: number;
-  options: OptionDraft[];
-  /** The `key` of the option marked correct — exactly one, or none yet. */
-  correctKey: string | null;
-  /** "Why this is the answer", optional; `''` for none. */
-  explanation: string;
-}
-
-let draftCounter = 0;
-function nextKey(prefix: string): string {
-  draftCounter += 1;
-  return `${prefix}-${draftCounter}`;
-}
-
-function newOption(content = ''): OptionDraft {
-  return { key: nextKey('opt'), content };
-}
-
-function newQuestion(): QuestionDraft {
-  return {
-    key: nextKey('q'),
-    type: 'multiple_choice',
-    question: '',
-    seconds: QUIZ_DEFAULT_SECONDS,
-    options: [newOption(), newOption()],
-    correctKey: null,
-    explanation: '',
-  };
-}
-
-/** True/false questions are exactly two fixed options — the server validates
- *  the count, and offering free text for them would only invite a 422. */
-function trueFalseOptions(): OptionDraft[] {
-  return [newOption('True'), newOption('False')];
-}
-
-function draftsFromQuiz(quiz: ChannelQuiz): QuestionDraft[] {
-  return (quiz.questions ?? []).map((question) => {
-    const options = question.options.map((option) => ({
-      key: nextKey('opt'),
-      content: option.content,
-    }));
-    const correctIndex = question.options.findIndex((option) => option.is_correct);
-    return {
-      key: nextKey('q'),
-      type: question.type,
-      question: question.question,
-      seconds: question.time_limit_seconds,
-      options,
-      correctKey: correctIndex >= 0 ? options[correctIndex].key : null,
-      explanation: question.explanation ?? '',
-    };
-  });
-}
-
-/** The first thing wrong with the draft, phrased for the author — or `null`. */
-function validate(title: string, questions: QuestionDraft[]): string | null {
-  if (!title.trim()) return 'Give the quiz a title.';
-  if (questions.length === 0) return 'Add at least one question.';
-  for (let i = 0; i < questions.length; i += 1) {
-    const question = questions[i];
-    const label = `Question ${i + 1}`;
-    if (!question.question.trim()) return `${label} needs its question text.`;
-    const filled = question.options.filter((option) => option.content.trim());
-    if (filled.length < QUIZ_MIN_OPTIONS) {
-      return `${label} needs at least ${QUIZ_MIN_OPTIONS} answers.`;
-    }
-    if (question.correctKey === null) {
-      return `${label} needs one answer marked correct.`;
-    }
-    if (!filled.some((option) => option.key === question.correctKey)) {
-      return `${label}'s correct answer is empty.`;
-    }
-  }
-  return null;
-}
-
-function toPayload(questions: QuestionDraft[]): QuizQuestionInput[] {
-  return questions.map((question) => ({
-    type: question.type,
-    question: question.question.trim(),
-    time_limit_seconds: question.seconds,
-    options: question.options
-      .filter((option) => option.content.trim())
-      .map((option) => ({
-        content: option.content.trim(),
-        is_correct: option.key === question.correctKey,
-      })),
-    // Always sent, so clearing the box clears the stored explanation.
-    explanation: question.explanation.trim() || null,
-  }));
-}
 
 /** Where a NEW quiz is filed. Ignored when editing — a quiz's home is fixed. */
 export type QuizDestination = 'channel' | 'library';
@@ -265,6 +185,7 @@ export function QuizFormDialog({
   const [questions, setQuestions] = useState<QuestionDraft[]>(() => [
     newQuestion(),
   ]);
+  const [scenarios, setScenarios] = useState<ScenarioDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   /** Set when the server refuses a question change on a played quiz. */
   const [frozen, setFrozen] = useState(false);
@@ -282,7 +203,9 @@ export function QuizFormDialog({
     setDescription(loaded.description ?? '');
     setSettings({ ...QUIZ_DEFAULT_SETTINGS, ...loaded.settings });
     setVisibility(loaded.visibility);
-    setQuestions(draftsFromQuiz(loaded));
+    const drafts = draftsFromQuiz(loaded);
+    setQuestions(drafts.questions);
+    setScenarios(drafts.scenarios);
     setFrozen(false);
     setPublicRefused(false);
   }
@@ -301,9 +224,26 @@ export function QuizFormDialog({
    *  quiz born in their room may change its title, never its visibility). */
   const mayEditVisibility = !isEdit || loaded?.is_mine === true;
   /** `shared` is offered only where a room is in the picture. */
-  const visibilityChoices = visibilityChoicesFor(
-    room !== null || (loaded !== null && quizHasRoom(loaded)),
-  );
+  const inRoom = room !== null || (loaded !== null && quizHasRoom(loaded));
+  const visibilityChoices = visibilityChoicesFor(inRoom);
+  /** The library's form: scenarios on, the channel game's switches off. */
+  const solo = !inRoom;
+  const groups = groupQuestions(questions, scenarios);
+
+  const updateScenario = (key: string, patch: Partial<ScenarioDraft>) => {
+    setScenarios((prev) => prev.map((scenario) => (scenario.key === key ? { ...scenario, ...patch } : scenario)));
+  };
+  /** A new scenario arrives with its first question, at the end of the list. */
+  const addScenario = () => {
+    const scenario = newScenario();
+    setScenarios((prev) => [...prev, scenario]);
+    setQuestions((prev) => [...prev, newQuestion(scenario.key)]);
+  };
+  /** Removing a scenario keeps its questions, as questions on their own. */
+  const removeScenario = (key: string) => {
+    setScenarios((prev) => prev.filter((scenario) => scenario.key !== key));
+    setQuestions((prev) => prev.map((question) => (question.scenarioKey === key ? { ...question, scenarioKey: null } : question)));
+  };
 
   const updateQuestion = (key: string, patch: Partial<QuestionDraft>) => {
     setQuestions((prev) =>
@@ -339,7 +279,7 @@ export function QuizFormDialog({
       ? title.trim()
         ? null
         : 'Give the quiz a title.'
-      : validate(title, questions);
+      : validate(title, questions, scenarios);
     if (problem) {
       setError(problem);
       return;
@@ -370,8 +310,7 @@ export function QuizFormDialog({
           description: description.trim() || undefined,
           settings,
           visibility: mayEditVisibility ? visibility : undefined,
-          questions:
-            metadataOnly || !mayEditQuestions ? undefined : toPayload(questions),
+          ...(metadataOnly || !mayEditQuestions ? {} : toPayload(questions, scenarios)),
         },
         {
           onSuccess: (response) => {
@@ -389,7 +328,7 @@ export function QuizFormDialog({
       description: description.trim() || undefined,
       visibility,
       settings,
-      questions: toPayload(questions),
+      ...toPayload(questions, scenarios),
     };
     const onCreated = {
       onSuccess: (response: ChannelQuizResponse) => {
@@ -487,6 +426,7 @@ export function QuizFormDialog({
               />
             </div>
 
+            {!solo && (
             <div className="space-y-3 rounded-lg border p-3">
               <SettingRow
                 id="quiz-leaderboard"
@@ -507,6 +447,7 @@ export function QuizFormDialog({
                 }
               />
             </div>
+            )}
 
             {mayEditVisibility && (
               <div className="space-y-2">
@@ -571,33 +512,63 @@ export function QuizFormDialog({
                     · {questions.length}
                   </span>
                 </p>
-                {questions.map((question, index) => (
-                  <QuestionCard
-                    key={question.key}
-                    index={index}
-                    draft={question}
-                    canRemove={questions.length > 1}
-                    onChange={(patch) => updateQuestion(question.key, patch)}
-                    onChangeType={(type) => setType(question.key, type)}
-                    onRemove={() =>
-                      setQuestions((prev) =>
-                        prev.filter((entry) => entry.key !== question.key),
-                      )
-                    }
-                  />
-                ))}
+                {groups.map((group) => {
+                  const card = (question: QuestionDraft, index: number) => (
+                    <QuestionCard
+                      key={question.key}
+                      index={index}
+                      draft={question}
+                      inScenario={group.kind === 'scenario'}
+                      canRemove={questions.length > 1}
+                      onChange={(patch) => updateQuestion(question.key, patch)}
+                      onChangeType={(type) => setType(question.key, type)}
+                      onRemove={() =>
+                        setQuestions((prev) =>
+                          prev.filter((entry) => entry.key !== question.key),
+                        )
+                      }
+                    />
+                  );
+                  if (group.kind === 'question') return card(group.question, group.start);
+                  const number = groups.filter((entry) => entry.kind === 'scenario').indexOf(group) + 1;
+                  return (
+                    <ScenarioCard
+                      key={group.scenario.key}
+                      number={number}
+                      draft={group.scenario}
+                      onChange={(patch) => updateScenario(group.scenario.key, patch)}
+                      onRemove={() => removeScenario(group.scenario.key)}
+                      onAddQuestion={() => setQuestions((prev) => addToScenario(prev, group.scenario.key))}
+                    >
+                      {group.questions.map((question, offset) => card(question, group.start + offset))}
+                    </ScenarioCard>
+                  );
+                })}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() =>
-                    setQuestions((prev) => [...prev, newQuestion()])
-                  }
-                >
-                  <Plus aria-hidden className="size-4" />
-                  Add a question
-                </Button>
+                <div className={cn('grid gap-2', solo && 'sm:grid-cols-2')}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() =>
+                      setQuestions((prev) => [...prev, newQuestion()])
+                    }
+                  >
+                    <Plus aria-hidden className="size-4" />
+                    Add a question
+                  </Button>
+                  {solo && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-[oklch(0.62_0.17_255/0.55)]"
+                      onClick={addScenario}
+                    >
+                      <FileText aria-hidden className="size-4" />
+                      Add a scenario
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -633,9 +604,84 @@ function SettingRow({
   );
 }
 
+/**
+ * A scenario's card: its title (optional) and passage, then its questions,
+ * then the way to add one more to it. Blue, so a question about a passage
+ * never reads as one on its own.
+ */
+function ScenarioCard({
+  number,
+  draft,
+  onChange,
+  onRemove,
+  onAddQuestion,
+  children,
+}: {
+  number: number;
+  draft: ScenarioDraft;
+  onChange: (patch: Partial<ScenarioDraft>) => void;
+  onRemove: () => void;
+  onAddQuestion: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      aria-label={`Scenario ${number}`}
+      className="space-y-3 rounded-2xl border-2 border-[oklch(0.62_0.17_255/0.55)] bg-[oklch(0.62_0.17_255/0.07)] p-3"
+    >
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold tracking-[0.12em] text-[oklch(0.7_0.15_255)] uppercase">
+          Scenario {number}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="ml-auto text-muted-foreground"
+          onClick={onRemove}
+        >
+          Remove scenario
+        </Button>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`scenario-title-${draft.key}`}>
+          Title <span className="font-normal text-muted-foreground">(optional)</span>
+        </Label>
+        <Input
+          id={`scenario-title-${draft.key}`}
+          maxLength={QUIZ_SCENARIO_TITLE_MAX}
+          placeholder="e.g. The right of way over Plot 14"
+          value={draft.title}
+          onChange={(event) => onChange({ title: event.target.value })}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor={`scenario-passage-${draft.key}`}>Passage</Label>
+        <Textarea
+          id={`scenario-passage-${draft.key}`}
+          rows={5}
+          maxLength={QUIZ_SCENARIO_PASSAGE_MAX}
+          placeholder="The facts the questions below are about. The reader sees this above each of them."
+          value={draft.passage}
+          onChange={(event) => onChange({ passage: event.target.value })}
+        />
+        <p className="text-right text-xs text-muted-foreground tabular-nums">
+          {draft.passage.length.toLocaleString('en-US')} / {QUIZ_SCENARIO_PASSAGE_MAX.toLocaleString('en-US')}
+        </p>
+      </div>
+      <div className="space-y-3">{children}</div>
+      <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={onAddQuestion}>
+        <Plus aria-hidden className="size-4" />
+        Add a question to this scenario
+      </Button>
+    </section>
+  );
+}
+
 function QuestionCard({
   index,
   draft,
+  inScenario,
   canRemove,
   onChange,
   onChangeType,
@@ -643,6 +689,8 @@ function QuestionCard({
 }: {
   index: number;
   draft: QuestionDraft;
+  /** Inside a scenario's card: says so beside the number. */
+  inScenario: boolean;
   canRemove: boolean;
   onChange: (patch: Partial<QuestionDraft>) => void;
   onChangeType: (type: QuizQuestionType) => void;
@@ -656,6 +704,12 @@ function QuestionCard({
         <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
           Question {index + 1}
         </span>
+        {inScenario && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[oklch(0.62_0.17_255/0.14)] px-2 py-0.5 text-xs font-medium text-[oklch(0.78_0.1_255)]">
+            <FileText aria-hidden className="size-3" />
+            Uses the scenario
+          </span>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <Select
             value={draft.type}
