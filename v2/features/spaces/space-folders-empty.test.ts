@@ -18,6 +18,12 @@ test('the Folders pill counts its files in no folder, so files alone are not "em
   assert.match(panel, /count=\{items\.length \+ \(looseFileCount \?\? 0\)\}/);
 });
 
+test('the files draw their top rule only under folders, so no rule stands alone under the pills', () => {
+  const loose = readFileSync(join(here, 'detail', 'content', 'SpaceLooseFiles.tsx'), 'utf8');
+  assert.match(loose, /className=\{cn\(afterFolders && 'border-t border-border\/40'\)\}/);
+  assert.match(panel, /afterFolders=\{items\.some\(\(entry\) => entry\.type === 'folder'\)\}/);
+});
+
 test('while the files are still loading the Folders pill shows no empty state', () => {
   assert.match(panel, /empty=\{\n\s+tab === 'folders' && looseFileCount === null \? null : \(\n\s+<SpaceContentEmptyState/);
 });

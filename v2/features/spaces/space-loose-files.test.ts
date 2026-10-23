@@ -41,11 +41,12 @@ test('the Folders pill is the Folders page: its header, its folder rows, no day 
   );
   assert.match(
     panel,
-    /\{tab === 'folders' \? \(\s*<SpaceLooseFiles\s+spaceUuid=\{spaceUuid\}\s+viewerId=\{viewerId\}\s+enabled=\{enabled\}\s+held=\{query\.isPending\}\s+now=\{now\}\s+actionsFor=\{fileActions\}\s+fileSelect=\{fileSelect\}\s+\/>\s*\) : null\}/,
+    /\{tab === 'folders' \? \(\s*<SpaceLooseFiles\s+spaceUuid=\{spaceUuid\}\s+viewerId=\{viewerId\}\s+enabled=\{enabled\}\s+held=\{query\.isPending\}\s+now=\{now\}\s+actionsFor=\{fileActions\}\s+fileSelect=\{fileSelect\}\s+afterFolders=\{items\.some\(\(entry\) => entry\.type === 'folder'\)\}\s+\/>\s*\) : null\}/,
   );
   const section = content('SpaceLooseFiles.tsx');
-  // The Folders page's own file row, dividers and top rule; no heading at all.
-  assert.match(section, /<section aria-label="Files in no folder" className="border-t border-border\/40">/);
+  // The Folders page's own file row, dividers and top rule (under folders
+  // only); no heading at all.
+  assert.match(section, /<section aria-label="Files in no folder" className=\{cn\(afterFolders && 'border-t border-border\/40'\)\}>/);
   assert.match(section, /<ul className="flex flex-col divide-y divide-border\/40">/);
   assert.match(section, /<FileEntryRow\s+key=\{file\.id\}\s+fileId=\{row\.id\}\s+kind=\{row\.kind\}\s+name=\{row\.title\}\s+named=\{row\.hasTitle\}\s+date=\{formatEntryDate\(row\.createdAt, now\)\}\s+index=\{index\}\s+onView=\{row\.view \? \(\) => openView\(file\) : undefined\}\s+menu=\{<SpaceFileMenu file=\{file\} look="row" \{\.\.\.actionsFor\(file\)\} \/>\}/);
   assert.doesNotMatch(section, /LobbySection|SPACE_LOOSE_FILES_TITLE|Files not in a folder/);

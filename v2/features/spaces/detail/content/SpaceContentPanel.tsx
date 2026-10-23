@@ -674,6 +674,7 @@ function SpaceFeed({
           now={now}
           actionsFor={fileActions}
           fileSelect={fileSelect}
+          afterFolders={items.some((entry) => entry.type === 'folder')}
         />
       ) : null}
 

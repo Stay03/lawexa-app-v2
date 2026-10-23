@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { SpaceFile } from '@/types/collab';
 import { FileViewers } from '@/v2/features/files/FileViewers';
@@ -40,6 +41,7 @@ export function SpaceLooseFiles({
   viewerId,
   enabled,
   held,
+  afterFolders,
   now,
   actionsFor,
   fileSelect,
@@ -53,6 +55,10 @@ export function SpaceLooseFiles({
   enabled: boolean;
   /** The folders above are still loading: the files load too, but wait to show. */
   held: boolean;
+  /** Folders are listed above, so the files continue their list under a rule.
+   *  With none, the rule stood alone under the pills (backend's check, 23
+   *  October 2026). */
+  afterFolders: boolean;
   /** The pill's frozen clock, for the date column. */
   now: number;
   /** What a file's ⋯ holds for this reader. */
@@ -108,7 +114,7 @@ export function SpaceLooseFiles({
         // NO HEADING: the files continue the folders' list (the Folders page's
         // "clean file system", Stay, 20 October 2026). The top rule continues
         // the list's dividers.
-        <section aria-label="Files in no folder" className="border-t border-border/40">
+        <section aria-label="Files in no folder" className={cn(afterFolders && 'border-t border-border/40')}>
           {query.isPending ? (
             <LooseFilesSkeleton />
           ) : query.isError && files.length === 0 ? (
