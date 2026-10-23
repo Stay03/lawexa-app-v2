@@ -371,6 +371,13 @@ export function showsPrivateMark(space: Pick<Space, 'kind' | 'is_private'>): boo
   return !isSharedSpace(space) && space.is_private;
 }
 
+/** "1 invite sent", the invites not accepted yet; `null` (no fact) at none,
+ *  or when the viewer is not told. */
+export function spaceInvitesLabel(count: number | undefined): string | null {
+  if (!count) return null;
+  return `${count} ${count === 1 ? 'invite' : 'invites'} sent`;
+}
+
 /**
  * The line under the space's name in its header: the type, then whether it is
  * private ("Study · Private"), the words the spaces list uses. Arthur, 15

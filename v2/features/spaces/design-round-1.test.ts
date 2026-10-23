@@ -98,7 +98,7 @@ test('the space header prints the type and privacy, not the role (Arthur, 15 Oct
   // (Tester, live, 23 October 2026: "Private 2 members").
   assert.match(
     header,
-    /<MetaLine\s+as="span"\s+className="text-sm"\s+(?:\/\/[^\n]*\n\s*)*lead=\{\[\.\.\.spaceHeaderFacts\(space\), spaceMembersLabel\(space\.active_members_count\)\]\}\s*\/>/,
+    /<MetaLine\s+as="span"\s+className="text-sm"\s+(?:\/\/[^\n]*\n\s*)*lead=\{\[\.\.\.spaceHeaderFacts\(space\), spaceMembersLabel\(space\.active_members_count\), spaceInvitesLabel\(invitesSent\)\]\}\s*\/>/,
   );
   assert.doesNotMatch(header, /trail=\{\[spaceMembersLabel/);
   assert.ok(

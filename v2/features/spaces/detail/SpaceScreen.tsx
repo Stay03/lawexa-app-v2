@@ -137,9 +137,10 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
      the pill opens with them drawn. Asked for only when the pill mounted, they
      landed a beat after the members, already cached, and popped in under them
      (inside-shots-1, 15 October 2026). Same keys as the pill's own reads, so
-     it paints from this cache and asks again for nothing. */
+     it paints from this cache and asks again for nothing. The header's
+     "1 invite sent" is this list's total. */
   const peopleReads = eligible && space !== null && canManage;
-  useQuery({
+  const pendingInvites = useQuery({
     ...spacesQueries.members(spaceUuid, { viewerId: session.userId, status: 'pending' }),
     enabled: peopleReads,
   });
@@ -330,6 +331,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         membership={scope.membership}
         onOpenAbout={openAbout}
         onOpenRoster={scope.openRoster}
+        invitesSent={peopleReads ? pendingInvites.data?.pagination.total : undefined}
       />
 
       <SpaceContentPanel space={space} tab={tab} onTabChange={setTab} />

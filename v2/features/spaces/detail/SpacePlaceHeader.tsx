@@ -9,7 +9,7 @@ import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
 import { setSpaceTitleOnScreen } from '@/v2/features/collab/shell/collab-header';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { spaceHeaderFacts, spacePrincipleLine, type MembershipSubject } from '../model';
+import { spaceHeaderFacts, spaceInvitesLabel, spacePrincipleLine, type MembershipSubject } from '../model';
 
 /**
  * SpacePlaceHeader — the identity block at the top of the space page.
@@ -39,6 +39,13 @@ import { spaceHeaderFacts, spacePrincipleLine, type MembershipSubject } from '..
  * list's place. On a shared space Stay's two lines still sit in the details
  * sheet (`spacePrincipleLine`).
  *
+ * ── AND THE INVITES STILL WAITING, FOR WHOEVER MANAGES THE PEOPLE ──────────
+ * While an invite is not accepted yet the line ends with it: "Work · Private
+ * · 2 members · 1 invite sent" (Stay, 23 October 2026, 11:21Z). A sent invite
+ * left no trace on the page itself (Lucy, live, 23 October 2026). The count is
+ * the `?status=pending` list's total, which the server answers only for
+ * members who may manage members, so nobody else sees it (`invitesSent`).
+ *
  * ── THE NAME IS PRINTED IN FULL AT EVERY WIDTH ─────────────────────────────
  * Below `md:` the heading used to be stated for assistive tech only, with the
  * name in the shell's bar, cut to about 190px: a law firm's matter names were
@@ -60,6 +67,7 @@ export function SpacePlaceHeader({
   membership,
   onOpenAbout,
   onOpenRoster,
+  invitesSent,
 }: {
   space: Space;
   /** The viewer's roles, the frame's one reading of them. */
@@ -68,6 +76,9 @@ export function SpacePlaceHeader({
   onOpenAbout: () => void;
   /** Opens the members sheet (`SpaceMembersSheet`, the frame's). */
   onOpenRoster?: () => void;
+  /** The invites not accepted yet, for a viewer who manages the people;
+   *  `undefined` for anyone else, or before the list lands. */
+  invitesSent?: number;
 }) {
   const hasAbout = spaceHasAbout(space, membership);
   const facts = (
@@ -77,7 +88,7 @@ export function SpacePlaceHeader({
       // One zone, so a dot sits between every fact: "Work · Private · 2 members".
       // A separate trail zone had no dot before the count (Tester, live, 23
       // October 2026: "Private 2 members").
-      lead={[...spaceHeaderFacts(space), spaceMembersLabel(space.active_members_count)]}
+      lead={[...spaceHeaderFacts(space), spaceMembersLabel(space.active_members_count), spaceInvitesLabel(invitesSent)]}
     />
   );
 
