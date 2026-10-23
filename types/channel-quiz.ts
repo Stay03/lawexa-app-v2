@@ -269,6 +269,16 @@ export interface ChannelQuiz {
   scenarios?: QuizScenario[];
   /** Present on index rows (which never embed questions). */
   question_count?: number;
+  /** How many scenarios the quiz has, on index rows (backend, 23 October
+   *  2026). Absent from older bodies; read as unknown, not as none. */
+  scenario_count?: number;
+  /** The signed-in viewer's best points on a finished attempt; `null` before
+   *  their first, or signed out (backend, 23 October 2026). */
+  viewer_best_points?: number | null;
+  /** Finished attempts by the viewer; `null` signed out. */
+  viewer_attempts_count?: number | null;
+  /** The sum of the questions' time limits, in seconds: the "about N min". */
+  total_seconds?: number;
   created_at: string;
   updated_at: string;
 }

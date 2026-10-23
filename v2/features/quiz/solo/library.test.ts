@@ -26,7 +26,8 @@ test('every row carries the owner\'s menu: who can find it, Edit, Delete', () =>
   const screen = read('v2', 'features', 'quiz', 'solo', 'library', 'LibraryScreen.tsx');
   assert.match(screen, /<VisibilityGroup quiz=\{quiz\} canPublish=\{canPublish\} onRefused=\{setRefusal\} \/>/);
   assert.match(screen, /const canPublish = canPublishPublicly\(session\);/);
-  assert.match(screen, /<VisibilityChip visibility=\{quiz\.visibility\} \/>/);
+  // Who can find it, said in words on its own line (the chip shrank to an icon).
+  assert.match(screen, /<Mark aria-hidden className="size-3 shrink-0" \/>\s*\{visibilityFace\(quiz\.visibility\)\}/);
   // A refusal is said under its own row, never toasted.
   assert.match(screen, /\{refusal && \(\s*<p\s*role="alert"/);
   assert.doesNotMatch(screen, /from 'sonner'/);

@@ -4,7 +4,6 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
-  ChevronRight,
   ClipboardList,
   MoreHorizontal,
   Pencil,
@@ -23,11 +22,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDayLabel } from '@/lib/utils/collab';
 import type { ChannelQuiz } from '@/types/channel-quiz';
 import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
 import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
-import { VisibilityChip } from '@/v2/features/channels/quiz/VisibilityChip';
+import { VISIBILITY_MARKS } from '@/v2/features/channels/quiz/VisibilityChip';
+import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { VisibilityGroup } from '@/v2/features/channels/quiz/VisibilityGroup';
 import { LawexaMark } from '@/v2/features/channels/ui/avatars';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
@@ -38,6 +37,8 @@ import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { QuizMessage } from '../../ui/QuizMessage';
 import { QuizErrorState } from '../../ui/states';
 import { canPublishPublicly, questionCountLabel, quizFrontHref } from '../model';
+import { QuizTile } from '../QuizTile';
+import { bestLabel, editedLabel, scenarioCountLabel } from '../rows-model';
 import { soloQuizQueries } from '../queries';
 
 /**
@@ -229,6 +230,12 @@ const LibraryRow = memo(function LibraryRow({
   const [refusal, setRefusal] = useState<string | null>(null);
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
   const share = useShareAction({ path: quizFrontHref(quiz.uuid), title: quiz.title });
+  // Captured once per row, so no clock read runs in render (React Compiler purity).
+  const [now] = useState(() => new Date());
+  const Mark = VISIBILITY_MARKS[quiz.visibility];
+  const scenarios = scenarioCountLabel(quiz.scenario_count);
+  const best = bestLabel(quiz.viewer_best_points);
+  const edited = editedLabel(quiz.updated_at, now);
 
   return (
     <li
@@ -243,43 +250,35 @@ const LibraryRow = memo(function LibraryRow({
             FOCUS_RING,
           )}
         >
-          <span
-            aria-hidden
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-colors group-hover:text-foreground"
-          >
-            <ClipboardList className="size-4" />
-          </span>
+          <QuizTile uuid={quiz.uuid} title={quiz.title} className="self-start" />
           <span className="min-w-0 flex-1">
-            <span className="line-clamp-2 text-[15px] font-medium text-foreground transition-colors group-hover:text-primary sm:line-clamp-1">
+            <span className="line-clamp-2 text-[15px] leading-snug font-semibold text-foreground transition-colors group-hover:text-primary">
               {quiz.title}
             </span>
-            <span className="mt-1 flex items-center gap-2 text-xs whitespace-nowrap text-muted-foreground">
-              {/* LEAD — what it is: the count, who can find it, and whether
-                  Lawexa drafted it. The chip is the one thing that may give. */}
-              <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                <span className="shrink-0">{questionCountLabel(count)}</span>
-                <span aria-hidden className="text-muted-foreground/40">
-                  ·
-                </span>
-                <VisibilityChip visibility={quiz.visibility} />
-                {quiz.is_ai_generated && (
-                  <span className="hidden min-w-0 items-center gap-1 sm:inline-flex">
-                    <LawexaMark className="size-3 shrink-0" />
-                    <span className="truncate">drafted by Lawexa</span>
-                  </span>
-                )}
+            {/* WHAT IT IS, on its own line: the count, its scenarios, and the
+                reader's best in gold. Nothing here shares a line with who can
+                take it, so nothing squeezes it (the audit's "By link" chip
+                shrunk to an icon beside a long date, 23 October 2026). */}
+            <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+              <span>{questionCountLabel(count)}</span>
+              {scenarios ? <Dot>{scenarios}</Dot> : null}
+              {best ? <Dot className="font-comfortaa font-bold text-primary">{best}</Dot> : null}
+            </span>
+            {/* WHO CAN TAKE IT, AND WHEN it was last edited, in short words. */}
+            <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <Mark aria-hidden className="size-3 shrink-0" />
+                {visibilityFace(quiz.visibility)}
               </span>
-              {/* TRAIL — when, right-anchored so the dates read straight down
-                  the list. */}
-              <span className="shrink-0 tabular-nums">
-                {formatDayLabel(quiz.created_at)}
-              </span>
+              {edited ? <Dot className="whitespace-nowrap tabular-nums">{edited}</Dot> : null}
+              {quiz.is_ai_generated && (
+                <Dot className="inline-flex items-center gap-1 whitespace-nowrap">
+                  <LawexaMark className="size-3 shrink-0" />
+                  drafted by Lawexa
+                </Dot>
+              )}
             </span>
           </span>
-          <ChevronRight
-            aria-hidden
-            className="size-4 shrink-0 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5"
-          />
         </Link>
 
         <DropdownMenu>
@@ -337,6 +336,18 @@ const LibraryRow = memo(function LibraryRow({
     </li>
   );
 });
+
+/** A fact after the first on a meta line, with its dot. */
+function Dot({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span className={cn('inline-flex items-center gap-1.5', className)}>
+      <span aria-hidden className="font-sans font-normal text-muted-foreground/40">
+        ·
+      </span>
+      {children}
+    </span>
+  );
+}
 
 /** One skeleton row at `LibraryRow`'s geometry: tile, two text lines, menu. */
 function LibraryRowSkeleton() {
