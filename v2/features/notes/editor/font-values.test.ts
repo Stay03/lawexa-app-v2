@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { NOTE_FONTS, NOTE_SIZES, noteFont, noteSize } from './font-values';
+import { NOTE_FONTS, NOTE_SIZES, noteFont, noteSize } from '@/lib/notes/note-fonts';
 
 /* Font type and size in notes (Stay, 23 October 2026: "Font size and type for
  * now"), as agreed with backend: <span data-font data-size>, values from a
@@ -43,7 +43,7 @@ test('the mark writes data attributes, never a style, and is in every note edito
 
 test('a finished draft opens in the editor with the font menus; one still being written reads', () => {
   const panel = readFileSync(join(here, '..', '..', 'conversations', 'conversation', 'draft', 'DraftPanel.tsx'), 'utf8');
-  assert.match(panel, /\{draft\.complete && conversationId \? \(\s*<DraftEditor conversationId=\{conversationId\} ordinal=\{ordinal\} markdown=\{draft\.body\} \/>/);
+  assert.match(panel, /\{draft\.complete && conversationId \? \(\s*<DraftEditor\s+conversationId=\{conversationId\}\s+ordinal=\{ordinal\}\s+title=\{draft\.title\}\s+markdown=\{draft\.body\}\s+space=\{space\}\s+\/>/);
   const editor = readFileSync(join(here, '..', '..', 'conversations', 'conversation', 'draft', 'DraftEditor.tsx'), 'utf8');
   assert.match(editor, /<FontMenu editor=\{editor\} \/>\s*<SizeMenu editor=\{editor\} \/>/);
   assert.match(editor, /content: readDraftEdit\(conversationId, ordinal\) \?\? markdownToDoc\(markdown\),/);

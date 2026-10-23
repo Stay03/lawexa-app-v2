@@ -114,7 +114,7 @@ export function createNoteExtensions({
     TableKit.configure({ table: false }),
     EditorTable.configure({ resizable: false }),
     // Font type and size (the draft editor, 23 October 2026): one span with
-    // data attributes from a closed list (font-values.ts), never a style. In
+    // data attributes from a closed list (lib/notes/note-fonts.ts), never a style. In
     // every note editor, so a note saved from a draft keeps its fonts when it
     // is edited later.
     FontStyle,

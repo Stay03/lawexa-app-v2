@@ -1,4 +1,4 @@
-/* A note's font type and size (font-values.ts), drawn from the span's data
+/* A note's font type and size (lib/notes/note-fonts.ts), drawn from the span's data
    attributes, never from an inline style: the editor and the reader paint the
    same closed list, and a value outside it has no rule, so it shows in the
    house font. Scoped to `.v2-note-fonts`, the editing and reading surfaces.

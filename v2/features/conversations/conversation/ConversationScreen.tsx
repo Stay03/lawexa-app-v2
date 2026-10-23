@@ -401,7 +401,7 @@ export function ConversationScreen({
       {embed ? (
         transcript
       ) : (
-        <SidePanelProvider offsets={offsets}>
+        <SidePanelProvider offsets={offsets} space={controller.space}>
           <div className="flex h-full min-h-0">
             {transcript}
             <SidePanelSlot messages={messages} streamingText={streamingText} />

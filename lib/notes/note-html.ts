@@ -1,3 +1,4 @@
+import { noteFont, noteSize, type NoteFont, type NoteSize } from './note-fonts';
 import { htmlToPlainText } from './plain-text';
 
 /**
@@ -44,9 +45,10 @@ import { htmlToPlainText } from './plain-text';
  *       of three dispositions ({@link RENDER_AS}, {@link DROP_SUBTREE}, and
  *       "everything else"), and attributes are dropped WHOLESALE except the
  *       ones the model actually carries (`href`, `src`, `alt`, a cell's
- *       `colspan`/`rowspan`, and a block's `text-align`), each of which is
- *       re-validated here into a URL, a small whole number or one of three
- *       words. There is no "strip the dangerous ones" step to fall behind a new
+ *       `colspan`/`rowspan`, a block's `text-align`, and a font span's
+ *       `data-font`/`data-size`), each of which is re-validated here into a
+ *       URL, a small whole number, one of three words, or one value of a
+ *       closed list (note-fonts.ts). There is no "strip the dangerous ones" step to fall behind a new
  *       attack; an attribute survives only by being named.
  *
  *   (c) THE OUTPUT CANNOT CARRY MARKUP. A {@link NoteNode} holds text, a tag
@@ -112,7 +114,11 @@ export type NoteTag =
   | 'caption'
   | 'thead'
   | 'tbody'
-  | 'tr';
+  | 'tr'
+  // A run in a chosen font or size (the draft editor, 23 October 2026). Made
+  // ONLY for a `<span>` whose `data-font` or `data-size` is an allowed value;
+  // every other span still unwraps.
+  | 'span';
 
 /** A block's alignment, from the editor's `text-align`. Left is the page's
  *  own and is never stored, so it is not a value. */
@@ -129,7 +135,16 @@ export type NoteLinkMode =
 
 export type NoteNode =
   | { kind: 'text'; key: string; text: string }
-  | { kind: 'element'; key: string; tag: NoteTag; align?: NoteAlign; children: NoteNode[] }
+  | {
+      kind: 'element';
+      key: string;
+      tag: NoteTag;
+      align?: NoteAlign;
+      /** A `span`'s font and size, each an allowed value (note-fonts.ts). */
+      font?: NoteFont;
+      size?: NoteSize;
+      children: NoteNode[];
+    }
   /** A table cell. A span is there only when it is more than one. */
   | {
       kind: 'cell';
@@ -709,6 +724,18 @@ function pushConverted(
     const align = ALIGNABLE.has(rendered) ? textAlign(element) : undefined;
     out.push({ kind: 'element', key: keys.take(), tag: rendered, ...(align && { align }), children });
     return;
+  }
+
+  // A FONT SPAN keeps its run, its font and its size, when at least one value
+  // is allowed; the values are re-read from the closed list, never copied.
+  if (tag === 'span') {
+    const font = noteFont(element.getAttribute('data-font')) ?? undefined;
+    const size = noteSize(element.getAttribute('data-size')) ?? undefined;
+    if (font || size) {
+      const children = convertChildren(element, keys, depth + 1, inParagraph);
+      out.push({ kind: 'element', key: keys.take(), tag: 'span', ...(font && { font }), ...(size && { size }), children });
+      return;
+    }
   }
 
   // UNWRAP — the element disappears, its reading stays. `div`, `span`, `font`,

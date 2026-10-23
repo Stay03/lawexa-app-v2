@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { CaseMentionLink } from '@/v2/features/conversations/conversation/markdown/CaseMentionLink';
 import { parseNoteHtml, type NoteNode, type NoteTag } from '@/lib/notes/note-html';
 import { NOTE_ALIGN_CLASS } from '@/lib/notes/note-elements';
+import '@/v2/features/notes/note-fonts.css';
 
 /**
  * NoteContent — the note body, as REACT ELEMENTS.
@@ -29,8 +30,10 @@ import { NOTE_ALIGN_CLASS } from '@/lib/notes/note-elements';
  *
  * The node kinds that DO carry props are the ones the parser validated: a case
  * mention (a slug), a link (a URL and how to open it), an image (a URL and its
- * alt text), a table cell (its spans, whole numbers), and an aligned block,
- * whose word becomes a class from a closed table (`NOTE_ALIGN_CLASS`). Each is
+ * alt text), a table cell (its spans, whole numbers), an aligned block,
+ * whose word becomes a class from a closed table (`NOTE_ALIGN_CLASS`), and a
+ * font run, whose font and size are values from a closed list
+ * (lib/notes/note-fonts.ts), drawn by `note-fonts.css`. Each is
  * rendered by the component that owns that behaviour, so this file holds no
  * policy of its own.
  *
@@ -58,7 +61,7 @@ const LINK_CLASS =
 export function NoteContent({ html }: { html: string }) {
   const nodes = useMemo(() => parseNoteHtml(html), [html]);
   if (nodes.length === 0) return null;
-  return <div className="v2-note-body">{renderNodes(nodes)}</div>;
+  return <div className="v2-note-body v2-note-fonts">{renderNodes(nodes)}</div>;
 }
 
 function renderNodes(nodes: readonly NoteNode[]): ReactNode {
@@ -81,6 +84,15 @@ function renderNode(node: NoteNode): ReactNode {
           <div key={node.key} className="v2-note-table">
             <table>{renderNodes(node.children)}</table>
           </div>
+        );
+      }
+      // A font run carries its two checked values as the data attributes
+      // note-fonts.css draws (the same rules the editor uses), never a style.
+      if (node.tag === 'span') {
+        return createElement(
+          'span',
+          { key: node.key, 'data-font': node.font, 'data-size': node.size },
+          renderNodes(node.children),
         );
       }
       return createElement(

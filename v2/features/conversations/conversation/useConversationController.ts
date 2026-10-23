@@ -11,6 +11,7 @@ import {
 } from '@/v2/runtime/chat-engine';
 import type {
   ConversationReference,
+  ConversationSpaceRef,
   ConversationStatusData,
   ConversationTurnUser,
   MessageAttachment,
@@ -202,6 +203,9 @@ export interface ConversationController {
   isSpaceChat: boolean;
   /** The chat's space, or null: where a space chat's attachments are uploaded. */
   spaceUuid: string | null;
+  /** The same space with its name, from the record (null until it answers):
+   *  where a draft's Save to folder files a note. */
+  space: ConversationSpaceRef | null;
   /** Name who asked each user turn: a space chat whose record carries the B4
    *  fields. False on a personal chat, which looks exactly as before. */
   showAuthors: boolean;
@@ -1136,6 +1140,7 @@ export function useConversationController(
     viewOnlyReason: viewOnlyReason(detailData),
     isSpaceChat,
     spaceUuid,
+    space: detailData?.space ?? null,
     showAuthors,
     spaceRoster,
     recordRoster,

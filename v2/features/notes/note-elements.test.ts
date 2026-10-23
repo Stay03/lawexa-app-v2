@@ -102,3 +102,24 @@ test('an aligned block gets a class from the closed table, never a style; a high
   );
   assert.doesNotMatch(html, /style=/);
 });
+
+/* Font type and size (the draft editor, 23 October 2026): the walker keeps a
+ * font span only with an allowed value, and v1's renderer draws it as a plain
+ * span, so the old reader looks as it did. */
+test('a font run reaches v1 as a plain span with no attributes', () => {
+  const html = markup([
+    { kind: 'element', key: 's', tag: 'span', font: 'Georgia', size: 14, children: [text('t', 'TEST DATA clause')] },
+  ]);
+  assert.equal(html, '<div><span>TEST DATA clause</span></div>');
+});
+
+test('the walker re-reads a font span from the closed list, and v2 draws the data attributes', async () => {
+  const { readFileSync } = await import('node:fs');
+  const walker = readFileSync(new URL('../../../lib/notes/note-html.ts', import.meta.url), 'utf8');
+  assert.match(walker, /const font = noteFont\(element\.getAttribute\('data-font'\)\) \?\? undefined;/);
+  assert.match(walker, /const size = noteSize\(element\.getAttribute\('data-size'\)\) \?\? undefined;/);
+  assert.match(walker, /if \(font \|\| size\) \{/);
+  const reader = readFileSync(new URL('./reader/NoteContent.tsx', import.meta.url), 'utf8');
+  assert.match(reader, /\{ key: node\.key, 'data-font': node\.font, 'data-size': node\.size \}/);
+  assert.match(reader, /className="v2-note-body v2-note-fonts"/);
+});

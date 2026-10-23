@@ -18,7 +18,9 @@ import { StyleSelect } from '@/v2/features/notes/editor/StyleSelect';
 import { ToolbarButton, ToolbarDivider } from '@/v2/features/notes/editor/ToolbarButton';
 import { BLOCK_VERBS, REDO_KEYS, TEXT_VERBS, UNDO_KEYS } from '@/v2/features/notes/editor/toolbar-verbs';
 import '@/v2/features/notes/note-fonts.css';
-import { readDraftEdit, writeDraftEdit } from './draft-edits';
+import type { ConversationSpaceRef } from '@/types/chat';
+import { readDraftEdit, readSavedDraftNote, writeDraftEdit } from './draft-edits';
+import { DraftSaveBar } from './DraftSaveBar';
 import { markdownToDoc } from './markdown-to-doc';
 
 /**
@@ -32,18 +34,25 @@ import { markdownToDoc } from './markdown-to-doc';
  *
  * It opens from the reader's earlier edits if they made any this visit
  * (draft-edits.ts), else from the draft's Markdown (markdown-to-doc.ts). Every
- * change is kept there as it is typed. Keeping the draft for good is Save as
- * note, the next piece.
+ * change is kept there as it is typed. Save as note (DraftSaveBar.tsx) keeps
+ * it for good, and offers the note's links once it is one.
  */
 export function DraftEditor({
   conversationId,
   ordinal,
+  title,
   markdown,
+  space,
 }: {
   conversationId: string;
   ordinal: number;
+  title: string;
   markdown: string;
+  /** The chat's Space, for Save to Space folder; `null` outside one. */
+  space: ConversationSpaceRef | null;
 }) {
+  // Changed since its last save, or never saved: what Save offers.
+  const [dirty, setDirty] = useState(() => readSavedDraftNote(conversationId, ordinal) === undefined);
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
   const [extensions] = useState(() =>
@@ -57,7 +66,10 @@ export function DraftEditor({
     immediatelyRender: false,
     extensions,
     content: readDraftEdit(conversationId, ordinal) ?? markdownToDoc(markdown),
-    onUpdate: ({ editor: instance }) => writeDraftEdit(conversationId, ordinal, instance.getJSON()),
+    onUpdate: ({ editor: instance }) => {
+      writeDraftEdit(conversationId, ordinal, instance.getJSON());
+      setDirty(true);
+    },
     editorProps: {
       transformPastedHTML: stripPastedPresentation,
       attributes: {
@@ -83,6 +95,17 @@ export function DraftEditor({
       <div className="mx-auto w-full max-w-[68ch] flex-1 px-5 py-6 xl:px-8">
         <EditorContent editor={editor} />
       </div>
+      {editor ? (
+        <DraftSaveBar
+          editor={editor}
+          conversationId={conversationId}
+          ordinal={ordinal}
+          title={title}
+          dirty={dirty}
+          onSaved={() => setDirty(false)}
+          space={space}
+        />
+      ) : null}
     </div>
   );
 }
@@ -91,8 +114,10 @@ const LIST_VERBS = BLOCK_VERBS.filter((verb) => verb.verb === 'bulletList' || ve
 const MARK_VERBS = TEXT_VERBS.filter((verb) => verb.verb === 'bold' || verb.verb === 'italic' || verb.verb === 'underline');
 
 /**
- * The panel's one bar: it sticks to the panel's top while the draft scrolls,
- * and scrolls sideways itself in a narrow panel rather than wrapping.
+ * The panel's one bar: it sticks to the panel's top while the draft scrolls.
+ * On a phone it is one row that scrolls sideways, so the sheet keeps its text;
+ * beside the chat on a computer it wraps onto a second row, so every control
+ * is in sight (the first pictures had lists, alignment and Copy past the edge).
  */
 function DraftToolbar({ editor }: { editor: Editor }) {
   const state = useFormatState(editor);
@@ -105,7 +130,7 @@ function DraftToolbar({ editor }: { editor: Editor }) {
       role="toolbar"
       aria-label="Formatting"
       aria-orientation="horizontal"
-      className="v2-quiet-scroll sticky top-0 z-10 flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border/70 bg-popover/95 px-3 py-1.5 backdrop-blur-sm xl:px-4"
+      className="v2-quiet-scroll sticky top-0 z-10 flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-border/70 bg-popover/95 px-3 py-1.5 backdrop-blur-sm xl:flex-wrap xl:gap-y-1 xl:overflow-visible xl:px-4"
     >
       <ToolbarButton
         compact

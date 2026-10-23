@@ -7,6 +7,7 @@ import { useStreamingText } from '@/v2/runtime/chat-engine/use-conversation-stre
 import { useV2ChatContext } from '../chat-context';
 import { MarkdownText } from '../markdown/MarkdownText';
 import { ChatSidePanel } from '../side-panel/ChatSidePanel';
+import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, draftsIn, type DraftBlock } from './draft-blocks';
 import { locateDraft } from './draft-ordinals';
 import { DraftEditor } from './DraftEditor';
@@ -37,6 +38,7 @@ export function DraftPanel({
   const streamingMessage = 'streamingIndex' in place ? messages.findLast((message) => message.isStreaming) : undefined;
   const live = useStreamingText(streamingText, streamingMessage?.id ?? '');
   const conversationId = useV2ChatContext()?.conversationId;
+  const space = useSidePanel()?.space ?? null;
 
   let draft: DraftBlock | null = null;
   if ('messageId' in place) {
@@ -64,7 +66,13 @@ export function DraftPanel({
       icon={<DraftIcon />}
     >
       {draft.complete && conversationId ? (
-        <DraftEditor conversationId={conversationId} ordinal={ordinal} markdown={draft.body} />
+        <DraftEditor
+          conversationId={conversationId}
+          ordinal={ordinal}
+          title={draft.title}
+          markdown={draft.body}
+          space={space}
+        />
       ) : (
         <article className="mx-auto w-full max-w-[68ch] px-5 py-6 xl:px-8 xl:py-8">
           <MarkdownText content={draft.body} animate={!draft.complete && Boolean(streamingMessage)} />

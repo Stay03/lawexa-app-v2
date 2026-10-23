@@ -97,3 +97,22 @@ test('the status says finished, being written, or cut short in a saved answer', 
   assert.equal(draftStatus({ title: 'A', body, complete: false }, true), 'Writing · 3 words');
   assert.equal(draftStatus({ title: 'A', body, complete: false }, false), 'Unfinished · 3 words');
 });
+
+test('a failed Save as note names a newer copy and the size cap, else asks to retry', async () => {
+  const { saveFailureSentence } = await import('./draft-save-failure');
+  assert.equal(saveFailureSentence({ response: { status: 409 } }), 'This note was changed somewhere else. Open it to see the newer copy.');
+  assert.equal(saveFailureSentence({ response: { status: 413 } }), 'This draft is too large to save as one note.');
+  assert.equal(saveFailureSentence(new Error('offline')), "Couldn't save the note. Check your connection and try again.");
+});
+
+test('Save as note makes a note once, then updates it with the copy it was made from', async () => {
+  const { readFileSync } = await import('node:fs');
+  const hook = readFileSync(new URL('./use-save-draft-note.ts', import.meta.url), 'utf8');
+  assert.match(hook, /notesApi\.update\(saved\.id, \{ title: cleanTitle, content: html, base_updated_at: saved\.updatedAt \}\)/);
+  assert.match(hook, /: notesApi\.create\(\{ title: cleanTitle, content: html \}\);/);
+  assert.match(hook, /invalidates: \[notesQueries\.lists\(\)\]/);
+  const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
+  assert.match(bar, /<ExportMenu slug=\{saved\.slug\} \/>/);
+  assert.match(bar, /target=\{\{ type: 'note', contentId: saved\.id \}\}/);
+  assert.match(bar, /space=\{space \?\? undefined\}/);
+});

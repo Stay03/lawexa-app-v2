@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { FONT_STYLE } from './font-style';
-import { HOUSE_FONT_LABEL, NOTE_FONTS, NOTE_SIZES, noteFont, noteSize, type NoteFont, type NoteSize } from './font-values';
+import { HOUSE_FONT_LABEL, NOTE_FONTS, NOTE_SIZES, noteFont, noteSize, type NoteFont, type NoteSize } from '@/lib/notes/note-fonts';
 
 /**
  * FontMenu and SizeMenu — the toolbar's font type and size (the draft editor,

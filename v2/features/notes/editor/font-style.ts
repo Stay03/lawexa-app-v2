@@ -1,10 +1,10 @@
 import { Mark, mergeAttributes, type CommandProps } from '@tiptap/core';
 
-import { noteFont, noteSize, type NoteFont, type NoteSize } from './font-values';
+import { noteFont, noteSize, type NoteFont, type NoteSize } from '@/lib/notes/note-fonts';
 
 /**
  * FontStyle — a note's font and size as ONE mark, written as the span the
- * contract names (font-values.ts): `<span data-font="…" data-size="…">`, with
+ * contract names (lib/notes/note-fonts.ts): `<span data-font="…" data-size="…">`, with
  * no `style` attribute, so the reader and the downloads read the same thing.
  *
  * One mark with two attributes rather than two marks, so a run that has both

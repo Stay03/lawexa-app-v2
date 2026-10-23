@@ -1,5 +1,5 @@
 /**
- * font-values — the fonts and sizes a note may carry, and nothing else
+ * note-fonts — the fonts and sizes a note may carry, and nothing else
  * (Stay, 23 October 2026: "Font size and type for now"; the contract agreed
  * with backend the same day, which its HTML cleaner and the Word and PDF
  * downloads keep to the letter).

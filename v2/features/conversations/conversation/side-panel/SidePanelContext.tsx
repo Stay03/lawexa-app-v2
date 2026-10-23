@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 
+import type { ConversationSpaceRef } from '@/types/chat';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import {
   SIDE_PANEL_PARAM,
@@ -35,6 +36,8 @@ export interface SidePanelApi {
   finishClose: () => void;
   /** How many drafts come before an answer's own (0 for an answer not in the map). */
   draftOffset: (messageId: string) => number;
+  /** The chat's Space, where a draft's Save to folder files it; `null` outside one. */
+  space: ConversationSpaceRef | null;
 }
 
 const SidePanelContext = createContext<SidePanelApi | null>(null);
@@ -46,9 +49,11 @@ export function useSidePanel(): SidePanelApi | null {
 
 export function SidePanelProvider({
   offsets,
+  space,
   children,
 }: {
   offsets: ReadonlyMap<string, number>;
+  space: ConversationSpaceRef | null;
   children: ReactNode;
 }) {
   const overlay = useUrlOverlay(SIDE_PANEL_PARAM);
@@ -73,8 +78,8 @@ export function SidePanelProvider({
   const draftOffset = useCallback((messageId: string) => offsets.get(messageId) ?? 0, [offsets]);
 
   const api = useMemo<SidePanelApi>(
-    () => ({ target, closing, open, close, finishClose, draftOffset }),
-    [target, closing, open, close, finishClose, draftOffset],
+    () => ({ target, closing, open, close, finishClose, draftOffset, space }),
+    [target, closing, open, close, finishClose, draftOffset, space],
   );
 
   return <SidePanelContext.Provider value={api}>{children}</SidePanelContext.Provider>;

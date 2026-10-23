@@ -117,7 +117,7 @@ type ExportFormat = keyof typeof EXPORT_FORMATS;
  * this one", which is a different sentence from "the download failed", and a
  * reader who sees the generic one will try again forever.
  */
-function ExportMenu({ slug }: { slug: string }) {
+export function ExportMenu({ slug }: { slug: string }) {
   const [exporting, setExporting] = useState(false);
   const revokeRef = useRef<number | null>(null);
 
