@@ -121,7 +121,15 @@ test('Cancel, Escape, a tap outside and Back all go through the discard question
   assert.match(dialog, /const dirty = !isEdit && hasFormContent\(\{ title, description, questions, scenarios \}\);/);
   assert.match(dialog, /onOpenChange=\{requestClose\}/);
   assert.match(dialog, /onClick=\{\(\) => requestClose\(false\)\}/);
-  assert.match(dialog, /window\.addEventListener\('popstate', onBack\);/);
+  // Back takes one extra step while filled in, and asks; every close takes that step first.
+  assert.match(dialog, /const backGuard = useBackGuard\(open && dirty, \(\) => setConfirmDiscard\(true\)\);/);
+  assert.match(dialog, /const close = \(\) => backGuard\.release\(\(\) => onOpenChange\(false\)\);/);
+  assert.doesNotMatch(dialog, /^\s+onOpenChange\(false\);$/m);
+  assert.match(dialog, /if \(!next && !discardingRef\.current\) backGuard\.rearm\(\);/);
+  const guard = readFileSync(new URL('../../../runtime/use-back-guard.ts', import.meta.url), 'utf8');
+  // The extra step is the same address, never a push from inside the Back event.
+  assert.match(guard, /quietPushStampedCopy\(\{ \[GUARD_KEY\]: 'on' \}\)/);
+  assert.match(guard, /if \(releasingRef\.current \|\| readHistoryStamp\(GUARD_KEY\) !== null\) return;/);
   assert.match(dialog, /<AlertDialogTitle>Discard changes\?<\/AlertDialogTitle>/);
   assert.match(dialog, /<AlertDialogCancel>Keep editing<\/AlertDialogCancel>/);
   const library = readFileSync(new URL('../../quiz/solo/library/LibraryScreen.tsx', import.meta.url), 'utf8');

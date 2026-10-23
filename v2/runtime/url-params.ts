@@ -180,6 +180,20 @@ export function quietPushUrlParams(
   return true;
 }
 
+/**
+ * Quietly ADD a copy of the current entry, same address, with `stamp` on its
+ * state: one extra Back step that lands on the page as it is, for a form that
+ * asks before it is left (`useBackGuard`). Refused (false) when the entry is not
+ * the router's, since a stamp there would be lost and the guard never seen.
+ */
+export function quietPushStampedCopy(stamp: Record<string, string>): boolean {
+  if (typeof window === 'undefined') return false;
+  const current: unknown = window.history.state;
+  if (!isRouterOwnedState(current)) return false;
+  window.history.pushState({ ...current, ...stamp }, '', window.location.href);
+  return true;
+}
+
 /** Read a key written by {@link quietPushUrlParams}'s `stamp` off the CURRENT
  *  entry. `null` whenever the entry was not stamped, or the stamp was lost. */
 export function readHistoryStamp(key: string): string | null {

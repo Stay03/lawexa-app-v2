@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 
@@ -39,6 +39,7 @@ import type {
 } from '@/types/channel-quiz';
 import { canPublishPublicly } from '@/v2/features/quiz/solo/model';
 import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
+import { useBackGuard } from '@/v2/runtime/use-back-guard';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useCreateLibraryQuiz, useCreateQuiz, useUpdateQuiz } from './mutations';
 import { channelQuizQueries } from './queries';
@@ -251,26 +252,26 @@ export function QuizFormDialog({
   // (its saved copy is still there), close at once.
   const dirty = !isEdit && hasFormContent({ title, description, questions, scenarios });
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // The device's Back asks too: while there is something to lose, Back takes
+  // one extra step that leaves the form where it is, and the question shows.
+  const backGuard = useBackGuard(open && dirty, () => setConfirmDiscard(true));
+  const close = () => backGuard.release(() => onOpenChange(false));
   const requestClose = (next: boolean) => {
     if (next) {
       onOpenChange(true);
       return;
     }
     if (dirty && !submitting) setConfirmDiscard(true);
-    else onOpenChange(false);
+    else close();
   };
-  // Back is the one way out the overlay does not see: where the form has its
-  // own address (`?quiz-form=`, the library's), Back has already closed it, so
-  // the form opens again and asks. Only while there is something to lose.
-  useEffect(() => {
-    if (!open || !dirty) return;
-    const onBack = () => {
-      onOpenChange(true);
-      setConfirmDiscard(true);
-    };
-    window.addEventListener('popstate', onBack);
-    return () => window.removeEventListener('popstate', onBack);
-  }, [open, dirty, onOpenChange]);
+  // Set by Discard, whose tap also closes the question: that close is not
+  // "Keep editing" and must not put the extra Back step back.
+  const discardingRef = useRef(false);
+  const onConfirmDiscardChange = (next: boolean) => {
+    setConfirmDiscard(next);
+    // Keep editing: Back asks again next time.
+    if (!next && !discardingRef.current) backGuard.rearm();
+  };
 
   const updateScenario = (key: string, patch: Partial<ScenarioDraft>) => {
     setScenarios((prev) => prev.map((scenario) => (scenario.key === key ? { ...scenario, ...patch } : scenario)));
@@ -356,7 +357,7 @@ export function QuizFormDialog({
         },
         {
           onSuccess: (response) => {
-            onOpenChange(false);
+            close();
             onSaved?.(response.data);
           },
           onError,
@@ -374,7 +375,7 @@ export function QuizFormDialog({
     };
     const onCreated = {
       onSuccess: (response: ChannelQuizResponse) => {
-        onOpenChange(false);
+        close();
         onSaved?.(response.data);
       },
       onError,
@@ -621,7 +622,7 @@ export function QuizFormDialog({
           </>
         )}
       </div>
-      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+      <AlertDialog open={confirmDiscard} onOpenChange={onConfirmDiscardChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Discard changes?</AlertDialogTitle>
@@ -634,8 +635,9 @@ export function QuizFormDialog({
             <AlertDialogAction
               variant="destructive"
               onClick={() => {
+                discardingRef.current = true;
                 setConfirmDiscard(false);
-                onOpenChange(false);
+                close();
               }}
             >
               Discard
