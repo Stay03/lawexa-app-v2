@@ -32,10 +32,11 @@ import { QuizHomeTabs } from './QuizHomeTabs';
  * create an account on a guest pass. While a visitor's guest pass is still
  * being minted it draws the list's skeleton, so the panel does not flash.
  *
- * ── NEW QUIZ IS ON THE TABS LINE, ON MY QUIZZES ────────────────────────────
+ * ── NEW QUIZ IS ON THE TABS LINE, ON BOTH TABS ─────────────────────────────
  * The form belongs to the home (`useQuizForm`), so the pill on the tabs line
- * and a row's Edit open the same dialog. It shows only on My quizzes, and only
- * to an account that may write one.
+ * and a card's Edit open the same dialog. It shows on Explore and on My
+ * quizzes alike (Stay, 23 October 2026: "Both"), and only to an account that
+ * may write one: a guest and a visitor never see it.
  *
  * The tab is the query string, read on every render, so the strip is static
  * chrome and a tab is a shareable link.
@@ -67,7 +68,7 @@ export function QuizHomeScreen() {
 
       <div className="mb-3 flex items-center justify-between gap-3">
         <QuizHomeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
-        {tab === 'mine' && canWrite ? (
+        {canWrite ? (
           <button
             type="button"
             onClick={() => openForm()}
@@ -102,7 +103,7 @@ export function QuizHomeScreen() {
  * The home's route fallback (`app/v2/quiz/(home)/loading.tsx`): the same
  * title and tab strip, drawn for real but inert, over the row skeleton, so the
  * boundary hands over to the live screen without a jump. New quiz is not
- * reserved: whether it exists depends on the tab and the viewer.
+ * reserved: whether it exists depends on the viewer.
  */
 export function QuizHomeFallback() {
   return (
