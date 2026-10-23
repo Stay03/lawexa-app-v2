@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Boxes } from 'lucide-react';
+import { Blocks } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -45,7 +45,7 @@ export function SpaceFolderMark({
           : 'bg-secondary',
       )}
     >
-      <Boxes aria-hidden className="size-full stroke-[2.6]" />
+      <Blocks aria-hidden className="size-full stroke-[2.6]" />
     </span>
   );
   if (!tooltip) return <span aria-hidden>{glyph}</span>;
@@ -71,7 +71,7 @@ export function spaceFolderNote(spaceName: string): string {
 export function SpaceFolderLine({ space }: { space: { uuid: string; name: string } }) {
   return (
     <p className="-mt-1 mb-3 flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-      <Boxes aria-hidden className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+      <Blocks aria-hidden className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
       <span className="shrink-0">In</span>
       <Link
         href={`/spaces/${space.uuid}`}

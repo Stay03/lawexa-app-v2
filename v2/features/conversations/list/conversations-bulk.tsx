@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Boxes, Lock, Trash2 } from 'lucide-react';
+import { Blocks, Lock, Trash2 } from 'lucide-react';
 
 import type { ConversationListItem } from '@/types/chat';
 import { bulkApi } from '@/v2/features/bulk/api';
@@ -83,7 +83,7 @@ export function useConversationsBulk({ rows }: { rows: readonly ConversationList
       noun={NOUN}
     >
       {offered.has('space') ? (
-        <BulkBarAction icon={Boxes} label="Move to a space" disabled={off} onClick={() => setDialog('space')} />
+        <BulkBarAction icon={Blocks} label="Move to a space" disabled={off} onClick={() => setDialog('space')} />
       ) : null}
       {offered.has('make_private') ? (
         <BulkBarAction

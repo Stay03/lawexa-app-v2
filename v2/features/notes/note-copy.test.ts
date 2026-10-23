@@ -42,7 +42,7 @@ test('the reader and the editor follow the copy rules', () => {
   const doc = read('reader', 'NoteDocument.tsx');
   // A copy reads as a plain note (Stay, 19 October 2026, 20:55Z): no Space
   // label and no link to the original, on the page or in the editor.
-  assert.doesNotMatch(doc, /Copied from|Boxes|spaceHref|copied_from/);
+  assert.doesNotMatch(doc, /Copied from|Blocks|spaceHref|copied_from/);
   assert.match(doc, /const isSpaceCopy = noteSpace\(note\) !== null;/);
   // No "Add to folder" on a copy: the server files it only in its own Space's folders.
   assert.match(doc, /canAddToFolder=\{!isSpaceCopy\}/);

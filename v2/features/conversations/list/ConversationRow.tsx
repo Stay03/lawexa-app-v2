@@ -4,7 +4,7 @@ import { Fragment } from 'react';
 
 import { MoveFirstLink } from '@/v2/shell/move-first';
 import {
-  Boxes,
+  Blocks,
   ChevronRight,
   FolderOutput,
   MessageSquare,
@@ -176,7 +176,7 @@ export function ConversationRow({
           </span>
         ) : spaceName ? (
           <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-            <Boxes aria-hidden className="size-3 shrink-0" />
+            <Blocks aria-hidden className="size-3 shrink-0" />
             <span className="truncate">{spaceName}</span>
           </span>
         ) : origin ? (
@@ -282,8 +282,8 @@ const NO_ACTIONS: readonly ConversationMenuAction[] = [];
 
 const MENU_ICONS: Readonly<Record<ConversationMenuItem, typeof Trash2>> = {
   rename: Pencil,
-  move_to_space: Boxes,
-  move: Boxes,
+  move_to_space: Blocks,
+  move: Blocks,
   remove: FolderOutput,
   share: Share2,
   delete: Trash2,

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Boxes, FolderOutput, Pencil, Share2, Trash2 } from 'lucide-react';
+import { Blocks, FolderOutput, Pencil, Share2, Trash2 } from 'lucide-react';
 
 import { stripPastedTags } from '@/lib/utils';
 import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
@@ -121,7 +121,7 @@ export function ConversationActions({
           return {
             id: 'move-chat',
             label,
-            icon: Boxes,
+            icon: Blocks,
             onSelect: () => setMove((previous) => ({ open: true, key: previous.key + 1 })),
           };
         case 'remove':

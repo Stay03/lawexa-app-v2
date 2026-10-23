@@ -104,7 +104,7 @@ test('the sidebar and the drawer name the space under a recent chat, as the chat
   assert.equal(recentSpaceName({}), null);
   const label = read('v2', 'shell', 'recent-chat-label.tsx');
   assert.match(label, /if \(!spaceName\) return <span className="truncate">\{title\}<\/span>;/);
-  assert.match(label, /<Boxes aria-hidden className="size-3! shrink-0" \/>\s*<span className="sr-only">, in <\/span>\s*<span className="truncate">\{spaceName\}<\/span>/);
+  assert.match(label, /<Blocks aria-hidden className="size-3! shrink-0" \/>\s*<span className="sr-only">, in <\/span>\s*<span className="truncate">\{spaceName\}<\/span>/);
   const sidebar = read('v2', 'shell', 'V2Sidebar.tsx');
   assert.match(sidebar, /const spaceName = recentSpaceName\(conversation\);/);
   assert.match(sidebar, /size=\{spaceName \? 'lg' : 'default'\}/);

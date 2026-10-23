@@ -463,7 +463,7 @@ test('the invitations screen has a title on a desktop and keeps Spaces lit in th
   assert.equal(isNavItemActive(spaces, isActive('/folders')), false);
   assert.equal(isNavItemActive({ href: '/folders' }, isActive('/invitations')), false);
   const nav = read('v2', 'shell', 'nav.config.ts');
-  assert.match(nav, /href: '\/spaces',\s*icon: Boxes,[\s\S]*?alsoActiveOn: \['\/invitations'\],/);
+  assert.match(nav, /href: '\/spaces',\s*icon: Blocks,[\s\S]*?alsoActiveOn: \['\/invitations'\],/);
 });
 
 test('a thread row truncates once at most', () => {

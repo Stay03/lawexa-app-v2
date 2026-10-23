@@ -1,6 +1,6 @@
 import {
   Bookmark,
-  Boxes,
+  Blocks,
   FolderClosed,
   GraduationCap,
   Library,
@@ -165,7 +165,7 @@ export const v2NavItems: V2NavItem[] = [
   {
     label: 'Spaces',
     href: '/spaces',
-    icon: Boxes,
+    icon: Blocks,
     // The invitations screen is opened from the spaces list's pill, so the
     // row stays lit there instead of the nav losing its place.
     alsoActiveOn: ['/invitations'],

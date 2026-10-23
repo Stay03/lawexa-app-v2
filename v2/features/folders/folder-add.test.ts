@@ -18,7 +18,7 @@ const read = (...parts: string[]) => readFileSync(join(here, ...parts), 'utf8').
 test('the "+" is a labelled Add with the folder’s ways in', () => {
   const add = read('detail', 'FolderAdd.tsx');
   assert.match(add, /<Plus aria-hidden className="size-4" \/>\s*Add\s*<\/DropdownMenuTrigger>/);
-  assert.match(add, /\{choices\.fromSpace \? \(\s*<DropdownMenuItem onSelect=\{choices\.fromSpace\}>\s*<Boxes \/>\s*Files from this space/);
+  assert.match(add, /\{choices\.fromSpace \? \(\s*<DropdownMenuItem onSelect=\{choices\.fromSpace\}>\s*<Blocks \/>\s*Files from this space/);
   assert.match(add, /<DropdownMenuItem onSelect=\{choices\.upload\}>\s*<Upload \/>\s*Upload a file/);
   assert.match(add, /<DropdownMenuItem onSelect=\{choices\.newSubfolder\}>\s*<FolderPlus \/>\s*New subfolder/);
   const screen = read('detail', 'FolderScreen.tsx');

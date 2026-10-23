@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { folderRow } from './folder-row-model';
@@ -53,7 +53,7 @@ test('the Folders page marks Space folders, with the tooltip and the screen-read
   assert.match(mark, /return `, in \$\{spaceName\}`;/);
   // The Space cubes in the folder's own yellow, half over the corner, on a
   // square of the ground behind them; no disc and no people glyph.
-  assert.match(mark, /<Boxes aria-hidden className="size-full stroke-\[2\.6\]" \/>/);
+  assert.match(mark, /<Blocks aria-hidden className="size-full stroke-\[2\.6\]" \/>/);
   assert.match(mark, /absolute -bottom-0\.5 -right-0\.5 flex size-\[11px\]/);
   assert.match(mark, /'text-amber-500 dark:text-amber-400'/);
   assert.match(mark, /bg-background group-hover:bg-\[color-mix/);
@@ -75,4 +75,17 @@ test('the Add to folder picker wears the same mark on its tiles', () => {
   const picker = read('picker', 'PickerRows.tsx');
   assert.match(picker, /\{folder\.space \? <SpaceFolderMark spaceName=\{folder\.space\.name\} ground="tile" \/> : null\}/);
   assert.match(picker, /spaceFolderNote\(folder\.space\.name\)/);
+});
+
+test('a space is drawn with lucide\'s Blocks everywhere in v2 (Stay, 23 October 2026, 09:37Z: "11. Lucide blocks")', () => {
+  // Every v2 source file: no Boxes mark left, the old Spaces icon.
+  const root = join(process.cwd(), 'v2');
+  const files = readdirSync(root, { recursive: true, encoding: 'utf8' }).filter(
+    (file) => /\.(ts|tsx)$/.test(file) && !file.endsWith('.test.ts'),
+  );
+  const left = files.filter((file) => /\bBoxes\b/.test(readFileSync(join(root, file), 'utf8')));
+  assert.deepEqual(left, []);
+  // The sidebar's Spaces row and a space folder's corner mark use it.
+  assert.match(readFileSync(join(process.cwd(), 'v2', 'shell', 'nav.config.ts'), 'utf8'), /href: '\/spaces',\s*icon: Blocks,/);
+  assert.match(readFileSync(join(process.cwd(), 'v2', 'features', 'folders', 'space-mark.tsx'), 'utf8'), /<Blocks aria-hidden className="size-full stroke-\[2\.6\]" \/>/);
 });

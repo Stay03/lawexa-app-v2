@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ReactNode } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { BookOpen, Boxes, Check, FileText, FolderPlus, Loader2, Plus, Upload, type LucideIcon } from 'lucide-react';
+import { BookOpen, Blocks, Check, FileText, FolderPlus, Loader2, Plus, Upload, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -98,7 +98,7 @@ export function FolderAddMenu({ choices }: { choices: AddChoices }) {
       <DropdownMenuContent align="end">
         {choices.fromSpace ? (
           <DropdownMenuItem onSelect={choices.fromSpace}>
-            <Boxes />
+            <Blocks />
             Files from this space
           </DropdownMenuItem>
         ) : null}
@@ -125,7 +125,7 @@ export function FolderAddButtons({ choices }: { choices: AddChoices }) {
     <div className="flex flex-wrap items-center justify-center gap-2">
       {choices.fromSpace ? (
         <Button type="button" size="sm" onClick={choices.fromSpace}>
-          <Boxes aria-hidden className="size-4" />
+          <Blocks aria-hidden className="size-4" />
           Files from this space
         </Button>
       ) : null}

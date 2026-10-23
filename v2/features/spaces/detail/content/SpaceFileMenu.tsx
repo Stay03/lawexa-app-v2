@@ -1,6 +1,6 @@
 'use client';
 
-import { Boxes, Copy, FolderInput, FolderOutput, MoreHorizontal, MoreVertical, Trash2 } from 'lucide-react';
+import { Blocks, Copy, FolderInput, FolderOutput, MoreHorizontal, MoreVertical, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -90,7 +90,7 @@ export function SpaceFileMenu({
         ) : null}
         {onMove ? (
           <DropdownMenuItem onSelect={() => onMove(file)}>
-            <Boxes />
+            <Blocks />
             Move to space
           </DropdownMenuItem>
         ) : null}

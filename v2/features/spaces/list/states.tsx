@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Boxes, Briefcase, GraduationCap } from 'lucide-react';
+import { Blocks, Briefcase, GraduationCap } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -93,10 +93,10 @@ function SpaceLaneGhost() {
  *  sentence that names the wrong thing. */
 const EMPTY_COPY: Record<
   SpaceFilter,
-  { icon: typeof Boxes; title: string; description: string }
+  { icon: typeof Blocks; title: string; description: string }
 > = {
   all: {
-    icon: Boxes,
+    icon: Blocks,
     title: 'Create your first space',
     description:
       'A space holds conversations, folders and files for everyone in it. Start one for your team or your study group, or accept an invitation to join someone else’s.',

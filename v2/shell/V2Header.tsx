@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Boxes, ChevronLeft, Menu, ShieldCheck } from 'lucide-react';
+import { Blocks, ChevronLeft, Menu, ShieldCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -727,7 +727,7 @@ function HeaderPlaceLine({ place }: { place: HeaderPlace | null }) {
               FOCUS_RING,
             )}
           >
-            <Boxes aria-hidden className="size-3 shrink-0" />
+            <Blocks aria-hidden className="size-3 shrink-0" />
             <span className="min-w-0 truncate">{shown.label}</span>
           </Link>
         ) : null}

@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { Boxes, FolderOutput, Pencil, Trash2 } from 'lucide-react';
+import { Blocks, FolderOutput, Pencil, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -451,7 +451,7 @@ function FolderBody({ uuid }: { uuid: string }) {
             id: 'move-to-space',
             // A folder already in a space changes space (Arthur, item 6).
             label: folder.space ? 'Change space' : 'Move to space',
-            icon: Boxes,
+            icon: Blocks,
             onSelect: () => setMove((previous) => ({ open: true, key: previous.key + 1 })),
           },
         ]
