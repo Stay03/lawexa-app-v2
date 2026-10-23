@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 
+import { myNotesAddress } from '@/v2/features/notes/library/my-notes-address';
+
 /**
  * v1's `/notes/mine` page, retired into the library's My notes tab.
  *
@@ -18,8 +20,13 @@ import { redirect } from 'next/navigation';
  *
  * The destination is the CLEAN path (`/notes?tab=mine`), never a `/v2`-prefixed
  * one: the proxy owns that rewrite, and a v2-prefixed URL in the address bar
- * is a leak of the migration into the product.
+ * is a leak of the migration into the product. The old link's other
+ * parameters (`?search=`, `?tags=`) go along (`myNotesAddress`).
  */
-export default function V2MyNotesPage(): never {
-  redirect('/notes?tab=mine');
+export default async function V2MyNotesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<never> {
+  redirect(myNotesAddress(await searchParams));
 }
