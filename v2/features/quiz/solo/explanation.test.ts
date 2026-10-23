@@ -30,11 +30,11 @@ test('the form: a box per question, loaded from the quiz, always sent (empty is 
   assert.match(form, /placeholder="Shown with the answers on the results, never during the quiz\."/);
 });
 
-test('the results: the author\'s why under the answers, only when there is one; never in the player', () => {
-  const card = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptQuestionCard.tsx');
-  assert.match(card, /const explanation = question\.explanation\?\.trim\(\) \|\| null;/);
-  assert.match(card, /\{explanation \? \(\s*<div className="mt-3 rounded-lg border-l-2 border-emerald-500\/50 bg-secondary\/40 px-3 py-2\.5">/);
-  assert.match(card, /whitespace-pre-line text-foreground">\{explanation\}<\/p>/);
+test('the answers: the author\'s why under the tiles, only when there is one; never in the player', () => {
+  const page = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersStepper.tsx');
+  assert.match(page, /const explanation = question\.explanation\?\.trim\(\) \|\| null;/);
+  assert.match(page, /\{explanation \? \(\s*<div className="mt-4">\s*<p className="text-\[11px\] font-bold tracking-\[0\.08em\] text-primary uppercase">Why<\/p>/);
+  assert.match(page, /whitespace-pre-line text-foreground\/85">\{explanation\}<\/p>/);
   // The play screen never draws one, in either mode.
   assert.doesNotMatch(read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx'), /explanation/);
 });

@@ -16,7 +16,7 @@ const read = (...parts: string[]) =>
 const exists = (...parts: string[]) => existsSync(join(process.cwd(), ...parts));
 
 test('every solo address is rewritten into the v2 tree', () => {
-  for (const path of ['/quiz/library', '/quiz/explore', '/quiz/q/abc', '/quiz/attempts/abc', '/quiz/attempts/abc/results']) {
+  for (const path of ['/quiz/library', '/quiz/explore', '/quiz/q/abc', '/quiz/attempts/abc', '/quiz/attempts/abc/results', '/quiz/attempts/abc/answers']) {
     assert.equal(isMigratedToV2(path), true, path);
   }
 });
@@ -55,6 +55,12 @@ test('an attempt and its results default to the hub until the screen names the q
     backHref: '/quiz',
     backLabel: 'Back to Quiz',
     title: { kind: 'fixed', text: 'Results' },
+  });
+  // "See your answers" goes back to its own results; the page prints its heading.
+  assert.deepEqual(pushedScreenFor('/quiz/attempts/abc/answers'), {
+    backHref: '/quiz/attempts/abc/results',
+    backLabel: 'Back to your results',
+    title: { kind: 'none' },
   });
   assert.equal(pushedScreenFor('/quiz/attempts'), null);
   assert.equal(pushedScreenFor('/quiz/attempts/abc/other'), null);

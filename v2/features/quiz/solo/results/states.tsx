@@ -47,6 +47,56 @@ export function AttemptResultsSkeleton() {
 }
 
 /**
+ * "See your answers" at the live page's geometry (`AnswersStepper`): the
+ * heading row, two rows of ten number cells, the three filter pills, the
+ * question with two tiles and its Why, and the bar at the bottom.
+ */
+export function AttemptAnswersSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-1 flex-col">
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-6 w-40 rounded" />
+        <Skeleton className="h-3.5 w-20 rounded" />
+      </div>
+      <div className="mt-4 grid grid-cols-10 gap-1.5">
+        {Array.from({ length: 20 }, (_, index) => (
+          <Skeleton key={index} className="h-8 rounded-lg" />
+        ))}
+      </div>
+      <Skeleton className="mt-3 h-9 w-52 rounded-full" />
+      <div className="mt-5 border-t border-border/60 pt-4">
+        <Skeleton className="h-3.5 w-28 rounded" />
+        <Skeleton className="mt-3 h-5 w-full rounded" />
+        <Skeleton className="mt-2 h-5 w-2/3 rounded" />
+        <Skeleton className="mt-4 h-16 w-full rounded-2xl" />
+        <Skeleton className="mt-2.5 h-16 w-full rounded-2xl" />
+        <Skeleton className="mt-4 h-3 w-10 rounded" />
+        <Skeleton className="mt-2 h-4 w-full rounded" />
+      </div>
+      <div className="mt-auto flex items-center gap-3 pt-8">
+        <Skeleton className="h-12 w-24 rounded-full" />
+        <Skeleton className="mx-auto h-4 w-16 rounded" />
+        <Skeleton className="h-12 w-24 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
+
+/** The answers route's fallback: the skeleton, in the results column. */
+export function AttemptAnswersFallback() {
+  return (
+    <>
+      <span role="status" className="sr-only">
+        Loading your answers
+      </span>
+      <div aria-hidden inert className={RESULTS_COLUMN}>
+        <AttemptAnswersSkeleton />
+      </div>
+    </>
+  );
+}
+
+/**
  * The results route's fallback (`app/v2/quiz/(solo)/attempts/[attemptUuid]/
  * results/loading.tsx`, and the `[attemptUuid]` SEGMENT boundary): the
  * skeleton, in the results column.

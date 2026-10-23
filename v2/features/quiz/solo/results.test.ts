@@ -62,20 +62,21 @@ test('the headline leads with the greeting and the points, then one row of three
   assert.doesNotMatch(summary, /ScoreRing|SummaryChip|speedLabel|avgResponseMs|SPEED_SCORING_NOTE/);
   assert.match(summary, /divide-x divide-border/);
 
-  const card = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptQuestionCard.tsx');
-  assert.match(card, /const verdict = questionVerdict\(question\);/);
-  assert.match(card, /formatResponseTime\(responseMs\)/);
-  assert.match(card, /\{points > 0 \? `\+\$\{pointsLabel\(points\)\}` : '0'\} pts/);
-  assert.match(card, /'Correct' : verdict === 'incorrect' \? 'Incorrect' : 'Unanswered'/);
+  // One question's page: the server's verdict, its time and its points.
+  const page = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersStepper.tsx');
+  assert.match(page, /const verdict = questionVerdict\(question\);/);
+  assert.match(page, /` · \$\{secondsLabel\(responseMs\)\}`/);
+  assert.match(page, /\+\{pointsLabel\(points\)\}/);
+  assert.match(page, /You didn&rsquo;t answer this one in time\./);
 });
 
-test('the answers sit behind one fold row, and the two buttons sit at the bottom', () => {
+test('the answers open from one row, on their own page, and the two buttons sit at the bottom', () => {
+  // One question per page (Stay and Arthur, 23 October 2026), not a fold of all of them.
   const fold = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersFold.tsx');
-  assert.match(fold, /const \[open, setOpen\] = useState\(false\);/);
   assert.match(fold, /const subtitle = reviewSubtitle\(questions\.length, toReviewCount\(questions\)\);/);
   assert.match(fold, /See your answers/);
-  assert.match(fold, /<CollapsibleContent className="v2-collapse">/);
-  assert.match(fold, /<AttemptQuestionCard question=\{question\} index=\{index\} \/>/);
+  assert.match(fold, /<Link\s+href=\{attemptAnswersHref\(attemptUuid\)\}/);
+  assert.doesNotMatch(fold, /Collapsible|AttemptQuestionCard/);
 
   const actions = read('v2', 'features', 'quiz', 'solo', 'results', 'ResultsActions.tsx');
   assert.match(actions, /sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto/);
@@ -87,7 +88,7 @@ test('the answers sit behind one fold row, and the two buttons sit at the bottom
   assert.match(screen, /const \{ userId: viewerId, name: viewerName \} = useV2Session\(\);/);
   assert.match(screen, /const highlights = attemptHighlights\(score, questions\);/);
   assert.match(screen, /challenge=\{challengeText\(viewerName, score\.points, attempt\.quiz\.title, highlights\)\}/);
-  assert.match(screen, /<AnswersFold questions=\{questions\} \/>/);
+  assert.match(screen, /<AnswersFold attemptUuid=\{attempt\.uuid\} questions=\{questions\} \/>/);
   // The results column is a full-height flex column, so the row can sit on
   // the bottom edge; the B1 tokens ride it.
   const states = read('v2', 'features', 'quiz', 'solo', 'results', 'states.tsx');

@@ -156,7 +156,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
         viewerName={viewerName}
       />
 
-      <AnswersFold questions={questions} />
+      <AnswersFold attemptUuid={attempt.uuid} questions={questions} />
 
       {retakeError && (
         <p

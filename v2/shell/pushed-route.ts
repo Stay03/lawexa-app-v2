@@ -297,6 +297,16 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Results'),
         };
       }
+      // "See your answers", one question at a time: a child of the results,
+      // which the address names, so its chevron goes back to them. The page
+      // prints its own heading, so the bar carries none.
+      if (depth === 4 && second === 'attempts' && segments[3] === 'answers') {
+        return {
+          backHref: `/quiz/attempts/${segments[2]}/results`,
+          backLabel: 'Back to your results',
+          title: NO_TITLE,
+        };
+      }
       return null;
 
     case 'spaces':
