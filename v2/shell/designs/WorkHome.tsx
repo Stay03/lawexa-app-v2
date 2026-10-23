@@ -3,8 +3,8 @@
 import { useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
-import { useV2Session } from '@/v2/runtime/session-context';
 import type { UserRole } from '@/types/auth';
+import { HomeTimeline } from '@/v2/features/home-timeline/HomeTimeline';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
@@ -15,10 +15,9 @@ import {
   CHAT_PROMPTS_HIDDEN,
   DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
-  HOME_SECTIONS,
   HOME_SURFACE_FOCUSED,
+  HOME_SURFACE_TIMELINE,
 } from './home-frame';
-import { ChannelMessagesSection, ConversationsSection } from './sections/HomeSections';
 
 /**
  * WorkHome — the Work tab (owner #34), REDESIGNED July 25.
@@ -49,14 +48,16 @@ import { ChannelMessagesSection, ConversationsSection } from './sections/HomeSec
  * `position: fixed` — shell-contract safe) so an overlaying keyboard cannot cover
  * it, with a soft fade dissolving the content scrolling behind.
  *
- * GUESTS get the honest minimum — greeting, composer, prompts. The sections need a
- * session and are never rendered, so they never fetch.
+ * ── SIGNED IN, IT IS THE TIMELINE (24 October 2026) ────────────────────────
+ * Stay said yes to "What's happening in your Work Spaces": a signed-in reader's
+ * Work tab is the day-by-day timeline of their Work Spaces
+ * (`v2/features/home-timeline`) under that heading, and nothing else. The
+ * composer, the prompts and the Channel messages and Recent conversations
+ * sections left the tab with it; a new chat starts from the Chat tab and the
+ * sidebar.
  *
- * THE CHANNELS SECTION follows Team Channels: the server's `canAccessTeamChannels` flag (researchers
- * and above today; Stay, 11 October 2026). Channels are the research team's tool, the
- * backend refuses their list below researcher, and the nav row has the same rule,
- * so the home never shows a section that could only fail. Conversations are for
- * everyone.
+ * GUESTS get the honest minimum — greeting, composer, prompts. The timeline needs
+ * a session and is never rendered for them, so it never fetches.
  */
 export function WorkHome({
   name,
@@ -67,8 +68,19 @@ export function WorkHome({
   signedIn?: boolean;
   role?: UserRole;
 }) {
+  if (signedIn) {
+    return (
+      <div data-v2-marker="V2-HOME" data-home-tab="work" className={HOME_SURFACE_TIMELINE}>
+        <HomeTimeline type="work" />
+      </div>
+    );
+  }
+  return <WorkGuestHome name={name} role={role} />;
+}
+
+/** The Work tab for a guest: the greeting, the composer and the Work prompts. */
+function WorkGuestHome({ name, role }: { name?: string; role?: UserRole }) {
   const [input, setInput] = useComposerDraft();
-  const { canAccessTeamChannels } = useV2Session();
   const [confidential, setConfidential] = useState(false);
   // A redacted send waiting on this screen fades the prompts (`onRedactingChange`).
   const [redacting, setRedacting] = useState(false);
@@ -87,11 +99,7 @@ export function WorkHome({
         name={name}
         confidential={confidential}
         align="center"
-        subline={
-          signedIn
-            ? 'Pick up where you left off, or start something new.'
-            : 'Your spaces and active matters, together in one place.'
-        }
+        subline="Your spaces and active matters, together in one place."
         headingClassName={HOME_GREETING_HEADING_FOCUSED}
       />
 
@@ -105,7 +113,7 @@ export function WorkHome({
           <HomeComposer
             value={input}
             onValueChange={setInput}
-            signedIn={signedIn}
+            signedIn={false}
             role={role}
             confidential={confidential}
             onConfidentialChange={setConfidential}
@@ -127,13 +135,6 @@ export function WorkHome({
           <HomePrompts variant="desktop" tab="work" onSelect={fillPrompt} />
         </div>
       </div>
-
-      {signedIn ? (
-        <div className={HOME_SECTIONS}>
-          {canAccessTeamChannels ? <ChannelMessagesSection /> : null}
-          <ConversationsSection />
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
 import { invitationsApi } from '@/lib/api/collab';
 import type { LengthAwareResponse } from '@/types/collab';
 import { channelsQueries } from '@/v2/features/channels/queries';
+import { homeTimelineQueries } from '@/v2/features/home-timeline/queries';
 import { organizationsQueries } from '@/v2/features/organizations/queries';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { invitationsQueries } from './queries';
@@ -245,6 +246,13 @@ export function useRespondToInvitation() {
         // gone server-side; an accepted one has become a membership).
         queryClient.invalidateQueries({ queryKey: inboxPrefix(kind) }),
       ];
+
+      // A space invitation is also a row of the Work and Study timeline, whose
+      // Accept and Decline answer it; held in the same pending window, so the
+      // buttons leave with the server's answer rather than coming back first.
+      if (kind === 'space') {
+        invalidations.push(queryClient.invalidateQueries({ queryKey: homeTimelineQueries.all }));
+      }
 
       if (action === 'accept') {
         invalidations.push(

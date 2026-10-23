@@ -53,6 +53,8 @@
  * `md:order-*` half of each constant, and the rail becomes grid column 2.
  */
 
+import { LIST_COLUMN } from '../page-columns';
+
 /* ── Surface roots ────────────────────────────────────────────────────────── */
 
 /**
@@ -62,6 +64,14 @@
  */
 export const HOME_SURFACE_FOCUSED =
   'relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pt-10 pb-8 md:pt-36 md:pb-12';
+
+/**
+ * The signed-in Work and Study tabs: the timeline (`v2/features/home-timeline`),
+ * in the list column every v2 list and the Space page use (`page-columns.ts`),
+ * so going from the timeline into a Space moves nothing sideways. Its route
+ * fallback draws the same column.
+ */
+export const HOME_SURFACE_TIMELINE = LIST_COLUMN;
 
 /*
  * THE TWO-COLUMN WORKSPACE FRAME IS GONE (owner, July 25).

@@ -3,10 +3,8 @@
 import { useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
-import { useAuthStore } from '@/lib/stores/authStore';
-import { useV2Session } from '@/v2/runtime/session-context';
 import type { UserRole } from '@/types/auth';
-import { useMounted } from '@/v2/shell/use-mounted';
+import { HomeTimeline } from '@/v2/features/home-timeline/HomeTimeline';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
@@ -17,44 +15,24 @@ import {
   CHAT_PROMPTS_HIDDEN,
   DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
-  HOME_SECTIONS,
   HOME_SURFACE_FOCUSED,
+  HOME_SURFACE_TIMELINE,
 } from './home-frame';
-import {
-  ChannelMessagesSection,
-  ConversationsSection,
-  RecentlyViewedSection,
-} from './sections/HomeSections';
-import { StudyModeRow, StudyModeChip } from './study/StudyMode';
 
 /**
- * StudyHome — the Study tab (owner #34), REDESIGNED July 25 to the same shape as
- * Work. See `WorkHome` for the redesign rationale and `sections/HomeSection.tsx`
- * for why the card is gone; only what is Study-specific is documented here.
+ * StudyHome — the Study tab (owner #34).
  *
- * ── WHAT CHANGED BEYOND THE SHARED REDESIGN ─────────────────────────────────
- *  • QUIZ IS GONE from the home (owner). It was the tab's boxed hero — continue a
- *    session, a stats strip, recent topics — and it is still fully reachable at its
- *    own v1 routes. The home's job is to get you moving, not to hold a product.
- *  • THE RAIL IS GONE — Study spaces, Bookmarks, Recently viewed and Recent chats
- *    were four cards competing with the composer. Two of them survive as sections
- *    in the single column; Bookmarks and Study spaces move to the sidebar's
- *    territory.
- *  • THE ORDER IS THE OWNER'S: channel messages, then conversations, then three
- *    recently-viewed items.
- *  • STUDY-THEMED PROMPTS — understand, summarise, compare, test yourself.
+ * ── SIGNED IN, IT IS THE TIMELINE (24 October 2026) ────────────────────────
+ * The same change as Work (`WorkHome` carries it): a signed-in reader's Study
+ * tab is the day-by-day timeline of their Study Spaces under "What's happening
+ * in your Study Spaces", and nothing else. The composer went with it, and so
+ * did the student-only study-mode row and chip, which only ever changed the
+ * turn that composer sent; Channel messages, Recent conversations and Recently
+ * viewed left too.
  *
- * ── STUDY MODE SURVIVED, AS A ROW ───────────────────────────────────────────
- * The owner's section list did not mention it, but it is a real feature, not a
- * glance card: it sends `study_mode: true` with the turn, which changes how the
- * answer is written. Deleting it would remove a capability rather than tidy a
- * surface. It is rebuilt as a plain toggle ROW in the new language instead of a
- * bordered card, so it fits the clean layout without being lost.
- *
- * It stays STUDENT-gated exactly as v1 does (`profile.profession === 'student'`).
- * That read is client-only, so `useMounted` keeps the first client render identical
- * to the server's and the row fades in after hydration rather than causing a
- * mismatch.
+ * GUESTS get the greeting, the composer and the study-themed prompts —
+ * understand, summarise, compare, test yourself. Study mode was never theirs
+ * (it is student-gated on the signed-in profile).
  */
 export function StudyHome({
   name,
@@ -65,12 +43,22 @@ export function StudyHome({
   signedIn?: boolean;
   role?: UserRole;
 }) {
+  if (signedIn) {
+    return (
+      <div data-v2-marker="V2-HOME" data-home-tab="study" className={HOME_SURFACE_TIMELINE}>
+        <HomeTimeline type="study" />
+      </div>
+    );
+  }
+  return <StudyGuestHome name={name} role={role} />;
+}
+
+/** The Study tab for a guest: the greeting, the composer and the Study prompts. */
+function StudyGuestHome({ name, role }: { name?: string; role?: UserRole }) {
   const [input, setInput] = useComposerDraft();
-  const { canAccessTeamChannels } = useV2Session();
   const [confidential, setConfidential] = useState(false);
   // A redacted send waiting on this screen fades the prompts (`onRedactingChange`).
   const [redacting, setRedacting] = useState(false);
-  const [studyMode, setStudyMode] = useState(false);
   const composerAreaRef = useRef<HTMLDivElement>(null);
 
   const fillPrompt = (prompt: string) => {
@@ -78,21 +66,13 @@ export function StudyHome({
     composerAreaRef.current?.querySelector('textarea')?.focus();
   };
 
-  const mounted = useMounted();
-  const profession = useAuthStore((s) => s.user?.profile?.profession);
-  const isStudent = signedIn && mounted && profession === 'student';
-
   return (
     <div data-v2-marker="V2-HOME" data-home-tab="study" className={HOME_SURFACE_FOCUSED}>
       <HomeGreeting
         name={name}
         confidential={confidential}
         align="center"
-        subline={
-          signedIn
-            ? 'Pick up your reading, or ask something new.'
-            : "Everything you're learning, in one place."
-        }
+        subline="Everything you're learning, in one place."
         headingClassName={HOME_GREETING_HEADING_FOCUSED}
       />
 
@@ -100,19 +80,13 @@ export function StudyHome({
       <div className={CHAT_COMPOSER_DOCK}>
         <div aria-hidden className={DOCK_FADE} />
         <div ref={composerAreaRef}>
-          {/* Study-mode marker — rides ABOVE the composer, animating symmetrically
-              in and out (owner #24). Only mounted for students, matching the row. */}
-          {isStudent ? (
-            <StudyModeChip active={studyMode} onClear={() => setStudyMode(false)} />
-          ) : null}
           <HomeComposer
             value={input}
             onValueChange={setInput}
-            signedIn={signedIn}
+            signedIn={false}
             role={role}
             confidential={confidential}
             onConfidentialChange={setConfidential}
-            studyMode={studyMode}
             className="p-2.5 shadow-lg"
             onRedactingChange={setRedacting}
             textareaClassName="text-base md:text-lg"
@@ -129,17 +103,6 @@ export function StudyHome({
           <HomePrompts variant="desktop" tab="study" onSelect={fillPrompt} />
         </div>
       </div>
-
-      {signedIn ? (
-        <div className={HOME_SECTIONS}>
-          {isStudent ? (
-            <StudyModeRow checked={studyMode} onCheckedChange={setStudyMode} />
-          ) : null}
-          {canAccessTeamChannels ? <ChannelMessagesSection /> : null}
-          <ConversationsSection />
-          <RecentlyViewedSection />
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -111,10 +111,12 @@ test('the gate, the spine, both homes and discover all read the flag, never the 
   const signal = read('v2', 'features', 'channels', 'my-channels', 'nav-signal.tsx');
   assert.match(signal, /useQuery\(\{ \.\.\.channels, enabled: canOpenTeamChannels\(session\), select: selectUnreadPresent \}\)/);
   assert.match(signal, /useQuery\(\{ \.\.\.spaces, enabled: eligible, select: sumSpaceMentions \}\)/);
+  // The Work and Study tabs are the Spaces timeline since 24 October 2026, with
+  // no Channel messages section to gate.
   for (const home of ['WorkHome.tsx', 'StudyHome.tsx']) {
     const source = read('v2', 'shell', 'designs', home);
-    assert.match(source, /const \{ canAccessTeamChannels \} = useV2Session\(\);/, home);
-    assert.match(source, /\{canAccessTeamChannels \? <ChannelMessagesSection \/>/, home);
+    assert.match(source, /<HomeTimeline type="(work|study)" \/>/, home);
+    assert.doesNotMatch(source, /ChannelMessagesSection/, home);
     assert.doesNotMatch(source, /canAccessCollab/, home);
   }
   const sections = read('v2', 'shell', 'designs', 'sections', 'HomeSections.tsx');

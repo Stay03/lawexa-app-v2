@@ -4,15 +4,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { HomeTab } from '@/v2/shell/home-tabs';
 import { HomePrompts } from './HomePrompts';
 import { HomeQuickJump } from './HomeQuickJump';
-import { HomeSection, HomeSectionSkeleton } from './sections/HomeSection';
+import { TimelineHeading, TimelineSkeleton } from '@/v2/features/home-timeline/states';
 import {
   CHAT_COMPOSER_DOCK,
-  HOME_SECTIONS,
   CHAT_PROMPTS,
   DOCK_FADE,
   HOME_GREETING_SKELETON_HEADING,
   HOME_GREETING_SKELETON_SUBLINE,
   HOME_SURFACE_FOCUSED,
+  HOME_SURFACE_TIMELINE,
 } from './home-frame';
 
 /**
@@ -107,11 +107,9 @@ import {
  *    on this route's server work: its text is built from the signed-in first name
  *    that `verifySession()` resolves. It reuses `HomeGreeting`'s own skeleton
  *    geometry so the hand-off is skeleton → identical skeleton → text.
- *  • THE SECTION STACK gets real headings over pulsing `HomeSectionSkeleton`
- *    rows. A wait wears one appearance wherever it is drawn, so this matches
- *    what each module renders while its own query is pending —
- *    exactly what each module renders while its query is pending, so the fallback
- *    and the first mounted frame are the same picture.
+ *  • THE WORK AND STUDY TIMELINE gets its real heading over the timeline's own
+ *    row skeleton, which is exactly what the tab renders while its query is
+ *    pending, so the fallback and the first mounted frame are the same picture.
  *
  * ── GEOMETRY ────────────────────────────────────────────────────────────────
  * Every container class comes from `home-frame.ts`, the single definition the
@@ -206,61 +204,21 @@ function GreetingSkeleton({
 }
 
 /**
- * The Work / Study frame — the SAME focused column the real surfaces now use.
+ * The Work / Study frame — the timeline's column, its heading, and the
+ * timeline's own skeleton (`v2/features/home-timeline/states.tsx`), so the
+ * hand-off to the real tab changes nothing but the rows.
  *
- * The old two-column workspace frame and its two hand-built rails are gone with
- * the rail itself. What is left is the shared shape plus the tab's own section
- * headings, which is all these tabs are.
- *
- * WHY THE HEADINGS ARE REAL TEXT AND THE ROWS ARE SKELETONS. A heading is static
- * chrome — "Jump back in" is a literal, known before any request — so drawing it
- * still and solid is honest and makes the hand-off to the real section change
- * nothing but the rows. The rows genuinely are waiting on data, so they pulse.
- * That is standards §8 applied per element rather than per block.
- *
- * `still` on every skeleton: this fallback waits on an RSC payload, not on the
- * API, and the queries behind the real sections are frequently already warm.
- * Pulsing here would animate over data we already hold.
- *
- * `prefetch: false` on every heading action is load-bearing, not cosmetic:
- * `next/link` prefetches by default through a callback ref + shared
- * IntersectionObserver, and `inert` stops focus, clicks and pointer events but NOT
- * refs, observers or network. Without it this about-to-be-deleted subtree fires
- * real RSC prefetches — invisible in dev, where prefetching is off, and live in
- * production.
- *
- * ROLE-GATED SECTIONS ARE NOT DRAWN. The fallback has no session, and reserving a
- * panel that half the audience never sees trades one settle for a worse one — so
- * "Jump back in" (spaces-gated) and the student-gated study-mode row are omitted,
- * exactly as the old frame omitted their boxed ancestors.
+ * The heading is static chrome ("What's happening in your Work Spaces" is a
+ * literal), so it is drawn for real; the rows wait on data, so they are
+ * skeletons. A GUEST on these tabs sees this frame for the length of the
+ * fallback and then the guest surface (greeting, composer, prompts): the
+ * fallback has no session, and a signed-in reader is who these tabs are for.
  */
 function TabFrame({ tab }: { tab: Exclude<HomeTab, 'chat'> }) {
   return (
-    <div className={HOME_SURFACE_FOCUSED}>
-      <GreetingSkeleton align="center" subline />
-
-      <div className={CHAT_COMPOSER_DOCK}>
-        <div className={DOCK_FADE} />
-        <ComposerShape />
-      </div>
-
-      <div className={CHAT_PROMPTS}>
-        <PromptsBlock tab={tab} />
-      </div>
-
-      <div className={HOME_SECTIONS}>
-        <HomeSection
-          title="Recent conversations"
-          action={{ href: '/conversations', label: 'All', prefetch: false }}
-        >
-          <HomeSectionSkeleton />
-        </HomeSection>
-        {tab === 'study' ? (
-          <HomeSection title="Recently viewed">
-            <HomeSectionSkeleton />
-          </HomeSection>
-        ) : null}
-      </div>
+    <div className={HOME_SURFACE_TIMELINE}>
+      <TimelineHeading type={tab} />
+      <TimelineSkeleton />
     </div>
   );
 }
