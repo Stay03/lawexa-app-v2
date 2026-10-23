@@ -7,12 +7,13 @@ import { fileURLToPath } from 'node:url';
 import {
   DRAWER_CLOSE_CAP_MS,
   afterContentDraws,
+  EMPTY_CONTENT,
   afterPaint,
-  contentDrawn,
+  contentChanged,
   drawerCloseStep,
   pathOf,
   type ArmedDrawerClose,
-  type DrawnProbe,
+  type ContentSnapshot,
 } from './drawer-close';
 
 /* Stay, 22 October 2026: "when I select an option from the sidebar and it's
@@ -27,7 +28,7 @@ const drawer = read('V2Drawer.tsx');
 const footer = read('V2UserFooter.tsx');
 
 const NONE: ArmedDrawerClose | null = null;
-const ARMED: ArmedDrawerClose = { from: '/cases' };
+const ARMED: ArmedDrawerClose = { from: '/cases', before: EMPTY_CONTENT };
 
 test('a row for the shown page closes the drawer at once', () => {
   assert.equal(drawerCloseStep(NONE, { kind: 'tap', href: '/cases', pathname: '/cases' }), 'close');
@@ -53,7 +54,8 @@ test('the armed close fires after a paint once the shown path has changed, and n
 });
 
 test('the cap closes an armed drawer and ignores an unarmed one', () => {
-  assert.equal(DRAWER_CLOSE_CAP_MS, 600);
+  // Live, Notes' loading rows drew at about 0.39 s on a first visit: 450 ms covers that and bounds a slow one.
+  assert.equal(DRAWER_CLOSE_CAP_MS, 450);
   assert.equal(drawerCloseStep(ARMED, { kind: 'cap' }), 'close');
   assert.equal(drawerCloseStep(NONE, { kind: 'cap' }), 'wait');
 });
@@ -106,23 +108,26 @@ test('afterPaint runs after an animation frame and then a task, and its cancel s
   }
 });
 
-/* Tester's live check, 22 October 2026: on a first visit to Notes the address
- * committed at about 0.12 s with the top bar alone on screen, and the drawer
- * slid away over that until the loading rows came at about 0.39 s. A drawn
- * page is text or a loading skeleton; an empty content area is not. */
-const probe = (textContent: string | null, skeleton = false): DrawnProbe => ({
-  textContent,
-  querySelector: (selector: string) => (skeleton && selector === '[data-slot="skeleton"]' ? {} : null),
-});
+/* Tester's live checks: on a first visit to Notes the address committed at
+ * about 0.12 s with the top bar alone on screen, and the drawer slid away over
+ * that until the loading rows came at about 0.39 s (22 October 2026). The
+ * first fix counted any text in the content area as drawn, and the old page,
+ * still mounted under the route change, passed at once (23 October 2026). The
+ * new page is up once the area shows something the tap did not see. */
+const snap = (text: string, skeletons = 0): ContentSnapshot => ({ text, skeletons });
+const HOME = snap('Good evening Ask Lawexa anything');
 
-test('a page is drawn once the content area holds text or loading rows, not while it is empty', () => {
-  assert.equal(contentDrawn(probe('')), false);
-  assert.equal(contentDrawn(probe('   \n ')), false);
-  assert.equal(contentDrawn(probe(null)), false);
-  assert.equal(contentDrawn(probe('', true)), true, 'a loading skeleton is the first picture');
-  assert.equal(contentDrawn(probe('Notes')), true);
-  // No content area at all: never wait on what cannot come (the cap would anyway).
-  assert.equal(contentDrawn(null), true);
+test('the new page is up once the content area shows something the tap did not see', () => {
+  // The old page still mounted under the route change: not the new one.
+  assert.equal(contentChanged(HOME, HOME), false);
+  // Nothing on screen yet (the v2 root's empty boundary; its sr-only line is not read).
+  assert.equal(contentChanged(HOME, EMPTY_CONTENT), false);
+  // The new page's loading rows, or its words.
+  assert.equal(contentChanged(HOME, snap('', 6)), true, 'a loading skeleton is the first picture');
+  assert.equal(contentChanged(HOME, snap('Notes Community Mine')), true);
+  // Rows the old page already had do not count; more of them do.
+  assert.equal(contentChanged(snap('', 3), snap('', 3)), false);
+  assert.equal(contentChanged(snap('', 3), snap('', 4)), true);
 });
 
 test('afterContentDraws checks each frame, then waits one painted frame, and its cancel stops it', () => {
@@ -137,16 +142,19 @@ test('afterContentDraws checks each frame, then waits one painted frame, and its
     clearTimeout: () => undefined,
   };
   try {
-    const region = { textContent: '', querySelector: () => null } as unknown as HTMLElement & { textContent: string };
+    let shown: ContentSnapshot = HOME;
     let ran = 0;
-    afterContentDraws(region, () => {
+    afterContentDraws(() => shown, HOME, () => {
       ran += 1;
     });
     frames.shift()?.();
     frames.shift()?.();
-    assert.equal(ran, 0, 'still empty after two frames: nothing runs');
+    assert.equal(ran, 0, 'still the old page after two frames: nothing runs');
     assert.equal(frames.length, 1, 'and it keeps watching');
-    region.textContent = 'Notes';
+    shown = EMPTY_CONTENT;
+    frames.shift()?.();
+    assert.equal(ran, 0, 'an empty screen is not the page either');
+    shown = snap('', 6);
     frames.shift()?.(); // the frame that finds the page
     assert.equal(ran, 0, 'not in the frame that finds it');
     frames.shift()?.(); // afterPaint's frame
@@ -154,9 +162,8 @@ test('afterContentDraws checks each frame, then waits one painted frame, and its
     assert.equal(ran, 1);
 
     // Cancelled while still empty: it stops watching and never runs.
-    const empty = { textContent: '', querySelector: () => null } as unknown as HTMLElement;
     let never = 0;
-    const cancel = afterContentDraws(empty, () => {
+    const cancel = afterContentDraws(() => HOME, HOME, () => {
       never += 1;
     });
     cancel();
@@ -170,7 +177,7 @@ test('afterContentDraws checks each frame, then waits one painted frame, and its
 test('every drawer row arms through closeFor with where it goes; only the X closes outright', () => {
   // Nothing is set in state in the click: the armed close and the cap are refs.
   assert.match(drawer, /const armedRef = useRef<ArmedDrawerClose \| null>\(null\);\s*const capRef = useRef\(0\);/);
-  assert.match(drawer, /const closeFor = \(href: string\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'tap', href, pathname: shown \}\) === 'close'\) \{\s*close\(\);\s*return;\s*\}\s*disarm\(\);\s*armedRef\.current = \{ from: shown \};\s*capRef\.current = window\.setTimeout\(\(\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'cap' \}\) === 'close'\) close\(\);\s*\}, DRAWER_CLOSE_CAP_MS\);\s*\};/);
+  assert.match(drawer, /const closeFor = \(href: string\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'tap', href, pathname: shown \}\) === 'close'\) \{\s*close\(\);\s*return;\s*\}\s*disarm\(\);\s*\/\/ [^\n]*\n\s*\/\/ [^\n]*\n\s*armedRef\.current = \{ from: shown, before: readContent\(document\.getElementById\(V2_SHELL_CONTENT_ID\)\) \};\s*capRef\.current = window\.setTimeout\(\(\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'cap' \}\) === 'close'\) close\(\);\s*\}, DRAWER_CLOSE_CAP_MS\);\s*\};/);
   assert.equal((drawer.match(/onClick=\{\(\) => closeFor\(v2NewChat\.href\)\}/g) ?? []).length, 2, 'the wordmark and the New chat row');
   assert.match(drawer, /onClick=\{\(\) => closeFor\(item\.href\)\}/);
   assert.match(drawer, /onClick=\{\(\) => onNavigate\(sub\.href\)\}/);
@@ -188,7 +195,11 @@ test('every drawer row arms through closeFor with where it goes; only the X clos
 test('the drawer closes on the shown path, after a painted frame, with no setState in the effect body', () => {
   // The shown path, not the router's: a chat row's frame changes it in the tap's own commit.
   assert.match(drawer, /const shown = useShownPathname\(\);/);
-  assert.match(drawer, /const leave = useEffectEvent\(close\);\s*useEffect\(\(\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'shown', pathname: shown \}\) !== 'close-after-paint'\) return;\s*return afterContentDraws\(document\.getElementById\(V2_SHELL_CONTENT_ID\), \(\) => leave\(\)\);\s*\}, \[shown\]\);/);
+  assert.match(drawer, /const leave = useEffectEvent\(close\);\s*useEffect\(\(\) => \{\s*const armed = armedRef\.current;\s*if \(armed === null \|\| drawerCloseStep\(armed, \{ kind: 'shown', pathname: shown \}\) !== 'close-after-paint'\) return;\s*const region = document\.getElementById\(V2_SHELL_CONTENT_ID\);\s*return afterContentDraws\(\(\) => readContent\(region\), armed\.before, \(\) => leave\(\)\);\s*\}, \[shown\]\);/);
+  // What the tap saw is read without a screen-reader line or a hidden subtree.
+  const close = read('drawer-close.ts');
+  assert.match(close, /const UNSEEN = '\.sr-only, \[hidden\], \[aria-hidden="true"\]';/);
+  assert.match(close, /if \(!parent \|\| parent\.closest\(UNSEEN\)\) continue;/);
   // A scrim tap or Esc drops the armed close with the drawer.
   assert.match(drawer, /onOpenChange=\{\(open\) => \(open \? setOpenMobile\(true\) : close\(\)\)\}/);
   assert.match(drawer, /const close = \(\) => \{\s*disarm\(\);\s*setOpenMobile\(false\);\s*\};/);

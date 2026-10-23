@@ -11,36 +11,51 @@
  * it slides away over the screen the reader asked for. A row for the page
  * already on screen closes it at once, as before.
  *
- * "UP" IS THE SHOWN PATH CHANGING, AND THEN SOMETHING DRAWN. `useShownPathname`
- * (move-first.tsx) is the router's pathname, or the tap's destination while a
- * move-first frame shows, so it changes in the tap's own commit for a chat row
- * (the frame is the screen) and at the route's commit for every other row. A
- * route's commit is NOT its first picture, though: on a first visit Next
- * commits the new address before the page, or even its loading screen, has
- * drawn anything (Tester's live check, 22 October 2026: Notes showed the top
- * bar alone from about 0.12 to 0.39 s while the drawer slid away over it). So
- * after the path changes the drawer watches the shell's content area frame
- * by frame (`afterContentDraws`) and leaves one painted frame after it holds
- * text or a loading skeleton (`contentDrawn`), so what it uncovers is a page.
+ * "UP" IS THE SHOWN PATH CHANGING, AND THEN SOMETHING NEW ON SCREEN.
+ * `useShownPathname` (move-first.tsx) is the router's pathname, or the tap's
+ * destination while a move-first frame shows, so it changes in the tap's own
+ * commit for a chat row and at the route's commit for every other row. A
+ * route's commit is NOT its first picture: on a first visit Next commits the
+ * new address before the page, or even its loading rows, has drawn anything
+ * (Tester's live check, 22 October 2026: Notes showed the top bar alone from
+ * about 0.12 to 0.39 s while the drawer slid away over it). So after the path
+ * changes the drawer watches the shell's content area frame by frame
+ * (`afterContentDraws`) and leaves one painted frame after it shows something
+ * that was not there at the tap (`contentChanged`): a loading row, or visible
+ * text. What was on screen at the tap is read then (`readContent`), so the old
+ * page still mounted under the route change never counts, and neither does a
+ * line only a screen reader gets (the v2 root's empty loading boundary says
+ * "Loading page" that way). The first version counted any text in the area,
+ * and that passed at once on the old page's (Tester, live, 23 October 2026).
  *
- * A CAP, SO IT CAN NEVER HANG. A route that takes longer than
- * `DRAWER_CLOSE_CAP_MS` (a cold screen on a slow link) closes the drawer at
- * the cap over whatever is on screen, at worst the old page's loading state.
+ * A CAP, SO IT CAN NEVER HANG, SET FROM THE LIVE NUMBERS. Whatever happens the
+ * drawer slides `DRAWER_CLOSE_CAP_MS` after the tap: live, Notes' loading rows
+ * drew at about 0.39 s on a first visit, so 450 ms covers a normal first visit
+ * and bounds a slow one (techlead, 23 October 2026: one rule, a fixed hold or
+ * the new page on screen, whichever comes first).
  *
- * The decision is a pure function, so it is tested here; the drawer holds
+ * The decisions are pure functions, so they are tested here; the drawer holds
  * the armed close in a ref and the cap in a timer (V2Drawer.tsx), and never
  * sets state in the click, which is the task the destination's first frame
  * paints in.
  */
 
 /** How long a tapped row may keep the drawer open before it closes anyway. */
-export const DRAWER_CLOSE_CAP_MS = 600;
+export const DRAWER_CLOSE_CAP_MS = 450;
+
+/** What the content area shows: its visible text, and how many loading rows. */
+export interface ContentSnapshot {
+  readonly text: string;
+  readonly skeletons: number;
+}
 
 /** A row's tap that is leaving the shown page: the drawer stays open until
- *  the shown path changes, or the cap. */
+ *  the shown path changes and something new is on screen, or the cap. */
 export interface ArmedDrawerClose {
   /** The shown path at the tap. The destination is up once it differs. */
   readonly from: string;
+  /** What the content area showed at the tap: the old page. */
+  readonly before: ContentSnapshot;
 }
 
 export type DrawerCloseSignal =
@@ -54,7 +69,7 @@ export type DrawerCloseSignal =
 export type DrawerCloseStep =
   /** Close now. */
   | 'close'
-  /** Close after the next painted frame. */
+  /** Watch the content area, and close a painted frame after it changes. */
   | 'close-after-paint'
   /** Keep the drawer open, remember the tap and start the cap. */
   | 'arm'
@@ -92,37 +107,59 @@ export function afterPaint(fn: () => void): () => void {
   };
 }
 
-/** The part of an element `contentDrawn` reads, so it is tested without a DOM. */
-export interface DrawnProbe {
-  readonly textContent: string | null;
-  querySelector(selector: string): unknown;
+/** Nothing on screen: what a missing content area reads as. */
+export const EMPTY_CONTENT: ContentSnapshot = { text: '', skeletons: 0 };
+
+/**
+ * Whether the content area shows something the tap did not see: more loading
+ * rows than then (shadcn's `Skeleton`, a page's first picture), or visible
+ * text that differs from the old page's. The same text as at the tap is the
+ * old page still mounted, so it does not count.
+ */
+export function contentChanged(before: ContentSnapshot, now: ContentSnapshot): boolean {
+  if (now.skeletons > before.skeletons) return true;
+  return now.text.length > 0 && now.text !== before.text;
 }
 
-/** A loading skeleton (shadcn's `Skeleton`) counts as drawn: its rows are the
- *  page's first picture. */
+/** A loading skeleton, by the slot shadcn's `Skeleton` stamps. */
 const SKELETON = '[data-slot="skeleton"]';
 
+/** Text a reader does not see: a screen-reader line, or a hidden subtree. */
+const UNSEEN = '.sr-only, [hidden], [aria-hidden="true"]';
+
 /**
- * Whether the content area holds a page yet: any text, or a loading skeleton.
- * An empty area (the address committed, nothing drawn) is not; a missing area
- * counts as drawn, so the drawer never waits on something that cannot come.
+ * What the content area shows now (`ContentSnapshot`): the text of its laid
+ * out, visible nodes, whitespace collapsed, and its loading rows. A missing
+ * area reads as empty.
  */
-export function contentDrawn(region: DrawnProbe | null): boolean {
-  if (!region) return true;
-  if (region.querySelector(SKELETON)) return true;
-  return (region.textContent ?? '').trim().length > 0;
+export function readContent(region: HTMLElement | null): ContentSnapshot {
+  if (!region) return EMPTY_CONTENT;
+  let text = '';
+  const walker = document.createTreeWalker(region, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const parent = node.parentElement;
+    if (!parent || parent.closest(UNSEEN)) continue;
+    const box = parent.getBoundingClientRect();
+    if (box.width === 0 || box.height === 0) continue;
+    text += node.textContent ?? '';
+  }
+  return { text: text.replace(/\s+/g, ' ').trim(), skeletons: region.querySelectorAll(SKELETON).length };
 }
 
 /**
- * Runs `fn` one painted frame after `region` first holds a page
- * (`contentDrawn`), checking once per animation frame. Returns the cancel.
- * The drawer's cap (`DRAWER_CLOSE_CAP_MS`) bounds the wait from outside.
+ * Runs `fn` one painted frame after `read()` first shows something new against
+ * `before` (`contentChanged`), checking once per animation frame. Returns the
+ * cancel. The drawer's cap (`DRAWER_CLOSE_CAP_MS`) bounds the wait from outside.
  */
-export function afterContentDraws(region: HTMLElement | null, fn: () => void): () => void {
+export function afterContentDraws(
+  read: () => ContentSnapshot,
+  before: ContentSnapshot,
+  fn: () => void,
+): () => void {
   let frame = 0;
   let cancelPaint: (() => void) | null = null;
   const check = () => {
-    if (contentDrawn(region)) {
+    if (contentChanged(before, read())) {
       cancelPaint = afterPaint(fn);
       return;
     }

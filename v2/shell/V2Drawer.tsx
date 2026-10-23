@@ -48,6 +48,7 @@ import {
   DRAWER_CLOSE_CAP_MS,
   afterContentDraws,
   drawerCloseStep,
+  readContent,
   type ArmedDrawerClose,
 } from './drawer-close';
 
@@ -210,20 +211,25 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
       return;
     }
     disarm();
-    armedRef.current = { from: shown };
+    // What the content area shows at the tap is the old page: only something
+    // else on screen counts as the new one (drawer-close.ts).
+    armedRef.current = { from: shown, before: readContent(document.getElementById(V2_SHELL_CONTENT_ID)) };
     capRef.current = window.setTimeout(() => {
       if (drawerCloseStep(armedRef.current, { kind: 'cap' }) === 'close') close();
     }, DRAWER_CLOSE_CAP_MS);
   };
-  // The address is the destination's: close once the content area has drawn
-  // the page (or its loading rows) and that frame has painted, so the drawer
-  // never slides away over an empty screen (Tester, 22 October 2026). The cap
-  // above still closes it if nothing draws. An Effect Event, so the effect
-  // keys on the shown path alone (the shape of move-first's onPopState).
+  // The address is the destination's: close once the content area shows
+  // something the tap did not see (the page, or its loading rows) and that
+  // frame has painted, so the drawer never slides away over an empty screen
+  // (Tester, 22 and 23 October 2026). The cap above still closes it if nothing
+  // draws. An Effect Event, so the effect keys on the shown path alone (the
+  // shape of move-first's onPopState).
   const leave = useEffectEvent(close);
   useEffect(() => {
-    if (drawerCloseStep(armedRef.current, { kind: 'shown', pathname: shown }) !== 'close-after-paint') return;
-    return afterContentDraws(document.getElementById(V2_SHELL_CONTENT_ID), () => leave());
+    const armed = armedRef.current;
+    if (armed === null || drawerCloseStep(armed, { kind: 'shown', pathname: shown }) !== 'close-after-paint') return;
+    const region = document.getElementById(V2_SHELL_CONTENT_ID);
+    return afterContentDraws(() => readContent(region), armed.before, () => leave());
   }, [shown]);
   // The cap's timer does not outlive the drawer: a footer row to a v1 page
   // unmounts the whole v2 shell before the cap.
