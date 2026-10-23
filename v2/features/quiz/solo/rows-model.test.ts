@@ -7,44 +7,43 @@ import { fileURLToPath } from 'node:url';
 import {
   QUIZ_TONES,
   bestLabel,
-  editedLabel,
+  bestOrNotTaken,
+  quizFactsLabel,
   quizInitial,
   quizMinutesLabel,
   quizTone,
-  scenarioCountLabel,
 } from './rows-model';
 
-/* Quiz piece 2 (Stay, 23 October 2026, pictures 2 and 3): the rows say the
- * size, the reader's best and the edit date in short words, on their own lines. */
+/* Quiz piece 2, version C (Stay, 23 October 2026: "let's do C"): small cards,
+ * two across on a phone and four on a computer, each with one fact line and
+ * the reader's best or "Not taken". */
 
 const here = dirname(fileURLToPath(import.meta.url));
 
 test('the minutes round up from the summed timers, at least one, and are absent without the field', () => {
-  assert.equal(quizMinutesLabel(60), 'about 1 min');
-  assert.equal(quizMinutesLabel(150), 'about 3 min');
-  assert.equal(quizMinutesLabel(20), 'about 1 min');
+  assert.equal(quizMinutesLabel(60), '1 min');
+  assert.equal(quizMinutesLabel(150), '3 min');
+  assert.equal(quizMinutesLabel(20), '1 min');
   assert.equal(quizMinutesLabel(0), null);
   assert.equal(quizMinutesLabel(undefined), null);
 });
 
-test('scenarios and the best score are said only when there is something to say', () => {
-  assert.equal(scenarioCountLabel(1), '1 scenario');
-  assert.equal(scenarioCountLabel(2), '2 scenarios');
-  assert.equal(scenarioCountLabel(0), null);
-  assert.equal(scenarioCountLabel(undefined), null);
+test('the fact line is the count and the minutes, or the count alone', () => {
+  assert.equal(quizFactsLabel(10, 290), '10 questions · 5 min');
+  assert.equal(quizFactsLabel(1, 30), '1 question · 1 min');
+  assert.equal(quizFactsLabel(6, undefined), '6 questions');
+});
+
+test('the best is said when there is one, "Not taken" only to an account the server says has none', () => {
   assert.equal(bestLabel(2553), 'Best 2,553');
   assert.equal(bestLabel(0), 'Best 0');
   assert.equal(bestLabel(null), null);
-  assert.equal(bestLabel(undefined), null);
-});
-
-test('the edit date is short: today, yesterday, a day and month, and the year only in another year', () => {
-  const now = new Date(2026, 9, 23, 15, 0);
-  assert.equal(editedLabel(new Date(2026, 9, 23, 9, 0).toISOString(), now), 'Edited today');
-  assert.equal(editedLabel(new Date(2026, 9, 22, 18, 0).toISOString(), now), 'Edited yesterday');
-  assert.equal(editedLabel(new Date(2026, 9, 21, 12, 0).toISOString(), now), 'Edited 21 Oct');
-  assert.equal(editedLabel(new Date(2025, 2, 4, 12, 0).toISOString(), now), 'Edited 4 Mar 2025');
-  assert.equal(editedLabel('not a date', now), null);
+  assert.deepEqual(bestOrNotTaken(4210, true), { label: 'Best 4,210', taken: true });
+  assert.deepEqual(bestOrNotTaken(null, true), { label: 'Not taken', taken: false });
+  // Signed out there is no one to have taken it, and a server that does not
+  // send the field says nothing either way.
+  assert.equal(bestOrNotTaken(null, false), null);
+  assert.equal(bestOrNotTaken(undefined, true), null);
 });
 
 test('the tile is the same colour for the same quiz, and its letter is the first one in the title', () => {
@@ -55,14 +54,19 @@ test('the tile is the same colour for the same quiz, and its letter is the first
   assert.equal(quizInitial('…'), 'Q');
 });
 
-test('who can take it never shares a line with the counts, and the date is the short one', () => {
+test('both tabs draw the same card in the same grid, the menu on My quizzes only, the author on Explore only', () => {
+  const card = readFileSync(join(here, 'QuizCard.tsx'), 'utf8');
+  assert.match(card, /export const QUIZ_CARD_GRID = 'grid grid-cols-2 gap-2\.5 sm:grid-cols-3 xl:grid-cols-4';/);
+  // The menu is a sibling above the stretched link, never inside it.
+  assert.match(card, /\{menu \? <div className="relative z-10 -mr-1\.5">\{menu\}<\/div> : null\}\s*<\/div>\s*<Link/);
+  assert.match(card, /after:absolute after:inset-0/);
   const library = readFileSync(join(here, 'library', 'LibraryScreen.tsx'), 'utf8');
-  assert.doesNotMatch(library, /<VisibilityChip /);
-  assert.doesNotMatch(library, /formatDayLabel/);
-  assert.match(library, /const edited = editedLabel\(quiz\.updated_at, now\);/);
-  assert.match(library, /\{visibilityFace\(quiz\.visibility\)\}/);
+  assert.match(library, /<ul className=\{QUIZ_CARD_GRID\}>/);
+  assert.match(library, /<QuizCard quiz=\{quiz\} index=\{index\} signedIn menu=\{menu\}>/);
+  assert.doesNotMatch(library, /editedLabel|visibilityFace/);
   const explore = readFileSync(join(here, 'explore', 'ExploreScreen.tsx'), 'utf8');
-  // The author's full name gets its own line; the card grid widens on larger screens.
-  assert.match(explore, /<span className="min-w-0 flex-1 truncate font-medium text-foreground\/85">\{author\}<\/span>/);
-  assert.match(explore, /<ul className="grid gap-3 sm:grid-cols-2">/);
+  assert.match(explore, /<ul className=\{QUIZ_CARD_GRID\}>/);
+  assert.match(explore, /<QuizCard quiz=\{quiz\} index=\{index\} signedIn=\{signedIn\} author=\{author\} \/>/);
+  const home = readFileSync(join(here, '..', 'home', 'QuizHomeScreen.tsx'), 'utf8');
+  assert.match(home, /const HOME_COLUMN = cn\(LIST_COLUMN, 'max-w-5xl'\);/);
 });

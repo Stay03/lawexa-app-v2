@@ -1,26 +1,26 @@
+import { questionCountLabel } from './model';
+
 /**
- * rows-model — what a quiz row says beyond its title, in the words of the
- * redesign Stay approved (23 October 2026, pictures 2 and 3): the size ("6
- * questions · 1 scenario · about 3 min"), the reader's own best ("Best
- * 2,553"), when it was edited ("Edited 21 Oct"), and the tile's colour. Pure,
- * so the rules are tested here and the rows only lay them out.
+ * rows-model — what a quiz card says beyond its title, in the small-card
+ * version Stay picked (C, 23 October 2026): one fact line ("10 questions · 5
+ * min"), the reader's own best ("Best 2,553") or "Not taken", and the tile's
+ * colour. Pure, so the rules are tested here and the card only lays them out.
  *
- * Each fact the server does not send is `null`, and a `null` fact is simply
- * not drawn: `viewer_best_points`, `viewer_attempts_count`, `total_seconds`
- * and `scenario_count` arrive with backend's quiz fields, and a row read
- * before them shows the count and the date alone.
+ * A fact the server does not send is left out: a card read before
+ * `total_seconds` arrives says the count alone, and one read before
+ * `viewer_best_points` arrives says nothing about a best.
  */
 
-/** "about 3 min" from the quiz's summed question timers, rounded up, at least 1. */
+/** "5 min" from the quiz's summed question timers, rounded up, at least 1. */
 export function quizMinutesLabel(totalSeconds: number | null | undefined): string | null {
   if (typeof totalSeconds !== 'number' || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
-  return `about ${Math.max(1, Math.ceil(totalSeconds / 60))} min`;
+  return `${Math.max(1, Math.ceil(totalSeconds / 60))} min`;
 }
 
-/** "1 scenario", "2 scenarios"; nothing when there are none. */
-export function scenarioCountLabel(count: number | null | undefined): string | null {
-  if (typeof count !== 'number' || count <= 0) return null;
-  return `${count} ${count === 1 ? 'scenario' : 'scenarios'}`;
+/** The card's one fact line: "10 questions · 5 min", or the count alone. */
+export function quizFactsLabel(count: number, totalSeconds: number | null | undefined): string {
+  const minutes = quizMinutesLabel(totalSeconds);
+  return minutes ? `${questionCountLabel(count)} · ${minutes}` : questionCountLabel(count);
 }
 
 /** "Best 2,553": the reader's best finished score here; nothing before their first. */
@@ -29,28 +29,19 @@ export function bestLabel(points: number | null | undefined): string | null {
   return `Best ${Math.round(points).toLocaleString('en-US')}`;
 }
 
-const SHORT_DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' });
-const SHORT_DAY_YEAR = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-
-/** Whether two dates fall on the same local calendar day. */
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
 /**
- * "Edited today", "Edited yesterday", "Edited 21 Oct", or "Edited 21 Oct
- * 2025" in another year: short enough to share a phone line with who can
- * take the quiz, which the weekday-and-month form never did (the chip it
- * squeezed, audit, 23 October 2026).
+ * The card's bottom right: the best once there is one, "Not taken" when the
+ * server says the reader has none (`null`) and the reader has an account to
+ * hold one, and nothing when the field is absent or no one is signed in.
  */
-export function editedLabel(iso: string, now: Date): string | null {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  if (sameDay(date, now)) return 'Edited today';
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (sameDay(date, yesterday)) return 'Edited yesterday';
-  return `Edited ${(date.getFullYear() === now.getFullYear() ? SHORT_DAY : SHORT_DAY_YEAR).format(date)}`;
+export function bestOrNotTaken(
+  points: number | null | undefined,
+  signedIn: boolean,
+): { label: string; taken: boolean } | null {
+  const best = bestLabel(points);
+  if (best) return { label: best, taken: true };
+  if (points === null && signedIn) return { label: 'Not taken', taken: false };
+  return null;
 }
 
 /** The tile's four colours, one per quiz and stable across renders and devices. */

@@ -16,10 +16,14 @@ test('the explore list is fetched for everyone and opens each quiz on its front'
   // The rows stay on screen across the visitor-to-guest key change.
   assert.match(screen, /placeholderData: keepPreviousData,/);
   assert.doesNotMatch(screen, /enabled:/);
-  assert.doesNotMatch(screen, /signedIn|useGuestPassFailed|SignedOutState/);
-  assert.match(screen, /href=\{quizFrontHref\(quiz\.uuid\)\}/);
-  // The author has the card's last line, and a gone account is a word, not a crash.
-  assert.match(screen, /<MemberAvatar user=\{quiz\.creator\} className="size-5" \/>/);
+  assert.doesNotMatch(screen, /useGuestPassFailed|SignedOutState/);
+  // Signed in or not only decides whether a card may say "Not taken".
+  assert.match(screen, /const \{ userId: viewerId, signedIn \} = useV2Session\(\);/);
+  assert.match(screen, /signedIn=\{signedIn\}/);
+  const card = read('v2', 'features', 'quiz', 'solo', 'QuizCard.tsx');
+  assert.match(card, /href=\{quizFrontHref\(quiz\.uuid\)\}/);
+  // The author has its own line on the card, and a gone account is a word, not a crash.
+  assert.match(screen, /author=\{author\}/);
   assert.match(screen, /quiz\.creator\?\.name \?\? 'Someone who has left'/);
   assert.match(screen, /rootRef: scrollRootRef,/);
   // A tab of the Quiz home now: no page column and no heading of its own.

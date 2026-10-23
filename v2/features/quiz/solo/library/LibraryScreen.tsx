@@ -1,7 +1,6 @@
 'use client';
 
 import { memo, useCallback, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
   ClipboardList,
@@ -12,7 +11,6 @@ import {
   Trash2,
 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,24 +19,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Skeleton } from '@/components/ui/skeleton';
 import type { ChannelQuiz } from '@/types/channel-quiz';
 import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
 import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
-import { VISIBILITY_MARKS } from '@/v2/features/channels/quiz/VisibilityChip';
-import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { VisibilityGroup } from '@/v2/features/channels/quiz/VisibilityGroup';
-import { LawexaMark } from '@/v2/features/channels/ui/avatars';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { QuizMessage } from '../../ui/QuizMessage';
 import { QuizErrorState } from '../../ui/states';
-import { canPublishPublicly, questionCountLabel, quizFrontHref } from '../model';
-import { QuizTile } from '../QuizTile';
-import { bestLabel, editedLabel, scenarioCountLabel } from '../rows-model';
+import { canPublishPublicly, quizFrontHref } from '../model';
+import { QUIZ_CARD_GRID, QuizCard, QuizCardGridSkeleton } from '../QuizCard';
 import { soloQuizQueries } from '../queries';
 
 /**
@@ -63,11 +55,12 @@ import { soloQuizQueries } from '../queries';
  * Delete. Nothing is gated on a channel's host policy: a library is not a
  * room.
  *
- * ── ROWS ARE THE LIST GRAMMAR ──────────────────────────────────────────────
- * The `SessionRow` shape: one honest link per row, a hairline between rows,
- * the loudest line first and a quiet meta line in two zones (what it is on
- * the left, when it was written right-anchored). The menu trigger is a
- * SIBLING of the link, never nested in it.
+ * ── SMALL CARDS, TWO ACROSS ON A PHONE ─────────────────────────────────────
+ * The grid Stay picked (version C, 23 October 2026), the same card Explore
+ * uses (`QuizCard`): tile, title, the one fact line, the reader's best. Who
+ * can take it and when it was edited left the card; the menu's visibility
+ * switch says the first, and the card is the quiz, not its history. The menu
+ * trigger is a SIBLING of the card's link, never nested in it.
  *
  * ── THE SENTINEL IS ROOTED IN THE SHELL, NOT THE VIEWPORT ──────────────────
  * Same reasoning as the quiz history: the list lives inside the shell's one
@@ -97,7 +90,7 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
     rootMargin: '320px',
   });
 
-  // One stable pair for every row, so `LibraryRow`'s `memo` holds when the
+  // One stable pair for every card, so `LibraryCard`'s `memo` holds when the
   // list re-renders (a page loading under the sentinel, a refetch).
   const editQuiz = useCallback((quiz: ChannelQuiz) => openForm(quiz.uuid), [openForm]);
   const deleteQuiz = useCallback((quiz: ChannelQuiz) => setDeleting(quiz), []);
@@ -143,9 +136,9 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
         />
       ) : (
         <>
-          <ul className="flex flex-col divide-y divide-border/60">
+          <ul className={QUIZ_CARD_GRID}>
             {quizzes.map((quiz, index) => (
-              <LibraryRow
+              <LibraryCard
                 key={quiz.uuid}
                 quiz={quiz}
                 index={index}
@@ -206,10 +199,10 @@ export function useQuizForm(viewerId: number | null) {
 }
 
 /**
- * One quiz the reader wrote. `memo` because the list can grow past a page and
- * the sentinel re-renders the list on every one.
+ * One quiz the reader wrote, as a card with the owner's menu. `memo` because
+ * the list can grow past a page and the sentinel re-renders it on every one.
  */
-const LibraryRow = memo(function LibraryRow({
+const LibraryCard = memo(function LibraryCard({
   quiz,
   index,
   canPublish,
@@ -224,174 +217,81 @@ const LibraryRow = memo(function LibraryRow({
   onEdit: (quiz: ChannelQuiz) => void;
   onDelete: (quiz: ChannelQuiz) => void;
 }) {
-  const count = quiz.question_count ?? quiz.questions?.length ?? 0;
-  /** The visibility switch's refusal, said under the row it was pressed on.
+  /** The visibility switch's refusal, said on the card it was pressed on.
    *  There are no toasts on this surface and the write is `silentError`. */
   const [refusal, setRefusal] = useState<string | null>(null);
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
   const share = useShareAction({ path: quizFrontHref(quiz.uuid), title: quiz.title });
-  // Captured once per row, so no clock read runs in render (React Compiler purity).
-  const [now] = useState(() => new Date());
-  const Mark = VISIBILITY_MARKS[quiz.visibility];
-  const scenarios = scenarioCountLabel(quiz.scenario_count);
-  const best = bestLabel(quiz.viewer_best_points);
-  const edited = editedLabel(quiz.updated_at, now);
+
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground"
+          aria-label={`Options for ${quiz.title}`}
+        >
+          <MoreHorizontal aria-hidden className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        <VisibilityGroup quiz={quiz} canPublish={canPublish} onRefused={setRefusal} />
+        <DropdownMenuSeparator />
+        {/* Only where a link can open it: sharing a private quiz's address
+            would hand out a 404. The chip above the menu says why. */}
+        {shareable && (
+          <DropdownMenuItem onClick={() => void share.share()}>
+            <Share2 aria-hidden className="size-4" />
+            Share
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={() => onEdit(quiz)}>
+          <Pencil aria-hidden className="size-4" />
+          Edit
+        </DropdownMenuItem>
+        <DropdownMenuItem variant="destructive" onClick={() => onDelete(quiz)}>
+          <Trash2 aria-hidden className="size-4" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
-    <li
-      className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:fill-mode-both motion-safe:duration-200"
-      style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
-    >
-      <div className="flex items-center gap-1">
-        <Link
-          href={quizFrontHref(quiz.uuid)}
-          className={cn(
-            'v2-interactive group flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
-            FOCUS_RING,
-          )}
-        >
-          <QuizTile uuid={quiz.uuid} title={quiz.title} className="self-start" />
-          <span className="min-w-0 flex-1">
-            <span className="line-clamp-2 text-[15px] leading-snug font-semibold text-foreground transition-colors group-hover:text-primary">
-              {quiz.title}
-            </span>
-            {/* WHAT IT IS, on its own line: the count, its scenarios, and the
-                reader's best in gold. Nothing here shares a line with who can
-                take it, so nothing squeezes it (the audit's "By link" chip
-                shrunk to an icon beside a long date, 23 October 2026). */}
-            <span className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-              <span>{questionCountLabel(count)}</span>
-              {scenarios ? <Dot>{scenarios}</Dot> : null}
-              {best ? <Dot className="font-comfortaa font-bold text-primary">{best}</Dot> : null}
-            </span>
-            {/* WHO CAN TAKE IT, AND WHEN it was last edited, in short words. */}
-            <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                <Mark aria-hidden className="size-3 shrink-0" />
-                {visibilityFace(quiz.visibility)}
-              </span>
-              {edited ? <Dot className="whitespace-nowrap tabular-nums">{edited}</Dot> : null}
-              {quiz.is_ai_generated && (
-                <Dot className="inline-flex items-center gap-1 whitespace-nowrap">
-                  <LawexaMark className="size-3 shrink-0" />
-                  drafted by Lawexa
-                </Dot>
-              )}
-            </span>
-          </span>
-        </Link>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-9 shrink-0"
-              aria-label={`Options for ${quiz.title}`}
-            >
-              <MoreHorizontal aria-hidden className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <VisibilityGroup quiz={quiz} canPublish={canPublish} onRefused={setRefusal} />
-            <DropdownMenuSeparator />
-            {/* Only where a link can open it: sharing a private quiz's address
-                would hand out a 404. The chip above the menu says why. */}
-            {shareable && (
-              <DropdownMenuItem onClick={() => void share.share()}>
-                <Share2 aria-hidden className="size-4" />
-                Share
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => onEdit(quiz)}>
-              <Pencil aria-hidden className="size-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem variant="destructive" onClick={() => onDelete(quiz)}>
-              <Trash2 aria-hidden className="size-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
+    <QuizCard quiz={quiz} index={index} signedIn menu={menu}>
       {refusal && (
         <p
           role="alert"
-          className="px-2 pb-3 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          className="text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
         >
           {refusal}
         </p>
       )}
-      {/* The menu has closed by the time the clipboard answers, so the row
+      {/* The menu has closed by the time the clipboard answers, so the card
           says it — for a reader who cannot see it too. */}
       {share.copied && !refusal && (
         <p
           role="status"
-          className="px-2 pb-3 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          className="text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
         >
           Link copied
         </p>
       )}
-    </li>
+    </QuizCard>
   );
 });
 
-/** A fact after the first on a meta line, with its dot. */
-function Dot({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <span className={cn('inline-flex items-center gap-1.5', className)}>
-      <span aria-hidden className="font-sans font-normal text-muted-foreground/40">
-        ·
-      </span>
-      {children}
-    </span>
-  );
-}
-
-/** One skeleton row at `LibraryRow`'s geometry: tile, two text lines, menu. */
-function LibraryRowSkeleton() {
-  return (
-    <div className="flex items-center gap-1">
-      <div className="flex min-h-11 flex-1 items-center gap-3 px-2 py-3">
-        <Skeleton className="size-9 shrink-0 rounded-lg" />
-        <div className="min-w-0 flex-1 space-y-2">
-          <Skeleton className="h-4 w-3/5 rounded" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-3 w-2/5 rounded" />
-            <Skeleton className="ml-auto h-3 w-12 shrink-0 rounded" />
-          </div>
-        </div>
-      </div>
-      <Skeleton className="size-9 shrink-0 rounded-full" />
-    </div>
-  );
-}
-
-/** The initial-load skeleton — progressive opacity down the stack, the one
- *  loading language every v2 list speaks. It pulses in the route fallback too. */
-export function LibraryListSkeleton({ rows = 5 }: { rows?: number }) {
-  return (
-    <div aria-hidden className="flex flex-col">
-      {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} style={{ opacity: Math.max(0.25, 1 - index * 0.16) }}>
-          <LibraryRowSkeleton />
-        </div>
-      ))}
-    </div>
-  );
+/** The initial-load skeleton, in the card grid's shape. It pulses in the
+ *  route fallback too. */
+export function LibraryListSkeleton() {
+  return <QuizCardGridSkeleton />;
 }
 
 function LibraryNextPageSkeleton() {
   return (
-    <div
-      aria-hidden
-      className="flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-    >
-      <LibraryRowSkeleton />
-      <div style={{ opacity: 0.5 }}>
-        <LibraryRowSkeleton />
-      </div>
+    <div className="pt-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+      <QuizCardGridSkeleton cards={4} />
     </div>
   );
 }

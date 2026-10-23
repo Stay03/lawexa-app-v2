@@ -43,6 +43,10 @@ import { QuizHomeTabs } from './QuizHomeTabs';
 
 const PANEL_ID = 'quiz-home-panel';
 
+/** The list column, widened so the card grid fits four across on a computer
+ *  (version C, 23 October 2026), the quiz front's width. */
+const HOME_COLUMN = cn(LIST_COLUMN, 'max-w-5xl');
+
 export function QuizHomeScreen() {
   const session = useV2Session();
   const { signedIn, role, userId: viewerId } = session;
@@ -58,7 +62,7 @@ export function QuizHomeScreen() {
   };
 
   return (
-    <div className={LIST_COLUMN}>
+    <div className={HOME_COLUMN}>
       <ScreenTitle />
 
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -108,7 +112,7 @@ export function QuizHomeFallback() {
       </span>
       {/* `aria-hidden` + `inert` (standards §8ii): a Suspense fallback is
           DELETED when content arrives, so nothing in it may hold focus. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
+      <div aria-hidden inert className={HOME_COLUMN}>
         <ScreenTitle />
         <div className="mb-3 flex items-center justify-between gap-3">
           <QuizHomeTabs value="explore" onChange={() => undefined} panelId={PANEL_ID} />

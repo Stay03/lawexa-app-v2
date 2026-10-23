@@ -13,7 +13,7 @@ const read = (...parts: string[]) =>
 test('the library lists the reader\'s quizzes page by page and opens each on its front', () => {
   const screen = read('v2', 'features', 'quiz', 'solo', 'library', 'LibraryScreen.tsx');
   assert.match(screen, /useInfiniteQuery\(soloQuizQueries\.library\(\{ viewerId \}\)\)/);
-  assert.match(screen, /href=\{quizFrontHref\(quiz\.uuid\)\}/);
+  assert.match(read('v2', 'features', 'quiz', 'solo', 'QuizCard.tsx'), /href=\{quizFrontHref\(quiz\.uuid\)\}/);
   // The sentinel is rooted in the shell's scroller, like every v2 list.
   assert.match(screen, /rootRef: scrollRootRef,/);
   // A tab of the Quiz home now: the home owns the column and the form.
@@ -26,9 +26,7 @@ test('every row carries the owner\'s menu: who can find it, Edit, Delete', () =>
   const screen = read('v2', 'features', 'quiz', 'solo', 'library', 'LibraryScreen.tsx');
   assert.match(screen, /<VisibilityGroup quiz=\{quiz\} canPublish=\{canPublish\} onRefused=\{setRefusal\} \/>/);
   assert.match(screen, /const canPublish = canPublishPublicly\(session\);/);
-  // Who can find it, said in words on its own line (the chip shrank to an icon).
-  assert.match(screen, /<Mark aria-hidden className="size-3 shrink-0" \/>\s*\{visibilityFace\(quiz\.visibility\)\}/);
-  // A refusal is said under its own row, never toasted.
+  // A refusal is said on its own card, never toasted.
   assert.match(screen, /\{refusal && \(\s*<p\s*role="alert"/);
   assert.doesNotMatch(screen, /from 'sonner'/);
 });
