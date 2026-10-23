@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { ToolMessage } from '@/types/chat';
-import { createdQuiz, createdQuizLine } from './created-quiz';
+import { createQuizStepAction, createdQuiz, createdQuizLine } from './created-quiz';
 
 /* Quiz from a source, door 1 (Stay, 23 October 2026): Lawexa's create_quiz
  * step shows the quiz as a card under the answer. Shape from backend
@@ -58,9 +58,19 @@ test('a refusal is told by its content: the sentence, even when the step reads s
 });
 
 test('a result not loaded yet is null, so the card asks for it rather than guessing', () => {
-  assert.equal(createdQuiz(step({ toolResult: { success: true, error: null, data: null } })), null);
+  assert.equal(createdQuiz(step({ toolResult: { success: true, error: null, data: null }, resultRef: { messageId: 1, size: null } })), null);
+  // With no result to fetch, the run stopped: the card says so instead of loading for ever.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: null } })), { kind: 'failed', message: 'Lawexa stopped before the quiz was made. Ask again to try once more.' });
+  assert.deepEqual(createdQuiz(step({})), { kind: 'failed', message: 'Lawexa stopped before the quiz was made. Ask again to try once more.' });
   // A body with no quiz and no sentence is a failure in the card's own words.
   assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: { quiz: { title: 'No uuid' } } } })), { kind: 'failed', message: 'Lawexa could not make the quiz this time.' });
+});
+
+test('the step label says making, made, or could not make, never made above a refusal', () => {
+  assert.equal(createQuizStepAction(false, undefined, false), 'Making a quiz');
+  assert.equal(createQuizStepAction(true, { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA' } } }, false), 'Made a quiz');
+  assert.equal(createQuizStepAction(true, { success: true, error: null, data: { data: { error: { code: 'too_short', message: 'TEST DATA. Too short.' } } } }, false), "Couldn't make a quiz");
+  assert.equal(createQuizStepAction(true, { success: true, error: null, data: null }, true), 'Made a quiz');
 });
 
 test('the card sits after the step chain, and Edit opens the quiz page with its form', () => {

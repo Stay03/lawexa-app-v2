@@ -55,7 +55,11 @@ export function isCreateQuizStep(message: ToolMessage): boolean {
 export function createdQuiz(message: ToolMessage): CreatedQuiz | null {
   if (!isCreateQuizStep(message)) return null;
   if (message.toolStatus !== 'complete') return { kind: 'making' };
-  const result = message.toolResult;
+  return finishedQuiz(message.toolResult, Boolean(message.resultRef));
+}
+
+/** A finished step's quiz, from its result and whether a lazy result is still to fetch. */
+function finishedQuiz(result: ToolMessage['toolResult'], hasRef: boolean): CreatedQuiz | null {
   const data = payload(result?.data);
   const quiz = record(data?.quiz);
   if (quiz && typeof quiz.uuid === 'string' && quiz.uuid && typeof quiz.title === 'string') {
@@ -71,15 +75,32 @@ export function createdQuiz(message: ToolMessage): CreatedQuiz | null {
       source: sourceTitle ? (range ? `${sourceTitle}, ${range}` : sourceTitle) : null,
     };
   }
+  // The server's own refusal first (HTTP 200 with `data.error`, which no mask
+  // touches; backend, 23 October 2026), then any sentence the step carries.
   const sentence =
+    text(record(data?.error)?.message) ??
     text(result?.error) ??
     text(result?.data) ??
-    text(data?.message) ??
-    text(record(data?.error)?.message);
+    text(data?.message);
   if (sentence) return { kind: 'failed', message: sentence };
-  // Not loaded yet (a lazy result): the card asks for it.
-  if (result?.data == null) return null;
+  if (result?.data == null) {
+    // A lazy result still to fetch: the card asks for it.
+    if (hasRef) return null;
+    // A step stored with no result at all: the run stopped before the quiz
+    // was made, so the card says so rather than waiting for ever.
+    return { kind: 'failed', message: 'Lawexa stopped before the quiz was made. Ask again to try once more.' };
+  }
   return { kind: 'failed', message: 'Lawexa could not make the quiz this time.' };
+}
+
+/**
+ * The step's own label. A refusal reads "Couldn't make a quiz", so the row
+ * never says "Made a quiz" above a card that says it was not. A result still
+ * to fetch keeps "Made a quiz": a lazy refusal already carries its sentence.
+ */
+export function createQuizStepAction(isComplete: boolean, result: ToolMessage['toolResult'] | undefined, hasRef: boolean): string {
+  if (!isComplete) return 'Making a quiz';
+  return finishedQuiz(result, hasRef)?.kind === 'failed' ? "Couldn't make a quiz" : 'Made a quiz';
 }
 
 /** A non-empty trimmed string, or `null`. */

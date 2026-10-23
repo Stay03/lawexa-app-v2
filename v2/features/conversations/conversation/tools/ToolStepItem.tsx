@@ -27,6 +27,7 @@ import {
   isSearchLikeTool,
 } from './tool-content';
 import type { ToolMessage } from '@/types/chat';
+import { createQuizStepAction } from './created-quiz';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -97,6 +98,8 @@ export function formatToolMessage(
   statuteTitle?: string,
   /** The note or case title from the result's metadata, likewise. */
   entityTitle?: string,
+  /** Whether a lazy result is still to fetch (`resultRef`). */
+  hasResultRef = false,
 ): { action: string; detail?: string } {
   // A read step names what it read: the title from the loaded result, else the
   // one the transcript carries, else (older chats) the id it was asked for.
@@ -202,7 +205,7 @@ export function formatToolMessage(
     // card after the chain (`CreatedQuizCard`).
     case 'create_quiz':
       return {
-        action: isComplete ? 'Made a quiz' : 'Making a quiz',
+        action: createQuizStepAction(isComplete, toolResult, hasResultRef),
         detail: typeof parameters.title === 'string' && parameters.title.trim() ? parameters.title.trim() : undefined,
       };
     default: {
@@ -325,6 +328,7 @@ export function ToolStepItem({
     loaded.message.toolResult ?? undefined,
     message.statuteTitle,
     message.entityTitle,
+    Boolean(message.resultRef),
   );
   // Glance-level zero signal: a search that affirmatively returned nothing hints
   // it on the COLLAPSED line, so a user need not expand to learn it found nothing.
