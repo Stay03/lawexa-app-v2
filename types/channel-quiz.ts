@@ -184,9 +184,10 @@ export interface QuizQuestion {
  * `422 "The questions about scenario N must come one after another."`), so a
  * player can show the passage once, above its run of questions.
  *
- * TYPED, NOT YET DRAWN: no screen renders scenarios today. The sizing of that
- * work is in the solo quiz report; until then a quiz with scenarios plays as
- * plain questions.
+ * WHERE THEY ARE DRAWN (23 October 2026): the solo player shows the passage
+ * above its questions, a quiz's page names each scenario in "What is in it",
+ * and the library's form writes them (`form-model.ts`). A channel game does
+ * not draw them yet, so the channel's form offers no scenario box.
  */
 export interface QuizScenario {
   uuid: string;
