@@ -7,6 +7,7 @@ import { Table, TableKit, TableView } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 
 import { createCaseMentionExtension } from './case-mention';
+import { FontStyle } from './font-style';
 import type { CaseMentionStore } from './mention-store';
 
 /**
@@ -14,7 +15,10 @@ import type { CaseMentionStore } from './mention-store';
  * "no colour, ever" promise.
  *
  * ── WHAT IS DELIBERATELY ABSENT ─────────────────────────────────────────────
- * No `@tiptap/extension-color`, no `text-style`, no font family or size. The
+ * No `@tiptap/extension-color` and no `text-style`: no colour, and no inline
+ * style of any kind. Font type and size arrived on 23 October 2026 (Stay: "Font
+ * size and type for now") as their OWN mark, `FontStyle`, which writes data
+ * attributes from a closed list and never a style (font-style.ts). The
  * owner's decision (August 2026) is that notes have never had colour — coloured
  * notes came from pasting — and the v2 reader strips inline styles at parse.
  * This is the writing half of the same decision, and it is enforced by ABSENCE
@@ -109,6 +113,11 @@ export function createNoteExtensions({
     }),
     TableKit.configure({ table: false }),
     EditorTable.configure({ resizable: false }),
+    // Font type and size (the draft editor, 23 October 2026): one span with
+    // data attributes from a closed list (font-values.ts), never a style. In
+    // every note editor, so a note saved from a draft keeps its fonts when it
+    // is edited later.
+    FontStyle,
   ];
 }
 

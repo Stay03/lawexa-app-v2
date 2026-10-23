@@ -1,0 +1,26 @@
+/* A note's font type and size (font-values.ts), drawn from the span's data
+   attributes, never from an inline style: the editor and the reader paint the
+   same closed list, and a value outside it has no rule, so it shows in the
+   house font. Scoped to `.v2-note-fonts`, the editing and reading surfaces.
+
+   Phones have neither Times New Roman nor Arial: each falls back to the
+   nearest system face in its own family, so a draft keeps its character. */
+
+.v2-note-fonts [data-font='Times New Roman'] {
+  font-family: 'Times New Roman', Times, 'Liberation Serif', serif;
+}
+.v2-note-fonts [data-font='Arial'] {
+  font-family: Arial, Helvetica, 'Liberation Sans', sans-serif;
+}
+.v2-note-fonts [data-font='Georgia'] {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.v2-note-fonts [data-size='10'] { font-size: 10pt; }
+.v2-note-fonts [data-size='11'] { font-size: 11pt; }
+.v2-note-fonts [data-size='12'] { font-size: 12pt; }
+.v2-note-fonts [data-size='14'] { font-size: 14pt; }
+.v2-note-fonts [data-size='16'] { font-size: 16pt; }
+.v2-note-fonts [data-size='18'] { font-size: 18pt; }
+.v2-note-fonts [data-size='20'] { font-size: 20pt; }
+.v2-note-fonts [data-size='24'] { font-size: 24pt; }
