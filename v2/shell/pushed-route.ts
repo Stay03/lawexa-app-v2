@@ -250,21 +250,6 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
           title: fixed('Your progress'),
         };
       }
-      // The solo quiz (21 October 2026). Both lists are opened from the hub.
-      if (depth === 2 && second === 'library') {
-        return {
-          backHref: '/quiz',
-          backLabel: 'Back to Quiz',
-          title: fixed('My quizzes'),
-        };
-      }
-      if (depth === 2 && second === 'explore') {
-        return {
-          backHref: '/quiz',
-          backLabel: 'Back to Quiz',
-          title: fixed('Explore quizzes'),
-        };
-      }
       // A quiz's front is reached from the library, from Explore, from a
       // shared link and from its own results, so its chevron means OUT: the
       // history step whenever any screen of ours is behind, and the hub for a

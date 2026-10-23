@@ -41,9 +41,12 @@ import type { V2SessionSnapshot } from '@/v2/runtime/session-context';
  * prefixes: `app/v2/quiz/[sessionUuid]` catches any other `/quiz/{id}`, so a
  * quiz lives at `/quiz/q/{uuid}` and an attempt at `/quiz/attempts/{uuid}`,
  * never at `/quiz/{uuid}`.
+ *
+ * The two lists are the Quiz home's tabs (Stay, 23 October 2026); their old
+ * addresses, `/quiz/library` and `/quiz/explore`, redirect to these.
  */
-export const LIBRARY_HREF = '/quiz/library';
-export const EXPLORE_HREF = '/quiz/explore';
+export const LIBRARY_HREF = '/quiz?tab=mine';
+export const EXPLORE_HREF = '/quiz';
 
 export function quizFrontHref(quizUuid: string): string {
   return `/quiz/q/${quizUuid}`;

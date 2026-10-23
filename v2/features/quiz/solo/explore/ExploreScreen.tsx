@@ -12,7 +12,6 @@ import type { ChannelQuiz } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { QuizMessage } from '../../ui/QuizMessage';
@@ -21,7 +20,10 @@ import { questionCountLabel, quizFrontHref } from '../model';
 import { soloQuizQueries } from '../queries';
 
 /**
- * ExploreScreen — `/quiz/explore`, every public quiz, for anyone.
+ * ExploreList — the Quiz home's Explore tab (`/quiz`), every public quiz,
+ * for anyone. It was the `/quiz/explore` page until the home became two tabs
+ * (Stay, 23 October 2026: "tabs discover/explore and my quiz"); that address
+ * now lands here.
  *
  * ── IT RENDERS SIGNED OUT, AND THAT IS THE POINT ───────────────────────────
  * `GET /channel-quizzes/explore` answers with no token (measured 21 October
@@ -43,7 +45,7 @@ import { soloQuizQueries } from '../queries';
  * reason to open one. `creator` is nullable (an account that has gone), and a
  * missing author is a designed word, never a dereference.
  */
-export function ExploreScreen() {
+export function ExploreList() {
   const { userId: viewerId } = useV2Session();
 
   const query = useInfiniteQuery({
@@ -73,10 +75,10 @@ export function ExploreScreen() {
   const showEmpty = !showSkeleton && !showError && quizzes.length === 0;
 
   return (
-    <div className={LIST_COLUMN}>
-      <ExploreHeading />
+    <>
+      <ExploreLede />
 
-      {/* The ONE live region for this surface — see the library. */}
+      {/* The ONE live region for this tab — see the library. */}
       <span role="status" aria-live="polite" className="sr-only">
         {showSkeleton ? 'Loading quizzes' : ''}
       </span>
@@ -114,23 +116,16 @@ export function ExploreScreen() {
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }
 
-/** Static chrome — identical in the live screen and in the route fallback. */
-function ExploreHeading() {
+/** What the tab holds, in one line. Static chrome: the home's fallback draws it too. */
+export function ExploreLede() {
   return (
-    <div className="mb-3 space-y-1">
-      {/* ONE TITLE PER SCREEN, AT EVERY WIDTH: the bar carries "Explore
-          quizzes" below `md:` (`pushed-route.ts`). */}
-      <h1 className="sr-only md:not-sr-only md:text-xl md:font-semibold md:tracking-tight md:text-foreground">
-        Explore quizzes
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        Public quizzes from verified authors. Open one to take it.
-      </p>
-    </div>
+    <p className="mb-3 text-sm text-muted-foreground">
+      Public quizzes from verified authors. Open one to take it.
+    </p>
   );
 }
 
@@ -237,26 +232,5 @@ function ExploreNextPageSkeleton() {
         <ExploreRowSkeleton />
       </div>
     </div>
-  );
-}
-
-/**
- * The explore route's fallback (`app/v2/quiz/explore/loading.tsx`): the SAME
- * heading, drawn for real, over the row skeleton, so route boundary → live
- * list is one continuous shape.
- */
-export function ExploreFallback() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading quizzes
-      </span>
-      {/* `aria-hidden` + `inert` (standards §8ii): a Suspense fallback is
-          DELETED when content arrives, so nothing in it may hold focus. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
-        <ExploreHeading />
-        <ExploreListSkeleton />
-      </div>
-    </>
   );
 }

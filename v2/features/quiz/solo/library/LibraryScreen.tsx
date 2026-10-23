@@ -32,8 +32,7 @@ import { VisibilityGroup } from '@/v2/features/channels/quiz/VisibilityGroup';
 import { LawexaMark } from '@/v2/features/channels/ui/avatars';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
-import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { QuizMessage } from '../../ui/QuizMessage';
@@ -42,7 +41,11 @@ import { canPublishPublicly, questionCountLabel, quizFrontHref } from '../model'
 import { soloQuizQueries } from '../queries';
 
 /**
- * LibraryScreen — `/quiz/library`, every quiz this account wrote.
+ * LibraryList — the Quiz home's My quizzes tab (`/quiz?tab=mine`), every
+ * quiz this account wrote. It was the `/quiz/library` page until the home
+ * became two tabs (Stay, 23 October 2026); that address now lands here. The
+ * create and edit form belongs to the home (`useQuizForm`), because New quiz
+ * sits on the tabs line, outside this list.
  *
  * ── THE SAME QUIZZES THE CHANNEL SHEET'S LIBRARY TAB LISTS, AS A PAGE ──────
  * A quiz belongs to the person who wrote it and merely RUNS in channels
@@ -69,17 +72,11 @@ import { soloQuizQueries } from '../queries';
  * Same reasoning as the quiz history: the list lives inside the shell's one
  * scroll container, so the observer is handed that scroller.
  */
-export function LibraryScreen() {
+export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => void }) {
   const session = useV2Session();
   const { userId: viewerId } = session;
   const canPublish = canPublishPublicly(session);
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingUuid, setEditingUuid] = useState<string | undefined>(undefined);
-  /** Bumped on every OPENING of the form, and used as its `key` — the house
-   *  dialog contract (`use-url-overlay.ts`): mounted through its close so the
-   *  exit plays, keyed so every arrival is a fresh mount. */
-  const [formOpenings, setFormOpenings] = useState(0);
   const [deleting, setDeleting] = useState<ChannelQuiz | null>(null);
 
   const query = useInfiniteQuery(soloQuizQueries.library({ viewerId }));
@@ -99,11 +96,6 @@ export function LibraryScreen() {
     rootMargin: '320px',
   });
 
-  const openForm = useCallback((quizUuid?: string) => {
-    setEditingUuid(quizUuid);
-    setFormOpenings((openings) => openings + 1);
-    setFormOpen(true);
-  }, []);
   // One stable pair for every row, so `LibraryRow`'s `memo` holds when the
   // list re-renders (a page loading under the sentinel, a refetch).
   const editQuiz = useCallback((quiz: ChannelQuiz) => openForm(quiz.uuid), [openForm]);
@@ -114,10 +106,13 @@ export function LibraryScreen() {
   const showEmpty = !showSkeleton && !showError && quizzes.length === 0;
 
   return (
-    <div className={LIST_COLUMN}>
-      <LibraryHeading onCreate={() => openForm()} />
+    <>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Quizzes you wrote. Take one yourself, run it in a channel, or share it
+        by link.
+      </p>
 
-      {/* The ONE live region for this surface: the skeleton is `aria-hidden`
+      {/* The ONE live region for this tab: the skeleton is `aria-hidden`
           and the route fallback's announcement is gone by the time an in-page
           fetch happens. */}
       <span role="status" aria-live="polite" className="sr-only">
@@ -172,43 +167,41 @@ export function LibraryScreen() {
         </>
       )}
 
-      {/* No channel: the form can only file into the library. Keyed per
-          opening and mounted through its close — see `openForm`. */}
-      <QuizFormDialog
-        key={formOpenings}
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        viewerId={viewerId}
-        quizUuid={editingUuid}
-      />
-
       <DeleteQuizDialog quiz={deleting} onClose={() => setDeleting(null)} />
-    </div>
+    </>
   );
 }
 
-/** Static chrome — identical in the live screen and in the route fallback. */
-function LibraryHeading({ onCreate }: { onCreate: () => void }) {
-  return (
-    <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-      <div className="space-y-1">
-        {/* ONE TITLE PER SCREEN, AT EVERY WIDTH: the bar carries "My quizzes"
-            below `md:` (`pushed-route.ts`), so the heading is stated for
-            assistive tech everywhere and drawn only from `md:` up. */}
-        <h1 className="sr-only md:not-sr-only md:text-xl md:font-semibold md:tracking-tight md:text-foreground">
-          My quizzes
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Quizzes you wrote. Take one yourself, run it in a channel, or share
-          it by link.
-        </p>
-      </div>
-      <button type="button" onClick={onCreate} className={cn(CREATE_PILL, FOCUS_RING)}>
-        <Plus aria-hidden className="size-4" />
-        New quiz
-      </button>
-    </div>
+/**
+ * The create and edit form for the reader's own quizzes, with no channel, so
+ * it can only file into the library. `openForm()` writes a new quiz,
+ * `openForm(uuid)` edits one; `dialog` is mounted once by the home.
+ *
+ * Keyed per OPENING and mounted through its close — the house dialog contract
+ * (`use-url-overlay.ts`): the exit plays, and every arrival is a fresh mount.
+ */
+export function useQuizForm(viewerId: number | null) {
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingUuid, setEditingUuid] = useState<string | undefined>(undefined);
+  const [formOpenings, setFormOpenings] = useState(0);
+
+  const openForm = useCallback((quizUuid?: string) => {
+    setEditingUuid(quizUuid);
+    setFormOpenings((openings) => openings + 1);
+    setFormOpen(true);
+  }, []);
+
+  const dialog = (
+    <QuizFormDialog
+      key={formOpenings}
+      open={formOpen}
+      onOpenChange={setFormOpen}
+      viewerId={viewerId}
+      quizUuid={editingUuid}
+    />
   );
+
+  return { openForm, dialog };
 }
 
 /**
@@ -389,26 +382,5 @@ function LibraryNextPageSkeleton() {
         <LibraryRowSkeleton />
       </div>
     </div>
-  );
-}
-
-/**
- * The library route's fallback (`app/v2/quiz/(solo)/library/loading.tsx`): the
- * SAME heading, drawn for real, over the row skeleton, so route boundary →
- * live list is one continuous shape.
- */
-export function LibraryFallback() {
-  return (
-    <>
-      <span role="status" className="sr-only">
-        Loading your quizzes
-      </span>
-      {/* `aria-hidden` + `inert` (standards §8ii): a Suspense fallback is
-          DELETED when content arrives, so nothing in it may hold focus. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
-        <LibraryHeading onCreate={() => undefined} />
-        <LibraryListSkeleton />
-      </div>
-    </>
   );
 }

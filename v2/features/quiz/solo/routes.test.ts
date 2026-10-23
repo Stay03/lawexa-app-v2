@@ -21,17 +21,11 @@ test('every solo address is rewritten into the v2 tree', () => {
   }
 });
 
-test('the two lists are pushed screens that go up to the hub, named in the bar', () => {
-  assert.deepEqual(pushedScreenFor(LIBRARY_HREF), {
-    backHref: '/quiz',
-    backLabel: 'Back to Quiz',
-    title: { kind: 'fixed', text: 'My quizzes' },
-  });
-  assert.deepEqual(pushedScreenFor(`/v2${EXPLORE_HREF}`), {
-    backHref: '/quiz',
-    backLabel: 'Back to Quiz',
-    title: { kind: 'fixed', text: 'Explore quizzes' },
-  });
+test('the two lists are the Quiz home\'s tabs, a top-level screen, not pushed ones', () => {
+  assert.equal(LIBRARY_HREF, '/quiz?tab=mine');
+  assert.equal(EXPLORE_HREF, '/quiz');
+  assert.equal(pushedScreenFor('/quiz/library'), null);
+  assert.equal(pushedScreenFor('/quiz/explore'), null);
 });
 
 test("a quiz's front keeps its title in the page and its chevron means out", () => {
@@ -69,14 +63,17 @@ test('an attempt and its results default to the hub until the screen names the q
   assert.equal(pushedScreenFor('/quiz/abc'), null);
 });
 
-test('the gate is split: practice and solo groups each mount it, the public pair has none', () => {
+test('the solo group keeps its gate, practice is hidden behind a redirect, the home has none', () => {
   assert.ok(!exists('app', 'v2', 'quiz', 'layout.tsx'), 'no gate over the whole segment');
-  assert.match(read('app', 'v2', 'quiz', '(practice)', 'layout.tsx'), /<QuizAccessGate surface="practice">\{children\}<\/QuizAccessGate>/);
   assert.match(read('app', 'v2', 'quiz', '(solo)', 'layout.tsx'), /<QuizAccessGate surface="solo">\{children\}<\/QuizAccessGate>/);
-  // The practice routes moved with their gate.
-  for (const route of ['(hub)/page.tsx', '[sessionUuid]/(play)/page.tsx', 'history/page.tsx', 'stats/page.tsx', 'play/page.tsx']) {
+  // Practice is hidden (Stay, 23 October 2026): one layout sends every
+  // practice address home, and its pages stay for when it comes back.
+  assert.match(read('app', 'v2', 'quiz', '(practice)', 'layout.tsx'), /redirect\('\/quiz'\);/);
+  for (const route of ['[sessionUuid]/(play)/page.tsx', 'history/page.tsx', 'stats/page.tsx', 'play/page.tsx']) {
     assert.ok(exists('app', 'v2', 'quiz', '(practice)', route), route);
   }
+  assert.ok(!exists('app', 'v2', 'quiz', '(practice)', '(hub)', 'page.tsx'), '/quiz is the home now');
+  assert.ok(exists('app', 'v2', 'quiz', '(home)', 'page.tsx'));
   const gate = read('v2', 'features', 'quiz', 'access.tsx');
   // Neutral words on the solo surface, the practice words kept for practice.
   assert.match(gate, /surface === 'solo' \? \(\s*<SoloSignedOutState signInHref=\{signIn\} \/>\s*\) : \(\s*<QuizSignedOutState signInHref=\{signIn\} \/>/);

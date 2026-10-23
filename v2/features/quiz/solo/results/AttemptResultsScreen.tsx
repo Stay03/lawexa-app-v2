@@ -172,6 +172,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
         quizTitle={attempt.quiz.title}
         challenge={challengeText(viewerName, score.points, attempt.quiz.title, highlights)}
         shareable={shareable}
+        privateQuiz={visibility === 'private'}
         retaking={startAttempt.isPending}
         onRetake={retake}
       />

@@ -1,8 +1,11 @@
 'use client';
 
-import { Check, Loader2, RotateCcw, Share2 } from 'lucide-react';
+import Link from 'next/link';
+import { Check, Loader2, Lock, RotateCcw, Share2 } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { quizFrontHref } from '../model';
 import { RaisedButton } from '../ui';
 
@@ -25,7 +28,10 @@ import { RaisedButton } from '../ui';
  * ── ONLY WHERE A LINK CAN OPEN THE QUIZ ────────────────────────────────────
  * The caller reads the quiz's visibility and withholds Challenge for a
  * private or channel-only quiz, rather than handing out an address that
- * answers 404.
+ * answers 404. On an "Only you" quiz a quiet line takes its place and says
+ * why, with the way to change it (Stay, 23 October 2026, picture 7): only
+ * its author can take a private quiz, so the reader here is the author, and
+ * the quiz's own page is where who can take it is set.
  *
  * ── AT THE BOTTOM, AND IT STAYS THERE ──────────────────────────────────────
  * `mt-auto` puts the row on the bottom edge of a short page; `sticky
@@ -37,6 +43,7 @@ export function ResultsActions({
   quizTitle,
   challenge,
   shareable,
+  privateQuiz,
   retaking,
   onRetake,
 }: {
@@ -46,6 +53,8 @@ export function ResultsActions({
   challenge: string;
   /** A link or public quiz — the only ones a shared link can open. */
   shareable: boolean;
+  /** An "Only you" quiz: say why there is no Challenge. */
+  privateQuiz: boolean;
   retaking: boolean;
   onRetake: () => void;
 }) {
@@ -81,6 +90,21 @@ export function ResultsActions({
           </RaisedButton>
         )}
       </div>
+      {privateQuiz && !shareable ? (
+        <p className="mt-3 flex items-start gap-2.5 rounded-2xl border border-border/60 bg-secondary/30 px-3.5 py-3 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+          <Lock aria-hidden className="mt-0.5 size-4 shrink-0" />
+          <span>
+            Only you can take this quiz.{' '}
+            <Link
+              href={quizFrontHref(quizUuid)}
+              className={cn('rounded-sm font-semibold text-primary underline-offset-2 hover:underline', FOCUS_RING)}
+            >
+              Change who can take it
+            </Link>{' '}
+            to challenge a friend.
+          </span>
+        </p>
+      ) : null}
     </div>
   );
 }

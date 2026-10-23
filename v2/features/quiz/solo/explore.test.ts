@@ -22,14 +22,16 @@ test('the explore list is fetched for everyone and opens each quiz on its front'
   assert.match(screen, /<MemberAvatar user=\{quiz\.creator\} className="mt-0\.5" \/>/);
   assert.match(screen, /quiz\.creator\?\.name \?\? 'Someone who has left'/);
   assert.match(screen, /rootRef: scrollRootRef,/);
-  assert.match(screen, /<ExploreHeading \/>\s*<ExploreListSkeleton \/>/);
+  // A tab of the Quiz home now: no page column and no heading of its own.
+  assert.match(screen, /export function ExploreList\(\) \{/);
+  assert.doesNotMatch(screen, /LIST_COLUMN|<h1/);
 });
 
-test('the route is public: canonical, OG card, indexable, and under no gate', () => {
-  const page = read('app', 'v2', 'quiz', 'explore', 'page.tsx');
-  assert.match(page, /const canonical = `\$\{getAppUrl\(\)\.replace\(\/\\\/\$\/, ''\)\}\/quiz\/explore`;/);
-  assert.match(page, /alternates: \{ canonical \}/);
-  assert.match(page, /robots: \{ index: true, follow: true \}/);
-  assert.match(page, /openGraph: \{/);
-  assert.match(read('app', 'v2', 'quiz', 'explore', 'loading.tsx'), /return <ExploreFallback \/>;/);
+test('the old Explore address lands on the home, which carries the public treatment', () => {
+  assert.match(read('app', 'v2', 'quiz', 'explore', 'page.tsx'), /redirect\(EXPLORE_HREF\);/);
+  const home = read('app', 'v2', 'quiz', '(home)', 'page.tsx');
+  assert.match(home, /const canonical = `\$\{getAppUrl\(\)\.replace\(\/\\\/\$\/, ''\)\}\/quiz`;/);
+  assert.match(home, /alternates: \{ canonical \}/);
+  assert.match(home, /robots: \{ index: true, follow: true \}/);
+  assert.match(home, /openGraph: \{/);
 });

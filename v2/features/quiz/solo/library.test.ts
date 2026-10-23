@@ -16,9 +16,10 @@ test('the library lists the reader\'s quizzes page by page and opens each on its
   assert.match(screen, /href=\{quizFrontHref\(quiz\.uuid\)\}/);
   // The sentinel is rooted in the shell's scroller, like every v2 list.
   assert.match(screen, /rootRef: scrollRootRef,/);
-  // The heading is drawn for real in the fallback, the rows reserved.
-  assert.match(screen, /<LibraryHeading onCreate=\{\(\) => undefined\} \/>\s*<LibraryListSkeleton \/>/);
-  assert.match(screen, /<div aria-hidden inert className=\{LIST_COLUMN\}>/);
+  // A tab of the Quiz home now: the home owns the column and the form.
+  assert.match(screen, /export function LibraryList\(\{ openForm \}: \{ openForm: \(quizUuid\?: string\) => void \}\) \{/);
+  assert.doesNotMatch(screen, /LIST_COLUMN|<h1/);
+  assert.match(screen, /export function useQuizForm\(viewerId: number \| null\) \{/);
 });
 
 test('every row carries the owner\'s menu: who can find it, Edit, Delete', () => {
@@ -57,9 +58,6 @@ test('the visibility group offers Everyone disabled with the reason until the au
   assert.doesNotMatch(sheet, /function DeleteQuizDialog/);
 });
 
-test('the route is private, noindex, and its fallback is the screen\'s own', () => {
-  const page = read('app', 'v2', 'quiz', '(solo)', 'library', 'page.tsx');
-  assert.match(page, /title: 'My quizzes',/);
-  assert.match(page, /robots: \{ index: false, follow: false \}/);
-  assert.match(read('app', 'v2', 'quiz', '(solo)', 'library', 'loading.tsx'), /return <LibraryFallback \/>;/);
+test('the old My quizzes address lands on the home\'s My quizzes tab', () => {
+  assert.match(read('app', 'v2', 'quiz', '(solo)', 'library', 'page.tsx'), /redirect\(LIBRARY_HREF\);/);
 });

@@ -99,8 +99,8 @@ const TOP_LEVEL: ReadonlyMap<string, TopLevelScreen> = new Map([
   // Team Channels (researcher+), the name the nav row carries.
   ['/channels', { title: 'Team Channels' }],
 
-  // The quiz hub opens on its own hero sentence, which IS its heading.
-  ['/quiz', OWN_HEADING],
+  // The Quiz home: Explore and My quizzes, as two tabs (Stay, 23 October 2026).
+  ['/quiz', { title: 'Quiz' }],
 ]);
 
 /**
