@@ -27,7 +27,7 @@ import {
   isSearchLikeTool,
 } from './tool-content';
 import type { ToolMessage } from '@/types/chat';
-import { createQuizStepAction } from './created-quiz';
+import { createQuizStepAction, createdQuiz, isCreateQuizStep } from './created-quiz';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -313,7 +313,11 @@ export function ToolStepItem({
   const isComplete = message.toolStatus === 'complete';
   const isSuccess = isComplete && message.toolResult?.success !== false;
   const isError = isComplete && message.toolResult?.success === false;
-  const status = !isComplete ? 'loading' : isSuccess ? 'success' : 'error';
+  // A refused quiz is a finished step the stored result may still call a
+  // success, so its mark follows the card's reading (created-quiz.ts). Only
+  // the mark: the card under the chain already says why, so no "Error:" line.
+  const quizRefused = isCreateQuizStep(message) && createdQuiz(message)?.kind === 'failed';
+  const status = !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
 
   const memory = isMemoryTool(message.toolName);
   // The step's result, fetched the first time it opens (v2 loads chats with
@@ -394,7 +398,7 @@ export function ToolStepItem({
         </div>
       </StepCollapse>
 
-      {isError && !isExpanded && (
+      {isError && !quizRefused && !isExpanded && (
         <p className="text-destructive ml-7 mt-1 text-sm">
           Error: {extractStepError(message) || 'Unknown error'}
         </p>

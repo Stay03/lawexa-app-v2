@@ -73,6 +73,14 @@ test('the step label says making, made, or could not make, never made above a re
   assert.equal(createQuizStepAction(true, { success: true, error: null, data: null }, true), 'Made a quiz');
 });
 
+test('a refused quiz step carries the error mark, with no Error line under it', () => {
+  const item = readFileSync(join(here, 'ToolStepItem.tsx'), 'utf8');
+  assert.match(item, /const quizRefused = isCreateQuizStep\(message\) && createdQuiz\(message\)\?\.kind === 'failed';/);
+  assert.match(item, /isSuccess && !quizRefused \? 'success' : 'error'/);
+  // No "Error:" line for a refused quiz, whatever the stored flag says: the card says it once.
+  assert.match(item, /\{isError && !quizRefused && !isExpanded && \(/);
+});
+
 test('the card sits after the step chain, and Edit opens the quiz page with its form', () => {
   const list = readFileSync(join(here, '..', 'MessageList.tsx'), 'utf8');
   assert.match(list, /<CompactToolChain messages=\{steps\} \/>\s*\{quizSteps\.map\(\(step\) => \(\s*<CreatedQuizCard key=\{step\.id\} message=\{step\} \/>/);
