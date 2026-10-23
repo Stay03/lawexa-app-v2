@@ -53,9 +53,33 @@ export function notePreviewText(
   plain: string | null | undefined,
   html: string | null | undefined,
 ): string | null {
-  const direct = plain?.trim();
-  if (direct) return direct;
-  return htmlToPlainText(html) || null;
+  const text = plain?.trim() ? plain.replace(/\s+/g, ' ').trim() : htmlToPlainText(html);
+  return withoutLeadingHeadings(text, html) || null;
+}
+
+const LEADING_HEADING = /^\s*<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/i;
+
+/**
+ * The preview minus the heading(s) the note opens with (techlead, 23 October
+ * 2026): a note that starts "Tenancy Agreement" read "Tenancy Agreement TEST
+ * DATA. This agreement…" in the list, the heading run into the first sentence,
+ * and usually a copy of the title. The plain preview has lost its tags, so the
+ * headings are read off the start of the HTML one and cut from the start of the
+ * text when it begins with them. A heading the HTML preview cuts short is left
+ * in, and so is a note that is only headings.
+ */
+function withoutLeadingHeadings(text: string, html: string | null | undefined): string {
+  let rest = text;
+  let markup = html ?? '';
+  for (let match = LEADING_HEADING.exec(markup); match; match = LEADING_HEADING.exec(markup)) {
+    const heading = htmlToPlainText(match[2]);
+    if (!heading || !rest.startsWith(heading)) break;
+    const after = rest.slice(heading.length).trim();
+    if (!after) break;
+    rest = after;
+    markup = markup.slice(match[0].length);
+  }
+  return rest;
 }
 
 /**

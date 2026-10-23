@@ -42,6 +42,9 @@ test('only My notes can be ticked, and a tab change drops the ticks', () => {
   assert.match(page, /useNotesBulk\(\{ rows: tab === 'mine' \? rows : NO_ROWS \}\)/);
   assert.match(page, /const selecting = bulk\.selecting && tab === 'mine';/);
   assert.match(page, /\{tab === 'mine' && rows\.length > 0 && !selecting\s*\? bulk\.startButton\(/);
+  // On a phone Select is its icon, square, so the tab row stays one line; the word is still read out.
+  assert.match(page, /max-sm:size-11 max-sm:px-0/);
+  assert.match(read('notes-bulk.tsx'), /<ListChecks aria-hidden className="size-4 sm:hidden" \/>\s*<span className="max-sm:sr-only">Select<\/span>/);
   assert.match(page, /const setTab = \(next: NotesTab\) => \{\s*\/\/ [^\n]*\n\s*bulk\.stop\(\);/);
   // The floating search pill steps aside for the bar.
   assert.match(page, /\{searchAtTop \|\| selecting \? null : \(\s*<ScreenDock>/);

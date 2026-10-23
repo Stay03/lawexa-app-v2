@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Globe, Lock, Send, Trash2, Undo2 } from 'lucide-react';
+import { Globe, ListChecks, Lock, Send, Trash2, Undo2 } from 'lucide-react';
 
 import { bulkApi } from '@/v2/features/bulk/api';
 import { BulkBar, BulkBarAction } from '@/v2/features/bulk/BulkBar';
@@ -60,10 +60,13 @@ export function useNotesBulk({ rows }: { rows: readonly NoteRowModel[] }) {
   const busy = remove.isPending || publish.isPending || unpublish.isPending || makePrivate.isPending || makePublic.isPending;
   const off = select.count === 0 || busy;
 
+  // On a phone the button is its icon, so the tabs, Select and New note stay on
+  // one line (techlead, 23 October 2026); the word is still read out.
   const startButton = useCallback(
     (className: string): ReactNode => (
       <button type="button" onClick={select.start} className={className}>
-        Select
+        <ListChecks aria-hidden className="size-4 sm:hidden" />
+        <span className="max-sm:sr-only">Select</span>
       </button>
     ),
     [select.start],

@@ -242,7 +242,7 @@ export function NotesBrowser() {
             {tab === 'mine' && rows.length > 0 && !selecting
               ? bulk.startButton(
                   cn(
-                    'v2-interactive inline-flex min-h-11 shrink-0 items-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+                    'v2-interactive inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary max-sm:size-11 max-sm:px-0',
                     FOCUS_RING,
                   ),
                 )
