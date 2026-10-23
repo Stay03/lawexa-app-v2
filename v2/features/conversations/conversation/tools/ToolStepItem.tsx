@@ -198,6 +198,13 @@ export function formatToolMessage(
       return {
         action: isComplete ? 'Memory recalled' : 'Recalling memory',
       };
+    // Quiz from a source (Stay, 23 October 2026): the quiz itself shows as a
+    // card after the chain (`CreatedQuizCard`).
+    case 'create_quiz':
+      return {
+        action: isComplete ? 'Made a quiz' : 'Making a quiz',
+        detail: typeof parameters.title === 'string' && parameters.title.trim() ? parameters.title.trim() : undefined,
+      };
     default: {
       const readable = toolName
         .replace(/_/g, ' ')

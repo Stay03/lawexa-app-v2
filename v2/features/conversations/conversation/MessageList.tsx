@@ -36,6 +36,8 @@ import { spaceMarks } from './space-marks';
 import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
 import { CompactToolChain } from './tools/CompactToolChain';
+import { isCreateQuizStep } from './tools/created-quiz';
+import { CreatedQuizCard } from './cards/CreatedQuizCard';
 import { ActivityStatus } from './ActivityStatus';
 import { ReferenceChips } from './ReferenceChips';
 import { TranscriptSkeleton } from './skeletons';
@@ -942,7 +944,17 @@ const GroupRow = memo(function GroupRow({
       />
     );
   } else if (group.type === 'tool-chain') {
-    body = <CompactToolChain messages={group.messages} />;
+    // A quiz Lawexa made shows as a card after the chain, so the reader sees
+    // it without opening the step (quiz from a source, 23 October 2026).
+    const quizSteps = group.messages.filter(isCreateQuizStep);
+    body = (
+      <>
+        <CompactToolChain messages={group.messages} />
+        {quizSteps.map((step) => (
+          <CreatedQuizCard key={step.id} message={step} />
+        ))}
+      </>
+    );
   } else {
     const message = group.message;
     if (isErrorMessage(message)) {

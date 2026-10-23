@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   Compass,
@@ -31,6 +31,7 @@ import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { signInHref } from '@/v2/runtime/sign-in-href';
+import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { QuizTile } from '../QuizTile';
@@ -134,6 +135,21 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
     setFormOpenings((openings) => openings + 1);
     setFormOpen(true);
   }, []);
+  // `?edit=1` opens the form once, for its owner: the chat's quiz card links
+  // here with it (quiz from a source, 23 October 2026). Adopted in render, the
+  // same once-only pattern the form uses for a loaded quiz; the parameter goes
+  // when the form closes, so a refresh does not open it again.
+  const wantsEdit = useSearchParams().get('edit') === '1';
+  const [editAdopted, setEditAdopted] = useState(false);
+  if (wantsEdit && own && !editAdopted) {
+    setEditAdopted(true);
+    setFormOpenings((openings) => openings + 1);
+    setFormOpen(true);
+  }
+  const onFormOpenChange = (next: boolean) => {
+    setFormOpen(next);
+    if (!next && wantsEdit) replaceUrlParams({ edit: null });
+  };
   const openDelete = useCallback(() => setDeleting(quiz), [quiz]);
   /** The owner's rows for the bar's overflow menu. Stable while the quiz is,
    *  so the publish below is a no-op between loads. */
@@ -380,7 +396,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
       <QuizFormDialog
         key={formOpenings}
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={onFormOpenChange}
         viewerId={viewerId}
         quizUuid={quizUuid}
       />
