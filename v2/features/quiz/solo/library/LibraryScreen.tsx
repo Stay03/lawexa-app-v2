@@ -25,6 +25,7 @@ import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
 import { VisibilityGroup } from '@/v2/features/channels/quiz/VisibilityGroup';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { QuizMessage } from '../../ui/QuizMessage';
@@ -166,6 +167,9 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
   );
 }
 
+const QUIZ_FORM_PARAM = 'quiz-form';
+const NEW_QUIZ_FORM = 'new';
+
 /**
  * The create and edit form for the reader's own quizzes, with no channel, so
  * it can only file into the library. `openForm()` writes a new quiz,
@@ -175,23 +179,38 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
  * (`use-url-overlay.ts`): the exit plays, and every arrival is a fresh mount.
  */
 export function useQuizForm(viewerId: number | null) {
-  const [formOpen, setFormOpen] = useState(false);
-  const [editingUuid, setEditingUuid] = useState<string | undefined>(undefined);
+  // The form has its own address (`?quiz-form=new`, or the quiz's uuid to
+  // edit it), so the device's Back closes it like every v2 overlay, and the
+  // form can ask "Discard changes?" first when there is something to lose
+  // (QuizFormDialog, Stay 23 October 2026).
+  const overlay = useUrlOverlay(QUIZ_FORM_PARAM);
   const [formOpenings, setFormOpenings] = useState(0);
+  // The opening's value, kept past a Back so the form can open again on it.
+  const [lastValue, setLastValue] = useState<string>(NEW_QUIZ_FORM);
+  const { show, close } = overlay;
 
-  const openForm = useCallback((quizUuid?: string) => {
-    setEditingUuid(quizUuid);
-    setFormOpenings((openings) => openings + 1);
-    setFormOpen(true);
-  }, []);
+  const openForm = useCallback(
+    (quizUuid?: string) => {
+      const value = quizUuid ?? NEW_QUIZ_FORM;
+      setLastValue(value);
+      setFormOpenings((openings) => openings + 1);
+      show(value);
+    },
+    [show],
+  );
+  const onOpenChange = useCallback(
+    (next: boolean) => (next ? show(lastValue) : close()),
+    [show, close, lastValue],
+  );
+  const value = overlay.value ?? lastValue;
 
   const dialog = (
     <QuizFormDialog
       key={formOpenings}
-      open={formOpen}
-      onOpenChange={setFormOpen}
+      open={overlay.open}
+      onOpenChange={onOpenChange}
       viewerId={viewerId}
-      quizUuid={editingUuid}
+      quizUuid={value === NEW_QUIZ_FORM ? undefined : value}
     />
   );
 

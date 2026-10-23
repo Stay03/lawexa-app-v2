@@ -1,10 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,6 +56,7 @@ import {
   validate,
   type QuestionDraft,
   type ScenarioDraft,
+  hasFormContent,
 } from './form-model';
 import {
   optionLetter,
@@ -234,6 +245,33 @@ export function QuizFormDialog({
   const solo = !inRoom && channelUuid === undefined;
   const groups = groupQuestions(questions, scenarios);
 
+  // DISCARD CHANGES? (Stay, 23 October 2026). A NEW quiz with anything in it
+  // asks before it is thrown away, however the reader tries to leave: Cancel,
+  // Escape, a tap outside, or the device's Back. An empty form, and an edit
+  // (its saved copy is still there), close at once.
+  const dirty = !isEdit && hasFormContent({ title, description, questions, scenarios });
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const requestClose = (next: boolean) => {
+    if (next) {
+      onOpenChange(true);
+      return;
+    }
+    if (dirty && !submitting) setConfirmDiscard(true);
+    else onOpenChange(false);
+  };
+  // Back is the one way out the overlay does not see: where the form has its
+  // own address (`?quiz-form=`, the library's), Back has already closed it, so
+  // the form opens again and asks. Only while there is something to lose.
+  useEffect(() => {
+    if (!open || !dirty) return;
+    const onBack = () => {
+      onOpenChange(true);
+      setConfirmDiscard(true);
+    };
+    window.addEventListener('popstate', onBack);
+    return () => window.removeEventListener('popstate', onBack);
+  }, [open, dirty, onOpenChange]);
+
   const updateScenario = (key: string, patch: Partial<ScenarioDraft>) => {
     setScenarios((prev) => prev.map((scenario) => (scenario.key === key ? { ...scenario, ...patch } : scenario)));
   };
@@ -348,7 +386,7 @@ export function QuizFormDialog({
   return (
     <ResponsiveOverlay
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={requestClose}
       className="md:max-w-2xl"
       title={
         isEdit
@@ -383,7 +421,7 @@ export function QuizFormDialog({
         <>
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => requestClose(false)}
             disabled={submitting}
           >
             Cancel
@@ -583,6 +621,28 @@ export function QuizFormDialog({
           </>
         )}
       </div>
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard changes?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This quiz has not been saved. Discarding it throws away what you have written.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep editing</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                setConfirmDiscard(false);
+                onOpenChange(false);
+              }}
+            >
+              Discard
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ResponsiveOverlay>
   );
 }

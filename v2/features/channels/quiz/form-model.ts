@@ -73,6 +73,30 @@ export function newQuestion(scenarioKey: string | null = null): QuestionDraft {
   };
 }
 
+/**
+ * Whether a NEW quiz form holds anything the author would lose by closing it
+ * (Stay, 23 October 2026: Cancel on a filled-in form asks "Discard changes?").
+ * Any typed text, a marked answer, a second question or a scenario counts; the
+ * untouched form it opens as does not, so an empty form closes at once.
+ */
+export function hasFormContent(draft: {
+  title: string;
+  description: string;
+  questions: readonly QuestionDraft[];
+  scenarios: readonly ScenarioDraft[];
+}): boolean {
+  const typed = (value: string) => value.trim().length > 0;
+  if (typed(draft.title) || typed(draft.description)) return true;
+  if (draft.scenarios.length > 0 || draft.questions.length > 1) return true;
+  return draft.questions.some(
+    (question) =>
+      typed(question.question) ||
+      typed(question.explanation) ||
+      question.correctKey !== null ||
+      question.options.some((option) => typed(option.content)),
+  );
+}
+
 export function newScenario(): ScenarioDraft {
   return { key: nextKey('s'), title: '', passage: '' };
 }

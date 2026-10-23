@@ -33,7 +33,8 @@ test('every row carries the owner\'s menu: who can find it, Edit, Delete', () =>
 
 test('the form opens without a channel, keyed per opening, and files into the library', () => {
   const screen = read('v2', 'features', 'quiz', 'solo', 'library', 'LibraryScreen.tsx');
-  assert.match(screen, /<QuizFormDialog\s*key=\{formOpenings\}\s*open=\{formOpen\}\s*onOpenChange=\{setFormOpen\}\s*viewerId=\{viewerId\}\s*quizUuid=\{editingUuid\}\s*\/>/);
+  // The form has its own address (?quiz-form=new or the quiz uuid), so Back can ask "Discard changes?" first.
+  assert.match(screen, /<QuizFormDialog\s*key=\{formOpenings\}\s*open=\{overlay\.open\}\s*onOpenChange=\{onOpenChange\}\s*viewerId=\{viewerId\}\s*quizUuid=\{value === NEW_QUIZ_FORM \? undefined : value\}\s*\/>/);
   const form = read('v2', 'features', 'channels', 'quiz', 'QuizFormDialog.tsx');
   assert.match(form, /channelUuid\?: string;/);
   assert.match(form, /channelName\?: string;/);

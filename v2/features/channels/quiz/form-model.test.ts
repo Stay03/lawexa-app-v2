@@ -9,6 +9,7 @@ import {
   addToScenario,
   draftsFromQuiz,
   groupQuestions,
+  hasFormContent,
   newQuestion,
   newScenario,
   toPayload,
@@ -93,4 +94,36 @@ test('the library form has the scenario box and leaves out the game switches; a 
   assert.match(dialog, /\{!solo && \(\s*<div className="space-y-3 rounded-lg border p-3">\s*<SettingRow/);
   assert.match(dialog, /\{solo && \(\s*<Button[\s\S]*?Add a scenario/);
   assert.match(dialog, /validate\(title, questions, scenarios\)/);
+});
+
+/* Discard changes? (Stay, 23 October 2026): a NEW quiz form with anything in
+ * it asks before it closes; the untouched form closes at once. */
+test('a new quiz form counts as filled in once anything is typed, marked or added', () => {
+  const empty = { title: '', description: '', questions: [newQuestion()], scenarios: [] };
+  assert.equal(hasFormContent(empty), false);
+  assert.equal(hasFormContent({ ...empty, title: '  ' }), false);
+  assert.equal(hasFormContent({ ...empty, title: 'TEST DATA quiz' }), true);
+  assert.equal(hasFormContent({ ...empty, description: 'x' }), true);
+  const typed = { ...newQuestion(), question: 'TEST DATA. What is consent?' };
+  assert.equal(hasFormContent({ ...empty, questions: [typed] }), true);
+  const option = newQuestion();
+  option.options[0] = { ...option.options[0], content: 'Yes' };
+  assert.equal(hasFormContent({ ...empty, questions: [option] }), true);
+  const marked = { ...newQuestion(), correctKey: 'opt-x' };
+  assert.equal(hasFormContent({ ...empty, questions: [marked] }), true);
+  assert.equal(hasFormContent({ ...empty, questions: [newQuestion(), newQuestion()] }), true);
+  assert.equal(hasFormContent({ ...empty, scenarios: [newScenario()] }), true);
+});
+
+test('Cancel, Escape, a tap outside and Back all go through the discard question', async () => {
+
+  const dialog = readFileSync(new URL('./QuizFormDialog.tsx', import.meta.url), 'utf8');
+  assert.match(dialog, /const dirty = !isEdit && hasFormContent\(\{ title, description, questions, scenarios \}\);/);
+  assert.match(dialog, /onOpenChange=\{requestClose\}/);
+  assert.match(dialog, /onClick=\{\(\) => requestClose\(false\)\}/);
+  assert.match(dialog, /window\.addEventListener\('popstate', onBack\);/);
+  assert.match(dialog, /<AlertDialogTitle>Discard changes\?<\/AlertDialogTitle>/);
+  assert.match(dialog, /<AlertDialogCancel>Keep editing<\/AlertDialogCancel>/);
+  const library = readFileSync(new URL('../../quiz/solo/library/LibraryScreen.tsx', import.meta.url), 'utf8');
+  assert.match(library, /const overlay = useUrlOverlay\(QUIZ_FORM_PARAM\);/);
 });
