@@ -47,9 +47,11 @@ import { useSpaceRosterRow } from './use-roster-row';
  * The roster is the frame's own members query (same key, so this paints from
  * the warm cache and asks for nothing new); this mounts it again for its own
  * pending and error states. Invite, the links and handing ownership over stay
- * in the members sheet, which owns the `?invite=` param on space routes; the
- * buttons here open the sheet on that step (`scope.openInvite`,
- * `scope.openInviteLinks`).
+ * with the members sheet. "Invite links" opens the sheet on that step
+ * (`scope.openInviteLinks`); "Invite people" opens the invite dialog ALONE
+ * (`scope.openInviteAlone`), because the sheet opened over it hid "Send
+ * invitation" (Lucy, live, 23 October 2026), and this tab already shows the
+ * people.
  */
 export function SpacePeoplePanel({ space }: { space: Space }) {
   const scope = useCollabSpaceScope();
@@ -89,7 +91,7 @@ export function SpacePeoplePanel({ space }: { space: Space }) {
               <Link2 aria-hidden className="size-4" />
               Invite links
             </Button>
-            <Button size="sm" className="v2-interactive" onClick={scope.openInvite}>
+            <Button size="sm" className="v2-interactive" onClick={scope.openInviteAlone}>
               <UserPlus aria-hidden className="size-4" />
               Invite people
             </Button>

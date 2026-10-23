@@ -126,6 +126,10 @@ export interface CollabSpaceScope {
   /** Opens the members sheet with the invite dialog over it
    *  (`?roster=invite`), for an empty space's "Invite people". */
   openInvite: () => void;
+  /** Opens the invite dialog ALONE (`?invite=1`, no sheet), for the People
+   *  tab's "Invite people": the tab already shows the people, and the sheet
+   *  over the dialog hid "Send invitation" (Lucy, live, 23 October 2026). */
+  openInviteAlone: () => void;
   /** Opens the leave confirmation, the same one the sheet's footer opens. Not
    *  in the URL: a link that re-opens a destructive confirm is an armed
    *  trigger. */

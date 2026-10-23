@@ -13,6 +13,7 @@ import {
   UserPlus,
   type LucideIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import {
   AlertDialog,
@@ -40,7 +41,7 @@ import {
 import { InviteLinksPanel } from '@/v2/features/invites/InviteLinksPanel';
 import { SpaceJoinRequestsPanel } from '@/v2/features/invites/JoinRequestsPanel';
 import { useInviteLinks, useSpaceJoinRequests } from '@/v2/features/invites/queries';
-import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
+import type { UrlOverlay } from '@/v2/runtime/use-url-overlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   canManageMembership,
@@ -66,6 +67,7 @@ import {
   useTransferSpaceOwnership,
 } from '../mutations';
 import { spacesQueries } from '../queries';
+import { invitedRows } from './people/people-model';
 import { useSpaceRosterRow } from './people/use-roster-row';
 
 /**
@@ -145,10 +147,14 @@ export function SpaceMembersSheet({
   view,
   onViewChange,
   inviteArrivalKey,
+  invitePanel,
   leaveOpen,
   onLeaveOpenChange,
   onDeleteSpace,
 }: {
+  /** The frame's `?invite=` overlay: over this sheet, or alone from the
+   *  People tab. */
+  invitePanel: UrlOverlay;
   space: Space;
   viewerId: number | null;
   viewerUuid: string | null;
@@ -223,7 +229,18 @@ export function SpaceMembersSheet({
   // param gate strips it, and this is the same rule once the roster lands.
   const step = canManage ? view : 'members';
 
-  const { joined, invited } = splitRoster(members);
+  // The invites not accepted yet: the plain roster leaves most of them out, so
+  // a sent invite left no trace here (Lucy, live, 23 October 2026). The
+  // server's own list of them (`?status=pending`), as the People tab reads it,
+  // asked for only by whoever may manage; anyone else would get a 403. The
+  // invite mutation's refetch of the members key covers this list too.
+  const pendingQuery = useQuery({
+    ...spacesQueries.members(space.uuid, { viewerId, status: 'pending' }),
+    enabled: open && canManage,
+  });
+  const roster = splitRoster(members);
+  const joined = roster.joined;
+  const invited = canManage ? invitedRows(roster.invited, pendingQuery.data?.data ?? []) : roster.invited;
   const countLine = membersQuery.isSuccess
     ? rosterCountLabel(joined.length, invited.length)
     : memberCountLabel(space.active_members_count);
@@ -253,16 +270,19 @@ export function SpaceMembersSheet({
    * Invite gets its OWN param rather than a value of `?roster=`, because it
    * opens ON TOP of this sheet and one param holds one value. The URL reads
    * `?roster=1&invite=1`, and Back unwinds them in the order they were
-   * opened: invite first, then the roster.
+   * opened: invite first, then the roster. With no `?roster=` the dialog
+   * opens ALONE: the People tab's "Invite people" (`scope.openInviteAlone`;
+   * Lucy, live, 23 October 2026: from the tab, the sheet opened over the
+   * dialog and hid "Send invitation"). The frame owns the param
+   * (`invitePanel`), so that button and this sheet's write the same one.
    *
    * The ONE exception is an empty space's "Invite people", which arrives with
    * the dialog already open (`?roster=invite`): there it is a step of the
    * sheet, and closing it returns to the roster in place.
    *
-   * Gated on the same `canManage` the button is, so `?invite=1` in a copied
-   * link cannot open the invite form for someone who may not invite.
+   * The frame gates it on `canManage`, the button's rule, so `?invite=1` in a
+   * copied link cannot open the invite form for someone who may not invite.
    */
-  const invitePanel = useUrlOverlay('invite', { canOpen: canManage });
   const inviteFromStep = step === 'invite';
 
   // The roles this space speaks in, and the request each one becomes: Viewer
@@ -279,7 +299,13 @@ export function SpaceMembersSheet({
         return;
       }
       invite.mutate(payload, {
-        onSuccess: () => resolve(),
+        onSuccess: () => {
+          // The dialog closes on success; this says it went (Lucy, live, 23
+          // October 2026: the sender got no sign), and the person's row
+          // under "Invite sent" lands with the refetch.
+          toast.success(`Invitation sent to ${'email' in invitee ? invitee.email : `@${invitee.username}`}`);
+          resolve();
+        },
         onError: (error) => reject(error),
       });
     });

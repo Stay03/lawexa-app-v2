@@ -51,10 +51,25 @@ test('the panel: members for everyone; invite, links, Invited and Asked to join 
   assert.match(panel, /status: 'pending' \}\),\s*enabled: canManage,/);
   assert.match(panel, /const invited = canManage \? invitedRows\(roster\.invited, pendingQuery\.data\?\.data \?\? \[\]\) : \[\];/);
   assert.match(panel, /const requests = useSpaceJoinRequests\(space\.uuid, canManage\);/);
-  // Invite and the links open the members sheet's own steps: it owns `?invite=`.
-  assert.match(panel, /onClick=\{scope\.openInvite\}/);
+  // Invite opens the dialog ALONE: with the sheet over it "Send invitation"
+  // was out of reach (Lucy, live, 23 October 2026). The links open the sheet's step.
+  assert.match(panel, /onClick=\{scope\.openInviteAlone\}/);
+  assert.doesNotMatch(panel, /onClick=\{scope\.openInvite\}/);
   assert.match(panel, /onClick=\{scope\.openInviteLinks\}/);
   assert.doesNotMatch(panel, /useUrlOverlay/);
+
+  // The frame owns `?invite=` and hands it to the sheet, so the tab's button
+  // and the sheet's write one param; off the space route it is left ungated,
+  // never refused, because a refusal would strip the channel roster's own.
+  const frame = read('v2', 'features', 'collab', 'shell', 'CollabFrame.tsx');
+  assert.match(frame, /const invite = useUrlOverlay\('invite', \{\s*canOpen: !isSpaceRoute \? undefined : roleSettled \? canManage : undefined,\s*\}\);/);
+  assert.match(frame, /const openInviteAlone = useCallback\(\(\) => showInvite\(\), \[showInvite\]\);/);
+  assert.match(frame, /invitePanel=\{invite\}/);
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
+  assert.doesNotMatch(sheet, /useUrlOverlay\(/);
+  assert.match(sheet, /invitePanel: UrlOverlay;/);
+  // The dialog opens on the param alone, with or without the sheet.
+  assert.match(sheet, /open=\{invitePanel\.open \|\| inviteFromStep\}/);
   assert.match(panel, /\{canManage && waiting > 0 \? \(/);
   assert.match(panel, /<SpaceJoinRequestsPanel spaceUuid=\{space\.uuid\} \/>/);
   // Stay's names (15 October 2026): "Invite sent" and "Needs your approval".
@@ -151,4 +166,16 @@ test('a space chat row says its last message and who sent it (Stay, 15 October 2
   // No message to preview: say so, never "You" (techlead, 15 October 2026).
   assert.match(panel, /byline: \(item\) => lastMessageLine\(item\.last_message, viewerUuid\) \?\? 'No messages yet',/);
   assert.doesNotMatch(panel, /spaceChatByline/);
+});
+
+test('the members sheet shows a sent invite: the waiting list, the count, and "Invitation sent to …" (Lucy, live, 23 October 2026)', () => {
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'SpaceMembersSheet.tsx');
+  // The server's list of invites not accepted yet, as the People tab reads it,
+  // asked for only by whoever may manage (403 otherwise).
+  assert.match(sheet, /spacesQueries\.members\(space\.uuid, \{ viewerId, status: 'pending' \}\),\s*enabled: open && canManage,/);
+  assert.match(sheet, /const invited = canManage \? invitedRows\(roster\.invited, pendingQuery\.data\?\.data \?\? \[\]\) : roster\.invited;/);
+  // The count line counts them: "2 members · 1 invited".
+  assert.match(sheet, /rosterCountLabel\(joined\.length, invited\.length\)/);
+  // The sender is told it went, by the address or the username they typed.
+  assert.match(sheet, /toast\.success\(`Invitation sent to \$\{'email' in invitee \? invitee\.email : `@\$\{invitee\.username\}`\}`\);/);
 });

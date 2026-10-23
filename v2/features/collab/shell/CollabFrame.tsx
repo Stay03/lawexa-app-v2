@@ -440,10 +440,22 @@ function CollabPlaceFrame({
         : undefined,
   });
 
+  // The space sheet's invite dialog (`?invite=`), over the sheet or ALONE
+  // from the People tab (Lucy, live, 23 October 2026: from the tab the sheet
+  // opened over the dialog). Owned here so the tab's button and the sheet's
+  // write the same param. Off the space route it is left UNGATED, never
+  // refused: a refusal strips the value, and the channel screen's own roster
+  // owns `?invite=` there. Only the space sheet reads this one.
+  const invite = useUrlOverlay('invite', {
+    canOpen: !isSpaceRoute ? undefined : roleSettled ? canManage : undefined,
+  });
+
   // The hooks' dispatchers are stable; the hook OBJECTS are not, so the
   // dispatchers are what these depend on — `openRail` in particular must keep
   // one identity forever, because it rides the header store's snapshot.
   const { show: showRail, closeInPlace: closeRailInPlace } = rail;
+  const { show: showInvite } = invite;
+  const openInviteAlone = useCallback(() => showInvite(), [showInvite]);
   const { show: showRoster, swap: swapRoster } = roster;
   const { show: showCreate, closeInPlace: closeCreateInPlace } = create;
 
@@ -601,6 +613,7 @@ function CollabPlaceFrame({
       openInviteLinks,
       openJoinRequests,
       openInvite,
+      openInviteAlone,
       openLeave,
       openDelete,
       openRail,
@@ -630,6 +643,7 @@ function CollabPlaceFrame({
       openInviteLinks,
       openJoinRequests,
       openInvite,
+      openInviteAlone,
       openLeave,
       openDelete,
       openRail,
@@ -751,6 +765,7 @@ function CollabPlaceFrame({
           view={rosterView}
           onViewChange={changeRosterView}
           inviteArrivalKey={roster.keyFor(MEMBERS_SHEET_PARAM.invite)}
+          invitePanel={invite}
           leaveOpen={leaveOpen}
           onLeaveOpenChange={setLeaveOpen}
           onDeleteSpace={openDelete}
