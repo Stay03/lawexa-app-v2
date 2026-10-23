@@ -24,7 +24,8 @@ import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
 import { SPEED_SCORING_NOTE } from '@/v2/features/channels/quiz/model';
 import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
 import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
-import { VisibilityChip } from '@/v2/features/channels/quiz/VisibilityChip';
+import { VISIBILITY_MARKS } from '@/v2/features/channels/quiz/VisibilityChip';
+import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { LawexaMark, MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
@@ -32,6 +33,9 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { signInHref } from '@/v2/runtime/sign-in-href';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
+import { QuizTile } from '../QuizTile';
+import { bestLabel, quizMinutesLabel, scenarioCountLabel } from '../rows-model';
+import { quizContents, takenLabel } from './front-model';
 import {
   clearScreenContext,
   setScreenContext,
@@ -81,8 +85,16 @@ import { soloQuizQueries } from '../queries';
  *
  * ── NOTHING HERE LISTS THE QUESTIONS ───────────────────────────────────────
  * The preview carries them (without answers), but a quiz read before it is
- * taken is a quiz half-spoiled. The front says how many and how long; the
- * player shows them one at a time.
+ * taken is a quiz half-spoiled. The front says how many and how long, and
+ * "What is in it" names only the scenarios and how many questions each has
+ * (`quizContents`), until Arthur answers "the first 2 questions, or all"
+ * (Stay, 23 October 2026). The player shows the questions one at a time.
+ *
+ * ── THE APPROVED DESIGN (quiz piece 3, picture 4) ──────────────────────────
+ * A masthead (the tile, the title, the author, the facts as pills), then a
+ * panel with the reader's best and how often they took it, the reveal choice
+ * and Start. On a computer the two sit side by side; on a phone Start stays
+ * at the foot of the screen.
  */
 export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const router = useRouter();
@@ -165,7 +177,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 
   if (query.isPending) {
     return (
-      <div className={LIST_COLUMN}>
+      <div className={FRONT_COLUMN}>
         <QuizFrontSkeleton />
       </div>
     );
@@ -205,130 +217,161 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const questions = quiz.questions ?? [];
   const count = quiz.question_count ?? questions.length;
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
+  const scenarios = scenarioCountLabel(quiz.scenario_count ?? quiz.scenarios?.length);
+  const minutes = quizMinutesLabel(quiz.total_seconds) ?? (questions.length > 0 ? quizLengthLabel(questions) : null);
+  const best = bestLabel(quiz.viewer_best_points);
+  const taken = takenLabel(quiz.viewer_attempts_count);
+  const contents = quizContents(questions, quiz.scenarios ?? []);
+  const Mark = VISIBILITY_MARKS[quiz.visibility];
 
   return (
-    <div className={LIST_COLUMN}>
-      <article className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-        <header className="space-y-3">
-          <h1 className="text-2xl leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-3xl">
-            {quiz.title}
-          </h1>
-          {quiz.description && (
-            <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
-              {quiz.description}
-            </p>
-          )}
-          {/* Whose, how many, how long — and, for the owner, who can find it.
-              `creator` is nullable (a gone account): a word, never a crash. */}
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm text-muted-foreground">
-            <span className="inline-flex min-w-0 items-center gap-1.5">
+    <div className={FRONT_COLUMN}>
+      <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-8">
+        <div className="flex min-w-0 flex-col gap-5">
+          <header className="space-y-3">
+            <QuizTile uuid={quiz.uuid} title={quiz.title} className="size-14 rounded-[18px] text-xl" />
+            <h1 className="text-2xl leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-3xl">
+              {quiz.title}
+            </h1>
+            {/* Whose. `creator` is nullable (a gone account): a word, never a crash. */}
+            <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
               <MemberAvatar user={quiz.creator} size="sm" />
-              <span className="truncate">
+              <span className="truncate font-medium text-foreground/85">
                 {own ? 'You wrote this' : (quiz.creator?.name ?? 'Someone who has left')}
               </span>
-            </span>
-            <span aria-hidden className="text-muted-foreground/40">
-              ·
-            </span>
-            <span className="shrink-0">{questionCountLabel(count)}</span>
-            {questions.length > 0 && (
-              <>
-                <span aria-hidden className="text-muted-foreground/40">
-                  ·
+              {quiz.is_ai_generated && (
+                <span className="inline-flex shrink-0 items-center gap-1">
+                  <LawexaMark className="size-3 shrink-0" />
+                  drafted by Lawexa
                 </span>
-                <span className="shrink-0">{quizLengthLabel(questions)}</span>
-              </>
+              )}
+            </p>
+            {quiz.description && (
+              <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
-            {quiz.is_ai_generated && (
-              <span className="inline-flex items-center gap-1">
-                <LawexaMark className="size-3 shrink-0" />
-                drafted by Lawexa
-              </span>
-            )}
-            {own && <VisibilityChip visibility={quiz.visibility} />}
-          </div>
-        </header>
+            {/* What it is, as pills that wrap whole, never cut. */}
+            <ul className="flex flex-wrap gap-2" aria-label="About this quiz">
+              <FactPill>{questionCountLabel(count)}</FactPill>
+              {scenarios ? <FactPill>{scenarios}</FactPill> : null}
+              {minutes ? <FactPill>{minutes}</FactPill> : null}
+              {own ? (
+                <FactPill>
+                  <Mark aria-hidden className="size-3.5 shrink-0" />
+                  {visibilityFace(quiz.visibility)}
+                </FactPill>
+              ) : null}
+            </ul>
+          </header>
 
-        <section aria-labelledby="quiz-reveal-heading" className="space-y-2">
-          <h2 id="quiz-reveal-heading" className="text-sm font-medium text-foreground">
-            When do you want to see the answers?
-          </h2>
-          <div
-            role="group"
-            aria-labelledby="quiz-reveal-heading"
-            className="grid gap-2 sm:grid-cols-2"
-          >
-            {REVEAL_MODE_CHOICES.map((choice) => (
-              <VisibilityOption
-                key={choice.id}
-                icon={choice.id === 'each' ? Eye : ListChecks}
-                title={choice.label}
-                description={choice.hint}
-                selected={revealMode === choice.id}
-                busy={false}
-                onSelect={() => setRevealMode(choice.id)}
-              />
-            ))}
-          </div>
-        </section>
+          {contents.length > 0 ? (
+            <section aria-labelledby="quiz-contents-heading" className="space-y-2">
+              <h2 id="quiz-contents-heading" className="text-sm font-medium text-foreground">
+                What is in it
+              </h2>
+              <ul className="flex flex-col divide-y divide-border/60 rounded-2xl border border-border/60">
+                {contents.map((line) => (
+                  <li key={line.key} className="px-4 py-3 text-sm text-foreground/90">
+                    {line.label}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
 
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-3">
-            {mayTake ? (
-              <Button size="lg" onClick={start} disabled={startAttempt.isPending}>
-                {startAttempt.isPending ? (
-                  <Loader2 aria-hidden className="size-4 animate-spin" />
-                ) : (
-                  <Play aria-hidden className="size-4" />
-                )}
-                Start quiz
-              </Button>
-            ) : (
-              <Button asChild size="lg">
-                <Link href={signInHref(pathname)}>Sign in to take this quiz</Link>
-              </Button>
-            )}
-            {shareable && (
-              <ShareButton
-                path={quizFrontHref(quiz.uuid)}
-                title={quiz.title}
-                label="Share this quiz"
-              />
-            )}
-          </div>
+        <div className="flex min-w-0 flex-col gap-5 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
+          {best || taken ? (
+            <div className="flex items-end justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:border-0 md:bg-transparent md:p-0">
+              {best ? (
+                <div>
+                  <div className="text-xs text-muted-foreground">Your best</div>
+                  <div className="font-comfortaa text-2xl font-bold text-primary tabular-nums">
+                    {best.replace(/^Best /, '')}
+                  </div>
+                </div>
+              ) : (
+                <span />
+              )}
+              {taken ? <div className="text-sm font-medium text-foreground/85">{taken}</div> : null}
+            </div>
+          ) : null}
 
-          {!mayTake && (
-            <p className="text-sm text-muted-foreground">
-              Anyone can browse quizzes. Taking one keeps your score on your
-              account —{' '}
-              <Link
-                href="/register"
-                className={cn('rounded text-foreground underline underline-offset-4', FOCUS_RING)}
+          <section aria-labelledby="quiz-reveal-heading" className="space-y-2">
+            <h2 id="quiz-reveal-heading" className="text-sm font-medium text-foreground">
+              When do you want to see the answers?
+            </h2>
+            <div role="group" aria-labelledby="quiz-reveal-heading" className="grid gap-2">
+              {REVEAL_MODE_CHOICES.map((choice) => (
+                <VisibilityOption
+                  key={choice.id}
+                  icon={choice.id === 'each' ? Eye : ListChecks}
+                  title={choice.label}
+                  description={choice.hint}
+                  selected={revealMode === choice.id}
+                  busy={false}
+                  onSelect={() => setRevealMode(choice.id)}
+                />
+              ))}
+            </div>
+          </section>
+
+          <div className="flex flex-col gap-3">
+            {/* START STAYS IN REACH: pinned to the foot of a phone's screen over
+                the same see-through plate the results use; in the panel on a
+                computer. */}
+            <div className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70 md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              {mayTake ? (
+                <Button size="lg" className="min-w-0 flex-1" onClick={start} disabled={startAttempt.isPending}>
+                  {startAttempt.isPending ? (
+                    <Loader2 aria-hidden className="size-4 animate-spin" />
+                  ) : (
+                    <Play aria-hidden className="size-4" />
+                  )}
+                  Start quiz
+                </Button>
+              ) : (
+                <Button asChild size="lg" className="min-w-0 flex-1">
+                  <Link href={signInHref(pathname)}>Sign in to take this quiz</Link>
+                </Button>
+              )}
+              {shareable && (
+                <ShareButton path={quizFrontHref(quiz.uuid)} title={quiz.title} label="Share this quiz" />
+              )}
+            </div>
+
+            {!mayTake && (
+              <p className="text-sm text-muted-foreground">
+                Anyone can browse quizzes. Taking one keeps your score on your
+                account —{' '}
+                <Link
+                  href="/register"
+                  className={cn('rounded text-foreground underline underline-offset-4', FOCUS_RING)}
+                >
+                  create a free account
+                </Link>
+                .
+              </p>
+            )}
+
+            {own && !shareable && (
+              <p className="text-sm text-muted-foreground">
+                {quiz.visibility === 'private'
+                  ? 'Only you can open this quiz. Change who can find it to share it by link.'
+                  : 'This quiz is shared with the channels it has run in. Change who can find it to share it by link.'}
+              </p>
+            )}
+
+            {startError && (
+              <p
+                role="alert"
+                className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
               >
-                create a free account
-              </Link>
-              .
-            </p>
-          )}
+                {startError}
+              </p>
+            )}
 
-          {own && !shareable && (
-            <p className="text-sm text-muted-foreground">
-              {quiz.visibility === 'private'
-                ? 'Only you can open this quiz. Change who can find it to share it by link.'
-                : 'This quiz is shared with the channels it has run in. Change who can find it to share it by link.'}
-            </p>
-          )}
-
-          {startError && (
-            <p
-              role="alert"
-              className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-            >
-              {startError}
-            </p>
-          )}
-
-          <p className="text-xs text-muted-foreground/80">{SPEED_SCORING_NOTE}</p>
+            <p className="text-xs text-muted-foreground/80">{SPEED_SCORING_NOTE}</p>
+          </div>
         </div>
       </article>
 
@@ -348,6 +391,20 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         onDeleted={() => router.replace(LIBRARY_HREF)}
       />
     </div>
+  );
+}
+
+/** The page's column: wider than a list, for the side panel on a computer,
+ *  with room at the foot of a phone for the pinned Start. The skeleton and the
+ *  route fallback share it, so the hand-over moves nothing sideways. */
+const FRONT_COLUMN = 'mx-auto w-full max-w-5xl px-4 pt-5 pb-28 sm:pt-6 md:pb-16';
+
+/** One fact about the quiz, as a pill that wraps whole. */
+function FactPill({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-3 text-xs whitespace-nowrap text-foreground/85">
+      {children}
+    </li>
   );
 }
 
@@ -392,7 +449,7 @@ export function QuizFrontFallback() {
       </span>
       {/* `aria-hidden` + `inert` (standards §8ii): a Suspense fallback is
           DELETED when content arrives, so nothing in it may hold focus. */}
-      <div aria-hidden inert className={LIST_COLUMN}>
+      <div aria-hidden inert className={FRONT_COLUMN}>
         <QuizFrontSkeleton />
       </div>
     </>

@@ -27,7 +27,7 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
   const source = screen();
   assert.match(source, /const mayTake = canTakeQuiz\(session\);/);
   assert.match(source, /startAttempt\.mutate\(revealMode, \{\s*onSuccess: \(response\) => router\.push\(attemptHref\(response\.data\.uuid\)\),/);
-  assert.match(source, /\{mayTake \? \(\s*<Button size="lg" onClick=\{start\}/);
+  assert.match(source, /\{mayTake \? \(\s*<Button size="lg" className="min-w-0 flex-1" onClick=\{start\}/);
   assert.match(source, /<Link href=\{signInHref\(pathname\)\}>Sign in to take this quiz<\/Link>/);
   // A stale session's 401 is not bounced by the client on this page, so the
   // screen takes the reader to sign in itself.
