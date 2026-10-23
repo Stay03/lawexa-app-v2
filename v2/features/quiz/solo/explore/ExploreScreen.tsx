@@ -101,8 +101,9 @@ export function ExploreList() {
       ) : (
         <>
           {/* One card per quiz (picture 3, Stay, 23 October 2026): one
-              column on a phone, two or three from `sm:` / `lg:` up. */}
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              column on a phone, two from `sm:` up. Three left a card too narrow
+              for its size line, which wrapped onto a lone dot. */}
+          <ul className="grid gap-3 sm:grid-cols-2">
             {quizzes.map((quiz, index) => (
               <ExploreRow key={quiz.uuid} quiz={quiz} index={index} />
             ))}

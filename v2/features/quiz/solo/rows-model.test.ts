@@ -64,5 +64,5 @@ test('who can take it never shares a line with the counts, and the date is the s
   const explore = readFileSync(join(here, 'explore', 'ExploreScreen.tsx'), 'utf8');
   // The author's full name gets its own line; the card grid widens on larger screens.
   assert.match(explore, /<span className="min-w-0 flex-1 truncate font-medium text-foreground\/85">\{author\}<\/span>/);
-  assert.match(explore, /<ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">/);
+  assert.match(explore, /<ul className="grid gap-3 sm:grid-cols-2">/);
 });
