@@ -22,9 +22,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { filesApi } from '@/lib/api/files';
 import { spacesApi } from '@/lib/api/collab';
-import { extractApiError } from '@/lib/utils/api-error';
 import { formatBytes } from '@/lib/utils/format-bytes';
-import { FILES_ACCEPT, fileTypeLabel, uploadPrecheck } from '@/v2/features/spaces/content-model';
+import { FILES_ACCEPT, fileTypeLabel } from '@/v2/features/spaces/content-model';
 import { invalidateSpaceContents } from '@/v2/features/spaces/content-mutations';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -36,6 +35,7 @@ import {
   useAddItemToFolder,
   type FolderItemTarget,
 } from '../item-mutations';
+import { FiledAfterUploadError, sendFolderUpload } from './folder-upload';
 
 /**
  * FolderAdd — how things get INTO a folder from the folder itself (Arthur, 17
@@ -147,22 +147,15 @@ export function FolderAddButtons({ choices }: { choices: AddChoices }) {
 
 /* ── Upload ──────────────────────────────────────────────────────────────── */
 
-/** The file reached its store but the folder refused it: the reader keeps the file. */
-class FiledAfterUploadError extends Error {
-  constructor(readonly reason: unknown) {
-    super('The file uploaded but was not added to the folder.');
-  }
-}
-
 /**
  * Upload into the folder: the file's store first, then the folder. A picked
  * file is checked against the upload rules before anything is sent, and each
- * file's toast walks from "Uploading" to its outcome in place.
+ * file's toast walks from "Uploading" to its outcome in place
+ * (`sendFolderUpload`).
  */
 export function useFolderUpload(folder: AddTarget): { pick: () => void; input: ReactNode } {
   const queryClient = useQueryClient();
   const inputRef = useRef<HTMLInputElement>(null);
-  const place = folder.space ? 'a space' : 'a folder';
 
   const upload = useMutation({
     mutationFn: async (file: File) => {
@@ -182,26 +175,10 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
       if (folder.space) void invalidateSpaceContents(queryClient, folder.space.uuid);
     },
   });
-  const uploadMutate = upload.mutate;
+  const uploadAsync = upload.mutateAsync;
 
   const send = (file: File) => {
-    const refusal = uploadPrecheck(file, place);
-    if (refusal) {
-      toast.error(refusal);
-      return;
-    }
-    const id = toast.loading(`Uploading “${file.name}”`);
-    uploadMutate(file, {
-      onSuccess: () => toast.success(`Added “${file.name}” to ${folder.name}`, { id }),
-      onError: (error) => {
-        if (error instanceof FiledAfterUploadError) {
-          const where = folder.space ? `It is in ${folder.space.name}` : 'It is in your files';
-          toast.error(`“${file.name}” uploaded, but couldn’t be added to ${folder.name}. ${where}.`, { id });
-          return;
-        }
-        toast.error(`Couldn’t upload “${file.name}”. ${extractApiError(error).message}`, { id });
-      },
-    });
+    void sendFolderUpload(file, { folder, upload: uploadAsync, notices: toast });
   };
 
   const input = (

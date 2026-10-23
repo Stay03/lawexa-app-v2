@@ -92,11 +92,13 @@ export function AttemptTimer({
 }
 
 /** The rail after the answer: frozen where the clock stopped, with the time
- *  the answer took or the word for what happened instead. */
+ *  the answer took or the word for what happened instead. A word ("Time's
+ *  up") is wider than the digits' slot, so the label grows to fit on one line
+ *  rather than wrap (Tester, live, 23 October 2026: "Time's / up" at 390 px). */
 export function FrozenRail({ fraction, label }: { fraction: number; label: string }) {
   return (
     <ClockRail frozen fraction={Math.min(1, Math.max(0, fraction))}>
-      <span className={DIGITS}>{label}</span>
+      <span className={cn(DIGITS, 'w-auto min-w-11 whitespace-nowrap')}>{label}</span>
     </ClockRail>
   );
 }

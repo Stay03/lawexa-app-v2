@@ -66,9 +66,11 @@ test('an upload goes to its store first, then into the folder', () => {
   // which no file list shows (backend's local run, 22 October 2026).
   assert.doesNotMatch(add, /uploadImage/);
   assert.match(add, /await foldersApi\.addItem\(folder\.uuid, \{ type: 'file', id: stored\.data\.id \}\);/);
-  // A file that uploaded but was not filed says where it is.
-  assert.match(add, /uploaded, but couldn’t be added to \$\{folder\.name\}\. \$\{where\}\./);
-  assert.match(add, /const refusal = uploadPrecheck\(file, place\);/);
+  // A file that uploaded but was not filed says where it is, and a picked file
+  // is checked first (folder-upload.ts, each file on its own toast).
+  const send = read('detail', 'folder-upload.ts');
+  assert.match(send, /uploaded, but couldn’t be added to \$\{folder\.name\}\. \$\{where\}\./);
+  assert.match(send, /const refusal = uploadPrecheck\(file, folder\.space \? 'a space' : 'a folder'\);/);
 });
 
 test('the refusal names a folder when the upload is a folder’s', () => {
