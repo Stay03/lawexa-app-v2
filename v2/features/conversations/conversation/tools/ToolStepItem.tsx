@@ -313,11 +313,6 @@ export function ToolStepItem({
   const isComplete = message.toolStatus === 'complete';
   const isSuccess = isComplete && message.toolResult?.success !== false;
   const isError = isComplete && message.toolResult?.success === false;
-  // A refused quiz is a finished step the stored result may still call a
-  // success, so its mark follows the card's reading (created-quiz.ts). Only
-  // the mark: the card under the chain already says why, so no "Error:" line.
-  const quizRefused = isCreateQuizStep(message) && createdQuiz(message)?.kind === 'failed';
-  const status = !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
 
   const memory = isMemoryTool(message.toolName);
   // The step's result, fetched the first time it opens (v2 loads chats with
@@ -325,6 +320,13 @@ export function ToolStepItem({
   // what the step read once the result arrives (Stay's #13), and keeps the
   // name after the step closes: the fetched result is kept for the visit.
   const loaded = useToolResult(message, isExpanded);
+  // A refused quiz is a finished step the stored result may still call a
+  // success, so its mark follows the card's reading (created-quiz.ts), from the
+  // LOADED result: a lazy chat's step carries none until it is fetched (the
+  // card fetches it), and the mark read the empty one (shots5, 24 October
+  // 2026). The card under the chain already says why, so no "Error:" line.
+  const quizRefused = isCreateQuizStep(message) && createdQuiz(loaded.message)?.kind === 'failed';
+  const status = !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
   const { action, detail } = formatToolMessage(
     message.toolName,
     message.toolParameters,

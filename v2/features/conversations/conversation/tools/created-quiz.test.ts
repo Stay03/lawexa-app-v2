@@ -75,7 +75,8 @@ test('the step label says making, made, or could not make, never made above a re
 
 test('a refused quiz step carries the error mark, with no Error line under it', () => {
   const item = readFileSync(join(here, 'ToolStepItem.tsx'), 'utf8');
-  assert.match(item, /const quizRefused = isCreateQuizStep\(message\) && createdQuiz\(message\)\?\.kind === 'failed';/);
+  // From the LOADED result: a lazy chat's step has none of its own until fetched (shots5).
+  assert.match(item, /const quizRefused = isCreateQuizStep\(message\) && createdQuiz\(loaded\.message\)\?\.kind === 'failed';/);
   assert.match(item, /isSuccess && !quizRefused \? 'success' : 'error'/);
   // No "Error:" line for a refused quiz, whatever the stored flag says: the card says it once.
   assert.match(item, /\{isError && !quizRefused && !isExpanded && \(/);
