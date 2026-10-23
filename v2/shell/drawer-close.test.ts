@@ -28,7 +28,8 @@ const drawer = read('V2Drawer.tsx');
 const footer = read('V2UserFooter.tsx');
 
 const NONE: ArmedDrawerClose | null = null;
-const ARMED: ArmedDrawerClose = { from: '/cases', before: EMPTY_CONTENT };
+const ARMED: ArmedDrawerClose = { from: '/cases', before: EMPTY_CONTENT, seen: false };
+const ARMED_SEEN: ArmedDrawerClose = { from: '/cases', before: EMPTY_CONTENT, seen: true };
 
 test('a row for the shown page closes the drawer at once', () => {
   assert.equal(drawerCloseStep(NONE, { kind: 'tap', href: '/cases', pathname: '/cases' }), 'close');
@@ -51,6 +52,20 @@ test('the armed close fires after a paint once the shown path has changed, and n
   assert.equal(drawerCloseStep(ARMED, { kind: 'shown', pathname: '/cases' }), 'wait');
   // A path change with nothing armed (the drawer is closed, or was closed by the scrim) does nothing.
   assert.equal(drawerCloseStep(NONE, { kind: 'shown', pathname: '/c/42' }), 'wait');
+});
+
+test('a destination opened earlier this session closes on the address change, with no reading of the page (Tester, live, 23 October 2026)', () => {
+  // Notes, then Cases, then Notes again: Notes was shown, so the tap is seen.
+  assert.equal(drawerCloseStep(ARMED_SEEN, { kind: 'shown', pathname: '/notes' }), 'close-now');
+  // Not before the address changes, and a first visit keeps the wait.
+  assert.equal(drawerCloseStep(ARMED_SEEN, { kind: 'shown', pathname: '/cases' }), 'wait');
+  assert.equal(drawerCloseStep(ARMED, { kind: 'shown', pathname: '/notes' }), 'close-after-paint');
+});
+
+test('the drawer records every shown path and marks a tap to one of them as seen', () => {
+  assert.match(drawer, /const openedRef = useRef<Set<string>>\(new Set\(\)\);\s*useEffect\(\(\) => \{\s*openedRef\.current\.add\(shown\);\s*\}, \[shown\]\);/);
+  assert.match(drawer, /seen: openedRef\.current\.has\(pathOf\(href\)\),/);
+  assert.match(drawer, /if \(step === 'close-now'\) \{\s*leave\(\);\s*return;\s*\}/);
 });
 
 test('the cap closes an armed drawer and ignores an unarmed one', () => {
@@ -211,7 +226,7 @@ test('a page already drawn when the watch starts goes on a microtask, with no fr
 test('every drawer row arms through closeFor with where it goes; only the X closes outright', () => {
   // Nothing is set in state in the click: the armed close and the cap are refs.
   assert.match(drawer, /const armedRef = useRef<ArmedDrawerClose \| null>\(null\);\s*const capRef = useRef\(0\);/);
-  assert.match(drawer, /const closeFor = \(href: string\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'tap', href, pathname: shown \}\) === 'close'\) \{\s*close\(\);\s*return;\s*\}\s*disarm\(\);\s*\/\/ [^\n]*\n\s*\/\/ [^\n]*\n\s*armedRef\.current = \{ from: shown, before: readContent\(document\.getElementById\(V2_SHELL_CONTENT_ID\)\) \};\s*capRef\.current = window\.setTimeout\(\(\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'cap' \}\) === 'close'\) close\(\);\s*\}, DRAWER_CLOSE_CAP_MS\);\s*\};/);
+  assert.match(drawer, /const closeFor = \(href: string\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'tap', href, pathname: shown \}\) === 'close'\) \{\s*close\(\);\s*return;\s*\}\s*disarm\(\);\s*\/\/ [^\n]*\n\s*\/\/ [^\n]*\n\s*armedRef\.current = \{\s*from: shown,\s*before: readContent\(document\.getElementById\(V2_SHELL_CONTENT_ID\)\),\s*seen: openedRef\.current\.has\(pathOf\(href\)\),\s*\};\s*capRef\.current = window\.setTimeout\(\(\) => \{\s*if \(drawerCloseStep\(armedRef\.current, \{ kind: 'cap' \}\) === 'close'\) close\(\);\s*\}, DRAWER_CLOSE_CAP_MS\);\s*\};/);
   assert.equal((drawer.match(/onClick=\{\(\) => closeFor\(v2NewChat\.href\)\}/g) ?? []).length, 2, 'the wordmark and the New chat row');
   assert.match(drawer, /onClick=\{\(\) => closeFor\(item\.href\)\}/);
   assert.match(drawer, /onClick=\{\(\) => onNavigate\(sub\.href\)\}/);
@@ -229,7 +244,7 @@ test('every drawer row arms through closeFor with where it goes; only the X clos
 test('the drawer closes on the shown path, after a painted frame, with no setState in the effect body', () => {
   // The shown path, not the router's: a chat row's frame changes it in the tap's own commit.
   assert.match(drawer, /const shown = useShownPathname\(\);/);
-  assert.match(drawer, /const leave = useEffectEvent\(close\);\s*useEffect\(\(\) => \{\s*const armed = armedRef\.current;\s*if \(armed === null \|\| drawerCloseStep\(armed, \{ kind: 'shown', pathname: shown \}\) !== 'close-after-paint'\) return;\s*const region = document\.getElementById\(V2_SHELL_CONTENT_ID\);\s*return afterContentDraws\(\(\) => readContent\(region\), armed\.before, \(\) => leave\(\)\);\s*\}, \[shown\]\);/);
+  assert.match(drawer, /const leave = useEffectEvent\(close\);\s*useEffect\(\(\) => \{\s*const armed = armedRef\.current;\s*if \(armed === null\) return;\s*const step = drawerCloseStep\(armed, \{ kind: 'shown', pathname: shown \}\);\s*if \(step === 'close-now'\) \{\s*leave\(\);\s*return;\s*\}\s*if \(step !== 'close-after-paint'\) return;\s*const region = document\.getElementById\(V2_SHELL_CONTENT_ID\);\s*return afterContentDraws\(\(\) => readContent\(region\), armed\.before, \(\) => leave\(\)\);\s*\}, \[shown\]\);/);
   // What the tap saw is read without a screen-reader line or a hidden subtree.
   const close = read('drawer-close.ts');
   assert.match(close, /const UNSEEN = '\.sr-only, \[hidden\], \[aria-hidden="true"\]';/);

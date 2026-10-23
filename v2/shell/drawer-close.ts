@@ -34,6 +34,14 @@
  * and bounds a slow one (techlead, 23 October 2026: one rule, a fixed hold or
  * the new page on screen, whichever comes first).
  *
+ * A PAGE ALREADY OPENED THIS SESSION CLOSES IT AT ONCE. Reading the content
+ * area could not tell a cached page from the old one live: Notes, then Cases,
+ * then Notes again still waited for the cap, three fixes running (Tester,
+ * live, 23 October 2026). So the drawer keeps the paths it has shown this
+ * session (`V2Drawer`), the tap says whether its destination is one of them
+ * (`seen`), and a seen destination closes on the address change itself, with
+ * no reading of the page. A first visit keeps the rule above.
+ *
  * The decisions are pure functions, so they are tested here; the drawer holds
  * the armed close in a ref and the cap in a timer (V2Drawer.tsx), and never
  * sets state in the click, which is the task the destination's first frame
@@ -56,6 +64,9 @@ export interface ArmedDrawerClose {
   readonly from: string;
   /** What the content area showed at the tap: the old page. */
   readonly before: ContentSnapshot;
+  /** The destination was shown earlier this session, so it is in the
+   *  router's cache: close on the address change, without waiting. */
+  readonly seen: boolean;
 }
 
 export type DrawerCloseSignal =
@@ -69,6 +80,8 @@ export type DrawerCloseSignal =
 export type DrawerCloseStep =
   /** Close now. */
   | 'close'
+  /** The destination is up and was opened before: close now, in that commit. */
+  | 'close-now'
   /** Watch the content area, and close a painted frame after it changes. */
   | 'close-after-paint'
   /** Keep the drawer open, remember the tap and start the cap. */
@@ -82,7 +95,8 @@ export function drawerCloseStep(armed: ArmedDrawerClose | null, signal: DrawerCl
     case 'tap':
       return pathOf(signal.href) === signal.pathname ? 'close' : 'arm';
     case 'shown':
-      return armed !== null && signal.pathname !== armed.from ? 'close-after-paint' : 'wait';
+      if (armed === null || signal.pathname === armed.from) return 'wait';
+      return armed.seen ? 'close-now' : 'close-after-paint';
     case 'cap':
       return armed !== null ? 'close' : 'wait';
   }

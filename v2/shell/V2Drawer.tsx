@@ -48,6 +48,7 @@ import {
   DRAWER_CLOSE_CAP_MS,
   afterContentDraws,
   drawerCloseStep,
+  pathOf,
   readContent,
   type ArmedDrawerClose,
 } from './drawer-close';
@@ -193,6 +194,12 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   // first frame paints in.
   const armedRef = useRef<ArmedDrawerClose | null>(null);
   const capRef = useRef(0);
+  // Every path shown this session (drawer-close.ts): a tap to one of them
+  // closes on the address change. Kept in a ref, read only in handlers.
+  const openedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    openedRef.current.add(shown);
+  }, [shown]);
 
   const disarm = () => {
     window.clearTimeout(capRef.current);
@@ -213,7 +220,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
     disarm();
     // What the content area shows at the tap is the old page: only something
     // else on screen counts as the new one (drawer-close.ts).
-    armedRef.current = { from: shown, before: readContent(document.getElementById(V2_SHELL_CONTENT_ID)) };
+    armedRef.current = {
+      from: shown,
+      before: readContent(document.getElementById(V2_SHELL_CONTENT_ID)),
+      seen: openedRef.current.has(pathOf(href)),
+    };
     capRef.current = window.setTimeout(() => {
       if (drawerCloseStep(armedRef.current, { kind: 'cap' }) === 'close') close();
     }, DRAWER_CLOSE_CAP_MS);
@@ -227,7 +238,13 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   const leave = useEffectEvent(close);
   useEffect(() => {
     const armed = armedRef.current;
-    if (armed === null || drawerCloseStep(armed, { kind: 'shown', pathname: shown }) !== 'close-after-paint') return;
+    if (armed === null) return;
+    const step = drawerCloseStep(armed, { kind: 'shown', pathname: shown });
+    if (step === 'close-now') {
+      leave();
+      return;
+    }
+    if (step !== 'close-after-paint') return;
     const region = document.getElementById(V2_SHELL_CONTENT_ID);
     return afterContentDraws(() => readContent(region), armed.before, () => leave());
   }, [shown]);
