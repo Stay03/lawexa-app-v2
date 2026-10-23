@@ -70,9 +70,13 @@ const PHONE_MOTION =
   'data-open:animate-in data-closed:animate-out data-open:fade-in-0 data-closed:fade-out-0 data-open:slide-in-from-bottom-8 data-closed:slide-out-to-bottom-8 duration-300 ease-out';
 
 /** The computer popover: the primitive's padding and gap are replaced, the
- *  body owns its own rhythm. */
+ *  body owns its own rhythm. It is never taller than the room below the
+ *  button (Radix's available height, less `collisionPadding`), so the list
+ *  scrolls inside it. Without the cap it grew to the whole outline, 3,421 px
+ *  in a 900 px window on the Constitution, and the modal popover's scroll
+ *  lock left the last six Parts out of reach (Tester, live, 23 October 2026). */
 const POPOVER =
-  'flex w-[22rem] flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl ring-1 ring-foreground/10';
+  'flex max-h-(--radix-popover-content-available-height) w-[22rem] flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl ring-1 ring-foreground/10';
 
 export function StatuteContents({
   outline,
