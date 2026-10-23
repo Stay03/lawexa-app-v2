@@ -75,7 +75,7 @@ test('the step label says making, made, or could not make, never made above a re
 
 test('the card sits after the step chain, and Edit opens the quiz page with its form', () => {
   const list = readFileSync(join(here, '..', 'MessageList.tsx'), 'utf8');
-  assert.match(list, /<CompactToolChain messages=\{group\.messages\} \/>\s*\{quizSteps\.map\(\(step\) => \(\s*<CreatedQuizCard key=\{step\.id\} message=\{step\} \/>/);
+  assert.match(list, /<CompactToolChain messages=\{steps\} \/>\s*\{quizSteps\.map\(\(step\) => \(\s*<CreatedQuizCard key=\{step\.id\} message=\{step\} \/>/);
   const card = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
   assert.match(card, /href=\{`\$\{quizFrontHref\(state\.uuid\)\}\?edit=1`\}/);
   const front = readFileSync(join(here, '..', '..', '..', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx'), 'utf8');
