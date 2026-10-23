@@ -11,16 +11,28 @@ import { questionCountLabel } from './model';
  * `viewer_best_points` arrives says nothing about a best.
  */
 
-/** "5 min" from the quiz's summed question timers, rounded up, at least 1. */
-export function quizMinutesLabel(totalSeconds: number | null | undefined): string | null {
+/** Whole minutes from the quiz's summed question timers, rounded up, at least 1. */
+function wholeMinutes(totalSeconds: number | null | undefined): number | null {
   if (typeof totalSeconds !== 'number' || !Number.isFinite(totalSeconds) || totalSeconds <= 0) return null;
-  return `${Math.max(1, Math.ceil(totalSeconds / 60))} min`;
+  return Math.max(1, Math.ceil(totalSeconds / 60));
+}
+
+/** "about 3 min", the quiz front's length pill. */
+export function quizMinutesLabel(totalSeconds: number | null | undefined): string | null {
+  const minutes = wholeMinutes(totalSeconds);
+  return minutes === null ? null : `about ${minutes} min`;
 }
 
 /** The card's one fact line: "10 questions · 5 min", or the count alone. */
 export function quizFactsLabel(count: number, totalSeconds: number | null | undefined): string {
-  const minutes = quizMinutesLabel(totalSeconds);
-  return minutes ? `${questionCountLabel(count)} · ${minutes}` : questionCountLabel(count);
+  const minutes = wholeMinutes(totalSeconds);
+  return minutes === null ? questionCountLabel(count) : `${questionCountLabel(count)} · ${minutes} min`;
+}
+
+/** "1 scenario", "2 scenarios"; nothing when there are none. The quiz front says it. */
+export function scenarioCountLabel(count: number | null | undefined): string | null {
+  if (typeof count !== 'number' || count <= 0) return null;
+  return `${count} ${count === 1 ? 'scenario' : 'scenarios'}`;
 }
 
 /** "Best 2,553": the reader's best finished score here; nothing before their first. */

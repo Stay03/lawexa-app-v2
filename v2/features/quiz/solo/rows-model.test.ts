@@ -12,6 +12,7 @@ import {
   quizInitial,
   quizMinutesLabel,
   quizTone,
+  scenarioCountLabel,
 } from './rows-model';
 
 /* Quiz piece 2, version C (Stay, 23 October 2026: "let's do C"): small cards,
@@ -21,9 +22,9 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 
 test('the minutes round up from the summed timers, at least one, and are absent without the field', () => {
-  assert.equal(quizMinutesLabel(60), '1 min');
-  assert.equal(quizMinutesLabel(150), '3 min');
-  assert.equal(quizMinutesLabel(20), '1 min');
+  assert.equal(quizMinutesLabel(60), 'about 1 min');
+  assert.equal(quizMinutesLabel(150), 'about 3 min');
+  assert.equal(quizMinutesLabel(20), 'about 1 min');
   assert.equal(quizMinutesLabel(0), null);
   assert.equal(quizMinutesLabel(undefined), null);
 });
@@ -32,6 +33,13 @@ test('the fact line is the count and the minutes, or the count alone', () => {
   assert.equal(quizFactsLabel(10, 290), '10 questions · 5 min');
   assert.equal(quizFactsLabel(1, 30), '1 question · 1 min');
   assert.equal(quizFactsLabel(6, undefined), '6 questions');
+});
+
+test('the quiz front still counts its scenarios', () => {
+  assert.equal(scenarioCountLabel(1), '1 scenario');
+  assert.equal(scenarioCountLabel(2), '2 scenarios');
+  assert.equal(scenarioCountLabel(0), null);
+  assert.equal(scenarioCountLabel(undefined), null);
 });
 
 test('the best is said when there is one, "Not taken" only to an account the server says has none', () => {
