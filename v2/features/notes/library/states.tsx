@@ -72,35 +72,36 @@ function PageState({
 }
 
 /**
- * One skeleton row, mirroring `NoteRow`'s geometry EXACTLY — the same nesting
- * (`gap-2` between the identity block and the star, `gap-3 px-2 py-3` inside
- * it), so the tile, the text column and the star land on the pixels the
- * resolved row will use and nothing reflows on hand-off.
+ * One skeleton row, mirroring `NoteRow`'s geometry EXACTLY (the owner's take
+ * A, 23 October 2026): the same `pt-4 pb-[15px]` and hairline under it, a
+ * bar in each of the row's line boxes (title 24px, two summary lines of 22px,
+ * the meta line's 20px after its `mt-2`), and the menu's 36px place on the
+ * title's line, so nothing reflows on hand-off.
  *
- * THREE TEXT LINES, which is the note row's MEDIAN and its maximum at once:
- * every note row is title + meta + a two-line preview clamp, so unlike the
- * bookmarks list there is no tall-vs-short trade to make here.
- *
- * The meta line mirrors the row's TWO ZONES: a lead bar on the left and a
- * short, right-anchored bar for the "updated N ago" trail.
+ * TWO SUMMARY LINES, which is the row's maximum and its usual shape: a note
+ * with any text fills the clamp.
  */
 function NoteRowSkeleton() {
   return (
-    <div className="flex items-start gap-2">
-      <div className="flex min-w-0 flex-1 items-start gap-3 px-2 py-3">
-        <Skeleton className="mt-0.5 size-9 shrink-0 rounded-lg" />
-        <div className="min-w-0 flex-1 space-y-1.5">
+    <div className="flex items-start gap-2 border-b border-border/60">
+      <div className="min-w-0 flex-1 pb-[15px] pt-4">
+        <div className="flex h-6 items-center">
           <Skeleton className="h-4 w-3/5 rounded" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-3 w-2/5 rounded" />
-            <Skeleton className="ml-auto h-3 w-20 shrink-0 rounded" />
+        </div>
+        <div className="mt-1 max-w-[640px]">
+          <div className="flex h-[22px] items-center">
+            <Skeleton className="h-3.5 w-full rounded" />
           </div>
-          <Skeleton className="h-3.5 w-full rounded" />
+          <div className="flex h-[22px] items-center">
+            <Skeleton className="h-3.5 w-4/5 rounded" />
+          </div>
+        </div>
+        <div className="mt-2 flex h-5 items-center">
+          <Skeleton className="h-3 w-40 max-w-full rounded" />
         </div>
       </div>
-      {/* `mt-3.5` matches the row's star exactly — see `NoteRow` for the
-          arithmetic (review F6). */}
-      <Skeleton className="mt-3.5 size-9 shrink-0 rounded-full" />
+      {/* The menu's place: `NoteRow` explains the arithmetic. */}
+      <span aria-hidden className="-mr-1.5 mt-2.5 size-9 shrink-0" />
     </div>
   );
 }

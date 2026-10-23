@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Download, FileText, FileType2, Loader2, Pencil } from 'lucide-react';
-import { toast } from 'sonner';
+import { Download, Loader2, Pencil } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -15,8 +13,8 @@ import { cn } from '@/lib/utils';
 import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { AddToFolderButton } from '@/v2/features/folders/picker/AddToFolderButton';
 import { FeedbackButton } from '@/v2/features/feedback/FeedbackButton';
-import { notesApi } from '../api';
 import { NoteBookmarkButton } from '../bookmark/NoteBookmarkButton';
+import { NOTE_EXPORT_FORMAT_KEYS, NOTE_EXPORT_FORMATS, useNoteExport } from '../use-note-export';
 import { ShareButton } from '@/v2/features/sharing/ShareButton';
 
 /**
@@ -91,73 +89,12 @@ export function NoteActions({
   );
 }
 
-/** The two files a note exports to (Stay chose PDF next to Word, 20 October 2026). */
-const EXPORT_FORMATS = {
-  docx: { label: 'Word document', extension: 'docx', fetch: notesApi.exportDocx, icon: FileText },
-  pdf: { label: 'PDF', extension: 'pdf', fetch: notesApi.exportPdf, icon: FileType2 },
-} as const;
-type ExportFormat = keyof typeof EXPORT_FORMATS;
-
 /**
- * Download the note as a Word document or a PDF, from one Export menu.
- *
- * THE ROUTE IS GONE, THE BUTTON REMAINS. v1 had a whole PAGE at
- * `/notes/{slug}/export-docx` whose only job was to fire this request on mount
- * and bounce back — a navigation, a render and a history entry to perform a
- * download. v2 does it in place; the old path stays carved out of the v2
- * manifest so any link to it still resolves against v1.
- *
- * THE OBJECT URL IS REVOKED ON THE NEXT TASK, not immediately after `click()`.
- * The click is dispatched synchronously but the browser's download starts
- * asynchronously, and revoking in the same task cancels it in Firefox — the
- * defect v1's version carries. The timer is cleared on unmount so a reader who
- * navigates mid-export leaves nothing behind.
- *
- * ERRORS ARE NAMED WHERE THE SERVER NAMED THEM: a 403 is "you can't export
- * this one", which is a different sentence from "the download failed", and a
- * reader who sees the generic one will try again forever.
+ * Download the note as a Word document or a PDF, from one Export menu. The
+ * download itself is `useNoteExport`, shared with the notes list's row menu.
  */
 export function ExportMenu({ slug }: { slug: string }) {
-  const [exporting, setExporting] = useState(false);
-  const revokeRef = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (revokeRef.current !== null) window.clearTimeout(revokeRef.current);
-    },
-    [],
-  );
-
-  const download = async (format: ExportFormat) => {
-    if (exporting) return;
-    setExporting(true);
-    try {
-      const blob = await EXPORT_FORMATS[format].fetch(slug);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${slug}.${EXPORT_FORMATS[format].extension}`;
-      anchor.rel = 'noreferrer noopener';
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      if (revokeRef.current !== null) window.clearTimeout(revokeRef.current);
-      revokeRef.current = window.setTimeout(() => {
-        revokeRef.current = null;
-        URL.revokeObjectURL(url);
-      }, 0);
-    } catch (error) {
-      const status = (error as { response?: { status?: number } } | null)?.response
-        ?.status;
-      toast.error(
-        status === 403
-          ? "You don't have access to export this note."
-          : "Couldn't export this note. Please try again.",
-      );
-    } finally {
-      setExporting(false);
-    }
-  };
+  const { download, exporting } = useNoteExport(slug);
 
   return (
     <DropdownMenu>
@@ -182,8 +119,8 @@ export function ExportMenu({ slug }: { slug: string }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48">
-        {(Object.keys(EXPORT_FORMATS) as ExportFormat[]).map((format) => {
-          const { label, icon: Icon } = EXPORT_FORMATS[format];
+        {NOTE_EXPORT_FORMAT_KEYS.map((format) => {
+          const { label, icon: Icon } = NOTE_EXPORT_FORMATS[format];
           return (
             <DropdownMenuItem key={format} disabled={exporting} onSelect={() => void download(format)}>
               <Icon aria-hidden className="size-4" />

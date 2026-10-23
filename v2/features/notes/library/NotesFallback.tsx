@@ -38,10 +38,10 @@ export function NotesFallback() {
           in here would lose focus and caret mid-interaction. */}
       <div aria-hidden inert className={LIST_COLUMN_DOCKED}>
         <ScreenTitle />
-        {searchAtTop ? <SearchFieldShape className="mb-3" /> : null}
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="h-9 w-44 max-w-full rounded-full bg-secondary/60" />
         </div>
+        {searchAtTop ? <SearchFieldShape className="mb-4" /> : null}
         <NotesListSkeleton />
         {searchAtTop ? null : (
           <ScreenDock>

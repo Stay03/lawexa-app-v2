@@ -1,144 +1,131 @@
 'use client';
 
-import { memo } from 'react';
+import { Fragment, memo } from 'react';
 import Link from 'next/link';
-import { NotebookPen } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
-import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
-import { NoteBookmarkButton } from '../bookmark/NoteBookmarkButton';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { NoteRowModel } from '../note-row-model';
 import { rememberNotePeek } from '../note-peek';
+import type { NotesTab } from './NoteTabs';
+import { noteRowMeta } from './note-row-meta';
+import { NoteRowMenu } from './NoteRowMenu';
 
 /**
- * NoteRow — one note in the library list, in the cases/statutes row grammar:
- * the NAME at full weight, ONE quiet meta line, a two-line clamp of what the
- * note says, hairlines between rows and no box around them.
+ * NoteRow — one note in the library list, as the owner's take A (23 October
+ * 2026): a list with no reading pane, each row three lines between hairlines.
  *
- * ── WHAT v1's `NoteCard` DID, AND WHAT CHANGED ──────────────────────────────
- *  1. IT WAS A CARD IN A GRID, with a thumbnail slot, a tag row, a price
- *     badge and a bookmark count. That is a product tile for a marketplace; a
- *     note is a document, and the v2 library is a reading list.
- *  2. THE WHOLE CARD WAS THE LINK, so its accessible name swallowed the
- *     preview, the tags and the price. The link now wraps the identity block
- *     only, and the star is a SIBLING of it rather than a `<button>` nested
- *     inside an `<a>` (invalid HTML, which v1 then had to cancel with a
- *     `preventDefault` on a wrapper div).
- *  3. IT SHOWED A PRICE. `NoteRowModel` cannot express one — see its docblock.
+ *   TITLE     one line, semibold, with the "⋮" menu at the right of it
+ *   SUMMARY   two lines of what the note says, clamped
+ *   META      one grey line: "23 Oct · Land law, Property" on My notes,
+ *             "Ada Okafor · 23 Oct · Land law" on All notes
+ *             (`note-row-meta.ts` holds that rule)
  *
- * ── THE META LINE IS TWO ZONES, NOT A SENTENCE ──────────────────────────────
- * A LEAD that gives up its width first, and a TRAIL that never moves:
+ * A tap on the row opens the note's page. The link wraps the three lines only;
+ * the menu is a SIBLING of it, never a `<button>` inside an `<a>`. There is no
+ * bookmark icon in the row: Save is the first item in the menu
+ * (`NoteRowMenu`), beside Add to folder, Share, Export, and Edit and Delete on
+ * the reader's own notes.
  *
- *   LEAD    the author on All notes; the draft/published mark on My notes,
- *           where the author is always the reader. Which one is chosen is the
- *           row model's decision, not this component's guess — see
- *           `note-row-model.ts`.
- *   TRAIL   "updated N ago", right-anchored and tabular on BOTH tabs, so the
- *           times read straight down the column whatever fills the lead.
+ * WHAT v1's `NoteCard` DID: a card in a grid with a thumbnail, a price badge
+ * and a bookmark count, and the whole card was the link. A note is a document
+ * and the v2 library is a reading list; `NoteRowModel` cannot express a price.
  *
- * The line NEVER wraps: under pressure the lead truncates and the trail stays
- * put.
- *
- * `memo` matters here for the same reason as `CaseRow`: the bookmark mutation
- * fans out across every cached notes surface, so an unmemoised row would
- * re-render the whole visible list on each star press.
+ * `memo` matters for the same reason as `CaseRow`: the bookmark mutation fans
+ * out across every cached notes surface, so an unmemoised row would re-render
+ * the whole visible list on each Save.
  */
 export const NoteRow = memo(function NoteRow({
   row,
   index,
   now,
-  showStatus,
+  tab,
+  onAddToFolder,
+  onDelete,
   selected,
   onToggleSelect,
 }: {
   row: NoteRowModel;
   /** Staggers the entrance for the first screenful only. */
   index: number;
-  /** Frozen clock for the relative "updated" label — threaded from the
-   *  browser's lazy `useState` so no `Date.now()` runs in render (React
-   *  Compiler lint). */
+  /** Frozen clock for the date — threaded from the browser's lazy `useState`
+   *  so no `Date.now()` runs in render (React Compiler lint). */
   now: number;
-  /** My notes: the LEAD is the draft/published mark. All notes: the author. */
-  showStatus: boolean;
+  /** Which list the row is in: it decides the meta line. */
+  tab: NotesTab;
+  /** The list's dialogs (`useNoteRowDialogs`); both must be stable. */
+  onAddToFolder: (row: NoteRowModel) => void;
+  onDelete: (row: NoteRowModel) => void;
   /**
    * Bulk select on My notes: the row is its tick box, a tap ticks it instead
-   * of opening the note, and the star steps aside for the bar's actions.
+   * of opening the note, and the menu steps aside for the bar's actions.
    * `onToggleSelect` must be stable, like the row itself.
    */
   selected?: boolean;
   onToggleSelect?: (id: number) => void;
 }) {
-  const updated = formatRelativeTime(row.updatedAt, now);
+  const meta = noteRowMeta(row, tab, now);
   const selecting = onToggleSelect !== undefined;
 
-  const identity = (
-    <>
+  const lines = (
+    <span className="block min-w-0 flex-1">
       <span
-        aria-hidden
-        className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground transition-colors group-hover:text-foreground"
+        className={cn(
+          'block truncate text-base font-semibold leading-6 transition-colors group-hover:text-primary',
+          // An untitled note wears its fallback in a quieter voice: the
+          // word "Untitled" is the absence of a name, not a name.
+          row.hasTitle ? 'text-foreground' : 'italic text-muted-foreground',
+        )}
+        title={row.title}
       >
-        <NotebookPen className="size-[18px]" />
+        {row.title}
       </span>
 
-      <span className="min-w-0 flex-1">
-        <span
-          className={cn(
-            'block truncate text-[15px] font-medium transition-colors group-hover:text-primary',
-            // An untitled note wears its fallback in a quieter voice: the
-            // word "Untitled" is the absence of a name, not a name.
-            row.hasTitle
-              ? 'text-foreground'
-              : 'italic text-muted-foreground',
-          )}
-          title={row.title}
-        >
-          {row.title}
+      {row.preview ? (
+        <span className="mt-1 line-clamp-2 max-w-[640px] text-sm leading-[22px] text-foreground/70">
+          {row.preview}
         </span>
+      ) : null}
 
-        <span className="mt-1 flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
-          {/* LEAD. */}
-          <span className="flex min-w-0 flex-1 items-center gap-2">
-            {showStatus ? (
-              <NoteStatusMark isDraft={row.isDraft} />
-            ) : row.author ? (
-              <span className="min-w-0 truncate">{row.author}</span>
-            ) : null}
-          </span>
-
-          {/* TRAIL — right-anchored on both tabs. */}
-          {updated ? (
-            <span className="shrink-0 tabular-nums">updated {updated}</span>
-          ) : null}
+      {meta.length > 0 ? (
+        <span className="mt-2 block truncate text-[13px] leading-5 text-muted-foreground">
+          {meta.map((part, position) => (
+            <Fragment key={position}>
+              {position > 0 ? (
+                <>
+                  <span aria-hidden className="mx-1.5 text-muted-foreground/50">
+                    ·
+                  </span>
+                  <span className="sr-only">, </span>
+                </>
+              ) : null}
+              {part}
+            </Fragment>
+          ))}
         </span>
-
-        {row.preview ? (
-          <span className="mt-1.5 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-            {row.preview}
-          </span>
-        ) : null}
-      </span>
-    </>
+      ) : null}
+    </span>
   );
 
-  const rowClass = 'v2-interactive flex min-w-0 flex-1 items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50';
+  const rowClass = 'v2-interactive group flex min-w-0 flex-1 items-start gap-3 rounded-lg pb-[15px] pt-4';
 
   return (
     <li
-      className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:fill-mode-both motion-safe:duration-200"
+      className="border-b border-border/60 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:fill-mode-both motion-safe:duration-200"
       // Capped at 14 so a deep page never staggers into a visible delay.
       style={{ animationDelay: `${Math.min(index, 14) * 25}ms` }}
     >
-      <div className="group relative flex items-start gap-2">
+      <div className="relative flex items-start gap-2">
         {selecting ? (
           <label className={cn(rowClass, 'cursor-pointer', selected && 'bg-secondary/60')}>
             <Checkbox
               checked={selected === true}
               onCheckedChange={() => onToggleSelect(row.id)}
               aria-label={`Select ${row.title}`}
-              className="mt-2.5 shrink-0"
+              className="mt-1 shrink-0"
             />
-            {identity}
+            {lines}
           </label>
         ) : (
           <Link
@@ -148,57 +135,25 @@ export const NoteRow = memo(function NoteRow({
             onClick={() => rememberNotePeek(row)}
             className={cn(rowClass, FOCUS_RING)}
           >
-            {identity}
+            {lines}
           </Link>
         )}
 
-        {/* Outside the link, so the star is its own control with its own
-            accessible name rather than a click the row has to swallow.
+        {/* On the title's line: `mt-2.5` (10px) centres the 36px target on
+            the link's `pt-4` (16px) plus half the 24px title line, and
+            `-mr-1.5` puts the glyph where the mock draws it, 12px in from
+            the column's edge.
 
-            `mt-3.5` (14px) = the link's `py-3` (12px) plus the icon tile's
-            `mt-0.5` (2px), so the star and the tile sit on exactly the same
-            baseline and the row reads as one bar between two anchors —
-            `BookmarkRow` documents the same arithmetic. It was `mt-2`, which
-            floated the star 6px high on every row (review F6).
-
-            While ticking, the star's place stays empty, so the rows keep
+            While ticking, the menu's place stays empty, so the rows keep
             their width and the bar holds the actions. */}
         {selecting ? (
-          <span aria-hidden className="mt-3.5 size-9 shrink-0" />
+          <span aria-hidden className="-mr-1.5 mt-2.5 size-9 shrink-0" />
         ) : (
-          <NoteBookmarkButton
-            noteId={row.id}
-            isBookmarked={row.isBookmarked}
-            className="mt-3.5"
-          />
+          <div className="-mr-1.5 mt-2.5 shrink-0">
+            <NoteRowMenu row={row} onAddToFolder={onAddToFolder} onDelete={onDelete} />
+          </div>
         )}
       </div>
     </li>
   );
 });
-
-/**
- * The draft / published mark — a dot AND a word, never colour alone. Amber for
- * a draft because it is the state that CHANGES what the note is (private to
- * its author); published is the unremarkable default and stays muted, the same
- * rule the statute status mark follows.
- */
-function NoteStatusMark({ isDraft }: { isDraft: boolean }) {
-  return (
-    <span
-      className={cn(
-        'inline-flex shrink-0 items-center gap-1.5',
-        isDraft && 'text-amber-700 dark:text-amber-400',
-      )}
-    >
-      <span
-        aria-hidden
-        className={cn(
-          'size-1.5 rounded-full',
-          isDraft ? 'bg-amber-500' : 'bg-muted-foreground/50',
-        )}
-      />
-      {isDraft ? 'Draft' : 'Published'}
-    </span>
-  );
-}

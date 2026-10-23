@@ -54,8 +54,8 @@ test('the outcome says which way the privacy went', () => {
   assert.doesNotMatch(bulk, /past: 'Changed'/);
 });
 
-test('a ticked note row is its own tick box, and the star steps aside', () => {
+test('a ticked note row is its own tick box, and the menu steps aside', () => {
   const row = read('NoteRow.tsx');
   assert.match(row, /\{selecting \? \(\s*<label className=\{cn\(rowClass, 'cursor-pointer', selected && 'bg-secondary\/60'\)\}>\s*<Checkbox/);
-  assert.match(row, /\{selecting \? \(\s*<span aria-hidden className="mt-3\.5 size-9 shrink-0" \/>\s*\) : \(\s*<NoteBookmarkButton/);
+  assert.match(row, /\{selecting \? \(\s*<span aria-hidden className="-mr-1\.5 mt-2\.5 size-9 shrink-0" \/>\s*\) : \(\s*<div className="-mr-1\.5 mt-2\.5 shrink-0">\s*<NoteRowMenu/);
 });

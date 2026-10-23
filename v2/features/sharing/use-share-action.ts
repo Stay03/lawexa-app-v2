@@ -23,11 +23,16 @@ import { useShareUrl } from './useShareUrl';
  * because "Link copied" is what the control then says, and a paragraph where
  * a reader expected an address would be the small lie that label exists to
  * avoid.
+ *
+ * `onCopied` (23 October 2026, the notes list's row menu) runs when the link
+ * went to the clipboard, for a control that closes before it could say
+ * "Link copied" itself.
  */
 export function useShareAction({
   path,
   title,
   text,
+  onCopied,
 }: {
   /** The page to share, as a path. Omitted: the address the reader is on. */
   path?: string;
@@ -35,6 +40,8 @@ export function useShareAction({
   title: string | null;
   /** Passed to the share sheet beside the link; nothing without one. */
   text?: string;
+  /** Called once the link is on the clipboard. */
+  onCopied?: () => void;
 }): { share: () => Promise<void>; copied: boolean } {
   const shareUrl = useShareUrl();
   const [copied, setCopied] = useState(false);
@@ -66,6 +73,7 @@ export function useShareAction({
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      onCopied?.();
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => {
         timerRef.current = null;

@@ -1,5 +1,6 @@
 import type { NoteStatus } from '@/types/note';
 import type { NoteRecord } from './types';
+import { mayEditNote, noteSpace } from './note-copy';
 import { noteDisplayTitle, noteHasTitle, notePreviewText } from './note-text';
 
 /**
@@ -9,21 +10,12 @@ import { noteDisplayTitle, noteHasTitle, notePreviewText } from './note-text';
  * renders, so the row component holds no derivation logic and the two tabs
  * cannot drift into two ideas of what a note row says.
  *
- * ── WHAT THIS MODEL SUPPLIES FOR THE TWO-ZONE META LINE ─────────────────────
- * A row's meta line has a LEAD (left, gives up its width first) and a TRAIL
- * (right-anchored, never wraps, never moves). This model supplies BOTH
- * candidates for the lead and the single trail value; the choice between the
- * two leads is the LIST's, because it depends on which tab is showing and a
- * row model does not know that (`NoteRow`'s `showStatus` prop, set by
- * `NotesBrowser`).
- *
- *   LEAD, on the public library   {@link NoteRowModel.author} — "who wrote
- *           this" is what distinguishes two notes on the same subject.
- *   LEAD, on My notes             {@link NoteRowModel.isDraft} — the author is
- *           always the reader there, so their name is noise and the honest
- *           draft/published mark takes the slot.
- *   TRAIL, on both                {@link NoteRowModel.updatedAt}, tabular, so
- *           the dates read straight down the column whatever fills the lead.
+ * ── WHAT THIS MODEL SUPPLIES FOR THE META LINE ─────────────────────────────
+ * The row's grey line (the owner's take A, 23 October 2026) is built from
+ * {@link NoteRowModel.author}, {@link NoteRowModel.updatedAt} and
+ * {@link NoteRowModel.tags}; which of them show, and in what order, depends on
+ * the tab, so that rule lives in `library/note-row-meta.ts` and the list passes
+ * the tab down.
  *
  * ── WHAT IS DELIBERATELY ABSENT ─────────────────────────────────────────────
  * PRICE. `NoteRecord` does not type `price_ngn` / `price_usd` at all (see
@@ -31,8 +23,8 @@ import { noteDisplayTitle, noteHasTitle, notePreviewText } from './note-text';
  * v2 entirely — {@link isLibraryListable} is the render-side half of that rule,
  * and the wire layer bakes `free: true` into the library request as the other.
  *
- * TAGS and THUMBNAILS. Both are marketplace furniture from the v1 note cards;
- * neither survives into a v2 row, which is a name, one meta line and a preview.
+ * THUMBNAILS. Marketplace furniture from the v1 note cards; a v2 row is a name,
+ * a summary and one meta line.
  */
 
 /** What a notes-list row renders. Every field is display-ready. */
@@ -46,21 +38,27 @@ export interface NoteRowModel {
   title: string;
   /** `false` when the fallback is standing in — lets the row set it quieter. */
   hasTitle: boolean;
-  /** The lead candidate the public library uses. `null` when the payload has
-   *  no name. */
+  /** First on the All notes meta line. `null` when the payload has no name. */
   author: string | null;
   /** PLAIN text only — nothing in this feature is handed to the browser as HTML. */
   preview: string | null;
   /** Present only when the payload carries it (detail and my-notes rows). */
   status: NoteStatus | undefined;
-  /** The lead candidate My notes uses: an honest draft/published mark. */
+  /** An honest draft mark, on PROOF only (the folder picker reads it). */
   isDraft: boolean;
-  /** The meta TRAIL, on both tabs. */
+  /** The date on the meta line. */
   updatedAt: string;
+  /** The note's tags, trimmed, empty ones dropped. */
+  tags: readonly string[];
   isBookmarked: boolean;
+  /** A Space's copy: the server files it only in its own Space's folders. */
+  isSpaceCopy: boolean;
+  /** Edit and Delete in the row's menu (`mayEditNote`). */
+  canEdit: boolean;
 }
 
-export function noteRow(note: NoteRecord): NoteRowModel {
+/** `viewerId` decides {@link NoteRowModel.canEdit}; without one, no row is editable. */
+export function noteRow(note: NoteRecord, viewerId: number | null = null): NoteRowModel {
   return {
     id: note.id,
     slug: note.slug,
@@ -73,9 +71,12 @@ export function noteRow(note: NoteRecord): NoteRowModel {
     // On PROOF only — `status` is absent from list payloads, and reading the
     // absence as "not published" would stamp a draft mark on every real row.
     isDraft: note.status === 'draft',
-    // List rows carry only `created_at`; a trail must never go blank.
+    // List rows carry only `created_at`; the date must never go blank.
     updatedAt: note.updated_at ?? note.created_at,
+    tags: (note.tags ?? []).map((tag) => tag.trim()).filter((tag) => tag.length > 0),
     isBookmarked: note.is_bookmarked,
+    isSpaceCopy: noteSpace(note) !== null,
+    canEdit: mayEditNote(note, viewerId),
   };
 }
 

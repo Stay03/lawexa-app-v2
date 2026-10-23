@@ -26,6 +26,7 @@ import { isLibraryListable, noteRow, type NoteRowModel } from '../note-row-model
 import { NoteRow } from './NoteRow';
 import { NoteTabs, parseNotesTab, type NotesTab } from './NoteTabs';
 import { useNotesBulk } from './notes-bulk';
+import { useNoteRowDialogs } from './note-row-dialogs';
 import {
   NextPageSkeleton,
   NotesCreateAccountState,
@@ -114,8 +115,8 @@ export function NotesBrowser() {
   // WHERE the field is drawn — the developer switch (`v2/search-position.ts`).
   const searchAtTop = useSearchPosition() === 'top';
 
-  // Frozen at mount for the relative "updated" labels — no `Date.now()` runs
-  // in render (React Compiler lint).
+  // Frozen at mount for the rows' dates — no `Date.now()` runs in render
+  // (React Compiler lint).
   const [now] = useState(() => Date.now());
 
   const params = { search: activeSearch || undefined, viewerId };
@@ -148,16 +149,19 @@ export function NotesBrowser() {
         // whatever the request asked for. My notes is the reader's own
         // collection, drafts included — that is the whole point of the tab.
         if (tab === 'all' && !isLibraryListable(note)) continue;
-        mapped.push(noteRow(note));
+        mapped.push(noteRow(note, viewerId));
       }
     }
     return mapped;
-  }, [pages, tab]);
+  }, [pages, tab, viewerId]);
 
   // Bulk select (Arthur, 20 October 2026): My notes only, the reader's own.
   const bulk = useNotesBulk({ rows: tab === 'mine' ? rows : NO_ROWS });
   const { toggle: toggleNote, isSelected } = bulk;
   const selecting = bulk.selecting && tab === 'mine';
+
+  // The row menu's folder picker and delete dialog, one of each for the list.
+  const rowDialogs = useNoteRowDialogs();
 
   const scrollRootRef = useShellScrollRoot();
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
@@ -219,8 +223,6 @@ export function NotesBrowser() {
 
   return (
     <PageShell>
-      {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
-
       {/* The tab strip and the one action this screen has, on one row. The
           action spent a day as a floating button at the bottom of the screen
           and the owner turned it down on sight ("Remove the floating button
@@ -230,7 +232,7 @@ export function NotesBrowser() {
           `sm:`, leaving an unlabelled circle on exactly the screens where the
           affordance mattered most. `flex-wrap` is the safety net at 320px,
           where the pill drops to its own line instead of squeezing the tabs. */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <NoteTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
         {/* A guest holds a real token and reads the library, but can never
             author a note (`canWriteNotes`), so they are shown no create
@@ -252,6 +254,10 @@ export function NotesBrowser() {
           </div>
         ) : null}
       </div>
+
+      {/* Under the tab row when the developer switch puts it at the top (the
+          owner's take A, 23 October 2026). */}
+      {searchAtTop ? <div className="mb-4">{searchField}</div> : null}
 
       {/* The ONE live region for this surface. The route fallback's
           announcement is gone by the time an in-page fetch happens and the
@@ -304,14 +310,17 @@ export function NotesBrowser() {
               </div>
             ) : null}
 
-            <ul className="flex flex-col divide-y divide-border/60">
+            {/* Each row draws its own hairline UNDER it, the last one too. */}
+            <ul className="flex flex-col">
               {rows.map((row, index) => (
                 <NoteRow
                   key={row.id}
                   row={row}
                   index={index}
                   now={now}
-                  showStatus={tab === 'mine'}
+                  tab={tab}
+                  onAddToFolder={rowDialogs.openAddToFolder}
+                  onDelete={rowDialogs.openDelete}
                   selected={selecting ? isSelected(row.id) : undefined}
                   onToggleSelect={selecting ? toggleNote : undefined}
                 />
@@ -338,6 +347,7 @@ export function NotesBrowser() {
       {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
       {selecting ? bulk.bar : null}
       {bulk.dialogs}
+      {rowDialogs.dialogs}
 
       {/* The floating layer, and the search pill is now all it carries. With
           the field switched to the top there is nothing left to float, so no
