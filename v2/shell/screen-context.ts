@@ -115,7 +115,7 @@ export interface ScreenBarAction {
 
 /**
  * The id the bar gives its one screen control, so a panel the control opens
- * can anchor to it (the Contents design under `?contents=a` places a popover
+ * can anchor to it (a statute's Contents, `StatuteContents`, places a popover
  * under the button on a computer). There is at most one bar control at a
  * time, so one id is enough.
  */

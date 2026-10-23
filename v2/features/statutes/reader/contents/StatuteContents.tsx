@@ -28,11 +28,13 @@ import {
   focusCurrentOnOpen,
   nestingLevel,
   useCentreOnMount,
-  type ContentsDesignProps,
+  type StatuteContentsProps,
 } from './shared';
 
 /**
- * Contents design A, "where you are" (`?contents=a`; finding 10, prototype).
+ * StatuteContents — a statute's Contents, design A, "where you are" (finding
+ * 10; Stay, 23 October 2026: "Let's see A push that"). It replaced the left
+ * sheet, and the two other designs filmed beside it are gone.
  *
  * A compact panel that opens on the Part the reader is in, with the other
  * Parts folded to one row each, and a progress line across the top that
@@ -72,13 +74,13 @@ const PHONE_MOTION =
 const POPOVER =
   'flex w-[22rem] flex-col gap-0 overflow-hidden rounded-2xl p-0 shadow-2xl ring-1 ring-foreground/10';
 
-export function ContentsDesignA({
+export function StatuteContents({
   outline,
   activeId,
   onJump,
   open,
   onOpenChange,
-}: ContentsDesignProps) {
+}: StatuteContentsProps) {
   const side = useSheetSide();
   const titleId = useId();
   // Measured by Radix when it positions the content, after mount; nothing

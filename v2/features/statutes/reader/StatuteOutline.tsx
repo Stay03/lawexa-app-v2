@@ -4,12 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Lock } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { V2_SHELL_CONTENT_ID } from '@/v2/shell/shell-content';
 import type { AknOutlineDivision, SpyTarget } from './akn';
@@ -26,10 +20,9 @@ import type { AknOutlineDivision, SpyTarget } from './akn';
  *            rail HONESTLY fits — the arithmetic, which must account for the
  *            shell's 256px sidebar, lives beside the aside in
  *            StatuteDocument.)
- *   <96rem   a floating "Contents" pill (sticky at the column's bottom edge)
- *            opening a Sheet with the full tree — the affordance the rail
- *            collapses into, on desktop widths below the threshold as well
- *            as on mobile.
+ *   <96rem   a Contents button in the bar, opening the Contents
+ *            (`contents/StatuteContents`, design A: a sheet from the bottom
+ *            on a phone, a popover under the button on a computer).
  *
  * ── THE SPY ─────────────────────────────────────────────────────────────────
  * One IntersectionObserver, rooted at the SHELL SCROLLER (`#v2-shell-content`
@@ -79,7 +72,7 @@ export interface OutlineHandle {
 }
 
 /** The locked mark: a quiet glyph for sighted readers, words for the rest.
- *  Shared with the Contents designs under `contents-variants/`. */
+ *  Shared with the Contents (`contents/StatuteContents`). */
 export function LockMark({ className }: { className?: string }) {
   return (
     <>
@@ -224,8 +217,6 @@ function activeChainOf(
  */
 const RAIL_DIVISION_PAD = ['pl-3.5', 'pl-6', 'pl-8'] as const;
 const RAIL_SECTION_PAD = ['pl-6', 'pl-8', 'pl-10'] as const;
-const SHEET_DIVISION_PAD = ['pl-3', 'pl-6', 'pl-9'] as const;
-const SHEET_SECTION_PAD = ['pl-7', 'pl-10', 'pl-12'] as const;
 
 function level(division: AknOutlineDivision): 0 | 1 | 2 {
   const depth = division.depth ?? 0;
@@ -335,128 +326,3 @@ function ActiveBar() {
   );
 }
 
-/* ── The contents sheet: the full tree, opened from the bar ─────────────── */
-
-/**
- * The full tree in a sheet, opened by the Contents button in the bar (the
- * statute screen publishes it, `StatuteDocument`). It used to be a pill
- * floating at the column's bottom edge, which sat over the text for the whole
- * read (Tester, 20 October 2026, finding 10; Stay chose the bar). From 96rem
- * the rail in the margin shows the same tree and the bar button hides, unless
- * the chat is docked where the rail sits.
- */
-export function StatuteContentsSheet({
-  outline,
-  activeId,
-  onJump,
-  open,
-  onOpenChange,
-}: OutlineHandle & {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const activeDivision = activeDivisionOf(outline, activeId);
-  // The full tree is long; when the sheet opens, start the reader at the
-  // division they are currently inside rather than at Part I.
-  const activeRef = useRef<HTMLLIElement | null>(null);
-  useEffect(() => {
-    if (!open) return;
-    // One frame so the sheet's content exists and has height.
-    const frame = requestAnimationFrame(() => {
-      activeRef.current?.scrollIntoView({ block: 'center' });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open]);
-
-  const select = (id: string) => {
-    onOpenChange(false);
-    onJump(id);
-  };
-
-  return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="left" className="w-[85vw] max-w-sm">
-          {/* px-7 (28px) aligns the TITLE'S text with the ENTRIES' text —
-              nav px-4 (16px) + item button px-3 (12px) = 28px. The list's
-              visible left rhythm is its text (item boxes only surface on
-              hover), so text-to-text is the honest alignment. */}
-          <SheetHeader className="px-7 pb-2">
-            <SheetTitle>Contents</SheetTitle>
-          </SheetHeader>
-          <nav aria-label="Contents" className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-            <ul className="flex flex-col gap-0.5">
-              {outline.map((division) => (
-                <li
-                  key={division.id}
-                  ref={activeDivision === division.id ? activeRef : undefined}
-                >
-                  <button
-                    type="button"
-                    onClick={() => select(division.id)}
-                    aria-current={activeId === division.id ? 'location' : undefined}
-                    className={cn(
-                      division.locked
-                        ? 'v2-interactive flex w-full items-center gap-2 rounded-lg py-2 pr-3 text-left text-sm transition-colors hover:bg-secondary'
-                        : 'v2-interactive block w-full rounded-lg py-2 pr-3 text-left text-sm transition-colors hover:bg-secondary',
-                      SHEET_DIVISION_PAD[level(division)],
-                      activeId === division.id
-                        ? 'font-medium text-primary'
-                        : 'text-foreground',
-                      FOCUS_RING,
-                    )}
-                  >
-                    {division.locked ? (
-                      <>
-                        <span className="min-w-0 flex-1">{division.label}</span>
-                        <LockMark className="size-3.5" />
-                      </>
-                    ) : (
-                      division.label
-                    )}
-                  </button>
-                  {division.sections.length > 0 ? (
-                    <ul className="flex flex-col gap-0.5 pb-1">
-                      {division.sections.map((section) => (
-                        <li key={section.id}>
-                          <button
-                            type="button"
-                            onClick={() => select(section.id)}
-                            aria-current={
-                              activeId === section.id ? 'location' : undefined
-                            }
-                            className={cn(
-                              section.locked
-                                ? 'v2-interactive flex w-full items-center gap-2 rounded-lg py-1.5 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary'
-                                : 'v2-interactive block w-full rounded-lg py-1.5 pr-3 text-left text-[13px] leading-snug transition-colors hover:bg-secondary',
-                              SHEET_SECTION_PAD[level(division)],
-                              activeId === section.id
-                                ? 'font-medium text-primary'
-                                : 'text-muted-foreground',
-                              FOCUS_RING,
-                            )}
-                          >
-                            {section.locked ? (
-                              <>
-                                <span className="min-w-0 flex-1">
-                                  {section.label}
-                                </span>
-                                <LockMark className="size-3.5" />
-                              </>
-                            ) : (
-                              section.label
-                            )}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </SheetContent>
-      </Sheet>
-    </>
-  );
-}

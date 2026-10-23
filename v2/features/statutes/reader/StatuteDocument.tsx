@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { cn } from '@/lib/utils';
@@ -35,13 +35,8 @@ import {
   type SectionLinkContextValue,
   type SectionLinkInfo,
 } from './SectionLink';
-import {
-  StatuteContentsSheet,
-  StatuteOutlineRail,
-  useStatuteScrollSpy,
-} from './StatuteOutline';
-import { contentsVariantOf } from './contents-variants/contents-model';
-import { StatuteContentsDesign } from './contents-variants/StatuteContentsDesign';
+import { StatuteOutlineRail, useStatuteScrollSpy } from './StatuteOutline';
+import { StatuteContents } from './contents/StatuteContents';
 import {
   DocumentEmptyState,
   DocumentErrorState,
@@ -465,13 +460,6 @@ export function StatuteDocument({
     [sectionIndex, citation],
   );
   const pathname = usePathname() ?? '';
-  // PROTOTYPE (finding 10): `?contents=a|b|c` swaps the contents sheet for
-  // one of three designs under `contents-variants/`, for Stay's films. With
-  // no parameter the sheet stands. Read through the router (the screen's
-  // Suspense boundary already covers `useSearchParams` for `?chat=`), so the
-  // first paint is the same on the server and the client.
-  const contentsVariant = contentsVariantOf(useSearchParams().get('contents'));
-
   // The rendered excerpt's outline is the floor; the SERVER outline (partial
   // documents, once resolved) replaces it with the full map. `showContents`
   // therefore also honours a server outline whose excerpt alone would be too
@@ -911,20 +899,11 @@ export function StatuteDocument({
         />
       ) : null}
 
-      {showContents && contentsVariant === null ? (
-        <StatuteContentsSheet
-          outline={railOutline}
-          activeId={activeId}
-          onJump={jump}
-          open={contentsOpen}
-          onOpenChange={setContentsOpen}
-        />
-      ) : null}
-      {/* PROTOTYPE (finding 10): one of the three Contents designs, when the
-          address asks for it; the same button, outline, mark and jump. */}
-      {showContents && contentsVariant !== null ? (
-        <StatuteContentsDesign
-          variant={contentsVariant}
+      {/* The Contents the bar button opens: design A, "where you are" (finding
+          10; Stay, 23 October 2026). A sheet from the bottom on a phone, a
+          popover under the button on a computer. */}
+      {showContents ? (
+        <StatuteContents
           outline={railOutline}
           activeId={activeId}
           onJump={jump}

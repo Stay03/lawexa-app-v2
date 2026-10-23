@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
@@ -57,8 +57,13 @@ test('Contents is a button in the bar, not a pill over the text, and stays at ev
   const outline = read('v2', 'features', 'statutes', 'reader', 'StatuteOutline.tsx');
   assert.doesNotMatch(outline, /sticky bottom-6/);
   assert.doesNotMatch(outline, /DockClearanceContext/);
-  assert.match(outline, /<Sheet open=\{open\} onOpenChange=\{onOpenChange\}>/);
+  // The button opens design A, the one Contents (Stay, 23 October 2026: "Let's
+  // see A push that"): no left sheet, no ?contents= switch, no B or C.
+  assert.doesNotMatch(outline, /StatuteContentsSheet|<Sheet /);
   const document = read('v2', 'features', 'statutes', 'reader', 'StatuteDocument.tsx');
+  assert.match(document, /\{showContents \? \(\s*<StatuteContents\s+outline=\{railOutline\}/);
+  assert.doesNotMatch(document, /contentsVariant|useSearchParams|StatuteContentsDesign|contents-variants/);
+  assert.ok(!existsSync(join(process.cwd(), 'v2', 'features', 'statutes', 'reader', 'contents-variants')), 'the prototype folder is gone');
   assert.match(document, /action: \{ id: CONTENTS_ACTION_ID, label: 'Contents', icon: TableOfContents, onSelect: openContents \},\s*wide: chatDocked,/);
   // Only once the document itself is drawn: the sheet the button opens exists then.
   assert.match(document, /showContents && documentShown/);

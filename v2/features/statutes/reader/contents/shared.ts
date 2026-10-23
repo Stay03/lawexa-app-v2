@@ -5,18 +5,17 @@ import { useEffect, useRef, type RefObject } from 'react';
 import type { OutlineHandle } from '../StatuteOutline';
 
 /**
- * What every Contents design takes: the outline handle the rail and the sheet
- * already share (`outline`, `activeId`, `onJump`) and the open state the bar
- * button drives (`StatuteDocument` owns it). A design closes itself before it
- * jumps, exactly as `StatuteContentsSheet` does.
+ * What the Contents takes: the outline handle the rail also reads (`outline`,
+ * `activeId`, `onJump`) and the open state the bar button drives
+ * (`StatuteDocument` owns it). It closes itself before it jumps.
  */
-export interface ContentsDesignProps extends OutlineHandle {
+export interface StatuteContentsProps extends OutlineHandle {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 /**
- * Centres the ref'd row in its list one frame after mount. A design's body
+ * Centres the ref'd row in its list one frame after mount. The Contents' body
  * mounts when the panel opens (Radix Presence unmounts it closed), so this
  * runs on every open and starts the reader where they are rather than at
  * Part I. One frame so the surface exists and has height.
