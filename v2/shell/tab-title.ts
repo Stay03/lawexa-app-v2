@@ -11,9 +11,22 @@
 /** app-badge's mention prefix, "(3) ". */
 const MENTION_PREFIX = /^\(\d+\) /;
 
-/** "{name} | Lawexa", the root template's form, or null without a name. */
+/** The whitespace `document.title` collapses: HTML's ASCII whitespace. */
+const TITLE_WHITESPACE = /[\t\n\f\r ]+/g;
+
+/**
+ * "{name} | Lawexa", the root template's form, or null without a name.
+ *
+ * THE NAME'S WHITESPACE IS COLLAPSED HERE, AS THE BROWSER DOES. Reading
+ * `document.title` gives the title with every run of whitespace made one
+ * space and the ends trimmed, so a name with a line break in it ("LAND RIGHTS
+ * CLASS 1 …\nLECTURER: …", a live note, 23 October 2026) never read back equal
+ * to what `useTabTitle` wrote. Its watch on <head> then wrote again on every
+ * write it caused, and the page froze. Collapsed first, the text reads back
+ * as written and the watch settles in one pass.
+ */
 export function tabTitleText(name: string | null | undefined): string | null {
-  const text = name?.trim();
+  const text = name?.replace(TITLE_WHITESPACE, ' ').trim();
   return text ? `${text} | Lawexa` : null;
 }
 

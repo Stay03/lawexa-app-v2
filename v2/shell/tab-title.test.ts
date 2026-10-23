@@ -13,6 +13,42 @@ import { bareTitle, heldTitle, restoredTitle, tabTitleText } from './tab-title';
 const read = (...parts: string[]) =>
   readFileSync(join(process.cwd(), ...parts), 'utf8').replace(/\r\n/g, '\n');
 
+test('a name with a line break reads back as written, so the watch on <head> settles (live freeze, 23 October 2026)', () => {
+  // `document.title` reads back with its whitespace collapsed and trimmed. A
+  // stand-in with the same getter, and the hook's own compare-then-write.
+  let stored = '';
+  const doc = {
+    get title() {
+      return stored.replace(/[\t\n\f\r ]+/g, ' ').trim();
+    },
+    set title(value: string) {
+      stored = value;
+    },
+  };
+  const text = tabTitleText('LAND RIGHTS CLASS 1 (T -1) : NATURE AND SCOPE OF LAND RIGHTS\nLECTURER: DIEKOLOLA DANIELS LLB. BL.');
+  assert.equal(text, 'LAND RIGHTS CLASS 1 (T -1) : NATURE AND SCOPE OF LAND RIGHTS LECTURER: DIEKOLOLA DANIELS LLB. BL. | Lawexa');
+  let writes = 0;
+  const hold = () => {
+    const next = heldTitle(doc.title, text ?? '');
+    if (doc.title !== next) {
+      doc.title = next;
+      writes += 1;
+    }
+  };
+  // Each write is a <head> mutation, which runs `hold` again: it must stop.
+  for (let pass = 0; pass < 5; pass += 1) hold();
+  assert.equal(writes, 1);
+  // With the app badge's "(1) " in front (a signed-in reader with a mention), too.
+  stored = '(1) Note | Lawexa';
+  writes = 0;
+  for (let pass = 0; pass < 5; pass += 1) hold();
+  assert.equal(writes, 1);
+  assert.equal(doc.title, `(1) ${text}`);
+  // Tabs and repeated spaces collapse the same way; a no-break space is not whitespace to the browser and stays.
+  assert.equal(tabTitleText('A\t\tB  C'), 'A B C | Lawexa');
+  assert.equal(tabTitleText('A B'), 'A B | Lawexa');
+});
+
 test('set: the screen’s name in the root template, nothing without a name', () => {
   assert.equal(tabTitleText('Hearing notes'), 'Hearing notes | Lawexa');
   assert.equal(tabTitleText('  Hearing notes  '), 'Hearing notes | Lawexa');
