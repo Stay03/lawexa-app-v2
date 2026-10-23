@@ -48,7 +48,7 @@ export function AttemptResultsSkeleton() {
 
 /**
  * "See your answers" at the live page's geometry (`AnswersStepper`): the
- * heading row, two rows of ten number cells, the three filter pills, the
+ * heading row, the three filter pills, two rows of ten number cells, the
  * question with two tiles and its Why, and the bar at the bottom.
  */
 export function AttemptAnswersSkeleton() {
@@ -58,12 +58,12 @@ export function AttemptAnswersSkeleton() {
         <Skeleton className="h-6 w-40 rounded" />
         <Skeleton className="h-3.5 w-20 rounded" />
       </div>
-      <div className="mt-4 grid grid-cols-10 gap-1.5">
+      <Skeleton className="mt-4 h-9 w-52 rounded-full" />
+      <div className="mt-3 grid grid-cols-10 gap-1.5">
         {Array.from({ length: 20 }, (_, index) => (
           <Skeleton key={index} className="h-8 rounded-lg" />
         ))}
       </div>
-      <Skeleton className="mt-3 h-9 w-52 rounded-full" />
       <div className="mt-5 border-t border-border/60 pt-4">
         <Skeleton className="h-3.5 w-28 rounded" />
         <Skeleton className="mt-3 h-5 w-full rounded" />

@@ -17,7 +17,6 @@ import {
   answersDeck,
   answersPositionLabel,
   indexAfterFilter,
-  matchesAnswersFilter,
   openingAnswer,
   stepAnswer,
   type AnswersFilter,
@@ -28,9 +27,11 @@ import {
  * October 2026, 00:03Z; Arthur, 00:16Z: "one per page is better"), modelled
  * on the practice review (`v2/features/quiz/results/ReviewStepper`):
  *
- *  - a grid of the question numbers, red for wrong, green for right, grey for
- *    a skipped one, the open one outlined; a tap jumps to it;
- *  - All, Wrong and Right, each with its count;
+ *  - All, Wrong and Right, each with its count, ON TOP (Stay, 23 October
+ *    2026, 09:25Z: the filter first, then the list it filters);
+ *  - under them, the numbers of the questions that tab holds, each keeping
+ *    its number in the quiz: red for wrong, green for right, grey for a
+ *    skipped one, the open one outlined; a tap jumps to it;
  *  - the question with only the tiles that matter (your wrong pick and the
  *    right answer, the play screen's own tiles) and the author's Why;
  *  - Back · "3 of 20" · Next along the bottom, and the ← → keys.
@@ -72,11 +73,9 @@ export function AnswersStepper({ attempt, questions }: { attempt: QuizAttempt; q
     [current, deck, goTo],
   );
 
+  // The grid holds only the open tab's questions, so a jump stays in the tab.
   const jumpTo = (index: number) => {
     setDirection(index >= current ? 'next' : 'prev');
-    // The grid shows every question, so a jump can land outside the filter:
-    // widening to All is the honest answer, the reader asked for that one.
-    if (!matchesAnswersFilter(questions[index], filter)) setFilter('all');
     goTo(index);
   };
 
@@ -120,12 +119,10 @@ export function AnswersStepper({ attempt, questions }: { attempt: QuizAttempt; q
         </p>
       </div>
 
-      <AnswerGrid questions={questions} current={current} onJump={jumpTo} />
-
       <div
         role="group"
         aria-label="Show"
-        className="mt-3 inline-flex items-center gap-0.5 self-start rounded-full bg-secondary/60 p-0.5"
+        className="mt-4 inline-flex items-center gap-0.5 self-start rounded-full bg-secondary/60 p-0.5"
       >
         {filters.map((entry) => (
           <button
@@ -144,6 +141,8 @@ export function AnswersStepper({ attempt, questions }: { attempt: QuizAttempt; q
           </button>
         ))}
       </div>
+
+      <AnswerGrid questions={questions} deck={deck} current={current} onJump={jumpTo} />
 
       {question ? (
         <div
@@ -208,16 +207,20 @@ const VERDICT_WORD: Record<QuestionVerdict, string> = {
  *  difference, never a third colour), and every cell names its verdict. */
 function AnswerGrid({
   questions,
+  deck,
   current,
   onJump,
 }: {
   questions: readonly QuizAttemptQuestion[];
+  /** The open tab's questions, as positions in the quiz (`answersDeck`). */
+  deck: readonly number[];
   current: number;
   onJump: (index: number) => void;
 }) {
   return (
-    <ol aria-label="Questions" className="mt-4 grid grid-cols-10 gap-1.5">
-      {questions.map((question, index) => {
+    <ol aria-label="Questions" className="mt-3 grid grid-cols-10 gap-1.5">
+      {deck.map((index) => {
+        const question = questions[index];
         const verdict = questionVerdict(question);
         const open = index === current;
         return (

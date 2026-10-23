@@ -112,3 +112,18 @@ test('the page: the grid, the filters, the two tiles and the Why, the bar, and a
   assert.match(route, /robots: \{ index: false, follow: false \}/);
   assert.match(route, /<AttemptAnswersScreen attemptUuid=\{attemptUuid\} \/>/);
 });
+
+test('the tabs sit above the numbers, and the numbers are the open tab\'s, each keeping its quiz number (Stay, 23 October 2026, 09:25Z)', () => {
+  const page = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersStepper.tsx');
+  // The filter first, then the list it filters.
+  assert.ok(page.indexOf('aria-label="Show"') < page.indexOf('<AnswerGrid'), 'the tabs before the numbers');
+  assert.match(page, /<AnswerGrid questions=\{questions\} deck=\{deck\} current=\{current\} onJump=\{jumpTo\} \/>/);
+  // Only the open tab's questions, by their place in the quiz.
+  assert.match(page, /\{deck\.map\(\(index\) => \{\s*const question = questions\[index\];/);
+  assert.match(page, /\{index \+ 1\}\s*<\/button>/);
+  // A jump stays in the tab: nothing widens it to All any more.
+  assert.doesNotMatch(page, /setFilter\('all'\)/);
+  // Under Wrong on FIVE (wrong on 2 and 4, skipped 5) the row holds 2, 4 and 5.
+  assert.deepEqual(answersDeck(FIVE, 'wrong').map((index) => index + 1), [2, 4, 5]);
+  assert.deepEqual(answersDeck(FIVE, 'right').map((index) => index + 1), [1, 3]);
+});
