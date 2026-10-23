@@ -107,7 +107,7 @@ test('the top is one row; the name opens the details sheet on ?panel=about (Stay
   assert.match(screen, /canOpen: space \? \{ edit: canManage, about: true, invites: false, requests: false \} : undefined,/);
   assert.match(
     screen,
-    /<SpacePlaceHeader\s+space=\{space\}\s+membership=\{scope\.membership\}\s+onOpenAbout=\{openAbout\}\s+onOpenRoster=\{scope\.openRoster\}\s*\/>/,
+    /<SpacePlaceHeader\s+space=\{space\}\s+membership=\{scope\.membership\}\s+onOpenAbout=\{openAbout\}\s+onOpenRoster=\{scope\.openRoster\}\s+invitesSent=\{peopleReads \? pendingInvites\.data\?\.pagination\.total : undefined\}\s*\/>/,
   );
   assert.match(
     screen,
