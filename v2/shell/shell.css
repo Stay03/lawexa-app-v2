@@ -186,6 +186,18 @@ html[data-v2-chat-screen] .v2-shell {
   pointer-events: none;
 }
 
+/* THE CHAT'S SIDE PANEL TAKES THE RIGHT OF THE ROW (the draft editor, 23
+   October 2026). On a computer a draft or a file opens BESIDE the transcript,
+   in the chat's own row (ChatSidePanel.tsx). The box floats in this dock, which
+   spans the whole content row, so it is padded by the panel's width, written to
+   the root while the panel is open, and stays centred over the transcript.
+   Below xl the panel is a sheet over everything, so the box keeps its place. */
+@media (min-width: 80rem) {
+  html[data-v2-side-panel] .v2-shell__dock:has([data-v2-chat-dock]) {
+    padding-right: var(--v2-side-panel-w, 0px);
+  }
+}
+
 /* -----------------------------------------------------------------------------
    THE SEE-THROUGH BAR ON A TOP-LEVEL SCREEN (mobile native overhaul, phase 10).
 

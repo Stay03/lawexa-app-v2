@@ -116,6 +116,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
           >
             <ChatContent
               content={shownText}
+              messageId={message.id}
               isStreaming={isStreaming}
               isDraining={draining}
               isInteracted={isInteracted}

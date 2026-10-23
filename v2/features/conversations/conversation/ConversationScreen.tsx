@@ -25,6 +25,9 @@ import {
   reportFollowUpRefusal,
 } from './embedded-composer';
 import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './route-composer';
+import { draftOffsets } from './draft/draft-ordinals';
+import { SidePanelProvider } from './side-panel/SidePanelContext';
+import { SidePanelSlot } from './side-panel/SidePanelSlot';
 
 /** The composer's height, read by the transcript's bottom padding and the
  *  jump-to-latest pill (MessageList). On a chat's own route the shell's docked
@@ -109,6 +112,10 @@ export function ConversationScreen({
     const roster = colourRosterFor(recordRoster, spaceRoster, asked);
     return roster ? memberColourIndex(roster, asked) : null;
   }, [recordRoster, spaceRoster, messages]);
+  // Each answer's draft offset, so a draft card and the side panel name the
+  // same draft (draft-ordinals.ts). Counted from saved text; a streaming flush
+  // does not change `messages`, so this does not run per word.
+  const offsets = useMemo(() => draftOffsets(messages), [messages]);
   // External-composer embedding (the case chat's ONE screen): the HOST owns the
   // composer element, this screen owns the conversation — so it renders the
   // transcript only and PUBLISHES its composer-facing surface through the
@@ -315,18 +322,12 @@ export function ConversationScreen({
   const connectionError =
     error && error !== 'confidential_transcript_lost' && error !== 'not_found' ? error : null;
 
-  return (
-    <V2ChatProvider
-      sendMessage={sendFollowUp}
-      isStreaming={isStreaming}
-      canSend={canSend}
-      conversationId={conversationId}
-    >
+  const transcript = (
       <div
         data-v2-marker="V2-CONVERSATION"
         data-conversation-id={conversationId}
         data-v2-chat-frame=""
-        className="relative flex h-full min-h-0 flex-col"
+        className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col"
         style={externalComposer ? NO_DOCK_CLEARANCE : undefined}
       >
         {controller.isConfidential && (
@@ -384,6 +385,29 @@ export function ConversationScreen({
         </DocumentExportScope>
 
       </div>
+  );
+
+  return (
+    <V2ChatProvider
+      sendMessage={sendFollowUp}
+      isStreaming={isStreaming}
+      canSend={canSend}
+      conversationId={conversationId}
+    >
+      {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
+          own route, a draft or a file opens beside the transcript on a
+          computer and as a sheet on a phone (ChatSidePanel.tsx). Embedded, the
+          host is already a side column, so a draft shows in its card instead. */}
+      {embed ? (
+        transcript
+      ) : (
+        <SidePanelProvider offsets={offsets}>
+          <div className="flex h-full min-h-0">
+            {transcript}
+            <SidePanelSlot messages={messages} streamingText={streamingText} />
+          </div>
+        </SidePanelProvider>
+      )}
     </V2ChatProvider>
   );
 }
