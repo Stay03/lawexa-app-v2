@@ -47,15 +47,20 @@ test('a made quiz reads its title, counts and source, with a statute part range'
   assert.equal(createdQuizLine({ ...quiz, questionCount: 1, scenarioCount: 0, source: null }), '1 question');
 });
 
-test('a refusal shows the server\'s own sentence, and a stored result wrapped in data reads the same', () => {
-  const failed = createdQuiz(step({ toolResult: { success: false, error: null, data: { data: { error: { code: 'too_short', message: 'TEST DATA. That document is too short to make a quiz from.' } } } } }));
-  assert.deepEqual(failed, { kind: 'failed', message: 'TEST DATA. That document is too short to make a quiz from.' });
-  assert.deepEqual(createdQuiz(step({ toolResult: { success: false, error: 'Rate limited', data: null } })), { kind: 'failed', message: 'Rate limited' });
+test('a refusal is told by its content: the sentence, even when the step reads success (backend, 23 October 2026)', () => {
+  const sentence = 'TEST DATA. That document is too short to make a quiz from.';
+  // A lazy list carries the sentence as the step's error, with no data.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: sentence, data: null } })), { kind: 'failed', message: sentence });
+  // The fetched result is the bare sentence, and a reader below researcher sees success: true.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: sentence } })), { kind: 'failed', message: sentence });
+  // A body that still carries { error: { message } } reads the same.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: false, error: null, data: { data: { error: { code: 'too_short', message: sentence } } } } })), { kind: 'failed', message: sentence });
 });
 
-test('an unknown or not-yet-loaded result is null, so the card waits rather than guessing', () => {
+test('a result not loaded yet is null, so the card asks for it rather than guessing', () => {
   assert.equal(createdQuiz(step({ toolResult: { success: true, error: null, data: null } })), null);
-  assert.equal(createdQuiz(step({ toolResult: { success: true, error: null, data: { quiz: { title: 'No uuid' } } } })), null);
+  // A body with no quiz and no sentence is a failure in the card's own words.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: { quiz: { title: 'No uuid' } } } })), { kind: 'failed', message: 'Lawexa could not make the quiz this time.' });
 });
 
 test('the card sits after the step chain, and Edit opens the quiz page with its form', () => {

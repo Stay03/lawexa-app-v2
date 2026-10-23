@@ -5,12 +5,16 @@ import type { ToolMessage } from '@/types/chat';
  * card draws it (quiz from a source, door 1; Stay, 23 October 2026: "a chat
  * message that uploads a document and Lawexa uses the create quiz tool").
  *
- * The shape is backend's (bb81d318): on success the tool result's data is
- * `{ quiz: { uuid, title, question_count, scenario_count, visibility, source:
- * { kind, title, range? }, url } }`; on failure `{ error: { code, message } }`,
- * whose message is a sentence to show as it is. Read defensively, like every
- * tool result: a shape it does not know is `null`, and the step's own row
- * still says what happened.
+ * READ BY CONTENT, NOT BY FLAGS (backend, reading the AI service, 23 October
+ * 2026). A made quiz's result is the whole body, so its data carries `quiz:
+ * { uuid, title, question_count, scenario_count, visibility, source: { kind,
+ * title, range? }, url }`. A refusal keeps only the server's sentence: the
+ * AI service stores a 4xx or 5xx body's `message` alone, so no error code
+ * reaches the chat, and for a reader below researcher the step even reads
+ * `success: true`. So `data.quiz` means ready, and anything else with a
+ * sentence (a lazy result's `error`, or the fetched result's bare text) is
+ * that sentence, shown as it is. A result not loaded yet is `null`, and the
+ * card asks for it.
  */
 
 export const CREATE_QUIZ_TOOL = 'create_quiz';
@@ -51,29 +55,36 @@ export function isCreateQuizStep(message: ToolMessage): boolean {
 export function createdQuiz(message: ToolMessage): CreatedQuiz | null {
   if (!isCreateQuizStep(message)) return null;
   if (message.toolStatus !== 'complete') return { kind: 'making' };
-  const data = payload(message.toolResult?.data);
-  const error = record(data?.error);
-  if (error) {
-    const text = typeof error.message === 'string' && error.message.trim() ? error.message.trim() : null;
-    return { kind: 'failed', message: text ?? 'Lawexa could not make the quiz this time.' };
-  }
-  if (message.toolResult?.success === false) {
-    const text = typeof message.toolResult.error === 'string' && message.toolResult.error.trim() ? message.toolResult.error.trim() : null;
-    return { kind: 'failed', message: text ?? 'Lawexa could not make the quiz this time.' };
-  }
+  const result = message.toolResult;
+  const data = payload(result?.data);
   const quiz = record(data?.quiz);
-  if (!quiz || typeof quiz.uuid !== 'string' || !quiz.uuid || typeof quiz.title !== 'string') return null;
-  const source = record(quiz.source);
-  const sourceTitle = typeof source?.title === 'string' && source.title.trim() ? source.title.trim() : null;
-  const range = typeof source?.range === 'string' && source.range.trim() ? source.range.trim() : null;
-  return {
-    kind: 'ready',
-    uuid: quiz.uuid,
-    title: quiz.title.trim() || 'Your quiz',
-    questionCount: typeof quiz.question_count === 'number' ? quiz.question_count : 0,
-    scenarioCount: typeof quiz.scenario_count === 'number' ? quiz.scenario_count : 0,
-    source: sourceTitle ? (range ? `${sourceTitle}, ${range}` : sourceTitle) : null,
-  };
+  if (quiz && typeof quiz.uuid === 'string' && quiz.uuid && typeof quiz.title === 'string') {
+    const source = record(quiz.source);
+    const sourceTitle = text(source?.title);
+    const range = text(source?.range);
+    return {
+      kind: 'ready',
+      uuid: quiz.uuid,
+      title: quiz.title.trim() || 'Your quiz',
+      questionCount: typeof quiz.question_count === 'number' ? quiz.question_count : 0,
+      scenarioCount: typeof quiz.scenario_count === 'number' ? quiz.scenario_count : 0,
+      source: sourceTitle ? (range ? `${sourceTitle}, ${range}` : sourceTitle) : null,
+    };
+  }
+  const sentence =
+    text(result?.error) ??
+    text(result?.data) ??
+    text(data?.message) ??
+    text(record(data?.error)?.message);
+  if (sentence) return { kind: 'failed', message: sentence };
+  // Not loaded yet (a lazy result): the card asks for it.
+  if (result?.data == null) return null;
+  return { kind: 'failed', message: 'Lawexa could not make the quiz this time.' };
+}
+
+/** A non-empty trimmed string, or `null`. */
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 /** "10 questions · 1 scenario · from TEST DATA tenancy notes.pdf". */
