@@ -9,14 +9,14 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 
 /**
  * The mark of a folder that sits in a Space (Arthur picked 2a, 21 October
- * 2026, 13:07Z): the Space glyph (the cubes, as a Space wears everywhere else)
+ * 2026, 13:07Z): the Space glyph (the blocks, as a Space wears everywhere else)
  * in the folder's own yellow, pulled in to sit about half over the folder
  * icon's bottom-right corner. No disc: Arthur, "It doesn't need the gold disc
  * around it". It replaces Stay's C1 of 20 October, a yellow disc with the
  * people glyph, which read as "shared". The yellow keeps the type colour rule
  * ("The colour should be for the types"): the mark adds no new colour.
  *
- * The cubes sit on a small square of the ground behind them, so their lines
+ * The blocks sit on a small square of the ground behind them, so their lines
  * do not run into the folder's outline where they cross it. `ground` names
  * that ground: a list row (the page, and the row's hover tint under the
  * pointer) or the picker's grey tile.
@@ -66,7 +66,7 @@ export function spaceFolderNote(spaceName: string): string {
 
 /**
  * A Space folder's page, under its name: "In <Space>", the Space a link. Quiet
- * type, led by the same yellow cubes as the list's mark so the two read as one.
+ * type, led by the same yellow blocks as the list's mark so the two read as one.
  */
 export function SpaceFolderLine({ space }: { space: { uuid: string; name: string } }) {
   return (
