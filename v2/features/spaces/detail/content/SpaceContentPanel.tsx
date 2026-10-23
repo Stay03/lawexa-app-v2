@@ -237,6 +237,7 @@ export function SpaceContentPanel({
         onNewFolder={startFolder}
         onAttach={() => dock.current?.attach()}
         fileSelect={fileSelect}
+        looseFileCount={tab === 'folders' && !looseQuery.isPending ? files.length : null}
       />
     );
 
@@ -436,6 +437,7 @@ function SpaceFeed({
   onNewFolder,
   onAttach,
   fileSelect,
+  looseFileCount,
 }: {
   tab: SpaceContentTab;
   query: FeedQuery;
@@ -449,6 +451,9 @@ function SpaceFeed({
   /** Bulk select on the Folders pill's files in no folder: the ticks, while
    *  they are being made. */
   fileSelect?: FeedRowMenus['fileSelect'];
+  /** The Folders pill's files in no folder, from the panel's read of them;
+   *  `null` while they load, and on the other pills. */
+  looseFileCount: number | null;
 }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
   const { viewerId, enabled } = useContentReadGate();
@@ -612,16 +617,23 @@ function SpaceFeed({
       <PagedContent
         tab={tab}
         query={query}
-        count={items.length}
+        // On the Folders pill the files in no folder are rows too: a space with
+        // files and no folders showed "No folders in this space yet" above its
+        // files (Stay, via Lucy, 23 October 2026). The empty state is for a
+        // space with neither, and it waits while the files are still loading
+        // (their own list draws the skeleton), so it never flashes first.
+        count={items.length + (looseFileCount ?? 0)}
         empty={
-          <SpaceContentEmptyState
-            tab={tab}
-            canAdd={canAdd}
-            action={emptyAction}
-            // The All and Conversations states offer Invite people beside
-            // Upload files already.
-            onInvite={tab === 'folders' ? (access.onInvite ?? undefined) : undefined}
-          />
+          tab === 'folders' && looseFileCount === null ? null : (
+            <SpaceContentEmptyState
+              tab={tab}
+              canAdd={canAdd}
+              action={emptyAction}
+              // The All and Conversations states offer Invite people beside
+              // Upload files already.
+              onInvite={tab === 'folders' ? (access.onInvite ?? undefined) : undefined}
+            />
+          )
         }
       >
         {tab === 'folders' ? (
