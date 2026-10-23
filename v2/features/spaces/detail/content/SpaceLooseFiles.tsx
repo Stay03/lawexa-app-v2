@@ -42,7 +42,11 @@ export function SpaceLooseFiles({
   held,
   now,
   actionsFor,
+  fileSelect,
 }: {
+  /** Bulk select from the Folders pill's + (`useSpaceFilesBulk`): while it
+   *  runs, each row is its tick box and a tap ticks it. */
+  fileSelect?: { isSelected: (id: number) => boolean; toggle: (id: number) => void };
   spaceUuid: string;
   viewerId: number | null;
   /** The content read gate (`useContentReadGate`). */
@@ -130,6 +134,11 @@ export function SpaceLooseFiles({
                       index={index}
                       onView={row.view ? () => openView(file) : undefined}
                       menu={<SpaceFileMenu file={file} look="row" {...actionsFor(file)} />}
+                      select={
+                        fileSelect
+                          ? { checked: fileSelect.isSelected(file.id), onToggle: () => fileSelect.toggle(file.id) }
+                          : undefined
+                      }
                     />
                   );
                 })}

@@ -132,7 +132,7 @@ export function useUploadQueue(channelUuid: string): UploadQueue {
 
 /**
  * The queue itself, for any surface that uploads (Spaces F3, 12 October 2026:
- * a space's Files tab is the second). The surface brings three things: the
+ * a space's list is the second). The surface brings three things: the
  * upload (a `mutateAsync`, for the reason in the docblock), the check run
  * before a file is sent, and optionally how a failure is put into words.
  * Pass stable functions (a module-level function, or `mutateAsync`, which

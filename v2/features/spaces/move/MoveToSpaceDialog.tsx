@@ -43,7 +43,7 @@ import { useServerSearch } from '../use-server-search';
  * MoveToSpaceDialog — put an item the viewer owns into one of their spaces,
  * or take it back out (Spaces F3, 12 October 2026, backend B3). One dialog
  * for all three kinds, opened from a chat's row and its open screen, a
- * folder's row and its page, and a file's row in a space's Files tab.
+ * folder's row and its page, and a file's row in a space's Folders pill.
  *
  * ── WHICH SPACES ARE OFFERED ───────────────────────────────────────────────
  * The viewer's spaces where they may add: Owner or Contributor

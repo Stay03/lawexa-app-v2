@@ -57,15 +57,11 @@ test('a file row holds its type and size together and lets the uploader truncate
 
 /* ── MUST 4: the empty state's add action has its word ───────────────────── */
 
-test('the folders and files empty states offer a labelled button', () => {
+test('the empty Folders pill offers New folder and Upload files, each a labelled button', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(
     panel,
-    /tab === 'folders' \? \(\s*<EmptyStateAddButton icon=\{Plus\} onClick=\{onNewFolder\}>\s*New folder\s*<\/EmptyStateAddButton>/,
-  );
-  assert.match(
-    panel,
-    /tab === 'files' \? \(\s*<EmptyStateAddButton icon=\{Upload\} onClick=\{onUpload\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
+    /tab === 'folders' \? \(\s*<div className="flex flex-wrap items-center justify-center gap-2">\s*<EmptyStateAddButton icon=\{FolderPlus\} onClick=\{onNewFolder\}>\s*New folder\s*<\/EmptyStateAddButton>\s*<EmptyStateAddButton variant="outline" icon=\{Upload\} onClick=\{onUpload\}>\s*Upload files\s*<\/EmptyStateAddButton>/,
   );
   assert.match(panel, /action=\{emptyAction\}/);
   // The word is plain text in the button, never `sr-only`.

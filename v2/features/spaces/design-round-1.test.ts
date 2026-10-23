@@ -407,7 +407,8 @@ test('the crest’s corner mark sits on the corner, off the letters', () => {
 
 test('the space name is a visible heading at every width, and the bar steps back while it shows', () => {
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.match(header, /<span className="line-clamp-2 min-w-0 break-words"/);
+  // One line cut with "…" on a phone, two from md: (header option 1, Stay, 23 October 2026).
+  assert.match(header, /<span className="min-w-0 truncate md:line-clamp-2 md:whitespace-normal md:break-words"/);
   assert.doesNotMatch(header, /sr-only md:not-sr-only/);
   assert.match(header, /setSpaceTitleOnScreen\(entry\.isIntersecting\)/);
   const slot = read('v2', 'features', 'collab', 'shell', 'CollabHeaderSlot.tsx');

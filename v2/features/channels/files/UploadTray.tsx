@@ -32,7 +32,7 @@ import type { UploadEntry, UploadQueue } from './use-upload-queue';
  *
  * ── TWO PLACEMENTS ─────────────────────────────────────────────────────────
  * `docked` (the default) is the channel panel's strip along the bottom edge.
- * `inline` is a space's Files tab (Spaces F3), where the pane scrolls and
+ * `inline` is a space's list (Spaces F3), where the pane scrolls and
  * there is no bottom edge to dock to: the same rows in a bordered card at the
  * top of the list, so the file being added sits where it is about to appear.
  *

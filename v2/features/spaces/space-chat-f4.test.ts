@@ -69,14 +69,14 @@ test('an empty All or Conversations pill reads Arthur’s words to those who may
 
 test('the home has the message box at its bottom, for the Owner and Contributors, and no New conversation (Stay, 15 October 2026)', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
-  // On All, Conversations and Files; not on Folders or People (Arthur, 17
-  // October 2026, item 2). Hidden, still mounted, while files are ticked
-  // (bulk select part 3).
+  // On All and Conversations; not on Folders or People (Arthur, 17 October
+  // 2026, item 2; the Files pill is gone). Hidden, still mounted, while files
+  // are ticked (bulk select part 3).
   assert.match(
     panel,
     /\{access\.canAdd && DOCK_TABS\.has\(tab\) \? \([\s\S]{0,240}?<div className=\{selecting \? 'hidden' : 'contents'\}>\s*<SpaceChatDock space=\{\{ uuid: space\.uuid, name: space\.name \}\} handle=\{dock\} \/>\s*<\/div>\s*\) : null\}/,
   );
-  assert.match(panel, /const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>\(\['all', 'conversations', 'files'\]\);/);
+  assert.match(panel, /const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>\(\['all', 'conversations'\]\);/);
   assert.doesNotMatch(panel, /New conversation|StartConversationDialog|startChat/);
   // The earlier conversations stay in the list above the box.
   assert.match(panel, /renderFeedRow\(\{ entry, now, menus: rowMenus, key: itemKey\(entry\) \}\)/);
@@ -88,26 +88,28 @@ test('the home has the message box at its bottom, for the Owner and Contributors
   assert.match(panel, /<div className="flex flex-1 flex-col">[\s\S]{0,900}?<div className=\{cn\(SPACE_PILL_BAR, 'flex-row items-center gap-2'\)\}>/);
 });
 
-test('the pill bar\'s add control is in the pills\' scale: one row, an icon on a phone (Stay, 22 October 2026)', () => {
+test('the pill bar\'s + is in the pills\' scale, at the row\'s end at every width, and its menu has icons (Stay, 22 and 23 October 2026)', () => {
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   // "That new folder button is ridiculously big and wasting space and out of place."
   assert.match(
     panel,
-    /'v2-interactive relative inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary\/90 after:absolute after:-inset-1\.5 sm:w-auto sm:px-3'/,
+    /'v2-interactive relative inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary\/90 after:absolute after:-inset-1\.5 data-\[state=open\]:bg-primary\/90 sm:w-auto sm:px-3'/,
   );
-  assert.match(panel, /<span className="sr-only sm:not-sr-only">\{children\}<\/span>/);
+  assert.match(panel, /<span className="sr-only sm:not-sr-only">Add<\/span>/);
+  // "the new folder, select and upload should have icons" (Stay, 23 October 2026, 00:06Z).
+  assert.match(panel, /<FolderPlus \/>\s*New folder/);
+  assert.match(panel, /<Upload \/>\s*Upload files/);
+  assert.match(panel, /<ListChecks \/>\s*Select/);
   assert.doesNotMatch(panel, /min-h-11/);
   assert.match(panel, /const PILLS_CLASS =\s*'inline-flex max-w-full min-w-0 items-center gap-0\.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary\/60 p-0\.5';/);
-  // From md: up the control ends the pills' row; on a phone it moves to the
-  // header's row beside the space's name, so it never cuts the last pill.
-  assert.match(panel, /\{action \? <div className="ml-auto hidden shrink-0 justify-end md:flex">\{action\}<\/div> : null\}/);
-  assert.match(panel, /\{action && headerActions \? createPortal\(action, headerActions\) : null\}/);
+  // With four pills the + fits a phone's row beside People: it ends the
+  // row at every width, and the header carries no slot for it.
+  assert.match(panel, /\{action \? <div className="ml-auto flex shrink-0 justify-end">\{action\}<\/div> : null\}/);
+  assert.doesNotMatch(panel, /createPortal|headerActions/);
   const header = read('v2', 'features', 'spaces', 'detail', 'SpacePlaceHeader.tsx');
-  assert.match(header, /\{actionsRef \? <div ref=\{actionsRef\} className="flex shrink-0 items-center gap-2 self-center md:hidden" \/> : null\}/);
+  assert.doesNotMatch(header, /actionsRef/);
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /const \[headerActions, setHeaderActions\] = useState<HTMLDivElement \| null>\(null\);/);
-  assert.match(screen, /actionsRef=\{setHeaderActions\}/);
-  assert.match(screen, /<SpaceContentPanel space=\{space\} tab=\{tab\} onTabChange=\{setTab\} headerActions=\{headerActions\} \/>/);
+  assert.doesNotMatch(screen, /headerActions|setHeaderActions/);
 });
 
 test('the inviter and the invitee read one promise: a Contributor continues the space’s conversations', () => {

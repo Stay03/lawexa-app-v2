@@ -100,10 +100,6 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   const searchParams = useSearchParams();
   const urlTab = searchParams.get('tab');
   const [tabParam, setTabParam] = useState<string | null>(urlTab);
-  // The header's slot for the open pill's add control on a phone (Stay, 22
-  // October 2026: the control in the pills' row cut the last pill). Set by a
-  // ref callback, so the control lands before the first paint.
-  const [headerActions, setHeaderActions] = useState<HTMLDivElement | null>(null);
   // A soft navigation to this same space with another `?tab=` (a link from
   // elsewhere in the app) changes the router's search params without
   // remounting this page, so the tab follows it. Adjusted during render, keyed
@@ -334,10 +330,9 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         membership={scope.membership}
         onOpenAbout={openAbout}
         onOpenRoster={scope.openRoster}
-        actionsRef={setHeaderActions}
       />
 
-      <SpaceContentPanel space={space} tab={tab} onTabChange={setTab} headerActions={headerActions} />
+      <SpaceContentPanel space={space} tab={tab} onTabChange={setTab} />
 
       <SpaceFormDialog
         key={panel.keyFor('edit')}

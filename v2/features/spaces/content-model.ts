@@ -20,7 +20,7 @@ import { canAddContent, type SpaceTab } from './model';
  * content-model — the pure rules of writing to a space's contents (Spaces F3,
  * 12 October 2026, backend B3 cb0fae8): who may add, take out and move, the
  * exact request bodies, and the sentences each refusal is answered with. No
- * JSX, no hooks, so the Files tab, the row menus and the move dialog all read
+ * JSX, no hooks, so the Folders pill, the row menus and the move dialog all read
  * the same answers, and the tests pin them without a browser.
  *
  * ── THREE ROLES, THREE VERBS ───────────────────────────────────────────────
@@ -341,7 +341,6 @@ export function fileTypeLabel(file: { mime_type: string; original_name: string }
 const SPACE_TAB_NOUN: Readonly<Record<Exclude<SpaceContentTab, 'all'>, string>> = {
   conversations: 'conversations',
   folders: 'folders',
-  files: 'files',
 };
 
 /**

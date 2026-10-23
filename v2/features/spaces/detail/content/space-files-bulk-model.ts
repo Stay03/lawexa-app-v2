@@ -1,7 +1,7 @@
 import type { BulkItemId } from '@/v2/features/bulk/model';
 
 /**
- * A Space's Files tab's bulk actions for what is ticked (Arthur, 20 October
+ * A Space's files' bulk actions for what is ticked (Arthur, 20 October
  * 2026: "keep the actions context-specific"; backend's rules, 21 October
  * 2026). Pure, so the rule is pinned by a test and the bar only draws what it
  * says.

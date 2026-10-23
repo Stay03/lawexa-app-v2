@@ -5,7 +5,6 @@ import {
   Folder,
   LayoutList,
   MessageSquare,
-  Paperclip,
   SearchX,
   UserPlus,
   type LucideIcon,
@@ -88,7 +87,6 @@ const EMPTY_ICON: Readonly<Record<SpaceContentTab, LucideIcon>> = {
   all: LayoutList,
   conversations: MessageSquare,
   folders: Folder,
-  files: Paperclip,
 };
 
 /** A pill with nothing in it. `action` is the way to add, passed only for a
@@ -147,7 +145,6 @@ const FAILURE_TITLE: Readonly<Record<SpaceContentTab, string>> = {
   all: 'Couldn’t load this space',
   conversations: 'Couldn’t load the conversations',
   folders: 'Couldn’t load the folders',
-  files: 'Couldn’t load the files',
 };
 
 /**

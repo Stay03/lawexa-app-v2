@@ -102,7 +102,8 @@ test('only an Owner or a Contributor may add content; the old my_role does not c
 
 test('the pills are the same for every kind and role; channels stay in the rail (B4)', () => {
   // People last (Stay, 15 October 2026); no Channels pill (design B4).
-  assert.deepEqual(SPACE_TABS, ['all', 'conversations', 'files', 'folders', 'people']);
+  // No Files pill (Stay, 22 October 2026, 23:58Z).
+  assert.deepEqual(SPACE_TABS, ['all', 'conversations', 'folders', 'people']);
   // Channels still show where they did, in the rail.
   const shows = (kind: SpaceKind, viewer: V2SessionSnapshot) => spaceShowsChannels({ kind }, viewer);
   assert.equal(shows('team', researcher), true);
@@ -113,7 +114,9 @@ test('the pills are the same for every kind and role; channels stay in the rail 
 });
 
 test('?tab= resolves to a pill, never to a missing one', () => {
-  assert.equal(parseSpaceTab('files'), 'files');
+  // The old Files pill opens Folders, where those files are now.
+  assert.equal(parseSpaceTab('files'), 'folders');
+  assert.equal(parseSpaceTab('folders'), 'folders');
   assert.equal(parseSpaceTab('people'), 'people');
   assert.equal(parseSpaceTab('channels'), 'all');
   assert.equal(parseSpaceTab('chats'), 'all');
@@ -200,7 +203,7 @@ test('the space page: pills from the model, one panel, no channel read (B4)', ()
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   assert.match(screen, /const tab = parseSpaceTab\(tabParam\);/);
   assert.match(screen, /quietReplaceUrlParams\(\{ tab: value \}\)/);
-  assert.match(screen, /<SpaceContentPanel space=\{space\} tab=\{tab\} onTabChange=\{setTab\} headerActions=\{headerActions\} \/>/);
+  assert.match(screen, /<SpaceContentPanel space=\{space\} tab=\{tab\} onTabChange=\{setTab\} \/>/);
   assert.doesNotMatch(screen, /SpaceTabs|threadsBySpace|showsChannels/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /<TabRow\s+tabs=\{PILLS\}/);

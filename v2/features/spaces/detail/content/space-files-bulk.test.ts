@@ -48,10 +48,16 @@ test('each action is one bulk request; remove and delete ask first with the coun
   );
 });
 
-test('only the Files pill ticks, the box hides without unmounting, and a file row is its own tick box', () => {
+test('only the Folders pill ticks, its files in no folder, and a file row is its own tick box', () => {
   const panel = read('SpaceContentPanel.tsx');
-  assert.match(panel, /const selecting = bulk\.selecting && tab === 'files';/);
-  assert.match(panel, /tab === 'files' && files\.length > 0 && !selecting\s*\? bulk\.startButton\(/);
+  // The old Files pill's Select moved to the Folders pill (Stay, 22 October
+  // 2026: "only folder tab"), over the same read the list shows.
+  assert.match(panel, /const selecting = bulk\.selecting && tab === 'folders';/);
+  assert.match(panel, /\.\.\.spacesQueries\.looseFiles\(space\.uuid, \{ viewerId \}\),\s*enabled: enabled && tab === 'folders',/);
+  assert.match(panel, /const canSelect = files\.length > 0;/);
+  assert.match(panel, /<SpaceLooseFiles[\s\S]{0,240}?fileSelect=\{fileSelect\}/);
+  const loose = read('SpaceLooseFiles.tsx');
+  assert.match(loose, /\? \{ checked: fileSelect\.isSelected\(file\.id\), onToggle: \(\) => fileSelect\.toggle\(file\.id\) \}/);
   assert.match(panel, /const changeTab = \(next: SpaceTab\) => \{\s*\/\/ [^\n]*\n\s*bulk\.stop\(\);/);
   assert.match(panel, /<div className=\{selecting \? 'hidden' : 'contents'\}>\s*<SpaceChatDock/);
   const rows = read('feed-rows.tsx');

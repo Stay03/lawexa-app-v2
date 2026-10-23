@@ -121,9 +121,9 @@ test('the home: a Viewer sees no add control, only the space Owner sees Remove f
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /canAdd: canAddContent\(space\),/);
   assert.match(panel, /canRemove: canRemoveFromSpace\(space\),/);
-  // Upload files on the Files pill, New folder on the Folders pill (B4).
-  assert.match(panel, /access\.canAdd && tab === 'files' \? \(\s*<PillButton icon=\{Upload\} onClick=\{pickFiles\}>\s*Upload files/);
-  assert.match(panel, /access\.canAdd && tab === 'folders' \? \(\s*<PillButton icon=\{Plus\} onClick=\{startFolder\}>\s*New folder/);
+  // The Folders pill's + (New folder, Upload files, Select) for whoever may
+  // add; a Viewer gets a plain Select and nothing to add (header option 1).
+  assert.match(panel, /tab !== 'folders' \|\| selecting \? null : access\.canAdd \? \(\s*<SpaceAddMenu onNewFolder=\{startFolder\} onUpload=\{pickFiles\} onSelect=\{canSelect \? bulk\.start : null\} \/>\s*\) : canSelect \? \(\s*bulk\.startButton\(/);
   // The file input and the tray exist only for someone who may add, and so
   // does the drop zone.
   // (`useSpaceUploads`; the empty All and Conversations pills open the docked
@@ -229,8 +229,8 @@ test('empty pills teach the Owner and Contributors, and tell a Viewer who fills 
   // Design round 1: Stay's lines moved to the header of every shared space,
   // so the empty state names what is missing and how it gets filled instead
   // of repeating them.
-  const nouns = { conversations: 'conversations', folders: 'folders', files: 'files' } as const;
-  for (const tab of ['conversations', 'folders', 'files'] as const) {
+  const nouns = { conversations: 'conversations', folders: 'folders' } as const;
+  for (const tab of ['conversations', 'folders'] as const) {
     const adder = spaceEmptyCopy(tab, true);
     // Arthur's heading for the Conversations tab (15 October 2026).
     assert.equal(
@@ -254,7 +254,6 @@ test('empty pills teach the Owner and Contributors, and tell a Viewer who fills 
     'Ask questions, explore your subject or work towards your goal. Add resources to give Lawexa the context it needs.',
   );
   assert.match(spaceEmptyCopy('folders', true).description, /Folders you add here are shared with everyone in this space\./);
-  assert.match(spaceEmptyCopy('files', true).description, /Files you add here are shared with everyone in this space\./);
 });
 
 test('no em dash in the new UI strings', () => {
@@ -264,7 +263,7 @@ test('no em dash in the new UI strings', () => {
     read('v2', 'features', 'spaces', 'detail', 'content', 'RemoveFromSpaceDialog.tsx'),
     read('v2', 'features', 'spaces', 'detail', 'content', 'states.tsx'),
   ];
-  for (const tab of ['all', 'conversations', 'folders', 'files'] as const) {
+  for (const tab of ['all', 'conversations', 'folders'] as const) {
     for (const canAdd of [true, false]) {
       const { title, description } = spaceEmptyCopy(tab, canAdd);
       assert.doesNotMatch(title + description, /—/);
@@ -278,12 +277,14 @@ test('no em dash in the new UI strings', () => {
   }
 });
 
-test('the pills are All, Conversations, Files, Folders and People; old tab ids open All', () => {
+test('the pills are All, Conversations, Folders and People; old tab ids open All, the old Files opens Folders', () => {
+  // No Files pill (Stay, 22 October 2026, 23:58Z): Folders lists the files in no folder.
   assert.deepEqual(
     SPACE_TABS.map((tab) => SPACE_TAB_LABELS[tab]),
-    ['All', 'Conversations', 'Files', 'Folders', 'People'],
+    ['All', 'Conversations', 'Folders', 'People'],
   );
   for (const old of ['chats', 'channels', null, 'nonsense']) assert.equal(parseSpaceTab(old), 'all');
+  assert.equal(parseSpaceTab('files'), 'folders');
   for (const tab of SPACE_TABS) assert.equal(parseSpaceTab(tab), tab);
 });
 

@@ -16,9 +16,10 @@ import { canDeleteSpaceFile } from '../../content-model';
 import { spaceFileIdOf, spaceFilesBulkActions } from './space-files-bulk-model';
 
 /**
- * Bulk select on a Space's Files tab (Arthur, 20 October 2026; part 3 with
- * Saved): the files on the tab, ticked together. The actions follow the
- * reader's role and what is ticked (`spaceFilesBulkActions`):
+ * Bulk select on a Space's files in no folder, from the Folders pill's +
+ * (Arthur, 20 October 2026, on the old Files pill; part 3 with Saved): those
+ * files, ticked together. The actions follow the reader's role and what is
+ * ticked (`spaceFilesBulkActions`):
  *
  *   Save copies to my files   any member
  *   Remove from space         the Space's Owner (nothing is deleted)
@@ -149,6 +150,7 @@ export function useSpaceFilesBulk({
     isSelected: select.isSelected,
     toggle: select.toggle,
     stop: select.stop,
+    start: select.start,
     startButton,
     bar,
     dialogs,

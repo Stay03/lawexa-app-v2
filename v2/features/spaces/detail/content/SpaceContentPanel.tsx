@@ -1,14 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
 import { useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from '@tanstack/react-query';
-import { Plus, Upload, UserPlus } from 'lucide-react';
+import { FolderPlus, ListChecks, Plus, Upload, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { extractApiError } from '@/lib/utils/api-error';
 import { formatDayLabel } from '@/lib/utils/collab';
 import type {
@@ -86,10 +91,12 @@ import {
  * space's conversations, files and folders, and the message box.
  *
  * ── THE PILLS (`?tab=`, `SpaceScreen` holds it) ────────────────────────────
- * All, Conversations, Files, Folders, People. The first four are one feed
+ * All, Conversations, Folders, People. The first three are one feed
  * (`GET /spaces/{uuid}/items`, `spacesQueries.items`): All with no `type`,
- * each kind with its own. People is the members page (`SpacePeoplePanel`) in
- * the list's place. Channels are not a pill; the space rail keeps them.
+ * each kind with its own. No Files pill (Stay, 22 October 2026, 23:58Z):
+ * Folders lists the files in no folder under the folders. People is the
+ * members page (`SpacePeoplePanel`) in the list's place. Channels are not a
+ * pill; the space rail keeps them.
  *
  * ── NO SEARCH ──────────────────────────────────────────────────────────────
  * Stay, 17 October 2026, 19:11 UTC, and Arthur, 22:31 UTC: "remove it". The
@@ -97,13 +104,15 @@ import {
  * pane is the scroller, `CollabFrame`'s `data-v2-scroller`).
  *
  * ── WHERE ADDING WENT ──────────────────────────────────────────────────────
- * The add controls sit at the end of the pill bar: Files shows "Upload
- * files", Folders shows "New folder", each for the Owner and Contributors
- * only (`canAddContent`; a Viewer would get a 403). Files dragged from the
- * desktop onto the list upload into the space on every pill but People. A new
- * conversation starts from the box docked at the bottom (Stay and Arthur, 15
- * October 2026), on All, Conversations and Files only (Arthur, 17 October
- * 2026, item 2).
+ * One gold + at the end of the Folders pill's bar opens New folder, Upload
+ * files and Select, each with its icon (Stay, 23 October 2026, 00:06Z, header
+ * option 1: "the new folder, select and upload should have icons"). New
+ * folder and Upload are for the Owner and Contributors only (`canAddContent`;
+ * a Viewer would get a 403); a Viewer gets a plain Select, for saving copies.
+ * Files dragged from the desktop onto the list upload into the space on every
+ * pill but People. A new conversation starts from the box docked at the
+ * bottom (Stay and Arthur, 15 October 2026), on All and Conversations only
+ * (Arthur, 17 October 2026, item 2).
  *
  * ── ONE LIST, BY DAY ───────────────────────────────────────────────────────
  * The feed is newest first (`sort_at`), so the list is cut into days with the
@@ -131,13 +140,10 @@ export function SpaceContentPanel({
   space,
   tab,
   onTabChange,
-  headerActions = null,
 }: {
   space: Space;
   tab: SpaceTab;
   onTabChange: (next: SpaceTab) => void;
-  /** The header's slot for the add control on a phone (`SpacePlaceHeader`). */
-  headerActions?: HTMLElement | null;
 }) {
   // A missing scope reads as the most careful answer: nobody to invite.
   const scope = useCollabSpaceScope();
@@ -177,20 +183,20 @@ export function SpaceContentPanel({
   // 2026: "no indication where it went").
   const dock = useRef<HomeComposerHandle>(null);
 
-  // Bulk select on the Files pill (Arthur, 20 October 2026): its files, from
-  // the same read the list shows (one cache entry, no second request).
-  const pages = query.data?.pages;
+  // Bulk select on the Folders pill (Arthur, 20 October 2026, on the old Files
+  // pill): the space's files in no folder, from the same read the list under
+  // the folders shows (`SpaceLooseFiles`; one cache entry, no second request).
+  const looseQuery = useInfiniteQuery({
+    ...spacesQueries.looseFiles(space.uuid, { viewerId }),
+    enabled: enabled && tab === 'folders',
+  });
+  const loosePages = looseQuery.data?.pages;
   const files = useMemo(
-    () =>
-      tab === 'files' && pages
-        ? uniqueRowsById(pages, itemKey)
-            .filter((entry): entry is Extract<SpaceItem, { type: 'file' }> => entry.type === 'file')
-            .map((entry) => entry.item)
-        : NO_FILES,
-    [tab, pages],
+    () => (tab === 'folders' && loosePages ? uniqueRowsById(loosePages, (file) => file.id) : NO_FILES),
+    [tab, loosePages],
   );
   const bulk = useSpaceFilesBulk({ space, files, canRemove: access.canRemove, viewerId });
-  const selecting = bulk.selecting && tab === 'files';
+  const selecting = bulk.selecting && tab === 'folders';
   const { isSelected, toggle } = bulk;
   const fileSelect = useMemo(() => (selecting ? { isSelected, toggle } : undefined), [selecting, isSelected, toggle]);
   const changeTab = (next: SpaceTab) => {
@@ -199,37 +205,23 @@ export function SpaceContentPanel({
     onTabChange(next);
   };
 
-  const selectButton =
-    tab === 'files' && files.length > 0 && !selecting
-      ? bulk.startButton(
-          cn(
-            // The pill row's scale (Stay, 22 October 2026: the 44px pill was
-            // "ridiculously big … out of place"); the tap area reaches 44px.
-            'v2-interactive relative inline-flex min-h-8 shrink-0 items-center rounded-full border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-secondary after:absolute after:-inset-y-1.5 after:inset-x-0',
-            FOCUS_RING,
-          ),
-        )
-      : null;
-
-  const addAction =
-    access.canAdd && tab === 'files' ? (
-      <PillButton icon={Upload} onClick={pickFiles}>
-        Upload files
-      </PillButton>
-    ) : access.canAdd && tab === 'folders' ? (
-      <PillButton icon={Plus} onClick={startFolder}>
-        New folder
-      </PillButton>
-    ) : null;
+  // The Folders pill's one control at the bar's end: the gold + for whoever
+  // may add, a plain Select for a Viewer with files to tick. Nothing while
+  // the files are being ticked: the bar at the foot holds Done.
+  const canSelect = files.length > 0;
   const action =
-    selectButton && addAction ? (
-      <div className="flex items-center gap-2">
-        {selectButton}
-        {addAction}
-      </div>
-    ) : (
-      (selectButton ?? addAction)
-    );
+    tab !== 'folders' || selecting ? null : access.canAdd ? (
+      <SpaceAddMenu onNewFolder={startFolder} onUpload={pickFiles} onSelect={canSelect ? bulk.start : null} />
+    ) : canSelect ? (
+      bulk.startButton(
+        cn(
+          // The pill row's scale (Stay, 22 October 2026: the 44px pill was
+          // "ridiculously big … out of place"); the tap area reaches 44px.
+          'v2-interactive relative inline-flex min-h-8 shrink-0 items-center rounded-full border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-secondary after:absolute after:-inset-y-1.5 after:inset-x-0',
+          FOCUS_RING,
+        ),
+      )
+    ) : null;
 
   const list =
     tab === 'people' ? (
@@ -250,13 +242,10 @@ export function SpaceContentPanel({
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* ONE ROW, the pills alone on a phone. The add control (Upload files,
-          New folder, the Files pill's Select) sits at the row's end from
-          `md:` up, in the pills' scale, and on a phone at the end of the
-          space's header row, beside its name (`SpacePlaceHeader`'s slot):
-          beside the pills it cut the last one to "Peo…", and on its own line
-          it was "ridiculously big and wasting space" (Stay, 22 October 2026). */}
-      {action && headerActions ? createPortal(action, headerActions) : null}
+      {/* ONE ROW at every width: the four pills, then the Folders pill's
+          control at the row's end (header option 1, Stay, 23 October 2026,
+          00:06Z). With the Files pill gone the row fits a phone with the +
+          beside People. */}
       <div className={cn(SPACE_PILL_BAR, 'flex-row items-center gap-2')}>
         <TabRow
           tabs={PILLS}
@@ -269,8 +258,7 @@ export function SpaceContentPanel({
         >
           {(pill) => pill.label}
         </TabRow>
-        {/* The pill's add control at the bar's end, from `md:` up. */}
-        {action ? <div className="ml-auto hidden shrink-0 justify-end md:flex">{action}</div> : null}
+        {action ? <div className="ml-auto flex shrink-0 justify-end">{action}</div> : null}
       </div>
       {access.canAdd ? picker : null}
 
@@ -341,12 +329,11 @@ const PANEL_ID = 'space-tab-panel';
 const FEED_TYPE: Readonly<Record<SpaceContentTab, SpaceItemsType | undefined>> = {
   all: undefined,
   conversations: 'conversations',
-  files: 'files',
   folders: 'folders',
 };
 
 /** The pills the Space's message box shows on. */
-const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations', 'files']);
+const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations']);
 
 const PILLS = SPACE_TABS.map((id) => ({ id, label: SPACE_TAB_LABELS[id] }));
 
@@ -453,13 +440,14 @@ function SpaceFeed({
   tab: SpaceContentTab;
   query: FeedQuery;
   access: ContentAccess;
-  /** Opens the upload picker (the Files pill's empty state). */
+  /** Opens the upload picker (the Folders pill's empty state). */
   onUpload: () => void;
   /** Opens the new-folder dialog (the Folders pill's empty state). */
   onNewFolder: () => void;
   /** Opens the docked box's picker (the All and Conversations empty states). */
   onAttach: () => void;
-  /** Bulk select on the Files pill: the ticks, while they are being made. */
+  /** Bulk select on the Folders pill's files in no folder: the ticks, while
+   *  they are being made. */
   fileSelect?: FeedRowMenus['fileSelect'];
 }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
@@ -597,14 +585,15 @@ function SpaceFeed({
   const renderRow = (entry: SpaceItem) => renderFeedRow({ entry, now, menus: rowMenus, key: itemKey(entry) });
 
   const emptyAction =
-    tab === 'files' ? (
-      <EmptyStateAddButton icon={Upload} onClick={onUpload}>
-        Upload files
-      </EmptyStateAddButton>
-    ) : tab === 'folders' ? (
-      <EmptyStateAddButton icon={Plus} onClick={onNewFolder}>
-        New folder
-      </EmptyStateAddButton>
+    tab === 'folders' ? (
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <EmptyStateAddButton icon={FolderPlus} onClick={onNewFolder}>
+          New folder
+        </EmptyStateAddButton>
+        <EmptyStateAddButton variant="outline" icon={Upload} onClick={onUpload}>
+          Upload files
+        </EmptyStateAddButton>
+      </div>
     ) : (
       <div className="flex flex-wrap items-center justify-center gap-2">
         <EmptyStateAddButton variant="outline" icon={Upload} onClick={onAttach}>
@@ -631,7 +620,7 @@ function SpaceFeed({
             action={emptyAction}
             // The All and Conversations states offer Invite people beside
             // Upload files already.
-            onInvite={tab === 'files' || tab === 'folders' ? (access.onInvite ?? undefined) : undefined}
+            onInvite={tab === 'folders' ? (access.onInvite ?? undefined) : undefined}
           />
         }
       >
@@ -672,6 +661,7 @@ function SpaceFeed({
           held={query.isPending}
           now={now}
           actionsFor={fileActions}
+          fileSelect={fileSelect}
         />
       ) : null}
 
@@ -826,34 +816,54 @@ function FileDropZone({
 /* ── Shared parts ─────────────────────────────────────────────────────────── */
 
 /**
- * A pill's add control at the end of the pill bar: Upload files or New folder.
+ * The Folders pill's + at the end of the pill bar, and its menu: New folder,
+ * Upload files and Select, each with its icon (Stay, 23 October 2026, 00:06Z:
+ * "the new folder, select and upload should have icons"). Select shows only
+ * while there are files in no folder to tick.
  * IN THE PILLS' SCALE (Stay, 22 October 2026: "That new folder button is
  * ridiculously big and wasting space and out of place"): 32px tall like the
- * pills beside it, small type, the gold that says it adds. On a phone it is
- * the icon alone, a 32px circle at the row's end, its word kept for a screen
- * reader; from `sm:` up the word shows. The tap area reaches 44px either way.
+ * pills beside it, the gold that says it adds. On a phone it is the + alone,
+ * a 32px circle, its word kept for a screen reader; from `sm:` up "Add"
+ * shows, as on a folder's own page (`FolderAddMenu`). The tap area reaches
+ * 44px either way.
  */
-function PillButton({
-  icon: Icon,
-  onClick,
-  children,
+function SpaceAddMenu({
+  onNewFolder,
+  onUpload,
+  onSelect,
 }: {
-  icon: typeof Plus;
-  onClick: () => void;
-  children: string;
+  onNewFolder: () => void;
+  onUpload: () => void;
+  onSelect: (() => void) | null;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'v2-interactive relative inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 after:absolute after:-inset-1.5 sm:w-auto sm:px-3',
-        FOCUS_RING,
-      )}
-    >
-      <Icon aria-hidden className="size-4 sm:size-3.5" />
-      <span className="sr-only sm:not-sr-only">{children}</span>
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={cn(
+          'v2-interactive relative inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 after:absolute after:-inset-1.5 data-[state=open]:bg-primary/90 sm:w-auto sm:px-3',
+          FOCUS_RING,
+        )}
+      >
+        <Plus aria-hidden className="size-4 sm:size-3.5" />
+        <span className="sr-only sm:not-sr-only">Add</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={onNewFolder}>
+          <FolderPlus />
+          New folder
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={onUpload}>
+          <Upload />
+          Upload files
+        </DropdownMenuItem>
+        {onSelect ? (
+          <DropdownMenuItem onSelect={onSelect}>
+            <ListChecks />
+            Select
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

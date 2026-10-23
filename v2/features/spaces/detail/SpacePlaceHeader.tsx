@@ -42,9 +42,13 @@ import { spaceHeaderFacts, spacePrincipleLine, type MembershipSubject } from '..
  * ── THE NAME IS PRINTED IN FULL AT EVERY WIDTH ─────────────────────────────
  * Below `md:` the heading used to be stated for assistive tech only, with the
  * name in the shell's bar, cut to about 190px: a law firm's matter names were
- * never readable on a phone. It now wraps to two lines at every width, and
- * the bar's title steps back while this heading is on screen
- * (`setSpaceTitleOnScreen`), so the name and the crest are not printed twice.
+ * never readable on a phone. It is printed here at every width, and the bar's
+ * title steps back while this heading is on screen (`setSpaceTitleOnScreen`),
+ * so the name and the crest are not printed twice. On a phone it is ONE line,
+ * cut with "…", with the facts on one line under it (header option 1, Stay,
+ * 23 October 2026, 00:06Z, on two lines: "Waste of space, disorganised"); the
+ * full name is in the details the name opens, and in its `title`. From `md:`
+ * up it wraps to two lines.
  *
  * ── THE OVERFLOW LEFT THIS BLOCK (phase 7) ─────────────────────────────────
  * The space's verbs are published to the bar's single overflow menu
@@ -56,11 +60,7 @@ export function SpacePlaceHeader({
   membership,
   onOpenAbout,
   onOpenRoster,
-  actionsRef,
 }: {
-  /** A phone's slot at the row's end for the open pill's add control
-   *  (`SpaceContentPanel` draws into it below `md:`). */
-  actionsRef?: (element: HTMLDivElement | null) => void;
   space: Space;
   /** The viewer's roles, the frame's one reading of them. */
   membership: MembershipSubject;
@@ -97,8 +97,6 @@ export function SpacePlaceHeader({
           <div className="mt-0.5">{facts}</div>
         )}
       </div>
-
-      {actionsRef ? <div ref={actionsRef} className="flex shrink-0 items-center gap-2 self-center md:hidden" /> : null}
     </header>
   );
 }
@@ -130,7 +128,8 @@ export function spaceHasAbout(
 }
 
 /**
- * The space's name as the page's `h1`, at every width, on up to two lines.
+ * The space's name as the page's `h1`, at every width: one line on a phone,
+ * up to two from `md:`.
  * It tells the shell's bar whether it is on screen, so the bar's own copy of
  * the name can step back while this one is readable. Shared with the route's
  * silhouette, so the hand-off moves nothing and the bar does not flicker
@@ -188,7 +187,7 @@ export function SpaceHeading({
             FOCUS_RING,
           )}
         >
-          <span className="line-clamp-2 min-w-0 break-words" title={name}>
+          <span className="min-w-0 truncate md:line-clamp-2 md:whitespace-normal md:break-words" title={name}>
             {name}
           </span>
           <span className="sr-only">, about this space</span>
@@ -198,7 +197,7 @@ export function SpaceHeading({
           />
         </button>
       ) : (
-        <span className="line-clamp-2 min-w-0 break-words" title={name}>
+        <span className="min-w-0 truncate md:line-clamp-2 md:whitespace-normal md:break-words" title={name}>
           {name}
         </span>
       )}

@@ -69,7 +69,7 @@ export interface FeedRowMenus {
   folderRow: (entry: Extract<SpaceItem, { type: 'folder' }>) => FolderRowModel;
   byline: (item: ConversationListItem) => string;
   /**
-   * The Files tab is being ticked (bulk select): a file's row is its tick box
+   * The space's files are being ticked (bulk select): a file's row is its tick box
    * and a tap ticks it instead of opening its card.
    */
   fileSelect?: { isSelected: (id: number) => boolean; toggle: (id: number) => void };

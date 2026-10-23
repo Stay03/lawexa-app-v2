@@ -138,15 +138,16 @@ export function createSpaceKind(
  *  list of everything (`all`), one kind of it, or the members and, for whoever
  *  manages them, the invited and the asked-to-join (`people`). Channels are
  *  not a pill: the space rail keeps them. */
-export type SpaceTab = 'all' | 'conversations' | 'files' | 'folders' | 'people';
+export type SpaceTab = 'all' | 'conversations' | 'folders' | 'people';
 
-/** The pills, in the order the home draws them. */
-export const SPACE_TABS: readonly SpaceTab[] = ['all', 'conversations', 'files', 'folders', 'people'];
+/** The pills, in the order the home draws them. No Files pill (Stay, 22
+ *  October 2026, 23:58Z: "There will be only folder tab no need for files"):
+ *  Folders lists the space's files in no folder under its folders. */
+export const SPACE_TABS: readonly SpaceTab[] = ['all', 'conversations', 'folders', 'people'];
 
 export const SPACE_TAB_LABELS: Readonly<Record<SpaceTab, string>> = {
   all: 'All',
   conversations: 'Conversations',
-  files: 'Files',
   folders: 'Folders',
   people: 'People',
 };
@@ -161,9 +162,11 @@ export function defaultSpaceTab(): SpaceTab {
  * Read `?tab=`. Anything that is not a pill resolves to All, so a copied link
  * never lands on nothing. That includes the two ids the tab strip used to
  * write: `channels` (the old lobby) and `chats` (the old Conversations tab,
- * the page every space opened on), which both now open the one list.
+ * the page every space opened on), which both now open the one list. The old
+ * Files pill (`files`) opens Folders, where those files are now.
  */
 export function parseSpaceTab(raw: string | null | undefined): SpaceTab {
+  if (raw === 'files') return 'folders';
   return SPACE_TABS.find((tab) => tab === raw) ?? defaultSpaceTab();
 }
 
