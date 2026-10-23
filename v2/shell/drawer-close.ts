@@ -150,6 +150,13 @@ export function readContent(region: HTMLElement | null): ContentSnapshot {
  * Runs `fn` one painted frame after `read()` first shows something new against
  * `before` (`contentChanged`), checking once per animation frame. Returns the
  * cancel. The drawer's cap (`DRAWER_CLOSE_CAP_MS`) bounds the wait from outside.
+ *
+ * ALREADY DRAWN, IT GOES AT ONCE. A page already in the router's cache is
+ * drawn by the time the address changes (Notes, then Cases, then Notes again:
+ * the list was on screen at about 0.12 s, live). The first check runs then,
+ * in the same frame, and `fn` follows on a microtask rather than waiting a
+ * frame and a paint (Tester, live, 23 October 2026: the drawer waited for its
+ * cap there, until 0.56 s).
  */
 export function afterContentDraws(
   read: () => ContentSnapshot,
@@ -158,6 +165,15 @@ export function afterContentDraws(
 ): () => void {
   let frame = 0;
   let cancelPaint: (() => void) | null = null;
+  let cancelled = false;
+  if (contentChanged(before, read())) {
+    queueMicrotask(() => {
+      if (!cancelled) fn();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }
   const check = () => {
     if (contentChanged(before, read())) {
       cancelPaint = afterPaint(fn);

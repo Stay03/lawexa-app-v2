@@ -174,6 +174,40 @@ test('afterContentDraws checks each frame, then waits one painted frame, and its
   }
 });
 
+test('a page already drawn when the watch starts goes on a microtask, with no frame (Tester, live, 23 October 2026)', async () => {
+  const g = globalThis as unknown as Record<string, unknown>;
+  const saved = g.window;
+  const frames: Array<() => void> = [];
+  g.window = {
+    requestAnimationFrame: (callback: () => void) => frames.push(callback),
+    cancelAnimationFrame: () => undefined,
+    setTimeout: () => 0,
+    clearTimeout: () => undefined,
+  };
+  try {
+    // Notes, then Cases, then Notes again: the cached list is on screen when the address changes.
+    let ran = 0;
+    afterContentDraws(() => snap('Notes Community Mine'), HOME, () => {
+      ran += 1;
+    });
+    assert.equal(frames.length, 0, 'no frame is waited for');
+    assert.equal(ran, 0, 'not inside the effect itself');
+    await Promise.resolve();
+    assert.equal(ran, 1, 'on the microtask, in the same frame');
+
+    // Cancelled before the microtask: it never runs.
+    let never = 0;
+    const cancel = afterContentDraws(() => snap('', 6), HOME, () => {
+      never += 1;
+    });
+    cancel();
+    await Promise.resolve();
+    assert.equal(never, 0);
+  } finally {
+    g.window = saved;
+  }
+});
+
 test('every drawer row arms through closeFor with where it goes; only the X closes outright', () => {
   // Nothing is set in state in the click: the armed close and the cap are refs.
   assert.match(drawer, /const armedRef = useRef<ArmedDrawerClose \| null>\(null\);\s*const capRef = useRef\(0\);/);
