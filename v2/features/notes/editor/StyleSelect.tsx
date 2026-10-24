@@ -29,7 +29,7 @@ import { STYLE_OPTIONS, styleLabel } from './toolbar-verbs';
  * Closing the menu hands focus back to the editor rather than to the trigger,
  * so the caret is where the reader left it.
  *
- * `pill` is the draft panel's floating bar (take B): a trigger as wide as its
+ * `pill` is the draft panel's bar (take B): a trigger as wide as its
  * word, with "Normal" for normal text, so the bar stays short.
  */
 export function StyleSelect({

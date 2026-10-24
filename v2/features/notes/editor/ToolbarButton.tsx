@@ -24,7 +24,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * Sized at 36px (`size-9`) — above the 24px floor everywhere and comfortable on
  * the dock bar, where the row is the primary way to format. `compact` is the
  * computer bar's 32px (`size-8`), a pointer's size, which keeps that bar on one
- * row (`DesktopToolbar.tsx`). `pill` is the draft panel's floating bar (take
+ * row (`DesktopToolbar.tsx`). `pill` is the draft panel's bar (take
  * B, Stay 24 October 2026): 30px, no fill at rest, a soft one on hover
  * (foreground at 6%, white at 7% in dark) and a firmer one while on.
  */
@@ -59,7 +59,7 @@ export function ToolbarButton({
   shortcut?: string;
   /** The computer bar's 32px size. */
   compact?: boolean;
-  /** The draft panel's floating bar: 30px with soft fills. Has a tooltip, as `compact`. */
+  /** The draft panel's bar: 30px with soft fills. Has a tooltip, as `compact`. */
   pill?: boolean;
 }) {
   // Every button on the computer bar names itself in a tooltip, with or without
@@ -126,7 +126,7 @@ export const DESKTOP_MENU_TRIGGER = cn(
 );
 
 /**
- * The draft panel's floating bar's menu buttons and dropdown triggers: 30px
+ * The menu buttons and dropdown triggers on the draft panel's bar: 30px
  * high, no fill at rest, the bar's soft hover, lit while the menu is open.
  * Width is the caller's (`size-7.5` for an icon, padding for a label).
  */
@@ -137,7 +137,7 @@ export const PILL_TRIGGER = cn(
   'data-[state=open]:bg-foreground/9 data-[state=open]:text-foreground dark:data-[state=open]:bg-white/11',
 );
 
-/** A small dot between the floating bar's groups. Decorative, as the divider. */
+/** A small dot between the draft bar's groups. Decorative, as the divider. */
 export function ToolbarDot() {
   return <span aria-hidden className="mx-1.25 size-0.75 shrink-0 rounded-full bg-foreground/22" />;
 }

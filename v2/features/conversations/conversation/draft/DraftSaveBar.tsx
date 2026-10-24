@@ -34,11 +34,12 @@ import { useSaveDraftNote } from './use-save-draft-note';
  *   phone sheet   the panel's foot (DraftSaveBar): Save as note, then
  *                 "Saved to your notes" · Open note · Export (Word, PDF) ·
  *                 Save to folder
- *   computer      the end of the slim title line (DraftSaveControl, take B,
- *                 Stay 24 October 2026): the gold Save as note, the panel's
- *                 only primary action; once saved a quiet "Saved" chip and a
- *                 ··· menu with Open note, Export Word, Export PDF and Save
- *                 to folder
+ *   computer      the right of the panel's one bar, before the close
+ *                 (DraftSaveControl, take B2, Stay 24 October 2026: "add save
+ *                 to that toolbar"): the gold Save as note, the panel's only
+ *                 primary action, "Save" on a narrow panel; once saved a
+ *                 quiet "Saved" chip and a ··· menu with Open note, Export
+ *                 Word, Export PDF and Save to folder
  *   edited        Save changes in place of the chip or the line, with the
  *                 same links
  *
@@ -76,6 +77,12 @@ export function useDraftSave({
 
 export type DraftSave = ReturnType<typeof useDraftSave>;
 
+/**
+ * The draft panel's menus: its own surface (draft-panel.css), as wide as the
+ * longest row so no row wraps, and never wider than the screen.
+ */
+export const DRAFT_MENU = 'v2-draft-menu w-max min-w-56 max-w-[calc(100vw-1rem)]';
+
 interface DraftSaveProps {
   draft: DraftSave;
   /** The draft changed since its last save (or was never saved). */
@@ -90,6 +97,11 @@ function folderLabel(space: ConversationSpaceRef | null): string {
 function saveLabel(draft: DraftSave): string {
   if (draft.mutation.isPending) return 'Saving…';
   return draft.saved ? 'Save changes' : 'Save as note';
+}
+
+/** The bar's word on a panel under 40rem, where the formatting needs the room. */
+function shortSaveLabel(draft: DraftSave): string {
+  return draft.mutation.isPending ? 'Saving…' : 'Save';
 }
 
 /** The phone sheet's foot. Not drawn on a computer, where the title line holds Save. */
@@ -150,9 +162,10 @@ export function DraftSaveBar({ draft, dirty, space }: DraftSaveProps) {
 }
 
 /**
- * The title line's end on a computer: the gold Save as note (or Save changes),
+ * The right of the computer's bar: the gold Save as note (or Save changes),
  * or once saved the quiet chip, then the ··· menu once there is a note. A
- * failed save says why in a small box under the button.
+ * failed save says why in a small box under the button. Inside the panel's
+ * `@container/draft`.
  */
 export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
   const { saved, mutation } = draft;
@@ -179,7 +192,10 @@ export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
           ) : (
             <NotebookPen aria-hidden className="size-[15px]" />
           )}
-          <span aria-live="polite">{saveLabel(draft)}</span>
+          <span aria-live="polite">
+            <span className="@max-[40rem]/draft:hidden">{saveLabel(draft)}</span>
+            <span className="hidden @max-[40rem]/draft:inline">{shortSaveLabel(draft)}</span>
+          </span>
         </button>
       )}
       {saved ? (
@@ -231,7 +247,7 @@ function SavedNoteMenu({
           Saved note
         </TooltipContent>
       </Tooltip>
-      <DropdownMenuContent align="end" className="v2-draft-menu w-58">
+      <DropdownMenuContent align="end" className={DRAFT_MENU}>
         <DropdownMenuLabel className="px-2.5 pt-2 pb-1.5 text-[11.5px]">
           <span className="mb-px block text-[12.5px] font-semibold text-foreground">Saved to your notes</span>
           {dirty ? 'Your later edits are not in it yet.' : 'Save changes appears when you edit.'}

@@ -8,9 +8,9 @@ import { useV2ChatContext } from '../chat-context';
 import { MarkdownText } from '../markdown/MarkdownText';
 import { ChatSidePanel } from '../side-panel/ChatSidePanel';
 import { useSidePanel } from '../side-panel/SidePanelContext';
-import { draftStatus, draftsIn, draftWordsLabel, type DraftBlock } from './draft-blocks';
+import { draftStatus, draftsIn, type DraftBlock } from './draft-blocks';
 import { locateDraft } from './draft-ordinals';
-import { DraftEditor } from './DraftEditor';
+import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
 
 /**
  * DraftPanel — draft N of this chat in the side panel (`?side=draft:N`).
@@ -25,9 +25,10 @@ import { DraftEditor } from './DraftEditor';
  * with the note editor's controls, font type and size included, and saves it
  * as a note.
  *
- * On a computer the header is the frame's slim line (take B, Stay 24 October
- * 2026): the title and its length in one muted line, with Save as note at its
- * end (DraftEditor.tsx puts it there). The phone sheet keeps its header.
+ * On a computer the panel is `bare` (take B2, Stay 24 October 2026): no title
+ * and no word count, which the chat's draft card already shows; the panel
+ * starts with its one bar (DraftEditor.tsx), and while the draft is written
+ * that bar holds only the close. The phone sheet keeps its header.
  */
 export function DraftPanel({
   ordinal,
@@ -54,8 +55,9 @@ export function DraftPanel({
 
   if (!draft) {
     return (
-      <ChatSidePanel label="Draft" title="Draft" icon={<DraftIcon />} slim>
-        <p className="px-5 py-8 text-sm text-muted-foreground">
+      <ChatSidePanel label="Draft" title="Draft" icon={<DraftIcon />} bare>
+        <DraftBar />
+        <p className="px-5 py-8 text-sm text-muted-foreground xl:px-12">
           This draft is no longer in the chat. Ask Lawexa to write it again.
         </p>
       </ChatSidePanel>
@@ -66,19 +68,9 @@ export function DraftPanel({
     <ChatSidePanel
       label="Draft"
       title={draft.title}
-      subtitle={
-        draft.complete ? (
-          <>
-            {/* The slim line says only the length: "Draft" is the panel itself. */}
-            <span className="xl:hidden">Draft · </span>
-            {draftWordsLabel(draft.body)}
-          </>
-        ) : (
-          draftStatus(draft, Boolean(streamingMessage))
-        )
-      }
+      subtitle={draftStatus(draft, Boolean(streamingMessage))}
       icon={<DraftIcon />}
-      slim
+      bare
     >
       {draft.complete && conversationId ? (
         <DraftEditor
@@ -90,22 +82,21 @@ export function DraftPanel({
           space={space}
         />
       ) : (
-        <article className="mx-auto w-full max-w-[68ch] px-5 py-6 xl:px-10 xl:pt-7 xl:pb-30">
-          <MarkdownText content={draft.body} animate={!draft.complete && Boolean(streamingMessage)} />
-        </article>
+        <div className="@container/draft">
+          <DraftBar />
+          <article className={DRAFT_DOCUMENT}>
+            <MarkdownText content={draft.body} animate={!draft.complete && Boolean(streamingMessage)} />
+          </article>
+        </div>
       )}
     </ChatSidePanel>
   );
 }
 
-/** A gold tile on the phone sheet; on a computer, a small icon on the slim line. */
 function DraftIcon() {
   return (
-    <span
-      aria-hidden
-      className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary xl:size-auto xl:rounded-none xl:bg-transparent"
-    >
-      <FileText className="size-[18px] xl:size-3.5" />
+    <span aria-hidden className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+      <FileText className="size-[18px]" />
     </span>
   );
 }

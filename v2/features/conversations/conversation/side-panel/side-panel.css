@@ -1,0 +1,19 @@
+/* The side panel's own background on a computer, for a `bare` panel
+   (ChatSidePanel.tsx, take B2, Stay 24 October 2026): the chat and the panel
+   are told apart by a step in background, never by a rule. A shade under the
+   page in light, a shade over it in dark. Below xl the sheet keeps its
+   popover surface. */
+
+:root {
+  --v2-side-panel-bg: oklch(0.982 0 0);
+}
+
+.dark {
+  --v2-side-panel-bg: oklch(0.178 0 0);
+}
+
+@media (min-width: 80rem) {
+  .v2-side-panel-bare {
+    background: var(--v2-side-panel-bg);
+  }
+}

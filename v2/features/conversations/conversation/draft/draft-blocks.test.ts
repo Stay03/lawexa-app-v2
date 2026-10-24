@@ -160,26 +160,33 @@ test('the draft tag may carry the whole draft\'s font and size; other values are
   assert.deepEqual([draftsIn('<draft title="T">\nB\n</draft>')[0].font, draftsIn('<draft title="T">\nB\n</draft>')[0].size], [null, null]);
 });
 
-/* Take B on a computer (Stay, 24 October 2026): a slim title line with Save at
- * its end, a floating bar over the document, no foot. The phone sheet keeps
- * its wrapped bar and its foot. */
+/* Take B2 on a computer (Stay, 24 October 2026: "find a way to add save to that
+ * toolbar and still remove that heading text and word count at the top"): no
+ * header, one bar with the formatting, Save and the close, the document across
+ * the panel's width, no outlines. The phone sheet keeps its header, its
+ * wrapped bar and its foot. */
 
-test('on a computer the draft panel has no foot: Save sits at the end of the slim title line', async () => {
+test('on a computer the draft panel has no title line and no foot: one bar holds Save and the close', async () => {
   const { readFileSync } = await import('node:fs');
   const panel = readFileSync(new URL('./DraftPanel.tsx', import.meta.url), 'utf8');
   const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
-  // The frame's slim line is the draft's, with no rule under it; the draft passes no footer.
-  assert.equal(panel.match(/\bslim\b\s*(>|\n)/g)?.length, 2);
+  // Every state of the draft panel is bare: the header is not drawn on a computer.
+  assert.equal(panel.match(/\bbare\b\s*(>|\n)/g)?.length, 2);
   assert.doesNotMatch(panel, /footer=/);
-  assert.match(frame, /slim && 'xl:h-11 xl:gap-2 xl:border-b-0 xl:py-0 xl:pr-2\.5'/);
-  assert.match(frame, /<div ref=\{setActionSlot\} className="contents" \/>/);
-  assert.match(frame, /return slot \? createPortal\(children, slot\) : null;/);
-  // The sheet's foot is not drawn on a computer; the title line's control is drawn only there.
+  assert.match(frame, /bare && 'xl:hidden',/);
+  // The phone sheet keeps its header: the title, "Draft · 219 words" and the tile.
+  assert.match(panel, /subtitle=\{draftStatus\(draft, Boolean\(streamingMessage\)\)\}/);
+  // One bar: the formatting, then Save, then the close; every state has the close.
+  assert.match(editor, /<div className="flex min-w-0 flex-1 items-center">\{tools\}<\/div>\s*\{actions\}\s*<SidePanelCloseButton \/>/);
+  assert.match(editor, /<DraftBar\s+tools=\{<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} \/>\}\s+actions=\{<DraftSaveControl draft=\{draft\} dirty=\{dirty\} space=\{space\} \/>\}\s+\/>/);
+  assert.equal(panel.match(/<DraftBar \/>/g)?.length, 2);
+  assert.match(frame, /export function SidePanelCloseButton\(\)/);
+  // The sheet's foot is not drawn on a computer; the bar's Save is drawn only there.
   assert.match(bar, /<div className="sticky bottom-0 z-10 [^"]* xl:hidden">/);
   assert.match(bar, /<div className="relative hidden shrink-0 items-center gap-0\.5 xl:flex">/);
-  assert.match(editor, /<SidePanelActions>\s*<DraftSaveControl draft=\{draft\} dirty=\{dirty\} space=\{space\} \/>\s*<\/SidePanelActions>/);
+  assert.match(editor, /className="v2-draft-bar sticky top-0 z-10 hidden h-12 shrink-0 items-center [^"]*xl:flex"/);
   // One save and one folder picker serve both places.
   assert.equal(editor.match(/useDraftSave\(/g)?.length, 1);
   assert.equal(editor.match(/<DraftFolderPicker /g)?.length, 1);
@@ -191,8 +198,9 @@ test('the gold Save as note is the only primary action on the computer panel', a
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
   const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
   assert.equal(control.match(/\bbg-primary\b(?!\/)/g)?.length, 1);
-  assert.match(control, /return draft\.saved \? 'Save changes' : 'Save as note';|\{saveLabel\(draft\)\}/);
   assert.match(bar, /return draft\.saved \? 'Save changes' : 'Save as note';/);
+  // A narrow panel (a 1280 screen) says "Save", by the bar's own fold width.
+  assert.match(control, /<span className="@max-\[40rem\]\/draft:hidden">\{saveLabel\(draft\)\}<\/span>\s*<span className="hidden @max-\[40rem\]\/draft:inline">\{shortSaveLabel\(draft\)\}<\/span>/);
   assert.doesNotMatch(editor, /\bbg-primary\b(?!\/)/);
   // A failed save still says why, beside the button.
   assert.match(control, /role="alert"[\s\S]*?\{saveFailureSentence\(mutation\.error\)\}/);
@@ -215,27 +223,65 @@ test('once saved, a quiet Saved chip and a ··· menu with the note, both expor
   assert.match(menu, /onSelect=\{\(\) => void download\('docx'\)\}/);
   assert.match(menu, /onSelect=\{\(\) => void download\('pdf'\)\}/);
   assert.match(menu, /<Link href=\{`\/notes\/\$\{slug\}`\}>/);
+  assert.match(menu, /<DropdownMenuContent align="end" className=\{DRAFT_MENU\}>/);
 });
 
-test('the computer bar floats over the document; its ··· holds the lists, alignment and Copy', async () => {
+test('the bar\'s ··· holds the lists, alignment and Copy, and its rows never wrap', async () => {
   const { readFileSync } = await import('node:fs');
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
-  const pill = editor.slice(editor.indexOf('function DraftPillToolbar'), editor.indexOf('function PillMoreMenu'));
-  const more = editor.slice(editor.indexOf('function PillMoreMenu'));
-  // Sticky over the top of the document, drawn on a computer only; the sheet's bar is not.
-  assert.match(pill, /className="@container\/draft sticky top-0 z-10 hidden h-0 xl:block"/);
-  assert.match(pill, /className="v2-draft-pill pointer-events-auto flex /);
-  assert.match(editor, /className="sticky top-0 z-10 flex shrink-0 flex-wrap [^"]* xl:hidden"/);
+  const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('./draft-panel.css', import.meta.url), 'utf8');
+  const tools = editor.slice(editor.indexOf('function DraftBarTools'), editor.indexOf('/** The bar\'s ···'));
+  const more = editor.slice(editor.indexOf('function BarMoreMenu'));
   // undo, redo · style, font and size · B I U, then ···.
-  assert.match(pill, /<StyleSelect editor=\{editor\} state=\{state\} mac=\{mac\} pill /);
-  assert.match(pill, /<FontSizeMenu editor=\{editor\} /);
-  assert.match(pill, /<PillMoreMenu /);
-  assert.doesNotMatch(pill, /LIST_VERBS\.map|<AlignMenu|icon=\{copied/);
+  assert.match(tools, /<StyleSelect editor=\{editor\} state=\{state\} mac=\{mac\} pill menuClassName=\{DRAFT_MENU\} \/>/);
+  assert.match(tools, /<FontSizeMenu editor=\{editor\} menuClassName=\{DRAFT_MENU\} \/>/);
+  assert.match(tools, /<BarMoreMenu /);
+  assert.doesNotMatch(tools, /LIST_VERBS\.map|<AlignMenu|icon=\{copied/);
   assert.match(more, /LIST_VERBS\.map/);
   assert.match(more, /ALIGN_OPTIONS\.map/);
   assert.match(more, /'Copy text'/);
-  // At a narrow panel Redo and Underline fold into ···, by the same width in CSS and in the menu.
-  assert.match(editor, /const PILL_FOLD_WIDTH = 520;/);
-  assert.equal(pill.match(/@max-\[32\.5rem\]\/draft:hidden/g)?.length, 2);
+  // At a narrow panel Redo, Underline and the text style fold into ···, by one width in CSS and in the menu.
+  assert.match(editor, /const BAR_FOLD_WIDTH = 640;/);
+  assert.equal(tools.match(/@max-\[40rem\]\/draft:hidden/g)?.length, 3);
   assert.match(more, /\{folded \? \(/);
+  assert.match(more, /STYLE_OPTIONS\.map/);
+  // No row wraps (718accef's fix, here for the draft's menus).
+  assert.match(bar, /export const DRAFT_MENU = 'v2-draft-menu w-max min-w-56 max-w-\[calc\(100vw-1rem\)\]';/);
+  assert.match(more, /className=\{DRAFT_MENU\}/);
+  assert.match(css, /\[data-slot='dropdown-menu-radio-item'\],\s*\.v2-draft-menu \[data-slot='dropdown-menu-label'\] \{\s*white-space: nowrap;\s*\}/);
+});
+
+test('the document spans the panel with even margins up to a reading width, in the same type', async () => {
+  const { readFileSync } = await import('node:fs');
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  const panel = readFileSync(new URL('./DraftPanel.tsx', import.meta.url), 'utf8');
+  const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('./draft-panel.css', import.meta.url), 'utf8');
+  // 48px margins, 32px under 40rem, up to 780px of text; the phone sheet keeps its measure.
+  assert.match(editor, /export const DRAFT_DOCUMENT =\s*'mx-auto w-full max-w-\[68ch\] px-5 py-6 xl:max-w-\[876px\] xl:px-8 xl:pt-8 xl:pb-30 xl:text-\[15px\] xl:@min-\[40rem\]\/draft:px-12';/);
+  assert.match(editor, /<div ref=\{frameRef\} className="@container\/draft flex min-h-full flex-col">/);
+  assert.match(panel, /<article className=\{DRAFT_DOCUMENT\}>/);
+  // A wide monitor gets a wide panel, up to 56rem.
+  assert.match(frame, /bare && 'v2-side-panel-bare xl:w-\[min\(48%,56rem\)\] xl:border-l-0',/);
+  // The type size stays.
+  assert.match(css, /\.v2-draft-doc \{\s*font-size: 15px;\s*line-height: 1\.72;\s*\}/);
+});
+
+test('no outlines on a computer: a background step from the chat, a filled bar, menus with no ring', async () => {
+  const { readFileSync } = await import('node:fs');
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('./draft-panel.css', import.meta.url), 'utf8');
+  const sideCss = readFileSync(new URL('../side-panel/side-panel.css', import.meta.url), 'utf8');
+  // The panel stands apart by its background, light and dark, with no rule.
+  assert.match(sideCss, /:root \{\s*--v2-side-panel-bg: oklch\(0\.982 0 0\);\s*\}/);
+  assert.match(sideCss, /\.dark \{\s*--v2-side-panel-bg: oklch\(0\.178 0 0\);\s*\}/);
+  assert.match(sideCss, /\.v2-side-panel-bare \{\s*background: var\(--v2-side-panel-bg\);\s*\}/);
+  // The bar is a filled band: no stroke, no shadow, no corners.
+  assert.match(css, /\.v2-draft-bar \{\s*background: var\(--v2-draft-bar-bg\);\s*\}/);
+  const barClass = editor.match(/className="(v2-draft-bar [^"]*)"/)?.[1] ?? '';
+  assert.doesNotMatch(barClass, /\bborder\b|\bshadow\b|\brounded|\bring\b/);
+  assert.doesNotMatch(css, /v2-draft-pill|0 0 0 1px|inset 0 0 0 1px/);
+  // The only rules in the document are the draft's own: its tables and its horizontal rules.
+  assert.equal(css.match(/border(-bottom)?: 1px solid/g)?.length, 1);
 });

@@ -1,33 +1,35 @@
 /**
- * The draft panel beside the chat, take B (Stay, 24 October 2026): a slim
- * title line, a floating bar over the top of the document, and the document
- * itself with no frame. Everything else in the panel is the app's own tokens
- * (globals.css); this file holds only what the approved mock added, the bar's
- * and the menus' surfaces, and the document's type on a computer.
+ * The draft panel beside the chat, take B2 (Stay, 24 October 2026): one bar
+ * across the top of the panel with the formatting, Save and the close, then
+ * the document across the panel's width. Everything else is the app's own
+ * tokens (globals.css) and the panel's background (side-panel.css); this file
+ * holds only the bar's and the menus' surfaces and the document's type on a
+ * computer.
+ *
+ * No outlines (Stay, 00:15Z: "The outlines just looks bad and tacky"): the
+ * bar is a filled band with no stroke, no shadow and no corners, and the
+ * menus lift on a shadow with no ring.
  *
  * The phone sheet (below xl) does not use any of it.
  */
 
 :root {
-  --v2-draft-pill-bg: var(--popover);
-  --v2-draft-pill-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 6px 20px -6px rgb(0 0 0 / 0.14), 0 0 0 1px rgb(0 0 0 / 0.05);
+  --v2-draft-bar-bg: oklch(0.958 0 0);
   --v2-draft-menu-bg: var(--popover);
-  --v2-draft-menu-shadow: 0 2px 4px rgb(0 0 0 / 0.05), 0 12px 32px -8px rgb(0 0 0 / 0.18), 0 0 0 1px rgb(0 0 0 / 0.06);
+  --v2-draft-menu-shadow: 0 2px 6px rgb(0 0 0 / 0.06), 0 14px 36px -10px rgb(0 0 0 / 0.22);
   --v2-draft-rule: color-mix(in oklab, var(--foreground) 8%, transparent);
 }
 
 .dark {
-  --v2-draft-pill-bg: oklch(0.245 0 0);
-  --v2-draft-pill-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -8px rgb(0 0 0 / 0.7), inset 0 0 0 1px oklch(1 0 0 / 6%);
-  --v2-draft-menu-bg: oklch(0.235 0 0);
-  --v2-draft-menu-shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 16px 40px -10px rgb(0 0 0 / 0.75), inset 0 0 0 1px oklch(1 0 0 / 8%);
+  --v2-draft-bar-bg: oklch(0.225 0 0);
+  --v2-draft-menu-bg: oklch(0.24 0 0);
+  --v2-draft-menu-shadow: 0 2px 6px rgb(0 0 0 / 0.45), 0 18px 44px -10px rgb(0 0 0 / 0.8);
   --v2-draft-rule: oklch(1 0 0 / 9%);
 }
 
-/* The floating bar: a raised surface with a soft shadow and no border. */
-.v2-draft-pill {
-  background: var(--v2-draft-pill-bg);
-  box-shadow: var(--v2-draft-pill-shadow);
+/* The bar: a filled band, one step off the panel's background. */
+.v2-draft-bar {
+  background: var(--v2-draft-bar-bg);
 }
 
 /* The raised surface of the menus and of a failed save's note. */
@@ -38,10 +40,18 @@
 }
 
 /* The bar's menus and the saved draft's menu: a little tighter than the
-   app's default menu, with the bar's soft hover. */
+   app's default menu, with the bar's soft hover. A row never wraps: the
+   menu is as wide as its longest row (`w-max`, DRAFT_MENU). */
 .v2-draft-menu {
   border-radius: 0.75rem;
   padding: 5px;
+}
+
+.v2-draft-menu [data-slot='dropdown-menu-item'],
+.v2-draft-menu [data-slot='dropdown-menu-checkbox-item'],
+.v2-draft-menu [data-slot='dropdown-menu-radio-item'],
+.v2-draft-menu [data-slot='dropdown-menu-label'] {
+  white-space: nowrap;
 }
 
 .v2-draft-menu [data-slot='dropdown-menu-item'],
@@ -76,8 +86,9 @@
   margin: 5px 6px;
 }
 
-/* The document on a computer: the mock's type, and tables drawn with rules
-   between rows rather than a box round every cell. */
+/* The document on a computer: the mock's type. The only lines in it are the
+   draft's own: a table keeps a light rule between its rows, and a horizontal
+   rule the draft wrote stays. */
 @media (min-width: 80rem) {
   .v2-draft-doc {
     font-size: 15px;
@@ -140,5 +151,9 @@
 
   .v2-draft-doc td {
     padding: 9px 12px 9px 0;
+  }
+
+  .v2-draft-doc hr {
+    border-color: var(--v2-draft-rule);
   }
 }

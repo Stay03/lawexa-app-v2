@@ -28,7 +28,7 @@ import { HOUSE_FONT_LABEL, NOTE_FONTS, NOTE_SIZES, noteFont, noteSize, type Note
  *
  * Each font's name is set in that font, so the reader sees what they pick.
  *
- * FontSizeMenu is the two in one control, for the draft panel's floating bar
+ * FontSizeMenu is the two in one control, for the draft panel's bar
  * (take B, Stay 24 October 2026): the trigger reads "Times New Roman 14", the
  * name in its own face, and one menu holds both lists.
  */
