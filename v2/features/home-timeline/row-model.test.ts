@@ -97,7 +97,10 @@ const row = (fields: Partial<TimelineEvent> & Pick<TimelineEvent, 'kind'>, messa
 };
 
 /** The grey line as the reader sees it. */
-const line = (r: TimelineRow) => (r.meta.rest ? `${r.meta.space.name} · ${r.meta.rest}` : r.meta.space.name);
+const line = (r: TimelineRow) => {
+  if (!r.meta.space) return r.meta.rest;
+  return r.meta.rest ? `${r.meta.space.name} · ${r.meta.rest}` : r.meta.space.name;
+};
 
 /* ── Fix 6: who did what, first names ─────────────────────────────────────── */
 
@@ -288,7 +291,7 @@ test('a reply or mention: "<who> replied to you", the Space then the chat, the w
   assert.equal(mention.card, null);
 });
 
-test('an invitation: "<who> invited you to <Space>", the Space then who is in it, the invite card', () => {
+test('an invitation: "<who> invited you to a Space", who is in it, no Space link, the Space named on the card', () => {
   const r = row({
     kind: 'invite',
     space: lekki,
@@ -296,8 +299,10 @@ test('an invitation: "<who> invited you to <Space>", the Space then who is in it
     action: { type: 'accept', target: { type: 'space_invite', id: 41 } },
     members_preview: ['Ada Okafor', 'Kemi Bello'],
   });
-  assert.equal(r.title, 'Tunde invited you to Lekki land');
-  assert.equal(line(r), 'Lekki land · Ada Okafor, Kemi Bello and 2 others are in it');
+  assert.equal(r.title, 'Tunde invited you to a Space');
+  // The reader is not in it yet: no link to a page that would refuse them.
+  assert.equal(r.meta.space, null);
+  assert.equal(line(r), 'Ada Okafor, Kemi Bello and 2 others are in it');
   assert.equal(r.href, null);
   assert.deepEqual(r.card, { type: 'invite', spaceName: 'Lekki land', facts: 'Work · Private · 4 members', invitationId: 41 });
   const stringId = row({ kind: 'invite', needs_action: true, action: { type: 'accept', target: { type: 'space_invite', id: '41' } } });
@@ -334,7 +339,7 @@ test('a join request and a role request are plain rows to the Space’s people',
 
 /* ── Fix 3: the Space name first, never the part that is cut ──────────────── */
 
-test('every row’s grey line starts with its Space, linked to the Space', () => {
+test('every row of a Space the reader is in starts its grey line with that Space, linked', () => {
   const rows = [
     row({ kind: 'files_added', items: [file(1, 'a.pdf', PDF)] }),
     row({ kind: 'folder_created', items: [{ id: 'f', name: 'F', url: '', item_count: 1 }] }),
@@ -342,11 +347,13 @@ test('every row’s grey line starts with its Space, linked to the Space', () =>
     row({ kind: 'lawexa_answered', actor: lawexa, items: [{ id: 'c', title: 'T', url: '' }] }),
     row({ kind: 'member_joined' }),
     row({ kind: 'reply', conversation: { uuid: 'c', title: 'T' } }),
-    row({ kind: 'invite' }),
     row({ kind: 'join_request' }),
     row({ kind: 'role_request' }),
   ];
   for (const r of rows) assert.deepEqual(r.meta.space, { name: 'Adeyemi appeal', href: '/spaces/uuid-adeyemi-appeal' }, r.title);
+  // An invitation is to a Space the reader is not in yet: no link (see the invitation's own test).
+  assert.equal(row({ kind: 'invite' }).meta.space, null);
+  assert.match(screen, /if \(!meta\.space\) return <span className="mt-0\.5 block truncate text-xs text-muted-foreground">\{meta\.rest\}<\/span>;/);
   // The Space keeps its width and its own link; only the rest truncates.
   assert.match(screen, /href=\{meta\.space\.href\}[\s\S]*?className="relative z-10 max-w-full shrink-0 truncate/);
   assert.match(screen, /<span className="min-w-0 truncate">\s*\{'\\u00a0·\\u00a0'\}\s*\{meta\.rest\}/);

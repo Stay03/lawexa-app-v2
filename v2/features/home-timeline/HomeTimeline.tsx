@@ -314,6 +314,8 @@ function Lead({ lead }: { lead: TimelineLead }) {
  * then the rest, which is what a narrow screen cuts.
  */
 function MetaLine({ meta }: { meta: TimelineMeta }) {
+  // An invitation's line has no Space: only who is in it.
+  if (!meta.space) return <span className="mt-0.5 block truncate text-xs text-muted-foreground">{meta.rest}</span>;
   return (
     <span className="mt-0.5 flex min-w-0 text-xs text-muted-foreground">
       <Link

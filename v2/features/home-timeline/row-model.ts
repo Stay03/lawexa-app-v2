@@ -80,7 +80,9 @@ export type TimelineCard =
 
 /** The grey line: the Space first (a link, never cut), then the rest (cut first). */
 export interface TimelineMeta {
-  space: { name: string; href: string };
+  /** `null` on an invitation: the reader is not in that Space yet, so its page
+   *  would refuse them, and its name is on the card (techlead, 24 October 2026). */
+  space: { name: string; href: string } | null;
   /** What follows the Space's name; '' for nothing. */
   rest: string;
 }
@@ -412,8 +414,9 @@ export function timelineRow(event: TimelineEvent, now: number | null, messages =
     case 'invite':
       return {
         ...base,
-        title: `${who} invited you to ${event.space.name}`,
-        meta: meta(membersLine(event.members_preview ?? [], event.space.member_count)),
+        // The Space is named once, on the card; the grey line says who is in it.
+        title: `${who} invited you to a Space`,
+        meta: { space: null, rest: membersLine(event.members_preview ?? [], event.space.member_count) },
         href: null,
         card: {
           type: 'invite',
