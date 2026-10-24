@@ -86,3 +86,13 @@ test('only allowed fonts and sizes are kept; a span may set one and keep the oth
   // A stray close tag is dropped; no font means no mark.
   assert.deepEqual(markdownToDoc('Plain </span> text').content?.[0].content?.map((node) => node.text), ['Plain ', ' text']);
 });
+
+test('a line break inside a paragraph is a hard break, as the chat shows it', () => {
+  const doc = markdownToDoc('[Your Name]\n[Property Address]\n[Date]\n\nDear Sir,');
+  const block = doc.content?.[0].content ?? [];
+  assert.deepEqual(block.map((node) => node.type), ['text', 'hardBreak', 'text', 'hardBreak', 'text']);
+  assert.deepEqual(block.filter((node) => node.type === 'text').map((node) => node.text), ['[Your Name]', '[Property Address]', '[Date]']);
+  // No newline is left inside any text, where a save would fold it into a space.
+  assert.ok(JSON.stringify(doc).includes('Dear Sir,'));
+  assert.ok(!(doc.content ?? []).some((node) => (node.content ?? []).some((child) => child.text?.includes('\n'))));
+});

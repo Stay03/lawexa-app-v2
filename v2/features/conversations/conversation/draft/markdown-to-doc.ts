@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import type { Nodes, PhrasingContent, Root, RootContent, Table } from 'mdast';
+import remarkBreaks from 'remark-breaks';
 import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
@@ -44,7 +45,12 @@ export interface DraftFont {
 
 const NO_FONT: DraftFont = { font: null, size: null };
 
-const parser = unified().use(remarkParse).use(remarkGfm);
+// remark-breaks, as the chat renders (MarkdownText.tsx): one newline is a new
+// line, so an address block written line by line opens as lines (a hard break,
+// saved as <br>). Without it the newline stayed inside the text, showed in the
+// editor, and was folded into a space once saved and reopened (Lucy's live
+// check, 24 October 2026).
+const parser = unified().use(remarkParse).use(remarkBreaks).use(remarkGfm);
 
 export function markdownToDoc(markdown: string, base: DraftFont = NO_FONT): JSONContent {
   const root = parser.runSync(parser.parse(markdown)) as Root;
