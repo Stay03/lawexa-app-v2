@@ -27,7 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { FolderPicker } from '@/v2/features/folders/picker/FolderPicker';
 import { PILL_TRIGGER } from '@/v2/features/notes/editor/ToolbarButton';
 import { useNoteExport } from '@/v2/features/notes/use-note-export';
