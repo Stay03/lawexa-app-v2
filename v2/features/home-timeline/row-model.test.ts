@@ -608,6 +608,8 @@ test('the timeline tabs dock the chat box at their foot, in flow, with no prompt
   assert.match(frame, /export const HOME_SURFACE_TIMELINE =\s*'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-6';/);
   // Sticky, never fixed: the dock takes its own height after the rows.
   assert.match(frame, /export const TIMELINE_COMPOSER_DOCK = 'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pt-8 pb-3 md:pb-6';/);
+  // Solid behind the pill and the box; only the top band, the dock's pt-8, fades.
+  assert.match(frame, /bg-\[linear-gradient\(to_top,var\(--background\)_calc\(100%-2rem\),transparent\)\]/);
   const fallback = read('v2', 'shell', 'designs', 'HomeFallback.tsx');
   assert.match(fallback, /<TimelineSkeleton \/>\s*\{\/\*[^*]*\*\/\}\s*<div className=\{TIMELINE_COMPOSER_DOCK\}>\s*<ComposerShape \/>/);
 });

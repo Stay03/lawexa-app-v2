@@ -81,9 +81,15 @@ export const HOME_SURFACE_TIMELINE =
  */
 export const TIMELINE_COMPOSER_DOCK = 'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pt-8 pb-3 md:pb-6';
 
-/** The fade behind that dock, at every width (the Chat tab's is phone-only). */
+/**
+ * The ground behind that dock, at every width (the Chat tab's fade is
+ * phone-only). SOLID up to the top 2rem, the dock's `pt-8`, and only that band
+ * fades: the composer's Jurisdiction pill rides above its card, and a fade
+ * across the whole dock let the rows show round the pill (Backend's
+ * pictures, 24 October 2026).
+ */
 export const TIMELINE_DOCK_FADE =
-  'pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/90 to-transparent';
+  'pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-[linear-gradient(to_top,var(--background)_calc(100%-2rem),transparent)]';
 
 /*
  * THE TWO-COLUMN WORKSPACE FRAME IS GONE (owner, July 25).
