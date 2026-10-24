@@ -52,17 +52,21 @@ export function PdfReader({
   renderControls,
   fallback,
   className,
+  columnClassName,
 }: {
   fileId: number;
   /** The file's name, for the pages' accessible names. */
   name: string;
   /** Called once the PDF is open, with its number of pages. */
   onPageCount?: (count: number) => void;
-  /** Where the zoom controls go (a panel's header); left out, they sit above the pages. */
-  renderControls?: (controls: ReactNode) => ReactNode;
+  /** Where the zoom controls go (a panel's header, a dialog's bar); called
+   *  with `null` until the PDF is open. Left out, they sit above the pages. */
+  renderControls?: (controls: ReactNode | null) => ReactNode;
   /** What shows when the PDF cannot be shown: the sentence, and Try again when it can help. */
   fallback: (message: string, retry: (() => void) | null) => ReactNode;
   className?: string;
+  /** The pages' column, inside the reader (its width, its padding). */
+  columnClassName?: string;
 }) {
   const link = useQuery(filesQueries.inlineUrl(fileId));
   const [relinked, setRelinked] = useState(false);
@@ -74,7 +78,14 @@ export function PdfReader({
   };
 
   if (link.isError) return <>{fallback('The PDF did not load. Try again, or download it.', again)}</>;
-  if (url === null) return <PdfSkeleton className={className} />;
+  if (url === null) {
+    return (
+      <div className={cn('flex min-h-full flex-col', className)}>
+        {renderControls ? renderControls(null) : null}
+        <PdfSkeleton className={columnClassName} />
+      </div>
+    );
+  }
 
   return (
     <PdfDocumentView
@@ -84,6 +95,7 @@ export function PdfReader({
       onPageCount={onPageCount}
       renderControls={renderControls}
       className={className}
+      columnClassName={columnClassName}
       fallback={fallback}
       onExpired={
         relinked
@@ -110,6 +122,7 @@ function PdfDocumentView({
   onPageCount,
   renderControls,
   className,
+  columnClassName,
   fallback,
   onExpired,
   onRetry,
@@ -117,8 +130,9 @@ function PdfDocumentView({
   url: string;
   name: string;
   onPageCount?: (count: number) => void;
-  renderControls?: (controls: ReactNode) => ReactNode;
+  renderControls?: (controls: ReactNode | null) => ReactNode;
   className?: string;
+  columnClassName?: string;
   fallback: (message: string, retry: (() => void) | null) => ReactNode;
   /** Ask for a fresh link, once; `null` once it has been asked. */
   onExpired: (() => void) | null;
@@ -187,18 +201,16 @@ function PdfDocumentView({
 
   return (
     <div className={cn('flex min-h-full flex-col', className)}>
-      {controls ? (
-        renderControls ? (
-          renderControls(controls)
-        ) : (
-          <div className="flex justify-end gap-1 px-3 pt-2">{controls}</div>
-        )
+      {renderControls ? (
+        renderControls(controls)
+      ) : controls ? (
+        <div className="flex justify-end gap-1 px-3 pt-2">{controls}</div>
       ) : null}
-      <div ref={columnRef} className="w-full">
+      <div ref={columnRef} className={cn('w-full', columnClassName)}>
         {state.status === 'loading' ? (
           <PdfSkeleton />
         ) : (
-          <div className="overflow-x-auto pb-30">
+          <div className="overflow-x-auto pb-6">
             <div className="flex w-max min-w-full flex-col gap-4 py-1">
               {Array.from({ length: state.doc.numPages }, (_, index) => (
                 <PdfPageView

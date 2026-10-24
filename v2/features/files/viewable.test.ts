@@ -20,7 +20,7 @@ import {
  * 'play', etc should work in folders and space folders". The decision is one
  * pure module, so the Folders page, a folder and a space's files agree. */
 
-test('a picture, a video and a recording open here; a document keeps its tab', () => {
+test('a picture, a video, a recording and a PDF open here; another document keeps its tab', () => {
   assert.equal(viewKind({ id: 1, mime_type: 'image/jpeg', original_name: 'exhibit.jpg' }), 'picture');
   assert.equal(viewKind({ id: 1, mime_type: 'image/png', original_name: 'scan.png' }), 'picture');
   assert.equal(viewKind({ id: 1, mime_type: 'image/webp', original_name: 'photo.webp' }), 'picture');
@@ -29,10 +29,14 @@ test('a picture, a video and a recording open here; a document keeps its tab', (
   assert.equal(viewKind({ id: 1, mime_type: 'audio/mpeg', original_name: 'call.mp3' }), 'audio');
   // A generic mime still reads the extension for media, as the channel's player does.
   assert.equal(viewKind({ id: 1, mime_type: 'application/octet-stream', original_name: 'call.wav' }), 'audio');
-  // Not everything the browser could try: a TIFF is not painted, a PDF is a tab's.
+  // Not everything the browser could try: a TIFF is not painted.
   assert.equal(viewKind({ id: 1, mime_type: 'image/tiff', original_name: 'scan.tiff' }), null);
-  assert.equal(viewKind({ id: 1, mime_type: 'application/pdf', original_name: 'bundle.pdf' }), null);
-  assert.equal(viewKind({ id: 1, mime_type: 'application/pdf', original_name: 'trick.mp4' }), null);
+  // A PDF opens in the PDF reader (the techlead, 24 October 2026), by its mime,
+  // or by its name under a generic mime; the mime wins over a misleading name.
+  assert.equal(viewKind({ id: 1, mime_type: 'application/pdf', original_name: 'bundle.pdf' }), 'pdf');
+  assert.equal(viewKind({ id: 1, mime_type: 'application/pdf', original_name: 'trick.mp4' }), 'pdf');
+  assert.equal(viewKind({ id: 1, mime_type: 'application/octet-stream', original_name: 'Scan.PDF' }), 'pdf');
+  assert.equal(viewKind({ id: 1, mime_type: 'text/plain', original_name: 'notes.pdf' }), null);
   assert.equal(
     viewKind({
       id: 1,
@@ -122,7 +126,8 @@ test('a row model says how its file opens', () => {
   });
   assert.equal(looseFileRow(file({})).view, 'picture');
   assert.equal(looseFileRow(file({ mime_type: 'audio/mpeg', original_name: 'call.mp3' })).view, 'audio');
-  assert.equal(looseFileRow(file({ mime_type: 'application/pdf', original_name: 'bundle.pdf' })).view, null);
+  assert.equal(looseFileRow(file({ mime_type: 'application/pdf', original_name: 'bundle.pdf' })).view, 'pdf');
+  assert.equal(looseFileRow(file({ mime_type: 'application/msword', original_name: 'brief.doc' })).view, null);
 
   const item = (content: Extract<FolderItemRecord, { type: 'file' }>['content']): FolderItemRecord => ({
     id: 40,

@@ -283,7 +283,7 @@ function FolderBody({ uuid }: { uuid: string }) {
           // same way).
           if (!pendingRemovals.has(folderItemKey(row.type, row.contentId))) {
             mapped.push(row);
-            if (item.type === 'file' && row.type === 'file' && row.view) {
+            if (item.type === 'file' && row.type === 'file' && row.view && row.view !== 'pdf') {
               shownPictures.push(viewerImage(item.content, row.title, row.view));
             }
           }

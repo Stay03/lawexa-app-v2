@@ -208,7 +208,8 @@ test('a failed mint or download is reported in place, a 404 as gone', () => {
 
 test('the feed file card and the AI chat document chip pass the file name and type', () => {
   assert.match(attachments, /open\(attachment\.id, \{ name: attachment\.original_name, type: attachment\.mime_type \}\)/);
-  assert.match(attachments, /onClick=\{ready \? save : openIt\}/);
+  // A PDF opens in the reader instead, so its row never offers the share sheet's save.
+  assert.match(attachments, /onClick=\{ready && !isPdf \? save : openIt\}/);
   assert.match(sent, /openInTab\.open\(document\.file_id, \{ name: document\.file_name, type: document\.mime_type \}\)/);
 });
 

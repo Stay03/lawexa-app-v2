@@ -128,7 +128,7 @@ function FileBody({
       return <WordPages file={file} />;
     case 'pdf':
       return (
-        <div className="mx-auto w-full max-w-[68ch] px-5 pt-4 xl:px-10 xl:pt-5">
+        <div className="mx-auto w-full max-w-[68ch] px-5 pt-4 pb-24 xl:px-10 xl:pt-5">
           <PdfReader
             fileId={file.id}
             name={file.original_name}

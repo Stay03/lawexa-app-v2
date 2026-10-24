@@ -7,6 +7,9 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import type { MessageAttachment } from '@/types/collab';
+import { PdfViewerDialog } from '@/v2/features/files/pdf/PdfViewerDialog';
+import { usePdfViewer } from '@/v2/features/files/pdf/use-pdf-viewer';
+import { isPdfFile } from '@/v2/features/files/viewable';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { isRenderableImage, playableKind } from '../files/file-model';
 import { FileMark } from '../files/FileMark';
@@ -583,18 +586,31 @@ function MediaAttachment({ attachment }: { attachment: MessageAttachment }) {
 function FileAttachment({ attachment }: { attachment: MessageAttachment }) {
   const { open, opening, failed, ready, save } = useOpenFileInNewTab();
   const isArchive = isArchiveFile(attachment.mime_type, attachment.original_name);
+  // A PDF opens in the app's PDF reader, over the room (the techlead, 24
+  // October 2026: "every PDF in the app opens in the reader"); the reader's
+  // bar keeps Download and Open in a new tab.
+  const pdf = usePdfViewer();
+  const isPdf = isPdfFile(attachment);
   // Named, so an installed iPhone app saves it through the share sheet under
   // its real name and type instead of opening a tab that cannot save.
   const openIt = () =>
-    open(attachment.id, { name: attachment.original_name, type: attachment.mime_type });
+    isPdf
+      ? pdf.open({
+          id: attachment.id,
+          name: attachment.original_name,
+          mimeType: attachment.mime_type,
+          size: attachment.size,
+        })
+      : open(attachment.id, { name: attachment.original_name, type: attachment.mime_type });
 
   return (
     <div>
       <button
         type="button"
-        onClick={ready ? save : openIt}
+        onClick={ready && !isPdf ? save : openIt}
         disabled={opening}
-        aria-label={`${ready ? 'Save' : 'Open'} ${attachment.original_name}`}
+        aria-haspopup={isPdf ? 'dialog' : undefined}
+        aria-label={`${isPdf ? 'Read' : ready ? 'Save' : 'Open'} ${attachment.original_name}`}
         className={cn(
           'v2-interactive group/att flex w-full max-w-sm items-center gap-2.5 rounded-xl border bg-background px-2 py-2 text-left',
           'transition-colors duration-150 hover:bg-secondary/50 motion-reduce:transition-none',
@@ -644,6 +660,7 @@ function FileAttachment({ attachment }: { attachment: MessageAttachment }) {
         />
       )}
       {ready && <AttachmentReady onSave={save} />}
+      {isPdf ? <PdfViewerDialog viewer={pdf} /> : null}
     </div>
   );
 }

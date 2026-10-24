@@ -566,7 +566,8 @@ function SpaceFeed({
   // goes back to the row the card hung from, not to a button that is gone.
   const cardRow = card?.row ?? null;
   const viewFile = useCallback(
-    (file: SpaceFile, kind: ViewKind) => view({ id: file.id, name: file.original_name, kind }, cardRow),
+    (file: SpaceFile, kind: ViewKind) =>
+      view({ id: file.id, name: file.original_name, kind, mimeType: file.mime_type, size: file.size }, cardRow),
     [view, cardRow],
   );
   // The feed cut into days, newest first.

@@ -25,7 +25,16 @@ import { isRenderableImage, playableKind } from '@/v2/features/channels/files/fi
  * so a file reads the same in a folder as in the room it was posted to.
  */
 
-export type ViewKind = 'picture' | 'video' | 'audio';
+/**
+ * A PDF opens in the app's PDF reader, over the list (the in-app PDF reader;
+ * the techlead, 24 October 2026: "every PDF in the app opens in the reader").
+ * It is not part of the picture viewer's set: the viewer's swipe owns the
+ * drag, and a document has to scroll.
+ */
+export type ViewKind = 'picture' | 'video' | 'audio' | 'pdf';
+
+/** The kinds the full-screen picture viewer shows, and swipes between. */
+export type GalleryKind = Exclude<ViewKind, 'pdf'>;
 
 /**
  * What the decision reads. Every field but the id is optional, because a
@@ -51,8 +60,20 @@ export interface ViewableFile {
 export function viewKind(file: ViewableFile): ViewKind | null {
   if (typeof file.mime_type !== 'string') return null;
   const named = { mime_type: file.mime_type, original_name: file.original_name ?? '' };
+  if (isPdfFile(named)) return 'pdf';
   if (isRenderableImage(named)) return 'picture';
   return playableKind(named);
+}
+
+/**
+ * A PDF: its mime says so, or a generic mime (`application/octet-stream`, or
+ * none sent) with a `.pdf` name, the extension rule the player uses for media.
+ */
+export function isPdfFile(file: { mime_type?: string | null; original_name?: string | null }): boolean {
+  const mime = (file.mime_type ?? '').trim().toLowerCase();
+  if (mime === 'application/pdf' || mime === 'application/x-pdf') return true;
+  if (mime !== '' && mime !== 'application/octet-stream') return false;
+  return /\.pdf$/i.test((file.original_name ?? '').trim());
 }
 
 /** Every viewable file of one list is one set, so the viewer needs no real message
@@ -73,7 +94,7 @@ export function pictureTarget(fileId: number): string {
  * rather than print "0 B". A video or a recording carries its `kind`, so the
  * viewer plays it rather than paints it.
  */
-export function viewerImage(file: ViewableFile, name: string, kind: ViewKind = 'picture'): ViewerImage {
+export function viewerImage(file: ViewableFile, name: string, kind: GalleryKind = 'picture'): ViewerImage {
   const size = file.size;
   return {
     id: file.id,
@@ -85,13 +106,14 @@ export function viewerImage(file: ViewableFile, name: string, kind: ViewKind = '
 }
 
 /** The list's viewable files (pictures, videos, recordings), in the list's
- *  order: the set a tap on one swipes through. `unnamed` names a file whose
- *  payload carries no name, in the list's own words. */
+ *  order: the set a tap on one swipes through. A PDF opens in the reader, so
+ *  it is not in the set. `unnamed` names a file whose payload carries no
+ *  name, in the list's own words. */
 export function listViewable(files: readonly ViewableFile[], unnamed: string): ViewerImage[] {
   const viewable: ViewerImage[] = [];
   for (const file of files) {
     const kind = viewKind(file);
-    if (kind) viewable.push(viewerImage(file, file.original_name?.trim() || unnamed, kind));
+    if (kind && kind !== 'pdf') viewable.push(viewerImage(file, file.original_name?.trim() || unnamed, kind));
   }
   return viewable;
 }

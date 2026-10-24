@@ -95,7 +95,8 @@ test('a list_files step gives one row per file: its name and "type · size · wh
       [813, 'Supervisor feedback.docx', 'Word · 84 KB · You'],
     ],
   );
-  assert.equal(list.rows[0].view, null);
+  assert.equal(list.rows[0].view, 'pdf');
+  assert.equal(list.rows[1].view, null);
   assert.equal(list.total, 2);
   assert.equal(list.place, space.name);
   // The result names the Space by name only; Go to Space needs the chat's own Space.

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, type ReactNode } from 'react';
-import { ExternalLink, Eye, Loader2, Play } from 'lucide-react';
+import { BookOpen, ExternalLink, Eye, Loader2, Play } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { formatBytes } from '@/lib/utils/format-bytes';
@@ -145,7 +145,8 @@ function CardBody({
 }) {
   const { open, opening, failed, gone } = useOpenFileInNewTab();
   const type = fileTypeLabel(file);
-  // View for a picture, Play for a video or a recording, nothing for the rest.
+  // View for a picture, Play for a video or a recording, Read for a PDF (the
+  // PDF reader's dialog), nothing for the rest.
   const kind = viewKind(file);
   // Close first, then act: the action's own dialog opens over the list.
   const then = (act?: (file: SpaceFile) => void) =>
@@ -221,8 +222,14 @@ function CardBody({
               }}
               className="w-full"
             >
-              {kind === 'picture' ? <Eye aria-hidden className="size-4" /> : <Play aria-hidden className="size-4" />}
-              {kind === 'picture' ? 'View' : 'Play'}
+              {kind === 'picture' ? (
+                <Eye aria-hidden className="size-4" />
+              ) : kind === 'pdf' ? (
+                <BookOpen aria-hidden className="size-4" />
+              ) : (
+                <Play aria-hidden className="size-4" />
+              )}
+              {kind === 'picture' ? 'View' : kind === 'pdf' ? 'Read' : 'Play'}
             </Button>
           ) : null}
           <Button

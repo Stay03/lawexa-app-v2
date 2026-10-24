@@ -8,6 +8,7 @@ import { PictureViewer } from '@/v2/features/channels/feed/MessageImageViewer';
 import type { ViewerImage } from '@/v2/features/channels/feed/image-target';
 import type { PictureSource } from '@/v2/features/channels/feed/picture-source';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
+import { PdfViewerDialog } from './pdf/PdfViewerDialog';
 import type { FileViewer } from './use-file-viewer';
 import { ViewerMedia } from './ViewerMedia';
 import { pictureSetAt } from './viewable';
@@ -17,7 +18,8 @@ import { pictureSetAt } from './viewable';
  * `useFileViewer` holds. Pictures, videos and recordings open in it alike, and
  * a swipe moves through all of them (Stay, 22 October 2026: "There should be
  * consistency"); a video or a recording plays where a picture sits
- * (`ViewerMedia`). The Folders page's loose files, a
+ * (`ViewerMedia`). A PDF opens in the PDF reader's dialog
+ * (`PdfViewerDialog`) beside it. The Folders page's loose files, a
  * folder (personal or a space's) and a space's files each render one.
  *
  * THE PICTURE VIEWER IS THE CHANNEL'S (`PictureViewer`): the same swipe, the
@@ -115,14 +117,17 @@ export function FileViewers({
   const set = useMemo(() => pictureSetAt(pictures, shown), [pictures, shown]);
 
   return (
-    <PictureViewer
-      open={viewer.picture !== null}
-      set={set}
-      resolving={false}
-      onSelect={viewer.setPicture}
-      onClose={() => viewer.setPicture(null)}
-      source={PICTURE_SOURCE[place]}
-      returnFocusTo={viewer.returnTo}
-    />
+    <>
+      <PictureViewer
+        open={viewer.picture !== null}
+        set={set}
+        resolving={false}
+        onSelect={viewer.setPicture}
+        onClose={() => viewer.setPicture(null)}
+        source={PICTURE_SOURCE[place]}
+        returnFocusTo={viewer.returnTo}
+      />
+      <PdfViewerDialog viewer={viewer.pdf} />
+    </>
   );
 }

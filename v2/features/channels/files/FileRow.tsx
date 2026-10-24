@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, Loader2, ShieldAlert, Trash2 } from 'lucide-react';
+import { BookOpen, Download, Loader2, ShieldAlert, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { formatBytes } from '@/lib/utils/format-bytes';
 import type { Channel, ChannelFile } from '@/types/collab';
 import { MetaLine } from '@/v2/features/collab/kit/MetaLine';
+import { PdfViewerDialog } from '@/v2/features/files/pdf/PdfViewerDialog';
+import { usePdfViewer } from '@/v2/features/files/pdf/use-pdf-viewer';
+import { isPdfFile } from '@/v2/features/files/viewable';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useFileShareSheetSave } from '../feed/use-file-url';
 import {
@@ -78,6 +81,12 @@ export function FileRow({
     );
   };
   const deleting = deleteFile.isPending;
+  // A PDF reads in the app's PDF reader (the techlead, 24 October 2026:
+  // "every PDF in the app opens in the reader"); Download keeps its download.
+  const pdf = usePdfViewer();
+  const isPdf = isPdfFile(file);
+  const read = () =>
+    pdf.open({ id: file.id, name: file.original_name, mimeType: file.mime_type, size: file.size });
   const isArchive = isArchiveFile(file.mime_type, file.original_name);
   const canDelete =
     (currentUserId !== null && file.uploader.id === currentUserId) ||
@@ -89,12 +98,27 @@ export function FileRow({
 
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
-          <p
-            className="min-w-0 truncate text-sm font-medium text-foreground"
-            title={file.original_name}
-          >
-            {file.original_name}
-          </p>
+          {isPdf ? (
+            <button
+              type="button"
+              onClick={read}
+              aria-haspopup="dialog"
+              title={file.original_name}
+              className={cn(
+                'v2-interactive min-w-0 truncate rounded text-left text-sm font-medium text-foreground hover:underline',
+                FOCUS_RING,
+              )}
+            >
+              {file.original_name}
+            </button>
+          ) : (
+            <p
+              className="min-w-0 truncate text-sm font-medium text-foreground"
+              title={file.original_name}
+            >
+              {file.original_name}
+            </p>
+          )}
           {isArchive ? <ArchiveChip /> : null}
         </div>
 
@@ -152,6 +176,21 @@ export function FileRow({
           '[@media(hover:none)]:opacity-100',
         )}
       >
+        {isPdf ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={read}
+            aria-haspopup="dialog"
+            aria-label={`Read ${file.original_name}`}
+            title="Read"
+            className="v2-interactive size-8 text-muted-foreground hover:text-foreground"
+          >
+            <BookOpen aria-hidden className="size-4" />
+          </Button>
+        ) : null}
+
         <Button
           type="button"
           variant="ghost"
@@ -217,6 +256,8 @@ export function FileRow({
           </>
         ) : null}
       </div>
+
+      {isPdf ? <PdfViewerDialog viewer={pdf} /> : null}
     </div>
   );
 }

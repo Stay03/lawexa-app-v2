@@ -19,6 +19,9 @@ import {
 } from '@/v2/features/channels/feed/image-target';
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
+import { PdfViewerDialog } from '@/v2/features/files/pdf/PdfViewerDialog';
+import { usePdfViewer } from '@/v2/features/files/pdf/use-pdf-viewer';
+import { isPdfFile } from '@/v2/features/files/viewable';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { isPictureAttachment } from '../../attachment-rules';
 import { useV2ChatContext } from '../chat-context';
@@ -127,6 +130,14 @@ export function SentAttachments({ attachments }: { attachments: readonly Message
   const heldTarget = useHeldValue(target);
   const set = pictureSet(pictures, links.map((link) => link.data), heldTarget);
 
+  // A PDF opens in the app's PDF reader, over the chat (the techlead, 24
+  // October 2026: "every PDF in the app opens in the reader"); any other
+  // document keeps its tab.
+  const pdf = usePdfViewer();
+  const isPdf = (document: MessageAttachment) =>
+    isPdfFile({ mime_type: document.mime_type, original_name: document.file_name });
+  const hasPdf = documents.some(isPdf);
+
   if (attachments.length === 0) return null;
 
   return (
@@ -165,10 +176,26 @@ export function SentAttachments({ attachments }: { attachments: readonly Message
       {documents.length > 0 && (
         <div className="flex max-w-full flex-wrap justify-end gap-1.5">
           {documents.map((document) => (
-            <DocumentChip key={document.file_id} document={document} />
+            <DocumentChip
+              key={document.file_id}
+              document={document}
+              onRead={
+                isPdf(document)
+                  ? () =>
+                      pdf.open({
+                        id: document.file_id,
+                        name: document.file_name,
+                        mimeType: document.mime_type || 'application/pdf',
+                        size: document.file_size,
+                      })
+                  : null
+              }
+            />
           ))}
         </div>
       )}
+
+      {hasPdf ? <PdfViewerDialog viewer={pdf} /> : null}
 
       {pictures.length > 0 && (
         <PictureViewer
@@ -333,7 +360,14 @@ function PictureTile({
   );
 }
 
-function DocumentChip({ document }: { document: MessageAttachment }) {
+function DocumentChip({
+  document,
+  onRead,
+}: {
+  document: MessageAttachment;
+  /** A PDF: open it in the reader instead of a tab. */
+  onRead: (() => void) | null;
+}) {
   const openInTab = useOpenFileInNewTab();
 
   if (openInTab.gone) {
@@ -354,9 +388,10 @@ function DocumentChip({ document }: { document: MessageAttachment }) {
   return (
     <button
       type="button"
-      onClick={openInTab.ready ? openInTab.save : openIt}
+      onClick={onRead ?? (openInTab.ready ? openInTab.save : openIt)}
       disabled={openInTab.opening}
-      aria-label={`${openInTab.ready ? 'Save' : 'Open'} ${document.file_name}`}
+      aria-haspopup={onRead ? 'dialog' : undefined}
+      aria-label={`${onRead ? 'Read' : openInTab.ready ? 'Save' : 'Open'} ${document.file_name}`}
       className={cn(
         'v2-interactive flex w-fit items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground',
         'transition-colors duration-150 hover:bg-muted hover:text-foreground motion-reduce:transition-none',

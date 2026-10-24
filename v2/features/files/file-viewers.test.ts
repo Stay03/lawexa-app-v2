@@ -144,7 +144,7 @@ test("a folder, personal or a space's: the stream's viewable files, less a remov
   assert.match(screen, /const viewer = useFileViewer\(\);/);
   assert.match(
     screen,
-    /mapped\.push\(row\);\s*if \(item\.type === 'file' && row\.type === 'file' && row\.view\) \{\s*shownPictures\.push\(viewerImage\(item\.content, row\.title, row\.view\)\);/,
+    /mapped\.push\(row\);\s*if \(item\.type === 'file' && row\.type === 'file' && row\.view && row\.view !== 'pdf'\) \{\s*shownPictures\.push\(viewerImage\(item\.content, row\.title, row\.view\)\);/,
   );
   assert.match(screen, /if \(row\.view\) view\(\{ id: row\.contentId, name: row\.title, kind: row\.view \}\);/);
   assert.match(screen, /<FolderItemRow[\s\S]*?onView=\{openView\}/);
@@ -155,7 +155,7 @@ test("a space's file card offers View or Play first, closes, and the feed opens 
   const card = readFeature('spaces', 'detail', 'content', 'SpaceFileCard.tsx');
   assert.match(card, /const kind = viewKind\(file\);/);
   assert.match(card, /close\(\);\s*onView\(file, kind\);/);
-  assert.match(card, /\{kind === 'picture' \? 'View' : 'Play'\}/);
+  assert.match(card, /\{kind === 'picture' \? 'View' : kind === 'pdf' \? 'Read' : 'Play'\}/);
   // "Open file" steps back to the outline only when View or Play is there.
   assert.match(card, /variant=\{kind \? 'outline' : 'default'\}/);
   // The inline player is the shared one; the card mints no link of its own.
@@ -168,5 +168,8 @@ test("a space's file card offers View or Play first, closes, and the feed opens 
   assert.match(panel, /onView=\{viewFile\}\s*\/>\s*<FileViewers viewer=\{viewer\} pictures=\{pictures\} place="space" \/>/);
   // The card's button is gone by the close: focus goes back to the row it hung from.
   assert.match(panel, /const cardRow = card\?\.row \?\? null;/);
-  assert.match(panel, /view\(\{ id: file\.id, name: file\.original_name, kind \}, cardRow\),\s*\[view, cardRow\],/);
+  assert.match(
+    panel,
+    /view\(\{ id: file\.id, name: file\.original_name, kind, mimeType: file\.mime_type, size: file\.size \}, cardRow\),\s*\[view, cardRow\],/,
+  );
 });

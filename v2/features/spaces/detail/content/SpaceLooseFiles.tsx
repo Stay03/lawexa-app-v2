@@ -77,7 +77,7 @@ export function SpaceLooseFiles({
   const openView = useCallback(
     (file: SpaceFile) => {
       const row = looseFileRow(file);
-      if (row.view) view({ id: row.id, name: row.title, kind: row.view });
+      if (row.view) view({ id: row.id, name: row.title, kind: row.view, mimeType: file.mime_type, size: file.size });
     },
     [view],
   );
