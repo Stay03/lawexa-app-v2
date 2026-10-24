@@ -99,7 +99,7 @@ function saveLabel(draft: DraftSave): string {
   return draft.saved ? 'Save changes' : 'Save as note';
 }
 
-/** The bar's word on a panel under 40rem, where the formatting needs the room. */
+/** The bar's word on a panel under 37.5rem, where the formatting needs the room. */
 function shortSaveLabel(draft: DraftSave): string {
   return draft.mutation.isPending ? 'Saving…' : 'Save';
 }
@@ -193,8 +193,8 @@ export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
             <NotebookPen aria-hidden className="size-[15px]" />
           )}
           <span aria-live="polite">
-            <span className="@max-[40rem]/draft:hidden">{saveLabel(draft)}</span>
-            <span className="hidden @max-[40rem]/draft:inline">{shortSaveLabel(draft)}</span>
+            <span className="@max-[37.5rem]/draft:hidden">{saveLabel(draft)}</span>
+            <span className="hidden @max-[37.5rem]/draft:inline">{shortSaveLabel(draft)}</span>
           </span>
         </button>
       )}

@@ -200,7 +200,7 @@ test('the gold Save as note is the only primary action on the computer panel', a
   assert.equal(control.match(/\bbg-primary\b(?!\/)/g)?.length, 1);
   assert.match(bar, /return draft\.saved \? 'Save changes' : 'Save as note';/);
   // A narrow panel (a 1280 screen) says "Save", by the bar's own fold width.
-  assert.match(control, /<span className="@max-\[40rem\]\/draft:hidden">\{saveLabel\(draft\)\}<\/span>\s*<span className="hidden @max-\[40rem\]\/draft:inline">\{shortSaveLabel\(draft\)\}<\/span>/);
+  assert.match(control, /<span className="@max-\[37\.5rem\]\/draft:hidden">\{saveLabel\(draft\)\}<\/span>\s*<span className="hidden @max-\[37\.5rem\]\/draft:inline">\{shortSaveLabel\(draft\)\}<\/span>/);
   assert.doesNotMatch(editor, /\bbg-primary\b(?!\/)/);
   // A failed save still says why, beside the button.
   assert.match(control, /role="alert"[\s\S]*?\{saveFailureSentence\(mutation\.error\)\}/);
@@ -242,8 +242,8 @@ test('the bar\'s ··· holds the lists, alignment and Copy, and its rows never 
   assert.match(more, /ALIGN_OPTIONS\.map/);
   assert.match(more, /'Copy text'/);
   // At a narrow panel Redo, Underline and the text style fold into ···, by one width in CSS and in the menu.
-  assert.match(editor, /const BAR_FOLD_WIDTH = 640;/);
-  assert.equal(tools.match(/@max-\[40rem\]\/draft:hidden/g)?.length, 3);
+  assert.match(editor, /const BAR_FOLD_WIDTH = 600;/);
+  assert.equal(tools.match(/@max-\[37\.5rem\]\/draft:hidden/g)?.length, 3);
   assert.match(more, /\{folded \? \(/);
   assert.match(more, /STYLE_OPTIONS\.map/);
   // No row wraps (718accef's fix, here for the draft's menus).
@@ -258,12 +258,12 @@ test('the document spans the panel with even margins up to a reading width, in t
   const panel = readFileSync(new URL('./DraftPanel.tsx', import.meta.url), 'utf8');
   const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
   const css = readFileSync(new URL('./draft-panel.css', import.meta.url), 'utf8');
-  // 48px margins, 32px under 40rem, up to 780px of text; the phone sheet keeps its measure.
-  assert.match(editor, /export const DRAFT_DOCUMENT =\s*'mx-auto w-full max-w-\[68ch\] px-5 py-6 xl:max-w-\[876px\] xl:px-8 xl:pt-8 xl:pb-30 xl:text-\[15px\] xl:@min-\[40rem\]\/draft:px-12';/);
+  // 48px margins, 32px under 37.5rem, up to 780px of text; the phone sheet keeps its measure.
+  assert.match(editor, /export const DRAFT_DOCUMENT =\s*'mx-auto w-full max-w-\[68ch\] px-5 py-6 xl:max-w-\[876px\] xl:px-8 xl:pt-8 xl:pb-30 xl:text-\[15px\] xl:@min-\[37\.5rem\]\/draft:px-12';/);
   assert.match(editor, /<div ref=\{frameRef\} className="@container\/draft flex min-h-full flex-col">/);
   assert.match(panel, /<article className=\{DRAFT_DOCUMENT\}>/);
   // A wide monitor gets a wide panel, up to 56rem.
-  assert.match(frame, /bare && 'v2-side-panel-bare xl:w-\[min\(48%,56rem\)\] xl:border-l-0',/);
+  assert.match(frame, /bare && 'v2-side-panel-bare xl:w-\[min\(52%,56rem\)\] xl:border-l-0',/);
   // The type size stays.
   assert.match(css, /\.v2-draft-doc \{\s*font-size: 15px;\s*line-height: 1\.72;\s*\}/);
 });

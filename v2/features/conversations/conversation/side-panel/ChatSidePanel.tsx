@@ -123,7 +123,7 @@ export function ChatSidePanel({
           // xl and up: the panel beside the transcript.
           'xl:static xl:z-auto xl:h-full xl:w-[min(48%,46rem)] xl:min-w-[26rem] xl:shrink-0 xl:rounded-none xl:border-t-0 xl:border-l xl:shadow-none',
           'xl:motion-safe:slide-in-from-bottom-0 xl:motion-safe:slide-in-from-right-6 xl:data-[state=closed]:motion-safe:slide-out-to-bottom-0 xl:data-[state=closed]:motion-safe:slide-out-to-right-6',
-          bare && 'v2-side-panel-bare xl:w-[min(48%,56rem)] xl:border-l-0',
+          bare && 'v2-side-panel-bare xl:w-[min(52%,56rem)] xl:border-l-0',
         )}
       >
         {/* The grab line, below xl: the sheet's shape, not a control. */}

@@ -106,12 +106,12 @@ interface DraftEditorProps {
 
 /**
  * The document's frame. On the phone sheet a document measure. On a computer
- * the panel's width with even margins, 48px, or 32px on a panel under 40rem
+ * the panel's width with even margins, 48px, or 32px on a panel under 37.5rem
  * (a 1280 screen), up to a 780px reading width (Stay, 24 October 2026: "waste
  * of horizontal space"). Inside an `@container/draft`.
  */
 export const DRAFT_DOCUMENT =
-  'mx-auto w-full max-w-[68ch] px-5 py-6 xl:max-w-[876px] xl:px-8 xl:pt-8 xl:pb-30 xl:text-[15px] xl:@min-[40rem]/draft:px-12';
+  'mx-auto w-full max-w-[68ch] px-5 py-6 xl:max-w-[876px] xl:px-8 xl:pt-8 xl:pb-30 xl:text-[15px] xl:@min-[37.5rem]/draft:px-12';
 
 /**
  * The panel's one bar on a computer: a filled band across the top, with no
@@ -314,10 +314,10 @@ function DraftToolbar({ editor }: { editor: Editor }) {
  * Below this width of the panel (px), the bar folds Redo, Underline and the
  * text style into its ··· menu, so Save and the close still fit beside the
  * formatting at a 1280 screen. The bar hides them in CSS with the same number
- * (`@max-[40rem]/draft`); the menu, drawn in a portal outside that container,
+ * (`@max-[37.5rem]/draft`); the menu, drawn in a portal outside that container,
  * measures the panel when it opens.
  */
-const BAR_FOLD_WIDTH = 640;
+const BAR_FOLD_WIDTH = 600;
 
 const UNDERLINE = TEXT_VERBS.find((verb) => verb.verb === 'underline');
 
@@ -346,7 +346,7 @@ function DraftBarTools({ editor, frameRef }: { editor: Editor; frameRef: RefObje
         disabled={!state.canUndo}
         onPress={() => editor.chain().focus().undo().run()}
       />
-      <span className="contents @max-[40rem]/draft:hidden">
+      <span className="contents @max-[37.5rem]/draft:hidden">
         <ToolbarButton
           pill
           icon={Redo2}
@@ -357,13 +357,13 @@ function DraftBarTools({ editor, frameRef }: { editor: Editor; frameRef: RefObje
         />
       </span>
       <ToolbarDot />
-      <span className="contents @max-[40rem]/draft:hidden">
+      <span className="contents @max-[37.5rem]/draft:hidden">
         <StyleSelect editor={editor} state={state} mac={mac} pill menuClassName={DRAFT_MENU} />
       </span>
       <FontSizeMenu editor={editor} menuClassName={DRAFT_MENU} />
       <ToolbarDot />
       {MARK_VERBS.map(({ verb, icon, label, keys: binding }) => (
-        <span key={verb} className={cn('contents', verb === 'underline' && '@max-[40rem]/draft:hidden')}>
+        <span key={verb} className={cn('contents', verb === 'underline' && '@max-[37.5rem]/draft:hidden')}>
           <ToolbarButton
             pill
             icon={icon}
