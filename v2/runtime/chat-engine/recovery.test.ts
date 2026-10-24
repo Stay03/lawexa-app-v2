@@ -15,6 +15,8 @@ import { STALL_CHECK_MS, STALL_SILENCE_MS } from './stall';
 
 interface FakeStream {
   send(type: string, data: unknown): void;
+  /** The connection drops with no `end` (a proxy or the PHP worker closing it). */
+  drop(): void;
 }
 
 const realFetch = globalThis.fetch;
@@ -47,6 +49,7 @@ beforeEach(() => {
     const encoder = new TextEncoder();
     streams.push({
       send: (type, data) => controller.enqueue(encoder.encode(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`)),
+      drop: () => controller.close(),
     });
     return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
   }) as typeof fetch;
@@ -121,6 +124,151 @@ test('a turn after a recovery by status shows its answer', async () => {
 
   assert.deepEqual(assistantText(engine), ['The first answer, from the server.', 'The second answer.']);
   assert.ok(engine.getSnapshot().messages.every((m) => !m.isStreaming));
+  engine.disconnect();
+});
+
+/* Lucy, 24 October 2026 (chat 91352c16): a reload mid-answer attached, drew the
+ * text so far, and the stream ended there. The page showed that first line as the
+ * finished answer for 12 minutes while the server wrote the rest. */
+test('a reload whose stream ends before the answer is complete follows the turn to its end', async () => {
+  let reloads = 0;
+  const engine = createChatEngine({ getToken: () => 'test-token', onHistoryLoaded: () => { reloads += 1; } });
+  engine.setConversationId('conv-1');
+  let status = 'pending';
+  let statusCalls = 0;
+  chatApi.getStatus = (async () => {
+    statusCalls += 1;
+    return { success: true, message: '', data: { status, execution_id: 'exec-1' } };
+  }) as never;
+  chatApi.getConversation = serverCopy([
+    row(1, 'user', 'Make a quiz from statute 1310'),
+    row(2, 'assistant', "I'll create the quiz from statute 1310. The quiz is ready."),
+  ]);
+
+  assert.equal(await engine.recoverPendingState('conv-1'), 'reconnected');
+  mock.timers.tick(0);
+  await settle();
+  const stream = streams[streams.length - 1];
+  stream.send('connected', { execution_id: 'exec-1', message: 'Connected', accumulated_text: "I'll create the quiz from statute 1310." });
+  stream.send('end', '</stream>');
+  await settle();
+
+  // The turn is still running: the answer so far stays live, nothing is final.
+  assert.equal(engine.getSnapshot().isStreaming, true);
+  assert.ok(engine.getSnapshot().messages.every((m) => m.role !== 'assistant' || m.isStreaming));
+  const checksAfterEnd = statusCalls;
+  assert.ok(checksAfterEnd >= 2, 'the status is asked again once the stream ends');
+  await advance(10_000);
+  assert.ok(statusCalls > checksAfterEnd, 'and again while the turn is pending');
+  assert.equal(reloads, 0);
+
+  // The server finishes the turn: the page loads the whole answer.
+  status = 'completed';
+  await advance(10_000);
+  assert.equal(reloads, 1);
+  assert.deepEqual(assistantText(engine), ["I'll create the quiz from statute 1310. The quiz is ready."]);
+  assert.equal(engine.getSnapshot().isStreaming, false);
+  engine.disconnect();
+});
+
+test('a reload that attached mid-answer draws the later steps and the answer from the stream', async () => {
+  let reloads = 0;
+  const engine = createChatEngine({ getToken: () => 'test-token', onHistoryLoaded: () => { reloads += 1; } });
+  engine.setConversationId('conv-1');
+  chatApi.getStatus = (async () => ({ success: true, message: '', data: { status: 'pending', execution_id: 'exec-1' } })) as never;
+  chatApi.getConversation = serverCopy([]);
+
+  await engine.recoverPendingState('conv-1');
+  mock.timers.tick(0);
+  await settle();
+  const stream = streams[streams.length - 1];
+  stream.send('connected', { execution_id: 'exec-1', message: 'Connected', accumulated_text: "I'll create the quiz." });
+  stream.send('heartbeat', { timestamp: at() });
+  await advance(5_000);
+  const tool = { id: 'call-1', name: 'create_quiz', parameters: {} };
+  stream.send('tool_calling', { seq: 7, iteration: 1, status: 'tool_calling', tool_call: tool, timestamp: at() });
+  stream.send('tool_complete', { seq: 8, iteration: 1, status: 'tool_complete', tool_call: tool, timestamp: at() });
+  stream.send('completed', { seq: 9, iteration: 2, status: 'completed', content: 'The quiz is ready.' });
+  stream.send('end', '</stream>');
+  await settle();
+  await advance(2_000);
+
+  const steps = engine.getSnapshot().messages.filter((m) => m.role === 'tool');
+  assert.equal(steps.length, 1);
+  assert.equal((steps[0] as { toolStatus?: string }).toolStatus, 'complete');
+  assert.deepEqual(assistantText(engine), ['The quiz is ready.']);
+  assert.equal(engine.getSnapshot().isStreaming, false);
+  assert.equal(reloads, 0);
+  engine.disconnect();
+});
+
+test('a reload whose connection drops with no end follows the turn by its status', async () => {
+  let reloads = 0;
+  const engine = createChatEngine({ getToken: () => 'test-token', onHistoryLoaded: () => { reloads += 1; } });
+  engine.setConversationId('conv-1');
+  let status = 'pending';
+  chatApi.getStatus = (async () => ({ success: true, message: '', data: { status, execution_id: 'exec-1' } })) as never;
+  chatApi.getConversation = serverCopy([row(1, 'user', 'Q'), row(2, 'assistant', 'The whole answer.')]);
+
+  await engine.recoverPendingState('conv-1');
+  mock.timers.tick(0);
+  await settle();
+  const first = streams[streams.length - 1];
+  first.send('connected', { execution_id: 'exec-1', message: 'Connected', accumulated_text: 'The first line.' });
+  first.send('heartbeat', { timestamp: at() });
+  await settle();
+  first.drop();
+  await advance(4_000);
+  // The transport reconnects; the new connection carries heartbeats and no progress.
+  const second = streams[streams.length - 1];
+  assert.notEqual(second, first, 'the dropped connection is reopened');
+  second.send('connected', { execution_id: 'exec-1', message: 'Connected', accumulated_text: 'The first line.' });
+  second.send('heartbeat', { timestamp: at() });
+  await advance(10_000);
+  assert.equal(engine.getSnapshot().isStreaming, true, 'still writing while the turn runs');
+  assert.equal(reloads, 0);
+
+  status = 'completed';
+  await advance(10_000);
+  assert.equal(reloads, 1);
+  assert.deepEqual(assistantText(engine), ['The whole answer.']);
+  assert.equal(engine.getSnapshot().isStreaming, false);
+  engine.disconnect();
+});
+
+/* The server's stream answers a fresh connection with `connected` carrying the
+ * text so far, then replays the turn from its start (0-0), deltas included. */
+test('a reload mid-answer shows the text so far once, under the saved copy of it', async () => {
+  const engine = createChatEngine({ getToken: () => 'test-token' });
+  engine.adoptConversationHistory({
+    id: 'conv-1',
+    title: 'Test chat',
+    messages: [row(1, 'user', 'Make a quiz from statute 1310'), row(2, 'assistant', "I'll create the quiz.")],
+  } as never);
+  chatApi.getStatus = (async () => ({ success: true, message: '', data: { status: 'pending', execution_id: 'exec-1' } })) as never;
+  chatApi.getConversation = serverCopy([]);
+
+  await engine.recoverPendingState('conv-1');
+  mock.timers.tick(0);
+  await settle();
+  const stream = streams[streams.length - 1];
+  stream.send('connected', { execution_id: 'exec-1', message: 'Connected', accumulated_text: 'The quiz has 10 ques' });
+  stream.send('iteration', { iteration: 1, status: 'processing', timestamp: at() });
+  stream.send('text_delta', { delta: "I'll create the quiz.", iteration: 1, timestamp: at() });
+  stream.send('text_reset', { iteration: 1, text_type: 'response', reason: 'tool_call', timestamp: at() });
+  const tool = { id: 'call-1', name: 'create_quiz', parameters: {} };
+  stream.send('tool_calling', { seq: 7, iteration: 1, status: 'tool_calling', tool_call: tool, timestamp: at() });
+  stream.send('tool_complete', { seq: 8, iteration: 1, status: 'tool_complete', tool_call: tool, timestamp: at() });
+  stream.send('iteration', { iteration: 2, status: 'processing', timestamp: at() });
+  stream.send('text_delta', { delta: 'The quiz has 10 ques', iteration: 2, timestamp: at() });
+  await settle();
+  await advance(2_000);
+
+  // History's saved line, then the answer being written, each once.
+  const live = engine.getSnapshot().messages.filter((m) => m.role === 'assistant');
+  assert.equal(live.length, 2, JSON.stringify(live.map((m) => [m.content, m.isStreaming])));
+  assert.equal(live[0].content, "I'll create the quiz.");
+  assert.equal(live[1].isStreaming, true);
   engine.disconnect();
 });
 

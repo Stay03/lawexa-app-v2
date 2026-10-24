@@ -429,6 +429,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    */
   let turnsAwaitingIds = 0;
   let executionId: string | null = null;
+  /** The execution whose `completed` came: only then does its `end` close a finished turn. */
+  let completedExecution: string | null = null;
   let reconnectCount = 0;
   /** When the last DATA (non-heartbeat) event arrived. 0 = no stream open. */
   let lastDataEventTime = 0;
@@ -1218,9 +1220,19 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       lastProgressAt = lastDataEventTime;
     };
 
+    /* The row `connected`'s text was drawn into on this connection's first
+       connect. A first connect is answered with the turn replayed from its start
+       (0-0), deltas included, so that row only stands in until the replay's own
+       text arrives: kept, it was retired as a finished answer and the text showed
+       twice (24 October 2026, the reload mid-answer). A transport reconnect
+       (Last-Event-ID) replays only what it missed and keeps its row. */
+    let connects = 0;
+    let standInId: string | null = null;
+
     // connected — on reconnect the backend may replay `accumulated_text` so the
     // user sees no gap after a refresh mid-stream.
     es.addEventListener('connected', (e) => {
+      connects += 1;
       lastEventTime = Date.now();
       reconnectCount = 0; // reset on successful connection
       markDataEvent();
@@ -1235,6 +1247,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         setMessages((msgs) =>
           msgs.map((m) => (m.id === msgId ? { ...m, content: data.accumulated_text! } : m)),
         );
+        if (connects === 1) standInId = msgId;
       }
       handlers.onConnected?.();
     });
@@ -1313,6 +1326,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         const id = agentSlugToMessageId.get(event.agent_slug);
         if (id) appendText(id, event.delta);
       } else {
+        if (standInId) {
+          dropStandIn(standInId);
+          standInId = null;
+        }
         const msgId = ensureStreamingPlaceholder(event.iteration);
         appendText(msgId, event.delta);
       }
@@ -1463,6 +1480,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       lastEventTime = Date.now();
       const event = parseEvent<CompletedEvent>((e as MessageEvent).data);
       if (!event) return;
+      completedExecution = execId;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       settleTurn(event.persisted_message_ids);
 
@@ -1688,6 +1706,23 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       stopWatchdog();
       es.close();
       eventSource = null;
+      // The stream ended before the turn's `completed`: the stream is over, the
+      // turn may not be (Lucy, 24 October 2026: a reload mid-answer drew the
+      // first line as the whole answer, and nothing more came for 12 minutes).
+      // The turn is followed by its status, as a stall is, and the finished
+      // conversation loaded when it is done.
+      const convId = conversationId;
+      if (completedExecution !== execId && convId) {
+        reportChatError({
+          code: 'stream_stall',
+          message: 'The stream ended before the answer was complete; followed the turn by its status.',
+          conversationId: convId,
+        });
+        reconnectCount = 0;
+        reconnectingSince = 0;
+        pollForCompletion(convId);
+        return;
+      }
       isCancelling = false;
       toolCallQueue.clear();
       const placeholderId = streamingMessageId;
@@ -1815,6 +1850,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     );
     clearText(placeholderId);
     messageIdToIteration.delete(placeholderId);
+    streamingMessageId = null;
+    currentIteration = null;
+  }
+
+  /** The replay rewrites what `connected`'s text stood in for: its row goes. */
+  function dropStandIn(id: string): void {
+    if (streamingMessageId !== id) return; // already finished or replaced
+    clearText(id);
+    takeReasoning(id);
+    messageIdToIteration.delete(id);
+    setMessages((msgs) => msgs.filter((m) => m.id !== id));
     streamingMessageId = null;
     currentIteration = null;
   }
