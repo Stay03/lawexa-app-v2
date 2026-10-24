@@ -151,12 +151,14 @@ export function CountUp({ value, durationMs = 600 }: { value: number; durationMs
   return pointsLabel(still ? value : shown);
 }
 
-/** "3 in a row", popped in after the tick has landed. */
+/** "3 in a row", popped in after the tick has landed. Its ground is solid
+ *  (the gold tint mixed into the page), as it can sit over a tile of a tall
+ *  question at the screen's foot. */
 export function StreakChip({ count, className }: { count: number; className?: string }) {
   return (
     <p
       className={cn(
-        'v2-solo-pop v2-solo-pop-late inline-flex items-center gap-2 rounded-full border border-[var(--solo-gold-deep)] bg-primary/10 py-1.5 pr-3 pl-2.5 text-[13px] font-bold text-[var(--solo-gold-text)]',
+        'v2-solo-pop v2-solo-pop-late inline-flex items-center gap-2 rounded-full border border-[var(--solo-gold-deep)] bg-[color-mix(in_oklch,var(--primary)_10%,var(--background))] py-1.5 pr-3 pl-2.5 text-[13px] font-bold text-[var(--solo-gold-text)]',
         className,
       )}
     >

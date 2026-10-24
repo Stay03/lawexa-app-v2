@@ -360,7 +360,16 @@ export function AttemptPlay({
             onPick={pick}
           />
 
-          <div className="mt-auto pt-6">
+          {/* THE FOOT STAYS ON SCREEN (Tester, 24 October 2026: on a tall
+              question the "2 in a row" chip sat below an 844px screen). With
+              no sheet up, this row is sticky at the screen's foot over the
+              safe area, so the chip and the key hint show however long the
+              question and its tiles are. The `end` sheet sticks on its own. */}
+          <div
+            className={
+              sheet ? 'mt-auto pt-6' : 'sticky bottom-0 z-10 mt-auto pt-6 pb-[env(safe-area-inset-bottom)]'
+            }
+          >
             {sheet ? (
               <EndSheet
                 step={step}
