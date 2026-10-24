@@ -104,10 +104,13 @@ export function ChatSidePanel({
         aria-label={label}
         data-state={closing ? 'closed' : 'open'}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.stopPropagation();
-            requestClose();
-          }
+          // Only an Escape pressed in the panel itself. A menu opened from the
+          // panel (the bar's ···, Saved, the font menus) draws in a portal outside
+          // it, and React still passes its keys up here: its Escape closes the
+          // menu alone.
+          if (event.key !== 'Escape' || !event.currentTarget.contains(event.target as Node)) return;
+          event.stopPropagation();
+          requestClose();
         }}
         onAnimationEnd={(event) => {
           if (closing && event.target === event.currentTarget) panel.finishClose();

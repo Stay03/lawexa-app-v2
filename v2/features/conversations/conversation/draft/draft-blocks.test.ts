@@ -285,3 +285,11 @@ test('no outlines on a computer: a background step from the chat, a filled bar, 
   // The only rules in the document are the draft's own: its tables and its horizontal rules.
   assert.equal(css.match(/border(-bottom)?: 1px solid/g)?.length, 1);
 });
+
+test('Escape in a menu opened from the panel closes the menu alone, not the panel (B2 pictures, 24 October 2026)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
+  // The menus draw in a portal outside the panel and React still passes their keys up: only an Escape
+  // whose target is inside the panel's own element closes it.
+  assert.match(frame, /if \(event\.key !== 'Escape' \|\| !event\.currentTarget\.contains\(event\.target as Node\)\) return;\s*event\.stopPropagation\(\);\s*requestClose\(\);/);
+});
