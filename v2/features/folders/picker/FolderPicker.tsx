@@ -30,6 +30,7 @@ import {
 import { filedContentId } from '../filed-content';
 import { useCreateFolderAndAdd } from './create-and-add';
 import { PickerBody } from './PickerBody';
+import { createDebounce, SEARCH_DEBOUNCE_MS } from './picker-search';
 import {
   folderItemNoun,
   pickerDescription,
@@ -86,9 +87,6 @@ import { usePickerBreakpoint } from './use-picker-breakpoint';
  * Folders page's loose files.
  */
 
-/** How long the field waits before the level query re-runs on what was typed. */
-const SEARCH_DEBOUNCE_MS = 250;
-
 /** One stable reference for "we have been told nothing yet". */
 const EMPTY_HELD: ReadonlySet<string> = new Set<string>();
 
@@ -139,17 +137,14 @@ export function FolderPicker({
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const debounceRef = useRef<number | null>(null);
+  // The wait between the last key and the search (`picker-search.ts`). Made
+  // once: `setQuery` never changes, so neither does the debounce.
+  const [debounce] = useState(() => createDebounce(setQuery, SEARCH_DEBOUNCE_MS));
   const sheetRef = useRef<HTMLDivElement | null>(null);
 
   // Cancel a pending debounce on unmount. No state is set here, so this stays
   // clear of `react-hooks/set-state-in-effect`.
-  useEffect(
-    () => () => {
-      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
-    },
-    [],
-  );
+  useEffect(() => () => debounce.cancel(), [debounce]);
 
   const noun = folderItemNoun(target.type);
 
@@ -169,13 +164,6 @@ export function FolderPicker({
   const move = useMoveFolderItem(target, { silentError: true });
   const undoMove = useMoveFolderItem(target);
 
-  const stopDebounce = () => {
-    if (debounceRef.current !== null) {
-      window.clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-  };
-
   const changeOpen = (next: boolean) => {
     if (!next) {
       // Reopening starts clean — at the root, with an empty field and NO
@@ -184,7 +172,7 @@ export function FolderPicker({
       // another tab) can do exactly that between two openings, and a picker
       // that kept the claim would refuse to say a folder is available when it
       // is. The 422 is cheap and always current — ask again.
-      stopDebounce();
+      debounce.cancel();
       setTrail([]);
       setInput('');
       setQuery('');
@@ -199,15 +187,11 @@ export function FolderPicker({
     setInput(value);
     setNotice(null);
     setInlineError(null);
-    stopDebounce();
-    debounceRef.current = window.setTimeout(() => {
-      debounceRef.current = null;
-      setQuery(value);
-    }, SEARCH_DEBOUNCE_MS);
+    debounce.push(value);
   };
 
   const clearInput = () => {
-    stopDebounce();
+    debounce.cancel();
     setInput('');
     setQuery('');
     setNotice(null);
@@ -219,10 +203,7 @@ export function FolderPicker({
    * the field, and only the next one, on a list that provably answers what is
    * typed, files anything.
    */
-  const commitSearch = () => {
-    stopDebounce();
-    setQuery(input);
-  };
+  const commitSearch = () => debounce.flush(input);
 
   const navigate = (next: readonly PickerCrumb[]) => {
     // Moving levels always empties the field. A search that found a folder is
@@ -435,10 +416,24 @@ export function FolderPicker({
           event.preventDefault();
           sheetRef.current?.focus();
         }}
-        className="max-h-[88dvh] gap-0 rounded-t-2xl border-border/60 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
-        // Rides the keyboard when the browser overlays it instead of resizing
-        // the layout viewport (iOS Safari) — the shell publishes the inset.
-        style={{ bottom: 'var(--keyboard-inset, 0px)' }}
+        // PLACED FROM THE VISIBLE RECTANGLE the keyboard hook publishes
+        // (`--visual-top`, `--visual-height`, use-keyboard-inset.ts), as the
+        // chat's draft sheet is (ChatSidePanel.tsx). Its top is put at the
+        // visible bottom and pulled up by its own height, so it stays sized to
+        // its rows and sits whole above the keyboard, and the cap keeps a
+        // 2.5rem strip above it. It used to stand on `--keyboard-inset` from
+        // the page's bottom, which iOS leaves behind the keyboard while it
+        // pans, so the sheet jumped between mid-screen and the top as the
+        // keyboard came and went (Arthur's iPhone recording, 24 October 2026).
+        className="top-[calc(var(--visual-top,0px)+var(--visual-height,100dvh))] max-h-[calc(var(--visual-height,100dvh)-2.5rem)] -translate-y-full gap-0 rounded-t-2xl border-border/60 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        // The sheet's own `bottom-0` would stretch it to the page's bottom.
+        style={{ bottom: 'auto' }}
+        // ONE DIM LAYER. Opened from the chat's draft sheet, which has its own
+        // backdrop and marks the page with `data-v2-side-panel`, a second dim
+        // layer turned the draft behind the picker nearly black (Arthur's
+        // iPhone recording, 24 October 2026). There the picker's overlay stays
+        // clear: it still takes the tap outside that closes the picker.
+        overlayClassName="[[data-v2-side-panel]_&]:bg-transparent [[data-v2-side-panel]_&]:backdrop-blur-none"
       >
         <SheetHeader className="gap-1 p-0 pb-3 pr-10">
           <SheetTitle>{title}</SheetTitle>

@@ -89,7 +89,8 @@ export function enterAction({
   committedSearch,
   active,
 }: {
-  /** The level query has data — the rows on screen are real rows. */
+  /** The level query has data for THIS search — the rows on screen are real
+   *  rows, not the previous search's kept while this one loads. */
   listReady: boolean;
   /** The field's live text. */
   input: string;
@@ -106,4 +107,37 @@ export function enterAction({
 
   if (active.kind === 'folder') return { kind: 'choose', uuid: active.uuid };
   return typed ? { kind: 'create', name: typed } : { kind: 'focus-field' };
+}
+
+/**
+ * What the phone keyboard's go key does in the sheet, which has no highlight
+ * to act on (Arthur's iPhone recording, 24 October 2026: he had to put the
+ * keyboard away to reach "Create 'Employment Folder'"). Only an answer that
+ * leaves no doubt acts: nothing matches, so it creates the typed name; one
+ * folder matches, so it picks that one. More than one match, or an empty
+ * field, does nothing, since go cannot say which row was meant. The same two
+ * gates as {@link enterAction} come first: a list behind the field commits
+ * the search, and a list still loading does nothing.
+ */
+export function sheetEnterAction({
+  answersTyped,
+  input,
+  committedSearch,
+  folderUuids,
+}: {
+  /** The rows on screen are the server's answer to the words in the field. */
+  answersTyped: boolean;
+  /** The field's live text. */
+  input: string;
+  /** The debounced text the current request was made with. */
+  committedSearch: string;
+  /** The folders on screen, in order. */
+  folderUuids: readonly string[];
+}): EnterAction {
+  const typed = input.trim();
+  if (typed !== committedSearch.trim()) return { kind: 'commit-search' };
+  if (!answersTyped || !typed) return { kind: 'none' };
+  if (folderUuids.length === 0) return { kind: 'create', name: typed };
+  if (folderUuids.length === 1) return { kind: 'choose', uuid: folderUuids[0] };
+  return { kind: 'none' };
 }

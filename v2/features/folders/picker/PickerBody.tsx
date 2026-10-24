@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { ChevronRight, Search, X } from 'lucide-react';
+import { ChevronRight, Loader2, Search, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -35,8 +35,11 @@ import {
   moveActive,
   pickerOptionRing,
   resolveActive,
+  sheetEnterAction,
+  type EnterAction,
   type PickerActive,
 } from './picker-keys';
+import { createRowFirst, keepWithinLevel, pickerListState } from './picker-search';
 
 /**
  * PickerBody — one search field, one trail, one list of destinations, in the
@@ -78,9 +81,19 @@ import {
  * it just did. When a drilled search comes up empty, the way out is offered
  * rather than described.
  *
- * ── SKELETON-FIRST, NEVER PLACEHOLDER TEXT ─────────────────────────────────
- * A cold level draws four rows of exact final geometry; a level already in
- * cache paints instantly and refetches behind the pulsing field icon.
+ * ── SKELETON ONCE, THEN THE LAST ANSWER STAYS UP ──────────────────────────
+ * A cold level draws four rows of exact final geometry. After that a new
+ * search keeps the last answer on screen while it loads, and a small spinner
+ * in the field says it is working (`picker-search.ts`): four skeleton rows on
+ * every key flashed the sheet (Arthur's iPhone recording, 24 October 2026).
+ * The words under the field read what is typed, never the search the rows
+ * were fetched with.
+ *
+ * ── THE PHONE'S GO KEY ────────────────────────────────────────────────────
+ * The sheet has no highlight, so its Enter follows {@link sheetEnterAction}:
+ * it creates the typed name when nothing matches and picks the folder when
+ * exactly one does. When nothing matches, the create row sits right under
+ * the field, above the keyboard ({@link createRowFirst}).
  *
  * ── WHOSE FOLDERS: THE VIEWER'S, OR ONE SPACE'S ────────────────────────────
  * With `space` the levels are the space's folders (`spacesQueries.folders`,
@@ -132,6 +145,8 @@ interface LevelQuery {
   isPending: boolean;
   isError: boolean;
   isFetching: boolean;
+  /** The rows are the previous search's, kept on screen while this one loads. */
+  isPlaceholderData: boolean;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   fetchNextPage: () => unknown;
@@ -174,7 +189,8 @@ export function PickerBody({
   const words: PickerWords = pickerWords(space);
 
   // One level of the viewer's own folders, or of the space's: the same
-  // question to two routes, one of them asked.
+  // question to two routes, one of them asked. A new search in the same
+  // level keeps the last answer up while it loads (`keepWithinLevel`).
   const ownLevel = useInfiniteQuery({
     ...foldersQueries.level({
       parentUuid,
@@ -182,6 +198,7 @@ export function PickerBody({
       viewerId,
     }),
     enabled: !inSpace,
+    placeholderData: keepWithinLevel(parentUuid),
   });
   const spaceLevel = useInfiniteQuery({
     ...spacesQueries.folders(space?.uuid ?? '', {
@@ -190,8 +207,16 @@ export function PickerBody({
       viewerId,
     }),
     enabled: inSpace,
+    placeholderData: keepWithinLevel(parentUuid),
   });
   const level: LevelQuery = inSpace ? spaceLevel : ownLevel;
+  const listState = pickerListState({
+    isPending: level.isPending,
+    isFetching: level.isFetching,
+    isPlaceholderData: level.isPlaceholderData,
+    input,
+    query,
+  });
 
   const ownPages = ownLevel.data?.pages;
   const spacePages = spaceLevel.data?.pages;
@@ -234,7 +259,8 @@ export function PickerBody({
   }, [activeId]);
 
   const sentinelRef = useInfiniteScrollSentinel<HTMLLIElement, HTMLDivElement>({
-    hasNextPage: level.hasNextPage,
+    // Rows kept from the last search have no next page in this search.
+    hasNextPage: level.hasNextPage && !level.isPlaceholderData,
     isFetchingNextPage: level.isFetchingNextPage,
     fetchNextPage: level.fetchNextPage,
     rootRef: scrollRef,
@@ -278,6 +304,37 @@ export function PickerBody({
     showAddress: search.length > 0 && trail.length === 0,
   });
 
+  const runEnter = (action: EnterAction) => {
+    if (action.kind === 'commit-search') {
+      onCommitSearch();
+      return;
+    }
+    if (action.kind === 'choose') {
+      const folder = folders.find((entry) => entry.uuid === action.uuid);
+      if (folder) onChoose(folder);
+      return;
+    }
+    if (action.kind === 'create') {
+      onCreate(action.name);
+      return;
+    }
+    if (action.kind === 'focus-field') inputRef.current?.focus();
+  };
+
+  /** The phone keyboard's go key: the sheet's only key (see the docblock). */
+  const onSheetKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    runEnter(
+      sheetEnterAction({
+        answersTyped: listState.answersTyped && !level.isError,
+        input,
+        committedSearch: query,
+        folderUuids: folders.map((folder) => folder.uuid),
+      }),
+    );
+  };
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     const field = event.currentTarget;
     const caretAtStart = field.selectionStart === 0 && field.selectionEnd === 0;
@@ -297,26 +354,16 @@ export function PickerBody({
     }
     if (event.key === 'Enter') {
       event.preventDefault();
-      const action = enterAction({
-        listReady,
-        input,
-        committedSearch: query,
-        active,
-      });
-      if (action.kind === 'commit-search') {
-        onCommitSearch();
-        return;
-      }
-      if (action.kind === 'choose') {
-        const folder = folders.find((entry) => entry.uuid === action.uuid);
-        if (folder) onChoose(folder);
-        return;
-      }
-      if (action.kind === 'create') {
-        onCreate(action.name);
-        return;
-      }
-      if (action.kind === 'focus-field') inputRef.current?.focus();
+      runEnter(
+        enterAction({
+          // Rows kept from the previous search are on screen, but they are
+          // not the answer to this one, so Enter waits for it.
+          listReady: listReady && !level.isPlaceholderData,
+          input,
+          committedSearch: query,
+          active,
+        }),
+      );
       return;
     }
     if (event.key === 'ArrowRight' && caretAtEnd) {
@@ -335,13 +382,19 @@ export function PickerBody({
     }
   };
 
-  const countAnnouncement = level.isPending
-    ? words.loading
-    : level.isError
-      ? words.failed
+  // The count is said only for the answer to what is typed: the rows kept
+  // from the last search are not a count of this one.
+  const countAnnouncement = level.isError
+    ? words.failed
+    : !listState.answersTyped
+      ? words.loading
       : `${folders.length} ${folders.length === 1 ? 'folder' : 'folders'}${
-          search ? ` matching ${search}` : ''
+          typedName ? ` matching ${typedName}` : ''
         }`;
+
+  // With nothing matching on the phone, the create row goes first, right
+  // under the field, so it stays above the keyboard.
+  const createFirst = !isDialog && createRowFirst(folders.length, typedName);
 
   const fieldLabel = here ? `Search in ${here.name}` : words.field;
 
@@ -389,13 +442,20 @@ export function PickerBody({
           ARIA wiring that component does not expose. Same 44px geometry, same
           16px base font (no iOS focus-zoom), same clear affordance. */}
       <div className="relative">
-        <Search
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground transition-opacity',
-            level.isFetching && !level.isPending && 'motion-safe:animate-pulse',
-          )}
-        />
+        {/* The field's icon turns into a small spinner while a search waits
+            for its pause or its answer: the rows stay put meanwhile. */}
+        {listState.searching ? (
+          <Loader2
+            aria-hidden
+            data-picker-searching=""
+            className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground motion-safe:animate-spin motion-reduce:opacity-60"
+          />
+        ) : (
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          />
+        )}
         <Input
           ref={inputRef}
           type="text"
@@ -419,7 +479,7 @@ export function PickerBody({
           maxLength={255}
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
-          onKeyDown={isDialog ? onKeyDown : undefined}
+          onKeyDown={isDialog ? onKeyDown : onSheetKeyDown}
           className="h-11 w-full rounded-4xl pl-10 pr-12"
         />
         {input ? (
@@ -441,7 +501,7 @@ export function PickerBody({
         ref={scrollRef}
         className="relative -mx-1 max-h-[min(24rem,45dvh)] min-h-0 overflow-y-auto overscroll-contain px-1"
       >
-        {level.isPending ? (
+        {listState.skeleton ? (
           <PickerRowsSkeleton />
         ) : level.isError ? (
           <PickerNotice
@@ -451,10 +511,16 @@ export function PickerBody({
           />
         ) : (
           <>
+            {createFirst ? (
+              <ul className="flex flex-col gap-0.5">
+                <CreateRow view={createRow} onActivate={activateCreate} />
+              </ul>
+            ) : null}
+
             {folders.length === 0 ? (
               <EmptyLevel
                 here={here}
-                search={search}
+                search={typedName}
                 words={words}
                 // Its button vanishes with the empty state it lives in, so the
                 // cursor is handed back to the field rather than dropped.
@@ -513,7 +579,7 @@ export function PickerBody({
                 {level.hasNextPage ? (
                   <li ref={sentinelRef} aria-hidden className="h-4 shrink-0" />
                 ) : null}
-                <CreateRow view={createRow} onActivate={activateCreate} />
+                {createFirst ? null : <CreateRow view={createRow} onActivate={activateCreate} />}
               </ul>
             )}
           </>
@@ -563,6 +629,9 @@ function EmptyLevel({
   onSearchEverywhere,
 }: {
   here: PickerCrumb | null;
+  /** What is typed in the field NOW, never the search the rows were fetched
+   *  with: "No folder matches 'E'" under "Emp" was Arthur's iPhone recording,
+   *  24 October 2026. */
   search: string;
   /** Whose folders were looked at (`pickerWords`). */
   words: PickerWords;
