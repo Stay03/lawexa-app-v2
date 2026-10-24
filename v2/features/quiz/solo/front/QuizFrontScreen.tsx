@@ -266,27 +266,32 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             <h1 className="text-xl leading-snug font-semibold tracking-tight text-balance text-foreground md:text-3xl">
               {quiz.title}
             </h1>
-            {/* What it is, in one line (Arthur, 24 October 2026): whose (the
-                author's photo and name, for the author too), how many
-                questions, how long, and who can find it. `creator` is
+            {/* What it is, in one line on a computer (Arthur, 24 October 2026):
+                whose (the author's photo and name, for the author too), how
+                many questions, how long, and who can find it. On a phone the
+                author has the first line and the facts the second, so a
+                wrapped line never starts with a separator. `creator` is
                 nullable (a gone account): a word, never a crash. */}
-            <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground" aria-label="About this quiz">
+            <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground md:flex-row md:flex-wrap md:items-center md:gap-x-1.5" aria-label="About this quiz">
               <span className="inline-flex min-w-0 items-center gap-1.5">
                 <MemberAvatar user={quiz.creator} size="sm" />
                 <span className="truncate font-medium text-foreground/85">{quiz.creator?.name ?? 'Someone who has left'}</span>
               </span>
-              {facts.map((fact) => (
-                <span key={fact} className="whitespace-nowrap">
-                  <span aria-hidden className="mr-1.5">·</span>
-                  {fact}
-                </span>
-              ))}
-              <span className="inline-flex items-center gap-1 whitespace-nowrap">
-                <span aria-hidden className="mr-0.5">·</span>
-                <Mark aria-hidden className="size-3.5 shrink-0" />
-                {visibilityFace(quiz.visibility)}
+              <span aria-hidden className="hidden md:inline">·</span>
+              <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                {[...facts, null].map((fact, index) => (
+                  <span key={fact ?? 'visibility'} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                    {index > 0 ? <span aria-hidden>·</span> : null}
+                    {fact ?? (
+                      <span className="inline-flex items-center gap-1">
+                        <Mark aria-hidden className="size-3.5 shrink-0" />
+                        {visibilityFace(quiz.visibility)}
+                      </span>
+                    )}
+                  </span>
+                ))}
               </span>
-            </p>
+            </div>
             {quiz.description && (
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
