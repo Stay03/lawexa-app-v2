@@ -200,6 +200,31 @@ export const V2_ROUTE_EXCLUSIONS = [
 export type V2Route = (typeof V2_ROUTES)[number];
 
 /**
+ * Addresses only v2 has a page for that readers SEND to other people, served
+ * from v2 whoever opens them: no cookie, v1's cookie, a crawler unfurling the
+ * link. A friend opening a shared link has usually never chosen v2, and v1 has
+ * no page at these addresses, so every one of them answered "This page could
+ * not be found" (Arthur, 24 October 2026: the results' "Challenge a friend"
+ * link, `/quiz/q/{uuid}`).
+ *
+ *  - `/quiz/q/{uuid}`: a quiz's own page, shared from its page, the library,
+ *    a Space's quiz sheet and the results' Challenge a friend. A signed-out
+ *    visitor sees it as v2 shows a guest.
+ *  - `/statutes/{slug}/{section…}`: a statute section, copied from the
+ *    reader's section link. v1 has the statute itself (`/statutes/{slug}`) and
+ *    keeps it.
+ *
+ * Nothing else changes for the visitor: the cookie is not set, so every other
+ * address stays where their choice puts it.
+ */
+export function isV2OnlySharedPath(pathname: string): boolean {
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments[0] === 'quiz' && segments[1] === 'q') return segments.length >= 3;
+  if (segments[0] === 'statutes') return segments.length >= 3;
+  return false;
+}
+
+/**
  * Whether `pathname` has been migrated to v2. Exact entries match the path
  * verbatim; `'/prefix/*'` entries match the prefix and everything below it.
  * Exclusions are checked first and always win over inclusions.

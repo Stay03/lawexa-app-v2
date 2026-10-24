@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isMigratedToV2 } from '@/v2/routes.manifest';
+import { isMigratedToV2, isV2OnlySharedPath } from '@/v2/routes.manifest';
 import { UI_COOKIE } from '@/v2/cookie';
 import { servesV2, v2DefaultFromEnv } from '@/v2/ui-choice';
 
@@ -54,7 +54,9 @@ export function proxy(request: NextRequest): NextResponse {
 
   // Opted-in users on a migrated route → serve the v2 tree without changing the
   // URL. Root `/` maps to `/v2`; `/x` maps to `/v2/x`. `clone()` preserves search.
-  if (hasV2Cookie && isMigratedToV2(pathname)) {
+  // A shared address only v2 has a page for is served from v2 to everyone
+  // (`isV2OnlySharedPath`): v1 would answer it with a 404.
+  if ((hasV2Cookie || isV2OnlySharedPath(pathname)) && isMigratedToV2(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = pathname === '/' ? V2_PREFIX : `${V2_PREFIX}${pathname}`;
     return NextResponse.rewrite(url);
