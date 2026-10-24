@@ -42,8 +42,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, quizMinutesLabel, scenarioCountLabel } from '../rows-model';
-import { QuizSourceLine } from '../../source/QuizSourceLine';
-import { FRONT_SCORING_NOTE, frontChallengeText, quizContents, takenLabel } from './front-model';
+import { FRONT_SCORING_NOTE, frontChallengeText, takenLabel } from './front-model';
 import {
   clearScreenContext,
   setScreenContext,
@@ -93,10 +92,10 @@ import { soloQuizQueries } from '../queries';
  *
  * ── NOTHING HERE LISTS THE QUESTIONS ───────────────────────────────────────
  * The preview carries them (without answers), but a quiz read before it is
- * taken is a quiz half-spoiled. The front says how many and how long, and
- * "What is in it" names only the scenarios and how many questions each has
- * (`quizContents`), until Arthur answers "the first 2 questions, or all"
- * (Stay, 23 October 2026). The player shows the questions one at a time.
+ * taken is a quiz half-spoiled. The front says how many questions and
+ * scenarios and how long, in its one line of facts; the "What is in it" list
+ * went (Stay, 24 October 2026: "so many unnecessary text"). The player shows
+ * the questions one at a time, each scenario with its source.
  *
  * ── THE APPROVED DESIGN (quiz piece 3, picture 4) ──────────────────────────
  * A masthead (the tile, the title, the author, the facts as pills), then a
@@ -253,7 +252,6 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const minutes = quizMinutesLabel(quiz.total_seconds) ?? (questions.length > 0 ? quizLengthLabel(questions) : null);
   const best = bestLabel(quiz.viewer_best_points);
   const taken = takenLabel(quiz.viewer_attempts_count);
-  const contents = quizContents(questions, quiz.scenarios ?? []);
   const Mark = VISIBILITY_MARKS[quiz.visibility];
   const facts = [questionCountLabel(count), scenarios, minutes].filter((fact): fact is string => Boolean(fact));
 
@@ -296,22 +294,6 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
           </header>
-
-          {contents.length > 0 ? (
-            <section aria-labelledby="quiz-contents-heading" className="space-y-2">
-              <h2 id="quiz-contents-heading" className="text-sm font-medium text-foreground">
-                What is in it
-              </h2>
-              <ul className="flex flex-col divide-y divide-border/60 rounded-2xl border border-border/60">
-                {contents.map((line) => (
-                  <li key={line.key} className="px-4 py-3 text-sm text-foreground/90">
-                    {line.label}
-                    <QuizSourceLine source={line.source} className="mt-1" />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-5 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">

@@ -62,7 +62,9 @@ test('the line is drawn where the answers and the scenarios are, and in the auth
   assert.match(answers, /<QuizSourceLine source=\{scenario\.source\} className="mt-2" \/>/);
   assert.match(answers, /<QuizSourceLine source=\{question\.source\} className="mt-3" \/>/);
   assert.match(read('features/quiz/solo/player/AttemptPlay.tsx'), /<QuizSourceLine source=\{scenario\.source\} className="mt-2" \/>/);
-  assert.match(read('features/quiz/solo/front/QuizFrontScreen.tsx'), /<QuizSourceLine source=\{line\.source\} className="mt-1" \/>/);
+  // The quiz's page names no scenario now (Stay, 24 October 2026): a scenario's
+  // source shows in the player and in the answers, above its questions.
+  assert.doesNotMatch(read('features/quiz/solo/front/QuizFrontScreen.tsx'), /QuizSourceLine/);
   const form = read('features/channels/quiz/QuizFormDialog.tsx');
   assert.equal(form.match(/<QuizSourceLine source=\{draft\.source\} \/>/g)?.length, 2);
   // Plain text and a link: no chip, no gold.
