@@ -307,3 +307,12 @@ test('on a phone the sheet takes the visible rectangle, so the keyboard never hi
   const shell = readFileSync(new URL('../../../../shell/shell.css', import.meta.url), 'utf8');
   assert.match(shell, /@media \(max-width: 79\.999rem\) \{[\s\S]*?html\[data-v2-side-panel\] \.v2-shell__dock \{\s*visibility: hidden;\s*\}/);
 });
+
+test('the caret stays in view as the keyboard rises: scrolled to on focus and on every visible-area change (Arthur, 24 October 2026)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  assert.match(editor, /viewport\?\.addEventListener\('resize', keepCaretInView\);\s*editor\.on\('focus', keepCaretInView\);/);
+  assert.match(editor, /if \(!editor\.isFocused\) return;/);
+  assert.match(editor, /if \(!editor\.isDestroyed\) editor\.commands\.scrollIntoView\(\);/);
+  assert.match(editor, /scrollMargin: \{ top: CARET_MARGIN_TOP, bottom: CARET_MARGIN_BOTTOM, left: 0, right: 0 \},/);
+});

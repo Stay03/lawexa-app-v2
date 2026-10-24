@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Content } from '@tiptap/core';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
@@ -105,6 +105,14 @@ interface DraftEditorProps {
 }
 
 /**
+ * How far from the scroller's edges the caret is kept when it is scrolled to
+ * (px): clear of the sticky toolbar above (two rows on the phone sheet) and
+ * of Save at the foot.
+ */
+const CARET_MARGIN_TOP = 112;
+const CARET_MARGIN_BOTTOM = 96;
+
+/**
  * The document's frame. On the phone sheet a document measure. On a computer
  * the panel's width with even margins, 48px, or 32px on a panel under 37.5rem
  * (a 1280 screen), up to a 780px reading width (Stay, 24 October 2026: "waste
@@ -175,6 +183,9 @@ function DraftEditorBody({
     },
     editorProps: {
       transformPastedHTML: stripPastedPresentation,
+      // The caret is kept clear of the sticky toolbar at the top and Save at the foot when it is scrolled to.
+      scrollThreshold: { top: CARET_MARGIN_TOP, bottom: CARET_MARGIN_BOTTOM, left: 0, right: 0 },
+      scrollMargin: { top: CARET_MARGIN_TOP, bottom: CARET_MARGIN_BOTTOM, left: 0, right: 0 },
       attributes: {
         'aria-label': 'Draft',
         class: cn(
@@ -193,6 +204,34 @@ function DraftEditorBody({
   });
 
   const draft = useDraftSave({ editor, conversationId, ordinal, title, onSaved: () => setDirty(false) });
+
+  // THE CARET STAYS IN VIEW AS THE KEYBOARD RISES (Arthur's iPhone, 24 October
+  // 2026: "the tap on the specific portion of the note still takes the
+  // blinker God knows where"). A tap puts the caret where it lands, then the
+  // keyboard rises and the sheet, which takes the visible area, gets shorter
+  // from the bottom, so a caret placed low in the draft ends up under the
+  // keyboard's top edge, out of sight. Once the editor has focus, and on
+  // every change of the visible area while it has it, the selection is
+  // scrolled back into view, clear of the toolbar and Save.
+  useEffect(() => {
+    if (!editor) return;
+    const viewport = window.visualViewport;
+    let frame = 0;
+    const keepCaretInView = (): void => {
+      if (!editor.isFocused) return;
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (!editor.isDestroyed) editor.commands.scrollIntoView();
+      });
+    };
+    viewport?.addEventListener('resize', keepCaretInView);
+    editor.on('focus', keepCaretInView);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      viewport?.removeEventListener('resize', keepCaretInView);
+      editor.off('focus', keepCaretInView);
+    };
+  }, [editor]);
 
   return (
     <div ref={frameRef} className="@container/draft flex min-h-full flex-col">
