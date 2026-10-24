@@ -30,7 +30,7 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
   assert.match(source, /const mayTake = canTakeQuiz\(session\);/);
   assert.match(source, /startAttempt\.mutate\(revealMode, \{\s*onSuccess: \(response\) => router\.push\(attemptHref\(response\.data\.uuid\)\),/);
   assert.match(source, /\{mayTake \? \(\s*<RaisedButton className=\{FRONT_BUTTON\} onClick=\{start\}/);
-  assert.match(source, /<RaisedButton asChild className=\{FRONT_BUTTON\}>\s*<Link href=\{signInHref\(pathname\)\}>Sign in to take this quiz<\/Link>/);
+  assert.match(source, /<RaisedButton asChild className=\{cn\(FRONT_BUTTON, 'max-md:basis-full'\)\}>\s*<Link href=\{signInHref\(pathname\)\}>Sign in to take this quiz<\/Link>/);
   // A stale session's 401 is not bounced by the client on this page, so the
   // screen takes the reader to sign in itself.
   assert.match(source, /if \(status === 401\) \{\s*router\.push\(signInHref\(pathname\)\);/);
@@ -102,6 +102,10 @@ test('the quiz page is drawn on B1: its tokens and the raised buttons', () => {
   const bar = source.slice(source.indexOf('START STAYS IN REACH'), source.indexOf('{!mayTake && ('));
   assert.doesNotMatch(bar, /<Button\b/);
   assert.equal(bar.match(/<RaisedButton\b/g)?.length, 3);
+  // On a phone the sign-in takes the bar's whole row, the challenge under it,
+  // and the page leaves room for the taller bar.
+  assert.match(source, /className=\{cn\(FRONT_BUTTON, 'flex-none max-md:\[a\+&\]:flex-1'\)\}/);
+  assert.match(source, /<div className=\{cn\(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44'\)\}>/);
 });
 
 /* Stay, 24 October 2026: "So many unnecessary text please remove them". */

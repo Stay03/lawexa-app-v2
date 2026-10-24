@@ -258,7 +258,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const facts = [questionCountLabel(count), scenarios, minutes].filter((fact): fact is string => Boolean(fact));
 
   return (
-    <div className={FRONT_COLUMN}>
+    <div className={cn(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44')}>
       <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-8">
         <div className="flex min-w-0 flex-col gap-5">
           <header className="space-y-2 md:space-y-3">
@@ -342,6 +342,10 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 the same see-through plate the results use; in the panel on a
                 computer. */}
             <div className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70 md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              {/* B1's bold type does not fit "Sign in to take this quiz" beside
+                  "Challenge a friend" in a phone's bar: the sign-in takes the
+                  whole row and the challenge, after it, fills the next
+                  (Backend's picture, 24 October 2026). */}
               {mayTake ? (
                 <RaisedButton className={FRONT_BUTTON} onClick={start} disabled={startAttempt.isPending}>
                   {startAttempt.isPending ? (
@@ -352,7 +356,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                   Start quiz
                 </RaisedButton>
               ) : (
-                <RaisedButton asChild className={FRONT_BUTTON}>
+                <RaisedButton asChild className={cn(FRONT_BUTTON, 'max-md:basis-full')}>
                   <Link href={signInHref(pathname)}>Sign in to take this quiz</Link>
                 </RaisedButton>
               )}
@@ -360,7 +364,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 <RaisedButton
                   type="button"
                   tone="quiet"
-                  className={cn(FRONT_BUTTON, 'flex-none')}
+                  className={cn(FRONT_BUTTON, 'flex-none max-md:[a+&]:flex-1')}
                   onClick={() => void challenge.share()}
                 >
                   {challenge.copied ? <Check aria-hidden className="size-4" /> : <Share2 aria-hidden className="size-4" />}
