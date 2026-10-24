@@ -1,11 +1,11 @@
 'use client';
 
-import type { ComponentProps, CSSProperties } from 'react';
+import { useEffect, useState, type ComponentProps, type CSSProperties } from 'react';
 import { Check } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import type { SegmentTone } from './model';
+import { pointsLabel, type SegmentTone } from './model';
 
 /**
  * solo quiz UI kit — the pieces design B1 draws on both of its screens: the
@@ -101,15 +101,54 @@ export function TickBurst() {
       <span className="v2-solo-pop absolute inset-0 grid place-items-center rounded-full bg-[var(--solo-right)] text-background shadow-[0_0_0_6px_color-mix(in_oklch,var(--solo-right)_18%,transparent)]">
         <Check className="size-5" strokeWidth={3} />
       </span>
-      {BURST_ANGLES.map((angle) => (
-        <span
-          key={angle}
-          className="v2-solo-dot absolute top-4 left-4 size-1.5 rounded-full bg-primary"
-          style={{ '--a': `${angle}deg` } as CSSProperties}
-        />
-      ))}
+      <BurstDots className="top-4 left-4" />
     </span>
   );
+}
+
+/**
+ * The eight gold dots that travel 28px out from a tick and fade (B1 motion
+ * note 3). `className` places their start at the tick's centre. Hidden under
+ * reduced motion by `solo-quiz.css`, where the tick alone says it.
+ */
+export function BurstDots({ className }: { className: string }) {
+  return BURST_ANGLES.map((angle) => (
+    <span
+      key={angle}
+      aria-hidden
+      className={cn('v2-solo-dot absolute size-1.5 rounded-full bg-primary', className)}
+      style={{ '--a': `${angle}deg` } as CSSProperties}
+    />
+  ));
+}
+
+/** Whether the reader asked for less motion. Read once, on the client. */
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * "960", counted up from 0 over 600 ms with an ease-out (B1 motion note 4),
+ * in the caller's tabular numerals so the width holds while it counts. Under
+ * reduced motion the final number shows at once. Decoration over a number
+ * the play page's live region already says in words.
+ */
+export function CountUp({ value, durationMs = 600 }: { value: number; durationMs?: number }) {
+  const [still] = useState(prefersReducedMotion);
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (still) return;
+    let frame = 0;
+    const started = performance.now();
+    const step = (now: number) => {
+      const done = Math.min(1, (now - started) / durationMs);
+      setShown(Math.round(value * (1 - (1 - done) ** 3)));
+      if (done < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [still, value, durationMs]);
+  return pointsLabel(still ? value : shown);
 }
 
 /** "3 in a row", popped in after the tick has landed. */

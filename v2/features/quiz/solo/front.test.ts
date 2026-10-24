@@ -29,8 +29,8 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
   const source = screen();
   assert.match(source, /const mayTake = canTakeQuiz\(session\);/);
   assert.match(source, /startAttempt\.mutate\(revealMode, \{\s*onSuccess: \(response\) => router\.push\(attemptHref\(response\.data\.uuid\)\),/);
-  assert.match(source, /\{mayTake \? \(\s*<Button size="lg" className="min-w-0 flex-1" onClick=\{start\}/);
-  assert.match(source, /<Link href=\{signInHref\(pathname\)\}>Sign in to take this quiz<\/Link>/);
+  assert.match(source, /\{mayTake \? \(\s*<RaisedButton className=\{FRONT_BUTTON\} onClick=\{start\}/);
+  assert.match(source, /<RaisedButton asChild className=\{FRONT_BUTTON\}>\s*<Link href=\{signInHref\(pathname\)\}>Sign in to take this quiz<\/Link>/);
   // A stale session's 401 is not bounced by the client on this page, so the
   // screen takes the reader to sign in itself.
   assert.match(source, /if \(status === 401\) \{\s*router\.push\(signInHref\(pathname\)\);/);
@@ -53,7 +53,7 @@ test("the owner's Edit and Delete ride the bar's menu, and Delete leaves for the
   // Share only where a link can open it; the owner of a private one is told why.
   assert.match(source, /const shareable = quiz\.visibility === 'link' \|\| quiz\.visibility === 'public';/);
   // Challenge a friend, a secondary button beside Start, the one gold action.
-  assert.match(source, /\{shareable && \(\s*<Button\s*type="button"\s*variant="outline"/);
+  assert.match(source, /\{shareable && \(\s*<RaisedButton\s*type="button"\s*tone="quiet"/);
   assert.match(source, /\{challenge\.copied \? 'Link copied' : 'Challenge a friend'\}/);
   assert.match(source, /'Only you can open this quiz\.'/);
 });
@@ -89,6 +89,19 @@ test('the quiz page says what it is in one plain line, with short copy and no em
   assert.doesNotMatch(FRONT_SCORING_NOTE, /\u2014/);
   assert.equal(frontChallengeText('TEST DATA Land law', 4947), 'I scored 4,947 points on TEST DATA Land law. Can you beat me?');
   assert.equal(frontChallengeText('TEST DATA Land law', null), 'Try TEST DATA Land law on Lawexa. How many can you get right?');
+});
+
+/* Arthur's B1, 24 October 2026: the page a "Challenge a friend" link lands
+ * on reads like the player and the results, on B1's tokens and lip. */
+test('the quiz page is drawn on B1: its tokens and the raised buttons', () => {
+  const source = screen();
+  assert.match(source, /import '\.\.\/solo-quiz\.css';/);
+  assert.match(source, /const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-5xl/);
+  assert.match(source, /const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-\[15px\] md:h-14 md:px-5 md:text-base';/);
+  // Start, Sign in and Challenge a friend: no flat house button among them.
+  const bar = source.slice(source.indexOf('START STAYS IN REACH'), source.indexOf('{!mayTake && ('));
+  assert.doesNotMatch(bar, /<Button\b/);
+  assert.equal(bar.match(/<RaisedButton\b/g)?.length, 3);
 });
 
 /* Stay, 24 October 2026: "So many unnecessary text please remove them". */

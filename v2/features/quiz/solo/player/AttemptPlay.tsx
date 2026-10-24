@@ -15,6 +15,7 @@ import {
   attemptResultsHref,
   END_MODE_ADVANCE_MS,
   REVEAL_HOLD_MS,
+  streakEndingAt,
   nextUnanswered,
   optionTileState,
   orderedQuestions,
@@ -29,7 +30,7 @@ import {
   type PlayStep,
 } from '../model';
 import { useAnswerAttempt, useFinishAttempt } from '../mutations';
-import { ProgressSegments, RaisedButton } from '../ui';
+import { CountUp, ProgressSegments, RaisedButton, StreakChip } from '../ui';
 import { AttemptOptionTile } from './AttemptOptionTile';
 import { AttemptTimer, FrozenRail } from './AttemptTimer';
 import { EndAttemptDialog } from './EndAttemptDialog';
@@ -139,6 +140,9 @@ export function AttemptPlay({
   const points = attemptPoints(attempt);
   const unanswered = unansweredCount(attempt);
   const segments = progressSegments(questions, cursor);
+  // The run this right answer extends, shown during the hold from two up
+  // (B1's "3 in a row"; Arthur's B1, 24 October 2026).
+  const streak = step === 'revealed' && question?.is_correct === true ? streakEndingAt(questions, cursor) : 0;
 
   const advance = useCallback(() => {
     setNote(null);
@@ -367,7 +371,7 @@ export function AttemptPlay({
                 onContinue={isLast ? finishNow : advance}
               />
             ) : (
-              <Foot step={step} note={note} optionCount={question.options.length} />
+              <Foot step={step} note={note} optionCount={question.options.length} streak={streak} />
             )}
           </div>
         </>
@@ -490,9 +494,14 @@ function QuestionGroup({
               disabled={step === 'sending' || step === 'answered'}
               onSelect={step === 'open' ? () => onPick(option.id) : undefined}
               badge={
-                step === 'revealed' && option.id === question.your_option_id
-                  ? `+${pointsLabel(question.points ?? 0)}`
-                  : null
+                step === 'revealed' && option.id === question.your_option_id ? (
+                  <>
+                    +<CountUp value={question.points ?? 0} />
+                  </>
+                ) : null
+              }
+              celebrate={
+                step === 'revealed' && option.id === question.your_option_id && question.is_correct === true
               }
             />
           ))}
@@ -511,10 +520,13 @@ function Foot({
   step,
   note,
   optionCount,
+  streak,
 }: {
   step: PlayStep;
   note: string | null;
   optionCount: number;
+  /** The run a right answer extends, during its hold; 0 for none. */
+  streak: number;
 }) {
   return (
     <div className="flex min-h-10 items-center gap-3 text-[13px] text-muted-foreground">
@@ -535,6 +547,9 @@ function Foot({
           <Check aria-hidden className="size-4 text-primary" />
           Locked in
         </p>
+      ) : step === 'revealed' ? (
+        // The verdict is on the tiles; the foot adds only a run worth naming.
+        streak >= 2 ? <StreakChip count={streak} /> : null
       ) : (
         // A phone says nothing before the tap: the tiles are the way in. A
         // computer names its keys.

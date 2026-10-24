@@ -28,7 +28,7 @@ test('the share behaviour is one hook, and the pill composes it unchanged', () =
 test('every share site hands on the quiz front, and only where a link can open it', () => {
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
   assert.match(front, /const challenge = useShareAction\(\{\s*path: quizFrontHref\(quizUuid\),/);
-  assert.match(front, /\{shareable && \(\s*<Button[\s\S]*?onClick=\{\(\) => void challenge\.share\(\)\}/);
+  assert.match(front, /\{shareable && \(\s*<RaisedButton[\s\S]*?onClick=\{\(\) => void challenge\.share\(\)\}/);
   // The results' Challenge a friend: the quiz's link with the challenge
   // sentence, through the same hook, and only where a link can open it.
   const actions = read('v2', 'features', 'quiz', 'solo', 'results', 'ResultsActions.tsx');

@@ -1,10 +1,12 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Check, Diamond, Triangle, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import type { OptionState } from '@/v2/features/channels/quiz/ui';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { BurstDots } from '../ui';
 
 /**
  * AttemptOptionTile — one answer in design B1: a raised card for a pick-one
@@ -19,6 +21,12 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * NEVER COLOUR ALONE (WCAG 1.4.1): a revealed tile carries a screen-reader
  * sentence naming its verdict beside the tick or the cross, and the true and
  * false tiles differ by glyph as well as by colour.
+ *
+ * B1'S CELEBRATION, ON THE TILE (Arthur's B1, 24 October 2026). The verdict
+ * sheet left the screen (3e9c4a28), so a right pick celebrates where it was
+ * tapped: its tick pops in a glow ring with the burst of gold dots, and its
+ * points count up in the badge. Reduced motion keeps the tick and the final
+ * number, with no pop and no dots (`solo-quiz.css`).
  *
  * THE DIGIT IS DRAWN FOR A POINTER ONLY: the key hint on the right of a card
  * answers the keyboard, so it shows where there is one to speak of (the
@@ -66,6 +74,7 @@ export function AttemptOptionTile({
   disabled,
   onSelect,
   badge = null,
+  celebrate = false,
 }: {
   index: number;
   content: string;
@@ -76,7 +85,9 @@ export function AttemptOptionTile({
   disabled?: boolean;
   onSelect?: () => void;
   /** The points this tile won, on the tapped tile of a verdict ("+853"). */
-  badge?: string | null;
+  badge?: ReactNode;
+  /** The reader's own right pick, on its verdict: the tick pops and bursts. */
+  celebrate?: boolean;
 }) {
   const interactive = !!onSelect && !disabled;
   const tall = look !== 'card';
@@ -130,19 +141,23 @@ export function AttemptOptionTile({
       )}
 
       {state === 'correct' || state === 'wrong-pick' ? (
-        <span
-          aria-hidden
-          className={cn(
-            'grid size-6 shrink-0 place-items-center rounded-full text-background',
-            state === 'correct' ? 'bg-[var(--solo-right)]' : 'bg-[var(--solo-wrong)]',
-            tall && 'ring-2 ring-white/70',
-          )}
-        >
-          {state === 'correct' ? (
-            <Check className="size-3.5" strokeWidth={3} />
-          ) : (
-            <X className="size-3.5" strokeWidth={3} />
-          )}
+        <span aria-hidden className="relative size-6 shrink-0">
+          <span
+            className={cn(
+              'grid size-6 place-items-center rounded-full text-background',
+              state === 'correct' ? 'bg-[var(--solo-right)]' : 'bg-[var(--solo-wrong)]',
+              tall && 'ring-2 ring-white/70',
+              celebrate &&
+                'v2-solo-pop shadow-[0_0_0_6px_color-mix(in_oklch,var(--solo-right)_18%,transparent)]',
+            )}
+          >
+            {state === 'correct' ? (
+              <Check className="size-3.5" strokeWidth={3} />
+            ) : (
+              <X className="size-3.5" strokeWidth={3} />
+            )}
+          </span>
+          {celebrate && <BurstDots className="top-[9px] left-[9px]" />}
         </span>
       ) : state === 'idle' ? (
         <kbd

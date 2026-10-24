@@ -130,7 +130,9 @@ test('each holds its verdict on the tiles, then moves on by itself (a tap sooner
   assert.match(play, /onContinue=\{isLast \? finishNow : advance\}/);
   assert.match(play, /\{isLast \? 'See results' : 'Continue'\}/);
   assert.match(play, /\{unanswered\} unanswered: /);
-  assert.doesNotMatch(play, /RevealSheet|TickBurst|StreakChip|was the\s*answer/);
+  // No verdict sheet in either mode (3e9c4a28): B1's celebration rides the
+  // tiles and the foot instead (below).
+  assert.doesNotMatch(play, /RevealSheet|TickBurst|was the\s*answer/);
   // The tiles are B1's, in the channel game's states; the digits are scoped
   // to the group.
   assert.match(play, /<AttemptOptionTile\s*key=\{option\.id\}/);
@@ -158,7 +160,7 @@ test('the question screen is drawn in B1: segments and the thin clock over the q
   assert.match(play, /look=\{question\.type === 'true_false' \? \(index === 0 \? 'true' : 'false'\) : 'card'\}/);
   // The verdict is the tiles': the tapped one shows its points, and during the
   // hold the tiles are passive, so a tap reaches the screen's "move on".
-  assert.match(play, /badge=\{\s*step === 'revealed' && option\.id === question\.your_option_id\s*\? `\+\$\{pointsLabel\(question\.points \?\? 0\)\}`\s*: null\s*\}/);
+  assert.match(play, /badge=\{\s*step === 'revealed' && option\.id === question\.your_option_id \? \(\s*<>\s*\+<CountUp value=\{question\.points \?\? 0\} \/>\s*<\/>\s*\) : null\s*\}/);
   assert.match(play, /disabled=\{step === 'sending' \|\| step === 'answered'\}/);
   // The `end` sheet, quiet: no verdict before the results.
   assert.match(play, /className="v2-solo-rise sticky bottom-0 z-10 -mx-4 -mb-6 rounded-t-3xl border-t-2 border-border bg-card/);
@@ -171,6 +173,22 @@ test('the question screen is drawn in B1: segments and the thin clock over the q
   // A passive tile (no pick, not locked) is not disabled, so its tap bubbles.
   assert.match(tile, /onClick=\{interactive \? onSelect : undefined\}\s*disabled=\{disabled === true\}\s*aria-disabled=\{interactive \? undefined : true\}/);
   assert.match(tile, /\{badge && \(/);
+
+  /* B1's celebration without the sheet (Arthur's B1, 24 October 2026): on
+   * the reader's own right pick the tick pops and bursts, the points count
+   * up in the badge, and a run of two or more shows in the foot during the
+   * hold. Reduced motion keeps the tick, the final number and the chip. */
+  assert.match(play, /celebrate=\{\s*step === 'revealed' && option\.id === question\.your_option_id && question\.is_correct === true\s*\}/);
+  assert.match(play, /const streak = step === 'revealed' && question\?\.is_correct === true \? streakEndingAt\(questions, cursor\) : 0;/);
+  assert.match(play, /\) : step === 'revealed' \? \(\s*\/\/[^\n]*\n\s*streak >= 2 \? <StreakChip count=\{streak\} \/> : null/);
+  assert.match(tile, /celebrate &&\s*'v2-solo-pop shadow-\[0_0_0_6px_color-mix\(in_oklch,var\(--solo-right\)_18%,transparent\)\]'/);
+  assert.match(tile, /\{celebrate && <BurstDots className="top-\[9px\] left-\[9px\]" \/>\}/);
+  const countUp = read('v2', 'features', 'quiz', 'solo', 'ui.tsx');
+  assert.match(countUp, /const \[still\] = useState\(prefersReducedMotion\);/);
+  assert.match(countUp, /return pointsLabel\(still \? value : shown\);/);
+  assert.match(countUp, /setShown\(Math\.round\(value \* \(1 - \(1 - done\) \*\* 3\)\)\);/);
+  const motionCss = read('v2', 'features', 'quiz', 'solo', 'solo-quiz.css');
+  assert.match(motionCss, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.v2-solo-dot \{\s*opacity: 0;/);
 
   const timer = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptTimer.tsx');
   assert.match(timer, /\{clock\.seconds\} s/);

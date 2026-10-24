@@ -63,6 +63,8 @@ import {
   REVEAL_MODE_CHOICES,
 } from '../model';
 import { useStartAttempt } from '../mutations';
+import { RaisedButton } from '../ui';
+import '../solo-quiz.css';
 import { soloQuizQueries } from '../queries';
 
 /**
@@ -341,30 +343,29 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 computer. */}
             <div className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70 md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
               {mayTake ? (
-                <Button size="lg" className="min-w-0 flex-1" onClick={start} disabled={startAttempt.isPending}>
+                <RaisedButton className={FRONT_BUTTON} onClick={start} disabled={startAttempt.isPending}>
                   {startAttempt.isPending ? (
                     <Loader2 aria-hidden className="size-4 animate-spin" />
                   ) : (
                     <Play aria-hidden className="size-4" />
                   )}
                   Start quiz
-                </Button>
+                </RaisedButton>
               ) : (
-                <Button asChild size="lg" className="min-w-0 flex-1">
+                <RaisedButton asChild className={FRONT_BUTTON}>
                   <Link href={signInHref(pathname)}>Sign in to take this quiz</Link>
-                </Button>
+                </RaisedButton>
               )}
               {shareable && (
-                <Button
+                <RaisedButton
                   type="button"
-                  variant="outline"
-                  size="lg"
-                  className="min-w-0 shrink-0"
+                  tone="quiet"
+                  className={cn(FRONT_BUTTON, 'flex-none')}
                   onClick={() => void challenge.share()}
                 >
                   {challenge.copied ? <Check aria-hidden className="size-4" /> : <Share2 aria-hidden className="size-4" />}
                   <span aria-live="polite">{challenge.copied ? 'Link copied' : 'Challenge a friend'}</span>
-                </Button>
+                </RaisedButton>
               )}
             </div>
 
@@ -427,7 +428,14 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 /** The page's column: wider than a list, for the side panel on a computer,
  *  with room at the foot of a phone for the pinned Start. The skeleton and the
  *  route fallback share it, so the hand-over moves nothing sideways. */
-const FRONT_COLUMN = 'mx-auto w-full max-w-5xl px-4 pt-3 pb-28 md:pt-6 md:pb-16';
+/* `v2-solo` carries design B1's tokens (`../solo-quiz.css`): the lip, the
+ * colours, the same reading as the player and the results (Arthur's B1,
+ * 24 October 2026). */
+const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-5xl px-4 pt-3 pb-28 md:pt-6 md:pb-16';
+
+/** The page's buttons on B1's lip: the results' raised pair, a size down on a
+ *  phone so Start and Challenge a friend share the pinned bar. */
+const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-[15px] md:h-14 md:px-5 md:text-base';
 
 /**
  * The front's reserved shape: the masthead (title, a line, the meta row), the
