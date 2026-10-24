@@ -27,7 +27,7 @@ import {
   isSearchLikeTool,
 } from './tool-content';
 import type { ToolMessage } from '@/types/chat';
-import { isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
+import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -329,7 +329,11 @@ export function ToolStepItem({
   // LOADED result: a lazy chat's step carries none until it is fetched (the
   // card fetches it), and the mark read the empty one (shots5, 24 October
   // 2026). The card under the chain already says why, so no "Error:" line.
-  const quizRefused = isQuizStep(message) && quizStepState(loaded.message)?.kind === 'failed';
+  // An edit that saved nothing is marked the same (Tester, chat 0a54fba4).
+  const quizRefused =
+    isQuizStep(message) &&
+    (quizStepState(loaded.message)?.kind === 'failed' ||
+      (message.toolName === EDIT_QUIZ_TOOL && editSavedNothing(loaded.message.toolResult ?? undefined)));
   const status = !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
   const { action, detail } = formatToolMessage(
     message.toolName,

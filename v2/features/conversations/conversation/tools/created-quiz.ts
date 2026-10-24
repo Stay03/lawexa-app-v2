@@ -286,13 +286,26 @@ export function quizStepLabel(
       const parts = [counted(count(added.questions), 'question'), counted(count(added.scenarios), 'scenario')].filter(Boolean);
       return { action: parts.length > 0 ? `Added ${parts.join(' and ')}` : 'Added nothing to the quiz', title };
     }
-    case EDIT_QUIZ_TOOL:
-      return { action: !isComplete ? 'Editing the quiz' : failed ? "Couldn't edit the quiz" : 'Edited the quiz', title };
+    case EDIT_QUIZ_TOOL: {
+      if (!isComplete) return { action: 'Editing the quiz', title };
+      return { action: failed || editSavedNothing(result) ? "Couldn't edit the quiz" : 'Edited the quiz', title };
+    }
     case READ_QUIZ_TOOL:
       return { action: !isComplete ? 'Reading the quiz' : failed ? "Couldn't read the quiz" : 'Read the quiz', title };
     default:
       return { action: createQuizStepAction(isComplete, result, hasRef), title };
   }
+}
+
+/**
+ * An `edit_quiz` result that saved nothing (backend, 24 October 2026): every
+ * change refused, or an id that matched nothing, comes back as success with
+ * `changed { updated: 0, removed: 0 }`, and the card names the refusals. A
+ * rename counts in `updated`. Some saved and some refused is an edit.
+ */
+export function editSavedNothing(result: ToolMessage['toolResult'] | undefined): boolean {
+  const changed = record(payload(result?.data)?.changed);
+  return changed !== null && count(changed.updated) + count(changed.removed) === 0;
 }
 
 /** "5 questions", "1 scenario", or `null` for none. */

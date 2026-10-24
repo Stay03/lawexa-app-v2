@@ -10,6 +10,7 @@ import {
   createQuizStepAction,
   createdQuiz,
   createdQuizLine,
+  editSavedNothing,
   quizCards,
   quizJobFinished,
   quizJobState,
@@ -97,7 +98,7 @@ test('the step label says making, made, or could not make, never made above a re
 test('a refused quiz step carries the error mark, with no Error line under it', () => {
   const item = readFileSync(join(here, 'ToolStepItem.tsx'), 'utf8');
   // From the LOADED result: a lazy chat's step has none of its own until fetched (shots5).
-  assert.match(item, /const quizRefused = isQuizStep\(message\) && quizStepState\(loaded\.message\)\?\.kind === 'failed';/);
+  assert.match(item, /const quizRefused =\s*isQuizStep\(message\) &&\s*\(quizStepState\(loaded\.message\)\?\.kind === 'failed' \|\|\s*\(message\.toolName === EDIT_QUIZ_TOOL && editSavedNothing\(loaded\.message\.toolResult \?\? undefined\)\)\);/);
   assert.match(item, /isSuccess && !quizRefused \? 'success' : 'error'/);
   // No "Error:" line for a refused quiz, whatever the stored flag says: the card says it once.
   assert.match(item, /\{isError && !quizRefused && !isExpanded && \(/);
@@ -293,6 +294,30 @@ test('an edit in a later chat draws the card there too', () => {
   const edited = built('m-1', 'edit_quiz', { quiz: QUIZ(7, 1), changed: { updated: 2, removed: 1 }, refused: [] });
   assert.deepEqual(ids([edited]), ['m-1']);
   assert.deepEqual(quizStepLabel('edit_quiz', true, edited.toolResult, false), { action: 'Edited the quiz', title: 'TEST DATA Contract law basics' });
+});
+
+/* Tester, chat 0a54fba4 (24 October 2026): an edit that saved nothing read
+ * "Edited the quiz". Backend's shape: success, `changed { updated: 0,
+ * removed: 0 }`, and each refusal in `refused`. */
+test('an edit that saved nothing says it could not edit, and the card names why', () => {
+  const reason = 'TEST DATA. An update needs fields to change.';
+  const nothing = built('m-1', 'edit_quiz', { quiz: QUIZ(5), changed: { updated: 0, removed: 0 }, refused: [{ index: 0, reason }], notes: [] });
+  assert.deepEqual(quizStepLabel('edit_quiz', true, nothing.toolResult, false), { action: "Couldn't edit the quiz", title: 'TEST DATA Contract law basics' });
+  const [card] = quizCards([nothing]);
+  assert.equal(refusedLine(card.refused), `1 question wasn't saved: ${reason}`);
+  // A rename alone counts as one update.
+  const renamed = built('m-2', 'edit_quiz', { quiz: QUIZ(5), changed: { updated: 1, removed: 0 }, refused: [], notes: [] });
+  assert.equal(quizStepLabel('edit_quiz', true, renamed.toolResult, false).action, 'Edited the quiz');
+  // Some saved and some refused is an edit, with the refusals on the card.
+  const some = built('m-3', 'edit_quiz', { quiz: QUIZ(4), changed: { updated: 0, removed: 1 }, refused: [{ index: 1, reason }], notes: [] });
+  assert.equal(quizStepLabel('edit_quiz', true, some.toolResult, false).action, 'Edited the quiz');
+  // Not loaded yet, or a result with no `changed`: what it did.
+  assert.equal(quizStepLabel('edit_quiz', true, { success: true, error: null, data: null }, true).action, 'Edited the quiz');
+  assert.equal(quizStepLabel('edit_quiz', true, built('m-4', 'edit_quiz', { quiz: QUIZ(5) }).toolResult, false).action, 'Edited the quiz');
+  // The row's mark follows: nothing saved is marked as not done.
+  assert.equal(editSavedNothing(nothing.toolResult), true);
+  assert.equal(editSavedNothing(some.toolResult), false);
+  assert.equal(editSavedNothing({ success: true, error: null, data: null }), false);
 });
 
 test('items refused while the rest are saved are said on the card, gathered over the quiz’s steps', () => {
