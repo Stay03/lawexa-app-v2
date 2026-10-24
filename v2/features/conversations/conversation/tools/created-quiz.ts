@@ -48,6 +48,8 @@ export type CreatedQuiz =
       scenarioCount: number;
       /** "TEST DATA tenancy notes.pdf", with a statute's part range when there is one. */
       source: string | null;
+      /** How many questions were asked, when the quiz holds fewer (a job's source ran out); else absent. */
+      asked?: number;
     }
   | { kind: 'failed'; message: string };
 
@@ -142,7 +144,11 @@ export function quizJobState(job: unknown, ref: QuizJobRef): CreatedQuiz {
   const status = polled?.status;
   if (status === 'done') {
     const quiz = readyQuiz(record(polled?.quiz), ref.source);
-    if (quiz) return quiz;
+    if (quiz?.kind === 'ready') {
+      // The count asked: the job's own, else the step's.
+      const asked = count(polled?.question_count) || ref.questionCount;
+      return asked > quiz.questionCount ? { ...quiz, asked } : quiz;
+    }
     // Done but sent without the quiz: draw it from the job's own fields.
     const uuid = text(polled?.quiz_uuid);
     if (uuid) return { kind: 'ready', uuid, title: 'Your quiz', questionCount: ref.questionCount, scenarioCount: 0, source: ref.source };
@@ -219,7 +225,13 @@ function text(value: unknown): string | null {
 
 /** "10 questions · 1 scenario · from TEST DATA tenancy notes.pdf". */
 export function createdQuizLine(quiz: Extract<CreatedQuiz, { kind: 'ready' }>): string {
-  const parts = [`${quiz.questionCount} ${quiz.questionCount === 1 ? 'question' : 'questions'}`];
+  // Fewer made than asked (backend, 24 October 2026: the job ends after Lawexa
+  // has replied, so its answer cannot say so): "8 of the 10 questions asked".
+  const parts = [
+    quiz.asked !== undefined && quiz.asked > quiz.questionCount
+      ? `${quiz.questionCount} of the ${quiz.asked} questions asked`
+      : `${quiz.questionCount} ${quiz.questionCount === 1 ? 'question' : 'questions'}`,
+  ];
   if (quiz.scenarioCount > 0) parts.push(`${quiz.scenarioCount} ${quiz.scenarioCount === 1 ? 'scenario' : 'scenarios'}`);
   if (quiz.source) parts.push(`from ${quiz.source}`);
   return parts.join(' · ');

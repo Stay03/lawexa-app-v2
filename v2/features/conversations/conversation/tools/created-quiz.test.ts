@@ -196,6 +196,31 @@ test('a polled job is making until done, then the made quiz with the step source
   assert.equal(quizJobFinished(null), false);
 });
 
+test('a quiz with fewer questions than asked says so: "8 of the 10 questions asked" (backend, 24 October 2026)', () => {
+  const short = quizJobState(
+    { status: 'done', question_count: 10, quiz: { uuid: 'q-8', title: 'TEST DATA Labour Act Part II', question_count: 8, scenario_count: 0 } },
+    REF,
+  );
+  assert.deepEqual(short, {
+    kind: 'ready',
+    uuid: 'q-8',
+    title: 'TEST DATA Labour Act Part II',
+    questionCount: 8,
+    scenarioCount: 0,
+    source: 'TEST DATA Labour Act, 1974, Part II',
+    asked: 10,
+  });
+  if (short.kind !== 'ready') throw new Error('not ready');
+  assert.equal(createdQuizLine(short), '8 of the 10 questions asked · from TEST DATA Labour Act, 1974, Part II');
+  // The job without its own count falls back to the step's.
+  const fromStep = quizJobState({ status: 'done', quiz: { uuid: 'q-8', title: 'T', question_count: 8 } }, REF);
+  assert.equal(fromStep.kind === 'ready' ? fromStep.asked : null, 10);
+  // As many as asked: the plain count, no "asked".
+  const full = quizJobState({ status: 'done', question_count: 10, quiz: { uuid: 'q-9', title: 'T', question_count: 10 } }, REF);
+  assert.equal(full.kind === 'ready' ? 'asked' in full : null, false);
+  assert.equal(full.kind === 'ready' ? createdQuizLine(full) : '', '10 questions · from TEST DATA Labour Act, 1974, Part II');
+});
+
 test('a bare transport error shows the plain sentence, never the code, in the card and the step', () => {
   for (const raw of ['HTTP 500', 'HTTP 504 Gateway Timeout', '500', 'Request failed with status code 500', 'Network Error', 'timeout of 30000ms exceeded', 'Internal Server Error']) {
     const result = { success: false, error: raw, data: null };
