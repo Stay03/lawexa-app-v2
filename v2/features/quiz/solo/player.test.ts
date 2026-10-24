@@ -183,7 +183,7 @@ test('the question screen is drawn in B1: segments and the thin clock over the q
   assert.match(play, /\) : step === 'revealed' \? \(\s*\/\/[^\n]*\n\s*streak >= 2 \? <StreakChip count=\{streak\} \/> : null/);
   // On a tall question the foot still shows (Tester, 24 October 2026): with
   // no sheet up it is sticky at the screen's foot, and the chip's ground is solid.
-  assert.match(play, /sheet \? 'mt-auto pt-6' : 'sticky bottom-0 z-10 mt-auto pt-6 pb-\[env\(safe-area-inset-bottom\)\]'/);
+  assert.match(play, /sheet \? 'mt-auto pt-6' : 'sticky bottom-0 z-10 mt-auto pt-6 pb-\[max\(0\.75rem,env\(safe-area-inset-bottom\)\)\]'/);
   assert.match(read('v2', 'features', 'quiz', 'solo', 'ui.tsx'), /bg-\[color-mix\(in_oklch,var\(--primary\)_10%,var\(--background\)\)\]/);
   assert.match(tile, /celebrate &&\s*'v2-solo-pop shadow-\[0_0_0_6px_color-mix\(in_oklch,var\(--solo-right\)_18%,transparent\)\]'/);
   assert.match(tile, /\{celebrate && <BurstDots className="top-\[9px\] left-\[9px\]" \/>\}/);

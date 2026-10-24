@@ -367,7 +367,7 @@ export function AttemptPlay({
               question and its tiles are. The `end` sheet sticks on its own. */}
           <div
             className={
-              sheet ? 'mt-auto pt-6' : 'sticky bottom-0 z-10 mt-auto pt-6 pb-[env(safe-area-inset-bottom)]'
+              sheet ? 'mt-auto pt-6' : 'sticky bottom-0 z-10 mt-auto pt-6 pb-[max(0.75rem,env(safe-area-inset-bottom))]'
             }
           >
             {sheet ? (
