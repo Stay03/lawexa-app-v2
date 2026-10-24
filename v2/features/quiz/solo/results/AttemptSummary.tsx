@@ -31,8 +31,11 @@ import { CountUp } from '../ui';
  *
  * THE HERO COUNTS UP (B1 motion note 6; Arthur's B1, 24 October 2026): from 0
  * to the total over 800 ms with an ease-out, once, on arrival. The final
- * number is laid out underneath, invisible, so the counting digits never
- * change the line's width, and a screen reader hears only the final number.
+ * number is laid out underneath, invisible, and sets the hero's width; the
+ * counting number is centred over it and may overflow it by a pixel or two
+ * (Comfortaa's digits are not all one width: "6,959" is 3px wider than
+ * "9,225", Backend's pictures), so the hero never grows or drifts while it
+ * counts. A screen reader hears only the final number.
  * Reduced motion shows the final number at once (`CountUp`).
  */
 export function AttemptSummary({
@@ -62,9 +65,9 @@ export function AttemptSummary({
       </h1>
 
       <p className="mt-4 font-comfortaa text-[84px] leading-none font-bold tracking-tight text-primary tabular-nums motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-500">
-        <span aria-hidden className="grid justify-items-center">
-          <span className="invisible col-start-1 row-start-1">{pointsLabel(score.points)}</span>
-          <span className="col-start-1 row-start-1">
+        <span aria-hidden className="relative inline-block">
+          <span className="invisible">{pointsLabel(score.points)}</span>
+          <span className="absolute inset-0 flex justify-center whitespace-nowrap">
             <CountUp value={score.points} durationMs={800} />
           </span>
         </span>
