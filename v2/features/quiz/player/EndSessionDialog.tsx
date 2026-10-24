@@ -77,8 +77,8 @@ export function EndSessionDialog({
           <AlertDialogTitle>End this session?</AlertDialogTitle>
           <AlertDialogDescription>
             {answeredCount > 0
-              ? `Your score is finalized on ${answeredCount === 1 ? 'the 1 question' : `all ${answeredCount} questions`} you answered, and every answer is revealed with its explanation. This session can't be reopened — starting again begins a fresh one.`
-              : "You haven't answered anything yet, so there is nothing to score. This session can't be reopened — starting again begins a fresh one."}
+              ? `Your score is finalized on ${answeredCount === 1 ? 'the 1 question' : `all ${answeredCount} questions`} you answered, and every answer is revealed with its explanation. This session can't be reopened. Starting again begins a fresh one.`
+              : "You haven't answered anything yet, so there is nothing to score. This session can't be reopened. Starting again begins a fresh one."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

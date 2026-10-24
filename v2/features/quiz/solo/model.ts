@@ -588,7 +588,7 @@ export function answerRefusalCopy(status: number, message: string): string | nul
     case 404:
       return "That answer doesn't match the question on screen. Pick again.";
     case 0:
-      return "We didn't hear back about that answer — if it reached us, it still counts.";
+      return "We didn't hear back about that answer. If it reached us, it still counts.";
     default:
       return message;
   }

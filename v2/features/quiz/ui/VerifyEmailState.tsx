@@ -61,7 +61,7 @@ export function VerifyEmailState() {
             {checking ? (
               <Loader2 aria-hidden className="animate-spin" />
             ) : null}
-            I&apos;ve verified — check again
+            I&apos;ve verified, check again
           </Button>
           <Button asChild variant="outline" size="sm">
             <Link href="/settings">Go to settings</Link>

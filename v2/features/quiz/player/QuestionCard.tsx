@@ -157,7 +157,7 @@ export function QuestionCard({
           <kbd className="rounded border border-border bg-secondary px-1 py-0.5 font-sans text-[11px] tabular-nums">
             {options.length}
           </kbd>
-          . It submits straight away — answers are revealed when you end the
+          . It submits straight away. Answers are revealed when you end the
           session.
         </p>
       </div>

@@ -104,7 +104,7 @@ export function HistoryScreen() {
       ) : showError ? (
         <QuizErrorState
           title="Couldn't load your history"
-          description="Your past sessions are still there — the list just did not load."
+          description="Your past sessions are still there. The list just did not load."
           onRetry={() => void query.refetch()}
         />
       ) : showEmpty ? (

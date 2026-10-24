@@ -100,7 +100,7 @@ export function ResultsScreen({ sessionUuid }: { sessionUuid: string }) {
           description={
             notFound
               ? 'The link may be wrong, or the session may belong to another account.'
-              : 'Your answers are safe — the review just did not load. Please try again.'
+              : 'Your answers are safe. The review just did not load. Please try again.'
           }
           onRetry={() => void resultsQuery.refetch()}
         />

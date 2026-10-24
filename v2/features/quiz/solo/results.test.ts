@@ -55,7 +55,7 @@ test('the headline leads with the greeting and the points, then one row of three
   assert.match(summary, /\{pointsLabel\(score\.points\)\}/);
   assert.match(summary, /<Stat value=\{`\$\{highlights\.correct\}\/\$\{highlights\.total\}`\} label="right" \/>/);
   assert.match(summary, /<Stat value=\{String\(highlights\.streak\)\} label="in a row" \/>/);
-  assert.match(summary, /value=\{highlights\.fastestMs === null \? '—' : secondsLabel\(highlights\.fastestMs\)\}\s*label="fastest"/);
+  assert.match(summary, /value=\{highlights\.fastestMs === null \? 'None' : secondsLabel\(highlights\.fastestMs\)\}\s*label="fastest"/);
   assert.match(summary, /const line = comparisonLine\(attempt\.comparison, score\.points\);/);
   assert.match(summary, /\{line && <p className="mt-4 text-sm text-muted-foreground">\{line\}<\/p>\}/);
   // No per-answer average, no chips, no ring: the points are the story.

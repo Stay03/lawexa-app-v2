@@ -128,7 +128,7 @@ test('each holds its verdict on the tiles, then moves on by itself (a tap sooner
   assert.match(play, /const sheet =\s*attempt\.reveal_mode === 'end' && \(\(step === 'answered' && isLast\) \|\| step === 'timed-out'\);/);
   assert.match(play, /onContinue=\{isLast \? finishNow : advance\}/);
   assert.match(play, /\{isLast \? 'See results' : 'Continue'\}/);
-  assert.match(play, /\{unanswered\} unanswered — /);
+  assert.match(play, /\{unanswered\} unanswered: /);
   assert.doesNotMatch(play, /RevealSheet|TickBurst|StreakChip|was the\s*answer/);
   // The tiles are B1's, in the channel game's states; the digits are scoped
   // to the group.

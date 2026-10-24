@@ -276,7 +276,7 @@ function mergeQuizEvent(
  */
 const ANSWER_CLOSED_NOTE = 'That question closed before your answer arrived.';
 const ALREADY_ANSWERED_NOTE =
-  'Your answer for this question was already in — it only counts once.';
+  'Your answer for this question was already in. It only counts once.';
 
 /**
  * Turn an answer failure into one honest sentence — or `null` when the reader
@@ -300,7 +300,7 @@ function answerRefusalCopy(error: unknown): string | null {
   const { status } = extractApiError(error);
   switch (status) {
     case 403:
-      return 'You joined after this question started — you play from the next one.';
+      return 'You joined after this question started. You play from the next one.';
     case 409:
       return ANSWER_CLOSED_NOTE;
     case 422:
@@ -314,7 +314,7 @@ function answerRefusalCopy(error: unknown): string | null {
       // request may have been recorded and the answer lost on the way back.
       // Claiming "nothing was recorded" would be a guess the scoreboard can
       // contradict a minute later.
-      return "We didn't hear back about that answer — if it reached us, it still counts.";
+      return "We didn't hear back about that answer. If it reached us, it still counts.";
   }
 }
 

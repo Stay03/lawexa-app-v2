@@ -159,7 +159,7 @@ export function QuizCreateAccountState() {
       icon={GraduationCap}
       tone="accent"
       title="Create a free account to practise"
-      description="Quiz turns your study conversations into multiple-choice practice and keeps your score history. It's part of the registered experience — create an account to play."
+      description="Quiz turns your study conversations into multiple-choice practice and keeps your score history. It’s part of the registered experience. Create an account to play."
       action={
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button asChild size="sm">

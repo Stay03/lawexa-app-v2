@@ -68,7 +68,7 @@ import './quiz-game.css';
 function announce(game: ReturnType<typeof useLiveGame>): string {
   const state = game.state;
   if (!state) return '';
-  if (game.closingAnswer) return 'The game is over — this was the last answer';
+  if (game.closingAnswer) return 'The game is over. This was the last answer';
   const current = state.current_question;
   const index = (current?.index ?? 0) + 1;
   const total = state.game.question_count;
@@ -245,7 +245,7 @@ export function GameOverlay({
       {game.joinErrorStatus === 403 && (
         <div className="shrink-0 border-b px-4 py-2">
           <p className="mx-auto w-full max-w-2xl text-xs text-muted-foreground">
-            This quiz doesn&rsquo;t allow joining once it has started — you can
+            This quiz doesn&rsquo;t allow joining once it has started. You can
             watch this one through.
           </p>
         </div>
@@ -362,7 +362,7 @@ function GameBody({
           icon={WifiOff}
           tone="alert"
           title="Couldn't reach the game"
-          description="The game keeps running on our side — this screen just lost touch with it."
+          description="The game keeps running on our side. This screen just lost touch with it."
           action={
             <Button variant="outline" size="sm" onClick={game.retry}>
               Try again

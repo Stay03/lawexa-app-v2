@@ -414,7 +414,7 @@ export function QuizFormDialog({
             <span className="mt-1 block text-xs">
               {room
                 ? `It belongs to ${room.name} and to you, and it is in your library either way.`
-                : 'It stays yours and appears in no channel until you run it in one — then that channel can see it too.'}
+                : 'It stays yours and appears in no channel until you run it in one. Then that channel can see it too.'}
             </span>
           )}
         </>
@@ -455,7 +455,7 @@ export function QuizFormDialog({
               <Input
                 id="quiz-title"
                 maxLength={QUIZ_TITLE_MAX}
-                placeholder="e.g. Land law — week 4"
+                placeholder="e.g. Land law, week 4"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
               />
@@ -467,7 +467,7 @@ export function QuizFormDialog({
                 id="quiz-description"
                 maxLength={QUIZ_DESCRIPTION_MAX}
                 rows={2}
-                placeholder="Optional — what is this quiz for?"
+                placeholder="Optional: what is this quiz for?"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               />
@@ -544,8 +544,8 @@ export function QuizFormDialog({
 
             {frozen && (
               <p className="rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground">
-                This quiz has already been played, so its questions are locked
-                — scores would stop meaning anything if they could change
+                This quiz has already been played, so its questions are locked:
+                scores would stop meaning anything if they could change
                 underneath. The title, description and settings can still be
                 saved. To change the questions, write a new quiz.
               </p>
@@ -835,7 +835,7 @@ function QuestionCard({
 
       <fieldset className="space-y-2">
         <legend className="text-xs text-muted-foreground">
-          Answers — mark the correct one
+          Answers: mark the correct one
         </legend>
         {draft.options.map((option, optionIndex) => (
           <div key={option.key} className="flex items-center gap-2">

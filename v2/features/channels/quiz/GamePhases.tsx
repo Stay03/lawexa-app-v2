@@ -337,7 +337,7 @@ export function QuestionStage({
           <p className="text-sm text-muted-foreground">{game.answerNote}</p>
         ) : throttled ? (
           <p className="text-sm text-muted-foreground">
-            Answers are coming in faster than we allow — one moment.
+            Answers are coming in faster than we allow. One moment.
           </p>
         ) : game.answering ? (
           // The tap is locked but the server has not confirmed it yet — say
@@ -354,7 +354,7 @@ export function QuestionStage({
         ) : (
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Timer aria-hidden className="size-4" />
-            Pick one — the faster you answer, the more it scores.
+            Pick one. The faster you answer, the more it scores.
           </p>
         )}
       </div>
@@ -403,7 +403,7 @@ function RevealResult({
     return (
       <p className="text-sm text-muted-foreground">
         {standing.kind === 'unknown'
-          ? "We never heard back about your answer — the scores have the last word."
+          ? "We never heard back about your answer. The scores have the last word."
           : 'No answer from you this time.'}
       </p>
     );
@@ -446,7 +446,7 @@ function WatchingNote() {
   return (
     <p className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
       <Eye aria-hidden className="size-4" />
-      You&rsquo;re watching this one — you can play the next game.
+      You&rsquo;re watching this one. You can play the next game.
     </p>
   );
 }
@@ -521,7 +521,7 @@ export function FinalAnswerStage({
         <PhaseRow>
           <Trophy aria-hidden className="size-4 shrink-0 text-primary" />
           <span className="text-sm text-muted-foreground">
-            That answer ended the game — final scores next
+            That answer ended the game. Final scores next
           </span>
         </PhaseRow>
       </div>
@@ -562,7 +562,7 @@ export function FinalAnswerStage({
           />
         ) : (
           <p className="text-sm text-muted-foreground">
-            We couldn&rsquo;t read how this question went — the final scores are
+            We couldn&rsquo;t read how this question went. The final scores are
             next.
           </p>
         )}
@@ -587,7 +587,7 @@ function VerdictChip({
     return (
       <p className="text-sm text-muted-foreground">
         {standing.kind === 'unknown'
-          ? "We never heard back about your last answer — the final scores below have it either way."
+          ? "We never heard back about your last answer. The final scores below have it either way."
           : 'No answer from you this time.'}
       </p>
     );
@@ -662,7 +662,7 @@ export function PodiumStage({
           description={
             refused
               ? 'Results are kept for games that ran to the end. A game that was cancelled leaves none.'
-              : 'The scores are safe on our side — this screen just lost touch with them.'
+              : 'The scores are safe on our side. This screen just lost touch with them.'
           }
           action={
             refused ? undefined : (
@@ -817,7 +817,7 @@ export function CancelledStage({
         description={
           cancelledBy
             ? `${cancelledBy.name} ended the game before it finished. Cancelled games keep no scores.`
-            : 'The game ended before it finished — cancelled games keep no scores.'
+            : 'The game ended before it finished. Cancelled games keep no scores.'
         }
         action={
           <Button variant="outline" size="sm" onClick={onBack}>

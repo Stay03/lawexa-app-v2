@@ -100,7 +100,7 @@ export function AttemptPlayerScreen({ attemptUuid }: { attemptUuid: string }) {
         ) : (
           <QuizErrorState
             title="Couldn't load this attempt"
-            description="Your answers so far are safe — the question just did not load. Please try again."
+            description="Your answers so far are safe. The question just did not load. Please try again."
             onRetry={() => void query.refetch()}
           />
         )}

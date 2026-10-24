@@ -85,7 +85,7 @@ export function ColdStartState() {
       icon={Sparkles}
       tone="accent"
       title="Your question bank is warming up"
-      description="We turn study conversations into practice questions overnight. There is nothing to answer just yet — check back soon."
+      description="We turn study conversations into practice questions overnight. There is nothing to answer just yet. Check back soon."
       action={
         <Button asChild variant="outline" size="sm">
           <Link href="/">Back to home</Link>

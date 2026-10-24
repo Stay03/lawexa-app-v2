@@ -123,7 +123,7 @@ export function difficultyDescription(
   difficulty: QuizDifficulty,
   label: string,
 ): string {
-  return `${label} — level ${difficulty} of ${DIFFICULTY_STEPS}`;
+  return `${label}, level ${difficulty} of ${DIFFICULTY_STEPS}`;
 }
 
 /* ── Lifecycle errors ───────────────────────────────────────────────────── */
@@ -234,12 +234,12 @@ export function readStats(data: QuizStatsData): HonestStats {
 
 /** Render a percentage metric, or the em dash that means "no data yet". */
 export function metricPercent(value: MaybeMetric): string {
-  return value == null ? '—' : `${Math.round(value)}%`;
+  return value == null ? 'None' : `${Math.round(value)}%`;
 }
 
 /** Render a duration metric, or the em dash that means "no data yet". */
 export function metricDuration(value: MaybeMetric): string {
-  return value == null ? '—' : formatDurationMs(value);
+  return value == null ? 'None' : formatDurationMs(value);
 }
 
 /* ── Results ────────────────────────────────────────────────────────────── */

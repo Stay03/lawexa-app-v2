@@ -66,7 +66,7 @@ export function AttemptSummary({
         <Stat value={`${highlights.correct}/${highlights.total}`} label="right" />
         <Stat value={String(highlights.streak)} label="in a row" />
         <Stat
-          value={highlights.fastestMs === null ? '—' : secondsLabel(highlights.fastestMs)}
+          value={highlights.fastestMs === null ? 'None' : secondsLabel(highlights.fastestMs)}
           label="fastest"
         />
       </ul>

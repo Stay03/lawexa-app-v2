@@ -57,7 +57,7 @@ export function ResultsSummary({
         <ScoreRing
           percent={percent}
           empty={answered === 0}
-          emptyLabel="No score — nothing was answered in this session"
+          emptyLabel="No score: nothing was answered in this session"
         />
 
         <div className="flex-1 text-center sm:text-left">

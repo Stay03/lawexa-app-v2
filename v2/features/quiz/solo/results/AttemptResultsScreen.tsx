@@ -117,7 +117,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
         ) : (
           <QuizErrorState
             title="Couldn't load your results"
-            description="Your answers are safe — the review just did not load. Please try again."
+            description="Your answers are safe. The review just did not load. Please try again."
             onRetry={() => void query.refetch()}
           />
         )}

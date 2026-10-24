@@ -166,7 +166,7 @@ export function ShareResults({
             htmlFor={`quiz-share-${gameUuid}`}
             className="text-xs text-muted-foreground"
           >
-            Your browser wouldn&rsquo;t let us reach the clipboard — copy it
+            Your browser wouldn&rsquo;t let us reach the clipboard. Copy it
             from here.
           </label>
           <Input

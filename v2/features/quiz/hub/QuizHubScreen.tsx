@@ -151,7 +151,7 @@ export function QuizHubScreen() {
         </h1>
         <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
           Multiple-choice questions drawn from your own study conversations.
-          Answers stay hidden until you end the session — then you get the full
+          Answers stay hidden until you end the session. Then you get the full
           breakdown.
         </p>
       </header>
@@ -343,7 +343,7 @@ function RecentSessions({
       ) : isError ? (
         <QuizErrorState
           title="Couldn't load your sessions"
-          description="Your practice history is still there — the list just didn't load."
+          description="Your practice history is still there. The list just didn't load."
           onRetry={onRetry}
         />
       ) : hasRows ? (
@@ -354,7 +354,7 @@ function RecentSessions({
         </ul>
       ) : (
         <p className="px-2 py-2.5 text-sm text-muted-foreground">
-          No sessions yet — your first one will show up here.
+          No sessions yet. Your first one will show up here.
         </p>
       )}
     </section>
@@ -413,7 +413,7 @@ export function QuizHubFallback() {
           </h1>
           <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">
             Multiple-choice questions drawn from your own study conversations.
-            Answers stay hidden until you end the session — then you get the
+            Answers stay hidden until you end the session. Then you get the
             full breakdown.
           </p>
         </header>

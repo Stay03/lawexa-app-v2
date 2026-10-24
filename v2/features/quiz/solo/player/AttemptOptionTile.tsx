@@ -29,7 +29,7 @@ export type TileLook = 'card' | 'true' | 'false';
 
 const REVEAL_LABEL: Partial<Record<OptionState, string>> = {
   correct: 'Correct answer',
-  'wrong-pick': 'Your answer — incorrect',
+  'wrong-pick': 'Your answer, incorrect',
   missed: 'Not the answer',
 };
 

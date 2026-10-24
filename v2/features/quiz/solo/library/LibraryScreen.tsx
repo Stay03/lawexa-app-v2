@@ -119,7 +119,7 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
       ) : showError ? (
         <QuizErrorState
           title="Couldn't load your quizzes"
-          description="Your quizzes are still there — the list just did not load."
+          description="Your quizzes are still there. The list just did not load."
           onRetry={() => void query.refetch()}
         />
       ) : showEmpty ? (

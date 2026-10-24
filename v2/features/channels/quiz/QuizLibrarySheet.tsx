@@ -396,8 +396,8 @@ export function QuizLibrarySheet({
                 }
                 description={
                   source === 'library'
-                    ? 'Your library holds the quizzes you write. They belong to you, not to a room — so you can run the same one in any channel you host in, as often as you like.'
-                    : 'A quiz is a few timed questions the whole channel answers at once — good for revision, onboarding, or settling an argument.'
+                    ? 'Your library holds the quizzes you write. They belong to you, not to a room, so you can run the same one in any channel you host in, as often as you like.'
+                    : 'A quiz is a few timed questions the whole channel answers at once. Good for revision, onboarding, or settling an argument.'
                 }
                 action={
                   mayCreateHere ? (
@@ -628,7 +628,7 @@ function QuizRow({
                     const { status, message } = extractApiError(error);
                     onLiveRefused(
                       status === 409
-                        ? 'A quiz is already running in this channel — open it above, or wait for it to finish.'
+                        ? 'A quiz is already running in this channel. Open it above, or wait for it to finish.'
                         : status === 403
                           ? HOST_POLICY_REFUSAL
                           : message,

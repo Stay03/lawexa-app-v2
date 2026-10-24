@@ -71,7 +71,7 @@ export function ScoreRing({
         aria-hidden
         className="absolute inset-0 flex items-center justify-center text-3xl font-semibold text-foreground"
       >
-        {empty ? '—' : `${rounded}%`}
+        {empty ? 'None' : `${rounded}%`}
       </span>
     </div>
   );

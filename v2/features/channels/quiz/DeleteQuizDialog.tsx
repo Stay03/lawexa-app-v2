@@ -88,7 +88,7 @@ export function DeleteQuizDialog({
                   const { status, message } = extractApiError(mutationError);
                   setError(
                     status === 409
-                      ? 'This quiz is live right now — end the game first, then it can be deleted.'
+                      ? 'This quiz is live right now. End the game first, then it can be deleted.'
                       : message,
                   );
                 },

@@ -91,7 +91,7 @@ export function StatsScreen() {
         <StatsHeading />
         <QuizErrorState
           title="Couldn't load your progress"
-          description="Your sessions are all still recorded — the summary just did not load."
+          description="Your sessions are all still recorded. The summary just did not load."
           onRetry={() => void statsQuery.refetch()}
         />
       </div>
@@ -197,7 +197,7 @@ export function StatsScreen() {
           ) : (
             <p className="flex h-40 items-center justify-center px-6 text-center text-sm text-muted-foreground">
               {performance.score_trend.length === 1
-                ? 'One finished session so far — finish another and the trend appears here.'
+                ? 'One finished session so far. Finish another and the trend appears here.'
                 : 'Finish a couple of sessions and your trend appears here.'}
             </p>
           )}

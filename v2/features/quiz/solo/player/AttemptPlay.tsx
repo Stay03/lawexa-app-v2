@@ -575,13 +575,13 @@ function EndSheet({
 
       {timedOut && (
         <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">
-          Out of time — nothing recorded for this one, and it counts as wrong.
+          Out of time. Nothing was recorded for this one, and it counts as wrong.
         </p>
       )}
 
       {isLast && unanswered > 0 && (
         <p className="mt-2.5 text-[13px] text-muted-foreground">
-          {unanswered} unanswered — {unanswered === 1 ? 'it counts' : 'they count'} as wrong.
+          {unanswered} unanswered: {unanswered === 1 ? 'it counts' : 'they count'} as wrong.
         </p>
       )}
 

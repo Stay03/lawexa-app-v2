@@ -685,7 +685,7 @@ export const ANSWERS_RAIL_VISIBLE = 8;
  * above it because nobody cares about the tenth second of a slow answer.
  */
 export function formatResponseTime(responseMs: number): string {
-  if (!Number.isFinite(responseMs) || responseMs < 0) return '—';
+  if (!Number.isFinite(responseMs) || responseMs < 0) return 'None';
   const seconds = responseMs / 1000;
   return seconds < 10 ? `${seconds.toFixed(1)}s` : `${Math.round(seconds)}s`;
 }
@@ -699,7 +699,7 @@ export function formatResponseTime(responseMs: number): string {
  * server sent.
  */
 export const SPEED_SCORING_NOTE =
-  'Right answers score up to 1000 — the faster you answer, the more you keep.';
+  'Right answers score up to 1,000 points. The faster you answer, the more you keep.';
 
 /** Option markers. Four is the server's maximum, so this can never run out. */
 export const OPTION_LETTERS = ['A', 'B', 'C', 'D'] as const;
