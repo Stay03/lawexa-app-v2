@@ -8,13 +8,13 @@ import type { ToolMessage } from '@/types/chat';
  * READ BY CONTENT, NOT BY FLAGS (backend, reading the AI service, 23 October
  * 2026). A made quiz's result is the whole body, so its data carries `quiz:
  * { uuid, title, question_count, scenario_count, visibility, source: { kind,
- * title, range? }, url }`. A refusal keeps only the server's sentence: the
- * AI service stores a 4xx or 5xx body's `message` alone, so no error code
- * reaches the chat, and for a reader below researcher the step even reads
- * `success: true`. So `data.quiz` means ready, and anything else with a
- * sentence (a lazy result's `error`, or the fetched result's bare text) is
- * that sentence, shown as it is. A result not loaded yet is `null`, and the
- * card asks for it.
+ * title, range? }, url }`; a quiz still being made carries `quiz_job` (below).
+ * A refusal is stored whole, as HTTP 200 with `data.error { code, message }`
+ * in the server's words, and is shown as it is. Anything else on a quiz step
+ * is a transport failure (backend, 24 October 2026): a lazy row's `error`, the
+ * masked "That lookup found nothing…" a reader below researcher gets (it reads
+ * `success: true` on purpose), a bare "HTTP 500". It never shows its own words.
+ * A result not loaded yet is `null`, and the card asks for it.
  *
  * A QUIZ STILL BEING MADE (backend, 24 October 2026: the server ends a request
  * after 30 s, and a large statute took longer, so Stay saw "HTTP 500"). The
@@ -115,14 +115,15 @@ function finishedQuiz(result: ToolMessage['toolResult'], hasRef: boolean): Creat
   if (job && typeof job.uuid === 'string' && job.uuid) {
     return { kind: 'job', job: { uuid: job.uuid, questionCount: count(job.question_count), source: sourceLine(record(job.source)) } };
   }
-  // The server's own refusal first (HTTP 200 with `data.error`, which no mask
-  // touches; backend, 23 October 2026), then any sentence the step carries.
-  const sentence =
-    text(record(data?.error)?.message) ??
-    text(result?.error) ??
-    text(result?.data) ??
-    text(data?.message);
-  if (sentence) return { kind: 'failed', message: readerSentence(sentence) };
+  // A refusal (no access, too short, unreadable, one at a time) is always
+  // stored whole: `data.error { code, message }`, in the server's words
+  // (backend, 24 October 2026). Shown as it is.
+  const refusal = text(record(data?.error)?.message);
+  if (refusal) return { kind: 'failed', message: readerSentence(refusal) };
+  // Anything else is a transport failure, never shown in its own words: a
+  // lazy row's `error`, the masked "That lookup found nothing…" a reader below
+  // researcher gets, a bare "HTTP 500".
+  if (text(result?.error)) return { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE };
   if (result?.data == null) {
     // A lazy result still to fetch: the card asks for it.
     if (hasRef) return null;
@@ -130,7 +131,7 @@ function finishedQuiz(result: ToolMessage['toolResult'], hasRef: boolean): Creat
     // was made, so the card says so rather than waiting for ever.
     return { kind: 'failed', message: 'Lawexa stopped before the quiz was made. Ask again to try once more.' };
   }
-  return { kind: 'failed', message: 'Lawexa could not make the quiz this time.' };
+  return { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE };
 }
 
 /**
@@ -167,17 +168,18 @@ export function quizJobFinished(job: unknown): boolean {
 }
 
 /**
- * The step's own label. A refusal reads "Couldn't make a quiz", so the row
- * never says "Made a quiz" above a card that says it was not. A result still
- * to fetch keeps "Made a quiz": a lazy refusal already carries its sentence.
- * A job the server is still making reads "Started a quiz": the card under the
- * chain says how it is going.
+ * The step's own label, from the LOADED result (ToolStepItem reads it from the
+ * cache the quiz cards fill). A refusal or a failure reads "Couldn't make a
+ * quiz", so the row never says "Made a quiz" above a card that says it was
+ * not. A quiz in hand reads "Made a quiz". A job, or a result not loaded yet,
+ * reads "Started a quiz", true either way: the card under the chain says how
+ * it went (a lazy row carries neither the job nor the quiz).
  */
 export function createQuizStepAction(isComplete: boolean, result: ToolMessage['toolResult'] | undefined, hasRef: boolean): string {
   if (!isComplete) return 'Making a quiz';
   const state = finishedQuiz(result, hasRef);
   if (state?.kind === 'failed') return "Couldn't make a quiz";
-  return state?.kind === 'job' ? 'Started a quiz' : 'Made a quiz';
+  return state?.kind === 'ready' ? 'Made a quiz' : 'Started a quiz';
 }
 
 /** A made quiz's fields as the card draws them, or `null` when it is not one; `source` stands in when it has none. */

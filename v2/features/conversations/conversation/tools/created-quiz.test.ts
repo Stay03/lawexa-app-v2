@@ -56,14 +56,18 @@ test('a made quiz reads its title, counts and source, with a statute part range'
   assert.equal(createdQuizLine({ ...quiz, questionCount: 1, scenarioCount: 0, source: null }), '1 question');
 });
 
-test('a refusal is told by its content: the sentence, even when the step reads success (backend, 23 October 2026)', () => {
+test('a refusal is stored whole with data.error and shown in its own words; anything else is a transport failure (backend, 24 October 2026)', () => {
   const sentence = 'TEST DATA. That document is too short to make a quiz from.';
-  // A lazy list carries the sentence as the step's error, with no data.
-  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: sentence, data: null } })), { kind: 'failed', message: sentence });
-  // The fetched result is the bare sentence, and a reader below researcher sees success: true.
-  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: sentence } })), { kind: 'failed', message: sentence });
-  // A body that still carries { error: { message } } reads the same.
+  // The refusal, as the fetched result carries it (wrapped or not).
   assert.deepEqual(createdQuiz(step({ toolResult: { success: false, error: null, data: { data: { error: { code: 'too_short', message: sentence } } } } })), { kind: 'failed', message: sentence });
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: { success: false, error: { code: 'no_access', message: sentence } } } })), { kind: 'failed', message: sentence });
+  // A lazy row's error is only ever a transport failure (refusals and jobs carry none): never its words.
+  const masked = 'That lookup found nothing, so Lawexa tried another way.';
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: masked, data: null }, resultRef: { messageId: 96, size: 8 } })), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE });
+  // The masked message as the fetched result, read as success: true on purpose.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: { message: masked } } })), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE });
+  // A bare text result.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: sentence } })), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE });
 });
 
 test('a result not loaded yet is null, so the card asks for it rather than guessing', () => {
@@ -71,15 +75,18 @@ test('a result not loaded yet is null, so the card asks for it rather than guess
   // With no result to fetch, the run stopped: the card says so instead of loading for ever.
   assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: null } })), { kind: 'failed', message: 'Lawexa stopped before the quiz was made. Ask again to try once more.' });
   assert.deepEqual(createdQuiz(step({})), { kind: 'failed', message: 'Lawexa stopped before the quiz was made. Ask again to try once more.' });
-  // A body with no quiz and no sentence is a failure in the card's own words.
-  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: { quiz: { title: 'No uuid' } } } })), { kind: 'failed', message: 'Lawexa could not make the quiz this time.' });
+  // A body with no quiz and no refusal is a failure in the card's own words.
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: true, error: null, data: { quiz: { title: 'No uuid' } } } })), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE });
 });
 
 test('the step label says making, made, or could not make, never made above a refusal', () => {
   assert.equal(createQuizStepAction(false, undefined, false), 'Making a quiz');
   assert.equal(createQuizStepAction(true, { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA' } } }, false), 'Made a quiz');
   assert.equal(createQuizStepAction(true, { success: true, error: null, data: { data: { error: { code: 'too_short', message: 'TEST DATA. Too short.' } } } }, false), "Couldn't make a quiz");
-  assert.equal(createQuizStepAction(true, { success: true, error: null, data: null }, true), 'Made a quiz');
+  // Not loaded yet: a lazy row carries neither the job nor the quiz, so it says only what is sure.
+  assert.equal(createQuizStepAction(true, { success: true, error: null, data: null }, true), 'Started a quiz');
+  // A lazy row with an error is a transport failure.
+  assert.equal(createQuizStepAction(true, { success: true, error: 'That lookup found nothing, so Lawexa tried another way.', data: null }, true), "Couldn't make a quiz");
 });
 
 test('a refused quiz step carries the error mark, with no Error line under it', () => {
@@ -228,9 +235,9 @@ test('a bare transport error shows the plain sentence, never the code, in the ca
     assert.equal(createQuizStepAction(true, result, false), "Couldn't make a quiz", raw);
   }
   assert.deepEqual(quizJobState({ status: 'failed', error: { code: 'failed', message: 'HTTP 500' } }, REF), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE });
-  // A real refusal keeps its own words.
+  // A real refusal (stored whole, with data.error) keeps its own words.
   const refusal = 'TEST DATA. A quiz is already being made for you. Wait for it to finish, then ask again.';
-  assert.deepEqual(createdQuiz(step({ toolResult: { success: false, error: refusal, data: null } })), { kind: 'failed', message: refusal });
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: false, error: null, data: { success: false, error: { code: 'limit', message: refusal } } } })), { kind: 'failed', message: refusal });
 });
 
 test('a quiz being made counts as maybe made, so an earlier refusal waits for it', () => {
