@@ -238,3 +238,12 @@ test('no new package: find and replace is built on the ProseMirror already insta
   const imports = [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
   assert.deepEqual([...new Set(imports)].sort(), ['@tiptap/core', '@tiptap/pm/model', '@tiptap/pm/state', '@tiptap/pm/view']);
 });
+
+test('the match tints are neutral greys, never a colour (no coloured accents; the techlead, 24 October 2026)', () => {
+  const css = read('v2', 'features', 'notes', 'editor', 'find-replace.css');
+  const colours = css.match(/oklch\([^)]*\)/g) ?? [];
+  assert.equal(colours.length, 6);
+  // Every oklch has zero chroma and zero hue: a grey, in light and dark.
+  for (const colour of colours) assert.match(colour, /^oklch\([\d.]+ 0 0 \/ [\d.]+\)$/, colour);
+  assert.match(css, /\.v2-find-current \{\s*background-color: var\(--v2-find-current\);\s*box-shadow: inset 0 -1px 0 var\(--v2-find-current-line\);/);
+});

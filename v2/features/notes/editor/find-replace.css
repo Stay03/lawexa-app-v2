@@ -3,23 +3,24 @@
  * 2026). The classes are ProseMirror decorations (find-replace.ts): drawn by
  * the editor, never saved into a note.
  *
- * A cool blue, not gold. Gold is the app's colour for actions, and the note's
- * own highlight is already gold (`[&_mark]` in the editors), so a match inside
- * highlighted text has to read as a different thing. Every match gets a soft
- * tint; the current one a stronger tint and a thin ring, so it is found at a
- * glance among the rest. The text keeps its own colour in both themes.
+ * Neutral greys, never a colour: Stay's rule is no coloured accents, and gold
+ * is kept for actions (the techlead, 24 October 2026). Every match gets a light
+ * grey wash; the current one a stronger wash and a thin line under it, so it
+ * is found at a glance among the rest. The washes are see-through, so a match
+ * inside the note's own gold highlight (`[&_mark]` in the editors) darkens or
+ * lightens that gold and still reads as a match. The text keeps its colour.
  */
 
 :root {
-  --v2-find-match: oklch(0.88 0.06 235 / 0.7);
-  --v2-find-current: oklch(0.78 0.12 240 / 0.75);
-  --v2-find-current-ring: oklch(0.55 0.15 245 / 0.8);
+  --v2-find-match: oklch(0.45 0 0 / 0.14);
+  --v2-find-current: oklch(0.35 0 0 / 0.28);
+  --v2-find-current-line: oklch(0.25 0 0 / 0.85);
 }
 
 .dark {
-  --v2-find-match: oklch(0.45 0.08 240 / 0.55);
-  --v2-find-current: oklch(0.55 0.14 242 / 0.8);
-  --v2-find-current-ring: oklch(0.75 0.13 240 / 0.9);
+  --v2-find-match: oklch(1 0 0 / 0.13);
+  --v2-find-current: oklch(1 0 0 / 0.28);
+  --v2-find-current-line: oklch(1 0 0 / 0.8);
 }
 
 .v2-find-match {
@@ -30,5 +31,5 @@
 
 .v2-find-current {
   background-color: var(--v2-find-current);
-  box-shadow: 0 0 0 1px var(--v2-find-current-ring);
+  box-shadow: inset 0 -1px 0 var(--v2-find-current-line);
 }
