@@ -71,6 +71,7 @@ export function DraftPanel({
           ordinal={ordinal}
           title={draft.title}
           markdown={draft.body}
+          font={{ font: draft.font, size: draft.size }}
           space={space}
         />
       ) : (

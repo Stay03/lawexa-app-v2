@@ -29,6 +29,8 @@ test('a finished draft is split from the reply around it, with its title decoded
       title: 'Tenancy Agreement for 12 Allen "A" & Co',
       body: '# Tenancy Agreement\n\nThis agreement is made on the 1st day of November 2026.',
       complete: true,
+      font: null,
+      size: null,
     },
   });
   assert.deepEqual(parts[2], { kind: 'text', text: '\nTell me what to change.' });
@@ -37,7 +39,10 @@ test('a finished draft is split from the reply around it, with its title decoded
 test('while it streams, an open draft runs to the end and a half-written tag is held back', () => {
   const growing = 'TEST DATA. Drafting now.\n<draft title="Notice to Quit">\nTake notice that you are to quit';
   const [, draft] = splitDrafts(growing, true);
-  assert.deepEqual(draft, { kind: 'draft', draft: { title: 'Notice to Quit', body: 'Take notice that you are to quit', complete: false } });
+  assert.deepEqual(draft, {
+    kind: 'draft',
+    draft: { title: 'Notice to Quit', body: 'Take notice that you are to quit', complete: false, font: null, size: null },
+  });
   // The closing tag's first letters never show in the body.
   assert.equal(draftsIn(`${growing} the premises.\n</dra`, true)[0].body, 'Take notice that you are to quit the premises.');
   // An opening tag still being written shows nothing of itself.
@@ -93,9 +98,9 @@ test('a draft is found by its place in the transcript, the streaming answer last
 
 test('the status says finished, being written, or cut short in a saved answer', () => {
   const body = 'One two three';
-  assert.equal(draftStatus({ title: 'A', body, complete: true }, false), 'Draft · 3 words');
-  assert.equal(draftStatus({ title: 'A', body, complete: false }, true), 'Writing · 3 words');
-  assert.equal(draftStatus({ title: 'A', body, complete: false }, false), 'Unfinished · 3 words');
+  assert.equal(draftStatus({ title: 'A', body, complete: true, font: null, size: null }, false), 'Draft · 3 words');
+  assert.equal(draftStatus({ title: 'A', body, complete: false, font: null, size: null }, true), 'Writing · 3 words');
+  assert.equal(draftStatus({ title: 'A', body, complete: false, font: null, size: null }, false), 'Unfinished · 3 words');
 });
 
 test('a failed Save as note names a newer copy and the size cap, else asks to retry', async () => {
@@ -126,4 +131,23 @@ test('a draft opens itself when Lawexa finishes it, unless the reader is writing
   // Writing means the box is focused or holds words.
   assert.match(card, /document\.querySelector<HTMLTextAreaElement>\('\[data-v2-chat-dock\] textarea'\)/);
   assert.match(card, /return document\.activeElement === box \|\| box\.value\.trim\(\) !== '';/);
+});
+
+test('the draft tag may carry the whole draft\'s font and size; other values are dropped', () => {
+  const [draft] = draftsIn('<draft title="TEST DATA Lease" font="Georgia" size="12">\nBody\n</draft>');
+  assert.equal(draft.title, 'TEST DATA Lease');
+  assert.equal(draft.font, 'Georgia');
+  assert.equal(draft.size, 12);
+  assert.equal(draft.body, 'Body');
+  // Either one alone, in any order after the title.
+  const [sized] = draftsIn('<draft title="T" size="14">\nB\n</draft>');
+  assert.equal(sized.font, null);
+  assert.equal(sized.size, 14);
+  const [swapped] = draftsIn('<draft title="T" size="10" font="Arial">\nB\n</draft>');
+  assert.deepEqual([swapped.font, swapped.size], ['Arial', 10]);
+  // Not on the list: the house font and size.
+  const [odd] = draftsIn('<draft title="T" font="Papyrus" size="13">\nB\n</draft>');
+  assert.deepEqual([odd.font, odd.size], [null, null]);
+  // The plain tag still reads as before.
+  assert.deepEqual([draftsIn('<draft title="T">\nB\n</draft>')[0].font, draftsIn('<draft title="T">\nB\n</draft>')[0].size], [null, null]);
 });

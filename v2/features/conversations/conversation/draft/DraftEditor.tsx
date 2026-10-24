@@ -21,7 +21,7 @@ import '@/v2/features/notes/note-fonts.css';
 import type { ConversationSpaceRef } from '@/types/chat';
 import { readDraftEdit, readSavedDraftNote, writeDraftEdit } from './draft-edits';
 import { DraftSaveBar } from './DraftSaveBar';
-import { markdownToDoc } from './markdown-to-doc';
+import { markdownToDoc, type DraftFont } from './markdown-to-doc';
 
 /**
  * DraftEditor — a finished draft, editable in the side panel with the note
@@ -42,12 +42,15 @@ export function DraftEditor({
   ordinal,
   title,
   markdown,
+  font,
   space,
 }: {
   conversationId: string;
   ordinal: number;
   title: string;
   markdown: string;
+  /** The draft's own font and size from its tag, put on all its text. */
+  font: DraftFont;
   /** The chat's Space, for Save to Space folder; `null` outside one. */
   space: ConversationSpaceRef | null;
 }) {
@@ -65,7 +68,7 @@ export function DraftEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
-    content: readDraftEdit(conversationId, ordinal) ?? markdownToDoc(markdown),
+    content: readDraftEdit(conversationId, ordinal) ?? markdownToDoc(markdown, font),
     onUpdate: ({ editor: instance }) => {
       writeDraftEdit(conversationId, ordinal, instance.getJSON());
       setDirty(true);

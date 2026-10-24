@@ -13,6 +13,13 @@
  * only entities in it), a Markdown body, and a closing tag. Text before and
  * after stays an ordinary reply, and one answer may hold several drafts.
  *
+ * FONTS (Stay, 24 October 2026; backend's prompt piece 398beb4a). The opening
+ * tag may carry the whole draft's font and size, `font="Georgia" size="12"`,
+ * either one optional, in any order after `title`. Only the note fonts and
+ * sizes are kept (lib/notes/note-fonts.ts); any other value is dropped and the
+ * draft reads in the house font. A part of the text carries its own as an
+ * inline `<span data-font data-size>`, which markdown-to-doc.ts reads.
+ *
  * WHILE IT STREAMS the closing tag has not arrived, so an open draft runs to
  * the end of the text and says it is not complete: the panel shows the body
  * growing. A tag cut off mid-name at the very end (`<dra`, `<draft title="Ten`)
@@ -21,22 +28,34 @@
  * Pure, so the rules are tested here and the card and the panel only draw them.
  */
 
+import { noteFont, noteSize, type NoteFont, type NoteSize } from '@/lib/notes/note-fonts';
+
 export interface DraftBlock {
   title: string;
   /** The Markdown between the tags, without the newline after the opening line. */
   body: string;
   /** The closing tag has arrived. */
   complete: boolean;
+  /** The whole draft's font and size from the opening tag; `null` for the house ones. */
+  font: NoteFont | null;
+  size: NoteSize | null;
 }
 
 export type DraftPart = { kind: 'text'; text: string } | { kind: 'draft'; draft: DraftBlock };
 
-const OPEN = /<draft\s+title="([^"]*)"\s*>/gi;
+/** `<draft title="…">`, with any other double-quoted attributes after the title. */
+const OPEN = /<draft\s+title="([^"]*)"((?:\s+[a-z-]+="[^"]*")*)\s*>/gi;
 const CLOSE = '</draft>';
 
 /** The two entities a title may carry. */
 function decodeTitle(raw: string): string {
   return raw.replace(/&quot;/g, '"').replace(/&amp;/g, '&').trim();
+}
+
+/** One double-quoted attribute out of the tag's rest, or `null`. */
+function attribute(rest: string, name: string): string | null {
+  const match = new RegExp(`\\s${name}="([^"]*)"`, 'i').exec(rest);
+  return match ? match[1].trim() : null;
 }
 
 /** How much of `text`'s end could still grow into `<draft title="…">`. */
@@ -78,9 +97,16 @@ export function splitDrafts(content: string, streaming = false): DraftPart[] {
         body = body.slice(0, partialClose);
       }
     }
+    const rest = open[2] ?? '';
     parts.push({
       kind: 'draft',
-      draft: { title: decodeTitle(open[1]) || 'Draft', body: body.replace(/\s+$/, ''), complete: closeAt >= 0 },
+      draft: {
+        title: decodeTitle(open[1]) || 'Draft',
+        body: body.replace(/\s+$/, ''),
+        complete: closeAt >= 0,
+        font: noteFont(attribute(rest, 'font')),
+        size: noteSize(attribute(rest, 'size')),
+      },
     });
     if (closeAt < 0) return parts;
     cursor = closeAt + CLOSE.length;

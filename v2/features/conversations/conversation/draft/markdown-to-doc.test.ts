@@ -43,10 +43,46 @@ test('lists keep their numbering start, and a table keeps its header row', () =>
 
 test('markup in a draft stays text, and an empty draft is one empty paragraph', () => {
   const doc = markdownToDoc('<span style="color:red">TEST DATA</span>\n\nText <b>bold?</b>');
-  // No HTML is parsed: the raw markup is text the reader can see and delete.
-  assert.equal(doc.content?.[0].content?.map((node) => node.text).join(''), '<span style="color:red">TEST DATA</span>');
+  // A span with no allowed font is dropped and its words kept, with no style and no mark.
+  assert.equal(doc.content?.[0].content?.map((node) => node.text).join(''), 'TEST DATA');
   assert.ok(doc.content?.[0].content?.every((node) => node.type === 'text' && !node.marks));
+  // Any other tag is text the reader can see and delete.
+  assert.equal(doc.content?.[1].content?.map((node) => node.text).join(''), 'Text <b>bold?</b>');
   assert.ok(doc.content?.[1].content?.every((node) => !node.marks));
   assert.deepEqual(markdownToDoc(''), { type: 'doc', content: [{ type: 'paragraph' }] });
   assert.deepEqual(markdownToDoc('---').content, [{ type: 'horizontalRule' }]);
+});
+
+const fontOf = (node: { marks?: { type: string; attrs?: Record<string, unknown> }[] } | undefined) =>
+  node?.marks?.find((mark) => mark.type === 'fontStyle')?.attrs ?? null;
+
+test('the draft\'s own font goes on every run of text, and a span wins for its words', () => {
+  const doc = markdownToDoc(
+    '# TEST DATA Agreement\n\nMade <span data-font="Times New Roman" data-size="14">between **the parties**</span> today.\n\n- One\n\n`code`',
+    { font: 'Georgia', size: 12 },
+  );
+  // The heading and the list carry the draft's font.
+  assert.deepEqual(fontOf(doc.content?.[0].content?.[0]), { font: 'Georgia', size: 12 });
+  const runs = doc.content?.[1].content ?? [];
+  assert.deepEqual(runs.map((node) => node.text), ['Made ', 'between ', 'the parties', ' today.']);
+  assert.deepEqual(fontOf(runs[0]), { font: 'Georgia', size: 12 });
+  // Inside the span, bold included.
+  assert.deepEqual(fontOf(runs[1]), { font: 'Times New Roman', size: 14 });
+  assert.deepEqual(fontOf(runs[2]), { font: 'Times New Roman', size: 14 });
+  assert.ok(runs[2].marks?.some((mark) => mark.type === 'bold'));
+  // After the close, the draft's font again.
+  assert.deepEqual(fontOf(runs[3]), { font: 'Georgia', size: 12 });
+  assert.deepEqual(fontOf(doc.content?.[2].content?.[0].content?.[0].content?.[0]), { font: 'Georgia', size: 12 });
+  // Code takes no font.
+  assert.equal(fontOf(doc.content?.[3].content?.[0]), null);
+});
+
+test('only allowed fonts and sizes are kept; a span may set one and keep the other', () => {
+  const doc = markdownToDoc('<span data-font="Comic Sans MS" data-size="13">kept words</span> and <span data-size="18">bigger</span>.');
+  const runs = doc.content?.[0].content ?? [];
+  assert.deepEqual(runs.map((node) => node.text), ['kept words', ' and ', 'bigger', '.']);
+  assert.equal(fontOf(runs[0]), null);
+  assert.deepEqual(fontOf(runs[2]), { font: null, size: 18 });
+  // A stray close tag is dropped; no font means no mark.
+  assert.deepEqual(markdownToDoc('Plain </span> text').content?.[0].content?.map((node) => node.text), ['Plain ', ' text']);
 });
