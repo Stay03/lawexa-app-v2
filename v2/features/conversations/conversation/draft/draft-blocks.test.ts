@@ -324,10 +324,14 @@ test('while the reader types on a phone: the title row down to ×, one row of to
   const { readFileSync } = await import('node:fs');
   const css = readFileSync(new URL('./draft-panel.css', import.meta.url), 'utf8');
   // Typing: the editor has focus, or a menu from the folded row is open (its opening takes the focus).
-  const typing = String.raw`\.v2-side-panel-bare:is\(:has\(\.ProseMirror-focused\), :has\(\.v2-draft-typing-tools \[data-state='open'\]\)\)`;
+  const typing = String.raw`\.v2-side-panel-bare:is\(:has\(\.ProseMirror-focused\), :has\(\.v2-draft-typing-tools \[aria-expanded='true'\]\)\)`;
   assert.match(css, new RegExp(`${typing} > header \\{\\s*justify-content: flex-end;`));
   assert.match(css, new RegExp(`${typing} > header > :not\\(:last-child\\),\\s*${typing} \\.v2-draft-sheet-tools,\\s*${typing} \\.v2-draft-save-foot \\{\\s*display: none;`));
   assert.match(css, new RegExp(`${typing} \\.v2-draft-typing-tools \\{\\s*display: flex;`));
+  // Held by the trigger's aria-expanded, never its data-state: the font menu's tooltip writes its own
+  // data-state on the same button and wins, so a data-state rule never held, and the menu closed as the
+  // row swapped back under the reader's finger (WebKit, 24 October 2026).
+  assert.doesNotMatch(css, /v2-draft-typing-tools \[data-state/);
   // The folded row is the computer bar's own tools; the three-row toolbar carries its class.
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
   assert.match(editor, /<div className="v2-draft-typing-tools sticky top-0 z-10 hidden [^"]*">\s*<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} \/>/);

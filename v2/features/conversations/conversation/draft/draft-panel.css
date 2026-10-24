@@ -170,23 +170,25 @@
    - the Save foot is put away.
    All come back when the keyboard goes down (Done) and the editor lets go. A
    menu opened from the folded row holds them too: opening it takes focus from
-   the editor, and the row must not swap back under the reader's finger.
+   the editor, and the row must not swap back under the reader's finger. It is
+   read from the trigger's aria-expanded: the font menu's tooltip writes its
+   own data-state on the same button, so data-state never reads "open" there.
    `.v2-side-panel-bare` is the draft's own sheet (ChatSidePanel's `bare`, which
    only the draft passes). */
 @media (max-width: 79.999rem) {
-  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) > header {
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [aria-expanded='true'])) > header {
     justify-content: flex-end;
     padding-block: 0.25rem;
     border-bottom-width: 0;
   }
 
-  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) > header > :not(:last-child),
-  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) .v2-draft-sheet-tools,
-  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) .v2-draft-save-foot {
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [aria-expanded='true'])) > header > :not(:last-child),
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [aria-expanded='true'])) .v2-draft-sheet-tools,
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [aria-expanded='true'])) .v2-draft-save-foot {
     display: none;
   }
 
-  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) .v2-draft-typing-tools {
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [aria-expanded='true'])) .v2-draft-typing-tools {
     display: flex;
   }
 }
