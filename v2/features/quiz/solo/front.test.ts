@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { FRONT_SCORING_NOTE, frontChallengeText } from './front/front-model';
+
 /* The quiz front (/quiz/q/{uuid}, 21 October 2026): what the quiz is, who
  * wrote it, the reveal choice, and Start for an account or the sign-in door
  * for everyone else. Pinned by source. */
@@ -34,7 +36,10 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
   assert.match(source, /if \(status === 401\) \{\s*router\.push\(signInHref\(pathname\)\);/);
   // The reveal choice opens on the default and offers both ways.
   assert.match(source, /useState<QuizRevealMode>\(DEFAULT_REVEAL_MODE\)/);
-  assert.match(source, /REVEAL_MODE_CHOICES\.map\(\(choice\) => \(\s*<VisibilityOption/);
+  // A small "Answer reveal" choice, not the two big cards (Arthur, 24 October 2026).
+  assert.match(source, /Answer reveal\s*<\/label>\s*<Select value=\{revealMode\} onValueChange=\{\(value\) => setRevealMode\(value as QuizRevealMode\)\}>/);
+  assert.match(source, /REVEAL_MODE_CHOICES\.map\(\(choice\) => \(\s*<SelectItem key=\{choice\.id\} value=\{choice\.id\}>/);
+  assert.doesNotMatch(source, /VisibilityOption|When do you want to see the answers\?/);
 });
 
 test("the owner's Edit and Delete ride the bar's menu, and Delete leaves for the library", () => {
@@ -47,7 +52,9 @@ test("the owner's Edit and Delete ride the bar's menu, and Delete leaves for the
   assert.doesNotMatch(source, /DropdownMenu/);
   // Share only where a link can open it; the owner of a private one is told why.
   assert.match(source, /const shareable = quiz\.visibility === 'link' \|\| quiz\.visibility === 'public';/);
-  assert.match(source, /\{shareable && \(\s*<ShareButton/);
+  // Challenge a friend, a secondary button beside Start, the one gold action.
+  assert.match(source, /\{shareable && \(\s*<Button\s*type="button"\s*variant="outline"/);
+  assert.match(source, /\{challenge\.copied \? 'Link copied' : 'Challenge a friend'\}/);
   assert.match(source, /Only you can open this quiz\. Change who can find it to share it by link\./);
 });
 
@@ -63,4 +70,23 @@ test('the route unfurls through the public preview and indexes only a public qui
   assert.match(server, /`\$\{apiUrl\}\/api\/channel-quizzes\/\$\{encodeURIComponent\(quizUuid\)\}\/preview`/);
   assert.match(server, /if \(typeof title !== 'string' \|\| typeof visibility !== 'string'\) return null;/);
   assert.doesNotMatch(server.slice(server.indexOf('fetchQuizPreviewForMetadata')), /Authorization|apiClient/);
+});
+
+/* Arthur, 24 October 2026: a smaller title on a phone, the facts in one line,
+ * the author's photo and name (never "You wrote this", never "drafted by
+ * Lawexa"), a short scoring note, and no em dash on the page. */
+test('the quiz page says what it is in one plain line, with short copy and no em dash', () => {
+  const source = screen();
+  assert.match(source, /<h1 className="text-xl leading-snug font-semibold tracking-tight text-balance text-foreground md:text-3xl">/);
+  assert.match(source, /<span className="truncate font-medium text-foreground\/85">\{quiz\.creator\?\.name \?\? 'Someone who has left'\}<\/span>/);
+  assert.match(source, /const facts = \[questionCountLabel\(count\), scenarios, minutes\]/);
+  assert.doesNotMatch(source, /You wrote this|drafted by Lawexa|FactPill|SPEED_SCORING_NOTE/);
+  // Gold only for Start: the best is in the plain colour.
+  assert.doesNotMatch(source, /text-primary/);
+  const visible = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.doesNotMatch(visible, /\u2014/);
+  assert.equal(FRONT_SCORING_NOTE, 'Right answers score up to 1,000 points. The faster you answer, the more you keep.');
+  assert.doesNotMatch(FRONT_SCORING_NOTE, /\u2014/);
+  assert.equal(frontChallengeText('TEST DATA Land law', 4947), 'I scored 4,947 points on TEST DATA Land law. Can you beat me?');
+  assert.equal(frontChallengeText('TEST DATA Land law', null), 'Try TEST DATA Land law on Lawexa. How many can you get right?');
 });

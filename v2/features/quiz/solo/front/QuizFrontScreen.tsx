@@ -5,30 +5,36 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
+  Check,
   Compass,
-  Eye,
-  ListChecks,
+  Info,
   Loader2,
   Pencil,
   Play,
   SearchX,
+  Share2,
   Trash2,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { ChannelQuiz, QuizRevealMode } from '@/types/channel-quiz';
 import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
-import { SPEED_SCORING_NOTE } from '@/v2/features/channels/quiz/model';
 import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
 import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
 import { VISIBILITY_MARKS } from '@/v2/features/channels/quiz/VisibilityChip';
 import { visibilityFace } from '@/v2/features/channels/quiz/model';
-import { LawexaMark, MemberAvatar } from '@/v2/features/channels/ui/avatars';
-import { ShareButton } from '@/v2/features/sharing/ShareButton';
-import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
+import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
+import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { signInHref } from '@/v2/runtime/sign-in-href';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
@@ -37,7 +43,7 @@ import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, quizMinutesLabel, scenarioCountLabel } from '../rows-model';
 import { QuizSourceLine } from '../../source/QuizSourceLine';
-import { quizContents, takenLabel } from './front-model';
+import { FRONT_SCORING_NOTE, frontChallengeText, quizContents, takenLabel } from './front-model';
 import {
   clearScreenContext,
   setScreenContext,
@@ -125,6 +131,15 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const startAttempt = useStartAttempt(quizUuid, viewerId);
   /** A refusal of Start, said under the button — this surface has no toasts. */
   const [startError, setStartError] = useState<string | null>(null);
+
+  // "Challenge a friend" (Arthur, 24 October 2026): the quiz's link with a
+  // line to beat. Called up here with the other hooks; it runs only on a tap,
+  // once the quiz is on screen.
+  const challenge = useShareAction({
+    path: quizFrontHref(quizUuid),
+    title: query.data?.data?.title ?? null,
+    text: frontChallengeText(query.data?.data?.title ?? null, query.data?.data?.viewer_best_points ?? null),
+  });
 
   const [formOpen, setFormOpen] = useState(false);
   /** Bumped on every opening, the form's `key` (the house dialog contract). */
@@ -240,44 +255,41 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const taken = takenLabel(quiz.viewer_attempts_count);
   const contents = quizContents(questions, quiz.scenarios ?? []);
   const Mark = VISIBILITY_MARKS[quiz.visibility];
+  const facts = [questionCountLabel(count), scenarios, minutes].filter((fact): fact is string => Boolean(fact));
 
   return (
     <div className={FRONT_COLUMN}>
       <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-8">
         <div className="flex min-w-0 flex-col gap-5">
-          <header className="space-y-3">
-            <QuizTile uuid={quiz.uuid} title={quiz.title} className="size-14 rounded-[18px] text-xl" />
-            <h1 className="text-2xl leading-snug font-semibold tracking-tight text-balance text-foreground sm:text-3xl">
+          <header className="space-y-2 md:space-y-3">
+            <QuizTile uuid={quiz.uuid} title={quiz.title} className="size-11 rounded-[14px] text-lg md:size-14 md:rounded-[18px] md:text-xl" />
+            <h1 className="text-xl leading-snug font-semibold tracking-tight text-balance text-foreground md:text-3xl">
               {quiz.title}
             </h1>
-            {/* Whose. `creator` is nullable (a gone account): a word, never a crash. */}
-            <p className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
-              <MemberAvatar user={quiz.creator} size="sm" />
-              <span className="truncate font-medium text-foreground/85">
-                {own ? 'You wrote this' : (quiz.creator?.name ?? 'Someone who has left')}
+            {/* What it is, in one line (Arthur, 24 October 2026): whose (the
+                author's photo and name, for the author too), how many
+                questions, how long, and who can find it. `creator` is
+                nullable (a gone account): a word, never a crash. */}
+            <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground" aria-label="About this quiz">
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <MemberAvatar user={quiz.creator} size="sm" />
+                <span className="truncate font-medium text-foreground/85">{quiz.creator?.name ?? 'Someone who has left'}</span>
               </span>
-              {quiz.is_ai_generated && (
-                <span className="inline-flex shrink-0 items-center gap-1">
-                  <LawexaMark className="size-3 shrink-0" />
-                  drafted by Lawexa
+              {facts.map((fact) => (
+                <span key={fact} className="whitespace-nowrap">
+                  <span aria-hidden className="mr-1.5">·</span>
+                  {fact}
                 </span>
-              )}
+              ))}
+              <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                <span aria-hidden className="mr-0.5">·</span>
+                <Mark aria-hidden className="size-3.5 shrink-0" />
+                {visibilityFace(quiz.visibility)}
+              </span>
             </p>
             {quiz.description && (
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
-            {/* What it is, as pills that wrap whole, never cut. */}
-            <ul className="flex flex-wrap gap-2" aria-label="About this quiz">
-              <FactPill>{questionCountLabel(count)}</FactPill>
-              {scenarios ? <FactPill>{scenarios}</FactPill> : null}
-              {minutes ? <FactPill>{minutes}</FactPill> : null}
-              {own ? (
-                <FactPill>
-                  <Mark aria-hidden className="size-3.5 shrink-0" />
-                  {visibilityFace(quiz.visibility)}
-                </FactPill>
-              ) : null}
-            </ul>
           </header>
 
           {contents.length > 0 ? (
@@ -303,7 +315,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
               {best ? (
                 <div>
                   <div className="text-xs text-muted-foreground">Your best</div>
-                  <div className="font-comfortaa text-2xl font-bold text-primary tabular-nums">
+                  <div className="font-comfortaa text-xl font-bold text-foreground tabular-nums">
                     {best.replace(/^Best /, '')}
                   </div>
                 </div>
@@ -314,24 +326,27 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             </div>
           ) : null}
 
-          <section aria-labelledby="quiz-reveal-heading" className="space-y-2">
-            <h2 id="quiz-reveal-heading" className="text-sm font-medium text-foreground">
-              When do you want to see the answers?
-            </h2>
-            <div role="group" aria-labelledby="quiz-reveal-heading" className="grid gap-2">
-              {REVEAL_MODE_CHOICES.map((choice) => (
-                <VisibilityOption
-                  key={choice.id}
-                  icon={choice.id === 'each' ? Eye : ListChecks}
-                  title={choice.label}
-                  description={choice.hint}
-                  selected={revealMode === choice.id}
-                  busy={false}
-                  onSelect={() => setRevealMode(choice.id)}
-                />
-              ))}
+          {/* When the answers show (Arthur, 24 October 2026): a small choice,
+              "After each question" by default, sent with Start. */}
+          {mayTake ? (
+            <div className="flex items-center justify-between gap-3">
+              <label id="quiz-reveal-label" htmlFor="quiz-reveal" className="text-sm text-muted-foreground">
+                Answer reveal
+              </label>
+              <Select value={revealMode} onValueChange={(value) => setRevealMode(value as QuizRevealMode)}>
+                <SelectTrigger id="quiz-reveal" aria-labelledby="quiz-reveal-label" className="h-9 w-auto min-w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  {REVEAL_MODE_CHOICES.map((choice) => (
+                    <SelectItem key={choice.id} value={choice.id}>
+                      {choice.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </section>
+          ) : null}
 
           <div className="flex flex-col gap-3">
             {/* START STAYS IN REACH: pinned to the foot of a phone's screen over
@@ -353,14 +368,23 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 </Button>
               )}
               {shareable && (
-                <ShareButton path={quizFrontHref(quiz.uuid)} title={quiz.title} label="Share this quiz" />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  className="min-w-0 shrink-0"
+                  onClick={() => void challenge.share()}
+                >
+                  {challenge.copied ? <Check aria-hidden className="size-4" /> : <Share2 aria-hidden className="size-4" />}
+                  <span aria-live="polite">{challenge.copied ? 'Link copied' : 'Challenge a friend'}</span>
+                </Button>
               )}
             </div>
 
             {!mayTake && (
               <p className="text-sm text-muted-foreground">
                 Anyone can browse quizzes. Taking one keeps your score on your
-                account —{' '}
+                account:{' '}
                 <Link
                   href="/register"
                   className={cn('rounded text-foreground underline underline-offset-4', FOCUS_RING)}
@@ -388,7 +412,10 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
               </p>
             )}
 
-            <p className="text-xs text-muted-foreground/80">{SPEED_SCORING_NOTE}</p>
+            <p className="flex items-start gap-1.5 text-xs text-muted-foreground/80">
+              <Info aria-hidden className="mt-px size-3.5 shrink-0" />
+              <span>{FRONT_SCORING_NOTE}</span>
+            </p>
           </div>
         </div>
       </article>
@@ -415,16 +442,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 /** The page's column: wider than a list, for the side panel on a computer,
  *  with room at the foot of a phone for the pinned Start. The skeleton and the
  *  route fallback share it, so the hand-over moves nothing sideways. */
-const FRONT_COLUMN = 'mx-auto w-full max-w-5xl px-4 pt-5 pb-28 sm:pt-6 md:pb-16';
-
-/** One fact about the quiz, as a pill that wraps whole. */
-function FactPill({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-3 text-xs whitespace-nowrap text-foreground/85">
-      {children}
-    </li>
-  );
-}
+const FRONT_COLUMN = 'mx-auto w-full max-w-5xl px-4 pt-3 pb-28 md:pt-6 md:pb-16';
 
 /**
  * The front's reserved shape: the masthead (title, a line, the meta row), the
