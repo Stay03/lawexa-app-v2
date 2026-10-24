@@ -112,10 +112,11 @@ test('the gate, the spine, both homes and discover all read the flag, never the 
   assert.match(signal, /useQuery\(\{ \.\.\.channels, enabled: canOpenTeamChannels\(session\), select: selectUnreadPresent \}\)/);
   assert.match(signal, /useQuery\(\{ \.\.\.spaces, enabled: eligible, select: sumSpaceMentions \}\)/);
   // The Work and Study tabs are the Spaces timeline since 24 October 2026, with
-  // no Channel messages section to gate.
-  for (const home of ['WorkHome.tsx', 'StudyHome.tsx']) {
+  // no Channel messages section to gate; the timeline and its chat box live in
+  // `TimelineHome` (Stay, 24 October 2026: "Yeah add it").
+  for (const home of ['WorkHome.tsx', 'StudyHome.tsx', 'TimelineHome.tsx']) {
     const source = read('v2', 'shell', 'designs', home);
-    assert.match(source, /<HomeTimeline type="(work|study)" \/>/, home);
+    assert.match(source, /<(HomeTimeline type=\{tab\}|TimelineHome tab="(work|study)" role=\{role\}) \/>/, home);
     assert.doesNotMatch(source, /ChannelMessagesSection/, home);
     assert.doesNotMatch(source, /canAccessCollab/, home);
   }
