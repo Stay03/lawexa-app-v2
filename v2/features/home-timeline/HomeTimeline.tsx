@@ -186,9 +186,9 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
             const lineAboveDay = day.rows[0]?.key === newSinceKey;
             return (
               <div key={day.key} className="flex min-w-0 flex-col gap-5">
-                {lineAboveDay ? <CentredLabel as="span" label={NEW_SINCE_WORDS} /> : null}
                 <section aria-label={day.label} className="flex min-w-0 flex-col gap-2">
-                  <CentredLabel label={day.label} />
+                  {/* On a day boundary the last visit joins the day's label, so two lines never stack. */}
+                  <CentredLabel label={lineAboveDay ? `${day.label} · ${NEW_SINCE_WORDS}` : day.label} />
                   <ul className="flex flex-col">
                     {day.rows.map((row, index) => {
                       // The avatars of a day are joined, except across the last-visit line.

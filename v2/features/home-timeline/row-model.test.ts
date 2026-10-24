@@ -382,6 +382,8 @@ test('the last-visit line goes before the first row older than the last visit', 
 test('the line names the rows below it, in the day labels’ dress (the techlead, 24 October 2026)', () => {
   assert.match(screen, /const NEW_SINCE_WORDS = 'Before your last visit';/);
   assert.match(screen, /<CentredLabel as="span" label=\{NEW_SINCE_WORDS\} \/>/);
+  // On a day boundary it joins the day's label: "YESTERDAY · BEFORE YOUR LAST VISIT", never two lines stacked.
+  assert.match(screen, /<CentredLabel label=\{lineAboveDay \? `\$\{day\.label\} · \$\{NEW_SINCE_WORDS\}` : day\.label\} \/>/);
   assert.doesNotMatch(screen, /'New since your last visit'/);
   // The avatars of a day are not joined across it.
   assert.match(screen, /const joined = next !== undefined && next\.key !== newSinceKey;/);
