@@ -3,7 +3,8 @@ import { filesApi } from '@/lib/api/files';
 
 /**
  * The v2 files query factory (standards §2, `cases/queries.ts` is the
- * exemplar). One leaf so far: the link a player plays from.
+ * exemplar): the link a player plays from, the link a picture shows from,
+ * and one file's facts.
  */
 
 /** A minted download link holds for an hour; a player reuses one for 50 minutes. */
@@ -25,6 +26,34 @@ export const filesQueries = {
       queryKey: [...filesQueries.all, 'download-url', fileId] as const,
       queryFn: () => filesApi.getDownloadUrl(fileId),
       staleTime: MEDIA_URL_STALE_MS,
+      retry: false,
+      meta: { silentError: true },
+    }),
+
+  /**
+   * A link that SHOWS the file (`?inline=1`), for a picture drawn in the
+   * chat's side panel. Kept apart from `downloadUrl`, whose link downloads.
+   */
+  inlineUrl: (fileId: number) =>
+    queryOptions({
+      queryKey: [...filesQueries.all, 'inline-url', fileId] as const,
+      queryFn: () => filesApi.getDownloadUrl(fileId, { inline: true }),
+      staleTime: MEDIA_URL_STALE_MS,
+      retry: false,
+      meta: { silentError: true },
+    }),
+
+  /**
+   * One file's facts (`GET /files/{id}`): its name, type, size and uploader,
+   * for a file opened by its id alone (`?side=file:ID`). The same `view`
+   * policy as the download, so a file the reader cannot open answers 403 or
+   * 404 and the host says so.
+   */
+  detail: (fileId: number) =>
+    queryOptions({
+      queryKey: [...filesQueries.all, 'detail', fileId] as const,
+      queryFn: () => filesApi.getById(fileId),
+      staleTime: 5 * 60 * 1000,
       retry: false,
       meta: { silentError: true },
     }),

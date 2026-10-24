@@ -201,6 +201,22 @@ export function formatToolMessage(
       return {
         action: isComplete ? 'Memory recalled' : 'Recalling memory',
       };
+    // The file list in chat (piece a; Stay, 23 October 2026): the files a
+    // step found show as a card after the chain (`ChatFileListCard`).
+    case 'list_files':
+      return {
+        action: isComplete ? 'Listed files' : 'Listing files',
+        detail: typeof parameters.name === 'string' && parameters.name.trim() ? `named "${parameters.name.trim()}"` : undefined,
+      };
+    case 'search_files':
+      return {
+        action: isComplete ? 'Searched files' : 'Searching files',
+        detail: query ? `for "${query}"` : undefined,
+      };
+    case 'list_space_contents':
+      return {
+        action: isComplete ? "Listed the Space's contents" : "Listing the Space's contents",
+      };
     // Quiz from a source (Stay, 23 October 2026), and Lawexa building and
     // editing a quiz itself (24 October 2026): the quiz shows as a card after
     // the chain (`CreatedQuizCard`); the step names it.

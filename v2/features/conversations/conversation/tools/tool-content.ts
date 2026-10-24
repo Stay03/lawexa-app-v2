@@ -129,6 +129,7 @@ const HEADER_COVERED_TOOLS = new Set([
   'get_page_content',
   'search_my_conversations',
   'view_conversation',
+  'search_files',
 ]);
 
 const PARAM_LABELS: Record<string, string> = {

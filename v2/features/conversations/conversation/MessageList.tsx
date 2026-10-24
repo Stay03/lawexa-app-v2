@@ -37,6 +37,8 @@ import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
 import { CompactToolChain } from './tools/CompactToolChain';
 import { CreatedQuizCards } from './cards/CreatedQuizCard';
+import { isFileListStep } from './files/chat-files';
+import { ChatFileListCard } from './files/ChatFileListCard';
 import { runningSteps } from './tools/running-steps';
 import { ActivityStatus } from './ActivityStatus';
 import { ReferenceChips } from './ReferenceChips';
@@ -950,10 +952,16 @@ const GroupRow = memo(function GroupRow({
     // (running-steps.ts), so it reads "Making a quiz", not stopped. A refusal
     // shows no card when a later step in the answer made the quiz.
     const steps = runningSteps(group.messages, isStreaming && isLastGroup);
+    // The files a step listed show as one card each (the file list in chat,
+    // piece a; Stay, 23 October 2026): a tap opens one in the side panel.
+    const fileSteps = steps.filter(isFileListStep);
     body = (
       <>
         <CompactToolChain messages={steps} />
         <CreatedQuizCards steps={steps} />
+        {fileSteps.map((step) => (
+          <ChatFileListCard key={step.id} message={step} />
+        ))}
       </>
     );
   } else {
