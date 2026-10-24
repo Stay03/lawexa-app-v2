@@ -271,13 +271,14 @@ test('the mark is the person (photo or initials), Lawexa’s mark, or "?" for no
   assert.equal(row({ kind: 'member_joined', actor: null }).title, 'Someone joined Adeyemi appeal');
   const lead = screen.slice(screen.indexOf('function Lead('), screen.indexOf('function Sentence('));
   assert.match(lead, /lead\.type === 'unknown' \? \{ name: '\?', avatar_url: null \} : \{ name: lead\.name, avatar_url: lead\.avatar \}/);
-  assert.match(lead, /<LogoMark className="size-5" alt="" \/>/);
-  // The badge sits on the avatar's lower right corner.
-  // 20px, the icon at full contrast (the techlead, 24 October 2026).
-  assert.match(lead, /absolute -right-1\.5 -bottom-1\.5 flex size-5 items-center justify-center rounded-full bg-background ring-1 ring-border/);
-  assert.match(lead, /<Icon className="size-3 text-foreground" \/>/);
-  // The line joining a day's avatars, as strong as the day labels' rules read.
-  assert.match(screen, /left-\[30px\] w-px -translate-x-1\/2 bg-foreground\/20/);
+  assert.match(lead, /<LogoMark className="size-\[18px\] md:size-5" alt="" \/>/);
+  // The badge sits on the avatar's lower right corner: 18px on a phone, 20px on a computer, the icon at full contrast.
+  assert.match(lead, /absolute -right-1 -bottom-1 flex size-\[18px\] items-center justify-center rounded-full bg-background ring-1 ring-border md:-right-1\.5 md:-bottom-1\.5 md:size-5/);
+  assert.match(lead, /<Icon className="size-2\.5 text-foreground md:size-3" \/>/);
+  // The avatar is 32px on a phone, 36px on a computer.
+  assert.match(screen, /const AVATAR =\s*'size-8 md:size-9 /);
+  // The line joining a day's avatars, as strong as the day labels' rules read, at each avatar's centre.
+  assert.match(screen, /left-\[28px\] w-px -translate-x-1\/2 bg-foreground\/20 md:top-12 md:-bottom-2\.5 md:left-\[30px\]/);
 });
 
 test('initials are one neutral grey with muted letters, never a colour per person (Stay, 24 October 2026)', () => {
@@ -420,7 +421,9 @@ test('the line is read once, written on leaving or after a while, and is not gol
 /* ── The header and the empty tab ────────────────────────────────────────── */
 
 test('the header: "Activity", what the tab shows, and today’s "N updates"', () => {
-  assert.match(states, /<h1 className="text-2xl font-bold tracking-tight text-foreground">Activity<\/h1>/);
+  // 22px on a phone with the grey line and the count on one line under it; 24px on a computer.
+  assert.match(states, /<h1 className="col-start-1 row-start-1 text-\[22px\] leading-tight font-bold tracking-tight text-foreground md:text-2xl">\s*Activity\s*<\/h1>/);
+  assert.match(states, /col-start-2 row-start-2 shrink-0 rounded-full bg-secondary/);
   assert.match(states, /What&rsquo;s happening in your \{type === 'study' \? 'Study' : 'Work'\} Spaces/);
   assert.match(states, /\{updates > 0 \? \(/);
   assert.match(screen, /<TimelineHeading type=\{type\} updates=\{todayUpdates\(days\)\} \/>/);
@@ -547,12 +550,32 @@ test('gold is only on Accept; Decline and Reply are quiet', () => {
 
 test('no boxed cards: a row is the avatar, the sentence, one muted line and the time', () => {
   assert.doesNotMatch(screen, /rounded-2xl|bg-card|function RowCard|ChevronRight/);
-  assert.match(screen, /<p className="line-clamp-2 min-w-0 flex-1 text-sm leading-5" title=\{row\.title\}>/);
-  assert.match(screen, /\{row\.detail \? <p className="mt-0\.5 truncate text-\[13px\] leading-5 text-muted-foreground">\{row\.detail\}<\/p> : null\}/);
+  // One line on a phone, two at most on a computer.
+  assert.match(screen, /<p className="min-w-0 flex-1 truncate text-sm leading-5 md:line-clamp-2 md:whitespace-normal" title=\{row\.title\}>/);
+  // The muted line where it carries meaning is the computer's only.
+  assert.match(screen, /<p className="mt-0\.5 hidden truncate text-\[13px\] leading-5 text-muted-foreground md:block">\{row\.detail\}<\/p>/);
   // The whole row opens its target; Reply and the invitation's buttons sit above the stretched link.
   assert.match(screen, /after:absolute after:inset-0 after:rounded-xl/);
   assert.match(screen, /const QUIET_LINK = cn\(\s*'v2-interactive relative z-10/);
-  assert.match(screen, /<span className="relative z-10 mt-2 flex gap-1\.5">/);
+  assert.match(screen, /<span className=\{cn\('relative z-10 flex gap-1\.5', className\)\}>/);
+});
+
+test('on a phone a row is two lines: the short sentence, then the Space and a short time (Stay, 24 October 2026: "Mobile is too cluttered")', () => {
+  const r = row({ kind: 'reply', actor: banner, space: gray, conversation: { uuid: 'c-9', title: 'T' }, excerpt: 'Hi' });
+  assert.equal(r.shortTime, '12m');
+  assert.equal(activityTime(at(0), NOW, 'UTC', true), 'now');
+  assert.equal(activityTime(at(180), NOW, 'UTC', true), '3h');
+  assert.equal(activityTime('2026-10-23T20:00:00Z', NOW, 'UTC', true), 'Yesterday');
+  assert.equal(activityTime('2026-10-21T09:00:00Z', NOW, 'UTC', true), '21 Oct');
+  // The Space leaves the sentence on a phone and heads the second line.
+  assert.match(screen, /<span className="hidden text-muted-foreground md:inline">\s*\{' '\}\s*\{sentence\.place\.word\} \{sentence\.place\.name\}/);
+  assert.match(screen, /const phoneLine = \[row\.sentence\.place\?\.name, row\.shortTime\]\.filter\(Boolean\)\.join\(' · '\);/);
+  assert.match(screen, /<div className="mt-px flex min-w-0 items-center gap-2 md:hidden">/);
+  // No Reply link and no long time on a phone; an invitation's answer sits at the second line's right.
+  assert.match(screen, /<div className="mt-1 hidden md:block">\s*<Link href=\{row\.replyHref\}/);
+  assert.match(screen, /hidden shrink-0 pt-px text-xs whitespace-nowrap text-muted-foreground tabular-nums md:block/);
+  assert.match(screen, /<InviteActions id=\{invitationId\} className="shrink-0" \/>/);
+  assert.match(screen, /<InviteActions id=\{invitationId\} className="mt-2 hidden md:flex" \/>/);
 });
 
 test('the clock is read once and only used after hydration', () => {

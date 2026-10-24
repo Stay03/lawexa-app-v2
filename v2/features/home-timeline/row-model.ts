@@ -63,6 +63,8 @@ export interface TimelineRow {
   detail: string | null;
   /** "12 min ago", "Yesterday", "21 Oct"; '' until the clock is known. */
   time: string;
+  /** The phone's short time: "now", "12m", "3h", "Yesterday", "21 Oct"; '' until the clock is known. */
+  shortTime: string;
   /** When it happened (epoch ms), for the "Before your last visit" line. */
   atMs: number;
   /** Where the row opens; null for an invitation (its Space would refuse the reader until they accept). */
@@ -216,6 +218,7 @@ export function timelineRow(
     title: sentenceText(sentence),
     detail: fields.detail,
     time: activityTime(event.at, now, timeZone),
+    shortTime: activityTime(event.at, now, timeZone, true),
     atMs: Number.isNaN(atMs) ? 0 : atMs,
     href: fields.href,
     replyHref: fields.replyHref ?? null,
@@ -299,11 +302,12 @@ export function sentenceText(sentence: TimelineSentence): string {
 }
 
 /**
- * The time on the right: "Just now", "12 min ago" and "3 hours ago" today,
- * then "Yesterday", "21 Oct", "31 Dec 2025" (the day words of the headings);
- * '' until the clock is known.
+ * The time: "Just now", "12 min ago" and "3 hours ago" today, then
+ * "Yesterday", "21 Oct", "31 Dec 2025" (the day words of the headings); ''
+ * until the clock is known. `short` is the phone's: "now", "12m", "3h", then
+ * the same day words (Stay, 24 October 2026: "Mobile is too cluttered").
  */
-export function activityTime(at: string, now: number | null, timeZone?: string): string {
+export function activityTime(at: string, now: number | null, timeZone?: string, short = false): string {
   if (now === null) return '';
   const time = Date.parse(at);
   const day = dayKey(at, timeZone);
@@ -311,9 +315,10 @@ export function activityTime(at: string, now: number | null, timeZone?: string):
   if (Number.isNaN(time) || day === null || today === null) return '';
   if (day !== today) return askedDate(day, today);
   const minutes = Math.max(0, Math.floor((now - time) / 60_000));
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return short ? 'now' : 'Just now';
+  if (minutes < 60) return short ? `${minutes}m` : `${minutes} min ago`;
   const hours = Math.floor(minutes / 60);
+  if (short) return `${hours}h`;
   return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
 }
 

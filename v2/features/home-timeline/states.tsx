@@ -20,19 +20,21 @@ import type { TimelineType } from './types';
  * shows in one grey line, and today's count in a quiet pill on the right,
  * left out when nothing happened today or the count is not known yet. The
  * route fallback draws the same header without the count, so nothing moves
- * when the list arrives.
+ * when the list arrives. On a phone it is smaller, "Activity" at 22px with the
+ * grey line and the count on one line under it (Stay, 24 October 2026: "Mobile
+ * is too cluttered"); on a computer the count sits at the top right.
  */
 export function TimelineHeading({ type, updates = 0 }: { type: TimelineType; updates?: number }) {
   return (
-    <header className="mb-6 flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Activity</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          What&rsquo;s happening in your {type === 'study' ? 'Study' : 'Work'} Spaces
-        </p>
-      </div>
+    <header className="mb-5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 md:mb-6">
+      <h1 className="col-start-1 row-start-1 text-[22px] leading-tight font-bold tracking-tight text-foreground md:text-2xl">
+        Activity
+      </h1>
+      <p className="col-start-1 row-start-2 truncate text-[13px] text-muted-foreground md:mt-1 md:text-sm">
+        What&rsquo;s happening in your {type === 'study' ? 'Study' : 'Work'} Spaces
+      </p>
       {updates > 0 ? (
-        <span className="mt-1 shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-foreground tabular-nums">
+        <span className="col-start-2 row-start-2 shrink-0 rounded-full bg-secondary px-2.5 py-0.5 text-xs font-semibold text-foreground tabular-nums md:row-span-2 md:row-start-1 md:mt-1 md:self-start md:px-3 md:py-1">
           {updatesLabel(updates)}
         </span>
       ) : null}

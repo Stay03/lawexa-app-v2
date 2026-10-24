@@ -267,21 +267,22 @@ const BADGES: Readonly<Record<TimelineBadge, LucideIcon>> = {
 };
 
 /**
- * The avatar at 36px: the person's photo, else their initials on ONE neutral
- * grey for everyone (no coloured tiles, Stay, 24 October 2026); Lawexa's mark;
- * a "?" on the same grey for a deleted account. The badge, a small round icon
- * of what happened, sits on its lower right corner.
+ * The avatar: 32px on a phone, 36px on a computer. The person's photo, else
+ * their initials on ONE neutral grey for everyone (no coloured tiles, Stay, 24
+ * October 2026); Lawexa's mark; a "?" on the same grey for a deleted account.
+ * The badge, a small round icon of what happened, sits on its lower right
+ * corner: 18px on a phone, 20px on a computer.
  */
 const AVATAR =
-  'size-9 [&_[data-slot=avatar-fallback]]:bg-secondary [&_[data-slot=avatar-fallback]]:text-xs [&_[data-slot=avatar-fallback]]:font-semibold [&_[data-slot=avatar-fallback]]:text-muted-foreground';
+  'size-8 md:size-9 [&_[data-slot=avatar-fallback]]:bg-secondary [&_[data-slot=avatar-fallback]]:text-[11px] md:[&_[data-slot=avatar-fallback]]:text-xs [&_[data-slot=avatar-fallback]]:font-semibold [&_[data-slot=avatar-fallback]]:text-muted-foreground';
 
 function Lead({ lead, badge }: { lead: TimelineLead; badge: TimelineBadge | null }) {
   const Icon = badge ? BADGES[badge] : null;
   return (
-    <span aria-hidden className="relative z-[1] flex size-9 shrink-0">
+    <span aria-hidden className="relative z-[1] flex size-8 shrink-0 md:size-9">
       {lead.type === 'lawexa' ? (
-        <span className="flex size-9 items-center justify-center rounded-full bg-secondary">
-          <LogoMark className="size-5" alt="" />
+        <span className="flex size-8 items-center justify-center rounded-full bg-secondary md:size-9">
+          <LogoMark className="size-[18px] md:size-5" alt="" />
         </span>
       ) : (
         <MemberAvatar
@@ -290,15 +291,20 @@ function Lead({ lead, badge }: { lead: TimelineLead; badge: TimelineBadge | null
         />
       )}
       {Icon ? (
-        <span className="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center rounded-full bg-background ring-1 ring-border">
-          <Icon className="size-3 text-foreground" />
+        <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full bg-background ring-1 ring-border md:-right-1.5 md:-bottom-1.5 md:size-5">
+          <Icon className="size-2.5 text-foreground md:size-3" />
         </span>
       ) : null}
     </span>
   );
 }
 
-/** The sentence: who and what in the foreground's weight, the doing and the Space in grey. */
+/**
+ * The sentence: who and what in the foreground's weight, the doing and the
+ * Space in grey. On a phone the Space is left off (it heads the second line),
+ * so the sentence is short and fits one line (Stay, 24 October 2026: "Mobile is
+ * too cluttered").
+ */
 function Sentence({ sentence }: { sentence: TimelineSentence }) {
   return (
     <>
@@ -311,7 +317,7 @@ function Sentence({ sentence }: { sentence: TimelineSentence }) {
         </>
       ) : null}
       {sentence.place ? (
-        <span className="text-muted-foreground">
+        <span className="hidden text-muted-foreground md:inline">
           {' '}
           {sentence.place.word} {sentence.place.name}
         </span>
@@ -333,26 +339,35 @@ const QUIET_LINK = cn(
 );
 
 /**
- * One row: the avatar with its badge, the sentence (two lines at most), a
- * muted second line where it carries meaning, the light actions, and the time
- * on the right. `joined` draws the thin line down to the next avatar of the day.
+ * One row. On a computer: the avatar with its badge, the sentence (two lines at
+ * most), the time on the right, a muted line where it carries meaning, then
+ * Reply or Accept and Decline. On a phone two lines only (Stay, 24 October
+ * 2026: "Mobile is too cluttered"): the short sentence, then the Space and a
+ * short time in grey, with an invitation's Accept and Decline at that line's
+ * right; the row itself opens the chat to reply. One element, two shapes in
+ * CSS. `joined` draws the thin line down to the next avatar of the day.
  */
 function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean }) {
+  const invitationId = row.invite?.invitationId ?? null;
+  const phoneLine = [row.sentence.place?.name, row.shortTime].filter(Boolean).join(' · ');
   return (
     <li className="relative">
       {joined ? (
-        <span aria-hidden className="absolute top-12 -bottom-2.5 left-[30px] w-px -translate-x-1/2 bg-foreground/20" />
+        <span
+          aria-hidden
+          className="absolute top-10 -bottom-2 left-[28px] w-px -translate-x-1/2 bg-foreground/20 md:top-12 md:-bottom-2.5 md:left-[30px]"
+        />
       ) : null}
       <div
         className={cn(
-          'relative flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5',
+          'relative flex min-w-0 items-start gap-3 rounded-xl px-3 py-2 md:py-2.5',
           row.href && 'transition-colors duration-150 hover:bg-secondary/50 motion-reduce:transition-none',
         )}
       >
         <Lead lead={row.lead} badge={row.badge} />
-        <div className="min-w-0 flex-1 pt-0.5">
+        <div className="min-w-0 flex-1 md:pt-0.5">
           <div className="flex min-w-0 items-start gap-3">
-            <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-5" title={row.title}>
+            <p className="min-w-0 flex-1 truncate text-sm leading-5 md:line-clamp-2 md:whitespace-normal" title={row.title}>
               {row.href ? (
                 <Link href={row.href} aria-label={row.title} className={STRETCHED}>
                   <Sentence sentence={row.sentence} />
@@ -362,18 +377,27 @@ function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean })
               )}
             </p>
             {row.time ? (
-              <span className="shrink-0 pt-px text-xs whitespace-nowrap text-muted-foreground tabular-nums">{row.time}</span>
+              <span className="hidden shrink-0 pt-px text-xs whitespace-nowrap text-muted-foreground tabular-nums md:block">
+                {row.time}
+              </span>
             ) : null}
           </div>
-          {row.detail ? <p className="mt-0.5 truncate text-[13px] leading-5 text-muted-foreground">{row.detail}</p> : null}
+          {/* The phone's second line: the Space and a short time, an invitation's answer at its right. */}
+          <div className="mt-px flex min-w-0 items-center gap-2 md:hidden">
+            <span className="min-w-0 flex-1 truncate text-xs leading-4 text-muted-foreground tabular-nums">{phoneLine}</span>
+            {invitationId !== null ? <InviteActions id={invitationId} className="shrink-0" /> : null}
+          </div>
+          {row.detail ? (
+            <p className="mt-0.5 hidden truncate text-[13px] leading-5 text-muted-foreground md:block">{row.detail}</p>
+          ) : null}
           {row.replyHref ? (
-            <div className="mt-1">
+            <div className="mt-1 hidden md:block">
               <Link href={row.replyHref} className={QUIET_LINK}>
                 Reply
               </Link>
             </div>
           ) : null}
-          {row.invite && row.invite.invitationId !== null ? <InviteActions id={row.invite.invitationId} /> : null}
+          {invitationId !== null ? <InviteActions id={invitationId} className="mt-2 hidden md:flex" /> : null}
         </div>
       </div>
     </li>
@@ -381,19 +405,19 @@ function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean })
 }
 
 /**
- * Accept (the only gold on the timeline) and Decline, small, under the
- * sentence. They are the invitations inbox's own mutation
- * (`invitations/mutations.ts`), keyed by the member-row id the event's action
- * carries; the answer also re-asks this timeline, so the buttons leave once
- * the server has it. While it is in flight both hold still and the pressed
- * one shows it is working.
+ * Accept (the only gold on the timeline) and Decline, small. They are the
+ * invitations inbox's own mutation (`invitations/mutations.ts`), keyed by the
+ * member-row id the event's action carries; the answer also re-asks this
+ * timeline, so the buttons leave once the server has it. While it is in flight
+ * both hold still and the pressed one shows it is working. `className` places
+ * them: under the sentence on a computer, at the second line's right on a phone.
  */
-function InviteActions({ id }: { id: number }) {
+function InviteActions({ id, className }: { id: number; className?: string }) {
   const respond = useRespondToInvitation();
   const pending = usePendingInvitationResponses();
   const busy = pending.get(invitationRowKey('space', id));
   return (
-    <span className="relative z-10 mt-2 flex gap-1.5">
+    <span className={cn('relative z-10 flex gap-1.5', className)}>
       <Button
         size="sm"
         className="h-7 rounded-full px-3 text-xs font-semibold"
