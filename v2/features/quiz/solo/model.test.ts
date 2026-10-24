@@ -40,7 +40,6 @@ import {
   progressSegments,
   questionCountLabel,
   questionDeadlineMs,
-  questionKicker,
   quizFrontHref,
   quizLengthLabel,
   readsPreview,
@@ -401,9 +400,7 @@ test('the streak counts right answers in a row, and a skipped question breaks it
   );
 });
 
-test('the question screen names its kind, finds its passage, and lights one segment per question', () => {
-  assert.equal(questionKicker('true_false'), 'True or false');
-  assert.equal(questionKicker('multiple_choice'), 'Pick one');
+test('the question screen finds its passage, and lights one segment per question', () => {
   const scenario = { uuid: 's1', title: null, passage: 'Adaeze buys a plot in Lekki.', position: 0 };
   assert.equal(scenarioFor({ scenarios: [scenario] }, { scenario_uuid: 's1' }), scenario);
   assert.equal(scenarioFor({ scenarios: [scenario] }, { scenario_uuid: 's2' }), null);

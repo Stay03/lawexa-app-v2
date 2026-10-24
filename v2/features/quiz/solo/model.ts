@@ -4,7 +4,6 @@ import type {
   QuizAttemptComparison,
   QuizAttemptQuestion,
   QuizAttemptResponse,
-  QuizQuestionType,
   QuizRevealMode,
   QuizScenario,
   SubmitQuizAttemptAnswerPayload,
@@ -535,11 +534,6 @@ export function challengeText(
 }
 
 /* ── The question screen's words ──────────────────────────────────────────── */
-
-/** The small line over the question: what kind of answer it takes. */
-export function questionKicker(type: QuizQuestionType): string {
-  return type === 'true_false' ? 'True or false' : 'Pick one';
-}
 
 /** The fact pattern a question is about, or `null` for a free-standing one
  *  (and for a body that names a scenario it does not carry). */

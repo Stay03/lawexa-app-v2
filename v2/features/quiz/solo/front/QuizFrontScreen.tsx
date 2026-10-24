@@ -370,23 +370,21 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 
             {!mayTake && (
               <p className="text-sm text-muted-foreground">
-                Anyone can browse quizzes. Taking one keeps your score on your
-                account:{' '}
                 <Link
                   href="/register"
                   className={cn('rounded text-foreground underline underline-offset-4', FOCUS_RING)}
                 >
-                  create a free account
-                </Link>
-                .
+                  Create a free account
+                </Link>{' '}
+                to keep your score.
               </p>
             )}
 
             {own && !shareable && (
               <p className="text-sm text-muted-foreground">
                 {quiz.visibility === 'private'
-                  ? 'Only you can open this quiz. Change who can find it to share it by link.'
-                  : 'This quiz is shared with the channels it has run in. Change who can find it to share it by link.'}
+                  ? 'Only you can open this quiz.'
+                  : 'Shared with the channels it has run in.'}
               </p>
             )}
 

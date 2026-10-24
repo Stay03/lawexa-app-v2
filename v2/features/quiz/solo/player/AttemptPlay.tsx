@@ -22,7 +22,6 @@ import {
   pointsLabel,
   progressSegments,
   questionDeadlineMs,
-  questionKicker,
   responseMsFor,
   scenarioFor,
   secondsLabel,
@@ -380,11 +379,6 @@ export function AttemptPlay({
             icon={Flag}
             tone="accent"
             title="Every question answered"
-            description={
-              attempt.reveal_mode === 'each'
-                ? 'Finish to see your score, your points and how fast you were.'
-                : 'Finish to see your score and every answer revealed.'
-            }
             action={
               <RaisedButton onClick={finishNow} disabled={finishing}>
                 {finishing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
@@ -460,10 +454,6 @@ function QuestionGroup({
         key={cursor}
         className="motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-right-4 motion-safe:duration-300"
       >
-        <p className="text-[13px] font-semibold text-muted-foreground">
-          {questionKicker(question.type)}
-        </p>
-
         {/* The fact pattern the question is about, once, over it. */}
         {scenario && (
           <div className="mt-3 border-l-[3px] border-primary pl-3.5 text-[15px] leading-relaxed text-muted-foreground">
@@ -546,12 +536,10 @@ function Foot({
           Locked in
         </p>
       ) : (
-        <p>
-          <span className="[@media(hover:hover)_and_(pointer:fine)]:hidden">Tap to answer</span>
-          <span className="hidden [@media(hover:hover)_and_(pointer:fine)]:inline">
-            Click an answer, or press <Key>1</Key> to <Key>{optionCount}</Key>. The first pick
-            counts.
-          </span>
+        // A phone says nothing before the tap: the tiles are the way in. A
+        // computer names its keys.
+        <p className="hidden [@media(hover:hover)_and_(pointer:fine)]:block">
+          Press <Key>1</Key> to <Key>{optionCount}</Key>
         </p>
       )}
     </div>
@@ -608,7 +596,7 @@ function EndSheet({
 
       {timedOut && (
         <p className="mt-2.5 text-[15px] leading-relaxed text-muted-foreground">
-          Out of time. Nothing was recorded for this one, and it counts as wrong.
+          Out of time. It counts as wrong.
         </p>
       )}
 

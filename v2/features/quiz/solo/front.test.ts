@@ -55,7 +55,7 @@ test("the owner's Edit and Delete ride the bar's menu, and Delete leaves for the
   // Challenge a friend, a secondary button beside Start, the one gold action.
   assert.match(source, /\{shareable && \(\s*<Button\s*type="button"\s*variant="outline"/);
   assert.match(source, /\{challenge\.copied \? 'Link copied' : 'Challenge a friend'\}/);
-  assert.match(source, /Only you can open this quiz\. Change who can find it to share it by link\./);
+  assert.match(source, /'Only you can open this quiz\.'/);
 });
 
 test('the route unfurls through the public preview and indexes only a public quiz', () => {
@@ -89,4 +89,14 @@ test('the quiz page says what it is in one plain line, with short copy and no em
   assert.doesNotMatch(FRONT_SCORING_NOTE, /\u2014/);
   assert.equal(frontChallengeText('TEST DATA Land law', 4947), 'I scored 4,947 points on TEST DATA Land law. Can you beat me?');
   assert.equal(frontChallengeText('TEST DATA Land law', null), 'Try TEST DATA Land law on Lawexa. How many can you get right?');
+});
+
+/* Stay, 24 October 2026: "So many unnecessary text please remove them". */
+test('the quiz page says each thing once, in a few words', () => {
+  const source = screen();
+  assert.match(source, />\s*Create a free account\s*<\/Link>\{' '\}\s*to keep your score\./);
+  assert.match(source, /\? 'Only you can open this quiz\.'\s*: 'Shared with the channels it has run in\.'/);
+  assert.doesNotMatch(source, /Anyone can browse quizzes|Change who can find it to share it by link/);
+  // Kept: the reader's own best.
+  assert.match(source, /Your best/);
 });

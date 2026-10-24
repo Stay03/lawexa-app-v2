@@ -150,8 +150,8 @@ test('the question screen is drawn in B1: segments and the thin clock over the q
   assert.match(play, /<ProgressSegments className="mt-3" segments=\{segments\} current=\{cursor\} total=\{total\} \/>/);
   assert.match(play, /fraction=\{1 - \(question\.response_ms \?\? 0\) \/ \(question\.time_limit_seconds \* 1000\)\}\s*label=\{secondsLabel\(question\.response_ms \?\? 0\)\}/);
   assert.match(play, /<FrozenRail fraction=\{0\} label="Time's up" \/>/);
-  // The kicker, the passage where there is one, and the question.
-  assert.match(play, /\{questionKicker\(question\.type\)\}/);
+  // The passage where there is one, then the question; no kicker over it.
+  assert.doesNotMatch(play, /questionKicker|Pick one|True or false/);
   assert.match(play, /scenario=\{scenarioFor\(attempt, question\)\}/);
   assert.match(play, /<p className="whitespace-pre-line">\{scenario\.passage\}<\/p>/);
   // True or false is two tall tiles; everything else is a card.
@@ -216,4 +216,20 @@ test('End quiz asks first, then scores what was answered and goes to the results
   // It stays open while it ends: the action's own close is held.
   assert.match(dialog, /onClick=\{\(event\) => \{\s*event\.preventDefault\(\);\s*onConfirm\(\);\s*\}\}/);
   assert.match(dialog, /<AlertDialogCancel disabled=\{ending\}>Keep playing<\/AlertDialogCancel>/);
+});
+
+/* Stay, 24 October 2026: "So many unnecessary text please remove them". */
+test('the player says only what the screen does not already say', () => {
+  const play = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
+  // No line before a tap on a phone; a computer names its keys, and that is all.
+  assert.doesNotMatch(play, /Tap to answer|Click an answer|The first pick/);
+  assert.match(play, /<p className="hidden \[@media\(hover:hover\)_and_\(pointer:fine\)\]:block">\s*Press <Key>1<\/Key> to <Key>\{optionCount\}<\/Key>\s*<\/p>/);
+  // A question lost to the clock, in one short sentence.
+  assert.match(play, /Out of time\. It counts as wrong\./);
+  assert.doesNotMatch(play, /Nothing was recorded for this one/);
+  // A reopened attempt with nothing left: the title and See results only.
+  assert.match(play, /title="Every question answered"\s*action=\{/);
+  assert.doesNotMatch(play, /Finish to see your score/);
+  // Kept: the only sign an answer went in when the verdict waits for the end.
+  assert.match(play, /Locked in/);
 });
