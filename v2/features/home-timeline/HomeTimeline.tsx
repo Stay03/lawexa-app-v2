@@ -81,8 +81,8 @@ import type { TimelineType } from './types';
  * is being asked to take, so nothing else wears the accent.
  *
  * ── NEW SINCE YOUR LAST VISIT (fix 8) ──────────────────────────────────────
- * A hairline with small muted words between the rows that are new and the ones
- * the reader has seen. The last visit is read ONCE, at mount, so the line
+ * A hairline with small muted words, "Before your last visit", between the rows
+ * that are new and the ones the reader has seen; the words name the rows below. The last visit is read ONCE, at mount, so the line
  * never moves while they look; the newest time on screen is written back when
  * they leave (unmount, page hide) or after {@link SEEN_AFTER_MS} on the list
  * (`last-seen.ts`, this device only).
@@ -232,7 +232,9 @@ const SEEN_AFTER_MS = 5_000;
 
 /* ── New since your last visit ───────────────────────────────────────────── */
 
-const NEW_SINCE_WORDS = 'New since your last visit';
+/** It labels what follows it, the rows from before the last visit (the
+ *  techlead, 24 October 2026: "New since…" read as naming the old rows). */
+const NEW_SINCE_WORDS = 'Before your last visit';
 
 /** The line itself: small muted words and a hairline. No gold, no dot. */
 function NewSinceLine({ className }: { className?: string }) {

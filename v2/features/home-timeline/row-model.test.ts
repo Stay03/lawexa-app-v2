@@ -484,6 +484,12 @@ test('the "new since" line goes before the first row older than the last visit',
   assert.equal(newestAt([]), null);
 });
 
+test('the line names the rows below it: "Before your last visit" (the techlead, 24 October 2026)', () => {
+  assert.match(screen, /const NEW_SINCE_WORDS = 'Before your last visit';/);
+  assert.match(screen, /role="separator" aria-label=\{NEW_SINCE_WORDS\}/);
+  assert.doesNotMatch(screen, /'New since your last visit'/);
+});
+
 test('last seen is stored per tab, and a bad value reads as never', () => {
   assert.equal(lastSeenKey('work'), 'lawexa:v2:home-timeline:last-seen:work');
   assert.equal(lastSeenKey('study'), 'lawexa:v2:home-timeline:last-seen:study');
