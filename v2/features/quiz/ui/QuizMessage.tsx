@@ -38,7 +38,8 @@ export function QuizMessage({
 }: {
   icon: LucideIcon;
   title: string;
-  description: string;
+  /** The sentence under the title; left out when the title says it all. */
+  description?: string;
   tone?: QuizMessageTone;
   /** The way forward. Every state that can offer one, does (standards §8iv). */
   action?: React.ReactNode;
@@ -64,9 +65,11 @@ export function QuizMessage({
       </span>
       <div className="space-y-1.5">
         <h2 className="text-base font-semibold text-foreground">{title}</h2>
-        <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
-          {description}
-        </p>
+        {description ? (
+          <p className="mx-auto max-w-sm text-sm leading-relaxed text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
       </div>
       {action}
       {footnote ? (
