@@ -112,10 +112,13 @@ test('on the phone sheet, before the first save, the foot has Download Word and 
   const foot = bar.slice(bar.indexOf('export function DraftSaveBar'), bar.indexOf('export function DraftSaveControl'));
   assert.match(
     foot,
-    /\) : \(\s*<>\s*<DownloadPill downloads=\{draft\.downloads\} format="docx" label="Download Word" \/>\s*<DownloadPill downloads=\{draft\.downloads\} format="pdf" label="Download PDF" \/>\s*<\/>\s*\)\}/,
+    /\) : \(\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*<>\s*<DownloadPill downloads=\{draft\.downloads\} format="docx" label="Download Word" short="Word" \/>\s*<DownloadPill downloads=\{draft\.downloads\} format="pdf" label="Download PDF" short="PDF" \/>\s*<\/>\s*\)\}/,
   );
-  // Once saved, the foot is as before: Open note, Export and Save to folder.
-  assert.match(foot, /\{saved \? \(\s*<>\s*<Link href=\{`\/notes\/\$\{saved\.slug\}`\}/);
+  // Short words, so the row stays one row beside Save as note on a phone;
+  // the button's name is the full one.
+  assert.match(bar, /aria-label=\{label\}\s*className=\{cn\(ACTION_PILL, FOCUS_RING\)\}/);
+  // Once saved, the foot is main's one row: the line and the saved note's menu.
+  assert.match(foot, /\{saved \? \(\s*<SavedNoteMenu\s*slug=\{saved\.slug\}/);
   assert.match(foot, /<p role="alert" className="mt-2 text-xs text-destructive">\s*\{draft\.downloads\.failure\}/);
   const pill = bar.slice(bar.indexOf('function DownloadPill'));
   assert.match(pill, /className=\{cn\(ACTION_PILL, FOCUS_RING\)\}/);
