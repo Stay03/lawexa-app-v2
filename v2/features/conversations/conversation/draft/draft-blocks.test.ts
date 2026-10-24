@@ -332,6 +332,14 @@ test('while the reader types on a phone: the title row down to ×, one row of to
   // data-state on the same button and wins, so a data-state rule never held, and the menu closed as the
   // row swapped back under the reader's finger (WebKit, 24 October 2026).
   assert.doesNotMatch(css, /v2-draft-typing-tools \[data-state/);
+  // The phone's sticky rows are solid: in WebKit a blurred, see-through row showed the text scrolled under it
+  // (keyboard-typed, 24 October 2026).
+  const rows = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8') + readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
+  for (const row of ['v2-draft-typing-tools', 'v2-draft-sheet-tools', 'v2-draft-save-foot']) {
+    const className = rows.match(new RegExp(`className="${row} ([^"]*)"`))?.[1] ?? '';
+    assert.match(className, /(^| )bg-popover( |$)/, row);
+    assert.doesNotMatch(className, /backdrop-blur|bg-popover\//, row);
+  }
   // The folded row is the computer bar's own tools; the three-row toolbar carries its class.
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
   assert.match(editor, /<div className="v2-draft-typing-tools sticky top-0 z-10 hidden [^"]*">\s*<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} \/>/);
