@@ -589,8 +589,25 @@ test('the clock is read once and only used after hydration', () => {
 test('the Work and Study tabs draw the timeline when signed in; the fallback draws the same header', () => {
   for (const [home, type] of [['WorkHome.tsx', 'work'], ['StudyHome.tsx', 'study']]) {
     const source = read('v2', 'shell', 'designs', home);
-    assert.match(source, new RegExp(`if \\(signedIn\\) \\{[\\s\\S]*?<HomeTimeline type="${type}" />`), home);
+    assert.match(source, new RegExp(`if \\(signedIn\\) \\{\\s*return <TimelineHome tab="${type}" role=\\{role\\} />;`), home);
   }
   const fallback = read('v2', 'shell', 'designs', 'HomeFallback.tsx');
   assert.match(fallback, /<TimelineHeading type=\{tab\} \/>\s*<TimelineSkeleton \/>/);
+});
+
+/* Stay, 24 October 2026, on the timeline's push ask: "Yeah add it". The
+ * signed-in Work and Study tabs keep the Chat tab's box at their foot: the
+ * same composer and send, no prompt chips, docked in flow so the last row
+ * scrolls above it. The fallback holds the box's place. */
+test('the timeline tabs dock the chat box at their foot, in flow, with no prompts', () => {
+  const home = read('v2', 'shell', 'designs', 'TimelineHome.tsx');
+  assert.match(home, /<HomeTimeline type=\{tab\} \/>\s*<div className=\{TIMELINE_COMPOSER_DOCK\}>\s*<div aria-hidden className=\{TIMELINE_DOCK_FADE\} \/>\s*<HomeComposer/);
+  assert.match(home, /signedIn\s*role=\{role\}\s*confidential=\{confidential\}/);
+  assert.doesNotMatch(home, /HomePrompts/);
+  const frame = read('v2', 'shell', 'designs', 'home-frame.ts');
+  assert.match(frame, /export const HOME_SURFACE_TIMELINE =\s*'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-6';/);
+  // Sticky, never fixed: the dock takes its own height after the rows.
+  assert.match(frame, /export const TIMELINE_COMPOSER_DOCK = 'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pt-8 pb-3 md:pb-6';/);
+  const fallback = read('v2', 'shell', 'designs', 'HomeFallback.tsx');
+  assert.match(fallback, /<TimelineSkeleton \/>\s*\{\/\*[^*]*\*\/\}\s*<div className=\{TIMELINE_COMPOSER_DOCK\}>\s*<ComposerShape \/>/);
 });

@@ -13,6 +13,7 @@ import {
   HOME_GREETING_SKELETON_SUBLINE,
   HOME_SURFACE_FOCUSED,
   HOME_SURFACE_TIMELINE,
+  TIMELINE_COMPOSER_DOCK,
 } from './home-frame';
 
 /**
@@ -219,6 +220,10 @@ function TabFrame({ tab }: { tab: Exclude<HomeTab, 'chat'> }) {
     <div className={HOME_SURFACE_TIMELINE}>
       <TimelineHeading type={tab} />
       <TimelineSkeleton />
+      {/* The chat box's place at the foot, as `TimelineHome` docks it. */}
+      <div className={TIMELINE_COMPOSER_DOCK}>
+        <ComposerShape />
+      </div>
     </div>
   );
 }

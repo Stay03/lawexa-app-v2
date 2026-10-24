@@ -53,7 +53,6 @@
  * `md:order-*` half of each constant, and the rail becomes grid column 2.
  */
 
-import { LIST_COLUMN } from '../page-columns';
 
 /* ── Surface roots ────────────────────────────────────────────────────────── */
 
@@ -71,7 +70,20 @@ export const HOME_SURFACE_FOCUSED =
  * so going from the timeline into a Space moves nothing sideways. Its route
  * fallback draws the same column.
  */
-export const HOME_SURFACE_TIMELINE = LIST_COLUMN;
+export const HOME_SURFACE_TIMELINE =
+  'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-6';
+
+/**
+ * The chat box under the Work / Study timeline (Stay, 24 October 2026: "Yeah
+ * add it"). Sticky at the foot at every width, in flow so the last row
+ * scrolls above it; `mt-auto` holds it at the foot of a short timeline. The
+ * top padding is the gap the fade dissolves the rows into.
+ */
+export const TIMELINE_COMPOSER_DOCK = 'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pt-8 pb-3 md:pb-6';
+
+/** The fade behind that dock, at every width (the Chat tab's is phone-only). */
+export const TIMELINE_DOCK_FADE =
+  'pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/90 to-transparent';
 
 /*
  * THE TWO-COLUMN WORKSPACE FRAME IS GONE (owner, July 25).

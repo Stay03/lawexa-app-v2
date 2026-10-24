@@ -4,9 +4,9 @@ import { useRef, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types/auth';
-import { HomeTimeline } from '@/v2/features/home-timeline/HomeTimeline';
 import { HomeGreeting } from './HomeGreeting';
 import { HomeComposer } from './HomeComposer';
+import { TimelineHome } from './TimelineHome';
 import { HomePrompts } from './HomePrompts';
 import { useComposerDraft } from './composer/useComposerDraft';
 import {
@@ -16,7 +16,6 @@ import {
   DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
   HOME_SURFACE_FOCUSED,
-  HOME_SURFACE_TIMELINE,
 } from './home-frame';
 
 /**
@@ -69,11 +68,7 @@ export function WorkHome({
   role?: UserRole;
 }) {
   if (signedIn) {
-    return (
-      <div data-v2-marker="V2-HOME" data-home-tab="work" className={HOME_SURFACE_TIMELINE}>
-        <HomeTimeline type="work" />
-      </div>
-    );
+    return <TimelineHome tab="work" role={role} />;
   }
   return <WorkGuestHome name={name} role={role} />;
 }
