@@ -10,6 +10,7 @@ import {
   type AttemptHighlights,
   type AttemptScore,
 } from '../model';
+import { CountUp } from '../ui';
 
 /**
  * AttemptSummary — the attempt's headline in design B1: the greeting, the
@@ -27,6 +28,12 @@ import {
  * (`runTone`), said once in the heading and nowhere else. The comparison
  * line is the backend's own block (`comparisonLine`), or nothing on a first
  * attempt, so the screen never invents a best to beat.
+ *
+ * THE HERO COUNTS UP (B1 motion note 6; Arthur's B1, 24 October 2026): from 0
+ * to the total over 800 ms with an ease-out, once, on arrival. The final
+ * number is laid out underneath, invisible, so the counting digits never
+ * change the line's width, and a screen reader hears only the final number.
+ * Reduced motion shows the final number at once (`CountUp`).
  */
 export function AttemptSummary({
   attempt,
@@ -55,7 +62,13 @@ export function AttemptSummary({
       </h1>
 
       <p className="mt-4 font-comfortaa text-[84px] leading-none font-bold tracking-tight text-primary tabular-nums motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-500">
-        {pointsLabel(score.points)}
+        <span aria-hidden className="grid justify-items-center">
+          <span className="invisible col-start-1 row-start-1">{pointsLabel(score.points)}</span>
+          <span className="col-start-1 row-start-1">
+            <CountUp value={score.points} durationMs={800} />
+          </span>
+        </span>
+        <span className="sr-only">{pointsLabel(score.points)}</span>
       </p>
       <p className="mt-2 text-[13px] font-bold tracking-[0.16em] text-muted-foreground uppercase">
         points

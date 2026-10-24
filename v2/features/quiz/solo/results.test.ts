@@ -61,6 +61,10 @@ test('the headline leads with the greeting and the points, then one row of three
   // No per-answer average, no chips, no ring: the points are the story.
   assert.doesNotMatch(summary, /ScoreRing|SummaryChip|speedLabel|avgResponseMs|SPEED_SCORING_NOTE/);
   assert.match(summary, /divide-x divide-border/);
+  // B1 motion note 6: the hero counts up over 800 ms, with the final number
+  // laid out under it so the width holds, and read out once, final.
+  assert.match(summary, /<span aria-hidden className="grid justify-items-center">\s*<span className="invisible col-start-1 row-start-1">\{pointsLabel\(score\.points\)\}<\/span>\s*<span className="col-start-1 row-start-1">\s*<CountUp value=\{score\.points\} durationMs=\{800\} \/>/);
+  assert.match(summary, /<span className="sr-only">\{pointsLabel\(score\.points\)\}<\/span>/);
 
   // One question's page: the server's verdict, its time and its points.
   const page = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersStepper.tsx');
