@@ -23,6 +23,35 @@ import type * as PdfJs from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 export type PdfJsModule = typeof PdfJs;
 
+/**
+ * THE PACKAGE'S DATA FILES, served from `public/pdfjs/<version>/` (the
+ * techlead, 24 October 2026): the wasm image decoders (JBIG2 and JPEG 2000,
+ * which scanned PDFs use), the 14 standard fonts a PDF may name without
+ * embedding, and the CMaps that Chinese, Japanese and Korean text needs.
+ * Copied byte for byte from pdfjs-dist; the folder carries the version, so a
+ * cached file of one version is never read by another. pdf.js fetches each
+ * file only when a PDF needs it.
+ *
+ * `PDFJS_VERSION` is the version pinned in package.json (a test checks it,
+ * the installed package and the copied files), so an upgrade of the package
+ * without a new folder fails the tests rather than the reader.
+ */
+export const PDFJS_VERSION = '5.7.284';
+
+export const PDFJS_ASSET_BASE = `/pdfjs/${PDFJS_VERSION}/`;
+
+/** The data-file options for `getDocument`, as absolute URLs: the worker
+ *  resolves them from its own address, which is not the page's. */
+export function pdfAssetOptions(origin: string) {
+  const base = new URL(PDFJS_ASSET_BASE, origin).href;
+  return {
+    wasmUrl: `${base}wasm/`,
+    standardFontDataUrl: `${base}standard_fonts/`,
+    cMapUrl: `${base}cmaps/`,
+    cMapPacked: true,
+  };
+}
+
 let loading: Promise<PdfJsModule> | null = null;
 
 export function loadPdfJs(): Promise<PdfJsModule> {

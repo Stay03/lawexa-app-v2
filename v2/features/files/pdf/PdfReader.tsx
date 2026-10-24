@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { filesQueries } from '../queries';
-import { loadPdfJs } from './load-pdfjs';
+import { loadPdfJs, pdfAssetOptions } from './load-pdfjs';
 import {
   canZoomIn,
   canZoomOut,
@@ -158,7 +158,11 @@ function PdfDocumentView({
     loadPdfJs()
       .then((pdfjs) => {
         if (!live) return;
-        const task = pdfjs.getDocument({ url, withCredentials: false });
+        const task = pdfjs.getDocument({
+          url,
+          withCredentials: false,
+          ...pdfAssetOptions(window.location.origin),
+        });
         destroy = () => void task.destroy();
         return task.promise.then(async (doc) => {
           const first = await doc.getPage(1);
