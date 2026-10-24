@@ -161,19 +161,19 @@ test('?side=file:ID names the file the panel opens', () => {
 
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
-test('the panel shows pictures, media and Word pages itself; a PDF and the rest go to the one placeholder', () => {
+test('the panel shows pictures, media, Word pages and PDFs itself; the rest go to the placeholder', () => {
   assert.equal(filePanelBody({ mime_type: 'image/jpeg', original_name: 'a.jpg' }), 'picture');
   assert.equal(filePanelBody({ mime_type: 'video/mp4', original_name: 'a.mp4' }), 'video');
   assert.equal(filePanelBody({ mime_type: 'audio/mpeg', original_name: 'a.mp3' }), 'audio');
   assert.equal(filePanelBody({ mime_type: 'application/pdf', original_name: 'a.pdf' }), 'pdf');
   assert.equal(filePanelBody({ mime_type: 'application/zip', original_name: 'a.zip' }), 'other');
 
-  // The placeholder is drawn for exactly `pdf` and `other`, from the panel's
-  // one switch, so the PDF reader replaces one component in one place; Word
-  // pages took `word` from it.
+  // One switch in the panel: Word pages took `word` (piece c) and the PDF
+  // reader took `pdf` (piece b); the placeholder keeps `other`.
   const panel = readHere('FilePanel.tsx');
   assert.match(panel, /case 'word':\n\s+return <WordPages file=\{file\} \/>;/);
-  assert.match(panel, /case 'pdf':\n\s+case 'other':\n\s+return <FileDocumentPlaceholder file=\{file\} kind=\{kind\} \/>;/);
+  assert.match(panel, /case 'pdf':\n\s+return \(\n\s+<div[^>]*>\n\s+<PdfReader\n/);
+  assert.match(panel, /case 'other':\n\s+return <FileDocumentPlaceholder file=\{file\} kind=\{kind\} \/>;/);
   assert.equal(panel.match(/function FileBody\(/g)?.length, 1);
 });
 

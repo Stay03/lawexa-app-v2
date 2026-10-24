@@ -11,13 +11,13 @@ import { FileMark } from './FileMark';
  * file or any other document TODAY: the file's mark, its name, and Download
  * and Open in a new tab.
  *
- * THE ONE SWAP POINT FOR DOCUMENT PAGES. The Word pages (piece c,
- * `WordPages`) took `word` from it in `FilePanel`'s one switch on
- * `filePanelBody`; the PDF reader (piece b) takes `pdf` the same way.
+ * WHAT IS LEFT FOR IT. The Word pages (piece c, `WordPages`) took `word`
+ * and the PDF reader (piece b, `PdfReader`) took `pdf` from it in
+ * `FilePanel`'s one switch on `filePanelBody`; it still shows `other`.
  *
- * It is also where a document that could not show lands: Word pages that
- * failed pass their `reason`, and `onRetry` when asking again can help, so
- * Download stays the way out.
+ * It is also where a document that could not show lands: Word pages or a PDF
+ * that failed pass their `reason`, and `onRetry` when asking again can help,
+ * so Download stays the way out.
  */
 export function FileDocumentPlaceholder({
   file,

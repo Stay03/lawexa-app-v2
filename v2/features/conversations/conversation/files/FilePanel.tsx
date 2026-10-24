@@ -12,9 +12,11 @@ import type { UserFileDetail } from '@/types/file';
 import { useOpenFileInNewTab, useShowFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { fileKind, fileSize } from '@/v2/features/folders/item-row-model';
 import { MediaPlayer } from '@/v2/features/files/MediaPlayer';
+import { PdfReader } from '@/v2/features/files/pdf/PdfReader';
+import { pageCountLabel } from '@/v2/features/files/pdf/pdf-model';
 import { filesQueries } from '@/v2/features/files/queries';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { ChatSidePanel } from '../side-panel/ChatSidePanel';
+import { ChatSidePanel, SidePanelActions } from '../side-panel/ChatSidePanel';
 import { chatFileLine, filePanelBody } from './chat-files';
 import { FileDocumentPlaceholder } from './FileDocumentPlaceholder';
 import { FileMark } from './FileMark';
@@ -33,13 +35,15 @@ import { WordPages } from './WordPages';
  *
  * WHAT IT SHOWS TODAY (`filePanelBody`): a picture, drawn from a link that
  * shows it; a video or a recording in the one player (`MediaPlayer`); a Word
- * or RTF file as readable pages (`WordPages`, piece c); a PDF or anything
- * else as `FileDocumentPlaceholder`, the one component the PDF reader
- * (piece b) replaces.
+ * or RTF file as readable pages (`WordPages`, piece c); a PDF in the app's
+ * one PDF reader (`PdfReader`, piece b), its zoom on the slim line and its
+ * page count in the line's facts; anything else as `FileDocumentPlaceholder`.
  */
 export function FilePanel({ fileId }: { fileId: number }) {
   const detail = useQuery(filesQueries.detail(fileId));
   const file = detail.data?.data ?? null;
+  // A PDF's page count, once its reader has opened it: "· 12 pages" on the slim line.
+  const [pageCount, setPageCount] = useState<number | null>(null);
 
   if (detail.isPending) {
     return (
@@ -73,7 +77,8 @@ export function FilePanel({ fileId }: { fileId: number }) {
   }
 
   const kind = fileKind(file.mime_type);
-  const line = chatFileLine({ kind, size: fileSize(file.size), by: file.uploader?.name ?? null });
+  const facts = chatFileLine({ kind, size: fileSize(file.size), by: file.uploader?.name ?? null });
+  const line = pageCount === null ? facts : `${facts} · ${pageCountLabel(pageCount)}`;
 
   return (
     <ChatSidePanel
@@ -84,13 +89,21 @@ export function FilePanel({ fileId }: { fileId: number }) {
       actions={<FileActions file={file} />}
       slim
     >
-      <FileBody file={file} kind={kind} />
+      <FileBody file={file} kind={kind} onPageCount={setPageCount} />
     </ChatSidePanel>
   );
 }
 
 /** The switch on what the file is: the one place a new kind of page goes in. */
-function FileBody({ file, kind }: { file: UserFileDetail; kind: string | null }) {
+function FileBody({
+  file,
+  kind,
+  onPageCount,
+}: {
+  file: UserFileDetail;
+  kind: string | null;
+  onPageCount: (count: number) => void;
+}) {
   const body = filePanelBody(file);
   switch (body) {
     case 'picture':
@@ -114,6 +127,19 @@ function FileBody({ file, kind }: { file: UserFileDetail; kind: string | null })
     case 'word':
       return <WordPages file={file} />;
     case 'pdf':
+      return (
+        <div className="mx-auto w-full max-w-[68ch] px-5 pt-4 xl:px-10 xl:pt-5">
+          <PdfReader
+            fileId={file.id}
+            name={file.original_name}
+            onPageCount={onPageCount}
+            renderControls={(controls) => <SidePanelActions>{controls}</SidePanelActions>}
+            fallback={(reason, retry) => (
+              <FileDocumentPlaceholder file={file} kind={kind} reason={reason} onRetry={retry ?? undefined} />
+            )}
+          />
+        </div>
+      );
     case 'other':
       return <FileDocumentPlaceholder file={file} kind={kind} />;
   }

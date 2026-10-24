@@ -189,9 +189,8 @@ export function fileListFoot(list: Pick<ChatFileList, 'rows' | 'total'>, expande
 
 /**
  * What the panel draws for a file: a picture, a video or a recording itself;
- * `word` for a file the server turns into readable pages; a PDF and anything
- * else on the placeholder (`FileDocumentPlaceholder`), until the PDF reader
- * (piece b) takes `pdf`.
+ * `word` for a file the server turns into readable pages; `pdf` for the PDF
+ * reader (piece b); anything else on the placeholder (`FileDocumentPlaceholder`).
  */
 export type FilePanelBody = 'picture' | 'video' | 'audio' | 'pdf' | 'word' | 'other';
 
