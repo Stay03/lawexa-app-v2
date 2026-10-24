@@ -41,6 +41,8 @@ export interface TimelineFileItem {
   mime_type: string;
   size_bytes: number;
   url: string;
+  /** Pages of a document (Backend, 25 October 2026); null, the row shows the type alone. */
+  page_count?: number | null;
 }
 
 /** A folder of a `folder_created` event: `id` is the folder's uuid, `url` an
@@ -57,6 +59,13 @@ export interface TimelineChatItem {
   id: number | string;
   title: string;
   url: string;
+  /** The question: the chat's first user turn on `chat_started`, the one answered
+   *  on `lawexa_answered` (Backend, 25 October 2026). Plain text, cut to 140
+   *  characters with "…", or null, and then the chat's title stands in. `id` is
+   *  the conversation's uuid on both kinds. */
+  question?: string | null;
+  /** The start of Lawexa's answer, on `lawexa_answered`; cut as `question` is. */
+  answer_preview?: string | null;
 }
 
 /** What the reader can do about an event, and on what. `target.id` is the
@@ -99,6 +108,9 @@ interface TimelineEventBase {
   asked_by?: TimelineActor | null;
   /** On `invite`: up to two names of people already in the Space, never the reader's. */
   members_preview?: string[];
+  /** On `chat_started` and `lawexa_answered`: that chat's user and assistant
+   *  turns on that UTC day (Backend, 25 October 2026). */
+  new_messages?: number | null;
 }
 
 export type TimelineEvent =

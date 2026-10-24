@@ -1,6 +1,5 @@
 import { askedDate, dayKey } from '@/v2/features/activity/model';
 import { folderHref } from '@/v2/features/folders/folder-row-model';
-import { fileSize } from '@/v2/features/folders/item-row-model';
 import { fileTypeLabel } from '@/v2/features/spaces/content-model';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import type {
@@ -13,47 +12,48 @@ import type {
 } from './types';
 
 /**
- * row-model — one timeline event as the ONE row the home draws for it (Stay
- * said yes to the design, 24 October 2026; the mock is
- * `journeys/results/timeline-final/mocks3.html`).
+ * row-model — the timeline's events as the rows the home draws (Stay said yes
+ * to the design, 24 October 2026; the mock is
+ * `journeys/results/timeline-final/mocks3.html`; the nine fixes after Stay's
+ * "criticize the ui/ux design", 25 October 2026, are below).
  *
- * EVERY EVENT IS ONE ROW: a 20px lead (a grey icon, Lawexa's mark, or the
- * person's face), the title, one grey meta line, the time on the title's
- * baseline. Under a row there is at most one card, and it is one of four: the
- * words someone wrote to you with a Reply, an invitation with Accept and
- * Decline, a chat Lawexa answered, or the files someone added.
+ * ── THE ROW ────────────────────────────────────────────────────────────────
+ * A 20px lead, a title that says who did what ("Kemi added 3 files"), one grey
+ * line, the time on the title's baseline. The lead is ONE kind of mark: the
+ * person's initials in their member colour, or Lawexa's mark; a deleted
+ * account is a neutral "?" circle. The grey line STARTS with the Space's name,
+ * which links to the Space and is never the part that is cut.
+ *
+ * Under a row there is at most one card, and it is one of four: the words
+ * someone wrote to you with a Reply, an invitation with Accept and Decline, a
+ * chat Lawexa answered (the question, then the first line of the answer), or
+ * the files or folders someone added.
+ *
+ * ── ONE ROW PER CHAT PER DAY ───────────────────────────────────────────────
+ * A chat's started, answered, reply and mention events of one day are one
+ * row: the newest of them, and "N new messages" on its grey line when there
+ * were several (the server's `new_messages`). See {@link chatKey} for the
+ * fields it groups on.
  *
  * Pure: the clock (`now`) and the time zone are passed in, so no date is read
  * in render and the day split is testable across a midnight.
  */
 
-/** The grey icon a row leads with; the screen maps each to its lucide icon. */
-export type TimelineIcon =
-  | 'document'
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'files'
-  | 'folder'
-  | 'chat'
-  | 'invite'
-  | 'joined'
-  | 'join-request'
-  | 'role-request'
-  /** A person with no account any more ("Someone"). */
-  | 'person';
+/** The grey icon of a line inside the files card. */
+export type TimelineIcon = 'document' | 'image' | 'video' | 'audio' | 'folder';
 
+/** The row's one mark: a person's initials, Lawexa's mark, or "?" for a deleted account. */
 export type TimelineLead =
-  | { type: 'icon'; icon: TimelineIcon }
   | { type: 'lawexa' }
-  | { type: 'person'; name: string; avatar: string | null; tint: number };
+  | { type: 'person'; name: string; avatar: string | null; tint: number }
+  | { type: 'unknown' };
 
 /** One line inside the files card: a file, or a folder of a several-folder row. */
 export interface TimelineFileLine {
   key: string;
   name: string;
   icon: TimelineIcon;
-  /** The fact on the right: a file's "1.2 MB", a folder's "3 items"; null when unreadable. */
+  /** The fact on the right: a file's "PDF · 4 pages", a folder's "3 items". */
   size: string | null;
 }
 
@@ -68,16 +68,32 @@ export type TimelineCard =
        *  when the event carries no usable one, and then there are no buttons. */
       invitationId: number | null;
     }
-  | { type: 'chat'; title: string; meta: string; href: string }
+  | {
+      type: 'chat';
+      /** The question, on one line; the chat's title when the server sends none. */
+      question: string;
+      /** The first line of the answer; null when the server sends none. */
+      answer: string | null;
+      href: string;
+    }
   | { type: 'files'; files: TimelineFileLine[]; more: number };
+
+/** The grey line: the Space first (a link, never cut), then the rest (cut first). */
+export interface TimelineMeta {
+  space: { name: string; href: string };
+  /** What follows the Space's name; '' for nothing. */
+  rest: string;
+}
 
 export interface TimelineRow {
   key: string;
   lead: TimelineLead;
   title: string;
-  meta: string;
+  meta: TimelineMeta;
   /** "12m"; '' until the clock is known. */
   time: string;
+  /** When it happened (epoch ms), for the "new since your last visit" line. */
+  atMs: number;
   /** Where the row opens; null for a row that only carries its card (an invitation). */
   href: string | null;
   card: TimelineCard | null;
@@ -102,11 +118,21 @@ const KINDS: readonly TimelineEventKind[] = [
 /** The palette slots of `member-colour.ts`; the face's tint is picked from them. */
 const TINTS = 8;
 
-/** "You" for the reader, the name for anyone else, "Someone" for a deleted account. */
-export function actorLabel(actor: TimelineActor | null | undefined): string {
+/**
+ * Who, in a title: "You" for the reader, the first name of a name with a
+ * space in it, the whole name otherwise, "Someone" for a deleted account.
+ */
+export function shortName(actor: TimelineActor | null | undefined): string {
   if (!actor) return 'Someone';
   if (actor.is_you) return 'You';
-  return actor.name.trim() || (actor.kind === 'ai' ? 'Lawexa' : 'Someone');
+  const name = actor.name.trim();
+  if (!name) return actor.kind === 'ai' ? 'Lawexa' : 'Someone';
+  return name.split(/\s+/)[0];
+}
+
+/** The same person as the object of a sentence: "you" for the reader. */
+function shortObject(actor: TimelineActor): string {
+  return actor.is_you ? 'you' : shortName(actor);
 }
 
 /** A stable palette slot for a person, from their id, so a face keeps its tint. */
@@ -118,19 +144,22 @@ export function tintIndex(id: number | string | null): number {
   return hash % TINTS;
 }
 
-function leadFor(actor: TimelineActor | null): TimelineLead {
-  // A deleted account has no face: a grey person, like every other grey lead.
-  if (!actor) return { type: 'icon', icon: 'person' };
+/** The row's mark for whoever did it. */
+export function leadFor(actor: TimelineActor | null): TimelineLead {
+  if (!actor) return { type: 'unknown' };
   if (actor.kind === 'ai') return { type: 'lawexa' };
   return { type: 'person', name: actor.name, avatar: actor.avatar, tint: tintIndex(actor.id) };
+}
+
+function plural(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
 }
 
 /** "Work · Private · 4 members": what a Space is, in one line. */
 export function spaceFacts(space: TimelineSpace): string {
   const type = space.type === 'study' ? 'Study' : 'Work';
   const visibility = space.visibility === 'public' ? 'Public' : 'Private';
-  const members = `${space.member_count} ${space.member_count === 1 ? 'member' : 'members'}`;
-  return `${type} · ${visibility} · ${members}`;
+  return `${type} · ${visibility} · ${plural(space.member_count, 'member', 'members')}`;
 }
 
 /**
@@ -157,11 +186,13 @@ function fileIcon(file: TimelineFileItem): TimelineIcon {
   return 'document';
 }
 
-/** "PDF · 4.8 MB": a file's type and size, as the Space list prints them. */
-function fileFacts(file: TimelineFileItem): string {
+/** "PDF · 4 pages": a file's type and its pages, or the type alone when the pages are unknown. */
+export function fileFacts(file: Pick<TimelineFileItem, 'name' | 'mime_type' | 'page_count'>): string {
   const type = fileTypeLabel({ mime_type: file.mime_type, original_name: file.name });
-  const size = fileSize(file.size_bytes);
-  return size ? `${type} · ${size}` : type;
+  const pages = file.page_count;
+  return typeof pages === 'number' && Number.isInteger(pages) && pages > 0
+    ? `${type} · ${plural(pages, 'page', 'pages')}`
+    : type;
 }
 
 /**
@@ -177,7 +208,7 @@ export function filesCard(files: readonly TimelineFileItem[], count: number): Ti
       key: String(file.id),
       name: file.name,
       icon: fileIcon(file),
-      size: fileSize(file.size_bytes),
+      size: fileFacts(file),
     })),
     more: Math.max(0, Math.max(count, files.length) - shown.length),
   };
@@ -185,7 +216,7 @@ export function filesCard(files: readonly TimelineFileItem[], count: number): Ti
 
 /** "3 items": a folder's items and subfolders together, as the server counts them. */
 export function folderItemsLabel(count: number): string {
-  return `${count} ${count === 1 ? 'item' : 'items'}`;
+  return plural(count, 'item', 'items');
 }
 
 /** The several-folder row's card: the files card's lines, with folders in them. */
@@ -208,11 +239,16 @@ export function moreFilesLabel(more: number): string {
   return more > 0 ? `and ${more} more` : '';
 }
 
+/** "3 new messages": what a chat row of several events adds to its grey line. */
+export function newMessagesLabel(count: number): string {
+  return plural(count, 'new message', 'new messages');
+}
+
 function chatHref(id: number | string): string {
   return `/c/${encodeURIComponent(String(id))}`;
 }
 
-function spaceHref(space: TimelineSpace): string {
+export function spaceHref(space: TimelineSpace): string {
   return `/spaces/${encodeURIComponent(space.uuid)}`;
 }
 
@@ -233,12 +269,50 @@ export function invitationId(event: TimelineEvent): number | null {
   return /^\d+$/.test(id) ? Number(id) : null;
 }
 
-/** One event as its row, or null for a kind this screen does not know yet. */
-export function timelineRow(event: TimelineEvent, now: number | null): TimelineRow | null {
+/**
+ * The chat an event belongs to, or null for an event that is not about a chat.
+ * Keyed on `conversation.uuid` when the event carries one (reply, mention),
+ * else on `items[0].id` (chat_started, lawexa_answered). Both are the chat's
+ * uuid, the `/c/{uuid}` address.
+ */
+export function chatKey(event: TimelineEvent): string | null {
+  switch (event.kind) {
+    case 'reply':
+    case 'mention':
+      return event.conversation?.uuid ?? null;
+    case 'chat_started':
+    case 'lawexa_answered': {
+      const id = event.conversation?.uuid ?? event.items[0]?.id;
+      return id === undefined || id === null || id === '' ? null : String(id);
+    }
+    default:
+      return null;
+  }
+}
+
+/** The non-empty text, trimmed, or null. */
+function text(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * One event as its row, or null for a kind this screen does not know yet.
+ * `messages` is how many of the chat's messages of the day this row stands
+ * for (see {@link timelineDays}); above one, the grey line says so.
+ */
+export function timelineRow(event: TimelineEvent, now: number | null, messages = 1): TimelineRow | null {
   if (!KINDS.includes(event.kind)) return null;
-  const actor = actorLabel(event.actor);
-  const space = event.space.name;
-  const base = { key: event.id, time: formatRelativeTime(event.at, now) };
+  const atMs = Date.parse(event.at);
+  const who = shortName(event.actor);
+  const space = { name: event.space.name, href: spaceHref(event.space) };
+  const meta = (rest: string): TimelineMeta => ({ space, rest: messages > 1 ? newMessagesLabel(messages) : rest });
+  const base = {
+    key: event.id,
+    time: formatRelativeTime(event.at, now),
+    atMs: Number.isNaN(atMs) ? 0 : atMs,
+    lead: leadFor(event.actor),
+  };
 
   switch (event.kind) {
     case 'files_added': {
@@ -247,19 +321,16 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
       if (event.count <= 1) {
         return {
           ...base,
-          lead: { type: 'icon', icon: fileIcon(first) },
-          title: first.name,
-          meta: `${fileFacts(first)} · ${actor} · ${space}`,
+          title: `${who} added ${first.name}`,
+          meta: meta(fileFacts(first)),
           href: spaceHref(event.space),
           card: null,
         };
       }
       return {
         ...base,
-        lead: { type: 'icon', icon: 'files' },
-        // The Space is the grey line, so the title does not say it twice.
-        title: `${actor} added ${event.count} files`,
-        meta: space,
+        title: `${who} added ${event.count} files`,
+        meta: meta(''),
         href: spaceHref(event.space),
         card: filesCard(event.items, event.count),
       };
@@ -272,18 +343,16 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
       if (event.count > 1) {
         return {
           ...base,
-          lead: { type: 'icon', icon: 'folder' },
-          title: `${actor} created ${event.count} folders`,
-          meta: space,
+          title: `${who} made ${event.count} folders`,
+          meta: meta(''),
           href: foldersHref(event.space),
           card: foldersCard(event.items, event.count),
         };
       }
       return {
         ...base,
-        lead: { type: 'icon', icon: 'folder' },
-        title: folder.name,
-        meta: `${folderItemsLabel(folder.item_count)} · ${actor} · ${space}`,
+        title: `${who} made ${folder.name}`,
+        meta: meta(`Folder · ${folderItemsLabel(folder.item_count)}`),
         // `url` is absolute (the server's own host); the folder's uuid is the address.
         href: folderHref(folder.id),
         card: null,
@@ -294,9 +363,8 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
       if (!chat) return null;
       return {
         ...base,
-        lead: { type: 'icon', icon: 'chat' },
-        title: chat.title,
-        meta: `${actor} · ${space}`,
+        title: `${who} started a chat`,
+        meta: meta(text(chat.question) ?? chat.title),
         href: chatHref(chat.id),
         card: null,
       };
@@ -305,17 +373,16 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
       const chat = event.items[0];
       if (!chat) return null;
       const asker = event.asked_by;
-      const answered = asker ? (asker.is_you ? 'you' : asker.name) : null;
       return {
         ...base,
         lead: { type: 'lawexa' },
-        title: answered ? `Lawexa answered ${answered}` : 'Lawexa answered',
-        meta: space,
+        title: asker ? `Lawexa answered ${shortObject(asker)}` : 'Lawexa answered',
+        meta: meta(''),
         href: chatHref(chat.id),
         card: {
           type: 'chat',
-          title: chat.title,
-          meta: asker ? `${actorLabel(asker)} asked` : space,
+          question: text(chat.question) ?? chat.title,
+          answer: text(chat.answer_preview),
           href: chatHref(chat.id),
         },
       };
@@ -323,9 +390,8 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
     case 'member_joined':
       return {
         ...base,
-        lead: { type: 'icon', icon: 'joined' },
-        title: `${actor} joined ${space}`,
-        meta: spaceFacts(event.space),
+        title: `${who} joined`,
+        meta: meta(plural(event.space.member_count, 'member', 'members')),
         href: peopleHref(event.space),
         card: null,
       };
@@ -334,26 +400,24 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
       const conversation = event.conversation;
       if (!conversation) return null;
       const href = chatHref(conversation.uuid);
-      const text = event.excerpt?.trim() ?? '';
+      const excerpt = text(event.excerpt);
       return {
         ...base,
-        lead: leadFor(event.actor),
-        title: `${actor} ${event.kind === 'reply' ? 'replied to you' : 'mentioned you'}`,
-        meta: `${conversation.title} · ${space}`,
+        title: `${who} ${event.kind === 'reply' ? 'replied to you' : 'mentioned you'}`,
+        meta: meta(conversation.title),
         href,
-        card: text ? { type: 'quote', text, replyHref: href } : null,
+        card: excerpt ? { type: 'quote', text: excerpt, replyHref: href } : null,
       };
     }
     case 'invite':
       return {
         ...base,
-        lead: { type: 'icon', icon: 'invite' },
-        title: `${actor} invited you to a Space`,
-        meta: membersLine(event.members_preview ?? [], event.space.member_count),
+        title: `${who} invited you to ${event.space.name}`,
+        meta: meta(membersLine(event.members_preview ?? [], event.space.member_count)),
         href: null,
         card: {
           type: 'invite',
-          spaceName: space,
+          spaceName: event.space.name,
           facts: spaceFacts(event.space),
           invitationId: event.needs_action && event.action?.type === 'accept' ? invitationId(event) : null,
         },
@@ -361,18 +425,16 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
     case 'join_request':
       return {
         ...base,
-        lead: { type: 'icon', icon: 'join-request' },
-        title: `${actor} asked to join ${space}`,
-        meta: spaceFacts(event.space),
+        title: `${who} asked to join`,
+        meta: meta(spaceFacts(event.space)),
         href: peopleHref(event.space),
         card: null,
       };
     case 'role_request':
       return {
         ...base,
-        lead: { type: 'icon', icon: 'role-request' },
-        title: `${actor} asked for a new role in ${space}`,
-        meta: spaceFacts(event.space),
+        title: `${who} asked for a new role`,
+        meta: meta(spaceFacts(event.space)),
         href: peopleHref(event.space),
         card: null,
       };
@@ -393,6 +455,12 @@ export interface TimelineDay {
  * page's day words. The list arrives newest first, so a day is one run of
  * events; an event seen twice (a page boundary moved under a new event) is
  * drawn once, and an event with an unreadable time is left out.
+ *
+ * A chat's events of one day (same {@link chatKey}, same day) are one row: the
+ * newest event draws it, at the place of the first of them in the list. The
+ * messages it stands for are the server's `new_messages` (the chat's turns
+ * that UTC day; the largest any of its events carries), and only when no
+ * event carries it, the number of its events.
  */
 export function timelineDays(
   events: readonly TimelineEvent[],
@@ -401,19 +469,80 @@ export function timelineDays(
 ): TimelineDay[] {
   const todayKey = dayKey(now, timeZone);
   if (todayKey === null) return [];
+
+  // Pass 1: the events once each, with their day, and each chat-day's newest
+  // event and its message count.
   const seen = new Set<string>();
-  const days: TimelineDay[] = [];
+  const dated: { event: TimelineEvent; day: string; chat: string | null }[] = [];
+  const chats = new Map<string, { newest: TimelineEvent; events: number; server: number | null }>();
   for (const event of events) {
     if (seen.has(event.id)) continue;
     seen.add(event.id);
-    const key = dayKey(event.at, timeZone);
-    const row = key === null ? null : timelineRow(event, now);
-    if (key === null || row === null) continue;
+    const day = dayKey(event.at, timeZone);
+    if (day === null) continue;
+    const key = chatKey(event);
+    const chat = key === null ? null : `${key}|${day}`;
+    dated.push({ event, day, chat });
+    if (chat === null) continue;
+    const group = chats.get(chat);
+    const server = serverMessages(event);
+    if (!group) chats.set(chat, { newest: event, events: 1, server });
+    else {
+      group.events += 1;
+      if (server !== null) group.server = Math.max(group.server ?? 0, server);
+      if (Date.parse(event.at) > Date.parse(group.newest.at)) group.newest = event;
+    }
+  }
+
+  // Pass 2: the rows, a chat-day once, where it first appears.
+  const drawn = new Set<string>();
+  const days: TimelineDay[] = [];
+  for (const { event, day, chat } of dated) {
+    let row: TimelineRow | null;
+    if (chat === null) row = timelineRow(event, now);
+    else {
+      if (drawn.has(chat)) continue;
+      drawn.add(chat);
+      const group = chats.get(chat);
+      row = group ? timelineRow(group.newest, now, group.server ?? group.events) : null;
+    }
+    if (row === null) continue;
     const last = days[days.length - 1];
-    if (last && last.key === key) last.rows.push(row);
-    else days.push({ key, label: askedDate(key, todayKey), rows: [row] });
+    if (last && last.key === day) last.rows.push(row);
+    else days.push({ key: day, label: askedDate(day, todayKey), rows: [row] });
   }
   return days;
+}
+
+/** The server's count of a chat's turns that day, or null when it sends none. */
+function serverMessages(event: TimelineEvent): number | null {
+  const value = event.new_messages;
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null;
+}
+
+/**
+ * Where the "New since your last visit" line goes: the key of the first row
+ * older than the last visit, when at least one newer row is above it. Null on
+ * a first visit (no last visit stored), and when every loaded row is new or
+ * none is.
+ */
+export function newSinceRowKey(days: readonly TimelineDay[], lastSeen: number | null): string | null {
+  if (lastSeen === null) return null;
+  let anyNew = false;
+  for (const day of days) {
+    for (const row of day.rows) {
+      if (row.atMs > lastSeen) anyNew = true;
+      else return anyNew ? row.key : null;
+    }
+  }
+  return null;
+}
+
+/** The newest moment on the list (epoch ms), what "seen" is written as; null when empty. */
+export function newestAt(days: readonly TimelineDay[]): number | null {
+  let newest: number | null = null;
+  for (const day of days) for (const row of day.rows) if (newest === null || row.atMs > newest) newest = row.atMs;
+  return newest;
 }
 
 /** Empty pages followed in a row before the screen stops and shows what it has. */

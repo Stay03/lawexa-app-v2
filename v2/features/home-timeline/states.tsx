@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -13,13 +14,12 @@ import type { TimelineType } from './types';
  * a quiet icon tile, one title, one line, and Try again.
  */
 
-/** The heading over the timeline, the same words in the route fallback. */
+/**
+ * The page's name, for screen readers only (fix 2, 25 October 2026: the list
+ * starts at the top). The same words in the route fallback.
+ */
 export function TimelineHeading({ type }: { type: TimelineType }) {
-  return (
-    <h1 className="text-[19px] font-semibold leading-[26px] tracking-[-0.02em] text-foreground md:text-2xl md:leading-8 md:tracking-[-0.015em]">
-      What&rsquo;s happening in your {type === 'study' ? 'Study' : 'Work'} Spaces
-    </h1>
-  );
+  return <h1 className="sr-only">What&rsquo;s happening in your {type === 'study' ? 'Study' : 'Work'} Spaces</h1>;
 }
 
 /** The rows fade down the stack, as the other v2 list skeletons do. */
@@ -28,7 +28,7 @@ const ROW_FADE = ['opacity-100', 'opacity-90', 'opacity-75', 'opacity-60', 'opac
 function TimelineRowSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn('flex min-h-14 items-start gap-3 px-3 py-2.5', className)}>
-      <Skeleton className="size-5 shrink-0 rounded-md" />
+      <Skeleton className="size-5 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 pt-[3px]">
           <Skeleton className="h-3.5 w-1/2 rounded" />
@@ -43,7 +43,7 @@ function TimelineRowSkeleton({ className }: { className?: string }) {
 /** The first load: a day heading over the row skeletons. */
 export function TimelineSkeleton() {
   return (
-    <div aria-hidden className="mt-[42px]">
+    <div aria-hidden>
       <Skeleton className="mb-1.5 h-4 w-14 rounded" />
       {ROW_FADE.map((fade) => (
         <TimelineRowSkeleton key={fade} className={fade} />
@@ -62,19 +62,29 @@ export function TimelineNextPageSkeleton() {
   );
 }
 
-/** Nothing has happened yet: one quiet line. */
+/**
+ * Nothing has happened yet (fix 9): one line saying what shows here, and a
+ * quiet way to the Spaces it comes from (`/spaces?type=`, the Spaces list's
+ * own filter). Outline, never gold.
+ */
 export function TimelineEmptyState({ type }: { type: TimelineType }) {
+  const label = type === 'study' ? 'Study' : 'Work';
   return (
-    <p className="mt-[42px] text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-      Nothing has happened in your {type === 'study' ? 'Study' : 'Work'} Spaces yet.
-    </p>
+    <div className="flex flex-col items-start gap-3 px-3 py-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+      <p className="text-sm text-muted-foreground">
+        Files, folders, chats and people from your {label} Spaces show here as they happen.
+      </p>
+      <Button asChild variant="outline" size="sm" className="rounded-full bg-transparent hover:bg-secondary">
+        <Link href={`/spaces?type=${type}`}>Go to your {label} Spaces</Link>
+      </Button>
+    </div>
   );
 }
 
 /** The first page failed. A server that said why is quoted. */
 export function TimelineErrorState({ message, onRetry }: { message?: string; onRetry: () => void }) {
   return (
-    <div className="mt-[42px] flex flex-col items-center gap-3 px-6 py-16 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
       <span
         aria-hidden
         className="flex size-12 items-center justify-center rounded-2xl bg-secondary text-muted-foreground"
