@@ -188,7 +188,7 @@ test('on a computer the draft panel has no title line and no foot: one bar holds
   assert.match(frame, /export function SidePanelCloseButton\(\)/);
   // The sheet's foot is not drawn on a computer; the bar's Save is drawn only there.
   assert.match(bar, /<div className="v2-draft-save-foot sticky bottom-0 z-10 [^"]* xl:hidden">/);
-  assert.match(bar, /<div className="relative hidden shrink-0 items-center gap-0\.5 xl:flex">/);
+  assert.match(bar, /<div className=\{cn\('relative hidden shrink-0 items-center xl:flex', saved \? 'gap-0\.5' : 'gap-px'\)\}>/);
   assert.match(editor, /className="v2-draft-bar sticky top-0 z-10 hidden h-12 shrink-0 items-center [^"]*xl:flex"/);
   // One save and one folder picker serve both places.
   assert.equal(editor.match(/useDraftSave\(/g)?.length, 1);

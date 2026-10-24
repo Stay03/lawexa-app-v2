@@ -30,7 +30,33 @@ export function filenameFromDisposition(disposition: unknown, fallback = DOCX_FA
   return plain?.[1].trim() || fallback;
 }
 
+/**
+ * Word or PDF of a draft as it stands in the draft panel, before it is a note
+ * (Stay, 24 October 2026: "That save as note should be a drop-down of 'save
+ * note, download docx, download pdf'"). Backend contract:
+ * `POST /api/export/document` with `{ title, html, format }`; the answer is
+ * the file. Signed in; no note is made.
+ */
+export type DocumentExportFormat = 'docx' | 'pdf';
+
+/** The name a draft's file takes when the server sends none. */
+export function documentFallbackName(format: DocumentExportFormat): string {
+  return `lawexa-draft.${format}`;
+}
+
 export const exportApi = {
+  document: async (input: { title: string; html: string; format: DocumentExportFormat }): Promise<ExportedFile> => {
+    const response = await apiClient.post<Blob>(
+      '/export/document',
+      { title: input.title, html: input.html, format: input.format },
+      { responseType: 'blob' },
+    );
+    return {
+      blob: response.data,
+      filename: filenameFromDisposition(response.headers['content-disposition'], documentFallbackName(input.format)),
+    };
+  },
+
   messageBlockDocx: async (input: {
     conversationId: string;
     messageId: number;

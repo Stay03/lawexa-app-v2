@@ -3,8 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { Editor } from '@tiptap/react';
-import { ArrowUpRight, Check, Download, FolderPlus, Loader2, MoreHorizontal, NotebookPen } from 'lucide-react';
+import {
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Download,
+  FolderPlus,
+  Loader2,
+  MoreHorizontal,
+  NotebookPen,
+} from 'lucide-react';
 
+import type { DocumentExportFormat } from '@/lib/api/export';
 import { cn } from '@/lib/utils';
 import type { ConversationSpaceRef } from '@/types/chat';
 import {
@@ -23,6 +33,7 @@ import { PILL_TRIGGER } from '@/v2/features/notes/editor/ToolbarButton';
 import { useNoteExport } from '@/v2/features/notes/use-note-export';
 import { readSavedDraftNote } from './draft-edits';
 import { saveFailureSentence } from './draft-save-failure';
+import { useDraftDownload, type DraftDownload } from './use-draft-download';
 import { useSaveDraftNote } from './use-save-draft-note';
 
 /**
@@ -41,6 +52,12 @@ import { useSaveDraftNote } from './use-save-draft-note';
  *                 Word, Export PDF and Save to folder
  *   edited        Save changes in place of the chip or the line, with the
  *                 same links
+ *
+ * Before the first save the draft downloads as it stands, with no note made
+ * (Stay, 24 October 2026: "That save as note should be a drop-down of 'save
+ * note, download docx, download pdf'"): on a computer the gold button is split,
+ * its chevron a menu of Save as note, Download Word and Download PDF; on the
+ * phone sheet the foot shows the two downloads beside Save as note.
  *
  * Save to folder opens the folder picker on this Space's folders in a Space
  * chat, else on the reader's own. Export is the note page's own download
@@ -65,13 +82,14 @@ export function useDraftSave({
   const mutation = useSaveDraftNote(conversationId, ordinal);
   const [folderOpen, setFolderOpen] = useState(false);
   const saved = readSavedDraftNote(conversationId, ordinal);
+  const downloads = useDraftDownload(editor, title);
 
   const press = () => {
     if (!editor || mutation.isPending) return;
     mutation.mutate({ title, html: editor.getHTML() }, { onSuccess: onSaved });
   };
 
-  return { mutation, saved, press, folderOpen, setFolderOpen };
+  return { mutation, saved, press, folderOpen, setFolderOpen, downloads };
 }
 
 export type DraftSave = ReturnType<typeof useDraftSave>;
@@ -143,27 +161,81 @@ export function DraftSaveBar({ draft, dirty, space }: DraftSaveProps) {
             onFolder={() => draft.setFolderOpen(true)}
             triggerClassName="size-10"
           />
-        ) : null}
+        ) : (
+          // Before the first save, the draft downloads as it is, with no note
+          // (Stay, 24 October 2026). Short words so the row stays one row
+          // beside Save as note on a phone; the full name is the button's.
+          <>
+            <DownloadPill downloads={draft.downloads} format="docx" label="Download Word" short="Word" />
+            <DownloadPill downloads={draft.downloads} format="pdf" label="Download PDF" short="PDF" />
+          </>
+        )}
       </div>
       {mutation.isError ? (
         <p role="alert" className="mt-2 text-xs text-destructive">
           {saveFailureSentence(mutation.error)}
         </p>
       ) : null}
+      {draft.downloads.failure ? (
+        <p role="alert" className="mt-2 text-xs text-destructive">
+          {draft.downloads.failure}
+        </p>
+      ) : null}
     </div>
   );
 }
 
+/** A phone download before the first save; the pressed one spins while it runs. */
+function DownloadPill({
+  downloads,
+  format,
+  label,
+  short,
+}: {
+  downloads: DraftDownload;
+  format: DocumentExportFormat;
+  /** The button's name: "Download Word". */
+  label: string;
+  /** The word it shows beside the download mark: "Word". */
+  short: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => void downloads.download(format)}
+      aria-disabled={downloads.downloading !== null}
+      aria-label={label}
+      className={cn(ACTION_PILL, FOCUS_RING)}
+    >
+      {downloads.downloading === format ? (
+        <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
+      ) : (
+        <Download aria-hidden className="size-4" />
+      )}
+      {short}
+    </button>
+  );
+}
+
+/** The gold of Save as note and its chevron: one fill, one raised edge. */
+const GOLD_FACE =
+  'shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_1px_2px_rgb(0_0_0/0.15)] transition-colors hover:bg-primary/90';
+
+/** A failed save or download, in a small box under the computer's button. */
+const FAILURE_BOX = 'v2-draft-surface rounded-lg px-3 py-2 text-xs leading-snug text-destructive';
+
 /**
  * The right of the computer's bar: the gold Save as note (or Save changes),
- * or once saved the quiet chip, then the ··· menu once there is a note. A
- * failed save says why in a small box under the button. Inside the panel's
- * `@container/draft`.
+ * or once saved the quiet chip, then the ··· menu once there is a note.
+ * Before the first save the gold button is split: a 1px space (no line, by
+ * Stay's no-outlines rule), then a chevron whose menu also downloads the
+ * draft as Word or PDF. A failed save or download says why in a small box
+ * under the button. Inside the panel's `@container/draft`.
  */
 export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
-  const { saved, mutation } = draft;
+  const { saved, mutation, downloads } = draft;
   return (
-    <div className="relative hidden shrink-0 items-center gap-0.5 xl:flex">
+    <div className={cn('relative hidden shrink-0 items-center xl:flex', saved ? 'gap-0.5' : 'gap-px')}>
       {saved && !dirty ? (
         <span className="inline-flex h-8 items-center gap-1.5 rounded-[9px] bg-primary/12 px-2.5 text-[13px] font-semibold text-primary">
           <Check aria-hidden className="size-[15px]" />
@@ -175,8 +247,9 @@ export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
           onClick={draft.press}
           aria-disabled={mutation.isPending}
           className={cn(
-            'v2-interactive inline-flex h-8 items-center gap-1.75 rounded-[9px] bg-primary pr-3.25 pl-2.75 text-[13px] font-semibold whitespace-nowrap text-primary-foreground',
-            'shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_1px_2px_rgb(0_0_0/0.15)] transition-colors hover:bg-primary/90',
+            'v2-interactive inline-flex h-8 items-center gap-1.75 bg-primary pr-3.25 pl-2.75 text-[13px] font-semibold whitespace-nowrap text-primary-foreground',
+            saved ? 'rounded-[9px]' : 'rounded-l-[9px]',
+            GOLD_FACE,
             FOCUS_RING,
           )}
         >
@@ -198,14 +271,22 @@ export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
           folder={folderLabel(space)}
           onFolder={() => draft.setFolderOpen(true)}
         />
-      ) : null}
-      {mutation.isError ? (
-        <p
-          role="alert"
-          className="v2-draft-surface absolute top-full right-0 z-30 mt-1.5 w-64 rounded-lg px-3 py-2 text-xs leading-snug text-destructive"
-        >
-          {saveFailureSentence(mutation.error)}
-        </p>
+      ) : (
+        <SaveMoreMenu draft={draft} />
+      )}
+      {mutation.isError || downloads.failure ? (
+        <div className="absolute top-full right-0 z-30 mt-1.5 flex w-64 flex-col gap-1">
+          {mutation.isError ? (
+            <p role="alert" className={FAILURE_BOX}>
+              {saveFailureSentence(mutation.error)}
+            </p>
+          ) : null}
+          {downloads.failure ? (
+            <p role="alert" className={FAILURE_BOX}>
+              {downloads.failure}
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );
@@ -289,5 +370,56 @@ export function DraftFolderPicker({ draft, space }: { draft: DraftSave; space: C
       open={draft.folderOpen}
       onOpenChange={draft.setFolderOpen}
     />
+  );
+}
+
+/**
+ * The gold chevron beside Save as note before the first save: Save as note
+ * again, then the draft as Word or PDF, made from the editor as it stands and
+ * with no note made. It spins while a download runs.
+ */
+function SaveMoreMenu({ draft }: { draft: DraftSave }) {
+  const { download, downloading } = draft.downloads;
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger
+            aria-label="More ways to save"
+            className={cn(
+              'v2-interactive inline-flex h-8 w-7 items-center justify-center rounded-r-[9px] bg-primary text-primary-foreground',
+              GOLD_FACE,
+              FOCUS_RING,
+            )}
+          >
+            {downloading ? (
+              <Loader2 aria-hidden className="size-[15px] motion-safe:animate-spin" />
+            ) : (
+              <ChevronDown aria-hidden className="size-[15px]" />
+            )}
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>
+          More ways to save
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent align="end" className={DRAFT_MENU}>
+        <DropdownMenuItem disabled={draft.mutation.isPending} onSelect={draft.press}>
+          <NotebookPen aria-hidden className="size-4 text-foreground/62" />
+          Save as note
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={downloading !== null} onSelect={() => void download('docx')}>
+          <Download aria-hidden className="size-4 text-foreground/62" />
+          Download Word
+          <DropdownMenuShortcut>.docx</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={downloading !== null} onSelect={() => void download('pdf')}>
+          <Download aria-hidden className="size-4 text-foreground/62" />
+          Download PDF
+          <DropdownMenuShortcut>.pdf</DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
