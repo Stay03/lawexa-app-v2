@@ -273,7 +273,11 @@ test('the mark is the person (photo or initials), Lawexa’s mark, or "?" for no
   assert.match(lead, /lead\.type === 'unknown' \? \{ name: '\?', avatar_url: null \} : \{ name: lead\.name, avatar_url: lead\.avatar \}/);
   assert.match(lead, /<LogoMark className="size-5" alt="" \/>/);
   // The badge sits on the avatar's lower right corner.
-  assert.match(lead, /absolute -right-1 -bottom-1/);
+  // 20px, the icon at full contrast (the techlead, 24 October 2026).
+  assert.match(lead, /absolute -right-1\.5 -bottom-1\.5 flex size-5 items-center justify-center rounded-full bg-background ring-1 ring-border/);
+  assert.match(lead, /<Icon className="size-3 text-foreground" \/>/);
+  // The line joining a day's avatars, as strong as the day labels' rules read.
+  assert.match(screen, /left-\[30px\] w-px -translate-x-1\/2 bg-foreground\/20/);
 });
 
 test('initials are one neutral grey with muted letters, never a colour per person (Stay, 24 October 2026)', () => {

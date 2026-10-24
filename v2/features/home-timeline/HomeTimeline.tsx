@@ -290,8 +290,8 @@ function Lead({ lead, badge }: { lead: TimelineLead; badge: TimelineBadge | null
         />
       )}
       {Icon ? (
-        <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full bg-background ring-1 ring-border">
-          <Icon className="size-2.5 text-muted-foreground" />
+        <span className="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center rounded-full bg-background ring-1 ring-border">
+          <Icon className="size-3 text-foreground" />
         </span>
       ) : null}
     </span>
@@ -341,7 +341,7 @@ function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean })
   return (
     <li className="relative">
       {joined ? (
-        <span aria-hidden className="absolute top-12 -bottom-2.5 left-[30px] w-px -translate-x-1/2 bg-border" />
+        <span aria-hidden className="absolute top-12 -bottom-2.5 left-[30px] w-px -translate-x-1/2 bg-foreground/20" />
       ) : null}
       <div
         className={cn(
