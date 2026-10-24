@@ -17,6 +17,7 @@ import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { CaseMentionLink } from './CaseMentionLink';
 import { FencedBlock } from './FencedBlock';
+import { ScrollTable } from './scroll-table';
 import { eagerStart, scheduleSwap, type FrameTimers } from './defer-plan';
 import { PREPARED_CHARS_CAP, createPreparedBlocks } from './prepared-blocks';
 import { linkReferenceLines } from './reference-lines';
@@ -100,8 +101,11 @@ const REHYPE_PLAIN: Options['rehypePlugins'] = [];
  * `pre` routes fenced blocks through {@link FencedBlock}: a fence the AI used
  * for a document (a court form, a letter) renders as a document block, real
  * code keeps the code look (fence-kind.ts).
+ *
+ * `table` gives each table its own sideways scroller ({@link ScrollTable}): the
+ * prose is `overflow-x-hidden`, so a wide table was clipped on a phone.
  */
-const MARKDOWN_COMPONENTS: Components = { a: CaseMentionLink, pre: FencedBlock };
+const MARKDOWN_COMPONENTS: Components = { a: CaseMentionLink, pre: FencedBlock, table: ScrollTable };
 
 /**
  * The parsed blocks of landed answers, kept across opens (prepared-blocks.ts).
