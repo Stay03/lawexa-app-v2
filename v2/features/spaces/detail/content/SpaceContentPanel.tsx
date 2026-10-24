@@ -111,8 +111,9 @@ import {
  * a Viewer would get a 403); a Viewer gets a plain Select, for saving copies.
  * Files dragged from the desktop onto the list upload into the space on every
  * pill but People. A new conversation starts from the box docked at the
- * bottom (Stay and Arthur, 15 October 2026), on All and Conversations only
- * (Arthur, 17 October 2026, item 2).
+ * bottom (Stay and Arthur, 15 October 2026), on All, Conversations and Folders
+ * (Arthur, 24 October 2026: "The folder tab in spaces should also have the
+ * chat composer", reversing his 17 October item 2); not on People.
  *
  * ── ONE LIST, BY DAY ───────────────────────────────────────────────────────
  * The feed is newest first (`sort_at`), so the list is cut into days with the
@@ -287,11 +288,11 @@ export function SpaceContentPanel({
       {selecting ? bulk.bar : null}
       {bulk.dialogs}
 
-      {/* The Space's message box on the pills that hold chats and files; not on
-          Folders or People, where a question to Lawexa has nothing to start
-          from (Arthur, 17 October 2026, item 2). While files are being
-          ticked, the bar holds the foot of the screen: the box is hidden, not
-          unmounted, so a half-typed question is still there after Done. */}
+      {/* The Space's message box on the pills that hold chats, folders and
+          files; not on People (Arthur, 24 October 2026, on Folders). While
+          files are being ticked on Folders, the bar holds the foot of the
+          screen: the box is hidden, not unmounted, so a half-typed question
+          is still there after Done. */}
       {access.canAdd && DOCK_TABS.has(tab) ? (
         // `contents`, so the box stays a child of this column for its `sticky`
         // and `mt-auto`; `hidden` takes it off screen without unmounting it.
@@ -334,7 +335,7 @@ const FEED_TYPE: Readonly<Record<SpaceContentTab, SpaceItemsType | undefined>> =
 };
 
 /** The pills the Space's message box shows on. */
-const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations']);
+const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations', 'folders']);
 
 const PILLS = SPACE_TABS.map((id) => ({ id, label: SPACE_TAB_LABELS[id] }));
 
