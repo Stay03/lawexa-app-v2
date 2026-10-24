@@ -142,7 +142,7 @@ test('the open card is full size and opaque from its first frame, whatever is lo
   assert.doesNotMatch(ask, /isPending|isLoading|isFetching/);
   // The loading rows sit in the middle, which fills the card and scrolls by itself.
   assert.match(core, /className="min-h-0 flex-1 motion-safe:animate-in/);
-  assert.match(core, /className="v2-quiet-scroll h-full min-h-0 overflow-y-auto overscroll-contain px-4 py-4"/);
+  assert.match(core, /className="v2-quiet-scroll h-full min-h-0 overflow-y-auto overscroll-y-contain px-4 py-4"/);
   // No colour fade on the phone card: the page never shows through it.
   assert.match(ask, /'fixed inset-x-0 z-40 flex flex-col bg-popover'/);
   assert.match(ask, /'mx-auto w-full max-w-\[26rem\] rounded-2xl border transition-\[background-color,box-shadow,border-color\] duration-300/);
@@ -168,10 +168,10 @@ test('while the phone chat is open the page under it cannot scroll, and closing 
     /return \(\) => \{\s*scroller\.style\.overflowY = previousOverflow;\s*if \(scroller\.scrollTop !== readingTop\) scroller\.scrollTop = readingTop;\s*\};\s*\}, \[screenMounted\]\);/,
   );
   // The chat's own scrollers keep their drags (both contain their overscroll).
-  assert.match(core, /overflow-y-auto overscroll-contain/);
+  assert.match(core, /overflow-y-auto overscroll-y-contain/);
   assert.match(
     strip(read('v2', 'features', 'conversations', 'conversation', 'MessageList.tsx')),
-    /overflow-y-auto overscroll-contain/,
+    /overflow-y-auto overscroll-y-contain/,
   );
 });
 

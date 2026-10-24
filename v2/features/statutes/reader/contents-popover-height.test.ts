@@ -18,5 +18,5 @@ test('the computer popover is capped to the room below the button, and its list 
   assert.match(popover, /(^| )overflow-hidden( |$)/);
   assert.match(source, /className=\{POPOVER\}/);
   // The list takes what is left under the header and scrolls on its own.
-  assert.match(source, /aria-label="Contents"\s+className="min-h-0 flex-1 overflow-y-auto overscroll-contain/);
+  assert.match(source, /aria-label="Contents"\s+className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain/);
 });

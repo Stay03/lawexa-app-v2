@@ -534,7 +534,7 @@ export function SpaceMembersSheet({
                 : `They take over ${space.name} and you become an admin. Then you can leave.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <ul className="-mx-2 flex max-h-[min(18rem,50vh)] flex-col gap-0.5 overflow-y-auto overscroll-contain">
+          <ul className="-mx-2 flex max-h-[min(18rem,50vh)] flex-col gap-0.5 overflow-y-auto overscroll-y-contain">
             {others.map((member) => (
               <li key={member.user.uuid}>
                 <button

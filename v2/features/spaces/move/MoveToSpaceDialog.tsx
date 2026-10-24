@@ -182,7 +182,7 @@ export function MoveToSpaceDialog({
 
         <div
           className={cn(
-            'relative -mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain',
+            'relative -mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-y-contain',
             'transition-opacity duration-150 motion-reduce:transition-none',
             spacesQuery.isPlaceholderData && 'opacity-60',
           )}

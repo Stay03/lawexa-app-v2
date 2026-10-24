@@ -239,7 +239,7 @@ export function JurisdictionsField({
               role="listbox"
               aria-label="Countries"
               aria-multiselectable="true"
-              className="max-h-56 overflow-y-auto overscroll-contain pt-1"
+              className="max-h-56 overflow-y-auto overscroll-y-contain pt-1"
             >
               {jurisdictionsQuery.isPending && signedIn ? (
                 <ul className="flex flex-col gap-1" aria-hidden>

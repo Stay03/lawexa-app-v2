@@ -237,7 +237,7 @@ export function SpaceFilesDialog({
             Add a file to {folder.name}. It stays in the space as well.
           </DialogDescription>
         </DialogHeader>
-        <div className="-mx-2 max-h-[min(60vh,28rem)] overflow-y-auto overscroll-contain">
+        <div className="-mx-2 max-h-[min(60vh,28rem)] overflow-y-auto overscroll-y-contain">
           {query.isPending ? (
             <div aria-hidden className="flex flex-col gap-1 px-2">
               {[0, 1, 2].map((row) => (

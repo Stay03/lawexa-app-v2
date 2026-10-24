@@ -157,7 +157,7 @@ export function ChatSidePanel({
             <X aria-hidden className="size-4" />
           </button>
         </header>
-        <div className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+        <div className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">{children}</div>
         {footer ? (
           <footer className="flex shrink-0 items-center gap-2 border-t border-border/70 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] xl:px-5">
             {footer}

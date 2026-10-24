@@ -15,27 +15,27 @@ const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts),
 const SCROLLERS: ReadonlyArray<[string[], string]> = [
   [
     ['v2', 'features', 'conversations', 'conversation', 'MessageList.tsx'],
-    'className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain"',
+    'className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain"',
   ],
   // The folder picker's list, inside a dialog that scrolls (its drillable rows' sr-only hint).
   [
     ['v2', 'features', 'folders', 'picker', 'PickerBody.tsx'],
-    'className="relative -mx-1 max-h-[min(24rem,45dvh)] min-h-0 overflow-y-auto overscroll-contain px-1"',
+    'className="relative -mx-1 max-h-[min(24rem,45dvh)] min-h-0 overflow-y-auto overscroll-y-contain px-1"',
   ],
   // "Move to space": the rows' sr-only "In it now" on a phone.
   [
     ['v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx'],
-    "'relative -mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-contain',",
+    "'relative -mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-y-contain',",
   ],
   // A channel's feed: the empty channel's intro sr-only visibility label.
   [
     ['v2', 'features', 'channels', 'feed', 'ChannelFeed.tsx'],
-    'className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain"',
+    'className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain"',
   ],
   // The space pane: lobby and content rows carry sr-only text.
   [
     ['v2', 'features', 'collab', 'shell', 'CollabFrame.tsx'],
-    'className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"',
+    'className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain"',
   ],
 ];
 

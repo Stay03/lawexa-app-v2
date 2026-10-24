@@ -303,7 +303,7 @@ function StatutePreview({
           </div>
         ) : null}
         {text ? (
-          <p className="text-popover-foreground/90 max-h-[280px] overflow-y-auto overscroll-contain pr-1 text-[0.8125rem] leading-relaxed motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+          <p className="text-popover-foreground/90 max-h-[280px] overflow-y-auto overscroll-y-contain pr-1 text-[0.8125rem] leading-relaxed motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
             {text}
           </p>
         ) : loading ? (

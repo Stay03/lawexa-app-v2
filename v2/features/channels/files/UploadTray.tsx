@@ -215,7 +215,7 @@ export function UploadTray({
 
             {/* Bounded height: a drop of thirty files must not push the list
                 off the screen. Beyond four rows the tray scrolls itself. */}
-            <ul className="max-h-44 divide-y divide-border/60 overflow-y-auto overscroll-contain">
+            <ul className="max-h-44 divide-y divide-border/60 overflow-y-auto overscroll-y-contain">
               {entries.map((entry) => (
                 <UploadRow
                   key={entry.id}

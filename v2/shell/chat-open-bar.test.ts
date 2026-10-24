@@ -66,7 +66,7 @@ test('on a phone the bar room moves into the chat: its frame below the buttons, 
   // The scroller is a containing block, so nothing absolutely placed in the
   // transcript (the author line's sr-only text) can overflow into the shell
   // region and make the chat draggable as a whole (real-server pass 10).
-  assert.match(list, /data-v2-chat-scroller=""[\s\S]{0,600}?className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain"/);
+  assert.match(list, /data-v2-chat-scroller=""[\s\S]{0,600}?className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain"/);
   const screen = read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
   assert.match(screen, /data-v2-chat-frame=""/);
   // The skeleton the route shows first sits below the buttons too.

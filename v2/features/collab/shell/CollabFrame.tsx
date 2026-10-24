@@ -695,14 +695,14 @@ function CollabPlaceFrame({
         ) : null}
 
         {/* ── The pane. It owns the scroll inside a place (see the docblock);
-              `overscroll-contain` keeps a rubber-band from leaking out to the
+              `overscroll-y-contain` keeps a rubber-band from leaking out to the
               shell behind it. ────────────────────────────────────────────── */}
         {/* `data-v2-scroller` hands this pane to ScrollMemory as the route's
             scroller, so Back restores the lobby where the reader left it. The
             shell's own scroller does not move inside a place. */}
         <div
           data-v2-scroller
-          className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain"
+          className="relative min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-y-contain"
         >
           {children}
         </div>

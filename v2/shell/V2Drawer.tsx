@@ -351,7 +351,7 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
         {/* ONE scroll region: New chat, nav rows, then Recents. */}
         <div
           ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 py-2"
         >
           <nav aria-label="Primary" className="flex flex-col gap-0.5">
             {/* New chat — a standard nav row (owner #9): identical shape/hover to

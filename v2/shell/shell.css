@@ -23,7 +23,11 @@
 html.v2-document-lock,
 html.v2-document-lock body {
   overflow: hidden;
-  overscroll-behavior: none;
+  /* Vertical only. A sideways overscroll that reaches the root is the
+     trackpad's swipe back on a Mac (Chrome and Safari, and the installed
+     app): `none` on both axes stopped it on every page (Arthur, 24 October
+     2026). The vertical axis keeps pull-to-refresh off. */
+  overscroll-behavior-y: none;
 }
 
 /* SCRIPT MUST NOT SCROLL IT EITHER. `overflow: hidden` stops the reader, not
@@ -124,13 +128,15 @@ html[data-v2-chat-screen] .v2-shell {
 
 /* Scrollable content region (grid-row 2) — the ONLY scroll container in the
    shell. `min-height: 0` lets the 1fr grid row shrink below its content so it can
-   actually scroll (grid items default to `min-height: auto`). `overscroll-behavior:
-   contain` stops scroll chaining / pull-to-refresh from leaking to the document. */
+   actually scroll (grid items default to `min-height: auto`). `overscroll-behavior-y:
+   contain` stops scroll chaining / pull-to-refresh from leaking to the document.
+   Vertical only, so a sideways swipe still reaches the root and goes back (the
+   rule above). */
 .v2-shell__content {
   grid-row: 2;
   min-height: 0;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
 }
 

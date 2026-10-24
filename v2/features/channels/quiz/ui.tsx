@@ -51,7 +51,7 @@ export function GameStage({
   className?: string;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
       <div
         className={cn(
           'mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6',

@@ -499,7 +499,7 @@ export function PickerBody({
 
       <div
         ref={scrollRef}
-        className="relative -mx-1 max-h-[min(24rem,45dvh)] min-h-0 overflow-y-auto overscroll-contain px-1"
+        className="relative -mx-1 max-h-[min(24rem,45dvh)] min-h-0 overflow-y-auto overscroll-y-contain px-1"
       >
         {listState.skeleton ? (
           <PickerRowsSkeleton />

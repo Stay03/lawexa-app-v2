@@ -228,7 +228,7 @@ export function TimezonePicker({
             id={listboxId}
             role="listbox"
             aria-label="Timezones"
-            className="max-h-64 overflow-y-auto overscroll-contain pt-1"
+            className="max-h-64 overflow-y-auto overscroll-y-contain pt-1"
           >
             {filtered.map((zone, index) => {
               const selected = zone === value;

@@ -376,7 +376,7 @@ export const SpaceRail = memo(function SpaceRail({
       {/* ── Channels ───────────────────────────────────────────────────── */}
       <nav
         aria-label={identity ? `Channels in ${identity.name}` : 'Channels'}
-        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-2"
+        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-1 pb-2"
       >
         {/* NO LIVE REGION HERE. The rail is chrome, and the lobby's activity
             block already announces "Loading channels" for the same query — two

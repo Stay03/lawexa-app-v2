@@ -145,7 +145,7 @@ function DocumentBlock({ text }: { text: string }) {
                 <X className="size-4" />
               </IconAction>
             </div>
-            <div ref={readerRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none">
+            <div ref={readerRef} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain outline-none">
               {readerFilled ? (
                 <DocumentBody
                   text={text}

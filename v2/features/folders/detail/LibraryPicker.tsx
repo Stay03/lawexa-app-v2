@@ -116,7 +116,7 @@ export function LibraryPicker({
           id={PANEL_ID}
           role="tabpanel"
           aria-labelledby={`${PANEL_ID}-tab-${tab}`}
-          className="-mx-2 max-h-[min(55vh,26rem)] overflow-y-auto overscroll-contain"
+          className="-mx-2 max-h-[min(55vh,26rem)] overflow-y-auto overscroll-y-contain"
         >
           {/* A new tab is a new list: a fresh mount, so no rows of the last
               kind show under this kind's name. */}

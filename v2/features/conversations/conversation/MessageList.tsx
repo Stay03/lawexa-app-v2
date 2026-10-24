@@ -691,7 +691,7 @@ export function MessageList({
         // container, the shell's content region, and made it scroll: the whole
         // chat could be dragged up the screen (real-server pass 10, 13 October
         // 2026: the region at 3528 px in a 664 px view).
-        className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="v2-quiet-scroll relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
       >
         {/* Bottom padding clears the FLOATING composer that ConversationScreen lays
             over this scroll region (the pill is absolute/out-of-flow, so the transcript

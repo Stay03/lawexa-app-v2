@@ -750,7 +750,7 @@ export function ConversationComposer({
             phone with the keyboard up; the meta row, notice, and error sit OUTSIDE this
             scroller so they always stay in view. */}
         {uploads.length > 0 && (
-          <div className="mb-2 flex max-h-[40vh] flex-wrap gap-2 overflow-y-auto overscroll-contain px-1">
+          <div className="mb-2 flex max-h-[40vh] flex-wrap gap-2 overflow-y-auto overscroll-y-contain px-1">
             {uploads.map((u) => {
               const isRemoving = removing.has(u.key);
               return (

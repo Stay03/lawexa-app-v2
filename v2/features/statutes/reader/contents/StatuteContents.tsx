@@ -210,7 +210,7 @@ function WhereYouAre({
 
       <nav
         aria-label="Contents"
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-2"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-2"
       >
         <ul className="flex flex-col gap-0.5">
           {outline.map((division) => (

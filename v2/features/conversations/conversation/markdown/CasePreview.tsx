@@ -135,7 +135,7 @@ function PreviewBody({
         ) : null}
 
         {summary ? (
-          <p className="text-popover-foreground/90 max-h-[280px] overflow-y-auto overscroll-contain pr-1 text-[0.8125rem] leading-relaxed">
+          <p className="text-popover-foreground/90 max-h-[280px] overflow-y-auto overscroll-y-contain pr-1 text-[0.8125rem] leading-relaxed">
             {summary}
           </p>
         ) : null}

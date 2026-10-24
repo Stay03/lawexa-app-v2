@@ -280,7 +280,7 @@ function JurisdictionPicker({
           scrolling list is halved below `sm` (max-h-32 ≈ half of the desktop max-h-64)
           with the internal scroll unchanged, so the whole popover's vertical footprint
           roughly halves on mobile; desktop is untouched. 44px rows + both themes stay. */}
-      <div className="max-h-32 overflow-y-auto overscroll-contain pt-1 sm:max-h-64">
+      <div className="max-h-32 overflow-y-auto overscroll-y-contain pt-1 sm:max-h-64">
         {isLoading ? (
           <ul className="flex flex-col gap-1" aria-hidden>
             {[0.9, 0.75, 0.6, 0.45, 0.3, 0.2].map((opacity, index) => (

@@ -345,7 +345,7 @@ export function CaseChatMiddle({
           embed={{ onDeleted: onClose, composer: 'external' }}
         />
       ) : (
-        <div className="v2-quiet-scroll h-full min-h-0 overflow-y-auto overscroll-contain px-4 py-4">
+        <div className="v2-quiet-scroll h-full min-h-0 overflow-y-auto overscroll-y-contain px-4 py-4">
           <CaseChatNewContent
             subject={subject}
             signedIn={signedIn}

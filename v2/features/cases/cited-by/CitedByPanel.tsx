@@ -203,7 +203,7 @@ function CitedByPanelBody({
 
       <div
         ref={bodyRef}
-        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain"
       >
         <div className="border-b border-border/60 px-4 py-3 sm:px-5">
           {filters ? (

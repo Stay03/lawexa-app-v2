@@ -441,10 +441,10 @@ export function ResponsiveOverlay({
             ) : null}
           </header>
 
-          {/* `overscroll-contain` for the same reason phase 6 put it on every
+          {/* `overscroll-y-contain` for the same reason phase 6 put it on every
               horizontal scroller: without it a flick past the end of the form
               scrolls whatever is behind. */}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 pb-6 md:px-6 md:pt-0 md:pb-6">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-4 pb-6 md:px-6 md:pt-0 md:pb-6">
             {children}
           </div>
 

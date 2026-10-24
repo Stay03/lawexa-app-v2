@@ -73,7 +73,7 @@ export function BoundedScroll({
       <div
         ref={scrollRef}
         onScroll={fade ? measure : undefined}
-        className={cn('overflow-y-auto overscroll-contain', maxHeight, className)}
+        className={cn('overflow-y-auto overscroll-y-contain', maxHeight, className)}
       >
         <div ref={innerRef}>{children}</div>
       </div>

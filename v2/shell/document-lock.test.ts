@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,9 +20,24 @@ const keyboard = read('use-keyboard-inset.ts');
 const drawer = read('V2Drawer.tsx');
 
 test('the locked body is fixed, with !important so the sheet scroll lock cannot make it relative', () => {
-  assert.match(css, /html\.v2-document-lock,\s*html\.v2-document-lock body \{\s*overflow: hidden;\s*overscroll-behavior: none;\s*\}/);
+  assert.match(css, /html\.v2-document-lock,\s*html\.v2-document-lock body \{\s*overflow: hidden;[\s\S]*?overscroll-behavior-y: none;\s*\}/);
   assert.match(css, /html\.v2-document-lock body \{\s*position: fixed !important;\s*inset: 0;\s*width: 100%;\s*\}/);
   assert.match(css, /body\[data-scroll-locked\] \{ position:\s*relative !important \}/);
+});
+
+/* A two-finger swipe back on a Mac trackpad starts from a sideways overscroll
+ * that reaches the root (Chrome and Safari, and the installed app). Both axes
+ * held at the root, the shell's region or a page's scroller stopped it on every
+ * page (Arthur, 24 October 2026). Only the vertical axis is held: pull-to-refresh
+ * and the rubber band stay off; the sideways strips keep x. */
+test('the root, the shell region and every vertical scroller hold only the vertical overscroll', () => {
+  assert.doesNotMatch(css, /overscroll-behavior: (none|contain)/);
+  assert.match(css, /\.v2-shell__content \{[\s\S]*?overscroll-behavior-y: contain;/);
+  const tsx = execSync("git ls-files 'v2/**/*.tsx' 'v2/**/*.ts'", { encoding: 'utf8' })
+    .split('\n')
+    .filter((file) => file && !file.endsWith('.test.ts'));
+  const both = tsx.filter((file) => /(?<![-\w])overscroll-(contain|none)(?![-\w])/.test(readFileSync(file, 'utf8')));
+  assert.deepEqual(both, [], 'overscroll on both axes');
 });
 
 test('the shell rows themselves stay out of position fixed (the keyboard rule stands)', () => {
