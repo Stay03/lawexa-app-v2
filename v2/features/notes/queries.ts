@@ -143,6 +143,21 @@ export const notesQueries = {
     }),
 
   /**
+   * The reader's note saved from a chat's draft, or `null` (the draft panel,
+   * opening a finished draft). Like `editorOpen`, always the server's answer:
+   * never kept on the device and never reused by a later open, because the
+   * editor starts from it and a kept copy could be older than a save made since.
+   */
+  byDraft: ({ conversationId, draft, viewerId }: { conversationId: string; draft: number } & ViewerScoped) =>
+    queryOptions({
+      queryKey: [...notesQueries.all, 'by-draft', conversationId, draft, { viewerId }] as const,
+      queryFn: () => notesApi.byDraft(conversationId, draft),
+      staleTime: 0,
+      gcTime: 0,
+      retry: retrySettledClientErrors,
+    }),
+
+  /**
    * Tags the server suggests at the publish step. Keyed on the saved version
    * (`updatedAt`): the sheet opens only while autosave is clean, so one open
    * of one version asks once, and reopening it unchanged reuses that answer.

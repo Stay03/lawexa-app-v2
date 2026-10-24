@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import type { Content } from '@tiptap/core';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { Check, Copy, Redo2, Undo2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { AlignMenu } from '@/v2/features/notes/editor/AlignMenu';
 import { FontMenu, SizeMenu } from '@/v2/features/notes/editor/FontMenus';
@@ -22,6 +24,7 @@ import type { ConversationSpaceRef } from '@/types/chat';
 import { readDraftEdit, readSavedDraftNote, writeDraftEdit } from './draft-edits';
 import { DraftSaveBar } from './DraftSaveBar';
 import { markdownToDoc, type DraftFont } from './markdown-to-doc';
+import { useDraftNote } from './use-draft-note';
 
 /**
  * DraftEditor — a finished draft, editable in the side panel with the note
@@ -32,19 +35,28 @@ import { markdownToDoc, type DraftFont } from './markdown-to-doc';
  * style, bold, italic, underline, both lists, alignment, and font type and
  * size (FontMenus.tsx).
  *
- * It opens from the reader's earlier edits if they made any this visit
- * (draft-edits.ts), else from the draft's Markdown (markdown-to-doc.ts). Every
- * change is kept there as it is typed. Save as note (DraftSaveBar.tsx) keeps
- * it for good, and offers the note's links once it is one.
+ * It opens from, in order: the reader's edits this visit (draft-edits.ts); the
+ * note it was saved as, on any device (`useDraftNote`, Lucy's live check,
+ * 23 October 2026: a reopened draft had lost its fonts); else the draft's
+ * Markdown (markdown-to-doc.ts). Every change is kept as it is typed. Save as
+ * note (DraftSaveBar.tsx) keeps it for good, and offers the note's links once
+ * it is one.
  */
-export function DraftEditor({
-  conversationId,
-  ordinal,
-  title,
-  markdown,
-  font,
-  space,
-}: {
+export function DraftEditor(props: DraftEditorProps) {
+  const { conversationId, ordinal } = props;
+  const edited = readDraftEdit(conversationId, ordinal);
+  // The saved note is asked for only when this visit has no edits of its own.
+  const note = useDraftNote(conversationId, ordinal, edited === undefined);
+
+  if (edited !== undefined) return <DraftEditorBody {...props} initial={edited} />;
+  if (note.isPending) return <DraftEditorSkeleton />;
+  // A failed lookup opens the draft as Lawexa wrote it; a save then finds the
+  // note on the server anyway (`useSaveDraftNote`), so none is made twice.
+  const saved = note.data?.content;
+  return <DraftEditorBody {...props} initial={saved ? saved : markdownToDoc(props.markdown, props.font)} />;
+}
+
+interface DraftEditorProps {
   conversationId: string;
   ordinal: number;
   title: string;
@@ -53,7 +65,30 @@ export function DraftEditor({
   font: DraftFont;
   /** The chat's Space, for Save to Space folder; `null` outside one. */
   space: ConversationSpaceRef | null;
-}) {
+}
+
+/** The editor's frame while the saved note is looked up: the bar, then lines. */
+function DraftEditorSkeleton() {
+  return (
+    <div aria-hidden className="flex min-h-full flex-col">
+      <div className="h-12 shrink-0 border-b border-border/70" />
+      <div className="mx-auto flex w-full max-w-[68ch] flex-col gap-3 px-5 py-6 xl:px-8">
+        <Skeleton className="h-7 w-2/3" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-11/12" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
+    </div>
+  );
+}
+
+function DraftEditorBody({
+  conversationId,
+  ordinal,
+  title,
+  space,
+  initial,
+}: DraftEditorProps & { initial: Content }) {
   // Changed since its last save, or never saved: what Save offers.
   const [dirty, setDirty] = useState(() => readSavedDraftNote(conversationId, ordinal) === undefined);
   const queryClient = useQueryClient();
@@ -68,7 +103,7 @@ export function DraftEditor({
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
-    content: readDraftEdit(conversationId, ordinal) ?? markdownToDoc(markdown, font),
+    content: initial,
     onUpdate: ({ editor: instance }) => {
       writeDraftEdit(conversationId, ordinal, instance.getJSON());
       setDirty(true);

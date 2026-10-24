@@ -16,6 +16,11 @@ import { readSavedDraftNote, writeSavedDraftNote } from './draft-edits';
  * that note (`PUT /notes/{id}`), sending the copy's `updated_at` so a newer
  * edit made on the note page is never overwritten (the API answers 409).
  *
+ * ONE NOTE PER DRAFT, ON EVERY DEVICE. A create names the chat and the draft
+ * it came from, and the server makes no second note for a draft: one saved on
+ * another device, or before a reload, comes back with `existing: true`, left
+ * as it was. This save is then written into it, on the copy just returned.
+ *
  * The note's HTML is the editor's own, so its fonts travel as the agreed
  * spans and the server keeps them (backend 9051f52a). The notes lists are
  * refetched, and the note's detail caches take the saved copy, so Open note
@@ -26,12 +31,25 @@ export function useSaveDraftNote(conversationId: string, ordinal: number) {
   const { userId: viewerId } = useV2Session();
 
   return useMutation<NoteEnvelope, Error, { title: string; html: string }>({
-    mutationFn: ({ title, html }) => {
+    mutationFn: async ({ title, html }) => {
       const saved = readSavedDraftNote(conversationId, ordinal);
       const cleanTitle = title.trim() || null;
-      return saved
-        ? notesApi.update(saved.id, { title: cleanTitle, content: html, base_updated_at: saved.updatedAt })
-        : notesApi.create({ title: cleanTitle, content: html });
+      if (saved) {
+        return notesApi.update(saved.id, { title: cleanTitle, content: html, base_updated_at: saved.updatedAt });
+      }
+      const created = await notesApi.create({
+        title: cleanTitle,
+        content: html,
+        source_conversation_uuid: conversationId,
+        source_draft: ordinal,
+      });
+      if (!created.data.existing) return created;
+      // Already a note (another device, or before a reload): this save goes into it.
+      return notesApi.update(created.data.id, {
+        title: cleanTitle,
+        content: html,
+        base_updated_at: created.data.updated_at,
+      });
     },
     // One draft saves one at a time, so a quick second press cannot make two notes.
     scope: { id: `draft-note-${conversationId}-${ordinal}` },

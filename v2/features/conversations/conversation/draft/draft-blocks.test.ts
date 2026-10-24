@@ -114,7 +114,15 @@ test('Save as note makes a note once, then updates it with the copy it was made 
   const { readFileSync } = await import('node:fs');
   const hook = readFileSync(new URL('./use-save-draft-note.ts', import.meta.url), 'utf8');
   assert.match(hook, /notesApi\.update\(saved\.id, \{ title: cleanTitle, content: html, base_updated_at: saved\.updatedAt \}\)/);
-  assert.match(hook, /: notesApi\.create\(\{ title: cleanTitle, content: html \}\);/);
+  // A create names its chat and draft; the server's existing note for that draft takes this save.
+  assert.match(hook, /source_conversation_uuid: conversationId,\s*source_draft: ordinal,/);
+  assert.match(hook, /if \(!created\.data\.existing\) return created;\s*\/\/[^\n]*\n\s*return notesApi\.update\(created\.data\.id, \{/);
+  // Opening a draft asks the server for its note and records it before the editor mounts.
+  const lookup = readFileSync(new URL('./use-draft-note.ts', import.meta.url), 'utf8');
+  assert.match(lookup, /const note = await notesApi\.byDraft\(conversationId, ordinal\);\s*if \(note\) \{\s*writeSavedDraftNote\(/);
+  const api = readFileSync(new URL('../../../notes/api.ts', import.meta.url), 'utf8');
+  assert.match(api, /apiClient\.get<NoteEnvelope>\('\/notes\/by-draft', \{\s*params: \{ conversation: conversationUuid, draft \},/);
+  assert.match(api, /if \(isNotFoundError\(error\)\) return null;/);
   assert.match(hook, /invalidates: \[notesQueries\.lists\(\)\]/);
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
   assert.match(bar, /<ExportMenu slug=\{saved\.slug\} \/>/);

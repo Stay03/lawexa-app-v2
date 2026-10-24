@@ -86,6 +86,17 @@ export interface NoteRecord {
   can_edit?: boolean;
   /** The original a copy was made from, sent to the original's owner only. */
   copied_from?: { slug: string; title: string | null } | null;
+  /**
+   * The chat and draft a note was saved from (the draft panel's Save as note),
+   * sent to the note's owner only; `null` for any other note.
+   */
+  source_conversation_uuid?: string | null;
+  source_draft?: number | null;
+  /**
+   * On a create from a draft only: `true` when the reader already had a note
+   * for that draft, which the server returned (200) instead of making another.
+   */
+  existing?: boolean;
 }
 
 export interface NoteListEnvelope {
@@ -113,6 +124,13 @@ export interface NoteCreateInput {
   /** Omit or `null` for an untitled draft. Caps at 500 characters. */
   title?: string | null;
   content: string;
+  /**
+   * A note saved from a chat's draft names it, both or neither (422 otherwise):
+   * the chat's uuid and the draft's place, 0-based, as in `?side=draft:N`. One
+   * reader has one note per draft; a second create returns that note.
+   */
+  source_conversation_uuid?: string;
+  source_draft?: number;
 }
 
 /**
