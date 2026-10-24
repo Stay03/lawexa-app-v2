@@ -176,6 +176,29 @@ export interface QuizQuestion {
    * author wrote none.
    */
   explanation?: string | null;
+  /**
+   * Where the question comes from, when Lawexa built the quiz and named it
+   * (24 October 2026). Present, like the explanation, only for the author and
+   * on a FINISHED attempt; `null` for no source, and for a source the viewer
+   * may not open (a private note, a file).
+   */
+  source?: QuizSource | null;
+}
+
+/**
+ * Where a question or a scenario comes from (the quiz builder, backend 24
+ * October 2026). A Library item (`note`, `case`, `statute`, `file`) or a page
+ * on the web. `url` is the item's address in the app (`/cases/{slug}` and the
+ * like), `null` for a file, which has no page of its own; for `web` it is the
+ * outside address. `quote` is a short excerpt of what the question rests on.
+ */
+export interface QuizSource {
+  kind: 'note' | 'case' | 'statute' | 'file' | 'web';
+  /** As Lawexa named it: a numeric id, a slug or a uuid. Not an address. */
+  id?: string | number | null;
+  title: string | null;
+  quote?: string | null;
+  url?: string | null;
 }
 
 /**
@@ -194,6 +217,8 @@ export interface QuizScenario {
   title: string | null;
   passage: string;
   position: number;
+  /** Where the scenario comes from; shown to everyone. `null` for none or a source the viewer may not open. */
+  source?: QuizSource | null;
 }
 
 /**
@@ -301,10 +326,14 @@ export interface QuizQuestionInput {
   /** "Why this is the answer", at most 1,000 characters; `null` for none.
    *  The form always sends it, so clearing the box clears it. */
   explanation?: string | null;
+  /** The stored question this one was, so the server keeps its source; absent for a new question. */
+  uuid?: string;
 }
 
 /** One scenario in a create/update body; the title is optional. */
 export interface QuizScenarioInput {
+  /** The stored scenario this one was, so the server keeps its source; absent for a new scenario. */
+  uuid?: string;
   title?: string;
   passage: string;
 }

@@ -116,8 +116,14 @@ export function useUpdateQuiz(quizUuid: string) {
     mutationFn: (payload: UpdateChannelQuizPayload) =>
       channelQuizApi.update(quizUuid, payload),
     meta: { silentError: true },
-    onSuccess: () => {
+    onSuccess: (response) => {
       invalidateQuizLists(queryClient);
+      // The saved quiz, as the server now holds it, before the refetch lands. A
+      // save rebuilds the questions with new uuids, and the form sends each
+      // question's uuid back so the server keeps its source (backend, 24 October
+      // 2026): a form opened again from the old copy would send the old uuids,
+      // and the sources would go.
+      queryClient.setQueriesData({ queryKey: channelQuizQueries.quizDetailOf(quizUuid) }, response);
       void queryClient.invalidateQueries({
         queryKey: channelQuizQueries.quizDetailOf(quizUuid),
       });

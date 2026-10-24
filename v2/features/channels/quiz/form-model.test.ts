@@ -84,7 +84,8 @@ test('a saved quiz loads with its scenarios, each question still pointing at its
   assert.equal(drafts.questions[1].scenarioKey, drafts.scenarios[0].key);
   // And it saves back the same way.
   const payload = toPayload(drafts.questions, drafts.scenarios);
-  assert.deepEqual(payload.scenarios, [{ title: 'First', passage: 'First passage' }]);
+  // With its uuid, so the server keeps whatever it stored on it (its source).
+  assert.deepEqual(payload.scenarios, [{ uuid: 's-a', title: 'First', passage: 'First passage' }]);
   assert.equal(payload.questions[1].scenario_index, 0);
 });
 
@@ -134,4 +135,33 @@ test('Cancel, Escape, a tap outside and Back all go through the discard question
   assert.match(dialog, /<AlertDialogCancel>Keep editing<\/AlertDialogCancel>/);
   const library = readFileSync(new URL('../../quiz/solo/library/LibraryScreen.tsx', import.meta.url), 'utf8');
   assert.match(library, /const overlay = useUrlOverlay\(QUIZ_FORM_PARAM\);/);
+});
+
+test('a saved question and scenario go back with their uuids, so the server keeps their sources; a source is never sent', () => {
+  const source = { kind: 'case' as const, id: 12, title: 'TEST DATA Ojukwu v Lagos State', quote: 'q', url: '/cases/x' };
+  const quiz = {
+    uuid: 'quiz-1',
+    title: 'TEST DATA Easements',
+    questions: [
+      { uuid: 'qq-1', type: 'multiple_choice', question: 'TEST DATA Q1', time_limit_seconds: 30, position: 1, scenario_uuid: 'sc-1', explanation: null, source,
+        options: [{ id: 1, content: 'A', position: 1, is_correct: true }, { id: 2, content: 'B', position: 2, is_correct: false }] },
+    ],
+    scenarios: [{ uuid: 'sc-1', title: 'TEST DATA Plot 14', passage: 'TEST DATA facts', position: 1, source }],
+  } as never;
+  const drafts = draftsFromQuiz(quiz);
+  assert.equal(drafts.questions[0].uuid, 'qq-1');
+  assert.deepEqual(drafts.questions[0].source, source);
+  assert.equal(drafts.scenarios[0].uuid, 'sc-1');
+  const payload = toPayload(drafts.questions, drafts.scenarios);
+  assert.equal(payload.questions[0].uuid, 'qq-1');
+  assert.equal(payload.scenarios[0].uuid, 'sc-1');
+  assert.ok(!('source' in payload.questions[0]) && !('source' in payload.scenarios[0]));
+  // A question added in the form has no uuid to send.
+  assert.ok(!('uuid' in toPayload([newQuestion()], []).questions[0]));
+});
+
+test('a save puts the quiz the server returned, with its new uuids, where the form reads it next', () => {
+  const mutations = readFileSync(join(here, 'mutations.ts'), 'utf8');
+  const update = mutations.slice(mutations.indexOf('export function useUpdateQuiz'), mutations.indexOf('export function useUpdateQuiz') + 1200);
+  assert.match(update, /onSuccess: \(response\) => \{[\s\S]*?queryClient\.setQueriesData\(\{ queryKey: channelQuizQueries\.quizDetailOf\(quizUuid\) \}, response\);[\s\S]*?invalidateQueries/);
 });

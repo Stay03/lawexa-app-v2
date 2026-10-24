@@ -36,6 +36,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, quizMinutesLabel, scenarioCountLabel } from '../rows-model';
+import { QuizSourceLine } from '../../source/QuizSourceLine';
 import { quizContents, takenLabel } from './front-model';
 import {
   clearScreenContext,
@@ -288,6 +289,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 {contents.map((line) => (
                   <li key={line.key} className="px-4 py-3 text-sm text-foreground/90">
                     {line.label}
+                    <QuizSourceLine source={line.source} className="mt-1" />
                   </li>
                 ))}
               </ul>

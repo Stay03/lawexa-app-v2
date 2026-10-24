@@ -10,6 +10,7 @@ import type { QuizAttempt, QuizAttemptQuestion } from '@/types/channel-quiz';
 import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { pointsLabel, questionVerdict, scenarioFor, secondsLabel, type QuestionVerdict } from '../model';
+import { QuizSourceLine } from '../../source/QuizSourceLine';
 import { AttemptOptionTile } from '../player/AttemptOptionTile';
 import { RaisedButton } from '../ui';
 import {
@@ -280,6 +281,7 @@ function AnswerPage({ attempt, question, index }: { attempt: QuizAttempt; questi
         <div className="mt-3 rounded-xl bg-secondary/50 px-3.5 py-3 text-sm leading-relaxed text-muted-foreground">
           {scenario.title ? <p className="font-semibold text-foreground">{scenario.title}</p> : null}
           <p className="whitespace-pre-line">{scenario.passage}</p>
+          <QuizSourceLine source={scenario.source} className="mt-2" />
         </div>
       ) : null}
 
@@ -301,6 +303,10 @@ function AnswerPage({ attempt, question, index }: { attempt: QuizAttempt; questi
           <p className="mt-1 text-[15px] leading-relaxed whitespace-pre-line text-foreground/85">{explanation}</p>
         </div>
       ) : null}
+      {/* Where the question comes from (the quiz builder, 24 October 2026): shown
+          with the answers, like the Why; nothing when it has none or the viewer
+          may not see it. */}
+      <QuizSourceLine source={question.source} className="mt-3" />
     </section>
   );
 }

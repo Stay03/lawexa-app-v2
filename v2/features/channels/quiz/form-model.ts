@@ -3,6 +3,7 @@ import type {
   QuizQuestionInput,
   QuizQuestionType,
   QuizScenarioInput,
+  QuizSource,
 } from '@/types/channel-quiz';
 import { QUIZ_DEFAULT_SECONDS, QUIZ_MIN_OPTIONS } from './model';
 
@@ -41,6 +42,10 @@ export interface QuestionDraft {
   explanation: string;
   /** The scenario this question is about, by its draft key; `null` for none. */
   scenarioKey: string | null;
+  /** Where Lawexa took it from (the quiz builder); shown, not edited. Absent on a new question. */
+  source?: QuizSource | null;
+  /** The stored question this draft was loaded from, sent back so the server keeps its source. Absent on a new one. */
+  uuid?: string;
 }
 
 export interface ScenarioDraft {
@@ -48,6 +53,10 @@ export interface ScenarioDraft {
   /** Optional; `''` for none. */
   title: string;
   passage: string;
+  /** Where Lawexa took it from (the quiz builder); shown, not edited. Absent on a new scenario. */
+  source?: QuizSource | null;
+  /** The stored scenario this draft was loaded from, sent back so the server keeps its source. Absent on a new one. */
+  uuid?: string;
 }
 
 let draftCounter = 0;
@@ -112,7 +121,7 @@ export function trueFalseOptions(): OptionDraft[] {
 export function draftsFromQuiz(quiz: ChannelQuiz): { questions: QuestionDraft[]; scenarios: ScenarioDraft[] } {
   const scenarios = [...(quiz.scenarios ?? [])]
     .sort((a, b) => a.position - b.position)
-    .map((scenario) => ({ uuid: scenario.uuid, draft: { key: nextKey('s'), title: scenario.title ?? '', passage: scenario.passage } }));
+    .map((scenario) => ({ uuid: scenario.uuid, draft: { key: nextKey('s'), uuid: scenario.uuid, title: scenario.title ?? '', passage: scenario.passage, source: scenario.source ?? null } }));
   const keyOf = new Map(scenarios.map(({ uuid, draft }) => [uuid, draft.key]));
   const questions = [...(quiz.questions ?? [])]
     .sort((a, b) => a.position - b.position)
@@ -128,6 +137,8 @@ export function draftsFromQuiz(quiz: ChannelQuiz): { questions: QuestionDraft[];
         correctKey: correctIndex >= 0 ? options[correctIndex].key : null,
         explanation: question.explanation ?? '',
         scenarioKey: question.scenario_uuid ? (keyOf.get(question.scenario_uuid) ?? null) : null,
+        source: question.source ?? null,
+        uuid: question.uuid,
       };
     });
   return { questions, scenarios: scenarios.map(({ draft }) => draft) };
@@ -213,13 +224,17 @@ export function toPayload(
         // Always sent, so clearing the box clears the stored explanation.
         explanation: question.explanation.trim() || null,
         ...(index >= 0 ? { scenario_index: index } : {}),
+        // A saved question goes back with its uuid: the server rebuilds the
+        // questions from this body and copies the stored row's source onto
+        // the new one (backend, 24 October 2026). A source is never sent.
+        ...(question.uuid ? { uuid: question.uuid } : {}),
       };
     }),
     scenarios: order.flatMap((key) => {
       const scenario = byKey.get(key);
       if (!scenario) return [];
       const title = scenario.title.trim();
-      return [{ ...(title ? { title } : {}), passage: scenario.passage.trim() }];
+      return [{ ...(scenario.uuid ? { uuid: scenario.uuid } : {}), ...(title ? { title } : {}), passage: scenario.passage.trim() }];
     }),
   };
 }

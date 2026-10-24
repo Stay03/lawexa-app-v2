@@ -1,4 +1,4 @@
-import type { QuizQuestion, QuizScenario } from '@/types/channel-quiz';
+import type { QuizQuestion, QuizScenario, QuizSource } from '@/types/channel-quiz';
 
 /**
  * front-model — "What is in it" on a quiz's page (quiz piece 3, Stay, 23
@@ -13,11 +13,13 @@ export interface ContentsLine {
   readonly label: string;
   /** How many questions the line covers. */
   readonly count: number;
+  /** A scenario's source, shown under its line to everyone (the quiz builder, 24 October 2026). */
+  readonly source?: QuizSource | null;
 }
 
 export function quizContents(
   questions: readonly Pick<QuizQuestion, 'scenario_uuid'>[],
-  scenarios: readonly Pick<QuizScenario, 'uuid' | 'title' | 'position'>[],
+  scenarios: readonly (Pick<QuizScenario, 'uuid' | 'title' | 'position'> & Partial<Pick<QuizScenario, 'source'>>)[],
 ): ContentsLine[] {
   const perScenario = new Map<string, number>();
   let standalone = 0;
@@ -44,6 +46,7 @@ export function quizContents(
         key: scenario.uuid,
         label: `${name} · ${count} ${count === 1 ? 'question' : 'questions'}`,
         count,
+        source: scenario.source ?? null,
       });
     });
   return lines;

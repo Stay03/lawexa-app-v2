@@ -75,6 +75,7 @@ import {
   visibilityChoicesFor,
 } from './model';
 import { VISIBILITY_MARKS } from './VisibilityChip';
+import { QuizSourceLine } from '@/v2/features/quiz/source/QuizSourceLine';
 
 /**
  * QuizFormDialog — write a quiz, or edit one that hasn't been played.
@@ -737,6 +738,7 @@ function ScenarioCard({
         <p className="text-right text-xs text-muted-foreground tabular-nums">
           {draft.passage.length.toLocaleString('en-US')} / {QUIZ_SCENARIO_PASSAGE_MAX.toLocaleString('en-US')}
         </p>
+        <QuizSourceLine source={draft.source} />
       </div>
       <div className="space-y-3">{children}</div>
       <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={onAddQuestion}>
@@ -916,6 +918,9 @@ function QuestionCard({
           onChange={(event) => onChange({ explanation: event.target.value })}
         />
       </div>
+      {/* Where Lawexa took the question from (the quiz builder, 24 October
+          2026): shown to the author, as the players see it on the results. */}
+      <QuizSourceLine source={draft.source} />
     </div>
   );
 }

@@ -34,6 +34,7 @@ import { ProgressSegments, RaisedButton } from '../ui';
 import { AttemptOptionTile } from './AttemptOptionTile';
 import { AttemptTimer, FrozenRail } from './AttemptTimer';
 import { SOLO_PLAY_COLUMN } from './states';
+import { QuizSourceLine } from '../../source/QuizSourceLine';
 import '../solo-quiz.css';
 
 /**
@@ -435,6 +436,7 @@ function QuestionGroup({
           <div className="mt-3 border-l-[3px] border-primary pl-3.5 text-[15px] leading-relaxed text-muted-foreground">
             {scenario.title && <p className="font-semibold text-foreground">{scenario.title}</p>}
             <p className="whitespace-pre-line">{scenario.passage}</p>
+            <QuizSourceLine source={scenario.source} className="mt-2" />
           </div>
         )}
 
