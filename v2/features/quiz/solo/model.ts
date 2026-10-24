@@ -593,3 +593,16 @@ export function answerRefusalCopy(status: number, message: string): string | nul
       return message;
   }
 }
+
+/**
+ * What "End quiz" says before it ends (Arthur, 24 October 2026): the attempt
+ * is scored on the answers given, and the rest count as wrong.
+ */
+export function endAttemptCopy(answered: number, total: number): string {
+  if (answered <= 0) return `You haven't answered any of the ${total} questions yet, so your score will be 0. You can take the quiz again any time.`;
+  const left = Math.max(0, total - answered);
+  const done = `You've answered ${answered} of ${total}.`;
+  return left === 0
+    ? `${done} Your score and every answer come next.`
+    : `${done} Your score counts those, and the ${left} left count as wrong. You can take the quiz again any time.`;
+}

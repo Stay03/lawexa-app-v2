@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import type { QuizAttempt, QuizAttemptQuestion } from '@/types/channel-quiz';
 import {
   attemptPoints,
+  endAttemptCopy,
   END_MODE_ADVANCE_MS,
   optionTileState,
   playStep,
@@ -197,4 +198,22 @@ test('the screen resumes from the read, sends a finished attempt to its results,
   const page = read('app', 'v2', 'quiz', '(solo)', 'attempts', '[attemptUuid]', '(play)', 'page.tsx');
   assert.match(page, /robots: \{ index: false, follow: false \}/);
   assert.match(read('app', 'v2', 'quiz', '(solo)', 'attempts', '[attemptUuid]', '(play)', 'loading.tsx'), /return <AttemptPlayerFallback \/>;/);
+});
+
+/* Arthur, 24 October 2026: a way to end the quiz you started, then the
+ * results for what was answered. */
+test('End quiz asks first, then scores what was answered and goes to the results', () => {
+  assert.equal(endAttemptCopy(4, 10), "You've answered 4 of 10. Your score counts those, and the 6 left count as wrong. You can take the quiz again any time.");
+  assert.equal(endAttemptCopy(10, 10), "You've answered 10 of 10. Your score and every answer come next.");
+  assert.equal(endAttemptCopy(0, 10), "You haven't answered any of the 10 questions yet, so your score will be 0. You can take the quiz again any time.");
+  const play = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx'), 'utf8');
+  // The button never moves the hold on: its tap stops at the button.
+  assert.match(play, /onClick=\{\(event\) => \{\s*event\.stopPropagation\(\);\s*setEnding\(true\);\s*\}\}/);
+  assert.match(play, /<EndAttemptDialog\s*open=\{ending\}\s*answered=\{attempt\.answered_count\}\s*total=\{total\}\s*ending=\{finish\.isPending\}\s*onCancel=\{\(\) => setEnding\(false\)\}\s*onConfirm=\{finishNow\}/);
+  // The same finish as the last question's: scored, then the results.
+  assert.match(play, /finish\.mutate\(undefined, \{\s*onSuccess: \(\) => router\.replace\(attemptResultsHref\(attempt\.uuid\)\),/);
+  const dialog = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'player', 'EndAttemptDialog.tsx'), 'utf8');
+  // It stays open while it ends: the action's own close is held.
+  assert.match(dialog, /onClick=\{\(event\) => \{\s*event\.preventDefault\(\);\s*onConfirm\(\);\s*\}\}/);
+  assert.match(dialog, /<AlertDialogCancel disabled=\{ending\}>Keep playing<\/AlertDialogCancel>/);
 });

@@ -33,6 +33,7 @@ import { useAnswerAttempt, useFinishAttempt } from '../mutations';
 import { ProgressSegments, RaisedButton } from '../ui';
 import { AttemptOptionTile } from './AttemptOptionTile';
 import { AttemptTimer, FrozenRail } from './AttemptTimer';
+import { EndAttemptDialog } from './EndAttemptDialog';
 import { SOLO_PLAY_COLUMN } from './states';
 import { QuizSourceLine } from '../../source/QuizSourceLine';
 import '../solo-quiz.css';
@@ -124,6 +125,8 @@ export function AttemptPlay({
   const [pending, setPending] = useState<{ cursor: number; optionId: number } | null>(null);
   /** The one sentence in the foot for a refusal, cleared on every move. */
   const [note, setNote] = useState<string | null>(null);
+  /** "End quiz" asked, the confirmation showing (Arthur, 24 October 2026). */
+  const [ending, setEnding] = useState(false);
 
   const answer = useAnswerAttempt(attempt.uuid, viewerId);
   const finish = useFinishAttempt(attempt.uuid, viewerId);
@@ -202,6 +205,7 @@ export function AttemptPlay({
         // Already scored elsewhere: the re-read carries the score and the
         // screen above sends the reader to it.
         if (status === 409) return;
+        setEnding(false);
         setNote(message);
       },
     });
@@ -265,6 +269,7 @@ export function AttemptPlay({
       <header className="sticky top-0 z-10 -mx-4 bg-background/85 px-4 pt-3 pb-2.5 backdrop-blur supports-backdrop-filter:bg-background/70">
         <div className="flex items-center justify-between gap-3">
           <p className="min-w-0 truncate text-sm text-muted-foreground">{attempt.quiz.title}</p>
+          <div className="flex shrink-0 items-center gap-3">
           <p className="shrink-0 text-sm tabular-nums text-muted-foreground">
             {/* Mounted from the first frame, EMPTY until an answer is recorded
                 in this mount — a live region only reliably announces changes
@@ -285,6 +290,25 @@ export function AttemptPlay({
               </span>
             )}
           </p>
+          {/* END THE QUIZ NOW (Arthur, 24 October 2026): scored on what was
+              answered, after a confirmation. Its tap never reaches the hold's
+              tap-to-move-on above. */}
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setEnding(true);
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+            disabled={finish.isPending}
+            className={cn(
+              'v2-interactive rounded-full px-2 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50',
+              FOCUS_RING,
+            )}
+          >
+            End quiz
+          </button>
+          </div>
         </div>
 
         <ProgressSegments className="mt-3" segments={segments} current={cursor} total={total} />
@@ -312,6 +336,15 @@ export function AttemptPlay({
           </div>
         )}
       </header>
+
+      <EndAttemptDialog
+        open={ending}
+        answered={attempt.answered_count}
+        total={total}
+        ending={finish.isPending}
+        onCancel={() => setEnding(false)}
+        onConfirm={finishNow}
+      />
 
       {question && step ? (
         <>
