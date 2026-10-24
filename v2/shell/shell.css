@@ -198,6 +198,21 @@ html[data-v2-chat-screen] .v2-shell {
   }
 }
 
+/* BELOW xl THE SHEET IS OVER EVERYTHING, ON iOS TOO (Arthur's iPhone, 24
+   October 2026: the chat's box and the Nigeria pill floated over the draft
+   sheet and hid Save). The sheet is `fixed z-50` inside the content region.
+   On iOS WebKit that region is a stacking context of its own (it is the
+   touch-scrolling container), so the sheet's 50 only counts inside it, and the
+   docked box (41) and the see-through bar (42), its siblings, paint over it;
+   Android makes no such context, so the sheet won there. While the panel is
+   open the region itself is lifted over both. A grid item takes `z-index`
+   with no `position`, so nothing else about the region changes. */
+@media (max-width: 79.999rem) {
+  html[data-v2-side-panel] .v2-shell__content {
+    z-index: 43;
+  }
+}
+
 /* -----------------------------------------------------------------------------
    THE SEE-THROUGH BAR ON A TOP-LEVEL SCREEN (mobile native overhaul, phase 10).
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { FileText, Loader2, PanelRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -7,6 +8,13 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { MarkdownText } from '../markdown/MarkdownText';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, type DraftBlock } from './draft-blocks';
+
+/** The chat's message box (ChatDock) is focused or has words in it. */
+function readerIsTyping(): boolean {
+  const box = document.querySelector<HTMLTextAreaElement>('[data-v2-chat-dock] textarea');
+  if (!box) return false;
+  return document.activeElement === box || box.value.trim() !== '';
+}
 
 /**
  * DraftCard — a draft Lawexa wrote, where it sits in the answer: its title,
@@ -31,6 +39,23 @@ export function DraftCard({
   const panel = useSidePanel();
   const showing = panel?.target?.kind === 'draft' && panel.target.ordinal === ordinal && !panel.closing;
   const status = draftStatus(draft, live);
+
+  // A DRAFT OPENS ITSELF WHEN LAWEXA FINISHES IT (Stay, 24 October 2026: "auto
+  // open when its done"). The card saw it being written, and its closing tag
+  // has now arrived: the panel opens on it, on a phone and a computer, unless
+  // the reader is writing in the message box (focused, or with words in it),
+  // where a sheet over the box would take their sentence away. A draft that was
+  // already finished when the card appeared (a saved answer) opens only on a tap.
+  const seenWriting = useRef(!draft.complete && live);
+  useEffect(() => {
+    if (!draft.complete) {
+      if (live) seenWriting.current = true;
+      return;
+    }
+    if (!seenWriting.current || !panel) return;
+    seenWriting.current = false;
+    if (!readerIsTyping()) panel.open({ kind: 'draft', ordinal });
+  }, [draft.complete, live, panel, ordinal]);
 
   if (!panel) {
     return (

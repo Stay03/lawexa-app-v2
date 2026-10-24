@@ -116,3 +116,14 @@ test('Save as note makes a note once, then updates it with the copy it was made 
   assert.match(bar, /target=\{\{ type: 'note', contentId: saved\.id \}\}/);
   assert.match(bar, /space=\{space \?\? undefined\}/);
 });
+
+test('a draft opens itself when Lawexa finishes it, unless the reader is writing in the message box', async () => {
+  const { readFileSync } = await import('node:fs');
+  const card = readFileSync(new URL('./DraftCard.tsx', import.meta.url), 'utf8');
+  // Only a draft the card saw being written opens by itself; a saved one waits for a tap.
+  assert.match(card, /const seenWriting = useRef\(!draft\.complete && live\);/);
+  assert.match(card, /if \(!seenWriting\.current \|\| !panel\) return;\s*seenWriting\.current = false;\s*if \(!readerIsTyping\(\)\) panel\.open\(\{ kind: 'draft', ordinal \}\);/);
+  // Writing means the box is focused or holds words.
+  assert.match(card, /document\.querySelector<HTMLTextAreaElement>\('\[data-v2-chat-dock\] textarea'\)/);
+  assert.match(card, /return document\.activeElement === box \|\| box\.value\.trim\(\) !== '';/);
+});
