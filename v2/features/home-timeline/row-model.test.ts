@@ -569,7 +569,9 @@ test('on a phone a row is two lines: the short sentence, then the Space and a sh
   assert.equal(activityTime('2026-10-21T09:00:00Z', NOW, 'UTC', true), '21 Oct');
   // The Space leaves the sentence on a phone and heads the second line.
   assert.match(screen, /<span className="hidden text-muted-foreground md:inline">\s*\{' '\}\s*\{sentence\.place\.word\} \{sentence\.place\.name\}/);
-  assert.match(screen, /const phoneLine = \[row\.sentence\.place\?\.name, row\.shortTime\]\.filter\(Boolean\)\.join\(' · '\);/);
+  // A long Space name ends in "…"; the time beside it never does.
+  assert.match(screen, /\{place \? <span className="min-w-0 truncate">\{place\}<\/span> : null\}/);
+  assert.match(screen, /\{row\.shortTime \? <span className="shrink-0 tabular-nums">\{row\.shortTime\}<\/span> : null\}/);
   assert.match(screen, /<div className="mt-px flex min-w-0 items-center gap-2 md:hidden">/);
   // No Reply link and no long time on a phone; an invitation's answer sits at the second line's right.
   assert.match(screen, /<div className="mt-1 hidden md:block">\s*<Link href=\{row\.replyHref\}/);

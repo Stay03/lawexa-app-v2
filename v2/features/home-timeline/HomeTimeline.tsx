@@ -349,7 +349,7 @@ const QUIET_LINK = cn(
  */
 function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean }) {
   const invitationId = row.invite?.invitationId ?? null;
-  const phoneLine = [row.sentence.place?.name, row.shortTime].filter(Boolean).join(' · ');
+  const place = row.sentence.place?.name ?? null;
   return (
     <li className="relative">
       {joined ? (
@@ -382,9 +382,14 @@ function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean })
               </span>
             ) : null}
           </div>
-          {/* The phone's second line: the Space and a short time, an invitation's answer at its right. */}
+          {/* The phone's second line: the Space and a short time, an invitation's answer at its right.
+              A long Space name ends in "…" and the time stays in sight. */}
           <div className="mt-px flex min-w-0 items-center gap-2 md:hidden">
-            <span className="min-w-0 flex-1 truncate text-xs leading-4 text-muted-foreground tabular-nums">{phoneLine}</span>
+            <span className="flex min-w-0 flex-1 text-xs leading-4 whitespace-nowrap text-muted-foreground">
+              {place ? <span className="min-w-0 truncate">{place}</span> : null}
+              {place && row.shortTime ? <span className="shrink-0">&nbsp;·&nbsp;</span> : null}
+              {row.shortTime ? <span className="shrink-0 tabular-nums">{row.shortTime}</span> : null}
+            </span>
             {invitationId !== null ? <InviteActions id={invitationId} className="shrink-0" /> : null}
           </div>
           {row.detail ? (
