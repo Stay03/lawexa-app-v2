@@ -1,16 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
-  ChevronRight,
+  AtSign,
   FileText,
-  Film,
   Folder,
-  Image as ImageIcon,
   Loader2,
-  Music,
+  Mail,
+  MessageCircle,
+  Reply,
+  UserCog,
+  UserPlus,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -34,15 +36,14 @@ import { homeTimelineQueries } from './queries';
 import {
   canScrollForMore,
   followEmptyCursor,
-  moreFilesLabel,
   newestAt,
   newSinceRowKey,
   timelineDays,
-  type TimelineCard,
-  type TimelineIcon,
+  todayUpdates,
+  type TimelineBadge,
   type TimelineLead,
-  type TimelineMeta,
   type TimelineRow,
+  type TimelineSentence,
 } from './row-model';
 import {
   TimelineEmptyState,
@@ -60,36 +61,30 @@ import type { TimelineType } from './types';
  * is `journeys/results/timeline-final/mocks3.html`; the techlead's nine fixes
  * after Stay's "criticize the ui/ux design", 25 October 2026).
  *
- * ── THE LIST STARTS AT THE TOP ─────────────────────────────────────────────
- * No big heading over it (fix 2): the tab already says Work or Study, and the
- * rows are the content. The page keeps its name for screen readers in an
- * `sr-only` h1.
+ * ── ACTIVITY (Stay, 24 October 2026: "It's too raw, basically and empty. Use
+ * these for inspiration and make it simple but pop") ────────────────────────
+ * A header: "Activity", what the tab shows in one grey line, and today's
+ * "N updates" in a quiet pill. Each day under a small centred label between
+ * thin rules (TODAY, YESTERDAY, 22 OCT). Each row is one sentence (who in
+ * bold, what they did in grey, what to in bold, the Space in grey) with the
+ * time on the right, and one muted second line only where it carries meaning
+ * (row-model.ts). The avatar is the person's photo or neutral grey initials,
+ * with a small badge of what happened; a thin line joins the avatars of a day.
+ * No boxed cards.
  *
- * ── ONE ROW, ONE CARD ──────────────────────────────────────────────────────
- * Every event is the Space list's row (`spaces/detail/content/feed-rows.tsx`):
- * a 20px mark, a title that says who did what, one grey line, the time on the
- * title's baseline. The mark is ONE kind (fix 4): the person's initials on
- * one neutral grey, Lawexa's mark, or a "?" on the same grey for a deleted
- * account.
- * The grey line starts with the Space's name, its own link (fix 3), so the row
- * opens through its TITLE, whose link is stretched over the row; a link inside
- * a link is not allowed, and the Space link sits above the stretched one.
- * Under a row sits at most one card, and every card is the same card (16px
- * corners, a hairline border, the card ground, the chat cards' padding).
+ * The row opens through its sentence's link, stretched over the row; Reply
+ * and an invitation's Accept and Decline sit above it.
  *
  * GOLD IS ONLY ON ACCEPT. Nothing else on the timeline is an action the reader
  * is being asked to take, so nothing else wears the accent.
  *
- * ── NEW SINCE YOUR LAST VISIT (fix 8) ──────────────────────────────────────
- * A hairline with small muted words, "Before your last visit", between the rows
- * that are new and the ones the reader has seen; the words name the rows below. The last visit is read ONCE, at mount, so the line
- * never moves while they look; the newest time on screen is written back when
- * they leave (unmount, page hide) or after {@link SEEN_AFTER_MS} on the list
+ * ── BEFORE YOUR LAST VISIT (fix 8) ─────────────────────────────────────────
+ * The day labels' centred line with "Before your last visit", between the rows
+ * that are new and the ones the reader has seen; the words name the rows
+ * below. The last visit is read ONCE, at mount, so the line never moves while
+ * they look; the newest time on screen is written back when they leave
+ * (unmount, page hide) or after {@link SEEN_AFTER_MS} on the list
  * (`last-seen.ts`, this device only).
- *
- * ── HAIRLINES ──────────────────────────────────────────────────────────────
- * Between the rows of a day, inset to the title column (the Folders view's
- * `border/40`), and none above a day's first row or below its last.
  *
  * ── TIME ───────────────────────────────────────────────────────────────────
  * The clock is read once, at mount, and only used after hydration (`useMounted`):
@@ -184,24 +179,32 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
   } else {
     body = (
       <>
-        <div className={cn('flex flex-col gap-8', CONTENT_FADE)}>
+        <div className={cn('flex flex-col gap-5', CONTENT_FADE)}>
           {days.map((day) => {
             // The line sits above a day whose first row is the first one seen,
             // and between two rows otherwise.
             const lineAboveDay = day.rows[0]?.key === newSinceKey;
             return (
-              <div key={day.key} className="flex min-w-0 flex-col gap-8">
-                {lineAboveDay ? <NewSinceLine /> : null}
-                <section aria-label={day.label} className="min-w-0">
-                  <h2 className="mb-1.5 text-sm font-semibold text-foreground">{day.label}</h2>
+              <div key={day.key} className="flex min-w-0 flex-col gap-5">
+                {lineAboveDay ? <CentredLabel as="span" label={NEW_SINCE_WORDS} /> : null}
+                <section aria-label={day.label} className="flex min-w-0 flex-col gap-2">
+                  <CentredLabel label={day.label} />
                   <ul className="flex flex-col">
-                    {day.rows.map((row, index) =>
-                      index > 0 && row.key === newSinceKey ? (
-                        <NewSinceRow key={`new-since-${row.key}`} row={row} />
+                    {day.rows.map((row, index) => {
+                      // The avatars of a day are joined, except across the last-visit line.
+                      const next = day.rows[index + 1];
+                      const joined = next !== undefined && next.key !== newSinceKey;
+                      return index > 0 && row.key === newSinceKey ? (
+                        <Fragment key={row.key}>
+                          <li className="py-2">
+                            <CentredLabel as="span" label={NEW_SINCE_WORDS} />
+                          </li>
+                          <TimelineRowItem row={row} joined={joined} />
+                        </Fragment>
                       ) : (
-                        <TimelineRowItem key={row.key} row={row} />
-                      ),
-                    )}
+                        <TimelineRowItem key={row.key} row={row} joined={joined} />
+                      );
+                    })}
                   </ul>
                 </section>
               </div>
@@ -221,7 +224,7 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
 
   return (
     <>
-      <TimelineHeading type={type} />
+      <TimelineHeading type={type} updates={todayUpdates(days)} />
       {body}
     </>
   );
@@ -230,256 +233,186 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
 /** How long the list is on screen before it counts as seen. */
 const SEEN_AFTER_MS = 5_000;
 
-/* ── New since your last visit ───────────────────────────────────────────── */
+/* ── Day labels and the last-visit line ──────────────────────────────────── */
 
-/** It labels what follows it, the rows from before the last visit (the
- *  techlead, 24 October 2026: "New since…" read as naming the old rows). */
-const NEW_SINCE_WORDS = 'Before your last visit';
-
-/** The line itself: small muted words and a hairline. No gold, no dot. */
-function NewSinceLine({ className }: { className?: string }) {
+/**
+ * A small centred label between two thin rules: TODAY, YESTERDAY, 22 OCT, and
+ * the last visit's line in the same dress. `as="h2"` names a day's section.
+ */
+function CentredLabel({ label, as: Tag = 'h2' }: { label: string; as?: 'h2' | 'span' }) {
   return (
-    <div role="separator" aria-label={NEW_SINCE_WORDS} className={cn('flex items-center gap-3 px-3', className)}>
-      <span aria-hidden className="shrink-0 text-[11px] leading-4 text-muted-foreground">
-        {NEW_SINCE_WORDS}
-      </span>
+    <div className="flex items-center gap-3 py-1" role={Tag === 'span' ? 'separator' : undefined} aria-label={Tag === 'span' ? label : undefined}>
+      <span aria-hidden className="h-px flex-1 bg-border" />
+      <Tag className="shrink-0 text-[11px] font-medium tracking-[0.08em] text-muted-foreground uppercase">{label}</Tag>
       <span aria-hidden className="h-px flex-1 bg-border" />
     </div>
   );
 }
 
-/** The line between two rows of one day, then the first row already seen. Its
- *  own hairline replaces that row's. */
-function NewSinceRow({ row }: { row: TimelineRow }) {
+/** It labels what follows it, the rows from before the last visit (the
+ *  techlead, 24 October 2026: "New since…" read as naming the old rows). */
+const NEW_SINCE_WORDS = 'Before your last visit';
+
+/* ── The row ─────────────────────────────────────────────────────────────── */
+
+const BADGES: Readonly<Record<TimelineBadge, LucideIcon>> = {
+  file: FileText,
+  folder: Folder,
+  chat: MessageCircle,
+  reply: Reply,
+  mention: AtSign,
+  join: UserPlus,
+  invite: Mail,
+  request: UserCog,
+};
+
+/**
+ * The avatar at 36px: the person's photo, else their initials on ONE neutral
+ * grey for everyone (no coloured tiles, Stay, 24 October 2026); Lawexa's mark;
+ * a "?" on the same grey for a deleted account. The badge, a small round icon
+ * of what happened, sits on its lower right corner.
+ */
+const AVATAR =
+  'size-9 [&_[data-slot=avatar-fallback]]:bg-secondary [&_[data-slot=avatar-fallback]]:text-xs [&_[data-slot=avatar-fallback]]:font-semibold [&_[data-slot=avatar-fallback]]:text-muted-foreground';
+
+function Lead({ lead, badge }: { lead: TimelineLead; badge: TimelineBadge | null }) {
+  const Icon = badge ? BADGES[badge] : null;
+  return (
+    <span aria-hidden className="relative z-[1] flex size-9 shrink-0">
+      {lead.type === 'lawexa' ? (
+        <span className="flex size-9 items-center justify-center rounded-full bg-secondary">
+          <LogoMark className="size-5" alt="" />
+        </span>
+      ) : (
+        <MemberAvatar
+          user={lead.type === 'unknown' ? { name: '?', avatar_url: null } : { name: lead.name, avatar_url: lead.avatar }}
+          className={AVATAR}
+        />
+      )}
+      {Icon ? (
+        <span className="absolute -right-1 -bottom-1 flex size-[18px] items-center justify-center rounded-full bg-background ring-1 ring-border">
+          <Icon className="size-2.5 text-muted-foreground" />
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/** The sentence: who and what in the foreground's weight, the doing and the Space in grey. */
+function Sentence({ sentence }: { sentence: TimelineSentence }) {
   return (
     <>
-      <li className="py-2">
-        <NewSinceLine />
-      </li>
-      <TimelineRowItem row={row} hairline={false} />
+      <span className="font-semibold text-foreground">{sentence.actor}</span>{' '}
+      <span className="text-muted-foreground">{sentence.verb}</span>
+      {sentence.object ? (
+        <>
+          {' '}
+          <span className="font-semibold text-foreground">{sentence.object}</span>
+        </>
+      ) : null}
+      {sentence.place ? (
+        <span className="text-muted-foreground">
+          {' '}
+          {sentence.place.word} {sentence.place.name}
+        </span>
+      ) : null}
     </>
   );
 }
 
-/* ── The row ─────────────────────────────────────────────────────────────── */
-
-const ICONS: Readonly<Record<TimelineIcon, LucideIcon>> = {
-  document: FileText,
-  image: ImageIcon,
-  video: Film,
-  audio: Music,
-  folder: Folder,
-};
-
-/** The row's head: the mark, the title with the time, the grey line. */
-const HEAD = 'relative flex min-h-14 min-w-0 items-start gap-3 rounded-xl px-3 py-2.5 text-left';
-const HEAD_HOVER = 'transition-colors duration-150 hover:bg-secondary/50 motion-reduce:transition-none';
-
-/** The title's link, stretched over the whole head so the row is the target. */
-const TITLE_LINK = cn(
-  'v2-interactive min-w-0 truncate text-sm font-medium text-foreground outline-none',
+/** The whole row opens its target through the sentence's link, stretched over the row. */
+const STRETCHED = cn(
+  'v2-interactive outline-none',
   'after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring',
 );
 
-/**
- * The initials at 20px, two letters at 8px, on ONE neutral grey for everyone
- * (no coloured tiles, Stay, 24 October 2026): the same surface and the same
- * muted letters whoever it is. Only Lawexa's mark keeps its gold.
- */
-const INITIALS_20 =
-  'size-5 [&_[data-slot=avatar-fallback]]:bg-secondary [&_[data-slot=avatar-fallback]]:text-[8px] [&_[data-slot=avatar-fallback]]:font-semibold [&_[data-slot=avatar-fallback]]:tracking-[0.02em] [&_[data-slot=avatar-fallback]]:text-muted-foreground';
-
-function Lead({ lead }: { lead: TimelineLead }) {
-  if (lead.type === 'lawexa') return <LogoMark className="size-5 shrink-0" alt="" />;
-  // A deleted account is a "?" on the same grey.
-  const user = lead.type === 'unknown' ? { name: '?', avatar_url: null } : { name: lead.name, avatar_url: lead.avatar };
-  return (
-    <span aria-hidden className="flex shrink-0">
-      <MemberAvatar user={user} className={INITIALS_20} />
-    </span>
-  );
-}
+/** Reply: a quiet text link, never the accent. */
+const QUIET_LINK = cn(
+  'v2-interactive relative z-10 -mx-1 rounded-md px-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground motion-reduce:transition-none',
+  FOCUS_RING,
+);
 
 /**
- * The grey line: the Space's name first, at its own width and its own link,
- * then the rest, which is what a narrow screen cuts.
+ * One row: the avatar with its badge, the sentence (two lines at most), a
+ * muted second line where it carries meaning, the light actions, and the time
+ * on the right. `joined` draws the thin line down to the next avatar of the day.
  */
-function MetaLine({ meta }: { meta: TimelineMeta }) {
-  // An invitation's line has no Space: only who is in it.
-  if (!meta.space) return <span className="mt-0.5 block truncate text-xs text-muted-foreground">{meta.rest}</span>;
+function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean }) {
   return (
-    <span className="mt-0.5 flex min-w-0 text-xs text-muted-foreground">
-      <Link
-        href={meta.space.href}
-        title={meta.space.name}
-        className="relative z-10 max-w-full shrink-0 truncate rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+    <li className="relative">
+      {joined ? (
+        <span aria-hidden className="absolute top-12 -bottom-2.5 left-[30px] w-px -translate-x-1/2 bg-border" />
+      ) : null}
+      <div
+        className={cn(
+          'relative flex min-w-0 items-start gap-3 rounded-xl px-3 py-2.5',
+          row.href && 'transition-colors duration-150 hover:bg-secondary/50 motion-reduce:transition-none',
+        )}
       >
-        {meta.space.name}
-      </Link>
-      {meta.rest ? (
-        <span className="min-w-0 truncate">
-          {'\u00a0·\u00a0'}
-          {meta.rest}
-        </span>
-      ) : null}
-    </span>
-  );
-}
-
-function TimelineRowItem({ row, hairline = true }: { row: TimelineRow; hairline?: boolean }) {
-  return (
-    <li
-      className={cn(
-        'relative flex min-w-0 flex-col',
-        // The hairline between rows, inset to the title column.
-        hairline &&
-          'not-first:before:absolute not-first:before:top-0 not-first:before:right-3 not-first:before:left-11 not-first:before:h-px not-first:before:bg-border/40',
-      )}
-    >
-      <div className={cn(HEAD, row.href && HEAD_HOVER)}>
-        <Lead lead={row.lead} />
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-baseline gap-2">
-            {row.href ? (
-              <Link href={row.href} title={row.title} className={TITLE_LINK}>
-                {row.title}
-              </Link>
-            ) : (
-              <span title={row.title} className="min-w-0 truncate text-sm font-medium text-foreground">
-                {row.title}
-              </span>
-            )}
+        <Lead lead={row.lead} badge={row.badge} />
+        <div className="min-w-0 flex-1 pt-0.5">
+          <div className="flex min-w-0 items-start gap-3">
+            <p className="line-clamp-2 min-w-0 flex-1 text-sm leading-5" title={row.title}>
+              {row.href ? (
+                <Link href={row.href} aria-label={row.title} className={STRETCHED}>
+                  <Sentence sentence={row.sentence} />
+                </Link>
+              ) : (
+                <Sentence sentence={row.sentence} />
+              )}
+            </p>
             {row.time ? (
-              <span className="ml-auto shrink-0 pl-1 text-xs tabular-nums text-muted-foreground">{row.time}</span>
+              <span className="shrink-0 pt-px text-xs whitespace-nowrap text-muted-foreground tabular-nums">{row.time}</span>
             ) : null}
-          </span>
-          <MetaLine meta={row.meta} />
-        </span>
-      </div>
-      {row.card ? (
-        <div className="pr-3 pb-2.5 pl-11">
-          <RowCard card={row.card} />
+          </div>
+          {row.detail ? <p className="mt-0.5 truncate text-[13px] leading-5 text-muted-foreground">{row.detail}</p> : null}
+          {row.replyHref ? (
+            <div className="mt-1">
+              <Link href={row.replyHref} className={QUIET_LINK}>
+                Reply
+              </Link>
+            </div>
+          ) : null}
+          {row.invite && row.invite.invitationId !== null ? <InviteActions id={row.invite.invitationId} /> : null}
         </div>
-      ) : null}
+      </div>
     </li>
   );
 }
 
-/* ── The one card ────────────────────────────────────────────────────────── */
-
-/** The one card (DraftCard / CreatedQuizCard's corners and ground). */
-const CARD = 'rounded-2xl border border-border bg-card px-3.5 py-3';
-
-/** Reply: a quiet text button, never the accent. */
-const QUIET_BUTTON = cn(
-  'v2-interactive -my-1 -mr-1.5 shrink-0 rounded-lg px-2 py-1 text-[13px] font-medium leading-5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground motion-reduce:transition-none',
-  FOCUS_RING,
-);
-
-function RowCard({ card }: { card: TimelineCard }) {
-  switch (card.type) {
-    case 'quote':
-      return (
-        <div className={cn(CARD, 'flex items-center gap-3')}>
-          <p className="line-clamp-2 min-w-0 flex-1 text-sm text-foreground/88">{card.text}</p>
-          <Link href={card.replyHref} className={QUIET_BUTTON}>
-            Reply
-          </Link>
-        </div>
-      );
-    case 'chat':
-      // The question on one line, then the first line of the answer (fix 5).
-      return (
-        <Link
-          href={card.href}
-          className={cn(
-            CARD,
-            'group v2-interactive flex items-center gap-3 transition-colors duration-150 hover:bg-secondary/50 motion-reduce:transition-none',
-            FOCUS_RING,
-          )}
-        >
-          <span className="min-w-0 flex-1">
-            <span title={card.question} className="block truncate text-sm font-medium text-foreground">
-              {card.question}
-            </span>
-            {card.answer ? (
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground">{card.answer}</span>
-            ) : null}
-          </span>
-          <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-        </Link>
-      );
-    case 'invite':
-      return <InviteCard card={card} />;
-    case 'files':
-      return (
-        <div className={CARD}>
-          <ul className="flex flex-col gap-2.5">
-            {card.files.map((file) => {
-              const Icon = ICONS[file.icon];
-              return (
-                <li key={file.key} className="flex min-w-0 items-center gap-2.5">
-                  <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                  <span title={file.name} className="min-w-0 truncate text-sm font-medium text-foreground">
-                    {file.name}
-                  </span>
-                  {file.size ? (
-                    <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums text-muted-foreground">{file.size}</span>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          {card.more > 0 ? (
-            <p className="mt-2.5 text-xs text-muted-foreground">{moreFilesLabel(card.more)}</p>
-          ) : null}
-        </div>
-      );
-  }
-}
-
 /**
- * The invitation: the Space, what it is, and the answer. Accept and Decline are
- * the invitations inbox's own mutation (`invitations/mutations.ts`), keyed by
- * the member-row id the event's action carries; the answer also re-asks this
- * timeline, so the buttons leave once the server has it. While it is in
- * flight both buttons hold still and the pressed one shows it is working.
+ * Accept (the only gold on the timeline) and Decline, small, under the
+ * sentence. They are the invitations inbox's own mutation
+ * (`invitations/mutations.ts`), keyed by the member-row id the event's action
+ * carries; the answer also re-asks this timeline, so the buttons leave once
+ * the server has it. While it is in flight both hold still and the pressed
+ * one shows it is working.
  */
-function InviteCard({ card }: { card: Extract<TimelineCard, { type: 'invite' }> }) {
+function InviteActions({ id }: { id: number }) {
   const respond = useRespondToInvitation();
   const pending = usePendingInvitationResponses();
-  const id = card.invitationId;
-  const busy = id === null ? undefined : pending.get(invitationRowKey('space', id));
-
+  const busy = pending.get(invitationRowKey('space', id));
   return (
-    <div className={cn(CARD, 'flex flex-col items-start gap-2.5 sm:flex-row sm:items-center sm:gap-3')}>
-      <span className="min-w-0 max-w-full flex-1">
-        <span className="block truncate text-sm font-medium text-foreground">{card.spaceName}</span>
-        <span className="mt-0.5 block truncate text-xs text-muted-foreground">{card.facts}</span>
-      </span>
-      {id !== null ? (
-        <span className="flex shrink-0 gap-1.5">
-          <Button
-            size="sm"
-            className="h-8 rounded-full px-3.5 text-[13px] font-semibold"
-            disabled={busy !== undefined}
-            onClick={() => respond.mutate({ kind: 'space', id, action: 'accept' })}
-          >
-            {busy === 'accept' ? <Loader2 aria-hidden className="animate-spin" /> : null}
-            Accept
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-8 rounded-full bg-transparent px-3.5 text-[13px] hover:bg-secondary"
-            disabled={busy !== undefined}
-            onClick={() => respond.mutate({ kind: 'space', id, action: 'decline' })}
-          >
-            {busy === 'decline' ? <Loader2 aria-hidden className="animate-spin" /> : null}
-            Decline
-          </Button>
-        </span>
-      ) : null}
-    </div>
+    <span className="relative z-10 mt-2 flex gap-1.5">
+      <Button
+        size="sm"
+        className="h-7 rounded-full px-3 text-xs font-semibold"
+        disabled={busy !== undefined}
+        onClick={() => respond.mutate({ kind: 'space', id, action: 'accept' })}
+      >
+        {busy === 'accept' ? <Loader2 aria-hidden className="animate-spin" /> : null}
+        Accept
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-7 rounded-full px-3 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground"
+        disabled={busy !== undefined}
+        onClick={() => respond.mutate({ kind: 'space', id, action: 'decline' })}
+      >
+        {busy === 'decline' ? <Loader2 aria-hidden className="animate-spin" /> : null}
+        Decline
+      </Button>
+    </span>
   );
 }

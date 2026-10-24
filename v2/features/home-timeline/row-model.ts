@@ -1,34 +1,25 @@
 import { askedDate, dayKey } from '@/v2/features/activity/model';
 import { folderHref } from '@/v2/features/folders/folder-row-model';
-import { fileTypeLabel } from '@/v2/features/spaces/content-model';
-import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
-import type {
-  TimelineActor,
-  TimelineEvent,
-  TimelineEventKind,
-  TimelineFileItem,
-  TimelineFolderItem,
-  TimelineSpace,
-} from './types';
+import type { TimelineActor, TimelineEvent, TimelineEventKind, TimelineSpace } from './types';
 
 /**
- * row-model — the timeline's events as the rows the home draws (Stay said yes
- * to the design, 24 October 2026; the mock is
- * `journeys/results/timeline-final/mocks3.html`; the nine fixes after Stay's
- * "criticize the ui/ux design", 25 October 2026, are below).
+ * row-model — the timeline's events as the rows the home draws, in the
+ * "Activity" style of Stay's four pictures (24 October 2026: "It's too raw,
+ * basically and empty. Use these for inspiration and make it simple but pop").
  *
- * ── THE ROW ────────────────────────────────────────────────────────────────
- * A 20px lead, a title that says who did what ("Kemi added 3 files"), one grey
- * line, the time on the title's baseline. The lead is ONE kind of mark: the
- * person's initials on one neutral grey, the same for everyone (no coloured
- * tiles, Stay, 24 October 2026), or Lawexa's mark; a deleted account is a "?"
- * on the same grey. The grey line STARTS with the Space's name,
- * which links to the Space and is never the part that is cut.
+ * ── THE ROW IS ONE SENTENCE ────────────────────────────────────────────────
+ * Who in bold, what they did in grey, what they did it to in bold, then the
+ * Space in grey: "Banner replied to you in Okafor & Co", "Case added 3 files
+ * to Okonkwo & Partners" (`TimelineSentence`). The time sits on the right
+ * ("12 min ago", "Yesterday"). A second, muted line only where it carries
+ * meaning: the words someone wrote to you, or the question a chat is about.
+ * No boxed cards. The avatar is the person's photo, else their initials on one
+ * neutral grey (no coloured tiles), with a small round badge for what
+ * happened (`TimelineBadge`); Lawexa is its mark.
  *
- * Under a row there is at most one card, and it is one of four: the words
- * someone wrote to you with a Reply, an invitation with Accept and Decline, a
- * chat Lawexa answered (the question, then the first line of the answer), or
- * the files or folders someone added.
+ * The actions stay, lighter: an invitation's Accept (the only gold) and
+ * Decline, and a quiet Reply on what someone wrote to you. The rest of the row
+ * opens its target.
  *
  * ── ONE ROW PER CHAT PER DAY ───────────────────────────────────────────────
  * A chat's started, answered, reply and mention events of one day are one
@@ -40,70 +31,47 @@ import type {
  * in render and the day split is testable across a midnight.
  */
 
-/** The grey icon of a line inside the files card. */
-export type TimelineIcon = 'document' | 'image' | 'video' | 'audio' | 'folder';
-
-/** The row's one mark: a person's initials, Lawexa's mark, or "?" for a deleted account. */
+/** The avatar: a person (photo or initials), Lawexa's mark, or "?" for a deleted account. */
 export type TimelineLead =
   | { type: 'lawexa' }
   | { type: 'person'; name: string; avatar: string | null }
   | { type: 'unknown' };
 
-/** One line inside the files card: a file, or a folder of a several-folder row. */
-export interface TimelineFileLine {
-  key: string;
-  name: string;
-  icon: TimelineIcon;
-  /** The fact on the right: a file's "PDF · 4 pages", a folder's "3 items". */
-  size: string | null;
-}
+/** The small round icon on the avatar's corner: what happened. Lawexa's own rows carry none. */
+export type TimelineBadge = 'file' | 'folder' | 'chat' | 'reply' | 'mention' | 'join' | 'invite' | 'request';
 
-export type TimelineCard =
-  | { type: 'quote'; text: string; replyHref: string }
-  | {
-      type: 'invite';
-      spaceName: string;
-      /** "Work · Private · 4 members". */
-      facts: string;
-      /** The invitation's member-row id, the accept and decline routes' key; null
-       *  when the event carries no usable one, and then there are no buttons. */
-      invitationId: number | null;
-    }
-  | {
-      type: 'chat';
-      /** The question, on one line; the chat's title when the server sends none. */
-      question: string;
-      /** The first line of the answer; null when the server sends none. */
-      answer: string | null;
-      href: string;
-    }
-  | { type: 'files'; files: TimelineFileLine[]; more: number };
-
-/** The grey line: the Space first (a link, never cut), then the rest (cut first). */
-export interface TimelineMeta {
-  /** `null` on an invitation: the reader is not in that Space yet, so its page
-   *  would refuse them, and its name is on the card (techlead, 24 October 2026). */
-  space: { name: string; href: string } | null;
-  /** What follows the Space's name; '' for nothing. */
-  rest: string;
+/**
+ * The row as one sentence: `actor` and `object` bold, `verb` and `place`
+ * grey. "Banner" "replied to you" — "in" "Okafor & Co".
+ */
+export interface TimelineSentence {
+  actor: string;
+  verb: string;
+  object: string | null;
+  /** The Space at the end ("in Okafor & Co", "to Okonkwo & Partners"); null when the object is the Space. */
+  place: { word: 'in' | 'to'; name: string } | null;
 }
 
 export interface TimelineRow {
   key: string;
   lead: TimelineLead;
+  badge: TimelineBadge | null;
+  sentence: TimelineSentence;
+  /** The sentence as plain words, for the row's label and a cut-off title. */
   title: string;
-  meta: TimelineMeta;
-  /** "12m"; '' until the clock is known. */
+  /** The muted second line: what someone wrote, or the chat's question, with "3 new messages"; else null. */
+  detail: string | null;
+  /** "12 min ago", "Yesterday", "21 Oct"; '' until the clock is known. */
   time: string;
-  /** When it happened (epoch ms), for the "new since your last visit" line. */
+  /** When it happened (epoch ms), for the "Before your last visit" line. */
   atMs: number;
-  /** Where the row opens; null for a row that only carries its card (an invitation). */
+  /** Where the row opens; null for an invitation (its Space would refuse the reader until they accept). */
   href: string | null;
-  card: TimelineCard | null;
+  /** Reply's address on what someone wrote to you; else null. */
+  replyHref: string | null;
+  /** An invitation: its member-row id for Accept and Decline, or null when the event carries no usable one. */
+  invite: { invitationId: number | null } | null;
 }
-
-/** The files card lists this many, then says how many more there are. */
-export const FILES_CARD_LIMIT = 3;
 
 const KINDS: readonly TimelineEventKind[] = [
   'files_added',
@@ -146,13 +114,6 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-/** "Work · Private · 4 members": what a Space is, in one line. */
-export function spaceFacts(space: TimelineSpace): string {
-  const type = space.type === 'study' ? 'Study' : 'Work';
-  const visibility = space.visibility === 'public' ? 'Public' : 'Private';
-  return `${type} · ${visibility} · ${plural(space.member_count, 'member', 'members')}`;
-}
-
 /**
  * "Ada Okafor, Kemi Bello and 2 others are in it": who is already in the
  * Space an invitation is for. The names are the preview the server sends;
@@ -168,66 +129,6 @@ export function membersLine(names: readonly string[], memberCount: number): stri
   if (others > 0) return `${shown.join(', ')} and ${rest} are in it`;
   if (shown.length === 1) return `${shown[0]} is in it`;
   return `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]} are in it`;
-}
-
-function fileIcon(file: TimelineFileItem): TimelineIcon {
-  if (file.kind === 'image') return 'image';
-  if (file.kind === 'video') return 'video';
-  if (file.kind === 'audio') return 'audio';
-  return 'document';
-}
-
-/** "PDF · 4 pages": a file's type and its pages, or the type alone when the pages are unknown. */
-export function fileFacts(file: Pick<TimelineFileItem, 'name' | 'mime_type' | 'page_count'>): string {
-  const type = fileTypeLabel({ mime_type: file.mime_type, original_name: file.name });
-  const pages = file.page_count;
-  return typeof pages === 'number' && Number.isInteger(pages) && pages > 0
-    ? `${type} · ${plural(pages, 'page', 'pages')}`
-    : type;
-}
-
-/**
- * The files card: up to {@link FILES_CARD_LIMIT} files, then "and N more"
- * counted against the event's `count` (the server sends five at most, and
- * the count covers them all).
- */
-export function filesCard(files: readonly TimelineFileItem[], count: number): TimelineCard {
-  const shown = files.slice(0, FILES_CARD_LIMIT);
-  return {
-    type: 'files',
-    files: shown.map((file) => ({
-      key: String(file.id),
-      name: file.name,
-      icon: fileIcon(file),
-      size: fileFacts(file),
-    })),
-    more: Math.max(0, Math.max(count, files.length) - shown.length),
-  };
-}
-
-/** "3 items": a folder's items and subfolders together, as the server counts them. */
-export function folderItemsLabel(count: number): string {
-  return plural(count, 'item', 'items');
-}
-
-/** The several-folder row's card: the files card's lines, with folders in them. */
-export function foldersCard(folders: readonly TimelineFolderItem[], count: number): TimelineCard {
-  const shown = folders.slice(0, FILES_CARD_LIMIT);
-  return {
-    type: 'files',
-    files: shown.map((folder) => ({
-      key: folder.id,
-      name: folder.name,
-      icon: 'folder',
-      size: folderItemsLabel(folder.item_count),
-    })),
-    more: Math.max(0, Math.max(count, folders.length) - shown.length),
-  };
-}
-
-/** "and 2 more", or '' when the card lists every file. */
-export function moreFilesLabel(more: number): string {
-  return more > 0 ? `and ${more} more` : '';
 }
 
 /** "3 new messages": what a chat row of several events adds to its grey line. */
@@ -290,147 +191,130 @@ function text(value: string | null | undefined): string | null {
 /**
  * One event as its row, or null for a kind this screen does not know yet.
  * `messages` is how many of the chat's messages of the day this row stands
- * for (see {@link timelineDays}); above one, the grey line says so.
+ * for (see {@link timelineDays}); above one, the second line says so.
  */
-export function timelineRow(event: TimelineEvent, now: number | null, messages = 1): TimelineRow | null {
+export function timelineRow(
+  event: TimelineEvent,
+  now: number | null,
+  messages = 1,
+  timeZone?: string,
+): TimelineRow | null {
   if (!KINDS.includes(event.kind)) return null;
   const atMs = Date.parse(event.at);
   const who = shortName(event.actor);
-  const space = { name: event.space.name, href: spaceHref(event.space) };
-  const meta = (rest: string): TimelineMeta => ({ space, rest: messages > 1 ? newMessagesLabel(messages) : rest });
-  const base = {
+  const inSpace = { word: 'in', name: event.space.name } as const;
+  const toSpace = { word: 'to', name: event.space.name } as const;
+  /** The row from its sentence and the rest; the title is the sentence in plain words. */
+  const build = (
+    sentence: TimelineSentence,
+    fields: Pick<TimelineRow, 'badge' | 'detail' | 'href'> & Partial<Pick<TimelineRow, 'lead' | 'replyHref' | 'invite'>>,
+  ): TimelineRow => ({
     key: event.id,
-    time: formatRelativeTime(event.at, now),
+    lead: fields.lead ?? leadFor(event.actor),
+    badge: fields.badge,
+    sentence,
+    title: sentenceText(sentence),
+    detail: fields.detail,
+    time: activityTime(event.at, now, timeZone),
     atMs: Number.isNaN(atMs) ? 0 : atMs,
-    lead: leadFor(event.actor),
-  };
+    href: fields.href,
+    replyHref: fields.replyHref ?? null,
+    invite: fields.invite ?? null,
+  });
+  /** A chat row's second line: its words, then "3 new messages" when it stands for several. */
+  const chatDetail = (words: string | null): string | null =>
+    [words, messages > 1 ? newMessagesLabel(messages) : null].filter(Boolean).join(' · ') || null;
 
   switch (event.kind) {
     case 'files_added': {
       const first = event.items[0];
       if (!first) return null;
-      if (event.count <= 1) {
-        return {
-          ...base,
-          title: `${who} added ${first.name}`,
-          meta: meta(fileFacts(first)),
-          href: spaceHref(event.space),
-          card: null,
-        };
-      }
-      return {
-        ...base,
-        title: `${who} added ${event.count} files`,
-        meta: meta(''),
-        href: spaceHref(event.space),
-        card: filesCard(event.items, event.count),
-      };
+      const object = event.count <= 1 ? first.name : plural(event.count, 'file', 'files');
+      return build({ actor: who, verb: 'added', object, place: toSpace }, { badge: 'file', detail: null, href: spaceHref(event.space) });
     }
     case 'folder_created': {
       const folder = event.items[0];
       if (!folder) return null;
-      // Several folders made in one hour are one row (the server groups by
-      // the hour): it names how many, and the files card lists them.
-      if (event.count > 1) {
-        return {
-          ...base,
-          title: `${who} made ${event.count} folders`,
-          meta: meta(''),
-          href: foldersHref(event.space),
-          card: foldersCard(event.items, event.count),
-        };
-      }
-      return {
-        ...base,
-        title: `${who} made ${folder.name}`,
-        meta: meta(`Folder · ${folderItemsLabel(folder.item_count)}`),
+      // Several folders made in one hour are one row (the server groups by the hour).
+      const several = event.count > 1;
+      return build(
+        { actor: who, verb: 'made', object: several ? plural(event.count, 'folder', 'folders') : folder.name, place: inSpace },
         // `url` is absolute (the server's own host); the folder's uuid is the address.
-        href: folderHref(folder.id),
-        card: null,
-      };
+        { badge: 'folder', detail: null, href: several ? foldersHref(event.space) : folderHref(folder.id) },
+      );
     }
     case 'chat_started': {
       const chat = event.items[0];
       if (!chat) return null;
-      return {
-        ...base,
-        title: `${who} started a chat`,
-        meta: meta(text(chat.question) ?? chat.title),
-        href: chatHref(chat.id),
-        card: null,
-      };
+      return build(
+        { actor: who, verb: 'started a chat', object: null, place: inSpace },
+        { badge: 'chat', detail: chatDetail(text(chat.question) ?? chat.title), href: chatHref(chat.id) },
+      );
     }
     case 'lawexa_answered': {
       const chat = event.items[0];
       if (!chat) return null;
       const asker = event.asked_by;
-      return {
-        ...base,
-        lead: { type: 'lawexa' },
-        title: asker ? `Lawexa answered ${shortObject(asker)}` : 'Lawexa answered',
-        meta: meta(''),
-        href: chatHref(chat.id),
-        card: {
-          type: 'chat',
-          question: text(chat.question) ?? chat.title,
-          answer: text(chat.answer_preview),
-          href: chatHref(chat.id),
-        },
-      };
+      return build(
+        { actor: 'Lawexa', verb: 'answered', object: asker ? shortObject(asker) : null, place: inSpace },
+        { lead: { type: 'lawexa' }, badge: null, detail: chatDetail(text(chat.question) ?? chat.title), href: chatHref(chat.id) },
+      );
     }
     case 'member_joined':
-      return {
-        ...base,
-        title: `${who} joined`,
-        meta: meta(plural(event.space.member_count, 'member', 'members')),
-        href: peopleHref(event.space),
-        card: null,
-      };
+      return build({ actor: who, verb: 'joined', object: event.space.name, place: null }, { badge: 'join', detail: null, href: peopleHref(event.space) });
     case 'reply':
     case 'mention': {
       const conversation = event.conversation;
       if (!conversation) return null;
       const href = chatHref(conversation.uuid);
-      const excerpt = text(event.excerpt);
-      return {
-        ...base,
-        title: `${who} ${event.kind === 'reply' ? 'replied to you' : 'mentioned you'}`,
-        meta: meta(conversation.title),
-        href,
-        card: excerpt ? { type: 'quote', text: excerpt, replyHref: href } : null,
-      };
+      const reply = event.kind === 'reply';
+      return build(
+        { actor: who, verb: reply ? 'replied to you' : 'mentioned you', object: null, place: inSpace },
+        { badge: reply ? 'reply' : 'mention', detail: chatDetail(text(event.excerpt) ?? conversation.title), href, replyHref: href },
+      );
     }
     case 'invite':
-      return {
-        ...base,
-        // The Space is named once, on the card; the grey line says who is in it.
-        title: `${who} invited you to a Space`,
-        meta: { space: null, rest: membersLine(event.members_preview ?? [], event.space.member_count) },
-        href: null,
-        card: {
-          type: 'invite',
-          spaceName: event.space.name,
-          facts: spaceFacts(event.space),
-          invitationId: event.needs_action && event.action?.type === 'accept' ? invitationId(event) : null,
+      // The reader is not in the Space yet, so the row opens nothing: its answer is Accept or Decline.
+      return build(
+        { actor: who, verb: 'invited you to', object: event.space.name, place: null },
+        {
+          badge: 'invite',
+          detail: membersLine(event.members_preview ?? [], event.space.member_count),
+          href: null,
+          invite: { invitationId: event.needs_action && event.action?.type === 'accept' ? invitationId(event) : null },
         },
-      };
+      );
     case 'join_request':
-      return {
-        ...base,
-        title: `${who} asked to join`,
-        meta: meta(spaceFacts(event.space)),
-        href: peopleHref(event.space),
-        card: null,
-      };
+      return build({ actor: who, verb: 'asked to join', object: event.space.name, place: null }, { badge: 'join', detail: null, href: peopleHref(event.space) });
     case 'role_request':
-      return {
-        ...base,
-        title: `${who} asked for a new role`,
-        meta: meta(spaceFacts(event.space)),
-        href: peopleHref(event.space),
-        card: null,
-      };
+      return build({ actor: who, verb: 'asked for a new role in', object: event.space.name, place: null }, { badge: 'request', detail: null, href: peopleHref(event.space) });
   }
+}
+
+/** The sentence in plain words: "Banner replied to you in Okafor & Co". */
+export function sentenceText(sentence: TimelineSentence): string {
+  return [sentence.actor, sentence.verb, sentence.object, sentence.place ? `${sentence.place.word} ${sentence.place.name}` : null]
+    .filter(Boolean)
+    .join(' ');
+}
+
+/**
+ * The time on the right: "Just now", "12 min ago" and "3 hours ago" today,
+ * then "Yesterday", "21 Oct", "31 Dec 2025" (the day words of the headings);
+ * '' until the clock is known.
+ */
+export function activityTime(at: string, now: number | null, timeZone?: string): string {
+  if (now === null) return '';
+  const time = Date.parse(at);
+  const day = dayKey(at, timeZone);
+  const today = dayKey(now, timeZone);
+  if (Number.isNaN(time) || day === null || today === null) return '';
+  if (day !== today) return askedDate(day, today);
+  const minutes = Math.max(0, Math.floor((now - time) / 60_000));
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
 }
 
 /** One day of the timeline: its heading and its rows, newest first. */
@@ -491,12 +375,12 @@ export function timelineDays(
   const days: TimelineDay[] = [];
   for (const { event, day, chat } of dated) {
     let row: TimelineRow | null;
-    if (chat === null) row = timelineRow(event, now);
+    if (chat === null) row = timelineRow(event, now, 1, timeZone);
     else {
       if (drawn.has(chat)) continue;
       drawn.add(chat);
       const group = chats.get(chat);
-      row = group ? timelineRow(group.newest, now, group.server ?? group.events) : null;
+      row = group ? timelineRow(group.newest, now, group.server ?? group.events, timeZone) : null;
     }
     if (row === null) continue;
     const last = days[days.length - 1];
@@ -528,6 +412,17 @@ export function newSinceRowKey(days: readonly TimelineDay[], lastSeen: number | 
     }
   }
   return null;
+}
+
+/** The header's "N updates": how many rows today has (the first day, when it is today). */
+export function todayUpdates(days: readonly TimelineDay[]): number {
+  const first = days[0];
+  return first && first.label === 'Today' ? first.rows.length : 0;
+}
+
+/** "1 update", "5 updates". */
+export function updatesLabel(count: number): string {
+  return plural(count, 'update', 'updates');
 }
 
 /** The newest moment on the list (epoch ms), what "seen" is written as; null when empty. */

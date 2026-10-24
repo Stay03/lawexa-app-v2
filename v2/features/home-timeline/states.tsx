@@ -4,6 +4,7 @@ import { WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { updatesLabel } from './row-model';
 import type { TimelineType } from './types';
 
 /**
@@ -15,11 +16,28 @@ import type { TimelineType } from './types';
  */
 
 /**
- * The page's name, for screen readers only (fix 2, 25 October 2026: the list
- * starts at the top). The same words in the route fallback.
+ * The header (Stay's references, 24 October 2026): "Activity", what the tab
+ * shows in one grey line, and today's count in a quiet pill on the right,
+ * left out when nothing happened today or the count is not known yet. The
+ * route fallback draws the same header without the count, so nothing moves
+ * when the list arrives.
  */
-export function TimelineHeading({ type }: { type: TimelineType }) {
-  return <h1 className="sr-only">What&rsquo;s happening in your {type === 'study' ? 'Study' : 'Work'} Spaces</h1>;
+export function TimelineHeading({ type, updates = 0 }: { type: TimelineType; updates?: number }) {
+  return (
+    <header className="mb-6 flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">Activity</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          What&rsquo;s happening in your {type === 'study' ? 'Study' : 'Work'} Spaces
+        </p>
+      </div>
+      {updates > 0 ? (
+        <span className="mt-1 shrink-0 rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-foreground tabular-nums">
+          {updatesLabel(updates)}
+        </span>
+      ) : null}
+    </header>
+  );
 }
 
 /** The rows fade down the stack, as the other v2 list skeletons do. */
