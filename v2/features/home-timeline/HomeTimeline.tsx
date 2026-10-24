@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import {
@@ -12,9 +12,11 @@ import {
   Image as ImageIcon,
   Loader2,
   MessageSquare,
+  Music,
   UserCheck,
   UserCog,
   UserPlus,
+  UserRound,
   UserRoundPlus,
   type LucideIcon,
 } from 'lucide-react';
@@ -37,6 +39,8 @@ import { useMounted } from '@/v2/shell/use-mounted';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { homeTimelineQueries } from './queries';
 import {
+  canScrollForMore,
+  followEmptyCursor,
   moreFilesLabel,
   timelineDays,
   type TimelineCard,
@@ -103,10 +107,21 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
     [pages, mounted, clock],
   );
 
+  // An empty page that still carries a cursor is followed at once, up to five
+  // in a row (`followEmptyCursor`): the empty state is only for a timeline
+  // that is really empty.
+  const following = pages !== undefined && followEmptyCursor(pages, query.hasNextPage);
+  const { fetchNextPage, isFetchingNextPage, isFetchNextPageError } = query;
+  useEffect(() => {
+    if (following && !isFetchingNextPage && !isFetchNextPageError) void fetchNextPage();
+  }, [following, isFetchingNextPage, isFetchNextPageError, fetchNextPage]);
+
   const scrollRootRef = useShellScrollRoot();
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
     // A failed page is not retried by scrolling; its line carries the retry.
-    hasNextPage: query.hasNextPage && !query.isFetchNextPageError,
+    // Past five empty pages in a row the list stops and shows what it has.
+    hasNextPage:
+      pages !== undefined && canScrollForMore(pages, query.hasNextPage) && !query.isFetchNextPageError,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,
     rootRef: scrollRootRef,
@@ -125,6 +140,8 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
       />
     );
   } else if (!loaded) {
+    body = <TimelineSkeleton />;
+  } else if (days.length === 0 && following) {
     body = <TimelineSkeleton />;
   } else if (days.length === 0) {
     body = <TimelineEmptyState type={type} />;
@@ -167,7 +184,8 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
 const ICONS: Readonly<Record<TimelineIcon, LucideIcon>> = {
   document: FileText,
   image: ImageIcon,
-  media: Film,
+  video: Film,
+  audio: Music,
   files: Files,
   folder: Folder,
   chat: MessageSquare,
@@ -175,6 +193,7 @@ const ICONS: Readonly<Record<TimelineIcon, LucideIcon>> = {
   joined: UserCheck,
   'join-request': UserRoundPlus,
   'role-request': UserCog,
+  person: UserRound,
 };
 
 /** The row's head: the lead, the title with the time, the meta line. */

@@ -3,8 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  EMPTY_PAGE_CAP,
   FILES_CARD_LIMIT,
+  canScrollForMore,
+  emptyPagesInARow,
   filesCard,
+  followEmptyCursor,
   membersLine,
   moreFilesLabel,
   spaceFacts,
@@ -12,10 +16,13 @@ import {
   timelineRow,
   tintIndex,
 } from './row-model';
-import type { TimelineActor, TimelineEvent, TimelineFileItem, TimelineSpace } from './types';
+import type { TimelineActor, TimelineEnvelope, TimelineEvent, TimelineFileItem, TimelineSpace } from './types';
 
 /* Events shaped like the contract agreed with Backend (24 October 2026), with
  * the mock's own people and Spaces (`timeline-final/mocks3.html`). */
+
+const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+const screen = read('v2', 'features', 'home-timeline', 'HomeTimeline.tsx');
 
 const NOW = Date.parse('2026-10-24T12:00:00Z');
 
@@ -131,12 +138,17 @@ test('the files card lists three, then "and N more" against the whole count', ()
   assert.equal(moreFilesLabel(four.more), 'and 1 more');
 });
 
-test('an image and a recording lead with their own icons', () => {
+test('an image, a video and a recording lead with their own icons', () => {
   const image = row({ kind: 'files_added', items: [{ ...file(1, 'Site.jpg', 'image/jpeg', 2048), kind: 'image' }] });
   assert.deepEqual(image.lead, { type: 'icon', icon: 'image' });
-  const media = row({ kind: 'files_added', items: [{ ...file(1, 'Hearing.mp3', 'audio/mpeg', 2048), kind: 'media' }] });
-  assert.deepEqual(media.lead, { type: 'icon', icon: 'media' });
-  assert.match(media.meta, /^Audio · /);
+  const video = row({ kind: 'files_added', items: [{ ...file(1, 'Site visit.mp4', 'video/mp4', 2048), kind: 'video' }] });
+  assert.deepEqual(video.lead, { type: 'icon', icon: 'video' });
+  assert.match(video.meta, /^Video · /);
+  const audio = row({ kind: 'files_added', items: [{ ...file(1, 'Hearing.mp3', 'audio/mpeg', 2048), kind: 'audio' }] });
+  assert.deepEqual(audio.lead, { type: 'icon', icon: 'audio' });
+  assert.match(audio.meta, /^Audio · /);
+  // Film and Music, in the screen's icon map.
+  assert.match(screen, /video: Film,\s*audio: Music,/);
 });
 
 test('a folder: its name, then its count, who and where', () => {
@@ -149,9 +161,54 @@ test('a folder: its name, then its count, who and where', () => {
   assert.equal(r.title, 'Title documents');
   assert.equal(r.meta, '3 items · Ada Okafor · Ikoyi lease');
   assert.equal(r.href, '/folders/f-uuid');
-  const one = row({ kind: 'folder_created', items: [{ id: 7, name: 'Briefs', url: '/folders/abc', item_count: 1 }] });
+  // The server's `url` is absolute; the row goes by the folder's uuid.
+  const one = row({
+    kind: 'folder_created',
+    items: [{ id: 'abc', name: 'Briefs', url: 'https://demo.lawexa.com/folders/abc', item_count: 1 }],
+  });
   assert.equal(one.meta, '1 item · Tunde Musa · Adeyemi appeal');
   assert.equal(one.href, '/folders/abc');
+});
+
+test('several folders in one hour: "<who> created N folders", listed in the files card', () => {
+  const r = row({
+    kind: 'folder_created',
+    actor: ada,
+    space: lease,
+    count: 2,
+    items: [
+      { id: 'f-1', name: 'Disputes', url: '', item_count: 1 },
+      { id: 'f-2', name: 'Leases', url: '', item_count: 4 },
+    ],
+  });
+  assert.equal(r.title, 'Ada Okafor created 2 folders');
+  assert.equal(r.meta, 'Ikoyi lease');
+  assert.equal(r.href, `/spaces/${lease.uuid}?tab=folders`);
+  assert.deepEqual(r.card, {
+    type: 'files',
+    files: [
+      { key: 'f-1', name: 'Disputes', icon: 'folder', size: '1 item' },
+      { key: 'f-2', name: 'Leases', icon: 'folder', size: '4 items' },
+    ],
+    more: 0,
+  });
+});
+
+test('a deleted account is "Someone", with a grey person and no face', () => {
+  const reply = row({ kind: 'reply', actor: null, conversation: { uuid: 'c', title: 'T' }, excerpt: 'Hi' });
+  assert.equal(reply.title, 'Someone replied to you');
+  assert.deepEqual(reply.lead, { type: 'icon', icon: 'person' });
+  const joined = row({ kind: 'member_joined', actor: null });
+  assert.equal(joined.title, 'Someone joined Adeyemi appeal');
+  // Lawexa with no agent: a null id, the name "Lawexa", the mark.
+  const answered = row({
+    kind: 'lawexa_answered',
+    actor: { id: null, name: 'Lawexa', avatar: null, kind: 'ai', is_you: false },
+    asked_by: null,
+    items: [{ id: 'c', title: 'Q', url: '' }],
+  });
+  assert.deepEqual(answered.lead, { type: 'lawexa' });
+  assert.equal(answered.title, 'Lawexa answered');
 });
 
 test('a chat started: its title, then who and where', () => {
@@ -325,10 +382,53 @@ test('an event seen on two pages is drawn once; an unreadable time is left out',
   assert.deepEqual(days.map((day) => day.rows.map((r) => r.key)), [['x']]);
 });
 
-/* Source pins. */
+test('empty pages with a cursor are followed, five in a row at most', () => {
+  const full = { events: [1] };
+  const empty = { events: [] };
+  assert.equal(emptyPagesInARow([full, empty, empty]), 2);
+  assert.equal(followEmptyCursor([empty], true), true);
+  assert.equal(followEmptyCursor([full, empty, empty, empty, empty], true), true);
+  assert.equal(EMPTY_PAGE_CAP, 5);
+  assert.equal(followEmptyCursor([empty, empty, empty, empty, empty], true), false);
+  assert.equal(canScrollForMore([empty, empty, empty, empty, empty], true), false);
+  // No cursor: nothing to follow. A page with events: the scroll asks.
+  assert.equal(followEmptyCursor([empty], false), false);
+  assert.equal(followEmptyCursor([full], true), false);
+  assert.equal(canScrollForMore([full], true), true);
+  // The screen shows its skeleton, not the empty state, while it follows.
+  assert.match(screen, /days\.length === 0 && following\) \{\s*body = <TimelineSkeleton \/>;/);
+});
 
-const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
-const screen = read('v2', 'features', 'home-timeline', 'HomeTimeline.tsx');
+test('every event of the backend local page (user 3, work) gives a row', () => {
+  const envelope = JSON.parse(read('v2', 'features', 'home-timeline', 'timeline-work.fixture.json')) as TimelineEnvelope;
+  const events = envelope.data.events;
+  assert.equal(events.length, 6);
+  assert.equal(typeof envelope.data.next_cursor, 'string');
+  const now = Date.parse('2026-10-24T00:00:00Z');
+  const rows = events.map((e) => timelineRow(e, now));
+  assert.ok(rows.every((r) => r !== null));
+  const gray = 'TEST DATA Gray Partners LP · Property Acquisition and Lease Review';
+  assert.deepEqual(
+    rows.map((r) => [r?.title, r?.meta]),
+    [
+      ['test-data-loose-file.pdf', 'PDF · 636 B · You · TEST DATA loose files only'],
+      ['You joined TEST DATA loose files only', 'Work · Private · 1 member'],
+      [`Case Timing Researcher joined ${gray}`, 'Work · Private · 2 members'],
+      ['You added 4 files', gray],
+      ['You created 2 folders', gray],
+      [`You joined ${gray}`, 'Work · Private · 2 members'],
+    ],
+  );
+  const files = rows[3]?.card;
+  assert.ok(files?.type === 'files');
+  assert.equal(files.files.length, 3);
+  assert.equal(moreFilesLabel(files.more), 'and 1 more');
+  // 23 and 22 October, read on 24 October in UTC: two days.
+  const days = timelineDays(events, now, 'UTC');
+  assert.deepEqual(days.map((day) => [day.label, day.rows.length]), [['Yesterday', 2], ['22 Oct', 4]]);
+});
+
+/* Source pins. */
 
 test('gold is only on Accept', () => {
   // The accent appears once, as the default (primary) Button that says Accept.

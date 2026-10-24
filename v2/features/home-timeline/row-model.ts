@@ -8,6 +8,7 @@ import type {
   TimelineEvent,
   TimelineEventKind,
   TimelineFileItem,
+  TimelineFolderItem,
   TimelineSpace,
 } from './types';
 
@@ -30,26 +31,29 @@ import type {
 export type TimelineIcon =
   | 'document'
   | 'image'
-  | 'media'
+  | 'video'
+  | 'audio'
   | 'files'
   | 'folder'
   | 'chat'
   | 'invite'
   | 'joined'
   | 'join-request'
-  | 'role-request';
+  | 'role-request'
+  /** A person with no account any more ("Someone"). */
+  | 'person';
 
 export type TimelineLead =
   | { type: 'icon'; icon: TimelineIcon }
   | { type: 'lawexa' }
   | { type: 'person'; name: string; avatar: string | null; tint: number };
 
-/** One file line inside the files card. */
+/** One line inside the files card: a file, or a folder of a several-folder row. */
 export interface TimelineFileLine {
   key: string;
   name: string;
   icon: TimelineIcon;
-  /** "1.2 MB"; null when the size is unreadable. */
+  /** The fact on the right: a file's "1.2 MB", a folder's "3 items"; null when unreadable. */
   size: string | null;
 }
 
@@ -98,20 +102,25 @@ const KINDS: readonly TimelineEventKind[] = [
 /** The palette slots of `member-colour.ts`; the face's tint is picked from them. */
 const TINTS = 8;
 
-/** "You" for the reader, the name for anyone else. */
-export function actorLabel(actor: TimelineActor): string {
-  return actor.is_you ? 'You' : actor.name;
+/** "You" for the reader, the name for anyone else, "Someone" for a deleted account. */
+export function actorLabel(actor: TimelineActor | null | undefined): string {
+  if (!actor) return 'Someone';
+  if (actor.is_you) return 'You';
+  return actor.name.trim() || (actor.kind === 'ai' ? 'Lawexa' : 'Someone');
 }
 
 /** A stable palette slot for a person, from their id, so a face keeps its tint. */
-export function tintIndex(id: number | string): number {
+export function tintIndex(id: number | string | null): number {
+  if (id === null) return 0;
   if (typeof id === 'number' && Number.isFinite(id)) return Math.abs(Math.trunc(id)) % TINTS;
   let hash = 0;
   for (const char of String(id)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return hash % TINTS;
 }
 
-function leadFor(actor: TimelineActor): TimelineLead {
+function leadFor(actor: TimelineActor | null): TimelineLead {
+  // A deleted account has no face: a grey person, like every other grey lead.
+  if (!actor) return { type: 'icon', icon: 'person' };
   if (actor.kind === 'ai') return { type: 'lawexa' };
   return { type: 'person', name: actor.name, avatar: actor.avatar, tint: tintIndex(actor.id) };
 }
@@ -143,7 +152,8 @@ export function membersLine(names: readonly string[], memberCount: number): stri
 
 function fileIcon(file: TimelineFileItem): TimelineIcon {
   if (file.kind === 'image') return 'image';
-  if (file.kind === 'media') return 'media';
+  if (file.kind === 'video') return 'video';
+  if (file.kind === 'audio') return 'audio';
   return 'document';
 }
 
@@ -173,6 +183,26 @@ export function filesCard(files: readonly TimelineFileItem[], count: number): Ti
   };
 }
 
+/** "3 items": a folder's items and subfolders together, as the server counts them. */
+export function folderItemsLabel(count: number): string {
+  return `${count} ${count === 1 ? 'item' : 'items'}`;
+}
+
+/** The several-folder row's card: the files card's lines, with folders in them. */
+export function foldersCard(folders: readonly TimelineFolderItem[], count: number): TimelineCard {
+  const shown = folders.slice(0, FILES_CARD_LIMIT);
+  return {
+    type: 'files',
+    files: shown.map((folder) => ({
+      key: folder.id,
+      name: folder.name,
+      icon: 'folder',
+      size: folderItemsLabel(folder.item_count),
+    })),
+    more: Math.max(0, Math.max(count, folders.length) - shown.length),
+  };
+}
+
 /** "and 2 more", or '' when the card lists every file. */
 export function moreFilesLabel(more: number): string {
   return more > 0 ? `and ${more} more` : '';
@@ -188,6 +218,10 @@ function spaceHref(space: TimelineSpace): string {
 
 function peopleHref(space: TimelineSpace): string {
   return `${spaceHref(space)}?tab=people`;
+}
+
+function foldersHref(space: TimelineSpace): string {
+  return `${spaceHref(space)}?tab=folders`;
 }
 
 /** A space invitation's member-row id, the key the accept and decline routes take. */
@@ -233,13 +267,25 @@ export function timelineRow(event: TimelineEvent, now: number | null): TimelineR
     case 'folder_created': {
       const folder = event.items[0];
       if (!folder) return null;
-      const items = `${folder.item_count} ${folder.item_count === 1 ? 'item' : 'items'}`;
+      // Several folders made in one hour are one row (the server groups by
+      // the hour): it names how many, and the files card lists them.
+      if (event.count > 1) {
+        return {
+          ...base,
+          lead: { type: 'icon', icon: 'folder' },
+          title: `${actor} created ${event.count} folders`,
+          meta: space,
+          href: foldersHref(event.space),
+          card: foldersCard(event.items, event.count),
+        };
+      }
       return {
         ...base,
         lead: { type: 'icon', icon: 'folder' },
         title: folder.name,
-        meta: `${items} · ${actor} · ${space}`,
-        href: folder.url.startsWith('/') ? folder.url : folderHref(String(folder.id)),
+        meta: `${folderItemsLabel(folder.item_count)} · ${actor} · ${space}`,
+        // `url` is absolute (the server's own host); the folder's uuid is the address.
+        href: folderHref(folder.id),
         card: null,
       };
     }
@@ -368,4 +414,38 @@ export function timelineDays(
     else days.push({ key, label: askedDate(key, todayKey), rows: [row] });
   }
   return days;
+}
+
+/** Empty pages followed in a row before the screen stops and shows what it has. */
+export const EMPTY_PAGE_CAP = 5;
+
+/** How many pages at the end of the list came back with no events. */
+export function emptyPagesInARow(pages: readonly { events: readonly unknown[] }[]): number {
+  let empty = 0;
+  for (let index = pages.length - 1; index >= 0 && pages[index].events.length === 0; index -= 1) {
+    empty += 1;
+  }
+  return empty;
+}
+
+/**
+ * Whether to ask for the next page without waiting for a scroll. A page can
+ * come back empty and still carry a cursor (the server filters after it reads),
+ * so an empty last page is followed at once, up to {@link EMPTY_PAGE_CAP} of
+ * them in a row; after that the screen shows what there is.
+ */
+export function followEmptyCursor(
+  pages: readonly { events: readonly unknown[] }[],
+  hasNextPage: boolean,
+): boolean {
+  const empty = emptyPagesInARow(pages);
+  return hasNextPage && empty > 0 && empty < EMPTY_PAGE_CAP;
+}
+
+/** Whether scrolling may still load more: not once the empty pages hit the cap. */
+export function canScrollForMore(
+  pages: readonly { events: readonly unknown[] }[],
+  hasNextPage: boolean,
+): boolean {
+  return hasNextPage && emptyPagesInARow(pages) < EMPTY_PAGE_CAP;
 }
