@@ -374,6 +374,27 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       }
       return null;
 
+    // My requests is opened from Settings, so Settings is where "up" goes. One
+    // request is opened from the list, or from a request email; the list is its
+    // parent either way. A request prints its own title as the page heading,
+    // so the bar carries none.
+    case 'content-requests':
+      if (depth === 1) {
+        return {
+          backHref: '/settings',
+          backLabel: 'Back to settings',
+          title: fixed('My requests'),
+        };
+      }
+      if (depth === 2) {
+        return {
+          backHref: '/content-requests',
+          backLabel: 'Back to your requests',
+          title: NO_TITLE,
+        };
+      }
+      return null;
+
     // The inbox is opened from the BELL, a control on every screen, which makes
     // it a screen you pushed into (the settings reasoning below). Its chevron
     // promises OUT, back to wherever the bell was pressed, so it reaches

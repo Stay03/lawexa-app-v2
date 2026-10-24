@@ -2,6 +2,7 @@ import {
   Bell,
   Building2,
   ChartColumn,
+  ClipboardList,
   CreditCard,
   FlaskConical,
   Gauge,
@@ -24,13 +25,14 @@ import { canAccessV2Preview } from '@/lib/utils/v2-access';
  * settings/rows — every door on the settings screen, in one table.
  *
  * ── WHERE EACH ROW ACTUALLY GOES TODAY (READ THIS BEFORE BUILDING ONE) ─────
- * This is a screen built option by option. TEN rows already land in v2; the
+ * This is a screen built option by option. ELEVEN rows already land in v2; the
  * rest cross into the classic app through the proxy, exactly as
  * `v2/shell/nav.config.ts` describes for an unmigrated nav row: v2 shell, v1
  * content, until the route joins `v2/routes.manifest.ts`.
  *
  *   Profile         /settings/profile        → V2 (rebuilt, 16 August 2026)
  *   Activity        /activity                → V2 (rebuilt, 5 October 2026)
+ *   My requests     /content-requests        → V2 (rebuilt, 24 October 2026)
  *   Verification    /settings/verification   → V2 (rebuilt, 5 October 2026)
  *   Devices         /settings/devices        → V2 (new, 28 September 2026)
  *   Organization    /organization            → V2 (rebuilt, phase-5 W5)
@@ -179,6 +181,19 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         label: 'Your stats',
         icon: ChartColumn,
         href: '/activity/stats',
+        requiresAccount: true,
+      },
+      {
+        // The cases and notes the reader asked the research team for (Stay,
+        // 24 October 2026: "my requests in settings"). v1 kept it in the
+        // sidebar; Settings is where v2 keeps what belongs to the account. Its
+        // address is v1's, like Activity's, because the request emails link to
+        // `/content-requests/{uuid}`. Account-only: a guest cannot ask (the
+        // POST is 403 for guests), so the list would only ever be empty.
+        id: 'requests',
+        label: 'My requests',
+        icon: ClipboardList,
+        href: '/content-requests',
         requiresAccount: true,
       },
       {

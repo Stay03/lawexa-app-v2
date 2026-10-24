@@ -165,6 +165,12 @@ export const V2_ROUTES = [
   '/space-invitations',
   '/organization-invitations',
   '/settings/organization',
+  // My requests, opened from Settings: the list and every request. v1's
+  // addresses, kept as the v2 screens rather than redirected, because the
+  // request emails link to `/content-requests/{uuid}`. A wildcard, unlike the
+  // `/settings/` entries: it is not under `/settings/`, and v1 has nothing
+  // under it but the one request page this replaces.
+  '/content-requests/*',
   // v1's lawyer verification address, a v2-only redirect shell onto
   // `/settings/verification` (see `app/v2/lawyer-verification/page.tsx`).
   '/lawyer-verification',

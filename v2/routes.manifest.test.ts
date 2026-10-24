@@ -36,3 +36,14 @@ test('the ambassador referrals address is a v2 redirect shell, and only that add
   const shell = readFileSync(join(process.cwd(), 'app', 'v2', 'ambassadors', 'referrals', 'page.tsx'), 'utf8');
   assert.match(shell, /redirect\('\/settings\/referrals'\);/);
 });
+
+test('My requests keeps v1 addresses: the list and each request are v2, and nothing beside them', () => {
+  // Stay, 24 October 2026: "my requests in settings". The request emails link
+  // to `/content-requests/{uuid}`, so the address did not move.
+  assert.equal(isMigratedToV2('/content-requests'), true);
+  assert.equal(isMigratedToV2('/content-requests/559c838d-278d-47b4-9fcc-89d0e408d361'), true);
+  assert.equal(isMigratedToV2('/content-requestsx'), false);
+  assert.equal(isMigratedToV2('/admin/content-requests'), false);
+  // Appearance still falls through to v1.
+  assert.equal(isMigratedToV2('/settings/appearance'), false);
+});

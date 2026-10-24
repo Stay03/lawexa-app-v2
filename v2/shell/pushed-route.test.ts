@@ -34,3 +34,17 @@ test('the other screens keep the parent reach they had', () => {
   assert.equal(pushedScreenFor('/invitations')?.reach, undefined);
   assert.equal(pushedScreenFor('/bookmarks'), null);
 });
+
+test('My requests goes up to settings; one request goes up to My requests and prints no bar title', () => {
+  assert.deepEqual(pushedScreenFor('/content-requests'), {
+    backHref: '/settings',
+    backLabel: 'Back to settings',
+    title: { kind: 'fixed', text: 'My requests' },
+  });
+  assert.deepEqual(pushedScreenFor('/v2/content-requests/abc'), {
+    backHref: '/content-requests',
+    backLabel: 'Back to your requests',
+    title: { kind: 'none' },
+  });
+  assert.equal(pushedScreenFor('/content-requests/abc/def'), null);
+});
