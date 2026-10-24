@@ -34,8 +34,8 @@ import { FileDocumentPlaceholder } from './FileDocumentPlaceholder';
  *
  * THE DOCUMENT LOOK IS THE DRAFT PANEL'S (take B): no frame, the document
  * measure, the draft's type on a computer (`.v2-draft-doc`), light and dark
- * from the app's prose colours. Download and Open in a new tab stay on the
- * slim line (FilePanel), and every failure keeps them in the body too.
+ * from the app's prose colours. Download and Open in a new tab stay in the
+ * panel's header (FilePanel), and every failure keeps them in the body too.
  */
 
 /** The draft panel's document column, without the room its floating bar takes. */

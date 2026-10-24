@@ -16,7 +16,7 @@ import { PdfReader } from '@/v2/features/files/pdf/PdfReader';
 import { pageCountLabel } from '@/v2/features/files/pdf/pdf-model';
 import { filesQueries } from '@/v2/features/files/queries';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { ChatSidePanel, SidePanelActions } from '../side-panel/ChatSidePanel';
+import { ChatSidePanel } from '../side-panel/ChatSidePanel';
 import { chatFileLine, filePanelBody } from './chat-files';
 import { FileDocumentPlaceholder } from './FileDocumentPlaceholder';
 import { FileMark } from './FileMark';
@@ -25,9 +25,10 @@ import { WordPages } from './WordPages';
 /**
  * FilePanel — one file in the chat's side panel (`?side=file:ID`), opened
  * from the file list card (the file list in chat, piece a; Stay, 23 October
- * 2026). Its look is the draft panel's (take B): on a computer the header is
- * the slim line with the file's mark, its name and "PDF · 1.2 MB · Ada", then
- * Download, Open in a new tab and the close; below xl it is the sheet.
+ * 2026). It uses the side panel's own header: the file's mark, its name and
+ * "PDF · 1.2 MB · Ada", then Download, Open in a new tab and the close; below
+ * xl it is the sheet. (It was built on the draft panel's slim line, which the
+ * draft panel's bar replaced, 9c51e145.)
  *
  * THE FILE IS READ BY ITS ID (`GET /files/{id}`), so a reload or a shared
  * address opens the same file the card did, under the server's own `view`
@@ -36,18 +37,18 @@ import { WordPages } from './WordPages';
  * WHAT IT SHOWS TODAY (`filePanelBody`): a picture, drawn from a link that
  * shows it; a video or a recording in the one player (`MediaPlayer`); a Word
  * or RTF file as readable pages (`WordPages`, piece c); a PDF in the app's
- * one PDF reader (`PdfReader`, piece b), its zoom on the slim line and its
- * page count in the line's facts; anything else as `FileDocumentPlaceholder`.
+ * one PDF reader (`PdfReader`, piece b), its zoom over the pages and its
+ * page count in the header's facts; anything else as `FileDocumentPlaceholder`.
  */
 export function FilePanel({ fileId }: { fileId: number }) {
   const detail = useQuery(filesQueries.detail(fileId));
   const file = detail.data?.data ?? null;
-  // A PDF's page count, once its reader has opened it: "· 12 pages" on the slim line.
+  // A PDF's page count, once its reader has opened it: "· 12 pages" in the header's facts line.
   const [pageCount, setPageCount] = useState<number | null>(null);
 
   if (detail.isPending) {
     return (
-      <ChatSidePanel label="File" title="Opening the file…" icon={<PanelMark kind={null} />} slim>
+      <ChatSidePanel label="File" title="Opening the file…" icon={<PanelMark kind={null} />}>
         <div aria-hidden className="mx-auto w-full max-w-[68ch] space-y-3 px-5 py-6 xl:px-10 xl:pt-7">
           <Skeleton className="aspect-[4/3] w-full rounded-xl" />
         </div>
@@ -57,7 +58,7 @@ export function FilePanel({ fileId }: { fileId: number }) {
 
   if (!file) {
     return (
-      <ChatSidePanel label="File" title="File" icon={<PanelMark kind={null} />} slim>
+      <ChatSidePanel label="File" title="File" icon={<PanelMark kind={null} />}>
         {isNotFoundError(detail.error) ? (
           <p className="px-5 py-8 text-sm text-muted-foreground xl:px-10">This file is no longer available.</p>
         ) : (
@@ -87,7 +88,6 @@ export function FilePanel({ fileId }: { fileId: number }) {
       subtitle={line}
       icon={<PanelMark kind={kind} />}
       actions={<FileActions file={file} />}
-      slim
     >
       <FileBody file={file} kind={kind} onPageCount={setPageCount} />
     </ChatSidePanel>
@@ -133,7 +133,6 @@ function FileBody({
             fileId={file.id}
             name={file.original_name}
             onPageCount={onPageCount}
-            renderControls={(controls) => <SidePanelActions>{controls}</SidePanelActions>}
             fallback={(reason, retry) => (
               <FileDocumentPlaceholder file={file} kind={kind} reason={reason} onRetry={retry ?? undefined} />
             )}
@@ -206,7 +205,7 @@ function PanelPicture({ file }: { file: UserFileDetail }) {
   );
 }
 
-/** Download and Open in a new tab, on the slim line beside the close. */
+/** Download and Open in a new tab, in the panel's header beside the close. */
 function FileActions({ file }: { file: UserFileDetail }) {
   const download = useOpenFileInNewTab();
   const show = useShowFileInNewTab();
@@ -277,7 +276,7 @@ function HeaderButton({
   );
 }
 
-/** The file's mark: a tile on the phone sheet, a small glyph on the computer's slim line (the draft's rule). */
+/** The file's mark: a tile on the phone sheet, a small glyph in the computer's header (the draft's rule). */
 function PanelMark({ kind }: { kind: string | null }) {
   return (
     <FileMark

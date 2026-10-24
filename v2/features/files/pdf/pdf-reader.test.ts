@@ -71,7 +71,11 @@ test('the chat file panel picks the reader for a PDF', () => {
   assert.equal(filePanelBody({ mime_type: 'application/octet-stream', original_name: 'scan.PDF' }), 'pdf');
   const panel = read('v2', 'features', 'conversations', 'conversation', 'files', 'FilePanel.tsx');
   assert.match(panel, /case 'pdf':\n\s+return \(\n\s+<div[^>]*>\n\s+<PdfReader\n\s+fileId=\{file\.id\}/);
-  assert.match(panel, /renderControls=\{\(controls\) => <SidePanelActions>\{controls\}<\/SidePanelActions>\}/);
+  // The side panel's header lost its slim line and its controls slot to the
+  // draft panel's bar (9c51e145), so the reader draws its zoom over the pages
+  // itself; the dialog still puts it on its own bar.
+  const code = panel.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.doesNotMatch(code, /renderControls|SidePanelActions|\bslim\b/);
 });
 
 test('zoom steps through multiples of fit width, and Fit is 1', () => {
