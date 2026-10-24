@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Content } from '@tiptap/core';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
-import { Check, Copy, MoreHorizontal, Redo2, Undo2 } from 'lucide-react';
+import { Check, Copy, MoreHorizontal, Redo2, Search, Undo2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -25,6 +25,8 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { AlignMenu } from '@/v2/features/notes/editor/AlignMenu';
 import { FontMenu, FontSizeMenu, SizeMenu } from '@/v2/features/notes/editor/FontMenus';
 import { createNoteExtensions } from '@/v2/features/notes/editor/extensions';
+import { FindBar } from '@/v2/features/notes/editor/FindBar';
+import { isFindShortcut, selectionSeed } from '@/v2/features/notes/editor/find-replace';
 import {
   applyAlign,
   applyStyle,
@@ -78,6 +80,13 @@ import { useDraftNote } from './use-draft-note';
  * document spans the panel's width with even margins, up to a reading width.
  * Both shapes are drawn and CSS shows one, so a resize never remounts the
  * editor or loses a save in flight.
+ *
+ * ── FIND AND REPLACE (Arthur asked; Stay said "Yes build", 24 October 2026)
+ * Ctrl+F (⌘F on a Mac) while focus is in the panel, "Find and replace" in the
+ * bar's ···, or the search button on the phone sheet's toolbar. The chat
+ * page's own Ctrl+F outside the panel stays the browser's. One find bar
+ * (FindBar.tsx) for both shapes: a strip under the sheet's toolbar on a
+ * phone, a card under the bar's right end on a computer.
  */
 export function DraftEditor(props: DraftEditorProps) {
   const { conversationId, ordinal } = props;
@@ -233,22 +242,61 @@ function DraftEditorBody({
     };
   }, [editor]);
 
+  const mac = useIsMac();
+  const [findOpen, setFindOpen] = useState(false);
+  const [findSeed, setFindSeed] = useState('');
+  const [findRequest, setFindRequest] = useState(0);
+  const openFind = useCallback(() => {
+    if (!editor) return;
+    setFindSeed(selectionSeed(editor.state));
+    setFindOpen(true);
+    setFindRequest((count) => count + 1);
+  }, [editor]);
+
+  // Ctrl+F (⌘F) with focus in the panel opens the draft's find; anywhere else
+  // on the chat page it stays the browser's. A listener on the panel's own
+  // element, so a key pressed outside it never arrives here.
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame || !editor) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!isFindShortcut(event, mac)) return;
+      event.preventDefault();
+      openFind();
+    };
+    frame.addEventListener('keydown', onKeyDown);
+    return () => frame.removeEventListener('keydown', onKeyDown);
+  }, [editor, mac, openFind]);
+
   return (
     <div ref={frameRef} className="@container/draft flex min-h-full flex-col">
       {editor ? (
-        <>
-          <DraftToolbar editor={editor} />
+        // The bars and the find bar stick to the panel's top together: the
+        // find bar is a strip under the sheet's toolbar, or a card under the
+        // computer bar's right end.
+        <div className="sticky top-0 z-10 shrink-0">
+          <DraftToolbar editor={editor} onFind={openFind} />
           {/* While the reader types on a phone (draft-panel.css): the computer bar's
               tools, folded to one row (undo, font, B I, ··· with the rest), in place
               of the three-row toolbar above, so the draft keeps its lines. */}
           <div className="v2-draft-typing-tools sticky top-0 z-10 hidden h-11 shrink-0 items-center border-b border-border/70 bg-popover px-2">
-            <DraftBarTools editor={editor} frameRef={frameRef} />
+            <DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} />
           </div>
           <DraftBar
-            tools={<DraftBarTools editor={editor} frameRef={frameRef} />}
+            tools={<DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} />}
             actions={<DraftSaveControl draft={draft} dirty={dirty} space={space} />}
           />
-        </>
+          {findOpen ? (
+            <FindBar
+              editor={editor}
+              layout="draft"
+              label="Find in draft"
+              seed={findSeed}
+              focusRequest={findRequest}
+              onClose={() => setFindOpen(false)}
+            />
+          ) : null}
+        </div>
       ) : (
         <>
           <div aria-hidden className="h-12 shrink-0 border-b border-border/70 xl:hidden" />
@@ -290,7 +338,7 @@ function useCopyText(editor: Editor) {
  * they were there (Lucy's live check, 23 October 2026). Not drawn on a
  * computer, where the panel's one bar (`DraftBar`) takes its place.
  */
-function DraftToolbar({ editor }: { editor: Editor }) {
+function DraftToolbar({ editor, onFind }: { editor: Editor; onFind: () => void }) {
   const state = useFormatState(editor);
   const { copied, copy } = useCopyText(editor);
   const mac = useIsMac();
@@ -351,6 +399,7 @@ function DraftToolbar({ editor }: { editor: Editor }) {
       <AlignMenu editor={editor} state={state} mac={mac} />
       <ToolbarDivider />
       <ToolbarButton compact icon={copied ? Check : Copy} label={copied ? 'Copied' : 'Copy text'} onPress={copy} />
+      <ToolbarButton compact icon={Search} label="Find and replace" shortcut={keys('Mod-f')} onPress={onFind} />
     </div>
   );
 }
@@ -376,7 +425,15 @@ const UNDERLINE = TEXT_VERBS.find((verb) => verb.verb === 'underline');
  * text style when the panel is narrow. Soft fills on hover (ToolbarButton
  * `pill`), no outlined boxes.
  */
-function DraftBarTools({ editor, frameRef }: { editor: Editor; frameRef: RefObject<HTMLDivElement | null> }) {
+function DraftBarTools({
+  editor,
+  frameRef,
+  onFind,
+}: {
+  editor: Editor;
+  frameRef: RefObject<HTMLDivElement | null>;
+  onFind: () => void;
+}) {
   const state = useFormatState(editor);
   const mac = useIsMac();
   const keys = (binding: string) => shortcutLabel(binding, mac);
@@ -420,25 +477,30 @@ function DraftBarTools({ editor, frameRef }: { editor: Editor; frameRef: RefObje
           />
         </span>
       ))}
-      <BarMoreMenu editor={editor} state={state} mac={mac} frameRef={frameRef} />
+      <BarMoreMenu editor={editor} state={state} mac={mac} frameRef={frameRef} onFind={onFind} />
     </div>
   );
 }
 
-/** The bar's ···: lists, alignment and Copy text; Redo, Underline and the text style too on a narrow panel. */
+/** The bar's ···: lists, alignment, Copy text and Find and replace; Redo, Underline and the text style too on a narrow panel. */
 function BarMoreMenu({
   editor,
   state,
   mac,
   frameRef,
+  onFind,
 }: {
   editor: Editor;
   state: FormatState;
   mac: boolean;
   frameRef: RefObject<HTMLDivElement | null>;
+  onFind: () => void;
 }) {
   const [folded, setFolded] = useState(false);
   const { copied, copy } = useCopyText(editor);
+  // Find and replace takes focus to its own box: the menu must not pull focus
+  // back to the editor as it closes.
+  const toFind = useRef(false);
 
   return (
     <DropdownMenu
@@ -465,7 +527,8 @@ function BarMoreMenu({
         className={DRAFT_MENU}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          editor.commands.focus();
+          if (!toFind.current) editor.commands.focus();
+          toFind.current = false;
         }}
       >
         {folded ? (
@@ -535,6 +598,16 @@ function BarMoreMenu({
         >
           {copied ? <Check aria-hidden className="size-4" /> : <Copy aria-hidden className="size-4" />}
           {copied ? 'Copied' : 'Copy text'}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            toFind.current = true;
+            onFind();
+          }}
+        >
+          <Search aria-hidden className="size-4" />
+          Find and replace
+          <DropdownMenuShortcut>{shortcutLabel('Mod-f', mac)}</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

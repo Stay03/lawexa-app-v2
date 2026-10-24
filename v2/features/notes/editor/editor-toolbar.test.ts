@@ -194,7 +194,7 @@ test('the phone bar holds nine controls and the rest is in More', () => {
   assert.match(bar, /const MORE_TEXT_VERBS = TEXT_VERBS\.filter\(\(\{ verb \}\) => verb !== 'bold' && verb !== 'italic'\);/);
   assert.match(bar, /\{ROW_TEXT_VERBS\.map/);
   assert.match(bar, /\{LIST_VERBS\.map/);
-  assert.match(bar, /<MoreMenu editor=\{editor\} state=\{state\} onLink=\{onLink\} \/>/);
+  assert.match(bar, /<MoreMenu editor=\{editor\} state=\{state\} onLink=\{onLink\} onFind=\{onFind\} \/>/);
   // More: the style, underline, strike and highlight, quote, code, alignment, the table, link and clear formatting.
   const more = bar.slice(bar.indexOf('function MoreMenu'));
   for (const piece of [

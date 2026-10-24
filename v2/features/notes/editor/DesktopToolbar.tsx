@@ -1,7 +1,19 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import type { Editor } from '@tiptap/react';
-import { AtSign, ImagePlus, Link2, Link2Off, Loader2, MoreHorizontal, Redo2, RemoveFormatting, Undo2 } from 'lucide-react';
+import {
+  AtSign,
+  ImagePlus,
+  Link2,
+  Link2Off,
+  Loader2,
+  MoreHorizontal,
+  Redo2,
+  RemoveFormatting,
+  Search,
+  Undo2,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -33,7 +45,7 @@ const SHAPE_VERBS = BLOCK_VERBS.filter(
  * insert icons in the header, so undo, redo and a heading needed a shortcut the
  * reader had to know. The bar holds every verb, in a word processor's order:
  *
- *   undo · redo | style | B I U S highlight | align | lists · quote · table | link · image · @case | More
+ *   undo · redo | style | B I U S highlight | align | lists · quote · table | link · image · @case | find · More
  *
  * ONE ROW (techlead, 20 October 2026: "a wrapped bar isn't clean"). Step 2
  * added highlight, the alignment menu and the table menu, and the bar wrapped
@@ -46,6 +58,11 @@ const SHAPE_VERBS = BLOCK_VERBS.filter(
  * elsewhere). The bar sticks to the top of the page while the note scrolls
  * under it. The selection bubble stays: it is the quick reach for a word just
  * selected, and both read the same verbs (`toolbar-verbs.ts`).
+ *
+ * The search button opens find and replace (Arthur asked; Stay said "Yes
+ * build", 24 October 2026), as Ctrl+F does. The find bar hangs from the
+ * bar's bottom right edge, over the text, so it stays in sight while the note
+ * scrolls under both.
  */
 export function DesktopToolbar({
   editor,
@@ -53,6 +70,8 @@ export function DesktopToolbar({
   onLink,
   onImage,
   onMention,
+  onFind,
+  find,
   imageBusy,
 }: {
   editor: Editor;
@@ -60,6 +79,10 @@ export function DesktopToolbar({
   onLink: () => void;
   onImage: () => void;
   onMention: () => void;
+  /** Open find and replace. */
+  onFind: () => void;
+  /** The find bar while it is open, drawn under the bar's right end. */
+  find: ReactNode;
   imageBusy: boolean;
 }) {
   const mac = useIsMac();
@@ -148,7 +171,10 @@ export function DesktopToolbar({
 
       <ToolbarDivider />
 
+      <ToolbarButton compact icon={Search} label="Find and replace" shortcut={keys('Mod-f')} onPress={onFind} />
       <DesktopMoreMenu editor={editor} state={state} mac={mac} />
+
+      {find ? <div className="absolute top-full right-2 mt-2">{find}</div> : null}
     </div>
   );
 }

@@ -40,6 +40,8 @@ import { DeleteNoteDialog } from './DeleteNoteDialog';
 import { DesktopToolbar } from './DesktopToolbar';
 import { EditorBubbleMenu } from './EditorBubbleMenu';
 import { createNoteExtensions } from './extensions';
+import { FindBar } from './FindBar';
+import { isFindShortcut, selectionSeed } from './find-replace';
 import { FormattingBar } from './FormattingBar';
 import { openCaseMention, useFormatState } from './formatting';
 import { LinkDialog } from './LinkDialog';
@@ -48,6 +50,7 @@ import { createCaseMentionStore } from './mention-store';
 import { stripPastedPresentation } from './paste-sanitizer';
 import { RestoreDraftBar } from './RestoreDraftBar';
 import { SaveIndicator } from './SaveIndicator';
+import { useIsMac } from './shortcut-label';
 import { NOTE_PAPER_COLUMN } from './states';
 import { noteDisplayTitle } from '../note-text';
 import { useTabTitle } from '@/v2/shell/use-tab-title';
@@ -126,6 +129,10 @@ export function NoteEditorScreen({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [restoreDismissed, setRestoreDismissed] = useState(false);
+  // Find and replace (Arthur asked; Stay said "Yes build", 24 October 2026).
+  const [findOpen, setFindOpen] = useState(false);
+  const [findSeed, setFindSeed] = useState('');
+  const [findRequest, setFindRequest] = useState(0);
 
   const [title, setTitle] = useState(initialRecord?.title ?? '');
   const titleRef = useRef(title);
@@ -184,6 +191,7 @@ export function NoteEditorScreen({
 
   const formatState = useFormatState(editor);
   const coarsePointer = useCoarsePointer();
+  const mac = useIsMac();
   const images = useNoteImageUploads(editor);
   const { commit: commitUploads, reconcile: reconcileUploads } = images;
 
@@ -312,6 +320,43 @@ export function NoteEditorScreen({
   }, [editor, mentionStore]);
 
   useEffect(() => () => mentionStore.destroy(), [mentionStore]);
+
+  // ── Find and replace ──────────────────────────────────────────────────────
+  // The bar opens with the selected words in the find box, if a few are
+  // selected; open already, it takes focus back to the find box.
+  const openFind = useCallback(() => {
+    if (!editor) return;
+    setFindSeed(selectionSeed(editor.state));
+    setFindOpen(true);
+    setFindRequest((count) => count + 1);
+  }, [editor]);
+
+  // Ctrl+F (⌘F on a Mac) anywhere on this screen opens the note's own find,
+  // and only then is the browser's find held back. A listener and its
+  // cleanup; the state is set by the key press, not by the effect.
+  useEffect(() => {
+    if (!editor) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (!isFindShortcut(event, mac)) return;
+      event.preventDefault();
+      openFind();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editor, mac, openFind]);
+
+  const findBar = (layout: 'float' | 'dock') =>
+    editor && findOpen ? (
+      <FindBar
+        editor={editor}
+        layout={layout}
+        label="Find in note"
+        seed={findSeed}
+        focusRequest={findRequest}
+        onClose={() => setFindOpen(false)}
+      />
+    ) : null;
 
   // Fit the title box to its content on first paint (a wrapped title must not
   // open scrolled).
@@ -501,8 +546,15 @@ export function NoteEditorScreen({
           onLink={handleLink}
           onImage={handleImage}
           onMention={handleMention}
+          onFind={openFind}
+          find={findBar('float')}
           imageBusy={images.busy}
         />
+      ) : null}
+
+      {/* The phone's find bar: a strip under the header, above the keyboard. */}
+      {editor && coarsePointer === true && findOpen ? (
+        <div className="sticky top-0 z-20 -mx-4 mb-4">{findBar('dock')}</div>
       ) : null}
 
       {candidate ? (
@@ -596,6 +648,7 @@ export function NoteEditorScreen({
           onLink={handleLink}
           onImage={handleImage}
           onMention={handleMention}
+          onFind={openFind}
           imageBusy={images.busy}
         />
       ) : null}

@@ -1,0 +1,34 @@
+/**
+ * Find and replace tints (Arthur asked; Stay said "Yes build", 24 October
+ * 2026). The classes are ProseMirror decorations (find-replace.ts): drawn by
+ * the editor, never saved into a note.
+ *
+ * A cool blue, not gold. Gold is the app's colour for actions, and the note's
+ * own highlight is already gold (`[&_mark]` in the editors), so a match inside
+ * highlighted text has to read as a different thing. Every match gets a soft
+ * tint; the current one a stronger tint and a thin ring, so it is found at a
+ * glance among the rest. The text keeps its own colour in both themes.
+ */
+
+:root {
+  --v2-find-match: oklch(0.88 0.06 235 / 0.7);
+  --v2-find-current: oklch(0.78 0.12 240 / 0.75);
+  --v2-find-current-ring: oklch(0.55 0.15 245 / 0.8);
+}
+
+.dark {
+  --v2-find-match: oklch(0.45 0.08 240 / 0.55);
+  --v2-find-current: oklch(0.55 0.14 242 / 0.8);
+  --v2-find-current-ring: oklch(0.75 0.13 240 / 0.9);
+}
+
+.v2-find-match {
+  border-radius: 0.15em;
+  background-color: var(--v2-find-match);
+  color: inherit;
+}
+
+.v2-find-current {
+  background-color: var(--v2-find-current);
+  box-shadow: 0 0 0 1px var(--v2-find-current-ring);
+}

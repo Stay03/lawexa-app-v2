@@ -7,6 +7,7 @@ import { Table, TableKit, TableView } from '@tiptap/extension-table';
 import TextAlign from '@tiptap/extension-text-align';
 
 import { createCaseMentionExtension } from './case-mention';
+import { FindReplace } from './find-replace';
 import { FontStyle } from './font-style';
 import type { CaseMentionStore } from './mention-store';
 
@@ -118,6 +119,10 @@ export function createNoteExtensions({
     // every note editor, so a note saved from a draft keeps its fonts when it
     // is edited later.
     FontStyle,
+    // Find and replace (Arthur asked; Stay said "Yes build", 24 October 2026):
+    // a plugin whose tints are decorations, so it adds nothing to the schema
+    // and nothing to the saved note (find-replace.ts).
+    FindReplace,
   ];
 }
 

@@ -183,7 +183,7 @@ test('on a computer the draft panel has no title line and no foot: one bar holds
   assert.match(panel, /subtitle=\{draftStatus\(draft, Boolean\(streamingMessage\)\)\}/);
   // One bar: the formatting, then Save, then the close; every state has the close.
   assert.match(editor, /<div className="flex min-w-0 flex-1 items-center">\{tools\}<\/div>\s*\{actions\}\s*<SidePanelCloseButton \/>/);
-  assert.match(editor, /<DraftBar\s+tools=\{<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} \/>\}\s+actions=\{<DraftSaveControl draft=\{draft\} dirty=\{dirty\} space=\{space\} \/>\}\s+\/>/);
+  assert.match(editor, /<DraftBar\s+tools=\{<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} onFind=\{openFind\} \/>\}\s+actions=\{<DraftSaveControl draft=\{draft\} dirty=\{dirty\} space=\{space\} \/>\}\s+\/>/);
   assert.equal(panel.match(/<DraftBar \/>/g)?.length, 2);
   assert.match(frame, /export function SidePanelCloseButton\(\)/);
   // The sheet's foot is not drawn on a computer; the bar's Save is drawn only there.

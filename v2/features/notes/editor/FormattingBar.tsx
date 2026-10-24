@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   Redo2,
   RemoveFormatting,
+  Search,
   Undo2,
 } from 'lucide-react';
 
@@ -73,6 +74,10 @@ import { OVERFLOW_LEFT, OVERFLOW_RIGHT, useOverflowEdges } from './use-overflow-
  * formatting (highlight, alignment, tables and Large heading since Arthur's
  * step 2, 20 October 2026). On a narrower phone the row still scrolls, and a
  * geometry-driven edge fade ({@link useOverflowEdges}) marks the hidden rest.
+ *
+ * More also holds "Find and replace" (Arthur asked; Stay said "Yes build", 24
+ * October 2026), since a phone has no Ctrl+F. Its bar opens at the top of the
+ * screen, not here, so the keyboard does not cover it.
  */
 
 /** The marks the row keeps; underline, strike and highlight are in More. */
@@ -89,6 +94,7 @@ export function FormattingBar({
   onLink,
   onImage,
   onMention,
+  onFind,
   imageBusy,
 }: {
   editor: Editor;
@@ -96,6 +102,8 @@ export function FormattingBar({
   onLink: () => void;
   onImage: () => void;
   onMention: () => void;
+  /** Open find and replace. */
+  onFind: () => void;
   /** An upload is in flight — the image button shows it rather than a toast. */
   imageBusy: boolean;
 }) {
@@ -168,7 +176,7 @@ export function FormattingBar({
 
           <ToolbarDivider />
 
-          <MoreMenu editor={editor} state={state} onLink={onLink} />
+          <MoreMenu editor={editor} state={state} onLink={onLink} onFind={onFind} />
         </div>
 
         {/* Scroll-cut affordances — drawn only while geometry says content is
@@ -202,13 +210,16 @@ function MoreMenu({
   editor,
   state,
   onLink,
+  onFind,
 }: {
   editor: Editor;
   state: FormatState;
   onLink: () => void;
+  onFind: () => void;
 }) {
-  // Add link opens the link dialog, which takes focus itself: the menu must not
-  // pull focus back to the editor as it closes.
+  // Add link opens the link dialog and Find and replace opens the find bar,
+  // and each takes focus itself: the menu must not pull focus back to the
+  // editor as it closes.
   const toDialog = useRef(false);
   return (
     <DropdownMenu>
@@ -312,6 +323,18 @@ function MoreMenu({
         <DropdownMenuItem onSelect={() => runFormat(editor, CLEAR_FORMATTING.verb)}>
           <RemoveFormatting aria-hidden className="size-4" />
           {CLEAR_FORMATTING.label}
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        <DropdownMenuItem
+          onSelect={() => {
+            toDialog.current = true;
+            onFind();
+          }}
+        >
+          <Search aria-hidden className="size-4" />
+          Find and replace
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
