@@ -1,19 +1,14 @@
 'use client';
 
-import { useRef, useState } from 'react';
-
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
-import { HomeComposer } from './HomeComposer';
 import { TimelineHome } from './TimelineHome';
 import { HomePrompts } from './HomePrompts';
-import { useComposerDraft } from './composer/useComposerDraft';
+import { useFillPrompt, useHomeComposer } from './home-composer-context';
 import {
-  CHAT_COMPOSER_DOCK,
   CHAT_PROMPTS,
   CHAT_PROMPTS_HIDDEN,
-  DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
   HOME_SURFACE_FOCUSED,
 } from './home-frame';
@@ -29,37 +24,38 @@ import {
  * turn that composer sent; Channel messages, Recent conversations and Recently
  * viewed left too.
  *
- * GUESTS get the greeting, the composer and the study-themed prompts —
+ * GUESTS get the greeting and the study-themed prompts, over the shared box —
  * understand, summarise, compare, test yourself. Study mode was never theirs
- * (it is student-gated on the signed-in profile).
+ * (it is student-gated on the signed-in profile). *
+ * ── ONE BOX FOR THE THREE TABS (24 October 2026) ───────────────────────────
+ * Stay: "same chat box with the chat tab ... the tabs switch but the chat box
+ * remains". The box is no longer this surface's: `HomeFrame`, in the home
+ * layout, draws it once under Chat, Work and Study, so switching tabs keeps
+ * what was typed. This surface draws only its content, and reads the box's
+ * state (confidential, a held send, the prompt fill) from
+ * `home-composer-context`.
  */
 export function StudyHome({
   name,
   signedIn = false,
-  role,
 }: {
   name?: string;
   signedIn?: boolean;
   role?: UserRole;
 }) {
   if (signedIn) {
-    return <TimelineHome tab="study" role={role} />;
+    return <TimelineHome tab="study" />;
   }
-  return <StudyGuestHome name={name} role={role} />;
+  return <StudyGuestHome name={name} />;
 }
 
-/** The Study tab for a guest: the greeting, the composer and the Study prompts. */
-function StudyGuestHome({ name, role }: { name?: string; role?: UserRole }) {
-  const [input, setInput] = useComposerDraft();
-  const [confidential, setConfidential] = useState(false);
-  // A redacted send waiting on this screen fades the prompts (`onRedactingChange`).
-  const [redacting, setRedacting] = useState(false);
-  const composerAreaRef = useRef<HTMLDivElement>(null);
-
-  const fillPrompt = (prompt: string) => {
-    setInput(prompt);
-    composerAreaRef.current?.querySelector('textarea')?.focus();
-  };
+/**
+ * The Study tab for a guest: the greeting and the Study prompts, over the
+ * home's shared box (`HomeFrame`), which the prompts fill and focus.
+ */
+function StudyGuestHome({ name }: { name?: string }) {
+  const { confidential, redacting } = useHomeComposer();
+  const fillPrompt = useFillPrompt();
 
   return (
     <div data-v2-marker="V2-HOME" data-home-tab="study" className={HOME_SURFACE_FOCUSED}>
@@ -71,25 +67,8 @@ function StudyGuestHome({ name, role }: { name?: string; role?: UserRole }) {
         headingClassName={HOME_GREETING_HEADING_FOCUSED}
       />
 
-      {/* Composer dock — see WorkHome for the sticky-dock contract. */}
-      <div className={CHAT_COMPOSER_DOCK}>
-        <div aria-hidden className={DOCK_FADE} />
-        <div ref={composerAreaRef}>
-          <HomeComposer
-            value={input}
-            onValueChange={setInput}
-            signedIn={false}
-            role={role}
-            confidential={confidential}
-            onConfidentialChange={setConfidential}
-            className="p-2.5 shadow-lg"
-            onRedactingChange={setRedacting}
-            textareaClassName="text-base md:text-lg"
-            sendButtonClassName="md:size-10"
-          />
-        </div>
-      </div>
-
+      {/* The prompts sink to just above the shared box, on a phone and a
+          computer alike, and fade while a redacted send is held. */}
       <div className={cn(CHAT_PROMPTS, redacting && CHAT_PROMPTS_HIDDEN)} aria-hidden={redacting || undefined}>
         <div className="md:hidden">
           <HomePrompts variant="mobile" tab="study" onSelect={fillPrompt} />

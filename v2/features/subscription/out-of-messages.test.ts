@@ -183,9 +183,8 @@ test('C4: the Home box draws the strip at its top, and Send waits while it shows
   // Joined to the card's edges: every host passes p-2.5.
   assert.match(source, /-mx-2\.5 -mt-2\.5 mb-2 flex items-center justify-between gap-3 rounded-t-3xl border-b border-border/);
   for (const host of [
-    ['v2', 'shell', 'designs', 'ChatHome.tsx'],
-    ['v2', 'shell', 'designs', 'StudyHome.tsx'],
-    ['v2', 'shell', 'designs', 'WorkHome.tsx'],
+    // The home's one box, shared by Chat, Work and Study (24 October 2026).
+    ['v2', 'shell', 'designs', 'HomeFrame.tsx'],
     ['v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx'],
   ]) {
     assert.match(read(...host), /<HomeComposer[\s\S]*?className="p-2\.5 shadow-lg"/, host.join('/'));

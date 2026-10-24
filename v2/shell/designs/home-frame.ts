@@ -58,11 +58,11 @@
 
 /**
  * The focused single-column surface — Chat, plus the Work/Study guest surfaces.
- * `min-h-full` + `flex-col` is what lets `mt-auto` sink the compose cluster to
- * the thumb on mobile; `md:pt-36` is the approved desktop top anchor (owner #33).
+ * It fills the frame's content column (`flex-1`), which is what lets `mt-auto`
+ * sink the prompts to just above the shared box, at every width.
  */
 export const HOME_SURFACE_FOCUSED =
-  'relative mx-auto flex min-h-full w-full max-w-2xl flex-col px-4 pt-10 pb-8 md:pt-36 md:pb-12';
+  'relative mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-10 md:pt-24';
 
 /**
  * The signed-in Work and Study tabs: the timeline (`v2/features/home-timeline`),
@@ -70,25 +70,32 @@ export const HOME_SURFACE_FOCUSED =
  * so going from the timeline into a Space moves nothing sideways. Its route
  * fallback draws the same column.
  */
-export const HOME_SURFACE_TIMELINE =
-  'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-6';
+export const HOME_SURFACE_TIMELINE = 'mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 pt-5 sm:pt-6';
 
 /**
- * The chat box under the Work / Study timeline (Stay, 24 October 2026: "Yeah
- * add it"). Sticky at the foot at every width, in flow so the last row
- * scrolls above it; `mt-auto` holds it at the foot of a short timeline. The
- * top padding is the gap the fade dissolves the rows into.
+ * THE HOME FRAME (Stay, 24 October 2026: one chat box for Chat, Work and
+ * Study). `HomeFrame` lays the home layout out as a column at least the
+ * screen's height: the tab's content takes the room left (`flex-1`), and the
+ * shared box docks under it.
  */
-export const TIMELINE_COMPOSER_DOCK = 'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pt-8 pb-3 md:pb-6';
+export const HOME_FRAME = 'flex min-h-full flex-col';
+export const HOME_FRAME_CONTENT = 'flex flex-1 flex-col';
 
 /**
- * The ground behind that dock, at every width (the Chat tab's fade is
- * phone-only). SOLID up to the top 2rem, the dock's `pt-8`, and only that band
- * fades: the composer's Jurisdiction pill rides above its card, and a fade
- * across the whole dock let the rows show round the pill (Backend's
- * pictures, 24 October 2026).
+ * The shared chat box's dock: sticky at the foot of the screen at every width,
+ * in flow (never `fixed`), so the content's last line scrolls up above it and
+ * on a phone it rides the keyboard. As wide as the timeline's column, so the
+ * box keeps one width as the tabs switch. The top padding is the band the
+ * ground fades through.
  */
-export const TIMELINE_DOCK_FADE =
+export const HOME_COMPOSER_DOCK = 'sticky bottom-0 z-10 mx-auto w-full max-w-3xl px-4 pt-8 pb-3 md:pb-6';
+
+/**
+ * The ground behind that dock: SOLID up to its top 2rem, and only that band
+ * fades, so nothing shows round the Jurisdiction pill that rides above the
+ * box (Backend's pictures, 24 October 2026).
+ */
+export const HOME_DOCK_FADE =
   'pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-[linear-gradient(to_top,var(--background)_calc(100%-2rem),transparent)]';
 
 /*
@@ -101,23 +108,14 @@ export const TIMELINE_DOCK_FADE =
  * was removed outright rather than restyled.
  *
  * Deleted rather than kept dormant: a frame nobody renders drifts silently from the
- * surfaces, which is the exact failure this file exists to prevent. The `contents
- * md:flex` trick and the mobile `order` scale it documented are preserved where they
- * are still load-bearing — on the focused frame's composer dock, below.
+ * surfaces, which is the exact failure this file exists to prevent.
  */
 
 /* ── Chat blocks ──────────────────────────────────────────────────────────── */
 
-/**
- * The Chat composer dock. Same mechanic as the workspace dock, but the focused
- * surface is `px-4` at every width (no `sm:px-6` bleed) and desktop adds the
- * hero gap under the greeting (`md:mt-10`).
- */
-export const CHAT_COMPOSER_DOCK =
-  'order-4 sticky bottom-0 z-10 -mx-4 px-4 pb-3 pt-6 md:order-3 md:static md:z-auto md:mx-0 md:mt-10 md:px-0 md:pb-0 md:pt-0';
-
-/** Chat's prompts — ABOVE the dock on mobile, BELOW the composer on desktop. */
-export const CHAT_PROMPTS = 'order-3 mt-auto pt-8 transition-opacity duration-200 motion-reduce:transition-none md:order-4 md:mt-3 md:pt-0';
+/** The prompts on Chat and the guest tabs — sunk to just above the shared box,
+ *  at every width (the box moved to the foot on a computer too, 24 October 2026). */
+export const CHAT_PROMPTS = 'mt-auto pt-8 transition-opacity duration-200 motion-reduce:transition-none';
 
 /** The prompts while a redacted send waits on this screen: faded out, so the
  *  box that says "Removing personal details…" has nothing behind it (Stay,
@@ -158,14 +156,6 @@ export const CHAT_QUICK_JUMP_ITEM =
   'inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[0.8125rem] text-muted-foreground transition-colors';
 
 /* ── Shared furniture ─────────────────────────────────────────────────────── */
-
-/**
- * The mobile-only gradient under a sticky dock — dissolves the content scrolling
- * behind the composer instead of letting it collide with it. Sits at `-z-10`
- * inside the dock, so it needs the dock to be the positioned ancestor.
- */
-export const DOCK_FADE =
-  'pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/85 to-transparent md:hidden';
 
 /** Comfortaa greeting scale for the focused (Chat / guest) surfaces. */
 export const HOME_GREETING_HEADING_FOCUSED =

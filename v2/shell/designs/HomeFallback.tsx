@@ -6,14 +6,11 @@ import { HomePrompts } from './HomePrompts';
 import { HomeQuickJump } from './HomeQuickJump';
 import { TimelineHeading, TimelineSkeleton } from '@/v2/features/home-timeline/states';
 import {
-  CHAT_COMPOSER_DOCK,
   CHAT_PROMPTS,
-  DOCK_FADE,
   HOME_GREETING_SKELETON_HEADING,
   HOME_GREETING_SKELETON_SUBLINE,
   HOME_SURFACE_FOCUSED,
   HOME_SURFACE_TIMELINE,
-  TIMELINE_COMPOSER_DOCK,
 } from './home-frame';
 
 /**
@@ -80,7 +77,7 @@ import {
  * all. A real composer in the fallback is therefore a focus-stealing,
  * caret-destroying bug by construction — mid-typing focus loss is far worse than
  * a short wait. So the whole subtree is `inert` and `aria-hidden`, and the
- * composer appears only as a static reserved SHAPE at the exact real height. One
+ * composer is not in it: the home layout's live box sits under it. One
  * `role="status"` live region outside the hidden subtree carries the
  * announcement, so screen-reader users are told once rather than read a wall of
  * decorative boxes.
@@ -100,10 +97,9 @@ import {
  *    just appear immediately", and it is what Polaris states outright: "Show
  *    static content that never changes on a page and use skeleton loading for
  *    dynamic content."
- *  • THE COMPOSER gets a quiet, NON-PULSING reserved shape. It is not loading
- *    anything (its draft is a synchronous localStorage read, its placeholder is a
- *    literal, its buttons are static markup) — it just cannot be rendered live
- *    here, so we reserve its exact 118px footprint without claiming to load.
+ *  • THE COMPOSER is not here at all: it is the home layout's (`HomeFrame`, Stay,
+ *    24 October 2026), drawn once under every tab, so it stays on screen, live,
+ *    while this fallback stands in for the tab's content above it.
  *  • THE GREETING gets a real pulsing skeleton, because it genuinely IS blocked
  *    on this route's server work: its text is built from the signed-in first name
  *    that `verifySession()` resolves. It reuses `HomeGreeting`'s own skeleton
@@ -135,7 +131,7 @@ export function HomeFallback({ tab }: { tab: HomeTab }) {
       <span role="status" className="sr-only">
         Loading your home
       </span>
-      <div aria-hidden inert className="h-full">
+      <div aria-hidden inert className="flex flex-1 flex-col">
         {tab === 'chat' ? <ChatFrame /> : <TabFrame tab={tab} />}
       </div>
     </>
@@ -148,9 +144,8 @@ export function HomeFallback({ tab }: { tab: HomeTab }) {
 
 /**
  * The Chat frame — the focused reading column. Mirrors `ChatHome` block for
- * block: greeting, the mobile quick-jump row, then the compose cluster, whose
- * `order` values put the prompts ABOVE the thumb-docked composer on mobile and
- * BELOW the composer on desktop.
+ * block: greeting, the mobile quick-jump row, then the prompts, sunk to just
+ * above the home layout's shared box.
  *
  * There is no ambient spotlight to reproduce. The Chat surface used to carry one;
  * the owner removed it outright on July 25, so neither this fallback nor the real
@@ -163,11 +158,6 @@ function ChatFrame() {
 
       {/* Static chrome — the real row, so the reserved space matches its wrap. */}
       <HomeQuickJump />
-
-      <div className={CHAT_COMPOSER_DOCK}>
-        <div className={DOCK_FADE} />
-        <ComposerShape />
-      </div>
 
       <div className={CHAT_PROMPTS}>
         <PromptsBlock tab="chat" />
@@ -212,7 +202,7 @@ function GreetingSkeleton({
  * The heading is static chrome ("What's happening in your Work Spaces" is a
  * literal), so it is drawn for real; the rows wait on data, so they are
  * skeletons. A GUEST on these tabs sees this frame for the length of the
- * fallback and then the guest surface (greeting, composer, prompts): the
+ * fallback and then the guest surface (greeting and prompts): the
  * fallback has no session, and a signed-in reader is who these tabs are for.
  */
 function TabFrame({ tab }: { tab: Exclude<HomeTab, 'chat'> }) {
@@ -220,10 +210,6 @@ function TabFrame({ tab }: { tab: Exclude<HomeTab, 'chat'> }) {
     <div className={HOME_SURFACE_TIMELINE}>
       <TimelineHeading type={tab} />
       <TimelineSkeleton />
-      {/* The chat box's place at the foot, as `TimelineHome` docks it. */}
-      <div className={TIMELINE_COMPOSER_DOCK}>
-        <ComposerShape />
-      </div>
     </div>
   );
 }
@@ -241,56 +227,3 @@ function PromptsBlock({ tab }: { tab: HomeTab }) {
   );
 }
 
-/**
- * The composer's reserved shape — QUIET AND STILL, never a pulse.
- *
- * The real composer loads nothing: the draft comes from a synchronous
- * localStorage read in a lazy `useState`, the placeholder is a string literal,
- * and the send button, plus-menu and privacy toggles are static markup. The only
- * two fetching parts (`WorkflowField`, which is `enabled: isAdmin` and so is
- * never pending for a normal user, and `JurisdictionField`) already skeleton
- * themselves IN PLACE at fixed geometry. So a pulsing composer here would claim
- * something is loading that is not — the owner spotted exactly this.
- *
- * What it does need is its SPACE. The height is built structurally, not from a
- * magic number, mirroring the real stack one element at a time:
- *
- *     ring `p-[1px]`                              2px
- *   + card `p-2.5`                               20px
- *   + textarea box `py-3` + one line `h-6/md:h-7` 48px  (52px from md)
- *   + action row `pb-1` + `size-11`/`md:size-10` 48px  (44px from md)
- *   ------------------------------------------------------------------
- *     total                                     118px at every breakpoint
- *
- * A plain `bg-border` hairline stands in for the animated gold shimmer and the
- * marks are flat `bg-muted` — so it reads unmistakably as "the composer goes
- * here", never as a live control the user can type into and never as a spinner.
- *
- * COUPLING NOTE: this mirrors `HomeComposer` + the `PromptInput` primitive, which
- * are outside this workstream's file ownership and so could not be refactored to
- * share a height token. If the composer's card padding, textarea min-height, or
- * action-row control sizes change, change them here too.
- */
-function ComposerShape() {
-  return (
-    <div className="rounded-3xl bg-border p-[1px]">
-      <div className="rounded-3xl bg-background p-2.5 shadow-lg">
-        {/* Textarea box — the primitive's `px-3 py-3` around one line of text. */}
-        <div className="px-3 py-3">
-          {/* Width tracks the real "Ask a legal question" placeholder's measure
-              at `text-base` / `md:text-lg`; only the HEIGHT is load-bearing. */}
-          <div className="h-6 w-40 rounded-full bg-muted md:h-7 md:w-44" />
-        </div>
-        {/* Action row — plus, the two furniture chips, and the send button. */}
-        <div className="flex items-center gap-2 px-2 pb-1">
-          <div className="flex min-w-0 flex-1 items-center gap-1 py-0.5">
-            <div className="size-9 shrink-0 rounded-full bg-muted" />
-            <div className="h-8 w-24 shrink-0 rounded-full bg-muted" />
-            <div className="h-8 w-28 shrink-0 rounded-full bg-muted" />
-          </div>
-          <div className="size-11 shrink-0 rounded-full bg-muted md:size-10" />
-        </div>
-      </div>
-    </div>
-  );
-}

@@ -587,27 +587,39 @@ test('the clock is read once and only used after hydration', () => {
 test('the Work and Study tabs draw the timeline when signed in; the fallback draws the same header', () => {
   for (const [home, type] of [['WorkHome.tsx', 'work'], ['StudyHome.tsx', 'study']]) {
     const source = read('v2', 'shell', 'designs', home);
-    assert.match(source, new RegExp(`if \\(signedIn\\) \\{\\s*return <TimelineHome tab="${type}" role=\\{role\\} />;`), home);
+    assert.match(source, new RegExp(`if \\(signedIn\\) \\{\\s*return <TimelineHome tab="${type}" />;`), home);
   }
   const fallback = read('v2', 'shell', 'designs', 'HomeFallback.tsx');
   assert.match(fallback, /<TimelineHeading type=\{tab\} \/>\s*<TimelineSkeleton \/>/);
 });
 
-/* Stay, 24 October 2026, on the timeline's push ask: "Yeah add it". The
- * signed-in Work and Study tabs keep the Chat tab's box at their foot: the
- * same composer and send, no prompt chips, docked in flow so the last row
- * scrolls above it. The fallback holds the box's place. */
-test('the timeline tabs dock the chat box at their foot, in flow, with no prompts', () => {
-  const home = read('v2', 'shell', 'designs', 'TimelineHome.tsx');
-  assert.match(home, /<HomeTimeline type=\{tab\} \/>\s*<div className=\{TIMELINE_COMPOSER_DOCK\}>\s*<div aria-hidden className=\{TIMELINE_DOCK_FADE\} \/>\s*<HomeComposer/);
-  assert.match(home, /signedIn\s*role=\{role\}\s*confidential=\{confidential\}/);
-  assert.doesNotMatch(home, /HomePrompts/);
-  const frame = read('v2', 'shell', 'designs', 'home-frame.ts');
-  assert.match(frame, /export const HOME_SURFACE_TIMELINE =\s*'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-6';/);
-  // Sticky, never fixed: the dock takes its own height after the rows.
-  assert.match(frame, /export const TIMELINE_COMPOSER_DOCK = 'sticky bottom-0 z-10 -mx-4 mt-auto px-4 pt-8 pb-3 md:pb-6';/);
-  // Solid behind the pill and the box; only the top band, the dock's pt-8, fades.
-  assert.match(frame, /bg-\[linear-gradient\(to_top,var\(--background\)_calc\(100%-2rem\),transparent\)\]/);
-  const fallback = read('v2', 'shell', 'designs', 'HomeFallback.tsx');
-  assert.match(fallback, /<TimelineSkeleton \/>\s*\{\/\*[^*]*\*\/\}\s*<div className=\{TIMELINE_COMPOSER_DOCK\}>\s*<ComposerShape \/>/);
+/* Stay, 24 October 2026, on the timeline's push ask: "Yeah add it", then
+ * "same chat box with the chat tab ... the tabs switch but the chat box
+ * remains". One box, in the home layout, under Chat, Work and Study: a tab
+ * switch changes only the content above it. Docked in flow at the foot of
+ * the screen, so the last row scrolls above it; no prompts on the timeline. */
+test('one chat box, in the home layout, under all three tabs, at the foot of the screen', () => {
+  const layout = read('app', 'v2', '(home)', 'layout.tsx');
+  assert.match(layout, /return <HomeFrame>\{children\}<\/HomeFrame>;/);
+  // The three tabs are pages of that one layout; their addresses are unchanged.
+  for (const page of [['page.tsx'], ['work', 'page.tsx'], ['study', 'page.tsx']]) {
+    assert.match(read('app', 'v2', '(home)', ...page), /return <V2Home tab="(chat|work|study)" \/>;/);
+  }
+  const frame = read('v2', 'shell', 'designs', 'HomeFrame.tsx');
+  assert.match(frame, /<HomeComposerProvider key=\{userId \?\? 'visitor'\}>\s*<div className=\{HOME_FRAME\}>\s*<div className=\{HOME_FRAME_CONTENT\}>\{children\}<\/div>\s*<HomeDock signedIn=\{signedIn\} role=\{role \?\? undefined\} \/>/);
+  assert.match(frame, /<div data-home-dock="" className=\{HOME_COMPOSER_DOCK\}>\s*<div aria-hidden className=\{HOME_DOCK_FADE\} \/>\s*<div ref=\{areaRef\}>\s*<HomeComposer/);
+  const css = read('v2', 'shell', 'designs', 'home-frame.ts');
+  // Sticky, never fixed: the dock takes its own height after the content.
+  assert.match(css, /export const HOME_COMPOSER_DOCK = 'sticky bottom-0 z-10 mx-auto w-full max-w-3xl px-4 pt-8 pb-3 md:pb-6';/);
+  assert.match(css, /export const HOME_FRAME = 'flex min-h-full flex-col';/);
+  // Solid behind the pill and the box; only the top band fades.
+  assert.match(css, /bg-\[linear-gradient\(to_top,var\(--background\)_calc\(100%-2rem\),transparent\)\]/);
+  assert.doesNotMatch(css, /CHAT_COMPOSER_DOCK|TIMELINE_COMPOSER_DOCK|export const DOCK_FADE/);
+  // No surface draws a box of its own; the timeline has no prompts.
+  for (const surface of ['ChatHome.tsx', 'WorkHome.tsx', 'StudyHome.tsx', 'TimelineHome.tsx']) {
+    assert.doesNotMatch(read('v2', 'shell', 'designs', surface), /<HomeComposer\b|useComposerDraft/, surface);
+  }
+  assert.doesNotMatch(read('v2', 'shell', 'designs', 'TimelineHome.tsx'), /HomePrompts/);
+  // The fallbacks draw no box shape: the layout's live box sits under them.
+  assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeFallback.tsx'), /ComposerShape/);
 });

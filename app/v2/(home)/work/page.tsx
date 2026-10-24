@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { V2Home } from '../home';
+import { V2Home } from '../../home';
 
 /**
  * v2 `/work` — the Work home tab as a REAL ROUTE.

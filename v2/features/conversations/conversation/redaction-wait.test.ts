@@ -79,9 +79,12 @@ test('a new redacted chat says the same on the home screen, where its first mess
 
 test('every home fades its suggested prompts while a redacted send waits', () => {
   assert.match(read('v2', 'shell', 'designs', 'home-frame.ts'), /export const CHAT_PROMPTS_HIDDEN = 'pointer-events-none opacity-0';/);
+  // The one shared box reports a held send (Stay, 24 October 2026: one box
+  // for Chat, Work and Study); each home's prompts read it from the context.
+  assert.match(read('v2', 'shell', 'designs', 'HomeFrame.tsx'), /onRedactingChange=\{setRedacting\}/);
   for (const surface of ['ChatHome.tsx', 'WorkHome.tsx', 'StudyHome.tsx']) {
     const source = read('v2', 'shell', 'designs', surface);
-    assert.match(source, /onRedactingChange=\{setRedacting\}/, surface);
+    assert.match(source, /const \{ confidential, redacting \} = useHomeComposer\(\);/, surface);
     assert.match(source, /<div className=\{cn\(CHAT_PROMPTS, redacting && CHAT_PROMPTS_HIDDEN\)\} aria-hidden=\{redacting \|\| undefined\}>/, surface);
   }
 });

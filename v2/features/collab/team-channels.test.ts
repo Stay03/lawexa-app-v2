@@ -116,7 +116,7 @@ test('the gate, the spine, both homes and discover all read the flag, never the 
   // `TimelineHome` (Stay, 24 October 2026: "Yeah add it").
   for (const home of ['WorkHome.tsx', 'StudyHome.tsx', 'TimelineHome.tsx']) {
     const source = read('v2', 'shell', 'designs', home);
-    assert.match(source, /<(HomeTimeline type=\{tab\}|TimelineHome tab="(work|study)" role=\{role\}) \/>/, home);
+    assert.match(source, /<(HomeTimeline type=\{tab\}|TimelineHome tab="(work|study)") \/>/, home);
     assert.doesNotMatch(source, /ChannelMessagesSection/, home);
     assert.doesNotMatch(source, /canAccessCollab/, home);
   }

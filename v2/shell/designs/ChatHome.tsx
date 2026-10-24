@@ -1,19 +1,13 @@
 'use client';
 
-import { useRef, useState } from 'react';
-
 import { cn } from '@/lib/utils';
-import type { UserRole } from '@/types/auth';
 import { HomeGreeting } from './HomeGreeting';
-import { HomeComposer } from './HomeComposer';
 import { HomePrompts } from './HomePrompts';
 import { HomeQuickJump } from './HomeQuickJump';
-import { useComposerDraft } from './composer/useComposerDraft';
+import { useFillPrompt, useHomeComposer } from './home-composer-context';
 import {
-  CHAT_COMPOSER_DOCK,
   CHAT_PROMPTS,
   CHAT_PROMPTS_HIDDEN,
-  DOCK_FADE,
   HOME_GREETING_HEADING_FOCUSED,
   HOME_SURFACE_FOCUSED,
 } from './home-frame';
@@ -62,29 +56,24 @@ import {
  * loading shape and this surface cannot drift apart. The quick-jump row moved to
  * `HomeQuickJump` for the same reason (only the real component reserves the
  * real height; its pills keep to one line). Nothing about the design changed in the extraction.
+ *
+ * ── ONE BOX FOR THE THREE TABS (24 October 2026) ───────────────────────────
+ * Stay: "same chat box with the chat tab ... the tabs switch but the chat box
+ * remains". The box is no longer this surface's: `HomeFrame`, in the home
+ * layout, draws it once under Chat, Work and Study, so switching tabs keeps
+ * what was typed. This surface draws only its content, and reads the box's
+ * state (confidential, a held send, the prompt fill) from
+ * `home-composer-context`.
+ * On a computer that moves Chat's box from under the greeting to the foot of
+ * the screen, as on a phone: the greeting stays at the top of the column and
+ * the prompts sink to just above the box.
  */
 
-export function ChatHome({
-  name,
-  signedIn = false,
-  role,
-}: {
-  name?: string;
-  signedIn?: boolean;
-  role?: UserRole;
-}) {
-  const [input, setInput] = useComposerDraft();
-  const [confidential, setConfidential] = useState(false);
-  // A redacted send waiting on this screen fades the prompts (`onRedactingChange`).
-  const [redacting, setRedacting] = useState(false);
-  const composerAreaRef = useRef<HTMLDivElement>(null);
-
-  // v1 parity: filling a prompt stub also focuses the textarea (places the
-  // cursor / opens the mobile keyboard) so the user can complete the stub.
-  const fillPrompt = (prompt: string) => {
-    setInput(prompt);
-    composerAreaRef.current?.querySelector('textarea')?.focus();
-  };
+export function ChatHome({ name }: { name?: string }) {
+  const { confidential, redacting } = useHomeComposer();
+  // v1 parity: filling a prompt stub also focuses the box (places the cursor /
+  // opens the mobile keyboard) so the user can complete the stub.
+  const fillPrompt = useFillPrompt();
 
   return (
     <div
@@ -102,46 +91,13 @@ export function ChatHome({
       />
 
       {/* Quiet quick-jump nav — MOBILE ONLY (owner #20). Real `<a>` links to
-          canonical paths (proxied to v1 for now). Shared with the route fallback
-          so the reserved row wraps exactly like this one. */}
+          canonical paths. Shared with the route fallback so the reserved row
+          wraps exactly like this one. */}
       <HomeQuickJump />
 
-      {/* Composer dock — MOBILE: `sticky bottom-0` so it pins to the (keyboard-shrunk)
-          viewport bottom rather than sitting half-behind an overlaying keyboard, with a
-          soft bottom fade dissolving the content scrolling behind it (never
-          `position: fixed` — shell-contract safe). DESKTOP: static, the approved
-          top-anchored hero (`md:mt-10`). Hoisted to a DIRECT root-flex child (the SAME
-          structure Work/Study use) so the tall root is its sticky containing block, not
-          a short nested wrapper; `order` sequences it AFTER the prompts on mobile
-          (thumb-docked) and BEFORE them on desktop. No transform lives on the sticky
-          element or its inner ref div — transforms break `position: sticky`. The gold
-          spotlight still pools behind it (the glow sits low on mobile / a touch below
-          centre on desktop, unchanged). */}
-      <div className={CHAT_COMPOSER_DOCK}>
-        <div aria-hidden className={DOCK_FADE} />
-        {/* The shared v2-native composer — the ORIGINAL animated gold-shimmer border
-            comes free from the default PromptInput variant. The ref is the prompt-fill
-            focus target (v1's querySelector pattern). */}
-        <div ref={composerAreaRef}>
-          <HomeComposer
-            value={input}
-            onValueChange={setInput}
-            signedIn={signedIn}
-            role={role}
-            confidential={confidential}
-            onConfidentialChange={setConfidential}
-            className="p-2.5 shadow-lg"
-            onRedactingChange={setRedacting}
-            textareaClassName="text-base md:text-lg"
-            sendButtonClassName="md:size-10"
-          />
-        </div>
-      </div>
-
-      {/* Suggested prompts — MOBILE: v1's stacked list sinking toward the thumb
-          (`mt-auto`), just above the docked composer (owner #27). DESKTOP: a quiet
-          ChatGPT-style list directly under the composer. Exactly one shows per
-          breakpoint. */}
+      {/* Suggested prompts — sinking toward the thumb (`mt-auto`), just above the
+          shared box, on a phone and a computer alike (owner #27). Exactly one
+          shows per breakpoint. */}
       <div className={cn(CHAT_PROMPTS, redacting && CHAT_PROMPTS_HIDDEN)} aria-hidden={redacting || undefined}>
         <div className="md:hidden">
           <HomePrompts variant="mobile" onSelect={fillPrompt} />

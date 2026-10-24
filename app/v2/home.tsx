@@ -73,7 +73,7 @@ export function V2Home({ tab }: { tab: HomeTab }) {
   const surfaceRole = role ?? undefined;
 
   return (
-    <div className="h-full">
+    <div className="flex flex-1 flex-col">
       {/* KEYED ON IDENTITY. The surfaces capture `name` in a first-render-only lazy
           initializer (`HomeGreeting`), so a surface mounted for one identity can never
           re-read it for another. That normally cannot happen — the session is resolved
@@ -90,7 +90,7 @@ export function V2Home({ tab }: { tab: HomeTab }) {
       ) : tab === 'study' ? (
         <StudyHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
       ) : (
-        <ChatHome key={userId} name={firstName} signedIn={signedIn} role={surfaceRole} />
+        <ChatHome key={userId} name={firstName} />
       )}
     </div>
   );
