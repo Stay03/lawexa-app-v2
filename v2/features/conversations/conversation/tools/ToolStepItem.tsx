@@ -27,7 +27,7 @@ import {
   isSearchLikeTool,
 } from './tool-content';
 import type { ToolMessage } from '@/types/chat';
-import { createQuizStepAction, createdQuiz, isCreateQuizStep } from './created-quiz';
+import { isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -201,13 +201,17 @@ export function formatToolMessage(
       return {
         action: isComplete ? 'Memory recalled' : 'Recalling memory',
       };
-    // Quiz from a source (Stay, 23 October 2026): the quiz itself shows as a
-    // card after the chain (`CreatedQuizCard`).
+    // Quiz from a source (Stay, 23 October 2026), and Lawexa building and
+    // editing a quiz itself (24 October 2026): the quiz shows as a card after
+    // the chain (`CreatedQuizCard`); the step names it.
     case 'create_quiz':
-      return {
-        action: createQuizStepAction(isComplete, toolResult, hasResultRef),
-        detail: typeof parameters.title === 'string' && parameters.title.trim() ? parameters.title.trim() : undefined,
-      };
+    case 'add_to_quiz':
+    case 'edit_quiz':
+    case 'read_quiz': {
+      const { action, title } = quizStepLabel(toolName, isComplete, toolResult, hasResultRef);
+      const asked = typeof parameters.title === 'string' && parameters.title.trim() ? parameters.title.trim() : undefined;
+      return { action, detail: title ?? asked };
+    }
     default: {
       const readable = toolName
         .replace(/_/g, ' ')
@@ -325,7 +329,7 @@ export function ToolStepItem({
   // LOADED result: a lazy chat's step carries none until it is fetched (the
   // card fetches it), and the mark read the empty one (shots5, 24 October
   // 2026). The card under the chain already says why, so no "Error:" line.
-  const quizRefused = isCreateQuizStep(message) && createdQuiz(loaded.message)?.kind === 'failed';
+  const quizRefused = isQuizStep(message) && quizStepState(loaded.message)?.kind === 'failed';
   const status = !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
   const { action, detail } = formatToolMessage(
     message.toolName,

@@ -10,9 +10,12 @@ import {
   createQuizStepAction,
   createdQuiz,
   createdQuizLine,
-  quizCardSteps,
+  quizCards,
   quizJobFinished,
   quizJobState,
+  quizStepLabel,
+  quizStepState,
+  refusedLine,
   type QuizJobRef,
 } from './created-quiz';
 
@@ -81,7 +84,9 @@ test('a result not loaded yet is null, so the card asks for it rather than guess
 
 test('the step label says making, made, or could not make, never made above a refusal', () => {
   assert.equal(createQuizStepAction(false, undefined, false), 'Making a quiz');
-  assert.equal(createQuizStepAction(true, { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA' } } }, false), 'Made a quiz');
+  assert.equal(createQuizStepAction(true, { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA', question_count: 10 } } }, false), 'Made a quiz');
+  // The quiz builder starts a quiz with no questions: they come in the steps after.
+  assert.equal(createQuizStepAction(true, { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA', question_count: 0 } } }, false), 'Started a quiz');
   assert.equal(createQuizStepAction(true, { success: true, error: null, data: { data: { error: { code: 'too_short', message: 'TEST DATA. Too short.' } } } }, false), "Couldn't make a quiz");
   // Not loaded yet: a lazy row carries neither the job nor the quiz, so it says only what is sure.
   assert.equal(createQuizStepAction(true, { success: true, error: null, data: null }, true), 'Started a quiz');
@@ -92,14 +97,14 @@ test('the step label says making, made, or could not make, never made above a re
 test('a refused quiz step carries the error mark, with no Error line under it', () => {
   const item = readFileSync(join(here, 'ToolStepItem.tsx'), 'utf8');
   // From the LOADED result: a lazy chat's step has none of its own until fetched (shots5).
-  assert.match(item, /const quizRefused = isCreateQuizStep\(message\) && createdQuiz\(loaded\.message\)\?\.kind === 'failed';/);
+  assert.match(item, /const quizRefused = isQuizStep\(message\) && quizStepState\(loaded\.message\)\?\.kind === 'failed';/);
   assert.match(item, /isSuccess && !quizRefused \? 'success' : 'error'/);
   // No "Error:" line for a refused quiz, whatever the stored flag says: the card says it once.
   assert.match(item, /\{isError && !quizRefused && !isExpanded && \(/);
 });
 
 const NOTE_REFUSAL = "TEST DATA. You can't open that note, so a quiz can't be made from it.";
-const ids = (steps: ToolMessage[]) => quizCardSteps(steps).map((s) => s.id);
+const ids = (steps: ToolMessage[]) => quizCards(steps).map((entry) => entry.step.id);
 /** A reopened chat's step before its result is fetched (`?results=lazy`): no data, a ref to fetch. */
 const lazy = (id: string, messageId: number) => step({ id, toolResult: { success: true, error: null, data: null }, resultRef: { messageId, size: null } });
 /** The same step once fetched: the refusal is the bare sentence, a made quiz is `data.quiz`. */
@@ -141,7 +146,7 @@ test('the cards read every quiz step loaded, through the same cache the card rea
   const list = readFileSync(join(here, '..', 'MessageList.tsx'), 'utf8');
   assert.match(list, /<CompactToolChain messages=\{steps\} \/>\s*<CreatedQuizCards steps=\{steps\} \/>/);
   const cards = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
-  assert.match(cards, /const loaded = useToolResults\(quizSteps\);\s*return quizCardSteps\(loaded\)\.map\(\(step\) => <CreatedQuizCard key=\{step\.id\} message=\{step\} \/>\);/);
+  assert.match(cards, /const quizSteps = steps\.filter\(isQuizCardStep\);\s*const loaded = useToolResults\(quizSteps\);\s*return quizCards\(loaded\)\.map\(\(entry\) => <CreatedQuizCard key=\{entry\.key\} message=\{entry\.step\} refused=\{entry\.refused\} \/>\);/);
   const hook = readFileSync(join(here, 'use-tool-result.ts'), 'utf8');
   // One query shape for one step and for many, so the key is the same and nothing is fetched twice.
   assert.match(hook, /const \{ needed, options \} = toolResultQuery\(conversationId, message, enabled\);\s*const query = useQuery\(options\);/);
@@ -255,4 +260,94 @@ test('the job is asked every 4 s until it is done, failed or gone, and not while
   const card = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
   assert.match(card, /if \(state\.kind === 'job'\) return <QuizJobCard job=\{state\.job\} \/>;/);
   assert.match(card, /const query = useQuizJob\(job\.uuid\);/);
+});
+
+/* Lawexa builds the quiz itself (Stay, 24 October 2026, "one version"):
+ * create_quiz starts it, add_to_quiz and edit_quiz grow and change it,
+ * read_quiz reads it back. Shape from backend, 24 October 2026. */
+
+const QUIZ = (count: number, scenarios = 0) => ({ uuid: 'q-7', title: 'TEST DATA Contract law basics', question_count: count, scenario_count: scenarios, visibility: 'private', url: '/quiz/q-7' });
+const built = (id: string, toolName: string, data: Record<string, unknown>) =>
+  step({ id, toolName, toolResult: { success: true, error: null, data: { success: true, message: '', data } } });
+
+test('one card per quiz: it is drawn from the latest step, at the place of the first', () => {
+  const started = built('m-1', 'create_quiz', { quiz: QUIZ(0) });
+  const added = built('m-2', 'add_to_quiz', { quiz: QUIZ(5, 1), added: { questions: 5, scenarios: 1 }, refused: [] });
+  const addedMore = built('m-3', 'add_to_quiz', { quiz: QUIZ(8, 1), added: { questions: 3, scenarios: 0 }, refused: [] });
+  const read = built('m-4', 'read_quiz', { quiz: QUIZ(8, 1), items: [] });
+  const cards = quizCards([started, added, read, addedMore]);
+  assert.equal(cards.length, 1, 'one quiz, one card; a read has none of its own');
+  assert.equal(cards[0].key, 'quiz:q-7');
+  assert.equal(cards[0].step.id, 'm-3');
+  const state = quizStepState(cards[0].step);
+  assert.equal(state?.kind === 'ready' ? createdQuizLine(state) : '', '8 questions · 1 scenario');
+  // Just started: no questions yet.
+  const fresh = quizStepState(started);
+  assert.equal(fresh?.kind === 'ready' ? createdQuizLine(fresh) : '', 'No questions yet');
+  // Two quizzes in one answer keep two cards.
+  const other = built('m-5', 'create_quiz', { quiz: { ...QUIZ(0), uuid: 'q-8', title: 'TEST DATA Tort' } });
+  assert.deepEqual(quizCards([started, other, added]).map((entry) => entry.key), ['quiz:q-7', 'quiz:q-8']);
+});
+
+test('an edit in a later chat draws the card there too', () => {
+  const edited = built('m-1', 'edit_quiz', { quiz: QUIZ(7, 1), changed: { updated: 2, removed: 1 }, refused: [] });
+  assert.deepEqual(ids([edited]), ['m-1']);
+  assert.deepEqual(quizStepLabel('edit_quiz', true, edited.toolResult, false), { action: 'Edited the quiz', title: 'TEST DATA Contract law basics' });
+});
+
+test('items refused while the rest are saved are said on the card, gathered over the quiz’s steps', () => {
+  const reason = 'TEST DATA. The answer is not one of its options.';
+  const first = built('m-1', 'add_to_quiz', { quiz: QUIZ(4), added: { questions: 4, scenarios: 0 }, refused: [{ index: 4, item: 'question', reason }] });
+  const second = built('m-2', 'add_to_quiz', { quiz: QUIZ(6), added: { questions: 2, scenarios: 0 }, refused: [{ index: 0, item: 'question', reason }] });
+  const [card] = quizCards([first, second]);
+  assert.equal(card.refused.length, 2);
+  assert.equal(refusedLine(card.refused), "2 questions weren't saved");
+  assert.equal(refusedLine(quizCards([first])[0].refused), `1 question wasn't saved: ${reason}`);
+  assert.equal(refusedLine([{ item: 'question', reason }, { item: 'scenario', reason }]), "2 items weren't saved");
+  assert.equal(refusedLine([]), null);
+  // A malformed row is skipped, never shown as a blank reason.
+  assert.equal(quizCards([built('m-3', 'add_to_quiz', { quiz: QUIZ(1), refused: [{ index: 0 }] })])[0].refused.length, 0);
+});
+
+test('each step names what it did, from its loaded result', () => {
+  const add = (added: unknown) => ({ success: true, error: null, data: { data: { quiz: QUIZ(5), added } } });
+  assert.deepEqual(quizStepLabel('add_to_quiz', false, undefined, false), { action: 'Adding to the quiz', title: null });
+  assert.equal(quizStepLabel('add_to_quiz', true, add({ questions: 5, scenarios: 1 }), false).action, 'Added 5 questions and 1 scenario');
+  assert.equal(quizStepLabel('add_to_quiz', true, add({ questions: 1, scenarios: 0 }), false).action, 'Added 1 question');
+  assert.equal(quizStepLabel('add_to_quiz', true, add({ questions: 0, scenarios: 2 }), false).action, 'Added 2 scenarios');
+  assert.equal(quizStepLabel('add_to_quiz', true, add({ questions: 0, scenarios: 0 }), false).action, 'Added nothing to the quiz');
+  // Not loaded yet: what it did, true whatever the result.
+  assert.equal(quizStepLabel('add_to_quiz', true, { success: true, error: null, data: null }, true).action, 'Added to the quiz');
+  assert.equal(quizStepLabel('read_quiz', true, { success: true, error: null, data: { quiz: QUIZ(5), items: [] } }, false).action, 'Read the quiz');
+  assert.equal(quizStepLabel('create_quiz', true, { success: true, error: null, data: { quiz: QUIZ(0) } }, false).action, 'Started a quiz');
+});
+
+test('a whole refusal (no access, not found, not yours) shows its own sentence, and a later good step hides it', () => {
+  const sentence = 'TEST DATA. That quiz is not yours to change.';
+  const refused = step({ id: 'm-1', toolName: 'edit_quiz', toolResult: { success: false, error: null, data: { success: false, message: '', data: { error: { code: 'not_yours', message: sentence } } } } });
+  assert.deepEqual(quizStepState(refused), { kind: 'failed', message: sentence });
+  assert.equal(quizStepLabel('edit_quiz', true, refused.toolResult, false).action, "Couldn't edit the quiz");
+  assert.equal(quizStepLabel('add_to_quiz', true, refused.toolResult, false).action, "Couldn't add to the quiz");
+  assert.equal(quizStepLabel('read_quiz', true, refused.toolResult, false).action, "Couldn't read the quiz");
+  assert.deepEqual(ids([refused]), ['m-1']);
+  const good = built('m-2', 'edit_quiz', { quiz: QUIZ(5), changed: { updated: 1, removed: 0 }, refused: [] });
+  assert.deepEqual(ids([refused, good]), ['m-2']);
+  // An add still running shows no card of its own and hides nothing it cannot answer for.
+  assert.equal(quizStepState(step({ id: 'm-3', toolName: 'add_to_quiz', toolStatus: 'calling' })), null);
+});
+
+test('the step row reads every quiz step, and its refused mark follows the card', () => {
+  const item = readFileSync(join(here, 'ToolStepItem.tsx'), 'utf8');
+  assert.match(item, /case 'create_quiz':\s*case 'add_to_quiz':\s*case 'edit_quiz':\s*case 'read_quiz': \{\s*const \{ action, title \} = quizStepLabel\(toolName, isComplete, toolResult, hasResultRef\);/);
+  const card = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
+  assert.match(card, /<p className="text-xs font-medium text-muted-foreground">Quiz · in My quizzes<\/p>/);
+  assert.match(card, /const notSaved = refusedLine\(refused\);/);
+});
+
+test('an add not loaded yet after a drawn card waits, so no skeleton shows beside the card and then goes', () => {
+  const started = built('m-1', 'create_quiz', { quiz: QUIZ(0) });
+  const pending = step({ id: 'm-2', toolName: 'add_to_quiz', toolResult: { success: true, error: null, data: null }, resultRef: { messageId: 9, size: null } });
+  assert.deepEqual(ids([started, pending]), ['m-1']);
+  // Alone, a step not loaded yet still draws its skeleton.
+  assert.deepEqual(ids([pending]), ['m-2']);
 });

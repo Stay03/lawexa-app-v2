@@ -11,27 +11,30 @@ import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
 import { statusOf } from '@/v2/runtime/persist/policy';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
-  createdQuiz,
   createdQuizLine,
-  isCreateQuizStep,
-  quizCardSteps,
+  isQuizCardStep,
+  quizCards,
   quizJobState,
+  quizStepState,
+  refusedLine,
   type CreatedQuiz,
   type QuizJobRef,
+  type RefusedItem,
 } from '../tools/created-quiz';
 import { useQuizJob } from '../tools/use-quiz-job';
 import { useToolResult, useToolResults } from '../tools/use-tool-result';
 
 /**
- * The quiz cards under one answer's step chain: one per `create_quiz` step,
- * less a refusal that a later step made good (`quizCardSteps`). The rule reads
- * every quiz step's result, loaded first in a reopened chat, through the same
- * cache entries each card reads, so nothing is fetched twice.
+ * The quiz cards under one answer's step chain: one per quiz, drawn from the
+ * latest step that names it, so it grows as Lawexa adds questions; less a
+ * refusal that a later step made good (`quizCards`). The rule reads every quiz
+ * step's result, loaded first in a reopened chat, through the same cache
+ * entries each card reads, so nothing is fetched twice.
  */
 export function CreatedQuizCards({ steps }: { steps: ToolMessage[] }) {
-  const quizSteps = steps.filter(isCreateQuizStep);
+  const quizSteps = steps.filter(isQuizCardStep);
   const loaded = useToolResults(quizSteps);
-  return quizCardSteps(loaded).map((step) => <CreatedQuizCard key={step.id} message={step} />);
+  return quizCards(loaded).map((entry) => <CreatedQuizCard key={entry.key} message={entry.step} refused={entry.refused} />);
 }
 
 /**
@@ -51,9 +54,9 @@ export function CreatedQuizCards({ steps }: { steps: ToolMessage[] }) {
  * The quiz is saved as "Only you" in My quizzes the moment it is made, so Open
  * is its own page and Edit opens it in the form there (`?edit=1`).
  */
-export function CreatedQuizCard({ message }: { message: ToolMessage }) {
+export function CreatedQuizCard({ message, refused = [] }: { message: ToolMessage; refused?: RefusedItem[] }) {
   const loaded = useToolResult(message, message.toolStatus === 'complete');
-  const state = createdQuiz(loaded.message);
+  const state = quizStepState(loaded.message);
 
   if (loaded.status === 'loading' || state === null) {
     return message.toolStatus === 'complete' && loaded.status !== 'error' ? (
@@ -68,7 +71,7 @@ export function CreatedQuizCard({ message }: { message: ToolMessage }) {
   }
 
   if (state.kind === 'job') return <QuizJobCard job={state.job} />;
-  return <QuizCardFace state={state} />;
+  return <QuizCardFace state={state} refused={refused} />;
 }
 
 /** A quiz the server is still making: asked about every few seconds, then drawn as made or failed. */
@@ -82,7 +85,7 @@ function QuizJobCard({ job }: { job: QuizJobRef }) {
 }
 
 /** One face of the card: making, failed, or the made quiz with Open and Edit. */
-function QuizCardFace({ state, job }: { state: CreatedQuiz; job?: QuizJobRef }) {
+function QuizCardFace({ state, job, refused = [] }: { state: CreatedQuiz; job?: QuizJobRef; refused?: RefusedItem[] }) {
   if (state.kind === 'making' || state.kind === 'job') {
     return (
       <div role="status" className="my-2 flex items-start gap-3 rounded-2xl border border-border/60 bg-card p-3 text-sm text-muted-foreground">
@@ -104,14 +107,21 @@ function QuizCardFace({ state, job }: { state: CreatedQuiz; job?: QuizJobRef }) 
     );
   }
 
+  const notSaved = refusedLine(refused);
   return (
     <div className="my-2 rounded-2xl border-2 border-border bg-card p-3.5 shadow-[0_4px_0_var(--border)] motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
       <div className="flex min-w-0 items-start gap-3">
         <QuizTile uuid={state.uuid} title={state.title} />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium text-muted-foreground">Quiz made · in My quizzes, only you can take it</p>
+          <p className="text-xs font-medium text-muted-foreground">Quiz · in My quizzes</p>
           <p className="mt-0.5 line-clamp-2 text-[15px] leading-snug font-semibold text-foreground">{state.title}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{createdQuizLine(state)}</p>
+          <p className="mt-1 text-xs text-muted-foreground tabular-nums">{createdQuizLine(state)}</p>
+          {notSaved ? (
+            <p className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <AlertCircle aria-hidden className="mt-px size-3.5 shrink-0" />
+              <span>{notSaved}</span>
+            </p>
+          ) : null}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
