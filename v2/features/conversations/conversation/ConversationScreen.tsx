@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -26,7 +27,8 @@ import {
 } from './embedded-composer';
 import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './route-composer';
 import { draftOffsets } from './draft/draft-ordinals';
-import { SidePanelProvider } from './side-panel/SidePanelContext';
+import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
+import { useSidePanelHost } from './side-panel/side-panel-host';
 import { SidePanelSlot } from './side-panel/SidePanelSlot';
 
 /** The composer's height, read by the transcript's bottom padding and the
@@ -116,6 +118,9 @@ export function ConversationScreen({
   // same draft (draft-ordinals.ts). Counted from saved text; a streaming flush
   // does not change `messages`, so this does not run per word.
   const offsets = useMemo(() => draftOffsets(messages), [messages]);
+  // Embedded, the page around the chat may show its side panel (the case
+  // page's draft editor, side-panel-host.tsx).
+  const panelHost = useSidePanelHost();
   // External-composer embedding (the case chat's ONE screen): the HOST owns the
   // composer element, this screen owns the conversation — so it renders the
   // transcript only and PUBLISHES its composer-facing surface through the
@@ -397,9 +402,22 @@ export function ConversationScreen({
       {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
           own route, a draft or a file opens beside the transcript on a
           computer and as a sheet on a phone (ChatSidePanel.tsx). Embedded, the
-          host is already a side column, so a draft shows in its card instead. */}
+          host page draws it where it keeps room for it (the case page: a card
+          over the reading, left of the docked chat), through a portal that
+          keeps this chat's context; it waits for the transcript, so a draft
+          is never reported missing from a chat still loading. With no host
+          (the statute page) a draft shows in its card instead. */}
       {embed ? (
-        transcript
+        panelHost ? (
+          <SidePanelValueProvider url={panelHost.url} offsets={offsets} space={controller.space} frame="card">
+            {transcript}
+            {panelHost.element && !isLoadingHistory
+              ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} />, panelHost.element)
+              : null}
+          </SidePanelValueProvider>
+        ) : (
+          transcript
+        )
       ) : (
         <SidePanelProvider offsets={offsets} space={controller.space}>
           <div className="flex h-full min-h-0">

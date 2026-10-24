@@ -548,8 +548,11 @@ export function CaseAskDock({
         </span>
       ) : null}
 
+      {/* `data-v2-case-ask-card`: where the case page measures the floating
+          card from when a draft moves the chat to the dock (case-draft-move.ts). */}
       <div
         ref={cardRef}
+        data-v2-case-ask-card=""
         tabIndex={-1}
         role={screenMounted ? 'dialog' : panelMounted ? 'complementary' : undefined}
         aria-modal={screenMounted ? true : undefined}

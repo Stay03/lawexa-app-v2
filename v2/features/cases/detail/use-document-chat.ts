@@ -53,7 +53,20 @@ const DOCK_PREF_KEY = 'v2-case-chat-docked';
  * document (`chatDraftScope`), which is what lets the composer be the same
  * element in every state.
  */
-export function useDocumentChat(subject: ChatSubject, signedIn: boolean) {
+export function useDocumentChat(
+  subject: ChatSubject,
+  signedIn: boolean,
+  {
+    holdDocked = false,
+  }: {
+    /**
+     * At xl, show the chat docked whatever the reader's choice: the case
+     * page's draft editor opens left of the docked chat, so the chat is docked
+     * for as long as the editor is open (CaseScreen).
+     */
+    holdDocked?: boolean;
+  } = {},
+) {
   const searchParams = useSearchParams();
 
   const [chat, setChat] = useState<string | null>(() => searchParams.get('chat'));
@@ -90,7 +103,7 @@ export function useDocumentChat(subject: ChatSubject, signedIn: boolean) {
   }, [chatClosing]);
 
   const isDesktopPanel = usePanelBreakpoint();
-  const [docked, setDocked] = useState(
+  const [dockedPref, setDocked] = useState(
     () => typeof window !== 'undefined' && window.localStorage.getItem(DOCK_PREF_KEY) === '1',
   );
   const setDockedPref = useCallback((next: boolean) => {
@@ -101,6 +114,8 @@ export function useDocumentChat(subject: ChatSubject, signedIn: boolean) {
       // Preference only: losing it costs a click, never the chat.
     }
   }, []);
+
+  const docked = dockedPref || holdDocked;
 
   const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({ mode: 'auto' });
   const startState = useStartCaseChat(subject, signedIn, switchChat, jurisdiction);
@@ -115,6 +130,7 @@ export function useDocumentChat(subject: ChatSubject, signedIn: boolean) {
   // (full screen below xl). Only the docked column, by choice at xl, is a
   // separate presentation.
   const phone = isDesktopPanel === false;
+  const desktop = isDesktopPanel === true;
   const dockOwnsChat = phone || (isDesktopPanel === true && !docked);
   const showDocked = renderedChat !== null && isDesktopPanel === true && docked;
   // The dock stays mounted through every state it owns, so the composer
@@ -134,6 +150,7 @@ export function useDocumentChat(subject: ChatSubject, signedIn: boolean) {
     switchChat,
     start,
     phone,
+    desktop,
     dockOwnsChat,
     showDock,
     showDocked,

@@ -41,6 +41,14 @@ import './side-panel.css';
  * (`--v2-side-panel-bg`, side-panel.css); and room for a wide page on a wide
  * monitor, up to 56rem. Below xl the sheet is the same as without it.
  *
+ * ── THE CARD (`frame: 'card'`) ──────────────────────────────────────────────
+ * On the case page (side-panel-host.tsx) the panel on a computer is a rounded
+ * card that fills the box the page keeps for it, the reading area left of the
+ * docked chat, in the chat card's own shape (Stay, 24 October 2026: "Move to
+ * the right"). It is uncovered from its left edge (`v2-side-panel-wipe-in`,
+ * side-panel.css) while its contents stay still, and covered again the same
+ * way on close. It writes no width to the root: there is no shell dock to pad.
+ *
  * ── IT CLOSES WITH ITS EXIT ────────────────────────────────────────────────
  * The close button, Escape and the backdrop mark the panel closing; the exit
  * animation's end walks the URL back (SidePanelContext). With reduced motion
@@ -72,12 +80,13 @@ export function ChatSidePanel({
   const panel = useSidePanel();
   const frameRef = useRef<HTMLElement | null>(null);
   const closing = panel?.closing ?? false;
+  const card = panel?.frame === 'card';
 
   // The panel's width on a computer, for the dock's padding (see the docblock).
   // A DOM write in an effect, no React state: the shell reads it in CSS.
   useEffect(() => {
     const frame = frameRef.current;
-    if (!frame) return;
+    if (!frame || card) return;
     const root = document.documentElement;
     root.setAttribute('data-v2-side-panel', '');
     const observer = new ResizeObserver(([entry]) => {
@@ -89,7 +98,7 @@ export function ChatSidePanel({
       root.removeAttribute('data-v2-side-panel');
       root.style.removeProperty('--v2-side-panel-w');
     };
-  }, []);
+  }, [card]);
 
   if (!panel) return null;
 
@@ -125,10 +134,20 @@ export function ChatSidePanel({
           'fixed inset-x-0 top-[calc(var(--visual-top,0px)+2.5rem)] z-50 flex h-[calc(var(--visual-height,100dvh)-2.5rem)] flex-col overflow-hidden rounded-t-3xl border-t border-border bg-popover shadow-[0_-18px_48px_-24px_rgba(0,0,0,0.5)]',
           'motion-safe:animate-in motion-safe:slide-in-from-bottom-10 motion-safe:fade-in motion-safe:duration-300',
           'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-10 data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:motion-safe:fill-mode-forwards',
-          // xl and up: the panel beside the transcript.
-          'xl:static xl:z-auto xl:h-full xl:w-[min(48%,46rem)] xl:min-w-[26rem] xl:shrink-0 xl:rounded-none xl:border-t-0 xl:border-l xl:shadow-none',
-          'xl:motion-safe:slide-in-from-bottom-0 xl:motion-safe:slide-in-from-right-6 xl:data-[state=closed]:motion-safe:slide-out-to-bottom-0 xl:data-[state=closed]:motion-safe:slide-out-to-right-6',
-          bare && 'v2-side-panel-bare xl:w-[min(52%,56rem)] xl:border-l-0',
+          card
+            ? // xl and up, the card: the whole box the host keeps, in the shape of the chat card, wiped in from the left.
+              cn(
+                'xl:static xl:z-auto xl:h-full xl:w-full xl:rounded-2xl xl:border xl:border-border xl:shadow-[0_18px_48px_-24px_rgba(0,0,0,0.35)]',
+                'xl:data-[state=open]:motion-safe:animate-[v2-side-panel-wipe-in_520ms_cubic-bezier(0.32,0.72,0,1)_60ms_both]',
+                'xl:data-[state=closed]:motion-safe:animate-[v2-side-panel-wipe-out_200ms_ease-in_forwards]',
+              )
+            : // xl and up: the panel beside the transcript.
+              cn(
+                'xl:static xl:z-auto xl:h-full xl:w-[min(48%,46rem)] xl:min-w-[26rem] xl:shrink-0 xl:rounded-none xl:border-t-0 xl:border-l xl:shadow-none',
+                'xl:motion-safe:slide-in-from-bottom-0 xl:motion-safe:slide-in-from-right-6 xl:data-[state=closed]:motion-safe:slide-out-to-bottom-0 xl:data-[state=closed]:motion-safe:slide-out-to-right-6',
+                // Bare beside the chat: no rule, the panel's own background, room for a wide page.
+                bare && 'v2-side-panel-bare xl:w-[min(52%,56rem)] xl:border-l-0',
+              ),
         )}
       >
         {/* The grab line, below xl: the sheet's shape, not a control. */}

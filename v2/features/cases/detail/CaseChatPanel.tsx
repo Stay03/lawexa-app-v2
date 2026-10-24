@@ -75,6 +75,7 @@ export function CaseChatDocked({
     <aside
       aria-label={`Chat about this ${CHAT_SUBJECT_NOUN[props.subject.kind]}`}
       data-state={props.closing ? 'closed' : 'open'}
+      data-v2-case-docked=""
       className={cn(
         // The RAIL — transparent flow space (panel + right gutter). The
         // visible chat is the inset PANEL below: a rounded card standing off
@@ -96,8 +97,14 @@ export function CaseChatDocked({
       {/* 0.75rem gaps: sticky 0.75 below the header line, 100dvh − header
           (3.5rem) − two gaps (1.5rem) tall, and the rail's spare 0.75rem
           lands on the right. Panel stays 26rem — the family width — so the
-          pill inside matches the floating card's to the pixel. */}
-      <div className="sticky top-3 flex h-[calc(100dvh-5rem)] w-[26rem] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-[0_18px_48px_-24px_rgba(0,0,0,0.35)]">
+          pill inside matches the floating card's to the pixel. The two
+          `data-v2-case-docked` marks are where the case page finds the rail
+          and the card when a draft moves the floating chat here
+          (case-draft-move.ts). */}
+      <div
+        data-v2-case-docked-card=""
+        className="sticky top-3 flex h-[calc(100dvh-5rem)] w-[26rem] flex-col overflow-hidden rounded-2xl border border-border bg-popover shadow-[0_18px_48px_-24px_rgba(0,0,0,0.35)]"
+      >
         <CaseChatBody {...props} onFloat={onFloat} />
       </div>
     </aside>

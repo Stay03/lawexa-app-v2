@@ -89,7 +89,8 @@ test('the phone chat is a modal dialog that Escape closes and a status line anno
   // The shell's bars leave the tab order by `display: none` (pinned below), the
   // page's own regions by `inert`.
   assert.match(ask, /element\.style\.display = 'none';/);
-  assert.match(screen, /inert=\{pageUnderChat\}/);
+  assert.match(screen, /inert=\{pageUnder\}/);
+  assert.match(screen, /const pageUnder = pageUnderChat \|\| editorShown;/);
 });
 
 test('the keyboard hook publishes the visible height and offset beside the inset, and clears them', () => {

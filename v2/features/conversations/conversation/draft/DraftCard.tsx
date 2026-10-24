@@ -9,9 +9,14 @@ import { MarkdownText } from '../markdown/MarkdownText';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, type DraftBlock } from './draft-blocks';
 
-/** The chat's message box (ChatDock) is focused or has words in it. */
+/**
+ * The chat's message box is focused or has words in it: the shell's box on a
+ * chat's route (ChatDock), the case chat's own on a case page (CaseChatCore).
+ */
 function readerIsTyping(): boolean {
-  const box = document.querySelector<HTMLTextAreaElement>('[data-v2-chat-dock] textarea');
+  const box = document.querySelector<HTMLTextAreaElement>(
+    '[data-v2-chat-dock] textarea, [data-v2-case-chat-composer] textarea',
+  );
   if (!box) return false;
   return document.activeElement === box || box.value.trim() !== '';
 }
@@ -23,8 +28,9 @@ function readerIsTyping(): boolean {
  * text is the panel's, not the transcript's, so a long agreement does not push
  * the conversation off the screen.
  *
- * Outside a chat that has the panel (none today, but the card must never be a
- * dead button), it shows the draft's text in place instead.
+ * Outside a chat that has the panel (the statute page's chat, which no page
+ * hosts a panel for: side-panel-host.tsx), it shows the draft's text in place,
+ * so the card is never a dead button.
  */
 export function DraftCard({
   draft,

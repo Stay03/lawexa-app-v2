@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -26,6 +26,16 @@ import {
   CaseNotFoundState,
 } from './states';
 import { isAccountRole } from '@/v2/runtime/account';
+import {
+  useSidePanelUrl,
+  type SidePanelUrlState,
+} from '@/v2/features/conversations/conversation/side-panel/SidePanelContext';
+import type { SidePanelTarget } from '@/v2/features/conversations/conversation/side-panel/side-panel-value';
+import {
+  SidePanelHostProvider,
+  type SidePanelHost,
+} from '@/v2/features/conversations/conversation/side-panel/side-panel-host';
+import { measureFloatingChat, playMoveToDock, type FloatingChatPlace } from './case-draft-move';
 
 // TEMPORARY, with its file: live viewport numbers for an iPhone recording,
 // loaded only with `?kbdebug=1` on the address (see KeyboardDebugReadout).
@@ -71,6 +81,14 @@ function CaseBody({ slug }: { slug: string }) {
   const searchQuery = searchParams.get('q')?.trim() || undefined;
   const keyboardDebug = searchParams.get('kbdebug') === '1';
 
+  // THE DRAFT EDITOR (Stay, 24 October 2026, option 1: "Move to the right").
+  // A draft Lawexa writes in this page's chat opens in the chat's side panel,
+  // `?side=draft:N`, the main chat's own address, so Back closes it. This page
+  // owns the param (side-panel-host.tsx): on a computer the chat is docked
+  // while it is open, and the editor covers the reading left of the chat.
+  const draftUrl = useSidePanelUrl();
+  const draftOpen = draftUrl.target?.kind === 'draft';
+
   // The chat this page hosts: open/close/switch, the presentation, and the
   // one create state (`useDocumentChat`, shared with the statute page).
   const subject = useMemo<ChatSubject>(() => ({ kind: 'case', slug }), [slug]);
@@ -79,16 +97,80 @@ function CaseBody({ slug }: { slug: string }) {
     renderedChat,
     chatClosing,
     openChat,
-    closeChat,
+    closeChat: closeChatOnly,
     switchChat,
     start,
     phone,
+    desktop,
     dockOwnsChat,
     showDock,
     showDocked,
     pageUnderChat,
     setDockedPref,
-  } = useDocumentChat(subject, signedIn);
+  } = useDocumentChat(subject, signedIn, { holdDocked: draftOpen });
+
+  // Opening a draft on a computer DOCKS a floating chat first, and keeps it
+  // docked after the editor closes: the reader's choice is set, not only
+  // held. The card and the column are measured where they stand, so the
+  // move can be played from there once the docked layout is in
+  // (case-draft-move.ts).
+  const columnRef = useRef<HTMLDivElement | null>(null);
+  const moveFrom = useRef<FloatingChatPlace | null>(null);
+  const { open: showDraft, closeInPlace: dropDraft } = draftUrl;
+  const openDraft = useCallback(
+    (target: SidePanelTarget) => {
+      if (desktop && !showDocked && target.kind === 'draft') {
+        moveFrom.current = measureFloatingChat(columnRef.current);
+        setDockedPref(true);
+      }
+      showDraft(target);
+    },
+    [desktop, showDocked, setDockedPref, showDraft],
+  );
+  useLayoutEffect(() => {
+    const from = moveFrom.current;
+    if (!showDocked || !from) return;
+    moveFrom.current = null;
+    playMoveToDock(from, columnRef.current);
+  }, [showDocked]);
+
+  // Closing the chat takes its draft with it: the panel's param would
+  // otherwise outlive the chat it belongs to.
+  const closeChat = useCallback(() => {
+    dropDraft();
+    closeChatOnly();
+  }, [dropDraft, closeChatOnly]);
+  // Another chat, or the chat list, has no such draft: the editor goes too.
+  const switchChatAway = useCallback(
+    (id: string) => {
+      dropDraft();
+      switchChat(id);
+    },
+    [dropDraft, switchChat],
+  );
+  // Floating the chat while a draft is open closes the editor first (its
+  // exit plays, as on its own ×); the chat floats once it has gone, as
+  // `holdDocked` ends. With reduced motion there is no exit to wait for.
+  const { close: closeDraft, finishClose: finishDraft } = draftUrl;
+  const floatChat = useCallback(() => {
+    if (draftOpen) {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) finishDraft();
+      else closeDraft();
+    }
+    setDockedPref(false);
+  }, [draftOpen, closeDraft, finishDraft, setDockedPref]);
+
+  // Where the embedded chat draws its panel: the editor's box on a computer
+  // (below), the body on a phone, where the panel is the sheet over the
+  // screen and over the phone chat (z-50 at the root, above the chat's z-40).
+  const [draftBox, setDraftBox] = useState<HTMLDivElement | null>(null);
+  const editorShown = signedIn && desktop && draftOpen && showDocked && renderedChat !== 'new';
+  const draftHostUrl = useMemo<SidePanelUrlState>(() => ({ ...draftUrl, open: openDraft }), [draftUrl, openDraft]);
+  const draftHost = useMemo<SidePanelHost>(
+    () => ({ url: draftHostUrl, element: desktop ? draftBox : phone ? document.body : null }),
+    [draftHostUrl, desktop, draftBox, phone],
+  );
+  const pageUnder = pageUnderChat || editorShown;
 
   const query = useQuery(casesQueries.detail(slug, searchQuery));
   const detail = query.data?.data ?? null;
@@ -172,80 +254,97 @@ function CaseBody({ slug }: { slug: string }) {
     // fixed 26rem on the right. Closed, it is exactly the old layout.
     // `overflow-x-clip` so the panel's width reveal can never mint a
     // horizontal scrollbar (clip, not hidden — no scroll container, so the
-    // panel's sticky inner box still tracks the shell scroller).
-    <div className="flex min-h-full w-full overflow-x-clip">
-      {/* The tall column the sticky dock needs: the document is the flow; the
-          pill dock is pinned to the bottom edge and floats over the reading.
-          `.v2-case-doc` scopes the reading typography (case-document.css).
-          `relative` anchors the outline rail beside the column. */}
-      {/* A visitor without an account has no chat box at all (Stay, 19 October
-          2026, 14:07 UTC: "Remove the chat text area"), so the column keeps
-          the reading column's own bottom room that the dock gave it. */}
-      <div
-        className={cn(
-          'v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8',
-          !signedIn && 'pb-24',
-        )}
-      >
-        <ReadingProgress />
-        <div className={arrive} inert={pageUnderChat}>
-          <CaseDocument detail={detail} />
+    // panel's sticky inner box still tracks the shell scroller). `relative`
+    // anchors the draft editor's box over the reading.
+    <SidePanelHostProvider value={draftHost}>
+      <div className="relative flex min-h-full w-full overflow-x-clip">
+        {/* The tall column the sticky dock needs: the document is the flow; the
+            pill dock is pinned to the bottom edge and floats over the reading.
+            `.v2-case-doc` scopes the reading typography (case-document.css).
+            `relative` anchors the outline rail beside the column. */}
+        {/* A visitor without an account has no chat box at all (Stay, 19 October
+            2026, 14:07 UTC: "Remove the chat text area"), so the column keeps
+            the reading column's own bottom room that the dock gave it. */}
+        <div
+          ref={columnRef}
+          className={cn(
+            'v2-case-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8',
+            !signedIn && 'pb-24',
+          )}
+        >
+          <ReadingProgress />
+          <div className={arrive} inert={pageUnder}>
+            <CaseDocument detail={detail} />
+          </div>
+          {/* The map, only when the document is long enough to need one (four or
+              more parts), only where the shell has true dead margin beside the
+              column (≥80rem: the shell is a single full-width scroll region, so
+              a 1280px viewport leaves 256px clear per side — the rail needs
+              216px), and not while the DOCKED chat holds that margin — the
+              floating card leaves the page's geometry alone, so the rail
+              stays. */}
+          {outline.length >= 4 && !showDocked ? (
+            <aside
+              inert={pageUnder}
+              className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block"
+            >
+              <div className={cn('sticky top-8', arrive)}>
+                <CaseOutline sections={outline} />
+              </div>
+            </aside>
+          ) : null}
+          {/* THE composer's dock — on a phone and at xl-floating it is the
+              entire chat (one card, three states). It hides only while the
+              docked column, chosen at xl, owns the composer. */}
+          {signedIn && showDock ? (
+            <CaseAskDock
+              subject={subject}
+              signedIn={signedIn}
+              viewerId={userId}
+              start={start}
+              view={dockOwnsChat ? renderedChat : null}
+              panelOpen={chat !== null && dockOwnsChat}
+              screen={phone}
+              onEngage={() => {
+                if (chat === null) openChat('new');
+              }}
+              onClose={closeChat}
+              onDock={() => setDockedPref(true)}
+              onOpenChat={switchChatAway}
+              arrive={arrival === 'fade'}
+            />
+          ) : null}
         </div>
-        {/* The map, only when the document is long enough to need one (four or
-            more parts), only where the shell has true dead margin beside the
-            column (≥80rem: the shell is a single full-width scroll region, so
-            a 1280px viewport leaves 256px clear per side — the rail needs
-            216px), and not while the DOCKED chat holds that margin — the
-            floating card leaves the page's geometry alone, so the rail
-            stays. */}
-        {outline.length >= 4 && !showDocked ? (
-          <aside
-            inert={pageUnderChat}
-            className="absolute inset-y-0 left-full ml-10 hidden w-44 min-[80rem]:block"
-          >
-            <div className={cn('sticky top-8', arrive)}>
-              <CaseOutline sections={outline} />
-            </div>
-          </aside>
-        ) : null}
-        {/* THE composer's dock — on a phone and at xl-floating it is the
-            entire chat (one card, three states). It hides only while the
-            docked column, chosen at xl, owns the composer. */}
-        {signedIn && showDock ? (
-          <CaseAskDock
+
+        {signedIn && showDocked && renderedChat !== null ? (
+          <CaseChatDocked
+            chatId={renderedChat}
+            closing={chatClosing}
             subject={subject}
             signedIn={signedIn}
             viewerId={userId}
             start={start}
-            view={dockOwnsChat ? renderedChat : null}
-            panelOpen={chat !== null && dockOwnsChat}
-            screen={phone}
-            onEngage={() => {
-              if (chat === null) openChat('new');
-            }}
             onClose={closeChat}
-            onDock={() => setDockedPref(true)}
-            onOpenChat={switchChat}
-            arrive={arrival === 'fade'}
+            onSwitchChat={switchChatAway}
+            onFloat={floatChat}
           />
         ) : null}
+
+        {/* THE DRAFT EDITOR'S BOX, on a computer while a draft is open: the
+            reading area from the sidebar's edge to the docked chat's, 0.75rem
+            clear of both, of the top bar and of the foot, the chat card's own
+            gaps. The rail is 26.75rem (the card and its right gap), so the box
+            ends 0.75rem short of it. Sticky like the card, so it stays on the
+            screen while the page under it keeps its place. The embedded chat
+            draws the editor into it (side-panel-host.tsx). */}
+        {editorShown ? (
+          <div className="pointer-events-none absolute inset-y-0 left-0 right-[27.5rem] z-20 pl-3">
+            <div ref={setDraftBox} className="pointer-events-auto sticky top-3 flex h-[calc(100dvh-5rem)]" />
+          </div>
+        ) : null}
+
+        {keyboardDebug ? <KeyboardDebugReadout /> : null}
       </div>
-
-      {signedIn && showDocked && renderedChat !== null ? (
-        <CaseChatDocked
-          chatId={renderedChat}
-          closing={chatClosing}
-          subject={subject}
-          signedIn={signedIn}
-          viewerId={userId}
-          start={start}
-          onClose={closeChat}
-          onSwitchChat={switchChat}
-          onFloat={() => setDockedPref(false)}
-        />
-      ) : null}
-
-      {keyboardDebug ? <KeyboardDebugReadout /> : null}
-    </div>
+    </SidePanelHostProvider>
   );
 }

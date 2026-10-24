@@ -540,7 +540,9 @@ export function CaseChatComposerDock({
   }, [conversationId, stageRef]);
 
   return (
-    <div className="shrink-0">
+    // `data-v2-case-chat-composer`: a draft that finishes opens itself unless
+    // the reader is writing in this box (DraftCard's `readerIsTyping`).
+    <div data-v2-case-chat-composer="" className="shrink-0">
       {/* Create-failure strip — list state only (a conversation reports errors
           in its own transcript). Persistent-collapse so it animates both ways. */}
       <div

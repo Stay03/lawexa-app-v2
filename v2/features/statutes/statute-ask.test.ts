@@ -48,8 +48,8 @@ test('the statute page hosts the case page’s chat, the same in every part', ()
   assert.match(source, /aria-hidden=\{pageUnderChat \|\| undefined\}/);
   // One box only: no section menu.
   assert.doesNotMatch(source, /Ask about section/);
-  // The case page runs on the same hook.
-  assert.match(read('v2', 'features', 'cases', 'detail', 'CaseScreen.tsx'), /\} = useDocumentChat\(subject, signedIn\);/);
+  // The case page runs on the same hook, held docked while its draft editor is open.
+  assert.match(read('v2', 'features', 'cases', 'detail', 'CaseScreen.tsx'), /\} = useDocumentChat\(subject, signedIn, \{ holdDocked: draftOpen \}\);/);
 });
 
 test('Contents is a button in the bar, not a pill over the text, and stays at every width while the chat is docked', () => {

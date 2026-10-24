@@ -140,7 +140,8 @@ test('a draft opens itself when Lawexa finishes it, unless the reader is writing
   assert.match(card, /const seenWriting = useRef\(!draft\.complete && live\);/);
   assert.match(card, /if \(!seenWriting\.current \|\| !panel\) return;\s*seenWriting\.current = false;\s*if \(!readerIsTyping\(\)\) panel\.open\(\{ kind: 'draft', ordinal \}\);/);
   // Writing means the box is focused or holds words.
-  assert.match(card, /document\.querySelector<HTMLTextAreaElement>\('\[data-v2-chat-dock\] textarea'\)/);
+  // The shell's box on a chat's route, the case chat's own on a case page.
+  assert.match(card, /document\.querySelector<HTMLTextAreaElement>\(\s*'\[data-v2-chat-dock\] textarea, \[data-v2-case-chat-composer\] textarea',\s*\)/);
   assert.match(card, /return document\.activeElement === box \|\| box\.value\.trim\(\) !== '';/);
 });
 

@@ -17,3 +17,39 @@
     background: var(--v2-side-panel-bg);
   }
 }
+
+/* The chat's side panel as a card (ChatSidePanel, `frame: 'card'`): on the
+   case page it opens over the reading, left of the docked chat (Stay, 24
+   October 2026: "Move to the right"). */
+
+/**
+ * A wipe from the left edge: the card is uncovered while its own layout stays
+ * still, so the document does not reflow as it arrives. The fade over the
+ * first third keeps the leading edge soft. The radius matches `rounded-2xl`,
+ * so the corners are round in every frame.
+ */
+@keyframes v2-side-panel-wipe-in {
+  from {
+    clip-path: inset(0 100% 0 0 round 1rem);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  to {
+    clip-path: inset(0 0 0 0 round 1rem);
+    opacity: 1;
+  }
+}
+
+/** Closing covers it again toward the left edge. */
+@keyframes v2-side-panel-wipe-out {
+  from {
+    clip-path: inset(0 0 0 0 round 1rem);
+    opacity: 1;
+  }
+  to {
+    clip-path: inset(0 100% 0 0 round 1rem);
+    opacity: 0;
+  }
+}
