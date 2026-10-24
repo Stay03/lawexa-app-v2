@@ -10,6 +10,7 @@ import { useHeldValue } from '@/v2/features/channels/use-held-value';
 import { fileSize } from '@/v2/features/folders/item-row-model';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { useBackGuard } from '@/v2/runtime/use-back-guard';
 import { pageCountLabel } from './pdf-model';
 import { PdfReader } from './PdfReader';
 import type { PdfViewer } from './use-pdf-viewer';
@@ -28,8 +29,16 @@ import type { PdfViewer } from './use-pdf-viewer';
  *
  * The dialog is always in the tree (Radix Presence plays its exit), and the
  * file is held through the exit so the title does not blank as it fades.
+ *
+ * BACK CLOSES THE READER (the techlead, 24 October 2026: on a phone it is the
+ * whole screen, so Back must close it, not leave the page). While it is open
+ * the page carries one extra history step (`useBackGuard`, as the quiz form's
+ * discard does): Back takes that step and the reader closes. The close button,
+ * Escape and the scrim take the step first (`release`), so none leaves it
+ * behind.
  */
 export function PdfViewerDialog({ viewer }: { viewer: PdfViewer }) {
+  const backGuard = useBackGuard(viewer.file !== null, viewer.close);
   const file = useHeldValue(viewer.file);
   const [counted, setCounted] = useState<{ id: number; pages: number } | null>(null);
   const pages = file && counted?.id === file.id ? counted.pages : null;
@@ -42,7 +51,7 @@ export function PdfViewerDialog({ viewer }: { viewer: PdfViewer }) {
     <ResponsiveOverlay
       open={viewer.file !== null}
       onOpenChange={(open) => {
-        if (!open) viewer.close();
+        if (!open) backGuard.release(viewer.close);
       }}
       title={file?.name ?? 'PDF'}
       description={facts}

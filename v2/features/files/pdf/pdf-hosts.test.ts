@@ -64,6 +64,19 @@ test('a sent chat PDF, a channel message PDF and a channel library PDF open in t
   assert.match(library, /\{isPdf \? <PdfViewerDialog viewer=\{pdf\} \/> : null\}/);
 });
 
+test('Back closes the reader, and a close by button, Escape or scrim leaves no history step (the techlead, 24 October 2026)', () => {
+  const dialog = read('v2', 'features', 'files', 'pdf', 'PdfViewerDialog.tsx');
+  // One extra step while a PDF is open; Back takes it and the reader closes.
+  assert.match(dialog, /const backGuard = useBackGuard\(viewer\.file !== null, viewer\.close\);/);
+  // The overlay's every close takes the step first, then closes.
+  assert.match(dialog, /if \(!open\) backGuard\.release\(viewer\.close\);/);
+  assert.doesNotMatch(dialog, /viewer\.close\(\)/);
+  // The guard walks back only when its own step is on top, and that walk is not the reader's Back.
+  const guard = read('v2', 'runtime', 'use-back-guard.ts');
+  assert.match(guard, /if \(readHistoryStamp\(GUARD_KEY\) === null\) \{\s*then\(\);\s*return;\s*\}\s*releasingRef\.current = true;/);
+  assert.match(guard, /if \(releasingRef\.current \|\| readHistoryStamp\(GUARD_KEY\) !== null\) return;\s*onBackRef\.current\(\);/);
+});
+
 test('the dialog is the responsive overlay, with Download and Open in a new tab in its bar', () => {
   const dialog = read('v2', 'features', 'files', 'pdf', 'PdfViewerDialog.tsx');
   assert.match(dialog, /<ResponsiveOverlay\s/);

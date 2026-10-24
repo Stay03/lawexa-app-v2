@@ -7,9 +7,9 @@ import { useCallback, useState } from 'react';
  * (`PdfViewerDialog`), held in state.
  *
  * IN STATE, NOT IN THE ADDRESS, like the file lists' picture viewer
- * (`use-file-viewer.ts`): those screens hold their viewer in state, so Back
- * leaves the page, and the reader follows the screen it opens over. Escape,
- * the close button and a tap on the scrim close it.
+ * (`use-file-viewer.ts`). Back still closes it: the dialog adds one history
+ * step while open (`PdfViewerDialog`). Escape, the close button and a tap on
+ * the scrim close it too.
  */
 export interface PdfTarget {
   id: number;
