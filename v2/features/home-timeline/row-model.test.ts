@@ -277,8 +277,8 @@ test('the mark is the person (photo or initials), Lawexa’s mark, or "?" for no
   assert.match(lead, /<Icon className="size-2\.5 text-foreground md:size-3" \/>/);
   // The avatar is 32px on a phone, 36px on a computer.
   assert.match(screen, /const AVATAR =\s*'size-8 md:size-9 /);
-  // The line joining a day's avatars, as strong as the day labels' rules read, at each avatar's centre.
-  assert.match(screen, /left-\[28px\] w-px -translate-x-1\/2 bg-foreground\/20 md:top-12 md:-bottom-2\.5 md:left-\[30px\]/);
+  // No line joins the avatars (Stay, 24 October 2026: "remove the vertical line on the avatars").
+  assert.doesNotMatch(screen, /\bw-px\b|joined=/);
 });
 
 test('initials are one neutral grey with muted letters, never a colour per person (Stay, 24 October 2026)', () => {
@@ -390,8 +390,6 @@ test('the line names the rows below it, in the day labels’ dress (the techlead
   // On a day boundary it joins the day's label: "YESTERDAY · BEFORE YOUR LAST VISIT", never two lines stacked.
   assert.match(screen, /<CentredLabel label=\{lineAboveDay \? `\$\{day\.label\} · \$\{NEW_SINCE_WORDS\}` : day\.label\} \/>/);
   assert.doesNotMatch(screen, /'New since your last visit'/);
-  // The avatars of a day are not joined across it.
-  assert.match(screen, /const joined = next !== undefined && next\.key !== newSinceKey;/);
 });
 
 test('last seen is stored per tab, and a bad value reads as never', () => {

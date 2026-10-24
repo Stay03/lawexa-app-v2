@@ -191,18 +191,15 @@ export function HomeTimeline({ type }: { type: TimelineType }) {
                   <CentredLabel label={lineAboveDay ? `${day.label} · ${NEW_SINCE_WORDS}` : day.label} />
                   <ul className="flex flex-col">
                     {day.rows.map((row, index) => {
-                      // The avatars of a day are joined, except across the last-visit line.
-                      const next = day.rows[index + 1];
-                      const joined = next !== undefined && next.key !== newSinceKey;
                       return index > 0 && row.key === newSinceKey ? (
                         <Fragment key={row.key}>
                           <li className="py-2">
                             <CentredLabel as="span" label={NEW_SINCE_WORDS} />
                           </li>
-                          <TimelineRowItem row={row} joined={joined} />
+                          <TimelineRowItem row={row} />
                         </Fragment>
                       ) : (
-                        <TimelineRowItem key={row.key} row={row} joined={joined} />
+                        <TimelineRowItem key={row.key} row={row} />
                       );
                     })}
                   </ul>
@@ -345,19 +342,14 @@ const QUIET_LINK = cn(
  * 2026: "Mobile is too cluttered"): the short sentence, then the Space and a
  * short time in grey, with an invitation's Accept and Decline at that line's
  * right; the row itself opens the chat to reply. One element, two shapes in
- * CSS. `joined` draws the thin line down to the next avatar of the day.
+ * CSS. No line joins the avatars (Stay, 24 October 2026: "remove the
+ * vertical line on the avatars").
  */
-function TimelineRowItem({ row, joined }: { row: TimelineRow; joined: boolean }) {
+function TimelineRowItem({ row }: { row: TimelineRow }) {
   const invitationId = row.invite?.invitationId ?? null;
   const place = row.sentence.place?.name ?? null;
   return (
     <li className="relative">
-      {joined ? (
-        <span
-          aria-hidden
-          className="absolute top-10 -bottom-2 left-[28px] w-px -translate-x-1/2 bg-foreground/20 md:top-12 md:-bottom-2.5 md:left-[30px]"
-        />
-      ) : null}
       <div
         className={cn(
           'relative flex min-w-0 items-start gap-3 rounded-xl px-3 py-2 md:py-2.5',
