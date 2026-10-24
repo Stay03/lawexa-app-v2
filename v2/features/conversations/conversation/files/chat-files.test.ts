@@ -6,7 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { parseToolResult, transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { ApiMessage, ToolMessage } from '@/types/chat';
 import { parseSidePanelValue, sidePanelValue } from '../side-panel/side-panel-value';
-import { chatFileLine, chatFileList, fileCountLabel, fileListFoot, filePanelBody, isFileListStep } from './chat-files';
+import {
+  WORD_PAGES_MAX_BYTES,
+  chatFileLine,
+  chatFileList,
+  fileCountLabel,
+  fileListFoot,
+  filePanelBody,
+  isFileListStep,
+  wordPagesFailure,
+} from './chat-files';
 
 /* The file list in chat, piece a (Stay, 23 October 2026): the files a Lawexa
  * step listed show as one card, and a tap opens one in the side panel. The
@@ -150,25 +159,62 @@ test('?side=file:ID names the file the panel opens', () => {
   assert.match(card, /panel\.open\(\{ kind: 'file', id: row\.id \}\)/);
 });
 
-test('the panel shows pictures and media itself; PDF, Word and the rest go to the one placeholder', () => {
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+test('the panel shows pictures, media and Word pages itself; a PDF and the rest go to the one placeholder', () => {
   assert.equal(filePanelBody({ mime_type: 'image/jpeg', original_name: 'a.jpg' }), 'picture');
   assert.equal(filePanelBody({ mime_type: 'video/mp4', original_name: 'a.mp4' }), 'video');
   assert.equal(filePanelBody({ mime_type: 'audio/mpeg', original_name: 'a.mp3' }), 'audio');
   assert.equal(filePanelBody({ mime_type: 'application/pdf', original_name: 'a.pdf' }), 'pdf');
-  assert.equal(
-    filePanelBody({ mime_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', original_name: 'a.docx' }),
-    'word',
-  );
-  assert.equal(filePanelBody({ mime_type: 'application/rtf', original_name: 'a.rtf' }), 'word');
   assert.equal(filePanelBody({ mime_type: 'application/zip', original_name: 'a.zip' }), 'other');
 
-  // The swap point: FileDocumentPlaceholder is drawn for exactly these kinds,
-  // from the panel's one switch, so the PDF reader and the Word pages replace
-  // one component in one place.
+  // The placeholder is drawn for exactly `pdf` and `other`, from the panel's
+  // one switch, so the PDF reader replaces one component in one place; Word
+  // pages took `word` from it.
   const panel = readHere('FilePanel.tsx');
-  assert.match(
-    panel,
-    /case 'pdf':\n\s+case 'word':\n\s+case 'other':\n\s+return <FileDocumentPlaceholder file=\{file\} kind=\{kind\} \/>;/,
-  );
+  assert.match(panel, /case 'word':\n\s+return <WordPages file=\{file\} \/>;/);
+  assert.match(panel, /case 'pdf':\n\s+case 'other':\n\s+return <FileDocumentPlaceholder file=\{file\} kind=\{kind\} \/>;/);
   assert.equal(panel.match(/function FileBody\(/g)?.length, 1);
+});
+
+/* Piece c (Stay, 23 October 2026): a Word file opens as readable pages, from
+ * GET /files/{id}/preview (lawexa-api f98f9d0c, FilePreviewService). */
+
+test('Word pages are asked for exactly the types and sizes the server turns into pages', () => {
+  assert.equal(filePanelBody({ mime_type: DOCX, original_name: 'TEST DATA lease.docx', size: 86_016 }), 'word');
+  assert.equal(filePanelBody({ mime_type: 'application/msword', original_name: 'old.doc', size: 1000 }), 'word');
+  assert.equal(filePanelBody({ mime_type: 'application/rtf', original_name: 'a.rtf' }), 'word');
+  assert.equal(filePanelBody({ mime_type: 'text/rtf', original_name: 'a.rtf' }), 'word');
+  // The server's own limit: a larger file answers 422, so the panel does not ask.
+  assert.equal(filePanelBody({ mime_type: DOCX, original_name: 'big.docx', size: WORD_PAGES_MAX_BYTES }), 'word');
+  assert.equal(filePanelBody({ mime_type: DOCX, original_name: 'big.docx', size: WORD_PAGES_MAX_BYTES + 1 }), 'other');
+  // The server decides by the stored type, not the name.
+  assert.equal(filePanelBody({ mime_type: 'application/octet-stream', original_name: 'a.docx', size: 1000 }), 'other');
+});
+
+test("a failed preview says why in the server's words, and offers Try again only when it can help", () => {
+  assert.deepEqual(wordPagesFailure(422, 'This file could not be turned into pages.'), {
+    message: 'This file could not be turned into pages. You can still download it.',
+    retry: false,
+  });
+  assert.deepEqual(wordPagesFailure(422, 'This file has no page view. Open or download it instead.'), {
+    message: 'This file has no page view. Open or download it instead.',
+    retry: false,
+  });
+  assert.equal(wordPagesFailure(403, 'This action is unauthorized.').retry, false);
+  assert.equal(wordPagesFailure(404, null).message, 'This file is no longer available.');
+  assert.equal(wordPagesFailure(429, 'Too Many Attempts.').retry, true);
+  assert.equal(wordPagesFailure(500, 'Server Error').retry, true);
+  assert.equal(wordPagesFailure(0, null).message, 'The pages did not load. Try again, or download it.');
+});
+
+test("the server's HTML reaches the page only through the notes sanitiser", () => {
+  const pages = readHere('WordPages.tsx');
+  assert.match(pages, /import \{ NoteContent \} from '@\/v2\/features\/notes\/reader\/NoteContent';/);
+  assert.match(pages, /<NoteContent html=\{html\} \/>/);
+  assert.doesNotMatch(pages, /dangerouslySetInnerHTML|innerHTML|createContextualFragment/);
+  // NoteContent's only input is parseNoteHtml's node tree.
+  const content = readHere('..', '..', '..', 'notes', 'reader', 'NoteContent.tsx');
+  assert.match(content, /useMemo\(\(\) => parseNoteHtml\(html\), \[html\]\)/);
+  assert.doesNotMatch(content, /dangerouslySetInnerHTML=/);
 });

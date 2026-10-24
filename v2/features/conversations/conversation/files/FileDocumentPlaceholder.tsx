@@ -1,6 +1,6 @@
 'use client';
 
-import { Download, ExternalLink, Loader2 } from 'lucide-react';
+import { Download, ExternalLink, Loader2, RotateCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useOpenFileInNewTab, useShowFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
@@ -11,18 +11,27 @@ import { FileMark } from './FileMark';
  * file or any other document TODAY: the file's mark, its name, and Download
  * and Open in a new tab.
  *
- * THE ONE SWAP POINT FOR DOCUMENT PAGES. The PDF reader (piece b) and the
- * Word pages (piece c, `GET /files/{id}/preview`) replace this component for
- * their kinds, in `FilePanel`'s one switch on `filePanelBody`; nothing else in
- * the panel changes when they arrive.
+ * THE ONE SWAP POINT FOR DOCUMENT PAGES. The Word pages (piece c,
+ * `WordPages`) took `word` from it in `FilePanel`'s one switch on
+ * `filePanelBody`; the PDF reader (piece b) takes `pdf` the same way.
+ *
+ * It is also where a document that could not show lands: Word pages that
+ * failed pass their `reason`, and `onRetry` when asking again can help, so
+ * Download stays the way out.
  */
 export function FileDocumentPlaceholder({
   file,
   kind,
+  reason,
+  onRetry,
 }: {
   file: { id: number; original_name: string; mime_type: string };
-  /** "PDF", "Word", ... for the mark and the sentence; `null` when unknown. */
+  /** "PDF", "Word", ... for the mark; `null` when unknown. */
   kind: string | null;
+  /** Why the file is not shown here, in place of the default sentence. */
+  reason?: string;
+  /** Ask again, for a failure that may pass. */
+  onRetry?: () => void;
 }) {
   const download = useOpenFileInNewTab();
   const show = useShowFileInNewTab();
@@ -37,11 +46,17 @@ export function FileDocumentPlaceholder({
         <p className="text-sm text-muted-foreground">
           {gone
             ? 'This file is no longer available.'
-            : 'Open it in a new tab, or download it.'}
+            : (reason ?? 'Open it in a new tab, or download it.')}
         </p>
       </div>
       {gone ? null : (
         <div className="flex flex-wrap justify-center gap-2">
+          {onRetry ? (
+            <Button type="button" variant="outline" onClick={onRetry} className="rounded-full">
+              <RotateCw aria-hidden className="size-4" />
+              Try again
+            </Button>
+          ) : null}
           <Button
             type="button"
             onClick={() => show.open(file.id)}

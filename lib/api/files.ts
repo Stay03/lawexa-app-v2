@@ -6,6 +6,7 @@ import type {
   FileDownloadResponse,
   FileDeleteResponse,
   FileListParams,
+  FilePreviewResponse,
 } from '@/types/file';
 
 /**
@@ -64,6 +65,17 @@ export const filesApi = {
    */
   deleteFile: async (id: number): Promise<FileDeleteResponse> => {
     const response = await apiClient.delete<FileDeleteResponse>(`/files/${id}`);
+    return response.data;
+  },
+
+  /**
+   * A Word or RTF file as readable pages: sanitised HTML the server converts
+   * on the call (pandoc, up to 30 s; kept a day per file version). 422 for a
+   * file with no page view or one that would not convert, with the reason in
+   * `message`.
+   */
+  getPreview: async (id: number): Promise<FilePreviewResponse> => {
+    const response = await apiClient.get<FilePreviewResponse>(`/files/${id}/preview`);
     return response.data;
   },
 

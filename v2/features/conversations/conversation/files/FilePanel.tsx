@@ -18,6 +18,7 @@ import { ChatSidePanel } from '../side-panel/ChatSidePanel';
 import { chatFileLine, filePanelBody } from './chat-files';
 import { FileDocumentPlaceholder } from './FileDocumentPlaceholder';
 import { FileMark } from './FileMark';
+import { WordPages } from './WordPages';
 
 /**
  * FilePanel — one file in the chat's side panel (`?side=file:ID`), opened
@@ -31,9 +32,10 @@ import { FileMark } from './FileMark';
  * rule. A file the reader may not open, or one that is gone, says so.
  *
  * WHAT IT SHOWS TODAY (`filePanelBody`): a picture, drawn from a link that
- * shows it; a video or a recording in the one player (`MediaPlayer`); a PDF,
- * a Word file or anything else as `FileDocumentPlaceholder`, the one
- * component the PDF reader and the Word pages replace.
+ * shows it; a video or a recording in the one player (`MediaPlayer`); a Word
+ * or RTF file as readable pages (`WordPages`, piece c); a PDF or anything
+ * else as `FileDocumentPlaceholder`, the one component the PDF reader
+ * (piece b) replaces.
  */
 export function FilePanel({ fileId }: { fileId: number }) {
   const detail = useQuery(filesQueries.detail(fileId));
@@ -109,8 +111,9 @@ function FileBody({ file, kind }: { file: UserFileDetail; kind: string | null })
           />
         </div>
       );
-    case 'pdf':
     case 'word':
+      return <WordPages file={file} />;
+    case 'pdf':
     case 'other':
       return <FileDocumentPlaceholder file={file} kind={kind} />;
   }

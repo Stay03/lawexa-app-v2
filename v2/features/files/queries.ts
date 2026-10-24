@@ -4,7 +4,7 @@ import { filesApi } from '@/lib/api/files';
 /**
  * The v2 files query factory (standards §2, `cases/queries.ts` is the
  * exemplar): the link a player plays from, the link a picture shows from,
- * and one file's facts.
+ * one file's facts, and a Word file's pages.
  */
 
 /** A minted download link holds for an hour; a player reuses one for 50 minutes. */
@@ -39,6 +39,22 @@ export const filesQueries = {
       queryKey: [...filesQueries.all, 'inline-url', fileId] as const,
       queryFn: () => filesApi.getDownloadUrl(fileId, { inline: true }),
       staleTime: MEDIA_URL_STALE_MS,
+      retry: false,
+      meta: { silentError: true },
+    }),
+
+  /**
+   * A Word or RTF file's pages (`GET /files/{id}/preview`), for the chat's
+   * side panel. The server converts on the call and keeps the result a day,
+   * so a fetched one is kept for the visit. `retry: false`: a refusal (422)
+   * will not change on a second ask, and the panel offers Try again for the
+   * failures that might.
+   */
+  preview: (fileId: number) =>
+    queryOptions({
+      queryKey: [...filesQueries.all, 'preview', fileId] as const,
+      queryFn: () => filesApi.getPreview(fileId),
+      staleTime: Infinity,
       retry: false,
       meta: { silentError: true },
     }),

@@ -60,6 +60,15 @@ export interface FileDownloadResponse {
   data: { url: string };
 }
 
+// A Word or RTF file as readable pages (GET /files/{id}/preview): clean
+// HTML, already passed through the server's NoteHtmlSanitizer. The client
+// still sanitises it again before it renders (lib/notes/note-html.ts).
+export interface FilePreviewResponse {
+  success: boolean;
+  message: string;
+  data: { id: number; name: string; html: string };
+}
+
 // Delete response
 export interface FileDeleteResponse {
   success: boolean;

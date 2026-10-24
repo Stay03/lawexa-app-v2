@@ -187,18 +187,71 @@ export function fileListFoot(list: Pick<ChatFileList, 'rows' | 'total'>, expande
   return { more: list.rows.length - shown, unlisted: list.total - list.rows.length };
 }
 
-/** What the panel does with a file of this type today: a placeholder is where the PDF reader and Word pages go. */
+/**
+ * What the panel draws for a file: a picture, a video or a recording itself;
+ * `word` for a file the server turns into readable pages; a PDF and anything
+ * else on the placeholder (`FileDocumentPlaceholder`), until the PDF reader
+ * (piece b) takes `pdf`.
+ */
 export type FilePanelBody = 'picture' | 'video' | 'audio' | 'pdf' | 'word' | 'other';
 
-export function filePanelBody(file: { mime_type?: string | null; original_name?: string | null }): FilePanelBody {
+/**
+ * The types `GET /files/{id}/preview` turns into pages (lawexa-api
+ * FilePreviewService, f98f9d0c): Word (.docx) and RTF through pandoc, a
+ * legacy .doc from the text extracted at upload. The server decides by the
+ * stored mime type alone, so a .docx stored as `application/octet-stream`
+ * has no page view and keeps the placeholder.
+ */
+export const WORD_PAGE_MIMES: ReadonlySet<string> = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/rtf',
+  'text/rtf',
+  'application/msword',
+]);
+
+/** Above this the server answers 422 and the file opens or downloads instead. */
+export const WORD_PAGES_MAX_BYTES = 20 * 1024 * 1024;
+
+export function filePanelBody(file: {
+  mime_type?: string | null;
+  original_name?: string | null;
+  size?: number | null;
+}): FilePanelBody {
   const view = viewKind({ id: 0, mime_type: file.mime_type, original_name: file.original_name });
   if (view === 'picture') return 'picture';
   if (view === 'video' || view === 'audio') return view;
-  const kind = fileKind(file.mime_type ?? undefined);
-  const extension = (file.original_name ?? '').toLowerCase().split('.').pop() ?? '';
-  if (kind === 'PDF' || extension === 'pdf') return 'pdf';
-  if (kind === 'Word' || ['doc', 'docx', 'rtf'].includes(extension) || (file.mime_type ?? '').includes('rtf')) {
+  const mime = (file.mime_type ?? '').toLowerCase();
+  if (WORD_PAGE_MIMES.has(mime) && (typeof file.size !== 'number' || file.size <= WORD_PAGES_MAX_BYTES)) {
     return 'word';
   }
+  const extension = (file.original_name ?? '').toLowerCase().split('.').pop() ?? '';
+  if (fileKind(file.mime_type ?? undefined) === 'PDF' || extension === 'pdf') return 'pdf';
   return 'other';
+}
+
+/** Why a Word file's pages did not show, and whether asking again can help. */
+export interface WordPagesFailure {
+  message: string;
+  retry: boolean;
+}
+
+/**
+ * The panel's sentence for a failed `GET /files/{id}/preview`, from its
+ * status and the server's own message. A 422 is a refusal that will not
+ * change ("This file could not be turned into pages.", or no page view for
+ * its type or size), said in the server's words; 429 is the route's limit of
+ * 60 a minute; anything else (a dropped line, a 500) may pass, so it offers
+ * Try again.
+ */
+export function wordPagesFailure(status: number, message: string | null): WordPagesFailure {
+  if (status === 422) {
+    const said = message?.trim() || 'This file could not be turned into pages.';
+    return { message: /download/i.test(said) ? said : `${said} You can still download it.`, retry: false };
+  }
+  if (status === 403) return { message: 'You can no longer open this file.', retry: false };
+  if (status === 404) return { message: 'This file is no longer available.', retry: false };
+  if (status === 429) {
+    return { message: 'Too many files opened in a minute. Wait a moment and try again, or download it.', retry: true };
+  }
+  return { message: 'The pages did not load. Try again, or download it.', retry: true };
 }
