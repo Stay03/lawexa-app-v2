@@ -18,7 +18,6 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { Button } from '@/components/ui/button';
 import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
-import { memberStyle } from '@/v2/features/conversations/conversation/member-colour';
 import {
   invitationRowKey,
   usePendingInvitationResponses,
@@ -69,8 +68,9 @@ import type { TimelineType } from './types';
  * ── ONE ROW, ONE CARD ──────────────────────────────────────────────────────
  * Every event is the Space list's row (`spaces/detail/content/feed-rows.tsx`):
  * a 20px mark, a title that says who did what, one grey line, the time on the
- * title's baseline. The mark is ONE kind (fix 4): the person's initials in
- * their member colour, Lawexa's mark, or a neutral "?" for a deleted account.
+ * title's baseline. The mark is ONE kind (fix 4): the person's initials on
+ * one neutral grey, Lawexa's mark, or a "?" on the same grey for a deleted
+ * account.
  * The grey line starts with the Space's name, its own link (fix 3), so the row
  * opens through its TITLE, whose link is stretched over the row; a link inside
  * a link is not allowed, and the Space link sits above the stretched one.
@@ -279,32 +279,21 @@ const TITLE_LINK = cn(
   'after:absolute after:inset-0 after:rounded-xl focus-visible:after:ring-2 focus-visible:after:ring-ring',
 );
 
-/** A person's face in their member colour (`member-colour.ts`), at the lead's 20px. */
-const PERSON_TINT =
-  '[&_[data-slot=avatar-fallback]]:bg-[var(--member-bg)] [&_[data-slot=avatar-fallback]]:text-[var(--member-ink)] dark:[&_[data-slot=avatar-fallback]]:bg-[var(--member-bg-dark)] dark:[&_[data-slot=avatar-fallback]]:text-[var(--member-ink-dark)]';
-
-/** The initials at 20px: two letters at 8px fit the disc. */
+/**
+ * The initials at 20px, two letters at 8px, on ONE neutral grey for everyone
+ * (no coloured tiles, Stay, 24 October 2026): the same surface and the same
+ * muted letters whoever it is. Only Lawexa's mark keeps its gold.
+ */
 const INITIALS_20 =
-  'size-5 [&_[data-slot=avatar-fallback]]:text-[8px] [&_[data-slot=avatar-fallback]]:font-semibold [&_[data-slot=avatar-fallback]]:tracking-[0.02em]';
+  'size-5 [&_[data-slot=avatar-fallback]]:bg-secondary [&_[data-slot=avatar-fallback]]:text-[8px] [&_[data-slot=avatar-fallback]]:font-semibold [&_[data-slot=avatar-fallback]]:tracking-[0.02em] [&_[data-slot=avatar-fallback]]:text-muted-foreground';
 
 function Lead({ lead }: { lead: TimelineLead }) {
   if (lead.type === 'lawexa') return <LogoMark className="size-5 shrink-0" alt="" />;
-  if (lead.type === 'unknown') {
-    // A deleted account: a neutral "?" circle, no colour, no face.
-    return (
-      <span aria-hidden className="flex shrink-0">
-        <MemberAvatar user={{ name: '?', avatar_url: null }} className={INITIALS_20} />
-      </span>
-    );
-  }
-  // The member colour's custom properties ride a wrapper, as in a space
-  // chat's turn (`SpaceTurn`): they are per person, so they cannot be classes.
+  // A deleted account is a "?" on the same grey.
+  const user = lead.type === 'unknown' ? { name: '?', avatar_url: null } : { name: lead.name, avatar_url: lead.avatar };
   return (
-    <span aria-hidden className="flex shrink-0" style={memberStyle(lead.tint)}>
-      <MemberAvatar
-        user={{ name: lead.name, avatar_url: lead.avatar }}
-        className={cn(INITIALS_20, PERSON_TINT)}
-      />
+    <span aria-hidden className="flex shrink-0">
+      <MemberAvatar user={user} className={INITIALS_20} />
     </span>
   );
 }

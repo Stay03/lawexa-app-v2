@@ -20,7 +20,6 @@ import {
   spaceFacts,
   timelineDays,
   timelineRow,
-  tintIndex,
   type TimelineRow,
 } from './row-model';
 import type { TimelineActor, TimelineEnvelope, TimelineEvent, TimelineFileItem, TimelineSpace } from './types';
@@ -366,7 +365,6 @@ test('the mark is the person’s initials, Lawexa’s mark, or "?" for no accoun
     type: 'person',
     name: 'Kemi Bello',
     avatar: null,
-    tint: tintIndex(2),
   });
   assert.equal(row({ kind: 'folder_created', actor: ada, items: [{ id: 'f', name: 'F', url: '', item_count: 1 }] }).lead.type, 'person');
   assert.equal(row({ kind: 'invite', actor: tunde }).lead.type, 'person');
@@ -375,15 +373,17 @@ test('the mark is the person’s initials, Lawexa’s mark, or "?" for no accoun
   assert.deepEqual(row({ kind: 'lawexa_answered', actor: lawexa, items: [{ id: 'c', title: 'T', url: '' }] }).lead, { type: 'lawexa' });
   // The Lead draws MemberAvatar, the "?" circle, or the mark: no lucide icon.
   const lead = screen.slice(screen.indexOf('function Lead('), screen.indexOf('function MetaLine('));
-  assert.match(lead, /<MemberAvatar user=\{\{ name: '\?', avatar_url: null \}\}/);
+  assert.match(lead, /lead\.type === 'unknown' \? \{ name: '\?', avatar_url: null \}/);
+  assert.match(lead, /<MemberAvatar user=\{user\} className=\{INITIALS_20\} \/>/);
   assert.match(lead, /<LogoMark className="size-5 shrink-0" alt="" \/>/);
   assert.doesNotMatch(lead, /ICONS\[|<Icon\b/);
 });
 
-test('a face keeps its tint from its id', () => {
-  assert.equal(tintIndex(10), 2);
-  assert.equal(tintIndex(null), 0);
-  assert.ok(tintIndex('abc') >= 0 && tintIndex('abc') < 8);
+test('every face is the same neutral grey with muted letters, never a colour per person (Stay, 24 October 2026)', () => {
+  assert.match(screen, /\[&_\[data-slot=avatar-fallback\]\]:bg-secondary /);
+  assert.match(screen, /\[&_\[data-slot=avatar-fallback\]\]:text-muted-foreground';/);
+  assert.doesNotMatch(screen, /memberStyle|member-bg|member-ink|PERSON_TINT/);
+  assert.equal('tint' in row({ kind: 'files_added', actor: kemi, items: [file(1, 'a.pdf', PDF)] }).lead, false);
 });
 
 /* ── Fix 1: one row per chat per day ──────────────────────────────────────── */

@@ -20,8 +20,9 @@ import type {
  * ── THE ROW ────────────────────────────────────────────────────────────────
  * A 20px lead, a title that says who did what ("Kemi added 3 files"), one grey
  * line, the time on the title's baseline. The lead is ONE kind of mark: the
- * person's initials in their member colour, or Lawexa's mark; a deleted
- * account is a neutral "?" circle. The grey line STARTS with the Space's name,
+ * person's initials on one neutral grey, the same for everyone (no coloured
+ * tiles, Stay, 24 October 2026), or Lawexa's mark; a deleted account is a "?"
+ * on the same grey. The grey line STARTS with the Space's name,
  * which links to the Space and is never the part that is cut.
  *
  * Under a row there is at most one card, and it is one of four: the words
@@ -45,7 +46,7 @@ export type TimelineIcon = 'document' | 'image' | 'video' | 'audio' | 'folder';
 /** The row's one mark: a person's initials, Lawexa's mark, or "?" for a deleted account. */
 export type TimelineLead =
   | { type: 'lawexa' }
-  | { type: 'person'; name: string; avatar: string | null; tint: number }
+  | { type: 'person'; name: string; avatar: string | null }
   | { type: 'unknown' };
 
 /** One line inside the files card: a file, or a folder of a several-folder row. */
@@ -117,9 +118,6 @@ const KINDS: readonly TimelineEventKind[] = [
   'role_request',
 ];
 
-/** The palette slots of `member-colour.ts`; the face's tint is picked from them. */
-const TINTS = 8;
-
 /**
  * Who, in a title: "You" for the reader, the first name of a name with a
  * space in it, the whole name otherwise, "Someone" for a deleted account.
@@ -137,20 +135,11 @@ function shortObject(actor: TimelineActor): string {
   return actor.is_you ? 'you' : shortName(actor);
 }
 
-/** A stable palette slot for a person, from their id, so a face keeps its tint. */
-export function tintIndex(id: number | string | null): number {
-  if (id === null) return 0;
-  if (typeof id === 'number' && Number.isFinite(id)) return Math.abs(Math.trunc(id)) % TINTS;
-  let hash = 0;
-  for (const char of String(id)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return hash % TINTS;
-}
-
 /** The row's mark for whoever did it. */
 export function leadFor(actor: TimelineActor | null): TimelineLead {
   if (!actor) return { type: 'unknown' };
   if (actor.kind === 'ai') return { type: 'lawexa' };
-  return { type: 'person', name: actor.name, avatar: actor.avatar, tint: tintIndex(actor.id) };
+  return { type: 'person', name: actor.name, avatar: actor.avatar };
 }
 
 function plural(count: number, one: string, many: string): string {
