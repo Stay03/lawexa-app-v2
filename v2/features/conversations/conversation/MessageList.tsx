@@ -36,8 +36,7 @@ import { spaceMarks } from './space-marks';
 import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
 import { CompactToolChain } from './tools/CompactToolChain';
-import { quizCardSteps } from './tools/created-quiz';
-import { CreatedQuizCard } from './cards/CreatedQuizCard';
+import { CreatedQuizCards } from './cards/CreatedQuizCard';
 import { runningSteps } from './tools/running-steps';
 import { ActivityStatus } from './ActivityStatus';
 import { ReferenceChips } from './ReferenceChips';
@@ -949,15 +948,12 @@ const GroupRow = memo(function GroupRow({
     // it without opening the step (quiz from a source, 23 October 2026).
     // In a running turn, a stored step with no result yet is still running
     // (running-steps.ts), so it reads "Making a quiz", not stopped. A refusal
-    // shows no card when another step in the answer made the quiz.
+    // shows no card when a later step in the answer made the quiz.
     const steps = runningSteps(group.messages, isStreaming && isLastGroup);
-    const quizSteps = quizCardSteps(steps);
     body = (
       <>
         <CompactToolChain messages={steps} />
-        {quizSteps.map((step) => (
-          <CreatedQuizCard key={step.id} message={step} />
-        ))}
+        <CreatedQuizCards steps={steps} />
       </>
     );
   } else {

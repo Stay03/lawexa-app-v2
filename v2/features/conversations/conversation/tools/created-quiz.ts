@@ -48,17 +48,30 @@ export function isCreateQuizStep(message: ToolMessage): boolean {
 }
 
 /**
- * The `create_quiz` steps that get a card under one answer. A refusal is left
- * out when another step in the same answer made a quiz, is still making one,
- * or has a result still to fetch (Lucy's live check, 24 October 2026: a first
- * call with a made-up note id was refused, the second made the quiz, and the
- * grey refusal sat above the good card). When every step was refused they all
- * stay, so a reader whose quiz could not be made still reads why.
+ * The `create_quiz` steps that get a card under one answer, read from their
+ * LOADED results (`useToolResults`): a reopened chat downloads them lazily, so
+ * before the fetch neither a refusal nor a made quiz can be told (Lucy's
+ * reload of chat 8f58bf9b, 24 October 2026).
+ *
+ * A refusal shows only when every later quiz step in the answer is known
+ * refused too, or there is none: a later step that made a quiz, is still
+ * making one, or has not loaded yet hides it (Lucy's live check: a first call
+ * with a made-up note id was refused, the second made the quiz, and the grey
+ * refusal sat above the good card). A step not loaded yet with a later quiz
+ * step after it waits, so no card shows and then goes. The last step always
+ * gets its card, as a skeleton while it loads.
  */
 export function quizCardSteps(steps: ToolMessage[]): ToolMessage[] {
   const quizSteps = steps.filter(isCreateQuizStep);
-  const kept = quizSteps.filter((step) => createdQuiz(step)?.kind !== 'failed');
-  return kept.length > 0 ? kept : quizSteps;
+  const states = quizSteps.map(createdQuiz);
+  return quizSteps.filter((_, index) => {
+    const later = states.slice(index + 1);
+    if (later.length === 0) return true;
+    const state = states[index];
+    if (state === null) return false;
+    if (state.kind === 'failed') return later.every((next) => next?.kind === 'failed');
+    return true;
+  });
 }
 
 /**

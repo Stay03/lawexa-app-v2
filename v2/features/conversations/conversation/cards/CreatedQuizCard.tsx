@@ -9,8 +9,20 @@ import type { ToolMessage } from '@/types/chat';
 import { quizFrontHref } from '@/v2/features/quiz/solo/model';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { createdQuiz, createdQuizLine } from '../tools/created-quiz';
-import { useToolResult } from '../tools/use-tool-result';
+import { createdQuiz, createdQuizLine, isCreateQuizStep, quizCardSteps } from '../tools/created-quiz';
+import { useToolResult, useToolResults } from '../tools/use-tool-result';
+
+/**
+ * The quiz cards under one answer's step chain: one per `create_quiz` step,
+ * less a refusal that a later step made good (`quizCardSteps`). The rule reads
+ * every quiz step's result, loaded first in a reopened chat, through the same
+ * cache entries each card reads, so nothing is fetched twice.
+ */
+export function CreatedQuizCards({ steps }: { steps: ToolMessage[] }) {
+  const quizSteps = steps.filter(isCreateQuizStep);
+  const loaded = useToolResults(quizSteps);
+  return quizCardSteps(loaded).map((step) => <CreatedQuizCard key={step.id} message={step} />);
+}
 
 /**
  * CreatedQuizCard — the quiz Lawexa made from a document or a Library item,

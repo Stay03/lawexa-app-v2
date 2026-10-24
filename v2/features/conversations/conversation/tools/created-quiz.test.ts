@@ -82,28 +82,58 @@ test('a refused quiz step carries the error mark, with no Error line under it', 
   assert.match(item, /\{isError && !quizRefused && !isExpanded && \(/);
 });
 
-test('a refusal shows no card when another step in the answer made the quiz (Lucy, 24 October 2026)', () => {
-  const refused = step({ id: 'm-1', toolResult: { success: true, error: "TEST DATA. You can't open that note, so a quiz can't be made from it.", data: null } });
+const NOTE_REFUSAL = "TEST DATA. You can't open that note, so a quiz can't be made from it.";
+const ids = (steps: ToolMessage[]) => quizCardSteps(steps).map((s) => s.id);
+/** A reopened chat's step before its result is fetched (`?results=lazy`): no data, a ref to fetch. */
+const lazy = (id: string, messageId: number) => step({ id, toolResult: { success: true, error: null, data: null }, resultRef: { messageId, size: null } });
+/** The same step once fetched: the refusal is the bare sentence, a made quiz is `data.quiz`. */
+const fetchedRefusal = (id: string, sentence = NOTE_REFUSAL) => step({ id, toolResult: { success: true, error: null, data: sentence }, resultRef: { messageId: 1, size: null } });
+const fetchedQuiz = (id: string) => step({ id, toolResult: { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA Election petitions' } } }, resultRef: { messageId: 2, size: null } });
+
+test('a refusal shows no card when a later step in the answer made the quiz (Lucy, 24 October 2026)', () => {
+  const refused = step({ id: 'm-1', toolResult: { success: true, error: NOTE_REFUSAL, data: null } });
   const made = step({ id: 'm-2', toolResult: { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA Election petitions' } } } });
   const making = step({ id: 'm-3', toolStatus: 'calling' });
-  const toFetch = step({ id: 'm-4', toolResult: { success: true, error: null, data: null }, resultRef: { messageId: 4, size: null } });
-  const ids = (steps: ToolMessage[]) => quizCardSteps(steps).map((s) => s.id);
   assert.deepEqual(ids([refused, made]), ['m-2']);
-  // A second call still running, or a result not fetched yet, may be the quiz: the refusal waits.
+  // A later call still running, or a later result not fetched yet, may be the quiz: the refusal waits.
   assert.deepEqual(ids([refused, making]), ['m-3']);
-  assert.deepEqual(ids([refused, toFetch]), ['m-4']);
-  // With no quiz made in the answer, every refusal stays and says why.
+  assert.deepEqual(ids([refused, lazy('m-4', 4)]), ['m-4']);
+  // With no quiz made after it, a refusal stays and says why.
   const refusedAgain = step({ id: 'm-5', toolResult: { success: true, error: 'TEST DATA. That document is too short to make a quiz from.', data: null } });
   assert.deepEqual(ids([refused]), ['m-1']);
   assert.deepEqual(ids([refused, refusedAgain]), ['m-1', 'm-5']);
+  // A refusal AFTER a made quiz has no later step that made good, so it keeps its card.
+  assert.deepEqual(ids([made, refusedAgain]), ['m-2', 'm-5']);
   // Other tools never get a quiz card.
   assert.deepEqual(ids([step({ id: 'm-6', toolName: 'search_statutes' }), made]), ['m-2']);
 });
 
-test('the card sits after the step chain, and Edit opens the quiz page with its form', () => {
+test('in a reopened chat the rule waits for the loaded results, so no refusal shows above the quiz (Lucy, chat 8f58bf9b)', () => {
+  // Nothing fetched yet: the first step waits (no card, so none appears and then goes); the last one draws its skeleton.
+  assert.deepEqual(ids([lazy('m-1', 1), lazy('m-2', 2)]), ['m-2']);
+  // The refusal has loaded, the quiz has not: still hidden.
+  assert.deepEqual(ids([fetchedRefusal('m-1'), lazy('m-2', 2)]), ['m-2']);
+  // Both loaded, the later one made the quiz: only the quiz.
+  assert.deepEqual(ids([fetchedRefusal('m-1'), fetchedQuiz('m-2')]), ['m-2']);
+  // The later step loads as refused too: both refusals show, each with its reason.
+  assert.deepEqual(ids([fetchedRefusal('m-1'), fetchedRefusal('m-2', 'TEST DATA. Too short.')]), ['m-1', 'm-2']);
+  // A lone step always has its card, loaded or not.
+  assert.deepEqual(ids([lazy('m-1', 1)]), ['m-1']);
+});
+
+test('the cards read every quiz step loaded, through the same cache the card reads', () => {
   const list = readFileSync(join(here, '..', 'MessageList.tsx'), 'utf8');
-  assert.match(list, /const quizSteps = quizCardSteps\(steps\);/);
-  assert.match(list, /<CompactToolChain messages=\{steps\} \/>\s*\{quizSteps\.map\(\(step\) => \(\s*<CreatedQuizCard key=\{step\.id\} message=\{step\} \/>/);
+  assert.match(list, /<CompactToolChain messages=\{steps\} \/>\s*<CreatedQuizCards steps=\{steps\} \/>/);
+  const cards = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
+  assert.match(cards, /const loaded = useToolResults\(quizSteps\);\s*return quizCardSteps\(loaded\)\.map\(\(step\) => <CreatedQuizCard key=\{step\.id\} message=\{step\} \/>\);/);
+  const hook = readFileSync(join(here, 'use-tool-result.ts'), 'utf8');
+  // One query shape for one step and for many, so the key is the same and nothing is fetched twice.
+  assert.match(hook, /const \{ needed, options \} = toolResultQuery\(conversationId, message, enabled\);\s*const query = useQuery\(options\);/);
+  assert.match(hook, /const queries = useQueries\(\{ queries: built\.map\(\(\{ options \}\) => options\) \}\);/);
+  assert.match(hook, /queryKey: \['tool-result', conversationId, ref\?\.messageId\] as const,/);
+});
+
+test('the card sits after the step chain, and Edit opens the quiz page with its form', () => {
   const card = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
   assert.match(card, /href=\{`\$\{quizFrontHref\(state\.uuid\)\}\?edit=1`\}/);
   const front = readFileSync(join(here, '..', '..', '..', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx'), 'utf8');
