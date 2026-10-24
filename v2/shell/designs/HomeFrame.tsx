@@ -47,7 +47,12 @@ function HomeDock({ signedIn, role }: { signedIn: boolean; role?: UserRole }) {
   return (
     <div data-home-dock="" className={HOME_COMPOSER_DOCK}>
       <div aria-hidden className={HOME_DOCK_FADE} />
-      <div ref={areaRef}>
+      {/* ON A COMPUTER, THE SPACE'S SIZE (Stay, 24 October 2026: "for web the
+          study and work chatbox is ridiculously massive. Use the one in the
+          space area its smaller. and nicer"): centred and as wide as the
+          Space's box (`SpaceChatDock`, `max-w-md`), with its text size. On a
+          phone it fills the column, as before. */}
+      <div ref={areaRef} className="md:mx-auto md:w-full md:max-w-md">
         <HomeComposer
           value={value}
           onValueChange={setValue}
@@ -57,8 +62,7 @@ function HomeDock({ signedIn, role }: { signedIn: boolean; role?: UserRole }) {
           onConfidentialChange={setConfidential}
           className="p-2.5 shadow-lg"
           onRedactingChange={setRedacting}
-          textareaClassName="text-base md:text-lg"
-          sendButtonClassName="md:size-10"
+          textareaClassName="text-base"
         />
       </div>
     </div>

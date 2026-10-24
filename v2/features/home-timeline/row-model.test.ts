@@ -607,7 +607,11 @@ test('one chat box, in the home layout, under all three tabs, at the foot of the
   }
   const frame = read('v2', 'shell', 'designs', 'HomeFrame.tsx');
   assert.match(frame, /<HomeComposerProvider key=\{userId \?\? 'visitor'\}>\s*<div className=\{HOME_FRAME\}>\s*<div className=\{HOME_FRAME_CONTENT\}>\{children\}<\/div>\s*<HomeDock signedIn=\{signedIn\} role=\{role \?\? undefined\} \/>/);
-  assert.match(frame, /<div data-home-dock="" className=\{HOME_COMPOSER_DOCK\}>\s*<div aria-hidden className=\{HOME_DOCK_FADE\} \/>\s*<div ref=\{areaRef\}>\s*<HomeComposer/);
+  assert.match(frame, /<div data-home-dock="" className=\{HOME_COMPOSER_DOCK\}>\s*<div aria-hidden className=\{HOME_DOCK_FADE\} \/>\s*\{\/\*[\s\S]*?\*\/\}\s*<div ref=\{areaRef\} className="md:mx-auto md:w-full md:max-w-md">\s*<HomeComposer/);
+  // On a computer the box is the Space's size (Stay, 24 October 2026: "Use
+  // the one in the space area its smaller"), with its text size.
+  assert.match(frame, /textareaClassName="text-base"\s*\/>/);
+  assert.doesNotMatch(frame, /md:text-lg|sendButtonClassName/);
   const css = read('v2', 'shell', 'designs', 'home-frame.ts');
   // Sticky, never fixed: the dock takes its own height after the content.
   assert.match(css, /export const HOME_COMPOSER_DOCK = 'sticky bottom-0 z-10 mx-auto w-full max-w-3xl px-4 pt-8 pb-3 md:pb-6';/);
