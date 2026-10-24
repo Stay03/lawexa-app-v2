@@ -293,3 +293,17 @@ test('Escape in a menu opened from the panel closes the menu alone, not the pane
   // whose target is inside the panel's own element closes it.
   assert.match(frame, /if \(event\.key !== 'Escape' \|\| !event\.currentTarget\.contains\(event\.target as Node\)\) return;\s*event\.stopPropagation\(\);\s*requestClose\(\);/);
 });
+
+test('on a phone the sheet takes the visible rectangle, so the keyboard never hides it, and the chat box is not drawn under it (Arthur, 24 October 2026)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
+  // Placed from the top of what is visible, at what is visible less the 2.5rem strip; never from the page's bottom.
+  assert.match(frame, /'fixed inset-x-0 top-\[calc\(var\(--visual-top,0px\)\+2\.5rem\)\] z-50 flex h-\[calc\(var\(--visual-height,100dvh\)-2\.5rem\)\] flex-col/);
+  assert.doesNotMatch(frame, /fixed inset-x-0 bottom-0 z-50/);
+  // The keyboard hook still publishes the rectangle the sheet reads.
+  const hook = readFileSync(new URL('../../../../shell/use-keyboard-inset.ts', import.meta.url), 'utf8');
+  assert.match(hook, /root\.style\.setProperty\('--visual-height', `\$\{viewport\.height\}px`\);/);
+  assert.match(hook, /root\.style\.setProperty\('--visual-top', `\$\{top\}px`\);/);
+  const shell = readFileSync(new URL('../../../../shell/shell.css', import.meta.url), 'utf8');
+  assert.match(shell, /@media \(max-width: 79\.999rem\) \{[\s\S]*?html\[data-v2-side-panel\] \.v2-shell__dock \{\s*visibility: hidden;\s*\}/);
+});

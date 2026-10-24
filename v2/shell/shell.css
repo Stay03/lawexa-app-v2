@@ -211,6 +211,14 @@ html[data-v2-chat-screen] .v2-shell {
   html[data-v2-side-panel] .v2-shell__content {
     z-index: 43;
   }
+
+  /* And the chat's box is not drawn under it at all (Arthur's recording, 24
+     October 2026: its gold glow showed behind the sheet while he typed). One
+     or the other: while the sheet is open it owns the screen. `visibility`
+     keeps the box's place, so nothing moves when the sheet closes. */
+  html[data-v2-side-panel] .v2-shell__dock {
+    visibility: hidden;
+  }
 }
 
 /* -----------------------------------------------------------------------------

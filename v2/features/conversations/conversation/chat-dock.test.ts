@@ -224,7 +224,7 @@ test('the case page’s side chat takes typing while its thread wires up; only S
 test('below xl the draft sheet sits over the docked box and the bar, on iOS too', () => {
   const css = read('v2', 'shell', 'shell.css');
   // The content region is lifted over the dock (41) and the see-through bar (42) while a side panel is open.
-  assert.match(css, /@media \(max-width: 79\.999rem\) \{\s*html\[data-v2-side-panel\] \.v2-shell__content \{\s*z-index: 43;\s*\}\s*\}/);
+  assert.match(css, /@media \(max-width: 79\.999rem\) \{\s*html\[data-v2-side-panel\] \.v2-shell__content \{\s*z-index: 43;\s*\}/);
   assert.match(css, /\.v2-shell__dock:has\(\[data-v2-chat-dock\]\) \{\s*grid-row: 2;\s*align-self: end;\s*z-index: 41;/);
   assert.match(css, /\.v2-shell__header \{\s*align-self: start;\s*z-index: 42;/);
 });

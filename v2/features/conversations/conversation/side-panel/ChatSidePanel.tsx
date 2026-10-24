@@ -18,10 +18,15 @@ import './side-panel.css';
  * The house rule (ResponsiveOverlay.tsx): the shape changes in CSS, so the
  * first paint is right and a resize never remounts what is typed inside.
  *
- *   below xl   a sheet from the bottom over the chat, with a dimmed backdrop;
- *              its height is the visible viewport minus the iOS keyboard
- *              inset (`--keyboard-inset`), so an editor's caret is never under
- *              the keyboard.
+ *   below xl   a sheet over the chat, with a dimmed backdrop. It takes the
+ *              VISIBLE rectangle the keyboard hook publishes (`--visual-top`,
+ *              `--visual-height`, use-keyboard-inset.ts), less a 2.5rem strip
+ *              at the top, so with the keyboard up it sits whole above it. It
+ *              used to stand on the page's bottom at the height of the screen
+ *              less the keyboard, and on iOS, which leaves the page's bottom
+ *              behind the keyboard, only its title showed above it (Arthur's
+ *              iPhone recording, 24 October 2026). While it is open the chat's
+ *              message box is hidden (shell.css): the sheet owns the screen.
  *   xl and up  a panel BESIDE the transcript, in the chat's own row: the
  *              transcript narrows and stays readable. The floating message box
  *              lives in the shell's dock, outside this row, so the panel writes
@@ -117,7 +122,7 @@ export function ChatSidePanel({
         }}
         className={cn(
           // Below xl: the sheet.
-          'fixed inset-x-0 bottom-0 z-50 flex h-[calc(100dvh-var(--keyboard-inset,0px)-2.5rem)] flex-col overflow-hidden rounded-t-3xl border-t border-border bg-popover shadow-[0_-18px_48px_-24px_rgba(0,0,0,0.5)]',
+          'fixed inset-x-0 top-[calc(var(--visual-top,0px)+2.5rem)] z-50 flex h-[calc(var(--visual-height,100dvh)-2.5rem)] flex-col overflow-hidden rounded-t-3xl border-t border-border bg-popover shadow-[0_-18px_48px_-24px_rgba(0,0,0,0.5)]',
           'motion-safe:animate-in motion-safe:slide-in-from-bottom-10 motion-safe:fade-in motion-safe:duration-300',
           'data-[state=closed]:motion-safe:animate-out data-[state=closed]:motion-safe:slide-out-to-bottom-10 data-[state=closed]:motion-safe:fade-out data-[state=closed]:motion-safe:duration-200 data-[state=closed]:motion-safe:fill-mode-forwards',
           // xl and up: the panel beside the transcript.
