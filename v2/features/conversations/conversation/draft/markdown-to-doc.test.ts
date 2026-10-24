@@ -61,8 +61,8 @@ test('the draft\'s own font goes on every run of text, and a span wins for its w
     '# TEST DATA Agreement\n\nMade <span data-font="Times New Roman" data-size="14">between **the parties**</span> today.\n\n- One\n\n`code`',
     { font: 'Georgia', size: 12 },
   );
-  // The heading and the list carry the draft's font.
-  assert.deepEqual(fontOf(doc.content?.[0].content?.[0]), { font: 'Georgia', size: 12 });
+  // The heading takes the draft's font and keeps its own size; the list takes both.
+  assert.deepEqual(fontOf(doc.content?.[0].content?.[0]), { font: 'Georgia', size: null });
   const runs = doc.content?.[1].content ?? [];
   assert.deepEqual(runs.map((node) => node.text), ['Made ', 'between ', 'the parties', ' today.']);
   assert.deepEqual(fontOf(runs[0]), { font: 'Georgia', size: 12 });

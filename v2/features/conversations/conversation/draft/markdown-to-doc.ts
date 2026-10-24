@@ -26,7 +26,8 @@ import { FONT_STYLE } from '@/v2/features/notes/editor/font-style';
  * as the editor's one font mark (font-style.ts), so a saved note keeps them as
  * the span the server allows:
  *   - the draft's own font and size (`<draft font size>`, draft-blocks.ts),
- *     passed in as `base` and put on every run of text;
+ *     passed in as `base` and put on every run of text, except that headings
+ *     take the font but keep their own size;
  *   - `<span data-font="…" data-size="…">words</span>` inside the Markdown,
  *     which wins over `base` for its words.
  * Only allowed values are kept (lib/notes/note-fonts.ts); a span with none is
@@ -70,7 +71,13 @@ function blocks(nodes: readonly RootContent[], font: DraftFont): JSONContent[] {
 function block(node: RootContent, font: DraftFont): JSONContent[] {
   switch (node.type) {
     case 'heading':
-      return [withContent({ type: 'heading', attrs: { level: Math.min(3, Math.max(1, node.depth)) } }, inline(node.children, font))];
+      // A heading keeps its own size: the draft's font reaches it, the draft's size does not.
+      return [
+        withContent(
+          { type: 'heading', attrs: { level: Math.min(3, Math.max(1, node.depth)) } },
+          inline(node.children, { font: font.font, size: null }),
+        ),
+      ];
     case 'paragraph':
       return [withContent({ type: 'paragraph' }, inline(node.children, font))];
     case 'list':
