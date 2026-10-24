@@ -17,9 +17,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ACTION_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { FolderPicker } from '@/v2/features/folders/picker/FolderPicker';
-import { ExportMenu } from '@/v2/features/notes/reader/NoteActions';
 import { PILL_TRIGGER } from '@/v2/features/notes/editor/ToolbarButton';
 import { useNoteExport } from '@/v2/features/notes/use-note-export';
 import { readSavedDraftNote } from './draft-edits';
@@ -133,23 +132,17 @@ export function DraftSaveBar({ draft, dirty, space }: DraftSaveProps) {
             <span aria-live="polite">{saveLabel(draft)}</span>
           </button>
         )}
+        {/* Once saved, one row: the line and the saved note's ··· menu (Open note,
+            Export Word, Export PDF, Save to folder), as on a computer (Arthur's
+            iPhone recording, 24 October 2026: four pills wrapped onto two rows). */}
         {saved ? (
-          <>
-            <Link href={`/notes/${saved.slug}`} className={cn(ACTION_PILL, FOCUS_RING)}>
-              Open note
-            </Link>
-            <ExportMenu slug={saved.slug} />
-            <button
-              type="button"
-              onClick={() => draft.setFolderOpen(true)}
-              aria-haspopup="dialog"
-              aria-expanded={draft.folderOpen}
-              className={cn(ACTION_PILL, FOCUS_RING)}
-            >
-              <FolderPlus aria-hidden className="size-4" />
-              {folderLabel(space)}
-            </button>
-          </>
+          <SavedNoteMenu
+            slug={saved.slug}
+            dirty={dirty}
+            folder={folderLabel(space)}
+            onFolder={() => draft.setFolderOpen(true)}
+            triggerClassName="size-10"
+          />
         ) : null}
       </div>
       {mutation.isError ? (
@@ -218,24 +211,29 @@ export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
   );
 }
 
-/** The saved note's menu: Open note, the two exports, then Save to folder. */
+/**
+ * The saved note's menu: Open note, the two exports, then Save to folder. The
+ * computer bar's 30px button; the phone sheet's foot passes a 40px one.
+ */
 function SavedNoteMenu({
   slug,
   dirty,
   folder,
   onFolder,
+  triggerClassName = 'size-7.5',
 }: {
   slug: string;
   dirty: boolean;
   folder: string;
   onFolder: () => void;
+  triggerClassName?: string;
 }) {
   const { download, exporting } = useNoteExport(slug);
   return (
     <DropdownMenu>
       <Tooltip>
         <TooltipTrigger asChild>
-          <DropdownMenuTrigger aria-label="Saved note" className={cn(PILL_TRIGGER, 'size-7.5', FOCUS_RING)}>
+          <DropdownMenuTrigger aria-label="Saved note" className={cn(PILL_TRIGGER, triggerClassName, FOCUS_RING)}>
             {exporting ? (
               <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
             ) : (

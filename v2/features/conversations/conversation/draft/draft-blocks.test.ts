@@ -125,7 +125,10 @@ test('Save as note makes a note once, then updates it with the copy it was made 
   assert.match(api, /if \(isNotFoundError\(error\)\) return null;/);
   assert.match(hook, /invalidates: \[notesQueries\.lists\(\)\]/);
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
-  assert.match(bar, /<ExportMenu slug=\{saved\.slug\} \/>/);
+  // The phone sheet's foot, once saved, is one row: the line and the saved note's ··· menu, 40px to tap
+  // (Arthur's iPhone recording, 24 October 2026: four pills wrapped onto two rows).
+  assert.match(bar, /<SavedNoteMenu\s+slug=\{saved\.slug\}\s+dirty=\{dirty\}\s+folder=\{folderLabel\(space\)\}\s+onFolder=\{\(\) => draft\.setFolderOpen\(true\)\}\s+triggerClassName="size-10"\s+\/>/);
+  assert.doesNotMatch(bar, /<ExportMenu\b/);
   assert.match(bar, /target=\{\{ type: 'note', contentId: saved\.id \}\}/);
   assert.match(bar, /space=\{space \?\? undefined\}/);
 });

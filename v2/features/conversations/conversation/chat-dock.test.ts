@@ -228,3 +228,9 @@ test('below xl the draft sheet sits over the docked box and the bar, on iOS too'
   assert.match(css, /\.v2-shell__dock:has\(\[data-v2-chat-dock\]\) \{\s*grid-row: 2;\s*align-self: end;\s*z-index: 41;/);
   assert.match(css, /\.v2-shell__header \{\s*align-self: start;\s*z-index: 42;/);
 });
+
+test('on a phone toasts clear the status bar, and the sheet’s header while one is open (Arthur, 24 October 2026)', () => {
+  const css = read('v2', 'shell', 'shell.css');
+  assert.match(css, /\[data-sonner-toaster\]\[data-y-position='top'\] \{\s*top: calc\(env\(safe-area-inset-top, 0px\) \+ 0\.75rem\) !important;/);
+  assert.match(css, /html\[data-v2-side-panel\] \[data-sonner-toaster\]\[data-y-position='top'\] \{\s*top: calc\(var\(--visual-top, 0px\) \+ 2\.5rem \+ 4\.5rem\) !important;/);
+});

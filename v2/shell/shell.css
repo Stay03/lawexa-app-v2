@@ -219,6 +219,20 @@ html[data-v2-chat-screen] .v2-shell {
   html[data-v2-side-panel] .v2-shell__dock {
     visibility: hidden;
   }
+
+  /* TOASTS CLEAR THE STATUS BAR, AND THE SHEET'S HEADER WHILE ONE IS OPEN
+     (Arthur's iPhone recording, 24 October 2026: "Added to 'Employment
+     Folder'" sat over the draft sheet's title, under the status bar). Sonner
+     sets its top from inline variables, so the top is set here directly. Below
+     the safe area always; with a side panel sheet open, under the sheet's
+     header (its 2.5rem strip, then the grab line and the 72px header). */
+  [data-sonner-toaster][data-y-position='top'] {
+    top: calc(env(safe-area-inset-top, 0px) + 0.75rem) !important;
+  }
+
+  html[data-v2-side-panel] [data-sonner-toaster][data-y-position='top'] {
+    top: calc(var(--visual-top, 0px) + 2.5rem + 4.5rem) !important;
+  }
 }
 
 /* -----------------------------------------------------------------------------
