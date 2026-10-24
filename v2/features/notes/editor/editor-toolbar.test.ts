@@ -170,9 +170,10 @@ test('a computer gets the bar above the note, with tooltips; touch keeps the doc
   assert.match(read('ToolbarButton.tsx'), /compact \? 'size-8' : 'size-9'/);
   // Every computer-bar button has a tooltip naming it, with its keys when it has
   // any (Tester, 20 October 2026: Link, Image and @case had none). Only the
-  // phone bar, which passes neither, keeps the native title.
+  // phone bar, which passes neither, keeps the native title. The draft panel's
+  // floating bar (`pill`) is a computer bar too.
   const button = read('ToolbarButton.tsx');
-  assert.match(button, /const tooltip = compact \|\| shortcut !== undefined;/);
+  assert.match(button, /const tooltip = compact \|\| pill \|\| shortcut !== undefined;/);
   assert.match(button, /title=\{tooltip \? undefined : label\}/);
   assert.match(button, /<TooltipContent side="bottom" sideOffset=\{6\}>\s*<span>\{label\}<\/span>\s*\{shortcut \? <kbd/);
   // A greyed Redo still shows its tooltip: `aria-disabled` keeps the pointer.

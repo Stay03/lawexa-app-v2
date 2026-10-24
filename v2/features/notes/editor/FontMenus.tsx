@@ -7,12 +7,16 @@ import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { FONT_STYLE } from './font-style';
+import { PILL_TRIGGER } from './ToolbarButton';
 import { HOUSE_FONT_LABEL, NOTE_FONTS, NOTE_SIZES, noteFont, noteSize, type NoteFont, type NoteSize } from '@/lib/notes/note-fonts';
 
 /**
@@ -23,6 +27,10 @@ import { HOUSE_FONT_LABEL, NOTE_FONTS, NOTE_SIZES, noteFont, noteSize, type Note
  * font or size, which carries no attribute at all.
  *
  * Each font's name is set in that font, so the reader sees what they pick.
+ *
+ * FontSizeMenu is the two in one control, for the draft panel's floating bar
+ * (take B, Stay 24 October 2026): the trigger reads "Times New Roman 14", the
+ * name in its own face, and one menu holds both lists.
  */
 
 const TRIGGER = cn(
@@ -121,6 +129,74 @@ export function SizeMenu({ editor }: { editor: Editor }) {
           editor.commands.focus();
         }}
       >
+        <DropdownMenuRadioGroup value={size ? String(size) : DEFAULT_VALUE}>
+          <DropdownMenuRadioItem value={DEFAULT_VALUE} onSelect={() => editor.chain().focus().setNoteSize(null).run()}>
+            {HOUSE_FONT_LABEL}
+          </DropdownMenuRadioItem>
+          {NOTE_SIZES.map((option) => (
+            <DropdownMenuRadioItem
+              key={option}
+              value={String(option)}
+              onSelect={() => editor.chain().focus().setNoteSize(option).run()}
+              className="tabular-nums"
+            >
+              {option} pt
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function FontSizeMenu({ editor, menuClassName }: { editor: Editor; menuClassName?: string }) {
+  const { font, size, disabled } = useFontState(editor);
+  const name = font ?? HOUSE_FONT_LABEL;
+  return (
+    <DropdownMenu>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger
+            disabled={disabled}
+            aria-label={`Font and size: ${name}, ${size ? `${size} point` : `${HOUSE_FONT_LABEL} size`}`}
+            onMouseDown={(event) => event.preventDefault()}
+            className={cn(PILL_TRIGGER, 'gap-1.5 pr-1.75 pl-2.25 text-[13px] text-foreground', FOCUS_RING)}
+          >
+            <span className={cn('max-w-[9.5rem] truncate', font && cn(FONT_FACE[font], 'text-sm'))}>{name}</span>
+            {size ? <span className="text-muted-foreground tabular-nums">{size}</span> : null}
+            <ChevronDown aria-hidden className="size-3.25 shrink-0 text-muted-foreground" />
+          </DropdownMenuTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={6}>
+          Font and size
+        </TooltipContent>
+      </Tooltip>
+      <DropdownMenuContent
+        align="start"
+        className={cn('w-52', menuClassName)}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          editor.commands.focus();
+        }}
+      >
+        <DropdownMenuLabel>Font</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={font ?? DEFAULT_VALUE}>
+          <DropdownMenuRadioItem value={DEFAULT_VALUE} onSelect={() => editor.chain().focus().setNoteFont(null).run()}>
+            {HOUSE_FONT_LABEL}
+          </DropdownMenuRadioItem>
+          {NOTE_FONTS.map((option) => (
+            <DropdownMenuRadioItem
+              key={option}
+              value={option}
+              onSelect={() => editor.chain().focus().setNoteFont(option).run()}
+              className={FONT_FACE[option]}
+            >
+              {option}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel>Size</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={size ? String(size) : DEFAULT_VALUE}>
           <DropdownMenuRadioItem value={DEFAULT_VALUE} onSelect={() => editor.chain().focus().setNoteSize(null).run()}>
             {HOUSE_FONT_LABEL}

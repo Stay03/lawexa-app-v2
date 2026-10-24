@@ -159,3 +159,83 @@ test('the draft tag may carry the whole draft\'s font and size; other values are
   // The plain tag still reads as before.
   assert.deepEqual([draftsIn('<draft title="T">\nB\n</draft>')[0].font, draftsIn('<draft title="T">\nB\n</draft>')[0].size], [null, null]);
 });
+
+/* Take B on a computer (Stay, 24 October 2026): a slim title line with Save at
+ * its end, a floating bar over the document, no foot. The phone sheet keeps
+ * its wrapped bar and its foot. */
+
+test('on a computer the draft panel has no foot: Save sits at the end of the slim title line', async () => {
+  const { readFileSync } = await import('node:fs');
+  const panel = readFileSync(new URL('./DraftPanel.tsx', import.meta.url), 'utf8');
+  const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
+  // The frame's slim line is the draft's, with no rule under it; the draft passes no footer.
+  assert.equal(panel.match(/\bslim\b\s*(>|\n)/g)?.length, 2);
+  assert.doesNotMatch(panel, /footer=/);
+  assert.match(frame, /slim && 'xl:h-11 xl:gap-2 xl:border-b-0 xl:py-0 xl:pr-2\.5'/);
+  assert.match(frame, /<div ref=\{setActionSlot\} className="contents" \/>/);
+  assert.match(frame, /return slot \? createPortal\(children, slot\) : null;/);
+  // The sheet's foot is not drawn on a computer; the title line's control is drawn only there.
+  assert.match(bar, /<div className="sticky bottom-0 z-10 [^"]* xl:hidden">/);
+  assert.match(bar, /<div className="relative hidden shrink-0 items-center gap-0\.5 xl:flex">/);
+  assert.match(editor, /<SidePanelActions>\s*<DraftSaveControl draft=\{draft\} dirty=\{dirty\} space=\{space\} \/>\s*<\/SidePanelActions>/);
+  // One save and one folder picker serve both places.
+  assert.equal(editor.match(/useDraftSave\(/g)?.length, 1);
+  assert.equal(editor.match(/<DraftFolderPicker /g)?.length, 1);
+});
+
+test('the gold Save as note is the only primary action on the computer panel', async () => {
+  const { readFileSync } = await import('node:fs');
+  const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
+  assert.equal(control.match(/\bbg-primary\b(?!\/)/g)?.length, 1);
+  assert.match(control, /return draft\.saved \? 'Save changes' : 'Save as note';|\{saveLabel\(draft\)\}/);
+  assert.match(bar, /return draft\.saved \? 'Save changes' : 'Save as note';/);
+  assert.doesNotMatch(editor, /\bbg-primary\b(?!\/)/);
+  // A failed save still says why, beside the button.
+  assert.match(control, /role="alert"[\s\S]*?\{saveFailureSentence\(mutation\.error\)\}/);
+});
+
+test('once saved, a quiet Saved chip and a ··· menu with the note, both exports and Save to folder', async () => {
+  const { readFileSync } = await import('node:fs');
+  const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
+  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
+  assert.match(control, /\{saved && !dirty \? \(\s*<span className="[^"]*bg-primary\/12[^"]*">\s*<Check aria-hidden className="size-\[15px\]" \/>\s*Saved\s*<\/span>/);
+  assert.match(control, /\{saved \? \(\s*<SavedNoteMenu/);
+  const menu = bar.slice(bar.indexOf('function SavedNoteMenu'), bar.indexOf('export function DraftFolderPicker'));
+  const order = ['Saved to your notes', 'Open note', 'Export Word', '.docx', 'Export PDF', '.pdf', '{folder}'];
+  let at = -1;
+  for (const word of order) {
+    const next = menu.indexOf(word, at + 1);
+    assert.ok(next > at, word);
+    at = next;
+  }
+  assert.match(menu, /onSelect=\{\(\) => void download\('docx'\)\}/);
+  assert.match(menu, /onSelect=\{\(\) => void download\('pdf'\)\}/);
+  assert.match(menu, /<Link href=\{`\/notes\/\$\{slug\}`\}>/);
+});
+
+test('the computer bar floats over the document; its ··· holds the lists, alignment and Copy', async () => {
+  const { readFileSync } = await import('node:fs');
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  const pill = editor.slice(editor.indexOf('function DraftPillToolbar'), editor.indexOf('function PillMoreMenu'));
+  const more = editor.slice(editor.indexOf('function PillMoreMenu'));
+  // Sticky over the top of the document, drawn on a computer only; the sheet's bar is not.
+  assert.match(pill, /className="@container\/draft sticky top-0 z-10 hidden h-0 xl:block"/);
+  assert.match(pill, /className="v2-draft-pill pointer-events-auto flex /);
+  assert.match(editor, /className="sticky top-0 z-10 flex shrink-0 flex-wrap [^"]* xl:hidden"/);
+  // undo, redo · style, font and size · B I U, then ···.
+  assert.match(pill, /<StyleSelect editor=\{editor\} state=\{state\} mac=\{mac\} pill /);
+  assert.match(pill, /<FontSizeMenu editor=\{editor\} /);
+  assert.match(pill, /<PillMoreMenu /);
+  assert.doesNotMatch(pill, /LIST_VERBS\.map|<AlignMenu|icon=\{copied/);
+  assert.match(more, /LIST_VERBS\.map/);
+  assert.match(more, /ALIGN_OPTIONS\.map/);
+  assert.match(more, /'Copy text'/);
+  // At a narrow panel Redo and Underline fold into ···, by the same width in CSS and in the menu.
+  assert.match(editor, /const PILL_FOLD_WIDTH = 520;/);
+  assert.equal(pill.match(/@max-\[32\.5rem\]\/draft:hidden/g)?.length, 2);
+  assert.match(more, /\{folded \? \(/);
+});

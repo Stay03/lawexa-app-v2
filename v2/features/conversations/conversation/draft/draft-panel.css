@@ -1,0 +1,144 @@
+/**
+ * The draft panel beside the chat, take B (Stay, 24 October 2026): a slim
+ * title line, a floating bar over the top of the document, and the document
+ * itself with no frame. Everything else in the panel is the app's own tokens
+ * (globals.css); this file holds only what the approved mock added, the bar's
+ * and the menus' surfaces, and the document's type on a computer.
+ *
+ * The phone sheet (below xl) does not use any of it.
+ */
+
+:root {
+  --v2-draft-pill-bg: var(--popover);
+  --v2-draft-pill-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 6px 20px -6px rgb(0 0 0 / 0.14), 0 0 0 1px rgb(0 0 0 / 0.05);
+  --v2-draft-menu-bg: var(--popover);
+  --v2-draft-menu-shadow: 0 2px 4px rgb(0 0 0 / 0.05), 0 12px 32px -8px rgb(0 0 0 / 0.18), 0 0 0 1px rgb(0 0 0 / 0.06);
+  --v2-draft-rule: color-mix(in oklab, var(--foreground) 8%, transparent);
+}
+
+.dark {
+  --v2-draft-pill-bg: oklch(0.245 0 0);
+  --v2-draft-pill-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -8px rgb(0 0 0 / 0.7), inset 0 0 0 1px oklch(1 0 0 / 6%);
+  --v2-draft-menu-bg: oklch(0.235 0 0);
+  --v2-draft-menu-shadow: 0 2px 6px rgb(0 0 0 / 0.4), 0 16px 40px -10px rgb(0 0 0 / 0.75), inset 0 0 0 1px oklch(1 0 0 / 8%);
+  --v2-draft-rule: oklch(1 0 0 / 9%);
+}
+
+/* The floating bar: a raised surface with a soft shadow and no border. */
+.v2-draft-pill {
+  background: var(--v2-draft-pill-bg);
+  box-shadow: var(--v2-draft-pill-shadow);
+}
+
+/* The raised surface of the menus and of a failed save's note. */
+.v2-draft-surface,
+.v2-draft-menu {
+  background: var(--v2-draft-menu-bg);
+  box-shadow: var(--v2-draft-menu-shadow);
+}
+
+/* The bar's menus and the saved draft's menu: a little tighter than the
+   app's default menu, with the bar's soft hover. */
+.v2-draft-menu {
+  border-radius: 0.75rem;
+  padding: 5px;
+}
+
+.v2-draft-menu [data-slot='dropdown-menu-item'],
+.v2-draft-menu [data-slot='dropdown-menu-checkbox-item'],
+.v2-draft-menu [data-slot='dropdown-menu-radio-item'] {
+  min-height: 34px;
+  padding-block: 7px;
+  padding-left: 10px;
+  border-radius: 0.5rem;
+  font-size: 13.5px;
+}
+
+.v2-draft-menu [data-slot='dropdown-menu-item'] {
+  padding-right: 10px;
+}
+
+.v2-draft-menu [data-slot='dropdown-menu-item']:focus,
+.v2-draft-menu [data-slot='dropdown-menu-checkbox-item']:focus,
+.v2-draft-menu [data-slot='dropdown-menu-radio-item']:focus {
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+  color: var(--foreground);
+}
+
+.dark .v2-draft-menu [data-slot='dropdown-menu-item']:focus,
+.dark .v2-draft-menu [data-slot='dropdown-menu-checkbox-item']:focus,
+.dark .v2-draft-menu [data-slot='dropdown-menu-radio-item']:focus {
+  background: oklch(1 0 0 / 7%);
+}
+
+.v2-draft-menu [data-slot='dropdown-menu-separator'] {
+  background: var(--v2-draft-rule);
+  margin: 5px 6px;
+}
+
+/* The document on a computer: the mock's type, and tables drawn with rules
+   between rows rather than a box round every cell. */
+@media (min-width: 80rem) {
+  .v2-draft-doc {
+    font-size: 15px;
+    line-height: 1.72;
+  }
+
+  .v2-draft-doc h1 {
+    margin: 0 0 14px;
+    font-size: 23px;
+    line-height: 1.3;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+  }
+
+  .v2-draft-doc h2 {
+    margin: 28px 0 8px;
+    font-size: 17px;
+    line-height: 1.4;
+    font-weight: 620;
+  }
+
+  .v2-draft-doc h3 {
+    margin: 22px 0 6px;
+    font-size: 15px;
+    line-height: 1.45;
+    font-weight: 620;
+  }
+
+  .v2-draft-doc p {
+    margin: 0 0 12px;
+  }
+
+  .v2-draft-doc li {
+    margin: 0 0 6px;
+  }
+
+  .v2-draft-doc li > p {
+    margin: 0;
+  }
+
+  .v2-draft-doc table {
+    font-size: 14px;
+  }
+
+  .v2-draft-doc th,
+  .v2-draft-doc td {
+    border: 0;
+    border-bottom: 1px solid var(--v2-draft-rule);
+    background: none;
+  }
+
+  .v2-draft-doc th {
+    padding: 0 12px 8px 0;
+    color: var(--muted-foreground);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .v2-draft-doc td {
+    padding: 9px 12px 9px 0;
+  }
+}

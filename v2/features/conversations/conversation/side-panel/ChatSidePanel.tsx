@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -27,11 +28,22 @@ import { useSidePanel } from './SidePanelContext';
  *              its width to `--v2-side-panel-w` on the root and a shell.css
  *              rule pads the dock by it, keeping the box over the transcript.
  *
+ * ── THE SLIM LINE (`slim`) ─────────────────────────────────────────────────
+ * The draft's header on a computer (take B, Stay 24 October 2026): one 44px
+ * line with a small icon, the title and the subtitle in small muted text, the
+ * actions, then the close; no rule under it, so the body runs up to it. Below
+ * xl the header is the same as without it. A control that lives deep in the
+ * body (the draft's Save, which needs its editor) reaches the header through
+ * `SidePanelActions`, a portal into the slot after `actions`.
+ *
  * ── IT CLOSES WITH ITS EXIT ────────────────────────────────────────────────
  * The close button, Escape and the backdrop mark the panel closing; the exit
  * animation's end walks the URL back (SidePanelContext). With reduced motion
  * there is no animation to end, so it closes at once.
  */
+
+/** The header's slot for `SidePanelActions`; `null` until the header is in place. */
+const ActionSlotContext = createContext<HTMLElement | null>(null);
 
 export function ChatSidePanel({
   label,
@@ -40,6 +52,7 @@ export function ChatSidePanel({
   icon,
   actions,
   footer,
+  slim = false,
   children,
 }: {
   /** The panel's accessible name ("Draft", "File"). */
@@ -50,10 +63,13 @@ export function ChatSidePanel({
   /** Buttons beside the close button. */
   actions?: ReactNode;
   footer?: ReactNode;
+  /** On a computer, the header is one slim line (see the docblock). */
+  slim?: boolean;
   children: ReactNode;
 }) {
   const panel = useSidePanel();
   const frameRef = useRef<HTMLElement | null>(null);
+  const [actionSlot, setActionSlot] = useState<HTMLElement | null>(null);
   const closing = panel?.closing ?? false;
 
   // The panel's width on a computer, for the dock's padding (see the docblock).
@@ -115,26 +131,53 @@ export function ChatSidePanel({
       >
         {/* The grab line, below xl: the sheet's shape, not a control. */}
         <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-border xl:hidden" />
-        <header className="flex shrink-0 items-center gap-3 border-b border-border/70 px-4 py-3 xl:px-5">
+        <header
+          className={cn(
+            'flex shrink-0 items-center gap-3 border-b border-border/70 px-4 py-3 xl:px-5',
+            slim && 'xl:h-11 xl:gap-2 xl:border-b-0 xl:py-0 xl:pr-2.5',
+          )}
+        >
           {icon ? <span className="shrink-0">{icon}</span> : null}
-          <div className="min-w-0 flex-1">
-            <h2 className="truncate text-[15px] leading-snug font-semibold text-foreground">{title}</h2>
-            {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
+          <div className={cn('min-w-0 flex-1', slim && 'xl:flex xl:items-center xl:gap-2')}>
+            <h2
+              className={cn(
+                'truncate text-[15px] leading-snug font-semibold text-foreground',
+                slim && 'xl:min-w-0 xl:text-[12.5px] xl:font-normal xl:text-muted-foreground',
+              )}
+            >
+              {title}
+            </h2>
+            {subtitle ? (
+              <p
+                className={cn(
+                  'truncate text-xs text-muted-foreground',
+                  slim && 'xl:shrink-0 xl:overflow-visible xl:text-[12.5px] xl:text-muted-foreground/75',
+                )}
+              >
+                {slim ? <span aria-hidden className="hidden xl:inline">· </span> : null}
+                {subtitle}
+              </p>
+            ) : null}
           </div>
           {actions}
+          <div ref={setActionSlot} className="contents" />
           <button
             type="button"
             onClick={requestClose}
             aria-label="Close"
             className={cn(
               'v2-interactive -mr-1.5 flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+              slim &&
+                'xl:mr-0 xl:size-7.5 xl:rounded-lg xl:text-foreground/62 xl:hover:bg-foreground/6 dark:xl:hover:bg-white/7',
               FOCUS_RING,
             )}
           >
             <X aria-hidden className="size-4" />
           </button>
         </header>
-        <div className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+        <div className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <ActionSlotContext.Provider value={actionSlot}>{children}</ActionSlotContext.Provider>
+        </div>
         {footer ? (
           <footer className="flex shrink-0 items-center gap-2 border-t border-border/70 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] xl:px-5">
             {footer}
@@ -143,4 +186,15 @@ export function ChatSidePanel({
       </aside>
     </>
   );
+}
+
+/**
+ * Controls from inside the body, drawn in the header after its `actions`:
+ * a portal, so they keep their state and their place in the body's tree (the
+ * draft's Save reads the editor it sits beside) while they show in the header.
+ * Nothing is drawn outside a side panel or before its header is in place.
+ */
+export function SidePanelActions({ children }: { children: ReactNode }) {
+  const slot = useContext(ActionSlotContext);
+  return slot ? createPortal(children, slot) : null;
 }
