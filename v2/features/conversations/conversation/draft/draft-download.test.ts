@@ -121,3 +121,19 @@ test('on the phone sheet, before the first save, the foot has Download Word and 
   assert.match(pill, /className=\{cn\(ACTION_PILL, FOCUS_RING\)\}/);
   assert.match(pill, /\{downloads\.downloading === format \? \(\s*<Loader2 /);
 });
+
+test('the route’s 422 is shown in its own words; a guest is asked to sign in (backend 2390231a)', async () => {
+  const input: DraftFileInput = { title: 'TEST DATA Draft', html: '<p>TEST DATA</p>', format: 'pdf' };
+  const tooLarge = 'The document is too large to download. It can be at most 2 MB.';
+  // The request asks for a file, so the error body is a Blob holding the JSON.
+  const blob = new Blob([JSON.stringify({ message: 'The given data was invalid.', errors: { html: [tooLarge] } })], { type: 'application/json' });
+  const refused = await fetchDraftFile(() => Promise.reject({ response: { status: 422, data: blob } }), input);
+  assert.deepEqual(refused, { ok: false, failure: tooLarge });
+  const empty = 'There is nothing in the document to download.';
+  const plain = await fetchDraftFile(() => Promise.reject({ response: { status: 422, data: { errors: { html: [empty] } } } }), input);
+  assert.deepEqual(plain, { ok: false, failure: empty });
+  // A 422 with no readable reason falls back to the retry sentence.
+  const unreadable = await fetchDraftFile(() => Promise.reject({ response: { status: 422, data: 'not json' } }), input);
+  assert.deepEqual(unreadable, { ok: false, failure: "Couldn't download the draft. Try again." });
+  assert.equal(downloadFailureSentence({ response: { status: 403 } }), 'Sign in to download this draft.');
+});
