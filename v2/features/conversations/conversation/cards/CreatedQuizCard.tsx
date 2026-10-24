@@ -8,8 +8,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ToolMessage } from '@/types/chat';
 import { quizFrontHref } from '@/v2/features/quiz/solo/model';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
+import { statusOf } from '@/v2/runtime/persist/policy';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { createdQuiz, createdQuizLine, isCreateQuizStep, quizCardSteps } from '../tools/created-quiz';
+import {
+  createdQuiz,
+  createdQuizLine,
+  isCreateQuizStep,
+  quizCardSteps,
+  quizJobState,
+  type CreatedQuiz,
+  type QuizJobRef,
+} from '../tools/created-quiz';
+import { useQuizJob } from '../tools/use-quiz-job';
 import { useToolResult, useToolResults } from '../tools/use-tool-result';
 
 /**
@@ -28,12 +38,15 @@ export function CreatedQuizCards({ steps }: { steps: ToolMessage[] }) {
  * CreatedQuizCard — the quiz Lawexa made from a document or a Library item,
  * under the answer that made it (quiz from a source, door 1; Stay, 23 October
  * 2026). It sits after the step chain, not inside a step, so the reader sees
- * it without opening anything: "Making your quiz…" while the tool runs, then
- * the quiz with Open and Edit, or the server's own sentence when it could not
- * be made (too short, unreadable, no access, one at a time, or failed).
+ * it without opening anything: "Making your quiz…" while the tool runs or the
+ * server is still writing it, then the quiz with Open and Edit, or the
+ * server's own sentence when it could not be made (too short, unreadable, no
+ * access, one at a time, or failed).
  *
  * A chat loaded with lazy results carries no result data until it is asked
- * for, so the card asks (`useToolResult`), the same read a step uses.
+ * for, so the card asks (`useToolResult`), the same read a step uses. A step
+ * that left a job (`data.quiz_job`, the 30 s fix) asks the job until it is
+ * done (`QuizJobCard`), in a chat still open or reopened later.
  *
  * The quiz is saved as "Only you" in My quizzes the moment it is made, so Open
  * is its own page and Edit opens it in the form there (`?edit=1`).
@@ -54,11 +67,30 @@ export function CreatedQuizCard({ message }: { message: ToolMessage }) {
     ) : null;
   }
 
-  if (state.kind === 'making') {
+  if (state.kind === 'job') return <QuizJobCard job={state.job} />;
+  return <QuizCardFace state={state} />;
+}
+
+/** A quiz the server is still making: asked about every few seconds, then drawn as made or failed. */
+function QuizJobCard({ job }: { job: QuizJobRef }) {
+  const query = useQuizJob(job.uuid);
+  const state: CreatedQuiz =
+    statusOf(query.error) === 404
+      ? { kind: 'failed', message: 'This quiz is no longer available.' }
+      : quizJobState(query.data, job);
+  return <QuizCardFace state={state} job={job} />;
+}
+
+/** One face of the card: making, failed, or the made quiz with Open and Edit. */
+function QuizCardFace({ state, job }: { state: CreatedQuiz; job?: QuizJobRef }) {
+  if (state.kind === 'making' || state.kind === 'job') {
     return (
-      <div role="status" className="my-2 flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3 text-sm text-muted-foreground">
-        <Loader2 aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
-        Making your quiz…
+      <div role="status" className="my-2 flex items-start gap-3 rounded-2xl border border-border/60 bg-card p-3 text-sm text-muted-foreground">
+        <Loader2 aria-hidden className="mt-0.5 size-4 shrink-0 animate-spin motion-reduce:animate-none" />
+        <span>
+          Making your quiz…
+          {job ? <span className="block text-xs">{makingLine(job)}</span> : null}
+        </span>
       </div>
     );
   }
@@ -106,4 +138,11 @@ export function CreatedQuizCard({ message }: { message: ToolMessage }) {
       </div>
     </div>
   );
+}
+
+/** "10 questions from Labour Act, 1974, Part II · this can take up to two minutes". */
+function makingLine(job: QuizJobRef): string {
+  const what = job.questionCount > 0 ? `${job.questionCount} ${job.questionCount === 1 ? 'question' : 'questions'}` : 'A quiz';
+  const from = job.source ? ` from ${job.source}` : '';
+  return `${what}${from} · this can take up to two minutes`;
 }

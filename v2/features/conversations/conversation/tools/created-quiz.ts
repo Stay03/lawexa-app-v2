@@ -15,12 +15,31 @@ import type { ToolMessage } from '@/types/chat';
  * sentence (a lazy result's `error`, or the fetched result's bare text) is
  * that sentence, shown as it is. A result not loaded yet is `null`, and the
  * card asks for it.
+ *
+ * A QUIZ STILL BEING MADE (backend, 24 October 2026: the server ends a request
+ * after 30 s, and a large statute took longer, so Stay saw "HTTP 500"). The
+ * step now returns at once with `data.quiz_job { uuid, status, question_count,
+ * source }`, and the card polls the job (`quizJobState`) until it is done or
+ * failed. A bare transport error ("HTTP 500" and the like) is never shown as
+ * it is: the card and the step say {@link QUIZ_TRANSPORT_FAILURE}.
  */
 
 export const CREATE_QUIZ_TOOL = 'create_quiz';
 
+/** What the reader is told for a transport error in place of its code. */
+export const QUIZ_TRANSPORT_FAILURE = "Lawexa couldn't make this quiz. Try again.";
+
+/** A quiz the server is still making: the job to poll, and what the card says about it. */
+export interface QuizJobRef {
+  uuid: string;
+  questionCount: number;
+  /** "Labour Act, 1974, Part II", from the step (the poll returns only the raw request). */
+  source: string | null;
+}
+
 export type CreatedQuiz =
   | { kind: 'making' }
+  | { kind: 'job'; job: QuizJobRef }
   | {
       kind: 'ready';
       uuid: string;
@@ -88,19 +107,11 @@ export function createdQuiz(message: ToolMessage): CreatedQuiz | null {
 /** A finished step's quiz, from its result and whether a lazy result is still to fetch. */
 function finishedQuiz(result: ToolMessage['toolResult'], hasRef: boolean): CreatedQuiz | null {
   const data = payload(result?.data);
-  const quiz = record(data?.quiz);
-  if (quiz && typeof quiz.uuid === 'string' && quiz.uuid && typeof quiz.title === 'string') {
-    const source = record(quiz.source);
-    const sourceTitle = text(source?.title);
-    const range = text(source?.range);
-    return {
-      kind: 'ready',
-      uuid: quiz.uuid,
-      title: quiz.title.trim() || 'Your quiz',
-      questionCount: typeof quiz.question_count === 'number' ? quiz.question_count : 0,
-      scenarioCount: typeof quiz.scenario_count === 'number' ? quiz.scenario_count : 0,
-      source: sourceTitle ? (range ? `${sourceTitle}, ${range}` : sourceTitle) : null,
-    };
+  const quiz = readyQuiz(record(data?.quiz), null);
+  if (quiz) return quiz;
+  const job = record(data?.quiz_job);
+  if (job && typeof job.uuid === 'string' && job.uuid) {
+    return { kind: 'job', job: { uuid: job.uuid, questionCount: count(job.question_count), source: sourceLine(record(job.source)) } };
   }
   // The server's own refusal first (HTTP 200 with `data.error`, which no mask
   // touches; backend, 23 October 2026), then any sentence the step carries.
@@ -109,7 +120,7 @@ function finishedQuiz(result: ToolMessage['toolResult'], hasRef: boolean): Creat
     text(result?.error) ??
     text(result?.data) ??
     text(data?.message);
-  if (sentence) return { kind: 'failed', message: sentence };
+  if (sentence) return { kind: 'failed', message: readerSentence(sentence) };
   if (result?.data == null) {
     // A lazy result still to fetch: the card asks for it.
     if (hasRef) return null;
@@ -121,13 +132,84 @@ function finishedQuiz(result: ToolMessage['toolResult'], hasRef: boolean): Creat
 }
 
 /**
+ * The card's state from a polled job (`GET /quiz-jobs/{uuid}`'s `data.job`):
+ * `ready` once done, with the quiz the job carries (backend, 24 October 2026)
+ * and the step's source line; `failed` with the job's sentence; `making` while
+ * it reads or writes, or while the job has not answered yet.
+ */
+export function quizJobState(job: unknown, ref: QuizJobRef): CreatedQuiz {
+  const polled = record(job);
+  const status = polled?.status;
+  if (status === 'done') {
+    const quiz = readyQuiz(record(polled?.quiz), ref.source);
+    if (quiz) return quiz;
+    // Done but sent without the quiz: draw it from the job's own fields.
+    const uuid = text(polled?.quiz_uuid);
+    if (uuid) return { kind: 'ready', uuid, title: 'Your quiz', questionCount: ref.questionCount, scenarioCount: 0, source: ref.source };
+  }
+  if (status === 'failed') {
+    const sentence = text(record(polled?.error)?.message);
+    return { kind: 'failed', message: sentence ? readerSentence(sentence) : QUIZ_TRANSPORT_FAILURE };
+  }
+  return { kind: 'making' };
+}
+
+/** Whether a polled job is finished, so the card stops asking. */
+export function quizJobFinished(job: unknown): boolean {
+  const status = record(job)?.status;
+  return status === 'done' || status === 'failed';
+}
+
+/**
  * The step's own label. A refusal reads "Couldn't make a quiz", so the row
  * never says "Made a quiz" above a card that says it was not. A result still
  * to fetch keeps "Made a quiz": a lazy refusal already carries its sentence.
+ * A job the server is still making reads "Started a quiz": the card under the
+ * chain says how it is going.
  */
 export function createQuizStepAction(isComplete: boolean, result: ToolMessage['toolResult'] | undefined, hasRef: boolean): string {
   if (!isComplete) return 'Making a quiz';
-  return finishedQuiz(result, hasRef)?.kind === 'failed' ? "Couldn't make a quiz" : 'Made a quiz';
+  const state = finishedQuiz(result, hasRef);
+  if (state?.kind === 'failed') return "Couldn't make a quiz";
+  return state?.kind === 'job' ? 'Started a quiz' : 'Made a quiz';
+}
+
+/** A made quiz's fields as the card draws them, or `null` when it is not one; `source` stands in when it has none. */
+function readyQuiz(quiz: Record<string, unknown> | null, source: string | null): CreatedQuiz | null {
+  if (!quiz || typeof quiz.uuid !== 'string' || !quiz.uuid || typeof quiz.title !== 'string') return null;
+  return {
+    kind: 'ready',
+    uuid: quiz.uuid,
+    title: quiz.title.trim() || 'Your quiz',
+    questionCount: count(quiz.question_count),
+    scenarioCount: count(quiz.scenario_count),
+    source: sourceLine(record(quiz.source)) ?? source,
+  };
+}
+
+/** "Labour Act, 1974, Part II": the source's title, with a statute's part range when there is one. */
+function sourceLine(source: Record<string, unknown> | null): string | null {
+  const title = text(source?.title);
+  const range = text(source?.range);
+  return title ? (range ? `${title}, ${range}` : title) : null;
+}
+
+/**
+ * A transport error the step carries in place of a sentence: "HTTP 500", a
+ * status code, a timeout or a dropped connection. The reader gets
+ * {@link QUIZ_TRANSPORT_FAILURE} instead of the code.
+ */
+const TRANSPORT_ERROR =
+  /^(?:HTTP\s*\d{3}\b|\d{3}\b|request failed|network error|timeout|timed out|socket hang up|econn|internal server error|bad gateway|service unavailable|gateway time-?out)/i;
+
+/** The sentence the reader sees: the server's own words, or the plain failure for a transport error. */
+export function readerSentence(sentence: string): string {
+  return TRANSPORT_ERROR.test(sentence) ? QUIZ_TRANSPORT_FAILURE : sentence;
+}
+
+/** A whole count from the server, 0 when it sent none. */
+function count(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 /** A non-empty trimmed string, or `null`. */

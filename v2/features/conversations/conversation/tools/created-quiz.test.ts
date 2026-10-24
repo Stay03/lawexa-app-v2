@@ -5,7 +5,16 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { ToolMessage } from '@/types/chat';
-import { createQuizStepAction, createdQuiz, createdQuizLine, quizCardSteps } from './created-quiz';
+import {
+  QUIZ_TRANSPORT_FAILURE,
+  createQuizStepAction,
+  createdQuiz,
+  createdQuizLine,
+  quizCardSteps,
+  quizJobFinished,
+  quizJobState,
+  type QuizJobRef,
+} from './created-quiz';
 
 /* Quiz from a source, door 1 (Stay, 23 October 2026): Lawexa's create_quiz
  * step shows the quiz as a card under the answer. Shape from backend
@@ -139,4 +148,79 @@ test('the card sits after the step chain, and Edit opens the quiz page with its 
   const front = readFileSync(join(here, '..', '..', '..', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx'), 'utf8');
   assert.match(front, /if \(wantsEdit && own && !editAdopted\) \{/);
   assert.match(front, /if \(!next && wantsEdit\) replaceUrlParams\(\{ edit: null \}\);/);
+});
+
+/* A quiz still being made (backend, 24 October 2026): create_quiz returns at
+ * once with data.quiz_job, and the card asks GET /quiz-jobs/{uuid}. */
+
+const JOB_RESULT = {
+  success: true,
+  error: null,
+  data: {
+    quiz_job: { uuid: 'j-1', status: 'reading', question_count: 10, source: { kind: 'statute', title: 'TEST DATA Labour Act, 1974', range: 'Part II' } },
+  },
+};
+const REF: QuizJobRef = { uuid: 'j-1', questionCount: 10, source: 'TEST DATA Labour Act, 1974, Part II' };
+
+test('a step that left a job is a quiz being made, with its count and source, and reads "Started a quiz"', () => {
+  assert.deepEqual(createdQuiz(step({ toolResult: JOB_RESULT })), { kind: 'job', job: REF });
+  assert.equal(createQuizStepAction(true, JOB_RESULT, false), 'Started a quiz');
+  // A job with no source still makes a card.
+  const bare = { success: true, error: null, data: { quiz_job: { uuid: 'j-2', status: 'reading' } } };
+  assert.deepEqual(createdQuiz(step({ toolResult: bare })), { kind: 'job', job: { uuid: 'j-2', questionCount: 0, source: null } });
+});
+
+test('a polled job is making until done, then the made quiz with the step source, or the job sentence', () => {
+  assert.deepEqual(quizJobState(null, REF), { kind: 'making' });
+  assert.deepEqual(quizJobState({ status: 'reading' }, REF), { kind: 'making' });
+  assert.deepEqual(quizJobState({ status: 'writing' }, REF), { kind: 'making' });
+  assert.deepEqual(
+    quizJobState({ status: 'done', quiz_uuid: 'q-9', quiz: { uuid: 'q-9', title: 'TEST DATA Labour Act Part II', question_count: 10, scenario_count: 1 } }, REF),
+    { kind: 'ready', uuid: 'q-9', title: 'TEST DATA Labour Act Part II', questionCount: 10, scenarioCount: 1, source: 'TEST DATA Labour Act, 1974, Part II' },
+  );
+  // Done, sent without the quiz: still the quiz, from the job's own fields.
+  assert.deepEqual(quizJobState({ status: 'done', quiz_uuid: 'q-9', quiz: null }, REF), {
+    kind: 'ready',
+    uuid: 'q-9',
+    title: 'Your quiz',
+    questionCount: 10,
+    scenarioCount: 0,
+    source: 'TEST DATA Labour Act, 1974, Part II',
+  });
+  const late = 'The quiz could not be written just now. Try again in a moment.';
+  assert.deepEqual(quizJobState({ status: 'failed', error: { code: 'failed', message: late } }, REF), { kind: 'failed', message: late });
+  assert.deepEqual(quizJobState({ status: 'failed', error: null }, REF), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE });
+  assert.equal(quizJobFinished({ status: 'done' }), true);
+  assert.equal(quizJobFinished({ status: 'failed' }), true);
+  assert.equal(quizJobFinished({ status: 'writing' }), false);
+  assert.equal(quizJobFinished(null), false);
+});
+
+test('a bare transport error shows the plain sentence, never the code, in the card and the step', () => {
+  for (const raw of ['HTTP 500', 'HTTP 504 Gateway Timeout', '500', 'Request failed with status code 500', 'Network Error', 'timeout of 30000ms exceeded', 'Internal Server Error']) {
+    const result = { success: false, error: raw, data: null };
+    assert.deepEqual(createdQuiz(step({ toolResult: result })), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE }, raw);
+    assert.equal(createQuizStepAction(true, result, false), "Couldn't make a quiz", raw);
+  }
+  assert.deepEqual(quizJobState({ status: 'failed', error: { code: 'failed', message: 'HTTP 500' } }, REF), { kind: 'failed', message: QUIZ_TRANSPORT_FAILURE });
+  // A real refusal keeps its own words.
+  const refusal = 'TEST DATA. A quiz is already being made for you. Wait for it to finish, then ask again.';
+  assert.deepEqual(createdQuiz(step({ toolResult: { success: false, error: refusal, data: null } })), { kind: 'failed', message: refusal });
+});
+
+test('a quiz being made counts as maybe made, so an earlier refusal waits for it', () => {
+  const refused = step({ id: 'm-1', toolResult: { success: true, error: NOTE_REFUSAL, data: null } });
+  const job = step({ id: 'm-2', toolResult: JOB_RESULT });
+  assert.deepEqual(ids([refused, job]), ['m-2']);
+});
+
+test('the job is asked every 4 s until it is done, failed or gone, and not while the tab is hidden', () => {
+  const hook = readFileSync(join(here, 'use-quiz-job.ts'), 'utf8');
+  assert.match(hook, /export const QUIZ_JOB_POLL_MS = 4_000;/);
+  assert.match(hook, /apiClient\.get<\{ data\?: \{ job\?: unknown \} \}>\(`\/quiz-jobs\/\$\{encodeURIComponent\(uuid\)\}`\)/);
+  assert.match(hook, /quizJobFinished\(query\.state\.data\) \|\| statusOf\(query\.state\.error\) === 404 \? false : QUIZ_JOB_POLL_MS/);
+  assert.match(hook, /refetchIntervalInBackground: false,/);
+  const card = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
+  assert.match(card, /if \(state\.kind === 'job'\) return <QuizJobCard job=\{state\.job\} \/>;/);
+  assert.match(card, /const query = useQuizJob\(job\.uuid\);/);
 });
