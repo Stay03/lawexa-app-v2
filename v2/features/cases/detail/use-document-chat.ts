@@ -62,7 +62,8 @@ export function useDocumentChat(
     /**
      * At xl, show the chat docked whatever the reader's choice: the case
      * page's draft editor opens left of the docked chat, so the chat is docked
-     * for as long as the editor is open (CaseScreen).
+     * for as long as the editor is open (CaseScreen). The choice itself is
+     * left alone, so the chat goes back to it when the hold ends.
      */
     holdDocked?: boolean;
   } = {},
@@ -151,6 +152,8 @@ export function useDocumentChat(
     start,
     phone,
     desktop,
+    /** The reader chose the docked chat (their remembered choice, not a hold). */
+    dockChosen: dockedPref,
     dockOwnsChat,
     showDock,
     showDocked,

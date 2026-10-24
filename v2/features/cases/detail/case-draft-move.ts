@@ -21,10 +21,19 @@
  * while it is still on its way in. The Web Animations API leaves nothing on
  * the elements when it ends. With reduced motion nothing is measured or
  * played: the chat is docked at once.
+ *
+ * ── AND BACK AGAIN ─────────────────────────────────────────────────────────
+ * Docking is only for while the editor is open (the techlead, 24 October
+ * 2026): a chat that floated before goes back to floating when the editor
+ * closes. The same move in reverse (`measureDockedChat`, then
+ * `playMoveToFloat`): the floating card slides from the dock's place back to
+ * the centre and the column slides back with it. The floating card is the
+ * shorter of the two, and a card cannot be drawn taller than it is, so on
+ * the way back it slides at its own height.
  */
 
-/** Where the floating chat and the reading column stood before the move. */
-export interface FloatingChatPlace {
+/** Where the chat's card and the reading column stood before a move. */
+export interface ChatPlace {
   card: DOMRect;
   column: DOMRect;
 }
@@ -34,15 +43,24 @@ export const DOCK_MOVE_MS = 520;
 const DOCK_MOVE_EASING = 'cubic-bezier(0.65, 0, 0.35, 1)';
 
 /** The floating card's place and the column's, or `null` when there is nothing to play. */
-export function measureFloatingChat(column: HTMLElement | null): FloatingChatPlace | null {
+export function measureFloatingChat(column: HTMLElement | null): ChatPlace | null {
+  return measure('[data-v2-case-ask-card]', column);
+}
+
+/** The docked card's place and the column's, or `null` when there is nothing to play. */
+export function measureDockedChat(column: HTMLElement | null): ChatPlace | null {
+  return measure('[data-v2-case-docked-card]', column);
+}
+
+function measure(selector: string, column: HTMLElement | null): ChatPlace | null {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
-  const card = document.querySelector<HTMLElement>('[data-v2-case-ask-card]');
+  const card = document.querySelector<HTMLElement>(selector);
   if (!card || !column) return null;
   return { card: card.getBoundingClientRect(), column: column.getBoundingClientRect() };
 }
 
 /** Plays the move onto the docked chat that has just been committed. */
-export function playMoveToDock(from: FloatingChatPlace, column: HTMLElement | null): void {
+export function playMoveToDock(from: ChatPlace, column: HTMLElement | null): void {
   const rail = document.querySelector<HTMLElement>('[data-v2-case-docked]');
   const card = rail?.querySelector<HTMLElement>('[data-v2-case-docked-card]');
   if (!rail || !card) return;
@@ -64,11 +82,28 @@ export function playMoveToDock(from: FloatingChatPlace, column: HTMLElement | nu
     timing,
   );
 
-  if (column) {
-    const now = column.getBoundingClientRect();
-    column.animate(
-      [{ transform: `translateX(${from.column.left - now.left}px)` }, { transform: 'translateX(0)' }],
-      timing,
-    );
-  }
+  slideColumn(from, column, timing);
+}
+
+/** Plays the move back onto the floating chat that has just been committed. */
+export function playMoveToFloat(from: ChatPlace, column: HTMLElement | null): void {
+  const card = document.querySelector<HTMLElement>('[data-v2-case-ask-card]');
+  if (!card) return;
+  const timing: KeyframeAnimationOptions = { duration: DOCK_MOVE_MS, easing: DOCK_MOVE_EASING };
+  const to = card.getBoundingClientRect();
+  card.animate(
+    [{ transform: `translateX(${from.card.left - to.left}px)` }, { transform: 'translateX(0)' }],
+    timing,
+  );
+  slideColumn(from, column, timing);
+}
+
+/** The reading column, from where it stood to where it stands now. */
+function slideColumn(from: ChatPlace, column: HTMLElement | null, timing: KeyframeAnimationOptions): void {
+  if (!column) return;
+  const now = column.getBoundingClientRect();
+  column.animate(
+    [{ transform: `translateX(${from.column.left - now.left}px)` }, { transform: 'translateX(0)' }],
+    timing,
+  );
 }

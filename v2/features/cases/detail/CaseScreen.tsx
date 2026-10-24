@@ -35,7 +35,13 @@ import {
   SidePanelHostProvider,
   type SidePanelHost,
 } from '@/v2/features/conversations/conversation/side-panel/side-panel-host';
-import { measureFloatingChat, playMoveToDock, type FloatingChatPlace } from './case-draft-move';
+import {
+  measureDockedChat,
+  measureFloatingChat,
+  playMoveToDock,
+  playMoveToFloat,
+  type ChatPlace,
+} from './case-draft-move';
 
 // TEMPORARY, with its file: live viewport numbers for an iPhone recording,
 // loaded only with `?kbdebug=1` on the address (see KeyboardDebugReadout).
@@ -72,6 +78,17 @@ export function CaseScreen({ slug }: { slug: string }) {
   );
 }
 
+/** The draft editor is drawn: a computer, a draft open, the chat docked on a conversation. */
+function editorShownFor(
+  signedIn: boolean,
+  desktop: boolean,
+  draftOpen: boolean,
+  showDocked: boolean,
+  renderedChat: string | null,
+): boolean {
+  return signedIn && desktop && draftOpen && showDocked && renderedChat !== 'new';
+}
+
 function CaseBody({ slug }: { slug: string }) {
   const { signedIn: sessionSignedIn, userId, role } = useV2Session();
   // The chat belongs to an account; a guest pass reads the case and meets the
@@ -102,6 +119,7 @@ function CaseBody({ slug }: { slug: string }) {
     start,
     phone,
     desktop,
+    dockChosen,
     dockOwnsChat,
     showDock,
     showDocked,
@@ -109,30 +127,55 @@ function CaseBody({ slug }: { slug: string }) {
     setDockedPref,
   } = useDocumentChat(subject, signedIn, { holdDocked: draftOpen });
 
-  // Opening a draft on a computer DOCKS a floating chat first, and keeps it
-  // docked after the editor closes: the reader's choice is set, not only
-  // held. The card and the column are measured where they stand, so the
-  // move can be played from there once the docked layout is in
-  // (case-draft-move.ts).
+  // Opening a draft on a computer DOCKS a floating chat first, for as long
+  // as the editor is open only (`holdDocked`; the techlead, 24 October 2026):
+  // the reader's own choice is not touched, so on close the chat goes back to
+  // it, floating where it floated. Each way the card and the column are
+  // measured where they stand, so the move can be played from there once the
+  // new layout is in (case-draft-move.ts).
   const columnRef = useRef<HTMLDivElement | null>(null);
-  const moveFrom = useRef<FloatingChatPlace | null>(null);
-  const { open: showDraft, closeInPlace: dropDraft } = draftUrl;
+  const moveFrom = useRef<ChatPlace | null>(null);
+  const { open: showDraft, finishClose: finishDraftClose, closeInPlace: dropDraft } = draftUrl;
   const openDraft = useCallback(
     (target: SidePanelTarget) => {
       if (desktop && !showDocked && target.kind === 'draft') {
         moveFrom.current = measureFloatingChat(columnRef.current);
-        setDockedPref(true);
       }
       showDraft(target);
     },
-    [desktop, showDocked, setDockedPref, showDraft],
+    [desktop, showDocked, showDraft],
   );
+  // The editor about to close on a chat that floats again: where the docked
+  // card stands now.
+  const floatsOnClose = editorShownFor(signedIn, desktop, draftOpen, showDocked, renderedChat) && !dockChosen;
+  const finishDraft = useCallback(() => {
+    if (floatsOnClose) moveFrom.current = measureDockedChat(columnRef.current);
+    finishDraftClose();
+  }, [floatsOnClose, finishDraftClose]);
+  // Back closes it from the browser: measured in the capture phase, ahead of
+  // the param's own listener, so before the closed layout is drawn.
+  useEffect(() => {
+    if (!floatsOnClose) return;
+    const onPopState = () => {
+      moveFrom.current = measureDockedChat(columnRef.current);
+    };
+    window.addEventListener('popstate', onPopState, { capture: true });
+    return () => window.removeEventListener('popstate', onPopState, { capture: true });
+  }, [floatsOnClose]);
   useLayoutEffect(() => {
     const from = moveFrom.current;
-    if (!showDocked || !from) return;
     moveFrom.current = null;
-    playMoveToDock(from, columnRef.current);
-  }, [showDocked]);
+    if (!from) return;
+    if (showDocked) playMoveToDock(from, columnRef.current);
+    else if (chat !== null) playMoveToFloat(from, columnRef.current);
+  }, [showDocked, chat]);
+  // A place measured for a change that left the chat where it was (a Back
+  // that did not close the editor) is dropped at the next commit, so a later
+  // move never starts from it. After the effect above, which has taken any it
+  // plays.
+  useLayoutEffect(() => {
+    moveFrom.current = null;
+  });
 
   // Closing the chat takes its draft with it: the panel's param would
   // otherwise outlive the chat it belongs to.
@@ -148,10 +191,11 @@ function CaseBody({ slug }: { slug: string }) {
     },
     [dropDraft, switchChat],
   );
-  // Floating the chat while a draft is open closes the editor first (its
-  // exit plays, as on its own ×); the chat floats once it has gone, as
-  // `holdDocked` ends. With reduced motion there is no exit to wait for.
-  const { close: closeDraft, finishClose: finishDraft } = draftUrl;
+  // Floating the chat while a draft is open is the reader's choice, kept: it
+  // closes the editor first (its exit plays, as on its own ×), and the chat
+  // floats once it has gone, as `holdDocked` ends. With reduced motion there
+  // is no exit to wait for.
+  const { close: closeDraft } = draftUrl;
   const floatChat = useCallback(() => {
     if (draftOpen) {
       if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) finishDraft();
@@ -164,8 +208,11 @@ function CaseBody({ slug }: { slug: string }) {
   // (below), the body on a phone, where the panel is the sheet over the
   // screen and over the phone chat (z-50 at the root, above the chat's z-40).
   const [draftBox, setDraftBox] = useState<HTMLDivElement | null>(null);
-  const editorShown = signedIn && desktop && draftOpen && showDocked && renderedChat !== 'new';
-  const draftHostUrl = useMemo<SidePanelUrlState>(() => ({ ...draftUrl, open: openDraft }), [draftUrl, openDraft]);
+  const editorShown = editorShownFor(signedIn, desktop, draftOpen, showDocked, renderedChat);
+  const draftHostUrl = useMemo<SidePanelUrlState>(
+    () => ({ ...draftUrl, open: openDraft, finishClose: finishDraft }),
+    [draftUrl, openDraft, finishDraft],
+  );
   const draftHost = useMemo<SidePanelHost>(
     () => ({ url: draftHostUrl, element: desktop ? draftBox : phone ? document.body : null }),
     [draftHostUrl, desktop, draftBox, phone],

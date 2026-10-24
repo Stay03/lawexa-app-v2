@@ -58,30 +58,64 @@ test('the address is the main chat’s ?side=draft:N, owned by the case page, so
   assert.match(screen, /const draftUrl = useSidePanelUrl\(\);\s*const draftOpen = draftUrl\.target\?\.kind === 'draft';/);
   assert.equal(embedded.match(/useSidePanelUrl\(/g), null);
   // The editor is drawn from the address alone, so Back (popstate) takes it away.
-  assert.match(screen, /const editorShown = signedIn && desktop && draftOpen && showDocked && renderedChat !== 'new';/);
+  assert.match(screen, /const editorShown = editorShownFor\(signedIn, desktop, draftOpen, showDocked, renderedChat\);/);
+  assert.match(screen, /return signedIn && desktop && draftOpen && showDocked && renderedChat !== 'new';/);
 });
 
-test('opening a draft docks a floating chat first, and the chat stays docked after', () => {
+test('opening a draft docks a floating chat for as long as the editor is open, and never sets the reader’s choice', () => {
   assert.match(
     screen,
-    /if \(desktop && !showDocked && target\.kind === 'draft'\) \{\s*moveFrom\.current = measureFloatingChat\(columnRef\.current\);\s*setDockedPref\(true\);\s*\}\s*showDraft\(target\);/,
+    /if \(desktop && !showDocked && target\.kind === 'draft'\) \{\s*moveFrom\.current = measureFloatingChat\(columnRef\.current\);\s*\}\s*showDraft\(target\);/,
   );
-  assert.match(screen, /const draftHostUrl = useMemo<SidePanelUrlState>\(\(\) => \(\{ \.\.\.draftUrl, open: openDraft \}\), \[draftUrl, openDraft\]\);/);
-  // A ?side=draft link opened straight holds the chat docked too.
+  // Only the reader's own dock and float buttons write the remembered choice.
+  assert.equal(screen.match(/setDockedPref\(/g)?.length, 2);
+  assert.match(screen, /onDock=\{\(\) => setDockedPref\(true\)\}/);
+  assert.match(
+    screen,
+    /const draftHostUrl = useMemo<SidePanelUrlState>\(\s*\(\) => \(\{ \.\.\.draftUrl, open: openDraft, finishClose: finishDraft \}\),\s*\[draftUrl, openDraft, finishDraft\],\s*\);/,
+  );
+  // The Open path and a ?side=draft link opened straight hold it the same way.
   assert.match(screen, /useDocumentChat\(subject, signedIn, \{ holdDocked: draftOpen \}\)/);
   assert.match(chat, /const docked = dockedPref \|\| holdDocked;/);
-  // The move plays before the docked layout's first paint, from where the card stood.
-  assert.match(screen, /useLayoutEffect\(\(\) => \{\s*const from = moveFrom\.current;\s*if \(!showDocked \|\| !from\) return;\s*moveFrom\.current = null;\s*playMoveToDock\(from, columnRef\.current\);\s*\}, \[showDocked\]\);/);
+  assert.match(chat, /dockChosen: dockedPref,/);
+  // The move plays before the new layout's first paint, from where the card stood.
+  assert.match(
+    screen,
+    /useLayoutEffect\(\(\) => \{\s*const from = moveFrom\.current;\s*moveFrom\.current = null;\s*if \(!from\) return;\s*if \(showDocked\) playMoveToDock\(from, columnRef\.current\);\s*else if \(chat !== null\) playMoveToFloat\(from, columnRef\.current\);\s*\}, \[showDocked, chat\]\);/,
+  );
+  // A place measured for nothing is dropped at the next commit.
+  assert.match(screen, /useLayoutEffect\(\(\) => \{\s*moveFrom\.current = null;\s*\}\);/);
   assert.match(move, /for \(const animation of rail\.getAnimations\(\)\) animation\.cancel\(\);/);
   assert.match(move, /rail\.animate\(\[\{ overflowX: 'visible' \}, \{ overflowX: 'visible' \}\], timing\);/);
   assert.match(move, /transform: `translateX\(\$\{from\.card\.left - to\.left\}px\)`,\s*clipPath: `inset\(\$\{top\}px 0 0 0 round 1rem\)`,/);
-  // Reduced motion: nothing is measured, so nothing plays.
-  assert.match(move, /if \(window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\) return null;/);
+  // Reduced motion: nothing is measured, so nothing plays either way.
+  assert.match(move, /function measure\(selector: string, column: HTMLElement \| null\): ChatPlace \| null \{\s*if \(window\.matchMedia\('\(prefers-reduced-motion: reduce\)'\)\.matches\) return null;/);
   // The marks the move finds its elements by.
   assert.match(detail('CaseAsk.tsx'), /data-v2-case-ask-card=""/);
   const docked = detail('CaseChatPanel.tsx');
   assert.match(docked, /data-v2-case-docked=""/);
   assert.match(docked, /data-v2-case-docked-card=""/);
+});
+
+test('when the editor closes a chat that floated before floats again, with the move in reverse', () => {
+  // Only a chat the reader had not docked goes back; a docked one stays.
+  assert.match(
+    screen,
+    /const floatsOnClose = editorShownFor\(signedIn, desktop, draftOpen, showDocked, renderedChat\) && !dockChosen;/,
+  );
+  // × and Escape end in the host's finishClose; Back is measured in the capture
+  // phase, ahead of the param's own listener.
+  assert.match(
+    screen,
+    /const finishDraft = useCallback\(\(\) => \{\s*if \(floatsOnClose\) moveFrom\.current = measureDockedChat\(columnRef\.current\);\s*finishDraftClose\(\);\s*\}, \[floatsOnClose, finishDraftClose\]\);/,
+  );
+  assert.match(screen, /window\.addEventListener\('popstate', onPopState, \{ capture: true \}\);/);
+  // The floating card slides back from the dock's place, the column with it.
+  const back = move.slice(move.indexOf('export function playMoveToFloat'));
+  assert.match(back, /document\.querySelector<HTMLElement>\('\[data-v2-case-ask-card\]'\)/);
+  assert.match(back, /\[\{ transform: `translateX\(\$\{from\.card\.left - to\.left\}px\)` \}, \{ transform: 'translateX\(0\)' \}\]/);
+  assert.match(back, /slideColumn\(from, column, timing\);/);
+  assert.match(move, /export function measureDockedChat\(column: HTMLElement \| null\): ChatPlace \| null \{\s*return measure\('\[data-v2-case-docked-card\]', column\);/);
 });
 
 test('the editor covers the reading column, 12px clear of the sidebar and the chat, and the reading goes inert', () => {
