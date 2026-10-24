@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { ToolMessage } from '@/types/chat';
-import { createQuizStepAction, createdQuiz, createdQuizLine } from './created-quiz';
+import { createQuizStepAction, createdQuiz, createdQuizLine, quizCardSteps } from './created-quiz';
 
 /* Quiz from a source, door 1 (Stay, 23 October 2026): Lawexa's create_quiz
  * step shows the quiz as a card under the answer. Shape from backend
@@ -82,8 +82,27 @@ test('a refused quiz step carries the error mark, with no Error line under it', 
   assert.match(item, /\{isError && !quizRefused && !isExpanded && \(/);
 });
 
+test('a refusal shows no card when another step in the answer made the quiz (Lucy, 24 October 2026)', () => {
+  const refused = step({ id: 'm-1', toolResult: { success: true, error: "TEST DATA. You can't open that note, so a quiz can't be made from it.", data: null } });
+  const made = step({ id: 'm-2', toolResult: { success: true, error: null, data: { quiz: { uuid: 'q-1', title: 'TEST DATA Election petitions' } } } });
+  const making = step({ id: 'm-3', toolStatus: 'calling' });
+  const toFetch = step({ id: 'm-4', toolResult: { success: true, error: null, data: null }, resultRef: { messageId: 4, size: null } });
+  const ids = (steps: ToolMessage[]) => quizCardSteps(steps).map((s) => s.id);
+  assert.deepEqual(ids([refused, made]), ['m-2']);
+  // A second call still running, or a result not fetched yet, may be the quiz: the refusal waits.
+  assert.deepEqual(ids([refused, making]), ['m-3']);
+  assert.deepEqual(ids([refused, toFetch]), ['m-4']);
+  // With no quiz made in the answer, every refusal stays and says why.
+  const refusedAgain = step({ id: 'm-5', toolResult: { success: true, error: 'TEST DATA. That document is too short to make a quiz from.', data: null } });
+  assert.deepEqual(ids([refused]), ['m-1']);
+  assert.deepEqual(ids([refused, refusedAgain]), ['m-1', 'm-5']);
+  // Other tools never get a quiz card.
+  assert.deepEqual(ids([step({ id: 'm-6', toolName: 'search_statutes' }), made]), ['m-2']);
+});
+
 test('the card sits after the step chain, and Edit opens the quiz page with its form', () => {
   const list = readFileSync(join(here, '..', 'MessageList.tsx'), 'utf8');
+  assert.match(list, /const quizSteps = quizCardSteps\(steps\);/);
   assert.match(list, /<CompactToolChain messages=\{steps\} \/>\s*\{quizSteps\.map\(\(step\) => \(\s*<CreatedQuizCard key=\{step\.id\} message=\{step\} \/>/);
   const card = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
   assert.match(card, /href=\{`\$\{quizFrontHref\(state\.uuid\)\}\?edit=1`\}/);

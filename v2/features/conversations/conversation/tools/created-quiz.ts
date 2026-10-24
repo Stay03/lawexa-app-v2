@@ -48,6 +48,20 @@ export function isCreateQuizStep(message: ToolMessage): boolean {
 }
 
 /**
+ * The `create_quiz` steps that get a card under one answer. A refusal is left
+ * out when another step in the same answer made a quiz, is still making one,
+ * or has a result still to fetch (Lucy's live check, 24 October 2026: a first
+ * call with a made-up note id was refused, the second made the quiz, and the
+ * grey refusal sat above the good card). When every step was refused they all
+ * stay, so a reader whose quiz could not be made still reads why.
+ */
+export function quizCardSteps(steps: ToolMessage[]): ToolMessage[] {
+  const quizSteps = steps.filter(isCreateQuizStep);
+  const kept = quizSteps.filter((step) => createdQuiz(step)?.kind !== 'failed');
+  return kept.length > 0 ? kept : quizSteps;
+}
+
+/**
  * The quiz card's state for one `create_quiz` step: `making` while it runs,
  * `ready` with the quiz, `failed` with the server's sentence, or `null` when
  * the result is not there yet or is a shape this does not know.

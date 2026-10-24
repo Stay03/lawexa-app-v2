@@ -36,7 +36,7 @@ import { spaceMarks } from './space-marks';
 import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
 import { CompactToolChain } from './tools/CompactToolChain';
-import { isCreateQuizStep } from './tools/created-quiz';
+import { quizCardSteps } from './tools/created-quiz';
 import { CreatedQuizCard } from './cards/CreatedQuizCard';
 import { runningSteps } from './tools/running-steps';
 import { ActivityStatus } from './ActivityStatus';
@@ -948,9 +948,10 @@ const GroupRow = memo(function GroupRow({
     // A quiz Lawexa made shows as a card after the chain, so the reader sees
     // it without opening the step (quiz from a source, 23 October 2026).
     // In a running turn, a stored step with no result yet is still running
-    // (running-steps.ts), so it reads "Making a quiz", not stopped.
+    // (running-steps.ts), so it reads "Making a quiz", not stopped. A refusal
+    // shows no card when another step in the answer made the quiz.
     const steps = runningSteps(group.messages, isStreaming && isLastGroup);
-    const quizSteps = steps.filter(isCreateQuizStep);
+    const quizSteps = quizCardSteps(steps);
     body = (
       <>
         <CompactToolChain messages={steps} />
