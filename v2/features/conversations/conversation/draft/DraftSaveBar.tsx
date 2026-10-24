@@ -107,7 +107,7 @@ function shortSaveLabel(draft: DraftSave): string {
 export function DraftSaveBar({ draft, dirty, space }: DraftSaveProps) {
   const { saved, mutation } = draft;
   return (
-    <div className="sticky bottom-0 z-10 border-t border-border/70 bg-popover/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm xl:hidden">
+    <div className="v2-draft-save-foot sticky bottom-0 z-10 border-t border-border/70 bg-popover/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-sm xl:hidden">
       <div className="flex flex-wrap items-center gap-2">
         {saved && !dirty ? (
           <span className="inline-flex h-10 items-center gap-1.5 pr-1 text-sm font-medium text-muted-foreground">

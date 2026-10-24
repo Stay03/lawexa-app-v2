@@ -187,7 +187,7 @@ test('on a computer the draft panel has no title line and no foot: one bar holds
   assert.equal(panel.match(/<DraftBar \/>/g)?.length, 2);
   assert.match(frame, /export function SidePanelCloseButton\(\)/);
   // The sheet's foot is not drawn on a computer; the bar's Save is drawn only there.
-  assert.match(bar, /<div className="sticky bottom-0 z-10 [^"]* xl:hidden">/);
+  assert.match(bar, /<div className="v2-draft-save-foot sticky bottom-0 z-10 [^"]* xl:hidden">/);
   assert.match(bar, /<div className="relative hidden shrink-0 items-center gap-0\.5 xl:flex">/);
   assert.match(editor, /className="v2-draft-bar sticky top-0 z-10 hidden h-12 shrink-0 items-center [^"]*xl:flex"/);
   // One save and one folder picker serve both places.
@@ -318,4 +318,23 @@ test('the caret stays in view as the keyboard rises: scrolled to on focus and on
   assert.match(editor, /if \(!editor\.isFocused\) return;/);
   assert.match(editor, /if \(!editor\.isDestroyed\) editor\.commands\.scrollIntoView\(\);/);
   assert.match(editor, /scrollMargin: \{ top: CARET_MARGIN_TOP, bottom: CARET_MARGIN_BOTTOM, left: 0, right: 0 \},/);
+});
+
+test('while the reader types on a phone: the title row down to ×, one row of tools, no Save foot (WebKit at a 420px visible height)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const css = readFileSync(new URL('./draft-panel.css', import.meta.url), 'utf8');
+  // Typing: the editor has focus, or a menu from the folded row is open (its opening takes the focus).
+  const typing = String.raw`\.v2-side-panel-bare:is\(:has\(\.ProseMirror-focused\), :has\(\.v2-draft-typing-tools \[data-state='open'\]\)\)`;
+  assert.match(css, new RegExp(`${typing} > header \\{\\s*justify-content: flex-end;`));
+  assert.match(css, new RegExp(`${typing} > header > :not\\(:last-child\\),\\s*${typing} \\.v2-draft-sheet-tools,\\s*${typing} \\.v2-draft-save-foot \\{\\s*display: none;`));
+  assert.match(css, new RegExp(`${typing} \\.v2-draft-typing-tools \\{\\s*display: flex;`));
+  // The folded row is the computer bar's own tools; the three-row toolbar carries its class.
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  assert.match(editor, /<div className="v2-draft-typing-tools sticky top-0 z-10 hidden [^"]*">\s*<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} \/>/);
+  assert.match(editor, /className="v2-draft-sheet-tools sticky top-0 z-10 flex shrink-0 flex-wrap /);
+  const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
+  assert.match(bar, /<div className="v2-draft-save-foot sticky bottom-0 z-10/);
+  // Only the draft's sheet carries the class (ChatSidePanel's `bare`).
+  const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
+  assert.match(frame, /bare && 'v2-side-panel-bare /);
 });

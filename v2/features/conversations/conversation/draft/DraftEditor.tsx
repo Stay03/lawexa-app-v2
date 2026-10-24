@@ -238,6 +238,12 @@ function DraftEditorBody({
       {editor ? (
         <>
           <DraftToolbar editor={editor} />
+          {/* While the reader types on a phone (draft-panel.css): the computer bar's
+              tools, folded to one row (undo, font, B I, ··· with the rest), in place
+              of the three-row toolbar above, so the draft keeps its lines. */}
+          <div className="v2-draft-typing-tools sticky top-0 z-10 hidden h-11 shrink-0 items-center border-b border-border/70 bg-popover/95 px-2 backdrop-blur-sm">
+            <DraftBarTools editor={editor} frameRef={frameRef} />
+          </div>
           <DraftBar
             tools={<DraftBarTools editor={editor} frameRef={frameRef} />}
             actions={<DraftSaveControl draft={draft} dirty={dirty} space={space} />}
@@ -295,7 +301,7 @@ function DraftToolbar({ editor }: { editor: Editor }) {
       role="toolbar"
       aria-label="Formatting"
       aria-orientation="horizontal"
-      className="sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-x-0.5 gap-y-1 border-b border-border/70 bg-popover/95 px-3 py-1.5 backdrop-blur-sm xl:hidden"
+      className="v2-draft-sheet-tools sticky top-0 z-10 flex shrink-0 flex-wrap items-center gap-x-0.5 gap-y-1 border-b border-border/70 bg-popover/95 px-3 py-1.5 backdrop-blur-sm xl:hidden"
     >
       <ToolbarButton
         compact

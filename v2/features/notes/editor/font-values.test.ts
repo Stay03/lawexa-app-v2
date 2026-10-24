@@ -56,6 +56,6 @@ test('a finished draft opens in the editor with the font menus; one still being 
   const menus = readFileSync(join(here, 'FontMenus.tsx'), 'utf8');
   assert.match(menus, /<span className=\{cn\('max-w-\[9\.5rem\] truncate', font && cn\(FONT_FACE\[font\], 'text-sm'\)\)\}>\{name\}<\/span>\s*\{size \? <span className="text-muted-foreground tabular-nums">\{size\}<\/span> : null\}/);
   // The phone sheet's bar wraps at every width, so size, bold and the rest are in sight on a phone too.
-  assert.match(editor, /role="toolbar"[\s\S]*?className="sticky top-0 z-10 flex shrink-0 flex-wrap /);
+  assert.match(editor, /role="toolbar"[\s\S]*?className="v2-draft-sheet-tools sticky top-0 z-10 flex shrink-0 flex-wrap /);
   assert.doesNotMatch(editor, /overflow-x-auto border-b/);
 });

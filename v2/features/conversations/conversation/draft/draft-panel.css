@@ -10,7 +10,8 @@
  * bar is a filled band with no stroke, no shadow and no corners, and the
  * menus lift on a shadow with no ring.
  *
- * The phone sheet (below xl) does not use any of it.
+ * The phone sheet (below xl) uses none of it, except the rule at the end for
+ * while the reader types.
  */
 
 :root {
@@ -155,5 +156,37 @@
 
   .v2-draft-doc hr {
     border-color: var(--v2-draft-rule);
+  }
+}
+
+/* WHILE THE READER TYPES ON A PHONE THE DRAFT HAS THE ROOM. With the keyboard up
+   a phone has little height, and the sheet's title row, three rows of tools and
+   the Save foot left about two lines of the draft to edit (WebKit at a 420px
+   visible height, 24 October 2026). While the editor has focus:
+   - the title row shrinks to its close button (the grab line stays above it);
+   - the three-row toolbar gives way to one row, the computer bar's tools folded
+     (undo, font, B I, and ··· with redo, underline, the text style, the lists,
+     alignment and Copy text);
+   - the Save foot is put away.
+   All come back when the keyboard goes down (Done) and the editor lets go. A
+   menu opened from the folded row holds them too: opening it takes focus from
+   the editor, and the row must not swap back under the reader's finger.
+   `.v2-side-panel-bare` is the draft's own sheet (ChatSidePanel's `bare`, which
+   only the draft passes). */
+@media (max-width: 79.999rem) {
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) > header {
+    justify-content: flex-end;
+    padding-block: 0.25rem;
+    border-bottom-width: 0;
+  }
+
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) > header > :not(:last-child),
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) .v2-draft-sheet-tools,
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) .v2-draft-save-foot {
+    display: none;
+  }
+
+  .v2-side-panel-bare:is(:has(.ProseMirror-focused), :has(.v2-draft-typing-tools [data-state='open'])) .v2-draft-typing-tools {
+    display: flex;
   }
 }
