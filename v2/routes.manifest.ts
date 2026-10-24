@@ -224,6 +224,37 @@ export function isV2OnlySharedPath(pathname: string): boolean {
   return false;
 }
 
+/** The quiz addresses the classic app has its own page for. */
+const CLASSIC_QUIZ_PAGES = new Set(['play', 'history', 'stats']);
+
+/**
+ * Where a visitor who is NOT served v2 goes from an address only v2 has a page
+ * for, or `null` for any other address. The guest quiz page (a shared link,
+ * `isV2OnlySharedPath`) is drawn in v2, and its shell links to the home's Work
+ * and Study tabs, the channels and the rest: v1 has no page at those, so a tap
+ * (or the back button, or an old bookmark) ended on "This page could not be
+ * found" (the techlead, 24 October 2026). Each now goes to the nearest classic
+ * page that does exist. The shared addresses themselves are left to v2.
+ */
+export function classicFallbackFor(pathname: string): string | null {
+  if (isV2OnlySharedPath(pathname)) return null;
+  const segments = pathname.split('/').filter(Boolean);
+  const [first, second] = segments;
+  const exact = segments.length === 1 ? first : null;
+  if (exact === 'work' || exact === 'study' || exact === 'channels') return '/';
+  if (exact === 'organization') return '/settings';
+  if (first === 'activity' && second === 'stats' && segments.length === 2) return '/activity';
+  if (first === 'settings' && (second === 'devices' || second === 'verification') && segments.length === 2) return '/settings';
+  if (first === 'quiz' && segments.length >= 2) {
+    // The library, explore, an attempt, and a practice session's own address
+    // (`/quiz/{session}`) are v2's; play, history and stats are the classic
+    // app's own pages.
+    if (second === 'attempts' || second === 'library' || second === 'explore') return '/quiz';
+    if (segments.length === 2 && !CLASSIC_QUIZ_PAGES.has(second)) return '/quiz';
+  }
+  return null;
+}
+
 /**
  * Whether `pathname` has been migrated to v2. Exact entries match the path
  * verbatim; `'/prefix/*'` entries match the prefix and everything below it.

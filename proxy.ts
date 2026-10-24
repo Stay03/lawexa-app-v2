@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isMigratedToV2, isV2OnlySharedPath } from '@/v2/routes.manifest';
+import { classicFallbackFor, isMigratedToV2, isV2OnlySharedPath } from '@/v2/routes.manifest';
 import { UI_COOKIE } from '@/v2/cookie';
 import { servesV2, v2DefaultFromEnv } from '@/v2/ui-choice';
 
@@ -50,6 +50,19 @@ export function proxy(request: NextRequest): NextResponse {
     const url = request.nextUrl.clone();
     url.pathname = pathname.slice(V2_PREFIX.length) || '/';
     return NextResponse.redirect(url);
+  }
+
+  // A visitor who is not served v2 on an address only v2 has a page for (a link
+  // in the guest quiz page's shell, the back button, an old bookmark) goes to
+  // the nearest classic page rather than v1's 404 (`classicFallbackFor`).
+  if (!hasV2Cookie) {
+    const fallback = classicFallbackFor(pathname);
+    if (fallback) {
+      const url = request.nextUrl.clone();
+      url.pathname = fallback;
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
   }
 
   // Opted-in users on a migrated route → serve the v2 tree without changing the
