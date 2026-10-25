@@ -162,7 +162,7 @@ test('side by side on a computer only: below xl the draft is the existing sheet 
   for (const rule of cardRules.match(/'[^']+'/g) ?? []) {
     for (const utility of rule.slice(1, -1).split(/\s+/)) assert.ok(utility.startsWith('xl:'), utility);
   }
-  assert.match(frame, /'fixed inset-x-0 bottom-0 z-50 flex h-\[calc\(100dvh-var\(--keyboard-inset,0px\)-2\.5rem\)\]/);
+  assert.match(frame, /'fixed inset-x-0 top-\[calc\(var\(--visual-top,0px\)\+2\.5rem\)\] z-50 flex h-\[calc\(var\(--visual-height,100dvh\)-2\.5rem\)\]/);
   // A draft that finishes while the reader types in the case chat's box does not open over it.
   assert.match(conversation('draft', 'DraftCard.tsx'), /'\[data-v2-chat-dock\] textarea, \[data-v2-case-chat-composer\] textarea'/);
   assert.match(detail('CaseChatCore.tsx'), /<div data-v2-case-chat-composer="" className="shrink-0">/);
