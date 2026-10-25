@@ -59,3 +59,34 @@ test('a column with text among its numbers stays text', () => {
   const html = render(['| Item | Amount |', '| --- | --- |', '| Rent | 2,400,000 |', '| Fee | waived |'].join('\n'));
   assert.doesNotMatch(html, /v2-cell-num/);
 });
+
+/* Lucy's live table, 25 October 2026 (1440 wide): both columns are long text.
+ * Each used to keep 30rem at every width, so the table needed 960px in a 640px
+ * card and cut the second column mid-word. The floor is now for a narrow frame
+ * only (chat-table.css), so here the two columns share the card and wrap. */
+const COURTS = [
+  '| Court | Appeal goes to |',
+  '| --- | --- |',
+  '| Supreme Court of Nigeria | None (final court of appeal) |',
+  '| Court of Appeal | Supreme Court |',
+  '| Federal High Court / State High Courts / National Industrial Court / Court of Appeal-level tribunals (e.g., Election Petition Tribunals, Customary Court of Appeal, Sharia Court of Appeal) | Court of Appeal (for federal and state high courts) |',
+  '| Magistrate / District / Customary / Sharia Courts | State High Court (or the relevant appellate structure) |',
+].join('\n');
+
+/* The other shape: the long text in the last column. */
+const LONG_LAST = [
+  '| Case | Year | Court | Holding |',
+  '| --- | --- | --- | --- |',
+  '| TEST DATA Amadi v Pool House Ltd | 1980 | Supreme Court | An employer who departs from its own disciplinary procedure may render a summary dismissal wrongful, and the employee may claim. |',
+  '| TEST DATA Okafor v Lagos State | 2019 | Court of Appeal | A notice to quit that misstates the date of expiry is void, and the landlord must serve a fresh one. |',
+].join('\n');
+
+test("Lucy's two-column table marks both columns as long text; the long-last table marks only its last", () => {
+  const courts = render(COURTS);
+  assert.match(courts, /<th class="v2-cell-long">Court<\/th>/);
+  assert.match(courts, /<th class="v2-cell-long">Appeal goes to<\/th>/);
+  const last = render(LONG_LAST);
+  assert.match(last, /<th class="v2-cell-long">Holding<\/th>/);
+  assert.match(last, /<th>Case<\/th>/);
+  assert.match(last, /<th class="v2-cell-num">Year<\/th>/);
+});

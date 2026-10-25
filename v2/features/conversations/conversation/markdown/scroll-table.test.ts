@@ -82,3 +82,13 @@ test('the table scrolls inside its card, and a narrow wide table keeps its first
   assert.match(css, /\.v2-chat-table wbr \{\s*display: none;\s*\}/);
   assert.match(css, /\.v2-chat-table \.v2-table-wide :is\(th, td\):first-child:not\(\.v2-cell-num\) wbr \{\s*display: inline;\s*\}/);
 });
+
+test('a long column keeps its 30rem floor only in a wide table in a narrow frame, so a table that can fit does fit', () => {
+  const css = readFileSync(join(here, 'chat-table.css'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(css, /@container v2-chat-table \(max-width: 30rem\) \{\s*\.v2-chat-table \.v2-table-wide \.v2-cell-long \{\s*min-width: 30rem;\s*\}\s*\}/);
+  // Outside the narrow-frame queries, nothing gives a long column a width of its own.
+  const outside = css.replace(/@container v2-chat-table \(max-width: 30rem\) \{[\s\S]*?\n\}\n/g, '');
+  assert.doesNotMatch(outside, /\.v2-cell-long \{[^}]*min-width/);
+  // The table fills the card and lays its columns out by content: they share the width and wrap.
+  assert.match(css, /\.v2-chat-table table \{\s*width: 100%;\s*margin: 0;\s*border-collapse: collapse;\s*table-layout: auto;/);
+});

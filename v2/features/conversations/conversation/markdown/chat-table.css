@@ -102,15 +102,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Long text wraps inside a readable width instead of running on. Wide
-   enough that a summary of about a hundred characters takes two lines: a
-   narrower one stretched every row into tall blank space under its short
-   cells, which on a phone show while the summary is still off to the right
-   (Backend's pictures, 26 October 2026). The table scrolls anyway, so the
-   width costs nothing on a phone. */
-.v2-chat-table .v2-cell-long {
-  min-width: 30rem;
-}
+/* Long text wraps in its own column. On a computer the columns share the
+   card's width, so a table that can fit does fit, with no sideways scroll
+   (Lucy, 25 October 2026: two long columns at 30rem each made a 960px table
+   in a 640px card, and cut the second column mid-word). The readable floor
+   for a long column is for a wide table in a narrow frame only (below). */
 
 /* A long file name stays on one line: its break points are only for the kept
    first column below. Chromium still breaks at a <wbr> inside nowrap (the
@@ -137,6 +133,21 @@
    wraps a long name at its separators and stays put while the rest scroll.
    The reader always sees which row is which (Stay picked this on 26 October
    2026). */
+/* ── A narrow frame: long text keeps a readable width ────────────────────── */
+
+/* In a narrow frame (a phone, the case page's chat card) a table of four
+   columns or more scrolls anyway, and there a long column keeps 30rem, enough
+   that a summary of about a hundred characters takes two lines: a narrower
+   one stretched every row into tall blank space under its short cells, which
+   show while the summary is still off to the right (Backend's pictures, 26
+   October 2026). A table of two or three columns fits the frame and wraps,
+   as it does on a computer. */
+@container v2-chat-table (max-width: 30rem) {
+  .v2-chat-table .v2-table-wide .v2-cell-long {
+    min-width: 30rem;
+  }
+}
+
 @container v2-chat-table (max-width: 30rem) {
   .v2-chat-table .v2-table-wide :is(th, td):first-child:not(.v2-cell-num) {
     position: sticky;
