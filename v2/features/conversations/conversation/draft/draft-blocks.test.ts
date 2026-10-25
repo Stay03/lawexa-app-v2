@@ -345,7 +345,8 @@ test('while the reader types on a phone: the title row down to ×, one row of to
   }
   // The folded row is the computer bar's own tools; the three-row toolbar carries its class.
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
-  assert.match(editor, /<div className="v2-draft-typing-tools sticky top-0 z-10 hidden [^"]*">\s*<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} \/>/);
+  // The typing row's tools open find too (find and replace, 24 October 2026).
+  assert.match(editor, /<div className="v2-draft-typing-tools sticky top-0 z-10 hidden [^"]*">\s*<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} onFind=\{openFind\} \/>/);
   assert.match(editor, /className="v2-draft-sheet-tools sticky top-0 z-10 flex shrink-0 flex-wrap /);
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
   assert.match(bar, /<div className="v2-draft-save-foot sticky bottom-0 z-10/);
