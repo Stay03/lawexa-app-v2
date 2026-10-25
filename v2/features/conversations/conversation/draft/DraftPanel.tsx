@@ -2,6 +2,8 @@
 
 import { FileText } from 'lucide-react';
 
+import { Skeleton } from '@/components/ui/skeleton';
+
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine/types';
 import { useStreamingText } from '@/v2/runtime/chat-engine/use-conversation-stream';
 import { useV2ChatContext } from '../chat-context';
@@ -18,7 +20,11 @@ import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
  * It finds the draft by its place (draft-ordinals.ts): in a saved answer's
  * text, or, past them, in the answer still streaming, read live so the panel
  * shows the draft as it is written. A draft that is no longer in the chat (an
- * old link, a regenerated answer) says so rather than showing another.
+ * old link, a regenerated answer) says so rather than showing another. One not
+ * found while the answer is still due (Lawexa is writing, or the transcript
+ * ends on the question) is waited for instead: the case page's chat moving to
+ * its docked frame mid-turn showed "no longer in the chat" until the answer
+ * arrived (Lucy's recording, 25 October 2026).
  *
  * While Lawexa is still writing it, the draft reads as it arrives. Once it
  * is finished it opens in the editor (DraftEditor.tsx): the reader edits it
@@ -42,7 +48,8 @@ export function DraftPanel({
   const place = locateDraft(messages, ordinal);
   const streamingMessage = 'streamingIndex' in place ? messages.findLast((message) => message.isStreaming) : undefined;
   const live = useStreamingText(streamingText, streamingMessage?.id ?? '');
-  const conversationId = useV2ChatContext()?.conversationId;
+  const chat = useV2ChatContext();
+  const conversationId = chat?.conversationId;
   const space = useSidePanel()?.space ?? null;
 
   let draft: DraftBlock | null = null;
@@ -51,6 +58,22 @@ export function DraftPanel({
     draft = message ? (draftsIn(message.content)[place.index] ?? null) : null;
   } else if (streamingMessage) {
     draft = draftsIn(live, true)[place.streamingIndex] ?? null;
+  }
+
+  const answerDue = Boolean(chat?.isStreaming) || messages[messages.length - 1]?.role === 'user';
+  if (!draft && answerDue) {
+    return (
+      <ChatSidePanel label="Draft" title="Draft" icon={<DraftIcon />} bare>
+        <DraftBar />
+        <div role="status" className="space-y-3 px-5 py-8 xl:px-12">
+          <span className="sr-only">Lawexa is still writing this draft.</span>
+          <Skeleton className="h-5 w-2/5" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-11/12" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      </ChatSidePanel>
+    );
   }
 
   if (!draft) {

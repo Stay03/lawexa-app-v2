@@ -121,7 +121,9 @@ test('when the editor closes a chat that floated before floats again, with the m
 test('the editor covers the reading column, 12px clear of the sidebar and the chat, and the reading goes inert', () => {
   assert.match(
     screen,
-    /\{editorShown \? \(\s*<div className="pointer-events-none absolute inset-y-0 left-0 right-\[27\.5rem\] z-20 pl-3">\s*<div ref=\{setDraftBox\} className="pointer-events-auto sticky top-3 flex h-\[calc\(100dvh-5rem\)\]" \/>/,
+    // The box is 100dvh - 5rem tall: its sticky frame runs to the foot, the
+    // 0.75rem strip under the box covered (Lucy, 25 October 2026).
+    /\{editorShown \? \(\s*<div className="pointer-events-none absolute inset-y-0 left-0 right-\[27\.5rem\] z-20 pl-3">\s*<div className="pointer-events-auto sticky top-3 flex h-\[calc\(100dvh-4\.25rem\)\] flex-col">\s*<div ref=\{setDraftBox\} className="flex min-h-0 flex-1" \/>/,
   );
   // The rail it stops short of: the 26rem card and its 0.75rem right gap.
   assert.match(detail('CaseChatPanel.tsx'), /'w-\[calc\(26rem\+0\.75rem\)\] shrink-0 overflow-x-clip'/);

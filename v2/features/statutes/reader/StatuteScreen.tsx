@@ -8,6 +8,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { CaseAskDock } from '@/v2/features/cases/detail/CaseAsk';
 import { useIdlePreloadCaseChat } from '@/v2/features/cases/detail/CaseChatCore';
 import { CaseChatDocked } from '@/v2/features/cases/detail/CaseChatPanel';
+import { CaseChatHost } from '@/v2/features/cases/detail/case-chat-host';
 import type { ChatSubject } from '@/v2/features/cases/detail/chat-subject';
 import { useDocumentChat } from '@/v2/features/cases/detail/use-document-chat';
 import {
@@ -235,85 +236,96 @@ function StatuteBody({
     // between the header's Notes button and the document's underlines.
     <StatuteNotesProvider slug={slug} statuteId={detail.id}>
       <DocumentLinkContext.Provider value={linkHost}>
-          {/* With the docked chat open (≥xl) this is a row: the reading column
-              centres in the remaining space, the panel takes 26rem on the right
-              (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
-              never mints a horizontal scrollbar. */}
-          <div className="flex min-h-full w-full overflow-x-clip">
-            <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
-              {/* UNDER THE PHONE CHAT THE TEXT LEAVES THE SCREEN READER AND
-                  THE TAB ORDER, BUT STAYS PAINTED (18 October 2026). The open
-                  chat sets the root's background (CaseAsk), and WebKit repaints
-                  a long statute that is inert or hidden very slowly when that
-                  colour changes: 45 to 50 s on the ACJL's 1194 parts, a frozen
-                  iPhone, on the open with `inert` and on the close with
-                  `visibility: hidden`. Painted, the same change costs 0.7 s.
-                  `aria-hidden` takes the text out of the accessibility tree, and
-                  focus that lands in it (Tab, Shift+Tab past the chat) goes back
-                  to the chat, which is a modal dialog in the same column. The
-                  case page, whose judgment is one block, keeps `inert`. */}
-              <article
-                aria-label={detail.title}
-                aria-hidden={pageUnderChat || undefined}
-                onFocusCapture={pageUnderChat ? returnFocusToChat : undefined}
-                className={cn(
-                  'flex flex-col gap-8 pb-8',
-                  arrival === 'peeked'
-                    ? 'v2-statute-arrive-peeked'
-                    : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
-                )}
-              >
-                <StatuteHeader detail={detail} />
-                {/* KEYED BY SLUG: a statute→statute navigation reuses this component
-                    instance, and an inherited `mountedCount` ≥ the new document's
-                    block count would mount the entire second document in ONE
-                    synchronous commit — the exact jank the progressive mount exists
-                    to prevent — and skip its deep link. The key resets the engine. */}
-                <StatuteDocument
-                  key={slug}
-                  slug={slug}
-                  provision={provision}
-                  chatDocked={showDocked}
-                  pauseMount={pageUnderChat}
-                  registerLinkHandlers={registerLinkHandlers}
-                />
-              </article>
-              {/* THE composer's dock: on a phone and at xl-floating it is the whole
-                  chat (one card, three states); it steps aside only while the
-                  docked column, chosen at xl, owns the composer. */}
-              {showDock ? (
-                <CaseAskDock
+        {/* The chat's middle is rendered once here and shown by whichever frame
+            is up, floating or docked (case-chat-host.tsx, the case page's). */}
+        <CaseChatHost
+          view={hasAccount ? renderedChat : null}
+          subject={subject}
+          signedIn={hasAccount}
+          viewerId={userId}
+          onOpenChat={switchChat}
+          onClose={closeChat}
+        >
+            {/* With the docked chat open (≥xl) this is a row: the reading column
+                centres in the remaining space, the panel takes 26rem on the right
+                (the CaseScreen layout). `overflow-x-clip` so the panel's width reveal
+                never mints a horizontal scrollbar. */}
+            <div className="flex min-h-full w-full overflow-x-clip">
+              <div className="v2-statute-doc relative mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pt-5 sm:pt-8">
+                {/* UNDER THE PHONE CHAT THE TEXT LEAVES THE SCREEN READER AND
+                    THE TAB ORDER, BUT STAYS PAINTED (18 October 2026). The open
+                    chat sets the root's background (CaseAsk), and WebKit repaints
+                    a long statute that is inert or hidden very slowly when that
+                    colour changes: 45 to 50 s on the ACJL's 1194 parts, a frozen
+                    iPhone, on the open with `inert` and on the close with
+                    `visibility: hidden`. Painted, the same change costs 0.7 s.
+                    `aria-hidden` takes the text out of the accessibility tree, and
+                    focus that lands in it (Tab, Shift+Tab past the chat) goes back
+                    to the chat, which is a modal dialog in the same column. The
+                    case page, whose judgment is one block, keeps `inert`. */}
+                <article
+                  aria-label={detail.title}
+                  aria-hidden={pageUnderChat || undefined}
+                  onFocusCapture={pageUnderChat ? returnFocusToChat : undefined}
+                  className={cn(
+                    'flex flex-col gap-8 pb-8',
+                    arrival === 'peeked'
+                      ? 'v2-statute-arrive-peeked'
+                      : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300',
+                  )}
+                >
+                  <StatuteHeader detail={detail} />
+                  {/* KEYED BY SLUG: a statute→statute navigation reuses this component
+                      instance, and an inherited `mountedCount` ≥ the new document's
+                      block count would mount the entire second document in ONE
+                      synchronous commit — the exact jank the progressive mount exists
+                      to prevent — and skip its deep link. The key resets the engine. */}
+                  <StatuteDocument
+                    key={slug}
+                    slug={slug}
+                    provision={provision}
+                    chatDocked={showDocked}
+                    pauseMount={pageUnderChat}
+                    registerLinkHandlers={registerLinkHandlers}
+                  />
+                </article>
+                {/* THE composer's dock: on a phone and at xl-floating it is the whole
+                    chat (one card, three states); it steps aside only while the
+                    docked column, chosen at xl, owns the composer. */}
+                {showDock ? (
+                  <CaseAskDock
+                    subject={subject}
+                    signedIn={hasAccount}
+                    viewerId={userId}
+                    start={start}
+                    view={dockOwnsChat ? renderedChat : null}
+                    panelOpen={chat !== null && dockOwnsChat}
+                    screen={phone}
+                    onEngage={() => {
+                      if (chat === null) openChat('new');
+                    }}
+                    onClose={closeChat}
+                    onDock={() => setDockedPref(true)}
+                    onOpenChat={switchChat}
+                  />
+                ) : null}
+              </div>
+
+              {showDocked && renderedChat !== null ? (
+                <CaseChatDocked
+                  chatId={renderedChat}
+                  closing={chatClosing}
                   subject={subject}
                   signedIn={hasAccount}
                   viewerId={userId}
                   start={start}
-                  view={dockOwnsChat ? renderedChat : null}
-                  panelOpen={chat !== null && dockOwnsChat}
-                  screen={phone}
-                  onEngage={() => {
-                    if (chat === null) openChat('new');
-                  }}
                   onClose={closeChat}
-                  onDock={() => setDockedPref(true)}
-                  onOpenChat={switchChat}
+                  onSwitchChat={switchChat}
+                  onFloat={() => setDockedPref(false)}
                 />
               ) : null}
             </div>
-
-            {showDocked && renderedChat !== null ? (
-              <CaseChatDocked
-                chatId={renderedChat}
-                closing={chatClosing}
-                subject={subject}
-                signedIn={hasAccount}
-                viewerId={userId}
-                start={start}
-                onClose={closeChat}
-                onSwitchChat={switchChat}
-                onFloat={() => setDockedPref(false)}
-              />
-            ) : null}
-          </div>
+        </CaseChatHost>
       </DocumentLinkContext.Provider>
     </StatuteNotesProvider>
   );

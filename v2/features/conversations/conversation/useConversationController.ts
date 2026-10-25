@@ -7,6 +7,7 @@ import {
   useConversationStream,
   claimTranscript,
   deleteTranscript,
+  recoverWithRetry,
   type SendRefusal,
 } from '@/v2/runtime/chat-engine';
 import type {
@@ -492,7 +493,7 @@ export function useConversationController(
     onCancelled: () => setRefusedTurn(null),
   });
 
-  const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle, turnOrigin } = stream;
+  const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, followUntilAnswered, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle, turnOrigin } = stream;
 
   // ── Jurisdiction slot: seed once per conversation, persist on change. ──
   useEffect(() => {
@@ -644,7 +645,15 @@ export function useConversationController(
       // finds once the screen is open (it reads the transcript before attaching).
       // The status it reads reaches the screen before it attaches (`onStatusRead`
       // above), so a colleague's turn is held from its first frame.
-      await recoverPendingState(conversationId).catch(() => {});
+      //
+      // One failed read no longer loses the turn (recover-with-retry.ts): a read
+      // that throws is tried again, and a transcript still ending on the question
+      // is followed until its answer is in.
+      await recoverWithRetry(conversationId, {
+        recover: recoverPendingState,
+        followUntilAnswered,
+        cancelled: () => cancelled,
+      });
       if (cancelled) return;
       setRecoveredFor(conversationId);
     })();
@@ -664,6 +673,7 @@ export function useConversationController(
     setConversationId,
     setError,
     recoverPendingState,
+    followUntilAnswered,
     embedded,
   ]);
 

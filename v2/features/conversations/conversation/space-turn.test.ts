@@ -252,7 +252,9 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
     /enabled:\s*isSpaceMember &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
   );
   // Recovery settles after the mount flow's own attach, or on any connect.
-  assert.match(controller, /await recoverPendingState\(conversationId\)\.catch\(\(\) => \{\}\);\s*if \(cancelled\) return;\s*setRecoveredFor\(conversationId\);\s*\}\)\(\);/);
+  // The open's recovery (retried, then followed: recover-with-retry.ts) settles
+  // before the poll may start.
+  assert.match(controller, /await recoverWithRetry\(conversationId, \{[\s\S]*?\}\);\s*if \(cancelled\) return;\s*setRecoveredFor\(conversationId\);\s*\}\)\(\);/);
   // Opened mid-turn: the mount flow attached, so whose turn it is is read once.
   // Opened mid-turn: the status the attach reads is kept (onStatusRead).
   assert.doesNotMatch(controller, /prefetchQuery\(statusOptions\)/);

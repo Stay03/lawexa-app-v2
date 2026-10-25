@@ -9,9 +9,9 @@ import type { ConversationComposerHandle } from '@/v2/features/conversations/con
 import {
   CaseChatBar,
   CaseChatComposerDock,
-  CaseChatMiddle,
   type CaseChatStart,
 } from './CaseChatCore';
+import { CaseChatMiddleSlot, useCaseChatStage } from './case-chat-host';
 import { CHAT_SUBJECT_NOUN, type ChatSubject } from './chat-subject';
 import './case-chat-panel.css';
 
@@ -125,7 +125,10 @@ function CaseChatBody({
 }: CaseChatCommonProps & {
   onFloat: () => void;
 }) {
-  const stageRef = useRef<ConversationComposerHandle | null>(null);
+  // The composer's handle: the page's one (case-chat-host.tsx) when the page
+  // renders the chat's middle once, else this frame's own.
+  const ownStage = useRef<ConversationComposerHandle | null>(null);
+  const stageRef = useCaseChatStage() ?? ownStage;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -150,7 +153,7 @@ function CaseChatBody({
           </button>
         }
       />
-      <CaseChatMiddle
+      <CaseChatMiddleSlot
         view={chatId}
         subject={subject}
         signedIn={signedIn}

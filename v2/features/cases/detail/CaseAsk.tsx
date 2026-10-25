@@ -10,9 +10,9 @@ import type { ConversationComposerHandle } from '@/v2/features/conversations/con
 import {
   CaseChatBar,
   CaseChatComposerDock,
-  CaseChatMiddle,
   type CaseChatStart,
 } from './CaseChatCore';
+import { CaseChatMiddleSlot, useCaseChatStage } from './case-chat-host';
 import { CHAT_SUBJECT_NOUN, type ChatSubject } from './chat-subject';
 import { guardChatDrags } from './case-chat-drag-guard';
 import {
@@ -140,7 +140,10 @@ export function CaseAskDock({
   const panelMounted = view !== null;
   const noun = CHAT_SUBJECT_NOUN[subject.kind];
   const screenMounted = screen && panelMounted;
-  const stageRef = useRef<ConversationComposerHandle | null>(null);
+  // The composer's handle: the page's one (case-chat-host.tsx) when the page
+  // renders the chat's middle once, else this frame's own.
+  const ownStage = useRef<ConversationComposerHandle | null>(null);
+  const stageRef = useCaseChatStage() ?? ownStage;
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   /** The phone screen's bar and middle, faded in once as they ride the keyboard. */
@@ -649,7 +652,7 @@ export function CaseAskDock({
               tall
               screen
             />
-            <CaseChatMiddle
+            <CaseChatMiddleSlot
               view={view}
               subject={subject}
               signedIn={signedIn}
@@ -690,7 +693,7 @@ export function CaseAskDock({
                     </button>
                   }
                 />
-                <CaseChatMiddle
+                <CaseChatMiddleSlot
                   view={view}
                   subject={subject}
                   signedIn={signedIn}

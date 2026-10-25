@@ -176,8 +176,9 @@ test('on a computer the draft panel has no title line and no foot: one bar holds
   const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
-  // Every state of the draft panel is bare: the header is not drawn on a computer.
-  assert.equal(panel.match(/\bbare\b\s*(>|\n)/g)?.length, 2);
+  // Every state of the draft panel is bare: the header is not drawn on a computer
+  // (the draft, the one still due, and the one no longer in the chat).
+  assert.equal(panel.match(/\bbare\b\s*(>|\n)/g)?.length, 3);
   assert.doesNotMatch(panel, /footer=/);
   assert.match(frame, /bare && 'xl:hidden',/);
   // The phone sheet keeps its header: the title, "Draft · 219 words" and the tile.
@@ -185,7 +186,7 @@ test('on a computer the draft panel has no title line and no foot: one bar holds
   // One bar: the formatting, then Save, then the close; every state has the close.
   assert.match(editor, /<div className="flex min-w-0 flex-1 items-center">\{tools\}<\/div>\s*\{actions\}\s*<SidePanelCloseButton \/>/);
   assert.match(editor, /<DraftBar\s+tools=\{<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} onFind=\{openFind\} \/>\}\s+actions=\{<DraftSaveControl draft=\{draft\} dirty=\{dirty\} space=\{space\} \/>\}\s+\/>/);
-  assert.equal(panel.match(/<DraftBar \/>/g)?.length, 2);
+  assert.equal(panel.match(/<DraftBar \/>/g)?.length, 3);
   assert.match(frame, /export function SidePanelCloseButton\(\)/);
   // The sheet's foot is not drawn on a computer; the bar's Save is drawn only there.
   assert.match(bar, /<div className="v2-draft-save-foot sticky bottom-0 z-10 [^"]* xl:hidden">/);

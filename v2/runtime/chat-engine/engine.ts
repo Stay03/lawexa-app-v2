@@ -2372,6 +2372,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // ─── Recovery (page reload / direct navigation) ─────────────────────────────
 
   async function recoverPendingState(convId: string): Promise<RecoverResult> {
+    // Already following a live turn: it is attached, and re-reading the status
+    // would only mark the reader's own turn as one this screen merely followed.
+    if (eventSource && executionId) return 'reconnected';
     try {
       // The open-time check reads only the status and the execution id. For a
       // finished chat the full answer also carried every message (351 KB for
@@ -2392,6 +2395,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     } catch {
       return 'load_history';
     }
+  }
+
+  function followUntilAnswered(convId: string): boolean {
+    if (disposed || eventSource || pollInterval || state.isStreaming) return false;
+    const last = state.messages[state.messages.length - 1];
+    if (!last || last.role !== 'user') return false;
+    pollForCompletion(convId);
+    return true;
   }
 
   // ─── Construction seed (the cache-warm first paint) ─────────────────────────
@@ -2463,6 +2474,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     setError,
     retryLastMessage,
     recoverPendingState,
+    followUntilAnswered,
     updateHandlers(next) {
       handlers = next;
     },

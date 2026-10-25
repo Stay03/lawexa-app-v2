@@ -368,6 +368,14 @@ export interface ChatEngine {
   setError(error: string | null): void;
   retryLastMessage(): Promise<void>;
   recoverPendingState(conversationId: string): Promise<RecoverResult>;
+  /**
+   * The transcript ends on a question with no answer and nothing is streaming
+   * (a status read failed, or said the turn was over while this copy of the
+   * conversation predates its answer): poll the status until the turn is done,
+   * then load the server's copy, so the answer shows without a reload. Returns
+   * whether it started following. Idle otherwise.
+   */
+  followUntilAnswered(conversationId: string): boolean;
 
   /**
    * Replace the live callbacks + mode resolvers on a long-lived engine. The React

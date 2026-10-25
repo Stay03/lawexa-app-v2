@@ -15,6 +15,7 @@
  */
 
 export { createChatEngine } from './engine';
+export { recoverWithRetry, RECOVER_RETRY_DELAYS_MS } from './recover-with-retry';
 export {
   useConversationStream,
   useStreamingText,
