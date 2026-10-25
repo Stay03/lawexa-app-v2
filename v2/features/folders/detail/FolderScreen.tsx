@@ -550,6 +550,8 @@ function FolderBody({ uuid }: { uuid: string }) {
         library: () => setLibrary((previous) => ({ open: true, key: previous.key + 1 })),
       }
     : null;
+  // Select, for whoever may manage the items, once there are items to pick.
+  const showSelect = canManageItems && itemRows.length > 0 && !selecting;
   const showTabs = typesPresent.size > 1 || tab !== 'all';
   const showSubfolders = tab === 'all';
 
@@ -594,8 +596,15 @@ function FolderBody({ uuid }: { uuid: string }) {
             page's heading at every width (Arthur, item 7) and wraps to two
             lines rather than being cut; the phone bar stays empty while it is
             on screen (`useScrolledTitle`). Rename and Delete are in the bar's
-            one menu. `sm:mt-3`: below `sm:` the trail above renders nothing. */}
-        <header className="flex items-start gap-3 pb-3 sm:mt-3">
+            one menu. `sm:mt-3`: below `sm:` the trail above renders nothing.
+
+            ON A PHONE THE NAME HAS THE WHOLE WIDTH (Tester, 25 October 2026:
+            "Adebayo v Kestrel Haulage..." was cut short beside Select and
+            Add). Below `sm:` the header is one column: the name, then the
+            Space it is in, then Select and Add on their own row. From `sm:`
+            the name and the buttons share the first row, as before, and the
+            Space line runs under both. */}
+        <header className="grid grid-cols-1 items-start gap-x-3 gap-y-2 pb-3 sm:mt-3 sm:grid-cols-[minmax(0,1fr)_auto]">
           <h1
             ref={headingRef}
             title={row.name}
@@ -607,21 +616,26 @@ function FolderBody({ uuid }: { uuid: string }) {
           >
             {row.name}
           </h1>
+          {/* A folder in a Space says which one, under its name, as a link to the
+              Space (Stay picked C1, 20 October 2026). */}
+          {folder.space ? (
+            <SpaceFolderLine space={folder.space} className="mt-0 mb-0 sm:col-span-2 sm:row-start-2" />
+          ) : null}
           {/* Only those who may add (items 8 and 9). */}
-          {canManageItems && itemRows.length > 0 && !selecting
-            ? bulk.startButton(
-                cn(
-                  'v2-interactive inline-flex min-h-9 shrink-0 items-center rounded-full border border-border px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
-                  FOCUS_RING,
-                ),
-              )
-            : null}
-          {addChoices ? <FolderAddMenu choices={addChoices} /> : null}
+          {showSelect || addChoices ? (
+            <div className="flex items-center gap-3 sm:col-start-2 sm:row-start-1">
+              {showSelect
+                ? bulk.startButton(
+                    cn(
+                      'v2-interactive inline-flex min-h-9 shrink-0 items-center rounded-full border border-border px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary',
+                      FOCUS_RING,
+                    ),
+                  )
+                : null}
+              {addChoices ? <FolderAddMenu choices={addChoices} /> : null}
+            </div>
+          ) : null}
         </header>
-
-        {/* A folder in a Space says which one, under its name, as a link to the
-            Space (Stay picked C1, 20 October 2026). */}
-        {folder.space ? <SpaceFolderLine space={folder.space} /> : null}
 
         {/* A legacy field: v2 has no description control, so this is only
             ever shown, never written. */}

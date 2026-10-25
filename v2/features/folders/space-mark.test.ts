@@ -64,7 +64,7 @@ test('the Folders page marks Space folders, with the tooltip and the screen-read
 });
 
 test("a Space folder's own page names its Space as a link", () => {
-  assert.match(read('detail', 'FolderScreen.tsx'), /\{folder\.space \? <SpaceFolderLine space=\{folder\.space\} \/> : null\}/);
+  assert.match(read('detail', 'FolderScreen.tsx'), /<SpaceFolderLine space=\{folder\.space\} className="mt-0 mb-0 sm:col-span-2 sm:row-start-2" \/>/);
   const mark = read('space-mark.tsx');
   const line = mark.slice(mark.indexOf('export function SpaceFolderLine'));
   assert.match(line, /<span className="shrink-0">In<\/span>/);

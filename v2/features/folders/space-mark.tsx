@@ -68,9 +68,9 @@ export function spaceFolderNote(spaceName: string): string {
  * A Space folder's page, under its name: "In <Space>", the Space a link. Quiet
  * type, led by the same yellow blocks as the list's mark so the two read as one.
  */
-export function SpaceFolderLine({ space }: { space: { uuid: string; name: string } }) {
+export function SpaceFolderLine({ space, className }: { space: { uuid: string; name: string }; className?: string }) {
   return (
-    <p className="-mt-1 mb-3 flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+    <p className={cn('-mt-1 mb-3 flex min-w-0 items-center gap-2 text-sm text-muted-foreground', className)}>
       <Blocks aria-hidden className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
       <span className="shrink-0">In</span>
       <Link

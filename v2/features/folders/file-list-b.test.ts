@@ -70,8 +70,14 @@ test('every folder wears the one folder colour, and every menu keeps its actions
 
 test('the folder page header is the name and Add, over a "Name / Added" head', () => {
   const screen = read('detail', 'FolderScreen.tsx');
-  assert.match(screen, /<header className="flex items-start gap-3 pb-3 sm:mt-3">\s*<h1/);
-  assert.match(screen, /\{addChoices \? <FolderAddMenu choices=\{addChoices\} \/> : null\}\s*<\/header>/);
+  // One column on a phone (the name has the whole width); name and buttons share a row from sm.
+  assert.match(screen, /<header className="grid grid-cols-1 items-start gap-x-3 gap-y-2 pb-3 sm:mt-3 sm:grid-cols-\[minmax\(0,1fr\)_auto\]">\s*<h1/);
+  assert.match(screen, /'line-clamp-2 min-w-0 flex-1 break-words',/);
+  assert.match(screen, /<div className="flex items-center gap-3 sm:col-start-2 sm:row-start-1">/);
+  assert.match(screen, /\{addChoices \? <FolderAddMenu choices=\{addChoices\} \/> : null\}\s*<\/div>\s*\) : null\}\s*<\/header>/);
+  // On a phone the order is the name, the Space line, then Select and Add.
+  const header = screen.slice(screen.indexOf('<header className="grid'), screen.indexOf('</header>'));
+  assert.ok(header.indexOf('<h1') < header.indexOf('<SpaceFolderLine') && header.indexOf('<SpaceFolderLine') < header.indexOf('<FolderAddMenu'));
   assert.doesNotMatch(screen, /FolderTile|countLabel|folderCountsLabel/);
   assert.match(screen, /<FileListHead \/>\s*<ul className="mt-1 flex flex-col divide-y divide-border\/40">/);
   // The wait draws the same head, so the rows do not move at the hand-off.

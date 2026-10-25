@@ -42,7 +42,9 @@ test('inside a folder, its items are taken out (asked first) or added to another
   assert.match(bulk, /title=\{`Remove \$\{countOf\(select\.count, NOUN\)\} from this folder\?`\}/);
   assert.doesNotMatch(bulk, /action: 'delete'|Delete/);
   // Only those who may take items out get "Select".
-  assert.match(read('..', 'detail', 'FolderScreen.tsx'), /\{canManageItems && itemRows\.length > 0 && !selecting\s*\? bulk\.startButton\(/);
+  const folderScreen = read('..', 'detail', 'FolderScreen.tsx');
+  assert.match(folderScreen, /const showSelect = canManageItems && itemRows\.length > 0 && !selecting;/);
+  assert.match(folderScreen, /\{showSelect\s*\? bulk\.startButton\(/);
 });
 
 test('a ticked row is its own tick box, and the menu steps aside', () => {
