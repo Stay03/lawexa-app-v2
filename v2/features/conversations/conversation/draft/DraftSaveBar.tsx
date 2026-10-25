@@ -111,9 +111,19 @@ function folderLabel(space: ConversationSpaceRef | null): string {
   return space ? 'Save to Space folder' : 'Save to folder';
 }
 
+/**
+ * The gold button's word: "Save" before the first save (Stay, 25 October
+ * 2026: "just have 'Save'"), "Save changes" after an edit, "Saving…" while it
+ * runs. A screen reader also hears what the first Save makes ({@link SaveAsNoteHint}).
+ */
 function saveLabel(draft: DraftSave): string {
   if (draft.mutation.isPending) return 'Saving…';
-  return draft.saved ? 'Save changes' : 'Save as note';
+  return draft.saved ? 'Save changes' : 'Save';
+}
+
+/** " as a note", for a screen reader only, after the first Save's word. */
+function SaveAsNoteHint({ draft }: { draft: DraftSave }) {
+  return draft.saved || draft.mutation.isPending ? null : <span className="sr-only"> as a note</span>;
 }
 
 /** The bar's word on a panel under 37.5rem, where the formatting needs the room. */
@@ -147,7 +157,10 @@ export function DraftSaveBar({ draft, dirty, space }: DraftSaveProps) {
             ) : (
               <NotebookPen aria-hidden className="size-4" />
             )}
-            <span aria-live="polite">{saveLabel(draft)}</span>
+            <span aria-live="polite">
+              {saveLabel(draft)}
+              <SaveAsNoteHint draft={draft} />
+            </span>
           </button>
         )}
         {/* Once saved, one row: the line and the saved note's ··· menu (Open note,
@@ -259,8 +272,14 @@ export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
             <NotebookPen aria-hidden className="size-[15px]" />
           )}
           <span aria-live="polite">
-            <span className="@max-[37.5rem]/draft:hidden">{saveLabel(draft)}</span>
-            <span className="hidden @max-[37.5rem]/draft:inline">{shortSaveLabel(draft)}</span>
+            <span className="@max-[37.5rem]/draft:hidden">
+              {saveLabel(draft)}
+              <SaveAsNoteHint draft={draft} />
+            </span>
+            <span className="hidden @max-[37.5rem]/draft:inline">
+              {shortSaveLabel(draft)}
+              <SaveAsNoteHint draft={draft} />
+            </span>
           </span>
         </button>
       )}
@@ -406,7 +425,8 @@ function SaveMoreMenu({ draft }: { draft: DraftSave }) {
       <DropdownMenuContent align="end" className={DRAFT_MENU}>
         <DropdownMenuItem disabled={draft.mutation.isPending} onSelect={draft.press}>
           <NotebookPen aria-hidden className="size-4 text-foreground/62" />
-          Save as note
+          Save
+          <span className="sr-only"> as a note</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled={downloading !== null} onSelect={() => void download('docx')}>

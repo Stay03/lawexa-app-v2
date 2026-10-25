@@ -91,7 +91,7 @@ test('on a computer, before the first save, a gold chevron holds Save as note, W
   assert.match(menu, /rounded-r-\[9px\] bg-primary text-primary-foreground/);
   assert.match(menu, /\{downloading \? \(\s*<Loader2 /);
   assert.match(menu, /<DropdownMenuContent align="end" className=\{DRAFT_MENU\}>/);
-  const order = ['Save as note', 'Download Word', '.docx', 'Download PDF', '.pdf'];
+  const order = ['Save', ' as a note', 'Download Word', '.docx', 'Download PDF', '.pdf'];
   let at = -1;
   for (const word of order) {
     const next = menu.indexOf(word, at + 1);

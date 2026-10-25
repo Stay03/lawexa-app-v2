@@ -201,9 +201,12 @@ test('the gold Save as note is the only primary action on the computer panel', a
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
   const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
   assert.equal(control.match(/\bbg-primary\b(?!\/)/g)?.length, 1);
-  assert.match(bar, /return draft\.saved \? 'Save changes' : 'Save as note';/);
+  // "Save" (Stay, 25 October 2026: "just have 'Save'"); a screen reader hears "Save as a note".
+  assert.match(bar, /return draft\.saved \? 'Save changes' : 'Save';/);
+  assert.match(bar, /return draft\.saved \|\| draft\.mutation\.isPending \? null : <span className="sr-only"> as a note<\/span>;/);
+  assert.doesNotMatch(bar.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''), />\s*Save as note\s*</);
   // A narrow panel (a 1280 screen) says "Save", by the bar's own fold width.
-  assert.match(control, /<span className="@max-\[37\.5rem\]\/draft:hidden">\{saveLabel\(draft\)\}<\/span>\s*<span className="hidden @max-\[37\.5rem\]\/draft:inline">\{shortSaveLabel\(draft\)\}<\/span>/);
+  assert.match(control, /<span className="@max-\[37\.5rem\]\/draft:hidden">\s*\{saveLabel\(draft\)\}\s*<SaveAsNoteHint draft=\{draft\} \/>\s*<\/span>\s*<span className="hidden @max-\[37\.5rem\]\/draft:inline">\s*\{shortSaveLabel\(draft\)\}\s*<SaveAsNoteHint draft=\{draft\} \/>\s*<\/span>/);
   assert.doesNotMatch(editor, /\bbg-primary\b(?!\/)/);
   // A failed save still says why, beside the button.
   assert.match(control, /role="alert"[\s\S]*?\{saveFailureSentence\(mutation\.error\)\}/);
