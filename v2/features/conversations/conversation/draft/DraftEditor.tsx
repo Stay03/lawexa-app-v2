@@ -114,12 +114,12 @@ interface DraftEditorProps {
 }
 
 /**
- * How far from the scroller's edges the caret is kept when it is scrolled to
- * (px): clear of the sticky toolbar above (two rows on the phone sheet) and
- * of Save at the foot.
+ * How far from the draft's own scroll area's edges the caret is kept when it
+ * is scrolled to (px). The toolbar and Save are outside that area, so a small
+ * margin keeps a line of text in sight above and below the caret.
  */
-const CARET_MARGIN_TOP = 112;
-const CARET_MARGIN_BOTTOM = 96;
+const CARET_MARGIN_TOP = 24;
+const CARET_MARGIN_BOTTOM = 24;
 
 /**
  * The document's frame. On the phone sheet a document measure. On a computer
@@ -192,7 +192,7 @@ function DraftEditorBody({
     },
     editorProps: {
       transformPastedHTML: stripPastedPresentation,
-      // The caret is kept clear of the sticky toolbar at the top and Save at the foot when it is scrolled to.
+      // The caret keeps a line of room inside the draft's scroll area when it is scrolled to.
       scrollThreshold: { top: CARET_MARGIN_TOP, bottom: CARET_MARGIN_BOTTOM, left: 0, right: 0 },
       scrollMargin: { top: CARET_MARGIN_TOP, bottom: CARET_MARGIN_BOTTOM, left: 0, right: 0 },
       attributes: {
@@ -269,12 +269,21 @@ function DraftEditorBody({
   }, [editor, mac, openFind]);
 
   return (
-    <div ref={frameRef} className="@container/draft flex min-h-full flex-col">
+    // THE DRAFT SCROLLS IN ITS OWN AREA, between the bars at the top and Save
+    // at the foot, and the bars and the find box sit outside it (Arthur's
+    // iPhone, 25 October 2026: with the keyboard up, "3 of 6" showed the
+    // draft's first lines). When the find box was a sticky strip inside the
+    // panel's scroller, iOS scrolled that scroller back to the box's place at
+    // the top every time the box had focus, so the match the find had just
+    // centred went out of sight. Now nothing focusable scrolls with the
+    // draft, and a match centred in this area is in the part above the
+    // keyboard: the sheet is as tall as the visible area (ChatSidePanel).
+    <div ref={frameRef} className="@container/draft flex h-full min-h-0 flex-col">
       {editor ? (
-        // The bars and the find bar stick to the panel's top together: the
-        // find bar is a strip under the sheet's toolbar, or a card under the
-        // computer bar's right end.
-        <div className="sticky top-0 z-10 shrink-0">
+        // The bars and the find bar, above the draft: the find bar is a
+        // strip under the sheet's toolbar, or a card under the computer bar's
+        // right end (placed against this box).
+        <div className="relative z-10 shrink-0">
           <DraftToolbar editor={editor} onFind={openFind} />
           {/* While the reader types on a phone (draft-panel.css): the computer bar's
               tools, folded to one row (undo, font, B I, ··· with the rest), in place
@@ -303,8 +312,10 @@ function DraftEditorBody({
           <DraftBar />
         </>
       )}
-      <div className={cn(DRAFT_DOCUMENT, 'flex-1')}>
-        <EditorContent editor={editor} />
+      <div data-v2-draft-scroll className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+        <div className={DRAFT_DOCUMENT}>
+          <EditorContent editor={editor} />
+        </div>
       </div>
       {editor ? (
         <>
