@@ -102,7 +102,7 @@ test('Copy confirms only a copy that happened', async () => {
 
 test('the chat renders fences through FencedBlock, and the Copy button copies the whole document', () => {
   const markdown = read('MarkdownText.tsx');
-  assert.match(markdown, /const MARKDOWN_COMPONENTS: Components = \{ a: CaseMentionLink, pre: FencedBlock \};/);
+  assert.match(markdown, /const MARKDOWN_COMPONENTS: Components = \{ a: CaseMentionLink, pre: FencedBlock, table: ScrollTable \};/);
   // Code blocks stay readable in light mode: theme text on the muted background.
   assert.match(markdown, /\[&_pre\]:bg-muted \[&_pre\]:text-foreground/);
   const block = read('FencedBlock.tsx');
