@@ -1,0 +1,213 @@
+/*
+ * A table in a chat answer (ScrollTable, rehype-table-columns). Stay, 25-26
+ * October 2026: "a more cleaner, professional ui/ux table that is beautifull
+ * and functional"; he picked look B (a soft card with a tinted header) and, on
+ * a phone, the first column kept in place. Plain and calm: greys only, gold
+ * stays for actions.
+ *
+ * Cell grounds are opaque mixes with --background (the card's own ground), so
+ * the kept first column hides what scrolls under it.
+ */
+
+.v2-chat-table {
+  /* The table's own width decides the narrow layout, not the screen's: a
+     phone, the case page's chat card and a narrow panel all count. */
+  container: v2-chat-table / inline-size;
+  margin-block: 1rem;
+  max-width: 100%;
+}
+
+/* ── The card ────────────────────────────────────────────────────────────── */
+
+.v2-chat-table-frame {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--background);
+}
+
+/* ── The scroller and its edge fades ─────────────────────────────────────── */
+
+.v2-chat-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  --v2-table-fade: 1.75rem;
+}
+
+/* The edge that hides columns fades out, so the reader sees the table goes on. */
+.v2-chat-table-scroll[data-more-end] {
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--v2-table-fade)), transparent);
+}
+.v2-chat-table-scroll[data-more-start] {
+  mask-image: linear-gradient(to right, transparent, #000 var(--v2-table-fade));
+}
+.v2-chat-table-scroll[data-more-start][data-more-end] {
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--v2-table-fade),
+    #000 calc(100% - var(--v2-table-fade)),
+    transparent
+  );
+}
+
+/* ── The table ───────────────────────────────────────────────────────────── */
+
+.v2-chat-table table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.v2-chat-table thead {
+  border-bottom: 0;
+}
+
+.v2-chat-table th {
+  padding: 0.625rem 0.875rem;
+  vertical-align: bottom;
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--muted-foreground);
+  background: color-mix(in oklab, var(--muted) 70%, var(--background));
+  border-bottom: 1px solid var(--border);
+}
+
+.v2-chat-table td {
+  padding: 0.625rem 0.875rem;
+  vertical-align: top;
+  color: var(--foreground);
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+.v2-chat-table tbody tr {
+  border-bottom: 0;
+}
+
+.v2-chat-table tbody tr:last-child > td {
+  border-bottom: 0;
+}
+
+/* Numbers and dates: right-aligned in tabular figures, never broken. */
+.v2-chat-table .v2-cell-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Long text wraps inside a readable width instead of running on. Wide
+   enough that a summary of about a hundred characters takes two lines: a
+   narrower one stretched every row into tall blank space under its short
+   cells, which on a phone show while the summary is still off to the right
+   (Backend's pictures, 26 October 2026). The table scrolls anyway, so the
+   width costs nothing on a phone. */
+.v2-chat-table .v2-cell-long {
+  min-width: 30rem;
+}
+
+/* A long file name stays on one line: its break points are only for the kept
+   first column below. */
+.v2-chat-table .v2-cell-token {
+  white-space: nowrap;
+}
+
+/* A row tints under the pointer on a computer. */
+@media (hover: hover) {
+  .v2-chat-table tbody tr:hover > td {
+    background: color-mix(in oklab, var(--muted) 55%, var(--background));
+  }
+}
+
+/* ── A narrow table: the first column stays in place ─────────────────────── */
+
+/* A table of four columns or more in a narrow frame (a phone, the case page's
+   chat card) keeps its first column, when it is text, in a 9rem column that
+   wraps a long name at its separators and stays put while the rest scroll.
+   The reader always sees which row is which (Stay picked this on 26 October
+   2026). */
+@container v2-chat-table (max-width: 30rem) {
+  .v2-chat-table .v2-table-wide :is(th, td):first-child:not(.v2-cell-num) {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 9rem;
+    min-width: 9rem;
+    max-width: 9rem;
+    white-space: normal;
+  }
+
+  /* Once the rest has scrolled under it, a thin line and a soft shadow mark
+     the column's edge. */
+  .v2-chat-table-scroll[data-more-start]:has(.v2-table-wide) :is(th, td):first-child:not(.v2-cell-num) {
+    box-shadow:
+      inset -1px 0 0 var(--border),
+      10px 0 12px -10px rgb(0 0 0 / 0.35);
+  }
+
+  /* The kept column never fades: only the far edge does. */
+  .v2-chat-table-scroll[data-more-start]:has(.v2-table-wide) {
+    mask-image: none;
+  }
+  .v2-chat-table-scroll[data-more-start][data-more-end]:has(.v2-table-wide) {
+    mask-image: linear-gradient(to right, #000 calc(100% - var(--v2-table-fade)), transparent);
+  }
+}
+
+/* ── Copy table ──────────────────────────────────────────────────────────── */
+
+.v2-chat-table-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.v2-chat-table-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 1.75rem;
+  padding-inline: 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  transition:
+    opacity 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+.v2-chat-table-copy:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.v2-chat-table-copy:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/* On a computer it shows while the pointer is on the table or the button has
+   focus; on a touch screen, with no hover, it always shows. */
+@media (hover: hover) {
+  .v2-chat-table-copy {
+    opacity: 0;
+  }
+  .v2-chat-table:hover .v2-chat-table-copy,
+  .v2-chat-table-copy:focus-visible {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v2-chat-table-copy {
+    transition: none;
+  }
+}

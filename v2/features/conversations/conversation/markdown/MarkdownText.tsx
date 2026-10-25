@@ -22,9 +22,11 @@ import { eagerStart, scheduleSwap, type FrameTimers } from './defer-plan';
 import { PREPARED_CHARS_CAP, createPreparedBlocks } from './prepared-blocks';
 import { linkReferenceLines } from './reference-lines';
 import { rehypeStreamWords } from './rehype-stream-words';
+import { rehypeTableColumns } from './rehype-table-columns';
 import { ScrollKeepContext } from './scroll-keep-context';
 import { scrollCorrection, type PendingRegion } from './scroll-keep';
 import { splitMarkdownBlocks } from './split-blocks';
+import './chat-table.css';
 
 /**
  * MarkdownText — the streaming-safe markdown renderer (foundation-standards §5).
@@ -85,8 +87,8 @@ const REMARK_PLUGINS = [remarkBreaks, remarkGfm];
  * (preparedBlocks), so a finished message renders exactly once more, with zero
  * word spans left in its DOM ({@link rehypeStreamWords}).
  */
-const REHYPE_ANIMATED: Options['rehypePlugins'] = [rehypeStreamWords];
-const REHYPE_PLAIN: Options['rehypePlugins'] = [];
+const REHYPE_ANIMATED: Options['rehypePlugins'] = [rehypeTableColumns, rehypeStreamWords];
+const REHYPE_PLAIN: Options['rehypePlugins'] = [rehypeTableColumns];
 
 /**
  * Stable module-level component overrides, defined once so every kept block's
