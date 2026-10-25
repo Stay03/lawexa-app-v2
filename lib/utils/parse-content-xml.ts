@@ -58,6 +58,12 @@ export interface ExecutionPlanInfo {
     reason: string;
   }>;
   writerNeeded?: boolean;
+  /**
+   * A plan block that holds no plan fields, only a line of text (the model
+   * writes a placeholder such as "(Already output earlier in this
+   * conversation.)"). The card draws it in its compact form, as written.
+   */
+  note?: string;
 }
 
 export interface MultiQuestionCompleteInfo {
@@ -595,21 +601,27 @@ export function parseContent(content: string): ParsedContent {
   }
 
   // ---- Find execution plan blocks ----
-  // Every plan block is cut out of the text, whatever it holds. One with fields
-  // draws the plan card; one without draws nothing. The model sometimes writes
-  // a placeholder in place of the plan ("(Already output earlier in this
-  // conversation.)", "(Output above, before any tool call.)"), and that block
-  // used to fall through to the markdown as raw tags (Expert answers, 25
-  // October 2026).
+  // Every plan block is cut out of the text, whatever it holds, so its tags
+  // never reach the markdown. The model sometimes writes a placeholder in
+  // place of the plan ("(Already output earlier in this conversation.)",
+  // "(Output above, before any tool call.)"); that block used to fall through
+  // as raw tags (Expert answers, 25 October 2026).
+  //   - fields (questions or a query summary): the plan card, as before;
+  //   - no fields but some text: the card's compact form with that text as its
+  //     note (Stay, 26 October 2026: "Show note in plan card");
+  //   - nothing at all: nothing is drawn.
   const executionPlanRegex = /<execution_plan>([\s\S]*?)<\/execution_plan>/gi;
 
   while ((match = executionPlanRegex.exec(content)) !== null) {
     const plan = parseExecutionPlan(match[0]);
-    matches.push({
-      start: match.index,
-      end: match.index + match[0].length,
-      segment: plan.totalQuestions || plan.querySummary ? { type: 'execution_plan', plan } : null,
-    });
+    const note = match[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const segment: ContentSegment | null =
+      plan.totalQuestions || plan.querySummary
+        ? { type: 'execution_plan', plan }
+        : note
+          ? { type: 'execution_plan', plan: { note } }
+          : null;
+    matches.push({ start: match.index, end: match.index + match[0].length, segment });
   }
 
   // ---- Find multi question complete blocks ----

@@ -16,6 +16,24 @@ interface ExecutionPlanCardProps {
 }
 
 export function ExecutionPlanCard({ plan }: ExecutionPlanCardProps) {
+  // Compact variant: a plan block that holds only a line of text (the model's
+  // placeholder, e.g. "(Already output earlier in this conversation.)"). One
+  // quiet grey row with the text as written (Stay, 26 October 2026).
+  if (!plan.totalQuestions && !plan.querySummary && plan.note) {
+    return (
+      <Card size="sm">
+        <CardContent className="flex items-start gap-2 text-sm text-muted-foreground">
+          <ListChecks aria-hidden className="mt-0.5 size-4 shrink-0" />
+          <p className="min-w-0 leading-snug">
+            <span className="font-medium">Execution plan</span>
+            <span aria-hidden> · </span>
+            <span>{plan.note}</span>
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Multi-question variant
   if (plan.totalQuestions && plan.questions && plan.questions.length > 0) {
     return (
