@@ -2,6 +2,7 @@ import { Extension, type Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey, type Command, type EditorState, type Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { scrollMatchToMiddle } from './scroll-to-match';
 
 /**
  * find-replace — find and replace in a note's body (Arthur asked; Stay said
@@ -189,11 +190,12 @@ export function createFindPlugin(): Plugin<FindState> {
         const before = findReplaceKey.getState(previousState);
         if (!next || !before || next.scroll === before.scroll) return;
         // The current match is drawn by now; bring it to the middle of the
-        // area the text scrolls in. In the chat draft that area is only the
-        // text between its bars and Save, so the middle is in sight above an
-        // iPhone keyboard too (DraftEditor).
+        // area the text scrolls in, by that area's scrollTop (scroll-to-match.ts:
+        // iOS Safari did not move the draft for scrollIntoView). In the chat
+        // draft that area is only the text between its bars and Save, so the
+        // middle is in sight above an iPhone keyboard too (DraftEditor).
         const element = view.dom.querySelector(`.${FIND_CURRENT_CLASS}`);
-        if (element instanceof HTMLElement) element.scrollIntoView({ block: 'center', inline: 'nearest' });
+        if (element instanceof HTMLElement) scrollMatchToMiddle(element);
       },
     }),
   });

@@ -236,7 +236,9 @@ test('no new package: find and replace is built on the ProseMirror already insta
   assert.deepEqual(names.filter((name) => /find|search|replace/i.test(name)), []);
   const source = read('v2', 'features', 'notes', 'editor', 'find-replace.ts');
   const imports = [...source.matchAll(/from '([^']+)'/g)].map((match) => match[1]);
-  assert.deepEqual([...new Set(imports)].sort(), ['@tiptap/core', '@tiptap/pm/model', '@tiptap/pm/state', '@tiptap/pm/view']);
+  // Plus its own scroll helper (scroll-to-match.ts), which imports nothing.
+  assert.deepEqual([...new Set(imports)].sort(), ['./scroll-to-match', '@tiptap/core', '@tiptap/pm/model', '@tiptap/pm/state', '@tiptap/pm/view']);
+  assert.doesNotMatch(read('v2', 'features', 'notes', 'editor', 'scroll-to-match.ts'), /^import /m);
 });
 
 test('the match tints are neutral greys, never a colour (no coloured accents; the techlead, 24 October 2026)', () => {
