@@ -327,7 +327,8 @@ function parseNoteLink(xml: string): NoteLinkInfo {
 interface MatchInfo {
   start: number;
   end: number;
-  segment: ContentSegment;
+  /** null: the span is cut out and nothing is drawn in its place. */
+  segment: ContentSegment | null;
 }
 
 // Known special tags whose in-progress (opened but not yet closed) form should
@@ -467,7 +468,7 @@ export function parseContent(content: string): ParsedContent {
   while ((match = singleLawyerRegex.exec(content)) !== null) {
     const isInsideLawyersBlock = matches.some(
       (m) =>
-        m.segment.type === 'lawyers' &&
+        m.segment?.type === 'lawyers' &&
         match!.index >= m.start &&
         match!.index < m.end
     );
@@ -506,7 +507,7 @@ export function parseContent(content: string): ParsedContent {
   while ((match = singleQuizRegex.exec(content)) !== null) {
     const isInsideQuizzesBlock = matches.some(
       (m) =>
-        m.segment.type === 'quizzes' &&
+        m.segment?.type === 'quizzes' &&
         match!.index >= m.start &&
         match!.index < m.end
     );
@@ -594,17 +595,21 @@ export function parseContent(content: string): ParsedContent {
   }
 
   // ---- Find execution plan blocks ----
+  // Every plan block is cut out of the text, whatever it holds. One with fields
+  // draws the plan card; one without draws nothing. The model sometimes writes
+  // a placeholder in place of the plan ("(Already output earlier in this
+  // conversation.)", "(Output above, before any tool call.)"), and that block
+  // used to fall through to the markdown as raw tags (Expert answers, 26
+  // October 2026).
   const executionPlanRegex = /<execution_plan>([\s\S]*?)<\/execution_plan>/gi;
 
   while ((match = executionPlanRegex.exec(content)) !== null) {
     const plan = parseExecutionPlan(match[0]);
-    if (plan.totalQuestions || plan.querySummary) {
-      matches.push({
-        start: match.index,
-        end: match.index + match[0].length,
-        segment: { type: 'execution_plan', plan },
-      });
-    }
+    matches.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      segment: plan.totalQuestions || plan.querySummary ? { type: 'execution_plan', plan } : null,
+    });
   }
 
   // ---- Find multi question complete blocks ----
@@ -650,8 +655,8 @@ export function parseContent(content: string): ParsedContent {
       }
     }
 
-    // Add the matched segment
-    segments.push(m.segment);
+    // Add the matched segment (none for a span that is only cut out)
+    if (m.segment) segments.push(m.segment);
     lastEnd = m.end;
   }
 
@@ -671,8 +676,9 @@ export function parseContent(content: string): ParsedContent {
   }
 
   // If nothing matched and there was no in-progress block, keep the raw content
-  // as a single text segment (unchanged fallback).
-  if (segments.length === 0 && content.trim()) {
+  // as a single text segment (unchanged fallback). A span that was only cut out
+  // still counts as a match, so an answer that is just an empty plan stays empty.
+  if (segments.length === 0 && matches.length === 0 && content.trim()) {
     segments.push({ type: 'text', content: content });
   }
 
