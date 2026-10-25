@@ -113,9 +113,14 @@
 }
 
 /* A long file name stays on one line: its break points are only for the kept
-   first column below. */
+   first column below. Chromium still breaks at a <wbr> inside nowrap (the
+   name went to 7 lines in a 90px column on a computer, Backend's pictures,
+   26 October 2026), so the break points are taken out of the line too. */
 .v2-chat-table .v2-cell-token {
   white-space: nowrap;
+}
+.v2-chat-table wbr {
+  display: none;
 }
 
 /* A row tints under the pointer on a computer. */
@@ -141,6 +146,10 @@
     min-width: 9rem;
     max-width: 9rem;
     white-space: normal;
+  }
+
+  .v2-chat-table .v2-table-wide :is(th, td):first-child:not(.v2-cell-num) wbr {
+    display: inline;
   }
 
   /* Once the rest has scrolled under it, a thin line and a soft shadow mark

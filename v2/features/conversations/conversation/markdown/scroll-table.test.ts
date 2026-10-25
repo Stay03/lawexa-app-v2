@@ -77,4 +77,8 @@ test('the table scrolls inside its card, and a narrow wide table keeps its first
     css,
     /@container v2-chat-table \(max-width: 30rem\) \{\s*\.v2-chat-table \.v2-table-wide :is\(th, td\):first-child:not\(\.v2-cell-num\) \{\s*position: sticky;\s*left: 0;/,
   );
+  // A long name breaks only in that kept column: everywhere else the break points are hidden, since Chromium
+  // breaks at a <wbr> even inside nowrap.
+  assert.match(css, /\.v2-chat-table wbr \{\s*display: none;\s*\}/);
+  assert.match(css, /\.v2-chat-table \.v2-table-wide :is\(th, td\):first-child:not\(\.v2-cell-num\) wbr \{\s*display: inline;\s*\}/);
 });
