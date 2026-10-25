@@ -251,6 +251,18 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         retryAfterMs: apiMsg.metadata.retry_after_ms ?? null,
       } as ErrorMessage);
     }
+    // A Radar report (metadata.type "radar_report", written by the Radar scan):
+    // an answer like any other, marked so the row can label it. Without this
+    // branch it matched nothing and the chat drew an empty body (25 October 2026).
+    else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'radar_report') {
+      messages.push({
+        id: `msg_${apiMsg.id}`,
+        role: 'assistant',
+        content: apiMsg.content,
+        timestamp: new Date(apiMsg.created_at),
+        kind: 'radar_report',
+      } as ChatMessage);
+    }
     // Inter-tool narration identified by lookahead — drop, matches behavior
     // for backend-tagged narration above.
     else if (apiMsg.role === 'assistant' && !apiMsg.metadata?.type && narrationApiIds.has(apiMsg.id)) {

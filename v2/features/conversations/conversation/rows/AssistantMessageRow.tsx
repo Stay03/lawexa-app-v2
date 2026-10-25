@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { AlertCircle, Check, Copy, CornerUpLeft, RotateCcw, Square } from 'lucide-react';
+import { AlertCircle, Check, Copy, CornerUpLeft, Radar, RotateCcw, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   useStreamingText,
@@ -81,6 +81,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   const text = isStreaming || draining ? live : message.content;
   const reasoningText = isStreaming ? liveReasoning : message.reasoning ?? '';
   const partial = (message as ChatMessage).partial;
+  const radarReport = (message as ChatMessage).kind === 'radar_report';
   // A stopped answer can end inside a link; draw it without that unclosed tail
   // (the saved text, and what Copy copies, stay as they are).
   const shownText = partial && !isStreaming && !draining ? trimUnclosedLinkTail(text) : text;
@@ -95,6 +96,15 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
     <SwipeToReply onReply={reply}>
       <div className="w-full">
         <ReasoningTrace text={reasoningText} isStreaming={isStreaming} reasoningMs={message.reasoningMs} />
+
+        {/* A report the Radar scan wrote, not a reply to a question: a quiet grey
+            label says so (no colour; gold is for actions). */}
+        {radarReport && (
+          <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Radar aria-hidden className="h-3.5 w-3.5" />
+            <span>Radar report</span>
+          </div>
+        )}
 
         {/* Rendered while STREAMING even with no text yet: in the `line` release style
             the first unit is deliberately held until it is complete, and ChatContent's

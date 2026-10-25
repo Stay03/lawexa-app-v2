@@ -63,6 +63,12 @@ export interface ChatMessage {
    */
   drawnHere?: true;
   /**
+   * An answer the server stored as a Radar report (`metadata.type`
+   * "radar_report", written by the Radar scan). Drawn as an answer, with a
+   * small "Radar report" label above it.
+   */
+  kind?: 'radar_report';
+  /**
    * The message this turn answers (space chat replies, 14 October 2026): the
    * server's {@link ApiMessage.reply_to}, or, on the row this client drew, the
    * target the writer picked. Absent when the turn replies to nothing.
@@ -636,7 +642,7 @@ export interface ApiMessage {
   role: 'user' | 'assistant' | 'tool';
   content: string;
   metadata: {
-    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result' | 'error' | 'narration';
+    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result' | 'error' | 'narration' | 'radar_report';
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
     success?: boolean;
