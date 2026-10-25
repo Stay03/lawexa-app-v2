@@ -23,7 +23,9 @@ import {
 import { useSubmitRequest } from './queries';
 
 const FORM_ID = 'new-request-form';
-const EMPTY_DRAFT: RequestDraft = { type: null, title: '', notes: '' };
+// "A case" is chosen as the form opens (Lucy's live check, 25 October 2026:
+// with neither chosen the two looked the same and the reader could not tell).
+const EMPTY_DRAFT: RequestDraft = { type: 'case', title: '', notes: '' };
 
 /**
  * NewRequestPanel — ask the research team for a case or a note. The fields are
@@ -131,8 +133,10 @@ export function NewRequestPanel({
                   'v2-interactive flex h-11 cursor-pointer items-center justify-center rounded-xl border text-[15px] font-medium',
                   'transition-colors duration-150 motion-reduce:transition-none',
                   'has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring',
+                  // Greys only, gold is for actions: the chosen kind is filled,
+                  // the other is an outline.
                   draft.type === option.value
-                    ? 'border-primary bg-primary/10 text-foreground'
+                    ? 'border-foreground/30 bg-foreground/10 font-semibold text-foreground'
                     : 'border-border bg-background text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground',
                   errors.type && draft.type !== option.value && 'border-destructive/50',
                 )}

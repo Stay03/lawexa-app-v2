@@ -94,6 +94,14 @@ test('the form sends nothing without a kind and a title', () => {
   assert.equal(submitBody({ type: 'case', title: '   ', notes: 'x' }), null);
 });
 
+test('the form opens with A case chosen, and the chosen kind is a grey fill, never gold', () => {
+  const panel = read('v2', 'features', 'settings', 'requests', 'NewRequestPanel.tsx');
+  assert.match(panel, /const EMPTY_DRAFT: RequestDraft = \{ type: 'case', title: '', notes: '' \};/);
+  const chosen = /draft\.type === option\.value\s*\?\s*'([^']+)'/.exec(panel)?.[1] ?? '';
+  assert.match(chosen, /bg-foreground\/10/);
+  assert.doesNotMatch(chosen, /primary|amber|gold/);
+});
+
 test('the form offers the two kinds the server accepts, case and note', () => {
   const model = read('v2', 'features', 'settings', 'requests', 'model.ts');
   // And the panel posts exactly what `submitBody` built.
