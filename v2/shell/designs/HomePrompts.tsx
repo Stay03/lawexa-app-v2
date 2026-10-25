@@ -3,12 +3,12 @@
 import {
   BookText,
   ClipboardList,
+  FilePen,
   FileSearch,
   GraduationCap,
   Handshake,
   ListChecks,
   Scale,
-  ShieldQuestion,
   Sparkles,
   UserRound,
   type LucideIcon,
@@ -40,8 +40,9 @@ import { promptText } from './home-prompt-text';
  * the most prominent, most-read content on the page identical. Each tab now has its
  * own four, written for what that tab is FOR:
  *
- *  • chat  — v1's exact four (owner #21/#27), unchanged. This is the general
- *            legal-question surface and its prompts were already right.
+ *  • chat  — v1's four (owner #21/#27), with the third now "Draft a
+ *            document" in place of "Do I have rights to" (Arthur, 25 October
+ *            2026). This is the general legal-question surface.
  *  • work  — practice work: a matter, a document, a deadline, a counterparty.
  *  • study — learning: understand, compare, test yourself, revise.
  *
@@ -58,11 +59,12 @@ interface HomePrompt {
 }
 
 const PROMPTS_BY_TAB: Record<HomeTab, readonly HomePrompt[]> = {
-  // v1's exact four — the general legal-question surface, unchanged.
+  // v1's four, the general legal-question surface; the third is Arthur's
+  // "Draft a document" (25 October 2026).
   chat: [
     { label: 'Explain this law', icon: BookText },
     { label: 'Find a case on', icon: Scale },
-    { label: 'Do I have rights to', icon: ShieldQuestion },
+    { label: 'Draft a document', icon: FilePen },
     { label: 'Connect me to a lawyer', icon: UserRound },
   ],
   // Practice work — the things a matter actually needs done.
