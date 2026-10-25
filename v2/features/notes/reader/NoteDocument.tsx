@@ -3,7 +3,9 @@
 import { cn } from '@/lib/utils';
 import type { NoteRecord } from '../types';
 import { noteSpace } from '../note-copy';
+import { noteTags } from '../note-row-model';
 import { formatNoteDate, noteDisplayTitle, noteHasTitle } from '../note-text';
+import { NoteTagList } from '../note-tag-list';
 import { NoteActions } from './NoteActions';
 import { NoteContent } from './NoteContent';
 import { NoteEmptyBodyState } from './states';
@@ -25,9 +27,15 @@ import './note-document.css';
  *   actions     save · copy link · export · edit
  *
  * v1's `NoteDetailHeader` put a thumbnail, a tag row, a price and a status
- * chip above the title. Three of those four are marketplace furniture v2 does
- * not have, and the fourth (status) is meaningless to anyone but the author —
- * so it is shown to the author and to nobody else.
+ * chip above the title. The thumbnail and the price are marketplace furniture
+ * v2 does not have. Status is meaningless to anyone but the author, so it is
+ * shown to the author and to nobody else.
+ *
+ * ── THE TAGS CLOSE THE NOTE ─────────────────────────────────────────────────
+ * Every tag as a small grey pill, the computer list row's look, at the end of
+ * the note under a hairline (Stay, 25 October 2026: "put the tags at the
+ * bottom of the view page"), not v1's coloured pills above the title. A phone
+ * row shows no tags, so this is where a phone reader sees them.
  *
  * ── WHY THE BYLINE IS THE KICKER AND NOT A FOOTER CARD ──────────────────────
  * v1 closed every note with a `NoteAuthorCard` — avatar, name, role badge,
@@ -49,6 +57,7 @@ export function NoteDocument({
   const hasTitle = noteHasTitle(note.title);
   const author = note.user?.name?.trim() || null;
   const updated = formatNoteDate(note.updated_at);
+  const tags = noteTags(note.tags);
   // `content` is `null` for a note the viewer may not read — the reader screen
   // catches that before this renders — so here an absent body can only mean an
   // empty one.
@@ -122,6 +131,14 @@ export function NoteDocument({
       ) : (
         <NoteEmptyBodyState editHref={editHref} />
       )}
+
+      {/* Every tag as a grey pill, wrapping on a narrow screen. Not links,
+          since the notes list has no tag filter to link to. */}
+      {tags.length > 0 ? (
+        <footer className="border-t border-border/60 pt-6">
+          <NoteTagList tags={tags} wrap />
+        </footer>
+      ) : null}
     </article>
   );
 }

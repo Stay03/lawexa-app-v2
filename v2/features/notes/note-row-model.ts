@@ -73,11 +73,20 @@ export function noteRow(note: NoteRecord, viewerId: number | null = null): NoteR
     isDraft: note.status === 'draft',
     // List rows carry only `created_at`; the date must never go blank.
     updatedAt: note.updated_at ?? note.created_at,
-    tags: (note.tags ?? []).map((tag) => tag.trim()).filter((tag) => tag.length > 0),
+    tags: noteTags(note.tags),
     isBookmarked: note.is_bookmarked,
     isSpaceCopy: noteSpace(note) !== null,
     canEdit: mayEditNote(note, viewerId),
   };
+}
+
+/**
+ * A note's tags as every surface shows them: trimmed, empty ones dropped, in
+ * the writer's order. The list rows and the note's own page both read this,
+ * so a tag cannot look one way in the list and another on the page.
+ */
+export function noteTags(tags: readonly string[] | null | undefined): string[] {
+  return (tags ?? []).map((tag) => tag.trim()).filter((tag) => tag.length > 0);
 }
 
 /**

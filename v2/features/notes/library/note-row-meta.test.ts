@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { noteRow } from '../note-row-model';
-import { formatRowDate, noteRowMeta } from './note-row-meta';
+import { noteRow, noteTags } from '../note-row-model';
+import { ROW_TAGS, formatRowDate, noteRowMeta, rowTags } from './note-row-meta';
 
 /* The Notes list, the owner's take A (23 October 2026): title, a two-line
- * summary, then one grey line. My notes: date · tags. All notes: the author
- * first, then the date, then the first tag only. */
+ * summary, then one grey line. My notes: the date. All notes: the author, then
+ * the date. On a computer the tags follow as pills, 3 then "+N", the same on
+ * both tabs; a phone row has no tags (Stay, 25 October 2026). */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...parts: string[]) => readFileSync(join(here, ...parts), 'utf8').replace(/\r\n/g, '\n');
@@ -22,19 +23,56 @@ const row = {
   tags: ['Land law', 'Property'],
 };
 
-test('My notes: the date, then every tag; no author', () => {
-  assert.deepEqual(noteRowMeta(row, 'mine', NOW), ['23 Oct', 'Land law, Property']);
+const nine = [
+  'Start Up Law',
+  'Company law',
+  'Contract',
+  'Tax',
+  'Employment',
+  'Intellectual property',
+  'Finance',
+  'Regulation',
+  'Data protection',
+];
+
+test('My notes: the date; no author', () => {
+  assert.deepEqual(noteRowMeta(row, 'mine', NOW), ['23 Oct']);
 });
 
-test('All notes: the author first, then the date, then the first tag only', () => {
-  assert.deepEqual(noteRowMeta(row, 'all', NOW), ['Ada Okafor', '23 Oct', 'Land law']);
+test('All notes: the author first, then the date', () => {
+  assert.deepEqual(noteRowMeta(row, 'all', NOW), ['Ada Okafor', '23 Oct']);
+});
+
+test('a row shows 3 tags, then +N for the rest', () => {
+  assert.equal(ROW_TAGS, 3);
+  assert.deepEqual(rowTags(nine), { shown: ['Start Up Law', 'Company law', 'Contract'], more: 6 });
+  assert.deepEqual(rowTags(nine.slice(0, 4)), { shown: ['Start Up Law', 'Company law', 'Contract'], more: 1 });
+  assert.deepEqual(rowTags(nine.slice(0, 3)), { shown: ['Start Up Law', 'Company law', 'Contract'], more: 0 });
+  assert.deepEqual(rowTags(['Tax']), { shown: ['Tax'], more: 0 });
+  assert.equal(rowTags([]), null);
+});
+
+test('the tags, and the dot before them, show on a computer only; the +N never shrinks', () => {
+  const source = read('NoteRow.tsx');
+  assert.match(source, /const tags = rowTags\(row\.tags\);/);
+  assert.match(
+    source,
+    /\{tags \? \(\s*<span className="flex min-w-0 items-baseline max-sm:hidden">\s*\{meta\.length > 0 \? <MetaDot \/> : null\}\s*<NoteTagList tags=\{tags\.shown\} more=\{tags\.more\} \/>/,
+  );
+  // The author and the date keep their width; the tags are the part that gives way.
+  assert.match(source, /<span className="shrink-0">\{part\}<\/span>/);
+  const css = read('..', 'note-tags.css');
+  assert.match(css, /\.v2-note-tag \{\s*flex: 0 1 auto;/);
+  assert.match(css, /\.v2-note-tag-more \{\s*flex: none;/);
+  // Look A, the light grey pill, with no switch left from the probe.
+  assert.match(css, /border-radius: 999px;\s*background: color-mix\(in oklab, var\(--muted\) 90%, var\(--foreground\) 4%\);/);
+  assert.doesNotMatch(css + read('..', 'note-tag-list.tsx'), /data-tag-look|PROBE/);
 });
 
 test('a part the note does not have is dropped, never filled in', () => {
-  assert.deepEqual(noteRowMeta({ ...row, tags: [] }, 'mine', NOW), ['23 Oct']);
-  assert.deepEqual(noteRowMeta({ ...row, tags: [] }, 'all', NOW), ['Ada Okafor', '23 Oct']);
-  assert.deepEqual(noteRowMeta({ ...row, author: null }, 'all', NOW), ['23 Oct', 'Land law']);
-  assert.deepEqual(noteRowMeta({ ...row, updatedAt: 'not a date' }, 'mine', NOW), ['Land law, Property']);
+  assert.deepEqual(noteRowMeta({ ...row, author: null }, 'all', NOW), ['23 Oct']);
+  assert.deepEqual(noteRowMeta({ ...row, updatedAt: 'not a date' }, 'mine', NOW), []);
+  assert.deepEqual(noteRowMeta({ ...row, author: null, updatedAt: 'not a date' }, 'all', NOW), []);
 });
 
 test('the year shows only for a date outside the current year', () => {
@@ -51,7 +89,7 @@ test('the row draws take A: title, summary, then the meta line, with the menu an
   assert.ok(title > 0 && title < summary && summary < metaLine, 'title, then summary, then meta');
   assert.match(source, /'block truncate text-base font-semibold leading-6/);
   assert.match(source, /line-clamp-2 max-w-\[640px\] text-sm leading-\[22px\]/);
-  assert.match(source, /mt-2 block truncate text-\[13px\] leading-5 text-muted-foreground/);
+  assert.match(source, /mt-2 flex min-w-0 items-baseline overflow-hidden whitespace-nowrap text-\[13px\] leading-5 text-muted-foreground/);
   assert.match(source, /<NoteRowMenu row=\{row\} onAddToFolder=\{onAddToFolder\} onDelete=\{onDelete\} \/>/);
   assert.doesNotMatch(source, /NoteBookmarkButton|NotebookPen|formatRelativeTime/);
   // Hairline under every row, the last one too.
@@ -109,4 +147,23 @@ test('the row model carries the tags, and Edit only for the note\'s author', () 
   assert.equal(noteRow(note, 4).canEdit, false);
   assert.equal(noteRow(note).canEdit, false);
   assert.deepEqual(noteRow({ ...note, tags: null }, 3).tags, []);
+});
+
+test('the note page ends with every tag as pills under a hairline, on a phone and a computer', () => {
+  assert.deepEqual(noteTags([' Land law ', '', 'Property']), ['Land law', 'Property']);
+  assert.deepEqual(noteTags(null), []);
+  const page = read('..', 'reader', 'NoteDocument.tsx');
+  assert.match(page, /const tags = noteTags\(note\.tags\);/);
+  // Every tag, wrapping, with no width class hiding them.
+  assert.match(
+    page,
+    /\{tags\.length > 0 \? \(\s*<footer className="border-t border-border\/60 pt-6">\s*<NoteTagList tags=\{tags\} wrap \/>\s*<\/footer>\s*\) : null\}\s*<\/article>/,
+  );
+  // After the body, and only once.
+  const tags = page.indexOf('<NoteTagList');
+  assert.ok(tags > page.indexOf('<NoteContent html={body} />') && tags > page.indexOf('</header>'));
+  assert.equal(page.split('<NoteTagList').length, 2);
+  const list = read('..', 'note-tag-list.tsx');
+  assert.match(list, /<span className="sr-only">Tags: <\/span>/);
+  assert.match(list, /<span className="sr-only">and <\/span>\+\{more\}/);
 });

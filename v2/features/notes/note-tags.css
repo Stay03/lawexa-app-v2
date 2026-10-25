@@ -1,0 +1,40 @@
+/*
+ * A note's tags (NoteTagList): small light grey pills (Stay picked look A).
+ * Greys only; gold stays for actions.
+ */
+
+.v2-note-tags {
+  /* Display comes from the component's Tailwind classes, so a row can hide
+     its tags on a phone with max-sm:hidden. */
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.v2-note-tags.flex-wrap {
+  overflow: visible;
+}
+
+/* A tag may shrink (its name cut with "…") so the line keeps its "+N";
+   the "+N" itself never does. */
+.v2-note-tag {
+  flex: 0 1 auto;
+  min-width: 2.75rem;
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-inline: 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--muted) 90%, var(--foreground) 4%);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.v2-note-tag-more {
+  flex: none;
+  min-width: 0;
+}

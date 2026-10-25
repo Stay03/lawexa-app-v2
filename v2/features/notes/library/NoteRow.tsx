@@ -9,8 +9,9 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { NoteRowModel } from '../note-row-model';
 import { rememberNotePeek } from '../note-peek';
 import type { NotesTab } from './NoteTabs';
-import { noteRowMeta } from './note-row-meta';
+import { noteRowMeta, rowTags } from './note-row-meta';
 import { NoteRowMenu } from './NoteRowMenu';
+import { NoteTagList } from '../note-tag-list';
 
 /**
  * NoteRow — one note in the library list, as the owner's take A (23 October
@@ -18,9 +19,9 @@ import { NoteRowMenu } from './NoteRowMenu';
  *
  *   TITLE     one line, semibold, with the "⋮" menu at the right of it
  *   SUMMARY   two lines of what the note says, clamped
- *   META      one grey line: "23 Oct · Land law, Property" on My notes,
- *             "Ada Okafor · 23 Oct · Land law" on All notes
- *             (`note-row-meta.ts` holds that rule)
+ *   META      one grey line: "23 Oct" on My notes, "Ada Okafor · 23 Oct" on
+ *             All notes; on a computer the tags follow as pills, 3 then "+N"
+ *             (`note-row-meta.ts` holds that rule), and a phone row has none
  *
  * A tap on the row opens the note's page. The link wraps the three lines only;
  * the menu is a SIBLING of it, never a `<button>` inside an `<a>`. There is no
@@ -66,6 +67,7 @@ export const NoteRow = memo(function NoteRow({
   onToggleSelect?: (id: number) => void;
 }) {
   const meta = noteRowMeta(row, tab, now);
+  const tags = rowTags(row.tags);
   const selecting = onToggleSelect !== undefined;
 
   const lines = (
@@ -88,21 +90,24 @@ export const NoteRow = memo(function NoteRow({
         </span>
       ) : null}
 
-      {meta.length > 0 ? (
-        <span className="mt-2 block truncate text-[13px] leading-5 text-muted-foreground">
+      {/* One line. The author and the date keep their width. On a computer
+          the tags follow and are the part that gives way, their names cut
+          with "…" while the "+N" after them always shows. A phone row has no
+          tags, nor the "·" before them (Stay, 25 October 2026). */}
+      {meta.length > 0 || tags ? (
+        <span className="mt-2 flex min-w-0 items-baseline overflow-hidden whitespace-nowrap text-[13px] leading-5 text-muted-foreground">
           {meta.map((part, position) => (
             <Fragment key={position}>
-              {position > 0 ? (
-                <>
-                  <span aria-hidden className="mx-1.5 text-muted-foreground/50">
-                    ·
-                  </span>
-                  <span className="sr-only">, </span>
-                </>
-              ) : null}
-              {part}
+              {position > 0 ? <MetaDot /> : null}
+              <span className="shrink-0">{part}</span>
             </Fragment>
           ))}
+          {tags ? (
+            <span className="flex min-w-0 items-baseline max-sm:hidden">
+              {meta.length > 0 ? <MetaDot /> : null}
+              <NoteTagList tags={tags.shown} more={tags.more} />
+            </span>
+          ) : null}
         </span>
       ) : null}
     </span>
@@ -157,3 +162,15 @@ export const NoteRow = memo(function NoteRow({
     </li>
   );
 });
+
+/** The "·" between two meta parts; a screen reader hears a comma. */
+function MetaDot() {
+  return (
+    <>
+      <span aria-hidden className="mx-1.5 shrink-0 text-muted-foreground/50">
+        ·
+      </span>
+      <span className="sr-only">, </span>
+    </>
+  );
+}
