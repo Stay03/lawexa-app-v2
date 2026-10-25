@@ -30,6 +30,7 @@ import { draftOffsets } from './draft/draft-ordinals';
 import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
 import { useSidePanelHost } from './side-panel/side-panel-host';
 import { SidePanelSlot } from './side-panel/SidePanelSlot';
+import { useScreenHold } from '@/v2/runtime/screen-hold';
 
 /** The composer's height, read by the transcript's bottom padding and the
  *  jump-to-latest pill (MessageList). On a chat's own route the shell's docked
@@ -99,6 +100,8 @@ export function ConversationScreen({
     error,
     retryLastMessage,
   } = stream;
+  // An answer being written: nothing pops up over it (screen-hold.ts).
+  useScreenHold(isStreaming);
   // Each person's colour in a space chat (member-colour.ts): the roster's order,
   // then anyone else who asked, by first appearance. A row this client drew for
   // the reader carries no author yet, so it takes the reader's own uuid.

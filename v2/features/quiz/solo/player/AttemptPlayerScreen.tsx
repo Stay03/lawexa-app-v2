@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { SearchX } from 'lucide-react';
 
 import { extractApiError } from '@/lib/utils/api-error';
+import { useScreenHold } from '@/v2/runtime/screen-hold';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { clearScreenContext, setScreenContext } from '@/v2/shell/screen-context';
@@ -52,6 +53,9 @@ export function AttemptPlayerScreen({ attemptUuid }: { attemptUuid: string }) {
 
   const query = useQuery(soloQuizQueries.attempt(attemptUuid, { viewerId }));
   const attempt = query.data?.data ?? null;
+  // While the attempt loads, nothing pops up over the quiz about to start;
+  // AttemptPlay holds while it is played (screen-hold.ts).
+  useScreenHold(query.isPending);
   const finished = attempt !== null && isFinishedAttempt(attempt);
   const quizUuid = attempt?.quiz.uuid ?? null;
 

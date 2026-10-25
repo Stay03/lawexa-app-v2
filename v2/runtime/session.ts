@@ -101,6 +101,13 @@ export interface SessionUser {
    * does not send it.
    */
   is_verified_author: boolean;
+  /**
+   * Has this account closed the "Lawexa, redesigned" pop-up, on any device?
+   * `user.v2_intro_seen_at` on `/auth/me` (Backend 3c807fdd, 25 October
+   * 2026). `false` when the server does not send it: the pop-up's own
+   * browser mark then decides (redesign-intro/model.ts).
+   */
+  v2_intro_seen: boolean;
 }
 
 export interface SessionDTO {
@@ -134,6 +141,7 @@ function toSessionDTO(
       can_access_team_channels: data?.can_access_team_channels === true,
       onboarding_complete: onboardingFinished(user.profile),
       is_verified_author: user.is_verified_author === true,
+      v2_intro_seen: typeof user.v2_intro_seen_at === 'string' && user.v2_intro_seen_at !== '',
     },
   };
 }

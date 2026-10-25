@@ -35,6 +35,7 @@ import { AttemptOptionTile } from './AttemptOptionTile';
 import { AttemptTimer, FrozenRail } from './AttemptTimer';
 import { EndAttemptDialog } from './EndAttemptDialog';
 import { SOLO_PLAY_COLUMN } from './states';
+import { useScreenHold } from '@/v2/runtime/screen-hold';
 import { QuizSourceLine } from '../../source/QuizSourceLine';
 import '../solo-quiz.css';
 
@@ -110,6 +111,8 @@ export function AttemptPlay({
   viewerId: number | null;
 }) {
   const router = useRouter();
+  // A quiz being played: nothing pops up over it (screen-hold.ts).
+  useScreenHold(true);
   const questions = useMemo(() => orderedQuestions(attempt), [attempt]);
   const total = attempt.question_count;
 

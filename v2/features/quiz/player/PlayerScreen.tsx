@@ -19,6 +19,7 @@ import { quizQueries } from '../queries';
 import { QuizErrorState } from '../ui/states';
 import { VerifyEmailState } from '../ui/VerifyEmailState';
 import { ProgressHeader } from './ProgressHeader';
+import { useScreenHold } from '@/v2/runtime/screen-hold';
 import { QuestionCard } from './QuestionCard';
 import {
   ColdStartState,
@@ -89,6 +90,8 @@ export function PlayerScreen({ sessionUuid }: { sessionUuid: string }) {
 
   const data = sessionQuery.data?.data;
   const quizSession = data?.session;
+  // A quiz being played, or about to be: nothing pops up over it (screen-hold.ts).
+  useScreenHold(sessionQuery.isPending || quizSession?.status === 'active');
   const served = data?.question ?? null;
 
   const verificationBlocked =

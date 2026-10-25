@@ -83,6 +83,13 @@ export interface User {
   profile: UserProfile | null;
   areas_of_expertise?: AreaOfExpertise[];
   created_at: string;
+  /**
+   * When this account first closed the "Lawexa, redesigned" pop-up (Backend,
+   * 25 October 2026). Only on the caller's own user: on anyone else's, and on
+   * a server without the field, the key is absent, which means "not known"
+   * (v2/features/redesign-intro/model.ts).
+   */
+  v2_intro_seen_at?: string | null;
 }
 
 export interface AuthResponse {

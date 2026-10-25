@@ -12,6 +12,7 @@ import { AppShell } from '@/v2/shell/AppShell';
 import { DockProvider, DockHost } from '@/v2/shell/Dock';
 import { V2Sidebar } from '@/v2/shell/V2Sidebar';
 import { V2Drawer } from '@/v2/shell/V2Drawer';
+import { RedesignIntro } from '@/v2/features/redesign-intro/RedesignIntro';
 import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
@@ -388,6 +389,9 @@ export default async function V2Layout({
                   </AppShell>
                 </SidebarInset>
                 <V2Drawer user={user} />
+                {/* "Lawexa, redesigned": once per account, the first time it
+                    opens the new design (Stay, 25 October 2026). */}
+                <RedesignIntro seenOnServer={user?.v2_intro_seen === true} />
               </SidebarProvider>
             </DockProvider>
             </MoveFirstProvider>

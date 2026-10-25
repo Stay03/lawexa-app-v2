@@ -99,6 +99,15 @@ export const authApi = {
     return response.data;
   },
 
+  /**
+   * The account has seen the "Lawexa, redesigned" pop-up. The first call sets
+   * the time; a later one, from any device, keeps the first.
+   */
+  v2IntroSeen: async () => {
+    const response = await apiClient.post<ApiResponse<{ v2_intro_seen_at: string }>>('/auth/me/v2-intro-seen');
+    return response.data;
+  },
+
   logout: async () => {
     const response = await apiClient.post<ApiResponse<null>>('/auth/logout');
     return response.data;

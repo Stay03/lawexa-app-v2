@@ -30,6 +30,7 @@ const user = (over: Partial<SessionUser> = {}): SessionUser => ({
   can_access_team_channels: false,
   onboarding_complete: true,
   is_verified_author: false,
+  v2_intro_seen: false,
   ...over,
 });
 
