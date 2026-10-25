@@ -62,7 +62,8 @@ test('the case preview still takes the cut, so its popover goes in the frame it 
   const preview = read('..', 'features', 'conversations', 'conversation', 'markdown', 'CasePreview.tsx');
   assert.equal((preview.match(/onMove=\{onOpen\}/g) ?? []).length, 2);
   const mention = read('..', 'features', 'conversations', 'conversation', 'markdown', 'CaseMentionLink.tsx');
-  assert.match(mention, /<MoveFirstLink href=\{casePath\} kind="case" onMove=\{\(\) => setOpen\(false\)\}/);
+  // The chat rating's "cited case opened" moment rides the same link (onClick).
+  assert.match(mention, /<MoveFirstLink href=\{casePath\} kind="case" onClick=\{onOpen\} onMove=\{\(\) => setOpen\(false\)\}/);
 });
 
 test('the library behaviour the cut relies on is still there', () => {
