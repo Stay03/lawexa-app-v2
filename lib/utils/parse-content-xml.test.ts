@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parseContent, type ContentSegment } from './parse-content-xml';
 
-/* Expert answers, 26 October 2026: an answer showed the raw tags
+/* Expert answers, 25 October 2026: an answer showed the raw tags
  * "<execution_plan> (Already output earlier in this conversation.)
  * </execution_plan>". A plan block with no fields was never matched, so its
  * text fell through to the markdown. Every plan block is now cut out; only one

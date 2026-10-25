@@ -599,7 +599,7 @@ export function parseContent(content: string): ParsedContent {
   // draws the plan card; one without draws nothing. The model sometimes writes
   // a placeholder in place of the plan ("(Already output earlier in this
   // conversation.)", "(Output above, before any tool call.)"), and that block
-  // used to fall through to the markdown as raw tags (Expert answers, 26
+  // used to fall through to the markdown as raw tags (Expert answers, 25
   // October 2026).
   const executionPlanRegex = /<execution_plan>([\s\S]*?)<\/execution_plan>/gi;
 
