@@ -102,8 +102,9 @@ export interface RadarPerson {
   avatar_url: string | null;
 }
 
-/** `no_balance`: the Space owner, who pays for the scans, has no messages left. */
-export type RadarScheduleState = 'active' | 'paused' | 'no_balance' | 'failed';
+/** `no_balance`: the Space owner, who pays for the scans, has no messages left.
+ *  `archived` beside status `archived` (Backend, 26 October 2026). */
+export type RadarScheduleState = 'active' | 'paused' | 'no_balance' | 'failed' | 'archived';
 
 export interface RadarScan {
   uuid: string;

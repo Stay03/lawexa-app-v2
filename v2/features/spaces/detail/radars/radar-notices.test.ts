@@ -40,3 +40,13 @@ test('a space Radar report notice has its own title', () => {
   const presentation = read('v2', 'features', 'notifications', 'presentation.ts');
   assert.match(presentation, /space_radar_report: 'A Radar report is ready in your Space',/);
 });
+
+test('the Radars pill switches between the space’s active and archived Radars', () => {
+  const panel = code('v2', 'features', 'spaces', 'detail', 'radars', 'SpaceRadarsPanel.tsx');
+  assert.match(panel, /\{ id: 'active', label: 'Active' \},\s*\{ id: 'archived', label: 'Archived' \},/);
+  assert.match(panel, /status: status === 'archived' \? 'archived' : undefined,/);
+  assert.match(panel, /<RadarTabs\s+tabs=\{STATUS_TABS\}\s+value=\{status\}\s+onChange=\{setStatus\}/);
+  assert.match(panel, /title="No archived Radars"/);
+  // An archived Radar's row says so: its state reads before anything else.
+  assert.match(code('v2', 'features', 'spaces', 'detail', 'radars', 'radar-rows.ts'), /if \(radar\.status === 'archived'\) return 'Archived';/);
+});

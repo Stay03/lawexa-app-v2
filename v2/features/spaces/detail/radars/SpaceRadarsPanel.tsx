@@ -6,6 +6,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { Plus, Radar } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { RadarTabs, type RadarTab } from '@/v2/features/radars/RadarTabs';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -25,11 +26,21 @@ import { newSpaceRadarHref, radarRowModel } from './radar-rows';
  *
  * Every member reads the list. An Owner or Contributor gets "New Radar" in
  * the empty state; the pill bar's gold + is theirs too (`SpaceContentPanel`).
+ *
+ * ACTIVE AND ARCHIVED (Tester, live, 26 October 2026): after archiving, the
+ * pill said "No Radars in this space yet" with no way to the archived one.
+ * A strip above the list switches between the space's live Radars (running
+ * and paused, `GET /spaces/{uuid}/radars`) and its archived ones
+ * (`?status=archived`), the personal Radar page's strip.
  */
 export function SpaceRadarsPanel({ spaceUuid, canAdd }: { spaceUuid: string; canAdd: boolean }) {
   const session = useV2Session();
+  const [status, setStatus] = useState<SpaceRadarStatus>('active');
   const query = useInfiniteQuery({
-    ...spacesQueries.radars(spaceUuid, { viewerId: session.userId }),
+    ...spacesQueries.radars(spaceUuid, {
+      viewerId: session.userId,
+      status: status === 'archived' ? 'archived' : undefined,
+    }),
     enabled: collabAccessState(session) === 'eligible',
   });
   const pages = query.data?.pages;
@@ -38,61 +49,104 @@ export function SpaceRadarsPanel({ spaceUuid, canAdd }: { spaceUuid: string; can
   const [now] = useState(() => Date.now());
 
   return (
-    <PagedContent
-      tab="radars"
-      query={query}
-      count={radars.length}
-      empty={
-        <CollabEmpty
-          icon={Radar}
-          title="No Radars in this space yet"
-          description={
-            canAdd
-              ? 'A Radar checks for new law on a schedule and posts each report here, for everyone in this space.'
-              : 'Contributors and the owner add Radars here. Each report shows in this space.'
-          }
-          action={
-            canAdd ? (
-              <Button asChild size="sm">
-                <Link href={newSpaceRadarHref(spaceUuid)}>
-                  <Plus aria-hidden className="size-4" />
-                  New Radar
-                </Link>
-              </Button>
-            ) : undefined
-          }
-        />
-      }
-    >
-      <ul className="flex flex-col">
-        {radars.map((radar) => {
-          const row = radarRowModel(radar, spaceUuid, now);
-          return (
-            <FeedLine
-              key={radar.uuid}
-              line={{
-                icon: Radar,
-                warm: row.unread > 0,
-                strong: row.unread > 0,
-                quiet: radar.status === 'archived',
-                title: row.title,
-                status: row.state ?? undefined,
-                meta: row.meta,
-                time: row.time,
-                count: {
-                  value: row.unread,
-                  label: `${row.unread} unread ${row.unread === 1 ? 'report' : 'reports'} from ${row.title}`,
-                },
-              }}
-              render={(className, content) => (
-                <Link href={row.href} className={className}>
-                  {content}
-                </Link>
-              )}
-            />
-          );
-        })}
-      </ul>
-    </PagedContent>
+    <div className="flex flex-col gap-3">
+      <RadarTabs
+        tabs={STATUS_TABS}
+        value={status}
+        onChange={setStatus}
+        ariaLabel="Show the space's active or archived Radars"
+        panelId={PANEL_ID}
+      />
+      <div id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${status}`}>
+        <PagedContent
+          // A new strip choice is a new list: a fresh mount, so its rows enter once.
+          key={status}
+          tab="radars"
+          query={query}
+          count={radars.length}
+          empty={<RadarsEmpty status={status} spaceUuid={spaceUuid} canAdd={canAdd} />}
+        >
+          <ul className="flex flex-col">
+            {radars.map((radar) => {
+              const row = radarRowModel(radar, spaceUuid, now);
+              return (
+                <FeedLine
+                  key={radar.uuid}
+                  line={{
+                    icon: Radar,
+                    warm: row.unread > 0,
+                    strong: row.unread > 0,
+                    quiet: radar.status === 'archived',
+                    title: row.title,
+                    status: row.state ?? undefined,
+                    meta: row.meta,
+                    time: row.time,
+                    count: {
+                      value: row.unread,
+                      label: `${row.unread} unread ${row.unread === 1 ? 'report' : 'reports'} from ${row.title}`,
+                    },
+                  }}
+                  render={(className, content) => (
+                    <Link href={row.href} className={className}>
+                      {content}
+                    </Link>
+                  )}
+                />
+              );
+            })}
+          </ul>
+        </PagedContent>
+      </div>
+    </div>
   );
 }
+
+function RadarsEmpty({
+  status,
+  spaceUuid,
+  canAdd,
+}: {
+  status: SpaceRadarStatus;
+  spaceUuid: string;
+  canAdd: boolean;
+}) {
+  if (status === 'archived') {
+    return (
+      <CollabEmpty
+        icon={Radar}
+        title="No archived Radars"
+        description="A Radar archived in this space shows here, with its reports."
+      />
+    );
+  }
+  return (
+    <CollabEmpty
+      icon={Radar}
+      title="No Radars in this space yet"
+      description={
+        canAdd
+          ? 'A Radar checks for new law on a schedule and posts each report here, for everyone in this space.'
+          : 'Contributors and the owner add Radars here. Each report shows in this space.'
+      }
+      action={
+        canAdd ? (
+          <Button asChild size="sm">
+            <Link href={newSpaceRadarHref(spaceUuid)}>
+              <Plus aria-hidden className="size-4" />
+              New Radar
+            </Link>
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+}
+
+type SpaceRadarStatus = 'active' | 'archived';
+
+const STATUS_TABS: readonly RadarTab<SpaceRadarStatus>[] = [
+  { id: 'active', label: 'Active' },
+  { id: 'archived', label: 'Archived' },
+];
+
+const PANEL_ID = 'space-radars-panel';
