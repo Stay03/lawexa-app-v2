@@ -13,6 +13,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { formatScanDuration } from '@/lib/utils/duration';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context';
+import { useLeaveTo } from '@/v2/runtime/back-to';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { IN_FLIGHT_SCAN_STATUSES, radarsQueries } from '../queries';
 import { useRadarDetail } from '../naming';
@@ -159,6 +160,10 @@ export function ScanReportScreen({
   // Opening a completed unread report marks it read exactly once (owner
   // only) — the optimistic engine moves the unread badges everywhere.
   const { mutate: triage } = useTriageScan();
+  // MARK UNREAD LEAVES THE REPORT, as a mail app does (techlead, 26 October
+  // 2026): staying would mean the next opening (a reload) marks it read again,
+  // the rule above. Back to where it was listed, or to the Radar's reports.
+  const leaveReport = useLeaveTo(hrefs.radar(radarUuid));
   // Read state is each member's own in a space (Backend's B3), so opening a
   // report marks it read for whoever opens it, Viewers included. Decided once
   // per opening, from the state it opened in (read-on-open.ts), so Mark
@@ -358,7 +363,9 @@ export function ScanReportScreen({
           {/* ── The owner's working toolbar, riding the scroll. ─────────── */}
           {ownerScan && (canTriage || canManage || canDownload) ? (
             <div className="sticky top-0 z-10 -mx-1 flex items-center gap-2 border-b border-border/60 bg-background/95 px-1 py-2 backdrop-blur">
-              {canTriage ? <ScanTriageToolbar radarUuid={radarUuid} scan={ownerScan} /> : null}
+              {canTriage ? (
+                <ScanTriageToolbar radarUuid={radarUuid} scan={ownerScan} onMarkedUnread={leaveReport} />
+              ) : null}
               <div className="flex-1" />
               {canDownload ? <ReportDownloads radarUuid={radarUuid} scanUuid={scanUuid} /> : null}
               {canManage ? <ShareDialog radarUuid={radarUuid} scan={ownerScan} /> : null}

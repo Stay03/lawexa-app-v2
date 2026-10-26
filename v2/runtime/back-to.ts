@@ -232,3 +232,20 @@ export function useBackTo(
 
   return { href, onClick };
 }
+
+/**
+ * Leave this screen the way the reader came: one step back when an in-app
+ * screen is behind (`'anywhere'`), else to `href`, for a cold arrival (a
+ * notification, a pasted address) that has nothing of ours behind it.
+ *
+ * For an ACTION that ends with leaving, not a back control: a report marked
+ * unread goes back to where it was listed, as a mail app does (techlead, 26
+ * October 2026), so the reader sees it sitting there unread.
+ */
+export function useLeaveTo(href: string): () => void {
+  const router = useRouter();
+  return useCallback(() => {
+    if (anythingIsBehind()) router.back();
+    else router.push(href);
+  }, [router, href]);
+}

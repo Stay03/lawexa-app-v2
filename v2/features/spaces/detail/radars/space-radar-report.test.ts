@@ -36,7 +36,7 @@ test("a Viewer reads, marks read and downloads the report, with no triage toolba
   assert.match(report, /readDecided\.current === scanUuid/);
   assert.doesNotMatch(report, /canTriage.*readOnOpen|readOnOpen.*canTriage/);
   assert.match(report, /\{ownerScan && \(canTriage \|\| canManage \|\| canDownload\) \? \(/);
-  assert.match(report, /\{canTriage \? <ScanTriageToolbar radarUuid=\{radarUuid\} scan=\{ownerScan\} \/> : null\}/);
+  assert.match(report, /\{canTriage \? \(\s*<ScanTriageToolbar radarUuid=\{radarUuid\} scan=\{ownerScan\} onMarkedUnread=\{leaveReport\} \/>\s*\) : null\}/);
   assert.match(report, /\{canDownload \? <ReportDownloads radarUuid=\{radarUuid\} scanUuid=\{scanUuid\} \/> : null\}/);
   assert.match(report, /\{canManage \? <ShareDialog radarUuid=\{radarUuid\} scan=\{ownerScan\} \/> : null\}/);
 });
@@ -56,7 +56,8 @@ test('a report downloads as Word or PDF from one menu, and a refused download sa
 });
 
 test('the report leads back into the space, not to /radars', () => {
-  assert.equal((report.match(/hrefs\.radar\(radarUuid\)/g) ?? []).length, 2);
+  // The two back links, and where Mark unread leaves to on a cold arrival.
+  assert.equal((report.match(/hrefs\.radar\(radarUuid\)/g) ?? []).length, 3);
   assert.doesNotMatch(report, /href=\{`\/radars\/\$\{radarUuid\}`\}/);
   assert.match(report, /<Link href=\{hrefs\.list\}>Back to the space&apos;s Radars<\/Link>/);
 });

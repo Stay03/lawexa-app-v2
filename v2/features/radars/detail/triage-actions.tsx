@@ -125,9 +125,13 @@ export function ScanTriageMenuItems({
 export function ScanTriageToolbar({
   radarUuid,
   scan,
+  onMarkedUnread,
 }: {
   radarUuid: string;
   scan: RadarScan;
+  /** After Mark unread: the report page leaves, so the reader sees it unread
+   *  where it is listed (techlead, 26 October 2026). */
+  onMarkedUnread?: () => void;
 }) {
   const triageScan = useTriageScan();
   return (
@@ -139,13 +143,15 @@ export function ScanTriageToolbar({
               variant="ghost"
               size="icon"
               className="size-8 text-muted-foreground"
-              onClick={() =>
+              onClick={() => {
                 triageScan.mutate({
                   radarUuid,
                   scanUuid: scan.uuid,
                   payload: action.payload,
-                })
-              }
+                });
+                // The badge moves at once (optimistic), so leaving now shows it.
+                if (action.payload.read === false) onMarkedUnread?.();
+              }}
               aria-label={action.label}
             >
               <action.icon className={cn('size-4', action.iconClassName)} />
