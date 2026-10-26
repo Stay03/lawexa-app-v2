@@ -1,8 +1,10 @@
 'use client';
 
-import { Pencil, Users } from 'lucide-react';
+import { useId } from 'react';
+import { Pencil, Radar, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 
 import {
   Sheet,
@@ -14,6 +16,7 @@ import {
 import type { Space } from '@/types/collab';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { memberCountLabel, spacePrincipleLine, type MembershipSubject } from '../model';
+import { useSetRadarNotices } from '../mutations';
 import { SpaceAbout } from './SpacePlaceHeader';
 
 /**
@@ -86,6 +89,10 @@ export function SpaceAboutSheet({
             <Users aria-hidden className="size-4 shrink-0" />
             {memberCountLabel(space.active_members_count)}
           </p>
+          {/* Every member's own; the server sends it to members only (plan 6.1). */}
+          {space.my_radar_notices !== undefined ? (
+            <RadarNoticesRow spaceUuid={space.uuid} enabled={space.my_radar_notices} />
+          ) : null}
           {onEdit ? (
             // `self-start` from `md:`: the column stretches its children, so
             // `w-auto` alone left a 1440px-wide button (the first pictures).
@@ -102,5 +109,36 @@ export function SpaceAboutSheet({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/**
+ * "Radar notices for this Space": the reader's own switch (plan 6.1). Off, the
+ * space's Radar reports reach them neither in Lawexa, nor on their phone, nor
+ * by email; the reports still show in the space. It flips on the tap and goes
+ * back if the server refuses (`useSetRadarNotices`).
+ */
+function RadarNoticesRow({ spaceUuid, enabled }: { spaceUuid: string; enabled: boolean }) {
+  const id = useId();
+  const { mutate } = useSetRadarNotices(spaceUuid);
+  return (
+    <div className="flex items-start gap-3 border-t pt-4">
+      <Radar aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <label htmlFor={id} className="block text-sm font-medium text-foreground">
+          Radar notices for this Space
+        </label>
+        <p id={`${id}-hint`} className="mt-0.5 text-xs text-muted-foreground">
+          New reports from this Space&apos;s Radars, in Lawexa, on your phone and by email.
+        </p>
+      </div>
+      <Switch
+        id={id}
+        checked={enabled}
+        onCheckedChange={(next) => mutate(next)}
+        aria-describedby={`${id}-hint`}
+        className="mt-0.5"
+      />
+    </div>
   );
 }

@@ -256,6 +256,10 @@ export interface Space {
   active_members_count: number;
   /** List responses stamp the caller's role; `show` may omit it. */
   my_role?: MemberRole | null;
+  /** The reader's own "Radar notices for this Space" switch (plan 6.1, Backend's
+   *  B4): off, no in-app, phone or email notice of this space's Radar reports.
+   *  Sent only beside `my_role`; absent on an API without B4. */
+  my_radar_notices?: boolean;
   /**
    * §17 activity rollups (backend frontend-contract) — members-only, stamped
    * when the caller's membership is known. `unread_channels_count` = how many

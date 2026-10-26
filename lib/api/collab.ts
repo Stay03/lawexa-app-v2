@@ -487,6 +487,19 @@ export const spacesApi = {
     return response.data;
   },
 
+  /** The reader's own Radar notices switch for this space (plan 6.1, Backend's
+   *  B4): `PUT /spaces/{uuid}/radar-notices`, a member's own row only. */
+  setRadarNotices: async (
+    uuid: string,
+    enabled: boolean
+  ): Promise<ApiResponse<{ radar_notices: boolean }>> => {
+    const response = await apiClient.put<ApiResponse<{ radar_notices: boolean }>>(
+      `/spaces/${uuid}/radar-notices`,
+      { enabled }
+    );
+    return response.data;
+  },
+
   transferOwnership: async (
     uuid: string,
     payload: TransferOwnershipPayload

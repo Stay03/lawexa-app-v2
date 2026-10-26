@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, FileSearch, WifiOff } from 'lucide-react';
@@ -23,8 +24,23 @@ import { ReportMarkdown } from './ReportMarkdown';
 import { ReportSources } from './ReportSources';
 import { ShareDialog } from './ShareDialog';
 import { ReportDownloads } from './ReportDownloads';
+import { AffectedItems } from './AffectedItems';
+import { reportParts } from './report-drafts';
 import { isOwnerScan, resolveScanViewer } from './viewer';
+import {
+  SidePanelValueProvider,
+  useSidePanelUrl,
+} from '@/v2/features/conversations/conversation/side-panel/SidePanelContext';
+import { DraftCard } from '@/v2/features/conversations/conversation/draft/DraftCard';
 import './report.css';
+
+// The draft editor (tiptap) loads when a draft is opened, never with the report.
+const ReportDraftPanel = dynamic(() => import('./ReportDraftPanel').then((m) => m.ReportDraftPanel), {
+  ssr: false,
+});
+
+/** No answer's drafts are numbered from a map here: a report is one answer. */
+const NO_OFFSETS: ReadonlyMap<string, number> = new Map();
 
 /**
  * ScanReportScreen — `/radars/[radarUuid]/scans/[scanUuid]`, the one URL all
@@ -110,6 +126,19 @@ export function ScanReportScreen({
   const canManage =
     scope.kind === 'personal' || (reportFlags?.can_manage ?? spaceRadar?.can_manage) === true;
   const canDownload = scope.kind === 'space';
+
+  // ── DRAFTS (plan 5.5) ──────────────────────────────────────────────────
+  // A draft in a report opens in the chat's side panel (`?side=draft:N`) and
+  // saves as a note of the Radar's chat, so it needs that chat's id (the
+  // Radar's own read) and where this report's drafts start among the chat's
+  // (`draft_offset`, report-drafts.ts). A reader without either sees each
+  // draft's text in place (DraftCard with no panel).
+  const sideUrl = useSidePanelUrl();
+  const draftChatUuid = isOwner ? (radarQuery.data?.data.conversation_uuid ?? null) : null;
+  const draftOffset = ownerScan?.draft_offset;
+  const draftChat =
+    draftChatUuid !== null && typeof draftOffset === 'number' ? { uuid: draftChatUuid, offset: draftOffset } : null;
+  const draftSpace = scope.kind === 'space' ? (ownerScan?.space ?? spaceRadar?.space ?? null) : null;
 
   const [now] = useState(() => Date.now());
 
@@ -244,9 +273,11 @@ export function ScanReportScreen({
   // The study's fix: a signed-in non-owner sees the count too (the report is
   // published for them to be here at all); the owner sees it once public.
   const showViews = ownerScan === null || !ownerScan.is_private;
+  const parts = narrative?.trim() ? reportParts(narrative, draftOffset ?? 0) : [];
+  const draftOpen = draftChat !== null && narrative !== null && sideUrl.target?.kind === 'draft';
 
-  return (
-    <div className={cn('v2-radar-report', REPORT_COLUMN)}>
+  const page = (
+    <div className={cn('v2-radar-report', REPORT_COLUMN, draftOpen && 'xl:min-w-0 xl:flex-1')}>
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         {isOwner ? (
           <Link
@@ -324,19 +355,46 @@ export function ScanReportScreen({
             </div>
           ) : null}
 
-          {/* ── The report, in the reading voice. ───────────────────────── */}
-          {narrative?.trim() ? (
-            <ReportMarkdown content={narrative} />
+          {/* ── The report, in the reading voice; a draft is a card where it
+                 sits (plan 5.5). ─────────────────────────────────────────── */}
+          {parts.length > 0 ? (
+            parts.map((part, index) =>
+              part.kind === 'text' ? (
+                <ReportMarkdown key={`text-${index}`} content={part.text} />
+              ) : (
+                <DraftCard key={`draft-${part.ordinal}`} draft={part.draft} ordinal={part.ordinal} live={false} />
+              ),
+            )
           ) : (
             <p className="text-sm text-muted-foreground">
               This scan completed without a written report.
             </p>
           )}
 
+          <AffectedItems items={ownerScan?.affected_items} />
           <ReportSources sources={view.sources} />
         </article>
       </div>
     </div>
+  );
+
+  if (!draftChat) return page;
+
+  // The report owns `?side=`; on a computer an open draft stands beside it.
+  return (
+    <SidePanelValueProvider url={sideUrl} offsets={NO_OFFSETS} space={draftSpace} frame="card">
+      <div className={cn(draftOpen && 'xl:flex xl:items-start')}>
+        {page}
+        {draftOpen && narrative !== null ? (
+          <ReportDraftPanel
+            narrative={narrative}
+            draftOffset={draftChat.offset}
+            conversationUuid={draftChat.uuid}
+            space={draftSpace}
+          />
+        ) : null}
+      </div>
+    </SidePanelValueProvider>
   );
 }
 

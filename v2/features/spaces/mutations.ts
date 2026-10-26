@@ -12,6 +12,8 @@ import type {
   UpdateSpacePayload,
 } from '@/types/collab';
 import { channelsQueries } from '@/v2/features/channels/queries';
+import { optimisticMutation } from '@/v2/runtime/mutations';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { spacesQueries } from './queries';
 
 /**
@@ -70,6 +72,28 @@ export function useCreateSpace() {
       void queryClient.invalidateQueries({ queryKey: spacesQueries.lists() });
     },
   });
+}
+
+/**
+ * The reader's own Radar notices switch for a space (plan 6.1). Unlike the
+ * membership edges above it is ONE field of the reader's own, which nothing
+ * else derives, so it moves at once (`optimisticMutation`): the switch flips
+ * on the tap, goes back if the server refuses, and the global toast says why.
+ * The lists carry the field too and re-ask.
+ */
+export function useSetRadarNotices(spaceUuid: string) {
+  const queryClient = useQueryClient();
+  const { userId: viewerId } = useV2Session();
+  return useMutation(
+    optimisticMutation<unknown, boolean, SpaceResponse>(queryClient, {
+      mutationFn: (enabled) => spacesApi.setRadarNotices(spaceUuid, enabled),
+      queryKey: spacesQueries.detail(spaceUuid, { viewerId }).queryKey,
+      optimisticUpdate: (previous, enabled) =>
+        previous ? { ...previous, data: { ...previous.data, my_radar_notices: enabled } } : previous,
+      meta: { invalidates: [spacesQueries.lists()] },
+      scope: { id: `radar-notices-${spaceUuid}` },
+    }),
+  );
 }
 
 /**

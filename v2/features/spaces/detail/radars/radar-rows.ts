@@ -33,7 +33,8 @@ export const UNTITLED_REPORT = 'Radar report';
 
 export interface ReportRowModel {
   title: string;
-  /** The Radar's name, then the report's first line when it has one. */
+  /** The Radar's name, then what the report holds for the space ("2 affected
+   *  · 1 draft", plan 5.4), else its first line when it has one. */
   meta: string;
   /** Unread by THIS reader (read state is per member). */
   unread: boolean;
@@ -41,11 +42,22 @@ export interface ReportRowModel {
   time: string;
 }
 
+/** "2 affected · 1 draft": what a report holds for the space; `null` when nothing. */
+export function reportHoldings(report: Pick<SpaceRadarReport, 'affected_items_count' | 'drafts_count'>): string | null {
+  const affected = report.affected_items_count ?? 0;
+  const drafts = report.drafts_count ?? 0;
+  const words = [
+    affected > 0 ? `${affected} affected` : null,
+    drafts > 0 ? `${drafts} ${drafts === 1 ? 'draft' : 'drafts'}` : null,
+  ].filter(Boolean);
+  return words.length > 0 ? words.join(' · ') : null;
+}
+
 export function reportRowModel(report: SpaceRadarReport, spaceUuid: string, now: number): ReportRowModel {
-  const excerpt = report.excerpt?.trim();
+  const fact = reportHoldings(report) ?? report.excerpt?.trim();
   return {
     title: report.title?.trim() || UNTITLED_REPORT,
-    meta: excerpt ? `${report.radar.name} · ${excerpt}` : report.radar.name,
+    meta: fact ? `${report.radar.name} · ${fact}` : report.radar.name,
     unread: report.read_at === null,
     href: spaceRadarReportHref(spaceUuid, report.radar.uuid, report.uuid),
     time: now > 0 ? formatRelativeTime(report.completed_at, now) : '',

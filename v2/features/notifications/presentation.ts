@@ -123,6 +123,9 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   organization_invite: 'Organization invitation',
   channel_quiz_live: 'A quiz is live',
   radar_report: 'A radar report is ready',
+  // A space Radar's report (plan 6.3). The server sends its own title ("New
+  // Radar report in {space}: {title}"); this is for a row that comes without one.
+  space_radar_report: 'A Radar report is ready in your Space',
   // A space chat (techlead's contract, 14 October 2026). The server sends its
   // own title ("Chidi Okonkwo mentioned you in Contract review"); these are for
   // a row that comes without one.
