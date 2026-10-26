@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-/* One report of a space's Radar (Radar in Spaces, first part, F5, 26 October
- * 2026). Read through GET /radars/{radar}/scans/{scan}, which answers every
- * member in the owner's full shape (Backend), so what a member may DO comes
- * from the space Radar's can_triage and can_manage, never from that shape. */
+/* One report of a space's Radar (Radar in Spaces, F5 and Backend's B3, 26
+ * October 2026). Every member reads it in the owner's full shape, so what a
+ * member may DO comes from can_triage and can_manage (the report's own, else
+ * the space Radar's), never from that shape. Reading, marking read and
+ * downloading are every member's: read state is per member. */
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
 const report = read('v2', 'features', 'radars', 'report', 'ScanReportScreen.tsx');
 
@@ -19,15 +20,28 @@ test('the report page in a space wraps the same page in the space scope', () => 
   );
 });
 
-test("a Viewer reads the report and gets no toolbar, no share and no mark-read", () => {
-  assert.match(report, /const canTriage = scope\.kind === 'personal' \|\| spaceRadar\?\.can_triage === true;/);
-  assert.match(report, /const canManage = scope\.kind === 'personal' \|\| spaceRadar\?\.can_manage === true;/);
-  // Opening an unread report marks it read only for one who may triage (a
-  // Viewer's triage is a 403 until the per-member read step).
-  assert.match(report, /const shouldMarkRead =\s*canTriage &&/);
-  assert.match(report, /\{ownerScan && \(canTriage \|\| canManage\) \? \(/);
+test("a Viewer reads, marks read and downloads the report, with no triage toolbar and no share", () => {
+  assert.match(report, /scope\.kind === 'personal' \|\| \(reportFlags\?\.can_triage \?\? spaceRadar\?\.can_triage\) === true;/);
+  assert.match(report, /scope\.kind === 'personal' \|\| \(reportFlags\?\.can_manage \?\? spaceRadar\?\.can_manage\) === true;/);
+  assert.match(report, /const canDownload = scope\.kind === 'space';/);
+  // Read state is per member (B3): opening an unread report marks it read for anyone.
+  assert.match(report, /const shouldMarkRead =\s*ownerScan !== null &&/);
+  assert.doesNotMatch(report, /const shouldMarkRead =\s*canTriage/);
+  assert.match(report, /\{ownerScan && \(canTriage \|\| canManage \|\| canDownload\) \? \(/);
   assert.match(report, /\{canTriage \? <ScanTriageToolbar radarUuid=\{radarUuid\} scan=\{ownerScan\} \/> : null\}/);
+  assert.match(report, /\{canDownload \? <ReportDownloads radarUuid=\{radarUuid\} scanUuid=\{scanUuid\} \/> : null\}/);
   assert.match(report, /\{canManage \? <ShareDialog radarUuid=\{radarUuid\} scan=\{ownerScan\} \/> : null\}/);
+});
+
+test('a report downloads as Word or PDF, and a refused download says why beside the buttons', async () => {
+  const { downloadFailure } = await import('@/v2/features/radars/report/use-report-download');
+  assert.equal(downloadFailure(429), 'Too many downloads in a minute. Try again shortly.');
+  assert.equal(downloadFailure(404), 'This report is no longer available to download.');
+  assert.equal(downloadFailure(500), "The file didn't download. Try again.");
+  const buttons = read('v2', 'features', 'radars', 'report', 'ReportDownloads.tsx');
+  assert.match(buttons, /\{ format: 'docx', label: 'Download Word', short: 'Word' \}/);
+  assert.match(buttons, /\{ format: 'pdf', label: 'Download PDF', short: 'PDF' \}/);
+  assert.match(buttons, /<p role="alert" className="text-xs text-destructive">/);
 });
 
 test('the report leads back into the space, not to /radars', () => {
@@ -36,13 +50,12 @@ test('the report leads back into the space, not to /radars', () => {
   assert.match(report, /<Link href=\{hrefs\.list\}>Back to the space&apos;s Radars<\/Link>/);
 });
 
-test('one report, its triage and its share call /radars, with a note to switch later', () => {
+test('one report and its triage use the space routes; the share stays on /radars', () => {
   const scope = read('v2', 'features', 'radars', 'scope.ts');
-  for (const call of ['getScan', 'triageScan', 'publishScan', 'unpublishScan']) {
-    assert.match(scope, new RegExp(`    ${call}: radarsApi\\.${call},`), call);
-  }
-  assert.match(scope, /If the per-member read step \(B3\) adds one, switch these four\./);
-  assert.doesNotMatch(read('lib', 'api', 'radars.ts'), /getScan: async \(spaceUuid: string/);
+  assert.match(scope, /getScan: \(radarUuid, scanUuid\) => spaceRadarsApi\.getScan\(spaceUuid, radarUuid, scanUuid\),/);
+  assert.match(scope, /triageScan: \(radarUuid, scanUuid, payload\) => spaceRadarsApi\.triageScan\(spaceUuid, radarUuid, scanUuid, payload\),/);
+  assert.match(scope, /    publishScan: radarsApi\.publishScan,/);
+  assert.match(scope, /    unpublishScan: radarsApi\.unpublishScan,/);
 });
 
 test("a long source title truncates inside its row, on a phone too", () => {

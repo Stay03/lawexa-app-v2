@@ -22,6 +22,7 @@ import { ScanTriageToolbar } from '../detail/triage-actions';
 import { ReportMarkdown } from './ReportMarkdown';
 import { ReportSources } from './ReportSources';
 import { ShareDialog } from './ShareDialog';
+import { ReportDownloads } from './ReportDownloads';
 import { isOwnerScan, resolveScanViewer } from './viewer';
 import './report.css';
 
@@ -98,13 +99,17 @@ export function ScanReportScreen({
   // ── IN A SPACE, THE FULL REPORT IS NOT OWNERSHIP ───────────────────────
   // Every member of a space reads a space Radar's report in the owner's full
   // shape (Backend, 26 October 2026), so "full shape" means "may read", not
-  // "may act". What a member may do is the space Radar's own flags: the
-  // toolbar and the mark-read need `can_triage` (Owner and Editor; a Viewer's
-  // triage is a 403 until the per-member read step), the share `can_manage`.
-  // A personal report is the reader's own, so both hold.
+  // "may act". What a member may do is the report's own flags (Backend's B3),
+  // else the space Radar's: the toolbar needs `can_triage` (Owner and Editor),
+  // the share `can_manage`. Reading, marking read and downloading are every
+  // member's. A personal report is the reader's own, so all of it holds.
   const spaceRadar = scope.kind === 'space' ? radarQuery.data?.data : undefined;
-  const canTriage = scope.kind === 'personal' || spaceRadar?.can_triage === true;
-  const canManage = scope.kind === 'personal' || spaceRadar?.can_manage === true;
+  const reportFlags = scope.kind === 'space' && ownerScan ? ownerScan : undefined;
+  const canTriage =
+    scope.kind === 'personal' || (reportFlags?.can_triage ?? spaceRadar?.can_triage) === true;
+  const canManage =
+    scope.kind === 'personal' || (reportFlags?.can_manage ?? spaceRadar?.can_manage) === true;
+  const canDownload = scope.kind === 'space';
 
   const [now] = useState(() => Date.now());
 
@@ -120,8 +125,9 @@ export function ScanReportScreen({
   // only) — the optimistic engine moves the unread badges everywhere.
   const { mutate: triage } = useTriageScan();
   const hasMarkedRead = useRef(false);
+  // Read state is each member's own in a space (Backend's B3), so opening a
+  // report marks it read for whoever opens it, Viewers included.
   const shouldMarkRead =
-    canTriage &&
     ownerScan !== null &&
     ownerScan.status === 'completed' &&
     ownerScan.read_at === null;
@@ -309,10 +315,11 @@ export function ScanReportScreen({
           </header>
 
           {/* ── The owner's working toolbar, riding the scroll. ─────────── */}
-          {ownerScan && (canTriage || canManage) ? (
+          {ownerScan && (canTriage || canManage || canDownload) ? (
             <div className="sticky top-0 z-10 -mx-1 flex items-center gap-2 border-b border-border/60 bg-background/95 px-1 py-2 backdrop-blur">
               {canTriage ? <ScanTriageToolbar radarUuid={radarUuid} scan={ownerScan} /> : null}
               <div className="flex-1" />
+              {canDownload ? <ReportDownloads radarUuid={radarUuid} scanUuid={scanUuid} /> : null}
               {canManage ? <ShareDialog radarUuid={radarUuid} scan={ownerScan} /> : null}
             </div>
           ) : null}

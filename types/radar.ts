@@ -150,6 +150,9 @@ export interface RadarScanDetail extends RadarScan {
   export_urls?: { docx: string; pdf: string } | null;
   radar?: { uuid: string; name: string; status?: RadarStatus } | null;
   space?: RadarSpaceStub | null;
+  /** A space report's own read of what the caller may do (Backend's B3). */
+  can_manage?: boolean;
+  can_triage?: boolean;
 }
 
 export type RadarAffectedItemType = 'file' | 'note' | 'conversation';

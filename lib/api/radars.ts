@@ -255,6 +255,36 @@ export const spaceRadarsApi = {
   },
 
   /**
+   * One report of a space Radar (Backend's B3, 26 October 2026): the personal
+   * report's fields plus `can_manage`, `can_triage`, and the caller's OWN
+   * `read_at` (read state is per member). Opening it does not mark it read.
+   */
+  getScan: async (spaceUuid: string, radarUuid: string, scanUuid: string): Promise<RadarScanDetailResponse> => {
+    const response = await apiClient.get<RadarScanDetailResponse>(
+      `${spaceRadarsPath(spaceUuid, radarUuid)}/scans/${encodeURIComponent(scanUuid)}`,
+    );
+    return response.data;
+  },
+
+  /**
+   * `{ read }` is any member's own read state; `workflow_status` and
+   * `priority` are shared and need `can_triage` (a Viewer sending either gets
+   * a 403 and nothing changes, the read included).
+   */
+  triageScan: async (
+    spaceUuid: string,
+    radarUuid: string,
+    scanUuid: string,
+    payload: TriageScanPayload,
+  ): Promise<RadarScanDetailResponse> => {
+    const response = await apiClient.patch<RadarScanDetailResponse>(
+      `${spaceRadarsPath(spaceUuid, radarUuid)}/scans/${encodeURIComponent(scanUuid)}`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /**
    * A report as Word or PDF (`GET /radars/{radar}/scans/{scan}/export`), for
    * any member of the Radar's Space. Nothing is stored; the answer is the
    * file, named by its `Content-Disposition`. 20 a minute per user.

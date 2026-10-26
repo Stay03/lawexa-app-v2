@@ -41,7 +41,7 @@ async function requests(
   return sent;
 }
 
-test('a Space Radar is read and run under its space; one report goes to /radars', async () => {
+test('a Space Radar, its report and its triage are under its space; its share stays on /radars', async () => {
   const calls = radarCalls(SPACE);
   const sent = await requests(async () => {
     await calls.get('radar-1');
@@ -60,10 +60,9 @@ test('a Space Radar is read and run under its space; one report goes to /radars'
     [
       'get /spaces/space-test-1/radars/radar-1',
       'get /spaces/space-test-1/radars/radar-1/scans',
-      // One report, its triage and its share: the personal routes, which
-      // check the space's rules (Backend, 26 October 2026).
-      'get /radars/radar-1/scans/scan-1',
-      'patch /radars/radar-1/scans/scan-1',
+      // One report and its triage: the space's own routes (Backend's B3).
+      'get /spaces/space-test-1/radars/radar-1/scans/scan-1',
+      'patch /spaces/space-test-1/radars/radar-1/scans/scan-1',
       'post /spaces/space-test-1/radars/radar-1/pause',
       'post /spaces/space-test-1/radars/radar-1/resume',
       'post /spaces/space-test-1/radars/radar-1/scan',
@@ -73,6 +72,7 @@ test('a Space Radar is read and run under its space; one report goes to /radars'
     ],
   );
   assert.deepEqual(sent[1].params, { status: undefined, workflow_status: undefined, unread: 1, per_page: 15, page: 1 });
+  // A read on its own: any member's own read state (Backend's B3).
   assert.deepEqual(sent[3].data, { read: true });
 });
 

@@ -65,12 +65,12 @@ export function radarCalls(scope: RadarScope): RadarCalls {
     scanNow: (radarUuid) => spaceRadarsApi.scanNow(spaceUuid, radarUuid),
     archive: (radarUuid) => spaceRadarsApi.archive(spaceUuid, radarUuid),
     getScans: (radarUuid, params) => spaceRadarsApi.getScans(spaceUuid, radarUuid, params),
-    // ONE REPORT GOES TO /radars (Backend, 26 October 2026): a member reads a
-    // space Radar's report, its triage and its share through the personal
-    // routes, which check the space's rules; there is no space-scoped scan
-    // route yet. If the per-member read step (B3) adds one, switch these four.
-    getScan: radarsApi.getScan,
-    triageScan: radarsApi.triageScan,
+    // ONE REPORT AND ITS TRIAGE are the space's own routes (Backend's B3):
+    // the answer carries the caller's own read state and the Radar's
+    // can_manage / can_triage. The share stays on the personal routes, which
+    // check the space's rules (can_manage).
+    getScan: (radarUuid, scanUuid) => spaceRadarsApi.getScan(spaceUuid, radarUuid, scanUuid),
+    triageScan: (radarUuid, scanUuid, payload) => spaceRadarsApi.triageScan(spaceUuid, radarUuid, scanUuid, payload),
     publishScan: radarsApi.publishScan,
     unpublishScan: radarsApi.unpublishScan,
   };
