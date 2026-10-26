@@ -101,6 +101,29 @@ export function ScheduleOnHoldNotice({ payer }: { payer: 'space_owner' | 'self' 
   );
 }
 
+/**
+ * The schedule gave up (`schedule_state: 'failed'`: after five holds, or a
+ * fault, Backend's B2c, 26 October 2026). Scan now starts it again, so it
+ * stays enabled and the notice says so, in plain words. Shown only to those
+ * who can press it.
+ */
+export function ScheduleStoppedNotice() {
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+    >
+      <TriangleAlert aria-hidden className="mt-0.5 size-4 shrink-0 text-destructive" />
+      <div className="min-w-0 flex-1 text-sm">
+        <p className="font-medium text-foreground">Scans have stopped</p>
+        <p className="mt-0.5 text-muted-foreground">
+          This Radar stopped scanning on its schedule. Scan now starts it again.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function ScanGapNotice({
   status,
   when,

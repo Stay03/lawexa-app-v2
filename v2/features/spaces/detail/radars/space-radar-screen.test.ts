@@ -91,3 +91,12 @@ test('Scan now waits while scans are on hold, with the reason on it', () => {
   assert.match(screen, /"Scans are on hold until the space's owner has messages"/);
   assert.match(screen, /'Scans are on hold until you have messages'/);
 });
+
+test('a schedule that gave up says so, and Scan now stays the way to restart it', () => {
+  const screen = radars('detail', 'RadarScreen.tsx');
+  // Disabled for no_balance only: "failed" is restarted by Scan now (Backend's B2c).
+  assert.match(screen, /scanNow\.isPending \|\| scanInFlight \|\| radar\.status !== 'active' \|\| onHold;/);
+  assert.doesNotMatch(screen, /schedule_state === 'failed'[^\n]*scanNowDisabled/);
+  assert.match(screen, /\) : radar\.schedule_state === 'failed' && canManage && radar\.status === 'active' \? \(/);
+  assert.match(radars('detail', 'states.tsx'), /This Radar stopped scanning on its schedule\. Scan now starts it again\./);
+});

@@ -63,6 +63,7 @@ import {
   RadarNotFoundState,
   ScanGapNotice,
   ScheduleOnHoldNotice,
+  ScheduleStoppedNotice,
   ScanListEmptyState,
   ScanListErrorState,
   ScanListSkeleton,
@@ -537,6 +538,11 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
         {radar.schedule_state === 'no_balance' ? (
           <div className="mt-4">
             <ScheduleOnHoldNotice payer={scope.kind === 'space' ? 'space_owner' : 'self'} />
+          </div>
+        ) : radar.schedule_state === 'failed' && canManage && radar.status === 'active' ? (
+          // Scan now stays enabled here: it is what starts the schedule again.
+          <div className="mt-4">
+            <ScheduleStoppedNotice />
           </div>
         ) : null}
 
