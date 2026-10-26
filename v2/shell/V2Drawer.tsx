@@ -22,7 +22,6 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { useSidebar } from '@/components/ui/sidebar';
-import { SwitchBackButton } from '@/app/v2/switch-back-button';
 import {
   NavSignalMark,
   QUIET_NAV_SIGNAL,
@@ -484,12 +483,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
           ) : null}
         </div>
 
-        {/* Pinned footer: real account row + preview exit (no gold pill). A
+        {/* Pinned footer: the account row, which opens the account menu. A
             hairline sets it off from the scroll region — this is a pinned bar over
             scrolling content, not a chrome edge. */}
         <div className="v2-safe-bottom flex shrink-0 flex-col gap-2 border-t border-border p-3">
           <V2UserFooter user={user} onNavigate={closeFor} />
-          <SwitchBackButton />
         </div>
       </SheetContent>
     </Sheet>

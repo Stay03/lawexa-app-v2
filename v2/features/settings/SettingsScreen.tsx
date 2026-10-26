@@ -38,7 +38,8 @@ import { SignOutRow } from './sign-out/SignOutRow';
  * ── WHAT THIS SCREEN IS NOT ────────────────────────────────────────────────
  * It is not a v1 settings layout with a second sidebar (see `SettingsList` for
  * why that did not come across), and it is not a top-level screen: it is
- * reached from the header's overflow menu, so it is a screen you PUSHED into.
+ * reached from the account menu at the foot of the sidebar, so it is a screen
+ * you PUSHED into.
  * The back arrow and the bar's title come from `v2/shell/pushed-route.ts`, and
  * the heading below is drawn only from `md:` up, where the bar's title is
  * hidden — one title on the pixels at every width.

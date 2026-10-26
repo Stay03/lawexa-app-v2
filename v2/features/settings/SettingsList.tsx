@@ -19,8 +19,8 @@ import { Skeleton } from '@/components/ui/skeleton';
  *
  * ── AND WHAT WAS NOT ───────────────────────────────────────────────────────
  * Both reference apps put a HAMBURGER on this screen, because settings is
- * top-level in their navigation. In ours it is reached from the header's
- * overflow menu, so it is a screen you PUSHED into: a back arrow, the title in
+ * top-level in their navigation. In ours it is reached from the account menu
+ * at the foot of the sidebar, so it is a screen you PUSHED into: a back arrow, the title in
  * the bar below `md:`, and no hamburger (`v2/shell/pushed-route.ts`).
  *
  * ── ONE COLUMN AT EVERY WIDTH, AND NO SETTINGS SIDEBAR ─────────────────────

@@ -31,8 +31,9 @@ const PERF_LAYER_ICONS: Record<PerfLayer, LucideIcon> = {
  * anyone reading it is inside v2 and the switch is on. It is not read from
  * `document.cookie`: that value does not exist on the server, and reading it
  * on the first client render would disagree with the server's HTML. Turning it
- * off is the header menu's "Switch to classic Lawexa", the same function, so
- * the two ways out cannot drift.
+ * off calls `switchBackToV1`. Since the sidebar's "Switch to classic Lawexa"
+ * went (Stay, 26 October 2026), this switch is the one way back to the classic
+ * design from inside the new one.
  *
  * ── THE SEARCH POSITION ────────────────────────────────────────────────────
  * Read through `useSearchPosition`, whose server snapshot is the default

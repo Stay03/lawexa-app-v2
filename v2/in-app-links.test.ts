@@ -13,8 +13,10 @@ import { isMigratedToV2 } from './routes.manifest';
  * loads the whole page when the root layout changes. A v1 page that only
  * redirects does not, so a link to it must point at where it redirects. */
 
-/** v1 pages v2 links to on purpose: each renders a page of its own. */
-const V1_PAGES_V2_SENDS_TO = new Set(['/login', '/register', '/check-email', '/ambassadors']);
+/** v1 pages v2 links to on purpose: each renders a page of its own. `/admin`
+ *  is the admin dashboard, reached from the account menu by an admin only
+ *  (Stay, 26 October 2026); v2 has no admin pages. */
+const V1_PAGES_V2_SENDS_TO = new Set(['/login', '/register', '/check-email', '/ambassadors', '/admin']);
 
 const V2_ROOT = join(process.cwd(), 'v2');
 

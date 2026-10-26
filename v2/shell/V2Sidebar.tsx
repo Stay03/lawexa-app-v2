@@ -30,7 +30,6 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from '@/components/ui/sidebar';
-import { SwitchBackButton } from '@/app/v2/switch-back-button';
 import {
   NavSignalMark,
   QUIET_NAV_SIGNAL,
@@ -387,8 +386,6 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
 
       <SidebarFooter className="gap-2 border-t border-sidebar-border/60 p-2">
         <V2UserFooter user={user} />
-        {/* Always-available exit from the preview. */}
-        <SwitchBackButton />
       </SidebarFooter>
 
       <SidebarRail />

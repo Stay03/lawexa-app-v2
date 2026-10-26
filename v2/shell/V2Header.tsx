@@ -139,9 +139,10 @@ const OPEN_BAR_CONTROL =
  *
  * Everything else, on every other route, is untouched: no context, no swap,
  * byte-identical header.
- *  - RIGHT (grid col 3): exactly TWO controls (owner #28) — the notification bell
- *    (hidden for guests) and the overflow menu (`V2HeaderMenu`), which now owns
- *    the light/dark theme toggle. The bare theme button has left the bar.
+ *  - RIGHT (grid col 3): at most TWO controls (owner #28) — the notification bell
+ *    (hidden for guests) and the overflow menu (`V2HeaderMenu`), which draws
+ *    only on a screen with actions of its own. Theme and Settings live in the
+ *    account menu at the foot of the sidebar (Stay, 26 October 2026).
  *
  * Visibility is CSS-driven (`md:` variants), not `useIsMobile()`, so the correct
  * bar paints before hydration with no flash.

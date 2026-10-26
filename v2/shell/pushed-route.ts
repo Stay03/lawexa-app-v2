@@ -440,9 +440,9 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
     //
     // The reference apps put a HAMBURGER on their settings screen, because
     // settings is top-level in their navigation. In ours it is opened from the
-    // header's overflow menu, which makes it a screen you pushed into: back
-    // arrow, title in the bar below `md:`, no hamburger. Home is the parent of
-    // the index because the menu is on every screen, and `useBackTo` still
+    // account menu at the foot of the sidebar, which makes it a screen you
+    // pushed into: back arrow, title in the bar below `md:`, no hamburger. Home
+    // is the parent of the index because that menu is on every screen, and `useBackTo` still
     // takes the real history step whenever the reader did come from somewhere.
     case 'settings':
       if (depth === 1) {

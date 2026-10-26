@@ -68,13 +68,17 @@ test('the waiting list draws its face with MemberAvatar', () => {
   assert.doesNotMatch(requests, /@\/components\/ui\/avatar/);
 });
 
-/* ── NICE 3: one name for the exit to the old app ────────────────────────── */
+/* ── NICE 3: the exit to the old app (removed 26 October 2026) ─────────────── */
 
-test('the sidebar footer and the header menu name the exit the same way', () => {
-  const footer = read('app', 'v2', 'switch-back-button.tsx');
-  const menu = read('v2', 'shell', 'V2HeaderMenu.tsx');
-  assert.match(footer, /<Button variant="outline" onClick=\{switchBackToV1\}>\s*Switch to classic Lawexa\s*<\/Button>/);
-  assert.match(menu, /<span>Switch to classic Lawexa<\/span>/);
-  // "v1" is the team's word; the reader never sees it.
-  assert.doesNotMatch(footer, />\s*[^<{]*\bv1\b[^<{]*\s*</);
+test('no "Switch to classic Lawexa" in the sidebar, the drawer or the bar; the Developer switch stays', () => {
+  // Stay, 26 October 2026, with the new design everyone's default: "remove that
+  // switch to classic lawexa at the bottom", then "ok keep the dev switch".
+  for (const file of ['V2Sidebar.tsx', 'V2Drawer.tsx', 'V2HeaderMenu.tsx', 'V2UserFooter.tsx']) {
+    const source = read('v2', 'shell', file).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    assert.doesNotMatch(source, /Switch to classic|SwitchBackButton|switchBackToV1/, file);
+  }
+  const exit = read('app', 'v2', 'switch-back-button.tsx');
+  assert.doesNotMatch(exit, /export function SwitchBackButton/);
+  assert.match(exit, /export function switchBackToV1\(\) \{/);
+  assert.match(read('v2', 'features', 'settings', 'developer', 'DeveloperScreen.tsx'), /if \(!next\) switchBackToV1\(\);/);
 });
