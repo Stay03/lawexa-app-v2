@@ -141,9 +141,13 @@ export function questionCountLabel(count: number): string {
 /* ── Reading an attempt ───────────────────────────────────────────────────── */
 
 /** The questions in play order. The server serves `position`; array order is
- *  never trusted for a numbered list. */
+ *  never trusted for a numbered list. A question added to the quiz after the
+ *  attempt began (`in_attempt: false`) is left out: it is not in
+ *  `question_count` and cannot be played. */
 export function orderedQuestions(attempt: QuizAttempt): QuizAttemptQuestion[] {
-  return [...attempt.questions].sort((a, b) => a.position - b.position);
+  return attempt.questions
+    .filter((question) => question.in_attempt !== false)
+    .sort((a, b) => a.position - b.position);
 }
 
 /**
@@ -249,7 +253,7 @@ export function withAnswer(
 /** How many questions have no answer — the number Finish names before it
  *  scores them as wrong. */
 export function unansweredCount(attempt: QuizAttempt): number {
-  return attempt.questions.filter((question) => !question.answered).length;
+  return orderedQuestions(attempt).filter((question) => !question.answered).length;
 }
 
 /** Points so far on an `each` attempt: the sum the receipts have handed back.

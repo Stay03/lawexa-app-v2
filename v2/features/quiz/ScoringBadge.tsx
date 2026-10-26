@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import type { QuizQuestionScoring } from '@/types/channel-quiz';
+import type { QuizAttemptScoring } from '@/types/channel-quiz';
 import { scoringLabel } from './scoring';
 
 /**
@@ -12,7 +12,7 @@ export function ScoringBadge({
   question,
   className,
 }: {
-  question: { scoring?: QuizQuestionScoring };
+  question: { scoring?: QuizAttemptScoring };
   className?: string;
 }) {
   const label = scoringLabel(question);

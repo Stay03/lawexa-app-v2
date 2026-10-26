@@ -197,6 +197,9 @@ export interface QuizQuestion {
  */
 export type QuizQuestionScoring = 'scored' | 'unscored' | 'free_point';
 
+/** An attempt question adds one value: `not_in_attempt`, with `in_attempt: false`. */
+export type QuizAttemptScoring = QuizQuestionScoring | 'not_in_attempt';
+
 /**
  * Where a question or a scenario comes from (the quiz builder, backend 24
  * October 2026). A Library item (`note`, `case`, `statute`, `file`) or a page
@@ -445,7 +448,13 @@ export interface QuizAttemptQuiz {
  * So every verdict field is optional, and the one place a screen may read them
  * as a set is a finished attempt.
  */
-export interface QuizAttemptQuestion extends QuizQuestion {
+export interface QuizAttemptQuestion extends Omit<QuizQuestion, 'scoring'> {
+  scoring?: QuizAttemptScoring;
+  /** `false` for a question added to the quiz after this attempt began
+   *  (Backend, 26 October 2026): its `scoring` is `not_in_attempt`, it is not
+   *  in `question_count`, and the app never plays it. A finished attempt
+   *  leaves such questions out. Absent on a body from before the field. */
+  in_attempt?: boolean;
   answered: boolean;
   your_option_id?: number | null;
   correct_option_id?: number;

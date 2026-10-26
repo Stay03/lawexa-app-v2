@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import type { QuizAttempt, QuizAttemptQuestion } from '@/types/channel-quiz';
 import { countsTowardScore, scoringLabel } from './scoring';
-import { attemptScore } from './solo/model';
+import { attemptScore, nextUnanswered, orderedQuestions, unansweredCount } from './solo/model';
 import { answersScore } from './solo/results/answers-model';
 
 /* Quiz question kinds (Arthur, 26 October 2026; thread a2f9567d): a question
@@ -38,6 +38,30 @@ test('a question says Bonus or Free point, and nothing when it is scored the usu
   assert.equal(countsTowardScore({}), true);
   assert.equal(countsTowardScore({ scoring: 'free_point' }), true);
   assert.equal(countsTowardScore({ scoring: 'unscored' }), false);
+  assert.equal(scoringLabel({ scoring: 'not_in_attempt' }), null);
+  assert.equal(countsTowardScore({ scoring: 'not_in_attempt' }), false);
+});
+
+test('a question added after the attempt began is not played, counted or waited on', () => {
+  // The shape of a local attempt on Backend's 2106ac83: four questions in the
+  // attempt, a fifth added to the quiz while it was open.
+  const attempt = {
+    finished_at: null,
+    question_count: 4,
+    scored_count: 3,
+    questions: [
+      question({ uuid: 'q1', position: 0, answered: true }),
+      question({ uuid: 'q2', position: 1, answered: true, scoring: 'unscored' }),
+      question({ uuid: 'q5', position: 4, answered: false, scoring: 'not_in_attempt', in_attempt: false }),
+      question({ uuid: 'q3', position: 2, answered: false, scoring: 'free_point', in_attempt: true }),
+      question({ uuid: 'q4', position: 3, answered: false }),
+    ],
+  } as unknown as QuizAttempt;
+  assert.deepEqual(orderedQuestions(attempt).map((each) => each.uuid), ['q1', 'q2', 'q3', 'q4']);
+  assert.equal(unansweredCount(attempt), 2);
+  const allIn = { ...attempt, questions: attempt.questions.map((each) => (each.in_attempt === false ? each : { ...each, answered: true })) };
+  assert.equal(nextUnanswered(allIn), null);
+  assert.equal(unansweredCount(allIn), 0);
 });
 
 test('a finished attempt’s "x of y right" is over the questions that count', () => {
