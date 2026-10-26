@@ -33,7 +33,8 @@ test('the home composer in a space offers no private modes and says a refusal in
   const composer = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
   assert.match(composer, /\{space \? null : \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuLabel>Privacy<\/DropdownMenuLabel>/);
   assert.match(composer, /spaceUuid: space\?\.uuid,/);
-  assert.match(composer, /setError\(space \? startChatRefusal\(apiError\.status, apiError\.message\) : apiError\.message\);/);
+  // The refusal's words are chosen in `home-send-failure` (its own test).
+  assert.match(composer, /homeSendFailure\(err, \{ attachments: uploadedFiles\.length, inSpace: Boolean\(space\) \}\);/);
   // Study mode is never sent from a space (T3). The box is the dock at the
   // bottom of the Conversations tab since 15 October 2026 (Stay, Arthur).
   const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');

@@ -44,6 +44,7 @@ import { seedEarlyRuling } from '@/v2/features/conversations/conversation/early-
 import { ActivityStatus } from '@/v2/features/conversations/conversation/ActivityStatus';
 import { REDACTING_LABEL } from '@/v2/features/conversations/conversation/redaction-wait';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { extractApiError, extractBlockedReason } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { UserRole } from '@/types/auth';
@@ -53,7 +54,6 @@ import {
   RedactionUnavailableError,
   startConversation,
 } from '@/v2/features/conversations/start-conversation';
-import { startChatRefusal } from '@/v2/features/spaces/content-model';
 import {
   ALLOWED_FILE_TYPES,
   ATTACHMENT_SIZE_ERROR,
@@ -72,6 +72,7 @@ import { JurisdictionField } from './composer/JurisdictionField';
 import { WorkflowField } from './composer/WorkflowField';
 import { useWorkflowSelection } from './composer/useWorkflowSelection';
 import { OutOfMessagesStrip } from '@/v2/features/subscription/OutOfMessagesStrip';
+import { homeSendFailure } from './home-send-failure';
 
 /**
  * HomeComposer — the ONE v2-native composer both home designs share, now WIRED to
@@ -502,10 +503,12 @@ export function HomeComposer({
         setBlocked(extractBlockedReason(err));
         setError(null);
       } else if (err instanceof AxiosError) {
-        // A real HTTP failure — surface the API's message (or a network fallback).
-        // In a space, a refusal is said in the space's words (a Viewer's 403).
-        const apiError = extractApiError(err);
-        setError(space ? startChatRefusal(apiError.status, apiError.message) : apiError.message);
+        // No answer at all: reported, and said with what the box still holds.
+        // An answer: the API's message; in a space, a refusal in the space's
+        // words (`home-send-failure`).
+        const failure = homeSendFailure(err, { attachments: uploadedFiles.length, inSpace: Boolean(space) });
+        if (failure.report) reportChatError(failure.report);
+        setError(failure.message);
       } else if (err instanceof Error) {
         // A `success: false` body throws with the server's message — keep it.
         setError(err.message);
