@@ -70,6 +70,19 @@ export interface ViewerScoped {
  */
 export const SPACES_BASELINE_PARAMS: SpaceListParams = {};
 
+/**
+ * What the feed asks to have joined in. The rooms join All and Conversations
+ * for a reader who has team channels (`rooms`); the space Radars' reports
+ * join All only (Radar in Spaces, Backend's B3, 26 October 2026): a report
+ * is not a conversation, and the Radars pill lists the Radars themselves.
+ */
+export function spaceItemsInclude({ type, rooms }: { type?: SpaceItemsType; rooms: boolean }): string | undefined {
+  const parts: string[] = [];
+  if (rooms && (type === undefined || type === 'conversations')) parts.push('channels', 'threads');
+  if (type === undefined) parts.push('radar_reports');
+  return parts.length > 0 ? parts.join(',') : undefined;
+}
+
 export const spacesQueries = {
   all: ['spaces'] as const,
 
@@ -201,12 +214,12 @@ export const spacesQueries = {
       rooms?: boolean;
     },
   ) => {
-    const withRooms = rooms && (type === undefined || type === 'conversations');
+    const include = spaceItemsInclude({ type, rooms });
     const params: SpaceItemsParams = {
       per_page: SPACE_CONTENT_PER_PAGE,
       ...(type ? { type } : {}),
       ...(search ? { search } : {}),
-      ...(withRooms ? { include: 'channels,threads' as const } : {}),
+      ...(include ? { include } : {}),
     };
     return infiniteQueryOptions({
       queryKey: [...spacesQueries.itemsOf(spaceUuid), params, { viewerId }] as const,

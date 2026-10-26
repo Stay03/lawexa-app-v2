@@ -1777,7 +1777,7 @@ export type SpaceItem =
  * READER'S OWN (Stay, 26 October 2026: read state per member), so one member
  * opening a report leaves it unread for the rest. `workflow_status` and
  * `priority` are shared, one per report. `excerpt` is the report's first
- * readable line, about 200 characters.
+ * readable line, cut at 140 characters (the chat timeline's preview, Backend).
  */
 export interface SpaceRadarReport {
   uuid: string;
@@ -1819,7 +1819,11 @@ export interface SpaceRadarListParams {
 /** The room kinds the feed adds only when asked (`include`), and only for a
  *  reader with team channels (researcher and above) in a team space: anyone
  *  else gets today's feed whatever is asked. */
-export type SpaceItemsInclude = 'channels,threads';
+/** What joins the feed besides its files, folders and chats, comma-joined:
+ *  the rooms (`channels,threads`) and the space Radars' reports
+ *  (`radar_reports`, Backend's B3: only sent when asked, so an app that does
+ *  not know the row never receives one). */
+export type SpaceItemsInclude = string;
 
 export interface SpaceItemsParams {
   /** One kind; none is all three mixed. */

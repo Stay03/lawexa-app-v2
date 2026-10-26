@@ -19,14 +19,16 @@ const paramsOf = (options: Parameters<typeof spacesQueries.items>[1]) =>
   spacesQueries.items('s-1', options).queryKey[4];
 
 test('rooms are asked for on All and Conversations only, and only when they show', () => {
-  assert.equal(paramsOf({ viewerId: 7, rooms: true }).include, 'channels,threads');
+  // All also asks for the space Radars' reports (Backend's B3, 26 October 2026).
+  assert.equal(paramsOf({ viewerId: 7, rooms: true }).include, 'channels,threads,radar_reports');
   assert.equal(paramsOf({ viewerId: 7, type: 'conversations', rooms: true }).include, 'channels,threads');
-  // Files and Folders hold no rooms, so they keep their own entry.
+  // Files and Folders hold no rooms and no reports, so they keep their own entry.
   assert.equal(paramsOf({ viewerId: 7, type: 'files', rooms: true }).include, undefined);
   assert.equal(paramsOf({ viewerId: 7, type: 'folders', rooms: true }).include, undefined);
-  // A reader without them asks for nothing new: today's cache entry.
-  assert.equal(paramsOf({ viewerId: 7 }).include, undefined);
-  assert.deepEqual(paramsOf({ viewerId: 7 }), { per_page: 20 });
+  // A reader without rooms: All asks for the reports alone, Conversations for nothing new.
+  assert.equal(paramsOf({ viewerId: 7 }).include, 'radar_reports');
+  assert.equal(paramsOf({ viewerId: 7, type: 'conversations' }).include, undefined);
+  assert.deepEqual(paramsOf({ viewerId: 7 }), { per_page: 20, include: 'radar_reports' });
   // The include is part of the key, so the two answers never share an entry.
   assert.notDeepEqual(
     spacesQueries.items('s-1', { viewerId: 7, rooms: true }).queryKey,
@@ -40,7 +42,7 @@ test('the call sends include, and the feed rows carry the two room kinds', () =>
   const types = read('types', 'collab.ts');
   assert.match(types, /\| \{ type: 'channel'; sort_at: string; item: Channel \}/);
   assert.match(types, /\| \{ type: 'thread'; sort_at: string; item: Channel \};/);
-  assert.match(types, /export type SpaceItemsInclude = 'channels,threads';/);
+  assert.match(types, /export type SpaceItemsInclude = string;/);
 });
 
 test('the home asks for rooms by the rail’s own rule, and draws them in the feed’s one row', () => {
