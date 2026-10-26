@@ -31,9 +31,12 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://lawexa.com';
  * mirrors out of next-themes, and the address never changes — every page
  * keeps one constant, statically-renderable <link>.
  *
- * No cookie, or an unrecognised value, falls back to DARK — the same default
- * as `ThemeProvider defaultTheme="dark"`, so a first-ever visit gets the bar
- * that matches the page it is about to see.
+ * No cookie, or an unrecognised value, falls back to DARK. The page itself
+ * now follows the device on a first visit (`defaultTheme="system"`, 26 October
+ * 2026), but the cookie is written as soon as that first page has resolved its
+ * theme, and an install always comes after a page has loaded, so this fallback
+ * only answers a manifest fetched before any page. Dark is the safe answer
+ * there: white status icons read on it (see below).
  *
  * `Cache-Control: private, no-store` because the body is per-reader: a shared
  * cache serving one person's light manifest to everyone would put this bug

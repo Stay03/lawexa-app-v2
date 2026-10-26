@@ -16,7 +16,7 @@ import { themeCookieSet } from '@/lib/theme-cookie';
  * `system`, and the manifest needs the colour actually on screen, which only
  * this client can resolve. Before hydration resolves it the value is
  * undefined and nothing is written — the previous visit's cookie (or the
- * no-cookie dark default, matching `defaultTheme` below) answers instead.
+ * manifest's no-cookie dark fallback) answers instead.
  */
 function ThemeCookieMirror() {
   const { resolvedTheme } = useTheme();
@@ -30,11 +30,18 @@ function ThemeCookieMirror() {
   return null;
 }
 
+/**
+ * A first visit follows the device's light or dark setting (Stay, 26 October
+ * 2026, thread "Moving to v2 UI": "Device"). It was `"dark"` from the first
+ * version of this file on 13 January 2026, so a phone set to light opened
+ * dark. A reader who has picked a theme keeps it: next-themes stores the pick
+ * and reads it before this default.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="dark"
+      defaultTheme="system"
       enableSystem
       disableTransitionOnChange
     >
