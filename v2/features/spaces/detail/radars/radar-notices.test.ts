@@ -50,3 +50,23 @@ test('the Radars pill switches between the space’s active and archived Radars'
   // An archived Radar's row says so: its state reads before anything else.
   assert.match(code('v2', 'features', 'spaces', 'detail', 'radars', 'radar-rows.ts'), /if \(radar\.status === 'archived'\) return 'Archived';/);
 });
+
+test('when every Radar is archived, Active says so and points to Archived', () => {
+  const panel = code('v2', 'features', 'spaces', 'detail', 'radars', 'SpaceRadarsPanel.tsx');
+  // The archived list is asked only once Active has loaded empty.
+  assert.match(panel, /const activeEmpty = status === 'active' && query\.isSuccess && radars\.length === 0;/);
+  assert.match(panel, /enabled: activeEmpty && collabAccessState\(session\) === 'eligible',/);
+  assert.match(panel, /title=\{hasArchived \? 'No active Radars' : 'No Radars in this space yet'\}/);
+  assert.match(panel, /'Every Radar in this space is archived\. They and their reports are under Archived\.'/);
+});
+
+test('Mark unread on a report leaves it, back to where it was listed', () => {
+  const toolbar = code('v2', 'features', 'radars', 'detail', 'triage-actions.tsx');
+  assert.match(toolbar, /if \(action\.payload\.read === false\) onMarkedUnread\?\.\(\);/);
+  const report = code('v2', 'features', 'radars', 'report', 'ScanReportScreen.tsx');
+  assert.match(report, /const leaveReport = useLeaveTo\(hrefs\.radar\(radarUuid\)\);/);
+  assert.match(report, /<ScanTriageToolbar radarUuid=\{radarUuid\} scan=\{ownerScan\} onMarkedUnread=\{leaveReport\} \/>/);
+  // One step back when one of our screens is behind; the Radar's reports on a cold arrival.
+  const back = code('v2', 'runtime', 'back-to.ts');
+  assert.match(back, /export function useLeaveTo\(href: string\): \(\) => void \{[\s\S]*?if \(anythingIsBehind\(\)\) router\.back\(\);\s*else router\.push\(href\);/);
+});

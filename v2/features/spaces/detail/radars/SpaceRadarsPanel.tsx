@@ -45,6 +45,15 @@ export function SpaceRadarsPanel({ spaceUuid, canAdd }: { spaceUuid: string; can
   });
   const pages = query.data?.pages;
   const radars = useMemo(() => (pages ? uniqueRowsById(pages, (radar) => radar.uuid) : []), [pages]);
+  // AN EMPTY ACTIVE LIST IS NOT AN EMPTY SPACE (techlead, 26 October 2026):
+  // when every Radar is archived, "No Radars in this space yet" is untrue. The
+  // archived list is asked once, only then, and the empty text says so.
+  const activeEmpty = status === 'active' && query.isSuccess && radars.length === 0;
+  const archivedProbe = useInfiniteQuery({
+    ...spacesQueries.radars(spaceUuid, { viewerId: session.userId, status: 'archived' }),
+    enabled: activeEmpty && collabAccessState(session) === 'eligible',
+  });
+  const hasArchived = (archivedProbe.data?.pages[0]?.data.length ?? 0) > 0;
   // Captured once, so no clock read runs in render (React Compiler purity).
   const [now] = useState(() => Date.now());
 
@@ -64,7 +73,7 @@ export function SpaceRadarsPanel({ spaceUuid, canAdd }: { spaceUuid: string; can
           tab="radars"
           query={query}
           count={radars.length}
-          empty={<RadarsEmpty status={status} spaceUuid={spaceUuid} canAdd={canAdd} />}
+          empty={<RadarsEmpty status={status} hasArchived={hasArchived} spaceUuid={spaceUuid} canAdd={canAdd} />}
         >
           <ul className="flex flex-col">
             {radars.map((radar) => {
@@ -103,10 +112,13 @@ export function SpaceRadarsPanel({ spaceUuid, canAdd }: { spaceUuid: string; can
 
 function RadarsEmpty({
   status,
+  hasArchived,
   spaceUuid,
   canAdd,
 }: {
   status: SpaceRadarStatus;
+  /** On Active: the space has archived Radars, so it is not "yet" empty. */
+  hasArchived: boolean;
   spaceUuid: string;
   canAdd: boolean;
 }) {
@@ -122,11 +134,13 @@ function RadarsEmpty({
   return (
     <CollabEmpty
       icon={Radar}
-      title="No Radars in this space yet"
+      title={hasArchived ? 'No active Radars' : 'No Radars in this space yet'}
       description={
-        canAdd
-          ? 'A Radar checks for new law on a schedule and posts each report here, for everyone in this space.'
-          : 'Contributors and the owner add Radars here. Each report shows in this space.'
+        hasArchived
+          ? 'Every Radar in this space is archived. They and their reports are under Archived.'
+          : canAdd
+            ? 'A Radar checks for new law on a schedule and posts each report here, for everyone in this space.'
+            : 'Contributors and the owner add Radars here. Each report shows in this space.'
       }
       action={
         canAdd ? (
