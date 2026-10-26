@@ -78,3 +78,16 @@ test('the label shows where a question is asked and reviewed', () => {
   // A quiz card inside a chat answer is left as it is (techlead, 26 October 2026).
   assert.doesNotMatch(code('v2', 'features', 'conversations', 'conversation', 'cards', 'QuizCard.tsx'), /ScoringBadge|scoring/);
 });
+
+test('a 409 on saving a quiz freezes its questions only when they were played', async () => {
+  const { quizSaveConflict } = await import('@/v2/features/channels/quiz/form-model');
+  assert.equal(quizSaveConflict('questions_played'), 'frozen');
+  assert.equal(quizSaveConflict('quiz_live'), 'temporary');
+  assert.equal(quizSaveConflict('question_in_use'), 'temporary');
+  // No reason: never read as a freeze.
+  assert.equal(quizSaveConflict(undefined), 'temporary');
+  const dialog = code('v2', 'features', 'channels', 'quiz', 'QuizFormDialog.tsx');
+  assert.match(dialog, /if \(status === 409 && !metadataOnly && quizSaveConflict\(reason\) === 'frozen'\) \{\s*setFrozen\(true\);/);
+  // A passing 409 falls through to the server's sentence, with the form and its edits kept.
+  assert.match(dialog, /setError\(message\);/);
+});

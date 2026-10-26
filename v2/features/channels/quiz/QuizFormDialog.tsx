@@ -52,6 +52,7 @@ import {
   newScenario,
   QUIZ_SCENARIO_PASSAGE_MAX,
   QUIZ_SCENARIO_TITLE_MAX,
+  quizSaveConflict,
   toPayload,
   trueFalseOptions,
   validate,
@@ -330,8 +331,12 @@ export function QuizFormDialog({
     }
 
     const onError = (mutationError: Error) => {
-      const { status, message } = extractApiError(mutationError);
-      if (status === 409 && !metadataOnly) {
+      const { status, message, errors } = extractApiError(mutationError);
+      // A 409 is a freeze only when the server says the questions were played;
+      // a live game or a question in use passes, so its sentence shows and the
+      // edits stay for the next save (`quizSaveConflict`).
+      const reason = (errors as Record<string, unknown> | null)?.reason;
+      if (status === 409 && !metadataOnly && quizSaveConflict(reason) === 'frozen') {
         // The documented freeze — not a failure, a rule.
         setFrozen(true);
         setError(null);

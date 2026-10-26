@@ -238,3 +238,18 @@ export function toPayload(
     }),
   };
 }
+
+/**
+ * What a 409 on saving a quiz means (Backend, 26 October 2026: every 409 on
+ * PUT /channel-quizzes/{quiz} carries `errors.reason`):
+ *   questions_played  a game recorded answers, so the questions are frozen for
+ *                     good: the form offers to save the title and settings only
+ *   quiz_live         a game is in its lobby, countdown or play
+ *   question_in_use   the save drops a question someone is answering right now
+ * The last two pass: the form says the server's sentence, keeps every edit, and
+ * the author saves again once the game or the attempt ends. A 409 with no
+ * reason is read as passing too, never as a freeze.
+ */
+export function quizSaveConflict(reason: unknown): 'frozen' | 'temporary' {
+  return reason === 'questions_played' ? 'frozen' : 'temporary';
+}
