@@ -5,7 +5,8 @@ import { join } from 'node:path';
 
 import { screenHeld, setScreenHold } from '@/v2/runtime/screen-hold';
 import { imagesStatus, INTRO_IMAGES_TIMEOUT_MS } from './intro-images';
-import { introSeenKey, introShouldOpen, REDESIGN_INTRO_IMAGES, REDESIGN_INTRO_TITLE, type IntroInputs } from './model';
+import { slideAt, slideOffset } from './carousel';
+import { introSeenKey, introShouldOpen, REDESIGN_INTRO_IMAGES, REDESIGN_INTRO_TEXT, REDESIGN_INTRO_TITLE, type IntroInputs } from './model';
 
 /* "Lawexa, redesigned": the one-time pop-up for the switch (Stay, 25 October 2026). */
 
@@ -80,11 +81,12 @@ test('the chat and both quiz players hold; the layout mounts the pop-up with the
   assert.match(read('app', 'v2', 'layout.tsx'), /<RedesignIntro seenOnServer=\{user\?\.v2_intro_seen === true\} \/>/);
 });
 
-test('the card: the title, two buttons that both close it for good, gold only on Take a look, a picture slot', () => {
-  assert.equal(REDESIGN_INTRO_TITLE, 'Lawexa, redesigned');
+test("the card: Stay's text, one button that closes it for good, the pictures above", () => {
+  assert.equal(REDESIGN_INTRO_TITLE, 'Welcome to the new Lawexa');
+  assert.equal(REDESIGN_INTRO_TEXT, 'A cleaner look, with your chats, cases, notes and work in one place.');
   const card = read('v2', 'features', 'redesign-intro', 'RedesignIntro.tsx');
-  assert.match(card, /<Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick=\{close\}>\s*Don&apos;t show again/);
-  assert.match(card, /<Button size="sm" onClick=\{close\}>\s*Take a look/);
+  assert.match(card, /<Button className="w-full sm:w-auto sm:self-end" onClick=\{close\}>\s*Take a look/);
+  assert.doesNotMatch(card, /Don&apos;t show again/);
   // Closing marks this browser and posts the account's own mark for every other device.
   const close = card.slice(card.indexOf('const close = () => {'), card.indexOf('return (', card.indexOf('const close = () => {')));
   assert.ok(close.indexOf('markSeenHere(userId);') > 0);
@@ -92,11 +94,33 @@ test('the card: the title, two buttons that both close it for good, gold only on
   assert.match(read('lib', 'api', 'auth.ts'), /apiClient\.post<ApiResponse<\{ v2_intro_seen_at: string \}>>\('\/auth\/me\/v2-intro-seen'\)/);
   // Every way out is "seen": the ×, Escape and a tap outside go through onOpenChange.
   assert.match(card, /onOpenChange=\{\(next\) => \(next \? undefined : close\(\)\)\}/);
-  // The pictures are a list (one or three), a neutral band while it is empty; the band shows the first.
-  assert.deepEqual(REDESIGN_INTRO_IMAGES, []);
-  assert.match(card, /const first = REDESIGN_INTRO_IMAGES\[0\];/);
+  // The light pictures as WebP in public/, in Stay's order (the draft one is added once Tester retakes it).
+  assert.deepEqual(REDESIGN_INTRO_IMAGES.map((image) => image.src), ['/v2-intro/redesigned-case.webp', '/v2-intro/redesigned-statute.webp']);
+  for (const image of REDESIGN_INTRO_IMAGES) {
+    assert.ok(image.alt.length > 0, image.src);
+    assert.ok(readFileSync(join(process.cwd(), 'public', image.src)).length < 80 * 1024, `${image.src} stays small`);
+  }
+  // They slide, with snap points and grey dots (never gold).
+  assert.match(card, /className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain outline-none/);
+  assert.match(card, /position === index \? 'bg-foreground\/70' : 'bg-foreground\/20 hover:bg-foreground\/40'/);
   // Loaded before the card may open, and only for a reader it is for.
   assert.match(card, /const images = useIntroImages\(REDESIGN_INTRO_IMAGES, account && !seenOnServer && !seenHere\);/);
   assert.match(card, /aspect-\[1200\/630\] w-full items-center justify-center bg-secondary/);
   assert.doesNotMatch(card, /amber|emerald|destructive/);
+});
+
+test('the picture strip: which picture shows for a scroll, and where a dot takes it', () => {
+  // A 576px strip of three pictures.
+  assert.equal(slideAt(0, 576, 3), 0);
+  assert.equal(slideAt(300, 576, 3), 1);
+  assert.equal(slideAt(1152, 576, 3), 2);
+  // Past either end it stays on the first or the last.
+  assert.equal(slideAt(-40, 576, 3), 0);
+  assert.equal(slideAt(5000, 576, 3), 2);
+  assert.equal(slideOffset(2, 576, 3), 1152);
+  assert.equal(slideOffset(5, 576, 3), 1152);
+  assert.equal(slideOffset(-1, 576, 3), 0);
+  // No pictures, or a strip not laid out yet.
+  assert.equal(slideAt(100, 0, 3), 0);
+  assert.equal(slideOffset(1, 576, 0), 0);
 });

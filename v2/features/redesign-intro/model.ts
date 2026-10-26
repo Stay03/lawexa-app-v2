@@ -4,8 +4,8 @@
  *
  * Shown once to a signed-in account, the first time it opens the new design,
  * and never over an answer that is being written or a quiz being played.
- * Every way out of it counts as seen: "Take a look", "Don't show again", the
- * ×, Escape and a tap outside. It does not come back.
+ * Every way out of it counts as seen: "Take a look", the ×, Escape and a tap
+ * outside. It does not come back.
  *
  * WHERE "SEEN" LIVES. Per account, so a reader who closes it on a phone does
  * not meet it again on a computer: the account's own user record carries
@@ -15,9 +15,10 @@
  * the field yet (a missing key is "not known", never "seen").
  */
 
-export const REDESIGN_INTRO_TITLE = 'Lawexa, redesigned';
-export const REDESIGN_INTRO_TEXT =
-  'A cleaner chat, drafts that open beside the case you are reading, and your notes and quizzes in one place.';
+// Stay, 26 October 2026 (00:25 UTC): the text as the techlead wrote it. The
+// pictures already say "Lawexa, redesigned.", so the title does not repeat it.
+export const REDESIGN_INTRO_TITLE = 'Welcome to the new Lawexa';
+export const REDESIGN_INTRO_TEXT = 'A cleaner look, with your chats, cases, notes and work in one place.';
 
 /** One of the pop-up's pictures, 1200 x 630, in public/. */
 export interface IntroImage {
@@ -26,13 +27,19 @@ export interface IntroImage {
 }
 
 /**
- * The pop-up's pictures, in order. Stay picked three light ones (25 October
- * 2026); the files come from Tester. Empty: the pop-up draws a neutral band
- * of the same shape. Every one is loaded before the pop-up may open
- * (intro-images.ts). How three are shown (a carousel, or one at a time)
- * waits on Stay; until then the band shows the first.
+ * The pop-up's pictures, in order, light only (Stay, 25 October 2026: pictures
+ * 2, 3 and 6). WebP files in public/v2-intro/, made from Tester's PNGs. They
+ * slide one after another, with dots under them (Stay picked A, 26 October
+ * 2026). Every one is loaded before the pop-up may open (intro-images.ts).
+ * Empty: a neutral band of the same shape.
+ *
+ * Picture 6 (the draft beside the case) is retaken by Tester with the calmer
+ * Save button, then added here as the third.
  */
-export const REDESIGN_INTRO_IMAGES: readonly IntroImage[] = [];
+export const REDESIGN_INTRO_IMAGES: readonly IntroImage[] = [
+  { src: '/v2-intro/redesigned-case.webp', alt: 'A case on a phone and a computer in the new design' },
+  { src: '/v2-intro/redesigned-statute.webp', alt: 'A statute with its contents on a phone and a computer in the new design' },
+];
 
 /** This browser's mark for one account. */
 export function introSeenKey(userId: number): string {

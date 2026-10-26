@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { isAccountRole } from '@/v2/runtime/account';
 import { useScreenHeld } from '@/v2/runtime/screen-hold';
 import { useIntroImages } from './intro-images';
+import { slideAt, slideOffset } from './carousel';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LogoMark } from '@/v2/shell/Logo';
@@ -69,10 +70,10 @@ export function RedesignIntro({ seenOnServer }: { seenOnServer: boolean }) {
           (event.currentTarget as HTMLElement | null)?.focus();
           setShowing(true);
         }}
-        className="flex flex-col gap-0 overflow-hidden p-0 outline-none sm:max-w-md"
+        className="flex flex-col gap-0 overflow-hidden p-0 outline-none sm:max-w-xl"
       >
         <div className="relative shrink-0">
-          <IntroPicture />
+          <IntroPictures />
           <button
             type="button"
             onClick={close}
@@ -92,14 +93,10 @@ export function RedesignIntro({ seenOnServer }: { seenOnServer: boolean }) {
             <DialogDescription className="text-sm leading-6 text-muted-foreground">{REDESIGN_INTRO_TEXT}</DialogDescription>
           </div>
 
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={close}>
-              Don&apos;t show again
-            </Button>
-            <Button size="sm" onClick={close}>
-              Take a look
-            </Button>
-          </div>
+          {/* One button (Stay, 26 October 2026): it closes the pop-up and marks it seen. */}
+          <Button className="w-full sm:w-auto sm:self-end" onClick={close}>
+            Take a look
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -107,26 +104,79 @@ export function RedesignIntro({ seenOnServer }: { seenOnServer: boolean }) {
 }
 
 /**
- * The first picture (already loaded, intro-images.ts), or a neutral band of
- * the same shape when there are none. How several are shown waits on Stay.
+ * The pictures (already loaded, intro-images.ts), sliding one after another:
+ * a swipe or a scroll moves between them, each stops in place, and the dots
+ * under them say which one shows and jump to one (Stay picked A, 26 October
+ * 2026). Arrow keys move too once the strip has focus. Greys only: the dots
+ * are not gold. One picture: no dots. None: a neutral band of the same shape.
  */
-function IntroPicture() {
-  const first = REDESIGN_INTRO_IMAGES[0];
-  if (first) {
+function IntroPictures() {
+  const [index, setIndex] = useState(0);
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const count = REDESIGN_INTRO_IMAGES.length;
+
+  if (count === 0) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- fixed 1200x630 pictures in public/, loaded before the card opens: next/image would add a wrapper and lazy loading to a card that is already on screen.
-      <img
-        src={first.src}
-        alt={first.alt}
-        width={1200}
-        height={630}
-        className="aspect-[1200/630] w-full object-cover"
-      />
+      <div aria-hidden className="flex aspect-[1200/630] w-full items-center justify-center bg-secondary">
+        <LogoMark alt="" className="size-12 opacity-40 grayscale" />
+      </div>
     );
   }
+
+  const go = (next: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    track.scrollTo({ left: slideOffset(next, track.clientWidth, count), behavior: reduced ? 'auto' : 'smooth' });
+  };
+
   return (
-    <div aria-hidden className="flex aspect-[1200/630] w-full items-center justify-center bg-secondary">
-      <LogoMark alt="" className="size-12 opacity-40 grayscale" />
+    <div>
+      <div
+        ref={trackRef}
+        role="region"
+        aria-roledescription="carousel"
+        aria-label="What is new"
+        tabIndex={count > 1 ? 0 : -1}
+        onScroll={(event) => setIndex(slideAt(event.currentTarget.scrollLeft, event.currentTarget.clientWidth, count))}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowRight') go(index + 1);
+          if (event.key === 'ArrowLeft') go(index - 1);
+        }}
+        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain outline-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {REDESIGN_INTRO_IMAGES.map((image, position) => (
+          // eslint-disable-next-line @next/next/no-img-element -- fixed 1200x630 pictures in public/, loaded before the card opens: next/image would add a wrapper and lazy loading to a card that is already on screen.
+          <img
+            key={image.src}
+            src={image.src}
+            alt={image.alt}
+            width={1200}
+            height={630}
+            aria-roledescription="slide"
+            aria-label={`${position + 1} of ${count}`}
+            className="aspect-[1200/630] w-full shrink-0 snap-center object-cover"
+          />
+        ))}
+      </div>
+      {count > 1 ? (
+        <div className="flex justify-center gap-2 pt-3">
+          {REDESIGN_INTRO_IMAGES.map((image, position) => (
+            <button
+              key={image.src}
+              type="button"
+              aria-label={`Picture ${position + 1} of ${count}`}
+              aria-current={position === index ? 'true' : undefined}
+              onClick={() => go(position)}
+              className={cn(
+                'v2-interactive size-2 rounded-full transition-colors',
+                position === index ? 'bg-foreground/70' : 'bg-foreground/20 hover:bg-foreground/40',
+                FOCUS_RING,
+              )}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
