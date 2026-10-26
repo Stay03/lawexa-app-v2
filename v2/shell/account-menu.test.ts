@@ -13,11 +13,13 @@ const footer = read('v2', 'shell', 'V2UserFooter.tsx');
 const menu = read('v2', 'shell', 'V2HeaderMenu.tsx');
 const code = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-test('the account row opens a menu: Profile, Settings, Theme, Admin for an admin, the legal pages, Sign out', () => {
+test('the account row opens a menu: Profile, Settings, Pricing, Theme, Admin for an admin, the legal pages, Sign out', () => {
   assert.match(footer, /<DropdownMenuTrigger asChild>\s*<button\s+type="button"/);
   const rows = [...footer.matchAll(/<span(?: className="flex-1")?>([A-Z][A-Za-z ]+)<\/span>/g)].map((m) => m[1]);
-  assert.deepEqual(rows, ['Profile', 'Settings', 'Theme', 'Admin', 'Privacy policy', 'Terms of service', 'Sign out']);
-  for (const href of ['/settings/profile', '/settings', '/privacy', '/terms']) {
+  assert.deepEqual(rows, ['Profile', 'Settings', 'Pricing', 'Theme', 'Admin', 'Privacy policy', 'Terms of service', 'Sign out']);
+  // Pricing for every account, free or paid (Stay, 26 October 2026, 08:36 UTC).
+  assert.doesNotMatch(footer, /\{showUpgrade \? \(\s*<DropdownMenuItem/);
+  for (const href of ['/settings/profile', '/settings', '/pricing', '/privacy', '/terms']) {
     assert.match(footer, new RegExp(`<Link href="${href}" onClick=\\{\\(\\) => onNavigate\\?\\.\\('${href}'\\)\\}>`), href);
   }
   // Admin only for an admin, and loaded, since the admin pages are in the classic app.

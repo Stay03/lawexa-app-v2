@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from 'next-themes';
-import { FileText, LogOut, Moon, Settings, Shield, ShieldCheck, Sun, SunMoon, UserRound } from 'lucide-react';
+import { FileText, LogOut, Moon, Settings, Shield, ShieldCheck, Sun, SunMoon, Tag, UserRound } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -65,6 +65,8 @@ import { useMounted } from './use-mounted';
  * Settings, Theme, Admin for an admin, the privacy policy and terms, and Sign
  * out (Stay approved the list, 03:51 UTC). Theme and Settings came
  * here from the bar's ⋮, which now carries only a screen's own actions.
+ * Pricing follows Settings for every account (Stay, 08:36 UTC: "Add pricing
+ * to that menu"): a paid reader may want to compare or change plan.
  *
  * UPGRADE sits beside the row for a free account, as v1's did, and only once
  * the plan has loaded, so a paid account never sees it flash.
@@ -221,6 +223,12 @@ export function V2UserFooter({
             <Link href="/settings" onClick={() => onNavigate?.('/settings')}>
               <Settings className="text-muted-foreground" />
               <span>Settings</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild className="min-h-11 md:min-h-8">
+            <Link href="/pricing" onClick={() => onNavigate?.('/pricing')}>
+              <Tag className="text-muted-foreground" />
+              <span>Pricing</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
