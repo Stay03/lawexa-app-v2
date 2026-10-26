@@ -139,7 +139,8 @@ function RadarsEmpty({
         hasArchived
           ? 'Every Radar in this space is archived. They and their reports are under Archived.'
           : canAdd
-            ? 'A Radar checks for new law on a schedule and posts each report here, for everyone in this space.'
+            ? // Arthur's words, 26 October 2026 (thread b2cacd2d).
+              'A Radar tracks laws, regulators, and topics affecting matters in this space'
             : 'Contributors and the owner add Radars here. Each report shows in this space.'
       }
       action={

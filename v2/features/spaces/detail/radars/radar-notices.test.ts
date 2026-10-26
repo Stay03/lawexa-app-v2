@@ -70,3 +70,9 @@ test('Mark unread on a report leaves it, back to where it was listed', () => {
   const back = code('v2', 'runtime', 'back-to.ts');
   assert.match(back, /export function useLeaveTo\(href: string\): \(\) => void \{[\s\S]*?if \(anythingIsBehind\(\)\) router\.back\(\);\s*else router\.push\(href\);/);
 });
+
+test('an empty Radars pill says what a Radar is in Arthur’s words', () => {
+  const panel = code('v2', 'features', 'spaces', 'detail', 'radars', 'SpaceRadarsPanel.tsx');
+  assert.match(panel, /'A Radar tracks laws, regulators, and topics affecting matters in this space'/);
+  assert.doesNotMatch(panel, /A Radar checks for new law on a schedule/);
+});
