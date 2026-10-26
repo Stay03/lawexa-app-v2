@@ -10,6 +10,7 @@ import {
   radarsQueries,
   scanListPollInterval,
 } from './queries';
+import { useRadarScope } from './scope-context';
 
 /**
  * useRadarScans — one workflow tab's scan list, with the two behaviours the
@@ -45,11 +46,12 @@ export function useRadarScans(
 ) {
   const { signedIn, userId: viewerId, role } = useV2Session();
   const queryClient = useQueryClient();
+  const scope = useRadarScope();
   const { awaitingFirstScan = false, enabled = true } = options;
   const authEnabled = signedIn && role !== 'guest';
 
   const query = useInfiniteQuery({
-    ...radarsQueries.infiniteScans(radarUuid, { ...params, viewerId }),
+    ...radarsQueries.infiniteScans(radarUuid, { ...params, viewerId, scope }),
     enabled: authEnabled && enabled && !!radarUuid,
     refetchInterval: (activeQuery) =>
       scanListPollInterval(activeQuery) ||

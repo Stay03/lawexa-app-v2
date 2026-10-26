@@ -16,7 +16,8 @@ import type {
 } from '@/types/radar';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { radarsQueries } from './queries';
-import { PERSONAL_RADAR_SCOPE, radarCalls, type RadarScope } from './scope';
+import { radarCalls, type RadarScope } from './scope';
+import { useRadarScope } from './scope-context';
 
 /**
  * useTriageScan — v1's optimistic triage engine (`lib/hooks/useRadars.ts`),
@@ -128,9 +129,11 @@ function patchScanEverywhere(
 
 export function useTriageScan() {
   const queryClient = useQueryClient();
+  // The screen's scope, unless the caller names one (`scope-context`).
+  const screenScope = useRadarScope();
 
   return useMutation({
-    mutationFn: ({ radarUuid, scanUuid, payload, scope = PERSONAL_RADAR_SCOPE }: TriageScanVariables) =>
+    mutationFn: ({ radarUuid, scanUuid, payload, scope = screenScope }: TriageScanVariables) =>
       radarCalls(scope).triageScan(radarUuid, scanUuid, payload),
 
     onMutate: async ({ radarUuid, scanUuid, payload }) => {
@@ -257,8 +260,8 @@ export function useTriageScan() {
     // A Space's feed rows and its Radars list carry the report's read and
     // triage state too; they re-read rather than guess (the feed is cursor
     // paged, the list holds the newest report only).
-    onSettled: (_data, _error, { scope }) => {
-      if (scope?.kind !== 'space') return;
+    onSettled: (_data, _error, { scope = screenScope }) => {
+      if (scope.kind !== 'space') return;
       void queryClient.invalidateQueries({ queryKey: spacesQueries.itemsOf(scope.spaceUuid) });
       void queryClient.invalidateQueries({ queryKey: spacesQueries.radarsOf(scope.spaceUuid) });
     },

@@ -2,10 +2,12 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { radarsApi } from '@/lib/api/radars';
 import type { RadarDetailResponse, UpdateRadarPayload } from '@/types/radar';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { radarsQueries } from './queries';
+import { radarCalls, type RadarScope } from './scope';
+import { useRadarScope } from './scope-context';
 
 /**
  * actions.ts — THE radar action layer. v1 implemented scan-now / pause /
@@ -27,6 +29,16 @@ import { radarsQueries } from './queries';
  * visible rather than papered over with a guess that would need rollback.
  */
 
+/**
+ * WHERE THE CALL GOES (Radar in Spaces, 26 October 2026). Each hook reads the
+ * Radar's scope from the screen (`scope-context`): a personal screen has none
+ * and calls `/radars/...`; the space's Radar page calls `/spaces/{s}/radars/...`.
+ * A space Radar's action also refreshes the space's Radars list.
+ */
+function spaceListKeys(scope: RadarScope) {
+  return scope.kind === 'space' ? [spacesQueries.radarsOf(scope.spaceUuid)] : [];
+}
+
 /** Write the mutation's returned radar into every cached detail entry for it. */
 function useWriteRadarDetail() {
   const queryClient = useQueryClient();
@@ -45,8 +57,9 @@ function useWriteRadarDetail() {
  */
 export function useScanNow() {
   const queryClient = useQueryClient();
+  const scope = useRadarScope();
   return useMutation({
-    mutationFn: (uuid: string) => radarsApi.scanNow(uuid),
+    mutationFn: (uuid: string) => radarCalls(scope).scanNow(uuid),
     onSuccess: (_response, uuid) => {
       toast.success('Scan dispatched', {
         description: 'The report will land in the inbox shortly.',
@@ -63,9 +76,10 @@ export function useScanNow() {
 
 export function usePauseRadar() {
   const writeDetail = useWriteRadarDetail();
+  const scope = useRadarScope();
   return useMutation({
-    mutationFn: (uuid: string) => radarsApi.pause(uuid),
-    meta: { invalidates: [radarsQueries.lists()] },
+    mutationFn: (uuid: string) => radarCalls(scope).pause(uuid),
+    meta: { invalidates: [radarsQueries.lists(), ...spaceListKeys(scope)] },
     onSuccess: (response) => {
       writeDetail(response);
       toast.success('Radar paused', {
@@ -77,9 +91,10 @@ export function usePauseRadar() {
 
 export function useResumeRadar() {
   const writeDetail = useWriteRadarDetail();
+  const scope = useRadarScope();
   return useMutation({
-    mutationFn: (uuid: string) => radarsApi.resume(uuid),
-    meta: { invalidates: [radarsQueries.lists()] },
+    mutationFn: (uuid: string) => radarCalls(scope).resume(uuid),
+    meta: { invalidates: [radarsQueries.lists(), ...spaceListKeys(scope)] },
     onSuccess: (response) => {
       writeDetail(response);
       toast.success('Radar resumed', {
@@ -96,10 +111,12 @@ export function useResumeRadar() {
  */
 export function useArchiveRadar() {
   const queryClient = useQueryClient();
+  const scope = useRadarScope();
   return useMutation({
-    mutationFn: (uuid: string) => radarsApi.archive(uuid),
+    mutationFn: (uuid: string) => radarCalls(scope).archive(uuid),
     onSuccess: (_response, uuid) => {
       void queryClient.invalidateQueries({ queryKey: radarsQueries.lists() });
+      for (const queryKey of spaceListKeys(scope)) void queryClient.invalidateQueries({ queryKey });
       queryClient.removeQueries({
         queryKey: [...radarsQueries.details(), uuid],
       });
@@ -112,6 +129,7 @@ export function useArchiveRadar() {
  *  refresh through the invalidation channel (the name may have changed). */
 export function useUpdateRadar() {
   const writeDetail = useWriteRadarDetail();
+  const scope = useRadarScope();
   return useMutation({
     mutationFn: ({
       uuid,
@@ -119,9 +137,17 @@ export function useUpdateRadar() {
     }: {
       uuid: string;
       payload: UpdateRadarPayload;
-    }) => radarsApi.update(uuid, payload),
+    }) => {
+      // The space routes refuse `channels`: a space Radar's reports reach its members.
+      if (scope.kind === 'space') {
+        const spacePayload = { ...payload };
+        delete spacePayload.channels;
+        return radarCalls(scope).update(uuid, spacePayload);
+      }
+      return radarCalls(scope).update(uuid, payload);
+    },
     meta: {
-      invalidates: [radarsQueries.lists()],
+      invalidates: [radarsQueries.lists(), ...spaceListKeys(scope)],
       // The settings form renders 422 validation errors on its own fields —
       // a toast on top of an inline error would double-report it.
       silentError: true,

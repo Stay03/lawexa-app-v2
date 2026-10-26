@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   FileSearch,
   ListChecks,
+  PauseCircle,
   Radar as RadarIcon,
   TriangleAlert,
   WifiOff,
@@ -70,15 +71,48 @@ function PageState({
  * definition not a failed newest scan. When the radar is PAUSED the copy stops
  * promising a retry that will never fire and says what to do instead.
  */
+/**
+ * The schedule is held because whoever pays has no messages left
+ * (`schedule_state: 'no_balance'`, Backend, 26 October 2026). For a space
+ * Radar that is the space's owner, so the reader is told whose balance it is
+ * and is offered nothing to buy; for a personal Radar it is the reader's own.
+ */
+export function ScheduleOnHoldNotice({ payer }: { payer: 'space_owner' | 'self' }) {
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+    >
+      <PauseCircle aria-hidden className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+      <div className="min-w-0 flex-1 text-sm">
+        <p className="font-medium text-foreground">Scans are on hold</p>
+        <p className="mt-0.5 text-muted-foreground">
+          {payer === 'space_owner'
+            ? "The space's owner has no AI messages left. Scans start again once the owner has messages."
+            : 'You have no AI messages left. Scans start again once you have messages.'}
+        </p>
+        {payer === 'self' ? (
+          <Button asChild size="sm" variant="outline" className="mt-2">
+            <Link href="/settings/message-packs">Get messages</Link>
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function ScanGapNotice({
   status,
   when,
   radarPaused,
+  payer = 'self',
 }: {
   status: 'failed' | 'skipped_no_balance';
   /** `agoLabel` of the failed run, or '' when the timestamp is absent. */
   when: string;
   radarPaused: boolean;
+  /** Whose balance a skip ran out of: a space Radar's scans are the space owner's. */
+  payer?: 'space_owner' | 'self';
 }) {
   const title =
     status === 'failed'
@@ -87,7 +121,9 @@ export function ScanGapNotice({
   const cause =
     status === 'failed'
       ? `Something went wrong${when ? ` ${when}` : ''}.`
-      : `Your account was out of scan credit${when ? ` ${when}` : ''}.`;
+      : payer === 'space_owner'
+        ? `The space's owner was out of AI messages${when ? ` ${when}` : ''}.`
+        : `Your account was out of scan credit${when ? ` ${when}` : ''}.`;
   const onward = radarPaused
     ? 'This radar is paused, so nothing will retry until you resume it.'
     : status === 'failed'
@@ -182,15 +218,19 @@ export function RadarErrorState({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export function RadarNotFoundState() {
+export function RadarNotFoundState({ inSpace = false, backHref = '/radars' }: { inSpace?: boolean; backHref?: string }) {
   return (
     <PageState
       icon={RadarIcon}
       title="Radar not found"
-      description="It may have been archived, or it belongs to another account."
+      description={
+        inSpace
+          ? 'It may have been archived, or it is not in this space.'
+          : 'It may have been archived, or it belongs to another account.'
+      }
       action={
         <Button asChild variant="outline" size="sm">
-          <Link href="/radars">Back to radars</Link>
+          <Link href={backHref}>{inSpace ? "Back to the space's Radars" : 'Back to radars'}</Link>
         </Button>
       }
     />

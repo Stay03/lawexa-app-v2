@@ -49,6 +49,7 @@ import {
 import { RADAR_STATUS, agoLabel, radarMetaParts } from '../model';
 import { RadarTabs, type RadarTab } from '../RadarTabs';
 import { useRadarScans } from '../use-radar-scans';
+import { radarHrefs, useRadarScope } from '../scope-context';
 import {
   RadarsGuestState,
   RadarsSignedOutState,
@@ -61,6 +62,7 @@ import {
   RadarErrorState,
   RadarNotFoundState,
   ScanGapNotice,
+  ScheduleOnHoldNotice,
   ScanListEmptyState,
   ScanListErrorState,
   ScanListSkeleton,
@@ -131,6 +133,9 @@ export function RadarScreen({ radarUuid }: { radarUuid: string }) {
 function RadarBody({ radarUuid }: { radarUuid: string }) {
   const { signedIn, role } = useV2Session();
   const router = useRouter();
+  // Personal, or the space's Radar page (`scope-context`): the same screen.
+  const scope = useRadarScope();
+  const hrefs = radarHrefs(scope);
   const searchParams = useSearchParams();
 
   // Quiet-URL state — initialised from the URL once, then locally owned.
@@ -275,7 +280,7 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
     return (
       <div className={LIST_COLUMN}>
         {notFound ? (
-          <RadarNotFoundState />
+          <RadarNotFoundState inSpace={scope.kind === 'space'} backHref={hrefs.list} />
         ) : (
           <RadarErrorState onRetry={() => void radarQuery.refetch()} />
         )}
@@ -285,6 +290,11 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
 
   const statusConfig = RADAR_STATUS[radar.status];
   const meta = radarMetaParts(radar, now);
+  // What the reader may do, from the server (a personal Radar has no flags
+  // and is the reader's own). The creator and the space's Owners and Admins
+  // manage a space Radar; an Owner or Contributor triages its reports.
+  const canManage = radar.can_manage ?? true;
+  const canTriage = radar.can_triage ?? true;
 
   // ── THE LOUD FAILURE (owner, August 3 2026) ───────────────────────────────
   // Derived from the ALWAYS-MOUNTED inbox data, so it speaks on every tab.
@@ -401,6 +411,15 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
             </p>
           ) : null}
 
+          {/* A space Radar names its space and who made it: it is everyone's
+              in the space, so "whose is this" is a real question. */}
+          {radar.space ? (
+            <p className="text-xs text-muted-foreground">
+              {`In ${radar.space.name}`}
+              {radar.creator ? ` · made by ${radar.creator.name}` : null}
+            </p>
+          ) : null}
+
           <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             {meta.map((part, partIndex) => (
               <span key={part} className="inline-flex items-center gap-2">
@@ -414,7 +433,7 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
             ))}
           </p>
 
-          {radar.status !== 'archived' ? (
+          {radar.status !== 'archived' && canManage ? (
             <div className="flex items-center gap-2 pt-1">
               {radar.status === 'paused' ? (
                 <Button
@@ -501,6 +520,12 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
           ) : null}
         </header>
 
+        {radar.schedule_state === 'no_balance' ? (
+          <div className="mt-4">
+            <ScheduleOnHoldNotice payer={scope.kind === 'space' ? 'space_owner' : 'self'} />
+          </div>
+        ) : null}
+
         {scanGap ? (
           <div className="mt-4">
             <ScanGapNotice
@@ -509,6 +534,7 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
               }
               when={agoLabel(scanGap.started_at ?? scanGap.created_at, now)}
               radarPaused={radar.status !== 'active'}
+              payer={scope.kind === 'space' ? 'space_owner' : 'self'}
             />
           </div>
         ) : null}
@@ -567,6 +593,7 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
                     scan={scan}
                     context={tab === 'activity' ? 'activity' : 'workflow'}
                     now={now}
+                    canTriage={canTriage}
                   />
                 ))}
               </ul>
@@ -595,7 +622,7 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
         open={archiveOpen}
         onOpenChange={setArchiveOpen}
         radar={radar}
-        onArchived={() => router.push('/radars')}
+        onArchived={() => router.push(hrefs.list)}
       />
     </div>
   );

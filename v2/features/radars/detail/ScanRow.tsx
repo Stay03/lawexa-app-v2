@@ -15,6 +15,7 @@ import { formatScanDuration } from '@/lib/utils/duration';
 import type { RadarScan } from '@/types/radar';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { SCAN_STATUS, agoLabel, exactTime } from '../model';
+import { radarHrefs, useRadarScope } from '../scope-context';
 import { ScanTriageMenuItems } from './triage-actions';
 
 /**
@@ -38,13 +39,20 @@ export const ScanRow = memo(function ScanRow({
   scan,
   context,
   now,
+  canTriage = true,
 }: {
   radarUuid: string;
   scan: RadarScan;
   context: 'workflow' | 'activity';
   /** Frozen clock from the screen root. */
   now: number;
+  /** May mark this report read, priority, complete or archived (a space
+   *  Radar's `can_triage`). Without it the row has no actions menu. */
+  canTriage?: boolean;
 }) {
+  // A space Radar's report opens inside the space, and only its owner buys
+  // messages, so the skip row's purchase link is the personal Radar's alone.
+  const scope = useRadarScope();
   const isUnread = scan.read_at === null;
   const readable = scan.status === 'completed';
   const timestamp =
@@ -161,7 +169,7 @@ export const ScanRow = memo(function ScanRow({
     <li className="group relative flex items-start gap-2">
       {readable ? (
         <Link
-          href={`/radars/${radarUuid}/scans/${scan.uuid}`}
+          href={radarHrefs(scope).report(radarUuid, scan.uuid)}
           className={cn(
             'v2-interactive min-w-0 flex-1 rounded-lg px-2 py-3 transition-colors hover:bg-secondary/50',
             FOCUS_RING,
@@ -174,7 +182,7 @@ export const ScanRow = memo(function ScanRow({
       )}
 
       {/* A no-balance skip's one useful action, in the row that reports it. */}
-      {context === 'activity' && scan.status === 'skipped_no_balance' ? (
+      {context === 'activity' && scan.status === 'skipped_no_balance' && scope.kind === 'personal' ? (
         <Link
           href="/settings/message-packs"
           className={cn(
@@ -187,7 +195,7 @@ export const ScanRow = memo(function ScanRow({
         </Link>
       ) : null}
 
-      {context === 'workflow' ? (
+      {context === 'workflow' && canTriage ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button

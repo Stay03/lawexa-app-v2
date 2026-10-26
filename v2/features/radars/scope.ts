@@ -71,3 +71,28 @@ export function radarCalls(scope: RadarScope): RadarCalls {
     unpublishScan: (radarUuid, scanUuid) => spaceRadarsApi.unpublishScan(spaceUuid, radarUuid, scanUuid),
   };
 }
+
+/** The addresses a Radar screen links to, for where the Radar lives. */
+export interface RadarHrefs {
+  /** Where "up" is, and where an archived Radar leaves to. */
+  list: string;
+  radar: (radarUuid: string) => string;
+  report: (radarUuid: string, scanUuid: string) => string;
+}
+
+export function radarHrefs(scope: RadarScope): RadarHrefs {
+  if (scope.kind === 'personal') {
+    return {
+      list: '/radars',
+      radar: (radarUuid) => `/radars/${radarUuid}`,
+      report: (radarUuid, scanUuid) => `/radars/${radarUuid}/scans/${scanUuid}`,
+    };
+  }
+  const space = `/spaces/${encodeURIComponent(scope.spaceUuid)}`;
+  return {
+    list: `${space}?tab=radars`,
+    radar: (radarUuid) => `${space}/radars/${encodeURIComponent(radarUuid)}`,
+    report: (radarUuid, scanUuid) =>
+      `${space}/radars/${encodeURIComponent(radarUuid)}/scans/${encodeURIComponent(scanUuid)}`,
+  };
+}

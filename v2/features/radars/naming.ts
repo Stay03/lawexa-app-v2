@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { radarsQueries } from './queries';
+import { useRadarScope } from './scope-context';
 
 /**
  * naming.ts — the async AI-naming flow, made VISIBLE.
@@ -110,10 +111,11 @@ export function useFirstScanDispatched(radarUuid: string): boolean {
 export function useRadarDetail(radarUuid: string, enabled = true) {
   const { signedIn, userId: viewerId, role } = useV2Session();
   const queryClient = useQueryClient();
+  const scope = useRadarScope();
   const authEnabled = signedIn && role !== 'guest';
 
   return useQuery({
-    ...radarsQueries.detail(radarUuid, { viewerId }),
+    ...radarsQueries.detail(radarUuid, { viewerId, scope }),
     enabled: authEnabled && enabled && !!radarUuid,
     refetchInterval: (query) => {
       const pending = queryClient.getQueryData<PendingName>(

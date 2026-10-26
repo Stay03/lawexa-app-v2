@@ -17,6 +17,7 @@ import type { CreateRadarPayload, Radar } from '@/types/radar';
 import { usePauseRadar, useResumeRadar, useUpdateRadar } from '../actions';
 import { ArchiveRadarDialog } from '../ArchiveRadarDialog';
 import { RadarForm, type RadarFormHelpers } from '../create/RadarForm';
+import { radarHrefs, useRadarScope } from '../scope-context';
 
 /**
  * SettingsSheet — the radar's settings as a sheet OVER the detail (the
@@ -38,6 +39,7 @@ export function SettingsSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
+  const scope = useRadarScope();
   const updateRadar = useUpdateRadar();
   const pauseRadar = usePauseRadar();
   const resumeRadar = useResumeRadar();
@@ -90,6 +92,7 @@ export function SettingsSheet({
             key={`${radar.uuid}:${radar.updated_at}`}
             mode="edit"
             radar={radar}
+            space={radar.space ?? undefined}
             isSubmitting={updateRadar.isPending}
             submitLabel="Save changes"
             onSubmit={handleSubmit}
@@ -161,7 +164,7 @@ export function SettingsSheet({
         radar={radar}
         onArchived={() => {
           onOpenChange(false);
-          router.push('/radars');
+          router.push(radarHrefs(scope).list);
         }}
       />
     </Sheet>
