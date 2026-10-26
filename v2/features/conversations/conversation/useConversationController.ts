@@ -33,6 +33,8 @@ import { goneOnServer } from './gone';
 import { markGoneOnServer, useGoneMark } from './gone-marks';
 import { ConfidentialConversationError, conversationsQueries } from '../queries';
 import { spacesQueries } from '@/v2/features/spaces/queries';
+import { radarsQueries } from '@/v2/features/radars/queries';
+import { radarToolChangesRadars } from '@/v2/features/radars/radar-tools';
 import type { RosterEntry } from './member-colour';
 import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
@@ -488,6 +490,14 @@ export function useConversationController(
       });
       if (isConfidentialMark(conversationId)) return;
       void queryClient.invalidateQueries({ queryKey: detailKey });
+    },
+    // Lawexa made or changed a Radar in this chat (a space's Radars box,
+    // Stay 26 October 2026): the Radar lists re-ask, the Radar page's and every
+    // space's Radars pill, so going back shows it.
+    onToolComplete: (event) => {
+      if (!radarToolChangesRadars(event.tool_call.name)) return;
+      void queryClient.invalidateQueries({ queryKey: radarsQueries.all });
+      void queryClient.invalidateQueries({ queryKey: spacesQueries.allRadars() });
     },
     onError: () => setRefusedTurn(null),
     onCancelled: () => setRefusedTurn(null),

@@ -40,7 +40,9 @@ test('the home composer in a space offers no private modes and says a refusal in
   const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
   assert.doesNotMatch(dock, /studyMode/);
   assert.match(dock, /space=\{space\}/);
-  assert.match(dock, /placeholder=\{SPACE_COMPOSER_PLACEHOLDER\}/);
+  // The space's line unless the pill passes its own (the Radars pill).
+  assert.match(dock, /placeholder = SPACE_COMPOSER_PLACEHOLDER,/);
+  assert.match(dock, /placeholder=\{placeholder\}/);
   assert.match(dock, /export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Space\?';/);
   // Its own draft, never the home's shared one.
   assert.match(dock, /const \[value, setValue\] = useState\(''\);/);
@@ -72,13 +74,14 @@ test('the home has the message box at its bottom, for the Owner and Contributors
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   // On All, Conversations and Folders; not on People (Arthur, 24 October
   // 2026: "The folder tab in spaces should also have the chat composer",
-  // reversing his 17 October item 2; the Files pill is gone). Hidden, still
-  // mounted, while files are ticked (bulk select part 3).
+  // reversing his 17 October item 2; the Files pill is gone). On Radars too,
+  // asking what to watch (Stay, 26 October 2026). Hidden, still mounted, while
+  // files are ticked (bulk select part 3).
   assert.match(
     panel,
-    /\{access\.canAdd && DOCK_TABS\.has\(tab\) \? \([\s\S]{0,240}?<div className=\{selecting \? 'hidden' : 'contents'\}>\s*<SpaceChatDock space=\{\{ uuid: space\.uuid, name: space\.name \}\} handle=\{dock\} \/>\s*<\/div>\s*\) : null\}/,
+    /\{access\.canAdd && DOCK_TABS\.has\(tab\) \? \([\s\S]{0,240}?<div className=\{selecting \? 'hidden' : 'contents'\}>\s*<SpaceChatDock\s+space=\{\{ uuid: space\.uuid, name: space\.name \}\}\s+handle=\{dock\}\s+placeholder=\{tab === 'radars' \? SPACE_RADAR_COMPOSER_PLACEHOLDER : SPACE_COMPOSER_PLACEHOLDER\}\s*\/>\s*<\/div>\s*\) : null\}/,
   );
-  assert.match(panel, /const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>\(\['all', 'conversations', 'folders'\]\);/);
+  assert.match(panel, /const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>\(\['all', 'conversations', 'folders', 'radars'\]\);/);
   assert.doesNotMatch(panel, /New conversation|StartConversationDialog|startChat/);
   // The earlier conversations stay in the list above the box.
   assert.match(panel, /renderFeedRow\(\{ entry, now, menus: rowMenus, key: itemKey\(entry\) \}\)/);
@@ -164,7 +167,9 @@ test('the space box is the phone’s at every width, centred on a desktop (B4, A
   // As wide as the chat's follow-up box on a desktop (Stay, 15 October 2026).
   assert.match(dock, /<div className="pb-3 md:mx-auto md:w-full md:max-w-md">/);
   // Arthur's line stays (12:04Z and 12:17Z): not the follow-up one.
-  assert.match(dock, /placeholder=\{SPACE_COMPOSER_PLACEHOLDER\}/);
+  // The space's line unless the pill passes its own (the Radars pill).
+  assert.match(dock, /placeholder = SPACE_COMPOSER_PLACEHOLDER,/);
+  assert.match(dock, /placeholder=\{placeholder\}/);
   assert.match(dock, /export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Space\?';/);
   // The one-row desktop pill went: no host asks the composer for it.
   assert.doesNotMatch(dock, /compact/);

@@ -71,7 +71,7 @@ import { newSpaceRadarHref } from '../radars/radar-rows';
 import { SpaceRadarsPanel } from '../radars/SpaceRadarsPanel';
 import { DeleteSpaceFileDialog } from './DeleteSpaceFileDialog';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
-import { SpaceChatDock } from './SpaceChatDock';
+import { SPACE_COMPOSER_PLACEHOLDER, SPACE_RADAR_COMPOSER_PLACEHOLDER, SpaceChatDock } from './SpaceChatDock';
 import { SpaceFileCard } from './SpaceFileCard';
 import type { SpaceFileActions } from './SpaceFileMenu';
 import { SpaceLooseFiles } from './SpaceLooseFiles';
@@ -293,7 +293,8 @@ export function SpaceContentPanel({
       {bulk.dialogs}
 
       {/* The Space's message box on the pills that hold chats, folders and
-          files; not on People (Arthur, 24 October 2026, on Folders). While
+          files, and on Radars, where it asks what to watch (Stay, 26 October
+          2026); not on People (Arthur, 24 October 2026, on Folders). While
           files are being ticked on Folders, the bar holds the foot of the
           screen: the box is hidden, not unmounted, so a half-typed question
           is still there after Done. */}
@@ -301,7 +302,11 @@ export function SpaceContentPanel({
         // `contents`, so the box stays a child of this column for its `sticky`
         // and `mt-auto`; `hidden` takes it off screen without unmounting it.
         <div className={selecting ? 'hidden' : 'contents'}>
-          <SpaceChatDock space={{ uuid: space.uuid, name: space.name }} handle={dock} />
+          <SpaceChatDock
+            space={{ uuid: space.uuid, name: space.name }}
+            handle={dock}
+            placeholder={tab === 'radars' ? SPACE_RADAR_COMPOSER_PLACEHOLDER : SPACE_COMPOSER_PLACEHOLDER}
+          />
         </div>
       ) : null}
     </div>
@@ -339,7 +344,7 @@ const FEED_TYPE: Readonly<Record<SpaceContentTab, SpaceItemsType | undefined>> =
 };
 
 /** The pills the Space's message box shows on. */
-const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations', 'folders']);
+const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations', 'folders', 'radars']);
 
 const PILLS = SPACE_TABS.map((id) => ({ id, label: SPACE_TAB_LABELS[id] }));
 

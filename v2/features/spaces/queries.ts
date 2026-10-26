@@ -277,8 +277,11 @@ export const spacesQueries = {
       refetchOnMount: REFETCH_ON_VISIT,
     }),
 
+  /** Every space's cached Radar lists: a chat's Radar tool may have changed any. */
+  allRadars: () => [...spacesQueries.all, 'radars'] as const,
+
   /** Every cached list of one space's Radars, live and archived. */
-  radarsOf: (spaceUuid: string) => [...spacesQueries.all, 'radars', spaceUuid] as const,
+  radarsOf: (spaceUuid: string) => [...spacesQueries.allRadars(), spaceUuid] as const,
 
   /**
    * The space's Radars (`GET /spaces/{uuid}/radars`, Radar in Spaces), each

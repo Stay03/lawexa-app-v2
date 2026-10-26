@@ -13,6 +13,11 @@ import {
  *  Study space: one layout, and here one line of copy too. */
 export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Space?';
 
+/** The same box on the Radars pill (Stay, 26 October 2026: "The radar tab in
+ *  spaces should have text area too"): a send starts the space chat, where
+ *  Lawexa sets up or changes the space's Radars with its Radar tools. */
+export const SPACE_RADAR_COMPOSER_PLACEHOLDER = 'Tell Lawexa what this Space should watch';
+
 /**
  * The message box at the bottom of a space's home (Stay, 15
  * October 2026: "it should be a text area at the bottom like the chat page and
@@ -51,9 +56,12 @@ export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Spa
 export function SpaceChatDock({
   space,
   handle,
+  placeholder = SPACE_COMPOSER_PLACEHOLDER,
 }: {
   space: HomeComposerSpace;
   handle?: Ref<HomeComposerHandle>;
+  /** The pill's own line: the Radars pill asks what to watch. */
+  placeholder?: string;
 }) {
   const session = useV2Session();
   const [value, setValue] = useState('');
@@ -72,7 +80,7 @@ export function SpaceChatDock({
           role={session.role ?? undefined}
           space={space}
           handle={handle}
-          placeholder={SPACE_COMPOSER_PLACEHOLDER}
+          placeholder={placeholder}
           className="p-2.5 shadow-lg"
           textareaClassName="text-base"
         />
