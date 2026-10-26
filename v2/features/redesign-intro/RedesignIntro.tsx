@@ -9,11 +9,12 @@ import { authApi } from '@/lib/api/auth';
 import { cn } from '@/lib/utils';
 import { isAccountRole } from '@/v2/runtime/account';
 import { useScreenHeld } from '@/v2/runtime/screen-hold';
+import { useIntroImages } from './intro-images';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LogoMark } from '@/v2/shell/Logo';
 import {
-  REDESIGN_INTRO_IMAGE,
+  REDESIGN_INTRO_IMAGES,
   REDESIGN_INTRO_TEXT,
   REDESIGN_INTRO_TITLE,
   introSeenKey,
@@ -43,10 +44,12 @@ export function RedesignIntro({ seenOnServer }: { seenOnServer: boolean }) {
   // Set as the card opens (an event, not an effect): from then on a chat
   // that starts writing under it does not take it down.
   const [showing, setShowing] = useState(false);
+  // The pictures load first, and only for a reader the pop-up is for.
+  const images = useIntroImages(REDESIGN_INTRO_IMAGES, account && !seenOnServer && !seenHere);
 
   if (!account || userId === null || seenOnServer) return null;
 
-  const open = introShouldOpen({ account, userId, seenOnServer, seenHere, mounted: settled, screenHeld, showing });
+  const open = introShouldOpen({ account, userId, seenOnServer, seenHere, mounted: settled, screenHeld, showing, images });
   const close = () => {
     markSeenHere(userId);
     // The account's own mark, for every other device. A failed post leaves
@@ -103,14 +106,18 @@ export function RedesignIntro({ seenOnServer }: { seenOnServer: boolean }) {
   );
 }
 
-/** The chosen picture, or a neutral band of the same shape until Stay picks one. */
+/**
+ * The first picture (already loaded, intro-images.ts), or a neutral band of
+ * the same shape when there are none. How several are shown waits on Stay.
+ */
 function IntroPicture() {
-  if (REDESIGN_INTRO_IMAGE) {
+  const first = REDESIGN_INTRO_IMAGES[0];
+  if (first) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element -- one fixed 1200x630 picture in public/: next/image would add a wrapper and lazy loading to a card that is already on screen.
+      // eslint-disable-next-line @next/next/no-img-element -- fixed 1200x630 pictures in public/, loaded before the card opens: next/image would add a wrapper and lazy loading to a card that is already on screen.
       <img
-        src={REDESIGN_INTRO_IMAGE.src}
-        alt={REDESIGN_INTRO_IMAGE.alt}
+        src={first.src}
+        alt={first.alt}
         width={1200}
         height={630}
         className="aspect-[1200/630] w-full object-cover"

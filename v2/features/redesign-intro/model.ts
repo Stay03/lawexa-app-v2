@@ -19,11 +19,20 @@ export const REDESIGN_INTRO_TITLE = 'Lawexa, redesigned';
 export const REDESIGN_INTRO_TEXT =
   'A cleaner chat, drafts that open beside the case you are reading, and your notes and quizzes in one place.';
 
+/** One of the pop-up's pictures, 1200 x 630, in public/. */
+export interface IntroImage {
+  src: string;
+  alt: string;
+}
+
 /**
- * The hero, 1200 x 630. `null` until Stay picks one of Lucy's options: the
- * pop-up then draws a neutral placeholder of the same shape.
+ * The pop-up's pictures, in order. Stay picked three light ones (25 October
+ * 2026); the files come from Tester. Empty: the pop-up draws a neutral band
+ * of the same shape. Every one is loaded before the pop-up may open
+ * (intro-images.ts). How three are shown (a carousel, or one at a time)
+ * waits on Stay; until then the band shows the first.
  */
-export const REDESIGN_INTRO_IMAGE: { src: string; alt: string } | null = null;
+export const REDESIGN_INTRO_IMAGES: readonly IntroImage[] = [];
 
 /** This browser's mark for one account. */
 export function introSeenKey(userId: number): string {
@@ -44,11 +53,15 @@ export interface IntroInputs {
   screenHeld: boolean;
   /** The pop-up is already up: a hold that starts under it does not take it down. */
   showing: boolean;
+  /** Its pictures: every one loaded, still loading, or one failed. */
+  images: 'loading' | 'ready' | 'failed';
 }
 
 export function introShouldOpen(inputs: IntroInputs): boolean {
-  const { account, userId, seenOnServer, seenHere, mounted, screenHeld, showing } = inputs;
+  const { account, userId, seenOnServer, seenHere, mounted, screenHeld, showing, images } = inputs;
   if (!account || userId === null || !mounted) return false;
   if (seenOnServer || seenHere) return false;
+  // Never a card with a missing picture: it opens only once all have loaded.
+  if (images !== 'ready') return false;
   return showing || !screenHeld;
 }

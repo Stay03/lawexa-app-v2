@@ -4,7 +4,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { screenHeld, setScreenHold } from '@/v2/runtime/screen-hold';
-import { introSeenKey, introShouldOpen, REDESIGN_INTRO_IMAGE, REDESIGN_INTRO_TITLE, type IntroInputs } from './model';
+import { imagesStatus, INTRO_IMAGES_TIMEOUT_MS } from './intro-images';
+import { introSeenKey, introShouldOpen, REDESIGN_INTRO_IMAGES, REDESIGN_INTRO_TITLE, type IntroInputs } from './model';
 
 /* "Lawexa, redesigned": the one-time pop-up for the switch (Stay, 25 October 2026). */
 
@@ -19,6 +20,7 @@ const base: IntroInputs = {
   mounted: true,
   screenHeld: false,
   showing: false,
+  images: 'ready',
 };
 
 test('it opens once for a signed-in account that has not seen it', () => {
@@ -36,6 +38,23 @@ test('never for a guest or a signed-out reader, and never before the client know
 test('it waits while an answer is written or a quiz is played, but a hold under it does not close it', () => {
   assert.equal(introShouldOpen({ ...base, screenHeld: true }), false);
   assert.equal(introShouldOpen({ ...base, screenHeld: true, showing: true }), true);
+});
+
+test('it opens only once every picture has loaded, and never when one failed', () => {
+  assert.equal(introShouldOpen({ ...base, images: 'loading' }), false);
+  assert.equal(introShouldOpen({ ...base, images: 'failed' }), false);
+  // A failed picture keeps it shut even if it was up: no broken card.
+  assert.equal(introShouldOpen({ ...base, images: 'failed', showing: true }), false);
+  assert.equal(introShouldOpen({ ...base, images: 'ready' }), true);
+});
+
+test('the pictures add up: ready when all loaded, failed as soon as one fails, none is ready', () => {
+  assert.equal(imagesStatus([]), 'ready');
+  assert.equal(imagesStatus(['loaded', 'loaded', 'loaded']), 'ready');
+  assert.equal(imagesStatus(['loaded', 'loading', 'loaded']), 'loading');
+  assert.equal(imagesStatus(['loaded', 'failed', 'loading']), 'failed');
+  // A slow picture counts as failed for the page load after this long.
+  assert.equal(INTRO_IMAGES_TIMEOUT_MS, 10_000);
 });
 
 test('the mark is per account', () => {
@@ -73,8 +92,11 @@ test('the card: the title, two buttons that both close it for good, gold only on
   assert.match(read('lib', 'api', 'auth.ts'), /apiClient\.post<ApiResponse<\{ v2_intro_seen_at: string \}>>\('\/auth\/me\/v2-intro-seen'\)/);
   // Every way out is "seen": the ×, Escape and a tap outside go through onOpenChange.
   assert.match(card, /onOpenChange=\{\(next\) => \(next \? undefined : close\(\)\)\}/);
-  // The picture is a 1200 x 630 slot, a neutral band until one is chosen.
-  assert.equal(REDESIGN_INTRO_IMAGE, null);
+  // The pictures are a list (one or three), a neutral band while it is empty; the band shows the first.
+  assert.deepEqual(REDESIGN_INTRO_IMAGES, []);
+  assert.match(card, /const first = REDESIGN_INTRO_IMAGES\[0\];/);
+  // Loaded before the card may open, and only for a reader it is for.
+  assert.match(card, /const images = useIntroImages\(REDESIGN_INTRO_IMAGES, account && !seenOnServer && !seenHere\);/);
   assert.match(card, /aspect-\[1200\/630\] w-full items-center justify-center bg-secondary/);
   assert.doesNotMatch(card, /amber|emerald|destructive/);
 });
