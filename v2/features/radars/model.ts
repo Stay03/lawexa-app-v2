@@ -1,5 +1,5 @@
 import { describeCron } from '@/lib/utils/cron';
-import { formatRelativeTime } from '@/v2/shell/designs/modules';
+import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import type { RadarListItem, RadarStatus, ScanStatus } from '@/types/radar';
 
 /**

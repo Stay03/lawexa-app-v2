@@ -7,6 +7,7 @@ import {
   Folder,
   GitBranch,
   MessageSquare,
+  Radar,
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { CountBadge, FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { MoveFirstLink } from '@/v2/shell/move-first';
 import { fileTypeLabel } from '../../content-model';
+import { reportRowModel } from '../radars/radar-rows';
 
 /**
  * feed-rows — the rows of a space's one list (Stay picked version A, 17
@@ -64,6 +66,8 @@ import { fileTypeLabel } from '../../content-model';
 
 /** What the feed decides for its rows: a file's card, a folder's model, a chat's byline. */
 export interface FeedRowMenus {
+  /** The space the feed lists: a Radar report's row links inside it. */
+  spaceUuid: string;
   /** Opens the file's card (its name, "Open file" and its ⋮), hung from the tapped row on a computer. */
   openFile: (file: SpaceFile, row: HTMLElement) => void;
   folderRow: (entry: Extract<SpaceItem, { type: 'folder' }>) => FolderRowModel;
@@ -91,6 +95,9 @@ interface LineModel {
   time: string;
   /** The @you count, under the time. */
   mentions?: number;
+  /** Another count in the same place, with its own words for a screen
+   *  reader: a Radar's unread reports. */
+  count?: { value: number; label: string };
 }
 
 const BODY = cn(
@@ -99,7 +106,9 @@ const BODY = cn(
   FOCUS_RING,
 );
 
-function Line({
+/** The feed's one row, for any list in a space that reads like the feed
+ *  (the Radars pill's rows). */
+export function FeedLine({
   line,
   render,
 }: {
@@ -109,6 +118,7 @@ function Line({
 }) {
   const Icon = line.icon;
   const mentions = line.mentions ?? 0;
+  const count = line.count && line.count.value > 0 ? line.count : null;
   const content = (
     <>
       <Icon
@@ -137,7 +147,7 @@ function Line({
             <span className="ml-auto shrink-0 pl-1 text-xs tabular-nums text-muted-foreground">{line.time}</span>
           ) : null}
         </span>
-        {line.meta || mentions > 0 ? (
+        {line.meta || mentions > 0 || count ? (
           <span className="mt-0.5 flex min-w-0 items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{line.meta}</span>
             {mentions > 0 ? (
@@ -145,6 +155,8 @@ function Line({
                 count={mentions}
                 label={`${mentions} unread ${mentions === 1 ? 'mention' : 'mentions'} in ${line.title}`}
               />
+            ) : count ? (
+              <CountBadge count={count.value} label={count.label} />
             ) : null}
           </span>
         ) : null}
@@ -203,7 +215,7 @@ function roomLink(href: string) {
 function FeedFileRow({ file, now, menus }: { file: SpaceFile; now: number; menus: FeedRowMenus }) {
   const select = menus.fileSelect;
   return (
-    <Line
+    <FeedLine
       line={{
         icon: FileText,
         title: file.original_name,
@@ -257,7 +269,7 @@ export function renderFeedRow({
       const conversation = entry.item;
       const title = stripPastedTags(conversation.title);
       return (
-        <Line
+        <FeedLine
           key={key}
           line={{
             icon: conversation.is_confidential ? ShieldCheck : MessageSquare,
@@ -285,7 +297,7 @@ export function renderFeedRow({
     case 'folder': {
       const row = menus.folderRow(entry);
       return (
-        <Line
+        <FeedLine
           key={key}
           line={{
             icon: Folder,
@@ -308,7 +320,7 @@ export function renderFeedRow({
       const channel = entry.item;
       const grammar = channelUnreadGrammar(channel);
       return (
-        <Line
+        <FeedLine
           key={key}
           line={{
             icon: channelVisibilityFace(channel.visibility).icon,
@@ -329,13 +341,31 @@ export function renderFeedRow({
         />
       );
     }
+    case 'radar_report': {
+      const row = reportRowModel(entry.item, menus.spaceUuid, now);
+      return (
+        <FeedLine
+          key={key}
+          line={{
+            icon: Radar,
+            // Unread by this reader: gold and semibold, as an unread room reads.
+            warm: row.unread,
+            strong: row.unread,
+            title: row.title,
+            meta: row.meta,
+            time: row.time,
+          }}
+          render={roomLink(row.href)}
+        />
+      );
+    }
     case 'thread': {
       const thread = entry.item;
       const grammar = channelUnreadGrammar(thread);
       const state = threadUnreadState(thread);
       const behind = state === 'behind' && !grammar.muted;
       return (
-        <Line
+        <FeedLine
           key={key}
           line={{
             icon: GitBranch,

@@ -37,7 +37,7 @@ import { canAddContent, type SpaceTab } from './model';
 export type SpaceItemKind = SpaceItemRef['type'];
 
 /** The space home's pills that list items; `people` is the roster. */
-export type SpaceContentTab = Exclude<SpaceTab, 'people'>;
+export type SpaceContentTab = Exclude<SpaceTab, 'people' | 'radars'>;
 
 /** Whether the viewer may take items out of this space: its content Owner. */
 export function canRemoveFromSpace(space: Pick<Space, 'my_content_role'>): boolean {

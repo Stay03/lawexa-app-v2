@@ -123,13 +123,13 @@ test('the home: a Viewer sees no add control, only the space Owner sees Remove f
   assert.match(panel, /canRemove: canRemoveFromSpace\(space\),/);
   // The Folders pill's + (New folder, Upload files, Select) for whoever may
   // add; a Viewer gets a plain Select and nothing to add (header option 1).
-  assert.match(panel, /tab !== 'folders' \|\| selecting \? null : access\.canAdd \? \(\s*<SpaceAddMenu onNewFolder=\{startFolder\} onUpload=\{pickFiles\} onSelect=\{canSelect \? bulk\.start : null\} \/>\s*\) : canSelect \? \(\s*bulk\.startButton\(/);
+  assert.match(panel, /\) : tab !== 'folders' \|\| selecting \? null : access\.canAdd \? \(\s*<SpaceAddMenu onNewFolder=\{startFolder\} onUpload=\{pickFiles\} onSelect=\{canSelect \? bulk\.start : null\} \/>\s*\) : canSelect \? \(\s*bulk\.startButton\(/);
   // The file input and the tray exist only for someone who may add, and so
   // does the drop zone.
   // (`useSpaceUploads`; the empty All and Conversations pills open the docked
   // box's own picker instead, Arthur, 15 October 2026.)
   assert.match(panel, /\{access\.canAdd \? picker : null\}/);
-  assert.match(panel, /\{access\.canAdd && tab !== 'people' \? \(\s*<FileDropZone/);
+  assert.match(panel, /\{access\.canAdd && tab !== 'people' && tab !== 'radars' \? \(\s*<FileDropZone/);
   // Remove from space on the folder and file rows, for the space's Owner
   // only; a chat's row follows its `can` (the shared conversation menu).
   // Since 18 October 2026 only a file row has a menu (Stay: no row dots);
@@ -277,11 +277,12 @@ test('no em dash in the new UI strings', () => {
   }
 });
 
-test('the pills are All, Conversations, Folders and People; old tab ids open All, the old Files opens Folders', () => {
+test('the pills are All, Conversations, Folders, Radars and People; old tab ids open All, the old Files opens Folders', () => {
   // No Files pill (Stay, 22 October 2026, 23:58Z): Folders lists the files in no folder.
+  // Radars before People (Radar in Spaces, 26 October 2026).
   assert.deepEqual(
     SPACE_TABS.map((tab) => SPACE_TAB_LABELS[tab]),
-    ['All', 'Conversations', 'Folders', 'People'],
+    ['All', 'Conversations', 'Folders', 'Radars', 'People'],
   );
   for (const old of ['chats', 'channels', null, 'nonsense']) assert.equal(parseSpaceTab(old), 'all');
   assert.equal(parseSpaceTab('files'), 'folders');

@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from '@tanstack/react-query';
 import { FolderPlus, ListChecks, Plus, Upload, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,7 +41,6 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import type { HomeComposerHandle } from '@/v2/shell/designs/HomeComposer';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { TabRow } from '@/v2/shell/TabRow';
-import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useCopySpaceFileToMine, useUploadSpaceFile } from '../../content-mutations';
 import { useSpaceFilesBulk } from './space-files-bulk';
 import {
@@ -67,6 +67,8 @@ import { MoveToSpaceDialog } from '../../move/MoveToSpaceDialog';
 import { spacesQueries } from '../../queries';
 import { LobbySection, SPACE_PILL_BAR } from '../lobby-parts';
 import { SpacePeoplePanel } from '../people/SpacePeoplePanel';
+import { newSpaceRadarHref } from '../radars/radar-rows';
+import { SpaceRadarsPanel } from '../radars/SpaceRadarsPanel';
 import { DeleteSpaceFileDialog } from './DeleteSpaceFileDialog';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SpaceChatDock } from './SpaceChatDock';
@@ -77,13 +79,8 @@ import { FileListHead } from '@/v2/features/folders/file-list/FileListRow';
 import { FolderRow } from '@/v2/features/folders/list/FolderRow';
 import { FOLDERS_DATE_LABEL } from '@/v2/features/folders/list/states';
 import { renderFeedRow, type FeedRowMenus } from './feed-rows';
-import {
-  SpaceContentEmptyState,
-  SpaceContentErrorState,
-  SpaceContentMoreErrorState,
-  SpaceContentNextPageSkeleton,
-  SpaceContentSkeleton,
-} from './states';
+import { PagedContent } from './paged-content';
+import { SpaceContentEmptyState } from './states';
 
 /**
  * SpaceContentPanel — everything under a space's header (design B4, Arthur
@@ -91,12 +88,14 @@ import {
  * space's conversations, files and folders, and the message box.
  *
  * ── THE PILLS (`?tab=`, `SpaceScreen` holds it) ────────────────────────────
- * All, Conversations, Folders, People. The first three are one feed
+ * All, Conversations, Folders, Radars, People. The first three are one feed
  * (`GET /spaces/{uuid}/items`, `spacesQueries.items`): All with no `type`,
  * each kind with its own. No Files pill (Stay, 22 October 2026, 23:58Z):
- * Folders lists the files in no folder under the folders. People is the
- * members page (`SpacePeoplePanel`) in the list's place. Channels are not a
- * pill; the space rail keeps them.
+ * Folders lists the files in no folder under the folders. Radars is the
+ * space's Radars (`SpaceRadarsPanel`, Radar in Spaces, 26 October 2026);
+ * their reports are rows of All too. People is the members page
+ * (`SpacePeoplePanel`) in the list's place. Channels are not a pill; the
+ * space rail keeps them.
  *
  * ── NO SEARCH ──────────────────────────────────────────────────────────────
  * Stay, 17 October 2026, 19:11 UTC, and Arthur, 22:31 UTC: "remove it". The
@@ -169,11 +168,12 @@ export function SpaceContentPanel({
   // in the list, which a new pill remounts: a file still uploading keeps its
   // row in the tray. No search (Stay, 17 October 2026, 19:11 UTC; Arthur,
   // 22:31 UTC: "remove it").
-  const listTab: SpaceContentTab = tab === 'people' ? 'all' : tab;
+  // People and Radars are their own lists: the feed's read waits.
+  const listTab: SpaceContentTab = tab === 'people' || tab === 'radars' ? 'all' : tab;
   const type = FEED_TYPE[listTab];
   const query = useInfiniteQuery({
     ...spacesQueries.items(space.uuid, { viewerId, type, rooms }),
-    enabled: enabled && tab !== 'people',
+    enabled: enabled && tab !== 'people' && tab !== 'radars',
   });
   const { queue, pickFiles, picker } = useSpaceUploads(space.uuid);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -211,7 +211,9 @@ export function SpaceContentPanel({
   // the files are being ticked: the bar at the foot holds Done.
   const canSelect = files.length > 0;
   const action =
-    tab !== 'folders' || selecting ? null : access.canAdd ? (
+    tab === 'radars' ? (
+      access.canAdd ? <NewRadarButton spaceUuid={space.uuid} /> : null
+    ) : tab !== 'folders' || selecting ? null : access.canAdd ? (
       <SpaceAddMenu onNewFolder={startFolder} onUpload={pickFiles} onSelect={canSelect ? bulk.start : null} />
     ) : canSelect ? (
       bulk.startButton(
@@ -227,6 +229,8 @@ export function SpaceContentPanel({
   const list =
     tab === 'people' ? (
       <SpacePeoplePanel space={space} />
+    ) : tab === 'radars' ? (
+      <SpaceRadarsPanel spaceUuid={space.uuid} canAdd={access.canAdd} />
     ) : (
       <SpaceFeed
         // A new pill is a new list: a fresh mount, so its rows enter once.
@@ -244,10 +248,10 @@ export function SpaceContentPanel({
 
   return (
     <div className="flex flex-1 flex-col">
-      {/* ONE ROW at every width: the four pills, then the Folders pill's
-          control at the row's end (header option 1, Stay, 23 October 2026,
-          00:06Z). With the Files pill gone the row fits a phone with the +
-          beside People. */}
+      {/* ONE ROW at every width: the pills, then the Folders or Radars
+          pill's control at the row's end (header option 1, Stay, 23 October
+          2026, 00:06Z). The pills scroll sideways when a phone is too narrow
+          for all five. */}
       <div className={cn(SPACE_PILL_BAR, 'flex-row items-center gap-2')}>
         <TabRow
           tabs={PILLS}
@@ -267,7 +271,7 @@ export function SpaceContentPanel({
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${tab}`} className="mt-4">
         {/* Files dropped on the list upload into the space; a Viewer gets the
             list and nothing to drop onto. */}
-        {access.canAdd && tab !== 'people' ? (
+        {access.canAdd && tab !== 'people' && tab !== 'radars' ? (
           <FileDropZone spaceName={space.name} onDrop={queue.add}>
             {list}
           </FileDropZone>
@@ -583,6 +587,7 @@ function SpaceFeed({
   }, [items]);
 
   const rowMenus: FeedRowMenus = {
+    spaceUuid,
     openFile,
     folderRow: (entry) => folderRow(entry.item),
     byline: (item) => lastMessageLine(item.last_message, viewerUuid) ?? 'No messages yet',
@@ -882,6 +887,27 @@ function SpaceAddMenu({
   );
 }
 
+/**
+ * The Radars pill's gold + at the end of the pill bar: New Radar, for the
+ * Owner and Contributors. The Folders pill's + in shape and scale (one
+ * action, so a link and not a menu): the + alone on a phone, "New Radar"
+ * from `sm:` up.
+ */
+function NewRadarButton({ spaceUuid }: { spaceUuid: string }) {
+  return (
+    <Link
+      href={newSpaceRadarHref(spaceUuid)}
+      className={cn(
+        'v2-interactive relative inline-flex size-8 shrink-0 items-center justify-center gap-1 rounded-full bg-primary text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 after:absolute after:-inset-1.5 sm:w-auto sm:px-3',
+        FOCUS_RING,
+      )}
+    >
+      <Plus aria-hidden className="size-4 sm:size-3.5" />
+      <span className="sr-only sm:not-sr-only">New Radar</span>
+    </Link>
+  );
+}
+
 /** The empty state's add control, a small button with its word at every
  *  width, in the shape the app's other empty-state actions take. */
 function EmptyStateAddButton({
@@ -902,97 +928,5 @@ function EmptyStateAddButton({
       <Icon aria-hidden className="size-4" />
       {children}
     </Button>
-  );
-}
-
-/** What the shared body reads off an infinite query: its states and pager. */
-interface PagedQuery {
-  isPending: boolean;
-  isError: boolean;
-  isFetchNextPageError: boolean;
-  error: unknown;
-  hasNextPage: boolean;
-  isFetchingNextPage: boolean;
-  fetchNextPage: () => unknown;
-  refetch: () => unknown;
-}
-
-/**
- * The list's body, so its states cannot drift: skeleton on a first load, the
- * failure panel when nothing loaded, the pill's empty state (`empty`), or the
- * rows with the next-page sentinel under them.
- */
-function PagedContent({
-  tab,
-  query,
-  count,
-  empty,
-  children,
-}: {
-  tab: SpaceContentTab;
-  query: PagedQuery;
-  /** How many rows are loaded: every state decision reads this. */
-  count: number;
-  /** What the pill shows with no rows. */
-  empty: ReactNode;
-  children: ReactNode;
-}) {
-  // The pane this list scrolls in, found from the list's own element. Set in
-  // an effect declared BEFORE the sentinel's, so it is in place when that
-  // observer is first built (`useShellScrollRoot`'s ordering rule).
-  const anchorRef = useRef<HTMLDivElement | null>(null);
-  const paneRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    // `data-v2-scroller` is the attribute `CollabFrame` puts on its pane for
-    // `ScrollMemory`; it names the scroller of the route.
-    paneRef.current = anchorRef.current?.closest<HTMLElement>('[data-v2-scroller]') ?? null;
-    return () => {
-      paneRef.current = null;
-    };
-  }, []);
-
-  const { fetchNextPage, refetch } = query;
-  const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
-    // A failed page is not retried by scrolling; its strip carries the retry.
-    hasNextPage: query.hasNextPage && !query.isFetchNextPageError,
-    isFetchingNextPage: query.isFetchingNextPage,
-    fetchNextPage,
-    rootRef: paneRef,
-    rootMargin: '320px',
-  });
-
-  // A refusal the server explained (403) is worth its own sentence; anything
-  // else, a network drop or a 5xx, gets the designed one.
-  const apiError = query.error ? extractApiError(query.error) : null;
-  const message = apiError?.status === 403 ? apiError.message : undefined;
-
-  return (
-    <div ref={anchorRef}>
-      {query.isPending ? (
-        <SpaceContentSkeleton />
-      ) : query.isError && count === 0 ? (
-        <SpaceContentErrorState
-          tab={tab}
-          message={message}
-          onRetry={() => void refetch()}
-        />
-      ) : count === 0 ? (
-        empty
-      ) : (
-        <div>
-          {children}
-          <div ref={sentinelRef} className="pt-1">
-            {query.isFetchingNextPage ? <SpaceContentNextPageSkeleton /> : null}
-          </div>
-          {query.isError ? (
-            <SpaceContentMoreErrorState
-              onRetry={() =>
-                void (query.isFetchNextPageError ? fetchNextPage() : refetch())
-              }
-            />
-          ) : null}
-        </div>
-      )}
-    </div>
   );
 }

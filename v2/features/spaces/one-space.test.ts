@@ -102,8 +102,9 @@ test('only an Owner or a Contributor may add content; the old my_role does not c
 
 test('the pills are the same for every kind and role; channels stay in the rail (B4)', () => {
   // People last (Stay, 15 October 2026); no Channels pill (design B4).
-  // No Files pill (Stay, 22 October 2026, 23:58Z).
-  assert.deepEqual(SPACE_TABS, ['all', 'conversations', 'folders', 'people']);
+  // No Files pill (Stay, 22 October 2026, 23:58Z). Radars before People
+  // (Radar in Spaces, 26 October 2026).
+  assert.deepEqual(SPACE_TABS, ['all', 'conversations', 'folders', 'radars', 'people']);
   // Channels still show where they did, in the rail.
   const shows = (kind: SpaceKind, viewer: V2SessionSnapshot) => spaceShowsChannels({ kind }, viewer);
   assert.equal(shows('team', researcher), true);
@@ -227,7 +228,7 @@ test('the content feed: its own key under spaces, read-only rows', () => {
   assert.match(panel, /uniqueRowsById\(pages, itemKey\)/);
   assert.match(
     panel,
-    /const itemKey = \(entry: SpaceItem\): string =>\s*entry\.type === 'folder' \|\| entry\.type === 'channel' \|\| entry\.type === 'thread'\s*\? `\$\{entry\.type\}:\$\{entry\.item\.uuid\}`\s*: `\$\{entry\.type\}:\$\{entry\.item\.id\}`;/,
+    /const itemKey = \(entry: SpaceItem\): string =>\s*entry\.type === 'folder' \|\| entry\.type === 'channel' \|\| entry\.type === 'thread' \|\| entry\.type === 'radar_report'\s*\? `\$\{entry\.type\}:\$\{entry\.item\.uuid\}`\s*: `\$\{entry\.type\}:\$\{entry\.item\.id\}`;/,
   );
   // Files open through the tap-first opener, from the file's card (its row
   // opens the card), never the channel download hook.
