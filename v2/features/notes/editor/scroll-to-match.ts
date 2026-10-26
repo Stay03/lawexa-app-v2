@@ -1,3 +1,12 @@
+import {
+  FIND_DEBUG_LATER_MS,
+  describeElement,
+  findDebugEnabled,
+  recordFindStep,
+  updateFindStep,
+  viewportLine,
+} from './find-debug';
+
 /**
  * Bring the find's current match to the middle of the part of its scroll area
  * the reader can see, by setting that area's `scrollTop` from measured boxes.
@@ -76,10 +85,32 @@ export function scrollAreaOf(element: HTMLElement): HTMLElement | null {
   return page instanceof HTMLElement && page.scrollHeight > page.clientHeight ? page : null;
 }
 
-/** Moves the area that holds `match` so the match sits in the middle of what can be seen of it. */
-export function scrollMatchToMiddle(match: HTMLElement): void {
+/**
+ * Moves the area that holds `match` so the match sits in the middle of what
+ * can be seen of it. `count` ("3 of 6") is only for the hidden readout
+ * (find-debug.ts), which records each step when `?finddebug=1` is on.
+ */
+export function scrollMatchToMiddle(match: HTMLElement, count = ''): void {
   const area = scrollAreaOf(match);
-  if (!area) return;
+  const debug = findDebugEnabled();
+  if (!area) {
+    if (debug) {
+      const box = match.getBoundingClientRect();
+      recordFindStep({
+        count,
+        match: `${Math.round(box.top)}-${Math.round(box.bottom)}`,
+        area: 'none',
+        before: null,
+        set: null,
+        readBack: null,
+        later: null,
+        size: '-',
+        viewport: viewportLine(),
+        focus: describeElement(document.activeElement),
+      });
+    }
+    return;
+  }
   const page = area === document.scrollingElement;
   const box = area.getBoundingClientRect();
   const boxTop = page ? 0 : box.top + area.clientTop;
@@ -99,5 +130,21 @@ export function scrollMatchToMiddle(match: HTMLElement): void {
     },
     { top: matchBox.top, height: matchBox.height },
   );
+  const before = area.scrollTop;
   if (next !== area.scrollTop) area.scrollTop = next;
+  if (debug) {
+    const id = recordFindStep({
+      count,
+      match: `${Math.round(matchBox.top)}-${Math.round(matchBox.bottom)}`,
+      area: describeElement(area),
+      before: Math.round(before),
+      set: next,
+      readBack: Math.round(area.scrollTop),
+      later: null,
+      size: `${area.scrollHeight}/${area.clientHeight}`,
+      viewport: viewportLine(),
+      focus: describeElement(document.activeElement),
+    });
+    window.setTimeout(() => updateFindStep(id, { later: Math.round(area.scrollTop) }), FIND_DEBUG_LATER_MS);
+  }
 }

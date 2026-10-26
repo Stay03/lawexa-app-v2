@@ -2,6 +2,7 @@ import { Extension, type Editor } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey, type Command, type EditorState, type Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { findDebugEnabled, recordFindStep, viewportLine } from './find-debug';
 import { scrollMatchToMiddle } from './scroll-to-match';
 
 /**
@@ -195,7 +196,23 @@ export function createFindPlugin(): Plugin<FindState> {
         // draft that area is only the text between its bars and Save, so the
         // middle is in sight above an iPhone keyboard too (DraftEditor).
         const element = view.dom.querySelector(`.${FIND_CURRENT_CLASS}`);
-        if (element instanceof HTMLElement) scrollMatchToMiddle(element);
+        const count = `${next.current + 1} of ${next.matches.length}`;
+        if (element instanceof HTMLElement) scrollMatchToMiddle(element, count);
+        else if (findDebugEnabled()) {
+          // The hidden readout (find-debug.ts): the count moved but no match was drawn.
+          recordFindStep({
+            count: `${count} (no match drawn)`,
+            match: '-',
+            area: '-',
+            before: null,
+            set: null,
+            readBack: null,
+            later: null,
+            size: '-',
+            viewport: viewportLine(),
+            focus: document.activeElement?.tagName.toLowerCase() ?? 'none',
+          });
+        }
       },
     }),
   });

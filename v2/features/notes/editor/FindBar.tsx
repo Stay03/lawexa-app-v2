@@ -20,6 +20,7 @@ import {
   runFind,
   setFindQuery,
 } from './find-replace';
+import { FindDebugPanel } from './FindDebugPanel';
 import './find-replace.css';
 
 /**
@@ -172,6 +173,8 @@ export function FindBar({
       }}
       className={cn(FRAME[layout], 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150')}
     >
+      {/* The hidden readout, only with ?finddebug=1 (find-debug.ts). */}
+      <FindDebugPanel />
       <div className="flex items-center gap-0.5">
         {editable ? (
           <FindIconButton
