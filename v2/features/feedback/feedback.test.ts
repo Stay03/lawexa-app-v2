@@ -62,5 +62,8 @@ test('one button on all three pages, sending through v1’s feedback call', () =
 
 test('a send that never reached the server says so, and keeps the report', () => {
   const button = read('v2', 'features', 'feedback', 'FeedbackButton.tsx');
-  assert.match(button, /isAxiosError\(error\) && !error\.response\s*\? "Couldn't reach Lawexa, so nothing was sent\. Your report is still here: try again\."\s*: getErrorMessage\(error\)/);
+  // The words are `feedbackFailureText`'s (tested with the quiz report), from
+  // the error: no answer at all, the ten-a-minute 429, or the server's own.
+  assert.match(button, /onError: \(error\) => setProblem\(sendFailure\(error\)\),/);
+  assert.match(button, /offline: isAxiosError\(error\) && !error\.response,/);
 });

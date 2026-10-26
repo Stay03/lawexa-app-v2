@@ -4,16 +4,14 @@ import { useState, type MouseEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Flag, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { isAxiosError } from 'axios';
 
 import { cn } from '@/lib/utils';
 import { feedbackApi } from '@/lib/api/feedback';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { getErrorMessage } from '@/v2/runtime/query';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { DetailsField, FeedbackFrame, IssueChecklist } from '@/v2/features/feedback/FeedbackButton';
+import { DetailsField, FeedbackFrame, IssueChecklist, sendFailure } from '@/v2/features/feedback/FeedbackButton';
 import { canSendFeedback } from '@/v2/features/feedback/feedback-model';
 import {
   QUIZ_FEEDBACK_REASONS,
@@ -138,12 +136,7 @@ function QuestionFeedbackForm({
         toast.success('Report sent', { description: 'Thank you. We will look at this question.' });
         onSent();
       },
-      onError: (error) =>
-        setProblem(
-          isAxiosError(error) && !error.response
-            ? "Couldn't reach Lawexa, so nothing was sent. Your report is still here: try again."
-            : getErrorMessage(error),
-        ),
+      onError: (error) => setProblem(sendFailure(error)),
     });
   };
 

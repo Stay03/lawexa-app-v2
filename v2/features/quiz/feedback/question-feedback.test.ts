@@ -161,3 +161,16 @@ test('an open report holds the solo reveal still, and closing it starts the hold
   // The flag's own tap never reaches the screen's "tap to move on".
   assert.match(code('v2', 'features', 'quiz', 'feedback', 'QuestionFeedbackButton.tsx'), /event\.stopPropagation\(\);\s*change\(true\);/);
 });
+
+test('a lost or refused report says why, the server’s ten-a-minute limit included', async () => {
+  const { feedbackFailureText } = await import('@/v2/features/feedback/feedback-model');
+  assert.equal(
+    feedbackFailureText({ offline: true, status: null, serverMessage: 'Network Error' }),
+    "Couldn't reach Lawexa, so nothing was sent. Your report is still here: try again.",
+  );
+  assert.equal(
+    feedbackFailureText({ offline: false, status: 429, serverMessage: 'Too Many Attempts.' }),
+    'That is a lot of reports in a minute. Your report is still here: try again shortly.',
+  );
+  assert.equal(feedbackFailureText({ offline: false, status: 422, serverMessage: 'The specified question does not exist.' }), 'The specified question does not exist.');
+});

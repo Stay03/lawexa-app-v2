@@ -36,6 +36,7 @@ import {
   FEEDBACK_PICTURE_ACCEPT,
   FEEDBACK_TEXT_MAX,
   canSendFeedback,
+  feedbackFailureText,
   feedbackText,
   pictureRefusal,
 } from './feedback-model';
@@ -200,12 +201,7 @@ function FeedbackForm({
       },
       // No answer at all (offline, a dropped connection) is not the server's
       // word, so it is said plainly; a refusal keeps the server's own words.
-      onError: (error) =>
-        setProblem(
-          isAxiosError(error) && !error.response
-            ? "Couldn't reach Lawexa, so nothing was sent. Your report is still here: try again."
-            : getErrorMessage(error),
-        ),
+      onError: (error) => setProblem(sendFailure(error)),
     });
   };
 
@@ -369,4 +365,13 @@ export function DetailsField({
       </p>
     </div>
   );
+}
+
+/** A refused or lost send in words (`feedbackFailureText`). Shared with a quiz question's report. */
+export function sendFailure(error: unknown): string {
+  return feedbackFailureText({
+    offline: isAxiosError(error) && !error.response,
+    status: isAxiosError(error) ? (error.response?.status ?? null) : null,
+    serverMessage: getErrorMessage(error),
+  });
 }

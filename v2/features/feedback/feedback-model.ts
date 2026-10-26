@@ -100,3 +100,15 @@ export function feedbackText(
 export function canSendFeedback(session: { signedIn: boolean; role: string | null }): boolean {
   return session.signedIn && session.role !== null && session.role !== 'guest';
 }
+
+/**
+ * What a refused or lost report says under its Send button. No answer at all
+ * (offline, a dropped link) is said plainly; 429 is the server's limit of ten
+ * reports a minute (Backend, 26 October 2026); anything else keeps the
+ * server's own words. Whatever was typed stays in the form.
+ */
+export function feedbackFailureText(failure: { offline: boolean; status: number | null; serverMessage: string }): string {
+  if (failure.offline) return "Couldn't reach Lawexa, so nothing was sent. Your report is still here: try again.";
+  if (failure.status === 429) return 'That is a lot of reports in a minute. Your report is still here: try again shortly.';
+  return failure.serverMessage;
+}
