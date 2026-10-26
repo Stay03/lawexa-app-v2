@@ -24,23 +24,28 @@ test("a Viewer reads, marks read and downloads the report, with no triage toolba
   assert.match(report, /scope\.kind === 'personal' \|\| \(reportFlags\?\.can_triage \?\? spaceRadar\?\.can_triage\) === true;/);
   assert.match(report, /scope\.kind === 'personal' \|\| \(reportFlags\?\.can_manage \?\? spaceRadar\?\.can_manage\) === true;/);
   assert.match(report, /const canDownload = scope\.kind === 'space';/);
-  // Read state is per member (B3): opening an unread report marks it read for anyone.
-  assert.match(report, /const shouldMarkRead =\s*ownerScan !== null &&/);
-  assert.doesNotMatch(report, /const shouldMarkRead =\s*canTriage/);
+  // Read state is per member (B3): opening an unread report marks it read for
+  // anyone, decided once per opening (read-on-open.ts), never by a role.
+  assert.match(report, /const scanStatus = ownerScan\?\.status \?\? null;/);
+  assert.match(report, /readDecided\.current === scanUuid/);
+  assert.doesNotMatch(report, /canTriage.*readOnOpen|readOnOpen.*canTriage/);
   assert.match(report, /\{ownerScan && \(canTriage \|\| canManage \|\| canDownload\) \? \(/);
   assert.match(report, /\{canTriage \? <ScanTriageToolbar radarUuid=\{radarUuid\} scan=\{ownerScan\} \/> : null\}/);
   assert.match(report, /\{canDownload \? <ReportDownloads radarUuid=\{radarUuid\} scanUuid=\{scanUuid\} \/> : null\}/);
   assert.match(report, /\{canManage \? <ShareDialog radarUuid=\{radarUuid\} scan=\{ownerScan\} \/> : null\}/);
 });
 
-test('a report downloads as Word or PDF, and a refused download says why beside the buttons', async () => {
+test('a report downloads as Word or PDF from one menu, and a refused download says why beside it', async () => {
   const { downloadFailure } = await import('@/v2/features/radars/report/use-report-download');
   assert.equal(downloadFailure(429), 'Too many downloads in a minute. Try again shortly.');
   assert.equal(downloadFailure(404), 'This report is no longer available to download.');
   assert.equal(downloadFailure(500), "The file didn't download. Try again.");
   const buttons = read('v2', 'features', 'radars', 'report', 'ReportDownloads.tsx');
-  assert.match(buttons, /\{ format: 'docx', label: 'Download Word', short: 'Word' \}/);
-  assert.match(buttons, /\{ format: 'pdf', label: 'Download PDF', short: 'PDF' \}/);
+  assert.match(buttons, /\{ format: 'docx', label: 'Word document', extension: '\.docx' \}/);
+  assert.match(buttons, /\{ format: 'pdf', label: 'PDF', extension: '\.pdf' \}/);
+  // An icon on a phone, "Download" from sm: the toolbar fits at 390px (Tester).
+  assert.match(buttons, /aria-label="Download report"/);
+  assert.match(buttons, /<span className="hidden sm:inline">Download<\/span>/);
   assert.match(buttons, /<p role="alert" className="text-xs text-destructive">/);
 });
 
