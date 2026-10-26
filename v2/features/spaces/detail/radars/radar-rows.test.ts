@@ -100,6 +100,8 @@ test("a Radar row reads its schedule and maker, this reader's unread, and its ne
   assert.equal(radarRowModel({ ...RADAR, latest_report: null }, 'space-1', NOW).time, '1d');
   // No maker named: the schedule alone.
   assert.doesNotMatch(radarRowModel({ ...RADAR, creator: null }, 'space-1', NOW).meta, / · /);
+  // The server sends no count for a space Radar yet (Backend, 26 October 2026): no badge.
+  assert.equal(radarRowModel({ ...RADAR, unread_reports_count: undefined }, 'space-1', NOW).unread, 0);
 });
 
 test('a Radar that is not running says why in a word or two', () => {

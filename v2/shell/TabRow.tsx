@@ -106,6 +106,23 @@ export function TabRow<Item extends { id: string }>({
       list.removeEventListener('scroll', mark);
     };
   }, [tabs.length]);
+  // THE SELECTED TAB IS ON SCREEN. A strip that scrolls (a phone's space pills,
+  // since the Radars pill made five) could open on a page whose tab sits past
+  // the edge, under the fade, so the reader could not see which one was on
+  // (techlead, 26 October 2026). The strip scrolls ITSELF to it: never
+  // `scrollIntoView`, which would also move the page and every scroller above.
+  // A DOM write and no React state, so it is legal in an effect.
+  useEffect(() => {
+    const list = listRef.current;
+    const node = refs.current.get(value);
+    if (!list || !node || list.scrollWidth <= list.clientWidth) return;
+    const box = list.getBoundingClientRect();
+    const tab = node.getBoundingClientRect();
+    // Room past the tab for the 28px fade, so it lands clear of it.
+    const room = 32;
+    if (tab.left < box.left + room) list.scrollLeft -= box.left + room - tab.left;
+    else if (tab.right > box.right - room) list.scrollLeft += tab.right - (box.right - room);
+  }, [value]);
   // The roving-tabindex position — where FOCUS last was, which may differ
   // from the selection under manual activation. Updated by each tab's own
   // focus event, so click, arrow keys, and programmatic focus all agree.

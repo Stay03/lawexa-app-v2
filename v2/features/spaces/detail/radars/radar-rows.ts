@@ -84,7 +84,9 @@ export function radarRowModel(radar: SpaceRadarListItem, spaceUuid: string, now:
     title: radar.name,
     state: radarStateWord(radar),
     meta: creator ? `${schedule} · ${creator}` : schedule,
-    unread: Math.max(0, radar.unread_reports_count),
+    // Missing until the per-member read state lands (Backend's B3): no badge,
+    // never a NaN or a guessed 0 that a later count would contradict.
+    unread: Math.max(0, radar.unread_reports_count ?? 0),
     href: spaceRadarHref(spaceUuid, radar.uuid),
     time: now > 0 ? formatRelativeTime(radar.latest_report?.completed_at ?? radar.last_scan_at, now) : '',
   };

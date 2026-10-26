@@ -1799,8 +1799,12 @@ export interface SpaceRadarReport {
 
 /** One row of `GET /spaces/{uuid}/radars`: the full Radar, with the
  *  reader's unread count and the newest report (Backend's contract). */
-export interface SpaceRadarListItem extends Radar {
-  latest_report: SpaceRadarReport | null;
+export interface SpaceRadarListItem extends Omit<Radar, 'unread_reports_count'> {
+  /** Missing on a space Radar until the per-member read state lands
+   *  (Backend's B3, 26 October 2026): read it as "no badge", never as 0. */
+  unread_reports_count?: number;
+  /** Not in Backend's first part (B1): absent until the space report shape lands. */
+  latest_report?: SpaceRadarReport | null;
 }
 
 export type SpaceRadarListResponse = LengthAwareResponse<SpaceRadarListItem>;

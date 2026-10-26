@@ -67,3 +67,27 @@ test("the space owner's empty balance is named, and nothing is offered to buy", 
   assert.match(screen, /<RadarNotFoundState inSpace=\{scope\.kind === 'space'\} backHref=\{hrefs\.list\} \/>/);
   assert.match(screen, /onArchived=\{\(\) => router\.push\(hrefs\.list\)\}/);
 });
+
+/* The techlead's three fixes after the first pictures (26 October 2026). */
+
+test("a strip scrolls its selected tab into view, by itself and never the page", () => {
+  const row = read('v2', 'shell', 'TabRow.tsx');
+  assert.match(row, /const node = refs\.current\.get\(value\);\s*if \(!list \|\| !node \|\| list\.scrollWidth <= list\.clientWidth\) return;/);
+  assert.match(row, /if \(tab\.left < box\.left \+ room\) list\.scrollLeft -= box\.left \+ room - tab\.left;/);
+  assert.match(row, /else if \(tab\.right > box\.right - room\) list\.scrollLeft \+= tab\.right - \(box\.right - room\);/);
+  assert.doesNotMatch(row.replace(/\/\/.*$/gm, ''), /scrollIntoView\(/);
+});
+
+test("a Radar's meta line never opens a wrapped line with its dot", () => {
+  const screen = radars('detail', 'RadarScreen.tsx');
+  assert.match(screen, /<div className="overflow-hidden">\s*<p className="-ml-4 flex flex-wrap items-center gap-y-0\.5 text-xs text-muted-foreground">/);
+  assert.match(screen, /className="relative pl-4 before:absolute before:left-1\.5 before:text-muted-foreground\/40 before:content-\['·'\]"/);
+});
+
+test('Scan now waits while scans are on hold, with the reason on it', () => {
+  const screen = radars('detail', 'RadarScreen.tsx');
+  assert.match(screen, /const onHold = radar\.schedule_state === 'no_balance';/);
+  assert.match(screen, /scanNow\.isPending \|\| scanInFlight \|\| radar\.status !== 'active' \|\| onHold;/);
+  assert.match(screen, /"Scans are on hold until the space's owner has messages"/);
+  assert.match(screen, /'Scans are on hold until you have messages'/);
+});

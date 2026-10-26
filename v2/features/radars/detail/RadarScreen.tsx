@@ -352,13 +352,21 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
     inFlightScans.length === 0 &&
     completedRows.length === 0;
 
+  // On hold for want of messages (`schedule_state`): a scan now could only be
+  // skipped, so the button waits like it does for a paused Radar, with the
+  // reason on it (techlead, 26 October 2026).
+  const onHold = radar.schedule_state === 'no_balance';
   const scanNowDisabled =
-    scanNow.isPending || scanInFlight || radar.status !== 'active';
+    scanNow.isPending || scanInFlight || radar.status !== 'active' || onHold;
   const scanNowReason = scanInFlight
     ? 'A scan is already running for this radar'
     : radar.status !== 'active'
       ? 'Resume this radar to scan'
-      : null;
+      : onHold
+        ? scope.kind === 'space'
+          ? "Scans are on hold until the space's owner has messages"
+          : 'Scans are on hold until you have messages'
+        : null;
 
   const showListSkeleton = activeQuery.isPending;
   const showListError = activeQuery.isError && allScans.length === 0;
@@ -420,18 +428,24 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
             </p>
           ) : null}
 
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-            {meta.map((part, partIndex) => (
-              <span key={part} className="inline-flex items-center gap-2">
-                {partIndex > 0 ? (
-                  <span aria-hidden className="text-muted-foreground/40">
-                    ·
-                  </span>
-                ) : null}
-                {part}
-              </span>
-            ))}
-          </p>
+          {/* THE SEPARATOR NEVER STARTS A LINE. Each part carries its "·" in
+              its own left padding, and the row is pulled left by that same
+              width inside a clipping box, so the part that opens a line has
+              its dot in the clipped strip and only dots BETWEEN parts show
+              ("· Next scan in 1w" on a phone's second line; techlead,
+              26 October 2026). */}
+          <div className="overflow-hidden">
+            <p className="-ml-4 flex flex-wrap items-center gap-y-0.5 text-xs text-muted-foreground">
+              {meta.map((part) => (
+                <span
+                  key={part}
+                  className="relative pl-4 before:absolute before:left-1.5 before:text-muted-foreground/40 before:content-['·']"
+                >
+                  {part}
+                </span>
+              ))}
+            </p>
+          </div>
 
           {radar.status !== 'archived' && canManage ? (
             <div className="flex items-center gap-2 pt-1">
