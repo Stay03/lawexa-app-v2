@@ -44,3 +44,10 @@ test('one report, its triage and its share call /radars, with a note to switch l
   assert.match(scope, /If the per-member read step \(B3\) adds one, switch these four\./);
   assert.doesNotMatch(read('lib', 'api', 'radars.ts'), /getScan: async \(spaceUuid: string/);
 });
+
+test("a long source title truncates inside its row, on a phone too", () => {
+  const sources = read('v2', 'features', 'radars', 'report', 'ReportSources.tsx');
+  assert.match(sources, /'v2-interactive flex min-h-11 min-w-0 flex-1 items-start gap-2\.5 rounded-lg px-2 py-2\.5/);
+  assert.match(sources, /<span className="flex min-h-11 min-w-0 flex-1 items-start gap-2\.5 px-2 py-2\.5">\{body\}<\/span>/);
+  assert.match(sources, /<span className="block truncate text-sm text-foreground">\{title\}<\/span>/);
+});

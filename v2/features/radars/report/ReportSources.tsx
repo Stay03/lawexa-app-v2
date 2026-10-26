@@ -90,8 +90,11 @@ function SourceRow({ source }: { source: ReportSource }) {
     </>
   );
 
+  // `min-w-0`: a flex item will not shrink below its content without it, so a
+  // long title ran off a phone's edge instead of truncating (Radar in Spaces
+  // pictures, 26 October 2026).
   const rowClass =
-    'v2-interactive flex min-h-11 flex-1 items-start gap-2.5 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/50';
+    'v2-interactive flex min-h-11 min-w-0 flex-1 items-start gap-2.5 rounded-lg px-2 py-2.5 transition-colors hover:bg-secondary/50';
 
   if (EXTERNAL_SOURCE_TYPES.has(source.source_type) && source.url) {
     return (
@@ -119,7 +122,7 @@ function SourceRow({ source }: { source: ReportSource }) {
     );
   }
 
-  return <span className="flex min-h-11 flex-1 items-start gap-2.5 px-2 py-2.5">{body}</span>;
+  return <span className="flex min-h-11 min-w-0 flex-1 items-start gap-2.5 px-2 py-2.5">{body}</span>;
 }
 
 export function ReportSources({ sources }: { sources: ReportSource[] }) {
