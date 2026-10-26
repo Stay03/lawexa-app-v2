@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { getAppUrl } from '@/lib/constants/seo';
 import type { ReportSource, ReportSourceType } from '@/types/radar';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { sourceNumber } from './source-number';
 
 /**
  * ReportSources — the report's structured citation list, in the v2 row
@@ -23,6 +24,12 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
  * NUMBERED BY `position`, not array index (the study's correction): the
  * number shown IS the marker the report's text cites — a gap in the sequence
  * stays a gap, so "[3]" in the prose always finds row 3 here.
+ *
+ * FROM ONE. The API stores `position` from 0 (`RadarScanService`:
+ * `array_values($sources) as $position`), and every report showed its first
+ * source as "0" while the prose cites it as "[1]" (26 October 2026). The row
+ * shows `position + 1` (`sourceNumber`), still in position order, so gaps
+ * still show as gaps.
  *
  * Link resolution is the same three-way rule as the case page's authority
  * rows: web sources open externally (new tab, safe rel), Lawexa records
@@ -138,7 +145,7 @@ export function ReportSources({ sources }: { sources: ReportSource[] }) {
         {ordered.map((source) => (
           <li key={source.id} className="flex items-start gap-1">
             <span className="w-7 shrink-0 pt-3 text-center font-mono text-xs tabular-nums text-muted-foreground">
-              {source.position}
+              {sourceNumber(source.position)}
             </span>
             <SourceRow source={source} />
           </li>
