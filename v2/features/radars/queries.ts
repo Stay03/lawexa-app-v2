@@ -8,6 +8,7 @@ import type {
 } from '@/types/radar';
 import type { InfiniteData } from '@tanstack/react-query';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
+import { PERSONAL_RADAR_SCOPE, radarCalls, type RadarScope } from './scope';
 
 /**
  * Radar query factory (the `cases` exemplar pattern) — the full v2 radar
@@ -62,6 +63,12 @@ export const RADARS_PAGE_SIZE = 15;
 /** The viewer partition — see the factory docblock. */
 export interface ViewerScoped {
   viewerId: number | null;
+}
+
+/** Where the Radar lives, for the leaves a Space Radar shares with a personal
+ *  one. Absent is personal. It picks the route, never the key (`./scope.ts`). */
+interface Scoped {
+  scope?: RadarScope;
 }
 
 /** True when any page of a scan list holds a queued/running row. */
@@ -149,10 +156,10 @@ export const radarsQueries = {
    * Full radar detail (perimeter, channels, schedule). The async-naming poll
    * layers over this leaf in `naming.ts` — see the factory docblock.
    */
-  detail: (uuid: string, { viewerId }: ViewerScoped) =>
+  detail: (uuid: string, { viewerId, scope = PERSONAL_RADAR_SCOPE }: ViewerScoped & Scoped) =>
     queryOptions({
       queryKey: [...radarsQueries.details(), uuid, { viewerId }] as const,
-      queryFn: () => radarsApi.getByUuid(uuid),
+      queryFn: () => radarCalls(scope).get(uuid),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,
@@ -175,8 +182,11 @@ export const radarsQueries = {
    */
   infiniteScans: (
     radarUuid: string,
-    { viewerId, ...params }: Omit<RadarScanListParams, 'page' | 'per_page'> &
-      ViewerScoped,
+    {
+      viewerId,
+      scope = PERSONAL_RADAR_SCOPE,
+      ...params
+    }: Omit<RadarScanListParams, 'page' | 'per_page'> & ViewerScoped & Scoped,
   ) =>
     infiniteQueryOptions({
       queryKey: [
@@ -185,7 +195,7 @@ export const radarsQueries = {
         { viewerId },
       ] as const,
       queryFn: ({ pageParam }) =>
-        radarsApi.getScans(radarUuid, {
+        radarCalls(scope).getScans(radarUuid, {
           ...params,
           per_page: RADARS_PAGE_SIZE,
           page: pageParam,
@@ -208,7 +218,11 @@ export const radarsQueries = {
    * reader shape — `report/viewer.ts` is the seam that tells them apart.
    * Polls itself while the scan is still running.
    */
-  scanDetail: (radarUuid: string, scanUuid: string, { viewerId }: ViewerScoped) =>
+  scanDetail: (
+    radarUuid: string,
+    scanUuid: string,
+    { viewerId, scope = PERSONAL_RADAR_SCOPE }: ViewerScoped & Scoped,
+  ) =>
     queryOptions({
       queryKey: [
         ...radarsQueries.scans(radarUuid),
@@ -216,7 +230,7 @@ export const radarsQueries = {
         scanUuid,
         { viewerId },
       ] as const,
-      queryFn: () => radarsApi.getScan(radarUuid, scanUuid),
+      queryFn: () => radarCalls(scope).getScan(radarUuid, scanUuid),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,

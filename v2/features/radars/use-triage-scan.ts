@@ -6,7 +6,6 @@ import {
   type InfiniteData,
   type QueryClient,
 } from '@tanstack/react-query';
-import { radarsApi } from '@/lib/api/radars';
 import type {
   RadarDetailResponse,
   RadarListResponse,
@@ -15,7 +14,9 @@ import type {
   RadarScanListResponse,
   TriageScanPayload,
 } from '@/types/radar';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { radarsQueries } from './queries';
+import { PERSONAL_RADAR_SCOPE, radarCalls, type RadarScope } from './scope';
 
 /**
  * useTriageScan — v1's optimistic triage engine (`lib/hooks/useRadars.ts`),
@@ -42,6 +43,8 @@ interface TriageScanVariables {
   radarUuid: string;
   scanUuid: string;
   payload: TriageScanPayload;
+  /** Absent is personal. A Space Radar's `read` is the caller's own. */
+  scope?: RadarScope;
 }
 
 type Snapshot = { queryKey: readonly unknown[]; data: unknown };
@@ -127,8 +130,8 @@ export function useTriageScan() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ radarUuid, scanUuid, payload }: TriageScanVariables) =>
-      radarsApi.triageScan(radarUuid, scanUuid, payload),
+    mutationFn: ({ radarUuid, scanUuid, payload, scope = PERSONAL_RADAR_SCOPE }: TriageScanVariables) =>
+      radarCalls(scope).triageScan(radarUuid, scanUuid, payload),
 
     onMutate: async ({ radarUuid, scanUuid, payload }) => {
       const snapshots: Snapshot[] = [];
@@ -249,6 +252,15 @@ export function useTriageScan() {
       // The server owns timestamps — its record replaces the optimistic one.
       const serverScan = response.data;
       patchScanEverywhere(queryClient, radarUuid, scanUuid, () => serverScan);
+    },
+
+    // A Space's feed rows and its Radars list carry the report's read and
+    // triage state too; they re-read rather than guess (the feed is cursor
+    // paged, the list holds the newest report only).
+    onSettled: (_data, _error, { scope }) => {
+      if (scope?.kind !== 'space') return;
+      void queryClient.invalidateQueries({ queryKey: spacesQueries.itemsOf(scope.spaceUuid) });
+      void queryClient.invalidateQueries({ queryKey: spacesQueries.radarsOf(scope.spaceUuid) });
     },
   });
 }

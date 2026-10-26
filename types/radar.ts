@@ -69,9 +69,38 @@ export interface Radar extends RadarListItem {
   keywords: string[];
   sources: RadarSource[];
   entities: RadarEntity[];
+  /** Always `[]` for a Space Radar: its reports go to the Space's members. */
   channels: NotificationChannel[];
   conversation_uuid: string;
+  /**
+   * ── A RADAR IN A SPACE (Radar in Spaces, plan 5.2; Stay's go 26 Oct 2026) ──
+   * Present on a Space Radar's reads only; a personal Radar's read leaves them
+   * out, so every one is optional and a personal screen never reads them.
+   * `unread_reports_count` on a Space Radar is the READER'S own.
+   */
+  space?: RadarSpaceStub | null;
+  creator?: RadarPerson | null;
+  /** The creator, the Space owner or a Space admin: edit, pause, archive. */
+  can_manage?: boolean;
+  /** May mark this Radar's reports read, priority, complete or archived. */
+  can_triage?: boolean;
+  schedule_state?: RadarScheduleState;
 }
+
+export interface RadarSpaceStub {
+  uuid: string;
+  name: string;
+}
+
+/** A member as a Space Radar names them: the slim user, never an email. */
+export interface RadarPerson {
+  uuid: string;
+  name: string;
+  avatar_url: string | null;
+}
+
+/** `no_balance`: the Space owner, who pays for the scans, has no messages left. */
+export type RadarScheduleState = 'active' | 'paused' | 'no_balance' | 'failed';
 
 export interface RadarScan {
   uuid: string;
@@ -84,6 +113,8 @@ export interface RadarScan {
   duration_ms: number | null;
   error: string | null;
   workflow_status: ScanWorkflowStatus;
+  /** On a Space Radar's report, the READER'S own read (Stay, 26 October 2026:
+   *  per member); `workflow_status` and `priority` stay shared. */
   read_at: string | null;
   priority: boolean;
   dismissed_at: string | null;
@@ -110,6 +141,28 @@ export interface RadarScanDetail extends RadarScan {
   sources: ReportSource[];
   // Non-bot reads of the published report (signed-in users + crawlers).
   views_count: number;
+  /** Space reports only, and not in the first part (plan 5.4): they come
+   *  with the affected-items and drafts step. */
+  affected_items?: RadarAffectedItem[];
+  /** Drafts in this Radar's earlier reports: a draft's ordinal is
+   *  `draft_offset + its index in this report` (plan 5.5). */
+  draft_offset?: number;
+  export_urls?: { docx: string; pdf: string } | null;
+  radar?: { uuid: string; name: string; status?: RadarStatus } | null;
+  space?: RadarSpaceStub | null;
+}
+
+export type RadarAffectedItemType = 'file' | 'note' | 'conversation';
+
+/** A file, note or chat in the Space that a report says is affected, and why. */
+export interface RadarAffectedItem {
+  type: RadarAffectedItemType;
+  id: string | number;
+  name: string;
+  reason: string;
+  url: string | null;
+  /** False once the item has left the Space or been deleted. */
+  exists: boolean;
 }
 
 /**
@@ -169,6 +222,17 @@ export interface CreateRadarPayload {
 
 export type UpdateRadarPayload = Partial<CreateRadarPayload>;
 
+/**
+ * Body for `POST /spaces/{uuid}/radars`: the personal body without `channels`
+ * (a Space Radar reports to the Space's members).
+ */
+export type CreateSpaceRadarPayload = Omit<CreateRadarPayload, 'channels'>;
+
+export type UpdateSpaceRadarPayload = Partial<CreateSpaceRadarPayload>;
+
+/** Formats `GET /radars/{radar}/scans/{scan}/export` serves. */
+export type RadarExportFormat = 'docx' | 'pdf';
+
 export interface TriageScanPayload {
   read?: boolean;
   workflow_status?: ScanWorkflowStatus;
@@ -205,7 +269,10 @@ export interface RadarDetailResponse {
 
 export interface FirstScanResult {
   dispatched: boolean;
-  block_reason: IBlockedReason | null;
+  /** On a Space create, `payer` says whose balance stopped the scan: the
+   *  Space's owner pays, so a member may be stopped by the owner's balance
+   *  (Backend, 26 October 2026). Its message already says so. */
+  block_reason: (IBlockedReason & { payer?: 'space_owner' | 'self' }) | null;
 }
 
 export interface CreateRadarResponse {

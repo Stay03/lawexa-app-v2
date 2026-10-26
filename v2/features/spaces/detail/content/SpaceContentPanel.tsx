@@ -354,7 +354,7 @@ const NO_FILES: readonly SpaceFile[] = [];
 
 /** A feed row's identity across pages: the kind and that kind's own id. */
 const itemKey = (entry: SpaceItem): string =>
-  entry.type === 'folder' || entry.type === 'channel' || entry.type === 'thread'
+  entry.type === 'folder' || entry.type === 'channel' || entry.type === 'thread' || entry.type === 'radar_report'
     ? `${entry.type}:${entry.item.uuid}`
     : `${entry.type}:${entry.item.id}`;
 

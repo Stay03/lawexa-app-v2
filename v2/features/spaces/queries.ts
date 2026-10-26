@@ -1,5 +1,6 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { spacesApi } from '@/lib/api/collab';
+import { spaceRadarsApi } from '@/lib/api/radars';
 import type {
   MemberListParams,
   SpaceItemsParams,
@@ -253,6 +254,34 @@ export const spacesQueries = {
           per_page: SPACE_CONTENT_PER_PAGE,
           page: pageParam,
         }),
+      initialPageParam: 1,
+      getNextPageParam: (last) => {
+        const { current_page, last_page } = last.pagination;
+        return current_page < last_page ? current_page + 1 : undefined;
+      },
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
+  /** Every cached list of one space's Radars, live and archived. */
+  radarsOf: (spaceUuid: string) => [...spacesQueries.all, 'radars', spaceUuid] as const,
+
+  /**
+   * The space's Radars (`GET /spaces/{uuid}/radars`, Radar in Spaces), each
+   * with the reader's unread count and the newest report: the Radars pill.
+   * Scans finish while the reader is away, so an arrival asks
+   * (`REFETCH_ON_VISIT`, the personal Radars list's reasoning). One Radar's
+   * own reads stay on `radarsQueries`, keyed by its uuid.
+   */
+  radars: (
+    spaceUuid: string,
+    { viewerId, status }: ViewerScoped & { status?: 'archived' },
+  ) =>
+    infiniteQueryOptions({
+      queryKey: [...spacesQueries.radarsOf(spaceUuid), { status: status ?? null }, { viewerId }] as const,
+      queryFn: ({ pageParam }) =>
+        spaceRadarsApi.getList(spaceUuid, { status, per_page: SPACE_CONTENT_PER_PAGE, page: pageParam }),
       initialPageParam: 1,
       getNextPageParam: (last) => {
         const { current_page, last_page } = last.pagination;

@@ -17,6 +17,7 @@ import type { PaginationLinks, PaginationMeta } from '@/types/case';
 import type { ConversationListItem, ListConversationsParams } from '@/types/chat';
 import type { FileCategory, UserFile } from '@/types/file';
 import type { IBlockedReason } from '@/types/message-pack';
+import type { Radar, RadarStatus, ScanWorkflowStatus } from '@/types/radar';
 
 /******************************************************************************
                               Shared primitives
@@ -1753,12 +1754,15 @@ export type SpaceFolderResponse = ItemResponse<SpaceFolder>;
  * id, so a cursor never repeats or skips a row. Members only (403); a missing
  * space 404s.
  */
-export type SpaceItemsType = 'conversations' | 'files' | 'folders';
+export type SpaceItemsType = 'conversations' | 'files' | 'folders' | 'radar_reports';
 
 export type SpaceItem =
   | { type: 'conversation'; sort_at: string; item: SpaceConversation }
   | { type: 'file'; sort_at: string; item: SpaceFile }
   | { type: 'folder'; sort_at: string; item: SpaceFolder }
+  /** A finished Radar report in this space (Radar in Spaces, plan 5.1);
+   *  `sort_at` is its `completed_at`. */
+  | { type: 'radar_report'; sort_at: string; item: SpaceRadarReport }
   /** With `include` (backend, 17 October 2026): a row of GET
    *  /spaces/{uuid}/channels, field for field. Top-level channels only. */
   | { type: 'channel'; sort_at: string; item: Channel }
@@ -1766,6 +1770,47 @@ export type SpaceItem =
    *  (parent_channel_uuid, parent_channel_name, can_read, can_post). Only the
    *  threads the reader follows. */
   | { type: 'thread'; sort_at: string; item: Channel };
+
+/**
+ * ── A RADAR REPORT IN A SPACE (plan 5.1, `SpaceRadarReportResource`) ───────
+ * The feed row and the Radars pill's "latest report" line. `read_at` is the
+ * READER'S OWN (Stay, 26 October 2026: read state per member), so one member
+ * opening a report leaves it unread for the rest. `workflow_status` and
+ * `priority` are shared, one per report. `excerpt` is the report's first
+ * readable line, about 200 characters.
+ */
+export interface SpaceRadarReport {
+  uuid: string;
+  title: string | null;
+  has_findings: boolean;
+  priority: boolean;
+  read_at: string | null;
+  workflow_status: ScanWorkflowStatus;
+  completed_at: string;
+  excerpt: string | null;
+  /** Not in the first part (Backend's contract, 26 October 2026): they come
+   *  with the affected-items and drafts step. */
+  affected_items_count?: number;
+  drafts_count?: number;
+  radar: { uuid: string; name: string; status: RadarStatus };
+  /** The report's page in the space, `/spaces/{space}/radars/{radar}/scans/{scan}`. */
+  url: string;
+}
+
+/** One row of `GET /spaces/{uuid}/radars`: the full Radar, with the
+ *  reader's unread count and the newest report (Backend's contract). */
+export interface SpaceRadarListItem extends Radar {
+  latest_report: SpaceRadarReport | null;
+}
+
+export type SpaceRadarListResponse = LengthAwareResponse<SpaceRadarListItem>;
+
+export interface SpaceRadarListParams {
+  /** `archived` lists the space's archived Radars; absent, the live ones. */
+  status?: 'archived';
+  per_page?: number;
+  page?: number;
+}
 
 /** The room kinds the feed adds only when asked (`include`), and only for a
  *  reader with team channels (researcher and above) in a team space: anyone
