@@ -94,8 +94,12 @@ test("the card: Stay's text, one button that closes it for good, the pictures ab
   assert.match(read('lib', 'api', 'auth.ts'), /apiClient\.post<ApiResponse<\{ v2_intro_seen_at: string \}>>\('\/auth\/me\/v2-intro-seen'\)/);
   // Every way out is "seen": the ×, Escape and a tap outside go through onOpenChange.
   assert.match(card, /onOpenChange=\{\(next\) => \(next \? undefined : close\(\)\)\}/);
-  // The light pictures as WebP in public/, in Stay's order (the draft one is added once Tester retakes it).
-  assert.deepEqual(REDESIGN_INTRO_IMAGES.map((image) => image.src), ['/v2-intro/redesigned-case.webp', '/v2-intro/redesigned-statute.webp']);
+  // The light pictures 2, 3 and 6 as WebP in public/, in Stay's order.
+  assert.deepEqual(REDESIGN_INTRO_IMAGES.map((image) => image.src), [
+    '/v2-intro/redesigned-case.webp',
+    '/v2-intro/redesigned-statute.webp',
+    '/v2-intro/redesigned-draft.webp',
+  ]);
   for (const image of REDESIGN_INTRO_IMAGES) {
     assert.ok(image.alt.length > 0, image.src);
     assert.ok(readFileSync(join(process.cwd(), 'public', image.src)).length < 80 * 1024, `${image.src} stays small`);

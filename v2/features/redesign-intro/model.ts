@@ -33,12 +33,13 @@ export interface IntroImage {
  * 2026). Every one is loaded before the pop-up may open (intro-images.ts).
  * Empty: a neutral band of the same shape.
  *
- * Picture 6 (the draft beside the case) is retaken by Tester with the calmer
- * Save button, then added here as the third.
+ * Picture 6 (the draft beside the case) is Tester's retake with the calmer
+ * Save button (app 9386975a, 26 October 2026).
  */
 export const REDESIGN_INTRO_IMAGES: readonly IntroImage[] = [
   { src: '/v2-intro/redesigned-case.webp', alt: 'A case on a phone and a computer in the new design' },
   { src: '/v2-intro/redesigned-statute.webp', alt: 'A statute with its contents on a phone and a computer in the new design' },
+  { src: '/v2-intro/redesigned-draft.webp', alt: 'A letter drafted beside a case on a phone and a computer in the new design' },
 ];
 
 /** This browser's mark for one account. */
