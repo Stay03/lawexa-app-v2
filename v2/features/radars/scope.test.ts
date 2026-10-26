@@ -41,7 +41,7 @@ async function requests(
   return sent;
 }
 
-test('a Space Radar is read, triaged and run under its space', async () => {
+test('a Space Radar is read and run under its space; one report goes to /radars', async () => {
   const calls = radarCalls(SPACE);
   const sent = await requests(async () => {
     await calls.get('radar-1');
@@ -60,18 +60,19 @@ test('a Space Radar is read, triaged and run under its space', async () => {
     [
       'get /spaces/space-test-1/radars/radar-1',
       'get /spaces/space-test-1/radars/radar-1/scans',
-      'get /spaces/space-test-1/radars/radar-1/scans/scan-1',
-      'patch /spaces/space-test-1/radars/radar-1/scans/scan-1',
+      // One report, its triage and its share: the personal routes, which
+      // check the space's rules (Backend, 26 October 2026).
+      'get /radars/radar-1/scans/scan-1',
+      'patch /radars/radar-1/scans/scan-1',
       'post /spaces/space-test-1/radars/radar-1/pause',
       'post /spaces/space-test-1/radars/radar-1/resume',
       'post /spaces/space-test-1/radars/radar-1/scan',
       'delete /spaces/space-test-1/radars/radar-1',
-      'post /spaces/space-test-1/radars/radar-1/scans/scan-1/publish',
-      'post /spaces/space-test-1/radars/radar-1/scans/scan-1/unpublish',
+      'post /radars/radar-1/scans/scan-1/publish',
+      'post /radars/radar-1/scans/scan-1/unpublish',
     ],
   );
   assert.deepEqual(sent[1].params, { status: undefined, workflow_status: undefined, unread: 1, per_page: 15, page: 1 });
-  // A read on its own: the one triage a Viewer may send (Backend, 26 October 2026).
   assert.deepEqual(sent[3].data, { read: true });
 });
 

@@ -15,6 +15,7 @@ import { clearHeaderContext, setHeaderContext } from '@/v2/shell/header-context'
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { IN_FLIGHT_SCAN_STATUSES, radarsQueries } from '../queries';
 import { useRadarDetail } from '../naming';
+import { radarHrefs, useRadarScope } from '../scope-context';
 import { agoLabel, exactTime } from '../model';
 import { useTriageScan } from '../use-triage-scan';
 import { ScanTriageToolbar } from '../detail/triage-actions';
@@ -63,6 +64,9 @@ export function ScanReportScreen({
   scanUuid: string;
 }) {
   const { signedIn, userId: viewerId, role } = useV2Session();
+  // A personal report, or one in a space (`scope-context`): the same page.
+  const scope = useRadarScope();
+  const hrefs = radarHrefs(scope);
   // Which endpoint this session reads — guests hold a token but not an
   // account, so they read the public shape like signed-out visitors.
   const isAccount = signedIn && role !== 'guest';
@@ -91,6 +95,17 @@ export function ScanReportScreen({
     ? (radarQuery.data?.data.name ?? null)
     : sharedRadarName;
 
+  // ── IN A SPACE, THE FULL REPORT IS NOT OWNERSHIP ───────────────────────
+  // Every member of a space reads a space Radar's report in the owner's full
+  // shape (Backend, 26 October 2026), so "full shape" means "may read", not
+  // "may act". What a member may do is the space Radar's own flags: the
+  // toolbar and the mark-read need `can_triage` (Owner and Editor; a Viewer's
+  // triage is a 403 until the per-member read step), the share `can_manage`.
+  // A personal report is the reader's own, so both hold.
+  const spaceRadar = scope.kind === 'space' ? radarQuery.data?.data : undefined;
+  const canTriage = scope.kind === 'personal' || spaceRadar?.can_triage === true;
+  const canManage = scope.kind === 'personal' || spaceRadar?.can_manage === true;
+
   const [now] = useState(() => Date.now());
 
   // Publish the report title to the header centre once it resolves.
@@ -106,6 +121,7 @@ export function ScanReportScreen({
   const { mutate: triage } = useTriageScan();
   const hasMarkedRead = useRef(false);
   const shouldMarkRead =
+    canTriage &&
     ownerScan !== null &&
     ownerScan.status === 'completed' &&
     ownerScan.read_at === null;
@@ -142,6 +158,10 @@ export function ScanReportScreen({
               !signedIn ? (
                 <Button asChild size="sm">
                   <Link href="/login">Sign in to view your reports</Link>
+                </Button>
+              ) : scope.kind === 'space' ? (
+                <Button asChild variant="outline" size="sm">
+                  <Link href={hrefs.list}>Back to the space&apos;s Radars</Link>
                 </Button>
               ) : (
                 <Button asChild variant="outline" size="sm">
@@ -203,7 +223,7 @@ export function ScanReportScreen({
           action={
             isOwner ? (
               <Button asChild variant="outline" size="sm">
-                <Link href={`/radars/${radarUuid}`}>Back to radar</Link>
+                <Link href={hrefs.radar(radarUuid)}>Back to radar</Link>
               </Button>
             ) : undefined
           }
@@ -224,7 +244,7 @@ export function ScanReportScreen({
       <div className="motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
         {isOwner ? (
           <Link
-            href={`/radars/${radarUuid}`}
+            href={hrefs.radar(radarUuid)}
             className={cn(
               'v2-interactive -ml-2 mb-4 inline-flex min-h-9 w-fit items-center gap-1.5 rounded-full px-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
               FOCUS_RING,
@@ -289,11 +309,11 @@ export function ScanReportScreen({
           </header>
 
           {/* ── The owner's working toolbar, riding the scroll. ─────────── */}
-          {ownerScan ? (
+          {ownerScan && (canTriage || canManage) ? (
             <div className="sticky top-0 z-10 -mx-1 flex items-center gap-2 border-b border-border/60 bg-background/95 px-1 py-2 backdrop-blur">
-              <ScanTriageToolbar radarUuid={radarUuid} scan={ownerScan} />
+              {canTriage ? <ScanTriageToolbar radarUuid={radarUuid} scan={ownerScan} /> : null}
               <div className="flex-1" />
-              <ShareDialog radarUuid={radarUuid} scan={ownerScan} />
+              {canManage ? <ShareDialog radarUuid={radarUuid} scan={ownerScan} /> : null}
             </div>
           ) : null}
 

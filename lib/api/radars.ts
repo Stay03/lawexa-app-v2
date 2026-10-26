@@ -254,40 +254,6 @@ export const spaceRadarsApi = {
     return response.data;
   },
 
-  getScan: async (spaceUuid: string, radarUuid: string, scanUuid: string): Promise<RadarScanDetailResponse> => {
-    const response = await apiClient.get<RadarScanDetailResponse>(
-      `${spaceRadarsPath(spaceUuid, radarUuid)}/scans/${encodeURIComponent(scanUuid)}`,
-    );
-    return response.data;
-  },
-
-  triageScan: async (
-    spaceUuid: string,
-    radarUuid: string,
-    scanUuid: string,
-    payload: TriageScanPayload,
-  ): Promise<RadarScanResponse> => {
-    const response = await apiClient.patch<RadarScanResponse>(
-      `${spaceRadarsPath(spaceUuid, radarUuid)}/scans/${encodeURIComponent(scanUuid)}`,
-      payload,
-    );
-    return response.data;
-  },
-
-  publishScan: async (spaceUuid: string, radarUuid: string, scanUuid: string): Promise<RadarScanResponse> => {
-    const response = await apiClient.post<RadarScanResponse>(
-      `${spaceRadarsPath(spaceUuid, radarUuid)}/scans/${encodeURIComponent(scanUuid)}/publish`,
-    );
-    return response.data;
-  },
-
-  unpublishScan: async (spaceUuid: string, radarUuid: string, scanUuid: string): Promise<RadarScanResponse> => {
-    const response = await apiClient.post<RadarScanResponse>(
-      `${spaceRadarsPath(spaceUuid, radarUuid)}/scans/${encodeURIComponent(scanUuid)}/unpublish`,
-    );
-    return response.data;
-  },
-
   /**
    * A report as Word or PDF (`GET /radars/{radar}/scans/{scan}/export`), for
    * any member of the Radar's Space. Nothing is stored; the answer is the
