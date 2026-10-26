@@ -86,7 +86,9 @@ test('the report draws its drafts as cards and opens them beside it, with the af
   const screen = code('./ScanReportScreen.tsx');
   assert.match(screen, /reportParts\(narrative, draftOffset \?\? 0\)/);
   assert.match(screen, /<DraftCard key=\{`draft-\$\{part\.ordinal\}`\} draft=\{part\.draft\} ordinal=\{part\.ordinal\} live=\{false\} \/>/);
-  // The panel needs the Radar's chat and the offset; without them a draft reads in place.
+  // The panel needs the Radar's chat (the report's read, else the Radar's) and
+  // the offset; without them a draft reads in place.
+  assert.match(screen, /ownerScan\?\.conversation_uuid \?\? radarQuery\.data\?\.data\.conversation_uuid \?\? null/);
   assert.match(screen, /draftChatUuid !== null && typeof draftOffset === 'number'/);
   assert.match(screen, /if \(!draftChat\) return page;/);
   assert.match(screen, /<SidePanelValueProvider url=\{sideUrl\} offsets=\{NO_OFFSETS\} space=\{draftSpace\} frame="card">/);

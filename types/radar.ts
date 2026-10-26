@@ -85,6 +85,9 @@ export interface Radar extends RadarListItem {
   /** May mark this Radar's reports read, priority, complete or archived. */
   can_triage?: boolean;
   schedule_state?: RadarScheduleState;
+  /** "Email reports to" (plan 6.2): the chosen members carry no address. */
+  email_audience?: RadarEmailAudience;
+  email_members?: RadarPerson[];
 }
 
 export interface RadarSpaceStub {
@@ -147,6 +150,9 @@ export interface RadarScanDetail extends RadarScan {
   /** Drafts in this Radar's earlier reports: a draft's ordinal is
    *  `draft_offset + its index in this report` (plan 5.5). */
   draft_offset?: number;
+  /** The Radar's chat, for a draft's Save as note: the space read's own
+   *  (asked of Backend, 26 October 2026), else the Radar read's. */
+  conversation_uuid?: string;
   export_urls?: { docx: string; pdf: string } | null;
   radar?: { uuid: string; name: string; status?: RadarStatus } | null;
   space?: RadarSpaceStub | null;
@@ -221,7 +227,15 @@ export interface CreateRadarPayload {
   entities?: RadarEntityInput[];
   channels?: RadarChannelType[];
   first_scan?: boolean;
+  /** Space Radars only (plan 6.2, Backend's B4): who of the space's members
+   *  gets each report by email. */
+  email_audience?: RadarEmailAudience;
+  /** With `chosen`: the members' user uuids (at most 100), replacing the list. */
+  email_member_uuids?: string[];
 }
+
+/** "Email reports to": every member who has Radar notices on, or the chosen ones. */
+export type RadarEmailAudience = 'everyone' | 'chosen';
 
 export type UpdateRadarPayload = Partial<CreateRadarPayload>;
 

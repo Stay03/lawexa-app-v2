@@ -19,6 +19,7 @@ import { jurisdictionsQueries } from '@/v2/features/jurisdictions/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { CreateRadarPayload, Radar } from '@/types/radar';
 import { ChipsField } from './ChipsField';
+import { EmailAudienceField } from './EmailAudienceField';
 import { JurisdictionsField } from './JurisdictionsField';
 import { ReviewDialog } from './ReviewDialog';
 import { SchedulePicker } from './SchedulePicker';
@@ -530,7 +531,22 @@ export function RadarForm({
         </Collapsible>
 
         <div className="divide-y rounded-xl border">
-          {space ? null : (
+          {space ? (
+            <EmailAudienceField
+              spaceUuid={space.uuid}
+              audience={values.emailAudience}
+              members={values.emailMembers}
+              error={errors.email_member_uuids}
+              onAudienceChange={(next) => {
+                set('emailAudience', next);
+                clearError('email_member_uuids');
+              }}
+              onMembersChange={(next) => {
+                set('emailMembers', next);
+                clearError('email_member_uuids');
+              }}
+            />
+          ) : (
             <div className="flex items-center justify-between gap-4 px-4 py-3">
               <div>
                 <label

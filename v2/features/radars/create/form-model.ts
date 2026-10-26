@@ -1,5 +1,5 @@
 import { parseCronExpression } from '@/lib/utils/cron';
-import type { CreateRadarPayload, Radar } from '@/types/radar';
+import type { CreateRadarPayload, Radar, RadarEmailAudience } from '@/types/radar';
 
 /**
  * form-model.ts — the radar form's values, validation, payload building, and
@@ -54,6 +54,10 @@ export interface RadarFormValues {
   keywords: string[];
   sources: RadarSourceValue[];
   emailChannel: boolean;
+  /** A space Radar's "Email reports to" (plan 6.2): everyone, or the chosen
+   *  members' user uuids. Unused on a personal Radar. */
+  emailAudience: RadarEmailAudience;
+  emailMembers: string[];
   /** Create-only: dispatch an immediate first scan. */
   firstScan: boolean;
 }
@@ -70,6 +74,7 @@ export type RadarFieldName =
   | 'topics'
   | 'keywords'
   | 'sources'
+  | 'email_member_uuids'
   | 'form';
 
 export type RadarFieldErrors = Partial<Record<RadarFieldName, string>>;
@@ -100,6 +105,8 @@ export function emptyRadarFormValues(): RadarFormValues {
     keywords: [],
     sources: [],
     emailChannel: false,
+    emailAudience: 'everyone',
+    emailMembers: [],
     firstScan: true,
   };
 }
@@ -121,6 +128,8 @@ export function radarFormValuesFromRadar(radar: Radar): RadarFormValues {
     emailChannel: radar.channels.some(
       (channel) => channel.type === 'email' && channel.active,
     ),
+    emailAudience: radar.email_audience ?? 'everyone',
+    emailMembers: (radar.email_members ?? []).map((member) => member.uuid),
     firstScan: false,
   };
 }
@@ -226,7 +235,12 @@ export function buildRadarPayload(
         ? { url: source.url.trim(), label }
         : { url: source.url.trim() };
     }),
-    ...(options.inSpace ? {} : { channels: values.emailChannel ? ['in_app', 'email'] : ['in_app'] }),
+    ...(options.inSpace
+      ? // The chosen list is sent only with `chosen`; the server replaces it whole.
+        values.emailAudience === 'chosen'
+        ? { email_audience: 'chosen', email_member_uuids: values.emailMembers }
+        : { email_audience: 'everyone' }
+      : { channels: values.emailChannel ? ['in_app', 'email'] : ['in_app'] }),
     ...(options.includeFirstScan ? { first_scan: values.firstScan } : {}),
   };
 }
@@ -241,6 +255,7 @@ const SERVER_FIELD_NAMES: ReadonlySet<string> = new Set([
   'topics',
   'keywords',
   'sources',
+  'email_member_uuids',
 ]);
 
 /**

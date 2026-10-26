@@ -130,11 +130,13 @@ export function ScanReportScreen({
   // ── DRAFTS (plan 5.5) ──────────────────────────────────────────────────
   // A draft in a report opens in the chat's side panel (`?side=draft:N`) and
   // saves as a note of the Radar's chat, so it needs that chat's id (the
-  // Radar's own read) and where this report's drafts start among the chat's
-  // (`draft_offset`, report-drafts.ts). A reader without either sees each
-  // draft's text in place (DraftCard with no panel).
+  // report's own read, else the Radar's) and where this report's drafts start
+  // among the chat's (`draft_offset`, report-drafts.ts). A reader without
+  // either sees each draft's text in place (DraftCard with no panel).
   const sideUrl = useSidePanelUrl();
-  const draftChatUuid = isOwner ? (radarQuery.data?.data.conversation_uuid ?? null) : null;
+  const draftChatUuid = isOwner
+    ? (ownerScan?.conversation_uuid ?? radarQuery.data?.data.conversation_uuid ?? null)
+    : null;
   const draftOffset = ownerScan?.draft_offset;
   const draftChat =
     draftChatUuid !== null && typeof draftOffset === 'number' ? { uuid: draftChatUuid, offset: draftOffset } : null;

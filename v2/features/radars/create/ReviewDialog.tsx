@@ -16,6 +16,7 @@ import { describeCron, estimateScansPerMonth } from '@/lib/utils/cron';
 import { jurisdictionsQueries } from '@/v2/features/jurisdictions/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { RadarFormValues } from './form-model';
+import { spaceReportsLine } from './email-audience';
 import { userLimitsQuery } from '@/v2/features/subscription/limits';
 
 /**
@@ -157,7 +158,7 @@ export function ReviewDialog({
             <SummaryRow label="Reports">
               <p>
                 {space
-                  ? `In ${space.name}, for everyone in it`
+                  ? spaceReportsLine(space.name, values.emailAudience, values.emailMembers.length)
                   : values.emailChannel
                     ? 'In-app, notifications, and email'
                     : 'In-app and notifications'}
