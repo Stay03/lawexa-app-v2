@@ -20,6 +20,12 @@ test('the report page in a space wraps the same page in the space scope', () => 
   );
 });
 
+test('a space report reads the space’s own route, which carries the member’s fields', () => {
+  // The personal route answers a member too, but without the Radar chat's id,
+  // so a Viewer's drafts had no editor (picture run, 26 October 2026).
+  assert.match(report, /radarsQueries\.scanDetail\(radarUuid, scanUuid, \{ viewerId, scope \}\)/);
+});
+
 test("a Viewer reads, marks read and downloads the report, with no triage toolbar and no share", () => {
   assert.match(report, /scope\.kind === 'personal' \|\| \(reportFlags\?\.can_triage \?\? spaceRadar\?\.can_triage\) === true;/);
   assert.match(report, /scope\.kind === 'personal' \|\| \(reportFlags\?\.can_manage \?\? spaceRadar\?\.can_manage\) === true;/);

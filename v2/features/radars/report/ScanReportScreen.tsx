@@ -89,8 +89,11 @@ export function ScanReportScreen({
   // account, so they read the public shape like signed-out visitors.
   const isAccount = signedIn && role !== 'guest';
 
+  // A space report reads the space's own route (`radarCalls`), which carries
+  // what a member needs and the personal route does not: the reader's read
+  // state, affected items, the draft offset and the Radar's chat.
   const authedQuery = useQuery({
-    ...radarsQueries.scanDetail(radarUuid, scanUuid, { viewerId }),
+    ...radarsQueries.scanDetail(radarUuid, scanUuid, { viewerId, scope }),
     enabled: isAccount,
   });
   const publicQuery = useQuery({
