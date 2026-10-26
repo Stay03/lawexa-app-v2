@@ -130,12 +130,19 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 export function RadarForm({
   mode,
   radar,
+  space,
   isSubmitting,
   submitLabel,
   onSubmit,
 }: {
   mode: 'create' | 'edit';
   radar?: Radar;
+  /**
+   * The space the Radar is made in (Radar in Spaces, 26 October 2026). Its
+   * reports go to the space's members, so there is no personal email switch
+   * and the body sends no `channels`; the space's owner pays for its scans.
+   */
+  space?: { uuid: string; name: string };
   isSubmitting: boolean;
   submitLabel: string;
   onSubmit: (payload: CreateRadarPayload, helpers: RadarFormHelpers) => void;
@@ -265,7 +272,7 @@ export function RadarForm({
       buildRadarPayload(
         submitValues,
         { jurisdictions: effectiveJurisdictions, timezone },
-        { includeFirstScan: mode === 'create' },
+        { includeFirstScan: mode === 'create', inSpace: space !== undefined },
       ),
       helpers,
     );
@@ -523,25 +530,27 @@ export function RadarForm({
         </Collapsible>
 
         <div className="divide-y rounded-xl border">
-          <div className="flex items-center justify-between gap-4 px-4 py-3">
-            <div>
-              <label
-                htmlFor={`${uid}-email`}
-                className="text-sm font-medium text-foreground"
-              >
-                Email reports
-              </label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {userEmail ? `Sent to ${userEmail} — reports` : 'Reports'}{' '}
-                always appear in-app and in your notifications.
-              </p>
+          {space ? null : (
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <div>
+                <label
+                  htmlFor={`${uid}-email`}
+                  className="text-sm font-medium text-foreground"
+                >
+                  Email reports
+                </label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {userEmail ? `Sent to ${userEmail} — reports` : 'Reports'}{' '}
+                  always appear in-app and in your notifications.
+                </p>
+              </div>
+              <Switch
+                id={`${uid}-email`}
+                checked={values.emailChannel}
+                onCheckedChange={(checked) => set('emailChannel', checked)}
+              />
             </div>
-            <Switch
-              id={`${uid}-email`}
-              checked={values.emailChannel}
-              onCheckedChange={(checked) => set('emailChannel', checked)}
-            />
-          </div>
+          )}
 
           {mode === 'create' ? (
             <div className="flex items-center justify-between gap-4 px-4 py-3">
@@ -590,6 +599,7 @@ export function RadarForm({
         <ReviewDialog
           values={pendingValues}
           jurisdictionSlugs={effectiveJurisdictions}
+          space={space}
           // Resolved by the time the dialog can open (validation holds submit
           // until the zone exists); the fallback only satisfies the type.
           timezone={effectiveTimezone ?? ''}

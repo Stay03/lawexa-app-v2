@@ -201,7 +201,12 @@ export function validateRadarForm(
 export function buildRadarPayload(
   values: RadarFormValues,
   resolved: { jurisdictions: string[]; timezone: string },
-  options: { includeFirstScan: boolean },
+  options: {
+    includeFirstScan: boolean;
+    /** A Radar in a space reports to the space's members, so it sends no
+     *  `channels` (the space routes refuse them). */
+    inSpace?: boolean;
+  },
 ): CreateRadarPayload {
   const name = values.name.trim();
   return {
@@ -221,7 +226,7 @@ export function buildRadarPayload(
         ? { url: source.url.trim(), label }
         : { url: source.url.trim() };
     }),
-    channels: values.emailChannel ? ['in_app', 'email'] : ['in_app'],
+    ...(options.inSpace ? {} : { channels: values.emailChannel ? ['in_app', 'email'] : ['in_app'] }),
     ...(options.includeFirstScan ? { first_scan: values.firstScan } : {}),
   };
 }

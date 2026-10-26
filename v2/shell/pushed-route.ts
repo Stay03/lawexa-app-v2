@@ -295,14 +295,34 @@ export function pushedScreenFor(pathname: string): PushedScreen | null {
       return null;
 
     case 'spaces':
-      // ONLY `discover`. `/spaces/{uuid}` is a collab route and keeps the
-      // collab header's own back control and crest (see the file docblock).
+      // `discover` and a space's Radars. `/spaces/{uuid}` is a collab route and
+      // keeps the collab header's own back control and crest (see the file docblock).
       if (depth === 2 && second === 'discover') {
         return {
           backHref: '/spaces',
           backLabel: 'Back to your spaces',
           title: fixed('Find a space'),
         };
+      }
+      // A space's Radars (Radar in Spaces, 26 October 2026). Deeper than the
+      // collab routes, so the collab frame steps aside (`parseCollabRoute`)
+      // and these wear the pushed bar. Up is the space's Radars pill.
+      if (third === 'radars' && second) {
+        const space = `/spaces/${second}?tab=radars`;
+        if (depth === 4 && segments[3] === 'new') {
+          return { backHref: space, backLabel: 'Back to the space', title: fixed('New Radar') };
+        }
+        // The Radar, and one of its reports: both open on their own masthead.
+        if (depth === 4) {
+          return { backHref: space, backLabel: 'Back to the space', title: NO_TITLE };
+        }
+        if (depth === 6 && segments[4] === 'scans') {
+          return {
+            backHref: `/spaces/${second}/radars/${segments[3]}`,
+            backLabel: 'Back to the Radar',
+            title: NO_TITLE,
+          };
+        }
       }
       return null;
 

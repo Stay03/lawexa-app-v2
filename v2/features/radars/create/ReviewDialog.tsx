@@ -54,9 +54,13 @@ export function ReviewDialog({
   isSubmitting,
   onConfirm,
   onCancel,
+  space,
 }: {
   /** Values to review, or null when the dialog is closed. */
   values: RadarFormValues | null;
+  /** The space the Radar is made in: its reports go there, and the space's
+   *  owner pays for its scans, so the reader's own balance is not shown. */
+  space?: { uuid: string; name: string };
   /** The EFFECTIVE jurisdiction selection (incl. the untouched default). */
   jurisdictionSlugs: string[];
   /** The RESOLVED timezone (stored pick, else the device zone). */
@@ -74,7 +78,7 @@ export function ReviewDialog({
   });
   const { data: limitsData } = useQuery({
     ...userLimitsQuery({ viewerId }),
-    enabled: values !== null,
+    enabled: values !== null && space === undefined,
   });
 
   const jurisdictionNames = jurisdictionSlugs.map(
@@ -152,9 +156,11 @@ export function ReviewDialog({
             </SummaryRow>
             <SummaryRow label="Reports">
               <p>
-                {values.emailChannel
-                  ? 'In-app, notifications, and email'
-                  : 'In-app and notifications'}
+                {space
+                  ? `In ${space.name}, for everyone in it`
+                  : values.emailChannel
+                    ? 'In-app, notifications, and email'
+                    : 'In-app and notifications'}
               </p>
             </SummaryRow>
             <SummaryRow label="First report">
@@ -173,7 +179,7 @@ export function ReviewDialog({
         {/* The money, in one place: cadence cost, unit cost, balance. */}
         <div className="rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
           <p>
-            Each scan uses 1 AI message from your plan
+            {space ? "Each scan uses 1 AI message from the space owner's plan" : 'Each scan uses 1 AI message from your plan'}
             {scansPerMonth !== null && scansPerMonth > 0 ? (
               <>
                 {' '}
@@ -188,7 +194,7 @@ export function ReviewDialog({
             ) : (
               '.'
             )}
-            {messagesRemaining !== null ? (
+            {messagesRemaining !== null && space === undefined ? (
               <>
                 {' '}
                 You have{' '}
