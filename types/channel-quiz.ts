@@ -183,7 +183,19 @@ export interface QuizQuestion {
    * may not open (a private note, a file).
    */
   source?: QuizSource | null;
+  /** How the question counts (Arthur, 26 October 2026): absent on a body
+   *  from before the field, read as `scored`. */
+  scoring?: QuizQuestionScoring;
 }
+
+/**
+ * How a question counts toward the score (Backend, 26 October 2026):
+ *   scored      as every question until now
+ *   unscored    shown and answered, right or wrong, but no points and left
+ *               out of the total (the app says "Bonus")
+ *   free_point  any answer counts as right and earns points ("Free point")
+ */
+export type QuizQuestionScoring = 'scored' | 'unscored' | 'free_point';
 
 /**
  * Where a question or a scenario comes from (the quiz builder, backend 24
@@ -463,6 +475,10 @@ export interface QuizAttempt {
   reveal_mode: QuizRevealMode;
   question_count: number;
   answered_count: number;
+  /** The questions that count toward the score (not the unscored ones):
+   *  `score_percent` and `max_points` are over these. Absent before the
+   *  field, when every question counted. */
+  scored_count?: number;
   correct_count?: number;
   score_percent?: number;
   points?: number;
@@ -692,6 +708,7 @@ export interface QuizQuestionStats {
   no_answer_count: number;
   percent_correct: number;
   avg_correct_response_ms: number | null;
+  scoring?: QuizQuestionScoring;
 }
 
 /** `GET /quiz-games/{game}/results` — finished games only (409 while running

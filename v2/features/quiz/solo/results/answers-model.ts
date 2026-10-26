@@ -12,6 +12,7 @@
 
 import type { QuizAttemptQuestion } from '@/types/channel-quiz';
 import { questionVerdict } from '../model';
+import { countsTowardScore } from '../../scoring';
 
 export type AnswersFilter = 'all' | 'wrong' | 'right';
 
@@ -32,6 +33,16 @@ export function matchesAnswersFilter(question: QuizAttemptQuestion, filter: Answ
 export function answersCounts(questions: readonly QuizAttemptQuestion[]): Record<AnswersFilter, number> {
   const right = questions.filter((question) => questionVerdict(question) === 'correct').length;
   return { all: questions.length, wrong: questions.length - right, right };
+}
+
+/**
+ * "x of y right" over the questions that count (Arthur, 26 October 2026): a
+ * Bonus question is reviewed and filtered like any other, but it is left out
+ * of the score, as the server leaves it out of `correct_count`.
+ */
+export function answersScore(questions: readonly QuizAttemptQuestion[]): { right: number; counted: number } {
+  const counted = questions.filter(countsTowardScore);
+  return { right: counted.filter((question) => questionVerdict(question) === 'correct').length, counted: counted.length };
 }
 
 /** The 0-based positions a filter keeps, in the quiz's order. */

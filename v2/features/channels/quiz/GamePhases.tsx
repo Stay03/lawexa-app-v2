@@ -53,6 +53,7 @@ import {
   totalPicks,
 } from './model';
 import type { AnswerStanding, FinalAnswerClose, LiveGame } from './use-game';
+import { ScoringBadge } from '@/v2/features/quiz/ScoringBadge';
 
 /**
  * GamePhases — the six things a live game can look like: lobby, count-in,
@@ -257,10 +258,14 @@ export function QuestionStage({
     <GameStage>
       <div className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-3">
-          <StageKicker>
-            Question {questionNumber(current, state.game.question_count)} of{' '}
-            {state.game.question_count}
-          </StageKicker>
+          <span className="flex items-center gap-2">
+            <StageKicker>
+              Question {questionNumber(current, state.game.question_count)} of{' '}
+              {state.game.question_count}
+            </StageKicker>
+            {/* Bonus or Free point, before it is answered (scoring.ts). */}
+            <ScoringBadge question={current.question} />
+          </span>
           {/* THE SCREEN STOPS BEING SILENT ABOUT WHAT COMES NEXT. `is_final`
               rides the state read in both question phases, so the last question
               can say so while it is still being answered — and the podium then
@@ -517,7 +522,10 @@ export function FinalAnswerStage({
   return (
     <GameStage>
       <div className="flex flex-col gap-3">
-        <StageKicker>Last question</StageKicker>
+        <span className="flex items-center gap-2">
+          <StageKicker>Last question</StageKicker>
+          <ScoringBadge question={question} />
+        </span>
         <PhaseRow>
           <Trophy aria-hidden className="size-4 shrink-0 text-primary" />
           <span className="text-sm text-muted-foreground">

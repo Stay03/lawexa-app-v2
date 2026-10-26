@@ -13,11 +13,13 @@ import { pointsLabel, questionVerdict, scenarioFor, secondsLabel, type QuestionV
 import { QuizSourceLine } from '../../source/QuizSourceLine';
 import { QuestionFeedbackButton } from '../../feedback/QuestionFeedbackButton';
 import { attemptQuestionSnapshot } from '../../feedback/question-feedback';
+import { ScoringBadge } from '../../ScoringBadge';
 import { AttemptOptionTile } from '../player/AttemptOptionTile';
 import { RaisedButton } from '../ui';
 import {
   answersCounts,
   answersDeck,
+  answersScore,
   answersPositionLabel,
   indexAfterFilter,
   openingAnswer,
@@ -58,6 +60,7 @@ export function AnswersStepper({ attempt, questions }: { attempt: QuizAttempt; q
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
 
   const counts = useMemo(() => answersCounts(questions), [questions]);
+  const score = useMemo(() => answersScore(questions), [questions]);
   const deck = useMemo(() => answersDeck(questions, filter), [questions, filter]);
   const question = questions[current];
 
@@ -118,7 +121,7 @@ export function AnswersStepper({ attempt, questions }: { attempt: QuizAttempt; q
       <div className="flex items-baseline justify-between gap-3">
         <h1 className="text-lg font-bold text-foreground">See your answers</h1>
         <p className="shrink-0 text-[13px] text-muted-foreground tabular-nums">
-          {counts.right} of {counts.all} right
+          {score.right} of {score.counted} right
         </p>
       </div>
 
@@ -265,9 +268,12 @@ function AnswerPage({ attempt, question, index }: { attempt: QuizAttempt; questi
   return (
     <section aria-label={`Question ${index + 1}`}>
       <div className="flex items-center justify-between gap-3 text-[13px] font-semibold text-muted-foreground">
-        <span className="tabular-nums">
-          Question {index + 1}
-          {verdict !== 'unanswered' && responseMs !== null ? ` · ${secondsLabel(responseMs)}` : ''}
+        <span className="flex items-center gap-2">
+          <span className="tabular-nums">
+            Question {index + 1}
+            {verdict !== 'unanswered' && responseMs !== null ? ` · ${secondsLabel(responseMs)}` : ''}
+          </span>
+          <ScoringBadge question={question} />
         </span>
         <span className="flex items-center gap-1">
           <span

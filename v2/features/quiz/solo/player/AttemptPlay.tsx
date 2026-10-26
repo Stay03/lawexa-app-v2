@@ -39,6 +39,7 @@ import { useScreenHold } from '@/v2/runtime/screen-hold';
 import { QuizSourceLine } from '../../source/QuizSourceLine';
 import { QuestionFeedbackButton } from '../../feedback/QuestionFeedbackButton';
 import { attemptQuestionSnapshot } from '../../feedback/question-feedback';
+import { ScoringBadge } from '../../ScoringBadge';
 import '../solo-quiz.css';
 
 /**
@@ -505,6 +506,8 @@ function QuestionGroup({
           </div>
         )}
 
+        {/* Bonus or Free point, before it is answered (scoring.ts). */}
+        <ScoringBadge question={question} className="mt-2.5" />
         <h1
           id={headingId}
           className={cn(

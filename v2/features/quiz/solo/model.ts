@@ -168,7 +168,7 @@ export interface AttemptScore {
   /** The server's `score_percent`, as sent. */
   percent: number;
   points: number;
-  /** `question_count × 1000` (server rule). */
+  /** `scored_count × 1000` (server rule): an unscored question adds nothing. */
   maxPoints: number;
   /** Mean over the answered questions; `null` when none were answered. */
   avgResponseMs: number | null;
@@ -193,7 +193,9 @@ export function attemptScore(attempt: QuizAttempt): AttemptScore | null {
   return {
     correct: correct_count,
     answered: attempt.answered_count,
-    total: attempt.question_count,
+    // The questions that count (Arthur, 26 October 2026): a Bonus one is
+    // answered but left out of "x of y right".
+    total: attempt.scored_count ?? attempt.question_count,
     percent: score_percent,
     points,
     maxPoints: max_points,
