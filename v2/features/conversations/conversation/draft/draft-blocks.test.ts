@@ -197,12 +197,19 @@ test('on a computer the draft panel has no title line and no foot: one bar holds
   assert.equal(editor.match(/<DraftFolderPicker /g)?.length, 1);
 });
 
-test('the gold Save as note is the only primary action on the computer panel', async () => {
+test('Save is quiet everywhere: no gold fill, gold only on its icon (Stay, 25 October 2026)', async () => {
   const { readFileSync } = await import('node:fs');
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
   const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
-  assert.equal(control.match(/\bbg-primary\b(?!\/)/g)?.length, 1);
+  // No gold fill on the computer's Save or its chevron: the bar's grey face, a gold icon.
+  assert.doesNotMatch(bar, /\bbg-primary\b(?!\/)/);
+  assert.match(bar, /const SAVE_FACE =\s*'bg-foreground\/\[0\.06\] text-foreground transition-colors hover:bg-foreground\/10 dark:bg-white\/\[0\.08\] dark:hover:bg-white\/\[0\.12\]';/);
+  assert.match(control, /<NotebookPen aria-hidden className="size-\[15px\] text-primary" \/>/);
+  // The phone foot's Save wears the Word and PDF outline, with a gold icon.
+  const foot = bar.slice(bar.indexOf('v2-draft-save-foot'), bar.indexOf('function DownloadPill'));
+  assert.match(foot, /className=\{cn\(ACTION_PILL, 'font-medium text-foreground', FOCUS_RING\)\}/);
+  assert.match(foot, /<NotebookPen aria-hidden className="size-4 text-primary" \/>/);
   // "Save" (Stay, 25 October 2026: "just have 'Save'"); a screen reader hears "Save as a note".
   assert.match(bar, /return draft\.saved \? 'Save changes' : 'Save';/);
   assert.match(bar, /return draft\.saved \|\| draft\.mutation\.isPending \? null : <span className="sr-only"> as a note<\/span>;/);

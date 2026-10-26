@@ -77,7 +77,7 @@ test('the route posts the title, the html and the format, and reads a file', () 
   assert.match(bar, /const downloads = useDraftDownload\(editor, title\);/);
 });
 
-test('on a computer, before the first save, a gold chevron holds Save as note, Word and PDF', () => {
+test('on a computer, before the first save, the chevron holds Save as note, Word and PDF', () => {
   const bar = read('./DraftSaveBar.tsx');
   const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
   // The chevron only before the first save; after it, the Saved chip and its ··· as before.
@@ -88,7 +88,7 @@ test('on a computer, before the first save, a gold chevron holds Save as note, W
   assert.match(control, /<p role="alert" className=\{FAILURE_BOX\}>\s*\{downloads\.failure\}\s*<\/p>/);
   const menu = bar.slice(bar.indexOf('function SaveMoreMenu'));
   assert.match(menu, /<DropdownMenuTrigger\s+aria-label="More ways to save"/);
-  assert.match(menu, /rounded-r-\[9px\] bg-primary text-primary-foreground/);
+  assert.match(menu, /'v2-interactive inline-flex h-8 w-7 items-center justify-center rounded-r-\[9px\]',\s*SAVE_FACE,/);
   assert.match(menu, /\{downloading \? \(\s*<Loader2 /);
   assert.match(menu, /<DropdownMenuContent align="end" className=\{DRAFT_MENU\}>/);
   const order = ['Save', ' as a note', 'Download Word', '.docx', 'Download PDF', '.pdf'];

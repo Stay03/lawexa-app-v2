@@ -46,8 +46,8 @@ import { useSaveDraftNote } from './use-save-draft-note';
  *                 Save to folder
  *   computer      the right of the panel's one bar, before the close
  *                 (DraftSaveControl, take B2, Stay 24 October 2026: "add save
- *                 to that toolbar"): the gold Save as note, the panel's only
- *                 primary action, "Save" on a narrow panel; once saved a
+ *                 to that toolbar"): Save as note, "Save" on a narrow panel,
+ *                 in a quiet grey face with a gold icon; once saved a
  *                 quiet "Saved" chip and a ··· menu with Open note, Export
  *                 Word, Export PDF and Save to folder
  *   edited        Save changes in place of the chip or the line, with the
@@ -55,9 +55,10 @@ import { useSaveDraftNote } from './use-save-draft-note';
  *
  * Before the first save the draft downloads as it stands, with no note made
  * (Stay, 24 October 2026: "That save as note should be a drop-down of 'save
- * note, download docx, download pdf'"): on a computer the gold button is split,
+ * note, download docx, download pdf'"): on a computer the Save button is split,
  * its chevron a menu of Save as note, Download Word and Download PDF; on the
- * phone sheet the foot shows the two downloads beside Save as note.
+ * phone sheet the foot shows the two downloads beside Save as note, all three
+ * in the same outline, gold only on Save's icon (Stay, 25 October 2026).
  *
  * Save to folder opens the folder picker on this Space's folders in a Space
  * chat, else on the reader's own. Export is the note page's own download
@@ -147,15 +148,15 @@ export function DraftSaveBar({ draft, dirty, space }: DraftSaveProps) {
             type="button"
             onClick={draft.press}
             aria-disabled={mutation.isPending}
-            className={cn(
-              'v2-interactive inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90',
-              FOCUS_RING,
-            )}
+            // The same outline as Word and PDF beside it, with gold only on
+            // its icon (Stay, 25 October 2026: the gold Save "looks ugly like
+            // a sore thumb").
+            className={cn(ACTION_PILL, 'font-medium text-foreground', FOCUS_RING)}
           >
             {mutation.isPending ? (
-              <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
+              <Loader2 aria-hidden className="size-4 text-primary motion-safe:animate-spin" />
             ) : (
-              <NotebookPen aria-hidden className="size-4" />
+              <NotebookPen aria-hidden className="size-4 text-primary" />
             )}
             <span aria-live="polite">
               {saveLabel(draft)}
@@ -230,17 +231,22 @@ function DownloadPill({
   );
 }
 
-/** The gold of Save as note and its chevron: one fill, one raised edge. */
-const GOLD_FACE =
-  'shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_1px_2px_rgb(0_0_0/0.15)] transition-colors hover:bg-primary/90';
+/**
+ * The face of the computer's Save and its chevron: the bar's own quiet grey
+ * step, no line (Stay's no-outlines rule on a computer), with gold only on
+ * the Save icon (Stay, 25 October 2026: the gold button "looks ugly like a
+ * sore thumb").
+ */
+const SAVE_FACE =
+  'bg-foreground/[0.06] text-foreground transition-colors hover:bg-foreground/10 dark:bg-white/[0.08] dark:hover:bg-white/[0.12]';
 
 /** A failed save or download, in a small box under the computer's button. */
 const FAILURE_BOX = 'v2-draft-surface rounded-lg px-3 py-2 text-xs leading-snug text-destructive';
 
 /**
- * The right of the computer's bar: the gold Save as note (or Save changes),
- * or once saved the quiet chip, then the ··· menu once there is a note.
- * Before the first save the gold button is split: a 1px space (no line, by
+ * The right of the computer's bar: Save as note (or Save changes) in a quiet
+ * grey face with a gold icon, or once saved the quiet chip, then the ··· menu
+ * once there is a note. Before the first save the button is split: a 1px space (no line, by
  * Stay's no-outlines rule), then a chevron whose menu also downloads the
  * draft as Word or PDF. A failed save or download says why in a small box
  * under the button. Inside the panel's `@container/draft`.
@@ -260,16 +266,16 @@ export function DraftSaveControl({ draft, dirty, space }: DraftSaveProps) {
           onClick={draft.press}
           aria-disabled={mutation.isPending}
           className={cn(
-            'v2-interactive inline-flex h-8 items-center gap-1.75 bg-primary pr-3.25 pl-2.75 text-[13px] font-semibold whitespace-nowrap text-primary-foreground',
+            'v2-interactive inline-flex h-8 items-center gap-1.75 pr-3.25 pl-2.75 text-[13px] font-semibold whitespace-nowrap',
             saved ? 'rounded-[9px]' : 'rounded-l-[9px]',
-            GOLD_FACE,
+            SAVE_FACE,
             FOCUS_RING,
           )}
         >
           {mutation.isPending ? (
-            <Loader2 aria-hidden className="size-[15px] motion-safe:animate-spin" />
+            <Loader2 aria-hidden className="size-[15px] text-primary motion-safe:animate-spin" />
           ) : (
-            <NotebookPen aria-hidden className="size-[15px]" />
+            <NotebookPen aria-hidden className="size-[15px] text-primary" />
           )}
           <span aria-live="polite">
             <span className="@max-[37.5rem]/draft:hidden">
@@ -406,8 +412,8 @@ function SaveMoreMenu({ draft }: { draft: DraftSave }) {
           <DropdownMenuTrigger
             aria-label="More ways to save"
             className={cn(
-              'v2-interactive inline-flex h-8 w-7 items-center justify-center rounded-r-[9px] bg-primary text-primary-foreground',
-              GOLD_FACE,
+              'v2-interactive inline-flex h-8 w-7 items-center justify-center rounded-r-[9px]',
+              SAVE_FACE,
               FOCUS_RING,
             )}
           >
