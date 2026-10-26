@@ -118,6 +118,25 @@
        examined and whether the setup interaction actually landed. A screen the
        check never reached must not read as a screen that passed.
 
+   ── WHITE TEXT ON A DEEPER GOLD (Stay, 26 October 2026) ────────────────────
+   Stay asked why the gold buttons had black text in light mode and picked
+   white (B, 02:09 UTC, from pictures of both side by side). White needs the
+   gold DARKER, which turns all three bars above into one direction:
+
+       L       label (4.5)   pill (3.0)   dot (3.0)
+       0.61      4.73 dark     3.83         3.12      the value before
+       0.56      4.71 white    4.69         3.78      <- taken
+
+   **LIGHT TAKES oklch(0.56 0.13 85) WITH WHITE TEXT**, the lightest gold on
+   which white passes 4.5 : 1, so the gold moves as little as it can. 0.52
+   gives 5.54 but reads brown. The darker gold lowers no bar: the label,
+   the pill on white and the dot on its tint all gain or hold. It also
+   darkens every other gold in light mode (links, icons, the New chat text,
+   borders, tints, focus rings), and each of those now has more contrast
+   against white, not less. The label figure was measured on the built page
+   (1x1 canvas, black on white 21.00); the sweep of every gold surface is in
+   the commit that made this change.
+
    DARK IS RESTATED, NOT CHANGED. Same values it already had. Without the
    second rule the light override above would follow the document element into
    dark mode, since both classes sit on <html> and the later rule wins.
@@ -128,9 +147,9 @@
    1.31 : 1 for a button that is plainly legible.
    ============================================================================= */
 html.v2-document-lock {
-  --primary: oklch(0.61 0.13 85);
-  --primary-foreground: oklch(0.20 0.06 82);
-  --ring: oklch(0.61 0.13 85);
+  --primary: oklch(0.56 0.13 85);
+  --primary-foreground: oklch(1 0 0);
+  --ring: oklch(0.56 0.13 85);
 }
 
 html.v2-document-lock.dark {
