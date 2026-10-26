@@ -26,6 +26,7 @@ import { ShareDialog } from './ShareDialog';
 import { ReportDownloads } from './ReportDownloads';
 import { AffectedItems } from './AffectedItems';
 import { reportParts } from './report-drafts';
+import { readOnOpen } from './read-on-open';
 import { isOwnerScan, resolveScanViewer } from './viewer';
 import {
   SidePanelValueProvider,
@@ -155,18 +156,22 @@ export function ScanReportScreen({
   // Opening a completed unread report marks it read exactly once (owner
   // only) — the optimistic engine moves the unread badges everywhere.
   const { mutate: triage } = useTriageScan();
-  const hasMarkedRead = useRef(false);
   // Read state is each member's own in a space (Backend's B3), so opening a
-  // report marks it read for whoever opens it, Viewers included.
-  const shouldMarkRead =
-    ownerScan !== null &&
-    ownerScan.status === 'completed' &&
-    ownerScan.read_at === null;
+  // report marks it read for whoever opens it, Viewers included. Decided once
+  // per opening, from the state it opened in (read-on-open.ts), so Mark
+  // unread sticks.
+  const readDecided = useRef<string | null>(null);
+  const scanStatus = ownerScan?.status ?? null;
+  const scanReadAt = ownerScan ? ownerScan.read_at : null;
   useEffect(() => {
-    if (!shouldMarkRead || hasMarkedRead.current) return;
-    hasMarkedRead.current = true;
-    triage({ radarUuid, scanUuid, payload: { read: true } });
-  }, [shouldMarkRead, triage, radarUuid, scanUuid]);
+    const action = readOnOpen(
+      readDecided.current === scanUuid,
+      scanStatus === null ? null : { status: scanStatus, read_at: scanReadAt },
+    );
+    if (action === 'wait') return;
+    readDecided.current = scanUuid;
+    if (action === 'mark-read') triage({ radarUuid, scanUuid, payload: { read: true } });
+  }, [scanStatus, scanReadAt, triage, radarUuid, scanUuid]);
 
   if (activeQuery.isPending) {
     return (
