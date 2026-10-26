@@ -87,7 +87,14 @@ function parseIndex(raw: string | null, total: number): number | null {
   return parsed - 1;
 }
 
-export function ReviewStepper({ questions }: { questions: QuizResultItem[] }) {
+export function ReviewStepper({
+  questions,
+  sessionUuid,
+}: {
+  questions: QuizResultItem[];
+  /** The practice session, for a question's report (QuestionFeedbackButton). */
+  sessionUuid: string;
+}) {
   const total = questions.length;
   const searchParams = useSearchParams();
 
@@ -291,7 +298,7 @@ export function ReviewStepper({ questions }: { questions: QuizResultItem[] }) {
               : 'motion-safe:slide-in-from-left-4',
           )}
         >
-          <ResultItemCard item={current} index={currentIndex} />
+          <ResultItemCard item={current} index={currentIndex} sessionUuid={sessionUuid} />
         </div>
       ) : (
         <p className="rounded-xl border border-dashed border-border bg-card/50 py-10 text-center text-sm text-muted-foreground">

@@ -56,7 +56,8 @@ test('one button on all three pages, sending through v1’s feedback call', () =
   assert.match(button, /feedbackApi\.submit\(\{\s*feedback_text: text,\s*content_type: type,\s*content_id: contentId,/);
   // An empty report is refused in place, and a session is needed to send at all.
   assert.match(button, /if \(!text\) \{\s*setProblem\('Tick an issue or tell us in your own words\.'\);/);
-  assert.match(button, /const \{ signedIn \} = useV2Session\(\);\s*if \(!signedIn\) return null;/);
+  // An account only: a guest pass's report is refused by the server (26 October 2026).
+  assert.match(button, /const session = useV2Session\(\);\s*if \(!canSendFeedback\(session\)\) return null;/);
 });
 
 test('a send that never reached the server says so, and keeps the report', () => {

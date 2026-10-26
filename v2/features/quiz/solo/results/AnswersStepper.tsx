@@ -11,6 +11,8 @@ import { quietReplaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { pointsLabel, questionVerdict, scenarioFor, secondsLabel, type QuestionVerdict } from '../model';
 import { QuizSourceLine } from '../../source/QuizSourceLine';
+import { QuestionFeedbackButton } from '../../feedback/QuestionFeedbackButton';
+import { attemptQuestionSnapshot } from '../../feedback/question-feedback';
 import { AttemptOptionTile } from '../player/AttemptOptionTile';
 import { RaisedButton } from '../ui';
 import {
@@ -267,13 +269,20 @@ function AnswerPage({ attempt, question, index }: { attempt: QuizAttempt; questi
           Question {index + 1}
           {verdict !== 'unanswered' && responseMs !== null ? ` · ${secondsLabel(responseMs)}` : ''}
         </span>
-        <span
-          className={cn(
-            'font-comfortaa text-base font-bold tabular-nums',
-            points > 0 ? 'text-[var(--solo-right)]' : 'text-muted-foreground',
-          )}
-        >
-          +{pointsLabel(points)}
+        <span className="flex items-center gap-1">
+          <span
+            className={cn(
+              'font-comfortaa text-base font-bold tabular-nums',
+              points > 0 ? 'text-[var(--solo-right)]' : 'text-muted-foreground',
+            )}
+          >
+            +{pointsLabel(points)}
+          </span>
+          {/* Report a problem with this question (Arthur, 26 October 2026). */}
+          <QuestionFeedbackButton
+            target={{ kind: 'quiz', questionUuid: question.uuid, quizUuid: attempt.quiz.uuid, attemptUuid: attempt.uuid }}
+            snapshot={attemptQuestionSnapshot(question)}
+          />
         </span>
       </div>
 

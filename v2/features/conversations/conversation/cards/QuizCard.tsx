@@ -29,6 +29,8 @@ import {
 import { cn } from '@/lib/utils';
 import type { QuizInfo } from '@/lib/utils/parse-quiz-xml';
 import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
+import { useSavedMessageId } from '@/v2/features/conversations/conversation/markdown/document-export';
+import { QuestionFeedbackButton } from '@/v2/features/quiz/feedback/QuestionFeedbackButton';
 
 export type { QuizInfo, QuizOption } from '@/lib/utils/parse-quiz-xml';
 
@@ -55,6 +57,8 @@ export function QuizCard({
   const selectedOption = selectedAnswer ?? localSelectedOption;
   const isCorrect = selectedOption === quiz.answer;
   const [isExplanationOpen, setIsExplanationOpen] = useState(false);
+  // The saved answer this card is in: a report names it and the card's place.
+  const savedMessageId = useSavedMessageId();
 
   // Auto-open explanation when result is shown
   const shouldShowExplanation = showResult;
@@ -169,6 +173,20 @@ export function QuizCard({
                 Incorrect
               </Badge>
             )}
+            {/* Report a problem with this question, once it is answered and
+                the answer is saved (Arthur, 26 October 2026). */}
+            {savedMessageId !== null && quizNumber !== undefined ? (
+              <QuestionFeedbackButton
+                className="ml-auto"
+                target={{ kind: 'chat', messageId: savedMessageId, quizIndex: quizNumber - 1 }}
+                snapshot={{
+                  position: null,
+                  questionText: quiz.question,
+                  chosenOption: quiz.options.find((option) => option.id === selectedOption)?.text ?? null,
+                  correctOption: quiz.options.find((option) => option.id === quiz.answer)?.text ?? null,
+                }}
+              />
+            ) : null}
           </div>
 
           <Collapsible

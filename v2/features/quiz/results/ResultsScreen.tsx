@@ -125,7 +125,7 @@ export function ResultsScreen({ sessionUuid }: { sessionUuid: string }) {
                 — the stepper reads `?q=` for its opening question. The fallback
                 draws the same three blocks, so resolving it moves nothing. */}
             <Suspense fallback={<ReviewStepperSkeleton />}>
-              <ReviewStepper questions={questions} />
+              <ReviewStepper questions={questions} sessionUuid={sessionUuid} />
             </Suspense>
           </>
         ) : (

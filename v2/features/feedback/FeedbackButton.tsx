@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type ReactNode } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { ImagePlus, Loader2, MessageSquarePlus, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ import {
   FEEDBACK_NOUN,
   FEEDBACK_PICTURE_ACCEPT,
   FEEDBACK_TEXT_MAX,
+  canSendFeedback,
   feedbackText,
   pictureRefusal,
 } from './feedback-model';
@@ -67,39 +68,50 @@ export function FeedbackButton({
   contentId: number;
 }) {
   const [open, setOpen] = useState(false);
-  // The report is sent with the reader's token: a guest pass has one, a
-  // signed-out page does not.
-  const { signedIn } = useV2Session();
-  if (!signedIn) return null;
+  // An account's report only: the server refuses a guest pass's (403), so a
+  // guest is not offered the button (`canSendFeedback`).
+  const session = useV2Session();
+  if (!canSendFeedback(session)) return null;
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={cn(ACTION_PILL, FOCUS_RING)}>
         <MessageSquarePlus aria-hidden className="size-4" />
         Feedback
       </button>
-      {open ? <FeedbackFrame type={type} contentId={contentId} onClose={() => setOpen(false)} /> : null}
+      {open ? (
+        <FeedbackFrame
+          title={`Feedback on this ${FEEDBACK_NOUN[type]}`}
+          description="Tell us what is wrong, or what works. The team reads every report."
+          onClose={() => setOpen(false)}
+        >
+          <FeedbackForm type={type} contentId={contentId} onSent={() => setOpen(false)} />
+        </FeedbackFrame>
+      ) : null}
     </>
   );
 }
 
-/** The dialog or the sheet, whichever the width calls for, around one form. */
-function FeedbackFrame({
-  type,
-  contentId,
+/**
+ * The dialog or the sheet, whichever the width calls for, around one form.
+ * Shared with a quiz question's report (`QuestionFeedbackButton`).
+ */
+export function FeedbackFrame({
+  title,
+  description,
   onClose,
+  children,
 }: {
-  type: FeedbackContentType;
-  contentId: number;
+  title: string;
+  description: string;
   onClose: () => void;
+  children: ReactNode;
 }) {
   const wide = useFeedbackBreakpoint();
-  const title = `Feedback on this ${FEEDBACK_NOUN[type]}`;
-  const description = 'Tell us what is wrong, or what works. The team reads every report.';
   const change = (next: boolean) => {
     if (!next) onClose();
   };
   if (wide === null) return null;
-  const form = <FeedbackForm type={type} contentId={contentId} onSent={onClose} />;
+  const form = children;
   if (wide) {
     return (
       <Dialog open onOpenChange={change}>
@@ -135,7 +147,6 @@ function FeedbackForm({
   contentId: number;
   onSent: () => void;
 }) {
-  const ids = useId();
   const [ticked, setTicked] = useState<readonly string[]>([]);
   const [details, setDetails] = useState('');
   const [pictures, setPictures] = useState<readonly File[]>([]);
@@ -206,47 +217,22 @@ function FeedbackForm({
         submit();
       }}
     >
-      <fieldset className="flex flex-col gap-1">
-        <legend className="mb-2 text-sm font-medium text-foreground">What is it about?</legend>
-        {FEEDBACK_CATEGORIES[type].map((category) => {
-          const id = `${ids}-${category.id}`;
-          return (
-            <label
-              key={category.id}
-              htmlFor={id}
-              className="v2-interactive flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-foreground hover:bg-secondary/60"
-            >
-              <Checkbox
-                id={id}
-                checked={ticked.includes(category.id)}
-                onCheckedChange={(state) => toggle(category.id, state === true)}
-              />
-              {category.label}
-            </label>
-          );
-        })}
-      </fieldset>
+      <IssueChecklist
+        legend="What is it about?"
+        categories={FEEDBACK_CATEGORIES[type]}
+        ticked={ticked}
+        onToggle={toggle}
+      />
 
-      <div className="flex flex-col gap-2">
-        <label htmlFor={`${ids}-details`} className="text-sm font-medium text-foreground">
-          In your own words <span className="font-normal text-muted-foreground">(optional)</span>
-        </label>
-        <Textarea
-          id={`${ids}-details`}
-          value={details}
-          maxLength={FEEDBACK_TEXT_MAX}
-          rows={4}
-          onChange={(event) => {
-            setProblem(null);
-            setDetails(event.target.value);
-          }}
-          placeholder="What did you expect, and what happened?"
-          className="text-base sm:text-sm"
-        />
-        <p className="self-end text-xs tabular-nums text-muted-foreground">
-          {details.length.toLocaleString()} / {FEEDBACK_TEXT_MAX.toLocaleString()}
-        </p>
-      </div>
+      <DetailsField
+        value={details}
+        max={FEEDBACK_TEXT_MAX}
+        placeholder="What did you expect, and what happened?"
+        onChange={(next) => {
+          setProblem(null);
+          setDetails(next);
+        }}
+      />
 
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
@@ -311,5 +297,76 @@ function FeedbackForm({
         ) : null}
       </div>
     </form>
+  );
+}
+
+/** The issues to tick, any number of them. Shared with a quiz question's report. */
+export function IssueChecklist({
+  legend,
+  categories,
+  ticked,
+  onToggle,
+}: {
+  legend: string;
+  categories: readonly { id: string; label: string }[];
+  ticked: readonly string[];
+  onToggle: (id: string, on: boolean) => void;
+}) {
+  const ids = useId();
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <legend className="mb-2 text-sm font-medium text-foreground">{legend}</legend>
+      {categories.map((category) => {
+        const id = `${ids}-${category.id}`;
+        return (
+          <label
+            key={category.id}
+            htmlFor={id}
+            className="v2-interactive flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 text-sm text-foreground hover:bg-secondary/60"
+          >
+            <Checkbox
+              id={id}
+              checked={ticked.includes(category.id)}
+              onCheckedChange={(state) => onToggle(category.id, state === true)}
+            />
+            {category.label}
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+/** The reader's own words, with the count against the limit. Shared with a quiz question's report. */
+export function DetailsField({
+  value,
+  max,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  max: number;
+  placeholder: string;
+  onChange: (next: string) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="flex flex-col gap-2">
+      <label htmlFor={id} className="text-sm font-medium text-foreground">
+        In your own words <span className="font-normal text-muted-foreground">(optional)</span>
+      </label>
+      <Textarea
+        id={id}
+        value={value}
+        maxLength={max}
+        rows={4}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="text-base sm:text-sm"
+      />
+      <p className="self-end text-xs tabular-nums text-muted-foreground">
+        {value.length.toLocaleString()} / {max.toLocaleString()}
+      </p>
+    </div>
   );
 }

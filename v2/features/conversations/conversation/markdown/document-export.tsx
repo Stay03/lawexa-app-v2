@@ -71,7 +71,22 @@ export function MessageDocumentScope({
         : null,
     [scope, landed, messageId, content],
   );
-  return <MessageScopeContext.Provider value={value}>{children}</MessageScopeContext.Provider>;
+  return (
+    <MessageScopeContext.Provider value={value}>
+      <SavedMessageContext.Provider value={landed ? messageId : null}>{children}</SavedMessageContext.Provider>
+    </MessageScopeContext.Provider>
+  );
+}
+
+/**
+ * The saved answer this content belongs to, once it has landed: its server
+ * id, or `null` while it streams or has none yet. A quiz card in the answer
+ * reports a question by it (Arthur's question feedback, 26 October 2026).
+ */
+const SavedMessageContext = createContext<number | null>(null);
+
+export function useSavedMessageId(): number | null {
+  return useContext(SavedMessageContext);
 }
 
 /** The export target for a block with this text, or null when it offers no Download. */

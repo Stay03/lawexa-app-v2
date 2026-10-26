@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { SubmitFeedbackData, FeedbackResponse } from '@/types/feedback';
+import type { SubmitFeedbackData, FeedbackResponse, QuizQuestionFeedbackBody } from '@/types/feedback';
 
 /**
  * Feedback API service for Phase 13 endpoints
@@ -27,6 +27,16 @@ export const feedbackApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+
+  /**
+   * One quiz question's report (Backend, 26 October 2026): JSON, with the
+   * question named by `content_uuid` (or a chat answer by `content_id`) and
+   * what the reader saw in `context`.
+   */
+  submitQuizQuestion: async (body: QuizQuestionFeedbackBody): Promise<FeedbackResponse> => {
+    const response = await apiClient.post<FeedbackResponse>('/feedback', body);
     return response.data;
   },
 };

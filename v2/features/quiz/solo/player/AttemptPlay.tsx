@@ -37,6 +37,8 @@ import { EndAttemptDialog } from './EndAttemptDialog';
 import { SOLO_PLAY_COLUMN } from './states';
 import { useScreenHold } from '@/v2/runtime/screen-hold';
 import { QuizSourceLine } from '../../source/QuizSourceLine';
+import { QuestionFeedbackButton } from '../../feedback/QuestionFeedbackButton';
+import { attemptQuestionSnapshot } from '../../feedback/question-feedback';
 import '../solo-quiz.css';
 
 /**
@@ -130,6 +132,8 @@ export function AttemptPlay({
   const [note, setNote] = useState<string | null>(null);
   /** "End quiz" asked, the confirmation showing (Arthur, 24 October 2026). */
   const [ending, setEnding] = useState(false);
+  /** A question's report form is open: the reveal holds still for it. */
+  const [reporting, setReporting] = useState(false);
 
   const answer = useAnswerAttempt(attempt.uuid, viewerId);
   const finish = useFinishAttempt(attempt.uuid, viewerId);
@@ -225,8 +229,14 @@ export function AttemptPlay({
   // sends the right answer only with an answer, so its tiles stay as they were
   // and the rail says "Time's up". A tap (or Enter or Space) during the hold
   // moves on at once. An `end` attempt keeps its own beat and its sheet.
+  //
+  // A REPORT HOLDS THE HOLD (Arthur's question feedback, 26 October 2026):
+  // while the reader is telling us what is wrong with this question, the
+  // next one does not come in under the form, and a tap in the form is not
+  // a tap to move on. Closing the form starts the hold again.
   const holding =
     attempt.reveal_mode === 'each' && (step === 'revealed' || step === 'timed-out');
+  const holdRuns = holding && !reporting;
   const moveOn = () => {
     if (finish.isPending) return;
     if (isLast) finishNow();
@@ -234,10 +244,10 @@ export function AttemptPlay({
   };
   const moveOnAfterHold = useEffectEvent(moveOn);
   useEffect(() => {
-    if (!holding) return;
+    if (!holdRuns) return;
     const id = window.setTimeout(() => moveOnAfterHold(), REVEAL_HOLD_MS);
     return () => window.clearTimeout(id);
-  }, [holding, cursor]);
+  }, [holdRuns, cursor]);
 
   const finishing = finish.isPending;
   /** The sentence the one live region says after an answer in THIS mount. */
@@ -258,9 +268,9 @@ export function AttemptPlay({
       className={SOLO_PLAY_COLUMN}
       // During an `each` hold the whole screen is the way on: the tiles are
       // passive (not disabled), so their taps land here.
-      onClick={holding ? moveOn : undefined}
+      onClick={holdRuns ? moveOn : undefined}
       onKeyDown={
-        holding
+        holdRuns
           ? (event) => {
               if (event.key !== 'Enter' && event.key !== ' ') return;
               event.preventDefault();
@@ -383,7 +393,23 @@ export function AttemptPlay({
                 onContinue={isLast ? finishNow : advance}
               />
             ) : (
-              <Foot step={step} note={note} optionCount={question.options.length} streak={streak} />
+              <Foot
+                step={step}
+                note={note}
+                optionCount={question.options.length}
+                streak={streak}
+                report={
+                  // On the reveal only: the answer is shown and the clock has stopped.
+                  attempt.reveal_mode === 'each' && step === 'revealed' ? (
+                    <QuestionFeedbackButton
+                      className="ml-auto"
+                      target={{ kind: 'quiz', questionUuid: question.uuid, quizUuid: attempt.quiz.uuid, attemptUuid: attempt.uuid }}
+                      snapshot={attemptQuestionSnapshot(question)}
+                      onOpenChange={setReporting}
+                    />
+                  ) : null
+                }
+              />
             )}
           </div>
         </>
@@ -533,12 +559,15 @@ function Foot({
   note,
   optionCount,
   streak,
+  report,
 }: {
   step: PlayStep;
   note: string | null;
   optionCount: number;
   /** The run a right answer extends, during its hold; 0 for none. */
   streak: number;
+  /** The reveal's "Report a problem with this question", at the row's end. */
+  report?: React.ReactNode;
 }) {
   return (
     <div className="flex min-h-10 items-center gap-3 text-[13px] text-muted-foreground">
@@ -560,8 +589,12 @@ function Foot({
           Locked in
         </p>
       ) : step === 'revealed' ? (
-        // The verdict is on the tiles; the foot adds only a run worth naming.
-        streak >= 2 ? <StreakChip count={streak} /> : null
+        // The verdict is on the tiles; the foot adds only a run worth naming,
+        // and the flag to report the question.
+        <>
+          {streak >= 2 ? <StreakChip count={streak} /> : null}
+          {report}
+        </>
       ) : (
         // A phone says nothing before the tap: the tiles are the way in. A
         // computer names its keys.

@@ -121,7 +121,8 @@ test('each holds its verdict on the tiles, then moves on by itself (a tap sooner
   assert.match(play, /const holding =\s*attempt\.reveal_mode === 'each' && \(step === 'revealed' \|\| step === 'timed-out'\);/);
   assert.match(play, /const moveOn = \(\) => \{\s*if \(finish\.isPending\) return;\s*if \(isLast\) finishNow\(\);\s*else advance\(\);\s*\};/);
   assert.match(play, /const id = window\.setTimeout\(\(\) => moveOnAfterHold\(\), REVEAL_HOLD_MS\);/);
-  assert.match(play, /onClick=\{holding \? moveOn : undefined\}/);
+  // `holdRuns`: the hold, unless a question's report is open (question feedback).
+  assert.match(play, /onClick=\{holdRuns \? moveOn : undefined\}/);
   assert.match(play, /if \(event\.key !== 'Enter' && event\.key !== ' '\) return;/);
   assert.match(play, /onSuccess: \(\) => router\.replace\(attemptResultsHref\(attempt\.uuid\)\),/);
   // The sheet is the `end` attempt's alone: its last answer and a lost clock;
@@ -180,7 +181,7 @@ test('the question screen is drawn in B1: segments and the thin clock over the q
    * hold. Reduced motion keeps the tick, the final number and the chip. */
   assert.match(play, /celebrate=\{\s*step === 'revealed' && option\.id === question\.your_option_id && question\.is_correct === true\s*\}/);
   assert.match(play, /const streak = step === 'revealed' && question\?\.is_correct === true \? streakEndingAt\(questions, cursor\) : 0;/);
-  assert.match(play, /\) : step === 'revealed' \? \(\s*\/\/[^\n]*\n\s*streak >= 2 \? <StreakChip count=\{streak\} \/> : null/);
+  assert.match(play, /\) : step === 'revealed' \? \((?:\s*\/\/[^\n]*\n)+\s*<>\s*\{streak >= 2 \? <StreakChip count=\{streak\} \/> : null\}\s*\{report\}\s*<\/>/);
   // On a tall question the foot still shows (Tester, 24 October 2026): with
   // no sheet up it is sticky at the screen's foot, and the chip's ground is solid.
   assert.match(play, /sheet \? 'mt-auto pt-6' : 'sticky bottom-0 z-10 mt-auto pt-6 pb-\[max\(0\.75rem,env\(safe-area-inset-bottom\)\)\]'/);

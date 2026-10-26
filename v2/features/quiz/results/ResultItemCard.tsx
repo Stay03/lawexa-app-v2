@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { formatDurationMs } from '@/lib/utils/quiz-format';
 import type { QuizResultItem } from '@/types/quiz';
 import { DifficultyBadge } from '../ui/DifficultyBadge';
+import { QuestionFeedbackButton } from '../feedback/QuestionFeedbackButton';
 
 /**
  * ResultItemCard — one answered question, revealed: every option graded, the
@@ -27,10 +28,13 @@ import { DifficultyBadge } from '../ui/DifficultyBadge';
 export function ResultItemCard({
   item,
   index,
+  sessionUuid,
 }: {
   item: QuizResultItem;
   /** 0-based position in the session, shown 1-based. */
   index: number;
+  /** The practice session, for this question's report (Arthur, 26 October 2026). */
+  sessionUuid: string;
 }) {
   const { question } = item;
   const number = index + 1;
@@ -59,7 +63,21 @@ export function ResultItemCard({
           <span className="tabular-nums text-muted-foreground">{number}.</span>{' '}
           {question.question_text}
         </h3>
-        <Verdict correct={item.was_correct} />
+        <div className="flex shrink-0 items-center gap-1">
+          <Verdict correct={item.was_correct} />
+          {/* Report a problem with this question: the answers are shown, so
+              the reader can say what is wrong with them. */}
+          <QuestionFeedbackButton
+            target={{ kind: 'practice', questionUuid: question.uuid, sessionUuid }}
+            snapshot={{
+              // 0-based, as the API counts.
+              position: index,
+              questionText: question.question_text,
+              chosenOption: options.find((option) => option.id === item.selected_option_id)?.option_text ?? null,
+              correctOption: options.find((option) => option.is_correct)?.option_text ?? null,
+            }}
+          />
+        </div>
       </div>
 
       <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">

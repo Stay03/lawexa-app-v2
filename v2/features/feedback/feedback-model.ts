@@ -91,3 +91,12 @@ export function feedbackText(
   if (details.trim()) parts.push(`Details: ${details.trim()}`);
   return parts.join('\n\n');
 }
+
+/**
+ * Who may send feedback: an account, never a guest pass. The server refuses
+ * a guest's report (403), so a guest is not offered the button (techlead, 26
+ * October 2026; Arthur: a quiz question's report needs sign-in).
+ */
+export function canSendFeedback(session: { signedIn: boolean; role: string | null }): boolean {
+  return session.signedIn && session.role !== null && session.role !== 'guest';
+}
