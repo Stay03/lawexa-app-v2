@@ -91,3 +91,8 @@ test('a 409 on saving a quiz freezes its questions only when they were played', 
   // A passing 409 falls through to the server's sentence, with the form and its edits kept.
   assert.match(dialog, /setError\(message\);/);
 });
+
+test('a refused quiz save is announced to a screen reader', () => {
+  const dialog = code('v2', 'features', 'channels', 'quiz', 'QuizFormDialog.tsx');
+  assert.match(dialog, /\{error && \(\s*<p role="alert" className="text-sm text-destructive">\s*\{error\}\s*<\/p>\s*\)\}/);
+});

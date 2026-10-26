@@ -624,7 +624,13 @@ export function QuizFormDialog({
               </div>
             )}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {/* `role="alert"`: a screen reader is told the moment the save is
+                refused, not only a reader who can see the red line. */}
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
           </>
         )}
       </div>
