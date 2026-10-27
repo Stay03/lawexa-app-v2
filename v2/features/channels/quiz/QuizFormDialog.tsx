@@ -854,7 +854,11 @@ function QuestionJump({ questions, problemKey }: { questions: readonly QuestionD
     document.getElementById(`quiz-question-${key}`)?.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
   };
   return (
-    <nav aria-label="Jump to a question" className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-1.5 backdrop-blur supports-backdrop-filter:bg-background/80">
+    <nav
+      aria-label="Jump to a question"
+      // The overlay's own surface (`bg-popover`), solid, so the text scrolling under it never shows through.
+      className="sticky top-0 z-10 -mx-1 border-b border-border/60 bg-popover px-1 py-1.5"
+    >
       <ol className="flex flex-wrap gap-1.5">
         {questions.map((question, index) => (
           <li key={question.key}>
@@ -1121,10 +1125,12 @@ function QuestionCard({
     >
       <div className="flex items-center gap-1.5">
         <span className="mr-1 text-sm font-semibold text-foreground tabular-nums">Q{number}</span>
+        {/* In a scenario's narrower box on a phone the word would push the
+            menu off the card, so the mark stands alone there. */}
         {inScenario && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[oklch(0.62_0.17_255/0.14)] px-2 py-0.5 text-xs font-medium text-[oklch(0.78_0.1_255)]">
+          <span className="inline-flex items-center gap-1 rounded-full bg-[oklch(0.62_0.17_255/0.14)] px-1.5 py-0.5 text-xs font-medium text-[oklch(0.78_0.1_255)] sm:px-2">
             <FileText aria-hidden className="size-3" />
-            Scenario
+            <span className="sr-only sm:not-sr-only">Scenario</span>
           </span>
         )}
         <div className="ml-auto flex items-center gap-1">
