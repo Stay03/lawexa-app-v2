@@ -97,8 +97,16 @@ test('a tool with no label of its own says "A step didn’t work"', () => {
 
 test('the server’s softened "found nothing", sent as a success, reads as not found', () => {
   // What a reader below researcher gets on live (d5045bf8): a success carrying this sentence.
-  const softened = (toolResult: ToolMessage['toolResult']): ToolMessage =>
-    ({ role: 'tool', toolName: 'read_statute', toolParameters: { section: '13' }, toolStatus: 'complete', toolResult }) as ToolMessage;
+  const softened = (toolResult: NonNullable<ToolMessage['toolResult']>): ToolMessage => ({
+    id: 'step-2',
+    role: 'tool',
+    content: '',
+    timestamp: new Date('2026-10-27T01:00:00Z'),
+    toolName: 'read_statute',
+    toolParameters: { section: '13' },
+    toolStatus: 'complete',
+    toolResult,
+  }) as ToolMessage;
   // A lazy row, before its result is fetched: the sentence rides on `error`.
   const lazy = softened({ success: true, data: null, error: SOFTENED_LOOKUP_MISS });
   // The fetched result: the sentence is the JSON's `message`.
