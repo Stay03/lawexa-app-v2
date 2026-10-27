@@ -20,7 +20,9 @@ import type { DraftVersion } from './draft-versions';
  * The panel is drawn again for the version it opens (SidePanelSlot keys it by
  * ordinal), so the arrow pressed is gone with the old one. The new strip puts
  * focus back on the same arrow, or on the other one when it is now at an end,
- * so a keyboard reader can keep stepping.
+ * so a keyboard reader can keep stepping. It can mount twice for one switch
+ * (in the editor's frame while the version's note loads, then in the editor),
+ * so the request holds for a moment instead of being used up by the first.
  */
 export function DraftVersionSwitch({ version }: { version: DraftVersion | null }) {
   const panel = useSidePanel();
@@ -28,10 +30,8 @@ export function DraftVersionSwitch({ version }: { version: DraftVersion | null }
   const nextRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
-    const pressed = refocus;
-    refocus = null;
-    if (!pressed) return;
-    const [first, second] = pressed === 'previous' ? [previousRef, nextRef] : [nextRef, previousRef];
+    if (!refocus || Date.now() > refocus.until) return;
+    const [first, second] = refocus.arrow === 'previous' ? [previousRef, nextRef] : [nextRef, previousRef];
     const target = first.current && !first.current.disabled ? first.current : second.current;
     target?.focus();
   }, []);
@@ -43,7 +43,7 @@ export function DraftVersionSwitch({ version }: { version: DraftVersion | null }
   const next = at < version.count - 1 ? version.ordinals[at + 1] : null;
   const go = (ordinal: number | null, arrow: Arrow) => {
     if (ordinal === null) return;
-    refocus = arrow;
+    refocus = { arrow, until: Date.now() + REFOCUS_MS };
     panel.open({ kind: 'draft', ordinal });
   };
 
@@ -87,5 +87,8 @@ export function DraftVersionSwitch({ version }: { version: DraftVersion | null }
 
 type Arrow = 'previous' | 'next';
 
-/** The arrow pressed to open the version now showing, read once by the new strip. */
-let refocus: Arrow | null = null;
+/** How long after a press the new strip takes focus back (ms). */
+const REFOCUS_MS = 2000;
+
+/** The arrow pressed to open the version now showing, for the strip drawn next. */
+let refocus: { arrow: Arrow; until: number } | null = null;

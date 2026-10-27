@@ -98,6 +98,11 @@ test('the panel switches versions in place and saves each under its own name', (
   const strip = code(...DRAFT_DIR, 'DraftVersionSwitch.tsx');
   assert.match(strip, /panel\.open\(\{ kind: 'draft', ordinal \}\)/);
   assert.match(strip, /if \(!panel \|\| !version \|\| version\.count < 2\) return null;/);
+  // Focus comes back to an arrow after the panel redraws, on both of its mounts
+  // (the note-loading frame, then the editor).
+  assert.match(strip, /refocus = \{ arrow, until: Date\.now\(\) \+ REFOCUS_MS \};/);
+  assert.match(strip, /if \(!refocus \|\| Date\.now\(\) > refocus\.until\) return;/);
+  assert.match(strip, /first\.current && !first\.current\.disabled \? first\.current : second\.current/);
   const editor = code(...DRAFT_DIR, 'DraftEditor.tsx');
   assert.match(editor, /<DraftBar \/>\s*\{versionSwitch\}/);
   assert.match(editor, /\)\}\s*\{versionSwitch\}\s*<div data-v2-draft-scroll/);
