@@ -100,8 +100,11 @@ test('a refused quiz step carries the error mark, with no Error line under it', 
   // From the LOADED result: a lazy chat's step has none of its own until fetched (shots5).
   assert.match(item, /const quizRefused =\s*isQuizStep\(message\) &&\s*\(quizStepState\(loaded\.message\)\?\.kind === 'failed' \|\|\s*\(message\.toolName === EDIT_QUIZ_TOOL && editSavedNothing\(loaded\.message\.toolResult \?\? undefined\)\)\);/);
   assert.match(item, /isSuccess && !quizRefused \? 'success' : 'error'/);
-  // No "Error:" line for a refused quiz, whatever the stored flag says: the card says it once.
-  assert.match(item, /\{isError && !quizRefused && !isExpanded && \(/);
+  // A refused quiz keeps its label and gets no failure words, whatever the stored
+  // flag says: the card says it once. No step shows an "Error:" line at all now
+  // (step-failure.ts, Stay 27 October 2026).
+  assert.match(item, /const failure = isError && !quizRefused \? failedStepLine\(loaded\.message, label\) : null;/);
+  assert.doesNotMatch(item, /Error: \{/);
 });
 
 const NOTE_REFUSAL = "TEST DATA. You can't open that note, so a quiz can't be made from it.";
