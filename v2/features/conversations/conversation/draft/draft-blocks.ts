@@ -20,6 +20,13 @@
  * draft reads in the house font. A part of the text carries its own as an
  * inline `<span data-font data-size>`, which markdown-to-doc.ts reads.
  *
+ * VERSIONS (Stay, 27 October 2026, option B; backend's prompt cfeb49c8). The
+ * tag may carry the draft's fixed id and its version number,
+ * `id="k3f9q2" version="2"`, so a draft Lawexa writes again after a change is
+ * known as the same draft even when its title changes (draft-versions.ts). An
+ * id is 4 to 12 lowercase letters and digits and a version 1 to 3 digits from
+ * 1; anything else is dropped, and the draft groups by its title as before.
+ *
  * WHILE IT STREAMS the closing tag has not arrived, so an open draft runs to
  * the end of the text and says it is not complete: the panel shows the body
  * growing. A tag cut off mid-name at the very end (`<dra`, `<draft title="Ten`)
@@ -39,6 +46,10 @@ export interface DraftBlock {
   /** The whole draft's font and size from the opening tag; `null` for the house ones. */
   font: NoteFont | null;
   size: NoteSize | null;
+  /** The draft's fixed id from the opening tag, the same in every version; `null` without one. */
+  id: string | null;
+  /** The version number Lawexa gave it; `null` without one. The app counts versions itself. */
+  version: number | null;
 }
 
 export type DraftPart = { kind: 'text'; text: string } | { kind: 'draft'; draft: DraftBlock };
@@ -56,6 +67,18 @@ function decodeTitle(raw: string): string {
 function attribute(rest: string, name: string): string | null {
   const match = new RegExp(`\\s${name}="([^"]*)"`, 'i').exec(rest);
   return match ? match[1].trim() : null;
+}
+
+/** A draft id as backend writes it, or `null`. */
+function draftId(raw: string | null): string | null {
+  return raw !== null && /^[a-z0-9]{4,12}$/.test(raw) ? raw : null;
+}
+
+/** A version number from 1, at most 3 digits, or `null`. */
+function draftVersionNumber(raw: string | null): number | null {
+  if (raw === null || !/^\d{1,3}$/.test(raw)) return null;
+  const version = Number(raw);
+  return version >= 1 ? version : null;
 }
 
 /** How much of `text`'s end could still grow into `<draft title="…">`. */
@@ -106,6 +129,8 @@ export function splitDrafts(content: string, streaming = false): DraftPart[] {
         complete: closeAt >= 0,
         font: noteFont(attribute(rest, 'font')),
         size: noteSize(attribute(rest, 'size')),
+        id: draftId(attribute(rest, 'id')),
+        version: draftVersionNumber(attribute(rest, 'version')),
       },
     });
     if (closeAt < 0) return parts;

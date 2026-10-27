@@ -42,6 +42,41 @@ test('drafts with the same title in one chat are one draft, whatever the case or
   assert.notEqual(draftGroupKey({ title: 'Tenancy Agreement' }), draftGroupKey({ title: 'Notice to Quit' }));
 });
 
+test('drafts with the same fixed id are one draft even when the title changes', () => {
+  const withId = (title: string, id: string, version: number) =>
+    `<draft title="${title}" id="${id}" version="${version}">\nTEST DATA body.\n</draft>`;
+  const messages = [
+    { id: 'a1', role: 'assistant', content: withId('TEST DATA Tenancy Agreement', 'k3f9q2', 1) },
+    { id: 'a2', role: 'assistant', content: withId('TEST DATA Monthly Tenancy Agreement', 'k3f9q2', 2) },
+    // A different draft that happens to share the first one's title.
+    { id: 'a3', role: 'assistant', content: withId('TEST DATA Tenancy Agreement', 'p7w2m1', 1) },
+  ];
+  const index = draftVersionIndex(messages);
+  assert.deepEqual(
+    index.map((entry) => entry.key),
+    ['id:k3f9q2', 'id:k3f9q2', 'id:p7w2m1'],
+  );
+  assert.deepEqual(draftVersion(index, 1, 'id:k3f9q2'), { version: 2, count: 2, ordinals: [0, 1], latest: true });
+  assert.equal(draftVersion(index, 2, 'id:p7w2m1').count, 1);
+});
+
+test('a draft with no id, or one that is not valid, groups by its title', () => {
+  const title = draftGroupKey({ title: 'TEST DATA Notice to Quit' });
+  assert.equal(draftGroupKey({ title: 'TEST DATA Notice to Quit', id: null }), title);
+  const messages = [
+    { id: 'a1', role: 'assistant', content: draft('TEST DATA Notice to Quit') },
+    // Bad characters, and longer than 12: both ignored, so these group by title.
+    { id: 'a2', role: 'assistant', content: '<draft title="TEST DATA Notice to Quit" id="k3f-q2">\nTEST DATA.\n</draft>' },
+    { id: 'a3', role: 'assistant', content: '<draft title="TEST DATA Notice to Quit" id="abcdefghijklm">\nTEST DATA.\n</draft>' },
+  ];
+  const index = draftVersionIndex(messages);
+  assert.deepEqual(
+    index.map((entry) => entry.key),
+    [title, title, title],
+  );
+  assert.equal(draftVersion(index, 2, title).version, 3);
+});
+
 test('the index counts drafts the way the ordinals do', () => {
   const index = draftVersionIndex(MESSAGES);
   assert.deepEqual(

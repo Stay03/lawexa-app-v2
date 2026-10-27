@@ -12,11 +12,14 @@ import type { DraftSourceMessage } from './draft-ordinals';
  * the reader's edits, Save as note and Download all stay per version: the
  * switch only opens another ordinal.
  *
- * THE GROUP KEY. Until the tag carries a fixed id (step 2, backend's
- * `<draft title="…" id="…" version="…">`), the drafts of one chat with the same
- * title, compared without case or extra spaces, are one draft. `draftGroupKey`
- * is the one place that decides it, so step 2 swaps the key there and nothing
- * else changes.
+ * THE GROUP KEY (`draftGroupKey`, the one place that decides it). A draft
+ * whose tag carries a fixed id (backend's prompt cfeb49c8,
+ * `<draft title="…" id="k3f9q2" version="2">`) groups with every draft of that
+ * id, whatever its title. A draft without one, every chat from before the id
+ * and any answer that leaves it out, groups by title within the chat,
+ * compared without case or extra spaces. The tag's own version number is not
+ * read for the label: the app counts a draft's place in its group, so a
+ * skipped or repeated number still reads right.
  *
  * Pure, so the rules are tested here; the card and the panel only draw them.
  */
@@ -40,8 +43,9 @@ export interface DraftVersion {
   latest: boolean;
 }
 
-/** Which drafts are one draft: the same title, without case or extra spaces. */
-export function draftGroupKey(draft: { title: string }): string {
+/** Which drafts are one draft: the same fixed id, else the same title without case or extra spaces. */
+export function draftGroupKey(draft: { title: string; id?: string | null }): string {
+  if (draft.id) return `id:${draft.id}`;
   return `title:${draft.title.trim().replace(/\s+/g, ' ').toLowerCase()}`;
 }
 

@@ -31,6 +31,8 @@ test('a finished draft is split from the reply around it, with its title decoded
       complete: true,
       font: null,
       size: null,
+      id: null,
+      version: null,
     },
   });
   assert.deepEqual(parts[2], { kind: 'text', text: '\nTell me what to change.' });
@@ -41,7 +43,7 @@ test('while it streams, an open draft runs to the end and a half-written tag is 
   const [, draft] = splitDrafts(growing, true);
   assert.deepEqual(draft, {
     kind: 'draft',
-    draft: { title: 'Notice to Quit', body: 'Take notice that you are to quit', complete: false, font: null, size: null },
+    draft: { title: 'Notice to Quit', body: 'Take notice that you are to quit', complete: false, font: null, size: null, id: null, version: null },
   });
   // The closing tag's first letters never show in the body.
   assert.equal(draftsIn(`${growing} the premises.\n</dra`, true)[0].body, 'Take notice that you are to quit the premises.');
@@ -61,6 +63,23 @@ test('several drafts in one answer are counted in order; text with none is one t
   assert.deepEqual(splitDrafts('TEST DATA. Plain.'), [{ kind: 'text', text: 'TEST DATA. Plain.' }]);
   // A draft with an empty title is still a draft.
   assert.equal(draftsIn('<draft title="">\nx\n</draft>')[0].title, 'Draft');
+});
+
+test('a tag may carry the draft’s fixed id and version; a bad one is dropped', () => {
+  const [kept] = draftsIn('<draft title="TEST DATA Lease" version="2" id="k3f9q2" font="Georgia">\nx\n</draft>');
+  assert.equal(kept.id, 'k3f9q2');
+  assert.equal(kept.version, 2);
+  assert.equal(kept.font, 'Georgia');
+  for (const id of ['abc', 'abcdefghijklm', 'K3F9Q2', 'k3f-q2', 'k3f9 q2', '']) {
+    assert.equal(draftsIn(`<draft title="A" id="${id}">\nx\n</draft>`)[0].id, null, id);
+  }
+  for (const version of ['0', '1000', '-1', '1.5', 'two', '']) {
+    assert.equal(draftsIn(`<draft title="A" version="${version}">\nx\n</draft>`)[0].version, null, version);
+  }
+  // A tag without them reads as before.
+  const [plain] = draftsIn('<draft title="A">\nx\n</draft>');
+  assert.equal(plain.id, null);
+  assert.equal(plain.version, null);
 });
 
 test('the card counts the words written so far', () => {
@@ -98,9 +117,9 @@ test('a draft is found by its place in the transcript, the streaming answer last
 
 test('the status says finished, being written, or cut short in a saved answer', () => {
   const body = 'One two three';
-  assert.equal(draftStatus({ title: 'A', body, complete: true, font: null, size: null }, false), 'Draft · 3 words');
-  assert.equal(draftStatus({ title: 'A', body, complete: false, font: null, size: null }, true), 'Writing · 3 words');
-  assert.equal(draftStatus({ title: 'A', body, complete: false, font: null, size: null }, false), 'Unfinished · 3 words');
+  assert.equal(draftStatus({ title: 'A', body, complete: true, font: null, size: null, id: null, version: null }, false), 'Draft · 3 words');
+  assert.equal(draftStatus({ title: 'A', body, complete: false, font: null, size: null, id: null, version: null }, true), 'Writing · 3 words');
+  assert.equal(draftStatus({ title: 'A', body, complete: false, font: null, size: null, id: null, version: null }, false), 'Unfinished · 3 words');
 });
 
 test('a failed Save as note names a newer copy and the size cap, else asks to retry', async () => {
