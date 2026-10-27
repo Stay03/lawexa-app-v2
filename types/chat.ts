@@ -171,6 +171,13 @@ export interface ErrorMessage extends ChatMessage {
   /** The server's block when the send was refused for messages (the reason,
    *  the reset time); absent for every other error. */
   blocked?: IBlockedReason | null;
+  /**
+   * An answer that failed after it had started (an error or a timeout mid-
+   * stream). Its streamed text is not shown and the turn is not charged
+   * (Stay, 27 October 2026), so the row says that in grey, never the
+   * server's error text in red. Absent on every other error.
+   */
+  failedAnswer?: boolean;
 }
 
 // Narration message - orchestrator commentary saved between phases

@@ -538,6 +538,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     retryable: boolean,
     retryAfterMs: number | null,
     blocked: IBlockedReason | null = null,
+    failedAnswer = false,
   ) {
     const message: ErrorMessage = {
       id: generateId(),
@@ -550,6 +551,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       retryAfterMs,
       // The out-of-messages notice reads the reason and the reset time from it.
       blocked,
+      ...(failedAnswer ? { failedAnswer: true } : {}),
     };
     setState((prev) => ({
       ...prev,
@@ -1653,14 +1655,19 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // `showActions` is gated on `!isStreaming` the user could not even copy the
       // part they could see. Mirrors the `end`/`timeout` shape exactly, including the
       // `partial` marker, so an interrupted answer reads as interrupted.
-      finalizeOpenPlaceholder('error');
+      //
+      // AN ANSWER THAT HAD STARTED IS WITHDRAWN (Stay, 27 October 2026): the
+      // text that streamed before the failure is not shown and the turn is
+      // free, so its row goes and the failed row stands in its place. The
+      // tool steps already drawn stay; they are not the answer.
+      const started = withdrawOpenPlaceholder();
 
       if (parsed) {
         const errorMsg = parsed.error_message || parsed.message || 'Something went wrong';
         const errorCode = parsed.error_code || 'UNKNOWN';
         const retryable = parsed.retryable ?? false;
         const retryAfterMs = parsed.retry_after_ms ?? null;
-        addErrorMessage(errorMsg, errorCode, retryable, retryAfterMs);
+        addErrorMessage(errorMsg, errorCode, retryable, retryAfterMs, null, started);
         handlers.onError?.(errorMsg);
       } else {
         const errorMsg = 'Stream error';
@@ -1747,37 +1754,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       resetStreamingBuffers();
     });
 
-    // timeout — terminal. Finalize any placeholder and tag partial timeout.
+    // timeout — terminal. An answer that had started is withdrawn, as on an
+    // error (Stay, 27 October 2026): its text goes and the failed row says
+    // it was not finished and not charged.
     es.addEventListener('timeout', () => {
       stopWatchdog();
       isCancelling = false;
       toolCallQueue.clear();
       const errorMsg = 'Stream timed out';
-      const placeholderId = streamingMessageId;
-      if (placeholderId) {
-        const finalText = liveText.get(placeholderId) ?? '';
-        const trace = takeReasoning(placeholderId);
-        setState((prev) => ({
-          ...prev,
-          messages: prev.messages.map((m) => {
-            if (m.id !== placeholderId) return m;
-            const content = finalText || m.content;
-            return {
-              ...m,
-              content,
-              isStreaming: false,
-              ...trace,
-              ...(content ? { partial: { reason: 'timeout' as const } } : {}),
-            };
-          }),
-          error: errorMsg,
-          isStreaming: false,
-          isCancelling: false,
-        }));
-        clearText(placeholderId);
-        messageIdToIteration.delete(placeholderId);
-        streamingMessageId = null;
-        currentIteration = null;
+      if (withdrawOpenPlaceholder()) {
+        addErrorMessage(errorMsg, 'TIMEOUT', true, null, null, true);
+        setState((prev) => ({ ...prev, error: errorMsg }));
       } else {
         setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false, isCancelling: false }));
       }
@@ -1852,6 +1839,24 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     messageIdToIteration.delete(placeholderId);
     streamingMessageId = null;
     currentIteration = null;
+  }
+
+  /**
+   * Take the open streaming placeholder off the list, text and all, and
+   * detach the streaming refs: the withdrawal of an answer that failed after
+   * it started. `true` when there was one. A placeholder with no row yet
+   * (no text had streamed) still counts as started.
+   */
+  function withdrawOpenPlaceholder(): boolean {
+    const placeholderId = streamingMessageId;
+    if (!placeholderId) return false;
+    clearText(placeholderId);
+    takeReasoning(placeholderId);
+    messageIdToIteration.delete(placeholderId);
+    setMessages((msgs) => msgs.filter((m) => m.id !== placeholderId));
+    streamingMessageId = null;
+    currentIteration = null;
+    return true;
   }
 
   /** The replay rewrites what `connected`'s text stood in for: its row goes. */
