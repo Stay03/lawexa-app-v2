@@ -5,9 +5,11 @@ import { join } from 'node:path';
 
 import type { QuizAttempt, QuizAttemptQuestion } from '@/types/channel-quiz';
 import {
+  answerTimedOut,
   attemptPoints,
   endAttemptCopy,
   END_MODE_ADVANCE_MS,
+  nextUnanswered,
   optionTileState,
   playStep,
   unansweredCount,
@@ -44,6 +46,37 @@ const attempt = (questions: QuizAttemptQuestion[]): QuizAttempt => ({
   started_at: '2026-10-21T15:44:16+00:00',
   finished_at: null,
   questions,
+});
+
+/* ── No second try (Techlead, 27 October 2026) ───────────────────────────── */
+
+test('a reload never reopens a question that ran out of time before a later answer', () => {
+  const at = (position: number, answered: boolean) => question({ uuid: `q${position}`, position, answered });
+  // Q2 timed out, Q3 was answered, then the page reloaded: on to Q4, not back to Q2.
+  assert.equal(nextUnanswered(attempt([at(0, true), at(1, false), at(2, true), at(3, false)])), 3);
+  // Nothing answered yet: the first question.
+  assert.equal(nextUnanswered(attempt([at(0, false), at(1, false)])), 0);
+  // Everything after the furthest answer is done: only Finish is left, and the
+  // passed-over question is one of the unanswered ones it scores as wrong.
+  const done = attempt([at(0, true), at(1, false), at(2, true)]);
+  assert.equal(nextUnanswered(done), null);
+  assert.equal(unansweredCount(done), 1);
+  const play = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
+  assert.match(play, /title=\{unanswered > 0 \? 'Nothing left to answer' : 'Every question answered'\}/);
+  assert.match(play, /ran out of time and count as wrong\./);
+});
+
+test("the server's \"time_ran_out\" refusal is a question lost to the clock, and the quiz moves on", () => {
+  assert.equal(answerTimedOut(409, { reason: 'time_ran_out' }), true);
+  // Any other 409, or the reason on another status, is not this.
+  assert.equal(answerTimedOut(409, { reason: 'already_answered' }), false);
+  assert.equal(answerTimedOut(409, null), false);
+  assert.equal(answerTimedOut(422, { reason: 'time_ran_out' }), false);
+  const play = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
+  assert.match(
+    play,
+    /if \(answerTimedOut\(status, errors\)\) \{\s*setNote\(null\);\s*setPlace\(\(current\) => \(current\.cursor === cursor \? \{ \.\.\.current, timedOut: true \} : current\)\);\s*return;\s*\}/,
+  );
 });
 
 /* ── The steps ────────────────────────────────────────────────────────────── */
@@ -250,8 +283,9 @@ test('the player says only what the screen does not already say', () => {
   // A question lost to the clock, in one short sentence.
   assert.match(play, /Out of time\. It counts as wrong\./);
   assert.doesNotMatch(play, /Nothing was recorded for this one/);
-  // A reopened attempt with nothing left: the title and See results only.
-  assert.match(play, /title="Every question answered"\s*action=\{/);
+  // A reopened attempt with nothing left: the title (and, when a question ran
+  // out of time, one line saying so) and See results.
+  assert.match(play, /title=\{unanswered > 0 \? 'Nothing left to answer' : 'Every question answered'\}\s*description=\{/);
   assert.doesNotMatch(play, /Finish to see your score/);
   // Kept: the only sign an answer went in when the verdict waits for the end.
   assert.match(play, /Locked in/);

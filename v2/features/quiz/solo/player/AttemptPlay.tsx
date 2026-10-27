@@ -16,6 +16,7 @@ import {
   END_MODE_ADVANCE_MS,
   REVEAL_HOLD_MS,
   streakEndingAt,
+  answerTimedOut,
   nextUnanswered,
   optionTileState,
   orderedQuestions,
@@ -196,7 +197,14 @@ export function AttemptPlay({
         onSuccess: () => setPending(null),
         onError: (error) => {
           setPending(null);
-          const { status, message } = extractApiError(error);
+          const { status, message, errors } = extractApiError(error);
+          // Too late for the server: the question is lost to the clock, as
+          // when the timer runs out on screen, and the quiz moves on.
+          if (answerTimedOut(status, errors)) {
+            setNote(null);
+            setPlace((current) => (current.cursor === cursor ? { ...current, timedOut: true } : current));
+            return;
+          }
           setNote(answerRefusalCopy(status, message));
         },
       },
@@ -400,7 +408,12 @@ export function AttemptPlay({
           <QuizMessage
             icon={Flag}
             tone="accent"
-            title="Every question answered"
+            title={unanswered > 0 ? 'Nothing left to answer' : 'Every question answered'}
+            description={
+              unanswered > 0
+                ? `${unanswered === 1 ? 'One question' : `${unanswered} questions`} ran out of time and count as wrong.`
+                : undefined
+            }
             action={
               <RaisedButton onClick={finishNow} disabled={finishing}>
                 {finishing ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}

@@ -152,12 +152,30 @@ export function orderedQuestions(attempt: QuizAttempt): QuizAttemptQuestion[] {
 
 /**
  * Where a resumed attempt picks up: the index (in play order) of the first
- * unanswered question, or `null` when every question has an answer and the
- * only move left is Finish.
+ * unanswered question AFTER the furthest one answered, or `null` when none is
+ * left and the only move is Finish.
+ *
+ * NO SECOND TRY (Techlead, 27 October 2026, for the leaderboard). A question
+ * left unanswered before one that was answered ran out of time while it was
+ * shown: "Time's up. It counts as wrong." A reload must not open it again
+ * with a fresh clock, so it is passed over and counts as wrong at the finish,
+ * as the server scores it.
  */
 export function nextUnanswered(attempt: QuizAttempt): number | null {
-  const index = orderedQuestions(attempt).findIndex((question) => !question.answered);
+  const questions = orderedQuestions(attempt);
+  const furthest = questions.reduce((found, question, index) => (question.answered ? index : found), -1);
+  const index = questions.findIndex((question, at) => at > furthest && !question.answered);
   return index === -1 ? null : index;
+}
+
+/**
+ * The server's refusal of an answer that came after the question's time ran
+ * out (`409`, `errors.reason: "time_ran_out"`, "Time ran out on this
+ * question."): the question is lost to the clock, as if the timer had run
+ * out on screen, and the quiz moves on.
+ */
+export function answerTimedOut(status: number, errors: unknown): boolean {
+  return status === 409 && (errors as Record<string, unknown> | null)?.reason === 'time_ran_out';
 }
 
 /** `finished_at` is the one honest "is it over" read — see the type. */
