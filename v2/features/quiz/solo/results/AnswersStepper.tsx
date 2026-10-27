@@ -23,6 +23,7 @@ import {
   answersPositionLabel,
   indexAfterFilter,
   openingAnswer,
+  reviewTiles,
   stepAnswer,
   type AnswersFilter,
 } from './answers-model';
@@ -258,9 +259,10 @@ function AnswerGrid({
 function AnswerPage({ attempt, question, index }: { attempt: QuizAttempt; question: QuizAttemptQuestion; index: number }) {
   const verdict = questionVerdict(question);
   const scenario = scenarioFor(attempt, question);
-  const right = question.options.find((option) => option.id === question.correct_option_id) ?? null;
-  const picked =
-    verdict === 'incorrect' ? (question.options.find((option) => option.id === question.your_option_id) ?? null) : null;
+  const tiles = reviewTiles(question);
+  // Answered, but the pick is gone: the author reworded the answers after the
+  // attempt (Backend, 27 October 2026), so no tile can carry it.
+  const pickChanged = question.answered && question.your_option_id == null;
   const points = question.points ?? 0;
   const explanation = question.explanation?.trim() || null;
   const responseMs = question.response_ms ?? null;
@@ -302,11 +304,26 @@ function AnswerPage({ attempt, question, index }: { attempt: QuizAttempt; questi
 
       <h2 className="mt-2 text-lg leading-snug font-bold text-foreground">{question.question}</h2>
 
+      {/* EVERY OPTION (Arthur, 27 October 2026: "show all the options with
+          their answer and or correct answer"): the right one green with its
+          tick, a wrong pick red, the rest quiet but readable, and "Your
+          answer" on the pick (one green tile when it was right). */}
       <div className="mt-4 flex flex-col gap-2.5">
-        {picked ? <AttemptOptionTile index={0} content={picked.content} look="card" state="wrong-pick" /> : null}
-        {right ? <AttemptOptionTile index={1} content={right.content} look="card" state="correct" /> : null}
+        {tiles.map((tile, tileIndex) => (
+          <AttemptOptionTile
+            key={tile.id}
+            index={tileIndex}
+            content={tile.content}
+            look="card"
+            state={tile.state}
+            tag={tile.yours ? 'Your answer' : undefined}
+            className={tile.state === 'missed' ? 'opacity-75' : undefined}
+          />
+        ))}
       </div>
-      {verdict === 'unanswered' ? (
+      {pickChanged ? (
+        <p className="mt-2 text-[13px] text-muted-foreground">The author has since changed these answers, so your pick isn&rsquo;t shown.</p>
+      ) : verdict === 'unanswered' ? (
         <p className="mt-2 text-[13px] text-muted-foreground">You didn&rsquo;t answer this one in time.</p>
       ) : null}
 

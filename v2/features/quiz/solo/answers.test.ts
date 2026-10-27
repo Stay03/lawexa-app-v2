@@ -12,6 +12,7 @@ import {
   indexAfterFilter,
   openingAnswer,
   parseAnswerIndex,
+  reviewTiles,
   stepAnswer,
 } from './results/answers-model';
 
@@ -37,6 +38,33 @@ const q = (uuid: string, verdict: 'right' | 'wrong' | 'skipped'): QuizAttemptQue
   is_correct: verdict === 'right',
   points: verdict === 'right' ? 900 : 0,
   response_ms: verdict === 'skipped' ? null : 2400,
+});
+
+test('the review shows every option: the right one, your pick, and the rest', () => {
+  const four = (your: number | null, correct: boolean): QuizAttemptQuestion => ({
+    ...q('x', 'wrong'),
+    options: [
+      { id: 13, content: 'One year', position: 3 },
+      { id: 10, content: 'One month', position: 0 },
+      { id: 12, content: 'Six months', position: 2 },
+      { id: 11, content: 'Three months', position: 1 },
+    ],
+    your_option_id: your,
+    correct_option_id: 12,
+    is_correct: correct,
+  });
+  const view = (question: QuizAttemptQuestion) => reviewTiles(question).map((tile) => `${tile.content}:${tile.state}${tile.yours ? ':yours' : ''}`);
+  // Wrong: your pick red, the right one green, the rest quiet, in the quiz's order.
+  assert.deepEqual(view(four(10, false)), ['One month:wrong-pick:yours', 'Three months:missed', 'Six months:correct', 'One year:missed']);
+  // Right: one tile that is both.
+  assert.deepEqual(view(four(12, true)), ['One month:missed', 'Three months:missed', 'Six months:correct:yours', 'One year:missed']);
+  // A Free point: any pick counts as right, so the pick is green too.
+  assert.deepEqual(view(four(11, true)), ['One month:missed', 'Three months:correct:yours', 'Six months:correct', 'One year:missed']);
+  // No pick (not answered, or reworded since): no tile says "Your answer".
+  assert.deepEqual(view(four(null, false)), ['One month:missed', 'Three months:missed', 'Six months:correct', 'One year:missed']);
+  const page = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersStepper.tsx');
+  assert.match(page, /const pickChanged = question\.answered && question\.your_option_id == null;/);
+  assert.match(page, /The author has since changed these answers, so your pick isn&rsquo;t shown\./);
 });
 
 // Wrong on 2 and 4, skipped on 5.
@@ -95,8 +123,10 @@ test('the page: the grid, the filters, the two tiles and the Why, the bar, and a
   assert.match(page, /aria-label=\{`Question \$\{index \+ 1\}, \$\{VERDICT_WORD\[verdict\]\}`\}/);
   assert.match(page, /open && 'ring-2 ring-foreground ring-offset-1 ring-offset-background'/);
   // Only the tiles that matter: your wrong pick, then the right answer, as played.
-  assert.match(page, /\{picked \? <AttemptOptionTile index=\{0\} content=\{picked\.content\} look="card" state="wrong-pick" \/> : null\}/);
-  assert.match(page, /\{right \? <AttemptOptionTile index=\{1\} content=\{right\.content\} look="card" state="correct" \/> : null\}/);
+  // Every option, from reviewTiles (Arthur, 27 October 2026), the quiet ones readable.
+  assert.match(page, /\{tiles\.map\(\(tile, tileIndex\) => \(\s*<AttemptOptionTile\s+key=\{tile\.id\}/);
+  assert.match(page, /tag=\{tile\.yours \? 'Your answer' : undefined\}/);
+  assert.match(page, /className=\{tile\.state === 'missed' \? 'opacity-75' : undefined\}/);
   // Back · "3 of 20" · Next, and Done at the end, back to the results.
   assert.match(page, /role="status" aria-live="polite"/);
   assert.match(page, /\{answersPositionLabel\(deck, current, filter\)\}/);

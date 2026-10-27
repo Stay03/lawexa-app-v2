@@ -109,3 +109,34 @@ export function answersPositionLabel(deck: readonly number[], current: number, f
 export function attemptAnswersHref(attemptUuid: string): string {
   return `/quiz/attempts/${attemptUuid}/answers`;
 }
+
+/* ── One question's options ───────────────────────────────────────────────── */
+
+export interface ReviewTile {
+  id: number;
+  content: string;
+  /** The right answer, a wrong pick, or neither. */
+  state: 'correct' | 'wrong-pick' | 'missed';
+  /** The reader picked it. */
+  yours: boolean;
+}
+
+/**
+ * Every option of a finished question, in the quiz's order (Arthur, 27
+ * October 2026): the right one, the reader's pick ("Your answer"), and the
+ * rest. A right pick is one tile that is both. A pick that counted as right
+ * though it is not the marked answer (a Free point question) is green too.
+ * A pick the author has since reworded has no id (`your_option_id: null`),
+ * so no tile carries it.
+ */
+export function reviewTiles(question: QuizAttemptQuestion): ReviewTile[] {
+  const yours = question.your_option_id ?? null;
+  return [...question.options]
+    .sort((a, b) => a.position - b.position)
+    .map((option) => {
+      const isYours = yours !== null && option.id === yours;
+      const isRight = option.id === question.correct_option_id;
+      const state = isRight || (isYours && question.is_correct === true) ? 'correct' : isYours ? 'wrong-pick' : 'missed';
+      return { id: option.id, content: option.content, state, yours: isYours };
+    });
+}

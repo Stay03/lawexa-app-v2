@@ -75,6 +75,8 @@ export function AttemptOptionTile({
   onSelect,
   badge = null,
   celebrate = false,
+  tag,
+  className,
 }: {
   index: number;
   content: string;
@@ -88,6 +90,10 @@ export function AttemptOptionTile({
   badge?: ReactNode;
   /** The reader's own right pick, on its verdict: the tick pops and bursts. */
   celebrate?: boolean;
+  /** A short word before the mark, "Your answer" on the answers review. */
+  tag?: string;
+  /** The answers review's own tone for the options that were neither (readable, not faded out). */
+  className?: string;
 }) {
   const interactive = !!onSelect && !disabled;
   const tall = look !== 'card';
@@ -108,6 +114,7 @@ export function AttemptOptionTile({
         tall ? cn(TALL_COLOUR[look], TALL_TONE[state]) : CARD_TONE[state],
         interactive ? 'cursor-pointer' : 'cursor-default',
         FOCUS_RING,
+        className,
       )}
     >
       {tall && (
@@ -139,6 +146,21 @@ export function AttemptOptionTile({
           {badge}
         </span>
       )}
+
+      {tag ? (
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
+            state === 'correct'
+              ? 'bg-[color-mix(in_oklch,var(--solo-right)_14%,transparent)] text-[var(--solo-right)]'
+              : state === 'wrong-pick'
+                ? 'bg-[color-mix(in_oklch,var(--solo-wrong)_14%,transparent)] text-[var(--solo-wrong)]'
+                : 'bg-secondary text-muted-foreground',
+          )}
+        >
+          {tag}
+        </span>
+      ) : null}
 
       {state === 'correct' || state === 'wrong-pick' ? (
         <span aria-hidden className="relative size-6 shrink-0">
