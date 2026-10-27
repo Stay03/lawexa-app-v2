@@ -44,9 +44,10 @@ test('a timeout the server marks discard_partial withdraws too, with Try again; 
 
 test('a user Stop and a dropped connection keep the text they showed', () => {
   const source = engine();
+  // Both stop paths, the cancelled event and the CANCELLED error, end the same way.
   const cancelled = source.slice(source.indexOf("es.addEventListener('cancelled'"));
-  assert.match(cancelled, /m\.id === placeholderId \? \{ \.\.\.m, content: finalText, isStreaming: false \} : m,/);
-  assert.match(source, /if \(parsed\?\.error_code === 'CANCELLED'\) \{/);
+  assert.match(cancelled, /toolCallQueue\.clear\(\);\s*stopOpenPlaceholder\(\);/);
+  assert.match(source, /if \(parsed\?\.error_code === 'CANCELLED'\) \{\s*stopOpenPlaceholder\(\);/);
   // A 401 mid-stream keeps what was streamed; the server decides later.
   const onerror = source.slice(source.indexOf('es.onerror = () => {'));
   assert.match(onerror, /if \(loginRejected\) \{[\s\S]*?finalizeOpenPlaceholder\('error'\);/);
@@ -109,4 +110,17 @@ test('two failed turns are two rows, and answered turns are untouched', () => {
     ['user', 'failed', 'user', 'assistant', 'user', 'failed'],
   );
   assert.equal(messages[3].content, 'A real answer.');
+});
+
+test('a stopped answer is marked Stopped at once, and a stop before the first word leaves no blank row', () => {
+  const source = engine();
+  const helper = source.slice(source.indexOf('function stopOpenPlaceholder(): void {'));
+  // The text so far stays, tagged as the reload's `partial` row is, so the row draws "Stopped".
+  assert.match(helper, /const content = finalText \|\| m\.content;/);
+  assert.match(helper, /return content \? \[\{ \.\.\.m, content, isStreaming: false, \.\.\.trace, partial: \{ reason: 'cancelled' as const \} \}\] : \[\];/);
+  // The reasoning is taken before the iteration it is keyed by is forgotten.
+  assert.ok(helper.indexOf('takeReasoning(placeholderId)') < helper.indexOf('messageIdToIteration.delete(placeholderId)'));
+  // The row's mark for that tag.
+  const row = read('v2', 'features', 'conversations', 'conversation', 'rows', 'AssistantMessageRow.tsx');
+  assert.match(row, /partial\.reason === 'cancelled' \? \(\s*<>\s*<Square className="h-3 w-3" \/>\s*<span>Stopped<\/span>/);
 });

@@ -1623,27 +1623,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       isCancelling = false;
       toolCallQueue.clear();
 
-      // CANCELLED: user-initiated stop — NOT an error. Keep the placeholder's
-      // partial text visible (matches ChatGPT/Claude cancel behavior).
+      // CANCELLED: user-initiated stop — NOT an error. The placeholder's
+      // partial text stays, marked "Stopped" (matches ChatGPT/Claude cancel behavior).
       if (parsed?.error_code === 'CANCELLED') {
-        const placeholderId = streamingMessageId;
-        if (placeholderId) {
-          const finalText = liveText.get(placeholderId) ?? '';
-          setState((prev) => ({
-            ...prev,
-            messages: prev.messages.map((m) =>
-              m.id === placeholderId ? { ...m, content: finalText, isStreaming: false } : m,
-            ),
-            isStreaming: false,
-            isCancelling: false,
-          }));
-          clearText(placeholderId);
-          messageIdToIteration.delete(placeholderId);
-          streamingMessageId = null;
-          currentIteration = null;
-        } else {
-          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
-        }
+        stopOpenPlaceholder();
         resetStreamingBuffers();
         return;
       }
@@ -1685,7 +1668,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       resetStreamingBuffers();
     });
 
-    // cancelled — backend-confirmed user stop. Keep partial text.
+    // cancelled — backend-confirmed user stop. Keep partial text, marked "Stopped".
     es.addEventListener('cancelled', (e) => {
       settleTurn(parseEvent<CancelledEvent>((e as MessageEvent).data)?.persisted_message_ids);
       stopWatchdog();
@@ -1694,24 +1677,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       executionId = null;
       isCancelling = false;
       toolCallQueue.clear();
-      const placeholderId = streamingMessageId;
-      if (placeholderId) {
-        const finalText = liveText.get(placeholderId) ?? '';
-        setState((prev) => ({
-          ...prev,
-          messages: prev.messages.map((m) =>
-            m.id === placeholderId ? { ...m, content: finalText, isStreaming: false } : m,
-          ),
-          isStreaming: false,
-          isCancelling: false,
-        }));
-        clearText(placeholderId);
-        messageIdToIteration.delete(placeholderId);
-        streamingMessageId = null;
-        currentIteration = null;
-      } else {
-        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
-      }
+      stopOpenPlaceholder();
       resetStreamingBuffers();
       handlers.onCancelled?.();
     });
@@ -1854,6 +1820,33 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * `eventSource`/`executionId` nulled before this is reached, so no sibling listener
    * and no `onerror` reconnect follows).
    */
+  /**
+   * A user's Stop. The text so far stays, marked "Stopped" at once, the same
+   * mark a reload draws from the server's `partial` row (Tester, 27 October
+   * 2026: a stopped answer had no mark until then). A stop before the first
+   * word drops the empty answer instead of leaving a blank row under the
+   * steps. Ends the turn's streaming either way.
+   */
+  function stopOpenPlaceholder(): void {
+    const placeholderId = streamingMessageId;
+    if (placeholderId) {
+      const finalText = liveText.get(placeholderId) ?? '';
+      const trace = takeReasoning(placeholderId);
+      setMessages((msgs) =>
+        msgs.flatMap((m) => {
+          if (m.id !== placeholderId) return [m];
+          const content = finalText || m.content;
+          return content ? [{ ...m, content, isStreaming: false, ...trace, partial: { reason: 'cancelled' as const } }] : [];
+        }),
+      );
+      clearText(placeholderId);
+      messageIdToIteration.delete(placeholderId);
+      streamingMessageId = null;
+      currentIteration = null;
+    }
+    setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+  }
+
   function finalizeOpenPlaceholder(reason: 'error'): void {
     const placeholderId = streamingMessageId;
     if (!placeholderId) return;
