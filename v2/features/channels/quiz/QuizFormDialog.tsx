@@ -637,7 +637,14 @@ export function QuizFormDialog({
                       </span>
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  {/* Below the trigger and no wider than the screen allows, so
+                      the question it answers stays in sight and a phone shows
+                      each line whole. */}
+                  <SelectContent
+                    position="popper"
+                    align="start"
+                    className="w-[min(24rem,calc(100vw-2rem))]"
+                  >
                     {visibilityChoices.map((choice) => {
                       const locked = choice.needsVerifiedAuthor && !canPublish;
                       return (
