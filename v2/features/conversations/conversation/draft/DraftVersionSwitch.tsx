@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import type { DraftVersion } from './draft-versions';
 
@@ -24,7 +25,18 @@ import type { DraftVersion } from './draft-versions';
  * (in the editor's frame while the version's note loads, then in the editor),
  * so the request holds for a moment instead of being used up by the first.
  */
-export function DraftVersionSwitch({ version }: { version: DraftVersion | null }) {
+export function DraftVersionSwitch({
+  version,
+  changes = null,
+}: {
+  version: DraftVersion | null;
+  /**
+   * "Show changes" (Stay, 27 October 2026), on version 2 and later only:
+   * what changed since the version before, marked in the panel
+   * (DraftChangesView). `null` where there is nothing to compare.
+   */
+  changes?: { on: boolean; onChange: (on: boolean) => void } | null;
+}) {
   const panel = useSidePanel();
   const previousRef = useRef<HTMLButtonElement | null>(null);
   const nextRef = useRef<HTMLButtonElement | null>(null);
@@ -57,8 +69,17 @@ export function DraftVersionSwitch({ version }: { version: DraftVersion | null }
         <span className="font-semibold text-foreground">
           Version {version.version} of {version.count}
         </span>
-        {version.latest ? ' · Latest' : ' · An older version'}
+        {/* On a phone the switch needs the room. */}
+        <span className={changes ? 'hidden sm:inline' : undefined}>
+          {version.latest ? ' · Latest' : ' · An older version'}
+        </span>
       </p>
+      {changes ? (
+        <label className="flex shrink-0 cursor-pointer items-center gap-2 pr-1 text-xs font-medium text-foreground">
+          <Switch checked={changes.on} onCheckedChange={changes.onChange} />
+          Show changes
+        </label>
+      ) : null}
       <Button
         type="button"
         variant="ghost"

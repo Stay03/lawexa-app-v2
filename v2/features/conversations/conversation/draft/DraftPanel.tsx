@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { FileText } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,8 +14,24 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, draftsIn, type DraftBlock } from './draft-blocks';
 import { locateDraft } from './draft-ordinals';
 import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
+import { DraftChangesView } from './DraftChangesView';
 import { draftGroupKey, draftVersionTitle } from './draft-versions';
 import { DraftVersionSwitch } from './DraftVersionSwitch';
+
+/**
+ * "Show changes" as the reader last set it, kept while they step between a
+ * draft's versions: the panel is drawn again for each version (keyed by
+ * ordinal), so state inside it would reset every step. Off on each page load.
+ */
+let rememberedShowChanges = false;
+
+/** A saved draft by its place in the chat; `null` for one not (yet) saved. */
+function draftAt(messages: readonly EngineMessage[], ordinal: number): DraftBlock | null {
+  const place = locateDraft(messages, ordinal);
+  if (!('messageId' in place)) return null;
+  const message = messages.find((candidate) => candidate.id === place.messageId);
+  return message ? (draftsIn(message.content)[place.index] ?? null) : null;
+}
 
 /**
  * DraftPanel — draft N of this chat in the side panel (`?side=draft:N`).
@@ -58,6 +75,7 @@ export function DraftPanel({
   const conversationId = chat?.conversationId;
   const panel = useSidePanel();
   const space = panel?.space ?? null;
+  const [showChanges, setShowChanges] = useState(() => rememberedShowChanges);
 
   let draft: DraftBlock | null = null;
   if ('messageId' in place) {
@@ -95,7 +113,48 @@ export function DraftPanel({
   }
 
   const version = panel?.draftVersion(ordinal, draftGroupKey(draft)) ?? null;
-  const versionSwitch = <DraftVersionSwitch version={version} />;
+  // SHOW CHANGES (Stay, 27 October 2026): version 2 and later, against the
+  // version before, both as Lawexa wrote them and both finished.
+  const previous =
+    version && version.version >= 2 ? draftAt(messages, version.ordinals[version.version - 2]) : null;
+  const comparable = draft.complete && previous?.complete === true;
+  const changes = comparable
+    ? {
+        on: showChanges,
+        onChange: (on: boolean) => {
+          rememberedShowChanges = on;
+          setShowChanges(on);
+        },
+      }
+    : null;
+  const versionSwitch = <DraftVersionSwitch version={version} changes={changes} />;
+
+  if (comparable && showChanges && previous && version) {
+    return (
+      <ChatSidePanel
+        label="Draft"
+        title={draft.title}
+        subtitle={draftStatus(draft, false)}
+        icon={<DraftIcon />}
+        bare
+      >
+        <div className="@container/draft flex h-full min-h-0 flex-col">
+          <DraftBar />
+          {versionSwitch}
+          <div data-v2-draft-scroll className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+            <div className={DRAFT_DOCUMENT}>
+              <DraftChangesView
+                before={previous.body}
+                after={draft.body}
+                font={{ font: draft.font, size: draft.size }}
+                previousNumber={version.version - 1}
+              />
+            </div>
+          </div>
+        </div>
+      </ChatSidePanel>
+    );
+  }
 
   return (
     <ChatSidePanel
