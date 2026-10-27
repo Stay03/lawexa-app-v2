@@ -431,10 +431,13 @@ test('the solo queries live under the channel-quiz root, partitioned by viewer',
   assert.match(queries, /libraryOf: \(\) => \[\.\.\.channelQuizQueries\.all, 'my-library'\] as const/);
   assert.match(queries, /previewOf: \(quizUuid: string\) =>\s*\[\.\.\.channelQuizQueries\.all, 'preview', quizUuid\] as const/);
   assert.match(queries, /attemptOf: \(attemptUuid: string\) =>\s*\[\.\.\.channelQuizQueries\.all, 'attempt', attemptUuid\] as const/);
-  assert.equal(queries.match(/\{ viewerId \}\] as const/g)?.length, 4);
-  // The attempt is a live read; the two lists re-check on every arrival.
+  // The preview, the attempt and the leaderboard by viewer; the two lists by
+  // viewer and their filters.
+  assert.equal(queries.match(/\{ viewerId \}\] as const/g)?.length, 3);
+  assert.equal(queries.match(/\{ viewerId \}, filtersKey\(filters\)\] as const/g)?.length, 2);
+  // The attempt is a live read; the two lists and the board re-check on every arrival.
   assert.match(queries, /quizAttemptsApi\.show\(attemptUuid\),\s*staleTime: STALE_TIMES\.live,/);
-  assert.equal(queries.match(/refetchOnMount: REFETCH_ON_VISIT,/g)?.length, 2);
+  assert.equal(queries.match(/refetchOnMount: REFETCH_ON_VISIT,/g)?.length, 3);
 });
 
 test('the attempt mutations seed, patch and re-read the one attempt key', () => {

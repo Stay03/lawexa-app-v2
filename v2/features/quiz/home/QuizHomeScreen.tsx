@@ -12,6 +12,8 @@ import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
+import { SearchFieldShape } from '@/v2/shell/SearchField';
+import { NO_QUIZ_FILTERS } from '../solo/home-model';
 import { ExploreList, ExploreListSkeleton } from '../solo/explore/ExploreScreen';
 import { LibraryList, LibraryListSkeleton, useQuizForm } from '../solo/library/LibraryScreen';
 import { SoloCreateAccountState, SoloSignedOutState } from '../solo/states';
@@ -58,8 +60,9 @@ export function QuizHomeScreen() {
   const canWrite = signedIn && canAccessQuizPlayer(role);
   const { openForm, dialog } = useQuizForm(viewerId);
 
+  // Each tab has its own choices, so a tab starts with none set.
   const setTab = (next: QuizHomeTab) => {
-    replaceUrlParams({ tab: next === 'explore' ? null : next });
+    replaceUrlParams({ ...NO_QUIZ_FILTERS, tab: next === 'explore' ? null : next });
   };
 
   return (
@@ -119,6 +122,8 @@ export function QuizHomeFallback() {
           <QuizHomeTabs value="explore" onChange={() => undefined} panelId={PANEL_ID} />
         </div>
         <div className="mb-3 h-5 w-3/5 max-w-full" />
+        {/* The search box is static chrome (SearchField's reservation). */}
+        <SearchFieldShape className="mb-3" />
         <ExploreListSkeleton />
       </div>
     </>

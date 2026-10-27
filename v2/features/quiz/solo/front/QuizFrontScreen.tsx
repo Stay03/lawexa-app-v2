@@ -41,6 +41,9 @@ import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { QuizTile } from '../QuizTile';
+import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
+import { useLeaderboardOverlay } from '../board/use-leaderboard-overlay';
+import { quizSubjectLabel, rankLabel } from '../home-model';
 import { bestLabel, quizMinutesLabel, scenarioCountLabel } from '../rows-model';
 import { FRONT_SCORING_NOTE, frontChallengeText, takenLabel } from './front-model';
 import {
@@ -92,6 +95,13 @@ import { soloQuizQueries } from '../queries';
  * screen never grows a second kebab under a bar that already has one. Delete
  * leaves the reader on their library, because this page no longer exists.
  *
+ * ── A PUBLIC QUIZ SHOWS ITS LEADERBOARD ────────────────────────────────────
+ * Under the masthead (Arthur's quiz list, part 6): the score to beat and its
+ * player, the top three, and "See full leaderboard", which opens the board
+ * over the page (`?board=`). The reader's own rank sits under their best in
+ * the start panel, apart from the score to beat. The board is read only for
+ * a `public` quiz: every other quiz's board is a `404`.
+ *
  * ── NOTHING HERE LISTS THE QUESTIONS ───────────────────────────────────────
  * The preview carries them (without answers), but a quiz read before it is
  * taken is a quiz half-spoiled. The front says how many questions and
@@ -127,6 +137,13 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   });
   const query = preview ? previewQuery : detailQuery;
   const quiz = query.data?.data ?? null;
+
+  const boardQuery = useQuery({
+    ...soloQuizQueries.leaderboard(quizUuid, { viewerId }),
+    enabled: quiz?.visibility === 'public',
+  });
+  const board = quiz?.visibility === 'public' ? (boardQuery.data?.data ?? null) : null;
+  const { openBoard, sheet: boardSheet } = useLeaderboardOverlay(viewerId);
 
   const [revealMode, setRevealMode] = useState<QuizRevealMode>(DEFAULT_REVEAL_MODE);
   const startAttempt = useStartAttempt(quizUuid, viewerId);
@@ -256,6 +273,8 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const taken = takenLabel(quiz.viewer_attempts_count);
   const Mark = VISIBILITY_MARKS[quiz.visibility];
   const facts = [questionCountLabel(count), scenarios, minutes].filter((fact): fact is string => Boolean(fact));
+  const subject = quizSubjectLabel(quiz);
+  const rank = board?.viewer ? rankLabel(board.viewer.rank, board.player_count) : null;
 
   return (
     <div className={cn(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44')}>
@@ -292,10 +311,19 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 ))}
               </span>
             </div>
+            {subject ? <p className="text-sm font-medium text-foreground/75">{subject}</p> : null}
             {quiz.description && (
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
           </header>
+
+          {quiz.visibility === 'public' ? (
+            board ? (
+              <FrontBoard board={board} onSeeAll={() => openBoard(quiz.uuid, quiz.title)} />
+            ) : boardQuery.isPending ? (
+              <FrontBoardSkeleton />
+            ) : null
+          ) : null}
         </div>
 
         <div className="flex min-w-0 flex-col gap-5 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
@@ -307,6 +335,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                   <div className="font-comfortaa text-xl font-bold text-foreground tabular-nums">
                     {best.replace(/^Best /, '')}
                   </div>
+                  {rank ? (
+                    <div className="text-xs text-muted-foreground tabular-nums">Your rank {rank}</div>
+                  ) : null}
                 </div>
               ) : (
                 <span />
@@ -425,6 +456,8 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         onClose={() => setDeleting(null)}
         onDeleted={() => router.replace(LIBRARY_HREF)}
       />
+
+      {boardSheet}
     </div>
   );
 }

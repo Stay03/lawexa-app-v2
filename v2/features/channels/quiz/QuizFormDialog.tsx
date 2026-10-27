@@ -58,6 +58,12 @@ import type {
   ChannelQuizVisibility,
   QuizQuestionType,
 } from '@/types/channel-quiz';
+import {
+  QUIZ_LEVELS,
+  QUIZ_TOPIC_MAX_LENGTH,
+  quizMaxYear,
+  readQuizYear,
+} from '@/v2/features/quiz/solo/home-model';
 import { canPublishPublicly } from '@/v2/features/quiz/solo/model';
 import { useBackGuard } from '@/v2/runtime/use-back-guard';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -185,6 +191,9 @@ import '@/v2/features/quiz/solo/solo-quiz.css';
 /** Where a NEW quiz is filed. Ignored when editing — a quiz's home is fixed. */
 export type QuizDestination = 'channel' | 'library';
 
+/** The level choice's "none", which a Radix item cannot hold as an empty value. */
+const NO_LEVEL = '__none';
+
 export function QuizFormDialog({
   open,
   onOpenChange,
@@ -230,6 +239,13 @@ export function QuizFormDialog({
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  // What the quiz lists filter by (Arthur's quiz list, part 5): each optional.
+  const [topic, setTopic] = useState('');
+  const [level, setLevel] = useState<string | null>(null);
+  const [yearText, setYearText] = useState('');
+  /** Read once per opening: the dialog is keyed per opening. */
+  const [maxYear] = useState(() => quizMaxYear(new Date()));
+  const [yearProblem, setYearProblem] = useState<string | null>(null);
   const [settings, setSettings] = useState<ChannelQuizSettings>(
     QUIZ_DEFAULT_SETTINGS,
   );
@@ -260,6 +276,9 @@ export function QuizFormDialog({
     setAdopted(loaded.uuid);
     setTitle(loaded.title);
     setDescription(loaded.description ?? '');
+    setTopic(loaded.topic ?? '');
+    setLevel(loaded.level ?? null);
+    setYearText(loaded.year ? String(loaded.year) : '');
     setSettings({ ...QUIZ_DEFAULT_SETTINGS, ...loaded.settings });
     setVisibility(loaded.visibility);
     const drafts = draftsFromQuiz(loaded);
@@ -404,6 +423,14 @@ export function QuizFormDialog({
       scrollToProblem(found.target);
       return;
     }
+    const { year, problem: badYear } = readQuizYear(yearText, maxYear);
+    if (badYear) {
+      setYearProblem(badYear);
+      document.getElementById('quiz-year')?.focus();
+      return;
+    }
+    // Sent as `null` when empty, so an edit can clear what was set.
+    const about = { topic: topic.trim() || null, level, year };
 
     const onError = (mutationError: Error) => {
       const { status, message, errors } = extractApiError(mutationError);
@@ -432,6 +459,7 @@ export function QuizFormDialog({
         {
           title: title.trim(),
           description: description.trim() || undefined,
+          ...about,
           settings,
           visibility: mayEditVisibility ? visibility : undefined,
           ...(metadataOnly || !mayEditQuestions ? {} : toPayload(questions, scenarios)),
@@ -450,6 +478,7 @@ export function QuizFormDialog({
     const payload = {
       title: title.trim(),
       description: description.trim() || undefined,
+      ...about,
       visibility,
       settings,
       ...toPayload(questions, scenarios),
@@ -554,6 +583,58 @@ export function QuizFormDialog({
                 onChange={(event) => setDescription(event.target.value)}
               />
             </div>
+
+            {/* What the quiz is about, so it can be found by it (Arthur's
+                quiz list, part 5). All three optional; the level list and
+                free-text topic wait on Stay, so both come from one place
+                (`home-model.ts`). */}
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-foreground">
+                Topic, level and year <span className="font-normal text-muted-foreground">(optional)</span>
+              </legend>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_10rem_7rem]">
+                <Input
+                  id="quiz-topic"
+                  aria-label="Topic"
+                  className="col-span-2 sm:col-span-1"
+                  maxLength={QUIZ_TOPIC_MAX_LENGTH}
+                  placeholder="Topic, e.g. Land Law"
+                  value={topic}
+                  onChange={(event) => setTopic(event.target.value)}
+                />
+                <Select
+                  value={level ?? NO_LEVEL}
+                  onValueChange={(next) => setLevel(next === NO_LEVEL ? null : next)}
+                >
+                  <SelectTrigger id="quiz-level" aria-label="Level" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="max-w-[min(18rem,calc(100vw-2rem))]">
+                    <SelectItem value={NO_LEVEL}>Any level</SelectItem>
+                    {QUIZ_LEVELS.map((choice) => (
+                      <SelectItem key={choice} value={choice}>
+                        {choice}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  id="quiz-year"
+                  aria-label="Year"
+                  inputMode="numeric"
+                  maxLength={4}
+                  placeholder="Year"
+                  value={yearText}
+                  aria-invalid={yearProblem ? true : undefined}
+                  aria-describedby={yearProblem ? 'quiz-year-problem' : undefined}
+                  onChange={(event) => {
+                    setYearText(event.target.value.replace(/\D/g, ''));
+                    setYearProblem(null);
+                  }}
+                />
+              </div>
+              {yearProblem ? <FormProblemLine id="quiz-year-problem">{yearProblem}</FormProblemLine> : null}
+            </fieldset>
 
             {!mayEditQuestions && (
               <p className="rounded-lg border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">

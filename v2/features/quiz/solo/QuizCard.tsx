@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { BadgeCheck } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,16 +15,19 @@ import { bestOrNotTaken, quizFactsLabel } from './rows-model';
  * (version C, 23 October 2026: "let's do C I kinda like it"). Two across on a
  * phone, four on a computer (`QUIZ_CARD_GRID`), the same card on both tabs:
  *
- *   tile ····· menu        the menu on My quizzes only
+ *   tile ····· menu        the owner's menu, or the leaderboard's button
  *   Title over at most     always two lines tall, so a row of cards lines up
  *   two lines
- *   Author                 Explore only
- *   10 questions · 5 min   the one fact line
+ *   Author ✓               Explore only; the tick is a verified author
+ *   Land Law · 300 Level   what it is about, when the author said
+ *   10 questions · 5 min   the fact line (· 3 players on a public quiz)
+ *   footer                 Explore's board lines and Take quiz; otherwise
  *               Best 4,210 or "Not taken" once the reader has an account
  *
  * The whole card opens the quiz: the title's link stretches over it (an
- * `after:` layer), and the menu sits above that layer as a SIBLING, never a
- * button inside a link.
+ * `after:` layer), and the corner control sits above that layer as a
+ * SIBLING, never a button inside a link. The footer is drawn under the link's
+ * layer, so a tap on it opens the quiz too.
  */
 
 export const QUIZ_CARD_GRID = 'grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4';
@@ -33,7 +37,11 @@ export function QuizCard({
   index,
   signedIn,
   author,
+  verified = false,
+  subject = null,
+  players = null,
   menu,
+  footer,
   children,
 }: {
   quiz: ChannelQuiz;
@@ -43,8 +51,16 @@ export function QuizCard({
   signedIn: boolean;
   /** Who wrote it, on Explore; `undefined` on the reader's own list. */
   author?: string;
-  /** The owner's ··· menu, on My quizzes. */
+  /** The author is verified: a tick after their name. */
+  verified?: boolean;
+  /** "Land Law · 300 Level · 2025" (`quizSubjectLabel`), or nothing. */
+  subject?: string | null;
+  /** "3 players" (`playersLabel`), put on the fact line. */
+  players?: string | null;
+  /** The corner control: the owner's ··· menu, or the leaderboard's button. */
   menu?: React.ReactNode;
+  /** In place of the best: Explore's board lines and its Take quiz. */
+  footer?: React.ReactNode;
   /** A line said under the card's facts (a refused switch, "Link copied"). */
   children?: React.ReactNode;
 }) {
@@ -67,12 +83,24 @@ export function QuizCard({
         {quiz.title}
       </Link>
       {author !== undefined ? (
-        <span className="truncate text-xs font-medium text-foreground/80">{author}</span>
+        <span className="flex min-w-0 items-center gap-1 text-xs font-medium text-foreground/80">
+          <span className="truncate">{author}</span>
+          {verified ? (
+            <>
+              <BadgeCheck aria-hidden className="size-3.5 shrink-0 text-primary" />
+              <span className="sr-only">, verified author</span>
+            </>
+          ) : null}
+        </span>
       ) : null}
+      {subject ? <span className="truncate text-xs text-foreground/70">{subject}</span> : null}
       <span className="truncate text-xs text-muted-foreground tabular-nums">
         {quizFactsLabel(count, quiz.total_seconds)}
+        {players ? ` · ${players}` : null}
       </span>
-      {best ? (
+      {footer !== undefined ? (
+        <div className="mt-auto flex min-w-0 flex-col gap-1 pt-1">{footer}</div>
+      ) : best ? (
         <span
           className={cn(
             'mt-auto self-end pt-1 text-xs whitespace-nowrap tabular-nums',
@@ -96,7 +124,12 @@ function QuizCardSkeleton({ author }: { author: boolean }) {
       <Skeleton className="h-3.5 w-3/5 rounded" />
       {author ? <Skeleton className="mt-1 h-3 w-1/2 rounded" /> : null}
       <Skeleton className="mt-1 h-3 w-2/3 rounded" />
-      <Skeleton className="mt-1 h-3 w-14 self-end rounded" />
+      {/* Explore's card ends in its Take quiz; My quizzes' in the best. */}
+      {author ? (
+        <Skeleton className="mt-2 h-8 w-full rounded-full" />
+      ) : (
+        <Skeleton className="mt-1 h-3 w-14 self-end rounded" />
+      )}
     </div>
   );
 }

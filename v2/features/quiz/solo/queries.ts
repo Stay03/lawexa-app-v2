@@ -1,6 +1,7 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 
 import { channelQuizApi, quizAttemptsApi } from '@/lib/api/channel-quiz';
+import type { QuizListFilters } from '@/types/channel-quiz';
 import type { ViewerScoped } from '@/v2/features/channels/queries';
 import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
@@ -38,6 +39,20 @@ export const EXPLORE_PAGE_SIZE = 15;
  *  is; this list scrolls on. */
 export const LIBRARY_PAGE_SIZE = 15;
 
+/** How many players the full leaderboard shows (the server allows 100). */
+export const LEADERBOARD_LIMIT = 50;
+
+/** The filters as a cache key part: the same choices are one entry however
+ *  the object was built. */
+function filtersKey(filters: QuizListFilters) {
+  return {
+    search: filters.search ?? null,
+    year: filters.year ?? null,
+    level: filters.level ?? null,
+    topic: filters.topic ?? null,
+  };
+}
+
 export const soloQuizQueries = {
   /** Key prefix for the explore list (every viewer variant). */
   exploreOf: () => [...channelQuizQueries.all, 'explore'] as const,
@@ -49,11 +64,11 @@ export const soloQuizQueries = {
    * `REFETCH_ON_VISIT`: a quiz published while the reader was elsewhere shows
    * on arrival, behind the rows already painted.
    */
-  explore: ({ viewerId }: ViewerScoped) =>
+  explore: ({ viewerId }: ViewerScoped, filters: QuizListFilters = {}) =>
     infiniteQueryOptions({
-      queryKey: [...soloQuizQueries.exploreOf(), { viewerId }] as const,
+      queryKey: [...soloQuizQueries.exploreOf(), { viewerId }, filtersKey(filters)] as const,
       queryFn: ({ pageParam }) =>
-        channelQuizApi.explore({ per_page: EXPLORE_PAGE_SIZE, page: pageParam }),
+        channelQuizApi.explore({ ...filters, per_page: EXPLORE_PAGE_SIZE, page: pageParam }),
       initialPageParam: 1,
       getNextPageParam: (lastPage) => {
         const { current_page, last_page } = lastPage.pagination;
@@ -74,11 +89,11 @@ export const soloQuizQueries = {
    * `useQuery` and `useInfiniteQuery`, and the shapes genuinely differ. Both
    * are settled by the same authoring writes.
    */
-  library: ({ viewerId }: ViewerScoped) =>
+  library: ({ viewerId }: ViewerScoped, filters: QuizListFilters = {}) =>
     infiniteQueryOptions({
-      queryKey: [...soloQuizQueries.libraryOf(), { viewerId }] as const,
+      queryKey: [...soloQuizQueries.libraryOf(), { viewerId }, filtersKey(filters)] as const,
       queryFn: ({ pageParam }) =>
-        channelQuizApi.getMine({ per_page: LIBRARY_PAGE_SIZE, page: pageParam }),
+        channelQuizApi.getMine({ ...filters, per_page: LIBRARY_PAGE_SIZE, page: pageParam }),
       initialPageParam: 1,
       getNextPageParam: (lastPage) => {
         const { current_page, last_page } = lastPage.pagination;
@@ -106,6 +121,26 @@ export const soloQuizQueries = {
       queryFn: () => channelQuizApi.preview(quizUuid),
       staleTime: STALE_TIMES.reference,
       gcTime: GC_TIMES.reference,
+    }),
+
+  /** Invalidation handle for one quiz's leaderboard (every viewer variant). */
+  leaderboardOf: (quizUuid: string) =>
+    [...channelQuizQueries.all, 'leaderboard', quizUuid] as const,
+
+  /**
+   * A PUBLIC QUIZ'S LEADERBOARD — its first {@link LEADERBOARD_LIMIT} players
+   * and the reader's own place, for anyone (Backend, quiz list part 6). The
+   * quiz front shows its top few and the full board reads the same entry, so
+   * opening the board after the front costs no second read. Standard tier,
+   * refetched on a visit: a finish elsewhere moves it.
+   */
+  leaderboard: (quizUuid: string, { viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...soloQuizQueries.leaderboardOf(quizUuid), { viewerId }] as const,
+      queryFn: () => channelQuizApi.leaderboard(quizUuid, LEADERBOARD_LIMIT),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
     }),
 
   /** Invalidation/write handle for one attempt (every viewer variant). */

@@ -242,7 +242,61 @@ export interface QuizScenario {
  * carry no `username`, and a type that promised one would be a lie the first
  * mention picker believed.
  */
-export type QuizAuthor = Pick<SlimUser, 'uuid' | 'name' | 'avatar_url'>;
+export type QuizAuthor = Pick<SlimUser, 'uuid' | 'name' | 'avatar_url'> & {
+  /** The author may publish to everyone: the badge on a list card (Backend,
+   *  quiz list part 5). Absent from bodies before it. */
+  is_verified_author?: boolean;
+};
+
+/**
+ * A public quiz's leaderboard as a list row carries it (Backend, quiz list
+ * part 6): how many people have played it, the best of them, and where the
+ * reader stands. `null` on the row of a quiz that is not on the public list.
+ * Ranks count each player's best finished score once, and equal points share
+ * a rank; the quiz's author is left out.
+ */
+export interface QuizLeaderboardBlock {
+  player_count: number;
+  /** The score to beat; `null` before anyone has finished it. */
+  top: { name: string; avatar_url: string | null; points: number } | null;
+  /** The reader's place; `null` signed out or before their first finish. */
+  viewer_rank: number | null;
+}
+
+/** One row of the full leaderboard (`GET /channel-quizzes/{quiz}/leaderboard`). */
+export interface QuizLeaderboardEntry {
+  rank: number;
+  /** Where they study and their level are sent to a signed-in reader only,
+   *  and only when the player gave them. */
+  user: {
+    uuid: string;
+    name: string;
+    avatar_url?: string | null;
+    institution?: string;
+    level?: string;
+  };
+  points: number;
+  correct_count: number;
+  question_count: number;
+  achieved_at: string | null;
+}
+
+/** The full leaderboard of a quiz on the public list. Any other quiz is `404`. */
+export interface QuizLeaderboard {
+  player_count: number;
+  entries: QuizLeaderboardEntry[];
+  /** The reader's own place; `null` signed out or before their first finish. */
+  viewer: { rank: number; points: number; achieved_at: string | null } | null;
+}
+
+/** What the quiz lists can be narrowed by, with how many quizzes use each
+ *  value, sent beside a page of Explore or My quizzes (Backend, part 5). */
+export interface QuizListFilterOptions {
+  years: { year: number; count: number }[];
+  levels: { level: string; count: number }[];
+  /** `topic` is the most used spelling; `key` is what spellings match by. */
+  topics: { topic: string; key: string; count: number }[];
+}
 
 export interface ChannelQuiz {
   uuid: string;
@@ -320,6 +374,15 @@ export interface ChannelQuiz {
   viewer_attempts_count?: number | null;
   /** The sum of the questions' time limits, in seconds: the "about N min". */
   total_seconds?: number;
+  /** A past paper's year, the level it is set for (`QUIZ_LEVELS`) and its
+   *  topic as the author wrote it; each `null` when not given (Backend, quiz
+   *  list part 5). Absent from older bodies. */
+  year?: number | null;
+  level?: string | null;
+  topic?: string | null;
+  /** On Explore and My quizzes rows only; `null` for a quiz not on the
+   *  public list. See {@link QuizLeaderboardBlock}. */
+  leaderboard?: QuizLeaderboardBlock | null;
   created_at: string;
   updated_at: string;
 }
@@ -360,6 +423,10 @@ export interface CreateChannelQuizPayload {
    *  anyone who is not a verified author. */
   visibility?: ChannelQuizVisibility;
   settings?: Partial<ChannelQuizSettings>;
+  /** What the lists filter by; each optional, `null` for none. */
+  year?: number | null;
+  level?: string | null;
+  topic?: string | null;
   questions: QuizQuestionInput[];
   scenarios?: QuizScenarioInput[];
 }
@@ -370,6 +437,10 @@ export interface CreateChannelQuizPayload {
 export interface UpdateChannelQuizPayload {
   title?: string;
   description?: string;
+  /** `null` clears it. Metadata, so a played quiz takes it too. */
+  year?: number | null;
+  level?: string | null;
+  topic?: string | null;
   settings?: Partial<ChannelQuizSettings>;
   questions?: QuizQuestionInput[];
   /** Sent with `questions` when the replacement has scenarios. */
@@ -539,6 +610,15 @@ export interface GoLiveChannelQuizPayload {
 export interface ChannelQuizListParams {
   per_page?: number;
   page?: number;
+}
+
+/** What Explore and My quizzes narrow by (Backend, quiz list part 5). Search
+ *  matches the title, description and topic, word by word. */
+export interface QuizListFilters {
+  search?: string;
+  year?: number;
+  level?: string;
+  topic?: string;
 }
 
 /******************************************************************************
@@ -870,6 +950,9 @@ export interface QuizCancelledPayload {
 ******************************************************************************/
 
 export type ChannelQuizListResponse = LengthAwareResponse<ChannelQuiz>;
+/** Explore and My quizzes: a page, with the filter choices beside it. */
+export type QuizHomeListResponse = ChannelQuizListResponse & { filters?: QuizListFilterOptions };
+export type QuizLeaderboardResponse = ItemResponse<QuizLeaderboard>;
 export type ChannelQuizResponse = ItemResponse<ChannelQuiz>;
 export type QuizAttemptResponse = ItemResponse<QuizAttempt>;
 export type QuizAttemptAnswerResponse = ItemResponse<QuizAttemptAnswerReceipt>;

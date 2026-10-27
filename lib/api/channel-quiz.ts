@@ -41,11 +41,26 @@ import type {
   QuizGameResponse,
   QuizGameResultsResponse,
   QuizGameStateResponse,
+  QuizHomeListResponse,
+  QuizLeaderboardResponse,
+  QuizListFilters,
   StartQuizAttemptPayload,
   SubmitQuizAnswerPayload,
   SubmitQuizAttemptAnswerPayload,
   UpdateChannelQuizPayload,
 } from '@/types/channel-quiz';
+
+/** Only the filters that are set: an empty search or a cleared choice is
+ *  not sent, so the request reads the same as one with no filter. */
+function listFilterParams(filters: QuizListFilters): QuizListFilters {
+  const search = filters.search?.trim();
+  return {
+    ...(search ? { search } : {}),
+    ...(filters.year !== undefined ? { year: filters.year } : {}),
+    ...(filters.level ? { level: filters.level } : {}),
+    ...(filters.topic ? { topic: filters.topic } : {}),
+  };
+}
 
 /** Authoring — gated by the channel's `settings.quiz_host_policy`. */
 export const channelQuizApi = {
@@ -77,14 +92,15 @@ export const channelQuizApi = {
   /** THE READER'S OWN LIBRARY — every quiz they authored, wherever it was born
    *  and wherever it has been played. Paginated, newest first. */
   getMine: async (
-    params: ChannelQuizListParams = {},
-  ): Promise<ChannelQuizListResponse> => {
-    const response = await apiClient.get<ChannelQuizListResponse>(
+    params: ChannelQuizListParams & QuizListFilters = {},
+  ): Promise<QuizHomeListResponse> => {
+    const response = await apiClient.get<QuizHomeListResponse>(
       '/channel-quizzes/mine',
       {
         params: {
           per_page: params.per_page ?? 30,
           page: params.page ?? 1,
+          ...listFilterParams(params),
         },
       },
     );
@@ -97,16 +113,31 @@ export const channelQuizApi = {
    * questions. `per_page` 1–50, server default 15.
    */
   explore: async (
-    params: ChannelQuizListParams = {},
-  ): Promise<ChannelQuizListResponse> => {
-    const response = await apiClient.get<ChannelQuizListResponse>(
+    params: ChannelQuizListParams & QuizListFilters = {},
+  ): Promise<QuizHomeListResponse> => {
+    const response = await apiClient.get<QuizHomeListResponse>(
       '/channel-quizzes/explore',
       {
         params: {
           per_page: params.per_page ?? 15,
           page: params.page ?? 1,
+          ...listFilterParams(params),
         },
       },
+    );
+    return response.data;
+  },
+
+  /**
+   * THE LEADERBOARD of a quiz on the public list (Backend, quiz list part 6):
+   * its first `limit` players (server default 20, at most 100) and the
+   * reader's own place. Works signed out, where each player is a name and a
+   * face only. Any quiz not on the public list is `404`.
+   */
+  leaderboard: async (quizUuid: string, limit = 20): Promise<QuizLeaderboardResponse> => {
+    const response = await apiClient.get<QuizLeaderboardResponse>(
+      `/channel-quizzes/${quizUuid}/leaderboard`,
+      { params: { limit } },
     );
     return response.data;
   },

@@ -68,13 +68,18 @@ test('both tabs draw the same card in the same grid, the menu on My quizzes only
   // The menu is a sibling above the stretched link, never inside it.
   assert.match(card, /\{menu \? <div className="relative z-10 -mr-1\.5">\{menu\}<\/div> : null\}\s*<\/div>\s*<Link/);
   assert.match(card, /after:absolute after:inset-0/);
+  // The footer replaces the best on both tabs: Explore's board lines and
+  // Take quiz; My quizzes' visibility beside the best (Arthur, 25 October 2026).
+  assert.match(card, /\{footer !== undefined \? \(\s*<div className="mt-auto flex min-w-0 flex-col gap-1 pt-1">\{footer\}<\/div>\s*\) : best \? \(/);
   const library = readFileSync(join(here, 'library', 'LibraryScreen.tsx'), 'utf8');
-  assert.match(library, /<ul className=\{QUIZ_CARD_GRID\}>/);
-  assert.match(library, /<QuizCard quiz=\{quiz\} index=\{index\} signedIn menu=\{menu\}>/);
-  assert.doesNotMatch(library, /editedLabel|visibilityFace/);
+  assert.match(library, /className=\{cn\(\s*QUIZ_CARD_GRID,/);
+  assert.match(library, /<QuizCard\s*quiz=\{quiz\}\s*index=\{index\}\s*signedIn\s*subject=\{quizSubjectLabel\(quiz\)\}\s*players=\{playersLabel\(quiz\.leaderboard\?\.player_count\)\}\s*menu=\{menu\}\s*footer=\{footer\}\s*>/);
+  assert.match(library, /\{visibilityFace\(quiz\.visibility\)\}/);
+  assert.doesNotMatch(library, /editedLabel/);
   const explore = readFileSync(join(here, 'explore', 'ExploreScreen.tsx'), 'utf8');
-  assert.match(explore, /<ul className=\{QUIZ_CARD_GRID\}>/);
-  assert.match(explore, /<QuizCard quiz=\{quiz\} index=\{index\} signedIn=\{signedIn\} author=\{author\} \/>/);
+  assert.match(explore, /className=\{cn\(\s*QUIZ_CARD_GRID,/);
+  assert.match(explore, /<QuizCard\s*quiz=\{quiz\}\s*index=\{index\}\s*signedIn=\{signedIn\}\s*author=\{author\}\s*verified=\{quiz\.creator\?\.is_verified_author === true\}/);
+  assert.match(explore, /menu=\{corner\}\s*footer=\{footer\}/);
   const home = readFileSync(join(here, '..', 'home', 'QuizHomeScreen.tsx'), 'utf8');
   assert.match(home, /const HOME_COLUMN = cn\(LIST_COLUMN, 'max-w-5xl'\);/);
 });

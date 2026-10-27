@@ -12,7 +12,7 @@ const read = (...parts: string[]) =>
 test('the explore list is fetched for everyone and opens each quiz on its front', () => {
   const screen = read('v2', 'features', 'quiz', 'solo', 'explore', 'ExploreScreen.tsx');
   // Unconditional: no `enabled`, no sign-in branch, no guest-pass wait.
-  assert.match(screen, /useInfiniteQuery\(\{\s*\.\.\.soloQuizQueries\.explore\(\{ viewerId \}\),/);
+  assert.match(screen, /useInfiniteQuery\(\{\s*\.\.\.soloQuizQueries\.explore\(\{ viewerId \}, filters\),/);
   // The rows stay on screen across the visitor-to-guest key change.
   assert.match(screen, /placeholderData: keepPreviousData,/);
   assert.doesNotMatch(screen, /enabled:/);

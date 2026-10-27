@@ -12,7 +12,7 @@ const read = (...parts: string[]) =>
 
 test('the library lists the reader\'s quizzes page by page and opens each on its front', () => {
   const screen = read('v2', 'features', 'quiz', 'solo', 'library', 'LibraryScreen.tsx');
-  assert.match(screen, /useInfiniteQuery\(soloQuizQueries\.library\(\{ viewerId \}\)\)/);
+  assert.match(screen, /useInfiniteQuery\(\{\s*\.\.\.soloQuizQueries\.library\(\{ viewerId \}, filters\),\s*\/\/[^\n]*\n\s*placeholderData: keepPreviousData,/);
   assert.match(read('v2', 'features', 'quiz', 'solo', 'QuizCard.tsx'), /href=\{quizFrontHref\(quiz\.uuid\)\}/);
   // The sentinel is rooted in the shell's scroller, like every v2 list.
   assert.match(screen, /rootRef: scrollRootRef,/);

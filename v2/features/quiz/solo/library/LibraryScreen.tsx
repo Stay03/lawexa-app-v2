@@ -1,16 +1,19 @@
 'use client';
 
 import { memo, useCallback, useMemo, useState } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import {
   ClipboardList,
   MoreHorizontal,
   Pencil,
   Plus,
+  SearchX,
   Share2,
   Trash2,
 } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -21,18 +24,31 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { ChannelQuiz } from '@/types/channel-quiz';
 import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
+import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
+import { VISIBILITY_MARKS } from '@/v2/features/channels/quiz/VisibilityChip';
 import { VisibilityGroup } from '@/v2/features/channels/quiz/VisibilityGroup';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
+import { useUrlSearch } from '@/v2/runtime/use-url-search';
 import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
+import { QuizFilters } from '../../home/QuizFilters';
 import { QuizMessage } from '../../ui/QuizMessage';
 import { QuizErrorState } from '../../ui/states';
+import {
+  hasFilterChoice,
+  NO_QUIZ_FILTERS,
+  parseQuizListFilters,
+  playersLabel,
+  quizSubjectLabel,
+} from '../home-model';
 import { canPublishPublicly, quizFrontHref } from '../model';
 import { QUIZ_CARD_GRID, QuizCard, QuizCardGridSkeleton } from '../QuizCard';
 import { soloQuizQueries } from '../queries';
+import { bestOrNotTaken } from '../rows-model';
 
 /**
  * LibraryList — the Quiz home's My quizzes tab (`/quiz?tab=mine`), every
@@ -58,10 +74,15 @@ import { soloQuizQueries } from '../queries';
  *
  * ── SMALL CARDS, TWO ACROSS ON A PHONE ─────────────────────────────────────
  * The grid Stay picked (version C, 23 October 2026), the same card Explore
- * uses (`QuizCard`): tile, title, the one fact line, the reader's best. Who
- * can take it and when it was edited left the card; the menu's visibility
- * switch says the first, and the card is the quiz, not its history. The menu
+ * uses (`QuizCard`): tile, title, its topic, level and year, the fact line,
+ * and at the foot who can take it beside the reader's best (Arthur's quiz
+ * home redesign, 25 October 2026: "show quiz title, question count, duration
+ * and visibility"). The menu's visibility switch changes it. The menu
  * trigger is a SIBLING of the card's link, never nested in it.
+ *
+ * ── SEARCH AND FILTERS ─────────────────────────────────────────────────────
+ * The same bar as Explore (`QuizFilters`), over the reader's own quizzes:
+ * the server answers with the years, levels and topics they used.
  *
  * ── THE SENTINEL IS ROOTED IN THE SHELL, NOT THE VIEWPORT ──────────────────
  * Same reasoning as the quiz history: the list lives inside the shell's one
@@ -73,8 +94,14 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
   const canPublish = canPublishPublicly(session);
 
   const [deleting, setDeleting] = useState<ChannelQuiz | null>(null);
+  const search = useUrlSearch('search');
+  const filters = parseQuizListFilters(useSearchParams());
 
-  const query = useInfiniteQuery(soloQuizQueries.library({ viewerId }));
+  const query = useInfiniteQuery({
+    ...soloQuizQueries.library({ viewerId }, filters),
+    // A new search or filter keeps the cards on screen while it is read.
+    placeholderData: keepPreviousData,
+  });
 
   const pages = query.data?.pages;
   const quizzes = useMemo<ChannelQuiz[]>(
@@ -84,7 +111,8 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
 
   const scrollRootRef = useShellScrollRoot();
   const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
-    hasNextPage: query.hasNextPage,
+    // Not from the outgoing key's pages: the next page belongs to the new read.
+    hasNextPage: query.hasNextPage && !query.isPlaceholderData,
     isFetchingNextPage: query.isFetchingNextPage,
     fetchNextPage: query.fetchNextPage,
     rootRef: scrollRootRef,
@@ -99,6 +127,7 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
   const showSkeleton = query.isPending;
   const showError = query.isError && quizzes.length === 0;
   const showEmpty = !showSkeleton && !showError && quizzes.length === 0;
+  const narrowed = Boolean(filters.search) || hasFilterChoice(filters);
 
   return (
     <>
@@ -106,6 +135,7 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
         Quizzes you wrote. Take one yourself, run it in a channel, or share it
         by link.
       </p>
+      <QuizFilters search={search} filters={filters} options={pages?.[0]?.filters} />
 
       {/* The ONE live region for this tab: the skeleton is `aria-hidden`
           and the route fallback's announcement is gone by the time an in-page
@@ -122,6 +152,24 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
           description="Your quizzes are still there. The list just did not load."
           onRetry={() => void query.refetch()}
         />
+      ) : showEmpty && narrowed ? (
+        <QuizMessage
+          icon={SearchX}
+          title="None of your quizzes match"
+          description="Try other words, or clear the filters to see all your quizzes."
+          action={
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                search.onClear();
+                replaceUrlParams(NO_QUIZ_FILTERS);
+              }}
+            >
+              Clear search and filters
+            </Button>
+          }
+        />
       ) : showEmpty ? (
         <QuizMessage
           icon={ClipboardList}
@@ -137,7 +185,13 @@ export function LibraryList({ openForm }: { openForm: (quizUuid?: string) => voi
         />
       ) : (
         <>
-          <ul className={QUIZ_CARD_GRID}>
+          <ul
+            className={cn(
+              QUIZ_CARD_GRID,
+              'transition-opacity duration-150',
+              query.isPlaceholderData && 'opacity-60',
+            )}
+          >
             {quizzes.map((quiz, index) => (
               <LibraryCard
                 key={quiz.uuid}
@@ -277,8 +331,37 @@ const LibraryCard = memo(function LibraryCard({
     </DropdownMenu>
   );
 
+  const Mark = VISIBILITY_MARKS[quiz.visibility];
+  const best = bestOrNotTaken(quiz.viewer_best_points, true);
+  const footer = (
+    <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
+      <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">
+        <Mark aria-hidden className="size-3.5 shrink-0" />
+        <span className="truncate">{visibilityFace(quiz.visibility)}</span>
+      </span>
+      {best ? (
+        <span
+          className={cn(
+            'shrink-0 whitespace-nowrap tabular-nums',
+            best.taken ? 'font-comfortaa font-bold text-primary' : 'text-muted-foreground/70',
+          )}
+        >
+          {best.label}
+        </span>
+      ) : null}
+    </span>
+  );
+
   return (
-    <QuizCard quiz={quiz} index={index} signedIn menu={menu}>
+    <QuizCard
+      quiz={quiz}
+      index={index}
+      signedIn
+      subject={quizSubjectLabel(quiz)}
+      players={playersLabel(quiz.leaderboard?.player_count)}
+      menu={menu}
+      footer={footer}
+    >
       {refusal && (
         <p
           role="alert"
