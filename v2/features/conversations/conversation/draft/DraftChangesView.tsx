@@ -74,7 +74,7 @@ export function DraftChangesView({
 
 /** Added words: underlined in green, on a faint green. */
 const ADDED =
-  'rounded-[0.2em] bg-emerald-500/12 px-[0.05em] text-inherit no-underline decoration-emerald-600 decoration-2 underline-offset-[3px] [text-decoration-line:underline] dark:decoration-emerald-400';
+  'rounded-[0.2em] bg-emerald-500/12 px-[0.05em] text-inherit underline decoration-emerald-600 decoration-2 underline-offset-[3px] dark:decoration-emerald-400';
 /** Removed words: struck through in red, on a faint red, a little quieter. */
 const REMOVED =
   'rounded-[0.2em] bg-red-500/10 px-[0.05em] text-red-700 decoration-red-600 decoration-[1.5px] [text-decoration-line:line-through] dark:text-red-300 dark:decoration-red-400';
