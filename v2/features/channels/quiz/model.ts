@@ -222,7 +222,10 @@ export const QUIZ_MIN_OPTIONS = 2;
 export const QUIZ_MAX_OPTIONS = 4;
 export const QUIZ_MIN_SECONDS = 5;
 export const QUIZ_MAX_SECONDS = 60;
-export const QUIZ_DEFAULT_SECONDS = 20;
+/** A new question's time (Arthur, 26 October 2026: 5 to 60 seconds, 30 by
+ *  default, as the quiz builder already does). Every save sends each
+ *  question's time, so the server's own default (20) never applies. */
+export const QUIZ_DEFAULT_SECONDS = 30;
 
 /** The timer choices the author picks from — a select, not a free number
  *  field: every value here is inside the server's 5–60s window by

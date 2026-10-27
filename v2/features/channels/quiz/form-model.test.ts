@@ -90,6 +90,22 @@ test('a saved quiz loads with its scenarios, each question still pointing at its
   assert.equal(payload.questions[1].scenario_index, 0);
 });
 
+test('a new question starts at 30 seconds, and every question sends its own time', () => {
+  // Arthur, 26 October 2026: 5 to 60 seconds, 30 by default.
+  assert.equal(newQuestion().seconds, 30);
+  const question = newQuestion();
+  question.question = 'TEST DATA. Is a lease an interest in land?';
+  question.options = question.options.map((option, index) => ({ ...option, content: index === 0 ? 'Yes' : 'No' }));
+  question.correctKey = question.options[0].key;
+  assert.equal(toPayload([question], []).questions[0].time_limit_seconds, 30);
+  // A stored question keeps its own time.
+  const loaded = draftsFromQuiz({
+    questions: [{ type: 'true_false', question: 'TEST DATA', time_limit_seconds: 45, position: 0, scenario_uuid: null, options: [{ content: 'True', is_correct: true }, { content: 'False', is_correct: false }] }],
+    scenarios: [],
+  } as unknown as ChannelQuiz);
+  assert.equal(loaded.questions[0].seconds, 45);
+});
+
 test('a refused save names the title, question or scenario at fault, so the form can go to it', () => {
   const filled = (scenarioKey: string | null = null): QuestionDraft => {
     const question = newQuestion(scenarioKey);
