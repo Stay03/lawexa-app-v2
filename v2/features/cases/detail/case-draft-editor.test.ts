@@ -38,7 +38,7 @@ test('a case chat answer splits its draft into the main chat’s card', () => {
   // DraftCard (Open / Showing), not the plain box a card without a panel shows.
   assert.match(
     embedded,
-    /panelHost \? \(\s*<SidePanelValueProvider url=\{panelHost\.url\} offsets=\{offsets\} space=\{controller\.space\} frame="card">\s*\{transcript\}/,
+    /panelHost \? \(\s*<SidePanelValueProvider\s+url=\{panelHost\.url\}\s+offsets=\{offsets\}\s+versions=\{draftVersions\}\s+space=\{controller\.space\}\s+frame="card"\s*>\s*\{transcript\}/,
   );
   assert.match(screen, /<SidePanelHostProvider value=\{draftHost\}>/);
   // The editor is the main chat's: the same slot, panel and editor, in the

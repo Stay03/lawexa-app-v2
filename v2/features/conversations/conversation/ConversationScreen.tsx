@@ -27,7 +27,7 @@ import {
 } from './embedded-composer';
 import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './route-composer';
 import { draftOffsets } from './draft/draft-ordinals';
-import { draftVersionIndex } from './draft/draft-versions';
+import { draftVersion, draftVersionIndex } from './draft/draft-versions';
 import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
 import { useSidePanelHost } from './side-panel/side-panel-host';
 import { SidePanelSlot } from './side-panel/SidePanelSlot';
@@ -123,7 +123,10 @@ export function ConversationScreen({
   // does not change `messages`, so this does not run per word.
   const offsets = useMemo(() => draftOffsets(messages), [messages]);
   // The same drafts by group, so a card reads "Version 2" (draft-versions.ts).
-  const draftVersions = useMemo(() => draftVersionIndex(messages), [messages]);
+  const draftVersions = useMemo(() => {
+    const index = draftVersionIndex(messages);
+    return (ordinal: number, key: string) => draftVersion(index, ordinal, key);
+  }, [messages]);
   // Embedded, the page around the chat may show its side panel (the case
   // page's draft editor, side-panel-host.tsx).
   const panelHost = useSidePanelHost();

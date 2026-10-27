@@ -105,6 +105,13 @@ test('the panel switches versions in place and saves each under its own name', (
 
 test('both chat frames hand the panel the version index', () => {
   const screen = code('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
-  assert.match(screen, /const draftVersions = useMemo\(\(\) => draftVersionIndex\(messages\), \[messages\]\);/);
+  assert.match(
+    screen,
+    /const draftVersions = useMemo\(\(\) => \{\s*const index = draftVersionIndex\(messages\);\s*return \(ordinal: number, key: string\) => draftVersion\(index, ordinal, key\);\s*\}, \[messages\]\);/,
+  );
   assert.equal(screen.match(/versions=\{draftVersions\}/g)?.length, 2);
+  // The case page loads the side panel's context before its chat opens, and no
+  // draft code: the context takes the lookup, and imports only its type.
+  const context = code('v2', 'features', 'conversations', 'conversation', 'side-panel', 'SidePanelContext.tsx');
+  assert.match(context, /import type \{ DraftVersion \} from '\.\.\/draft\/draft-versions';/);
 });

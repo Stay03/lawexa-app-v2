@@ -43,7 +43,7 @@ test('the mark writes data attributes, never a style, and is in every note edito
 
 test('a finished draft opens in the editor with the font menus; one still being written reads', () => {
   const panel = readFileSync(join(here, '..', '..', 'conversations', 'conversation', 'draft', 'DraftPanel.tsx'), 'utf8');
-  assert.match(panel, /\{draft\.complete && conversationId \? \(\s*<DraftEditor\s+conversationId=\{conversationId\}\s+ordinal=\{ordinal\}\s+title=\{draft\.title\}\s+markdown=\{draft\.body\}\s+font=\{\{ font: draft\.font, size: draft\.size \}\}\s+space=\{space\}\s+\/>/);
+  assert.match(panel, /\{draft\.complete && conversationId \? \(\s*<DraftEditor\s+conversationId=\{conversationId\}\s+ordinal=\{ordinal\}\s+title=\{draftVersionTitle\(draft\.title, version\)\}\s+markdown=\{draft\.body\}\s+font=\{\{ font: draft\.font, size: draft\.size \}\}\s+space=\{space\}\s+versionSwitch=\{versionSwitch\}\s+\/>/);
   const editor = readFileSync(join(here, '..', '..', 'conversations', 'conversation', 'draft', 'DraftEditor.tsx'), 'utf8');
   assert.match(editor, /<FontMenu editor=\{editor\} \/>\s*<SizeMenu editor=\{editor\} \/>/);
   // This visit's edits first, then the note it was saved as (any device), then Lawexa's text in its fonts.
