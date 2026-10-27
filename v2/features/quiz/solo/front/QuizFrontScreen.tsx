@@ -277,8 +277,12 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 
   return (
     <div className={cn(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44')}>
-      <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-8">
-        <div className="flex min-w-0 flex-col gap-5">
+      {/* Three cells (Arthur, 27 October 2026: "the quiz, Start and Challenge
+          first"): on a phone the quiz, then your best and Start, then the
+          board; on a computer the board sits under the quiz and the panel
+          holds the right column beside both. */}
+      <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-x-8 md:gap-y-5">
+        <div className="min-w-0 md:col-start-1 md:row-start-1">
           <header className="space-y-2 md:space-y-3">
             <h1 className="text-xl leading-snug font-semibold tracking-tight text-balance text-foreground md:text-3xl">
               {quiz.title}
@@ -314,17 +318,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
           </header>
-
-          {quiz.visibility === 'public' ? (
-            board ? (
-              <FrontBoard board={board} />
-            ) : boardQuery.isPending ? (
-              <FrontBoardSkeleton />
-            ) : null
-          ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-5 md:sticky md:top-6 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
+        <div className="flex min-w-0 flex-col gap-5 md:sticky md:top-6 md:col-start-2 md:row-span-2 md:row-start-1 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
           {best || taken ? (
             <div className="flex items-end justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:border-0 md:bg-transparent md:p-0">
               {best ? (
@@ -437,6 +433,12 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             </p>
           </div>
         </div>
+
+        {quiz.visibility === 'public' ? (
+          <div className="min-w-0 md:col-start-1 md:row-start-2">
+            {board ? <FrontBoard board={board} /> : boardQuery.isPending ? <FrontBoardSkeleton /> : null}
+          </div>
+        ) : null}
       </article>
 
       {/* The owner's edit, from the bar's menu. No channel: the quiz's home is
