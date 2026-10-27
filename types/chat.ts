@@ -712,6 +712,16 @@ export interface ApiMessage {
   reply_to?: MessageReplyTo | null;
   /** The people tagged in this row (`[]` when none, and in personal chats). */
   mentions?: MessageMention[];
+  /**
+   * `'failed'` on the text rows of a turn that failed after it started
+   * (Backend, failed-turns-free a967cbb9): `content` is `''`, the turn was
+   * not charged, and one turn may have several such rows (its narration and
+   * its partial answer), told apart by `metadata.execution_id`. Absent on
+   * every other row.
+   */
+  status?: 'failed';
+  /** The server's sentence for a failed turn; the app says its own. */
+  failure_message?: string;
   /** Handles the writer typed that matched nobody in the space: on the writer's own rows only. */
   unmatched_handles?: string[];
 }

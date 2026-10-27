@@ -88,7 +88,31 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
     }
   });
 
+  // A FAILED TURN (Backend, failed-turns-free): its text rows come back with
+  // `status: 'failed'` and no content, and the turn was not charged. One
+  // turn can have several such rows (its narration, its partial answer), so
+  // the turn becomes ONE failed row, where its first text row was (Stay, 27
+  // October 2026). Tool and handover rows are unchanged.
+  const failedTurnsShown = new Set<string>();
+
   for (const apiMsg of apiMessages) {
+    if (apiMsg.role === 'assistant' && apiMsg.status === 'failed') {
+      const turn = apiMsg.metadata?.execution_id ?? `row-${apiMsg.id}`;
+      if (failedTurnsShown.has(turn)) continue;
+      failedTurnsShown.add(turn);
+      messages.push({
+        id: `msg_${apiMsg.id}`,
+        role: 'assistant',
+        content: apiMsg.failure_message ?? '',
+        timestamp: new Date(apiMsg.created_at),
+        messageType: 'error',
+        errorCode: 'FAILED_TURN',
+        retryable: false,
+        retryAfterMs: null,
+        failedAnswer: true,
+      } as ErrorMessage);
+      continue;
+    }
     // User message
     if (apiMsg.role === 'user') {
       // Normalize the two server shapes: prefer `attachments` (array,

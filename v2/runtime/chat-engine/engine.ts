@@ -1609,6 +1609,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         retryable?: boolean;
         retry_after_ms?: number | null;
         persisted_message_ids?: number[];
+        /** A failed, free turn: withdraw what streamed (failed-turns-free). */
+        discard_partial?: boolean;
+        charged?: boolean;
       }>(data);
       settleTurn(parsed?.persisted_message_ids);
 
@@ -1656,18 +1659,23 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // part they could see. Mirrors the `end`/`timeout` shape exactly, including the
       // `partial` marker, so an interrupted answer reads as interrupted.
       //
-      // AN ANSWER THAT HAD STARTED IS WITHDRAWN (Stay, 27 October 2026): the
-      // text that streamed before the failure is not shown and the turn is
-      // free, so its row goes and the failed row stands in its place. The
-      // tool steps already drawn stay; they are not the answer.
-      const started = withdrawOpenPlaceholder();
+      // A FAILED TURN IS WITHDRAWN (Stay, 27 October 2026): the server says
+      // `discard_partial: true` (and `charged: false`) on every turn that
+      // failed after it started (Backend, failed-turns-free). The text that
+      // streamed is not shown, so its row goes and the failed row stands in
+      // its place. The tool steps already drawn stay; they are not the
+      // answer. A server before that change keeps the old way: the text
+      // stays, marked as interrupted.
+      const failedTurn = parsed?.discard_partial === true;
+      if (failedTurn) withdrawOpenPlaceholder();
+      else finalizeOpenPlaceholder('error');
 
       if (parsed) {
         const errorMsg = parsed.error_message || parsed.message || 'Something went wrong';
         const errorCode = parsed.error_code || 'UNKNOWN';
         const retryable = parsed.retryable ?? false;
         const retryAfterMs = parsed.retry_after_ms ?? null;
-        addErrorMessage(errorMsg, errorCode, retryable, retryAfterMs, null, started);
+        addErrorMessage(errorMsg, errorCode, retryable || failedTurn, retryAfterMs, null, failedTurn);
         handlers.onError?.(errorMsg);
       } else {
         const errorMsg = 'Stream error';
@@ -1754,17 +1762,46 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       resetStreamingBuffers();
     });
 
-    // timeout — terminal. An answer that had started is withdrawn, as on an
-    // error (Stay, 27 October 2026): its text goes and the failed row says
-    // it was not finished and not charged.
-    es.addEventListener('timeout', () => {
+    // timeout — terminal. The server's time limit ends the turn as free and
+    // says so (`discard_partial: true`, Backend failed-turns-free): the text
+    // is withdrawn, as on an error, and the failed row says it was not
+    // finished and not charged. A server before that change keeps the old
+    // way: the text stays, marked as timed out.
+    es.addEventListener('timeout', (e) => {
       stopWatchdog();
       isCancelling = false;
       toolCallQueue.clear();
       const errorMsg = 'Stream timed out';
-      if (withdrawOpenPlaceholder()) {
+      const failedTurn = parseEvent<{ discard_partial?: boolean }>((e as MessageEvent).data)?.discard_partial === true;
+      const placeholderId = streamingMessageId;
+      if (failedTurn) {
+        withdrawOpenPlaceholder();
         addErrorMessage(errorMsg, 'TIMEOUT', true, null, null, true);
         setState((prev) => ({ ...prev, error: errorMsg }));
+      } else if (placeholderId) {
+        const finalText = liveText.get(placeholderId) ?? '';
+        const trace = takeReasoning(placeholderId);
+        setState((prev) => ({
+          ...prev,
+          messages: prev.messages.map((m) => {
+            if (m.id !== placeholderId) return m;
+            const content = finalText || m.content;
+            return {
+              ...m,
+              content,
+              isStreaming: false,
+              ...trace,
+              ...(content ? { partial: { reason: 'timeout' as const } } : {}),
+            };
+          }),
+          error: errorMsg,
+          isStreaming: false,
+          isCancelling: false,
+        }));
+        clearText(placeholderId);
+        messageIdToIteration.delete(placeholderId);
+        streamingMessageId = null;
+        currentIteration = null;
       } else {
         setState((prev) => ({ ...prev, error: errorMsg, isStreaming: false, isCancelling: false }));
       }
@@ -1844,8 +1881,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   /**
    * Take the open streaming placeholder off the list, text and all, and
    * detach the streaming refs: the withdrawal of an answer that failed after
-   * it started. `true` when there was one. A placeholder with no row yet
-   * (no text had streamed) still counts as started.
+   * it started. `true` when there was one.
    */
   function withdrawOpenPlaceholder(): boolean {
     const placeholderId = streamingMessageId;
