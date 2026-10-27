@@ -40,9 +40,7 @@ import { signInHref } from '@/v2/runtime/sign-in-href';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
-import { QuizTile } from '../QuizTile';
 import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
-import { useLeaderboardOverlay } from '../board/use-leaderboard-overlay';
 import { quizSubjectLabel, rankLabel } from '../home-model';
 import { bestLabel, quizMinutesLabel, scenarioCountLabel } from '../rows-model';
 import { FRONT_SCORING_NOTE, frontChallengeText, takenLabel } from './front-model';
@@ -96,11 +94,11 @@ import { soloQuizQueries } from '../queries';
  * leaves the reader on their library, because this page no longer exists.
  *
  * ── A PUBLIC QUIZ SHOWS ITS LEADERBOARD ────────────────────────────────────
- * Under the masthead (Arthur's quiz list, part 6): the score to beat and its
- * player, the top three, and "See full leaderboard", which opens the board
- * over the page (`?board=`). The reader's own rank sits under their best in
- * the start panel, apart from the score to beat. The board is read only for
- * a `public` quiz: every other quiz's board is a `404`.
+ * Under the masthead (Arthur, 27 October 2026): a podium of the top three on
+ * B1's raised blocks, then places 4 to 10, the reader's row marked "You" and
+ * added at the foot when they are further down (`FrontBoard`). The reader's
+ * own rank also sits under their best in the start panel. The board is read
+ * only for a `public` quiz: every other quiz's board is a `404`.
  *
  * ── NOTHING HERE LISTS THE QUESTIONS ───────────────────────────────────────
  * The preview carries them (without answers), but a quiz read before it is
@@ -110,10 +108,12 @@ import { soloQuizQueries } from '../queries';
  * the questions one at a time, each scenario with its source.
  *
  * ── THE APPROVED DESIGN (quiz piece 3, picture 4) ──────────────────────────
- * A masthead (the tile, the title, the author, the facts as pills), then a
- * panel with the reader's best and how often they took it, the reveal choice
- * and Start. On a computer the two sit side by side; on a phone Start stays
- * at the foot of the screen.
+ * A masthead (the title, the author, the facts; no letter tile since
+ * Arthur's 27 October brief: "prioritise the quiz, Start Quiz, Challenge a
+ * Friend"), then a panel with the reader's best and how often they took it,
+ * the reveal choice, Start and Challenge a friend. On a computer the two sit
+ * side by side and the panel stays in view while the board scrolls; on a
+ * phone Start stays at the foot of the screen.
  */
 export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const router = useRouter();
@@ -143,7 +143,6 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
     enabled: quiz?.visibility === 'public',
   });
   const board = quiz?.visibility === 'public' ? (boardQuery.data?.data ?? null) : null;
-  const { openBoard, sheet: boardSheet } = useLeaderboardOverlay(viewerId);
 
   const [revealMode, setRevealMode] = useState<QuizRevealMode>(DEFAULT_REVEAL_MODE);
   const startAttempt = useStartAttempt(quizUuid, viewerId);
@@ -281,7 +280,6 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
       <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-8">
         <div className="flex min-w-0 flex-col gap-5">
           <header className="space-y-2 md:space-y-3">
-            <QuizTile uuid={quiz.uuid} title={quiz.title} className="size-11 rounded-[14px] text-lg md:size-14 md:rounded-[18px] md:text-xl" />
             <h1 className="text-xl leading-snug font-semibold tracking-tight text-balance text-foreground md:text-3xl">
               {quiz.title}
             </h1>
@@ -319,14 +317,14 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 
           {quiz.visibility === 'public' ? (
             board ? (
-              <FrontBoard board={board} onSeeAll={() => openBoard(quiz.uuid, quiz.title)} />
+              <FrontBoard board={board} />
             ) : boardQuery.isPending ? (
               <FrontBoardSkeleton />
             ) : null
           ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-5 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
+        <div className="flex min-w-0 flex-col gap-5 md:sticky md:top-6 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
           {best || taken ? (
             <div className="flex items-end justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:border-0 md:bg-transparent md:p-0">
               {best ? (
@@ -457,7 +455,6 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         onDeleted={() => router.replace(LIBRARY_HREF)}
       />
 
-      {boardSheet}
     </div>
   );
 }

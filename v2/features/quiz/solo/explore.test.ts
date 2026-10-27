@@ -17,14 +17,12 @@ test('the explore list is fetched for everyone and opens each quiz on its front'
   assert.match(screen, /placeholderData: keepPreviousData,/);
   assert.doesNotMatch(screen, /enabled:/);
   assert.doesNotMatch(screen, /useGuestPassFailed|SignedOutState/);
-  // Signed in or not only decides whether a card may say "Not taken".
-  assert.match(screen, /const \{ userId: viewerId, signedIn \} = useV2Session\(\);/);
-  assert.match(screen, /signedIn=\{signedIn\}/);
-  const card = read('v2', 'features', 'quiz', 'solo', 'QuizCard.tsx');
+  assert.match(screen, /const \{ userId: viewerId \} = useV2Session\(\);/);
+  assert.match(screen, /<ExploreQuizCard key=\{quiz\.uuid\} quiz=\{quiz\} \/>/);
+  const card = read('v2', 'features', 'quiz', 'solo', 'explore', 'ExploreQuizCard.tsx');
   assert.match(card, /href=\{quizFrontHref\(quiz\.uuid\)\}/);
-  // The author has its own line on the card, and a gone account is a word, not a crash.
-  assert.match(screen, /author=\{author\}/);
-  assert.match(screen, /quiz\.creator\?\.name \?\? 'Someone who has left'/);
+  // The author is on the card's quiet line, and a gone account is a word, not a crash.
+  assert.match(card, /quiz\.creator\?\.name \?\? 'Someone who has left'/);
   assert.match(screen, /rootRef: scrollRootRef,/);
   // A tab of the Quiz home now: no page column and no heading of its own.
   assert.match(screen, /export function ExploreList\(\) \{/);

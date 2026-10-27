@@ -122,15 +122,18 @@ test('both lists read their filters from the address and draw the same bar', () 
   assert.match(bar, /const levels = QUIZ_LEVELS\.filter\(/);
 });
 
-test('an Explore card keeps Take quiz the main action and opens the board from its corner', () => {
+test('an Explore card is one link: title first, the person to beat, the reader’s place, a quiet play mark', () => {
   const explore = read('explore', 'ExploreScreen.tsx');
   assert.match(explore, /Test your knowledge, learn something new and track your progress\./);
-  assert.match(explore, /const corner = hasBoard\(quiz\.leaderboard\) \? \(/);
-  assert.match(explore, /aria-label=\{`Leaderboard for \$\{quiz\.title\}`\}/);
-  assert.match(explore, /onClick=\{\(\) => onOpenBoard\(quiz\.uuid, quiz\.title\)\}/);
-  // Take quiz is the card's face, hidden from a screen reader, which hears the title link.
-  assert.match(explore, /<span\s*aria-hidden\s*className="[^"]*"\s*>\s*Take quiz\s*<\/span>/);
-  const card = read('QuizCard.tsx');
+  // No board button on the card now (Arthur, 27 October 2026): the quiz page carries the board.
+  assert.doesNotMatch(explore, /useLeaderboardOverlay|Trophy/);
+  const card = read('explore', 'ExploreQuizCard.tsx');
+  assert.match(card, /after:absolute after:inset-0/);
+  assert.match(card, /\{leading \? 'You lead' : 'To beat'\}/);
+  assert.match(card, /No one has played yet\./);
+  assert.match(card, /best !== null && rank !== null \? \(/);
+  // The play mark is the link's face, hidden from a screen reader, which hears the title.
+  assert.match(card, /<span\s*aria-hidden\s*className="flex size-9[^"]*"\s*>\s*<Play/);
   assert.match(card, /<BadgeCheck aria-hidden className="size-3\.5 shrink-0 text-primary" \/>\s*<span className="sr-only">, verified author<\/span>/);
 });
 
@@ -140,7 +143,12 @@ test('the board opens at its own address, and the quiz page reads it only for a 
   assert.match(overlay, /key=\{overlay\.keyFor\(quizUuid\)\}/);
   const front = read('front', 'QuizFrontScreen.tsx');
   assert.match(front, /enabled: quiz\?\.visibility === 'public',/);
-  assert.match(front, /<FrontBoard board=\{board\} onSeeAll=\{\(\) => openBoard\(quiz\.uuid, quiz\.title\)\} \/>/);
+  assert.match(front, /<FrontBoard board=\{board\} \/>/);
+  // The podium and the top ten, the reader's row marked and kept when further down.
+  const board = read('board', 'FrontBoard.tsx');
+  assert.match(board, /const BOARD_TOP = 10;/);
+  assert.match(board, /const order = \[entries\[1\], entries\[0\], entries\[2\]\];/);
+  assert.match(board, /\{viewer && !youShown \? \(/);
   assert.match(front, /Your rank \{rank\}/);
   const sheet = read('board', 'QuizLeaderboardSheet.tsx');
   assert.match(sheet, /enabled: open,/);

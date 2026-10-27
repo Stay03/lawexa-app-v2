@@ -62,7 +62,7 @@ test('the tile is the same colour for the same quiz, and its letter is the first
   assert.equal(quizInitial('…'), 'Q');
 });
 
-test('both tabs draw the same card in the same grid, the menu on My quizzes only, the author on Explore only', () => {
+test('My quizzes draws the shared card with its menu; Explore draws its own B1 card', () => {
   const card = readFileSync(join(here, 'QuizCard.tsx'), 'utf8');
   assert.match(card, /export const QUIZ_CARD_GRID = 'grid grid-cols-2 gap-2\.5 sm:grid-cols-3 xl:grid-cols-4';/);
   // The menu is a sibling above the stretched link, never inside it.
@@ -77,9 +77,10 @@ test('both tabs draw the same card in the same grid, the menu on My quizzes only
   assert.match(library, /\{visibilityFace\(quiz\.visibility\)\}/);
   assert.doesNotMatch(library, /editedLabel/);
   const explore = readFileSync(join(here, 'explore', 'ExploreScreen.tsx'), 'utf8');
-  assert.match(explore, /className=\{cn\(\s*QUIZ_CARD_GRID,/);
-  assert.match(explore, /<QuizCard\s*quiz=\{quiz\}\s*index=\{index\}\s*signedIn=\{signedIn\}\s*author=\{author\}\s*verified=\{quiz\.creator\?\.is_verified_author === true\}/);
-  assert.match(explore, /menu=\{corner\}\s*footer=\{footer\}/);
+  assert.match(explore, /className=\{cn\(\s*EXPLORE_CARD_GRID,/);
+  assert.doesNotMatch(explore, /<QuizCard/);
+  const exploreCard = readFileSync(join(here, 'explore', 'ExploreQuizCard.tsx'), 'utf8');
+  assert.match(exploreCard, /export const EXPLORE_CARD_GRID = 'v2-solo grid grid-cols-1 gap-4 pb-1 sm:grid-cols-2 xl:grid-cols-3';/);
   const home = readFileSync(join(here, '..', 'home', 'QuizHomeScreen.tsx'), 'utf8');
   assert.match(home, /const HOME_COLUMN = cn\(LIST_COLUMN, 'max-w-5xl'\);/);
 });

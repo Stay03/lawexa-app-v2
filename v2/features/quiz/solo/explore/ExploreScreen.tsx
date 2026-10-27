@@ -1,9 +1,9 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
-import { Compass, SearchX, Trophy } from 'lucide-react';
+import { Compass, SearchX } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -16,18 +16,9 @@ import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { QuizFilters } from '../../home/QuizFilters';
 import { QuizMessage } from '../../ui/QuizMessage';
 import { QuizErrorState } from '../../ui/states';
-import { useLeaderboardOverlay } from '../board/use-leaderboard-overlay';
-import {
-  cardBoardLines,
-  hasBoard,
-  hasFilterChoice,
-  NO_QUIZ_FILTERS,
-  parseQuizListFilters,
-  playersLabel,
-  quizSubjectLabel,
-  scoreLabel,
-} from '../home-model';
-import { QUIZ_CARD_GRID, QuizCard, QuizCardGridSkeleton } from '../QuizCard';
+import { hasFilterChoice, NO_QUIZ_FILTERS, parseQuizListFilters } from '../home-model';
+import { EXPLORE_CARD_GRID, ExploreQuizCard, ExploreQuizCardGridSkeleton } from './ExploreQuizCard';
+import '../solo-quiz.css';
 import { soloQuizQueries } from '../queries';
 
 /**
@@ -66,10 +57,9 @@ import { soloQuizQueries } from '../queries';
  * filter that leaves nothing says so with a way back.
  */
 export function ExploreList() {
-  const { userId: viewerId, signedIn } = useV2Session();
+  const { userId: viewerId } = useV2Session();
   const search = useUrlSearch('search');
   const filters = parseQuizListFilters(useSearchParams());
-  const { openBoard, sheet } = useLeaderboardOverlay(viewerId);
 
   const query = useInfiniteQuery({
     ...soloQuizQueries.explore({ viewerId }, filters),
@@ -144,13 +134,13 @@ export function ExploreList() {
         <>
           <ul
             className={cn(
-              QUIZ_CARD_GRID,
+              EXPLORE_CARD_GRID,
               'transition-opacity duration-150',
               query.isPlaceholderData && 'opacity-60',
             )}
           >
-            {quizzes.map((quiz, index) => (
-              <ExploreCard key={quiz.uuid} quiz={quiz} index={index} signedIn={signedIn} onOpenBoard={openBoard} />
+            {quizzes.map((quiz) => (
+              <ExploreQuizCard key={quiz.uuid} quiz={quiz} />
             ))}
           </ul>
 
@@ -166,7 +156,6 @@ export function ExploreList() {
         </>
       )}
 
-      {sheet}
     </>
   );
 }
@@ -181,95 +170,16 @@ export function ExploreLede() {
   );
 }
 
-/** One public quiz, as a card with its author and its board. `memo` because
- *  the list grows a page at a time. */
-const ExploreCard = memo(function ExploreCard({
-  quiz,
-  index,
-  signedIn,
-  onOpenBoard,
-}: {
-  quiz: ChannelQuiz;
-  /** Staggers the entrance for the first screenful only. */
-  index: number;
-  signedIn: boolean;
-  /** Stable across renders (the overlay's `useCallback`), so the `memo` holds. */
-  onOpenBoard: (quizUuid: string, quizTitle: string) => void;
-}) {
-  const author = quiz.is_mine ? 'You' : (quiz.creator?.name ?? 'Someone who has left');
-  const { toBeat, yourRank } = cardBoardLines(quiz.leaderboard);
-  const best = typeof quiz.viewer_best_points === 'number' ? scoreLabel(quiz.viewer_best_points) : null;
-
-  const corner = hasBoard(quiz.leaderboard) ? (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="size-8 text-muted-foreground hover:text-primary"
-      aria-label={`Leaderboard for ${quiz.title}`}
-      onClick={() => onOpenBoard(quiz.uuid, quiz.title)}
-    >
-      <Trophy aria-hidden className="size-4" />
-    </Button>
-  ) : undefined;
-
-  const footer = (
-    <>
-      {toBeat ? (
-        <span className="flex min-w-0 items-baseline gap-1 text-xs">
-          <span className="shrink-0 text-muted-foreground">To beat</span>
-          <span className="min-w-0 truncate font-medium text-foreground/85">{toBeat.name}</span>
-          <span className="ml-auto shrink-0 font-comfortaa font-bold text-foreground tabular-nums">
-            {toBeat.points}
-          </span>
-        </span>
-      ) : null}
-      {best ? (
-        <span className="flex min-w-0 items-baseline gap-1 text-xs">
-          <span className="shrink-0 text-muted-foreground">
-            You{yourRank ? <span className="tabular-nums"> · {yourRank}</span> : null}
-          </span>
-          <span className="sr-only">, your best</span>
-          <span className="ml-auto shrink-0 font-comfortaa font-bold text-primary tabular-nums">{best}</span>
-        </span>
-      ) : signedIn && quiz.viewer_best_points === null ? (
-        <span className="text-xs text-muted-foreground/70">Not taken</span>
-      ) : null}
-      {/* The card's own link opens the quiz; this is its face, not a second
-          control, so a screen reader hears the title once and not this. */}
-      <span
-        aria-hidden
-        className="mt-1 inline-flex h-8 items-center justify-center rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold text-primary"
-      >
-        Take quiz
-      </span>
-    </>
-  );
-
-  return (
-    <QuizCard
-      quiz={quiz}
-      index={index}
-      signedIn={signedIn}
-      author={author}
-      verified={quiz.creator?.is_verified_author === true}
-      subject={quizSubjectLabel(quiz)}
-      players={playersLabel(quiz.leaderboard?.player_count)}
-      menu={corner}
-      footer={footer}
-    />
-  );
-});
-
 /** The initial-load skeleton, in the card grid's shape. It pulses in the
  *  route fallback too. */
 export function ExploreListSkeleton() {
-  return <QuizCardGridSkeleton author />;
+  return <ExploreQuizCardGridSkeleton />;
 }
 
 function ExploreNextPageSkeleton() {
   return (
     <div className="pt-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-      <QuizCardGridSkeleton cards={4} author />
+      <ExploreQuizCardGridSkeleton cards={3} />
     </div>
   );
 }
