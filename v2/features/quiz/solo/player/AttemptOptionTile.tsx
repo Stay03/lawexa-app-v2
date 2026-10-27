@@ -133,6 +133,8 @@ export function AttemptOptionTile({
       <span className="min-w-0 flex-1 break-words">
         {content}
         {REVEAL_LABEL[state] && <span className="sr-only">. {REVEAL_LABEL[state]}</span>}
+        {/* The tag is read here, once: a wrong pick's label already says "Your answer". */}
+        {tag && state !== 'wrong-pick' ? <span className="sr-only">. {tag}</span> : null}
       </span>
 
       {badge && (
@@ -149,6 +151,7 @@ export function AttemptOptionTile({
 
       {tag ? (
         <span
+          aria-hidden
           className={cn(
             'shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold',
             state === 'correct'

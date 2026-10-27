@@ -64,6 +64,10 @@ test('the review shows every option: the right one, your pick, and the rest', ()
   assert.deepEqual(view(four(null, false)), ['One month:missed', 'Three months:missed', 'Six months:correct', 'One year:missed']);
   const page = read('v2', 'features', 'quiz', 'solo', 'results', 'AnswersStepper.tsx');
   assert.match(page, /const pickChanged = question\.answered && question\.your_option_id == null;/);
+  // A screen reader hears "Your answer" once: a wrong pick's own label says it already.
+  const tile = read('v2', 'features', 'quiz', 'solo', 'player', 'AttemptOptionTile.tsx');
+  assert.match(tile, /\{tag && state !== 'wrong-pick' \? <span className="sr-only">\. \{tag\}<\/span> : null\}/);
+  assert.match(tile, /\{tag \? \(\s*<span\s+aria-hidden/);
   assert.match(page, /The author has since changed these answers, so your pick isn&rsquo;t shown\./);
 });
 
