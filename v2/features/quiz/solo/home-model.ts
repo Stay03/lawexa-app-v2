@@ -1,4 +1,4 @@
-import type { QuizLeaderboardBlock, QuizListFilters } from '@/types/channel-quiz';
+import type { QuizListFilters } from '@/types/channel-quiz';
 
 /**
  * home-model — what the Quiz home's filters and cards say about a quiz beyond
@@ -133,29 +133,6 @@ export function rankLabel(rank: number, playerCount?: number | null): string {
 /** "11,405". */
 export function scoreLabel(points: number): string {
   return NUMBER.format(Math.round(points));
-}
-
-/**
- * The two leaderboard lines on an Explore card, kept apart as Arthur asked:
- * the score to beat (the top player and their points) and the reader's own
- * place. Each is `null` when there is nothing to say: no one has finished, or
- * the reader has not.
- */
-export function cardBoardLines(board: QuizLeaderboardBlock | null | undefined): {
-  toBeat: { name: string; points: string } | null;
-  yourRank: string | null;
-} {
-  if (!board) return { toBeat: null, yourRank: null };
-  return {
-    toBeat: board.top ? { name: board.top.name, points: scoreLabel(board.top.points) } : null,
-    yourRank: board.viewer_rank !== null ? rankLabel(board.viewer_rank, board.player_count) : null,
-  };
-}
-
-/** Whether the card offers its leaderboard: a quiz on the public list that
- *  someone has finished. */
-export function hasBoard(board: QuizLeaderboardBlock | null | undefined): boolean {
-  return Boolean(board && board.player_count > 0);
 }
 
 /**

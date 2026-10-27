@@ -23,7 +23,9 @@ import { quizFactsLabel } from '../rows-model';
  *   Title, in its own weight          two lines at most
  *   Author ✓ · Land Law · 2025        one quiet line
  *   ┌ (avatar) Bola Ade   2,820 pts ┐ the person to beat, on a tray
- *   You · #3 of 4 · 1,926       (▶)   only once the reader has played
+ *   You · #3 of 4 · 1,926       (▶)   once the reader has played; before
+ *                                     that the facts, unless the quiet line
+ *                                     already carries them (no subject)
  *
  * B1's lip is the card's press: the whole card is the one link (its title's
  * `after:` layer), raised 4px on the B1 lip and set down under a finger. The
@@ -91,9 +93,9 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
               You · <span className="font-medium text-foreground">#{rank}</span>
               {board ? ` of ${board.player_count}` : ''} · <span className="font-comfortaa font-bold text-[var(--solo-gold-text)]">{scoreLabel(best)}</span>
             </>
-          ) : (
+          ) : subject ? (
             quizFactsLabel(count, quiz.total_seconds)
-          )}
+          ) : null}
         </span>
         <span
           aria-hidden

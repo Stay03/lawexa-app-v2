@@ -90,7 +90,6 @@ export function ExploreList() {
 
   return (
     <>
-      <ExploreLede />
       <QuizFilters search={search} filters={filters} options={pages?.[0]?.filters} />
 
       {/* The ONE live region for this tab — see the library. */}
@@ -157,16 +156,6 @@ export function ExploreList() {
       )}
 
     </>
-  );
-}
-
-/** What the tab holds, in one line (Arthur, 25 October 2026). Static chrome:
- *  the home's fallback draws it too. */
-export function ExploreLede() {
-  return (
-    <p className="mb-3 text-sm text-muted-foreground">
-      Test your knowledge, learn something new and track your progress.
-    </p>
   );
 }
 

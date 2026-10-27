@@ -6,8 +6,6 @@ import { fileURLToPath } from 'node:url';
 
 import {
   BOARD_RULES_NOTE,
-  cardBoardLines,
-  hasBoard,
   hasFilterChoice,
   isQuizLevel,
   parseQuizListFilters,
@@ -69,18 +67,8 @@ test('a card says what the quiz is about and how many have played', () => {
   assert.equal(playersLabel(undefined), null);
 });
 
-test('the score to beat and the reader’s own place are two separate lines', () => {
-  assert.deepEqual(
-    cardBoardLines({ player_count: 128, top: { name: 'Ada', avatar_url: null, points: 11405 }, viewer_rank: 12 }),
-    { toBeat: { name: 'Ada', points: '11,405' }, yourRank: '#12 of 128' },
-  );
-  // No one has finished; the reader has not.
-  assert.deepEqual(cardBoardLines({ player_count: 0, top: null, viewer_rank: null }), { toBeat: null, yourRank: null });
-  // Not on the public list.
-  assert.deepEqual(cardBoardLines(null), { toBeat: null, yourRank: null });
-  assert.equal(hasBoard({ player_count: 3, top: null, viewer_rank: null }), true);
-  assert.equal(hasBoard({ player_count: 0, top: null, viewer_rank: null }), false);
-  assert.equal(hasBoard(null), false);
+test('a rank reads with its field, and a score as a whole number', () => {
+  assert.equal(rankLabel(12, 128), '#12 of 128');
   // A count that has not caught up with the rank is left out.
   assert.equal(rankLabel(5, 4), '#5');
   assert.equal(rankLabel(3), '#3');
@@ -124,23 +112,24 @@ test('both lists read their filters from the address and draw the same bar', () 
 
 test('an Explore card is one link: title first, the person to beat, the reader’s place, a quiet play mark', () => {
   const explore = read('explore', 'ExploreScreen.tsx');
-  assert.match(explore, /Test your knowledge, learn something new and track your progress\./);
+  // No tagline over the list (Arthur, 27 October 2026: less text).
+  assert.doesNotMatch(explore, /Test your knowledge/);
   // No board button on the card now (Arthur, 27 October 2026): the quiz page carries the board.
   assert.doesNotMatch(explore, /useLeaderboardOverlay|Trophy/);
   const card = read('explore', 'ExploreQuizCard.tsx');
   assert.match(card, /after:absolute after:inset-0/);
   assert.match(card, /\{leading \? 'You lead' : 'To beat'\}/);
   assert.match(card, /No one has played yet\./);
+  // The facts once: the footer leaves them to the quiet line when it carries them.
+  assert.match(card, /\{subject \?\? quizFactsLabel\(count, quiz\.total_seconds\)\}/);
+  assert.match(card, /\) : subject \? \(\s*quizFactsLabel\(count, quiz\.total_seconds\)\s*\) : null\}/);
   assert.match(card, /best !== null && rank !== null \? \(/);
   // The play mark is the link's face, hidden from a screen reader, which hears the title.
   assert.match(card, /<span\s*aria-hidden\s*className="flex size-9[^"]*"\s*>\s*<Play/);
   assert.match(card, /<BadgeCheck aria-hidden className="size-3\.5 shrink-0 text-primary" \/>\s*<span className="sr-only">, verified author<\/span>/);
 });
 
-test('the board opens at its own address, and the quiz page reads it only for a public quiz', () => {
-  const overlay = read('board', 'use-leaderboard-overlay.tsx');
-  assert.match(overlay, /const BOARD_PARAM = 'board';/);
-  assert.match(overlay, /key=\{overlay\.keyFor\(quizUuid\)\}/);
+test('the quiz page reads the board only for a public quiz, and draws the top ten', () => {
   const front = read('front', 'QuizFrontScreen.tsx');
   assert.match(front, /enabled: quiz\?\.visibility === 'public',/);
   assert.match(front, /<FrontBoard board=\{board\} \/>/);
@@ -150,9 +139,6 @@ test('the board opens at its own address, and the quiz page reads it only for a 
   assert.match(board, /const order = \[entries\[1\], entries\[0\], entries\[2\]\];/);
   assert.match(board, /\{viewer && !youShown \? \(/);
   assert.match(front, /Your rank \{rank\}/);
-  const sheet = read('board', 'QuizLeaderboardSheet.tsx');
-  assert.match(sheet, /enabled: open,/);
-  assert.match(sheet, /extractApiError\(query\.error\)\.status === 404/);
 });
 
 test('the form sends topic, level and year, and clears them with null', () => {
