@@ -3,7 +3,7 @@
 import { cn } from '@/lib/utils';
 import type { ToolMessage } from '@/types/chat';
 import { classifyParameters, detectEmptyResult, extractResultMessage } from './tool-content';
-import { failedStepSentence } from './step-failure';
+import { failedStepSentence, stepFailed } from './step-failure';
 import {
   BoundedScroll,
   ToolEmptyLine,
@@ -37,7 +37,8 @@ export function ToolCallDetails({ message, className }: ToolCallDetailsProps) {
   const blocks = params.filter((p) => p.kind !== 'chip');
 
   const isComplete = message.toolStatus === 'complete';
-  const success = message.toolResult?.success !== false;
+  // The server's softened "found nothing" reads as the failure it is (step-failure.ts).
+  const success = !stepFailed(message);
   const serverMessage = extractResultMessage(message);
   // An affirmative "returned zero" (empty-list payload) — null when the shape is
   // merely unrecognised, so an unreadable result never masquerades as zero.

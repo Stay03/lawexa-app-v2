@@ -7,11 +7,13 @@ import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { ApiMessage, ToolMessage } from '@/types/chat';
 import {
   GENERIC_STEP_FAILURE,
+  SOFTENED_LOOKUP_MISS,
   STEP_DID_NOT_WORK,
   STEP_NOT_FOUND,
   failedStepLine,
   failedStepOutcome,
   failedStepSentence,
+  stepFailed,
 } from './step-failure';
 
 /* A failed step in plain words (Stay, 27 October 2026, thread 9978b59a, option
@@ -91,6 +93,30 @@ test('a tool with no label of its own says "A step didn’t work"', () => {
   assert.deepEqual(line, { action: GENERIC_STEP_FAILURE, outcome: null });
   const step = code(...TOOLS, 'ToolStepItem.tsx');
   assert.match(step, /action: isComplete \? readable : `\$\{readable\}\.\.\.`,\s*generic: true,/);
+});
+
+test('the server’s softened "found nothing", sent as a success, reads as not found', () => {
+  // What a reader below researcher gets on live (d5045bf8): a success carrying this sentence.
+  const softened = (toolResult: ToolMessage['toolResult']): ToolMessage =>
+    ({ role: 'tool', toolName: 'read_statute', toolParameters: { section: '13' }, toolStatus: 'complete', toolResult }) as ToolMessage;
+  // A lazy row, before its result is fetched: the sentence rides on `error`.
+  const lazy = softened({ success: true, data: null, error: SOFTENED_LOOKUP_MISS });
+  // The fetched result: the sentence is the JSON's `message`.
+  const loaded = softened({ success: true, data: { message: SOFTENED_LOOKUP_MISS }, error: null });
+  for (const step of [lazy, loaded]) {
+    assert.equal(stepFailed(step), true);
+    assert.deepEqual(failedStepLine(step, { action: 'Read section 13' }), { action: 'Looked for a statute', outcome: STEP_NOT_FOUND });
+    assert.equal(failedStepSentence(step), 'Lawexa looked for this and it was not there.');
+  }
+  // The same sentence on a reloaded chat, through the app's own reading of the stored row.
+  const reloaded = replayed('read_statute', JSON.stringify({ message: SOFTENED_LOOKUP_MISS }));
+  assert.equal(stepFailed({ ...reloaded, toolResult: { ...reloaded.toolResult!, success: true } }), true);
+  // A real success, and a step still running, are not failures.
+  assert.equal(stepFailed(softened({ success: true, data: { message: 'Section 13 read.' }, error: null })), false);
+  assert.equal(stepFailed({ ...lazy, toolStatus: 'calling' }), false);
+  // Both step views read failure through the one check.
+  assert.match(code(...TOOLS, 'ToolStepItem.tsx'), /const isError = stepFailed\(loaded\.message\);\s*const isSuccess = isComplete && !isError;/);
+  assert.match(code(...TOOLS, 'ToolCallDetails.tsx'), /const success = !stepFailed\(message\);/);
 });
 
 test('an opened failed step says it in a sentence, not the error', () => {

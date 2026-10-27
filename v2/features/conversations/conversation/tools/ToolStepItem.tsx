@@ -27,7 +27,7 @@ import {
 } from './tool-content';
 import type { ToolMessage } from '@/types/chat';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
-import { failedStepLine } from './step-failure';
+import { failedStepLine, stepFailed } from './step-failure';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -329,8 +329,6 @@ export function ToolStepItem({
   className,
 }: ToolStepItemProps) {
   const isComplete = message.toolStatus === 'complete';
-  const isSuccess = isComplete && message.toolResult?.success !== false;
-  const isError = isComplete && message.toolResult?.success === false;
 
   const memory = isMemoryTool(message.toolName);
   // The step's result, fetched the first time it opens (v2 loads chats with
@@ -338,6 +336,10 @@ export function ToolStepItem({
   // what the step read once the result arrives (Stay's #13), and keeps the
   // name after the step closes: the fetched result is kept for the visit.
   const loaded = useToolResult(message, isExpanded);
+  // Failed, or the server's softened "found nothing" sent as a success
+  // (step-failure.ts): either way the step did not do what its label says.
+  const isError = stepFailed(loaded.message);
+  const isSuccess = isComplete && !isError;
   // A refused quiz is a finished step the stored result may still call a
   // success, so its mark follows the card's reading (created-quiz.ts), from the
   // LOADED result: a lazy chat's step carries none until it is fetched (the
