@@ -176,7 +176,124 @@ export function addToScenario(questions: readonly QuestionDraft[], scenarioKey: 
   return next;
 }
 
-/** The first thing wrong with the draft, phrased for the author — or `null`. */
+/* ── Managing the list (Arthur's redesign, part B, 25 October 2026) ────────────
+ * Reorder, duplicate, insert, and move a question into or out of a scenario.
+ * Every move keeps a scenario's questions next to each other, which the server
+ * requires (`422`): a question on its own steps past a whole scenario at once,
+ * a scenario's question moves only inside its scenario, and a scenario moves
+ * as one block. A move that cannot happen returns the same list, so the menu
+ * can offer it disabled (`canMove…`). */
+
+export type MoveDirection = 'up' | 'down';
+
+/** The list in runs: a question on its own, or a scenario's questions together. */
+function runsOf(questions: readonly QuestionDraft[]): QuestionDraft[][] {
+  const runs: QuestionDraft[][] = [];
+  for (const question of questions) {
+    const last = runs[runs.length - 1];
+    if (question.scenarioKey && last && last[0].scenarioKey === question.scenarioKey) last.push(question);
+    else runs.push([question]);
+  }
+  return runs;
+}
+
+function swapRuns(runs: QuestionDraft[][], index: number, direction: MoveDirection): QuestionDraft[] | null {
+  const other = direction === 'up' ? index - 1 : index + 1;
+  if (index < 0 || other < 0 || other >= runs.length) return null;
+  const next = [...runs];
+  [next[index], next[other]] = [next[other], next[index]];
+  return next.flat();
+}
+
+/** One question up or down, keeping every scenario's questions together. */
+export function moveQuestion(questions: readonly QuestionDraft[], key: string, direction: MoveDirection): readonly QuestionDraft[] {
+  const index = questions.findIndex((question) => question.key === key);
+  if (index < 0) return questions;
+  const question = questions[index];
+  if (question.scenarioKey) {
+    const other = direction === 'up' ? index - 1 : index + 1;
+    if (questions[other]?.scenarioKey !== question.scenarioKey) return questions;
+    const next = [...questions];
+    [next[index], next[other]] = [next[other], next[index]];
+    return next;
+  }
+  const runs = runsOf(questions);
+  return swapRuns(runs, runs.findIndex((run) => run[0].key === key), direction) ?? questions;
+}
+
+export function canMoveQuestion(questions: readonly QuestionDraft[], key: string, direction: MoveDirection): boolean {
+  return moveQuestion(questions, key, direction) !== questions;
+}
+
+/** A whole scenario, with its questions, up or down past the next run. */
+export function moveScenario(questions: readonly QuestionDraft[], scenarioKey: string, direction: MoveDirection): readonly QuestionDraft[] {
+  const runs = runsOf(questions);
+  return swapRuns(runs, runs.findIndex((run) => run[0].scenarioKey === scenarioKey), direction) ?? questions;
+}
+
+export function canMoveScenario(questions: readonly QuestionDraft[], scenarioKey: string, direction: MoveDirection): boolean {
+  return moveScenario(questions, scenarioKey, direction) !== questions;
+}
+
+/** A copy of the question right after it, as a new question: new keys, and no
+ *  stored id or source, so the server files it as written here. */
+export function duplicateQuestion(questions: readonly QuestionDraft[], key: string): QuestionDraft[] {
+  const index = questions.findIndex((question) => question.key === key);
+  if (index < 0) return [...questions];
+  const original = questions[index];
+  const options = original.options.map((option) => newOption(option.content));
+  const correctAt = original.options.findIndex((option) => option.key === original.correctKey);
+  const copy: QuestionDraft = {
+    key: nextKey('q'),
+    type: original.type,
+    question: original.question,
+    seconds: original.seconds,
+    options,
+    correctKey: correctAt >= 0 ? options[correctAt].key : null,
+    explanation: original.explanation,
+    scenarioKey: original.scenarioKey,
+  };
+  const next = [...questions];
+  next.splice(index + 1, 0, copy);
+  return next;
+}
+
+/** A new, empty question right after this one, in the same scenario if it is in one. */
+export function insertQuestionAfter(questions: readonly QuestionDraft[], key: string): QuestionDraft[] {
+  const index = questions.findIndex((question) => question.key === key);
+  const next = [...questions];
+  next.splice(index < 0 ? next.length : index + 1, 0, newQuestion(index < 0 ? null : questions[index].scenarioKey));
+  return next;
+}
+
+/** A question on its own into a scenario, as that scenario's last question. */
+export function moveIntoScenario(questions: readonly QuestionDraft[], key: string, scenarioKey: string): QuestionDraft[] {
+  const question = questions.find((entry) => entry.key === key);
+  if (!question || question.scenarioKey !== null) return [...questions];
+  const rest = questions.filter((entry) => entry.key !== key);
+  const lastIndex = rest.reduce((found, entry, index) => (entry.scenarioKey === scenarioKey ? index : found), -1);
+  if (lastIndex < 0) return [...questions];
+  rest.splice(lastIndex + 1, 0, { ...question, scenarioKey });
+  return rest;
+}
+
+/** A scenario's question out of it, placed right after the scenario. Not the
+ *  scenario's only question: the scenario would be left with none and dropped. */
+export function moveOutOfScenario(questions: readonly QuestionDraft[], key: string): QuestionDraft[] {
+  const question = questions.find((entry) => entry.key === key);
+  if (!question?.scenarioKey || !canMoveOutOfScenario(questions, key)) return [...questions];
+  const rest = questions.filter((entry) => entry.key !== key);
+  const lastIndex = rest.reduce((found, entry, index) => (entry.scenarioKey === question.scenarioKey ? index : found), -1);
+  rest.splice(lastIndex + 1, 0, { ...question, scenarioKey: null });
+  return rest;
+}
+
+export function canMoveOutOfScenario(questions: readonly QuestionDraft[], key: string): boolean {
+  const question = questions.find((entry) => entry.key === key);
+  if (!question?.scenarioKey) return false;
+  return questions.filter((entry) => entry.scenarioKey === question.scenarioKey).length > 1;
+}
+
 /** Where a refused save points: the title, a question or a scenario, by draft key. */
 export type FormProblemTarget =
   | { kind: 'title' }

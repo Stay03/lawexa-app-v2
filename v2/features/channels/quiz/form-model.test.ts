@@ -7,16 +7,112 @@ import { fileURLToPath } from 'node:url';
 import type { ChannelQuiz } from '@/types/channel-quiz';
 import {
   addToScenario,
+  canMoveOutOfScenario,
+  canMoveQuestion,
+  canMoveScenario,
   draftsFromQuiz,
+  duplicateQuestion,
   findFormProblem,
   groupQuestions,
   hasFormContent,
+  insertQuestionAfter,
+  moveIntoScenario,
+  moveOutOfScenario,
+  moveQuestion,
+  moveScenario,
   newQuestion,
   newScenario,
   toPayload,
   validate,
   type QuestionDraft,
 } from './form-model';
+
+/* Arthur's redesign, part B (25 October 2026): reorder, duplicate, insert, and
+ * move questions into and out of scenarios, always keeping a scenario's
+ * questions together (the server's 422). TEST DATA throughout. */
+
+/** A labelled question, so the list reads as its labels. */
+const named = (label: string, scenarioKey: string | null = null): QuestionDraft => ({ ...newQuestion(scenarioKey), question: label });
+const labels = (list: readonly QuestionDraft[]) => list.map((question) => question.question);
+/** Every scenario's questions sit next to each other. */
+const together = (list: readonly QuestionDraft[]) => {
+  const seen = new Set<string>();
+  let last: string | null = null;
+  for (const question of list) {
+    if (question.scenarioKey && question.scenarioKey !== last) {
+      if (seen.has(question.scenarioKey)) return false;
+      seen.add(question.scenarioKey);
+    }
+    last = question.scenarioKey;
+  }
+  return true;
+};
+
+test('a question on its own moves past a whole scenario at once', () => {
+  const s = newScenario();
+  const list = [named('A'), named('S1', s.key), named('S2', s.key), named('B')];
+  const aDown = moveQuestion(list, list[0].key, 'down');
+  assert.deepEqual(labels(aDown), ['S1', 'S2', 'A', 'B']);
+  assert.ok(together(aDown));
+  assert.deepEqual(labels(moveQuestion(list, list[3].key, 'up')), ['A', 'B', 'S1', 'S2']);
+  // At the ends nothing moves, and the menu offers it disabled.
+  assert.equal(moveQuestion(list, list[0].key, 'up'), list);
+  assert.equal(canMoveQuestion(list, list[0].key, 'up'), false);
+  assert.equal(canMoveQuestion(list, list[3].key, 'down'), false);
+});
+
+test('a scenario question moves only inside its scenario; a scenario moves as one block', () => {
+  const s = newScenario();
+  const list = [named('A'), named('S1', s.key), named('S2', s.key), named('B')];
+  assert.deepEqual(labels(moveQuestion(list, list[1].key, 'down')), ['A', 'S2', 'S1', 'B']);
+  // Its first question cannot leave the box by moving up.
+  assert.equal(canMoveQuestion(list, list[1].key, 'up'), false);
+  assert.equal(canMoveQuestion(list, list[2].key, 'down'), false);
+  assert.deepEqual(labels(moveScenario(list, s.key, 'up')), ['S1', 'S2', 'A', 'B']);
+  assert.deepEqual(labels(moveScenario(list, s.key, 'down')), ['A', 'B', 'S1', 'S2']);
+  assert.equal(canMoveScenario([named('S1', s.key)], s.key, 'up'), false);
+});
+
+test('duplicate copies a question right after it, as a new question with its answer marked', () => {
+  const original = named('A');
+  original.options = original.options.map((option, index) => ({ ...option, content: index === 0 ? 'Yes' : 'No' }));
+  original.correctKey = original.options[1].key;
+  original.uuid = 'stored-1';
+  const list = duplicateQuestion([original, named('B')], original.key);
+  assert.deepEqual(labels(list), ['A', 'A', 'B']);
+  const copy = list[1];
+  assert.notEqual(copy.key, original.key);
+  assert.equal(copy.uuid, undefined);
+  assert.deepEqual(copy.options.map((option) => option.content), ['Yes', 'No']);
+  assert.equal(copy.correctKey, copy.options[1].key);
+  assert.notEqual(copy.correctKey, original.correctKey);
+});
+
+test('add a question below puts an empty one right after, in the same scenario', () => {
+  const s = newScenario();
+  const list = [named('S1', s.key), named('S2', s.key), named('B')];
+  const added = insertQuestionAfter(list, list[0].key);
+  assert.deepEqual(labels(added), ['S1', '', 'S2', 'B']);
+  assert.equal(added[1].scenarioKey, s.key);
+  assert.ok(together(added));
+});
+
+test('a question moves into a scenario as its last question, and out of it right after it', () => {
+  const s = newScenario();
+  const list = [named('A'), named('S1', s.key), named('S2', s.key), named('B')];
+  const into = moveIntoScenario(list, list[0].key, s.key);
+  assert.deepEqual(labels(into), ['S1', 'S2', 'A', 'B']);
+  assert.equal(into[2].scenarioKey, s.key);
+  assert.ok(together(into));
+  const out = moveOutOfScenario(list, list[1].key);
+  assert.deepEqual(labels(out), ['A', 'S2', 'S1', 'B']);
+  assert.equal(out[2].scenarioKey, null);
+  // A scenario's only question cannot leave it: the scenario would be dropped.
+  const lone = [named('S1', s.key)];
+  assert.equal(canMoveOutOfScenario(lone, lone[0].key), false);
+  assert.deepEqual(labels(moveOutOfScenario(lone, lone[0].key)), ['S1']);
+  assert.equal(lone[0].scenarioKey, s.key);
+});
 
 /* Quiz piece 4 (Stay, 23 October 2026, picture 6): the library's form has a
  * scenario box, and a scenario's questions stay together. */
@@ -217,4 +313,16 @@ test('a save puts the quiz the server returned, with its new uuids, where the fo
   const mutations = readFileSync(join(here, 'mutations.ts'), 'utf8');
   const update = mutations.slice(mutations.indexOf('export function useUpdateQuiz'), mutations.indexOf('export function useUpdateQuiz') + 1200);
   assert.match(update, /onSuccess: \(response\) => \{[\s\S]*?queryClient\.setQueriesData\(\{ queryKey: channelQuizQueries\.quizDetailOf\(quizUuid\) \}, response\);[\s\S]*?invalidateQueries/);
+});
+
+test('the form offers the moves in each question\'s menu, a jump row for longer quizzes, and Add below', () => {
+  const dialog = readFileSync(join(here, 'QuizFormDialog.tsx'), 'utf8');
+  assert.match(dialog, /<QuestionMenu number=\{number\} menu=\{menu\} \/>/);
+  assert.match(dialog, /onMove: \(direction\) => setQuestions\(\(prev\) => \[\.\.\.moveQuestion\(prev, question\.key, direction\)\]\),/);
+  assert.match(dialog, /onDuplicate: \(\) => setQuestions\(\(prev\) => duplicateQuestion\(prev, question\.key\)\),/);
+  assert.match(dialog, /intoScenarios: question\.scenarioKey === null && solo \? scenarioNumbers : \[\],/);
+  assert.match(dialog, /\{questions\.length >= QUESTION_JUMP_FROM \? \(\s*<QuestionJump/);
+  assert.match(dialog, /const QUESTION_JUMP_FROM = 4;/);
+  assert.match(dialog, /Add a question below/);
+  assert.match(dialog, /A passage several questions share\. The reader sees it above each question in this box\./);
 });

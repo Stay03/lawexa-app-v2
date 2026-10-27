@@ -2,7 +2,20 @@
 
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  ChevronDown,
+  Copy,
+  FileMinus,
+  FilePlus,
+  FileText,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -17,6 +30,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -45,9 +65,18 @@ import { useCreateLibraryQuiz, useCreateQuiz, useUpdateQuiz } from './mutations'
 import { channelQuizQueries } from './queries';
 import {
   addToScenario,
+  canMoveOutOfScenario,
+  canMoveQuestion,
+  canMoveScenario,
   draftsFromQuiz,
+  duplicateQuestion,
   findFormProblem,
   groupQuestions,
+  insertQuestionAfter,
+  moveIntoScenario,
+  moveOutOfScenario,
+  moveQuestion,
+  moveScenario,
   newOption,
   newQuestion,
   newScenario,
@@ -57,6 +86,7 @@ import {
   toPayload,
   trueFalseOptions,
   type FormProblemTarget,
+  type MoveDirection,
   type QuestionDraft,
   type ScenarioDraft,
   hasFormContent,
@@ -262,6 +292,10 @@ export function QuizFormDialog({
    *  room (`goLive`). */
   const solo = !inRoom && channelUuid === undefined;
   const groups = groupQuestions(questions, scenarios);
+  /** Each scenario's number, as its card says it ("Scenario 2"). */
+  const scenarioNumbers = groups
+    .flatMap((group) => (group.kind === 'scenario' ? [group.scenario.key] : []))
+    .map((key, index) => ({ key, number: index + 1 }));
   /** Saving title and settings alone (a played quiz, or not this viewer's
    *  questions) checks only the title: the questions are not its business. */
   const metadataOnly = frozen || !mayEditQuestions;
@@ -546,32 +580,65 @@ export function QuizFormDialog({
                   </span>
                 </p>
                 {problem && problem.target === null ? <FormProblemLine>{problem.message}</FormProblemLine> : null}
+                {/* A longer quiz gets a row of its question numbers to jump by
+                    (Arthur: "navigate longer quizzes without excessive
+                    scrolling"); it stays in view as the form scrolls. */}
+                {questions.length >= QUESTION_JUMP_FROM ? (
+                  <QuestionJump
+                    questions={questions}
+                    problemKey={problem?.target?.kind === 'question' ? problem.target.key : null}
+                  />
+                ) : null}
                 {groups.map((group) => {
                   const card = (question: QuestionDraft, index: number) => (
-                    <QuestionCard
-                      key={question.key}
-                      index={index}
-                      draft={question}
-                      inScenario={group.kind === 'scenario'}
-                      canRemove={questions.length > 1}
-                      problem={problemAt('question', question.key)}
-                      onChange={(patch) => updateQuestion(question.key, patch)}
-                      onChangeType={(type) => setType(question.key, type)}
-                      onRemove={() =>
-                        setQuestions((prev) =>
-                          prev.filter((entry) => entry.key !== question.key),
-                        )
-                      }
-                    />
+                    <div key={question.key} className="space-y-1">
+                      <QuestionCard
+                        index={index}
+                        draft={question}
+                        inScenario={group.kind === 'scenario'}
+                        problem={problemAt('question', question.key)}
+                        onChange={(patch) => updateQuestion(question.key, patch)}
+                        onChangeType={(type) => setType(question.key, type)}
+                        menu={{
+                          canMoveUp: canMoveQuestion(questions, question.key, 'up'),
+                          canMoveDown: canMoveQuestion(questions, question.key, 'down'),
+                          onMove: (direction) => setQuestions((prev) => [...moveQuestion(prev, question.key, direction)]),
+                          onDuplicate: () => setQuestions((prev) => duplicateQuestion(prev, question.key)),
+                          intoScenarios: question.scenarioKey === null && solo ? scenarioNumbers : [],
+                          onMoveInto: (scenarioKey) => setQuestions((prev) => moveIntoScenario(prev, question.key, scenarioKey)),
+                          canMoveOut: question.scenarioKey === null ? null : canMoveOutOfScenario(questions, question.key),
+                          onMoveOut: () => setQuestions((prev) => moveOutOfScenario(prev, question.key)),
+                          canRemove: questions.length > 1,
+                          onRemove: () => setQuestions((prev) => prev.filter((entry) => entry.key !== question.key)),
+                        }}
+                      />
+                      {/* "Add question" after each question (Arthur, point 5);
+                          the last one has the buttons below the list. */}
+                      {index < questions.length - 1 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-muted-foreground"
+                          onClick={() => setQuestions((prev) => insertQuestionAfter(prev, question.key))}
+                        >
+                          <Plus aria-hidden className="size-3.5" />
+                          Add a question below
+                        </Button>
+                      ) : null}
+                    </div>
                   );
                   if (group.kind === 'question') return card(group.question, group.start);
-                  const number = groups.filter((entry) => entry.kind === 'scenario').indexOf(group) + 1;
+                  const number = scenarioNumbers.find((entry) => entry.key === group.scenario.key)?.number ?? 1;
                   return (
                     <ScenarioCard
                       key={group.scenario.key}
                       number={number}
                       draft={group.scenario}
                       problem={problemAt('scenario', group.scenario.key)}
+                      canMoveUp={canMoveScenario(questions, group.scenario.key, 'up')}
+                      canMoveDown={canMoveScenario(questions, group.scenario.key, 'down')}
+                      onMove={(direction) => setQuestions((prev) => [...moveScenario(prev, group.scenario.key, direction)])}
                       onChange={(patch) => updateScenario(group.scenario.key, patch)}
                       onRemove={() => removeScenario(group.scenario.key)}
                       onAddQuestion={() => setQuestions((prev) => addToScenario(prev, group.scenario.key))}
@@ -773,6 +840,109 @@ function SettingRow({
   );
 }
 
+/** From this many questions the form shows a row of their numbers to jump by. */
+const QUESTION_JUMP_FROM = 4;
+
+/**
+ * The question numbers in a row that stays at the top of the form as it
+ * scrolls: a tap brings that question into view. The one a refused save is
+ * about is marked.
+ */
+function QuestionJump({ questions, problemKey }: { questions: readonly QuestionDraft[]; problemKey: string | null }) {
+  const jump = (key: string) => {
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.getElementById(`quiz-question-${key}`)?.scrollIntoView({ block: 'start', behavior: still ? 'auto' : 'smooth' });
+  };
+  return (
+    <nav aria-label="Jump to a question" className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-1.5 backdrop-blur supports-backdrop-filter:bg-background/80">
+      <ol className="flex flex-wrap gap-1.5">
+        {questions.map((question, index) => (
+          <li key={question.key}>
+            <button
+              type="button"
+              onClick={() => jump(question.key)}
+              aria-label={`Go to question ${index + 1}${question.key === problemKey ? ', needs attention' : ''}`}
+              className={cn(
+                'v2-interactive grid h-7 min-w-7 place-items-center rounded-md px-1.5 text-xs font-semibold tabular-nums transition-colors',
+                question.key === problemKey
+                  ? 'bg-destructive/12 text-destructive ring-1 ring-destructive/50'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {index + 1}
+            </button>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+interface QuestionMenuActions {
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMove: (direction: MoveDirection) => void;
+  onDuplicate: () => void;
+  /** The scenarios a question on its own can join; empty where there are none. */
+  intoScenarios: readonly { key: string; number: number }[];
+  onMoveInto: (scenarioKey: string) => void;
+  /** `null` for a question on its own; `false` for a scenario's only question. */
+  canMoveOut: boolean | null;
+  onMoveOut: () => void;
+  canRemove: boolean;
+  onRemove: () => void;
+}
+
+/** A question's "⋯": move up or down, duplicate, into or out of a scenario, remove. */
+function QuestionMenu({ number, menu }: { number: number; menu: QuestionMenuActions }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-8 text-muted-foreground"
+          aria-label={`Question ${number} options`}
+        >
+          <MoreHorizontal aria-hidden className="size-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        <DropdownMenuItem disabled={!menu.canMoveUp} onSelect={() => menu.onMove('up')}>
+          <ArrowUp aria-hidden className="size-4" />
+          Move up
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!menu.canMoveDown} onSelect={() => menu.onMove('down')}>
+          <ArrowDown aria-hidden className="size-4" />
+          Move down
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={menu.onDuplicate}>
+          <Copy aria-hidden className="size-4" />
+          Duplicate
+        </DropdownMenuItem>
+        {menu.intoScenarios.map((scenario) => (
+          <DropdownMenuItem key={scenario.key} onSelect={() => menu.onMoveInto(scenario.key)}>
+            <FilePlus aria-hidden className="size-4" />
+            Move into scenario {scenario.number}
+          </DropdownMenuItem>
+        ))}
+        {menu.canMoveOut !== null ? (
+          <DropdownMenuItem disabled={!menu.canMoveOut} onSelect={menu.onMoveOut}>
+            <FileMinus aria-hidden className="size-4" />
+            Move out of the scenario
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" disabled={!menu.canRemove} onSelect={menu.onRemove}>
+          <Trash2 aria-hidden className="size-4" />
+          Remove question
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 /** The sentence a refused save says where the gap is. Live: it goes once the gap is filled. */
 function FormProblemLine({ id, children }: { id?: string; children: React.ReactNode }) {
   return (
@@ -801,6 +971,9 @@ function ScenarioCard({
   number,
   draft,
   problem,
+  canMoveUp,
+  canMoveDown,
+  onMove,
   onChange,
   onRemove,
   onAddQuestion,
@@ -810,6 +983,10 @@ function ScenarioCard({
   draft: ScenarioDraft;
   /** Why a save was refused, when the gap is in this scenario. */
   problem: string | null;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  /** The scenario moves with its questions, as one block. */
+  onMove: (direction: MoveDirection) => void;
   onChange: (patch: Partial<ScenarioDraft>) => void;
   onRemove: () => void;
   onAddQuestion: () => void;
@@ -828,16 +1005,45 @@ function ScenarioCard({
         <span className="text-xs font-bold tracking-[0.12em] text-[oklch(0.7_0.15_255)] uppercase">
           Scenario {number}
         </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="ml-auto text-muted-foreground"
-          onClick={onRemove}
-        >
-          Remove scenario
-        </Button>
+        <div className="ml-auto flex items-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            disabled={!canMoveUp}
+            onClick={() => onMove('up')}
+            aria-label={`Move scenario ${number} up`}
+          >
+            <ArrowUp aria-hidden className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            disabled={!canMoveDown}
+            onClick={() => onMove('down')}
+            aria-label={`Move scenario ${number} down`}
+          >
+            <ArrowDown aria-hidden className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={onRemove}
+          >
+            Remove scenario
+          </Button>
+        </div>
       </div>
+      {/* WHAT A SCENARIO IS FOR (Arthur, point 4): a passage several questions
+          share, shown above each of them. */}
+      <p className="-mt-1 text-xs text-muted-foreground">
+        A passage several questions share. The reader sees it above each question in this box.
+      </p>
       <div className="space-y-1.5">
         <Label htmlFor={`scenario-title-${draft.key}`}>
           Title <span className="font-normal text-muted-foreground">(optional)</span>
@@ -885,22 +1091,21 @@ function QuestionCard({
   index,
   draft,
   inScenario,
-  canRemove,
   problem,
   onChange,
   onChangeType,
-  onRemove,
+  menu,
 }: {
   index: number;
   draft: QuestionDraft;
   /** Inside a scenario's card: says so beside the number. */
   inScenario: boolean;
-  canRemove: boolean;
   /** Why a save was refused, when the gap is in this question. */
   problem: string | null;
   onChange: (patch: Partial<QuestionDraft>) => void;
   onChangeType: (type: QuizQuestionType) => void;
-  onRemove: () => void;
+  /** Its "⋯" menu (Arthur's point 5: reorder, edit, remove). */
+  menu: QuestionMenuActions;
 }) {
   const isTrueFalse = draft.type === 'true_false';
   const number = index + 1;
@@ -950,18 +1155,7 @@ function QuestionCard({
               ))}
             </SelectContent>
           </Select>
-          {canRemove && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-8 text-muted-foreground hover:text-destructive"
-              onClick={onRemove}
-              aria-label={`Remove question ${number}`}
-            >
-              <Trash2 aria-hidden className="size-4" />
-            </Button>
-          )}
+          <QuestionMenu number={number} menu={menu} />
         </div>
       </div>
 
