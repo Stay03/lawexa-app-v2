@@ -169,8 +169,10 @@ export function FoldersBrowser() {
   const loosePages = looseQuery.data?.pages;
   const fileIds = useMemo(() => (loosePages ?? []).flatMap((page) => page.data.map((file) => file.id)), [loosePages]);
   const bulk = useFoldersBulk({ folderUuids, fileIds });
-  const { toggle: toggleSelected, isSelected, selecting } = bulk;
+  const { toggle: toggleSelected, isSelected, selecting, startWith } = bulk;
   const toggleFolder = useCallback((uuid: string) => toggleSelected(folderKey(uuid)), [toggleSelected]);
+  // A folder row's hover tick box, on a computer: select mode with it ticked.
+  const startWithFolder = useCallback((uuid: string) => startWith(folderKey(uuid)), [startWith]);
   const toggleFile = useCallback((id: number) => toggleSelected(fileKey(id)), [toggleSelected]);
   const looseSelection = useMemo(
     () => (selecting ? { isSelected: (id: number) => isSelected(fileKey(id)), onToggle: toggleFile } : undefined),
@@ -357,6 +359,7 @@ export function FoldersBrowser() {
                 markSpace
                 selected={selecting ? isSelected(folderKey(row.uuid)) : undefined}
                 onToggleSelect={selecting ? toggleFolder : undefined}
+                onStartSelect={selecting ? undefined : startWithFolder}
               />
             ))}
           </ul>

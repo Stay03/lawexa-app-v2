@@ -22,6 +22,14 @@ import type { EntryLook } from './entry-look';
  * THE "⋯" IS A SIBLING of that control, never inside it. Where the pointer can
  * hover it shows on the row's hover or focus, and while its menu is open, so a
  * long list reads as names and dates; on a touch screen it always shows.
+ *
+ * THE HOVER TICK BOX (Arthur, 27 October 2026: "hovering over an item should
+ * show the tick at the side of the item just as it shows the three dots").
+ * Where the pointer can hover and the host passes `onStartSelect`, a tick box
+ * shows beside the "⋯" on the row's hover or focus. Ticking it starts select
+ * mode with this row ticked, and every row then shows its box. It is a
+ * keyboard stop like the "⋯", visible while focused. On a touch screen it is
+ * not drawn: Select stays the way in there.
  */
 
 /** The open control's classes: 52 px tall on a phone, 40 px on a computer.
@@ -50,6 +58,7 @@ export function FileListRow({
   iconMark,
   srNote,
   select,
+  onStartSelect,
 }: {
   look: EntryLook;
   name: string;
@@ -74,6 +83,8 @@ export function FileListRow({
    * actions.
    */
   select?: { checked: boolean; onToggle: () => void };
+  /** Not selecting yet: the hover tick box starts it with this row ticked. */
+  onStartSelect?: () => void;
 }) {
   const Icon = look.icon;
   const content = (
@@ -128,6 +139,15 @@ export function FileListRow({
         ) : (
           renderOpen(FILE_LIST_OPEN_CLASS, content)
         )}
+        {!select && onStartSelect ? (
+          <span className="hidden size-9 shrink-0 items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:flex">
+            <Checkbox
+              checked={false}
+              onCheckedChange={onStartSelect}
+              aria-label={`Select ${name}`}
+            />
+          </span>
+        ) : null}
         {select ? (
           <span aria-hidden className="size-9 shrink-0" />
         ) : menu ? (

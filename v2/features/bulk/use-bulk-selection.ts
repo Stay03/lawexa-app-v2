@@ -31,6 +31,11 @@ export function useBulkSelection<K>(keys: readonly K[]) {
   const toggleAll = useCallback(() => setRaw((current) => selectAllToggled(prunedTo(current, keys), keys)), [keys]);
   const keepOnly = useCallback((next: readonly K[]) => setRaw(new Set(next)), []);
   const start = useCallback(() => setActive(true), []);
+  /** Start selecting with this one row ticked: a row's own hover tick box. */
+  const startWith = useCallback((key: K) => {
+    setRaw(new Set([key]));
+    setActive(true);
+  }, []);
   const stop = useCallback(() => {
     setActive(false);
     setRaw(new Set());
@@ -40,6 +45,7 @@ export function useBulkSelection<K>(keys: readonly K[]) {
     /** Selecting: rows show their tick boxes, and a tap ticks instead of opening. */
     active,
     start,
+    startWith,
     stop,
     selection,
     count: selection.size,

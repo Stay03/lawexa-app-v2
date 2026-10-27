@@ -43,6 +43,7 @@ export const FolderRow = memo(function FolderRow({
   markSpace = false,
   selected,
   onToggleSelect,
+  onStartSelect,
 }: {
   row: FolderRowModel;
   /** Mark a folder that sits in a Space (the personal Folders page). */
@@ -62,6 +63,9 @@ export const FolderRow = memo(function FolderRow({
   /** Bulk select: the row ticks instead of opening. `onToggleSelect` must be stable. */
   selected?: boolean;
   onToggleSelect?: (uuid: string) => void;
+  /** Not selecting yet: the row's hover tick box starts it with this folder
+   *  ticked (computers only, `FileListRow`). Stable, like `onToggleSelect`. */
+  onStartSelect?: (uuid: string) => void;
 }) {
   const hasMenu =
     onRename !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
@@ -77,6 +81,7 @@ export const FolderRow = memo(function FolderRow({
       iconMark={space ? <SpaceFolderMark spaceName={space} ground="row" tooltip /> : undefined}
       srNote={space ? spaceFolderNote(space) : undefined}
       select={onToggleSelect ? { checked: selected === true, onToggle: () => onToggleSelect(row.uuid) } : undefined}
+      onStartSelect={onStartSelect ? () => onStartSelect(row.uuid) : undefined}
       // The folder page draws this row's name at once, before any request
       // answers (`folder-peek.ts`, speed step 5).
       renderOpen={(className, content) => (

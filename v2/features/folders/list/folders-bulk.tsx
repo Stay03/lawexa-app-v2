@@ -195,6 +195,7 @@ export function useFoldersBulk({ folderUuids, fileIds }: { folderUuids: readonly
     selecting: select.active,
     isSelected: select.isSelected,
     toggle: select.toggle,
+    startWith: select.startWith,
     startButton,
     bar,
     dialogs,
