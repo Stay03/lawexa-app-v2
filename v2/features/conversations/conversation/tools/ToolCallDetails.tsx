@@ -2,7 +2,8 @@
 
 import { cn } from '@/lib/utils';
 import type { ToolMessage } from '@/types/chat';
-import { classifyParameters, detectEmptyResult, extractResultMessage, extractStepError } from './tool-content';
+import { classifyParameters, detectEmptyResult, extractResultMessage } from './tool-content';
+import { failedStepSentence } from './step-failure';
 import {
   BoundedScroll,
   ToolEmptyLine,
@@ -37,7 +38,6 @@ export function ToolCallDetails({ message, className }: ToolCallDetailsProps) {
 
   const isComplete = message.toolStatus === 'complete';
   const success = message.toolResult?.success !== false;
-  const error = extractStepError(message);
   const serverMessage = extractResultMessage(message);
   // An affirmative "returned zero" (empty-list payload) — null when the shape is
   // merely unrecognised, so an unreadable result never masquerades as zero.
@@ -102,9 +102,8 @@ export function ToolCallDetails({ message, className }: ToolCallDetailsProps) {
         </div>
       )}
 
-      {isComplete && !success && (
-        <ToolStateLine tone="error">{error || 'Failed'}</ToolStateLine>
-      )}
+      {/* A step that didn't work: plain words, never the error text (step-failure.ts). */}
+      {isComplete && !success && <ToolEmptyLine>{failedStepSentence(message)}</ToolEmptyLine>}
       {empty && <ToolEmptyLine>{empty}</ToolEmptyLine>}
       {isComplete && success && !empty && serverMessage && (
         <ToolStateLine>{serverMessage}</ToolStateLine>

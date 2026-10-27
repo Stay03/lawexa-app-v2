@@ -19,7 +19,6 @@ import {
   detectEmptyResult,
   extractCreatedNote,
   extractSingleEntity,
-  extractStepError,
   readStepTitle,
   extractWebResults,
   formatDuration,
@@ -28,6 +27,7 @@ import {
 } from './tool-content';
 import type { ToolMessage } from '@/types/chat';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
+import { failedStepLine } from './step-failure';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -40,10 +40,11 @@ import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepSt
  */
 
 /**
- * A step's status marker — a `bg-secondary` disc with a muted glyph, switching to
- * a `destructive` tint only on failure. An optional `icon` overrides the glyph
- * (Brain for memory, Bot for a sub-agent); `spin` keeps a live spinner while the
- * step runs. NEVER the old green palette.
+ * A step's status marker — a `bg-secondary` disc with a muted glyph: a check, a
+ * spinner, or a cross for a step that didn't work, in the same grey (Stay, 27
+ * October 2026: a failed step is never red, step-failure.ts). An optional
+ * `icon` overrides the glyph (Brain for memory, Bot for a sub-agent); `spin`
+ * keeps a live spinner while the step runs. NEVER the old green palette.
  */
 export function ToolStepMarker({
   status,
@@ -57,12 +58,7 @@ export function ToolStepMarker({
   return (
     <span
       aria-hidden
-      className={cn(
-        'relative z-10 flex size-5 shrink-0 items-center justify-center rounded-full',
-        status === 'error'
-          ? 'bg-destructive/10 text-destructive'
-          : 'bg-secondary text-muted-foreground',
-      )}
+      className="relative z-10 flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"
     >
       {status === 'error' ? (
         <X className="size-3" strokeWidth={2.5} />
@@ -100,7 +96,7 @@ export function formatToolMessage(
   entityTitle?: string,
   /** Whether a lazy result is still to fetch (`resultRef`). */
   hasResultRef = false,
-): { action: string; detail?: string } {
+): { action: string; detail?: string; generic?: boolean } {
   // A read step names what it read: the title from the loaded result, else the
   // one the transcript carries, else (older chats) the id it was asked for.
   const readTitle = readStepTitle(toolResult) || entityTitle || null;
@@ -234,6 +230,8 @@ export function formatToolMessage(
         .replace(/\b\w/g, (c) => c.toUpperCase());
       return {
         action: isComplete ? readable : `${readable}...`,
+        // No label of its own: a failure says "A step didn't work" (step-failure.ts).
+        generic: true,
       };
     }
   }
@@ -351,7 +349,7 @@ export function ToolStepItem({
     (quizStepState(loaded.message)?.kind === 'failed' ||
       (message.toolName === EDIT_QUIZ_TOOL && editSavedNothing(loaded.message.toolResult ?? undefined)));
   const status = !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
-  const { action, detail } = formatToolMessage(
+  const label = formatToolMessage(
     message.toolName,
     message.toolParameters,
     isComplete,
@@ -360,6 +358,10 @@ export function ToolStepItem({
     message.entityTitle,
     Boolean(message.resultRef),
   );
+  // A step that didn't work says so in plain words, never Lawexa's own error
+  // text (step-failure.ts). A refused quiz keeps its label: its card says why.
+  const failure = isError && !quizRefused ? failedStepLine(loaded.message, label) : null;
+  const { action, detail } = failure ?? label;
   // Glance-level zero signal: a search that affirmatively returned nothing hints
   // it on the COLLAPSED line, so a user need not expand to learn it found nothing.
   const zeroHint = isSuccess && isSearchLikeTool(message.toolName) && detectEmptyResult(message);
@@ -400,6 +402,9 @@ export function ToolStepItem({
             {zeroHint && (
               <span className="text-muted-foreground/70 font-normal"> · no matches</span>
             )}
+            {failure?.outcome && (
+              <span className="text-muted-foreground font-normal"> · {failure.outcome}</span>
+            )}
           </span>
           {isComplete && message.latencyMs != null && (
             <span className="text-muted-foreground/60 shrink-0 text-xs tabular-nums">
@@ -424,11 +429,6 @@ export function ToolStepItem({
         </div>
       </StepCollapse>
 
-      {isError && !quizRefused && !isExpanded && (
-        <p className="text-destructive ml-7 mt-1 text-sm">
-          Error: {extractStepError(message) || 'Unknown error'}
-        </p>
-      )}
     </div>
   );
 }

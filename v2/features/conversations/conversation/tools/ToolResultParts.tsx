@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, ExternalLink, XCircle, type LucideIcon } from 'lucide-react';
+import { Check, ExternalLink, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -179,28 +179,14 @@ export function ToolSectionLabel({ children }: { children: React.ReactNode }) {
 
 /**
  * A single quiet status line — the ONLY thing a bodiless step shows on success
- * (a muted check + optional server message) or failure (destructive). Bare result
- * counts and "found in Xs" are gone; the duration lives on the step header.
+ * (a muted check + optional server message). A step that didn't work says so
+ * in a plain {@link ToolEmptyLine} (step-failure.ts). Bare result counts and
+ * "found in Xs" are gone; the duration lives on the step header.
  */
-export function ToolStateLine({
-  tone = 'muted',
-  children,
-}: {
-  tone?: 'muted' | 'error';
-  children: React.ReactNode;
-}) {
+export function ToolStateLine({ children }: { children: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        'flex items-center gap-2 text-xs',
-        tone === 'error' ? 'text-destructive' : 'text-muted-foreground',
-      )}
-    >
-      {tone === 'error' ? (
-        <XCircle aria-hidden className="size-3.5 shrink-0" />
-      ) : (
-        <Check aria-hidden className="size-3.5 shrink-0" strokeWidth={2.5} />
-      )}
+    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Check aria-hidden className="size-3.5 shrink-0" strokeWidth={2.5} />
       <span className="min-w-0 break-words">{children}</span>
     </div>
   );
@@ -209,8 +195,8 @@ export function ToolStateLine({
 /**
  * The explicit zero-result line — the calm, sentence-case answer to "it returned
  * zero, and that isn't obvious". Deliberately icon-less: distinct from the checked
- * "Completed"/success line and from the destructive error line, so an empty result
- * reads as a calm fact, never as a failure or as "found something".
+ * "Completed"/success line, so an empty result reads as a calm fact, never as
+ * "found something". A failed step's sentence uses it too.
  */
 export function ToolEmptyLine({ children }: { children: React.ReactNode }) {
   return <p className="text-muted-foreground min-w-0 break-words text-xs">{children}</p>;
