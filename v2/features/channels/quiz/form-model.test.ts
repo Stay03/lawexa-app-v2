@@ -8,6 +8,7 @@ import type { ChannelQuiz } from '@/types/channel-quiz';
 import {
   addToScenario,
   draftsFromQuiz,
+  findFormProblem,
   groupQuestions,
   hasFormContent,
   newQuestion,
@@ -89,12 +90,48 @@ test('a saved quiz loads with its scenarios, each question still pointing at its
   assert.equal(payload.questions[1].scenario_index, 0);
 });
 
+test('a refused save names the title, question or scenario at fault, so the form can go to it', () => {
+  const filled = (scenarioKey: string | null = null): QuestionDraft => {
+    const question = newQuestion(scenarioKey);
+    question.question = 'TEST DATA. Is a lease an interest in land?';
+    question.options = question.options.map((option, index) => ({ ...option, content: index === 0 ? 'Yes' : 'No' }));
+    question.correctKey = question.options[0].key;
+    return question;
+  };
+  assert.deepEqual(findFormProblem('', [filled()], []), { message: 'Give the quiz a title.', target: { kind: 'title' } });
+  assert.deepEqual(findFormProblem('TEST DATA', [], []), { message: 'Add at least one question.', target: null });
+  const second = filled();
+  second.correctKey = null;
+  assert.deepEqual(findFormProblem('TEST DATA', [filled(), second], []), {
+    message: 'Question 2 needs one answer marked correct.',
+    target: { kind: 'question', key: second.key },
+  });
+  const thin = filled();
+  thin.options = [thin.options[0], { ...thin.options[1], content: '  ' }];
+  assert.equal(findFormProblem('TEST DATA', [thin], [])?.message, 'Question 1 needs at least 2 answers.');
+  const scenario = newScenario();
+  assert.deepEqual(findFormProblem('TEST DATA', [filled(scenario.key)], [scenario]), {
+    message: 'Scenario 1 needs its passage.',
+    target: { kind: 'scenario', key: scenario.key },
+  });
+  assert.equal(findFormProblem('TEST DATA', [filled()], []), null);
+  // `validate` is the same check, as a sentence.
+  assert.equal(validate('TEST DATA', [filled(), second], []), 'Question 2 needs one answer marked correct.');
+  // The form says it where the gap is, and scrolls there.
+  const dialog = readFileSync(join(here, 'QuizFormDialog.tsx'), 'utf8');
+  assert.match(dialog, /setChecking\(true\);\s*scrollToProblem\(found\.target\);\s*return;/);
+  assert.match(dialog, /problem=\{problemAt\('question', question\.key\)\}/);
+  assert.match(dialog, /problem=\{problemAt\('scenario', group\.scenario\.key\)\}/);
+  assert.match(dialog, /id=\{`quiz-question-\$\{draft\.key\}`\}/);
+});
+
 test('the library form has the scenario box and leaves out the game switches; a channel form keeps them', () => {
   const dialog = readFileSync(join(here, 'QuizFormDialog.tsx'), 'utf8');
   assert.match(dialog, /const solo = !inRoom && channelUuid === undefined;/);
-  assert.match(dialog, /\{!solo && \(\s*<div className="space-y-3 rounded-lg border p-3">\s*<SettingRow/);
+  // A channel game's switches fold under "Game settings" (Arthur's redesign, part A).
+  assert.match(dialog, /\{!solo && \(\s*<Collapsible className="rounded-lg border">[\s\S]*?Game settings[\s\S]*?<SettingRow/);
   assert.match(dialog, /\{solo && \(\s*<Button[\s\S]*?Add a scenario/);
-  assert.match(dialog, /validate\(title, questions, scenarios\)/);
+  assert.match(dialog, /: findFormProblem\(title, questions, scenarios\);/);
 });
 
 /* Discard changes? (Stay, 23 October 2026): a NEW quiz form with anything in

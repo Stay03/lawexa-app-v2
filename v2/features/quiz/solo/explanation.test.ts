@@ -27,9 +27,11 @@ test('the form: a box per question, loaded from the quiz, always sent (empty is 
   assert.match(drafts, /explanation: '',\s*scenarioKey,\s*\};/);
   assert.match(drafts, /explanation: question\.explanation \?\? '',/);
   assert.match(drafts, /explanation: question\.explanation\.trim\(\) \|\| null,/);
-  assert.match(form, /Why this is the answer <span className="text-muted-foreground\/70">\(optional\)<\/span>/);
-  assert.match(form, /maxLength=\{QUIZ_EXPLANATION_MAX\}/);
-  assert.match(form, /placeholder="Shown with the answers on the results, never during the quiz\."/);
+  // Arthur, 25 October 2026: "Explanation (optional)", with its helper line.
+  assert.match(form, /Explanation <span className="font-normal text-muted-foreground\/70">\(optional\)<\/span>/);
+  assert.match(form, /Explain why the correct answer is right\. Shown after the quiz\./);
+  assert.match(form, /maxLength=\{QUIZ_EXPLANATION_MAX\}\s*aria-describedby=\{hintId\}/);
+  assert.doesNotMatch(form, /Why this is the answer|placeholder="Shown with the answers/);
 });
 
 test('the answers: the author\'s why under the tiles, only when there is one; never in the player', () => {

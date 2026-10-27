@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Check, ChevronDown, FileText, Loader2, Plus, Trash2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -16,6 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -38,7 +39,6 @@ import type {
   QuizQuestionType,
 } from '@/types/channel-quiz';
 import { canPublishPublicly } from '@/v2/features/quiz/solo/model';
-import { VisibilityOption } from '@/v2/features/sharing/VisibilityOption';
 import { useBackGuard } from '@/v2/runtime/use-back-guard';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useCreateLibraryQuiz, useCreateQuiz, useUpdateQuiz } from './mutations';
@@ -46,6 +46,7 @@ import { channelQuizQueries } from './queries';
 import {
   addToScenario,
   draftsFromQuiz,
+  findFormProblem,
   groupQuestions,
   newOption,
   newQuestion,
@@ -55,7 +56,7 @@ import {
   quizSaveConflict,
   toPayload,
   trueFalseOptions,
-  validate,
+  type FormProblemTarget,
   type QuestionDraft,
   type ScenarioDraft,
   hasFormContent,
@@ -77,6 +78,7 @@ import {
 } from './model';
 import { VISIBILITY_MARKS } from './VisibilityChip';
 import { QuizSourceLine } from '@/v2/features/quiz/source/QuizSourceLine';
+import '@/v2/features/quiz/solo/solo-quiz.css';
 
 /**
  * QuizFormDialog — write a quiz, or edit one that hasn't been played.
@@ -138,6 +140,16 @@ import { QuizSourceLine } from '@/v2/features/quiz/source/QuizSourceLine';
  * leaderboard, late joiners) belong to a channel game, so the library's form
  * leaves them out and the quiz keeps their defaults (picture 6). A channel's
  * form keeps them, and no scenario box: a game does not show passages yet.
+ *
+ * ── ARTHUR'S REDESIGN, PART A (25 October 2026; built 27 October) ──────────
+ * One short line in place of the introduction. The form reads title and
+ * description, then the questions, then "Who can access this quiz?" as one
+ * compact selector, with a channel game's switches folded under "Game
+ * settings". A question card has one compact row for its number, type and
+ * timer, the question box as its focus, answers whose correct one carries a
+ * tick, and "Explanation (optional)" below them. A refused save scrolls to
+ * the title, question or scenario at fault and says why there
+ * (`findFormProblem`), and keeps saying so until it is fixed.
  */
 
 /** Where a NEW quiz is filed. Ignored when editing — a quiz's home is fixed. */
@@ -206,6 +218,9 @@ export function QuizFormDialog({
   /** Set when the server refuses `public` for this author (a stale snapshot
    *  said otherwise). Cleared by choosing again. */
   const [publicRefused, setPublicRefused] = useState(false);
+  /** A save was refused for a gap in the form: from then on the gap is said
+   *  where it is, live, until it is filled (`findFormProblem`). */
+  const [checking, setChecking] = useState(false);
 
   // Adopt the loaded quiz ONCE, in render (the sanctioned adjust-on-prop-change
   // pattern) — an effect would paint one frame of an empty form over a quiz the
@@ -247,6 +262,22 @@ export function QuizFormDialog({
    *  room (`goLive`). */
   const solo = !inRoom && channelUuid === undefined;
   const groups = groupQuestions(questions, scenarios);
+  /** Saving title and settings alone (a played quiz, or not this viewer's
+   *  questions) checks only the title: the questions are not its business. */
+  const metadataOnly = frozen || !mayEditQuestions;
+  const problem = !checking
+    ? null
+    : metadataOnly
+      ? title.trim()
+        ? null
+        : { message: 'Give the quiz a title.', target: { kind: 'title' as const } }
+      : findFormProblem(title, questions, scenarios);
+  const titleProblem = problem?.target?.kind === 'title' ? problem.message : null;
+  const problemAt = (target: FormProblemTarget['kind'], key: string): string | null =>
+    problem?.target && problem.target.kind === target && 'key' in problem.target && problem.target.key === key
+      ? problem.message
+      : null;
+  const chosenVisibility = visibilityChoices.find((choice) => choice.id === visibility) ?? visibilityChoices[0];
 
   // DISCARD CHANGES? (Stay, 23 October 2026). A NEW quiz with anything in it
   // asks before it is thrown away, however the reader tries to leave: Cancel,
@@ -316,17 +347,27 @@ export function QuizFormDialog({
     );
   };
 
-  const handleSubmit = (metadataOnly = false) => {
+  /** The title, question or scenario a refused save is about, brought into view. */
+  const scrollToProblem = (target: FormProblemTarget | null) => {
+    const id = !target ? 'quiz-questions' : target.kind === 'title' ? 'quiz-title' : `quiz-${target.kind}-${target.key}`;
+    const element = document.getElementById(id);
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    element?.scrollIntoView({ block: 'center', behavior: still ? 'auto' : 'smooth' });
+    if (target?.kind === 'title') element?.focus({ preventScroll: true });
+  };
+
+  const handleSubmit = () => {
     setError(null);
     // A metadata-only save (the played-quiz path) still needs a title — the
     // questions it cannot touch are not its business.
-    const problem = metadataOnly
+    const found = metadataOnly
       ? title.trim()
         ? null
-        : 'Give the quiz a title.'
-      : validate(title, questions, scenarios);
-    if (problem) {
-      setError(problem);
+        : { message: 'Give the quiz a title.', target: { kind: 'title' as const } }
+      : findFormProblem(title, questions, scenarios);
+    if (found) {
+      setChecking(true);
+      scrollToProblem(found.target);
       return;
     }
 
@@ -404,24 +445,21 @@ export function QuizFormDialog({
       }
       description={
         <>
-          {/* The library's form says what a quiz taken alone is; a channel's
-              keeps the live game's sentence (backend's check, 23 October 2026). */}
+          {/* One short line (Arthur, 25 October 2026: "replace the long
+              introductory content with a short description"). A channel's
+              keeps the live game's own fact. */}
           {solo
-            ? 'As many questions as you like, each on its own timer, and faster right answers score more. Questions can stand on their own or share a scenario.'
-            : 'As many questions as you like, each on its own timer. Everyone answers on their own device, and faster right answers score more.'}
-          {/* THE CONSEQUENCE, STATED — one line, only while it is still a
-              choice. An edit cannot move a quiz, so it says nothing. It is a
-              `span` and not a `p` because `DialogDescription` IS a paragraph,
-              and a paragraph inside a paragraph is markup the browser silently
-              rewrites — closing the outer one early and leaving the sentence
-              orphaned outside the element the dialog is described by. */}
-          {!isEdit && (
+            ? 'Each question has its own timer, and faster right answers score more.'
+            : 'Each question has its own timer. Everyone answers on their own device.'}
+          {/* THE CONSEQUENCE, STATED — a channel's new quiz only, while it is
+              still a choice. It is a `span` and not a `p` because
+              `DialogDescription` IS a paragraph, and a paragraph inside a
+              paragraph is markup the browser silently rewrites. */}
+          {!isEdit && room ? (
             <span className="mt-1 block text-xs">
-              {room
-                ? `It belongs to ${room.name} and to you, and it is in your library either way.`
-                : 'It stays yours and appears in no channel until you run it in one. Then that channel can see it too.'}
+              It belongs to {room.name} and to you, and it is in your library either way.
             </span>
-          )}
+          ) : null}
         </>
       }
       footer={
@@ -437,11 +475,11 @@ export function QuizFormDialog({
               rewrite saves its METADATA — and validating questions it cannot
               touch would lock the reader out of the save that does work. */}
           <Button
-            onClick={() => handleSubmit(frozen || !mayEditQuestions)}
+            onClick={handleSubmit}
             disabled={submitting}
           >
             {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
-            {frozen || !mayEditQuestions
+            {metadataOnly
               ? 'Save title and settings'
               : isEdit
                 ? 'Save changes'
@@ -462,83 +500,26 @@ export function QuizFormDialog({
                 maxLength={QUIZ_TITLE_MAX}
                 placeholder="e.g. Land law, week 4"
                 value={title}
+                aria-invalid={titleProblem ? true : undefined}
+                aria-describedby={titleProblem ? 'quiz-title-problem' : undefined}
                 onChange={(event) => setTitle(event.target.value)}
               />
+              {titleProblem ? <FormProblemLine id="quiz-title-problem">{titleProblem}</FormProblemLine> : null}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="quiz-description">Description</Label>
+              <Label htmlFor="quiz-description">
+                Description <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               <Textarea
                 id="quiz-description"
                 maxLength={QUIZ_DESCRIPTION_MAX}
                 rows={2}
-                placeholder="Optional: what is this quiz for?"
+                placeholder="What is this quiz for?"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               />
             </div>
-
-            {!solo && (
-            <div className="space-y-3 rounded-lg border p-3">
-              <SettingRow
-                id="quiz-leaderboard"
-                label="Show the leaderboard between questions"
-                hint="Off keeps the scores a surprise until the podium."
-                checked={settings.show_leaderboard}
-                onChange={(value) =>
-                  setSettings((prev) => ({ ...prev, show_leaderboard: value }))
-                }
-              />
-              <SettingRow
-                id="quiz-late-join"
-                label="Let people join after it starts"
-                hint="Late joiners play from the next question."
-                checked={settings.allow_late_join}
-                onChange={(value) =>
-                  setSettings((prev) => ({ ...prev, allow_late_join: value }))
-                }
-              />
-            </div>
-            )}
-
-            {mayEditVisibility && (
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground">Who can find it</p>
-                <div
-                  role="group"
-                  aria-label="Who can find this quiz"
-                  className="flex flex-col gap-2"
-                >
-                  {visibilityChoices.map((choice) => {
-                    const locked = choice.needsVerifiedAuthor && !canPublish;
-                    return (
-                      <VisibilityOption
-                        key={choice.id}
-                        icon={VISIBILITY_MARKS[choice.id]}
-                        title={choice.label}
-                        description={locked ? PUBLIC_NEEDS_VERIFIED_AUTHOR : choice.hint}
-                        selected={visibility === choice.id}
-                        busy={false}
-                        disabled={locked}
-                        onSelect={() => {
-                          setVisibility(choice.id);
-                          setPublicRefused(false);
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-                {publicRefused && (
-                  <p
-                    role="alert"
-                    className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-                  >
-                    {PUBLIC_NEEDS_VERIFIED_AUTHOR} Choose another option, then
-                    save again.
-                  </p>
-                )}
-              </div>
-            )}
 
             {!mayEditQuestions && (
               <p className="rounded-lg border bg-secondary/40 px-3 py-2 text-sm text-muted-foreground">
@@ -557,13 +538,14 @@ export function QuizFormDialog({
             )}
 
             {mayEditQuestions && !frozen && (
-              <div className="space-y-4">
+              <div id="quiz-questions" className="space-y-3">
                 <p className="text-sm font-medium text-foreground">
                   Questions{' '}
                   <span className="font-normal tabular-nums text-muted-foreground">
                     · {questions.length}
                   </span>
                 </p>
+                {problem && problem.target === null ? <FormProblemLine>{problem.message}</FormProblemLine> : null}
                 {groups.map((group) => {
                   const card = (question: QuestionDraft, index: number) => (
                     <QuestionCard
@@ -572,6 +554,7 @@ export function QuizFormDialog({
                       draft={question}
                       inScenario={group.kind === 'scenario'}
                       canRemove={questions.length > 1}
+                      problem={problemAt('question', question.key)}
                       onChange={(patch) => updateQuestion(question.key, patch)}
                       onChangeType={(type) => setType(question.key, type)}
                       onRemove={() =>
@@ -588,6 +571,7 @@ export function QuizFormDialog({
                       key={group.scenario.key}
                       number={number}
                       draft={group.scenario}
+                      problem={problemAt('scenario', group.scenario.key)}
                       onChange={(patch) => updateScenario(group.scenario.key, patch)}
                       onRemove={() => removeScenario(group.scenario.key)}
                       onAddQuestion={() => setQuestions((prev) => addToScenario(prev, group.scenario.key))}
@@ -622,6 +606,103 @@ export function QuizFormDialog({
                   )}
                 </div>
               </div>
+            )}
+
+            {/* WHO CAN ACCESS THIS QUIZ? (Arthur, 25 October 2026): one
+                compact selector after the questions, each choice explained in
+                a line, "Everyone" for verified authors only, as the server
+                rules. The trigger names the choice; its line sits under it. */}
+            {mayEditVisibility && (
+              <div className="space-y-1.5">
+                <Label id="quiz-visibility-label" htmlFor="quiz-visibility">
+                  Who can access this quiz?
+                </Label>
+                <Select
+                  value={visibility}
+                  onValueChange={(value) => {
+                    setVisibility(value as ChannelQuizVisibility);
+                    setPublicRefused(false);
+                  }}
+                >
+                  <SelectTrigger
+                    id="quiz-visibility"
+                    aria-labelledby="quiz-visibility-label"
+                    aria-describedby="quiz-visibility-hint"
+                    className="h-10 w-full sm:w-72"
+                  >
+                    <SelectValue>
+                      <span className="flex items-center gap-2">
+                        <VisibilityMark id={chosenVisibility.id} />
+                        {chosenVisibility.label}
+                      </span>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {visibilityChoices.map((choice) => {
+                      const locked = choice.needsVerifiedAuthor && !canPublish;
+                      return (
+                        <SelectItem key={choice.id} value={choice.id} disabled={locked}>
+                          <span className="flex items-start gap-2.5 py-0.5">
+                            <VisibilityMark id={choice.id} className="mt-0.5" />
+                            <span className="flex flex-col gap-0.5">
+                              <span className="font-medium">{choice.label}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {locked ? PUBLIC_NEEDS_VERIFIED_AUTHOR : choice.hint}
+                              </span>
+                            </span>
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <p id="quiz-visibility-hint" className="text-xs text-muted-foreground">
+                  {chosenVisibility.hint}
+                </p>
+                {publicRefused && (
+                  <p
+                    role="alert"
+                    className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+                  >
+                    {PUBLIC_NEEDS_VERIFIED_AUTHOR} Choose another option, then
+                    save again.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* A channel game's two switches, folded away ("keep advanced
+                settings collapsible"); a quiz taken alone has none. */}
+            {!solo && (
+              <Collapsible className="rounded-lg border">
+                <CollapsibleTrigger className="group/settings v2-interactive flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground">
+                  Game settings
+                  <ChevronDown
+                    aria-hidden
+                    className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]/settings:rotate-180 motion-reduce:transition-none"
+                  />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 px-3 pb-3">
+                  <SettingRow
+                    id="quiz-leaderboard"
+                    label="Show the leaderboard between questions"
+                    hint="Off keeps the scores a surprise until the podium."
+                    checked={settings.show_leaderboard}
+                    onChange={(value) =>
+                      setSettings((prev) => ({ ...prev, show_leaderboard: value }))
+                    }
+                  />
+                  <SettingRow
+                    id="quiz-late-join"
+                    label="Let people join after it starts"
+                    hint="Late joiners play from the next question."
+                    checked={settings.allow_late_join}
+                    onChange={(value) =>
+                      setSettings((prev) => ({ ...prev, allow_late_join: value }))
+                    }
+                  />
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             {/* `role="alert"`: a screen reader is told the moment the save is
@@ -685,6 +766,25 @@ function SettingRow({
   );
 }
 
+/** The sentence a refused save says where the gap is. Live: it goes once the gap is filled. */
+function FormProblemLine({ id, children }: { id?: string; children: React.ReactNode }) {
+  return (
+    <p
+      id={id}
+      role="alert"
+      className="text-sm font-medium text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+    >
+      {children}
+    </p>
+  );
+}
+
+/** A visibility's mark, the same one its chip shows on the quiz's page and rows. */
+function VisibilityMark({ id, className }: { id: ChannelQuizVisibility; className?: string }) {
+  const Mark = VISIBILITY_MARKS[id];
+  return <Mark aria-hidden className={cn('size-4 shrink-0 text-muted-foreground', className)} />;
+}
+
 /**
  * A scenario's card: its title (optional) and passage, then its questions,
  * then the way to add one more to it. Blue, so a question about a passage
@@ -693,6 +793,7 @@ function SettingRow({
 function ScenarioCard({
   number,
   draft,
+  problem,
   onChange,
   onRemove,
   onAddQuestion,
@@ -700,6 +801,8 @@ function ScenarioCard({
 }: {
   number: number;
   draft: ScenarioDraft;
+  /** Why a save was refused, when the gap is in this scenario. */
+  problem: string | null;
   onChange: (patch: Partial<ScenarioDraft>) => void;
   onRemove: () => void;
   onAddQuestion: () => void;
@@ -707,8 +810,12 @@ function ScenarioCard({
 }) {
   return (
     <section
+      id={`quiz-scenario-${draft.key}`}
       aria-label={`Scenario ${number}`}
-      className="space-y-3 rounded-2xl border-2 border-[oklch(0.62_0.17_255/0.55)] bg-[oklch(0.62_0.17_255/0.07)] p-3"
+      className={cn(
+        'space-y-3 rounded-2xl border-2 border-[oklch(0.62_0.17_255/0.55)] bg-[oklch(0.62_0.17_255/0.07)] p-3',
+        problem && 'border-destructive/60',
+      )}
     >
       <div className="flex items-center gap-2">
         <span className="text-xs font-bold tracking-[0.12em] text-[oklch(0.7_0.15_255)] uppercase">
@@ -751,6 +858,7 @@ function ScenarioCard({
         </p>
         <QuizSourceLine source={draft.source} />
       </div>
+      {problem ? <FormProblemLine>{problem}</FormProblemLine> : null}
       <div className="space-y-3">{children}</div>
       <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={onAddQuestion}>
         <Plus aria-hidden className="size-4" />
@@ -760,11 +868,18 @@ function ScenarioCard({
   );
 }
 
+/**
+ * One question (Arthur, 25 October 2026): one compact row for its number,
+ * type and timer; the question box as the focus; the answers, where the
+ * correct one carries a filled tick and the others their letter; then
+ * "Explanation (optional)", quieter than the rest.
+ */
 function QuestionCard({
   index,
   draft,
   inScenario,
   canRemove,
+  problem,
   onChange,
   onChangeType,
   onRemove,
@@ -774,30 +889,38 @@ function QuestionCard({
   /** Inside a scenario's card: says so beside the number. */
   inScenario: boolean;
   canRemove: boolean;
+  /** Why a save was refused, when the gap is in this question. */
+  problem: string | null;
   onChange: (patch: Partial<QuestionDraft>) => void;
   onChangeType: (type: QuizQuestionType) => void;
   onRemove: () => void;
 }) {
   const isTrueFalse = draft.type === 'true_false';
+  const number = index + 1;
+  const hintId = `explanation-hint-${draft.key}`;
 
   return (
-    <div className="space-y-3 rounded-xl border bg-card p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-          Question {index + 1}
-        </span>
+    <div
+      id={`quiz-question-${draft.key}`}
+      className={cn(
+        'space-y-3 rounded-xl border border-border/70 bg-card p-3 transition-colors',
+        problem && 'border-destructive/60',
+      )}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="mr-1 text-sm font-semibold text-foreground tabular-nums">Q{number}</span>
         {inScenario && (
           <span className="inline-flex items-center gap-1 rounded-full bg-[oklch(0.62_0.17_255/0.14)] px-2 py-0.5 text-xs font-medium text-[oklch(0.78_0.1_255)]">
             <FileText aria-hidden className="size-3" />
-            Uses the scenario
+            Scenario
           </span>
         )}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-1">
           <Select
             value={draft.type}
             onValueChange={(value) => onChangeType(value as QuizQuestionType)}
           >
-            <SelectTrigger size="sm" className="w-36">
+            <SelectTrigger size="sm" className="h-8 w-auto gap-1 border-transparent bg-secondary/60 px-2.5 text-xs" aria-label={`Question ${number} type`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -809,7 +932,7 @@ function QuestionCard({
             value={String(draft.seconds)}
             onValueChange={(value) => onChange({ seconds: Number(value) })}
           >
-            <SelectTrigger size="sm" className="w-24">
+            <SelectTrigger size="sm" className="h-8 w-auto gap-1 border-transparent bg-secondary/60 px-2.5 text-xs tabular-nums" aria-label={`Question ${number} time`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -827,7 +950,7 @@ function QuestionCard({
               size="icon"
               className="size-8 text-muted-foreground hover:text-destructive"
               onClick={onRemove}
-              aria-label={`Remove question ${index + 1}`}
+              aria-label={`Remove question ${number}`}
             >
               <Trash2 aria-hidden className="size-4" />
             </Button>
@@ -841,62 +964,80 @@ function QuestionCard({
         placeholder="What do you want to ask?"
         value={draft.question}
         onChange={(event) => onChange({ question: event.target.value })}
-        aria-label={`Question ${index + 1} text`}
+        aria-label={`Question ${number} text`}
+        className="min-h-16 text-base"
       />
 
-      <fieldset className="space-y-2">
-        <legend className="text-xs text-muted-foreground">
-          Answers: mark the correct one
-        </legend>
-        {draft.options.map((option, optionIndex) => (
-          <div key={option.key} className="flex items-center gap-2">
-            <input
-              type="radio"
-              name={`correct-${draft.key}`}
-              checked={draft.correctKey === option.key}
-              onChange={() => onChange({ correctKey: option.key })}
-              className="size-4 shrink-0 accent-primary"
-              aria-label={`Mark answer ${optionLetter(optionIndex)} correct`}
-            />
-            <Input
-              maxLength={QUIZ_OPTION_MAX}
-              placeholder={`Answer ${optionLetter(optionIndex)}`}
-              value={option.content}
-              readOnly={isTrueFalse}
-              className={cn(isTrueFalse && 'text-muted-foreground')}
-              onChange={(event) =>
-                onChange({
-                  options: draft.options.map((entry) =>
-                    entry.key === option.key
-                      ? { ...entry, content: event.target.value }
-                      : entry,
-                  ),
-                })
-              }
-              aria-label={`Answer ${optionLetter(optionIndex)}`}
-            />
-            {!isTrueFalse && draft.options.length > QUIZ_MIN_OPTIONS && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-9 shrink-0 text-muted-foreground"
-                onClick={() =>
-                  onChange({
-                    options: draft.options.filter(
-                      (entry) => entry.key !== option.key,
-                    ),
-                    correctKey:
-                      draft.correctKey === option.key ? null : draft.correctKey,
-                  })
-                }
-                aria-label={`Remove answer ${optionLetter(optionIndex)}`}
-              >
-                <Trash2 aria-hidden className="size-4" />
-              </Button>
-            )}
-          </div>
-        ))}
+      <div className="space-y-1.5">
+        <p id={`answers-label-${draft.key}`} className="text-xs text-muted-foreground">
+          Answers · tap the circle beside the correct one
+        </p>
+        {/* `v2-solo`: the quiz's own right-answer green, in both themes (solo-quiz.css). */}
+        <div role="radiogroup" aria-labelledby={`answers-label-${draft.key}`} className="v2-solo space-y-1.5">
+          {draft.options.map((option, optionIndex) => {
+            const letter = optionLetter(optionIndex);
+            const correct = draft.correctKey === option.key;
+            return (
+              <div key={option.key} className="flex items-center gap-2">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={correct}
+                  aria-label={`Answer ${letter} is correct`}
+                  onClick={() => onChange({ correctKey: option.key })}
+                  className={cn(
+                    'v2-interactive flex size-9 shrink-0 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors',
+                    correct
+                      ? 'border-[var(--solo-right)] bg-[var(--solo-right)] text-[var(--solo-right-ink)]'
+                      : 'border-border text-muted-foreground hover:border-foreground/40',
+                  )}
+                >
+                  {correct ? <Check aria-hidden className="size-4" strokeWidth={3} /> : letter}
+                </button>
+                <Input
+                  maxLength={QUIZ_OPTION_MAX}
+                  placeholder={`Answer ${letter}`}
+                  value={option.content}
+                  readOnly={isTrueFalse}
+                  className={cn(
+                    isTrueFalse && 'text-muted-foreground',
+                    correct && 'border-[var(--solo-right)]',
+                  )}
+                  onChange={(event) =>
+                    onChange({
+                      options: draft.options.map((entry) =>
+                        entry.key === option.key
+                          ? { ...entry, content: event.target.value }
+                          : entry,
+                      ),
+                    })
+                  }
+                  aria-label={`Answer ${letter}`}
+                />
+                {!isTrueFalse && draft.options.length > QUIZ_MIN_OPTIONS && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 shrink-0 text-muted-foreground"
+                    onClick={() =>
+                      onChange({
+                        options: draft.options.filter(
+                          (entry) => entry.key !== option.key,
+                        ),
+                        correctKey:
+                          draft.correctKey === option.key ? null : draft.correctKey,
+                      })
+                    }
+                    aria-label={`Remove answer ${letter}`}
+                  >
+                    <Trash2 aria-hidden className="size-4" />
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
         {!isTrueFalse && draft.options.length < QUIZ_MAX_OPTIONS && (
           <Button
             type="button"
@@ -911,22 +1052,28 @@ function QuestionCard({
             Add answer
           </Button>
         )}
-      </fieldset>
+      </div>
 
-      {/* WHY THIS IS THE ANSWER (Arthur, 22 October 2026): optional, shown to
-          a player only on the results, under the right answer, never while
-          the quiz runs. */}
-      <div className="space-y-1.5">
-        <label htmlFor={`explanation-${draft.key}`} className="text-xs text-muted-foreground">
-          Why this is the answer <span className="text-muted-foreground/70">(optional)</span>
+      {problem ? <FormProblemLine>{problem}</FormProblemLine> : null}
+
+      {/* EXPLANATION (Arthur, 22 and 25 October 2026): optional, shown to a
+          player only after the quiz, under the right answer; quieter than the
+          question and its answers. */}
+      <div className="space-y-1">
+        <label htmlFor={`explanation-${draft.key}`} className="text-xs font-medium text-muted-foreground">
+          Explanation <span className="font-normal text-muted-foreground/70">(optional)</span>
         </label>
+        <p id={hintId} className="text-xs text-muted-foreground/80">
+          Explain why the correct answer is right. Shown after the quiz.
+        </p>
         <Textarea
           id={`explanation-${draft.key}`}
           rows={2}
           maxLength={QUIZ_EXPLANATION_MAX}
-          placeholder="Shown with the answers on the results, never during the quiz."
+          aria-describedby={hintId}
           value={draft.explanation}
           onChange={(event) => onChange({ explanation: event.target.value })}
+          className="min-h-14 bg-secondary/30 text-sm"
         />
       </div>
       {/* Where Lawexa took the question from (the quiz builder, 24 October

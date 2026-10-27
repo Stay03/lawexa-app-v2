@@ -177,28 +177,57 @@ export function addToScenario(questions: readonly QuestionDraft[], scenarioKey: 
 }
 
 /** The first thing wrong with the draft, phrased for the author — or `null`. */
-export function validate(title: string, questions: readonly QuestionDraft[], scenarios: readonly ScenarioDraft[]): string | null {
-  if (!title.trim()) return 'Give the quiz a title.';
-  if (questions.length === 0) return 'Add at least one question.';
+/** Where a refused save points: the title, a question or a scenario, by draft key. */
+export type FormProblemTarget =
+  | { kind: 'title' }
+  | { kind: 'question'; key: string }
+  | { kind: 'scenario'; key: string };
+
+export interface FormProblem {
+  message: string;
+  /** `null` when the problem is the quiz as a whole (no questions at all). */
+  target: FormProblemTarget | null;
+}
+
+/**
+ * The first thing that stops a save, and where it is (Arthur, 25 October
+ * 2026: "validate that each question has sufficient options and a correct
+ * answer before publication"). The form scrolls to the target and says the
+ * sentence there, so a gap on question seventeen is found at once.
+ */
+export function findFormProblem(
+  title: string,
+  questions: readonly QuestionDraft[],
+  scenarios: readonly ScenarioDraft[],
+): FormProblem | null {
+  if (!title.trim()) return { message: 'Give the quiz a title.', target: { kind: 'title' } };
+  if (questions.length === 0) return { message: 'Add at least one question.', target: null };
   const used = new Set(questions.map((question) => question.scenarioKey).filter((key): key is string => key !== null));
   let scenarioNumber = 0;
   for (const scenario of scenarios) {
     if (!used.has(scenario.key)) continue;
     scenarioNumber += 1;
-    if (!scenario.passage.trim()) return `Scenario ${scenarioNumber} needs its passage.`;
-    if (scenario.title.trim().length > QUIZ_SCENARIO_TITLE_MAX) return `Scenario ${scenarioNumber}'s title is too long.`;
-    if (scenario.passage.trim().length > QUIZ_SCENARIO_PASSAGE_MAX) return `Scenario ${scenarioNumber}'s passage is too long.`;
+    const target = { kind: 'scenario', key: scenario.key } as const;
+    if (!scenario.passage.trim()) return { message: `Scenario ${scenarioNumber} needs its passage.`, target };
+    if (scenario.title.trim().length > QUIZ_SCENARIO_TITLE_MAX) return { message: `Scenario ${scenarioNumber}'s title is too long.`, target };
+    if (scenario.passage.trim().length > QUIZ_SCENARIO_PASSAGE_MAX) return { message: `Scenario ${scenarioNumber}'s passage is too long.`, target };
   }
   for (let i = 0; i < questions.length; i += 1) {
     const question = questions[i];
     const label = `Question ${i + 1}`;
-    if (!question.question.trim()) return `${label} needs its question text.`;
+    const target = { kind: 'question', key: question.key } as const;
+    if (!question.question.trim()) return { message: `${label} needs its question text.`, target };
     const filled = question.options.filter((option) => option.content.trim());
-    if (filled.length < QUIZ_MIN_OPTIONS) return `${label} needs at least ${QUIZ_MIN_OPTIONS} answers.`;
-    if (question.correctKey === null) return `${label} needs one answer marked correct.`;
-    if (!filled.some((option) => option.key === question.correctKey)) return `${label}'s correct answer is empty.`;
+    if (filled.length < QUIZ_MIN_OPTIONS) return { message: `${label} needs at least ${QUIZ_MIN_OPTIONS} answers.`, target };
+    if (question.correctKey === null) return { message: `${label} needs one answer marked correct.`, target };
+    if (!filled.some((option) => option.key === question.correctKey)) return { message: `${label}'s correct answer is empty.`, target };
   }
   return null;
+}
+
+/** The sentence alone, for a caller that only needs to know whether it saves. */
+export function validate(title: string, questions: readonly QuestionDraft[], scenarios: readonly ScenarioDraft[]): string | null {
+  return findFormProblem(title, questions, scenarios)?.message ?? null;
 }
 
 /** The questions and scenarios as the server takes them. */
