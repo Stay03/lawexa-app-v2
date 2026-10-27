@@ -13,6 +13,8 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, draftsIn, type DraftBlock } from './draft-blocks';
 import { locateDraft } from './draft-ordinals';
 import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
+import { draftGroupKey, draftVersionTitle } from './draft-versions';
+import { DraftVersionSwitch } from './DraftVersionSwitch';
 
 /**
  * DraftPanel — draft N of this chat in the side panel (`?side=draft:N`).
@@ -35,6 +37,10 @@ import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
  * and no word count, which the chat's draft card already shows; the panel
  * starts with its one bar (DraftEditor.tsx), and while the draft is written
  * that bar holds only the close. The phone sheet keeps its header.
+ *
+ * A draft Lawexa has written more than once (draft-versions.ts) gets a strip
+ * under the bar to step between its versions, and saves and downloads under
+ * "Title (Version 2)", so each version is its own note and its own file.
  */
 export function DraftPanel({
   ordinal,
@@ -50,7 +56,8 @@ export function DraftPanel({
   const live = useStreamingText(streamingText, streamingMessage?.id ?? '');
   const chat = useV2ChatContext();
   const conversationId = chat?.conversationId;
-  const space = useSidePanel()?.space ?? null;
+  const panel = useSidePanel();
+  const space = panel?.space ?? null;
 
   let draft: DraftBlock | null = null;
   if ('messageId' in place) {
@@ -87,6 +94,9 @@ export function DraftPanel({
     );
   }
 
+  const version = panel?.draftVersion(ordinal, draftGroupKey(draft)) ?? null;
+  const versionSwitch = <DraftVersionSwitch version={version} />;
+
   return (
     <ChatSidePanel
       label="Draft"
@@ -99,14 +109,16 @@ export function DraftPanel({
         <DraftEditor
           conversationId={conversationId}
           ordinal={ordinal}
-          title={draft.title}
+          title={draftVersionTitle(draft.title, version)}
           markdown={draft.body}
           font={{ font: draft.font, size: draft.size }}
           space={space}
+          versionSwitch={versionSwitch}
         />
       ) : (
         <div className="@container/draft">
           <DraftBar />
+          {versionSwitch}
           <article className={DRAFT_DOCUMENT}>
             <MarkdownText content={draft.body} animate={!draft.complete && Boolean(streamingMessage)} />
           </article>

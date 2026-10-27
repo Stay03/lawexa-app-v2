@@ -8,6 +8,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { MarkdownText } from '../markdown/MarkdownText';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, type DraftBlock } from './draft-blocks';
+import { draftGroupKey, draftVersionLabel } from './draft-versions';
 
 /**
  * The chat's message box is focused or has words in it: the shell's box on a
@@ -31,6 +32,11 @@ function readerIsTyping(): boolean {
  * Outside a chat that has the panel (the statute page's chat, which no page
  * hosts a panel for: side-panel-host.tsx), it shows the draft's text in place,
  * so the card is never a dead button.
+ *
+ * VERSIONS (Stay, 27 October 2026, option B). A draft Lawexa wrote again after
+ * a change reads "Version 2 · Draft · 1,240 words", and every older version's
+ * card is greyed, so the newest one is the one the eye finds. An older card
+ * still opens its own version.
  */
 export function DraftCard({
   draft,
@@ -45,6 +51,9 @@ export function DraftCard({
   const panel = useSidePanel();
   const showing = panel?.target?.kind === 'draft' && panel.target.ordinal === ordinal && !panel.closing;
   const status = draftStatus(draft, live);
+  const version = panel?.draftVersion(ordinal, draftGroupKey(draft)) ?? null;
+  const versionLabel = draftVersionLabel(version);
+  const older = version !== null && !version.latest;
 
   // A DRAFT OPENS ITSELF WHEN LAWEXA FINISHES IT (Stay, 24 October 2026: "auto
   // open when its done"). The card saw it being written, and its closing tag
@@ -85,17 +94,28 @@ export function DraftCard({
     >
       <span
         aria-hidden
-        className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary"
+        className={cn(
+          'flex size-10 shrink-0 items-center justify-center rounded-xl transition-colors',
+          older ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary',
+        )}
       >
         <FileText className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[15px] leading-snug font-semibold text-foreground">{draft.title}</span>
+        <span
+          className={cn(
+            'block truncate text-[15px] leading-snug font-semibold',
+            older ? 'text-muted-foreground' : 'text-foreground',
+          )}
+        >
+          {draft.title}
+        </span>
         <span className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
           {draft.complete || !live ? null : (
             <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />
           )}
-          {status}
+          {versionLabel ? `${versionLabel} · ${status}` : status}
+          {older ? <span className="sr-only">, an older version</span> : null}
         </span>
       </span>
       <span

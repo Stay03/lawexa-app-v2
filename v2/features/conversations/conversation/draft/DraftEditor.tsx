@@ -95,7 +95,7 @@ export function DraftEditor(props: DraftEditorProps) {
   const note = useDraftNote(conversationId, ordinal, edited === undefined);
 
   if (edited !== undefined) return <DraftEditorBody {...props} initial={edited} />;
-  if (note.isPending) return <DraftEditorSkeleton />;
+  if (note.isPending) return <DraftEditorSkeleton versionSwitch={props.versionSwitch} />;
   // A failed lookup opens the draft as Lawexa wrote it; a save then finds the
   // note on the server anyway (`useSaveDraftNote`), so none is made twice.
   const saved = note.data?.content;
@@ -111,6 +111,8 @@ interface DraftEditorProps {
   font: DraftFont;
   /** The chat's Space, for Save to Space folder; `null` outside one. */
   space: ConversationSpaceRef | null;
+  /** The strip that switches between the draft's versions, under the bars (DraftVersionSwitch.tsx). */
+  versionSwitch?: ReactNode;
 }
 
 /**
@@ -148,11 +150,12 @@ export function DraftBar({ tools, actions }: { tools?: ReactNode; actions?: Reac
 }
 
 /** The editor's frame while the saved note is looked up: the bar, then lines. */
-function DraftEditorSkeleton() {
+function DraftEditorSkeleton({ versionSwitch }: { versionSwitch?: ReactNode }) {
   return (
     <div className="@container/draft flex min-h-full flex-col">
       <div aria-hidden className="h-12 shrink-0 border-b border-border/70 xl:hidden" />
       <DraftBar />
+      {versionSwitch}
       <div aria-hidden className={cn(DRAFT_DOCUMENT, 'flex flex-col gap-3')}>
         <Skeleton className="h-7 w-2/3" />
         <Skeleton className="h-4 w-full" />
@@ -168,6 +171,7 @@ function DraftEditorBody({
   ordinal,
   title,
   space,
+  versionSwitch,
   initial,
 }: DraftEditorProps & { initial: Content }) {
   // Changed since its last save, or never saved: what Save offers.
@@ -312,6 +316,7 @@ function DraftEditorBody({
           <DraftBar />
         </>
       )}
+      {versionSwitch}
       <div data-v2-draft-scroll className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
         <div className={DRAFT_DOCUMENT}>
           <EditorContent editor={editor} />

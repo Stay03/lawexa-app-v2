@@ -10,6 +10,7 @@ import {
   sidePanelValue,
   type SidePanelTarget,
 } from './side-panel-value';
+import { draftVersion, type DraftVersion, type DraftVersionIndex } from '../draft/draft-versions';
 
 /**
  * SidePanelContext — the chat's one side panel, shared by everything that
@@ -20,7 +21,8 @@ import {
  *
  * It also carries each answer's draft OFFSET (draft-ordinals.ts), so a card
  * inside an answer knows its draft's place without the answer knowing the
- * transcript.
+ * transcript. And the chat's drafts by group (draft-versions.ts), so a card
+ * reads "Version 2" and the panel switches between a draft's versions.
  *
  * CLOSING PLAYS ITS EXIT (the house motion rule: nothing disappears abruptly).
  * `close()` marks the panel closing, and the frame calls `finishClose()` when
@@ -60,6 +62,8 @@ export type SidePanelFrame = 'beside' | 'card';
 export interface SidePanelApi extends SidePanelUrlState {
   /** How many drafts come before an answer's own (0 for an answer not in the map). */
   draftOffset: (messageId: string) => number;
+  /** Draft `ordinal`'s place among its versions; `null` where the chat keeps no versions (a Radar report). */
+  draftVersion: (ordinal: number, key: string) => DraftVersion | null;
   /** The chat's Space, where a draft's Save to folder files it; `null` outside one. */
   space: ConversationSpaceRef | null;
   frame: SidePanelFrame;
@@ -107,16 +111,18 @@ export function useSidePanelUrl(): SidePanelUrlState {
 /** A chat's route: the panel owns its own param and opens beside the transcript. */
 export function SidePanelProvider({
   offsets,
+  versions,
   space,
   children,
 }: {
   offsets: ReadonlyMap<string, number>;
+  versions?: DraftVersionIndex;
   space: ConversationSpaceRef | null;
   children: ReactNode;
 }) {
   const url = useSidePanelUrl();
   return (
-    <SidePanelValueProvider url={url} offsets={offsets} space={space} frame="beside">
+    <SidePanelValueProvider url={url} offsets={offsets} versions={versions} space={space} frame="beside">
       {children}
     </SidePanelValueProvider>
   );
@@ -126,20 +132,27 @@ export function SidePanelProvider({
 export function SidePanelValueProvider({
   url,
   offsets,
+  versions,
   space,
   frame,
   children,
 }: {
   url: SidePanelUrlState;
   offsets: ReadonlyMap<string, number>;
+  /** The chat's drafts by group; absent where drafts have no versions. */
+  versions?: DraftVersionIndex;
   space: ConversationSpaceRef | null;
   frame: SidePanelFrame;
   children: ReactNode;
 }) {
   const draftOffset = useCallback((messageId: string) => offsets.get(messageId) ?? 0, [offsets]);
+  const versionOf = useCallback(
+    (ordinal: number, key: string) => (versions ? draftVersion(versions, ordinal, key) : null),
+    [versions],
+  );
   const api = useMemo<SidePanelApi>(
-    () => ({ ...url, draftOffset, space, frame }),
-    [url, draftOffset, space, frame],
+    () => ({ ...url, draftOffset, draftVersion: versionOf, space, frame }),
+    [url, draftOffset, versionOf, space, frame],
   );
   return <SidePanelContext.Provider value={api}>{children}</SidePanelContext.Provider>;
 }

@@ -27,6 +27,7 @@ import {
 } from './embedded-composer';
 import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './route-composer';
 import { draftOffsets } from './draft/draft-ordinals';
+import { draftVersionIndex } from './draft/draft-versions';
 import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
 import { useSidePanelHost } from './side-panel/side-panel-host';
 import { SidePanelSlot } from './side-panel/SidePanelSlot';
@@ -121,6 +122,8 @@ export function ConversationScreen({
   // same draft (draft-ordinals.ts). Counted from saved text; a streaming flush
   // does not change `messages`, so this does not run per word.
   const offsets = useMemo(() => draftOffsets(messages), [messages]);
+  // The same drafts by group, so a card reads "Version 2" (draft-versions.ts).
+  const draftVersions = useMemo(() => draftVersionIndex(messages), [messages]);
   // Embedded, the page around the chat may show its side panel (the case
   // page's draft editor, side-panel-host.tsx).
   const panelHost = useSidePanelHost();
@@ -412,7 +415,13 @@ export function ConversationScreen({
           (the statute page) a draft shows in its card instead. */}
       {embed ? (
         panelHost ? (
-          <SidePanelValueProvider url={panelHost.url} offsets={offsets} space={controller.space} frame="card">
+          <SidePanelValueProvider
+            url={panelHost.url}
+            offsets={offsets}
+            versions={draftVersions}
+            space={controller.space}
+            frame="card"
+          >
             {transcript}
             {panelHost.element && !isLoadingHistory
               ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} />, panelHost.element)
@@ -422,7 +431,7 @@ export function ConversationScreen({
           transcript
         )
       ) : (
-        <SidePanelProvider offsets={offsets} space={controller.space}>
+        <SidePanelProvider offsets={offsets} versions={draftVersions} space={controller.space}>
           <div className="flex h-full min-h-0">
             {transcript}
             <SidePanelSlot messages={messages} streamingText={streamingText} />
