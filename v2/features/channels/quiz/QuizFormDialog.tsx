@@ -606,7 +606,7 @@ export function QuizFormDialog({
                   value={level ?? NO_LEVEL}
                   onValueChange={(next) => setLevel(next === NO_LEVEL ? null : next)}
                 >
-                  <SelectTrigger id="quiz-level" aria-label="Level" className="w-full">
+                  <SelectTrigger id="quiz-level" aria-label="Level" className="w-full text-base md:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent position="popper" className="max-w-[min(18rem,calc(100vw-2rem))]">

@@ -96,8 +96,13 @@ export function QuizCard({
       {subject ? <span className="truncate text-xs text-foreground/70">{subject}</span> : null}
       <span className="truncate text-xs text-muted-foreground tabular-nums">
         {quizFactsLabel(count, quiz.total_seconds)}
-        {players ? ` · ${players}` : null}
+        {/* On the fact line where a card is wide enough; a phone's two-across
+            card has no room, so there the count has a line of its own. */}
+        {players ? <span className="hidden sm:inline"> · {players}</span> : null}
       </span>
+      {players ? (
+        <span className="truncate text-xs text-muted-foreground tabular-nums sm:hidden">{players}</span>
+      ) : null}
       {footer !== undefined ? (
         <div className="mt-auto flex min-w-0 flex-col gap-1 pt-1">{footer}</div>
       ) : best ? (
