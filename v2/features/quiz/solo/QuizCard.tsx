@@ -93,7 +93,9 @@ export function QuizCard({
           ) : null}
         </span>
       ) : null}
-      {subject ? <span className="truncate text-xs text-foreground/70">{subject}</span> : null}
+      {/* Wraps rather than cuts: on a phone's narrow card the year is the part
+          that would be lost. */}
+      {subject ? <span className="text-xs leading-snug text-foreground/70 [overflow-wrap:anywhere]">{subject}</span> : null}
       <span className="truncate text-xs text-muted-foreground tabular-nums">
         {quizFactsLabel(count, quiz.total_seconds)}
         {/* On the fact line where a card is wide enough; a phone's two-across
