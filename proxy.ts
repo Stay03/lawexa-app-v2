@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { classicFallbackFor, isMigratedToV2, isV2OnlySharedPath } from '@/v2/routes.manifest';
-import { UI_COOKIE } from '@/v2/cookie';
+import { LEGACY_V1_COOKIE_VALUE, UI_COOKIE } from '@/v2/cookie';
 import { servesV2, v2DefaultFromEnv } from '@/v2/ui-choice';
 
 const V2_PREFIX = '/v2';
@@ -34,22 +34,29 @@ export function proxy(request: NextRequest): NextResponse {
   }
 
   const { pathname } = request.nextUrl;
+  const uiCookie = request.cookies.get(UI_COOKIE)?.value;
   const hasV2Cookie = servesV2({
-    uiCookie: request.cookies.get(UI_COOKIE)?.value,
+    uiCookie,
     v2Default: v2DefaultFromEnv(),
     userAgent: request.headers.get('user-agent'),
   });
+  // The old classic choice (`v1`, before 26 October 2026) is no choice now; it
+  // is cleared on whatever this request answers, so it does not linger.
+  const answer = (response: NextResponse): NextResponse => {
+    if (uiCookie === LEGACY_V1_COOKIE_VALUE) response.cookies.delete(UI_COOKIE);
+    return response;
+  };
 
   // Direct hits on the internal /v2 tree are only allowed with the cookie;
   // otherwise strip the prefix so the canonical (v1) URL is the one users see.
   // `clone()` preserves the search params.
   if (pathname === V2_PREFIX || pathname.startsWith(`${V2_PREFIX}/`)) {
     if (hasV2Cookie) {
-      return NextResponse.next();
+      return answer(NextResponse.next());
     }
     const url = request.nextUrl.clone();
     url.pathname = pathname.slice(V2_PREFIX.length) || '/';
-    return NextResponse.redirect(url);
+    return answer(NextResponse.redirect(url));
   }
 
   // A visitor who is not served v2 on an address only v2 has a page for (a link
@@ -61,7 +68,7 @@ export function proxy(request: NextRequest): NextResponse {
       const url = request.nextUrl.clone();
       url.pathname = fallback;
       url.search = '';
-      return NextResponse.redirect(url);
+      return answer(NextResponse.redirect(url));
     }
   }
 
@@ -72,10 +79,10 @@ export function proxy(request: NextRequest): NextResponse {
   if ((hasV2Cookie || isV2OnlySharedPath(pathname)) && isMigratedToV2(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = pathname === '/' ? V2_PREFIX : `${V2_PREFIX}${pathname}`;
-    return NextResponse.rewrite(url);
+    return answer(NextResponse.rewrite(url));
   }
 
-  return NextResponse.next();
+  return answer(NextResponse.next());
 }
 
 export const config = {

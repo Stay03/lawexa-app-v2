@@ -7,8 +7,11 @@ import { V1_COOKIE_VALUE, V2_COOKIE_VALUE } from './cookie';
  * never disagree about which design a browser is in.
  *
  *  1. The reader's own choice wins. `lawexa-ui=v2` is the new design (the
- *     preview opt-in, kept), `lawexa-ui=v1` is "Switch to classic Lawexa",
- *     kept for a few weeks after the switch.
+ *     preview opt-in, kept), `lawexa-ui=classic` is the classic design, chosen
+ *     in Developer settings. The old `lawexa-ui=v1`, written by the
+ *     "Switch to classic Lawexa" button removed on 26 October 2026, is read
+ *     as NO choice (Arthur, 27 October 2026: readers holding it had no way
+ *     back), and the proxy clears it.
  *  2. With no choice, the deploy's default decides: `V2_DEFAULT=true` gives
  *     everyone the new design. Unset, it is the opt-in preview as before, so
  *     that one setting turns the switch off again without a code change.

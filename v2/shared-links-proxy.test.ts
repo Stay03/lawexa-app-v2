@@ -25,7 +25,7 @@ test('the shared addresses only v2 has: a quiz page and a statute section', () =
 test('the proxy serves them from v2 whatever the cookie or the browser; the rest by the reader’s choice', () => {
   const proxy = readFileSync(join(process.cwd(), 'proxy.ts'), 'utf8');
   assert.match(proxy, /import \{ classicFallbackFor, isMigratedToV2, isV2OnlySharedPath \} from '@\/v2\/routes\.manifest';/);
-  assert.match(proxy, /if \(\(hasV2Cookie \|\| isV2OnlySharedPath\(pathname\)\) && isMigratedToV2\(pathname\)\) \{\s*const url = request\.nextUrl\.clone\(\);\s*url\.pathname = pathname === '\/' \? V2_PREFIX : `\$\{V2_PREFIX\}\$\{pathname\}`;\s*return NextResponse\.rewrite\(url\);/);
+  assert.match(proxy, /if \(\(hasV2Cookie \|\| isV2OnlySharedPath\(pathname\)\) && isMigratedToV2\(pathname\)\) \{\s*const url = request\.nextUrl\.clone\(\);\s*url\.pathname = pathname === '\/' \? V2_PREFIX : `\$\{V2_PREFIX\}\$\{pathname\}`;\s*return answer\(NextResponse\.rewrite\(url\)\);/);
 });
 
 /* A guest on the shared quiz page sees v2's shell, whose links lead to
@@ -58,7 +58,7 @@ test('a visitor not served v2 is sent from a v2-only address to the nearest clas
 
 test('the proxy sends only a visitor not served v2, and drops the query on the way', () => {
   const proxy = readFileSync(join(process.cwd(), 'proxy.ts'), 'utf8');
-  assert.match(proxy, /if \(!hasV2Cookie\) \{\s*const fallback = classicFallbackFor\(pathname\);\s*if \(fallback\) \{\s*const url = request\.nextUrl\.clone\(\);\s*url\.pathname = fallback;\s*url\.search = '';\s*return NextResponse\.redirect\(url\);/);
+  assert.match(proxy, /if \(!hasV2Cookie\) \{\s*const fallback = classicFallbackFor\(pathname\);\s*if \(fallback\) \{\s*const url = request\.nextUrl\.clone\(\);\s*url\.pathname = fallback;\s*url\.search = '';\s*return answer\(NextResponse\.redirect\(url\)\);/);
   // It comes before v2's rewrite, so a visitor with the v2 cookie is never sent away.
-  assert.ok(proxy.indexOf('classicFallbackFor(pathname)') < proxy.indexOf('return NextResponse.rewrite(url);'));
+  assert.ok(proxy.indexOf('classicFallbackFor(pathname)') < proxy.indexOf('return answer(NextResponse.rewrite(url));'));
 });

@@ -42,7 +42,7 @@ test('everyone else gets the worker that removes itself', () => {
     ['v2 disabled on the server', { ...inside, v2Enabled: false }],
     ['the operator switch LAWEXA_SW=off', { ...inside, swSetting: 'off' }],
     // The switch (v2 Stage 1, item 9): the same rule the proxy serves pages by.
-    ['classic chosen, with the new design the default', { ...inside, uiCookie: 'v1', v2Default: true }],
+    ['classic chosen, with the new design the default', { ...inside, uiCookie: 'classic', v2Default: true }],
     ['a crawler with no choice, with the new design the default', { ...inside, uiCookie: undefined, v2Default: true, userAgent: 'Mozilla/5.0 (compatible; Googlebot/2.1)' }],
   ];
   for (const [name, gate] of cases) {

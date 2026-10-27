@@ -27,7 +27,11 @@ test('with the switch on, everyone who has not chosen gets the new design', () =
 });
 
 test('"Switch to classic Lawexa" is a choice that holds, and so is the preview opt-in', () => {
-  assert.equal(servesV2({ uiCookie: 'v1', v2Default: true, userAgent: CHROME }), false);
+  // The classic choice is `classic` now; the old `v1` (before 26 Oct 2026) is no choice.
+  assert.equal(servesV2({ uiCookie: 'classic', v2Default: true, userAgent: CHROME }), false);
+  assert.equal(servesV2({ uiCookie: 'v1', v2Default: true, userAgent: CHROME }), true);
+  assert.equal(servesV2({ uiCookie: 'v1', v2Default: false, userAgent: CHROME }), false);
+  assert.equal(servesV2({ uiCookie: 'v1', v2Default: true, userAgent: 'Googlebot/2.1' }), false);
   assert.equal(servesV2({ uiCookie: 'v2', v2Default: false, userAgent: CHROME }), true);
   // An unknown value is no choice.
   assert.equal(servesV2({ uiCookie: 'v2preview', v2Default: true, userAgent: CHROME }), true);
@@ -53,7 +57,7 @@ test('search engines and link previews keep the old pages', () => {
 });
 
 test('the classic choice is a cookie that lasts, not a cleared one', () => {
-  assert.equal(V1_COOKIE_SET, 'lawexa-ui=v1; path=/; max-age=31536000; samesite=lax');
+  assert.equal(V1_COOKIE_SET, 'lawexa-ui=classic; path=/; max-age=31536000; samesite=lax');
   assert.equal(V2_COOKIE_SET, 'lawexa-ui=v2; path=/; max-age=31536000; samesite=lax');
   assert.match(read('app', 'v2', 'switch-back-button.tsx'), /document\.cookie = V1_COOKIE_SET;/);
   assert.match(read('components', 'settings', 'DeveloperSettings.tsx'), /document\.cookie = next \? V2_COOKIE_SET : V1_COOKIE_SET;/);
@@ -61,10 +65,18 @@ test('the classic choice is a cookie that lasts, not a cleared one', () => {
 
 test('the proxy and the service worker read the same rule', () => {
   const proxy = read('proxy.ts');
-  assert.match(proxy, /servesV2\(\{\s*uiCookie: request\.cookies\.get\(UI_COOKIE\)\?\.value,\s*v2Default: v2DefaultFromEnv\(\),\s*userAgent: request\.headers\.get\('user-agent'\),\s*\}\)/);
+  assert.match(proxy, /const uiCookie = request\.cookies\.get\(UI_COOKIE\)\?\.value;\s*const hasV2Cookie = servesV2\(\{\s*uiCookie,\s*v2Default: v2DefaultFromEnv\(\),\s*userAgent: request\.headers\.get\('user-agent'\),\s*\}\)/);
   // The kill switch still comes first.
   assert.ok(proxy.indexOf("process.env.V2_ENABLED !== 'true'") < proxy.indexOf('servesV2('));
   const worker = read('app', 'sw.js', 'route.ts');
   assert.match(worker, /v2Default: v2DefaultFromEnv\(\),\s*userAgent: request\.get\('user-agent'\),/);
   assert.match(read('v2', 'runtime', 'sw', 'serve.ts'), /servesV2\(\{ uiCookie: gate\.uiCookie, v2Default: gate\.v2Default, userAgent: gate\.userAgent \}\)/);
+});
+
+test('the proxy clears the old classic choice on whatever it answers', () => {
+  const proxy = read('proxy.ts');
+  assert.match(proxy, /if \(uiCookie === LEGACY_V1_COOKIE_VALUE\) response\.cookies\.delete\(UI_COOKIE\);/);
+  // Every answer goes through it: the pass-through, the rewrite and both redirects.
+  assert.equal(proxy.match(/return answer\(NextResponse\./g)?.length, 5);
+  assert.doesNotMatch(proxy.replace(/if \(process\.env\.V2_ENABLED !== 'true'\) \{\s*return NextResponse\.next\(\);\s*\}/, ''), /return NextResponse\./);
 });
