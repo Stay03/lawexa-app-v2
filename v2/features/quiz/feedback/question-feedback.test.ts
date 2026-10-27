@@ -141,9 +141,10 @@ test('the flag shows where the answer is shown, never while a clock runs', () =>
   const card = code('v2', 'features', 'quiz', 'results', 'ResultItemCard.tsx');
   assert.match(card, /<QuestionFeedbackButton\s+target=\{\{ kind: 'practice', questionUuid: question\.uuid, sessionUuid \}\}/);
   assert.match(code('v2', 'features', 'quiz', 'results', 'ReviewStepper.tsx'), /<ResultItemCard item=\{current\} index=\{currentIndex\} sessionUuid=\{sessionUuid\} \/>/);
-  // Solo: on an `each` reveal only, and on every answers page.
+  // Solo: on every answers page, and never while playing (Arthur, 27 October
+  // 2026: a flag on the reveal let a reader pause the quiz to read the answer).
   const play = code('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
-  assert.match(play, /attempt\.reveal_mode === 'each' && step === 'revealed' \? \(\s*<QuestionFeedbackButton/);
+  assert.doesNotMatch(play, /QuestionFeedbackButton|attemptQuestionSnapshot|reporting/);
   assert.match(code('v2', 'features', 'quiz', 'solo', 'results', 'AnswersStepper.tsx'), /snapshot=\{attemptQuestionSnapshot\(question\)\}/);
   // A chat quiz card: once answered (the result footer) and saved.
   const chat = code('v2', 'features', 'conversations', 'conversation', 'cards', 'QuizCard.tsx');
@@ -151,14 +152,15 @@ test('the flag shows where the answer is shown, never while a clock runs', () =>
   assert.match(chat, /target=\{\{ kind: 'chat', messageId: savedMessageId, quizIndex: quizNumber - 1 \}\}/);
 });
 
-test('an open report holds the solo reveal still, and closing it starts the hold again', () => {
+test('nothing holds the solo reveal: it moves on after its hold, or on a tap', () => {
   const play = code('v2', 'features', 'quiz', 'solo', 'player', 'AttemptPlay.tsx');
-  assert.match(play, /const holdRuns = holding && !reporting;/);
-  assert.match(play, /if \(!holdRuns\) return;\s*const id = window\.setTimeout\(\(\) => moveOnAfterHold\(\), REVEAL_HOLD_MS\);/);
-  assert.match(play, /\}, \[holdRuns, cursor\]\);/);
-  assert.match(play, /onClick=\{holdRuns \? moveOn : undefined\}/);
-  assert.match(play, /onOpenChange=\{setReporting\}/);
-  // The flag's own tap never reaches the screen's "tap to move on".
+  assert.match(play, /if \(!holding\) return;\s*const id = window\.setTimeout\(\(\) => moveOnAfterHold\(\), REVEAL_HOLD_MS\);/);
+  assert.match(play, /\}, \[holding, cursor\]\);/);
+  assert.match(play, /onClick=\{holding \? moveOn : undefined\}/);
+  assert.doesNotMatch(play, /holdRuns/);
+  // A live channel game never had the flag, and still has none.
+  assert.doesNotMatch(code('v2', 'features', 'channels', 'quiz', 'GamePhases.tsx'), /QuestionFeedbackButton/);
+  // The flag's own tap never reaches a screen's "tap to move on".
   assert.match(code('v2', 'features', 'quiz', 'feedback', 'QuestionFeedbackButton.tsx'), /event\.stopPropagation\(\);\s*change\(true\);/);
 });
 
