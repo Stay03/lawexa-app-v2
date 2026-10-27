@@ -7,10 +7,10 @@ import {
   Folder,
   GitBranch,
   MessageSquare,
-  Radar,
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
+import { Radar } from '@/v2/shell/icons/radar-icon';
 
 import { cn, stripPastedTags } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';

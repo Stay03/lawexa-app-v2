@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { FileText, Landmark, NotebookPen, Radar, Scale, type LucideIcon } from 'lucide-react';
+import { FileText, Landmark, NotebookPen, Scale, type LucideIcon } from 'lucide-react';
+import { Radar } from '@/v2/shell/icons/radar-icon';
 import { getCaseDisplayTitle } from '@/lib/utils/case-title';
 import type { ConversationReference } from '@/types/chat';
 

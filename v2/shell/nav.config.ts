@@ -8,12 +8,12 @@ import {
   MessagesSquare,
   NotebookPen,
   PenSquare,
-  Radar,
   Scale,
   BookText,
   Tag,
   type LucideIcon,
 } from 'lucide-react';
+import { Radar } from '@/v2/shell/icons/radar-icon';
 
 import type { UserRole } from '@/types/auth';
 import { canAccessCollab } from '@/lib/utils/collab-audience';

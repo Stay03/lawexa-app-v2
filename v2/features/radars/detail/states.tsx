@@ -7,11 +7,11 @@ import {
   FileSearch,
   ListChecks,
   PauseCircle,
-  Radar as RadarIcon,
   TriangleAlert,
   WifiOff,
   type LucideIcon,
 } from 'lucide-react';
+import { Radar as RadarIcon } from '@/v2/shell/icons/radar-icon';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';

@@ -6,13 +6,13 @@ import {
   AtSign,
   Bell,
   ChevronDown,
-  Radar,
   Reply,
   Trash2,
   Trophy,
   UserPlus,
   type LucideIcon,
 } from 'lucide-react';
+import { Radar } from '@/v2/shell/icons/radar-icon';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';

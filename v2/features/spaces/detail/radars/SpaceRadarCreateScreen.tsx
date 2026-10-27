@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { CheckCircle2, Radar as RadarIcon } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import { Radar as RadarIcon } from '@/v2/shell/icons/radar-icon';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';

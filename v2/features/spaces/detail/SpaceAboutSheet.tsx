@@ -1,7 +1,8 @@
 'use client';
 
 import { useId } from 'react';
-import { Pencil, Radar, Users } from 'lucide-react';
+import { Pencil, Users } from 'lucide-react';
+import { Radar } from '@/v2/shell/icons/radar-icon';
 
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';

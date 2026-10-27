@@ -5,11 +5,11 @@ import {
   CalendarClock,
   FileSearch,
   Inbox,
-  Radar as RadarIcon,
   Sparkles,
   WifiOff,
   type LucideIcon,
 } from 'lucide-react';
+import { Radar as RadarIcon } from '@/v2/shell/icons/radar-icon';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';

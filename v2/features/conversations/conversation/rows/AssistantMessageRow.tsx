@@ -1,7 +1,8 @@
 'use client';
 
 import { memo, useState } from 'react';
-import { AlertCircle, Check, Copy, CornerUpLeft, Radar, RotateCcw, Square } from 'lucide-react';
+import { AlertCircle, Check, Copy, CornerUpLeft, RotateCcw, Square } from 'lucide-react';
+import { Radar } from '@/v2/shell/icons/radar-icon';
 import { cn } from '@/lib/utils';
 import {
   useStreamingText,

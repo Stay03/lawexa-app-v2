@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { Plus, Radar } from 'lucide-react';
+import { Plus } from 'lucide-react';
+import { Radar } from '@/v2/shell/icons/radar-icon';
 
 import { Button } from '@/components/ui/button';
 import { RadarTabs, type RadarTab } from '@/v2/features/radars/RadarTabs';
