@@ -75,11 +75,15 @@ test('the route unfurls through the public preview and indexes only a public qui
 /* Arthur, 24 October 2026: a smaller title on a phone, the facts in one line,
  * the author's photo and name (never "You wrote this", never "drafted by
  * Lawexa"), a short scoring note, and no em dash on the page. */
-test('the quiz page says what it is in one plain line, with short copy and no em dash', () => {
+test('the quiz page says what it is in a title, a name and quiet tags, with short copy and no em dash', () => {
   const source = screen();
-  assert.match(source, /<h1 className="text-xl leading-snug font-semibold tracking-tight text-balance text-foreground md:text-3xl">/);
+  // Minimal (Arthur, 28 October 2026): the letter tile, the title, whose it is, the tags.
+  assert.match(source, /<QuizTile uuid=\{quiz\.uuid\} title=\{quiz\.title\} size="md" className="mt-0\.5" \/>/);
+  assert.match(source, /<h1 className="text-2xl leading-tight font-bold tracking-tight text-balance text-foreground md:text-3xl">/);
   assert.match(source, /<span className="truncate font-medium text-foreground\/85">\{quiz\.creator\?\.name \?\? 'Someone who has left'\}<\/span>/);
-  assert.match(source, /const facts = \[questionCountLabel\(count\), scenarios, minutes\]/);
+  assert.match(source, /<QuizTags quiz=\{quiz\} facts extra=\{extraTags\} \/>/);
+  // The best alone: no rank, no "Taken once", no scoring note in the panel.
+  assert.doesNotMatch(source, /Your rank|takenLabel|FRONT_SCORING_NOTE/);
   assert.doesNotMatch(source, /You wrote this|drafted by Lawexa|FactPill|SPEED_SCORING_NOTE/);
   // Gold only for Start: the best is in the plain colour.
   assert.doesNotMatch(source, /text-primary/);

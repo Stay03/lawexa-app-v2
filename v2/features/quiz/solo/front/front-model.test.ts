@@ -23,8 +23,8 @@ test('the page names no question text, and Start stays in reach on a phone', () 
   const screen = readFileSync(join(here, 'QuizFrontScreen.tsx'), 'utf8');
   const drawn = screen.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.doesNotMatch(drawn, /What is in it|quizContents|on their own/);
-  // The scenarios are counted in the facts line, and only when there are some.
-  assert.match(screen, /const facts = \[questionCountLabel\(count\), scenarios, minutes\]\.filter/);
+  // The scenarios are counted in the tags, and only when there are some.
+  assert.match(screen, /const extraTags = \[scenarios, quiz\.visibility === 'public' \? null : visibilityFace\(quiz\.visibility\)\]\.filter\(/);
   assert.match(screen, /const scenarios = scenarioCountLabel\(quiz\.scenario_count \?\? quiz\.scenarios\?\.length\);/);
   assert.doesNotMatch(screen, /\.question\b(?!s)/);
   assert.match(screen, /fixed inset-x-0 bottom-0 z-10[^"]*md:static/);

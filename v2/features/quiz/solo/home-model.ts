@@ -1,4 +1,4 @@
-import type { QuizListFilters } from '@/types/channel-quiz';
+import type { ChannelQuiz, QuizListFilters } from '@/types/channel-quiz';
 
 /**
  * home-model — what the Quiz home's filters and cards say about a quiz beyond
@@ -150,4 +150,33 @@ export const BOARD_EMPTY_NOTE = 'No one has finished this quiz yet. Be the first
 export function playerDetailLabel(user: { institution?: string; level?: string }): string | null {
   const parts = [user.institution, user.level].filter((part): part is string => Boolean(part));
   return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+/**
+ * The line beside the reader's place on the board (Arthur's reference, 28
+ * October 2026: "#4 You are doing better than 60% of other players!"): the
+ * share of the OTHER players they are ahead of. Ties count as not ahead.
+ */
+export function standingLine(rank: number, playerCount: number): string {
+  if (playerCount <= 1) return 'You’re the only player so far.';
+  if (rank <= 1) return 'You’re top of the board.';
+  const share = Math.round((Math.max(0, playerCount - rank) / (playerCount - 1)) * 100);
+  return share > 0 ? `You’re doing better than ${share}% of other players.` : 'Play again to climb the board.';
+}
+
+/** The tags in order: topic, level, year; the size after them on the quiz page, or alone when there are none. */
+export function quizTagList(
+  quiz: Pick<ChannelQuiz, 'topic' | 'level' | 'year' | 'question_count' | 'questions' | 'total_seconds'>,
+  facts = false,
+): string[] {
+  const about = [quiz.topic, quiz.level, quiz.year ? String(quiz.year) : null].filter(
+    (tag): tag is string => Boolean(tag && tag.trim()),
+  );
+  const count = quiz.question_count ?? quiz.questions?.length ?? 0;
+  const seconds = quiz.total_seconds;
+  const size = [
+    count > 0 ? `${count} ${count === 1 ? 'question' : 'questions'}` : null,
+    typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0 ? `${Math.max(1, Math.ceil(seconds / 60))} min` : null,
+  ].filter((tag): tag is string => Boolean(tag));
+  return about.length === 0 ? size : facts ? [...about, ...size] : about;
 }

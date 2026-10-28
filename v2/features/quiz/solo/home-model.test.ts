@@ -15,7 +15,9 @@ import {
   quizSubjectLabel,
   rankLabel,
   readQuizYear,
+  quizTagList,
   scoreLabel,
+  standingLine,
 } from './home-model';
 
 /* Arthur's quiz home redesign (25 October 2026), parts C and D, on Backend's
@@ -110,7 +112,7 @@ test('both lists read their filters from the address and draw the same bar', () 
   assert.match(bar, /const levels = QUIZ_LEVELS\.filter\(/);
 });
 
-test('an Explore card is one link: title first, the person to beat, the reader’s place, a quiet play mark', () => {
+test('an Explore card is one link: the tile and title, quiet tags, the person to beat, the best, a play button', () => {
   const explore = read('explore', 'ExploreScreen.tsx');
   // No tagline over the list (Arthur, 27 October 2026: less text).
   assert.doesNotMatch(explore, /Test your knowledge/);
@@ -119,14 +121,16 @@ test('an Explore card is one link: title first, the person to beat, the reader�
   const card = read('explore', 'ExploreQuizCard.tsx');
   assert.match(card, /after:absolute after:inset-0/);
   assert.match(card, /\{leading \? 'You lead' : 'To beat'\}/);
-  assert.match(card, /No one has played yet\./);
-  // The facts once: the footer leaves them to the quiet line when it carries them.
-  assert.match(card, /\{subject \?\? quizFactsLabel\(count, quiz\.total_seconds\)\}/);
-  assert.match(card, /\) : subject \? \(\s*quizFactsLabel\(count, quiz\.total_seconds\)\s*\) : null\}/);
-  assert.match(card, /best !== null && rank !== null \? \(/);
-  // The play mark is the link's face, hidden from a screen reader, which hears the title.
-  assert.match(card, /<span\s*aria-hidden\s*className="flex size-9[^"]*"\s*>\s*<Play/);
-  assert.match(card, /<BadgeCheck aria-hidden className="size-3\.5 shrink-0 text-primary" \/>\s*<span className="sr-only">, verified author<\/span>/);
+  assert.match(card, /Be the first to play/);
+  // Colour on the tile and the play button only (Arthur, 28 October 2026).
+  assert.match(card, /<QuizTile uuid=\{quiz\.uuid\} title=\{quiz\.title\} size="md" \/>/);
+  assert.match(card, /QUIZ_TONE_PLAY\[quizTone\(quiz\.uuid\)\]/);
+  assert.match(card, /<QuizTags quiz=\{quiz\} \/>/);
+  // The best in the plain colour, and no rank on the card.
+  assert.match(card, /<span className="font-comfortaa text-base font-bold text-foreground tabular-nums">\{scoreLabel\(best\)\}<\/span>/);
+  assert.doesNotMatch(card, /viewer_rank\s*\?\?|rankLabel|text-\[var\(--solo-gold-text\)\]/);
+  // The play button is the link's face, hidden from a screen reader, which hears the title.
+  assert.match(card, /<span\s*aria-hidden\s*className=\{cn\(\s*'v2-solo-lip flex size-10/);
 });
 
 test('the quiz page reads the board only for a public quiz, and draws the top ten', () => {
@@ -138,7 +142,26 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   assert.match(board, /const BOARD_TOP = 10;/);
   assert.match(board, /const order = \[entries\[1\], entries\[0\], entries\[2\]\];/);
   assert.match(board, /\{viewer && !youShown \? \(/);
-  assert.match(front, /Your rank \{rank\}/);
+  // The reader's place on a banner, and where each player studies under the name.
+  assert.match(board, /\{standingLine\(viewer\.rank, board\.player_count\)\}/);
+  assert.equal(board.match(/entry\.user\.institution \? \(/g)?.length, 2);
+  // The board runs across the page under the quiz and its panel on a computer.
+  assert.match(front, /md:col-span-2 md:col-start-1 md:row-start-2/);
+});
+
+test('the banner line says how many of the other players the reader is ahead of', () => {
+  assert.equal(standingLine(13, 16), 'You’re doing better than 20% of other players.');
+  assert.equal(standingLine(4, 11), 'You’re doing better than 70% of other players.');
+  assert.equal(standingLine(1, 16), 'You’re top of the board.');
+  assert.equal(standingLine(1, 1), 'You’re the only player so far.');
+  assert.equal(standingLine(16, 16), 'Play again to climb the board.');
+});
+
+test('the tags are topic, level and year, or the size when there are none', () => {
+  const quiz = { topic: 'Land Law', level: '300 Level', year: 2025, question_count: 4, total_seconds: 100 };
+  assert.deepEqual(quizTagList(quiz), ['Land Law', '300 Level', '2025']);
+  assert.deepEqual(quizTagList(quiz, true), ['Land Law', '300 Level', '2025', '4 questions', '2 min']);
+  assert.deepEqual(quizTagList({ topic: null, level: null, year: null, question_count: 1 }), ['1 question']);
 });
 
 test('the form sends topic, level and year, and clears them with null', () => {

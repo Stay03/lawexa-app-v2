@@ -5,9 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
+  BadgeCheck,
   Check,
   Compass,
-  Info,
   Loader2,
   Pencil,
   Play,
@@ -31,7 +31,6 @@ import type { ChannelQuiz, QuizRevealMode } from '@/types/channel-quiz';
 import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
 import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
 import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
-import { VISIBILITY_MARKS } from '@/v2/features/channels/quiz/VisibilityChip';
 import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
@@ -41,9 +40,10 @@ import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
-import { quizSubjectLabel, rankLabel } from '../home-model';
-import { bestLabel, quizMinutesLabel, scenarioCountLabel } from '../rows-model';
-import { FRONT_SCORING_NOTE, frontChallengeText, takenLabel } from './front-model';
+import { QuizTags } from '../QuizTags';
+import { QuizTile } from '../QuizTile';
+import { bestLabel, scenarioCountLabel } from '../rows-model';
+import { frontChallengeText } from './front-model';
 import {
   clearScreenContext,
   setScreenContext,
@@ -57,9 +57,7 @@ import {
   DEFAULT_REVEAL_MODE,
   EXPLORE_HREF,
   LIBRARY_HREF,
-  questionCountLabel,
   quizFrontHref,
-  quizLengthLabel,
   readsPreview,
   REVEAL_MODE_CHOICES,
 } from '../model';
@@ -263,80 +261,59 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
     );
   }
 
-  const questions = quiz.questions ?? [];
-  const count = quiz.question_count ?? questions.length;
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
   const scenarios = scenarioCountLabel(quiz.scenario_count ?? quiz.scenarios?.length);
-  const minutes = quizMinutesLabel(quiz.total_seconds) ?? (questions.length > 0 ? quizLengthLabel(questions) : null);
   const best = bestLabel(quiz.viewer_best_points);
-  const taken = takenLabel(quiz.viewer_attempts_count);
-  const Mark = VISIBILITY_MARKS[quiz.visibility];
-  const facts = [questionCountLabel(count), scenarios, minutes].filter((fact): fact is string => Boolean(fact));
-  const subject = quizSubjectLabel(quiz);
-  const rank = board?.viewer ? rankLabel(board.viewer.rank, board.player_count) : null;
+  // After the topic, level, year and size: the scenarios, and who can find a
+  // quiz that is not on the public list (its owner's reminder).
+  const extraTags = [scenarios, quiz.visibility === 'public' ? null : visibilityFace(quiz.visibility)].filter(
+    (tag): tag is string => Boolean(tag),
+  );
 
   return (
     <div className={cn(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44')}>
       {/* Three cells (Arthur, 27 October 2026: "the quiz, Start and Challenge
-          first"): on a phone the quiz, then your best and Start, then the
-          board; on a computer the board sits under the quiz and the panel
-          holds the right column beside both. */}
+          first"; "there is empty space underneath desktop"): on a phone the
+          quiz, then your best and Start, then the board; on a computer the
+          quiz and its panel side by side, the board across the width under
+          both. */}
       <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-x-8 md:gap-y-5">
         <div className="min-w-0 md:col-start-1 md:row-start-1">
-          <header className="space-y-2 md:space-y-3">
-            <h1 className="text-xl leading-snug font-semibold tracking-tight text-balance text-foreground md:text-3xl">
-              {quiz.title}
-            </h1>
-            {/* What it is, in one line on a computer (Arthur, 24 October 2026):
-                whose (the author's photo and name, for the author too), how
-                many questions, how long, and who can find it. On a phone the
-                author has the first line and the facts the second, so a
-                wrapped line never starts with a separator. `creator` is
-                nullable (a gone account): a word, never a crash. */}
-            <div className="flex min-w-0 flex-col gap-1 text-sm text-muted-foreground md:flex-row md:flex-wrap md:items-center md:gap-x-1.5" aria-label="About this quiz">
-              <span className="inline-flex min-w-0 items-center gap-1.5">
-                <MemberAvatar user={quiz.creator} size="sm" />
-                <span className="truncate font-medium text-foreground/85">{quiz.creator?.name ?? 'Someone who has left'}</span>
-              </span>
-              <span aria-hidden className="hidden md:inline">·</span>
-              <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                {[...facts, null].map((fact, index) => (
-                  <span key={fact ?? 'visibility'} className="inline-flex items-center gap-1.5 whitespace-nowrap">
-                    {index > 0 ? <span aria-hidden>·</span> : null}
-                    {fact ?? (
-                      <span className="inline-flex items-center gap-1">
-                        <Mark aria-hidden className="size-3.5 shrink-0" />
-                        {visibilityFace(quiz.visibility)}
-                      </span>
-                    )}
-                  </span>
-                ))}
-              </span>
+          {/* Minimal (Arthur, 28 October 2026): the quiz's letter tile, the
+              title, whose it is, and its facts as quiet tags. `creator` is
+              nullable (a gone account): a word, never a crash. */}
+          <header className="flex flex-col gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <QuizTile uuid={quiz.uuid} title={quiz.title} size="md" className="mt-0.5" />
+              <div className="flex min-w-0 flex-col gap-2">
+                <h1 className="text-2xl leading-tight font-bold tracking-tight text-balance text-foreground md:text-3xl">
+                  {quiz.title}
+                </h1>
+                <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
+                  <MemberAvatar user={quiz.creator} size="sm" />
+                  <span className="truncate font-medium text-foreground/85">{quiz.creator?.name ?? 'Someone who has left'}</span>
+                  {quiz.creator?.is_verified_author ? (
+                    <>
+                      <BadgeCheck aria-hidden className="size-4 shrink-0 text-foreground/60" />
+                      <span className="sr-only">, verified author</span>
+                    </>
+                  ) : null}
+                </span>
+              </div>
             </div>
-            {subject ? <p className="text-sm font-medium text-foreground/75">{subject}</p> : null}
+            <QuizTags quiz={quiz} facts extra={extraTags} />
             {quiz.description && (
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
           </header>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-5 md:sticky md:top-6 md:col-start-2 md:row-span-2 md:row-start-1 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
-          {best || taken ? (
-            <div className="flex items-end justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:border-0 md:bg-transparent md:p-0">
-              {best ? (
-                <div>
-                  <div className="text-xs text-muted-foreground">Your best</div>
-                  <div className="font-comfortaa text-xl font-bold text-foreground tabular-nums">
-                    {best.replace(/^Best /, '')}
-                  </div>
-                  {rank ? (
-                    <div className="text-xs text-muted-foreground tabular-nums">Your rank {rank}</div>
-                  ) : null}
-                </div>
-              ) : (
-                <span />
-              )}
-              {taken ? <div className="text-sm font-medium text-foreground/85">{taken}</div> : null}
+        <div className="flex min-w-0 flex-col gap-5 md:col-start-2 md:row-start-1 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
+          {/* The best alone: the board says the place (Arthur, 28 October 2026: minimal). */}
+          {best ? (
+            <div className="flex items-baseline justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:border-0 md:bg-transparent md:p-0">
+              <span className="text-sm text-muted-foreground">Your best</span>
+              <span className="font-comfortaa text-xl font-bold text-foreground tabular-nums">{best.replace(/^Best /, '')}</span>
             </div>
           ) : null}
 
@@ -427,15 +404,11 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
               </p>
             )}
 
-            <p className="flex items-start gap-1.5 text-xs text-muted-foreground/80">
-              <Info aria-hidden className="mt-px size-3.5 shrink-0" />
-              <span>{FRONT_SCORING_NOTE}</span>
-            </p>
           </div>
         </div>
 
         {quiz.visibility === 'public' ? (
-          <div className="min-w-0 md:col-start-1 md:row-start-2">
+          <div className="min-w-0 md:col-span-2 md:col-start-1 md:row-start-2 md:pt-2">
             {board ? <FrontBoard board={board} /> : boardQuery.isPending ? <FrontBoardSkeleton /> : null}
           </div>
         ) : null}
