@@ -8,6 +8,18 @@ import { join } from 'node:path';
 
 const rows = readFileSync(join(process.cwd(), 'v2', 'features', 'settings', 'rows.ts'), 'utf8').replace(/\r\n/g, '\n');
 
+test('Developer is a staff-only row, and its screen refuses everyone else (owner, 28 October 2026, B)', () => {
+  assert.match(
+    rows,
+    /id: 'developer',\n\s+label: 'Developer',\n\s+icon: FlaskConical,\n\s+href: '\/settings\/developer',\n\s+requiresAccount: true,\n(\s+\/\/[^\n]*\n)*\s+canAccess: canUseDeveloperSettings,/,
+  );
+  const screen = readFileSync(join(process.cwd(), 'v2', 'features', 'settings', 'developer', 'DeveloperScreen.tsx'), 'utf8');
+  assert.match(screen, /if \(!canUseDeveloperSettings\(role\)\) notFound\(\);/);
+  // The classic design's page keeps the switch INTO the new design for every account.
+  const classic = readFileSync(join(process.cwd(), 'app', '(main)', 'settings', 'developer', 'page.tsx'), 'utf8');
+  assert.match(classic, /if \(!canAccessV2Preview\(role\)\)/);
+});
+
 test("My requests is a row in Your account, right after Your stats, opening v1's address", () => {
   const stats = rows.indexOf("id: 'stats',");
   const requests = rows.indexOf("id: 'requests',");

@@ -19,7 +19,7 @@ import {
 
 import type { UserRole } from '@/types/auth';
 import { canAccessCollab } from '@/lib/utils/collab-audience';
-import { canAccessV2Preview } from '@/lib/utils/v2-access';
+import { canUseDeveloperSettings } from '@/lib/utils/v2-access';
 
 /**
  * settings/rows — every door on the settings screen, in one table.
@@ -326,10 +326,10 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         icon: FlaskConical,
         href: '/settings/developer',
         requiresAccount: true,
-        // Every registered account since 3 August 2026; the helper excludes
-        // only guests and bots. It is also the row that switches this preview
-        // off, so it must never be hidden from somebody already inside v2.
-        canAccess: canAccessV2Preview,
+        // Staff only (owner, 28 October 2026, B): its "New Lawexa (v2)" switch
+        // is the one way back to the classic design, and users stay on the new
+        // one. The screen refuses everyone else too (`DeveloperScreen`).
+        canAccess: canUseDeveloperSettings,
       },
     ],
   },

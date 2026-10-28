@@ -1,8 +1,10 @@
 'use client';
 
+import { notFound } from 'next/navigation';
 import { ArrowUpToLine, Database, FlaskConical, HardDriveDownload, Route, Server, Zap, type LucideIcon } from 'lucide-react';
 
 import { switchBackToV1 } from '@/app/v2/switch-back-button';
+import { canUseDeveloperSettings } from '@/lib/utils/v2-access';
 import { setSearchPosition, useSearchPosition } from '@/v2/search-position';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { canUsePerfSwitch, setLayerOff, type PerfLayer } from '@/v2/runtime/perf-switch';
@@ -35,6 +37,12 @@ const PERF_LAYER_ICONS: Record<PerfLayer, LucideIcon> = {
  * went (Stay, 26 October 2026), this switch is the one way back to the classic
  * design from inside the new one.
  *
+ * ── STAFF ONLY (owner, 28 October 2026, B) ─────────────────────────────────
+ * Users stay on the new design, so only staff (`canUseDeveloperSettings`:
+ * researchers, admins, superadmins) see this screen. The Settings row is
+ * hidden from everyone else, and an ordinary account that types the address
+ * gets the app's not-found page, the same as any address it cannot open.
+ *
  * ── THE SEARCH POSITION ────────────────────────────────────────────────────
  * Read through `useSearchPosition`, whose server snapshot is the default
  * ("bottom"), so the server and the first client render agree and the switch
@@ -45,6 +53,8 @@ export function DeveloperScreen() {
   const searchPosition = useSearchPosition();
   const { role } = useV2Session();
   const layersOff = usePerfLayersOff();
+
+  if (!canUseDeveloperSettings(role)) notFound();
 
   return (
     <div className={SETTINGS_COLUMN}>
