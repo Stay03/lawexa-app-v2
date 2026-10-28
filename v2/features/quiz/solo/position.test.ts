@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import type { QuizLeaderboard } from '@/types/channel-quiz';
 import { isViewerEntry } from './home-model';
-import { finishPosition, opensOnPodium, PRIVATE_UNRANKED_LINE, UNRANKED_LINE } from './results/position-model';
+import { finishPosition, opensOnPodium, podiumFlight, PRIVATE_UNRANKED_LINE, UNRANKED_LINE } from './results/position-model';
 
 /* The reader's place under "See your answers" (Arthur, 28 October 2026): the
  * position line, the "better than" line, View leaderboard, and the podium
@@ -169,12 +169,18 @@ test('the podium plays first, full screen over the results, for a top-three fini
   // Arthur's pick: it moves on by itself about 3s after the confetti has fallen; no "See my score".
   assert.match(stage, /export const PODIUM_HOLD_MS = 3000;/);
   assert.match(stage, /if \(confetti !== 'fallen'\) return;\s*const timer = window\.setTimeout\(leave, PODIUM_HOLD_MS\);/);
-  // However it ends, the whole stage drops off the bottom like a curtain in 550ms, transform only
-  // (Arthur: "one smooth motion of podium goes down and score and other details come into view").
+  // However it ends, the ground clears in place (no band) while the stage's own podium moves down
+  // into the small podium's place, transform only (Arthur: "the same podium to move down into its place").
   assert.match(stage, /export const PODIUM_SLIDE_MS = 550;/);
-  assert.match(stage, /'transition-transform duration-\[550ms\] ease-in-out',\s*leaving && 'pointer-events-none translate-y-full',/);
+  assert.match(stage, /'transition-colors duration-\[550ms\] ease-out',\s*leaving && 'pointer-events-none bg-transparent',/);
   assert.match(stage, /if \(!leaving\) return;\s*const timer = window\.setTimeout\(onDone, PODIUM_SLIDE_MS\);/);
-  assert.doesNotMatch(stage, /transition-opacity|PODIUM_FADE_MS/);
+  assert.doesNotMatch(stage, /translate-y-full|PODIUM_FADE_MS/);
+  // On a phone the small podium's spot is scrolled into view first, while the stage still covers the results.
+  assert.match(stage, /small\?\.scrollIntoView\(\{ block: 'center', behavior: 'instant' \}\);\s*const from = podiumRef\.current\?\.getBoundingClientRect\(\);/);
+  assert.match(stage, /flight\s*\?\s*\{ transform: flight, transition: `transform \$\{PODIUM_SLIDE_MS\}ms cubic-bezier\(0\.22, 1, 0\.36, 1\)` \}/);
+  // Only one podium is ever seen: the small one is hidden until this one lands on it.
+  assert.match(screen, /podiumCovered=\{podiumFirst\}/);
+  assert.match(block, /data-small-podium=""\s*className=\{cn\('w-full', \(phase === 'waiting' \|\| covered\) && 'opacity-0', !playing && 'v2-solo-podium-still'\)\}/);
   assert.doesNotMatch(stage, /<RaisedButton|>\s*See my score/);
   // Skip (focused) or Escape ends it at once.
   assert.match(stage, /ref=\{skipRef\}\s*type="button"\s*onClick=\{leave\}/);
@@ -249,4 +255,17 @@ test('a rising step grows its lip and front as one', () => {
   const board = read('v2', 'features', 'quiz', 'solo', 'board', 'FrontBoard.tsx');
   assert.match(board, /<span className=\{cn\('flex w-full flex-col', rising && 'v2-solo-podium-step'\)\}>\s*<span aria-hidden className=\{cn\('mt-3 h-3 w-full/);
   assert.equal(board.match(/v2-solo-podium-step/g)?.length, 1);
+});
+
+test('the podium flies from its own box to the small podium’s, as one move and scale', () => {
+  // From its top left corner: the move between the two boxes, then the scale between their widths.
+  assert.equal(
+    podiumFlight({ top: 300, left: 20, width: 350 }, { top: 640, left: 30, width: 330, height: 260 }),
+    'translate(10px, 340px) scale(0.943)',
+  );
+  // The same box: no move at all.
+  assert.equal(podiumFlight({ top: 100, left: 0, width: 384 }, { top: 100, left: 0, width: 384, height: 300 }), 'translate(0px, 0px) scale(1.000)');
+  // Nothing to land on (no small podium, or not laid out): no flight; the podium fades with the ground.
+  assert.equal(podiumFlight({ top: 300, left: 20, width: 350 }, null), null);
+  assert.equal(podiumFlight({ top: 300, left: 20, width: 350 }, { top: 0, left: 0, width: 0, height: 0 }), null);
 });
