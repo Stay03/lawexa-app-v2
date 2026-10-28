@@ -99,7 +99,7 @@ test('a person with only done tasks keeps a group', () => {
   assert.equal(groups[0].done.length, 1);
 });
 
-test('by stage: stage order, empty stages left out, the queue by owner then order', () => {
+test('by stage: working first (the board order), empty stages left out, the queue by owner then order', () => {
   const groups = groupByStage([
     task('q-stay', { owner: STAY, position: 0 }),
     task('q-ada-2', { owner: ADA, position: 2 }),
@@ -109,9 +109,9 @@ test('by stage: stage order, empty stages left out, the queue by owner then orde
     task('w-new', { stage: 'working', stage_changed_at: '2026-10-28T12:00:00Z' }),
     task('w-old', { stage: 'working', stage_changed_at: '2026-10-28T08:00:00Z' }),
   ]);
-  assert.deepEqual(groups.map((group) => group.stage), ['queued', 'working', 'done']);
-  assert.deepEqual(groups[0].tasks.map((t) => t.uuid), ['q-ada-1', 'q-ada-2', 'q-stay', 'q-none']);
-  assert.deepEqual(groups[1].tasks.map((t) => t.uuid), ['w-old', 'w-new']);
+  assert.deepEqual(groups.map((group) => group.stage), ['working', 'queued', 'done']);
+  assert.deepEqual(groups[0].tasks.map((t) => t.uuid), ['w-old', 'w-new']);
+  assert.deepEqual(groups[1].tasks.map((t) => t.uuid), ['q-ada-1', 'q-ada-2', 'q-stay', 'q-none']);
 });
 
 test('the note: who a task waits on, or why it is paused', () => {

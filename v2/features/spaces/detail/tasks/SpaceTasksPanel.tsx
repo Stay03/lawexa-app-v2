@@ -66,13 +66,16 @@ export function SpaceTasksPanel({ spaceUuid }: { spaceUuid: string }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <RadarTabs
-        tabs={VIEW_TABS}
-        value={view}
-        onChange={setView}
-        ariaLabel="Show the space's tasks by person or by stage"
-        panelId={PANEL_ID}
-      />
+      {/* The strip is as wide as its two choices, like the space's pills. */}
+      <div className="self-start">
+        <RadarTabs
+          tabs={VIEW_TABS}
+          value={view}
+          onChange={setView}
+          ariaLabel="Show the space's tasks by person or by stage"
+          panelId={PANEL_ID}
+        />
+      </div>
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${view}`}>
         {query.isPending ? (
           <SpaceContentSkeleton />
@@ -115,15 +118,17 @@ function PersonBlock({ group, now }: { group: PersonGroup; now: number }) {
   const name = group.owner?.name ?? 'Nobody yet';
   return (
     <section aria-labelledby={headingId} className="flex flex-col">
-      <div className="flex min-h-9 min-w-0 items-center gap-3 px-3">
+      {/* A phone puts the head line under the name, so the name keeps its
+          whole width (the 390px pictures cut "Frontend Cl…"). */}
+      <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-3 px-3 max-md:py-1">
         {group.owner ? <MemberAvatar user={group.owner} size="sm" /> : <NobodyMark />}
-        <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5">
+        <h3 id={headingId} className="flex min-w-0 flex-1 items-baseline gap-1.5">
           <span className="min-w-0 truncate text-sm font-semibold text-foreground">{name}</span>
           {group.owner?.is_agent ? <AgentWord /> : null}
         </h3>
         <span
           className={cn(
-            'ml-auto shrink-0 text-xs tabular-nums',
+            'text-xs tabular-nums max-md:basis-full max-md:pl-9 md:ml-auto md:shrink-0',
             busy ? 'font-medium text-amber-800 dark:text-amber-300' : 'text-muted-foreground',
           )}
         >

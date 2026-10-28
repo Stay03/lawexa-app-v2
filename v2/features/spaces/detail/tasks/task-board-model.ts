@@ -88,6 +88,10 @@ export function groupByPerson(tasks: readonly SpaceTask[]): PersonGroup[] {
   return [...groups.values()].sort(byOwnerName);
 }
 
+/** The by-stage view's order: what is happening now first, the server's
+ *  own board order (Backend, 28 October 2026). */
+export const BOARD_STAGE_ORDER: readonly SpaceTaskStage[] = ['working', 'paused', 'waiting', 'queued', 'done'];
+
 /** One stage's tasks, for the by-stage view. */
 export interface StageGroup {
   stage: SpaceTaskStage;
@@ -95,12 +99,12 @@ export interface StageGroup {
 }
 
 /**
- * The board by stage, in the stages' own order, leaving out a stage with no
+ * The board by stage, in the board's order, leaving out a stage with no
  * tasks. Inside a stage: the queue by owner, then each owner's order; Working
  * longest-running first; Paused, Waiting and Done newest move first.
  */
 export function groupByStage(tasks: readonly SpaceTask[]): StageGroup[] {
-  return TASK_STAGES.map((stage) => {
+  return BOARD_STAGE_ORDER.map((stage) => {
     const rows = tasks.filter((task) => task.stage === stage);
     rows.sort(stage === 'queued' ? queueByOwner : stage === 'working' ? oldestMoveFirst : newestMoveFirst);
     return { stage, tasks: rows };
