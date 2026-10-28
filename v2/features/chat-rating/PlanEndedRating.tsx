@@ -3,24 +3,25 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { cn } from '@/lib/utils';
 import { feedbackApi } from '@/lib/api/feedback';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { ChatRatingBanner, chatPromptQuery } from './ChatRatingBanner';
 import { beginPlanEndedOffer, useActiveOffer, useAskedThisSession } from './store';
 
 /**
- * PlanEndedRating — "How is Lawexa doing?" once after a paid plan runs out
- * (Arthur, 28 October 2026, "B plus A"), on the FIRST screen the reader opens,
- * home, the chat list or a chat (Stay, 28 October 2026: "how can the user chat
- * if the plan has run out?"). The server says when (`moment: "plan_ended"`,
- * once, outside the 14 days); this asks it once a session as the app opens.
+ * PlanEndedSlot — "How is Lawexa doing?" once after a paid plan runs out
+ * (Arthur, 28 October 2026, "B plus A"), on the first screen the reader opens
+ * that can ask (Stay: "how can the user chat if the plan has run out?").
  *
- * Mounted once, in the v2 layout. The banner floats under the header, clear
- * of the home's and a chat's message box, and
- * is about no chat: a rating names none (Backend 0c7bb3c2). Shown and closed
- * are reported, as for the chat's banner, so it asks once.
+ * In the page, never floating (Arthur picked B, 28 October 2026): it sits just
+ * above the message box on the home and in a chat, and under the title on the
+ * chat list, which has no box. The server says when (`moment: "plan_ended"`,
+ * once, outside the 14 days); a slot asks it once a session, through the same
+ * cached answer as the chat's own banner. The rating names no chat (Backend
+ * 0c7bb3c2). Shown and closed are reported, so it asks once.
  */
-export function PlanEndedRating() {
+export function PlanEndedSlot({ className }: { className?: string }) {
   const { signedIn, role, userId } = useV2Session();
   const isAccount = signedIn && role !== null && role !== 'guest' && role !== 'bot';
   const askedThisSession = useAskedThisSession();
@@ -37,10 +38,8 @@ export function PlanEndedRating() {
 
   if (!active || active.trigger !== 'plan_ended') return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] z-40 flex justify-center px-4 md:top-[4.5rem]">
-      <div className="pointer-events-auto w-full max-w-md shadow-lg">
-        <ChatRatingBanner key={active.seq} offer={active} />
-      </div>
+    <div className={cn('w-full', className)}>
+      <ChatRatingBanner key={active.seq} offer={active} />
     </div>
   );
 }

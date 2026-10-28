@@ -122,8 +122,13 @@ test('the moments are hooked where they happen, and only inside an answer', () =
 
 test('the banner sits above every chat’s box, and the home box has none', () => {
   const dock = read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx');
-  assert.match(dock, /<ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\s*<ConversationComposer/);
-  assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /ChatRating/);
+  // The moment banner, then the plan-ended slot (Arthur's B), then the box.
+  assert.match(
+    dock,
+    /<ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*<ConversationComposer/,
+  );
+  // The home box carries only the plan-ended slot, never the moment banner.
+  assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /ChatRatingSlot|ChatRatingBanner/);
 });
 
 test('shown and closed are reported, and a rating carries its answer and its moment', () => {

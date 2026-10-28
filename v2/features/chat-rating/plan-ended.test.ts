@@ -20,14 +20,21 @@ test('a plan that ended opens the session’s one ask, and nothing asks again', 
   assert.equal(beginPlanEndedOffer(), false);
 });
 
-test('the shell asks the server as the app opens and shows the banner on any screen, about no chat', () => {
+test('the slot asks the server once a session and sits in the page: above the box, or under the chat list title', () => {
   const slot = read('v2', 'features', 'chat-rating', 'PlanEndedRating.tsx');
   assert.match(slot, /const prompt = useQuery\(\{ \.\.\.chatPromptQuery\(userId\), enabled: isAccount && !askedThisSession \}\);/);
   assert.match(slot, /prompt\.data\?\.eligible === true && prompt\.data\.moment === 'plan_ended'/);
   assert.match(slot, /if \(planEnded && beginPlanEndedOffer\(\)\) \{\s*void feedbackApi\.chatPromptSeen\('shown'\)/);
   assert.match(slot, /if \(!active \|\| active\.trigger !== 'plan_ended'\) return null;/);
-  const layout = read('app', 'v2', 'layout.tsx');
-  assert.match(layout, /<PlanEndedRating \/>/);
+  // In the page, never floating (Arthur picked B, 28 October 2026).
+  assert.doesNotMatch(slot, /fixed /);
+  assert.doesNotMatch(read('app', 'v2', 'layout.tsx'), /PlanEnded/);
+  assert.match(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /<PlanEndedSlot className="mb-2" \/>\s*\{\/\* Create \/ upload error banner/);
+  assert.match(
+    read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx'),
+    /<ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>/,
+  );
+  assert.match(read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx'), /<PlanEndedSlot className="mb-4" \/>\s*\{children\}/);
   // The chat's slot and the shell read one cached answer: one request a page load at most.
   const banner = read('v2', 'features', 'chat-rating', 'ChatRatingBanner.tsx');
   assert.match(banner, /queryKey: \['chat-rating', 'prompt', userId\] as const,/);

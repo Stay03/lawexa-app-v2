@@ -13,7 +13,6 @@ import { DockProvider, DockHost } from '@/v2/shell/Dock';
 import { V2Sidebar } from '@/v2/shell/V2Sidebar';
 import { V2Drawer } from '@/v2/shell/V2Drawer';
 import { RedesignIntro } from '@/v2/features/redesign-intro/RedesignIntro';
-import { PlanEndedRating } from '@/v2/features/chat-rating/PlanEndedRating';
 import { V2Header } from '@/v2/shell/V2Header';
 import { KeyboardInsetSync } from '@/v2/shell/use-keyboard-inset';
 import { DocumentLock } from '@/v2/shell/document-lock';
@@ -393,9 +392,6 @@ export default async function V2Layout({
                 {/* "Lawexa, redesigned": once per account, the first time it
                     opens the new design (Stay, 25 October 2026). */}
                 <RedesignIntro seenOnServer={user?.v2_intro_seen === true} />
-                {/* "How is Lawexa doing?" once after a paid plan runs out, on
-                    the first screen opened (Arthur and Stay, 28 October 2026). */}
-                <PlanEndedRating />
               </SidebarProvider>
             </DockProvider>
             </MoveFirstProvider>

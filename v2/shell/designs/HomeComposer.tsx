@@ -73,6 +73,7 @@ import { WorkflowField } from './composer/WorkflowField';
 import { useWorkflowSelection } from './composer/useWorkflowSelection';
 import { OutOfMessagesStrip } from '@/v2/features/subscription/OutOfMessagesStrip';
 import { homeSendFailure } from './home-send-failure';
+import { PlanEndedSlot } from '@/v2/features/chat-rating/PlanEndedRating';
 
 /**
  * HomeComposer — the ONE v2-native composer both home designs share, now WIRED to
@@ -546,6 +547,10 @@ export function HomeComposer({
           }}
         />
       ) : null}
+
+      {/* "How is Lawexa doing?" once after a paid plan runs out, in the
+          page just above the box (Arthur picked B, 28 October 2026). */}
+      <PlanEndedSlot className="mb-2" />
 
       {/* Create / upload error banner — distinct from the per-chip failed state
           below. Fades in/out (owner motion rule); cleared on the next keystroke. */}

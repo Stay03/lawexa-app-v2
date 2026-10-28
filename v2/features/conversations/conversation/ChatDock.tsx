@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { ChatRatingSlot } from '@/v2/features/chat-rating/ChatRatingBanner';
+import { PlanEndedSlot } from '@/v2/features/chat-rating/PlanEndedRating';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useMoveFirstPending } from '@/v2/shell/move-first';
 import { conversationIdOf } from '../warm';
@@ -153,6 +154,8 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
         {/* "How is Lawexa doing?" sits above the box, in every chat a reader
             may send in, a Space chat's included (Arthur, 19 October 2026). */}
         <ChatRatingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />
+        {/* After a paid plan runs out, once, about no chat (Arthur picked B). */}
+        <PlanEndedSlot className="mb-2" />
         <ConversationComposer
           holdSend={surface.holdSend}
           draftScopeId={conversationId}
