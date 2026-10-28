@@ -503,8 +503,8 @@ export function QuizFormDialog({
         isEdit
           ? 'Edit quiz'
           : room
-            ? `New quiz in ${room.name}`
-            : 'New quiz in your library'
+            ? `Create a quiz in ${room.name}`
+            : 'Create a quiz in your library'
       }
       description={
         <>

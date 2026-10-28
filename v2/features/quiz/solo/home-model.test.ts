@@ -17,6 +17,7 @@ import {
   readQuizYear,
   quizTagList,
   scoreLabel,
+  podiumInstitution,
   standingLine,
 } from './home-model';
 
@@ -112,7 +113,7 @@ test('both lists read their filters from the address and draw the same bar', () 
   assert.match(bar, /const levels = QUIZ_LEVELS\.filter\(/);
 });
 
-test('an Explore card is one link: the tile and title, quiet tags, the person to beat, the best, a play button', () => {
+test('an Explore card is one link: the tile and title, quiet tags, the person to beat, the best', () => {
   const explore = read('explore', 'ExploreScreen.tsx');
   // No tagline over the list (Arthur, 27 October 2026: less text).
   assert.doesNotMatch(explore, /Test your knowledge/);
@@ -122,15 +123,13 @@ test('an Explore card is one link: the tile and title, quiet tags, the person to
   assert.match(card, /after:absolute after:inset-0/);
   assert.match(card, /\{leading \? 'You lead' : 'To beat'\}/);
   assert.match(card, /Be the first to play/);
-  // Colour on the tile and the play button only (Arthur, 28 October 2026).
+  // Colour on the tile only, and no play button (Arthur, 28 October 2026).
   assert.match(card, /<QuizTile uuid=\{quiz\.uuid\} title=\{quiz\.title\} size="md" \/>/);
-  assert.match(card, /QUIZ_TONE_PLAY\[quizTone\(quiz\.uuid\)\]/);
+  assert.doesNotMatch(card, /<Play\b|QUIZ_TONE_PLAY/);
   assert.match(card, /<QuizTags quiz=\{quiz\} \/>/);
   // The best in the plain colour, and no rank on the card.
   assert.match(card, /<span className="font-comfortaa text-base font-bold text-foreground tabular-nums">\{scoreLabel\(best\)\}<\/span>/);
   assert.doesNotMatch(card, /viewer_rank\s*\?\?|rankLabel|text-\[var\(--solo-gold-text\)\]/);
-  // The play button is the link's face, hidden from a screen reader, which hears the title.
-  assert.match(card, /<span\s*aria-hidden\s*className=\{cn\(\s*'v2-solo-lip flex size-10/);
 });
 
 test('the quiz page reads the board only for a public quiz, and draws the top ten', () => {
@@ -145,6 +144,9 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   // The reader's place on a banner, and where each player studies under the name.
   assert.match(board, /\{standingLine\(viewer\.rank, board\.player_count\)\}/);
   assert.equal(board.match(/entry\.user\.institution \? \(/g)?.length, 2);
+  // On the podium: the campus alone, and a university wrapped, never cut.
+  assert.match(board, /\{podiumInstitution\(entry\.user\.institution\)\}/);
+  assert.match(board, /<span className="w-full px-1 text-\[10px\] leading-tight text-balance break-words text-muted-foreground sm:text-\[11px\]">/);
   // The board runs across the page under the quiz and its panel on a computer.
   assert.match(front, /md:col-span-2 md:col-start-1 md:row-start-2/);
 });
@@ -170,4 +172,14 @@ test('the form sends topic, level and year, and clears them with null', () => {
   assert.equal(form.match(/\.\.\.about,/g)?.length, 2);
   assert.match(form, /setTopic\(loaded\.topic \?\? ''\);\s*setLevel\(loaded\.level \?\? null\);\s*setYearText\(loaded\.year \? String\(loaded\.year\) : ''\);/);
   assert.match(form, /\{QUIZ_LEVELS\.map\(\(choice\) => \(/);
+});
+
+test('the podium names a Law School campus by the campus alone, and a university in full', () => {
+  assert.equal(podiumInstitution('Nigerian Law School, Enugu Campus'), 'Enugu Campus');
+  assert.equal(podiumInstitution('Nigerian Law School - Abuja Campus'), 'Abuja Campus');
+  assert.equal(podiumInstitution('Nigerian Law School – Lagos Campus'), 'Lagos Campus');
+  assert.equal(podiumInstitution('Nigeria Law School – Kano Campus'), 'Kano Campus');
+  assert.equal(podiumInstitution('The Nigerian Law School, Lagos Campus'), 'Lagos Campus');
+  assert.equal(podiumInstitution('University of Nigeria, Nsukka'), 'University of Nigeria, Nsukka');
+  assert.equal(podiumInstitution('Nigerian Law School'), 'Nigerian Law School');
 });

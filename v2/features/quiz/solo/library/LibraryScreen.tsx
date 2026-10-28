@@ -54,7 +54,7 @@ import { bestOrNotTaken } from '../rows-model';
  * LibraryList — the Quiz home's My quizzes tab (`/quiz?tab=mine`), every
  * quiz this account wrote. It was the `/quiz/library` page until the home
  * became two tabs (Stay, 23 October 2026); that address now lands here. The
- * create and edit form belongs to the home (`useQuizForm`), because New quiz
+ * create and edit form belongs to the home (`useQuizForm`), because Create quiz
  * sits on the tabs line, outside this list.
  *
  * ── THE SAME QUIZZES THE CHANNEL SHEET'S LIBRARY TAB LISTS, AS A PAGE ──────

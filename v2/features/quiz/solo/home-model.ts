@@ -180,3 +180,16 @@ export function quizTagList(
   ].filter((tag): tag is string => Boolean(tag));
   return about.length === 0 ? size : facts ? [...about, ...size] : about;
 }
+
+/**
+ * Where a player studies, short enough for the podium's narrow column
+ * (Arthur, 28 October 2026: "the university in the podium is cut off ... Can
+ * it be just the campus"): a Law School campus as the part after its dash or
+ * comma ("Nigerian Law School – Lagos Campus" is "Lagos Campus"; profiles
+ * also spell it "Nigeria Law School"), a university as it is. The rows under
+ * the podium keep the whole name.
+ */
+export function podiumInstitution(institution: string): string {
+  const campus = institution.match(/^(?:the\s+)?Nigerian?\s+Law\s+School\s*[,–—-]\s*(.+)$/i)?.[1]?.trim();
+  return campus ? campus : institution;
+}

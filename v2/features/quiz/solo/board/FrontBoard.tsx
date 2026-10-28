@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { QuizLeaderboard, QuizLeaderboardEntry } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
-import { BOARD_EMPTY_NOTE, BOARD_RULES_NOTE, playersLabel, scoreLabel, standingLine } from '../home-model';
+import { BOARD_EMPTY_NOTE, BOARD_RULES_NOTE, playersLabel, podiumInstitution, scoreLabel, standingLine } from '../home-model';
 
 /** The board's length on the quiz page: the podium and the rest of the top ten. */
 const BOARD_TOP = 10;
@@ -153,8 +153,12 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
               />
             </span>
             <span className="mt-2 w-full truncate px-1 text-sm font-semibold text-foreground">{you ? 'You' : entry.user.name}</span>
+            {/* The campus alone for the Law School; a university wraps in small
+                type and is never cut (Arthur, 28 October 2026). */}
             {entry.user.institution ? (
-              <span className="w-full truncate px-1 text-[11px] text-muted-foreground">{entry.user.institution}</span>
+              <span className="w-full px-1 text-[10px] leading-tight text-balance break-words text-muted-foreground sm:text-[11px]">
+                {podiumInstitution(entry.user.institution)}
+              </span>
             ) : null}
             <span className="mt-0.5 font-comfortaa text-sm font-bold text-foreground tabular-nums">
               {scoreLabel(entry.points)}

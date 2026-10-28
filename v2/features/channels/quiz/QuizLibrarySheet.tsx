@@ -108,7 +108,7 @@ import { VisibilityGroup } from './VisibilityGroup';
  *  - THE HOST POLICY (`settings.quiz_host_policy`) governs who may CREATE a
  *    quiz FOR this channel and who may START a game in it. It says nothing
  *    about a reader's own library, which is not the room's — so the Library tab
- *    keeps its New quiz button and says plainly that a game still needs a
+ *    keeps its Create quiz button and says plainly that a game still needs a
  *    channel admin.
  *  - AUTHORSHIP (`is_mine`, the server's own answer) governs editing, deleting
  *    and the visibility switch.
@@ -349,7 +349,7 @@ export function QuizLibrarySheet({
               {mayCreateHere && (
                 <Button size="sm" className="shrink-0" onClick={() => openForm()}>
                   <Plus aria-hidden className="size-4" />
-                  New quiz
+                  Create quiz
                 </Button>
               )}
             </div>

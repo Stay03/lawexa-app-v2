@@ -26,7 +26,7 @@ test('the home is a top-level screen titled Quiz, Explore first', () => {
   assert.ok(tabs.indexOf("label: 'Explore'") < tabs.indexOf("label: 'My quizzes'"));
 });
 
-test('Explore renders for anyone; My quizzes says the solo refusals; New quiz on both tabs, for a writer only', () => {
+test('Explore renders for anyone; My quizzes says the solo refusals; Create quiz on both tabs, for a writer only', () => {
   assert.match(screen, /\{tab === 'explore' \? \(\s*<ExploreList \/>\s*\) : canWrite \? \(\s*<LibraryList openForm=\{openForm\} \/>/);
   assert.match(screen, /!signedIn && !guestPassFailed \? \(\s*<LibraryListSkeleton \/>/);
   assert.match(screen, /<SoloSignedOutState signInHref=\{signInHref\(`\$\{pathname\}\?tab=mine`\)\} \/>/);

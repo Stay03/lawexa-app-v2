@@ -77,8 +77,10 @@ export function QuizHomeScreen() {
             onClick={() => openForm()}
             className={cn(CREATE_PILL, 'shrink-0', FOCUS_RING)}
           >
+            {/* "Create", not "New" (Arthur, 28 October 2026: "New quiz
+                presupposes to play a new quiz"). */}
             <Plus aria-hidden className="size-4" />
-            New quiz
+            Create quiz
           </button>
         ) : null}
       </div>
@@ -105,7 +107,7 @@ export function QuizHomeScreen() {
 /**
  * The home's route fallback (`app/v2/quiz/(home)/loading.tsx`): the same
  * title and tab strip, drawn for real but inert, over the row skeleton, so the
- * boundary hands over to the live screen without a jump. New quiz is not
+ * boundary hands over to the live screen without a jump. Create quiz is not
  * reserved: whether it exists depends on the viewer.
  */
 export function QuizHomeFallback() {

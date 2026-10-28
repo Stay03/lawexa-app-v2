@@ -8,7 +8,7 @@ import { quietPushStampedCopy, readHistoryStamp } from './url-params';
 const GUARD_KEY = '__v2BackGuard';
 
 /**
- * The device's Back, asked first (Stay, 23 October 2026: a filled-in New quiz
+ * The device's Back, asked first (Stay, 23 October 2026: a filled-in quiz
  * form asks "Discard changes?").
  *
  * WHY AN EXTRA ENTRY, NOT A REOPEN. The first build let Back close the form and

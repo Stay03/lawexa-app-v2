@@ -2,7 +2,6 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
-import { Play } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,8 +10,7 @@ import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { scoreLabel } from '../home-model';
 import { quizFrontHref } from '../model';
 import { QuizTags } from '../QuizTags';
-import { QUIZ_TONE_PLAY, QuizTile } from '../QuizTile';
-import { quizTone } from '../rows-model';
+import { QuizTile } from '../QuizTile';
 
 /**
  * ExploreQuizCard — one public quiz on the Quiz home (Arthur, 27 and 28
@@ -23,12 +21,11 @@ import { quizTone } from '../rows-model';
  *   (T) Title, in its own weight         the quiz's letter tile, its colour
  *   [Land Law] [300 Level] [2025]        quiet tags
  *   ┌ (face) To beat Bola Ade   2,820 ┐  the person to beat, on a tray
- *   Your best 1,926               (▶)   the best once played; play in the
- *                                       tile's colour
+ *   Your best 1,926                     once played
  *
- * Colour lives on the tile and the play button only. The whole card is the
- * one link (the title's `after:` layer), raised on B1's lip; the play button
- * is that link's face, not a second control.
+ * Colour lives on the tile only, and no play button (Arthur, 28 October
+ * 2026: "Remove the play button"): the whole card is the one link (the
+ * title's `after:` layer), raised on B1's lip.
  */
 
 const CARD = 'v2-solo-lip relative flex min-w-0 flex-col gap-3 rounded-2xl border-2 border-border bg-card p-4';
@@ -70,25 +67,12 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
         </div>
       )}
 
-      <div className="mt-auto flex items-center justify-between gap-3">
-        {best !== null ? (
-          <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="text-xs text-muted-foreground">Your best</span>
-            <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">{scoreLabel(best)}</span>
-          </span>
-        ) : (
-          <span />
-        )}
-        <span
-          aria-hidden
-          className={cn(
-            'v2-solo-lip flex size-10 shrink-0 items-center justify-center rounded-full',
-            QUIZ_TONE_PLAY[quizTone(quiz.uuid)],
-          )}
-        >
-          <Play className="size-4 translate-x-px fill-current" />
+      {best !== null ? (
+        <span className="mt-auto flex min-w-0 items-baseline gap-1.5">
+          <span className="text-xs text-muted-foreground">Your best</span>
+          <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">{scoreLabel(best)}</span>
         </span>
-      </div>
+      ) : null}
     </li>
   );
 });
@@ -109,10 +93,7 @@ function ExploreQuizCardSkeleton() {
         <Skeleton className="h-6 w-16 rounded-full" />
       </div>
       <Skeleton className="h-12 w-full rounded-xl" />
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-4 w-1/3 rounded" />
-        <Skeleton className="size-10 rounded-full" />
-      </div>
+      <Skeleton className="h-4 w-1/3 rounded" />
     </div>
   );
 }
