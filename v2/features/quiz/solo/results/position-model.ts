@@ -88,3 +88,30 @@ export function podiumFlight(
   const scale = to.width / from.width;
   return `translate(${Math.round(to.left - from.left)}px, ${Math.round(to.top - from.top)}px) scale(${scale.toFixed(3)})`;
 }
+
+/** How long the results glide back up to the score after the podium lands (Arthur's option B). */
+export const SCORE_GLIDE_MS = 600;
+
+/**
+ * Where the glide up to the score has the page at `elapsedMs` in, from
+ * `startTop` to the top: an ease-out (fast, then settling), done at
+ * `SCORE_GLIDE_MS`.
+ */
+export function glideTop(startTop: number, elapsedMs: number): number {
+  const t = Math.min(1, Math.max(0, elapsedMs / SCORE_GLIDE_MS));
+  const eased = 1 - (1 - t) ** 3;
+  return Math.round(startTop * (1 - eased));
+}
+
+/**
+ * Whether the small podium is in view for the landing: at least 60% of it
+ * between the top of the screen and the top of the button bar (the same
+ * share the small podium counts as seen). Its foot fades into the page, so a
+ * computer's, a little under the bar, needs no scroll; a phone's, below the
+ * fold, does.
+ */
+export function podiumInView(box: { top: number; bottom: number; height: number }, barTop: number): boolean {
+  if (box.height <= 0) return false;
+  const shown = Math.min(box.bottom, barTop) - Math.max(box.top, 0);
+  return shown / box.height >= 0.6;
+}

@@ -7,7 +7,7 @@ import type { QuizLeaderboardEntry } from '@/types/channel-quiz';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { Podium } from '../board/FrontBoard';
 import { Confetti } from './Confetti';
-import { podiumFlight } from './position-model';
+import { podiumFlight, podiumInView } from './position-model';
 
 /** Where an attempt's podium is remembered as seen, so a reload or Back does not replay it. */
 export function podiumSeenKey(attemptUuid: string): string {
@@ -83,7 +83,13 @@ export function PodiumStage({
     const small = document.querySelector<HTMLElement>('[data-small-podium]');
     // On a phone the small podium is below the fold: bring its spot into view
     // first, while this stage still covers the results, so nobody sees it scroll.
-    small?.scrollIntoView({ block: 'center', behavior: 'instant' });
+    // On a computer it is already in view (its faded foot may sit under the
+    // button bar), so nothing moves.
+    if (small) {
+      const box = small.getBoundingClientRect();
+      const barTop = document.querySelector('[data-results-bar]')?.getBoundingClientRect().top ?? window.innerHeight;
+      if (!podiumInView(box, barTop)) small.scrollIntoView({ block: 'center', behavior: 'instant' });
+    }
     const from = podiumRef.current?.getBoundingClientRect();
     setFlight(from ? podiumFlight(from, small?.getBoundingClientRect() ?? null) : null);
     // The headline lands on the small one's headline the same way, so the words are never doubled.
