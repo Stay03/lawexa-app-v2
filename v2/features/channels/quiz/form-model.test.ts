@@ -22,6 +22,7 @@ import {
   moveScenario,
   newQuestion,
   newScenario,
+  questionsFingerprint,
   toPayload,
   validate,
   type QuestionDraft,
@@ -184,6 +185,40 @@ test('a saved quiz loads with its scenarios, each question still pointing at its
   // With its uuid, so the server keeps whatever it stored on it (its source).
   assert.deepEqual(payload.scenarios, [{ uuid: 's-a', title: 'First', passage: 'First passage' }]);
   assert.equal(payload.questions[1].scenario_index, 0);
+});
+
+test('a quiz loaded twice reads the same, and any change to its questions reads as a change', () => {
+  // 28 October 2026: every edit resent every question, and a resend can restart the board.
+  const stored = {
+    scenarios: [{ uuid: 's-a', title: 'TEST DATA', passage: 'TEST DATA passage', position: 1 }],
+    questions: [
+      { uuid: 'q-1', type: 'multiple_choice', question: 'TEST DATA Q1', time_limit_seconds: 20, position: 1, scenario_uuid: null, options: [{ content: 'A', is_correct: true }, { content: 'B', is_correct: false }] },
+      { uuid: 'q-2', type: 'true_false', question: 'TEST DATA Q2', time_limit_seconds: 45, position: 2, scenario_uuid: 's-a', options: [{ content: 'True', is_correct: false }, { content: 'False', is_correct: true }] },
+    ],
+  } as unknown as ChannelQuiz;
+  const first = draftsFromQuiz(stored);
+  const again = draftsFromQuiz(stored);
+  const loaded = questionsFingerprint(first.questions, first.scenarios);
+  assert.equal(questionsFingerprint(again.questions, again.scenarios), loaded);
+  // A new right answer, a new time, new words or a new passage are each a change.
+  const right = first.questions.map((q, i) => (i === 0 ? { ...q, correctKey: q.options[1].key } : q));
+  assert.notEqual(questionsFingerprint(right, first.scenarios), loaded);
+  const time = first.questions.map((q, i) => (i === 1 ? { ...q, seconds: 30 } : q));
+  assert.notEqual(questionsFingerprint(time, first.scenarios), loaded);
+  const words = first.questions.map((q, i) => (i === 0 ? { ...q, question: 'TEST DATA Q1, reworded' } : q));
+  assert.notEqual(questionsFingerprint(words, first.scenarios), loaded);
+  const passage = first.scenarios.map((s) => ({ ...s, passage: 'TEST DATA a new passage' }));
+  assert.notEqual(questionsFingerprint(first.questions, passage), loaded);
+  // A question added or taken away is a change.
+  assert.notEqual(questionsFingerprint([...first.questions, newQuestion()], first.scenarios), loaded);
+  assert.notEqual(questionsFingerprint(first.questions.slice(1), first.scenarios), loaded);
+});
+
+test('an edit sends its questions only when they changed, so a tag edit keeps the board', () => {
+  const form = readFileSync(join(here, 'QuizFormDialog.tsx'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(form, /setLoadedQuestions\(questionsFingerprint\(drafts\.questions, drafts\.scenarios\)\);/);
+  assert.match(form, /const questionsEdited = loadedQuestions === null \|\| questionsFingerprint\(questions, scenarios\) !== loadedQuestions;/);
+  assert.match(form, /\.\.\.\(metadataOnly \|\| !mayEditQuestions \|\| !questionsEdited \? \{\} : toPayload\(questions, scenarios\)\),/);
 });
 
 test('a new question starts at 30 seconds, and every question sends its own time', () => {

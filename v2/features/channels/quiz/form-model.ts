@@ -347,6 +347,16 @@ export function validate(title: string, questions: readonly QuestionDraft[], sce
   return findFormProblem(title, questions, scenarios)?.message ?? null;
 }
 
+/**
+ * The questions and scenarios as a save would send them, as one string, so an
+ * edit can tell whether the author changed any (28 October 2026: every edit
+ * resent every question, and a resend can restart the quiz's leaderboard).
+ * Draft keys are not in it, so a quiz loaded twice reads the same.
+ */
+export function questionsFingerprint(questions: readonly QuestionDraft[], scenarios: readonly ScenarioDraft[]): string {
+  return JSON.stringify(toPayload(questions, scenarios));
+}
+
 /** The questions and scenarios as the server takes them. */
 export function toPayload(
   questions: readonly QuestionDraft[],

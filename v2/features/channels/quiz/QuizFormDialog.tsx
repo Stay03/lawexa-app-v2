@@ -89,6 +89,7 @@ import {
   newOption,
   newQuestion,
   newScenario,
+  questionsFingerprint,
   QUIZ_SCENARIO_PASSAGE_MAX,
   QUIZ_SCENARIO_TITLE_MAX,
   quizSaveConflict,
@@ -291,6 +292,9 @@ export function QuizFormDialog({
   // pattern) — an effect would paint one frame of an empty form over a quiz the
   // author asked to edit.
   const [adopted, setAdopted] = useState<string | null>(null);
+  /** The loaded quiz's questions as a save would send them: an edit sends its
+   *  questions only when they differ (`questionsFingerprint`). */
+  const [loadedQuestions, setLoadedQuestions] = useState<string | null>(null);
   if (loaded && adopted !== loaded.uuid) {
     setAdopted(loaded.uuid);
     setTitle(loaded.title);
@@ -303,6 +307,7 @@ export function QuizFormDialog({
     const drafts = draftsFromQuiz(loaded);
     setQuestions(drafts.questions);
     setScenarios(drafts.scenarios);
+    setLoadedQuestions(questionsFingerprint(drafts.questions, drafts.scenarios));
     setFrozen(false);
     setPublicRefused(false);
   }
@@ -474,6 +479,10 @@ export function QuizFormDialog({
     };
 
     if (isEdit) {
+      // QUESTIONS ONLY WHEN THEY CHANGED (28 October 2026). A save that resends
+      // the questions is a rewrite to the server, which can restart the quiz's
+      // leaderboard, so a title, tag or visibility edit sends none.
+      const questionsEdited = loadedQuestions === null || questionsFingerprint(questions, scenarios) !== loadedQuestions;
       updateQuiz.mutate(
         {
           title: title.trim(),
@@ -481,7 +490,7 @@ export function QuizFormDialog({
           ...about,
           settings,
           visibility: mayEditVisibility ? visibility : undefined,
-          ...(metadataOnly || !mayEditQuestions ? {} : toPayload(questions, scenarios)),
+          ...(metadataOnly || !mayEditQuestions || !questionsEdited ? {} : toPayload(questions, scenarios)),
         },
         {
           onSuccess: (response) => {
