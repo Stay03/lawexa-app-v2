@@ -136,20 +136,23 @@ export function createSpaceKind(
 
 /** The space home's pills (design B4, Arthur and Stay, 17 October 2026): one
  *  list of everything (`all`), one kind of it, the space's Radars (`radars`,
- *  Radar in Spaces, 26 October 2026), or the members and, for whoever manages
+ *  Radar in Spaces, 26 October 2026), the space's task board (`tasks`,
+ *  thread 7aa0c6d8, 28 October 2026), or the members and, for whoever manages
  *  them, the invited and the asked-to-join (`people`). Channels are not a
  *  pill: the space rail keeps them. */
-export type SpaceTab = 'all' | 'conversations' | 'folders' | 'radars' | 'people';
+export type SpaceTab = 'all' | 'conversations' | 'tasks' | 'folders' | 'radars' | 'people';
 
 /** The pills, in the order the home draws them. No Files pill (Stay, 22
  *  October 2026, 23:58Z: "There will be only folder tab no need for files"):
- *  Folders lists the space's files in no folder under its folders. Radars
- *  sits before People (the Radar in Spaces plan, section 8). */
-export const SPACE_TABS: readonly SpaceTab[] = ['all', 'conversations', 'folders', 'radars', 'people'];
+ *  Folders lists the space's files in no folder under its folders. Tasks
+ *  follows Conversations, the work it tracks (the task board design,
+ *  5dde1944). Radars sits before People (the Radar in Spaces plan, section 8). */
+export const SPACE_TABS: readonly SpaceTab[] = ['all', 'conversations', 'tasks', 'folders', 'radars', 'people'];
 
 export const SPACE_TAB_LABELS: Readonly<Record<SpaceTab, string>> = {
   all: 'All',
   conversations: 'Conversations',
+  tasks: 'Tasks',
   folders: 'Folders',
   radars: 'Radars',
   people: 'People',

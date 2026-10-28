@@ -1,11 +1,12 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
-import { spacesApi } from '@/lib/api/collab';
+import { spacesApi, spaceTasksApi } from '@/lib/api/collab';
 import { spaceRadarsApi } from '@/lib/api/radars';
 import type {
   MemberListParams,
   SpaceItemsParams,
   SpaceItemsType,
   SpaceListParams,
+  SpaceTask,
 } from '@/types/collab';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 
@@ -308,6 +309,26 @@ export const spacesQueries = {
       refetchOnMount: REFETCH_ON_VISIT,
     }),
 
+  /** Every cached read of one space's task board. */
+  tasksOf: (spaceUuid: string) => [...spacesQueries.all, 'tasks', spaceUuid] as const,
+
+  /**
+   * The space's task board (`GET /spaces/{uuid}/tasks`, thread 7aa0c6d8): every
+   * open task and the last 14 days of done ones (the server's window). The
+   * board groups by person, so it needs every row before it draws: the read
+   * takes every page in turn (100 a page; a space's board is one page).
+   * Agents move tasks while the reader is away, so an arrival asks
+   * (`REFETCH_ON_VISIT`).
+   */
+  tasks: (spaceUuid: string, { viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...spacesQueries.tasksOf(spaceUuid), { viewerId }] as const,
+      queryFn: () => readWholeBoard(spaceUuid),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
   /** Invalidation handle for one space's member roster (all params variants). */
   membersOf: (spaceUuid: string) =>
     [...spacesQueries.all, 'members', spaceUuid] as const,
@@ -329,3 +350,14 @@ export const spacesQueries = {
       refetchOnMount: REFETCH_ON_VISIT,
     }),
 };
+
+/** Every row of a space's task board, page after page, in the server's board order. */
+async function readWholeBoard(spaceUuid: string): Promise<SpaceTask[]> {
+  const first = await spaceTasksApi.getList(spaceUuid, { page: 1 });
+  const rows = [...first.data];
+  for (let page = 2; page <= first.pagination.last_page; page += 1) {
+    const next = await spaceTasksApi.getList(spaceUuid, { page });
+    rows.push(...next.data);
+  }
+  return rows;
+}

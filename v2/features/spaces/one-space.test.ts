@@ -103,8 +103,9 @@ test('only an Owner or a Contributor may add content; the old my_role does not c
 test('the pills are the same for every kind and role; channels stay in the rail (B4)', () => {
   // People last (Stay, 15 October 2026); no Channels pill (design B4).
   // No Files pill (Stay, 22 October 2026, 23:58Z). Radars before People
-  // (Radar in Spaces, 26 October 2026).
-  assert.deepEqual(SPACE_TABS, ['all', 'conversations', 'folders', 'radars', 'people']);
+  // (Radar in Spaces, 26 October 2026). Tasks after Conversations (the task
+  // board, thread 7aa0c6d8, 28 October 2026).
+  assert.deepEqual(SPACE_TABS, ['all', 'conversations', 'tasks', 'folders', 'radars', 'people']);
   // Channels still show where they did, in the rail.
   const shows = (kind: SpaceKind, viewer: V2SessionSnapshot) => spaceShowsChannels({ kind }, viewer);
   assert.equal(shows('team', researcher), true);

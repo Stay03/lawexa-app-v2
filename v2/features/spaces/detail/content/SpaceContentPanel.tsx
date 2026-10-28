@@ -69,6 +69,7 @@ import { LobbySection, SPACE_PILL_BAR } from '../lobby-parts';
 import { SpacePeoplePanel } from '../people/SpacePeoplePanel';
 import { newSpaceRadarHref } from '../radars/radar-rows';
 import { SpaceRadarsPanel } from '../radars/SpaceRadarsPanel';
+import { SpaceTasksPanel } from '../tasks/SpaceTasksPanel';
 import { DeleteSpaceFileDialog } from './DeleteSpaceFileDialog';
 import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SPACE_COMPOSER_PLACEHOLDER, SPACE_RADAR_COMPOSER_PLACEHOLDER, SpaceChatDock } from './SpaceChatDock';
@@ -88,10 +89,12 @@ import { SpaceContentEmptyState } from './states';
  * space's conversations, files and folders, and the message box.
  *
  * ── THE PILLS (`?tab=`, `SpaceScreen` holds it) ────────────────────────────
- * All, Conversations, Folders, Radars, People. The first three are one feed
- * (`GET /spaces/{uuid}/items`, `spacesQueries.items`): All with no `type`,
- * each kind with its own. No Files pill (Stay, 22 October 2026, 23:58Z):
- * Folders lists the files in no folder under the folders. Radars is the
+ * All, Conversations, Tasks, Folders, Radars, People. All, Conversations and
+ * Folders are one feed (`GET /spaces/{uuid}/items`, `spacesQueries.items`):
+ * All with no `type`, each kind with its own. Tasks is the space's task board
+ * (`SpaceTasksPanel`, thread 7aa0c6d8, 28 October 2026). No Files pill (Stay,
+ * 22 October 2026, 23:58Z): Folders lists the files in no folder under the
+ * folders. Radars is the
  * space's Radars (`SpaceRadarsPanel`, Radar in Spaces, 26 October 2026);
  * their reports are rows of All too. People is the members page
  * (`SpacePeoplePanel`) in the list's place. Channels are not a pill; the
@@ -168,12 +171,13 @@ export function SpaceContentPanel({
   // in the list, which a new pill remounts: a file still uploading keeps its
   // row in the tray. No search (Stay, 17 October 2026, 19:11 UTC; Arthur,
   // 22:31 UTC: "remove it").
-  // People and Radars are their own lists: the feed's read waits.
-  const listTab: SpaceContentTab = tab === 'people' || tab === 'radars' ? 'all' : tab;
+  // People, Tasks and Radars are their own lists: the feed's read waits.
+  const ownList = OWN_LIST_TABS.has(tab);
+  const listTab: SpaceContentTab = tab === 'people' || tab === 'radars' || tab === 'tasks' ? 'all' : tab;
   const type = FEED_TYPE[listTab];
   const query = useInfiniteQuery({
     ...spacesQueries.items(space.uuid, { viewerId, type, rooms }),
-    enabled: enabled && tab !== 'people' && tab !== 'radars',
+    enabled: enabled && !ownList,
   });
   const { queue, pickFiles, picker } = useSpaceUploads(space.uuid);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -231,6 +235,8 @@ export function SpaceContentPanel({
       <SpacePeoplePanel space={space} />
     ) : tab === 'radars' ? (
       <SpaceRadarsPanel spaceUuid={space.uuid} canAdd={access.canAdd} />
+    ) : tab === 'tasks' ? (
+      <SpaceTasksPanel spaceUuid={space.uuid} />
     ) : (
       <SpaceFeed
         // A new pill is a new list: a fresh mount, so its rows enter once.
@@ -271,7 +277,7 @@ export function SpaceContentPanel({
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${tab}`} className="mt-4">
         {/* Files dropped on the list upload into the space; a Viewer gets the
             list and nothing to drop onto. */}
-        {access.canAdd && tab !== 'people' && tab !== 'radars' ? (
+        {access.canAdd && !ownList ? (
           <FileDropZone spaceName={space.name} onDrop={queue.add}>
             {list}
           </FileDropZone>
@@ -342,6 +348,9 @@ const FEED_TYPE: Readonly<Record<SpaceContentTab, SpaceItemsType | undefined>> =
   conversations: 'conversations',
   folders: 'folders',
 };
+
+/** The pills that draw their own list, not the feed: no feed read, no file drop. */
+const OWN_LIST_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['people', 'radars', 'tasks']);
 
 /** The pills the Space's message box shows on. */
 const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>(['all', 'conversations', 'folders', 'radars']);

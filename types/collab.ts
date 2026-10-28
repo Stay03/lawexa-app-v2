@@ -1820,6 +1820,69 @@ export interface SpaceRadarListParams {
   page?: number;
 }
 
+/**
+ * ── A SPACE'S TASK BOARD (thread 7aa0c6d8, design approved 28 October 2026) ─
+ * Who is doing what in the space: each task has one owner, one stage and,
+ * often, its thread. People and agents move tasks through the same API, so
+ * the board is always current. The contract is Frontend's (5dde1944) with
+ * Backend's changes (07f2aac6, 6f0a3563): owner and editor create and move
+ * tasks, a viewer reads. A paused task carries its reason in `stage_note`; a
+ * waiting one carries the person in `waiting_on`. Both clear when the task
+ * leaves that stage.
+ */
+export type SpaceTaskStage = 'queued' | 'working' | 'paused' | 'waiting' | 'done';
+
+/** A person on a task: its owner, who it waits on, who moved it. Never an
+ *  internal id. `is_agent` marks the team's agent accounts (Stay, 28
+ *  October 2026, 23:17Z: yes to the eight). */
+export interface SpaceTaskPerson {
+  uuid: string;
+  name: string;
+  username: string | null;
+  avatar_url: string | null;
+  is_agent: boolean;
+}
+
+/** One row of `GET /spaces/{uuid}/tasks`, and the snapshot `.task.changed` carries. */
+export interface SpaceTask {
+  uuid: string;
+  title: string;
+  stage: SpaceTaskStage;
+  /** Required while paused (the reason); optional otherwise; at most 140 characters. */
+  stage_note: string | null;
+  /** Required while waiting: who the task waits on. */
+  waiting_on: SpaceTaskPerson | null;
+  /** `null`: nobody has it yet. */
+  owner: SpaceTaskPerson | null;
+  /** The task's thread or channel, one every member of the space can read
+   *  (Backend, 28 October 2026: the live snapshot reaches every member).
+   *  `channel_uuid` is the thread's channel, or the channel itself. */
+  thread: { uuid: string; name: string; channel_uuid: string } | null;
+  /** The task's place in its owner's queue, lowest first. */
+  position: number;
+  /** The first move to Working; `null` until then. */
+  started_at: string | null;
+  stage_changed_at: string;
+  /** `null`: Lawexa itself, or a deleted account. */
+  stage_changed_by: SpaceTaskPerson | null;
+  /** Whether the last move came from the app or from an agent's token. */
+  via: 'app' | 'agent' | null;
+  created_at: string;
+  created_by: SpaceTaskPerson | null;
+}
+
+export interface SpaceTaskListParams {
+  /** Done tasks moved since then come too (ISO time); the server's default is 14 days. */
+  done_since?: string;
+  /** At most 100. */
+  per_page?: number;
+  page?: number;
+}
+
+/** Every open task in the space, and its done ones since `done_since`, in
+ *  board order (working, paused, waiting, queued, done). */
+export type SpaceTaskListResponse = LengthAwareResponse<SpaceTask>;
+
 /** The room kinds the feed adds only when asked (`include`), and only for a
  *  reader with team channels (researcher and above) in a team space: anyone
  *  else gets today's feed whatever is asked. */

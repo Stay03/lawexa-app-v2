@@ -78,6 +78,8 @@ import type {
   SpaceListResponse,
   SpaceMemberListResponse,
   SpaceResponse,
+  SpaceTaskListParams,
+  SpaceTaskListResponse,
   TaskListItemResponse,
   TaskListItemsResponse,
   TaskListResponse,
@@ -507,6 +509,26 @@ export const spacesApi = {
     const response = await apiClient.post<MemberResponse>(
       `/spaces/${uuid}/transfer-ownership`,
       payload
+    );
+    return response.data;
+  },
+};
+
+/**
+ * A space's task board (thread 7aa0c6d8): every open task, and the done ones
+ * since `done_since`. Every member reads it; the owner and editors move tasks.
+ */
+export const spaceTasksApi = {
+  getList: async (spaceUuid: string, params: SpaceTaskListParams = {}): Promise<SpaceTaskListResponse> => {
+    const response = await apiClient.get<SpaceTaskListResponse>(
+      `/spaces/${encodeURIComponent(spaceUuid)}/tasks`,
+      {
+        params: {
+          done_since: params.done_since || undefined,
+          per_page: params.per_page ?? 100,
+          page: params.page ?? 1,
+        },
+      },
     );
     return response.data;
   },

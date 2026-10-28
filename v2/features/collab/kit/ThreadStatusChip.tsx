@@ -133,9 +133,14 @@ export function ThreadStatusChip({
   fit = false,
   fold = false,
   outline = false,
+  label,
   className,
 }: {
   value: ThreadStatusValue;
+  /** A word in place of the status's own, for something that wears a
+   *  status's colours under its own name: a task's stage ("Paused" in On
+   *  Hold's slate, the task board, 28 October 2026). */
+  label?: string;
   /** Needs Action's person, printed after a middle dot. */
   person?: string | null;
   /** `sm` on a row (20px), `md` in a thread's header (24px). */
@@ -168,7 +173,7 @@ export function ThreadStatusChip({
           aria-hidden
           className={cn('size-1.5 shrink-0 rounded-full', dotTone(value, outline))}
         />
-        {threadStatusLabel(value)}
+        {label ?? threadStatusLabel(value)}
       </span>
       {person ? (
         <span className={cn('min-w-0 max-w-32 truncate', fold && 'max-md:hidden')}>

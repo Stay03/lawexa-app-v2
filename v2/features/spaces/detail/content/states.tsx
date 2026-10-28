@@ -40,8 +40,8 @@ import { spaceEmptyCopy, type SpaceContentTab } from '../../content-model';
 
 export type { SpaceContentTab };
 
-/** Every pill that is a list with these states: the feed's, and Radars. */
-export type SpaceListTab = SpaceContentTab | 'radars';
+/** Every pill that is a list with these states: the feed's, Radars and Tasks. */
+export type SpaceListTab = SpaceContentTab | 'radars' | 'tasks';
 
 /** One feed row at its real geometry (`feed-rows`' `Line`; no row has a menu column). */
 function FeedRowSkeleton() {
@@ -149,6 +149,7 @@ const FAILURE_TITLE: Readonly<Record<SpaceListTab, string>> = {
   conversations: 'Couldn’t load the conversations',
   folders: 'Couldn’t load the folders',
   radars: 'Couldn’t load the Radars',
+  tasks: 'Couldn’t load the tasks',
 };
 
 /**

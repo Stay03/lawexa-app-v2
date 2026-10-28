@@ -80,7 +80,11 @@ export interface FeedRowMenus {
 }
 
 interface LineModel {
-  icon: LucideIcon;
+  /** The row's kind, at the row's start. */
+  icon?: LucideIcon;
+  /** In the icon's place: a person's face (a task's owner, on the task
+   *  board's by-stage view). With neither, the text starts the row. */
+  lead?: ReactNode;
   /** Gold icon: something new here for the reader. */
   warm?: boolean;
   title: string;
@@ -121,13 +125,16 @@ export function FeedLine({
   const count = line.count && line.count.value > 0 ? line.count : null;
   const content = (
     <>
-      <Icon
-        aria-hidden
-        className={cn(
-          'size-5 shrink-0',
-          line.warm ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
-        )}
-      />
+      {line.lead ??
+        (Icon ? (
+          <Icon
+            aria-hidden
+            className={cn(
+              'size-5 shrink-0',
+              line.warm ? 'text-primary' : 'text-muted-foreground group-hover:text-foreground',
+            )}
+          />
+        ) : null)}
       <span className="min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-2">
           <span

@@ -124,9 +124,11 @@ test('a report row in the feed is a Radar row that links inside the space, and t
   assert.match(rows, /case 'radar_report': \{\s*const row = reportRowModel\(entry\.item, menus\.spaceUuid, now\);/);
   assert.match(rows, /render=\{roomLink\(row\.href\)\}/);
   const panel = read('../content/SpaceContentPanel.tsx');
-  assert.match(panel, /enabled: enabled && tab !== 'people' && tab !== 'radars',/);
+  // Radars, People and Tasks draw their own lists (`OWN_LIST_TABS`).
+  assert.match(panel, /new Set<SpaceTab>\(\['people', 'radars', 'tasks'\]\)/);
+  assert.match(panel, /enabled: enabled && !ownList,/);
   assert.match(panel, /tab === 'radars' \? \(\s*<SpaceRadarsPanel spaceUuid=\{space\.uuid\} canAdd=\{access\.canAdd\} \/>/);
   // New Radar is for whoever may add; nothing is dropped onto Radars.
   assert.match(panel, /tab === 'radars' \? \(\s*access\.canAdd \? <NewRadarButton spaceUuid=\{space\.uuid\} \/> : null/);
-  assert.match(panel, /access\.canAdd && tab !== 'people' && tab !== 'radars' \? \(\s*<FileDropZone/);
+  assert.match(panel, /access\.canAdd && !ownList \? \(\s*<FileDropZone/);
 });
