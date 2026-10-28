@@ -117,8 +117,9 @@ function PersonBlock({ group, now }: { group: PersonGroup; now: number }) {
     <section aria-labelledby={headingId} className="flex flex-col">
       <div className="flex min-h-9 min-w-0 items-center gap-3 px-3">
         {group.owner ? <MemberAvatar user={group.owner} size="sm" /> : <NobodyMark />}
-        <h3 id={headingId} className="min-w-0 truncate text-sm font-semibold text-foreground">
-          {name}
+        <h3 id={headingId} className="flex min-w-0 items-baseline gap-1.5">
+          <span className="min-w-0 truncate text-sm font-semibold text-foreground">{name}</span>
+          {group.owner?.is_agent ? <AgentWord /> : null}
         </h3>
         <span
           className={cn(
@@ -214,7 +215,7 @@ function DoneFold({ tasks, now, showOwner }: { tasks: readonly SpaceTask[]; now:
  * name leads the second line.
  */
 function TaskLine({ task, now, showOwner }: { task: SpaceTask; now: number; showOwner: boolean }) {
-  const meta = [showOwner ? (task.owner?.name ?? 'Nobody yet') : null, taskNote(task), task.thread?.name ?? null]
+  const meta = [showOwner ? ownerWords(task.owner) : null, taskNote(task), task.thread?.name ?? null]
     .filter(Boolean)
     .join(' · ');
   return (
@@ -232,6 +233,18 @@ function TaskLine({ task, now, showOwner }: { task: SpaceTask; now: number; show
       render={(className, content) => <div className={className}>{content}</div>}
     />
   );
+}
+
+/** The agent mark (Stay, 28 October 2026, 23:17Z: yes to the eight agent
+ *  accounts): one quiet word after the name, no badge. */
+function AgentWord() {
+  return <span className="shrink-0 text-xs text-muted-foreground">Agent</span>;
+}
+
+/** The owner on a by-stage row's second line: "Backend Claude (agent)". */
+function ownerWords(owner: SpaceTask['owner']): string {
+  if (!owner) return 'Nobody yet';
+  return owner.is_agent ? `${owner.name} (agent)` : owner.name;
 }
 
 /** The face for the tasks nobody has yet. */
