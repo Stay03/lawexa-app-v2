@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, ChevronRight, Loader2, Lock, RotateCcw, Share2 } from 'lucide-react';
+import { Check, Compass, Loader2, Lock, RotateCcw, Share2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
@@ -33,11 +33,11 @@ import { RaisedButton } from '../ui';
  * its author can take a private quiz, so the reader here is the author, and
  * the quiz's own page is where who can take it is set.
  *
- * ── OTHER QUIZZES, QUIETLY, UNDER THEM (Arthur, 28 October 2026) ───────────
+ * ── OTHER QUIZZES, THE THIRD BUTTON (Arthur, 28 October 2026: "do B") ──────
  * "Take it again" replays this quiz, "Challenge a friend" shares it, and
- * "Other Quizzes" opens Explore Quizzes for a different one. It is a text
- * link under the two buttons, not a third button, so the bar stays two
- * buttons wide and two rows tall at most on a phone.
+ * "Other Quizzes" opens Explore Quizzes for a different one, at the same
+ * size as the other two. Three that do not fit in a row wrap like the two
+ * did, each at its label's width, so a phone stacks them.
  *
  * ── AT THE BOTTOM, AND IT STAYS THERE ──────────────────────────────────────
  * `mt-auto` puts the row on the bottom edge of a short page; `sticky
@@ -97,6 +97,12 @@ export function ResultsActions({
             <span aria-live="polite">{share.copied ? 'Link copied' : 'Challenge a friend'}</span>
           </RaisedButton>
         )}
+        <RaisedButton tone="quiet" className="min-w-fit flex-1 basis-40 whitespace-nowrap" asChild>
+          <Link href={EXPLORE_HREF}>
+            <Compass aria-hidden className="size-4" />
+            Other Quizzes
+          </Link>
+        </RaisedButton>
       </div>
       {privateQuiz && !shareable ? (
         <p className="mt-3 flex items-start gap-2.5 rounded-2xl border border-border/60 bg-secondary/30 px-3.5 py-3 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
@@ -113,18 +119,6 @@ export function ResultsActions({
           </span>
         </p>
       ) : null}
-      <div className="mt-2.5 flex justify-center">
-        <Link
-          href={EXPLORE_HREF}
-          className={cn(
-            'inline-flex min-h-9 items-center gap-1 rounded-sm px-2 text-sm font-semibold text-primary underline-offset-2 hover:underline',
-            FOCUS_RING,
-          )}
-        >
-          Other Quizzes
-          <ChevronRight aria-hidden className="size-4" />
-        </Link>
-      </div>
     </div>
   );
 }

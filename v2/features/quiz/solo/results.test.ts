@@ -86,9 +86,9 @@ test('the answers open from one row, on their own page, and the two buttons sit 
   assert.match(actions, /sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto/);
   assert.match(actions, /Take it again/);
   assert.match(actions, /\{share\.copied \? 'Link copied' : 'Challenge a friend'\}/);
-  // Other Quizzes: a text link under the two buttons, to Explore (Arthur, 28 October 2026).
-  assert.match(actions, /<Link\s+href=\{EXPLORE_HREF\}[\s\S]*?Other Quizzes\s*<ChevronRight aria-hidden className="size-4" \/>\s*<\/Link>/);
-  assert.equal((actions.match(/<RaisedButton/g) ?? []).length, 2);
+  // Other Quizzes: the third full-size button, to Explore (Arthur, 28 October 2026: "do B").
+  assert.match(actions, /<RaisedButton tone="quiet" className="min-w-fit flex-1 basis-40 whitespace-nowrap" asChild>\s*<Link href=\{EXPLORE_HREF\}>\s*<Compass aria-hidden className="size-4" \/>\s*Other Quizzes\s*<\/Link>/);
+  assert.equal((actions.match(/<RaisedButton/g) ?? []).length, 3);
 
   const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
   assert.match(screen, /import '\.\.\/solo-quiz\.css';/);
