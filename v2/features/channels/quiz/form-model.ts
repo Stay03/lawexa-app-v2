@@ -357,6 +357,33 @@ export function questionsFingerprint(questions: readonly QuestionDraft[], scenar
   return JSON.stringify(toPayload(questions, scenarios));
 }
 
+/** A saved question's time, as the quiz was loaded: what a time change is measured against. */
+export interface LoadedTime {
+  uuid: string;
+  seconds: number;
+}
+
+export function loadedTimes(questions: readonly QuestionDraft[]): LoadedTime[] {
+  return questions.flatMap((question) => (question.uuid ? [{ uuid: question.uuid, seconds: question.seconds }] : []));
+}
+
+/**
+ * Whether the author changed the time of a question the quiz already had.
+ * The time is part of a quiz's scoring (a faster right answer scores more
+ * within it), so the server restarts the leaderboard when it changes, and
+ * an attempt does not record the time it was played under (28 October
+ * 2026: a 20 to 30 second change restarted 9 boards). New questions, and
+ * questions taken away, are not a time change.
+ */
+export function timeChanged(loaded: readonly LoadedTime[], questions: readonly QuestionDraft[]): boolean {
+  const before = new Map(loaded.map((time) => [time.uuid, time.seconds]));
+  return questions.some((question) => {
+    if (!question.uuid) return false;
+    const seconds = before.get(question.uuid);
+    return seconds !== undefined && seconds !== question.seconds;
+  });
+}
+
 /** The questions and scenarios as the server takes them. */
 export function toPayload(
   questions: readonly QuestionDraft[],

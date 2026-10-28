@@ -16,6 +16,7 @@ import {
   groupQuestions,
   hasFormContent,
   insertQuestionAfter,
+  loadedTimes,
   moveIntoScenario,
   moveOutOfScenario,
   moveQuestion,
@@ -23,6 +24,7 @@ import {
   newQuestion,
   newScenario,
   questionsFingerprint,
+  timeChanged,
   toPayload,
   validate,
   type QuestionDraft,
@@ -212,6 +214,36 @@ test('a quiz loaded twice reads the same, and any change to its questions reads 
   // A question added or taken away is a change.
   assert.notEqual(questionsFingerprint([...first.questions, newQuestion()], first.scenarios), loaded);
   assert.notEqual(questionsFingerprint(first.questions.slice(1), first.scenarios), loaded);
+});
+
+test('a time change is a saved question with a new time, and nothing else', () => {
+  const stored = {
+    scenarios: [],
+    questions: [
+      { uuid: 'q-1', type: 'multiple_choice', question: 'TEST DATA Q1', time_limit_seconds: 20, position: 1, scenario_uuid: null, options: [{ content: 'A', is_correct: true }, { content: 'B', is_correct: false }] },
+      { uuid: 'q-2', type: 'true_false', question: 'TEST DATA Q2', time_limit_seconds: 20, position: 2, scenario_uuid: null, options: [{ content: 'True', is_correct: false }, { content: 'False', is_correct: true }] },
+    ],
+  } as unknown as ChannelQuiz;
+  const { questions } = draftsFromQuiz(stored);
+  const loaded = loadedTimes(questions);
+  assert.deepEqual(loaded, [{ uuid: 'q-1', seconds: 20 }, { uuid: 'q-2', seconds: 20 }]);
+  assert.equal(timeChanged(loaded, questions), false);
+  // 20 to 30 seconds on one question (Arthur, 28 October 2026).
+  assert.equal(timeChanged(loaded, questions.map((q, i) => (i === 1 ? { ...q, seconds: 30 } : q))), true);
+  // New words, a new right answer, a new question or one taken away keep every time.
+  assert.equal(timeChanged(loaded, questions.map((q, i) => (i === 0 ? { ...q, question: 'TEST DATA reworded' } : q))), false);
+  assert.equal(timeChanged(loaded, questions.map((q, i) => (i === 0 ? { ...q, correctKey: q.options[1].key } : q))), false);
+  assert.equal(timeChanged(loaded, [...questions, { ...newQuestion(), seconds: 45 }]), false);
+  assert.equal(timeChanged(loaded, questions.slice(1)), false);
+});
+
+test('the save asks before a time change on a quiz with players, and only then', () => {
+  const form = readFileSync(join(here, 'QuizFormDialog.tsx'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(form, /enabled: open && isEdit && loaded\?\.visibility === 'public',/);
+  assert.match(form, /if \(isEdit && !restartConfirmed && !metadataOnly && mayEditQuestions && boardPlayers > 0 && timeChanged\(loadedTimeList, questions\)\) \{\s*setConfirmRestart\(true\);\s*return;/);
+  assert.match(form, /Changing the time restarts this quiz&rsquo;s leaderboard\./);
+  assert.match(form, /<AlertDialogCancel>Cancel<\/AlertDialogCancel>/);
+  assert.match(form, /setConfirmRestart\(false\);\s*handleSubmit\(true\);[\s\S]*Save and restart/);
 });
 
 test('an edit sends its questions only when they changed, so a tag edit keeps the board', () => {

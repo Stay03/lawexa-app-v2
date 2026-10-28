@@ -68,6 +68,7 @@ import {
   readQuizYear,
 } from '@/v2/features/quiz/solo/home-model';
 import { canPublishPublicly } from '@/v2/features/quiz/solo/model';
+import { soloQuizQueries } from '@/v2/features/quiz/solo/queries';
 import { useBackGuard } from '@/v2/runtime/use-back-guard';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { useCreateLibraryQuiz, useCreateQuiz, useUpdateQuiz } from './mutations';
@@ -82,6 +83,8 @@ import {
   findFormProblem,
   groupQuestions,
   insertQuestionAfter,
+  loadedTimes,
+  type LoadedTime,
   moveIntoScenario,
   moveOutOfScenario,
   moveQuestion,
@@ -93,6 +96,7 @@ import {
   QUIZ_SCENARIO_PASSAGE_MAX,
   QUIZ_SCENARIO_TITLE_MAX,
   quizSaveConflict,
+  timeChanged,
   toPayload,
   trueFalseOptions,
   type FormProblemTarget,
@@ -198,6 +202,13 @@ import '@/v2/features/quiz/solo/solo-quiz.css';
  * shows this form. The chat is the home's, or for a channel's quiz the
  * channel's Space's. No cards, nothing else on the choice. An edit opens on
  * the form.
+ *
+ * ── A TIME CHANGE ASKS FIRST (28 October 2026) ─────────────────────────────
+ * Changing the time of a question a quiz already had restarts its
+ * leaderboard (the time is part of the scoring, and an attempt does not
+ * record the time it was played under), so on a quiz with players on its
+ * board the save asks before it goes: "Changing the time restarts this
+ * quiz's leaderboard." An edit that keeps every time never asks.
  */
 
 /** Where a NEW quiz is filed. Ignored when editing — a quiz's home is fixed. */
@@ -295,6 +306,8 @@ export function QuizFormDialog({
   /** The loaded quiz's questions as a save would send them: an edit sends its
    *  questions only when they differ (`questionsFingerprint`). */
   const [loadedQuestions, setLoadedQuestions] = useState<string | null>(null);
+  /** Each saved question's time as loaded: a change to one asks first. */
+  const [loadedTimeList, setLoadedTimeList] = useState<LoadedTime[]>([]);
   if (loaded && adopted !== loaded.uuid) {
     setAdopted(loaded.uuid);
     setTitle(loaded.title);
@@ -308,9 +321,20 @@ export function QuizFormDialog({
     setQuestions(drafts.questions);
     setScenarios(drafts.scenarios);
     setLoadedQuestions(questionsFingerprint(drafts.questions, drafts.scenarios));
+    setLoadedTimeList(loadedTimes(drafts.questions));
     setFrozen(false);
     setPublicRefused(false);
   }
+
+  // Who is on the board now, for an edit of a public quiz: the same read as
+  // the quiz page (no second request when the author came from there).
+  const boardQuery = useQuery({
+    ...soloQuizQueries.leaderboard(quizUuid ?? '', { viewerId }),
+    enabled: open && isEdit && loaded?.visibility === 'public',
+  });
+  const boardPlayers = boardQuery.data?.data.player_count ?? 0;
+  /** Waiting on the author: their save restarts the board. */
+  const [confirmRestart, setConfirmRestart] = useState(false);
 
   const submitting =
     createQuiz.isPending || createLibraryQuiz.isPending || updateQuiz.isPending;
@@ -433,7 +457,7 @@ export function QuizFormDialog({
     if (target?.kind === 'title') element?.focus({ preventScroll: true });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (restartConfirmed = false) => {
     setError(null);
     // A metadata-only save (the played-quiz path) still needs a title — the
     // questions it cannot touch are not its business.
@@ -477,6 +501,11 @@ export function QuizFormDialog({
       }
       setError(message);
     };
+
+    if (isEdit && !restartConfirmed && !metadataOnly && mayEditQuestions && boardPlayers > 0 && timeChanged(loadedTimeList, questions)) {
+      setConfirmRestart(true);
+      return;
+    }
 
     if (isEdit) {
       // QUESTIONS ONLY WHEN THEY CHANGED (28 October 2026). A save that resends
@@ -573,7 +602,7 @@ export function QuizFormDialog({
                 rewrite saves its METADATA — and validating questions it cannot
                 touch would lock the reader out of the save that does work. */}
             <Button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               disabled={submitting}
             >
               {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
@@ -914,6 +943,29 @@ export function QuizFormDialog({
           </>
         )}
       </div>
+      <AlertDialog open={confirmRestart} onOpenChange={setConfirmRestart}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restart the leaderboard?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Changing the time restarts this quiz&rsquo;s leaderboard.{' '}
+              {boardPlayers === 1 ? 'The player on it starts' : `The ${boardPlayers.toLocaleString('en-US')} players on it start`} again
+              from their next play.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmRestart(false);
+                handleSubmit(true);
+              }}
+            >
+              Save and restart
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={confirmDiscard} onOpenChange={onConfirmDiscardChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
