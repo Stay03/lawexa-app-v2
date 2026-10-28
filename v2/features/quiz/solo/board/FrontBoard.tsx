@@ -204,8 +204,7 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
 function BoardRow({ entry, you, standing = null }: { entry: QuizLeaderboardEntry; you: boolean; standing?: string | null }) {
   return (
     <li className={cn('flex min-w-0 flex-col', you && 'rounded-xl border-transparent bg-primary/10 ring-2 ring-primary/50')}>
-      <PlayerLine rank={entry.rank} user={entry.user} points={entry.points} you={you} />
-      {standing ? <StandingNote>{standing}</StandingNote> : null}
+      <PlayerLine rank={entry.rank} user={entry.user} points={entry.points} you={you} note={standing} />
     </li>
   );
 }
@@ -215,7 +214,9 @@ function BoardRow({ entry, you, standing = null }: { entry: QuizLeaderboardEntry
  * row (Stay, 28 October 2026: "the bottom one should have my name like the
  * other users"): the server sends the reader as a row shows a player
  * (`viewer.user`, the same school rule); before it does, the session's name
- * and face stand in, with no school. Their standing sits under it, in the gold.
+ * and face stand in, with no school. Their standing is the row's third line,
+ * under the school, so the face stays centred on the text (Stay, 28 October
+ * 2026: "the bottom of the avatar on my score has wasted space").
  */
 function YourRow({ viewer, standing }: { viewer: NonNullable<QuizLeaderboard['viewer']>; standing: string | null }) {
   const session = useV2Session();
@@ -226,23 +227,24 @@ function YourRow({ viewer, standing }: { viewer: NonNullable<QuizLeaderboard['vi
   };
   return (
     <li className="flex min-w-0 flex-col rounded-xl bg-primary/10 ring-2 ring-primary/50">
-      <PlayerLine rank={viewer.rank} user={user} points={viewer.points} you />
-      {standing ? <StandingNote>{standing}</StandingNote> : null}
+      <PlayerLine rank={viewer.rank} user={user} points={viewer.points} you note={standing} />
     </li>
   );
 }
 
-/** Rank, face, name over where they study, and points. */
+/** Rank, face, name over where they study (and, for the reader, their standing), and points. */
 function PlayerLine({
   rank,
   user,
   points,
   you,
+  note = null,
 }: {
   rank: number;
   user: QuizLeaderboardEntry['user'];
   points: number;
   you: boolean;
+  note?: string | null;
 }) {
   return (
     <div className="flex min-h-14 min-w-0 items-center gap-3 px-2 py-2">
@@ -261,6 +263,7 @@ function PlayerLine({
           {you ? <YouPill /> : null}
         </span>
         {user.institution ? <span className="truncate text-xs text-muted-foreground">{user.institution}</span> : null}
+        {note ? <span className="mt-1 text-xs leading-snug font-medium text-foreground/75">{note}</span> : null}
       </span>
       <span className="shrink-0 font-comfortaa text-sm font-bold text-foreground tabular-nums">
         {scoreLabel(points)}
@@ -268,11 +271,6 @@ function PlayerLine({
       </span>
     </div>
   );
-}
-
-/** The reader's standing, one short line under their row, inside the gold. */
-function StandingNote({ children }: { children: string }) {
-  return <p className="-mt-1 pr-2 pb-2.5 pl-[6.75rem] text-xs font-medium text-foreground/75">{children}</p>;
 }
 
 function YouPill() {

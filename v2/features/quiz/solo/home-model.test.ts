@@ -149,6 +149,8 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   assert.match(board, /const user = viewer\.user \?\? \{/);
   assert.match(board, /<YourRow viewer=\{viewer\} standing=\{standing\} \/>/);
   assert.match(board, /standing=\{isYou\(entry\) \? standing : null\}/);
+  // The standing is the row's third line, so the face stays centred (Stay, 28 October 2026).
+  assert.match(board, /\{note \? <span className="mt-1 text-xs leading-snug font-medium text-foreground\/75">\{note\}<\/span> : null\}/);
   // Where each player studies: the podium's short form, the rows' whole name.
   assert.match(board, /\{podiumInstitution\(entry\.user\.institution\)\}/);
   assert.match(board, /\{user\.institution \? <span className="truncate text-xs text-muted-foreground">\{user\.institution\}<\/span> : null\}/);
