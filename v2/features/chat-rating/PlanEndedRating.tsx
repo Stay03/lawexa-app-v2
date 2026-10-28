@@ -15,7 +15,8 @@ import { beginPlanEndedOffer, useActiveOffer, useAskedThisSession } from './stor
  * if the plan has run out?"). The server says when (`moment: "plan_ended"`,
  * once, outside the 14 days); this asks it once a session as the app opens.
  *
- * Mounted once, in the v2 layout. The banner floats above the page's foot and
+ * Mounted once, in the v2 layout. The banner floats under the header, clear
+ * of the home's and a chat's message box, and
  * is about no chat: a rating names none (Backend 0c7bb3c2). Shown and closed
  * are reported, as for the chat's banner, so it asks once.
  */
@@ -36,7 +37,7 @@ export function PlanEndedRating() {
 
   if (!active || active.trigger !== 'plan_ended') return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-6">
+    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top,0px)+4.75rem)] z-40 flex justify-center px-4 md:top-[4.5rem]">
       <div className="pointer-events-auto w-full max-w-md shadow-lg">
         <ChatRatingBanner key={active.seq} offer={active} />
       </div>
