@@ -71,8 +71,8 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
           {BOARD_EMPTY_NOTE}
         </p>
       ) : (
-        <div className="grid gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:items-start md:gap-8">
-          <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:items-start md:gap-8">
+          <div className="flex min-w-0 flex-col gap-4">
             {viewer ? (
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2.5">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary font-comfortaa text-base font-bold text-primary-foreground tabular-nums">
@@ -87,7 +87,7 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
           </div>
 
           {rest.length > 0 || (viewer && !youShown) ? (
-            <ol aria-label="Places 4 to 10" className="flex flex-col gap-1.5">
+            <ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col gap-1.5">
               {rest.map((entry) => (
                 <BoardRow key={`${entry.rank}-${entry.user.uuid}`} entry={entry} you={isYou(entry)} />
               ))}
@@ -114,8 +114,8 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
  */
 const BLOCK: Record<number, { front: string; top: string }> = {
   1: {
-    front: 'h-28 from-primary sm:h-36',
-    top: 'bg-[oklch(0.86_0.1_88)]',
+    front: 'h-28 from-[oklch(0.8_0.15_84)] sm:h-36',
+    top: 'bg-[oklch(0.89_0.11_90)]',
   },
   2: {
     front: 'h-20 from-[oklch(0.78_0.08_262)] sm:h-28',
@@ -131,7 +131,7 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
   // 2 | 1 | 3, so the first place stands in the middle.
   const order = [entries[1], entries[0], entries[2]];
   return (
-    <ol aria-label="Top three" className="grid grid-cols-3 items-end pt-6">
+    <ol aria-label="Top three" className="grid grid-cols-[repeat(3,minmax(0,1fr))] items-end pt-6">
       {order.map((entry, column) => {
         if (!entry) return <li key={`empty-${column}`} aria-hidden />;
         const place = column === 1 ? 1 : column === 0 ? 2 : 3;
@@ -249,7 +249,7 @@ export function FrontBoardSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-4">
       <Skeleton className="h-5 w-28 rounded" />
-      <div className="grid gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-8">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-8">
         <div className="grid grid-cols-3 items-end gap-1 pt-6">
           <Skeleton className="h-44 rounded-xl" />
           <Skeleton className="h-52 rounded-xl" />
