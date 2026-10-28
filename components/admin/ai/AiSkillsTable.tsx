@@ -24,11 +24,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { AdminAiSkill } from '@/types/admin-ai';
+import type { AdminAiSkill, AdminAiSkillRow } from '@/types/admin-ai';
 import { LOAD_MODE_LABEL } from './skill-model';
 
 interface AiSkillsTableProps {
-  skills: AdminAiSkill[];
+  skills: AdminAiSkillRow[];
   isLoading: boolean;
   onEdit: (skill: AdminAiSkill) => void;
   onDelete: (skill: AdminAiSkill) => void;
