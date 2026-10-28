@@ -36,6 +36,27 @@ import { glideTop, opensOnPodium, SCORE_GLIDE_MS } from './position-model';
 import '../solo-quiz.css';
 
 /**
+ * Glides the page that holds the results back up to their top, over
+ * `SCORE_GLIDE_MS` with an ease-out (`glideTop`), so the score comes into
+ * view. The page scrolls inside the shell, so it is the nearest scrolled
+ * ancestor of the heading that moves; nothing scrolled, nothing moves.
+ */
+function glideToScore(heading: HTMLElement): void {
+  let page: HTMLElement | null = heading.parentElement;
+  while (page && page.scrollTop === 0) page = page.parentElement;
+  const scroller = page ?? (document.scrollingElement as HTMLElement | null);
+  if (!scroller || scroller.scrollTop === 0) return;
+  const startTop = scroller.scrollTop;
+  const start = performance.now();
+  const step = (now: number) => {
+    const elapsed = now - start;
+    scroller.scrollTop = glideTop(startTop, elapsed);
+    if (elapsed < SCORE_GLIDE_MS) window.requestAnimationFrame(step);
+  };
+  window.requestAnimationFrame(step);
+}
+
+/**
  * AttemptResultsScreen — `/quiz/attempts/{uuid}/results`, the review of a
  * finished attempt in design B1: the greeting, the points, one row of
  * stats and the comparison line; See your answers, folded; Take it again
@@ -66,27 +87,6 @@ import '../solo-quiz.css';
  * top-three finish opens on the podium first, full screen, laid over these
  * results (`PodiumStage`), which moves on to them by itself.
  */
-/**
- * Glides the page that holds the results back up to their top, over
- * `SCORE_GLIDE_MS` with an ease-out (`glideTop`), so the score comes into
- * view. The page scrolls inside the shell, so it is the nearest scrolled
- * ancestor of the heading that moves; nothing scrolled, nothing moves.
- */
-function glideToScore(heading: HTMLElement): void {
-  let page: HTMLElement | null = heading.parentElement;
-  while (page && page.scrollTop === 0) page = page.parentElement;
-  const scroller = page ?? (document.scrollingElement as HTMLElement | null);
-  if (!scroller || scroller.scrollTop === 0) return;
-  const startTop = scroller.scrollTop;
-  const start = performance.now();
-  const step = (now: number) => {
-    const elapsed = now - start;
-    scroller.scrollTop = glideTop(startTop, elapsed);
-    if (elapsed < SCORE_GLIDE_MS) window.requestAnimationFrame(step);
-  };
-  window.requestAnimationFrame(step);
-}
-
 export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   const router = useRouter();
   const pathname = usePathname() ?? attemptResultsHref(attemptUuid);
