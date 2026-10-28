@@ -164,7 +164,9 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   // on the column's edges (Stay, 28 October 2026).
   assert.match(front, /<article className="grid grid-cols-\[minmax\(0,1fr\)\] gap-6 [^"]*md:gap-8">/);
   assert.doesNotMatch(front, /md:col-start-2|md:col-span-2|md:row-span-2/);
-  assert.match(front, /md:flex-row md:items-center md:gap-4 md:rounded-2xl md:border-2/);
+  // In a narrow window the buttons wrap to their own line, never squeezed (Arthur, 28 October 2026).
+  assert.match(front, /md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:rounded-2xl md:border-2/);
+  assert.match(front, /<div className="flex flex-col gap-3 md:ml-auto md:shrink-0">/);
   assert.match(board, /<div className="mx-auto w-full min-w-0 md:max-w-lg">\s*<Podium/);
 });
 

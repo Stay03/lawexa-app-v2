@@ -309,8 +309,10 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         </div>
 
         {/* On a computer one bar: your best on the left, the answer reveal,
-            then Start and Challenge on the right. */}
-        <div className="flex min-w-0 flex-col gap-5 md:flex-row md:items-center md:gap-4 md:rounded-2xl md:border-2 md:border-border md:bg-card md:px-5 md:py-4">
+            then Start and Challenge on the right. In a narrow window the two
+            buttons move together to a second line, right-aligned, rather than
+            squeeze or run past the edge (Arthur, 28 October 2026). */}
+        <div className="flex min-w-0 flex-col gap-5 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:rounded-2xl md:border-2 md:border-border md:bg-card md:px-5 md:py-4">
           {/* The best alone: the board says the place (Arthur, 28 October 2026: minimal). */}
           {best ? (
             <div className="flex items-baseline justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:shrink-0 md:justify-start md:border-0 md:bg-transparent md:p-0">
@@ -341,7 +343,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3 md:ml-auto">
+          <div className="flex flex-col gap-3 md:ml-auto md:shrink-0">
             {/* START STAYS IN REACH: pinned to the foot of a phone's screen over
                 the same see-through plate the results use; at the bar's right
                 end on a computer. */}
