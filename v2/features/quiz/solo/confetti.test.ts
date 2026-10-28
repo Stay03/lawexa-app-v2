@@ -70,27 +70,23 @@ test('a burst is never on screen for longer than 3.2s', () => {
   assert.equal(confettiDone(burstConfetti({ x: 0, y: 0 }, seeded(4)), 10_000, 100), false);
 });
 
-test('the podium moment says "You made the Podium!", bursts as the steps land, and Skip ends both', () => {
-  const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
-  assert.match(block, /\{onPodium \? \(\s*<p\s*className=\{cn\(\s*'font-comfortaa text-2xl font-bold text-balance text-primary',\s*phase === 'waiting' && 'opacity-0',\s*playing && 'v2-solo-podium-headline',\s*\)\}\s*>\s*You made the Podium!/);
-  // The burst waits for the steps (first place lands at 900ms) and only while playing.
-  assert.match(block, /const PODIUM_LANDS_MS = 900;/);
-  assert.match(block, /if \(!playing\) return;\s*const timer = window\.setTimeout\(/);
-  assert.match(block, /\}, \[playing\]\);/);
-  // Skip (or a tap) stops the podium and clears the confetti at once.
-  assert.match(block, /const stop = \(\) => \{\s*setPhase\('still'\);\s*setConfettiFrom\(null\);\s*\};/);
-  assert.match(block, /\{confettiFrom \? <Confetti origin=\{confettiFrom\} onDone=\{endConfetti\} \/> : null\}/);
+test('the podium moment says "You made the Podium!", bursts as the steps land, and moves on after it falls', () => {
+  const stage = read('v2', 'features', 'quiz', 'solo', 'results', 'PodiumStage.tsx');
+  assert.match(stage, /playing && 'v2-solo-podium-headline',\s*\)\}\s*>\s*You made the Podium!/);
+  // The burst waits for the steps (first place lands at 900ms).
+  assert.match(stage, /const PODIUM_LANDS_MS = 900;/);
+  assert.match(stage, /setConfetti\(box \? \{ x: box\.left \+ box\.width \/ 2, y: box\.top \+ box\.height \* 0\.55 \} : 'fallen'\);/);
+  assert.match(stage, /\{typeof confetti === 'object' \? <Confetti origin=\{confetti\} onDone=\{confettiFallen\} \/> : null\}/);
 
   const confetti = read('v2', 'features', 'quiz', 'solo', 'results', 'Confetti.tsx');
-  // Our own canvas, never a tap target, and stopped with the component.
+  // Our own canvas, never a tap target, over the stage (z-40), and stopped with the component.
   assert.match(confetti, /<canvas ref=\{canvasRef\} aria-hidden className="pointer-events-none fixed inset-0 z-50 size-full" \/>/);
   assert.match(confetti, /return \(\) => cancelAnimationFrame\(frame\);/);
 });
 
-test('under reduced motion the headline stands still and no confetti falls', () => {
-  const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
-  // Reduced motion: never playing, so the timer that starts the confetti never runs.
-  assert.match(block, /!prefersReducedMotion\(\) && onPodium \? 'waiting' : 'still'/);
+test('under reduced motion there is no podium stage and no confetti: the results come straight away', () => {
+  const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
+  assert.match(screen, /useState\(\(\) => prefersReducedMotion\(\) \|\| podiumAlreadySeen\(attemptUuid\)\)/);
   const css = read('v2', 'features', 'quiz', 'solo', 'solo-quiz.css');
   const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
   assert.ok(reduced.includes('.v2-solo-podium-headline'));

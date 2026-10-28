@@ -33,13 +33,17 @@ import { finishPosition } from './position-model';
  * the quiz page's podium (`Podium`, the same gold, pale blue and peach steps
  * and rounded-square faces) with the steps growing in and the reader's face
  * climbing onto theirs, about two seconds, once. Skip, or a tap on it, ends
- * it at once; under reduced motion it stands in place with no Skip.
+ * it at once; under reduced motion it stands in place with no Skip. A
+ * top-three finish has its moment first, full screen (`PodiumStage`), so by
+ * the time this one is seen it stands still, and the "#3 of 16" line gives
+ * way to the podium itself (Arthur, 28 October 2026).
  */
 export function FinishPosition({
   quizUuid,
   runPoints,
   publicQuiz,
   viewerId,
+  podiumPlayed,
 }: {
   quizUuid: string;
   /** This run's points, to tell a new place from an older best. */
@@ -47,6 +51,8 @@ export function FinishPosition({
   /** Whether the quiz is on the public list; `null` while its detail loads. */
   publicQuiz: boolean | null;
   viewerId: number | null;
+  /** The full-screen podium has played (or is playing) for this attempt: the small one stands still. */
+  podiumPlayed: boolean;
 }) {
   // Only a public quiz has a board: a link-only or private one answers 404
   // (Tester, 28 October 2026: twice a finish, on load and on the finish's
@@ -61,7 +67,15 @@ export function FinishPosition({
   if (publicQuiz === null || boardQuery.isPending) return <FinishPositionSkeleton />;
   if (boardQuery.isError || !boardQuery.data) return null;
 
-  return <PositionBlock board={boardQuery.data.data} quizUuid={quizUuid} runPoints={runPoints} publicQuiz={publicQuiz} />;
+  return (
+    <PositionBlock
+      board={boardQuery.data.data}
+      quizUuid={quizUuid}
+      runPoints={runPoints}
+      publicQuiz={publicQuiz}
+      podiumPlayed={podiumPlayed}
+    />
+  );
 }
 
 function PositionBlock({
@@ -69,16 +83,19 @@ function PositionBlock({
   quizUuid,
   runPoints,
   publicQuiz,
+  podiumPlayed,
 }: {
   board: QuizLeaderboard;
   quizUuid: string;
   runPoints: number;
   publicQuiz: boolean | null;
+  podiumPlayed: boolean;
 }) {
   const position = finishPosition(board, runPoints, { publicQuiz: publicQuiz !== false });
   const viewer = board.viewer;
   const isYou = (entry: QuizLeaderboardEntry) => isViewerEntry(viewer, entry);
   const boardLink = publicQuiz !== false && board.player_count > 0;
+  const onPodium = position.kind === 'ranked' && position.podiumPlace !== null;
 
   return (
     <section
@@ -87,16 +104,25 @@ function PositionBlock({
     >
       {/* The quiz's visibility decides whether "Challenge a friend" joins
           the bar, so the bar has its final height only once it is known. */}
-      {position.kind === 'ranked' && position.podiumPlace ? (
-        <PodiumMoment entries={board.entries.slice(0, 3)} isYou={isYou} barSettled={publicQuiz !== null} />
+      {onPodium ? (
+        <PodiumMoment
+          entries={board.entries.slice(0, 3)}
+          isYou={isYou}
+          barSettled={publicQuiz !== null}
+          played={podiumPlayed}
+        />
       ) : null}
 
-      <p className="flex items-center gap-2 font-comfortaa text-lg font-bold text-balance text-foreground">
-        {position.kind === 'ranked' ? <Trophy aria-hidden className="size-4 text-primary" /> : null}
-        {position.line}
-      </p>
+      {/* On the podium the place is the podium itself (Arthur, 28 October 2026:
+          remove the "#3 of 16" line there; keep the "better than" line). */}
+      {onPodium ? null : (
+        <p className="flex items-center gap-2 font-comfortaa text-lg font-bold text-balance text-foreground">
+          {position.kind === 'ranked' ? <Trophy aria-hidden className="size-4 text-primary" /> : null}
+          {position.line}
+        </p>
+      )}
       {position.kind === 'ranked' && position.standing ? (
-        <p className="-mt-1.5 text-sm text-muted-foreground">{position.standing}</p>
+        <p className={cn('text-sm text-muted-foreground', !onPodium && '-mt-1.5')}>{position.standing}</p>
       ) : null}
 
       {boardLink ? (
@@ -135,17 +161,24 @@ function PodiumMoment({
   entries,
   isYou,
   barSettled,
+  played,
 }: {
   entries: readonly QuizLeaderboardEntry[];
   isYou: (entry: QuizLeaderboardEntry) => boolean;
   /** The button bar is at its final height: until then what it covers is not known. */
   barSettled: boolean;
+  /** The full-screen podium has had the moment: this one never rises a second time. */
+  played: boolean;
 }) {
   const onPodium = entries.some(isYou);
   // Only a podium with the reader's face on it has a climb to end it (a reader
   // tied for third can sort fourth); without one it stands still from the start.
   // It waits, unseen, until it is on screen: on a phone it is below the fold.
-  const [phase, setPhase] = useState<MomentPhase>(() => (!prefersReducedMotion() && onPodium ? 'waiting' : 'still'));
+  // After the full-screen podium (`PodiumStage`) it stands still: no second
+  // rise, no second confetti.
+  const [phase, setPhase] = useState<MomentPhase>(() =>
+    !played && !prefersReducedMotion() && onPodium ? 'waiting' : 'still',
+  );
   const playing = phase === 'playing';
   const [confettiFrom, setConfettiFrom] = useState<{ x: number; y: number } | null>(null);
   const podiumRef = useRef<HTMLDivElement>(null);

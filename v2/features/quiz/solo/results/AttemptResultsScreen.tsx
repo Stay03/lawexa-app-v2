@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { SearchX } from 'lucide-react';
@@ -22,13 +22,17 @@ import {
   orderedQuestions,
   quizFrontHref,
 } from '../model';
+import { isViewerEntry } from '../home-model';
 import { useStartAttempt } from '../mutations';
 import { soloQuizQueries } from '../queries';
+import { prefersReducedMotion } from '../ui';
 import { AnswersFold } from './AnswersFold';
 import { AttemptSummary } from './AttemptSummary';
 import { FinishPosition } from './FinishPosition';
 import { ResultsActions } from './ResultsActions';
 import { AttemptResultsSkeleton, RESULTS_COLUMN } from './states';
+import { PodiumStage, podiumAlreadySeen, rememberPodiumSeen } from './PodiumStage';
+import { opensOnPodium } from './position-model';
 import '../solo-quiz.css';
 
 /**
@@ -58,7 +62,9 @@ import '../solo-quiz.css';
  * can open it: the quiz's visibility is read from its detail, which the
  * reader's visit to the front has almost always cached.
  *
- * Under the fold, the reader's place on the board (`FinishPosition`).
+ * Under the fold, the reader's place on the board (`FinishPosition`). A
+ * top-three finish opens on the podium first, full screen, laid over these
+ * results (`PodiumStage`), which moves on to them by itself.
  */
 export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   const router = useRouter();
@@ -79,6 +85,22 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   // For the place block, a detail that fails to load reads as not public: it
   // then leaves the space as it was, never a skeleton that stays.
   const shareable = visibility === 'link' || visibility === 'public';
+  const publicQuiz = detailQuery.isError ? false : visibility === null ? null : visibility === 'public';
+
+  // The board decides whether the results open on the podium; the place
+  // block below reads the same entry, so this costs no second read.
+  const boardQuery = useQuery({
+    ...soloQuizQueries.leaderboard(quizUuid ?? '', { viewerId }),
+    enabled: quizUuid !== null && publicQuiz === true,
+  });
+  /** The podium has been shown (or never will be: reduced motion). */
+  const [podiumDone, setPodiumDone] = useState(() => prefersReducedMotion() || podiumAlreadySeen(attemptUuid));
+  const finishPodium = useCallback(() => {
+    rememberPodiumSeen(attemptUuid);
+    setPodiumDone(true);
+    // Back to the results it covered, from their heading.
+    window.requestAnimationFrame(() => document.getElementById('attempt-results-heading')?.focus({ preventScroll: true }));
+  }, [attemptUuid]);
 
   const startAttempt = useStartAttempt(quizUuid ?? '', viewerId);
   /** A refusal of Retake, said over the buttons — this surface has no toasts. */
@@ -142,6 +164,20 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
     );
   }
 
+  // A top-three finish opens on the podium, full screen, before the score
+  // (Arthur, 28 October 2026). Until the board says whether it is one, the
+  // results keep their skeleton, so nothing swaps under the reader. A board
+  // that fails to load goes straight to the results.
+  if (!podiumDone && (publicQuiz === null || (publicQuiz && boardQuery.isPending))) {
+    return (
+      <div className={RESULTS_COLUMN}>
+        <AttemptResultsSkeleton />
+      </div>
+    );
+  }
+  const board = boardQuery.data?.data ?? null;
+  const podiumFirst = !podiumDone && board !== null && opensOnPodium(board, score.points);
+
   const highlights = attemptHighlights(score, questions);
 
   const retake = () => {
@@ -153,41 +189,53 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   };
 
   return (
-    <div className={RESULTS_COLUMN}>
-      <AttemptSummary
-        attempt={attempt}
-        score={score}
-        highlights={highlights}
-        viewerName={viewerName}
-      />
+    <>
+      {/* The podium first, as one full-screen layer over the results, which
+          sit still (and out of reach) underneath until it moves on. */}
+      {podiumFirst && board ? (
+        <PodiumStage
+          entries={board.entries.slice(0, 3)}
+          isYou={(entry) => isViewerEntry(board.viewer, entry)}
+          onDone={finishPodium}
+        />
+      ) : null}
+      <div className={RESULTS_COLUMN} inert={podiumFirst}>
+        <AttemptSummary
+          attempt={attempt}
+          score={score}
+          highlights={highlights}
+          viewerName={viewerName}
+        />
 
-      <AnswersFold attemptUuid={attempt.uuid} questions={questions} />
+        <AnswersFold attemptUuid={attempt.uuid} questions={questions} />
 
-      <FinishPosition
-        quizUuid={attempt.quiz.uuid}
-        runPoints={score.points}
-        publicQuiz={detailQuery.isError ? false : visibility === null ? null : visibility === 'public'}
-        viewerId={viewerId}
-      />
+        <FinishPosition
+          quizUuid={attempt.quiz.uuid}
+          runPoints={score.points}
+          publicQuiz={publicQuiz}
+          viewerId={viewerId}
+          podiumPlayed={podiumFirst || podiumDone}
+        />
 
-      {retakeError && (
-        <p
-          role="alert"
-          className="mt-4 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
-        >
-          {retakeError}
-        </p>
-      )}
+        {retakeError && (
+          <p
+            role="alert"
+            className="mt-4 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+          >
+            {retakeError}
+          </p>
+        )}
 
-      <ResultsActions
-        quizUuid={attempt.quiz.uuid}
-        quizTitle={attempt.quiz.title}
-        challenge={challengeText(viewerName, score.points, attempt.quiz.title, highlights)}
-        shareable={shareable}
-        privateQuiz={visibility === 'private'}
-        retaking={startAttempt.isPending}
-        onRetake={retake}
-      />
-    </div>
+        <ResultsActions
+          quizUuid={attempt.quiz.uuid}
+          quizTitle={attempt.quiz.title}
+          challenge={challengeText(viewerName, score.points, attempt.quiz.title, highlights)}
+          shareable={shareable}
+          privateQuiz={visibility === 'private'}
+          retaking={startAttempt.isPending}
+          onRetake={retake}
+        />
+      </div>
+    </>
   );
 }
