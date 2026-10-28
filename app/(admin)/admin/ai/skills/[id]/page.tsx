@@ -120,8 +120,8 @@ export default function AiSkillDetailPage({ params }: { params: Promise<{ id: st
               <p className="tabular-nums">{tokensLabel(skill.estimated_tokens)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground mb-1">Loads (7 days)</p>
-              <p className="tabular-nums">{skill.loads_7d.toLocaleString('en-US')}</p>
+              <p className="text-muted-foreground mb-1">On agents</p>
+              <p className="tabular-nums">{skill.agents_count.toLocaleString('en-US')}</p>
             </div>
             <div>
               <p className="text-muted-foreground mb-1 flex items-center gap-1">
