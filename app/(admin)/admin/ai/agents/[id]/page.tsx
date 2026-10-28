@@ -43,6 +43,7 @@ import { format } from 'date-fns';
 import { useAdminAiAgent } from '@/lib/hooks/useAdminAi';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { AiAgentDeleteDialog } from '@/components/admin/ai/AiAgentDeleteDialog';
+import { AiAgentSkillsCard } from '@/components/admin/ai/AiAgentSkillsCard';
 import type { AdminAiAgent } from '@/types/admin-ai';
 
 interface AiAgentDetailPageProps {
@@ -310,6 +311,9 @@ export default function AiAgentDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {/* Skills on this agent (read-only; attached from the skill's page) */}
+      <AiAgentSkillsCard skills={agent.skills} />
 
       {/* Delete Dialog */}
       <AiAgentDeleteDialog

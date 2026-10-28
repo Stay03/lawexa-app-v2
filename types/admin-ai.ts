@@ -274,7 +274,19 @@ export interface AdminAiAgent {
   updated_at: string;
 }
 
-export type AdminAiAgentDetail = AdminAiAgent;
+/** A skill on an agent, as the agent's detail lists it (woz, 28 October 2026). */
+export interface AdminAiAgentSkill {
+  id: number;
+  name: string;
+  display_name: string;
+  load_mode: 'on_demand' | 'always_on';
+  is_active: boolean;
+}
+
+export type AdminAiAgentDetail = AdminAiAgent & {
+  /** The skills on this agent; absent from a server without skills. */
+  skills?: AdminAiAgentSkill[];
+};
 
 export interface AdminAiAgentsParams {
   active_only?: boolean;
