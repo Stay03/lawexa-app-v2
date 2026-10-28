@@ -115,6 +115,9 @@ export function useFinishAttempt(attemptUuid: string, viewerId: number | null) {
     },
     onSuccess: (response) => {
       queryClient.setQueryData<QuizAttemptResponse>(attemptKey, response);
+      // The finish writes the reader's board row at once (Backend), so the
+      // results read the board fresh rather than a copy from the quiz page.
+      void queryClient.invalidateQueries({ queryKey: soloQuizQueries.leaderboardOf(response.data.quiz.uuid) });
     },
     onError: (error) => {
       // Already finished elsewhere (a second tab): the re-read carries the

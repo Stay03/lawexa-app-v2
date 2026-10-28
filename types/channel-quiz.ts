@@ -288,6 +288,10 @@ export interface QuizLeaderboard {
   /** The reader's own place; `null` signed out or before their first finish. */
   viewer: {
     rank: number;
+    /** Players with fewer points than the reader; players tied with them
+     *  count neither ahead nor behind (Backend, 28 October 2026). Absent
+     *  from an older server. */
+    players_behind?: number;
     points: number;
     achieved_at: string | null;
     /** The reader as a row shows a player, built by the server's same rule

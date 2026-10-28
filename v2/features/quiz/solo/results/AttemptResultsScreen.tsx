@@ -26,6 +26,7 @@ import { useStartAttempt } from '../mutations';
 import { soloQuizQueries } from '../queries';
 import { AnswersFold } from './AnswersFold';
 import { AttemptSummary } from './AttemptSummary';
+import { FinishPosition } from './FinishPosition';
 import { ResultsActions } from './ResultsActions';
 import { AttemptResultsSkeleton, RESULTS_COLUMN } from './states';
 import '../solo-quiz.css';
@@ -56,6 +57,8 @@ import '../solo-quiz.css';
  * friend hands on the quiz's own link with the score, and only where a link
  * can open it: the quiz's visibility is read from its detail, which the
  * reader's visit to the front has almost always cached.
+ *
+ * Under the fold, the reader's place on the board (`FinishPosition`).
  */
 export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   const router = useRouter();
@@ -157,6 +160,13 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
       />
 
       <AnswersFold attemptUuid={attempt.uuid} questions={questions} />
+
+      <FinishPosition
+        quizUuid={attempt.quiz.uuid}
+        runPoints={score.points}
+        publicQuiz={visibility === null ? null : visibility === 'public'}
+        viewerId={viewerId}
+      />
 
       {retakeError && (
         <p

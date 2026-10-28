@@ -145,7 +145,7 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   // row reads like the others, from the server's viewer.user, and their
   // standing sits under it.
   assert.doesNotMatch(board, /#\{viewer\.rank\}|>Your place</);
-  assert.match(board, /const standing = viewer \? standingLine\(viewer\.rank, board\.player_count\) : null;/);
+  assert.match(board, /const standing = viewer \? standingLine\(viewer\.players_behind, board\.player_count, viewer\.rank\) : null;/);
   assert.match(board, /const user = viewer\.user \?\? \{/);
   assert.match(board, /<YourRow viewer=\{viewer\} standing=\{standing\} \/>/);
   assert.match(board, /standing=\{isYou\(entry\) \? standing : null\}/);
@@ -168,12 +168,31 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   assert.match(board, /<div className="mx-auto w-full min-w-0 md:max-w-lg">\s*<Podium/);
 });
 
-test('the banner line says how many of the other players the reader is ahead of', () => {
-  assert.equal(standingLine(13, 16), 'You’re doing better than 20% of other players.');
-  assert.equal(standingLine(4, 11), 'You’re doing better than 70% of other players.');
-  assert.equal(standingLine(1, 16), 'You’re top of the board.');
-  assert.equal(standingLine(1, 1), 'You’re the only player so far.');
-  assert.equal(standingLine(16, 16), 'Play again to climb the board.');
+test('the standing line is the share of the OTHER players behind the reader, from the server’s players_behind', () => {
+  // Techlead, 28 October 2026: players_behind / (player_count - 1).
+  assert.equal(standingLine(15, 16, 1), 'You’re top of the board.');
+  assert.equal(standingLine(7, 16, 8), 'You’re doing better than 47% of other players.');
+  assert.equal(standingLine(3, 16, 13), 'You’re doing better than 20% of other players.');
+  assert.equal(standingLine(7, 11, 4), 'You’re doing better than 70% of other players.');
+  assert.equal(standingLine(0, 16, 16), 'Play again to climb the board.');
+  // A 3- and a 2-player board.
+  assert.equal(standingLine(1, 3, 2), 'You’re doing better than 50% of other players.');
+  assert.equal(standingLine(1, 2, 1), 'You’re top of the board.');
+  assert.equal(standingLine(0, 2, 2), 'Play again to climb the board.');
+});
+
+test('the standing line gives no percentage when there is no one to compare with', () => {
+  // One player.
+  assert.equal(standingLine(0, 1, 1), 'You’re the only player so far.');
+  // Two players level at the top: both rank 1, neither beats anyone.
+  assert.equal(standingLine(0, 2, 1), 'You’re level at the top of the board.');
+  // An older server without players_behind: nothing, rather than a guess from the rank.
+  assert.equal(standingLine(undefined, 16, 13), null);
+  assert.equal(standingLine(null, 16, 13), null);
+  // Never "better than 100%" while someone is level or ahead.
+  assert.equal(standingLine(298, 300, 2), 'You’re doing better than 99% of other players.');
+  // A share that rounds to 0 says climb, not "0%".
+  assert.equal(standingLine(1, 400, 399), 'Play again to climb the board.');
 });
 
 test('the tags are topic, level and year, or the size when there are none', () => {

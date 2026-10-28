@@ -123,7 +123,7 @@ export function BurstDots({ className }: { className: string }) {
 }
 
 /** Whether the reader asked for less motion. Read once, on the client. */
-function prefersReducedMotion(): boolean {
+export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 

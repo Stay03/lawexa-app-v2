@@ -153,14 +153,26 @@ export function playerDetailLabel(user: { institution?: string; level?: string }
 }
 
 /**
- * The line beside the reader's place on the board (Arthur's reference, 28
- * October 2026: "#4 You are doing better than 60% of other players!"): the
- * share of the OTHER players they are ahead of. Ties count as not ahead.
+ * The line beside the reader's place on the board and on their results
+ * (Arthur's reference, 28 October 2026: "#4 You are doing better than 60% of
+ * other players!"): the share of the OTHER players they are ahead of, from
+ * the server's `players_behind` (Techlead, 28 October 2026: a rank cannot say
+ * it when players tie; two players level at the top are both 1 of 2 and
+ * neither beats anyone). No percentage when there is no one else, when the
+ * count is missing (an older server) or when no one is behind them.
  */
-export function standingLine(rank: number, playerCount: number): string {
+export function standingLine(
+  playersBehind: number | null | undefined,
+  playerCount: number,
+  rank?: number,
+): string | null {
   if (playerCount <= 1) return 'You’re the only player so far.';
-  if (rank <= 1) return 'You’re top of the board.';
-  const share = Math.round((Math.max(0, playerCount - rank) / (playerCount - 1)) * 100);
+  if (typeof playersBehind !== 'number' || !Number.isFinite(playersBehind)) return null;
+  const others = playerCount - 1;
+  if (playersBehind >= others) return 'You’re top of the board.';
+  if (playersBehind <= 0) return rank === 1 ? 'You’re level at the top of the board.' : 'Play again to climb the board.';
+  // Never "better than 100%" while someone is level with or ahead of them.
+  const share = Math.min(99, Math.round((playersBehind / others) * 100));
   return share > 0 ? `You’re doing better than ${share}% of other players.` : 'Play again to climb the board.';
 }
 
