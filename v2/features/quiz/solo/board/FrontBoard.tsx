@@ -33,8 +33,9 @@ const BOARD_TOP = 10;
  * No card around it (Arthur, 28 October 2026: "Remove the outer card ... Let
  * the leaderboard, podium, and player rankings sit directly on the page's
  * normal background ... use subtle dividers between ranking rows, and retain
- * the gold highlight for the current user"). On a computer the podium and
- * the list stand side by side, so the board fills the page's width. The ranking rule sits behind the heading's (i).
+ * the gold highlight for the current user"). One column on a computer too
+ * (Stay, 28 October 2026): the banner across it, the podium centred, the
+ * rows under it at full width. The ranking rule sits behind the heading's (i).
  * Where a player studies is sent to a signed-in reader only (Backend: their
  * Law School campus when they are at law school, else their university); a
  * visitor sees names alone.
@@ -74,8 +75,8 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
           {BOARD_EMPTY_NOTE}
         </p>
       ) : (
-        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:items-start md:gap-8">
-          <div className="flex min-w-0 flex-col gap-4">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">
+          <div className="flex min-w-0 flex-col gap-4 md:gap-6">
             {viewer ? (
               <div className="flex items-center gap-3 rounded-2xl bg-secondary/60 px-3 py-2.5">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary font-comfortaa text-base font-bold text-primary-foreground tabular-nums">
@@ -86,7 +87,9 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
                 </span>
               </div>
             ) : null}
-            <Podium entries={podium} isYou={isYou} />
+            <div className="mx-auto w-full min-w-0 md:max-w-lg">
+              <Podium entries={podium} isYou={isYou} />
+            </div>
           </div>
 
           {rest.length > 0 || (viewer && !youShown) ? (
@@ -260,8 +263,8 @@ export function FrontBoardSkeleton() {
   return (
     <div aria-hidden className="flex flex-col gap-4">
       <Skeleton className="h-5 w-28 rounded" />
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:gap-8">
-        <div className="grid grid-cols-3 items-end gap-1 pt-6">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">
+        <div className="mx-auto grid w-full grid-cols-3 items-end gap-1 pt-6 md:max-w-lg">
           <Skeleton className="h-44 rounded-xl" />
           <Skeleton className="h-52 rounded-xl" />
           <Skeleton className="h-40 rounded-xl" />

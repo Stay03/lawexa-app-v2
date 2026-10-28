@@ -272,13 +272,13 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 
   return (
     <div className={cn(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44')}>
-      {/* Three cells (Arthur, 27 October 2026: "the quiz, Start and Challenge
-          first"; "there is empty space underneath desktop"): on a phone the
-          quiz, then your best and Start, then the board; on a computer the
-          quiz and its panel side by side, the board across the width under
-          both. */}
-      <article className="grid gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] md:items-start md:gap-x-8 md:gap-y-5">
-        <div className="min-w-0 md:col-start-1 md:row-start-1">
+      {/* One column, read top to bottom, on a phone and a computer alike
+          (Stay, 28 October 2026: on a computer "the name is squezed in one
+          side and the other components just look like they were spat on the
+          page"): the quiz, one bar with your best and Start, then the board.
+          Every part shares the column's edges. */}
+      <article className="grid grid-cols-[minmax(0,1fr)] gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 md:gap-8">
+        <div className="min-w-0">
           {/* Minimal (Arthur, 28 October 2026): the quiz's letter tile, the
               title, whose it is, and its facts as quiet tags. `creator` is
               nullable (a gone account): a word, never a crash. */}
@@ -308,10 +308,12 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
           </header>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-5 md:col-start-2 md:row-start-1 md:rounded-3xl md:border-2 md:border-border md:bg-card md:p-5">
+        {/* On a computer one bar: your best on the left, the answer reveal,
+            then Start and Challenge on the right. */}
+        <div className="flex min-w-0 flex-col gap-5 md:flex-row md:items-center md:gap-6 md:rounded-2xl md:border-2 md:border-border md:bg-card md:px-5 md:py-4">
           {/* The best alone: the board says the place (Arthur, 28 October 2026: minimal). */}
           {best ? (
-            <div className="flex items-baseline justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:border-0 md:bg-transparent md:p-0">
+            <div className="flex items-baseline justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:shrink-0 md:justify-start md:border-0 md:bg-transparent md:p-0">
               <span className="text-sm text-muted-foreground">Your best</span>
               <span className="font-comfortaa text-xl font-bold text-foreground tabular-nums">{best.replace(/^Best /, '')}</span>
             </div>
@@ -320,8 +322,8 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
           {/* When the answers show (Arthur, 24 October 2026): a small choice,
               "After each question" by default, sent with Start. */}
           {mayTake ? (
-            <div className="flex items-center justify-between gap-3">
-              <label id="quiz-reveal-label" htmlFor="quiz-reveal" className="text-sm text-muted-foreground">
+            <div className="flex items-center justify-between gap-3 md:justify-start">
+              <label id="quiz-reveal-label" htmlFor="quiz-reveal" className="text-sm whitespace-nowrap text-muted-foreground">
                 Answer reveal
               </label>
               <Select value={revealMode} onValueChange={(value) => setRevealMode(value as QuizRevealMode)}>
@@ -339,10 +341,10 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             </div>
           ) : null}
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-3 md:ml-auto">
             {/* START STAYS IN REACH: pinned to the foot of a phone's screen over
-                the same see-through plate the results use; in the panel on a
-                computer. */}
+                the same see-through plate the results use; at the bar's right
+                end on a computer. */}
             <div className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70 md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
               {/* B1's bold type does not fit "Sign in to take this quiz" beside
                   "Challenge a friend" in a phone's bar: the sign-in takes the
@@ -408,7 +410,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         </div>
 
         {quiz.visibility === 'public' ? (
-          <div className="min-w-0 md:col-span-2 md:col-start-1 md:row-start-2 md:pt-2">
+          <div className="min-w-0 md:pt-2">
             {board ? <FrontBoard board={board} /> : boardQuery.isPending ? <FrontBoardSkeleton /> : null}
           </div>
         ) : null}
@@ -440,11 +442,11 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 /* `v2-solo` carries design B1's tokens (`../solo-quiz.css`): the lip, the
  * colours, the same reading as the player and the results (Arthur's B1,
  * 24 October 2026). */
-const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-5xl px-4 pt-3 pb-28 md:pt-6 md:pb-16';
+const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-[50rem] px-4 pt-3 pb-28 md:pt-6 md:pb-16';
 
 /** The page's buttons on B1's lip: the results' raised pair, a size down on a
  *  phone so Start and Challenge a friend share the pinned bar. */
-const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-[15px] md:h-14 md:px-5 md:text-base';
+const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-[15px] md:flex-none md:px-5 md:text-base';
 
 /**
  * The front's reserved shape: the masthead (title, a line, the meta row), the
