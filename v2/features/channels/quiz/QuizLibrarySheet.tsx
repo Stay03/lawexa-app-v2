@@ -460,6 +460,7 @@ export function QuizLibrarySheet({
         onOpenChange={setFormOpen}
         channelUuid={channel.uuid}
         channelName={channel.name}
+        spaceUuid={channel.space.uuid}
         destination={formSource === 'library' ? 'library' : 'channel'}
         viewerId={viewerId}
         quizUuid={editingUuid}

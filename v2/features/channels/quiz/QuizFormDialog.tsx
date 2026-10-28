@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowDown,
@@ -14,6 +15,7 @@ import {
   Loader2,
   MoreHorizontal,
   Plus,
+  Sparkles,
   Trash2,
 } from 'lucide-react';
 
@@ -50,6 +52,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
+import { askHref, QUIZ_ASK_PROMPT } from '@/v2/shell/designs/composer/ask-param';
 import { extractApiError } from '@/lib/utils/api-error';
 import type {
   ChannelQuiz,
@@ -186,6 +189,14 @@ import '@/v2/features/quiz/solo/solo-quiz.css';
  * tick, and "Explanation (optional)" below them. A refused save scrolls to
  * the title, question or scenario at fault and says why there
  * (`findFormProblem`), and keeps saying so until it is fixed.
+ *
+ * ── LAWEXA FIRST (Arthur, 28 October 2026) ─────────────────────────────────
+ * A NEW quiz opens on one choice: "Create with Lawexa" as the main button,
+ * which opens a chat with "Make me a quiz on " in the box, focused and not
+ * sent (`ask-param.ts`), and "Create manually" as a quiet text button that
+ * shows this form. The chat is the home's, or for a channel's quiz the
+ * channel's Space's. No cards, nothing else on the choice. An edit opens on
+ * the form.
  */
 
 /** Where a NEW quiz is filed. Ignored when editing — a quiz's home is fixed. */
@@ -201,6 +212,7 @@ export function QuizFormDialog({
   channelName,
   destination = 'library',
   viewerId,
+  spaceUuid,
   quizUuid,
   onSaved,
 }: {
@@ -214,11 +226,18 @@ export function QuizFormDialog({
    *  place a quiz can go. */
   destination?: QuizDestination;
   viewerId: number | null;
+  /** The channel's Space: "Create with Lawexa" opens its chat for a quiz
+   *  written for the channel. Absent outside a channel. */
+  spaceUuid?: string;
   /** Present = edit an existing quiz; absent = write a new one. */
   quizUuid?: string;
   onSaved?: (quiz: ChannelQuiz) => void;
 }) {
   const isEdit = !!quizUuid;
+  /** "Create manually" was chosen. The dialog is keyed per opening, so every
+   *  new quiz starts on the choice. */
+  const [manual, setManual] = useState(false);
+  const choosing = !isEdit && !manual;
   const detailQuery = useQuery({
     ...channelQuizQueries.quizDetail(quizUuid ?? '', { viewerId }),
     enabled: open && isEdit,
@@ -498,7 +517,9 @@ export function QuizFormDialog({
     <ResponsiveOverlay
       open={open}
       onOpenChange={requestClose}
-      className="md:max-w-2xl"
+      className={choosing ? 'md:max-w-md' : 'md:max-w-2xl'}
+      // The choice is two buttons: a sheet as tall as them on a phone.
+      size={choosing ? 'content' : 'fill'}
       title={
         isEdit
           ? 'Edit quiz'
@@ -507,52 +528,63 @@ export function QuizFormDialog({
             : 'Create a quiz in your library'
       }
       description={
-        <>
-          {/* One short line (Arthur, 25 October 2026: "replace the long
-              introductory content with a short description"). A channel's
-              keeps the live game's own fact. */}
-          {solo
-            ? 'Each question has its own timer, and faster right answers score more.'
-            : 'Each question has its own timer. Everyone answers on their own device.'}
-          {/* THE CONSEQUENCE, STATED — a channel's new quiz only, while it is
-              still a choice. It is a `span` and not a `p` because
-              `DialogDescription` IS a paragraph, and a paragraph inside a
-              paragraph is markup the browser silently rewrites. */}
-          {!isEdit && room ? (
-            <span className="mt-1 block text-xs">
-              It belongs to {room.name} and to you, and it is in your library either way.
-            </span>
-          ) : null}
-        </>
+        choosing ? (
+          'Let Lawexa create a quiz on any topic or from your study material.'
+        ) : (
+          <>
+            {/* One short line (Arthur, 25 October 2026: "replace the long
+                introductory content with a short description"). A channel's
+                keeps the live game's own fact. */}
+            {solo
+              ? 'Each question has its own timer, and faster right answers score more.'
+              : 'Each question has its own timer. Everyone answers on their own device.'}
+            {/* THE CONSEQUENCE, STATED — a channel's new quiz only, while it is
+                still a choice. It is a `span` and not a `p` because
+                `DialogDescription` IS a paragraph, and a paragraph inside a
+                paragraph is markup the browser silently rewrites. */}
+            {!isEdit && room ? (
+              <span className="mt-1 block text-xs">
+                It belongs to {room.name} and to you, and it is in your library either way.
+              </span>
+            ) : null}
+          </>
+        )
       }
       footer={
-        <>
-          <Button
-            variant="outline"
-            onClick={() => requestClose(false)}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          {/* A quiz whose questions are frozen (played) or not this viewer's to
-              rewrite saves its METADATA — and validating questions it cannot
-              touch would lock the reader out of the save that does work. */}
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
-            {metadataOnly
-              ? 'Save title and settings'
-              : isEdit
-                ? 'Save changes'
-                : 'Create quiz'}
-          </Button>
-        </>
+        choosing ? undefined : (
+          <>
+            <Button
+              variant="outline"
+              onClick={() => requestClose(false)}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            {/* A quiz whose questions are frozen (played) or not this viewer's to
+                rewrite saves its METADATA — and validating questions it cannot
+                touch would lock the reader out of the save that does work. */}
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting}
+            >
+              {submitting && <Loader2 aria-hidden className="size-4 animate-spin" />}
+              {metadataOnly
+                ? 'Save title and settings'
+                : isEdit
+                  ? 'Save changes'
+                  : 'Create quiz'}
+            </Button>
+          </>
+        )
       }
     >
       <div className="space-y-5">
-        {isEdit && detailQuery.isPending ? (
+        {choosing ? (
+          <QuizCreateChoice
+            chatHref={askHref(room && spaceUuid ? `/spaces/${spaceUuid}` : '/', QUIZ_ASK_PROMPT)}
+            onManual={() => setManual(true)}
+          />
+        ) : isEdit && detailQuery.isPending ? (
           <QuizFormSkeleton />
         ) : (
           <>
@@ -560,6 +592,9 @@ export function QuizFormDialog({
               <Label htmlFor="quiz-title">Title</Label>
               <Input
                 id="quiz-title"
+                // Chosen from "Create manually": the button is gone, so the
+                // keyboard starts on the title.
+                autoFocus={manual}
                 maxLength={QUIZ_TITLE_MAX}
                 placeholder="e.g. Land law, week 4"
                 value={title}
@@ -894,6 +929,28 @@ export function QuizFormDialog({
         </AlertDialogContent>
       </AlertDialog>
     </ResponsiveOverlay>
+  );
+}
+
+/** Lawexa first, the form second (Arthur, 28 October 2026). The chat link
+ *  leaves the page, which closes the form with it. */
+function QuizCreateChoice({ chatHref, onManual }: { chatHref: string; onManual: () => void }) {
+  return (
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+      <Button asChild className="h-11 px-5 text-[15px]">
+        <Link href={chatHref}>
+          <Sparkles aria-hidden className="size-4" />
+          Create with Lawexa
+        </Link>
+      </Button>
+      <Button
+        variant="ghost"
+        className="h-11 px-3 text-[15px] text-muted-foreground hover:text-foreground"
+        onClick={onManual}
+      >
+        Create manually
+      </Button>
+    </div>
   );
 }
 

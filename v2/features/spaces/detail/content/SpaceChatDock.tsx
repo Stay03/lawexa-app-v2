@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type Ref } from 'react';
+import { useRef, useState, type Ref } from 'react';
 
 import { useV2Session } from '@/v2/runtime/session-context';
 import {
@@ -8,6 +8,7 @@ import {
   type HomeComposerHandle,
   type HomeComposerSpace,
 } from '@/v2/shell/designs/HomeComposer';
+import { readAskParam, useAskArrival } from '@/v2/shell/designs/composer/ask-param';
 
 /** Arthur's words for the box (15 October 2026), the same for a Work and a
  *  Study space: one layout, and here one line of copy too. */
@@ -40,7 +41,8 @@ export const SPACE_RADAR_COMPOSER_PLACEHOLDER = 'Tell Lawexa what this Space sho
  *
  * The text is local state: the page is keyed by the space, so a draft never
  * follows the reader into another space, and the home's shared draft key
- * (`useComposerDraft`) is left alone.
+ * (`useComposerDraft`) is left alone. A link's words (`?ask=…`, 28 October
+ * 2026: a channel's "Create with Lawexa") start it, focused after them.
  *
  * `handle` is the box's own (`HomeComposerHandle`): the empty list's Upload
  * files opens this box's picker, so the file shows as a chip in the box, saved
@@ -64,10 +66,12 @@ export function SpaceChatDock({
   placeholder?: string;
 }) {
   const session = useV2Session();
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(() => readAskParam() ?? '');
+  const box = useRef<HTMLDivElement>(null);
+  useAskArrival(box);
 
   return (
-    <div data-space-chat-dock="" className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto px-4 pt-6 v2-safe-bottom">
+    <div ref={box} data-space-chat-dock="" className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto px-4 pt-6 v2-safe-bottom">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 bottom-0 -z-10 h-full bg-gradient-to-t from-background via-background/90 to-transparent"

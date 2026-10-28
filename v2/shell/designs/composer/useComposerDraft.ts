@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react';
 
+import { readAskParam } from './ask-param';
+
 /**
  * useComposerDraft — the home composer's unsent-text draft, persisted so it survives
  * a reload AND a home-tab switch, faithful to v1 (`app/(main)/page.tsx` reads/writes
@@ -22,12 +24,29 @@ import { useCallback, useState } from 'react';
  * on hydration (the sanctioned "lazy useState for client values" pattern — the
  * initializer stays pure, and the setter is the only writer, so there is no
  * setState-in-effect for the React Compiler lint to flag).
+ *
+ * A LINK'S WORDS COME FIRST (`ask-param.ts`, 28 October 2026): `/?ask=…` opens
+ * the box with them in place of the saved draft, and the home stores them as
+ * the draft once it has them (`useAskArrival`).
  */
 const DRAFT_KEY = 'home_input_draft';
+
+/** Store the home's draft; an empty one is removed. */
+export function saveComposerDraft(next: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (next) window.localStorage.setItem(DRAFT_KEY, next);
+    else window.localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // localStorage unavailable (privacy mode) — the draft is in-memory only.
+  }
+}
 
 export function useComposerDraft(): readonly [string, (next: string) => void] {
   const [value, setValue] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
+    const ask = readAskParam();
+    if (ask) return ask;
     try {
       return window.localStorage.getItem(DRAFT_KEY) ?? '';
     } catch {
@@ -37,13 +56,7 @@ export function useComposerDraft(): readonly [string, (next: string) => void] {
 
   const set = useCallback((next: string) => {
     setValue(next);
-    if (typeof window === 'undefined') return;
-    try {
-      if (next) window.localStorage.setItem(DRAFT_KEY, next);
-      else window.localStorage.removeItem(DRAFT_KEY);
-    } catch {
-      // localStorage unavailable (privacy mode) — the draft is in-memory only.
-    }
+    saveComposerDraft(next);
   }, []);
 
   return [value, set] as const;

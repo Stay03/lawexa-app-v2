@@ -7,6 +7,7 @@ import { isAccountRole } from '@/v2/runtime/account';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { HomeComposer } from './HomeComposer';
 import { HomeComposerProvider, useHomeComposer } from './home-composer-context';
+import { useAskArrival } from './composer/ask-param';
 import { HOME_COMPOSER_DOCK, HOME_DOCK_FADE, HOME_FRAME, HOME_FRAME_CONTENT } from './home-frame';
 
 /**
@@ -44,6 +45,9 @@ export function HomeFrame({ children }: { children: ReactNode }) {
 
 function HomeDock({ signedIn, role }: { signedIn: boolean; role?: UserRole }) {
   const { value, setValue, confidential, setConfidential, setRedacting, areaRef } = useHomeComposer();
+  // A link's words (`/?ask=…`): the box is focused after them, and they stay
+  // as the draft.
+  useAskArrival(areaRef, true);
   return (
     <div data-home-dock="" className={HOME_COMPOSER_DOCK}>
       <div aria-hidden className={HOME_DOCK_FADE} />
