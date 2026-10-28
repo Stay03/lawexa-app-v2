@@ -17,6 +17,7 @@ import {
   findPrevious,
   getFindState,
   isFindShortcut,
+  keepCase,
   replaceAll,
   replaceCurrent,
   selectionSeed,
@@ -128,7 +129,8 @@ test('Replace all is one transaction: one undo brings every match back, and the 
   assert.equal(getFindState(state).matches.length, 2);
 
   state = run(state, replaceAll('appellant'));
-  assert.equal(state.doc.textBetween(0, state.doc.content.size, '\n'), 'appellant v defendant\nthe appellant wins');
+  // "Claimant" keeps its capital (Lucy, 25 October 2026).
+  assert.equal(state.doc.textBetween(0, state.doc.content.size, '\n'), 'appellant v defendant\nthe Appellant wins');
   const first = state.doc.firstChild?.firstChild;
   assert.equal(first?.text, 'appellant');
   assert.deepEqual(first?.marks.map((mark) => mark.type.name), ['bold']);
@@ -137,6 +139,65 @@ test('Replace all is one transaction: one undo brings every match back, and the 
   state = run(state, undo);
   assert.ok(state.doc.eq(original));
   assert.equal(getFindState(state).matches.length, 2);
+});
+
+test('a replacement keeps the capitals of the text it replaces', () => {
+  // Lucy, 25 October 2026: replacing "court" turned "Court" into "court".
+  assert.equal(keepCase('court', 'tribunal'), 'tribunal');
+  assert.equal(keepCase('Court', 'tribunal'), 'Tribunal');
+  assert.equal(keepCase('COURT', 'tribunal'), 'TRIBUNAL');
+  // Two words: the first letter only, or all capitals.
+  assert.equal(keepCase('High court', 'lower court'), 'Lower court');
+  assert.equal(keepCase('HIGH COURT', 'lower court'), 'LOWER COURT');
+  // A lone capital letter is a capital first letter, not "all capitals".
+  assert.equal(keepCase('I', 'we'), 'We');
+  assert.equal(keepCase('A', 'an'), 'An');
+  // Punctuation and digits around the letters do not count.
+  assert.equal(keepCase('"Court"', 'tribunal'), 'Tribunal');
+  assert.equal(keepCase('s20(4)', 'section'), 'section');
+  assert.equal(keepCase('20', 'twenty'), 'twenty');
+  // A replacement typed with capitals of its own goes in as typed (the techlead, 28 October 2026).
+  assert.equal(keepCase('court', 'SEC'), 'SEC');
+  assert.equal(keepCase('COURT', 'McDonald'), 'McDonald');
+  assert.equal(keepCase('Court', 'iPhone'), 'iPhone');
+  // Other scripts.
+  assert.equal(keepCase('Éclair', 'gâteau'), 'Gâteau');
+  assert.equal(keepCase('STRASSE', 'straße'), 'STRASSE');
+});
+
+test('Replace all keeps each match’s capitals with Match case off, and puts it in as typed with it on', () => {
+  const sentence = () => docOf(paragraph(text('The Court held that the court below erred, and the COURT of Appeal agreed.')));
+  let state = stateOf(sentence());
+  state = run(state, setFindQuery('court', false));
+  state = run(state, replaceAll('tribunal'));
+  assert.equal(state.doc.textContent, 'The Tribunal held that the tribunal below erred, and the TRIBUNAL of Appeal agreed.');
+  // Still one undo for all three.
+  state = run(state, undo);
+  assert.ok(state.doc.eq(sentence()));
+
+  // Match case on: only the exact "court" matches, and the replacement goes in as typed.
+  let exact = stateOf(sentence());
+  exact = run(exact, setFindQuery('Court', true));
+  exact = run(exact, replaceAll('tribunal'));
+  assert.equal(exact.doc.textContent, 'The tribunal held that the court below erred, and the COURT of Appeal agreed.');
+});
+
+test('Replace keeps the capitals too, and moves on past what it wrote even when capitals change its length', () => {
+  let state = stateOf(docOf(paragraph(text('Strasse strasse'))));
+  state = run(state, setFindQuery('strasse', false));
+  state = run(state, replaceCurrent('straße'));
+  // "Strasse" has a capital first letter: "Straße".
+  assert.equal(state.doc.textContent, 'Straße strasse');
+  assert.equal(getFindState(state).current, 0);
+  assert.equal(getFindState(state).matches.length, 1);
+
+  let shouting = stateOf(docOf(paragraph(text('STRASSE strasse'))));
+  shouting = run(shouting, setFindQuery('strasse', false));
+  shouting = run(shouting, replaceCurrent('straße'));
+  // In capitals "straße" is "STRASSE", one letter longer, and the next match is still the second word.
+  assert.equal(shouting.doc.textContent, 'STRASSE strasse');
+  const next = getFindState(shouting);
+  assert.equal(shouting.doc.textBetween(next.matches[next.current].from, next.matches[next.current].to), 'strasse');
 });
 
 test('Replace replaces the current match and moves to the next, and a replacement holding the query is not found again', () => {

@@ -27,7 +27,8 @@ import { scrollMatchToMiddle } from './scroll-to-match';
  * A replacement is an ordinary edit: it goes through the editor, so undo and
  * the autosave see it like typing. It takes the marks of the text where the
  * match starts, so a bold word stays bold. Replace all is ONE transaction, so
- * one undo brings every match back.
+ * one undo brings every match back. With Match case off, each replacement
+ * keeps the capitals of the text it replaces (`keepCase`).
  */
 
 /** One match, as document positions. */
@@ -268,14 +269,50 @@ export function findPrevious(): Command {
   return step(-1);
 }
 
-/** Put `text` over one match, with the marks of the match's first character. */
-function replaceRange(tr: Transaction, range: FindRange, text: string): void {
+/** A letter in any script. */
+const LETTER = /\p{L}/u;
+
+/**
+ * The replacement, written with the capitals of the text it replaces (Lucy, 25
+ * October 2026: replacing "court" turned "Court" into "court"): found in
+ * capitals (two letters or more), the replacement goes in capitals; found
+ * with a capital first letter, the replacement's first letter is a capital;
+ * otherwise it goes in as typed. A replacement typed with any capital of its
+ * own ("SEC", "McDonald") goes in exactly as typed: the reader chose those
+ * capitals (the techlead, 28 October 2026). Only used with Match case off;
+ * with it on, every replacement goes in as typed.
+ */
+export function keepCase(found: string, replacement: string): string {
+  if (replacement !== replacement.toLowerCase()) return replacement;
+  const letters = [...found].filter((character) => LETTER.test(character));
+  if (letters.length === 0) return replacement;
+  const word = letters.join('');
+  if (letters.length >= 2 && word === word.toUpperCase() && word !== word.toLowerCase()) {
+    return replacement.toUpperCase();
+  }
+  const first = letters[0];
+  if (first === first.toLowerCase() || first !== first.toUpperCase()) return replacement;
+  const characters = [...replacement];
+  const index = characters.findIndex((character) => LETTER.test(character));
+  if (index === -1) return replacement;
+  characters[index] = characters[index].toUpperCase();
+  return characters.join('');
+}
+
+/**
+ * Put `text` over one match, with the marks of the match's first character
+ * and, with Match case off, the capitals of the text it replaces. Returns the
+ * length written, which capitals can change ("ß" in capitals is "SS").
+ */
+function replaceRange(tr: Transaction, range: FindRange, text: string, caseSensitive: boolean): number {
   if (text.length === 0) {
     tr.delete(range.from, range.to);
-    return;
+    return 0;
   }
+  const written = caseSensitive ? text : keepCase(tr.doc.textBetween(range.from, range.to), text);
   const marks = tr.doc.nodeAt(range.from)?.marks ?? [];
-  tr.replaceWith(range.from, range.to, tr.doc.type.schema.text(text, marks));
+  tr.replaceWith(range.from, range.to, tr.doc.type.schema.text(written, marks));
+  return written.length;
 }
 
 /** Replace the current match and move to the next one after it. */
@@ -286,10 +323,10 @@ export function replaceCurrent(text: string): Command {
     if (!match) return false;
     if (dispatch) {
       const tr = state.tr;
-      replaceRange(tr, match, text);
+      const written = replaceRange(tr, match, text, find.caseSensitive);
       // The next match starts after the new text, so a replacement that
       // contains the query is not found again.
-      const meta: FindMeta = { type: 'after', pos: match.from + text.length };
+      const meta: FindMeta = { type: 'after', pos: match.from + written };
       dispatch(tr.setMeta(findReplaceKey, meta));
     }
     return true;
@@ -299,12 +336,14 @@ export function replaceCurrent(text: string): Command {
 /** Replace every match in one transaction, so one undo restores them all. */
 export function replaceAll(text: string): Command {
   return (state, dispatch) => {
-    const { matches } = getFindState(state);
+    const { matches, caseSensitive } = getFindState(state);
     if (matches.length === 0) return false;
     if (dispatch) {
       const tr = state.tr;
       // Last first, so the earlier positions still hold.
-      for (let index = matches.length - 1; index >= 0; index -= 1) replaceRange(tr, matches[index], text);
+      for (let index = matches.length - 1; index >= 0; index -= 1) {
+        replaceRange(tr, matches[index], text, caseSensitive);
+      }
       const meta: FindMeta = { type: 'after', pos: 0 };
       dispatch(tr.setMeta(findReplaceKey, meta));
     }
