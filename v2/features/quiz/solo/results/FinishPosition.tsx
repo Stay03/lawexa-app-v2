@@ -44,6 +44,7 @@ export function FinishPosition({
   publicQuiz,
   viewerId,
   podiumPlayed,
+  podiumCovered,
 }: {
   quizUuid: string;
   /** This run's points, to tell a new place from an older best. */
@@ -53,6 +54,8 @@ export function FinishPosition({
   viewerId: number | null;
   /** The full-screen podium has played (or is playing) for this attempt: the small one stands still. */
   podiumPlayed: boolean;
+  /** The full-screen podium is over the results: the small one is hidden until it lands in its place. */
+  podiumCovered: boolean;
 }) {
   // Only a public quiz has a board: a link-only or private one answers 404
   // (Tester, 28 October 2026: twice a finish, on load and on the finish's
@@ -74,6 +77,7 @@ export function FinishPosition({
       runPoints={runPoints}
       publicQuiz={publicQuiz}
       podiumPlayed={podiumPlayed}
+      podiumCovered={podiumCovered}
     />
   );
 }
@@ -84,12 +88,14 @@ function PositionBlock({
   runPoints,
   publicQuiz,
   podiumPlayed,
+  podiumCovered,
 }: {
   board: QuizLeaderboard;
   quizUuid: string;
   runPoints: number;
   publicQuiz: boolean | null;
   podiumPlayed: boolean;
+  podiumCovered: boolean;
 }) {
   const position = finishPosition(board, runPoints, { publicQuiz: publicQuiz !== false });
   const viewer = board.viewer;
@@ -110,6 +116,7 @@ function PositionBlock({
           isYou={isYou}
           barSettled={publicQuiz !== null}
           played={podiumPlayed}
+          covered={podiumCovered}
         />
       ) : null}
 
@@ -162,6 +169,7 @@ function PodiumMoment({
   isYou,
   barSettled,
   played,
+  covered,
 }: {
   entries: readonly QuizLeaderboardEntry[];
   isYou: (entry: QuizLeaderboardEntry) => boolean;
@@ -169,6 +177,8 @@ function PodiumMoment({
   barSettled: boolean;
   /** The full-screen podium has had the moment: this one never rises a second time. */
   played: boolean;
+  /** The full-screen podium is still over it, about to land in this place: only one podium is ever seen. */
+  covered: boolean;
 }) {
   const onPodium = entries.some(isYou);
   // Only a podium with the reader's face on it has a climb to end it (a reader
@@ -243,9 +253,10 @@ function PodiumMoment({
     <div className="relative flex w-full max-w-sm flex-col items-center">
       {onPodium ? (
         <p
+          data-small-podium-heading=""
           className={cn(
             'font-comfortaa text-2xl font-bold text-balance text-primary',
-            phase === 'waiting' && 'opacity-0',
+            (phase === 'waiting' || covered) && 'opacity-0',
             playing && 'v2-solo-podium-headline',
           )}
         >
@@ -254,7 +265,8 @@ function PodiumMoment({
       ) : null}
       <div
         ref={podiumRef}
-        className={cn('w-full', phase === 'waiting' && 'opacity-0', !playing && 'v2-solo-podium-still')}
+        data-small-podium=""
+        className={cn('w-full', (phase === 'waiting' || covered) && 'opacity-0', !playing && 'v2-solo-podium-still')}
         onClick={celebrating ? stop : undefined}
         onAnimationEnd={onAnimationEnd}
       >

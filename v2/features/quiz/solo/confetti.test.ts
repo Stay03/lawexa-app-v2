@@ -72,14 +72,20 @@ test('a burst is never on screen for longer than 3.2s', () => {
 
 test('the podium moment says "You made the Podium!", bursts as the steps land, and moves on after it falls', () => {
   const stage = read('v2', 'features', 'quiz', 'solo', 'results', 'PodiumStage.tsx');
-  assert.match(stage, /playing && 'v2-solo-podium-headline',\s*\)\}\s*>\s*You made the Podium!/);
+  assert.match(stage, /playing && 'v2-solo-podium-headline',\s*\/\/ Nowhere to land: it fades with the ground instead\.\s*leaving && !headingFlight && 'opacity-0 transition-opacity duration-300',/);
+  assert.match(stage, />\s*You made the Podium!\s*<\/h1>/);
+  // The headline lands on the small one's, which stays hidden until then: the words are never doubled.
+  assert.match(stage, /setHeadingFlight\(heading \? podiumFlight\(heading, smallHeading\) : null\);/);
+  const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
+  assert.match(block, /data-small-podium-heading=""\s*className=\{cn\(\s*'font-comfortaa text-2xl font-bold text-balance text-primary',\s*\(phase === 'waiting' \|\| covered\) && 'opacity-0',/);
   // The burst waits for the steps (first place lands at 900ms).
   assert.match(stage, /const PODIUM_LANDS_MS = 900;/);
   // A Skip or Escape before the steps land cancels the burst (Frontend's review of c2775f8).
   assert.match(stage, /useEffect\(\(\) => \{\s*if \(leaving\) return;\s*const timer = window\.setTimeout\(\(\) => \{\s*const box = podiumRef/);
   assert.match(stage, /\}, PODIUM_LANDS_MS\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[leaving\]\);/);
   assert.match(stage, /setConfetti\(box \? \{ x: box\.left \+ box\.width \/ 2, y: box\.top \+ box\.height \* 0\.55 \} : 'fallen'\);/);
-  assert.match(stage, /\{typeof confetti === 'object' \? <Confetti origin=\{confetti\} onDone=\{confettiFallen\} \/> : null\}/);
+  // It fades as the podium moves into its place.
+  assert.match(stage, /\{typeof confetti === 'object' \? \(\s*<div className=\{cn\('transition-opacity duration-300', leaving && 'opacity-0'\)\}>\s*<Confetti origin=\{confetti\} onDone=\{confettiFallen\} \/>/);
 
   const confetti = read('v2', 'features', 'quiz', 'solo', 'results', 'Confetti.tsx');
   // Our own canvas, never a tap target, over the stage (z-40), and stopped with the component.

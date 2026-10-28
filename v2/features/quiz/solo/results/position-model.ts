@@ -73,3 +73,18 @@ export function opensOnPodium(board: QuizLeaderboard, runPoints: number): boolea
   if (position.kind !== 'ranked' || position.podiumPlace === null) return false;
   return board.entries.slice(0, 3).some((entry) => isViewerEntry(board.viewer, entry));
 }
+
+/**
+ * How the stage's podium travels from its own box to the small podium's on
+ * the results (laid out underneath, only covered): one transform from its
+ * top left corner, a move and a scale, so nothing under it reflows. `null`
+ * when there is no small podium to land on.
+ */
+export function podiumFlight(
+  from: { top: number; left: number; width: number },
+  to: { top: number; left: number; width: number; height: number } | null,
+): string | null {
+  if (!to || to.width === 0 || to.height === 0 || from.width === 0) return null;
+  const scale = to.width / from.width;
+  return `translate(${Math.round(to.left - from.left)}px, ${Math.round(to.top - from.top)}px) scale(${scale.toFixed(3)})`;
+}

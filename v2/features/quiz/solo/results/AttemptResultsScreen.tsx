@@ -215,6 +215,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
           publicQuiz={publicQuiz}
           viewerId={viewerId}
           podiumPlayed={podiumFirst || podiumDone}
+          podiumCovered={podiumFirst}
         />
 
         {retakeError && (
