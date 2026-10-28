@@ -5,7 +5,16 @@ import { join } from 'node:path';
 
 import type { QuizLeaderboard } from '@/types/channel-quiz';
 import { isViewerEntry } from './home-model';
-import { finishPosition, opensOnPodium, podiumFlight, PRIVATE_UNRANKED_LINE, UNRANKED_LINE } from './results/position-model';
+import {
+  finishPosition,
+  glideTop,
+  opensOnPodium,
+  podiumFlight,
+  podiumInView,
+  PRIVATE_UNRANKED_LINE,
+  SCORE_GLIDE_MS,
+  UNRANKED_LINE,
+} from './results/position-model';
 
 /* The reader's place under "See your answers" (Arthur, 28 October 2026): the
  * position line, the "better than" line, View leaderboard, and the podium
@@ -156,7 +165,7 @@ test('the podium plays first, full screen over the results, for a top-three fini
   assert.match(screen, /onDone=\{finishPodium\}/);
   // Once per attempt, and focus back to the results' heading.
   assert.match(screen, /rememberPodiumSeen\(attemptUuid\);\s*setPodiumDone\(true\);/);
-  assert.match(screen, /document\.getElementById\('attempt-results-heading'\)\?\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(screen, /const heading = document\.getElementById\('attempt-results-heading'\);[\s\S]*?heading\?\.focus\(\{ preventScroll: true \}\);/);
   const summary = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptSummary.tsx');
   assert.match(summary, /id="attempt-results-heading"\s*tabIndex=\{-1\}/);
   // The small podium never rises a second time.
@@ -176,7 +185,8 @@ test('the podium plays first, full screen over the results, for a top-three fini
   assert.match(stage, /if \(!leaving\) return;\s*const timer = window\.setTimeout\(onDone, PODIUM_SLIDE_MS\);/);
   assert.doesNotMatch(stage, /translate-y-full|PODIUM_FADE_MS/);
   // On a phone the small podium's spot is scrolled into view first, while the stage still covers the results.
-  assert.match(stage, /small\?\.scrollIntoView\(\{ block: 'center', behavior: 'instant' \}\);\s*const from = podiumRef\.current\?\.getBoundingClientRect\(\);/);
+  // Only when it is not already in view clear of the button bar (on a computer nothing moves).
+  assert.match(stage, /if \(!podiumInView\(box, barTop\)\) small\.scrollIntoView\(\{ block: 'center', behavior: 'instant' \}\);\s*\}\s*const from = podiumRef\.current\?\.getBoundingClientRect\(\);/);
   assert.match(stage, /flight\s*\?\s*\{ transform: flight, transition: `transform \$\{PODIUM_SLIDE_MS\}ms cubic-bezier\(0\.22, 1, 0\.36, 1\)` \}/);
   // Only one podium is ever seen: the small one is hidden until this one lands on it.
   assert.match(screen, /podiumCovered=\{podiumFirst\}/);
@@ -268,4 +278,35 @@ test('the podium flies from its own box to the small podium’s, as one move and
   // Nothing to land on (no small podium, or not laid out): no flight; the podium fades with the ground.
   assert.equal(podiumFlight({ top: 300, left: 20, width: 350 }, null), null);
   assert.equal(podiumFlight({ top: 300, left: 20, width: 350 }, { top: 0, left: 0, width: 0, height: 0 }), null);
+});
+
+test('after the podium lands, a phone glides back up to the score in 600ms, easing out', () => {
+  // Arthur's option B: about 500 to 700ms.
+  assert.equal(SCORE_GLIDE_MS, 600);
+  assert.equal(glideTop(400, 0), 400);
+  // Ease-out: most of the way in the first half, then settling.
+  assert.ok(glideTop(400, 300) < 100, `halfway in time, past halfway in distance (${glideTop(400, 300)})`);
+  assert.equal(glideTop(400, SCORE_GLIDE_MS), 0);
+  assert.equal(glideTop(400, 900), 0);
+  // Never past the top, and nothing scrolled means nothing moves.
+  assert.equal(glideTop(0, 300), 0);
+
+  const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
+  // However the podium ends, the glide follows the landing, from the results' heading.
+  assert.match(screen, /heading\?\.focus\(\{ preventScroll: true \}\);[\s\S]*?if \(heading\) glideToScore\(heading\);/);
+  // The page scrolls inside the shell: its nearest scrolled ancestor moves; a computer's, unscrolled, does not.
+  assert.match(screen, /while \(page && page\.scrollTop === 0\) page = page\.parentElement;/);
+  assert.match(screen, /if \(!scroller \|\| scroller\.scrollTop === 0\) return;/);
+  assert.match(screen, /scroller\.scrollTop = glideTop\(startTop, elapsed\);/);
+});
+
+test('the landing scrolls only when the small podium is out of view: a phone yes, a computer no', () => {
+  // A computer (1440x900): the podium's faded foot a little under the button bar.
+  assert.equal(podiumInView({ top: 520, bottom: 830, height: 310 }, 790), true);
+  // A phone (390x844): the podium below the fold, under a three-row bar.
+  assert.equal(podiumInView({ top: 620, bottom: 930, height: 310 }, 640), false);
+  // Above the top of the screen.
+  assert.equal(podiumInView({ top: -250, bottom: 60, height: 310 }, 700), false);
+  // Not laid out.
+  assert.equal(podiumInView({ top: 0, bottom: 0, height: 0 }, 700), false);
 });

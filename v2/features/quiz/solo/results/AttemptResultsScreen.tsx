@@ -32,7 +32,7 @@ import { FinishPosition } from './FinishPosition';
 import { ResultsActions } from './ResultsActions';
 import { AttemptResultsSkeleton, RESULTS_COLUMN } from './states';
 import { PodiumStage, podiumAlreadySeen, rememberPodiumSeen } from './PodiumStage';
-import { opensOnPodium } from './position-model';
+import { glideTop, opensOnPodium, SCORE_GLIDE_MS } from './position-model';
 import '../solo-quiz.css';
 
 /**
@@ -66,6 +66,27 @@ import '../solo-quiz.css';
  * top-three finish opens on the podium first, full screen, laid over these
  * results (`PodiumStage`), which moves on to them by itself.
  */
+/**
+ * Glides the page that holds the results back up to their top, over
+ * `SCORE_GLIDE_MS` with an ease-out (`glideTop`), so the score comes into
+ * view. The page scrolls inside the shell, so it is the nearest scrolled
+ * ancestor of the heading that moves; nothing scrolled, nothing moves.
+ */
+function glideToScore(heading: HTMLElement): void {
+  let page: HTMLElement | null = heading.parentElement;
+  while (page && page.scrollTop === 0) page = page.parentElement;
+  const scroller = page ?? (document.scrollingElement as HTMLElement | null);
+  if (!scroller || scroller.scrollTop === 0) return;
+  const startTop = scroller.scrollTop;
+  const start = performance.now();
+  const step = (now: number) => {
+    const elapsed = now - start;
+    scroller.scrollTop = glideTop(startTop, elapsed);
+    if (elapsed < SCORE_GLIDE_MS) window.requestAnimationFrame(step);
+  };
+  window.requestAnimationFrame(step);
+}
+
 export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   const router = useRouter();
   const pathname = usePathname() ?? attemptResultsHref(attemptUuid);
@@ -98,8 +119,14 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   const finishPodium = useCallback(() => {
     rememberPodiumSeen(attemptUuid);
     setPodiumDone(true);
-    // Back to the results it covered, from their heading.
-    window.requestAnimationFrame(() => document.getElementById('attempt-results-heading')?.focus({ preventScroll: true }));
+    window.requestAnimationFrame(() => {
+      const heading = document.getElementById('attempt-results-heading');
+      // Back to the results it covered, from their heading.
+      heading?.focus({ preventScroll: true });
+      // On a phone the podium landed below the fold: the page glides back up to
+      // the score (Arthur's option B). On a computer nothing is scrolled.
+      if (heading) glideToScore(heading);
+    });
   }, [attemptUuid]);
 
   const startAttempt = useStartAttempt(quizUuid ?? '', viewerId);
