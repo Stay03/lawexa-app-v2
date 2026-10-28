@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { QuizLeaderboard, QuizLeaderboardEntry } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { BOARD_EMPTY_NOTE, BOARD_RULES_NOTE, playersLabel, podiumInstitution, scoreLabel, standingLine } from '../home-model';
 
 /** The board's length on the quiz page: the podium and the rest of the top ten. */
@@ -22,13 +23,13 @@ const BOARD_TOP = 10;
  * school".
  *
  *   Leaderboard (i)                                   16 players
- *   [#13  You're doing better than 20% of other players.]
  *         (2)        ♛(1)        (3)      faces, names, where they
  *        2,754      3,880       2,820     study, points
  *       ░░ 2 ░░   ▓▓▓ 1 ▓▓▓   ░░ 3 ░░     pale blue, gold, peach blocks
  *                                          fading into the page
  *   🏆4 (face) Emeka Uche / Lagos State University        3,712
- *   ...to 10, then ··· and your own row with your place
+ *   ...to 10, then ··· and your own row, named like the others, with
+ *   "You're doing better than 20% of other players." under it
  *
  * No card around it (Arthur, 28 October 2026: "Remove the outer card ... Let
  * the leaderboard, podium, and player rankings sit directly on the page's
@@ -48,6 +49,9 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
   const rest = board.entries.slice(3, BOARD_TOP);
   const youShown = board.entries.slice(0, BOARD_TOP).some(isYou);
   const players = playersLabel(board.player_count);
+  // "You're doing better than 20% of other players.": under the reader's own
+  // row (Stay, 28 October 2026: the #13 banner repeated the place).
+  const standing = viewer ? standingLine(viewer.rank, board.player_count) : null;
 
   return (
     <section
@@ -76,20 +80,14 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
         </p>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">
-          <div className="flex min-w-0 flex-col gap-4 md:gap-6">
-            {viewer ? (
-              <div className="flex items-center gap-3 rounded-2xl bg-secondary/60 px-3 py-2.5">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary font-comfortaa text-base font-bold text-primary-foreground tabular-nums">
-                  #{viewer.rank}
-                </span>
-                <span className="text-sm leading-snug font-semibold text-foreground">
-                  {standingLine(viewer.rank, board.player_count)}
-                </span>
-              </div>
-            ) : null}
+          <div className="flex min-w-0 flex-col gap-3">
             <div className="mx-auto w-full min-w-0 md:max-w-lg">
               <Podium entries={podium} isYou={isYou} />
             </div>
+            {/* On the podium the reader's line sits under it. */}
+            {standing && podium.some(isYou) ? (
+              <p className="text-center text-sm font-medium text-foreground/80">{standing}</p>
+            ) : null}
           </div>
 
           {rest.length > 0 || (viewer && !youShown) ? (
@@ -97,7 +95,12 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
               {rest.length > 0 ? (
                 <ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col divide-y divide-border/70">
                   {rest.map((entry) => (
-                    <BoardRow key={`${entry.rank}-${entry.user.uuid}`} entry={entry} you={isYou(entry)} />
+                    <BoardRow
+                      key={`${entry.rank}-${entry.user.uuid}`}
+                      entry={entry}
+                      you={isYou(entry)}
+                      standing={isYou(entry) ? standing : null}
+                    />
                   ))}
                 </ol>
               ) : null}
@@ -106,7 +109,7 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
                   <li aria-hidden className="py-1 text-center text-sm leading-none tracking-[0.3em] text-muted-foreground">
                     ···
                   </li>
-                  <YourRow rank={viewer.rank} points={viewer.points} />
+                  <YourRow viewer={viewer} standing={standing} />
                 </ol>
               ) : null}
             </div>
@@ -162,7 +165,8 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
                 )}
               />
             </span>
-            <span className="mt-2 w-full truncate px-1 text-sm font-semibold text-foreground">{you ? 'You' : entry.user.name}</span>
+            {/* The reader by name like everyone else (Stay, 28 October 2026); the gold ring marks them. */}
+            <span className="mt-2 w-full truncate px-1 text-sm font-semibold text-foreground">{entry.user.name}</span>
             {/* The campus alone for the Law School; a university wraps in small
                 type and is never cut (Arthur, 28 October 2026). */}
             {entry.user.institution ? (
@@ -197,59 +201,78 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
 }
 
 /** One place under the podium: rank, face, name over where they study, points. */
-function BoardRow({ entry, you }: { entry: QuizLeaderboardEntry; you: boolean }) {
+function BoardRow({ entry, you, standing = null }: { entry: QuizLeaderboardEntry; you: boolean; standing?: string | null }) {
   return (
-    <li
-      className={cn(
-        'flex min-h-14 min-w-0 items-center gap-3 px-2 py-2',
-        you && 'rounded-xl border-transparent bg-primary/10 ring-2 ring-primary/50',
-      )}
-    >
-      <span className="flex w-9 shrink-0 items-center gap-1 text-sm font-semibold text-foreground tabular-nums">
-        <Trophy aria-hidden className="size-3.5 text-muted-foreground" />
-        <span className="sr-only">Place </span>
-        {entry.rank}
-      </span>
-      <MemberAvatar
-        user={{ name: entry.user.name, avatar_url: entry.user.avatar_url ?? null }}
-        className="size-10 rounded-xl after:rounded-xl *:rounded-xl"
-      />
-      <span className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-semibold text-foreground">{entry.user.name}</span>
-          {you ? <YouPill /> : null}
-        </span>
-        {entry.user.institution ? (
-          <span className="truncate text-xs text-muted-foreground">{entry.user.institution}</span>
-        ) : null}
-      </span>
-      <span className="shrink-0 font-comfortaa text-sm font-bold text-foreground tabular-nums">
-        {scoreLabel(entry.points)}
-        <span className="sr-only"> points</span>
-      </span>
+    <li className={cn('flex min-w-0 flex-col', you && 'rounded-xl border-transparent bg-primary/10 ring-2 ring-primary/50')}>
+      <PlayerLine rank={entry.rank} user={entry.user} points={entry.points} you={you} />
+      {standing ? <StandingNote>{standing}</StandingNote> : null}
     </li>
   );
 }
 
-/** The reader's own place when it is below the ten: the server sends it even then. */
-function YourRow({ rank, points }: { rank: number; points: number }) {
+/**
+ * The reader's own place when it is below the ten. It reads like every other
+ * row (Stay, 28 October 2026: "the bottom one should have my name like the
+ * other users"): the server sends the reader as a row shows a player
+ * (`viewer.user`, the same school rule); before it does, the session's name
+ * and face stand in, with no school. Their standing sits under it, in the gold.
+ */
+function YourRow({ viewer, standing }: { viewer: NonNullable<QuizLeaderboard['viewer']>; standing: string | null }) {
+  const session = useV2Session();
+  const user = viewer.user ?? {
+    uuid: session.userUuid ?? 'you',
+    name: session.name ?? 'You',
+    avatar_url: session.avatarUrl,
+  };
   return (
-    <li className="flex min-h-14 min-w-0 items-center gap-3 rounded-xl bg-primary/10 px-2 py-2 ring-2 ring-primary/50">
-      <span className="flex w-9 shrink-0 items-center gap-1 text-sm font-bold text-foreground tabular-nums">
-        <Trophy aria-hidden className="size-3.5 text-primary" />
+    <li className="flex min-w-0 flex-col rounded-xl bg-primary/10 ring-2 ring-primary/50">
+      <PlayerLine rank={viewer.rank} user={user} points={viewer.points} you />
+      {standing ? <StandingNote>{standing}</StandingNote> : null}
+    </li>
+  );
+}
+
+/** Rank, face, name over where they study, and points. */
+function PlayerLine({
+  rank,
+  user,
+  points,
+  you,
+}: {
+  rank: number;
+  user: QuizLeaderboardEntry['user'];
+  points: number;
+  you: boolean;
+}) {
+  return (
+    <div className="flex min-h-14 min-w-0 items-center gap-3 px-2 py-2">
+      <span className="flex w-9 shrink-0 items-center gap-1 text-sm font-semibold text-foreground tabular-nums">
+        <Trophy aria-hidden className={cn('size-3.5', you ? 'text-primary' : 'text-muted-foreground')} />
         <span className="sr-only">Place </span>
         {rank}
       </span>
-      <span className="flex min-w-0 flex-1 items-center gap-2">
-        <YouPill />
-        <span className="text-xs text-muted-foreground">Your place</span>
+      <MemberAvatar
+        user={{ name: user.name, avatar_url: user.avatar_url ?? null }}
+        className="size-10 rounded-xl after:rounded-xl *:rounded-xl"
+      />
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-semibold text-foreground">{user.name}</span>
+          {you ? <YouPill /> : null}
+        </span>
+        {user.institution ? <span className="truncate text-xs text-muted-foreground">{user.institution}</span> : null}
       </span>
       <span className="shrink-0 font-comfortaa text-sm font-bold text-foreground tabular-nums">
         {scoreLabel(points)}
         <span className="sr-only"> points</span>
       </span>
-    </li>
+    </div>
   );
+}
+
+/** The reader's standing, one short line under their row, inside the gold. */
+function StandingNote({ children }: { children: string }) {
+  return <p className="-mt-1 px-2 pb-2.5 pl-[3.25rem] text-xs font-medium text-foreground/75 sm:pl-[6.25rem]">{children}</p>;
 }
 
 function YouPill() {

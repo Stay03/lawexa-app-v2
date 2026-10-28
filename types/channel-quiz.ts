@@ -286,7 +286,14 @@ export interface QuizLeaderboard {
   player_count: number;
   entries: QuizLeaderboardEntry[];
   /** The reader's own place; `null` signed out or before their first finish. */
-  viewer: { rank: number; points: number; achieved_at: string | null } | null;
+  viewer: {
+    rank: number;
+    points: number;
+    achieved_at: string | null;
+    /** The reader as a row shows a player, built by the server's same rule
+     *  (Backend, 28 October 2026); absent from an older server. */
+    user?: QuizLeaderboardEntry['user'];
+  } | null;
 }
 
 /** What the quiz lists can be narrowed by, with how many quizzes use each

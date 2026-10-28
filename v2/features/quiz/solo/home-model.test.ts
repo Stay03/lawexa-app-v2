@@ -141,9 +141,17 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   assert.match(board, /const BOARD_TOP = 10;/);
   assert.match(board, /const order = \[entries\[1\], entries\[0\], entries\[2\]\];/);
   assert.match(board, /\{viewer && !youShown \? \(/);
-  // The reader's place on a banner, and where each player studies under the name.
-  assert.match(board, /\{standingLine\(viewer\.rank, board\.player_count\)\}/);
-  assert.equal(board.match(/entry\.user\.institution \? \(/g)?.length, 2);
+  // The place once (Stay, 28 October 2026): no #13 banner; the reader's own
+  // row reads like the others, from the server's viewer.user, and their
+  // standing sits under it.
+  assert.doesNotMatch(board, /#\{viewer\.rank\}|>Your place</);
+  assert.match(board, /const standing = viewer \? standingLine\(viewer\.rank, board\.player_count\) : null;/);
+  assert.match(board, /const user = viewer\.user \?\? \{/);
+  assert.match(board, /<YourRow viewer=\{viewer\} standing=\{standing\} \/>/);
+  assert.match(board, /standing=\{isYou\(entry\) \? standing : null\}/);
+  // Where each player studies: the podium's short form, the rows' whole name.
+  assert.match(board, /\{podiumInstitution\(entry\.user\.institution\)\}/);
+  assert.match(board, /\{user\.institution \? <span className="truncate text-xs text-muted-foreground">\{user\.institution\}<\/span> : null\}/);
   // On the podium: the campus alone, and a university wrapped, never cut.
   assert.match(board, /\{podiumInstitution\(entry\.user\.institution\)\}/);
   assert.match(board, /<span className="w-full px-1 text-\[10px\] leading-tight text-balance break-words text-muted-foreground sm:text-\[11px\]">/);
