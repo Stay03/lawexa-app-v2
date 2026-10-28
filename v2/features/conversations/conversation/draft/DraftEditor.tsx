@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Content } from '@tiptap/core';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
@@ -52,6 +52,7 @@ import './draft-panel.css';
 import type { ConversationSpaceRef } from '@/types/chat';
 import { SidePanelCloseButton } from '../side-panel/ChatSidePanel';
 import { readDraftEdit, readSavedDraftNote, writeDraftEdit } from './draft-edits';
+import { findCardRoom } from './find-room';
 import { DRAFT_MENU, DraftFolderPicker, DraftSaveBar, DraftSaveControl, useDraftSave } from './DraftSaveBar';
 import { markdownToDoc, type DraftFont } from './markdown-to-doc';
 import { useDraftNote } from './use-draft-note';
@@ -257,6 +258,21 @@ function DraftEditorBody({
     setFindRequest((count) => count + 1);
   }, [editor]);
 
+  // ROOM UNDER THE FIND CARD (Lucy, 25 October 2026: "the find bar covers the
+  // top lines of the draft"). On a computer the card hangs over the top of the
+  // scroll area; while it is open its height, measured as it changes (the
+  // replace row opens and closes), is kept as top room in that area
+  // (find-room.ts). Closing the bar takes the room away.
+  const [findCardHeight, setFindCardHeight] = useState(0);
+  useEffect(() => {
+    const card = frameRef.current?.querySelector<HTMLElement>('[data-v2-draft-find] > *');
+    if (!findOpen || !card) return;
+    const observer = new ResizeObserver(([entry]) => setFindCardHeight(entry.target.getBoundingClientRect().height));
+    observer.observe(card);
+    return () => observer.disconnect();
+  }, [findOpen]);
+  const findRoom = findOpen ? findCardRoom(findCardHeight) : 0;
+
   // Ctrl+F (⌘F) with focus in the panel opens the draft's find; anywhere else
   // on the chat page it stays the browser's. A listener on the panel's own
   // element, so a key pressed outside it never arrives here.
@@ -300,14 +316,18 @@ function DraftEditorBody({
             actions={<DraftSaveControl draft={draft} dirty={dirty} space={space} />}
           />
           {findOpen ? (
-            <FindBar
-              editor={editor}
-              layout="draft"
-              label="Find in draft"
-              seed={findSeed}
-              focusRequest={findRequest}
-              onClose={() => setFindOpen(false)}
-            />
+            // `contents`: no box of its own, so the card is placed exactly as
+            // before; it only marks the card for the room above.
+            <div data-v2-draft-find className="contents">
+              <FindBar
+                editor={editor}
+                layout="draft"
+                label="Find in draft"
+                seed={findSeed}
+                focusRequest={findRequest}
+                onClose={() => setFindOpen(false)}
+              />
+            </div>
           ) : null}
         </div>
       ) : (
@@ -317,7 +337,11 @@ function DraftEditorBody({
         </>
       )}
       {versionSwitch}
-      <div data-v2-draft-scroll className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+      <div
+        data-v2-draft-scroll
+        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain xl:scroll-pt-[var(--v2-draft-find-room)] xl:pt-[var(--v2-draft-find-room)]"
+        style={{ '--v2-draft-find-room': `${findRoom}px` } as CSSProperties}
+      >
         <div className={DRAFT_DOCUMENT}>
           <EditorContent editor={editor} />
         </div>
