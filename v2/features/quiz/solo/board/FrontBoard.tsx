@@ -272,7 +272,7 @@ function PlayerLine({
 
 /** The reader's standing, one short line under their row, inside the gold. */
 function StandingNote({ children }: { children: string }) {
-  return <p className="-mt-1 px-2 pb-2.5 pl-[3.25rem] text-xs font-medium text-foreground/75 sm:pl-[6.25rem]">{children}</p>;
+  return <p className="-mt-1 pr-2 pb-2.5 pl-[6.75rem] text-xs font-medium text-foreground/75">{children}</p>;
 }
 
 function YouPill() {
