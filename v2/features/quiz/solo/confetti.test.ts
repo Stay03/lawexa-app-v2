@@ -75,6 +75,9 @@ test('the podium moment says "You made the Podium!", bursts as the steps land, a
   assert.match(stage, /playing && 'v2-solo-podium-headline',\s*\)\}\s*>\s*You made the Podium!/);
   // The burst waits for the steps (first place lands at 900ms).
   assert.match(stage, /const PODIUM_LANDS_MS = 900;/);
+  // A Skip or Escape before the steps land cancels the burst (Frontend's review of c2775f8).
+  assert.match(stage, /useEffect\(\(\) => \{\s*if \(leaving\) return;\s*const timer = window\.setTimeout\(\(\) => \{\s*const box = podiumRef/);
+  assert.match(stage, /\}, PODIUM_LANDS_MS\);\s*return \(\) => window\.clearTimeout\(timer\);\s*\}, \[leaving\]\);/);
   assert.match(stage, /setConfetti\(box \? \{ x: box\.left \+ box\.width \/ 2, y: box\.top \+ box\.height \* 0\.55 \} : 'fallen'\);/);
   assert.match(stage, /\{typeof confetti === 'object' \? <Confetti origin=\{confetti\} onDone=\{confettiFallen\} \/> : null\}/);
 

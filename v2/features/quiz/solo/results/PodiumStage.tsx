@@ -97,14 +97,15 @@ export function PodiumStage({
     return () => window.clearTimeout(timer);
   }, [leaving, onDone]);
 
-  // The burst, as the steps land.
+  // The burst, as the steps land; a Skip or Escape before then cancels it.
   useEffect(() => {
+    if (leaving) return;
     const timer = window.setTimeout(() => {
       const box = podiumRef.current?.getBoundingClientRect();
       setConfetti(box ? { x: box.left + box.width / 2, y: box.top + box.height * 0.55 } : 'fallen');
     }, PODIUM_LANDS_MS);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [leaving]);
 
   // Then the score, once the confetti has fallen and the podium has stood a moment.
   useEffect(() => {
