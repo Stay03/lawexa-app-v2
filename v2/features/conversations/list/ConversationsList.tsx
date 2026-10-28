@@ -34,7 +34,6 @@ import {
   ConversationsListSkeleton,
   NextPageSkeleton,
 } from './states';
-import { PlanEndedSlot } from '@/v2/features/chat-rating/PlanEndedRating';
 
 /**
  * The centred reading column every list state shares — the SHARED v2 list
@@ -58,9 +57,6 @@ function PageShell({ actions, children }: { actions?: React.ReactNode; children:
       ) : (
         <ScreenTitle />
       )}
-      {/* After a paid plan runs out, once (Arthur picked B, 28 October 2026):
-          the list has no message box, so it sits under the title. */}
-      <PlanEndedSlot className="mb-4" />
       {children}
     </div>
   );

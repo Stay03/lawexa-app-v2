@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import { beginOffer, beginPlanEndedOffer, noteChatMoment } from './store';
 
 /* A paid plan ran out (Arthur, 28 October 2026, "B plus A"): the server says
- * `moment: "plan_ended"`, and the banner asks on the FIRST screen opened, home,
- * the chat list or a chat (Stay: a plan that ran out cannot chat), about no
- * chat. Its own file: the store keeps the session's one ask, and this needs a
+ * `moment: "plan_ended"`, and the banner asks on the FIRST home or chat opened
+ * (Stay: a plan that ran out cannot chat; he picked A, never the chat list),
+ * about no chat. Its own file: the store keeps the session's one ask, and this needs a
  * fresh session. */
 
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8').replace(/\r\n/g, '\n');
@@ -20,7 +20,7 @@ test('a plan that ended opens the session’s one ask, and nothing asks again', 
   assert.equal(beginPlanEndedOffer(), false);
 });
 
-test('the slot asks the server once a session and sits in the page: above the box, or under the chat list title', () => {
+test('the slot asks the server once a session and sits in the page, above the box, never on the chat list', () => {
   const slot = read('v2', 'features', 'chat-rating', 'PlanEndedRating.tsx');
   assert.match(slot, /const prompt = useQuery\(\{ \.\.\.chatPromptQuery\(userId\), enabled: isAccount && !askedThisSession \}\);/);
   assert.match(slot, /prompt\.data\?\.eligible === true && prompt\.data\.moment === 'plan_ended'/);
@@ -34,7 +34,8 @@ test('the slot asks the server once a session and sits in the page: above the bo
     read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx'),
     /<ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>/,
   );
-  assert.match(read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx'), /<PlanEndedSlot className="mb-4" \/>\s*\{children\}/);
+  // Only where a question is typed (Stay picked A, 28 October 2026).
+  assert.doesNotMatch(read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx'), /PlanEnded/);
   // The chat's slot and the shell read one cached answer: one request a page load at most.
   const banner = read('v2', 'features', 'chat-rating', 'ChatRatingBanner.tsx');
   assert.match(banner, /queryKey: \['chat-rating', 'prompt', userId\] as const,/);

@@ -12,11 +12,13 @@ import { beginPlanEndedOffer, useActiveOffer, useAskedThisSession } from './stor
 /**
  * PlanEndedSlot — "How is Lawexa doing?" once after a paid plan runs out
  * (Arthur, 28 October 2026, "B plus A"), on the first screen the reader opens
- * that can ask (Stay: "how can the user chat if the plan has run out?").
+ * with a message box (Stay: "how can the user chat if the plan has run out?").
  *
  * In the page, never floating (Arthur picked B, 28 October 2026): it sits just
- * above the message box on the home and in a chat, and under the title on the
- * chat list, which has no box. The server says when (`moment: "plan_ended"`,
+ * above the message box on the home and in a chat. Only where a question is
+ * typed (Stay picked A, 28 October 2026): the chat list has none, so a reader
+ * who opens the list first sees it on the next home or chat they open. The
+ * server says when (`moment: "plan_ended"`,
  * once, outside the 14 days); a slot asks it once a session, through the same
  * cached answer as the chat's own banner. The rating names no chat (Backend
  * 0c7bb3c2). Shown and closed are reported, so it asks once.

@@ -21,9 +21,9 @@ import type { ChatRatingReason, ChatRatingTrigger } from '@/types/feedback';
  *
  * One ask needs no moment (Arthur, 28 October 2026, "B plus A"): when a paid
  * plan has ended, the server answers `moment: "plan_ended"`, and the banner
- * appears on the first screen the reader opens, home, the chat list or a chat
- * (Stay, 28 October 2026: a plan that ran out cannot chat). That ask is
- * `PlanEndedRating`'s, in the app's shell; the chat's own slot leaves it be.
+ * appears on the first home or chat the reader opens, above the message box
+ * (Stay, 28 October 2026: a plan that ran out cannot chat; he picked A, never
+ * the chat list). That ask is `PlanEndedSlot`'s; the chat's own slot leaves it be.
  */
 
 export const CHAT_RATING_QUESTION = 'How is Lawexa doing?';
