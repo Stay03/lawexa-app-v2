@@ -201,3 +201,16 @@ test('the usage chart draws its bars: each Bar is a direct child of the chart, n
   // On demand: loaded stacked on offered-but-not-loaded, from woz's daily rows.
   assert.match(card, /loaded: Math\.max\(0, day\.offered - day\.offered_not_loaded\),/);
 });
+
+test('an agent’s page lists its skills read-only, and draws nothing for a server without them', () => {
+  const card = read('components', 'admin', 'ai', 'AiAgentSkillsCard.tsx');
+  assert.match(card, /if \(!skills\) return null;/);
+  assert.match(card, /<Link href=\{`\/admin\/ai\/skills\/\$\{skill\.id\}`\}/);
+  assert.match(card, /\{skill\.is_active \? null : <Badge variant="secondary">Inactive<\/Badge>\}/);
+  // Read-only: no attach or detach here.
+  assert.doesNotMatch(card, /useAttachSkillToAgent|useDetachSkillFromAgent/);
+  const page = read('app', '(admin)', 'admin', 'ai', 'agents', '[id]', 'page.tsx');
+  assert.match(page, /<AiAgentSkillsCard skills=\{agent\.skills\} \/>/);
+  const types = read('types', 'admin-ai.ts');
+  assert.match(types, /export type AdminAiAgentDetail = AdminAiAgent & \{\s*\/\*\*[^*]*\*\/\s*skills\?: AdminAiAgentSkill\[\];/);
+});
