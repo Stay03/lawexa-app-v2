@@ -52,7 +52,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
-import { askHref, QUIZ_ASK_PROMPT } from '@/v2/shell/designs/composer/ask-param';
+import { askHref, queueAsk, QUIZ_ASK_PROMPT, type AskTarget } from '@/v2/shell/designs/composer/ask-param';
 import { extractApiError } from '@/lib/utils/api-error';
 import type {
   ChannelQuiz,
@@ -581,7 +581,7 @@ export function QuizFormDialog({
       <div className="space-y-5">
         {choosing ? (
           <QuizCreateChoice
-            chatHref={askHref(room && spaceUuid ? `/spaces/${spaceUuid}` : '/', QUIZ_ASK_PROMPT)}
+            chat={room && spaceUuid ? { kind: 'space', spaceUuid } : { kind: 'home' }}
             onManual={() => setManual(true)}
           />
         ) : isEdit && detailQuery.isPending ? (
@@ -933,12 +933,13 @@ export function QuizFormDialog({
 }
 
 /** Lawexa first, the form second (Arthur, 28 October 2026). The chat link
- *  leaves the page, which closes the form with it. */
-function QuizCreateChoice({ chatHref, onManual }: { chatHref: string; onManual: () => void }) {
+ *  leaves the page, which closes the form with it; its tap queues the words,
+ *  because Next draws the chat before the address changes (`ask-param.ts`). */
+function QuizCreateChoice({ chat, onManual }: { chat: AskTarget; onManual: () => void }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
       <Button asChild className="h-11 px-5 text-[15px]">
-        <Link href={chatHref}>
+        <Link href={askHref(chat, QUIZ_ASK_PROMPT)} onClick={() => queueAsk(chat, QUIZ_ASK_PROMPT)}>
           <Sparkles aria-hidden className="size-4" />
           Create with Lawexa
         </Link>

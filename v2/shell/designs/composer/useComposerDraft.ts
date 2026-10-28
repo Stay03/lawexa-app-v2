@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 
-import { readAskParam } from './ask-param';
+import { readAsk } from './ask-param';
 
 /**
  * useComposerDraft — the home composer's unsent-text draft, persisted so it survives
@@ -45,7 +45,7 @@ export function saveComposerDraft(next: string): void {
 export function useComposerDraft(): readonly [string, (next: string) => void] {
   const [value, setValue] = useState<string>(() => {
     if (typeof window === 'undefined') return '';
-    const ask = readAskParam();
+    const ask = readAsk({ kind: 'home' });
     if (ask) return ask;
     try {
       return window.localStorage.getItem(DRAFT_KEY) ?? '';

@@ -45,7 +45,7 @@ test('the home composer in a space offers no private modes and says a refusal in
   assert.match(dock, /placeholder=\{placeholder\}/);
   assert.match(dock, /export const SPACE_COMPOSER_PLACEHOLDER = 'How can Lawexa help you with this Space\?';/);
   // Its own draft, never the home's shared one; a link's words start it.
-  assert.match(dock, /const \[value, setValue\] = useState\(\(\) => readAskParam\(\) \?\? ''\);/);
+  assert.match(dock, /const \[value, setValue\] = useState\(\(\) => readAsk\(\{ kind: 'space', spaceUuid: space\.uuid \}\) \?\? ''\);/);
   assert.doesNotMatch(dock, /useComposerDraft\(/);
 });
 

@@ -43,11 +43,14 @@ export function HomeFrame({ children }: { children: ReactNode }) {
   );
 }
 
+/** The home's box, as a link names it (`ask-param.ts`). */
+const HOME_ASK = { kind: 'home' } as const;
+
 function HomeDock({ signedIn, role }: { signedIn: boolean; role?: UserRole }) {
   const { value, setValue, confidential, setConfidential, setRedacting, areaRef } = useHomeComposer();
   // A link's words (`/?ask=…`): the box is focused after them, and they stay
   // as the draft.
-  useAskArrival(areaRef, true);
+  useAskArrival(areaRef, HOME_ASK);
   return (
     <div data-home-dock="" className={HOME_COMPOSER_DOCK}>
       <div aria-hidden className={HOME_DOCK_FADE} />

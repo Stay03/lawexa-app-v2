@@ -8,7 +8,7 @@ import {
   type HomeComposerHandle,
   type HomeComposerSpace,
 } from '@/v2/shell/designs/HomeComposer';
-import { readAskParam, useAskArrival } from '@/v2/shell/designs/composer/ask-param';
+import { readAsk, useAskArrival } from '@/v2/shell/designs/composer/ask-param';
 
 /** Arthur's words for the box (15 October 2026), the same for a Work and a
  *  Study space: one layout, and here one line of copy too. */
@@ -66,9 +66,9 @@ export function SpaceChatDock({
   placeholder?: string;
 }) {
   const session = useV2Session();
-  const [value, setValue] = useState(() => readAskParam() ?? '');
+  const [value, setValue] = useState(() => readAsk({ kind: 'space', spaceUuid: space.uuid }) ?? '');
   const box = useRef<HTMLDivElement>(null);
-  useAskArrival(box);
+  useAskArrival(box, { kind: 'space', spaceUuid: space.uuid });
 
   return (
     <div ref={box} data-space-chat-dock="" className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto px-4 pt-6 v2-safe-bottom">
