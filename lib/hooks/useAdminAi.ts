@@ -16,6 +16,9 @@ import type {
   AdminAiToolsParams,
   AdminAiCreateToolData,
   AdminAiUpdateToolData,
+  AdminAiSkillsParams,
+  AdminAiCreateSkillData,
+  AdminAiUpdateSkillData,
   AdminAiWorkflowsParams,
   AdminAiCreateWorkflowData,
   AdminAiUpdateWorkflowData,
@@ -49,6 +52,19 @@ export const adminAiKeys = {
     [...adminAiKeys.agents(), 'list', params] as const,
   agentDetail: (id: number) =>
     [...adminAiKeys.agents(), 'detail', id] as const,
+
+  // Skills
+  skills: () => [...adminAiKeys.all, 'skills'] as const,
+  skillsList: (params: AdminAiSkillsParams) =>
+    [...adminAiKeys.skills(), 'list', params] as const,
+  skillDetail: (id: number) =>
+    [...adminAiKeys.skills(), 'detail', id] as const,
+  skillVersions: (id: number) =>
+    [...adminAiKeys.skillDetail(id), 'versions'] as const,
+  skillVersion: (id: number, version: number) =>
+    [...adminAiKeys.skillVersions(id), version] as const,
+  skillUsage: (id: number, days: number) =>
+    [...adminAiKeys.skillDetail(id), 'usage', days] as const,
 
   // Tools
   tools: () => [...adminAiKeys.all, 'tools'] as const,
@@ -420,6 +436,125 @@ export function useDetachToolFromAgent() {
       queryClient.invalidateQueries({
         queryKey: adminAiKeys.agentDetail(variables.agentId),
       });
+    },
+  });
+}
+
+// ============================================
+// Skill Hooks
+// ============================================
+
+/** The skills list, with filters. */
+export function useAdminAiSkills(params: AdminAiSkillsParams = {}) {
+  return useQuery({
+    queryKey: adminAiKeys.skillsList(params),
+    queryFn: () => adminAiApi.getSkills(params),
+    staleTime: 30 * 1000,
+  });
+}
+
+/** One skill, with its agents. */
+export function useAdminAiSkill(id: number) {
+  return useQuery({
+    queryKey: adminAiKeys.skillDetail(id),
+    queryFn: () => adminAiApi.getSkill(id),
+    enabled: !!id,
+    staleTime: 30 * 1000,
+  });
+}
+
+/** A skill's versions, newest first (without their instructions). */
+export function useAdminAiSkillVersions(id: number, page = 1) {
+  return useQuery({
+    queryKey: [...adminAiKeys.skillVersions(id), 'page', page] as const,
+    queryFn: () => adminAiApi.getSkillVersions(id, page),
+    enabled: !!id,
+    staleTime: 30 * 1000,
+  });
+}
+
+/** One version with its instructions, read when an admin opens it; a saved version never changes. */
+export function useAdminAiSkillVersion(id: number, version: number | null) {
+  return useQuery({
+    queryKey: adminAiKeys.skillVersion(id, version ?? 0),
+    queryFn: () => adminAiApi.getSkillVersion(id, version ?? 0),
+    enabled: !!id && version !== null,
+    staleTime: Infinity,
+  });
+}
+
+/** A skill's use over `days`. */
+export function useAdminAiSkillUsage(id: number, days: number) {
+  return useQuery({
+    queryKey: adminAiKeys.skillUsage(id, days),
+    queryFn: () => adminAiApi.getSkillUsage(id, days),
+    enabled: !!id,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreateAiSkill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AdminAiCreateSkillData) => adminAiApi.createSkill(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+    },
+  });
+}
+
+/** A save writes a version: the list, the skill and its versions all refresh. */
+export function useUpdateAiSkill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: AdminAiUpdateSkillData }) => adminAiApi.updateSkill(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+    },
+  });
+}
+
+export function useDeleteAiSkill() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => adminAiApi.deleteSkill(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+    },
+  });
+}
+
+/** A restore writes a new version: the list, the skill and its versions all refresh. */
+export function useRestoreAiSkillVersion() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, version }: { id: number; version: number }) => adminAiApi.restoreSkillVersion(id, version),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+    },
+  });
+}
+
+export function useAttachSkillToAgent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skillId, agentId }: { skillId: number; agentId: number }) =>
+      adminAiApi.attachSkillToAgent(skillId, agentId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agentDetail(variables.agentId) });
+    },
+  });
+}
+
+export function useDetachSkillFromAgent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ skillId, agentId }: { skillId: number; agentId: number }) =>
+      adminAiApi.detachSkillFromAgent(skillId, agentId),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agentDetail(variables.agentId) });
     },
   });
 }

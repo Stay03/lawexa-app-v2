@@ -30,6 +30,16 @@ import type {
   AdminAiUpdateToolData,
   AdminAiTool,
   AdminAiToolDetail,
+  AdminAiSkillsParams,
+  AdminAiSkillsListResponse,
+  AdminAiSkillDetailResponse,
+  AdminAiCreateSkillData,
+  AdminAiUpdateSkillData,
+  AdminAiSkill,
+  AdminAiSkillDetail,
+  AdminAiSkillVersionsResponse,
+  AdminAiSkillVersionResponse,
+  AdminAiSkillUsageResponse,
   AdminAiWorkflowsParams,
   AdminAiWorkflowsListResponse,
   AdminAiWorkflowDetailResponse,
@@ -414,6 +424,92 @@ export const adminAiApi = {
     const response = await apiClient.delete<AdminAiMutationResponse<null>>(
       `/admin/ai-tools/${toolId}/agents/${agentId}`
     );
+    return response.data;
+  },
+
+  // ============================================
+  // Skills (woz's server, 28 October 2026)
+  // ============================================
+
+  /** List skills, with agents_count and loads_7d on each row. */
+  getSkills: async (params: AdminAiSkillsParams = {}): Promise<AdminAiSkillsListResponse> => {
+    const response = await apiClient.get<AdminAiSkillsListResponse>('/admin/ai-skills', {
+      params: {
+        page: params.page ?? 1,
+        per_page: params.per_page ?? 15,
+        active_only: params.active_only,
+        load_mode: params.load_mode,
+        search: params.search || undefined,
+      },
+    });
+    return response.data;
+  },
+
+  /** One skill, with its agents and estimated token cost. */
+  getSkill: async (id: number): Promise<AdminAiSkillDetailResponse> => {
+    const response = await apiClient.get<AdminAiSkillDetailResponse>(`/admin/ai-skills/${id}`);
+    return response.data;
+  },
+
+  /** Create a skill; the server writes version 1. */
+  createSkill: async (data: AdminAiCreateSkillData): Promise<AdminAiMutationResponse<AdminAiSkill>> => {
+    const response = await apiClient.post<AdminAiMutationResponse<AdminAiSkill>>('/admin/ai-skills', data);
+    return response.data;
+  },
+
+  /** Edit a skill; the server writes a new version and returns the skill at it. */
+  updateSkill: async (id: number, data: AdminAiUpdateSkillData): Promise<AdminAiMutationResponse<AdminAiSkill>> => {
+    const response = await apiClient.put<AdminAiMutationResponse<AdminAiSkill>>(`/admin/ai-skills/${id}`, data);
+    return response.data;
+  },
+
+  /** Delete a skill (refused with a 422 naming the agents while it is attached). */
+  deleteSkill: async (id: number): Promise<AdminAiMutationResponse<null>> => {
+    const response = await apiClient.delete<AdminAiMutationResponse<null>>(`/admin/ai-skills/${id}`);
+    return response.data;
+  },
+
+  /** The versions, newest first, without their instructions. */
+  getSkillVersions: async (id: number, page = 1): Promise<AdminAiSkillVersionsResponse> => {
+    const response = await apiClient.get<AdminAiSkillVersionsResponse>(`/admin/ai-skills/${id}/versions`, {
+      params: { page },
+    });
+    return response.data;
+  },
+
+  /** One version, with its instructions. */
+  getSkillVersion: async (id: number, version: number): Promise<AdminAiSkillVersionResponse> => {
+    const response = await apiClient.get<AdminAiSkillVersionResponse>(`/admin/ai-skills/${id}/versions/${version}`);
+    return response.data;
+  },
+
+  /** Save an old version as a new one; returns the skill at the new version. */
+  restoreSkillVersion: async (id: number, version: number): Promise<AdminAiMutationResponse<AdminAiSkill>> => {
+    const response = await apiClient.post<AdminAiMutationResponse<AdminAiSkill>>(
+      `/admin/ai-skills/${id}/versions/${version}/restore`,
+    );
+    return response.data;
+  },
+
+  attachSkillToAgent: async (skillId: number, agentId: number): Promise<AdminAiMutationResponse<AdminAiSkillDetail>> => {
+    const response = await apiClient.post<AdminAiMutationResponse<AdminAiSkillDetail>>(
+      `/admin/ai-skills/${skillId}/agents/${agentId}`,
+    );
+    return response.data;
+  },
+
+  detachSkillFromAgent: async (skillId: number, agentId: number): Promise<AdminAiMutationResponse<AdminAiSkillDetail>> => {
+    const response = await apiClient.delete<AdminAiMutationResponse<AdminAiSkillDetail>>(
+      `/admin/ai-skills/${skillId}/agents/${agentId}`,
+    );
+    return response.data;
+  },
+
+  /** Per day over `days` (1 to 90): loads by mode, what was offered, and what was offered but not loaded. */
+  getSkillUsage: async (id: number, days = 7): Promise<AdminAiSkillUsageResponse> => {
+    const response = await apiClient.get<AdminAiSkillUsageResponse>(`/admin/ai-skills/${id}/usage`, {
+      params: { days },
+    });
     return response.data;
   },
 
