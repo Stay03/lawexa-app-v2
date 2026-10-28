@@ -140,7 +140,7 @@ test('the panel switches versions in place and saves each under its own name', (
   assert.match(strip, /first\.current && !first\.current\.disabled \? first\.current : second\.current/);
   const editor = code(...DRAFT_DIR, 'DraftEditor.tsx');
   assert.match(editor, /<DraftBar \/>\s*\{versionSwitch\}/);
-  assert.match(editor, /\)\}\s*\{versionSwitch\}\s*<div data-v2-draft-scroll/);
+  assert.match(editor, /\)\}\s*\{versionSwitch\}\s*<div\s+data-v2-draft-scroll/);
 });
 
 test('both chat frames hand the panel the version index', () => {
