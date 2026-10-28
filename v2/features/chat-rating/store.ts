@@ -59,9 +59,21 @@ export function noteAnswerStreaming(): void {
  * The banner appears in this chat: it is the session's one ask, and it stays
  * until the reader rates or closes it (`endOffer`). False when the session
  * has asked already or there is no moment in this chat to ask about.
+ *
+ * `plan_ended` is the server's own moment (a paid plan ran out): it needs
+ * none in the chat, and it is about the chat open, with no answer named.
  */
-export function beginOffer(conversationId: string): boolean {
-  if (askedThisSession || moment === null || moment.conversationId !== conversationId) return false;
+export function beginOffer(conversationId: string, serverMoment: 'plan_ended' | null = null): boolean {
+  if (askedThisSession) return false;
+  if (serverMoment === 'plan_ended') {
+    seq += 1;
+    askedThisSession = true;
+    active = { trigger: 'plan_ended', messageId: null, awaitsNewAnswer: false, streamed: false, conversationId, seq };
+    moment = null;
+    emit();
+    return true;
+  }
+  if (moment === null || moment.conversationId !== conversationId) return false;
   askedThisSession = true;
   active = moment;
   moment = null;

@@ -110,7 +110,9 @@ export type ChatRatingReason =
   | 'something_else';
 
 /** The moment that brought the banner up. */
-export type ChatRatingTrigger = 'copy' | 'cited_case' | 'regenerate';
+/** `plan_ended`: the banner asks once on the first chat after a paid plan
+ *  ran out, with no moment needed (Arthur, 28 October 2026, "B plus A"). */
+export type ChatRatingTrigger = 'copy' | 'cited_case' | 'regenerate' | 'plan_ended';
 
 /** POST /api/feedback, as a chat rating. */
 export interface SubmitChatRatingData {
@@ -128,4 +130,33 @@ export interface SubmitChatRatingData {
 export interface ChatPromptEligibility {
   eligible: boolean;
   next_at: string | null;
+  /** `plan_ended` when the banner asks because a paid plan ran out (once,
+   *  outside the 14 days); null otherwise. Absent from an older server. */
+  moment?: 'plan_ended' | null;
+}
+
+/** "Why are you cancelling?" (POST /subscriptions/cancellation-feedback). */
+export type CancellationReason = 'too_expensive' | 'not_used_enough' | 'missing_something' | 'other';
+
+export interface CancellationFeedbackBody {
+  reason: CancellationReason;
+  /** Optional, and required for `other`; at most 2,000 characters. */
+  details?: string;
+}
+
+/** One row of GET /admin/feedback/cancellations. */
+export interface AdminCancellationFeedback {
+  id: number;
+  reason: CancellationReason;
+  details: string | null;
+  created_at: string;
+  user: { id: number; name: string; email: string };
+  plan: { id: number; name: string } | null;
+  subscription: { id: number; status: string; cancelled_at: string | null; ends_at: string | null };
+}
+
+/** GET /admin/feedback/cancellations/summary. */
+export interface AdminCancellationSummary {
+  total: number;
+  reasons: Record<CancellationReason, number>;
 }

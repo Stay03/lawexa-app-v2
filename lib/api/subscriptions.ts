@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
+import type { CancellationFeedbackBody } from '@/types/feedback';
 import type { TCurrency, PaymentVerifyRef } from '@/types/payment';
 import type {
   IPlansResponse,
@@ -136,6 +137,19 @@ async function cancel(): Promise<ApiResponse<ISubscription>> {
 }
 
 /**
+ * "Why are you cancelling?", after a paid plan's cancel (Backend 53252e35).
+ * 201 on save; 409 when this plan's reason was already given; 422 when the
+ * reason is missing or there is no cancelled plan.
+ */
+async function sendCancellationFeedback(body: CancellationFeedbackBody): Promise<ApiResponse<unknown>> {
+  const response = await apiClient.post<ApiResponse<unknown>>('/subscriptions/cancellation-feedback', {
+    reason: body.reason,
+    ...(body.details ? { details: body.details } : {}),
+  });
+  return response.data;
+}
+
+/**
  * Get paginated invoice history.
  */
 async function getInvoices(params: IInvoiceListParams = {}): Promise<IInvoicesResponse> {
@@ -164,5 +178,6 @@ export const subscriptionsApi = {
   initializeUpgrade,
   verifyUpgrade,
   cancel,
+  sendCancellationFeedback,
   getInvoices,
 } as const;

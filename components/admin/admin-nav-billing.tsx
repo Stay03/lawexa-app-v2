@@ -13,6 +13,7 @@ import {
   Building2,
   Webhook,
   MessageSquare,
+  UserMinus,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -35,6 +36,7 @@ const billingNavItems = [
   { title: 'Plans', url: '/admin/plans', icon: Layers, exact: true },
   { title: 'Subscriptions', url: '/admin/subscriptions', icon: List, exact: true },
   { title: 'Sub. Analytics', url: '/admin/subscriptions/analytics', icon: BarChart3 },
+  { title: 'Why they cancelled', url: '/admin/feedback/cancellations', icon: UserMinus },
   { title: 'Message Packs', url: '/admin/message-packs', icon: Package, exact: true },
   { title: 'Pack Analytics', url: '/admin/message-packs/analytics', icon: BarChart3 },
   { title: 'Sponsors', url: '/admin/sponsors', icon: Building2, exact: true },
@@ -47,7 +49,7 @@ export function AdminNavBillingSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/plans') || pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/message-packs') || pathname.startsWith('/admin/sponsors') || pathname.startsWith('/admin/campaigns') || pathname.startsWith('/admin/billing') || pathname.startsWith('/admin/paystack-webhooks') || pathname.startsWith('/admin/messages');
+  const isSectionActive = pathname.startsWith('/admin/plans') || pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/message-packs') || pathname.startsWith('/admin/sponsors') || pathname.startsWith('/admin/campaigns') || pathname.startsWith('/admin/billing') || pathname.startsWith('/admin/paystack-webhooks') || pathname.startsWith('/admin/messages') || pathname.startsWith('/admin/feedback/cancellations');
 
   return (
     <SidebarGroup>

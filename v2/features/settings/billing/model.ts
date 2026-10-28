@@ -1,4 +1,5 @@
 import { isOnePeriodSubscription, onePeriodSentence } from '@/lib/utils/one-period-subscription';
+import type { CancellationReason } from '@/types/feedback';
 import type { ICurrentSubscriptionData } from '@/types/subscription';
 import type { ITrialData } from '@/types/trial';
 
@@ -107,4 +108,30 @@ export function summarisePlan(
         isFree: false,
       };
   }
+}
+
+/* ── "Why are you cancelling?" ───────────────────────────────────────────── */
+
+/**
+ * The step after a paid plan's cancel (Arthur, 28 October 2026, "B plus A"):
+ * one tap names the reason, a few words are optional, Other needs them, and
+ * Skip always ends it. The cancel is already done by then; nothing here can
+ * undo or hold it.
+ */
+export const CANCEL_REASONS: readonly { key: CancellationReason; label: string }[] = [
+  { key: 'too_expensive', label: 'Too expensive' },
+  { key: 'not_used_enough', label: 'Didn’t use it enough' },
+  { key: 'missing_something', label: 'Missing something I need' },
+  { key: 'other', label: 'Other' },
+];
+
+/** The server's cap on the words. */
+export const CANCEL_DETAILS_MAX = 2000;
+
+/** Whether Send may go: a reason, and words for Other, within the cap. */
+export function cancelReasonReady(reason: CancellationReason | null, details: string): boolean {
+  if (reason === null) return false;
+  const trimmed = details.trim();
+  if (trimmed.length > CANCEL_DETAILS_MAX) return false;
+  return reason !== 'other' || trimmed.length > 0;
 }

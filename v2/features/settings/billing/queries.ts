@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import { subscriptionsApi } from '@/lib/api/subscriptions';
+import type { CancellationFeedbackBody } from '@/types/feedback';
 import { trialApi } from '@/lib/api/trial';
 import { STALE_TIMES } from '@/v2/runtime/query';
 
@@ -18,6 +19,7 @@ import { STALE_TIMES } from '@/v2/runtime/query';
  *   GET  /subscriptions/invoices          paged, 10 a page
  *   POST /subscriptions/cancel            a paid subscription
  *   POST /trial/cancel                    a free trial
+ *   POST /subscriptions/cancellation-feedback   why, after a paid cancel
  */
 export const billingQueries = {
   all: ['settings', 'billing'] as const,
@@ -61,5 +63,13 @@ export function useCancelPlan() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: billingQueries.all });
     },
+  });
+}
+
+/** "Why are you cancelling?": one send; the plan is already cancelled. */
+export function useSendCancellationFeedback() {
+  return useMutation({
+    mutationFn: (body: CancellationFeedbackBody) => subscriptionsApi.sendCancellationFeedback(body),
+    meta: { silentError: true },
   });
 }

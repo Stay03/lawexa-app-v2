@@ -18,6 +18,11 @@ import type { ChatRatingReason, ChatRatingTrigger } from '@/types/feedback';
  * Shown and closed are both reported (POST /feedback/chat-prompt/seen), so a
  * banner the reader ignores still counts as asked (Arthur, choice 2).
  * Rephrasing is not a trigger (Arthur, choice 4: "Leave out").
+ *
+ * One ask needs no moment (Arthur, 28 October 2026, "B plus A"): when a paid
+ * plan has ended, the server answers `moment: "plan_ended"`, and the banner
+ * appears on the reader's first chat screen as it opens, once (the server
+ * stops answering it once the banner has been shown).
  */
 
 export const CHAT_RATING_QUESTION = 'How is Lawexa doing?';
@@ -62,6 +67,8 @@ export interface OfferInputs {
   isAccount: boolean;
   /** The server's answer: true, false, or null while it is not known. */
   eligible: boolean | null;
+  /** The server's moment: `plan_ended` asks with no moment in the chat. */
+  serverMoment: 'plan_ended' | null;
   askedThisSession: boolean;
   isStreaming: boolean;
   quizInProgress: boolean;
@@ -74,7 +81,10 @@ export interface OfferInputs {
 export function mayOffer(inputs: OfferInputs): boolean {
   const { isAccount, eligible, askedThisSession, isStreaming, quizInProgress, moment } = inputs;
   if (!isAccount || eligible !== true || askedThisSession) return false;
-  if (isStreaming || quizInProgress || moment === null) return false;
+  if (isStreaming || quizInProgress) return false;
+  // A plan that ended asks on its own, in whichever chat is open.
+  if (inputs.serverMoment === 'plan_ended') return true;
+  if (moment === null) return false;
   if (moment.conversationId !== inputs.conversationId) return false;
   // Ask again: only once the new answer has started and finished.
   if (moment.awaitsNewAnswer && !moment.streamed) return false;
