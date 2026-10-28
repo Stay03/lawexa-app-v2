@@ -214,3 +214,14 @@ test('an agent’s page lists its skills read-only, and draws nothing for a serv
   const types = read('types', 'admin-ai.ts');
   assert.match(types, /export type AdminAiAgentDetail = AdminAiAgent & \{\s*\/\*\*[^*]*\*\/\s*skills\?: AdminAiAgentSkill\[\];/);
 });
+
+test('only the list counts the loads: one skill’s page never reads loads_7d (woz’s server leaves it off)', () => {
+  const types = read('types', 'admin-ai.ts');
+  assert.match(types, /export interface AdminAiSkillRow extends AdminAiSkill \{\s*loads_7d: number;\s*\}/);
+  assert.match(types, /interface AdminAiSkillsListResponse \{[^}]*data: AdminAiSkillRow\[\];/);
+  const skillType = types.slice(types.indexOf('export interface AdminAiSkill {'), types.indexOf('export interface AdminAiSkillRow'));
+  assert.doesNotMatch(skillType, /loads_7d/);
+  const page = read('app', '(admin)', 'admin', 'ai', 'skills', '[id]', 'page.tsx');
+  assert.doesNotMatch(page, /loads_7d/);
+  assert.match(page, /\{skill\.agents_count\.toLocaleString\('en-US'\)\}/);
+});

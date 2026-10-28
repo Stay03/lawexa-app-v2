@@ -446,11 +446,15 @@ export interface AdminAiSkill {
   /** Characters / 4, from the server. */
   estimated_tokens: number;
   agents_count: number;
-  loads_7d: number;
   created_by: AdminAiSkillAuthor | null;
   updated_by: AdminAiSkillAuthor | null;
   created_at: string;
   updated_at: string;
+}
+
+/** A row of the skills list: only the list counts the loads (woz's server leaves it off one skill). */
+export interface AdminAiSkillRow extends AdminAiSkill {
+  loads_7d: number;
 }
 
 export interface AdminAiSkillAgent {
@@ -526,7 +530,7 @@ export interface AdminAiSkillUsage {
 export interface AdminAiSkillsListResponse {
   success: boolean;
   message: string;
-  data: AdminAiSkill[];
+  data: AdminAiSkillRow[];
   pagination: AdminConversationsPagination;
   links: AdminConversationsLinks;
 }
