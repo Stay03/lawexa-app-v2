@@ -115,7 +115,7 @@ test('the results screen puts the place between the answers and the button bar, 
 
   const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
   // The server's board, never a rank worked out here.
-  assert.match(block, /useQuery\(soloQuizQueries\.leaderboard\(quizUuid, \{ viewerId \}\)\)/);
+  assert.match(block, /\.\.\.soloQuizQueries\.leaderboard\(quizUuid, \{ viewerId \}\),/);
   assert.match(block, /const position = finishPosition\(board, runPoints/);
   // A board that fails to load leaves the space as it was.
   assert.match(block, /if \(boardQuery\.isError \|\| !boardQuery\.data\) return null;/);
@@ -124,6 +124,16 @@ test('the results screen puts the place between the answers and the button bar, 
   // The podium moment is the quiz page's podium, rising; only for a podium finish.
   assert.match(block, /position\.kind === 'ranked' && position\.podiumPlace \? \(\s*<PodiumMoment/);
   assert.match(block, /<Podium entries=\{entries\} isYou=\{isYou\} rising=\{playing\} \/>/);
+});
+
+test('only a public quiz asks for its board, so a link-only or private finish sends no request', () => {
+  const position = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(position, /useQuery\(\{\s*\.\.\.soloQuizQueries\.leaderboard\(quizUuid, \{ viewerId \}\),\s*enabled: publicQuiz === true,\s*\}\);/);
+  assert.match(position, /if \(publicQuiz === false\) return null;/);
+  assert.match(position, /if \(publicQuiz === null \|\| boardQuery\.isPending\) return <FinishPositionSkeleton \/>;/);
+  // A quiz detail that fails to load never leaves the skeleton up.
+  const screen = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx'), 'utf8');
+  assert.match(screen, /publicQuiz=\{detailQuery\.isError \? false : visibility === null \? null : visibility === 'public'\}/);
 });
 
 test('the podium moment is skippable and still under reduced motion', () => {

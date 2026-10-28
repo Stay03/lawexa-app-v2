@@ -76,6 +76,8 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
     enabled: quizUuid !== null,
   });
   const visibility = detailQuery.data?.data.visibility ?? null;
+  // For the place block, a detail that fails to load reads as not public: it
+  // then leaves the space as it was, never a skeleton that stays.
   const shareable = visibility === 'link' || visibility === 'public';
 
   const startAttempt = useStartAttempt(quizUuid ?? '', viewerId);
@@ -164,7 +166,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
       <FinishPosition
         quizUuid={attempt.quiz.uuid}
         runPoints={score.points}
-        publicQuiz={visibility === null ? null : visibility === 'public'}
+        publicQuiz={detailQuery.isError ? false : visibility === null ? null : visibility === 'public'}
         viewerId={viewerId}
       />
 

@@ -48,9 +48,17 @@ export function FinishPosition({
   publicQuiz: boolean | null;
   viewerId: number | null;
 }) {
-  const boardQuery = useQuery(soloQuizQueries.leaderboard(quizUuid, { viewerId }));
+  // Only a public quiz has a board: a link-only or private one answers 404
+  // (Tester, 28 October 2026: twice a finish, on load and on the finish's
+  // refresh). Asked for once the quiz is known to be public; a disabled read
+  // is never refetched, so the finish's refresh sends nothing either.
+  const boardQuery = useQuery({
+    ...soloQuizQueries.leaderboard(quizUuid, { viewerId }),
+    enabled: publicQuiz === true,
+  });
 
-  if (boardQuery.isPending) return <FinishPositionSkeleton />;
+  if (publicQuiz === false) return null;
+  if (publicQuiz === null || boardQuery.isPending) return <FinishPositionSkeleton />;
   if (boardQuery.isError || !boardQuery.data) return null;
 
   return <PositionBlock board={boardQuery.data.data} quizUuid={quizUuid} runPoints={runPoints} publicQuiz={publicQuiz} />;
