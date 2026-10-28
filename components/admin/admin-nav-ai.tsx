@@ -2,15 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Brain,
-  ChevronRight,
-  Server,
-  Box,
-  Bot,
-  Wrench,
-  GitBranch,
-} from 'lucide-react';
+import { Brain, ChevronRight, Server, Box, Bot, Wrench, GitBranch, BookOpenCheck } from 'lucide-react';
 import {
   Collapsible,
   CollapsibleContent,
@@ -33,6 +25,7 @@ const aiNavItems = [
   { title: 'Models', url: '/admin/ai/models', icon: Box },
   { title: 'Agents', url: '/admin/ai/agents', icon: Bot },
   { title: 'Tools', url: '/admin/ai/tools', icon: Wrench },
+  { title: 'Skills', url: '/admin/ai/skills', icon: BookOpenCheck },
   { title: 'Workflows', url: '/admin/ai/workflows', icon: GitBranch },
 ];
 
