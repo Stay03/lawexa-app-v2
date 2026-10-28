@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { QuizLeaderboard, QuizLeaderboardEntry } from '@/types/channel-quiz';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { Podium } from '../board/FrontBoard';
+import { isViewerEntry } from '../home-model';
 import { quizFrontHref } from '../model';
 import { soloQuizQueries } from '../queries';
 import { prefersReducedMotion } from '../ui';
@@ -67,8 +68,7 @@ function PositionBlock({
 }) {
   const position = finishPosition(board, runPoints, { publicQuiz: publicQuiz !== false });
   const viewer = board.viewer;
-  const isYou = (entry: QuizLeaderboardEntry) =>
-    viewer !== null && entry.rank === viewer.rank && entry.points === viewer.points;
+  const isYou = (entry: QuizLeaderboardEntry) => isViewerEntry(viewer, entry);
   const boardLink = publicQuiz !== false && board.player_count > 0;
 
   return (
@@ -112,7 +112,9 @@ function PodiumMoment({
   entries: readonly QuizLeaderboardEntry[];
   isYou: (entry: QuizLeaderboardEntry) => boolean;
 }) {
-  const [playing, setPlaying] = useState(() => !prefersReducedMotion());
+  // Only a podium with the reader's face on it has a climb to end it (a reader
+  // tied for third can sort fourth); without one it stands still from the start.
+  const [playing, setPlaying] = useState(() => !prefersReducedMotion() && entries.some(isYou));
   const stop = () => setPlaying(false);
   const onAnimationEnd = (event: AnimationEvent) => {
     if (event.animationName === 'v2-solo-podium-climb') stop();

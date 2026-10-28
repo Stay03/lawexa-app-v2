@@ -9,7 +9,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import type { QuizLeaderboard, QuizLeaderboardEntry } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { BOARD_EMPTY_NOTE, BOARD_RULES_NOTE, playersLabel, podiumInstitution, scoreLabel, standingLine } from '../home-model';
+import {
+  BOARD_EMPTY_NOTE,
+  BOARD_RULES_NOTE,
+  isViewerEntry,
+  playersLabel,
+  podiumInstitution,
+  scoreLabel,
+  standingLine,
+} from '../home-model';
 
 /** The board's length on the quiz page: the podium and the rest of the top ten. */
 const BOARD_TOP = 10;
@@ -44,8 +52,7 @@ const BOARD_TOP = 10;
  */
 export function FrontBoard({ board }: { board: QuizLeaderboard }) {
   const viewer = board.viewer;
-  const isYou = (entry: QuizLeaderboardEntry) =>
-    viewer !== null && entry.rank === viewer.rank && entry.points === viewer.points;
+  const isYou = (entry: QuizLeaderboardEntry) => isViewerEntry(viewer, entry);
   const podium = board.entries.slice(0, 3);
   const rest = board.entries.slice(3, BOARD_TOP);
   const youShown = board.entries.slice(0, BOARD_TOP).some(isYou);
@@ -197,24 +204,23 @@ export function Podium({
                 <span className="sr-only"> points</span>
               </span>
             </span>
-            <span
-              aria-hidden
-              className={cn('mt-3 h-3 w-full [clip-path:polygon(8%_0,92%_0,100%_100%,0_100%)]', block.top, rising && 'v2-solo-podium-step')}
-            />
-            <span
-              aria-label={`Place ${entry.rank}`}
-              className={cn(
-                'flex w-full flex-col items-center bg-gradient-to-b to-transparent pt-2 font-comfortaa text-4xl leading-none font-bold text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.18)]',
-                block.front,
-                rising && 'v2-solo-podium-step',
-              )}
-            >
-              <span aria-hidden className="mb-1 flex gap-0.5">
-                {[0, 1, 2].map((star) => (
-                  <Star key={star} className="size-2 fill-white text-white" />
-                ))}
+            {/* The lip and the front grow as one step, from its foot. */}
+            <span className={cn('flex w-full flex-col', rising && 'v2-solo-podium-step')}>
+              <span aria-hidden className={cn('mt-3 h-3 w-full [clip-path:polygon(8%_0,92%_0,100%_100%,0_100%)]', block.top)} />
+              <span
+                aria-label={`Place ${entry.rank}`}
+                className={cn(
+                  'flex w-full flex-col items-center bg-gradient-to-b to-transparent pt-2 font-comfortaa text-4xl leading-none font-bold text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.18)]',
+                  block.front,
+                )}
+              >
+                <span aria-hidden className="mb-1 flex gap-0.5">
+                  {[0, 1, 2].map((star) => (
+                    <Star key={star} className="size-2 fill-white text-white" />
+                  ))}
+                </span>
+                {entry.rank}
               </span>
-              {entry.rank}
             </span>
           </li>
         );
