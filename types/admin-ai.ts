@@ -406,6 +406,146 @@ export interface AdminAiToolDetailResponse {
 }
 
 // ============================================
+// AI Skills (woz's server, 28 October 2026)
+// ============================================
+
+/** How a skill reaches Lawexa: one line and `load_skill` on demand, or its steps on every turn. */
+export type AdminAiSkillLoadMode = 'on_demand' | 'always_on';
+
+/** Who made a skill or a version; null when that account is gone. Never an internal id. */
+export interface AdminAiSkillAuthor {
+  uuid: string;
+  name: string;
+}
+
+export interface AdminAiSkill {
+  id: number;
+  /** snake_case, fixed after create: transcripts and `load_skill` use it. */
+  name: string;
+  display_name: string;
+  /** The one line Lawexa sees (max 300). */
+  description: string;
+  /** The steps (max 20,000 characters). */
+  instructions: string;
+  load_mode: AdminAiSkillLoadMode;
+  is_active: boolean;
+  /** The current version number. */
+  version: number;
+  /** Characters / 4, from the server. */
+  estimated_tokens: number;
+  agents_count: number;
+  loads_7d: number;
+  created_by: AdminAiSkillAuthor | null;
+  updated_by: AdminAiSkillAuthor | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminAiSkillAgent {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+export interface AdminAiSkillDetail extends AdminAiSkill {
+  agents: AdminAiSkillAgent[];
+}
+
+export interface AdminAiSkillsParams {
+  active_only?: boolean;
+  load_mode?: AdminAiSkillLoadMode;
+  search?: string;
+  per_page?: number;
+  page?: number;
+}
+
+export interface AdminAiCreateSkillData {
+  name: string;
+  display_name: string;
+  description: string;
+  instructions: string;
+  load_mode: AdminAiSkillLoadMode;
+  is_active?: boolean;
+}
+
+/** `name` is refused if it differs from the skill's (it is fixed after create). */
+export interface AdminAiUpdateSkillData {
+  display_name?: string;
+  description?: string;
+  instructions?: string;
+  load_mode?: AdminAiSkillLoadMode;
+  is_active?: boolean;
+  change_note?: string;
+}
+
+/** One saved version. The list leaves `instructions` out to stay small. */
+export interface AdminAiSkillVersion {
+  version: number;
+  display_name: string;
+  description: string;
+  instructions?: string;
+  load_mode: AdminAiSkillLoadMode;
+  change_note: string | null;
+  created_by: AdminAiSkillAuthor | null;
+  created_at: string;
+}
+
+export interface AdminAiSkillUsageTotals {
+  loads_on_demand: number;
+  loads_always_on: number;
+  /** Turns by an attached agent while the skill was active. */
+  offered: number;
+  /** Always 0 for an always-on skill. */
+  offered_not_loaded: number;
+}
+
+export interface AdminAiSkillUsageDay extends AdminAiSkillUsageTotals {
+  /** YYYY-MM-DD, oldest first, every day of the window. */
+  date: string;
+}
+
+export interface AdminAiSkillUsage {
+  days: number;
+  load_mode: AdminAiSkillLoadMode;
+  totals: AdminAiSkillUsageTotals;
+  daily: AdminAiSkillUsageDay[];
+}
+
+export interface AdminAiSkillsListResponse {
+  success: boolean;
+  message: string;
+  data: AdminAiSkill[];
+  pagination: AdminConversationsPagination;
+  links: AdminConversationsLinks;
+}
+
+export interface AdminAiSkillDetailResponse {
+  success: boolean;
+  message: string;
+  data: AdminAiSkillDetail;
+}
+
+export interface AdminAiSkillVersionsResponse {
+  success: boolean;
+  message: string;
+  data: AdminAiSkillVersion[];
+  pagination: AdminConversationsPagination;
+  links: AdminConversationsLinks;
+}
+
+export interface AdminAiSkillVersionResponse {
+  success: boolean;
+  message: string;
+  data: AdminAiSkillVersion;
+}
+
+export interface AdminAiSkillUsageResponse {
+  success: boolean;
+  message: string;
+  data: AdminAiSkillUsage;
+}
+
+// ============================================
 // AI Workflows
 // ============================================
 
