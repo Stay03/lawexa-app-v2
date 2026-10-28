@@ -168,6 +168,11 @@
   }
 }
 
+/* "You made the Podium!" pops in as the steps rise. */
+.v2-solo-podium-headline {
+  animation: v2-solo-pop 500ms cubic-bezier(0.34, 1.56, 0.64, 1) 150ms both;
+}
+
 .v2-solo-podium-still :is(.v2-solo-podium-step, .v2-solo-podium-face, .v2-solo-podium-climb) {
   animation: none;
 }
@@ -181,7 +186,8 @@
   .v2-solo-dot,
   .v2-solo-podium-step,
   .v2-solo-podium-face,
-  .v2-solo-podium-climb {
+  .v2-solo-podium-climb,
+  .v2-solo-podium-headline {
     animation: none !important;
   }
   .v2-solo-dot {

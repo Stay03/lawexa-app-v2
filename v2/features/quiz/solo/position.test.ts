@@ -123,15 +123,18 @@ test('the results screen puts the place between the answers and the button bar, 
   assert.match(block, /href=\{`\$\{quizFrontHref\(quizUuid\)\}#quiz-front-board`\}/);
   // The podium moment is the quiz page's podium, rising; only for a podium finish.
   assert.match(block, /position\.kind === 'ranked' && position\.podiumPlace \? \(\s*<PodiumMoment/);
-  assert.match(block, /<Podium entries=\{entries\} isYou=\{isYou\} rising \/>/);
+  assert.match(block, /<Podium entries=\{entries\} isYou=\{isYou\} rising=\{playing\} \/>/);
 });
 
 test('the podium moment is skippable and still under reduced motion', () => {
   const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
   // Skip only while the reader's face is on the podium to climb; else it stands still.
-  assert.match(block, /const \[playing, setPlaying\] = useState\(\(\) => !prefersReducedMotion\(\) && entries\.some\(isYou\)\);/);
+  assert.match(block, /const onPodium = entries\.some\(isYou\);/);
+  assert.match(block, /useState<MomentPhase>\(\(\) => \(!prefersReducedMotion\(\) && onPodium \? 'waiting' : 'still'\)\);/);
+  // It rises only once it is on screen (below the fold on a phone).
+  assert.match(block, /if \(entry\?\.isIntersecting\) setPhase\('playing'\);/);
   assert.match(block, /onClick=\{stop\}/);
-  assert.match(block, /className=\{cn\(!playing && 'v2-solo-podium-still'\)\}/);
+  assert.match(block, /className=\{cn\('w-full', phase === 'waiting' && 'opacity-0', !playing && 'v2-solo-podium-still'\)\}/);
 
   const css = read('v2', 'features', 'quiz', 'solo', 'solo-quiz.css');
   const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
