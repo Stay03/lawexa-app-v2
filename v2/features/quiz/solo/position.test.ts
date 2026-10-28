@@ -169,10 +169,12 @@ test('the podium plays first, full screen over the results, for a top-three fini
   // Arthur's pick: it moves on by itself about 3s after the confetti has fallen; no "See my score".
   assert.match(stage, /export const PODIUM_HOLD_MS = 3000;/);
   assert.match(stage, /if \(confetti !== 'fallen'\) return;\s*const timer = window\.setTimeout\(leave, PODIUM_HOLD_MS\);/);
-  // However it ends, it fades out over the results in 350ms, opacity only (Arthur: "clean and smooth").
-  assert.match(stage, /export const PODIUM_FADE_MS = 350;/);
-  assert.match(stage, /'transition-opacity duration-\[350ms\] ease-out',\s*leaving && 'pointer-events-none opacity-0',/);
-  assert.match(stage, /if \(!leaving\) return;\s*const timer = window\.setTimeout\(onDone, PODIUM_FADE_MS\);/);
+  // However it ends, the whole stage drops off the bottom like a curtain in 550ms, transform only
+  // (Arthur: "one smooth motion of podium goes down and score and other details come into view").
+  assert.match(stage, /export const PODIUM_SLIDE_MS = 550;/);
+  assert.match(stage, /'transition-transform duration-\[550ms\] ease-in-out',\s*leaving && 'pointer-events-none translate-y-full',/);
+  assert.match(stage, /if \(!leaving\) return;\s*const timer = window\.setTimeout\(onDone, PODIUM_SLIDE_MS\);/);
+  assert.doesNotMatch(stage, /transition-opacity|PODIUM_FADE_MS/);
   assert.doesNotMatch(stage, /<RaisedButton|>\s*See my score/);
   // Skip (focused) or Escape ends it at once.
   assert.match(stage, /ref=\{skipRef\}\s*type="button"\s*onClick=\{leave\}/);
