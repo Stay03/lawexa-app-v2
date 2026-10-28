@@ -147,6 +147,9 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   // On the podium: the campus alone, and a university wrapped, never cut.
   assert.match(board, /\{podiumInstitution\(entry\.user\.institution\)\}/);
   assert.match(board, /<span className="w-full px-1 text-\[10px\] leading-tight text-balance break-words text-muted-foreground sm:text-\[11px\]">/);
+  // On the page itself, no card around it, the rows split by quiet dividers (Arthur, 28 October 2026).
+  assert.match(board, /aria-labelledby="quiz-front-board"\s*className="flex flex-col gap-4"\s*>/);
+  assert.match(board, /<ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col divide-y divide-border\/70">/);
   // The board runs across the page under the quiz and its panel on a computer.
   assert.match(front, /md:col-span-2 md:col-start-1 md:row-start-2/);
 });

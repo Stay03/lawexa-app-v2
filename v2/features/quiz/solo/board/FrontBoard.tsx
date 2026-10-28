@@ -30,8 +30,11 @@ const BOARD_TOP = 10;
  *   🏆4 (face) Emeka Uche / Lagos State University        3,712
  *   ...to 10, then ··· and your own row with your place
  *
- * On a computer the podium and the list stand side by side, so the board
- * fills the page's width. The ranking rule sits behind the heading's (i).
+ * No card around it (Arthur, 28 October 2026: "Remove the outer card ... Let
+ * the leaderboard, podium, and player rankings sit directly on the page's
+ * normal background ... use subtle dividers between ranking rows, and retain
+ * the gold highlight for the current user"). On a computer the podium and
+ * the list stand side by side, so the board fills the page's width. The ranking rule sits behind the heading's (i).
  * Where a player studies is sent to a signed-in reader only (Backend: their
  * Law School campus when they are at law school, else their university); a
  * visitor sees names alone.
@@ -48,7 +51,7 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
   return (
     <section
       aria-labelledby="quiz-front-board"
-      className="flex flex-col gap-4 rounded-3xl border-2 border-border bg-gradient-to-b from-[oklch(0.97_0.035_88)] via-card to-card p-4 sm:p-5 dark:from-[oklch(0.3_0.04_85)]"
+      className="flex flex-col gap-4"
     >
       <div className="flex items-center justify-between gap-3">
         <h2 id="quiz-front-board" className="flex items-center gap-1 text-lg font-bold text-foreground">
@@ -74,7 +77,7 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] md:items-start md:gap-8">
           <div className="flex min-w-0 flex-col gap-4">
             {viewer ? (
-              <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-3 py-2.5">
+              <div className="flex items-center gap-3 rounded-2xl bg-secondary/60 px-3 py-2.5">
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary font-comfortaa text-base font-bold text-primary-foreground tabular-nums">
                   #{viewer.rank}
                 </span>
@@ -87,19 +90,23 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
           </div>
 
           {rest.length > 0 || (viewer && !youShown) ? (
-            <ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col gap-1.5">
-              {rest.map((entry) => (
-                <BoardRow key={`${entry.rank}-${entry.user.uuid}`} entry={entry} you={isYou(entry)} />
-              ))}
+            <div className="flex min-w-0 flex-col gap-1">
+              {rest.length > 0 ? (
+                <ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col divide-y divide-border/70">
+                  {rest.map((entry) => (
+                    <BoardRow key={`${entry.rank}-${entry.user.uuid}`} entry={entry} you={isYou(entry)} />
+                  ))}
+                </ol>
+              ) : null}
               {viewer && !youShown ? (
-                <>
-                  <li aria-hidden className="py-0.5 text-center text-sm leading-none tracking-[0.3em] text-muted-foreground">
+                <ol aria-label="Your place" className="flex min-w-0 flex-col gap-1">
+                  <li aria-hidden className="py-1 text-center text-sm leading-none tracking-[0.3em] text-muted-foreground">
                     ···
                   </li>
                   <YourRow rank={viewer.rank} points={viewer.points} />
-                </>
+                </ol>
               ) : null}
-            </ol>
+            </div>
           ) : null}
         </div>
       )}
@@ -146,7 +153,7 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
               <MemberAvatar
                 user={{ name: entry.user.name, avatar_url: entry.user.avatar_url ?? null }}
                 className={cn(
-                  'rounded-2xl ring-2 ring-offset-2 ring-offset-card after:rounded-2xl *:rounded-2xl',
+                  'rounded-2xl ring-2 ring-offset-2 ring-offset-background after:rounded-2xl *:rounded-2xl',
                   place === 1 ? 'size-16' : 'size-14',
                   you || place === 1 ? 'ring-primary' : 'ring-border',
                 )}
@@ -191,8 +198,8 @@ function BoardRow({ entry, you }: { entry: QuizLeaderboardEntry; you: boolean })
   return (
     <li
       className={cn(
-        'flex min-h-14 min-w-0 items-center gap-3 rounded-2xl px-3 py-2',
-        you ? 'bg-primary/10 ring-2 ring-primary/50' : 'border border-border bg-card',
+        'flex min-h-14 min-w-0 items-center gap-3 px-2 py-2',
+        you && 'rounded-xl border-transparent bg-primary/10 ring-2 ring-primary/50',
       )}
     >
       <span className="flex w-9 shrink-0 items-center gap-1 text-sm font-semibold text-foreground tabular-nums">
@@ -224,7 +231,7 @@ function BoardRow({ entry, you }: { entry: QuizLeaderboardEntry; you: boolean })
 /** The reader's own place when it is below the ten: the server sends it even then. */
 function YourRow({ rank, points }: { rank: number; points: number }) {
   return (
-    <li className="flex min-h-14 min-w-0 items-center gap-3 rounded-2xl bg-primary/10 px-3 py-2 ring-2 ring-primary/50">
+    <li className="flex min-h-14 min-w-0 items-center gap-3 rounded-xl bg-primary/10 px-2 py-2 ring-2 ring-primary/50">
       <span className="flex w-9 shrink-0 items-center gap-1 text-sm font-bold text-foreground tabular-nums">
         <Trophy aria-hidden className="size-3.5 text-primary" />
         <span className="sr-only">Place </span>
