@@ -57,9 +57,11 @@ export function AttemptSummary({
       aria-labelledby="attempt-results-heading"
       className="flex flex-col items-center pt-10 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300 sm:pt-14"
     >
+      {/* Focusable from script only: where the podium hands the reader back. */}
       <h1
         id="attempt-results-heading"
-        className="font-comfortaa text-[22px] font-bold text-balance text-foreground"
+        tabIndex={-1}
+        className="font-comfortaa text-[22px] font-bold text-balance text-foreground outline-none"
       >
         {greeting(runTone(score), viewerName)}
       </h1>

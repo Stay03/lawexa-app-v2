@@ -5,7 +5,7 @@ import { join } from 'node:path';
 
 import type { QuizLeaderboard } from '@/types/channel-quiz';
 import { isViewerEntry } from './home-model';
-import { finishPosition, PRIVATE_UNRANKED_LINE, UNRANKED_LINE } from './results/position-model';
+import { finishPosition, opensOnPodium, PRIVATE_UNRANKED_LINE, UNRANKED_LINE } from './results/position-model';
 
 /* The reader's place under "See your answers" (Arthur, 28 October 2026): the
  * position line, the "better than" line, View leaderboard, and the podium
@@ -121,8 +121,12 @@ test('the results screen puts the place between the answers and the button bar, 
   assert.match(block, /if \(boardQuery\.isError \|\| !boardQuery\.data\) return null;/);
   // View leaderboard opens the quiz page's own board.
   assert.match(block, /href=\{`\$\{quizFrontHref\(quizUuid\)\}#quiz-front-board`\}/);
-  // The podium moment is the quiz page's podium, rising; only for a podium finish.
-  assert.match(block, /position\.kind === 'ranked' && position\.podiumPlace \? \(\s*<PodiumMoment/);
+  // The small podium stays for a podium finish (Arthur's pick), in place of the "#3 of 16" line.
+  assert.match(block, /const onPodium = position\.kind === 'ranked' && position\.podiumPlace !== null;/);
+  assert.match(block, /\{onPodium \? \(\s*<PodiumMoment/);
+  assert.match(block, /\{onPodium \? null : \(\s*<p className="flex items-center gap-2 font-comfortaa/);
+  // The "better than" line stays either way.
+  assert.match(block, /\{position\.kind === 'ranked' && position\.standing \? \(/);
   assert.match(block, /<Podium entries=\{entries\} isYou=\{isYou\} rising=\{playing\} \/>/);
 });
 
@@ -132,19 +136,49 @@ test('only a public quiz asks for its board, so a link-only or private finish se
   assert.match(position, /if \(publicQuiz === false\) return null;/);
   assert.match(position, /if \(publicQuiz === null \|\| boardQuery\.isPending\) return <FinishPositionSkeleton \/>;/);
   // A quiz detail that fails to load never leaves the skeleton up.
-  const screen = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx'), 'utf8');
-  assert.match(screen, /publicQuiz=\{detailQuery\.isError \? false : visibility === null \? null : visibility === 'public'\}/);
+  const screen = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(screen, /const publicQuiz = detailQuery\.isError \? false : visibility === null \? null : visibility === 'public';/);
+  assert.match(screen, /publicQuiz=\{publicQuiz\}/);
+  // The screen's own read of the board (for the podium) is public-only too.
+  assert.match(screen, /useQuery\(\{\s*\.\.\.soloQuizQueries\.leaderboard\(quizUuid \?\? '', \{ viewerId \}\),\s*enabled: quizUuid !== null && publicQuiz === true,\s*\}\);/);
 });
 
-test('the podium moment is skippable and still under reduced motion', () => {
+test('the podium plays first, full screen over the results, for a top-three finish, then the score by itself', () => {
+  const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
+  // Reduced motion, or a podium already seen on this attempt: straight to the results.
+  assert.match(screen, /useState\(\(\) => prefersReducedMotion\(\) \|\| podiumAlreadySeen\(attemptUuid\)\)/);
+  // Until the board says, the skeleton stays, so nothing swaps under the reader.
+  assert.match(screen, /if \(!podiumDone && \(publicQuiz === null \|\| \(publicQuiz && boardQuery\.isPending\)\)\) \{\s*return \(\s*<div className=\{RESULTS_COLUMN\}>\s*<AttemptResultsSkeleton \/>/);
+  assert.match(screen, /const podiumFirst = !podiumDone && board !== null && opensOnPodium\(board, score\.points\);/);
+  // One layer over the results, which sit still and out of reach underneath.
+  assert.match(screen, /\{podiumFirst && board \? \(\s*<PodiumStage/);
+  assert.match(screen, /<div className=\{RESULTS_COLUMN\} inert=\{podiumFirst\}>/);
+  assert.match(screen, /onDone=\{finishPodium\}/);
+  // Once per attempt, and focus back to the results' heading.
+  assert.match(screen, /rememberPodiumSeen\(attemptUuid\);\s*setPodiumDone\(true\);/);
+  assert.match(screen, /document\.getElementById\('attempt-results-heading'\)\?\.focus\(\{ preventScroll: true \}\)/);
+  const summary = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptSummary.tsx');
+  assert.match(summary, /id="attempt-results-heading"\s*tabIndex=\{-1\}/);
+  // The small podium never rises a second time.
+  assert.match(screen, /podiumPlayed=\{podiumFirst \|\| podiumDone\}/);
   const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
-  // Skip only while the reader's face is on the podium to climb; else it stands still.
-  assert.match(block, /const onPodium = entries\.some\(isYou\);/);
-  assert.match(block, /useState<MomentPhase>\(\(\) => \(!prefersReducedMotion\(\) && onPodium \? 'waiting' : 'still'\)\);/);
-  // It rises only once it is on screen (below the fold on a phone), clear of the button bar.
-  assert.match(block, /if \(seen\(\)\) setPhase\('playing'\);/);
-  assert.match(block, /onClick=\{stop\}/);
-  assert.match(block, /className=\{cn\('w-full', phase === 'waiting' && 'opacity-0', !playing && 'v2-solo-podium-still'\)\}/);
+  assert.match(block, /!played && !prefersReducedMotion\(\) && onPodium \? 'waiting' : 'still',/);
+
+  const stage = read('v2', 'features', 'quiz', 'solo', 'results', 'PodiumStage.tsx');
+  assert.match(stage, /role="dialog"\s*aria-modal="true"\s*aria-labelledby="podium-stage-heading"/);
+  // Arthur's pick: it moves on by itself about 3s after the confetti has fallen; no "See my score".
+  assert.match(stage, /export const PODIUM_HOLD_MS = 3000;/);
+  assert.match(stage, /if \(confetti !== 'fallen'\) return;\s*const timer = window\.setTimeout\(leave, PODIUM_HOLD_MS\);/);
+  // However it ends, it fades out over the results in 350ms, opacity only (Arthur: "clean and smooth").
+  assert.match(stage, /export const PODIUM_FADE_MS = 350;/);
+  assert.match(stage, /'transition-opacity duration-\[350ms\] ease-out',\s*leaving && 'pointer-events-none opacity-0',/);
+  assert.match(stage, /if \(!leaving\) return;\s*const timer = window\.setTimeout\(onDone, PODIUM_FADE_MS\);/);
+  assert.doesNotMatch(stage, /<RaisedButton|>\s*See my score/);
+  // Skip (focused) or Escape ends it at once.
+  assert.match(stage, /ref=\{skipRef\}\s*type="button"\s*onClick=\{leave\}/);
+  assert.match(stage, /skipRef\.current\?\.focus\(\{ preventScroll: true \}\);/);
+  assert.match(stage, /if \(event\.key === 'Escape'\) leave\(\);/);
+  assert.match(stage, /<Podium entries=\{entries\} isYou=\{isYou\} rising=\{playing\} \/>/);
 
   const css = read('v2', 'features', 'quiz', 'solo', 'solo-quiz.css');
   const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
@@ -154,6 +188,32 @@ test('the podium moment is skippable and still under reduced motion', () => {
   assert.match(css, /\.v2-solo-podium-still :is\(\.v2-solo-podium-step, \.v2-solo-podium-face, \.v2-solo-podium-climb\) \{\s*animation: none;/);
   // About two seconds: the climb starts at 1s and lasts 0.9s.
   assert.match(css, /animation: v2-solo-podium-climb 900ms cubic-bezier\(0\.34, 1\.3, 0\.64, 1\) 1000ms both;/);
+});
+
+test('the results open on the podium only when this run put the reader’s face on it', () => {
+  const entries = (me: number) =>
+    [1, 2, 3, 4].map((rank) => ({
+      rank,
+      points: 1000 - rank * 100,
+      correct_count: 5,
+      question_count: 5,
+      achieved_at: null,
+      user: { uuid: rank === me ? 'me' : `p${rank}`, name: `TEST DATA ${rank}` },
+    }));
+  const board = (me: number, viewerRank: number, viewerPoints: number) => ({
+    player_count: 4,
+    entries: entries(me),
+    viewer: { rank: viewerRank, points: viewerPoints, achieved_at: null, user: { uuid: 'me', name: 'TEST DATA me' } },
+  });
+  assert.equal(opensOnPodium(board(2, 2, 800), 800), true);
+  // Outside the top three.
+  assert.equal(opensOnPodium(board(4, 4, 600), 600), false);
+  // A best that is on the podium, from an earlier run: this run did not earn it.
+  assert.equal(opensOnPodium(board(2, 2, 800), 500), false);
+  // Tied for third but sorted fourth: their face is not on the podium.
+  assert.equal(opensOnPodium(board(4, 3, 600), 600), false);
+  // Not ranked.
+  assert.equal(opensOnPodium({ player_count: 4, entries: entries(0), viewer: null }, 700), false);
 });
 
 test('a finish refreshes the quiz’s board, so the results read the new place', () => {
@@ -179,6 +239,8 @@ test('"you" is the reader by their account, so a tie never marks two players', (
     const source = read('v2', 'features', 'quiz', 'solo', ...file);
     assert.match(source, /const isYou = \(entry: QuizLeaderboardEntry\) => isViewerEntry\(viewer, entry\);/);
   }
+  const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
+  assert.match(screen, /isYou=\{\(entry\) => isViewerEntry\(board\.viewer, entry\)\}/);
 });
 
 test('a rising step grows its lip and front as one', () => {

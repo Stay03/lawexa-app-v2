@@ -99,6 +99,9 @@ test('the answers open from one row, on their own page, and the two buttons sit 
   // And only once the bar has its final height (Challenge a friend waits on the quiz's visibility).
   assert.match(position, /barSettled=\{publicQuiz !== null\}/);
   assert.match(position, /if \(phase !== 'waiting' \|\| !barSettled\) return;/);
+  // The podium-first layer covers the bar (z-10) and the whole screen.
+  const stage = read('v2', 'features', 'quiz', 'solo', 'results', 'PodiumStage.tsx');
+  assert.match(stage, /'v2-solo fixed inset-0 z-40 flex flex-col/);
 
   const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
   assert.match(screen, /import '\.\.\/solo-quiz\.css';/);
@@ -110,7 +113,7 @@ test('the answers open from one row, on their own page, and the two buttons sit 
   // the bottom edge; the B1 tokens ride it.
   const states = read('v2', 'features', 'quiz', 'solo', 'results', 'states.tsx');
   assert.match(states, /export const RESULTS_COLUMN =\s*'v2-solo mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';/);
-  assert.match(screen, /<div className=\{RESULTS_COLUMN\}>\s*<AttemptSummary/);
+  assert.match(screen, /<div className=\{RESULTS_COLUMN\} inert=\{podiumFirst\}>\s*<AttemptSummary/);
 });
 
 test('the ring and the chips stay with the practice review; the solo results no longer draw them', () => {

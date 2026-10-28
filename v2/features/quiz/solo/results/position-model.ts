@@ -1,5 +1,5 @@
 import type { QuizLeaderboard } from '@/types/channel-quiz';
-import { standingLine } from '../home-model';
+import { isViewerEntry, standingLine } from '../home-model';
 
 /**
  * Where a finished run leaves the reader on the quiz's board, for the block
@@ -59,4 +59,17 @@ export function finishPosition(
     standing: standingLine(viewer.players_behind, count, viewer.rank),
     podiumPlace,
   };
+}
+
+/**
+ * Whether the results open on the full-screen podium (Arthur, 28 October
+ * 2026: "on a phone the podium sits below the score, so players miss it"):
+ * this run put the reader in the top three AND their face is among the
+ * three the podium shows (a reader tied for third can sort fourth). The
+ * caller adds the rest: not under reduced motion, and once per attempt.
+ */
+export function opensOnPodium(board: QuizLeaderboard, runPoints: number): boolean {
+  const position = finishPosition(board, runPoints);
+  if (position.kind !== 'ranked' || position.podiumPlace === null) return false;
+  return board.entries.slice(0, 3).some((entry) => isViewerEntry(board.viewer, entry));
 }
