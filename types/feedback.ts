@@ -119,7 +119,8 @@ export interface SubmitChatRatingData {
   rating: ChatRating;
   reason?: ChatRatingReason;
   text?: string;
-  conversationId: string;
+  /** The chat it is about; null for a plan_ended ask on a screen with no chat. */
+  conversationId: string | null;
   /** The rated answer's saved id; never a question's. Omitted when unknown. */
   messageId: number | null;
   trigger: ChatRatingTrigger;

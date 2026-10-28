@@ -12,8 +12,9 @@ import type { ChatMoment } from './model';
  * so none of this outlives one.
  */
 
-/** The offer on screen: the moment it is about, in the chat it is about. */
-export type ActiveOffer = ChatMoment;
+/** The offer on screen: the moment it is about, in the chat it is about.
+ *  A plan_ended offer is about no chat (`conversationId` null). */
+export type ActiveOffer = Omit<ChatMoment, 'conversationId'> & { conversationId: string | null };
 
 let moment: ChatMoment | null = null;
 let askedThisSession = false;
@@ -59,23 +60,26 @@ export function noteAnswerStreaming(): void {
  * The banner appears in this chat: it is the session's one ask, and it stays
  * until the reader rates or closes it (`endOffer`). False when the session
  * has asked already or there is no moment in this chat to ask about.
- *
- * `plan_ended` is the server's own moment (a paid plan ran out): it needs
- * none in the chat, and it is about the chat open, with no answer named.
  */
-export function beginOffer(conversationId: string, serverMoment: 'plan_ended' | null = null): boolean {
-  if (askedThisSession) return false;
-  if (serverMoment === 'plan_ended') {
-    seq += 1;
-    askedThisSession = true;
-    active = { trigger: 'plan_ended', messageId: null, awaitsNewAnswer: false, streamed: false, conversationId, seq };
-    moment = null;
-    emit();
-    return true;
-  }
-  if (moment === null || moment.conversationId !== conversationId) return false;
+export function beginOffer(conversationId: string): boolean {
+  if (askedThisSession || moment === null || moment.conversationId !== conversationId) return false;
   askedThisSession = true;
   active = moment;
+  moment = null;
+  emit();
+  return true;
+}
+
+/**
+ * A paid plan ran out (the server's `plan_ended`): the session's one ask, on
+ * whatever screen is open, about no chat and no answer. False once the
+ * session has asked.
+ */
+export function beginPlanEndedOffer(): boolean {
+  if (askedThisSession) return false;
+  seq += 1;
+  askedThisSession = true;
+  active = { trigger: 'plan_ended', messageId: null, awaitsNewAnswer: false, streamed: false, conversationId: null, seq };
   moment = null;
   emit();
   return true;

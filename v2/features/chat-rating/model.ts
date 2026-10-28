@@ -21,8 +21,9 @@ import type { ChatRatingReason, ChatRatingTrigger } from '@/types/feedback';
  *
  * One ask needs no moment (Arthur, 28 October 2026, "B plus A"): when a paid
  * plan has ended, the server answers `moment: "plan_ended"`, and the banner
- * appears on the reader's first chat screen as it opens, once (the server
- * stops answering it once the banner has been shown).
+ * appears on the first screen the reader opens, home, the chat list or a chat
+ * (Stay, 28 October 2026: a plan that ran out cannot chat). That ask is
+ * `PlanEndedRating`'s, in the app's shell; the chat's own slot leaves it be.
  */
 
 export const CHAT_RATING_QUESTION = 'How is Lawexa doing?';
@@ -67,8 +68,6 @@ export interface OfferInputs {
   isAccount: boolean;
   /** The server's answer: true, false, or null while it is not known. */
   eligible: boolean | null;
-  /** The server's moment: `plan_ended` asks with no moment in the chat. */
-  serverMoment: 'plan_ended' | null;
   askedThisSession: boolean;
   isStreaming: boolean;
   quizInProgress: boolean;
@@ -81,10 +80,7 @@ export interface OfferInputs {
 export function mayOffer(inputs: OfferInputs): boolean {
   const { isAccount, eligible, askedThisSession, isStreaming, quizInProgress, moment } = inputs;
   if (!isAccount || eligible !== true || askedThisSession) return false;
-  if (isStreaming || quizInProgress) return false;
-  // A plan that ended asks on its own, in whichever chat is open.
-  if (inputs.serverMoment === 'plan_ended') return true;
-  if (moment === null) return false;
+  if (isStreaming || quizInProgress || moment === null) return false;
   if (moment.conversationId !== inputs.conversationId) return false;
   // Ask again: only once the new answer has started and finished.
   if (moment.awaitsNewAnswer && !moment.streamed) return false;

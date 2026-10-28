@@ -24,7 +24,6 @@ const moment = (over: Partial<ChatMoment> = {}): ChatMoment => ({
 const ready = (over: Partial<OfferInputs> = {}): OfferInputs => ({
   isAccount: true,
   eligible: true,
-  serverMoment: null,
   askedThisSession: false,
   isStreaming: false,
   quizInProgress: false,
@@ -51,17 +50,6 @@ test('never during an answer, never mid-quiz, never without a moment in this cha
   assert.equal(mayOffer(ready({ moment: null })), false);
   // A moment in another chat is not about this one.
   assert.equal(mayOffer(ready({ conversationId: 'conv-2' })), false);
-});
-
-test('a plan that ended asks with no moment, in the chat that is open, still never mid-answer', () => {
-  const ended = ready({ serverMoment: 'plan_ended', moment: null });
-  assert.equal(mayOffer(ended), true);
-  assert.equal(mayOffer({ ...ended, conversationId: 'conv-7' }), true);
-  assert.equal(mayOffer({ ...ended, isStreaming: true }), false);
-  assert.equal(mayOffer({ ...ended, quizInProgress: true }), false);
-  assert.equal(mayOffer({ ...ended, askedThisSession: true }), false);
-  assert.equal(mayOffer({ ...ended, eligible: false }), false);
-  assert.equal(mayOffer({ ...ended, isAccount: false }), false);
 });
 
 test('Ask again waits for the new answer to be written', () => {
@@ -140,14 +128,14 @@ test('the banner sits above every chat’s box, and the home box has none', () =
 
 test('shown and closed are reported, and a rating carries its answer and its moment', () => {
   const banner = read('v2', 'features', 'chat-rating', 'ChatRatingBanner.tsx');
-  assert.match(banner, /if \(offerNow && beginOffer\(conversationId, serverMoment\)\) \{\s*void feedbackApi\.chatPromptSeen\('shown'\)/);
-  // The server is asked once a session as a chat opens, so a plan that ended can ask first.
-  assert.match(banner, /enabled: isAccount && !askedThisSession,/);
-  assert.match(banner, /const serverMoment = prompt\.data\?\.moment === 'plan_ended' \? 'plan_ended' : null;/);
+  assert.match(banner, /if \(offerNow && beginOffer\(conversationId\)\) \{\s*void feedbackApi\.chatPromptSeen\('shown'\)/);
+  // The chat's slot leaves the shell's plan_ended offer alone.
+  assert.match(banner, /if \(active && active\.trigger !== 'plan_ended' && active\.conversationId !== conversationId\) endOffer\(\);/);
   assert.match(banner, /void feedbackApi\.chatPromptSeen\('closed'\)/);
   assert.match(banner, /conversationId: offer\.conversationId,\s*messageId: offer\.messageId,\s*trigger: offer\.trigger,/);
   const api = read('lib', 'api', 'feedback.ts');
-  assert.match(api, /content_type: 'conversation',/);
+  // A chat is named when there is one; a plan_ended ask on a screen with none names none.
+  assert.match(api, /\.\.\.\(data\.conversationId !== null \? \{ content_type: 'conversation', content_id: data\.conversationId \} : \{\}\),/);
   assert.match(api, /\.\.\.\(data\.messageId !== null \? \{ message_id: data\.messageId \} : \{\}\),/);
   assert.match(api, /\.\.\.\(data\.reason === 'something_else' && data\.text \? \{ text: data\.text \} : \{\}\),/);
   assert.match(api, /apiClient\.post\('\/feedback\/chat-prompt\/seen', \{ action \}\)/);

@@ -48,15 +48,16 @@ export const feedbackApi = {
 
   /**
    * A chat rating from the "How is Lawexa doing?" banner. Same endpoint as a
-   * report; the rating, reason and trigger are its own fields.
+   * report; the rating, reason and trigger are its own fields. A plan_ended
+   * ask on a screen with no chat names none (Backend 0c7bb3c2 takes that for
+   * trigger plan_ended only).
    */
   submitChatRating: async (data: SubmitChatRatingData): Promise<FeedbackResponse> => {
     const response = await apiClient.post<FeedbackResponse>('/feedback', {
       rating: data.rating,
       ...(data.reason ? { reason: data.reason } : {}),
       ...(data.reason === 'something_else' && data.text ? { text: data.text } : {}),
-      content_type: 'conversation',
-      content_id: data.conversationId,
+      ...(data.conversationId !== null ? { content_type: 'conversation', content_id: data.conversationId } : {}),
       ...(data.messageId !== null ? { message_id: data.messageId } : {}),
       trigger: data.trigger,
     });

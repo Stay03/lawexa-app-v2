@@ -24,11 +24,26 @@ import {
 } from './store';
 
 /**
+ * The server's answer, once a session, shared by the chat's slot and the
+ * shell's: one request a page load at most.
+ */
+export function chatPromptQuery(userId: string | number | null) {
+  return {
+    queryKey: ['chat-rating', 'prompt', userId] as const,
+    queryFn: () => feedbackApi.chatPrompt(),
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+    meta: { silentError: true },
+  };
+}
+
+/**
  * ChatRatingSlot — where "How is Lawexa doing?" appears: above a chat's
  * message box (the ChatDock, which is every chat's box, a Space chat's
- * included). It decides when (`mayOffer`), asks the server once a session as
- * a chat opens (so a plan that ended can ask on the first chat screen, Arthur,
- * 28 October 2026), and reports the banner as shown the moment it appears.
+ * included). It decides when (`mayOffer`), asks the server only once a moment
+ * has happened in this chat, and reports the banner as shown the moment it
+ * appears. A plan that ended asks from the shell instead (`PlanEndedRating`).
  * The banner itself is `ChatRatingBanner`.
  */
 export function ChatRatingSlot({ conversationId, isStreaming }: { conversationId: string; isStreaming: boolean }) {
@@ -38,25 +53,20 @@ export function ChatRatingSlot({ conversationId, isStreaming }: { conversationId
   const askedThisSession = useAskedThisSession();
   const quizInProgress = useQuizUnderWay();
   const active = useActiveOffer();
+  // Only a moment in this chat (a cited case opened from it counts when the
+  // reader comes back).
+  const hasMoment = moment !== null && moment.conversationId === conversationId;
 
-  // The server's answer (14 days, new user, a plan that ended), asked once a
-  // session as the first chat opens: a plan that ended asks with no moment,
-  // and every later moment reads the same cached answer.
+  // The server's answer (14 days, new user), asked once a session; the shell
+  // asks it as the app opens (`PlanEndedRating`), so a moment reads that cache.
   const prompt = useQuery({
-    queryKey: ['chat-rating', 'prompt', userId],
-    queryFn: () => feedbackApi.chatPrompt(),
-    enabled: isAccount && !askedThisSession,
-    staleTime: Infinity,
-    gcTime: Infinity,
-    retry: false,
-    meta: { silentError: true },
+    ...chatPromptQuery(userId),
+    enabled: isAccount && hasMoment && !askedThisSession,
   });
 
-  const serverMoment = prompt.data?.moment === 'plan_ended' ? 'plan_ended' : null;
   const offerNow = mayOffer({
     isAccount,
     eligible: prompt.data ? prompt.data.eligible : null,
-    serverMoment,
     askedThisSession,
     isStreaming,
     quizInProgress,
@@ -72,18 +82,19 @@ export function ChatRatingSlot({ conversationId, isStreaming }: { conversationId
   // The banner appears: the session's one ask, reported as shown, which
   // starts the 14 days whether or not the reader answers (Arthur, choice 2).
   useEffect(() => {
-    if (offerNow && beginOffer(conversationId, serverMoment)) {
+    if (offerNow && beginOffer(conversationId)) {
       void feedbackApi.chatPromptSeen('shown').catch(() => undefined);
     }
-  }, [offerNow, conversationId, serverMoment]);
+  }, [offerNow, conversationId]);
 
   // An offer from another chat is not about this one: it ends quietly (it
-  // was already reported as shown).
+  // was already reported as shown). The shell's plan_ended offer is not a
+  // chat's, and is left alone.
   useEffect(() => {
-    if (active && active.conversationId !== conversationId) endOffer();
+    if (active && active.trigger !== 'plan_ended' && active.conversationId !== conversationId) endOffer();
   }, [active, conversationId]);
 
-  if (!active || active.conversationId !== conversationId) return null;
+  if (!active || active.trigger === 'plan_ended' || active.conversationId !== conversationId) return null;
   return <ChatRatingBanner key={active.seq} offer={active} />;
 }
 
