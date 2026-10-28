@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type AnimationEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type AnimationEvent } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Trophy } from 'lucide-react';
@@ -14,6 +14,7 @@ import { isViewerEntry } from '../home-model';
 import { quizFrontHref } from '../model';
 import { soloQuizQueries } from '../queries';
 import { prefersReducedMotion } from '../ui';
+import { Confetti } from './Confetti';
 import { finishPosition } from './position-model';
 
 /**
@@ -104,7 +105,19 @@ function PositionBlock({
   );
 }
 
-/** The podium, rising once; Skip (or a tap) stands it in place. */
+/** Unseen below the fold, then rising, then standing. */
+type MomentPhase = 'waiting' | 'playing' | 'still';
+
+/** When the steps have landed (the first place's grows from 400ms for 500ms) and the confetti bursts. */
+const PODIUM_LANDS_MS = 900;
+
+/**
+ * The podium, rising once, under "You made the Podium!" (Arthur, 28 October
+ * 2026: "isn't celebratory enough"), with a burst of confetti from its
+ * centre as the steps land (`Confetti`). Skip, or a tap, stands the podium
+ * in place and clears the confetti at once. Under reduced motion the
+ * headline and the podium stand still and no confetti falls.
+ */
 function PodiumMoment({
   entries,
   isYou,
@@ -112,24 +125,71 @@ function PodiumMoment({
   entries: readonly QuizLeaderboardEntry[];
   isYou: (entry: QuizLeaderboardEntry) => boolean;
 }) {
+  const onPodium = entries.some(isYou);
   // Only a podium with the reader's face on it has a climb to end it (a reader
   // tied for third can sort fourth); without one it stands still from the start.
-  const [playing, setPlaying] = useState(() => !prefersReducedMotion() && entries.some(isYou));
-  const stop = () => setPlaying(false);
+  // It waits, unseen, until it is on screen: on a phone it is below the fold.
+  const [phase, setPhase] = useState<MomentPhase>(() => (!prefersReducedMotion() && onPodium ? 'waiting' : 'still'));
+  const playing = phase === 'playing';
+  const [confettiFrom, setConfettiFrom] = useState<{ x: number; y: number } | null>(null);
+  const podiumRef = useRef<HTMLDivElement>(null);
+  const stop = () => {
+    setPhase('still');
+    setConfettiFrom(null);
+  };
   const onAnimationEnd = (event: AnimationEvent) => {
-    if (event.animationName === 'v2-solo-podium-climb') stop();
+    if (event.animationName === 'v2-solo-podium-climb') setPhase('still');
   };
 
+  useEffect(() => {
+    if (phase !== 'waiting') return;
+    const podium = podiumRef.current;
+    if (!podium) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setPhase('playing');
+      },
+      { threshold: 0.6 },
+    );
+    observer.observe(podium);
+    return () => observer.disconnect();
+  }, [phase]);
+  const endConfetti = useCallback(() => setConfettiFrom(null), []);
+
+  useEffect(() => {
+    if (!playing) return;
+    const timer = window.setTimeout(() => {
+      const box = podiumRef.current?.getBoundingClientRect();
+      if (box) setConfettiFrom({ x: box.left + box.width / 2, y: box.top + box.height * 0.55 });
+    }, PODIUM_LANDS_MS);
+    // A Skip before the steps land cancels the burst.
+    return () => window.clearTimeout(timer);
+  }, [playing]);
+
+  const celebrating = playing || confettiFrom !== null;
+
   return (
-    <div className="relative w-full max-w-sm">
+    <div className="relative flex w-full max-w-sm flex-col items-center">
+      {onPodium ? (
+        <p
+          className={cn(
+            'font-comfortaa text-2xl font-bold text-balance text-primary',
+            phase === 'waiting' && 'opacity-0',
+            playing && 'v2-solo-podium-headline',
+          )}
+        >
+          You made the Podium!
+        </p>
+      ) : null}
       <div
-        className={cn(!playing && 'v2-solo-podium-still')}
-        onClick={playing ? stop : undefined}
+        ref={podiumRef}
+        className={cn('w-full', phase === 'waiting' && 'opacity-0', !playing && 'v2-solo-podium-still')}
+        onClick={celebrating ? stop : undefined}
         onAnimationEnd={onAnimationEnd}
       >
-        <Podium entries={entries} isYou={isYou} rising />
+        <Podium entries={entries} isYou={isYou} rising={playing} />
       </div>
-      {playing ? (
+      {celebrating ? (
         <button
           type="button"
           onClick={stop}
@@ -141,6 +201,7 @@ function PodiumMoment({
           Skip
         </button>
       ) : null}
+      {confettiFrom ? <Confetti origin={confettiFrom} onDone={endConfetti} /> : null}
     </div>
   );
 }
