@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, Loader2, Lock, RotateCcw, Share2 } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Lock, RotateCcw, Share2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { quizFrontHref } from '../model';
+import { EXPLORE_HREF, quizFrontHref } from '../model';
 import { RaisedButton } from '../ui';
 
 /**
@@ -32,6 +32,12 @@ import { RaisedButton } from '../ui';
  * why, with the way to change it (Stay, 23 October 2026, picture 7): only
  * its author can take a private quiz, so the reader here is the author, and
  * the quiz's own page is where who can take it is set.
+ *
+ * ── OTHER QUIZZES, QUIETLY, UNDER THEM (Arthur, 28 October 2026) ───────────
+ * "Take it again" replays this quiz, "Challenge a friend" shares it, and
+ * "Other Quizzes" opens Explore Quizzes for a different one. It is a text
+ * link under the two buttons, not a third button, so the bar stays two
+ * buttons wide and two rows tall at most on a phone.
  *
  * ── AT THE BOTTOM, AND IT STAYS THERE ──────────────────────────────────────
  * `mt-auto` puts the row on the bottom edge of a short page; `sticky
@@ -107,6 +113,18 @@ export function ResultsActions({
           </span>
         </p>
       ) : null}
+      <div className="mt-2.5 flex justify-center">
+        <Link
+          href={EXPLORE_HREF}
+          className={cn(
+            'inline-flex min-h-9 items-center gap-1 rounded-sm px-2 text-sm font-semibold text-primary underline-offset-2 hover:underline',
+            FOCUS_RING,
+          )}
+        >
+          Other Quizzes
+          <ChevronRight aria-hidden className="size-4" />
+        </Link>
+      </div>
     </div>
   );
 }
