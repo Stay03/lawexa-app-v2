@@ -100,8 +100,9 @@ test('the quiz page says what it is in a title, a name and quiet tags, with shor
 test('the quiz page is drawn on B1: its tokens and the raised buttons', () => {
   const source = screen();
   assert.match(source, /import '\.\.\/solo-quiz\.css';/);
-  assert.match(source, /const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-5xl/);
-  assert.match(source, /const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-\[15px\] md:h-14 md:px-5 md:text-base';/);
+  // One centred column, about 800px, on a computer too (Stay, 28 October 2026).
+  assert.match(source, /const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-\[51\.25rem\]/);
+  assert.match(source, /const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-\[15px\] md:flex-none';/);
   // Start, Sign in and Challenge a friend: no flat house button among them.
   const bar = source.slice(source.indexOf('START STAYS IN REACH'), source.indexOf('{!mayTake && ('));
   assert.doesNotMatch(bar, /<Button\b/);

@@ -310,7 +310,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 
         {/* On a computer one bar: your best on the left, the answer reveal,
             then Start and Challenge on the right. */}
-        <div className="flex min-w-0 flex-col gap-5 md:flex-row md:items-center md:gap-6 md:rounded-2xl md:border-2 md:border-border md:bg-card md:px-5 md:py-4">
+        <div className="flex min-w-0 flex-col gap-5 md:flex-row md:items-center md:gap-4 md:rounded-2xl md:border-2 md:border-border md:bg-card md:px-5 md:py-4">
           {/* The best alone: the board says the place (Arthur, 28 October 2026: minimal). */}
           {best ? (
             <div className="flex items-baseline justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:shrink-0 md:justify-start md:border-0 md:bg-transparent md:p-0">
@@ -327,7 +327,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 Answer reveal
               </label>
               <Select value={revealMode} onValueChange={(value) => setRevealMode(value as QuizRevealMode)}>
-                <SelectTrigger id="quiz-reveal" aria-labelledby="quiz-reveal-label" className="h-9 w-auto min-w-44">
+                <SelectTrigger id="quiz-reveal" aria-labelledby="quiz-reveal-label" className="h-9 w-auto min-w-44 md:min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent align="end">
@@ -345,7 +345,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             {/* START STAYS IN REACH: pinned to the foot of a phone's screen over
                 the same see-through plate the results use; at the bar's right
                 end on a computer. */}
-            <div className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70 md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+            <div className="fixed inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70 md:static md:flex-nowrap md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
               {/* B1's bold type does not fit "Sign in to take this quiz" beside
                   "Challenge a friend" in a phone's bar: the sign-in takes the
                   whole row and the challenge, after it, fills the next
@@ -442,11 +442,11 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 /* `v2-solo` carries design B1's tokens (`../solo-quiz.css`): the lip, the
  * colours, the same reading as the player and the results (Arthur's B1,
  * 24 October 2026). */
-const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-[50rem] px-4 pt-3 pb-28 md:pt-6 md:pb-16';
+const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-[51.25rem] px-4 pt-3 pb-28 md:pt-6 md:pb-16';
 
 /** The page's buttons on B1's lip: the results' raised pair, a size down on a
  *  phone so Start and Challenge a friend share the pinned bar. */
-const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-[15px] md:flex-none md:px-5 md:text-base';
+const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-[15px] md:flex-none';
 
 /**
  * The front's reserved shape: the masthead (title, a line, the meta row), the

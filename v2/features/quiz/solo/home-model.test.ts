@@ -150,8 +150,12 @@ test('the quiz page reads the board only for a public quiz, and draws the top te
   // On the page itself, no card around it, the rows split by quiet dividers (Arthur, 28 October 2026).
   assert.match(board, /aria-labelledby="quiz-front-board"\s*className="flex flex-col gap-4"\s*>/);
   assert.match(board, /<ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col divide-y divide-border\/70">/);
-  // The board runs across the page under the quiz and its panel on a computer.
-  assert.match(front, /md:col-span-2 md:col-start-1 md:row-start-2/);
+  // One column on a computer: the quiz, one action bar, then the board, all
+  // on the column's edges (Stay, 28 October 2026).
+  assert.match(front, /<article className="grid grid-cols-\[minmax\(0,1fr\)\] gap-6 [^"]*md:gap-8">/);
+  assert.doesNotMatch(front, /md:col-start-2|md:col-span-2|md:row-span-2/);
+  assert.match(front, /md:flex-row md:items-center md:gap-4 md:rounded-2xl md:border-2/);
+  assert.match(board, /<div className="mx-auto w-full min-w-0 md:max-w-lg">\s*<Podium/);
 });
 
 test('the banner line says how many of the other players the reader is ahead of', () => {
