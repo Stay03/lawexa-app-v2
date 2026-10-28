@@ -36,8 +36,8 @@ const PODIUM_LANDS_MS = 900;
 /** How long the podium stays after the last confetti has fallen, then the score (Arthur: "about 3 seconds"). */
 export const PODIUM_HOLD_MS = 3000;
 
-/** The layer fades out over the results this long (Arthur: "clean and smooth"). */
-export const PODIUM_FADE_MS = 350;
+/** The stage drops off the bottom this long, like a curtain (Arthur: "one smooth motion"). */
+export const PODIUM_SLIDE_MS = 550;
 
 /**
  * PodiumStage — the podium first, full screen, over the results (Arthur, 28
@@ -51,10 +51,11 @@ export const PODIUM_FADE_MS = 350;
  * The caller lays it over the results (which never move underneath) only
  * for a top-three finish with the reader's face on the podium
  * (`opensOnPodium`), never under reduced motion, and once per attempt.
- * Skip, or Escape, ends it at once; however it ends, it fades out over the
- * results in 350ms (Arthur: "the movement from podium to score must be
- * clean and smooth"), and the results, laid out underneath all along, do
- * not move. It covers the whole screen, the results
+ * Skip, or Escape, ends it at once; however it ends, the whole stage slides
+ * down off the bottom edge in 550ms, like a curtain dropping, uncovering the
+ * results laid out underneath all along (Arthur: "one smooth motion of
+ * podium goes down and score and other details come into view"). Transform
+ * only, so the results never move. It covers the whole screen, the results
  * bar and the shell's bars too, and is a dialog with Skip focused; the
  * caller gives focus back to the results.
  */
@@ -68,7 +69,7 @@ export function PodiumStage({
   onDone: () => void;
 }) {
   const [playing, setPlaying] = useState(true);
-  /** Fading out over the results: however it ends (by itself, Skip, Escape), the same way. */
+  /** Dropping off the bottom: however it ends (by itself, Skip, Escape), the same way. */
   const [leaving, setLeaving] = useState(false);
   const leave = useCallback(() => setLeaving(true), []);
   const [confetti, setConfetti] = useState<'waiting' | { x: number; y: number } | 'fallen'>('waiting');
@@ -93,7 +94,7 @@ export function PodiumStage({
 
   useEffect(() => {
     if (!leaving) return;
-    const timer = window.setTimeout(onDone, PODIUM_FADE_MS);
+    const timer = window.setTimeout(onDone, PODIUM_SLIDE_MS);
     return () => window.clearTimeout(timer);
   }, [leaving, onDone]);
 
@@ -121,9 +122,11 @@ export function PodiumStage({
       aria-labelledby="podium-stage-heading"
       className={cn(
         'v2-solo fixed inset-0 z-40 flex flex-col items-center justify-center overflow-y-auto bg-background px-4 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]',
-        // Opacity alone, so nothing under it moves; the confetti fades with it.
-        'transition-opacity duration-[350ms] ease-out',
-        leaving && 'pointer-events-none opacity-0',
+        // The whole stage drops like a curtain, its confetti with it (a fixed
+        // canvas rides a transformed parent), and the results laid out under
+        // it never move: transform only.
+        'transition-transform duration-[550ms] ease-in-out',
+        leaving && 'pointer-events-none translate-y-full',
       )}
     >
       <button
