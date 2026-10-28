@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { QuizLeaderboard } from '@/types/channel-quiz';
+import { isViewerEntry } from './home-model';
 import { finishPosition, PRIVATE_UNRANKED_LINE, UNRANKED_LINE } from './results/position-model';
 
 /* The reader's place under "See your answers" (Arthur, 28 October 2026): the
@@ -127,7 +128,8 @@ test('the results screen puts the place between the answers and the button bar, 
 
 test('the podium moment is skippable and still under reduced motion', () => {
   const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
-  assert.match(block, /const \[playing, setPlaying\] = useState\(\(\) => !prefersReducedMotion\(\)\);/);
+  // Skip only while the reader's face is on the podium to climb; else it stands still.
+  assert.match(block, /const \[playing, setPlaying\] = useState\(\(\) => !prefersReducedMotion\(\) && entries\.some\(isYou\)\);/);
   assert.match(block, /onClick=\{stop\}/);
   assert.match(block, /className=\{cn\(!playing && 'v2-solo-podium-still'\)\}/);
 
@@ -147,4 +149,27 @@ test('a finish refreshes the quiz’s board, so the results read the new place',
     mutations,
     /void queryClient\.invalidateQueries\(\{ queryKey: soloQuizQueries\.leaderboardOf\(response\.data\.quiz\.uuid\) \}\);/,
   );
+});
+
+test('"you" is the reader by their account, so a tie never marks two players', () => {
+  const row = (uuid: string, rank: number, points: number) => ({ rank, points, user: { uuid, name: `TEST DATA ${uuid}` } });
+  const viewer = { rank: 1, points: 800, user: { uuid: 'me', name: 'TEST DATA me' } };
+  // Two players tied at the top: only the reader's own row is theirs.
+  assert.equal(isViewerEntry(viewer, row('me', 1, 800)), true);
+  assert.equal(isViewerEntry(viewer, row('other', 1, 800)), false);
+  // An older server without viewer.user falls back to rank and points.
+  assert.equal(isViewerEntry({ rank: 3, points: 500 }, row('anyone', 3, 500)), true);
+  assert.equal(isViewerEntry({ rank: 3, points: 500 }, row('anyone', 4, 500)), false);
+  assert.equal(isViewerEntry(null, row('me', 1, 800)), false);
+
+  for (const file of [['board', 'FrontBoard.tsx'], ['results', 'FinishPosition.tsx']]) {
+    const source = read('v2', 'features', 'quiz', 'solo', ...file);
+    assert.match(source, /const isYou = \(entry: QuizLeaderboardEntry\) => isViewerEntry\(viewer, entry\);/);
+  }
+});
+
+test('a rising step grows its lip and front as one', () => {
+  const board = read('v2', 'features', 'quiz', 'solo', 'board', 'FrontBoard.tsx');
+  assert.match(board, /<span className=\{cn\('flex w-full flex-col', rising && 'v2-solo-podium-step'\)\}>\s*<span aria-hidden className=\{cn\('mt-3 h-3 w-full/);
+  assert.equal(board.match(/v2-solo-podium-step/g)?.length, 1);
 });

@@ -1,4 +1,4 @@
-import type { ChannelQuiz, QuizListFilters } from '@/types/channel-quiz';
+import type { ChannelQuiz, QuizLeaderboard, QuizLeaderboardEntry, QuizListFilters } from '@/types/channel-quiz';
 
 /**
  * home-model — what the Quiz home's filters and cards say about a quiz beyond
@@ -174,6 +174,20 @@ export function standingLine(
   // Never "better than 100%" while someone is level with or ahead of them.
   const share = Math.min(99, Math.round((playersBehind / others) * 100));
   return share > 0 ? `You’re doing better than ${share}% of other players.` : 'Play again to climb the board.';
+}
+
+/**
+ * Whether a board row is the reader's own. By the player (`viewer.user`), so
+ * two players tied on rank and points are never both "you"; an older server
+ * without `viewer.user` falls back to the rank and points.
+ */
+export function isViewerEntry(
+  viewer: Pick<NonNullable<QuizLeaderboard['viewer']>, 'rank' | 'points' | 'user'> | null,
+  entry: Pick<QuizLeaderboardEntry, 'rank' | 'points' | 'user'>,
+): boolean {
+  if (!viewer) return false;
+  if (viewer.user) return viewer.user.uuid === entry.user.uuid;
+  return entry.rank === viewer.rank && entry.points === viewer.points;
 }
 
 /** The tags in order: topic, level, year; the size after them on the quiz page, or alone when there are none. */
