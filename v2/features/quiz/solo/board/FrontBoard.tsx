@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { Crown, Info, Star, Trophy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -51,7 +52,7 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
   const players = playersLabel(board.player_count);
   // "You're doing better than 20% of other players.": under the reader's own
   // row (Stay, 28 October 2026: the #13 banner repeated the place).
-  const standing = viewer ? standingLine(viewer.rank, board.player_count) : null;
+  const standing = viewer ? standingLine(viewer.players_behind, board.player_count, viewer.rank) : null;
 
   return (
     <section
@@ -140,7 +141,21 @@ const BLOCK: Record<number, { front: string; top: string }> = {
   },
 };
 
-function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; isYou: (entry: QuizLeaderboardEntry) => boolean }) {
+/**
+ * The top three on their steps. `rising` is the end-of-quiz podium moment
+ * (Arthur, 28 October 2026): the steps grow in third, second, first, and the
+ * reader's face climbs onto theirs, about two seconds in all (`solo-quiz.css`,
+ * off under reduced motion, where the podium stands in place).
+ */
+export function Podium({
+  entries,
+  isYou,
+  rising = false,
+}: {
+  entries: readonly QuizLeaderboardEntry[];
+  isYou: (entry: QuizLeaderboardEntry) => boolean;
+  rising?: boolean;
+}) {
   // 2 | 1 | 3, so the first place stands in the middle.
   const order = [entries[1], entries[0], entries[2]];
   return (
@@ -150,9 +165,10 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
         const place = column === 1 ? 1 : column === 0 ? 2 : 3;
         const block = BLOCK[place];
         const you = isYou(entry);
+        const step = rising ? ({ '--step': `${(3 - place) * 200}ms` } as CSSProperties) : undefined;
         return (
-          <li key={entry.user.uuid} className="flex min-w-0 flex-col items-center text-center">
-            <span className="relative">
+          <li key={entry.user.uuid} className="flex min-w-0 flex-col items-center text-center" style={step}>
+            <span className={cn('relative', rising && (you ? 'v2-solo-podium-climb' : 'v2-solo-podium-face'))}>
               {place === 1 ? (
                 <Crown aria-hidden className="absolute -top-5 left-1/2 size-5 -translate-x-1/2 fill-primary text-primary" />
               ) : null}
@@ -165,25 +181,32 @@ function Podium({ entries, isYou }: { entries: readonly QuizLeaderboardEntry[]; 
                 )}
               />
             </span>
-            {/* The reader by name like everyone else (Stay, 28 October 2026); the gold ring marks them. */}
-            <span className="mt-2 w-full truncate px-1 text-sm font-semibold text-foreground">{entry.user.name}</span>
-            {/* The campus alone for the Law School; a university wraps in small
-                type and is never cut (Arthur, 28 October 2026). */}
-            {entry.user.institution ? (
-              <span className="w-full px-1 text-[10px] leading-tight text-balance break-words text-muted-foreground sm:text-[11px]">
-                {podiumInstitution(entry.user.institution)}
+            {/* Name, school and points come in with their face when the podium rises. */}
+            <span className={cn('flex w-full min-w-0 flex-col items-center', rising && 'v2-solo-podium-face')}>
+              {/* The reader by name like everyone else (Stay, 28 October 2026); the gold ring marks them. */}
+              <span className="mt-2 w-full truncate px-1 text-sm font-semibold text-foreground">{entry.user.name}</span>
+              {/* The campus alone for the Law School; a university wraps in small
+                  type and is never cut (Arthur, 28 October 2026). */}
+              {entry.user.institution ? (
+                <span className="w-full px-1 text-[10px] leading-tight text-balance break-words text-muted-foreground sm:text-[11px]">
+                  {podiumInstitution(entry.user.institution)}
+                </span>
+              ) : null}
+              <span className="mt-0.5 font-comfortaa text-sm font-bold text-foreground tabular-nums">
+                {scoreLabel(entry.points)}
+                <span className="sr-only"> points</span>
               </span>
-            ) : null}
-            <span className="mt-0.5 font-comfortaa text-sm font-bold text-foreground tabular-nums">
-              {scoreLabel(entry.points)}
-              <span className="sr-only"> points</span>
             </span>
-            <span aria-hidden className={cn('mt-3 h-3 w-full [clip-path:polygon(8%_0,92%_0,100%_100%,0_100%)]', block.top)} />
+            <span
+              aria-hidden
+              className={cn('mt-3 h-3 w-full [clip-path:polygon(8%_0,92%_0,100%_100%,0_100%)]', block.top, rising && 'v2-solo-podium-step')}
+            />
             <span
               aria-label={`Place ${entry.rank}`}
               className={cn(
                 'flex w-full flex-col items-center bg-gradient-to-b to-transparent pt-2 font-comfortaa text-4xl leading-none font-bold text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.18)]',
                 block.front,
+                rising && 'v2-solo-podium-step',
               )}
             >
               <span aria-hidden className="mb-1 flex gap-0.5">
