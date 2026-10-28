@@ -390,7 +390,7 @@ test('the draft scrolls in its own area: the bars and the find box sit above it,
   const frame = editor.indexOf('<div ref={frameRef} className="@container/draft flex h-full min-h-0 flex-col">');
   const bars = editor.indexOf('<div className="relative z-10 shrink-0">', frame);
   const find = editor.indexOf('<FindBar', bars);
-  const scroll = editor.indexOf('<div data-v2-draft-scroll className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">', find);
+  const scroll = editor.indexOf('<div\n        data-v2-draft-scroll\n        className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain', find);
   const content = editor.indexOf('<EditorContent editor={editor} />', scroll);
   const save = editor.indexOf('<DraftSaveBar', content);
   assert.ok(frame > 0 && frame < bars && bars < find && find < scroll && scroll < content && content < save);
