@@ -102,7 +102,8 @@ test('the quiz page is drawn on B1: its tokens and the raised buttons', () => {
   assert.match(source, /import '\.\.\/solo-quiz\.css';/);
   // One centred column, about 800px, on a computer too (Stay, 28 October 2026).
   assert.match(source, /const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-\[51\.25rem\]/);
-  assert.match(source, /const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-\[15px\] md:flex-none';/);
+  // A button keeps its label's width and wraps to a row of its own instead of squeezing.
+  assert.match(source, /const FRONT_BUTTON = 'h-12 min-w-fit flex-1 px-4 text-\[15px\] whitespace-nowrap md:flex-none';/);
   // Start, Sign in and Challenge a friend: no flat house button among them.
   const bar = source.slice(source.indexOf('START STAYS IN REACH'), source.indexOf('{!mayTake && ('));
   assert.doesNotMatch(bar, /<Button\b/);

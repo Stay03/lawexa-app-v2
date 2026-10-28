@@ -448,7 +448,7 @@ const FRONT_COLUMN = 'v2-solo mx-auto w-full max-w-[51.25rem] px-4 pt-3 pb-28 md
 
 /** The page's buttons on B1's lip: the results' raised pair, a size down on a
  *  phone so Start and Challenge a friend share the pinned bar. */
-const FRONT_BUTTON = 'h-12 min-w-0 flex-1 px-4 text-[15px] md:flex-none';
+const FRONT_BUTTON = 'h-12 min-w-fit flex-1 px-4 text-[15px] whitespace-nowrap md:flex-none';
 
 /**
  * The front's reserved shape: the masthead (title, a line, the meta row), the

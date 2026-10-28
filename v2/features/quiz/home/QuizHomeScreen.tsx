@@ -70,7 +70,11 @@ export function QuizHomeScreen() {
       <ScreenTitle />
 
       <div className="mb-3 flex items-center justify-between gap-3">
-        <QuizHomeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
+        {/* The tabs scroll within what is left, so a narrow phone keeps
+            Create quiz whole beside them. */}
+        <div className="min-w-0">
+          <QuizHomeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
+        </div>
         {canWrite ? (
           <button
             type="button"
