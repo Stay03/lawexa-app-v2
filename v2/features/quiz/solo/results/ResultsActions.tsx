@@ -73,7 +73,8 @@ export function ResultsActions({
   return (
     // Each button keeps its label's width; two that do not fit side by side
     // stack, each across the row, rather than squeeze (Arthur, 28 October 2026).
-    <div className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto bg-background/85 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70">
+    // `data-results-bar`: the podium moment waits until it is clear of this bar.
+    <div data-results-bar="" className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto bg-background/85 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur supports-backdrop-filter:bg-background/70">
       <div className="flex flex-wrap gap-2.5">
         <RaisedButton className="min-w-fit flex-1 basis-40 whitespace-nowrap" onClick={onRetake} disabled={retaking}>
           {retaking ? (

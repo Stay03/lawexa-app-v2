@@ -131,8 +131,8 @@ test('the podium moment is skippable and still under reduced motion', () => {
   // Skip only while the reader's face is on the podium to climb; else it stands still.
   assert.match(block, /const onPodium = entries\.some\(isYou\);/);
   assert.match(block, /useState<MomentPhase>\(\(\) => \(!prefersReducedMotion\(\) && onPodium \? 'waiting' : 'still'\)\);/);
-  // It rises only once it is on screen (below the fold on a phone).
-  assert.match(block, /if \(entry\?\.isIntersecting\) setPhase\('playing'\);/);
+  // It rises only once it is on screen (below the fold on a phone), clear of the button bar.
+  assert.match(block, /if \(seen\(\)\) setPhase\('playing'\);/);
   assert.match(block, /onClick=\{stop\}/);
   assert.match(block, /className=\{cn\('w-full', phase === 'waiting' && 'opacity-0', !playing && 'v2-solo-podium-still'\)\}/);
 

@@ -89,6 +89,16 @@ test('the answers open from one row, on their own page, and the two buttons sit 
   // Other Quizzes: the third full-size button, to Explore (Arthur, 28 October 2026: "do B").
   assert.match(actions, /<RaisedButton tone="quiet" className="min-w-fit flex-1 basis-40 whitespace-nowrap" asChild>\s*<Link href=\{EXPLORE_HREF\}>\s*<Compass aria-hidden className="size-4" \/>\s*Other Quizzes\s*<\/Link>/);
   assert.equal((actions.match(/<RaisedButton/g) ?? []).length, 3);
+  // The podium moment counts only what the bar leaves uncovered as on screen.
+  assert.match(actions, /<div data-results-bar="" className="sticky bottom-0/);
+  const position = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');
+  assert.match(position, /const barTop = document\.querySelector<HTMLElement>\('\[data-results-bar\]'\)\?\.getBoundingClientRect\(\)\.top \?\? window\.innerHeight;/);
+  assert.match(position, /const shown = Math\.min\(box\.bottom, window\.innerHeight, barTop\) - Math\.max\(box\.top, 0\);/);
+  assert.match(position, /document\.addEventListener\('scroll', onMove, \{ capture: true, passive: true \}\);/);
+  assert.match(position, /window\.addEventListener\('resize', onMove\);/);
+  // And only once the bar has its final height (Challenge a friend waits on the quiz's visibility).
+  assert.match(position, /barSettled=\{publicQuiz !== null\}/);
+  assert.match(position, /if \(phase !== 'waiting' \|\| !barSettled\) return;/);
 
   const screen = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
   assert.match(screen, /import '\.\.\/solo-quiz\.css';/);

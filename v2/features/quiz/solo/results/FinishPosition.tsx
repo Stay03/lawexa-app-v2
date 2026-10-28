@@ -77,8 +77,10 @@ function PositionBlock({
       aria-label="Your place on the leaderboard"
       className="mt-8 mb-6 flex flex-col items-center gap-3 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
     >
+      {/* The quiz's visibility decides whether "Challenge a friend" joins
+          the bar, so the bar has its final height only once it is known. */}
       {position.kind === 'ranked' && position.podiumPlace ? (
-        <PodiumMoment entries={board.entries.slice(0, 3)} isYou={isYou} />
+        <PodiumMoment entries={board.entries.slice(0, 3)} isYou={isYou} barSettled={publicQuiz !== null} />
       ) : null}
 
       <p className="flex items-center gap-2 font-comfortaa text-lg font-bold text-balance text-foreground">
@@ -108,6 +110,9 @@ function PositionBlock({
 /** Unseen below the fold, then rising, then standing. */
 type MomentPhase = 'waiting' | 'playing' | 'still';
 
+/** How much of the podium, clear of the button bar, counts as seen. */
+const PODIUM_SEEN_SHARE = 0.6;
+
 /** When the steps have landed (the first place's grows from 400ms for 500ms) and the confetti bursts. */
 const PODIUM_LANDS_MS = 900;
 
@@ -121,9 +126,12 @@ const PODIUM_LANDS_MS = 900;
 function PodiumMoment({
   entries,
   isYou,
+  barSettled,
 }: {
   entries: readonly QuizLeaderboardEntry[];
   isYou: (entry: QuizLeaderboardEntry) => boolean;
+  /** The button bar is at its final height: until then what it covers is not known. */
+  barSettled: boolean;
 }) {
   const onPodium = entries.some(isYou);
   // Only a podium with the reader's face on it has a climb to end it (a reader
@@ -142,18 +150,40 @@ function PodiumMoment({
   };
 
   useEffect(() => {
-    if (phase !== 'waiting') return;
+    if (phase !== 'waiting' || !barSettled) return;
     const podium = podiumRef.current;
     if (!podium) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) setPhase('playing');
-      },
-      { threshold: 0.6 },
-    );
-    observer.observe(podium);
-    return () => observer.disconnect();
-  }, [phase]);
+    // The button bar sits over the foot of the screen (three rows tall on a
+    // phone), so the part it covers does not count as seen: otherwise the
+    // podium rises behind the bar with only the headline showing. A podium
+    // already inside the window but under the bar crosses no visibility
+    // threshold as the reader scrolls, so it looks on every scroll and resize
+    // (once a frame), measuring the bar each time.
+    const seen = () => {
+      const box = podium.getBoundingClientRect();
+      const barTop = document.querySelector<HTMLElement>('[data-results-bar]')?.getBoundingClientRect().top ?? window.innerHeight;
+      const shown = Math.min(box.bottom, window.innerHeight, barTop) - Math.max(box.top, 0);
+      return box.height > 0 && shown / box.height >= PODIUM_SEEN_SHARE;
+    };
+    let frame = 0;
+    const look = () => {
+      frame = 0;
+      if (seen()) setPhase('playing');
+    };
+    const onMove = () => {
+      if (!frame) frame = window.requestAnimationFrame(look);
+    };
+    // The first look too, in a frame: the podium may already be in view.
+    onMove();
+    // Capture, because the page scrolls inside the shell, not the window.
+    document.addEventListener('scroll', onMove, { capture: true, passive: true });
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('scroll', onMove, { capture: true });
+      window.removeEventListener('resize', onMove);
+    };
+  }, [phase, barSettled]);
   const endConfetti = useCallback(() => setConfettiFrom(null), []);
 
   useEffect(() => {
