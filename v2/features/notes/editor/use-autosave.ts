@@ -15,6 +15,7 @@ import {
   type SaveRequest,
 } from './autosave-machine';
 import { classifySaveFailure } from './save-failure';
+import { sendLeavingSave } from './leaving-save';
 
 /**
  * use-autosave — the DRIVER for `autosave-machine.ts`: the clock, the wire, and
@@ -159,7 +160,7 @@ export function useNoteAutosave({
   flushOnUnmount,
   onUnmountSave,
 }: UseNoteAutosaveOptions): NoteAutosave {
-  const { mutate } = useSaveNote(scopeId);
+  const { mutate, mutateAsync } = useSaveNote(scopeId);
 
   // The machine. A ref, not state — see the header. Seeded through a LAZY
   // `useState` initializer so `initialAutosaveState` runs exactly once (a
@@ -179,7 +180,8 @@ export function useNoteAutosave({
   const flushOnUnmountRef = useRef<UseNoteAutosaveOptions['flushOnUnmount']>(flushOnUnmount);
   const onUnmountSaveRef = useRef<UseNoteAutosaveOptions['onUnmountSave']>(onUnmountSave);
   const dispatchRef = useRef<(event: AutosaveEvent) => void>(() => {});
-  const runSaveRef = useRef<(request: SaveRequest, settle?: (saved: boolean) => void) => void>(() => {});
+  const runSaveRef = useRef<(request: SaveRequest) => void>(() => {});
+  const mutateAsyncRef = useRef(mutateAsync);
 
   // Keep the latest callback reachable from the stable closures below without
   // making them change identity (which would re-arm listeners on every render).
@@ -187,6 +189,7 @@ export function useNoteAutosave({
     onSavedRef.current = onSaved;
     flushOnUnmountRef.current = flushOnUnmount;
     onUnmountSaveRef.current = onUnmountSave;
+    mutateAsyncRef.current = mutateAsync;
   });
 
   const clearTimer = useCallback(() => {
@@ -216,10 +219,9 @@ export function useNoteAutosave({
   }, [clearTimer]);
 
   const runSave = useCallback(
-    (request: SaveRequest, settle?: (saved: boolean) => void) => {
+    (request: SaveRequest) => {
       mutate(request, {
         onSuccess: (envelope) => {
-          settle?.(true);
           // A save started by the unmount flush still reaches the server, but
           // its callbacks must not touch a screen that no longer exists.
           if (!mountedRef.current) return;
@@ -239,7 +241,6 @@ export function useNoteAutosave({
           void onSavedRef.current?.(record);
         },
         onError: (error) => {
-          settle?.(false);
           if (!mountedRef.current) return;
           dispatchRef.current({
             type: 'failed',
@@ -326,8 +327,9 @@ export function useNoteAutosave({
         at: Date.now(),
       });
       if (save === null) return;
-      const settled = new Promise<boolean>((resolve) => runSaveRef.current(save, resolve));
-      onUnmountSaveRef.current?.(settled);
+      // The mutation's own promise: per-call callbacks no longer run once the
+      // component has unmounted (leaving-save.ts).
+      onUnmountSaveRef.current?.(sendLeavingSave(mutateAsyncRef.current, save));
     };
   }, [clearTimer]);
 

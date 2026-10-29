@@ -27,6 +27,8 @@ import type { DraftSourceMessage } from './draft-ordinals';
 export interface DraftVersionEntry {
   ordinal: number;
   key: string;
+  /** The draft's closing tag arrived: a version cut off (Lawexa stopped) is not finished. */
+  finished: boolean;
 }
 
 /** Every saved draft in the chat, in order, with its group key. */
@@ -41,6 +43,13 @@ export interface DraftVersion {
   ordinals: readonly number[];
   /** No newer version follows this one. */
   latest: boolean;
+  /**
+   * A newer FINISHED version follows, so this one is greyed as older. A
+   * version cut off when Lawexa was stopped never greys the one before it:
+   * that one stays the newest the reader can edit (Frontend's review, 29
+   * October 2026; the panel's `newestFinished` agrees).
+   */
+  superseded: boolean;
 }
 
 /** Which drafts are one draft: the same fixed id, else the same title without case or extra spaces. */
@@ -61,7 +70,7 @@ export function draftVersionIndex(messages: readonly DraftSourceMessage[]): Draf
   for (const message of messages) {
     if (message.role !== 'assistant') continue;
     for (const draft of draftsIn(message.content)) {
-      entries.push({ ordinal, key: draftGroupKey(draft) });
+      entries.push({ ordinal, key: draftGroupKey(draft), finished: draft.complete });
       ordinal += 1;
     }
   }
@@ -74,7 +83,8 @@ export function draftVersion(index: DraftVersionIndex, ordinal: number, key: str
   if (!ordinals.includes(ordinal)) ordinals.push(ordinal);
   ordinals.sort((a, b) => a - b);
   const version = ordinals.indexOf(ordinal) + 1;
-  return { version, count: ordinals.length, ordinals, latest: version === ordinals.length };
+  const superseded = index.some((entry) => entry.key === key && entry.ordinal > ordinal && entry.finished);
+  return { version, count: ordinals.length, ordinals, latest: version === ordinals.length, superseded };
 }
 
 /** "Version 2", for a draft with more than one version; `null` for a draft with one. */

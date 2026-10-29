@@ -56,7 +56,7 @@ test('drafts with the same fixed id are one draft even when the title changes', 
     index.map((entry) => entry.key),
     ['id:k3f9q2', 'id:k3f9q2', 'id:p7w2m1'],
   );
-  assert.deepEqual(draftVersion(index, 1, 'id:k3f9q2'), { version: 2, count: 2, ordinals: [0, 1], latest: true });
+  assert.deepEqual(draftVersion(index, 1, 'id:k3f9q2'), { version: 2, count: 2, ordinals: [0, 1], latest: true, superseded: false });
   assert.equal(draftVersion(index, 2, 'id:p7w2m1').count, 1);
 });
 
@@ -92,18 +92,34 @@ test('the index counts drafts the way the ordinals do', () => {
 test('each draft knows its version, how many there are, and whether a newer one follows', () => {
   const index = draftVersionIndex(MESSAGES);
   const tenancy = draftGroupKey({ title: 'Tenancy Agreement' });
-  assert.deepEqual(draftVersion(index, 0, tenancy), { version: 1, count: 3, ordinals: [0, 1, 3], latest: false });
-  assert.deepEqual(draftVersion(index, 1, tenancy), { version: 2, count: 3, ordinals: [0, 1, 3], latest: false });
-  assert.deepEqual(draftVersion(index, 3, tenancy), { version: 3, count: 3, ordinals: [0, 1, 3], latest: true });
+  assert.deepEqual(draftVersion(index, 0, tenancy), { version: 1, count: 3, ordinals: [0, 1, 3], latest: false, superseded: true });
+  assert.deepEqual(draftVersion(index, 1, tenancy), { version: 2, count: 3, ordinals: [0, 1, 3], latest: false, superseded: true });
+  assert.deepEqual(draftVersion(index, 3, tenancy), { version: 3, count: 3, ordinals: [0, 1, 3], latest: true, superseded: false });
   const notice = draftVersion(index, 2, draftGroupKey({ title: 'Notice to Quit' }));
-  assert.deepEqual(notice, { version: 1, count: 1, ordinals: [2], latest: true });
+  assert.deepEqual(notice, { version: 1, count: 1, ordinals: [2], latest: true, superseded: false });
+});
+
+test('a version cut off when Lawexa was stopped never greys the finished one before it', () => {
+  const messages = [
+    { id: 'a1', role: 'assistant', content: '<draft title="TEST DATA Lease" id="k3f9q2" version="1">\nTEST DATA one.\n</draft>' },
+    { id: 'a2', role: 'assistant', content: '<draft title="TEST DATA Lease" id="k3f9q2" version="2">\nTEST DATA two.\n</draft>' },
+    // Stopped halfway: no closing tag.
+    { id: 'a3', role: 'assistant', content: '<draft title="TEST DATA Lease" id="k3f9q2" version="3">\nTEST DATA thr' },
+  ];
+  const index = draftVersionIndex(messages);
+  assert.deepEqual(index.map((entry) => entry.finished), [true, true, false]);
+  assert.equal(draftVersion(index, 0, 'id:k3f9q2').superseded, true);
+  assert.equal(draftVersion(index, 1, 'id:k3f9q2').superseded, false);
+  assert.equal(draftVersion(index, 2, 'id:k3f9q2').superseded, false);
+  // It still counts as a version, and is the last one.
+  assert.equal(draftVersion(index, 2, 'id:k3f9q2').count, 3);
 });
 
 test('a draft still being written is placed after the saved versions of its group', () => {
   // The streaming answer's text is not in `content` yet, so it is not indexed.
   const index = draftVersionIndex(MESSAGES);
   const streaming = draftVersion(index, 4, draftGroupKey({ title: 'Tenancy Agreement' }));
-  assert.deepEqual(streaming, { version: 4, count: 4, ordinals: [0, 1, 3, 4], latest: true });
+  assert.deepEqual(streaming, { version: 4, count: 4, ordinals: [0, 1, 3, 4], latest: true, superseded: false });
   assert.equal(draftVersion(index, 4, draftGroupKey({ title: 'A New Lease' })).count, 1);
 });
 
@@ -121,7 +137,8 @@ test('a draft with one version reads as today; with more, "Version N" and its ow
 test('the card labels its version and greys an older one', () => {
   const card = code(...DRAFT_DIR, 'DraftCard.tsx');
   assert.match(card, /panel\?\.draftVersion\(ordinal, draftGroupKey\(draft\)\)/);
-  assert.match(card, /const older = version !== null && !version\.latest;/);
+  // Greyed once a newer FINISHED version follows; a cut-off one does not grey it.
+  assert.match(card, /const older = version !== null && version\.superseded;/);
   assert.match(card, /older \? 'bg-muted text-muted-foreground' : 'bg-primary\/15 text-primary'/);
   assert.match(card, /\{versionLabel \? `\$\{versionLabel\} · \$\{status\}` : status\}/);
 });
