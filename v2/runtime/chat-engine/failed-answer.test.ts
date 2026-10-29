@@ -112,15 +112,51 @@ test('two failed turns are two rows, and answered turns are untouched', () => {
   assert.equal(messages[3].content, 'A real answer.');
 });
 
-test('a stopped answer is marked Stopped at once, and a stop before the first word leaves no blank row', () => {
+test('a stopped answer is marked Stopped at once, and a stop before the first word is the grey Stopped line', () => {
   const source = engine();
   const helper = source.slice(source.indexOf('function stopOpenPlaceholder(): void {'));
   // The text so far stays, tagged as the reload's `partial` row is, so the row draws "Stopped".
   assert.match(helper, /const content = finalText \|\| m\.content;/);
-  assert.match(helper, /return content \? \[\{ \.\.\.m, content, isStreaming: false, \.\.\.trace, partial: \{ reason: 'cancelled' as const \} \}\] : \[\];/);
+  assert.match(
+    helper,
+    /return content\s*\? \{ \.\.\.m, content, isStreaming: false, \.\.\.trace, partial: \{ reason: 'cancelled' as const \} \}\s*: \{ \.\.\.stoppedRow\(m\.id\), timestamp: m\.timestamp \};/,
+  );
+  // With no row open yet, the line is added; it is the server's own no-text row (Backend's Stop fix).
+  assert.match(helper, /setMessages\(\(msgs\) => \[\.\.\.msgs, stoppedRow\(generateId\(\)\)\]\);/);
+  assert.match(helper, /content: 'Stopped\.',[\s\S]*messageType: 'error',[\s\S]*retryable: false,[\s\S]*stopped: true,/);
+  // A retry clears error rows, never a stop.
+  assert.match(source, /return !isErrorMessage\(message\) \|\| message\.stopped === true;/);
   // The reasoning is taken before the iteration it is keyed by is forgotten.
   assert.ok(helper.indexOf('takeReasoning(placeholderId)') < helper.indexOf('messageIdToIteration.delete(placeholderId)'));
   // The row's mark for that tag.
   const row = read('v2', 'features', 'conversations', 'conversation', 'rows', 'AssistantMessageRow.tsx');
   assert.match(row, /partial\.reason === 'cancelled' \? \(\s*<>\s*<Square className="h-3 w-3" \/>\s*<span>Stopped<\/span>/);
+});
+
+test('a reload draws a stop the way the live chat does (Backend\'s `metadata.stopped`)', () => {
+  const messages = transformApiMessages([
+    row({ role: 'user', content: 'Draft a tenancy notice.' }),
+    // Stopped before the first word: kept `type: error` on the server, out of what Lawexa reads.
+    row({ role: 'assistant', content: 'Stopped.', metadata: { type: 'error', error_code: 'CANCELLED', retryable: false, stopped: true } }),
+    row({ role: 'user', content: 'Now the lease.' }),
+    // Stopped mid-answer: the text stays, marked Stopped whatever reason was saved.
+    row({ role: 'assistant', content: 'The lease runs from', metadata: { partial: true, reason: 'error', stopped: true } }),
+    // A plain error is still an error.
+    row({ role: 'assistant', content: 'Something went wrong.', metadata: { type: 'error', error_code: 'X', retryable: true } }),
+  ]);
+  const stopped = messages[1] as ErrorMessage;
+  assert.equal(stopped.messageType, 'error');
+  assert.equal(stopped.stopped, true);
+  assert.equal(stopped.retryable, false);
+  assert.deepEqual((messages[3] as { partial?: { reason: string } }).partial, { reason: 'cancelled' });
+  assert.equal((messages[4] as ErrorMessage).stopped, undefined);
+});
+
+test('the stopped row is a quiet grey line with no Try again, ahead of every other error look', () => {
+  const row = read('v2', 'features', 'conversations', 'conversation', 'rows', 'ErrorRow.tsx');
+  const stoppedBranch = row.slice(row.indexOf('if (message.stopped) {'), row.indexOf('if (message.failedAnswer) {'));
+  assert.match(stoppedBranch, /text-xs text-muted-foreground/);
+  assert.match(stoppedBranch, /<Square aria-hidden className="h-3 w-3" \/>\s*<span>Stopped<\/span>/);
+  assert.doesNotMatch(stoppedBranch, /Try again|onRetry|destructive/);
+  assert.ok(row.indexOf('if (message.stopped) {') < row.indexOf('if (message.failedAnswer) {'));
 });

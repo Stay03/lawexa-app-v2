@@ -178,6 +178,13 @@ export interface ErrorMessage extends ChatMessage {
    * server's error text in red. Absent on every other error.
    */
   failedAnswer?: boolean;
+  /**
+   * The reader stopped the answer before its first word (Backend's Stop fix,
+   * `metadata.stopped`, 29 October 2026). The row is a quiet grey "Stopped"
+   * line, never the red box, and offers no Try again. Absent on every other
+   * error.
+   */
+  stopped?: boolean;
 }
 
 // Narration message - orchestrator commentary saved between phases
@@ -686,6 +693,9 @@ export interface ApiMessage {
     // the user saw stream in. reason describes why it was cut short.
     partial?: boolean;
     reason?: 'cancelled' | 'error' | 'timeout';
+    /** The reader stopped this turn (Backend's Stop fix, 29 October 2026): on
+     *  the partial-text answer and on the no-text "Stopped." row alike. */
+    stopped?: boolean;
     /** The files on a user message, with their types. */
     files?: ApiMessageFile[];
     /** What redaction hid in a user turn of a redacted chat (see {@link RedactionSummary}). */

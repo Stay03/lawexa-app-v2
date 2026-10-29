@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, RotateCcw } from 'lucide-react';
+import { AlertCircle, RotateCcw, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { ErrorMessage } from '@/types/chat';
 import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
@@ -15,6 +15,8 @@ import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNot
  * row in the answer's place: its streamed text was withdrawn and the turn is
  * not charged (Stay, 27 October 2026), so it says exactly that, never the
  * server's error text, and offers Try again.
+ * An answer the reader stopped before its first word (`stopped`) is one grey
+ * "Stopped" line, as a stopped answer's text carries under it.
  * Every other error is a destructive banner with an inline Retry when the server
  * marks it retryable.
  */
@@ -40,6 +42,20 @@ export function ErrorRow({
 }) {
   if (EXHAUSTED_CODES.has(message.errorCode)) {
     return <OutOfMessagesNotice tight blocked={message.blocked} fallbackMessage={message.content} />;
+  }
+
+  // Stopped before the first word (Stay, 28 October 2026): a quiet grey line,
+  // the same "Stopped" a stopped answer wears under its text, with no Try again.
+  if (message.stopped) {
+    return (
+      <p
+        role="status"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+      >
+        <Square aria-hidden className="h-3 w-3" />
+        <span>Stopped</span>
+      </p>
+    );
   }
 
   if (message.failedAnswer) {

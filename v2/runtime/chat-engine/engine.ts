@@ -1824,8 +1824,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * A user's Stop. The text so far stays, marked "Stopped" at once, the same
    * mark a reload draws from the server's `partial` row (Tester, 27 October
    * 2026: a stopped answer had no mark until then). A stop before the first
-   * word drops the empty answer instead of leaving a blank row under the
-   * steps. Ends the turn's streaming either way.
+   * word puts the grey "Stopped" line in the answer's place, the row a reload
+   * draws from the server's no-text "Stopped." message (Backend's Stop fix,
+   * 29 October 2026), never a blank row under the steps. Ends the turn's
+   * streaming either way.
    */
   function stopOpenPlaceholder(): void {
     const placeholderId = streamingMessageId;
@@ -1833,18 +1835,38 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       const finalText = liveText.get(placeholderId) ?? '';
       const trace = takeReasoning(placeholderId);
       setMessages((msgs) =>
-        msgs.flatMap((m) => {
-          if (m.id !== placeholderId) return [m];
+        msgs.map((m) => {
+          if (m.id !== placeholderId) return m;
           const content = finalText || m.content;
-          return content ? [{ ...m, content, isStreaming: false, ...trace, partial: { reason: 'cancelled' as const } }] : [];
+          return content
+            ? { ...m, content, isStreaming: false, ...trace, partial: { reason: 'cancelled' as const } }
+            : { ...stoppedRow(m.id), timestamp: m.timestamp };
         }),
       );
       clearText(placeholderId);
       messageIdToIteration.delete(placeholderId);
       streamingMessageId = null;
       currentIteration = null;
+    } else {
+      // Stopped before the answer's row was even opened.
+      setMessages((msgs) => [...msgs, stoppedRow(generateId())]);
     }
     setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+  }
+
+  /** The no-text stop's row, as the server saves it: `type: error`, flagged `stopped`. */
+  function stoppedRow(id: string): ErrorMessage {
+    return {
+      id,
+      role: 'assistant',
+      content: 'Stopped.',
+      timestamp: new Date(),
+      messageType: 'error',
+      errorCode: 'CANCELLED',
+      retryable: false,
+      retryAfterMs: null,
+      stopped: true,
+    };
   }
 
   function finalizeOpenPlaceholder(reason: 'error'): void {
@@ -2330,7 +2352,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     setState((prev) => ({
       ...prev,
-      messages: prev.messages.filter((m) => !isErrorMessage(m as ConversationMessage)),
+      // A retry clears the error rows it replaces; a stop is not an error, and stays.
+      messages: prev.messages.filter((m) => {
+        const message = m as ConversationMessage;
+        return !isErrorMessage(message) || message.stopped === true;
+      }),
       error: null,
       isStreaming: true,
       isCancelling: false,

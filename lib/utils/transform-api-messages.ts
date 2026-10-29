@@ -258,7 +258,8 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         content: apiMsg.content,
         timestamp: new Date(apiMsg.created_at),
         partial: {
-          reason: apiMsg.metadata.reason ?? 'cancelled',
+          // A stop is a stop whatever reason was saved with it.
+          reason: apiMsg.metadata.stopped === true ? 'cancelled' : (apiMsg.metadata.reason ?? 'cancelled'),
         },
       } as ChatMessage);
     }
@@ -273,6 +274,9 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
         errorCode: apiMsg.metadata.error_code || 'UNKNOWN',
         retryable: apiMsg.metadata.retryable ?? false,
         retryAfterMs: apiMsg.metadata.retry_after_ms ?? null,
+        // Stopped before its first word: kept `type: error` on the server so
+        // it stays out of what Lawexa reads, drawn as a stop here.
+        ...(apiMsg.metadata.stopped === true ? { stopped: true } : {}),
       } as ErrorMessage);
     }
     // A Radar report (metadata.type "radar_report", written by the Radar scan):
