@@ -179,7 +179,11 @@ test('while the phone chat is open the page under it cannot scroll, and closing 
 test('the keyboard inset itself is unchanged for every other screen', () => {
   const insets = keyboard.match(/setProperty\('--keyboard-inset', `\$\{occlusion\}px`\)/g) ?? [];
   assert.equal(insets.length, 2);
-  assert.match(keyboard, /window\.innerHeight - viewport\.height - viewport\.offsetTop/);
+  // The formula moved into a pure helper for the task sheet's tests (Arthur,
+  // 29 October 2026, 21:13Z, thread 7aa0c6d8); both readings still use it.
+  assert.match(keyboard, /return Math\.max\(0, innerHeight - height - offsetTop\);/);
+  const reads = keyboard.match(/keyboardOcclusion\(window\.innerHeight, viewport\.height, viewport\.offsetTop\)/g) ?? [];
+  assert.equal(reads.length, 2);
 });
 
 /* Arthur's iPhone on d720169 (12 October 2026): with the keyboard up the page's bar

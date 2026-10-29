@@ -174,10 +174,7 @@ export function syncKeyboardInset(): () => void {
     // (innerHeight shrank in lockstep) and the true keyboard height when it
     // overlaid. Clamp ≥ 0 — rubber-band scrolling can transiently make the raw
     // value negative.
-    const occlusion = Math.max(
-      0,
-      window.innerHeight - viewport.height - viewport.offsetTop,
-    );
+    const occlusion = keyboardOcclusion(window.innerHeight, viewport.height, viewport.offsetTop);
     root.style.setProperty('--keyboard-inset', `${occlusion}px`);
     // The visible viewport (11 October 2026): its height caps a screen
     // riding the keyboard, so nothing sized from it can grow past the top,
@@ -203,10 +200,7 @@ export function syncKeyboardInset(): () => void {
    */
   const onFocusOut = (): void => {
     requestAnimationFrame(() => {
-      const occlusion = Math.max(
-        0,
-        window.innerHeight - viewport.height - viewport.offsetTop,
-      );
+      const occlusion = keyboardOcclusion(window.innerHeight, viewport.height, viewport.offsetTop);
       root.style.setProperty('--keyboard-inset', `${occlusion}px`);
       publishVisible();
       if (occlusion === 0) restoreDocumentScroll();
@@ -243,6 +237,19 @@ export function syncKeyboardInset(): () => void {
     root.style.removeProperty('--visual-height');
     root.style.removeProperty('--visual-top');
   };
+}
+
+/**
+ * How much of the layout viewport's bottom the keyboard covers: the space
+ * between the visible rectangle's bottom (`offsetTop + height`) and the
+ * layout viewport's bottom (`innerHeight`). About 0 in a browser that resizes
+ * the page for the keyboard, the keyboard's height in one that overlays it
+ * (Safari), and never below 0 (rubber-band scrolling can make the raw value
+ * negative). Pure, so the task sheet's keyboard numbers can be pinned in a
+ * test (Arthur, 29 October 2026, 21:13Z, thread 7aa0c6d8).
+ */
+export function keyboardOcclusion(innerHeight: number, height: number, offsetTop: number): number {
+  return Math.max(0, innerHeight - height - offsetTop);
 }
 
 /**
