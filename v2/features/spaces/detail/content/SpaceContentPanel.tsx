@@ -236,7 +236,7 @@ export function SpaceContentPanel({
     ) : tab === 'radars' ? (
       <SpaceRadarsPanel spaceUuid={space.uuid} canAdd={access.canAdd} />
     ) : tab === 'tasks' ? (
-      <SpaceTasksPanel spaceUuid={space.uuid} />
+      <SpaceTasksPanel spaceUuid={space.uuid} canEdit={access.canAdd} rooms={rooms} />
     ) : (
       <SpaceFeed
         // A new pill is a new list: a fresh mount, so its rows enter once.
