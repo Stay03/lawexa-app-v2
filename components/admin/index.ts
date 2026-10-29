@@ -10,6 +10,7 @@ export { AdminUserTokenUsage } from './AdminUserTokenUsage';
 export { UserIdentityCard } from './UserIdentityCard';
 export { UserDetailHeader } from './UserDetailHeader';
 export { UserFreeMessagesBlockDialog } from './UserFreeMessagesBlockDialog';
+export { ChangeRoleDialog } from './ChangeRoleDialog';
 export { UserAttributionCard } from './UserAttributionCard';
 export { AdminUserOverview } from './AdminUserOverview';
 export { AdminUserConversationsTab } from './AdminUserConversationsTab';

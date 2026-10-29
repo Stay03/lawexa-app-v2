@@ -19,10 +19,14 @@ import {
   Mail,
   MapPin,
   ShieldCheck,
+  UserCog,
   XCircle,
 } from 'lucide-react';
 import type { AdminUserDetail } from '@/types/admin';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/lib/stores/authStore';
+import { ChangeRoleDialog } from './ChangeRoleDialog';
+import { asRole, canChangeRole } from './change-role-model';
 
 interface UserDetailHeaderProps {
   user: AdminUserDetail;
@@ -77,6 +81,23 @@ function BlockButton({
  */
 export function UserDetailHeader({ user, onToggleBlock }: UserDetailHeaderProps) {
   const [copied, setCopied] = useState(false);
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+
+  // The signed-in admin, read as primitives so the selectors stay stable.
+  const actorRole = asRole(useAuthStore((s) => s.user?.role));
+  const actorId = useAuthStore((s) => s.user?.id);
+  const actorUuid = useAuthStore((s) => s.user?.uuid);
+  const isSelf =
+    (actorUuid != null && actorUuid === user.uuid) ||
+    (actorId != null && actorId === user.id);
+  /* Change role: Arthur chose option 3 on 29 October 2026; the techlead
+     approved design d0ed4466 the same day. Hidden on your own account, on
+     guests and bots, and on anyone at or above a non-superadmin. */
+  const showChangeRole = canChangeRole({
+    actorRole,
+    targetRole: user.role,
+    isSelf,
+  });
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(user.uuid);
@@ -113,6 +134,17 @@ export function UserDetailHeader({ user, onToggleBlock }: UserDetailHeaderProps)
             >
               {user.role}
             </Badge>
+            {showChangeRole && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRoleDialogOpen(true)}
+                className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <UserCog className="h-3.5 w-3.5" />
+                Change role
+              </Button>
+            )}
             {user.is_verified ? (
               <Badge
                 variant="outline"
@@ -200,6 +232,15 @@ export function UserDetailHeader({ user, onToggleBlock }: UserDetailHeaderProps)
         onToggle={onToggleBlock}
         className="mt-4 w-full sm:hidden"
       />
+
+      {showChangeRole && (
+        <ChangeRoleDialog
+          open={roleDialogOpen}
+          onOpenChange={setRoleDialogOpen}
+          actorRole={actorRole}
+          user={user}
+        />
+      )}
     </section>
   );
 }
