@@ -128,15 +128,25 @@ function listenForOnline(): void {
 
 /** Reports one chat error. Fire and forget: it never throws and never shows. */
 export function reportChatError(report: ChatErrorReport): void {
+  void sendChatError(report);
+}
+
+/**
+ * The same report, as a promise that settles when the request has (it never
+ * rejects): for a caller that must not leave the page before it is sent, the
+ * error screen's one reload for a missing chunk (`app/v2/error.tsx`).
+ */
+export function sendChatError(report: ChatErrorReport): Promise<void> {
   try {
-    if (typeof window === 'undefined' || !useAuthStore.getState().token) return;
-    if (!allow(report, Date.now())) return;
+    if (typeof window === 'undefined' || !useAuthStore.getState().token) return Promise.resolve();
+    if (!allow(report, Date.now())) return Promise.resolve();
     const payload = chatErrorPayload(report, {
       userAgent: navigator.userAgent,
       appVersion: document.documentElement.getAttribute('data-dpl-id'),
     });
-    void post(payload);
+    return post(payload);
   } catch {
     // A report must never break the screen that made it.
+    return Promise.resolve();
   }
 }
