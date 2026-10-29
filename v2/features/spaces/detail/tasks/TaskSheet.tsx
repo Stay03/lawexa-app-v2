@@ -241,7 +241,7 @@ function TaskSheetBody({
           <SheetTitle>{task ? 'Task' : 'New task'}</SheetTitle>
           <SheetDescription>
             {task
-              ? `${TASK_STAGE_LABELS[task.stage]} for ${formatRelativeTime(task.stage_changed_at, now) || 'now'}`
+              ? stageSince(task, now)
               : 'Give it a title. You can change the rest later.'}
           </SheetDescription>
         </SheetHeader>
@@ -699,6 +699,14 @@ function roomOptions(rooms: readonly Channel[], current: SpaceTask['thread']): P
   }
   if (current && !options.has(current.uuid)) options.set(current.uuid, { uuid: current.uuid, name: current.name });
   return [...options.values()];
+}
+
+/** The sheet's subtitle: "Waiting for 12m", or "Queued just now" inside the
+ *  first minute (the local run read "Queued for now"). */
+function stageSince(task: SpaceTask, now: number): string {
+  // The helper says "now" inside the first minute, and "" before the clock is read.
+  const time = formatRelativeTime(task.stage_changed_at, now);
+  return time && time !== 'now' ? `${TASK_STAGE_LABELS[task.stage]} for ${time}` : `${TASK_STAGE_LABELS[task.stage]} just now`;
 }
 
 const NO_MOVES: readonly SpaceTaskMove[] = [];
