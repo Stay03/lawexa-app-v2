@@ -1,8 +1,9 @@
 'use client';
 
 import { useId, type ComponentProps, type ReactNode } from 'react';
+import { Check, Minus } from 'lucide-react';
+import { Checkbox as CheckboxPrimitive } from 'radix-ui';
 
-import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -225,15 +226,34 @@ export function FileListHead({
 }
 
 /**
- * The round tick of a row and of the list head, the file library's circle:
- * the codebase's `Checkbox`, round and a size up, a check when ticked and a
- * minus for some of a list.
+ * The round tick of a row and of the list head, the file library's circle: a
+ * check when ticked and a minus for some of a list (Arthur's reference, 29
+ * October 2026). The house `Checkbox` draws a check for both and leaves the
+ * minus state unfilled, so the head read "all ticked" when only some were;
+ * this is the same Radix primitive with the minus drawn and filled.
  */
 function RowTick({
   className,
+  checked,
   ...props
-}: ComponentProps<typeof Checkbox>) {
-  return <Checkbox {...props} className={cn('size-[18px] rounded-full', className)} />;
+}: ComponentProps<typeof CheckboxPrimitive.Root>) {
+  return (
+    <CheckboxPrimitive.Root
+      checked={checked}
+      className={cn(
+        'peer flex size-[18px] shrink-0 items-center justify-center rounded-full border border-input outline-none transition-shadow',
+        'data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground',
+        'data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-primary-foreground',
+        'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30',
+        className,
+      )}
+      {...props}
+    >
+      <CheckboxPrimitive.Indicator className="grid place-content-center text-current [&>svg]:size-3">
+        {checked === 'indeterminate' ? <Minus aria-hidden strokeWidth={3} /> : <Check aria-hidden strokeWidth={3} />}
+      </CheckboxPrimitive.Indicator>
+    </CheckboxPrimitive.Root>
+  );
 }
 
 /**

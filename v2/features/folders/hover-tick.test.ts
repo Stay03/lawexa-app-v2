@@ -64,8 +64,11 @@ test('the round tick sits before the icon, and no tick is left on the right', ()
   const after = body.slice(body.indexOf('renderOpen(FILE_LIST_OPEN_CLASS, content)'));
   assert.doesNotMatch(after, /RowTick|Checkbox/);
   assert.doesNotMatch(row, /\{!select && onStartSelect \? \(\s*<span className="hidden size-9/);
-  // Round, and named by the row.
-  assert.match(row, /className=\{cn\('size-\[18px\] rounded-full', className\)\}/);
+  // Round, named by the row, and a minus (filled) for some of a list: the
+  // house Checkbox drew a faint check there, so the head read "all ticked".
+  assert.match(row, /'peer flex size-\[18px\] shrink-0 items-center justify-center rounded-full /);
+  assert.match(row, /data-\[state=indeterminate\]:bg-primary/);
+  assert.match(row, /\{checked === 'indeterminate' \? <Minus aria-hidden strokeWidth=\{3\} \/> : <Check aria-hidden strokeWidth=\{3\} \/>\}/);
   assert.equal((body.match(/aria-label=\{`Select \$\{name\}`\}/g) ?? []).length, 2);
 });
 
