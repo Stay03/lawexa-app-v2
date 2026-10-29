@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Globe, ListChecks, Lock, Send, Trash2, Undo2 } from 'lucide-react';
 
 import { bulkApi } from '@/v2/features/bulk/api';
-import { BulkBar, BulkBarAction } from '@/v2/features/bulk/BulkBar';
+import { BulkBar, BulkBarAction, BulkBarMenuItem } from '@/v2/features/bulk/BulkBar';
 import { BulkConfirm } from '@/v2/features/bulk/BulkConfirm';
 import { countOf, type BulkItemId } from '@/v2/features/bulk/model';
 import { useBulkAction, useBulkSelection } from '@/v2/features/bulk/use-bulk-selection';
@@ -80,6 +80,30 @@ export function useNotesBulk({ rows }: { rows: readonly NoteRowModel[] }) {
       onToggleAll={select.toggleAll}
       onDone={select.stop}
       noun={NOUN}
+      more={
+        <>
+          {offered.has('unpublish') ? (
+            <BulkBarMenuItem
+              icon={Undo2}
+              label="Unpublish"
+              disabled={off}
+              onClick={() => unpublish.mutate(() => bulkApi.notes(ticked, { action: 'unpublish' }))}
+            />
+          ) : null}
+          <BulkBarMenuItem
+            icon={Lock}
+            label="Make private"
+            disabled={off}
+            onClick={() => makePrivate.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: true }))}
+          />
+          <BulkBarMenuItem
+            icon={Globe}
+            label="Make public"
+            disabled={off}
+            onClick={() => makePublic.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: false }))}
+          />
+        </>
+      }
     >
       {offered.has('publish') ? (
         <BulkBarAction
@@ -89,26 +113,6 @@ export function useNotesBulk({ rows }: { rows: readonly NoteRowModel[] }) {
           onClick={() => publish.mutate(() => bulkApi.notes(ticked, { action: 'publish' }))}
         />
       ) : null}
-      {offered.has('unpublish') ? (
-        <BulkBarAction
-          icon={Undo2}
-          label="Unpublish"
-          disabled={off}
-          onClick={() => unpublish.mutate(() => bulkApi.notes(ticked, { action: 'unpublish' }))}
-        />
-      ) : null}
-      <BulkBarAction
-        icon={Lock}
-        label="Make private"
-        disabled={off}
-        onClick={() => makePrivate.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: true }))}
-      />
-      <BulkBarAction
-        icon={Globe}
-        label="Make public"
-        disabled={off}
-        onClick={() => makePublic.mutate(() => bulkApi.notes(ticked, { action: 'privacy', isPrivate: false }))}
-      />
       <BulkBarAction icon={Trash2} label="Delete" destructive disabled={off} onClick={() => setConfirmDelete(true)} />
     </BulkBar>
   ) : null;

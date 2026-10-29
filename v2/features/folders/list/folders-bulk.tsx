@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CornerUpRight, FolderInput, Lock, LockOpen, Trash2, Users } from 'lucide-react';
 
 import { bulkApi } from '@/v2/features/bulk/api';
-import { BulkBar, BulkBarAction } from '@/v2/features/bulk/BulkBar';
+import { BulkBar, BulkBarAction, BulkBarMenuItem } from '@/v2/features/bulk/BulkBar';
 import { BulkConfirm } from '@/v2/features/bulk/BulkConfirm';
 import { FolderChooser } from '@/v2/features/bulk/FolderChooser';
 import { countOf, mergeResults, type BulkItemId, type BulkResult } from '@/v2/features/bulk/model';
@@ -105,29 +105,33 @@ export function useFoldersBulk({ folderUuids, fileIds }: { folderUuids: readonly
       onToggleAll={select.toggleAll}
       onDone={select.stop}
       noun={NOUN}
+      more={
+        <>
+          <BulkBarMenuItem icon={Users} label="Move to a space" disabled={none || busy} onClick={() => setDialog('space')} />
+          {offered.has('make_private') ? (
+            <>
+              <BulkBarMenuItem
+                icon={Lock}
+                label="Make private"
+                disabled={busy}
+                onClick={() => privacy.mutate(() => bulkApi.folders(tickedFolders, { action: 'privacy', isPrivate: true }))}
+              />
+              <BulkBarMenuItem
+                icon={LockOpen}
+                label="Make public"
+                disabled={busy}
+                onClick={() => privacy.mutate(() => bulkApi.folders(tickedFolders, { action: 'privacy', isPrivate: false }))}
+              />
+            </>
+          ) : null}
+        </>
+      }
     >
       {offered.has('move') ? (
         <BulkBarAction icon={CornerUpRight} label="Move" disabled={busy} onClick={() => setDialog('move')} />
       ) : null}
       {offered.has('add_to_folder') ? (
         <BulkBarAction icon={FolderInput} label="Add to folder" disabled={busy} onClick={() => setDialog('add')} />
-      ) : null}
-      <BulkBarAction icon={Users} label="Move to a space" disabled={none || busy} onClick={() => setDialog('space')} />
-      {offered.has('make_private') ? (
-        <>
-          <BulkBarAction
-            icon={Lock}
-            label="Make private"
-            disabled={busy}
-            onClick={() => privacy.mutate(() => bulkApi.folders(tickedFolders, { action: 'privacy', isPrivate: true }))}
-          />
-          <BulkBarAction
-            icon={LockOpen}
-            label="Make public"
-            disabled={busy}
-            onClick={() => privacy.mutate(() => bulkApi.folders(tickedFolders, { action: 'privacy', isPrivate: false }))}
-          />
-        </>
       ) : null}
       <BulkBarAction icon={Trash2} label="Delete" destructive disabled={none || busy} onClick={() => setDialog('delete')} />
     </BulkBar>

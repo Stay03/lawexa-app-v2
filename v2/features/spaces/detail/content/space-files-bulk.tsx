@@ -6,7 +6,7 @@ import { Copy, FolderOutput, Trash2 } from 'lucide-react';
 
 import type { Space, SpaceFile } from '@/types/collab';
 import { bulkApi } from '@/v2/features/bulk/api';
-import { BulkBar, BulkBarAction } from '@/v2/features/bulk/BulkBar';
+import { BulkBar, BulkBarAction, BulkBarMenuItem } from '@/v2/features/bulk/BulkBar';
 import { BulkConfirm } from '@/v2/features/bulk/BulkConfirm';
 import { countOf, type BulkItemId } from '@/v2/features/bulk/model';
 import { useBulkAction, useBulkSelection } from '@/v2/features/bulk/use-bulk-selection';
@@ -101,6 +101,11 @@ export function useSpaceFilesBulk({
       onToggleAll={select.toggleAll}
       onDone={select.stop}
       noun={NOUN}
+      more={
+        offered.has('remove') ? (
+          <BulkBarMenuItem icon={FolderOutput} label="Remove from space" disabled={off} onClick={() => setConfirm('remove')} />
+        ) : undefined
+      }
     >
       <BulkBarAction
         icon={Copy}
@@ -108,9 +113,6 @@ export function useSpaceFilesBulk({
         disabled={off}
         onClick={() => copy.mutate(() => bulkApi.spaceFiles(space.uuid, ticked, 'copy_to_mine'))}
       />
-      {offered.has('remove') ? (
-        <BulkBarAction icon={FolderOutput} label="Remove from space" disabled={off} onClick={() => setConfirm('remove')} />
-      ) : null}
       {offered.has('delete') ? (
         <BulkBarAction icon={Trash2} label="Delete" destructive disabled={off} onClick={() => setConfirm('delete')} />
       ) : null}

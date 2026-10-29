@@ -6,7 +6,7 @@ import { Blocks, Lock, Trash2 } from 'lucide-react';
 
 import type { ConversationListItem } from '@/types/chat';
 import { bulkApi } from '@/v2/features/bulk/api';
-import { BulkBar, BulkBarAction } from '@/v2/features/bulk/BulkBar';
+import { BulkBar, BulkBarAction, BulkBarMenuItem } from '@/v2/features/bulk/BulkBar';
 import { BulkConfirm } from '@/v2/features/bulk/BulkConfirm';
 import { countOf, type BulkItemId, type BulkResult } from '@/v2/features/bulk/model';
 import { useBulkAction, useBulkSelection } from '@/v2/features/bulk/use-bulk-selection';
@@ -81,24 +81,27 @@ export function useConversationsBulk({ rows }: { rows: readonly ConversationList
       onToggleAll={select.toggleAll}
       onDone={select.stop}
       noun={NOUN}
+      more={
+        offered.has('make_private') ? (
+          <BulkBarMenuItem
+            icon={Lock}
+            label="Make private"
+            disabled={off}
+            onClick={() =>
+              privacy.mutate(() => bulkApi.conversations(ticked, { action: 'make_private' }), {
+                // In place, as the share dialog writes it: a visibility change is not a message.
+                onSuccess: (result) => {
+                  for (const id of doneIds(result)) conversationsCache.setVisibility(queryClient, id, true);
+                },
+              })
+            }
+          />
+        ) : undefined
+      }
     >
+      {/* A chat's move is into a space: the main action, beside Delete. */}
       {offered.has('space') ? (
         <BulkBarAction icon={Blocks} label="Move to a space" disabled={off} onClick={() => setDialog('space')} />
-      ) : null}
-      {offered.has('make_private') ? (
-        <BulkBarAction
-          icon={Lock}
-          label="Make private"
-          disabled={off}
-          onClick={() =>
-            privacy.mutate(() => bulkApi.conversations(ticked, { action: 'make_private' }), {
-              // In place, as the share dialog writes it: a visibility change is not a message.
-              onSuccess: (result) => {
-                for (const id of doneIds(result)) conversationsCache.setVisibility(queryClient, id, true);
-              },
-            })
-          }
-        />
       ) : null}
       {offered.has('delete') ? (
         <BulkBarAction icon={Trash2} label="Delete" destructive disabled={off} onClick={() => setDialog('delete')} />

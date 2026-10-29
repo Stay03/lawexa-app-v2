@@ -75,7 +75,7 @@ export function useFolderItemsBulk({ folderUuid, items }: { folderUuid: string; 
       noun={NOUN}
     >
       <BulkBarAction icon={FolderInput} label="Add to another folder" disabled={none || busy} onClick={() => setDialog('add')} />
-      <BulkBarAction icon={FolderMinus} label="Remove from this folder" destructive disabled={none || busy} onClick={() => setDialog('remove')} />
+      <BulkBarAction icon={FolderMinus} label="Remove from this folder" disabled={none || busy} onClick={() => setDialog('remove')} />
     </BulkBar>
   ) : null;
 

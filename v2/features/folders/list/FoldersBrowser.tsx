@@ -428,8 +428,11 @@ export function FoldersBrowser() {
           after it to fight. It is the only thing that floats here: "New folder"
           stays inline in the row above, which is where every v2 create action
           now lives — Notes, Radar and Spaces each spent a day with a floating
-          button instead and the owner turned all three down. */}
-      {searchAtTop ? null : (
+          button instead and the owner turned all three down. While rows are
+          ticked the select bar holds the foot of the screen, so the pill steps
+          aside, as on Notes and Chats (Stay, 29 October 2026: it showed
+          behind the bar). */}
+      {searchAtTop || selecting ? null : (
         <ScreenDock>
           <ScreenDockSearch>{searchField}</ScreenDockSearch>
         </ScreenDock>

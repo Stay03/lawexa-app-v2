@@ -1,22 +1,36 @@
 'use client';
 
-import type { ReactNode } from 'react';
-import { X } from 'lucide-react';
+import type { ComponentType, ReactNode } from 'react';
+import { MoreHorizontal, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { countOf } from './model';
 
 /**
  * The bar a list shows while its rows are being ticked (bulk select, Arthur,
- * 20 October 2026): the select-all box for THIS list with its count, how many
- * are ticked, the screen's own actions, and Done. Fixed at the foot of the
- * screen over the list, above a phone's safe area; on a computer a floating
- * bar centred in the content column.
+ * 20 October 2026). Fixed at the foot of the screen over the list, above a
+ * phone's safe area; on a computer a floating bar centred in the content
+ * column.
  *
- * The actions are the screen's (`children`): each is a {@link BulkBarAction},
- * off while nothing is ticked.
+ * ONE QUIET ROW (Stay, 29 October 2026, 01:11Z, on the folder picture: "Look
+ * at the bottom now those buttons are horrible"; the techlead's brief after
+ * Linear's and Gmail's bars). The select-all box, "1 selected", then the
+ * screen's main actions as plain text buttons, then "More" with the rest, and
+ * the close. Every label is on one line, never wrapped. Delete is red text
+ * only. On a phone the main actions and More show their icons alone, with
+ * their words for a screen reader, so the bar fits 390 px.
+ *
+ * The screen decides what is main (`children`, each a {@link BulkBarAction}:
+ * Move and Delete where it has them) and what goes in More (`more`, each a
+ * {@link BulkBarMenuItem}). Every action is off while nothing is ticked.
  */
 export function BulkBar({
   count,
@@ -26,6 +40,7 @@ export function BulkBar({
   onDone,
   noun,
   children,
+  more,
 }: {
   count: number;
   /** Rows in the current list: what select-all would tick. */
@@ -34,7 +49,10 @@ export function BulkBar({
   onToggleAll: () => void;
   onDone: () => void;
   noun: { one: string; many: string };
+  /** The main actions, as buttons. */
   children: ReactNode;
+  /** The rest, in the More menu. */
+  more?: ReactNode;
 }) {
   return (
     <div
@@ -42,39 +60,44 @@ export function BulkBar({
       aria-label="Selected items"
       className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:pointer-events-none md:pb-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
     >
-      <div className="pointer-events-auto mx-auto flex max-w-2xl flex-col gap-2 rounded-2xl border border-border bg-popover p-2.5 text-popover-foreground shadow-lg md:flex-row md:items-center">
-        <div className="flex min-w-0 items-center gap-2.5 px-1">
-          <label className="flex items-center gap-2 text-sm">
-            <Checkbox
-              checked={allState}
-              onCheckedChange={onToggleAll}
-              disabled={total === 0}
-              aria-label={`Select all ${countOf(total, noun)}`}
-            />
-            <span className="text-muted-foreground">All {total}</span>
-          </label>
-          <span aria-live="polite" className="min-w-0 flex-1 truncate text-sm font-medium">
-            {count === 0 ? 'None selected' : `${countOf(count, noun)} selected`}
-          </span>
-          <button
-            type="button"
-            onClick={onDone}
-            aria-label="Stop selecting"
-            className={cn(
-              'v2-interactive inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground md:order-last',
-              FOCUS_RING,
-            )}
-          >
-            <X aria-hidden className="size-4" />
-          </button>
+      <div className="pointer-events-auto mx-auto flex max-w-2xl items-center gap-1 rounded-2xl border border-border bg-popover py-1.5 pl-3 pr-1.5 text-popover-foreground shadow-lg">
+        <Checkbox
+          checked={allState}
+          onCheckedChange={onToggleAll}
+          disabled={total === 0}
+          aria-label={`Select all ${countOf(total, noun)}`}
+        />
+        <span aria-live="polite" className="ml-2 shrink-0 whitespace-nowrap text-sm font-medium tabular-nums">
+          {count === 0 ? 'None selected' : `${count} selected`}
+        </span>
+        <div className="ml-auto flex min-w-0 items-center gap-0.5">
+          {children}
+          {more ? <BulkBarMore>{more}</BulkBarMore> : null}
         </div>
-        <div className="flex flex-wrap gap-1.5 md:ml-auto md:flex-nowrap">{children}</div>
+        <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-border" />
+        <button
+          type="button"
+          onClick={onDone}
+          aria-label="Stop selecting"
+          className={cn(
+            'v2-interactive inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+            FOCUS_RING,
+          )}
+        >
+          <X aria-hidden className="size-4" />
+        </button>
       </div>
     </div>
   );
 }
 
-/** One action in the bar: a small pill, off while nothing is ticked or one is running. */
+type BulkIcon = ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+
+/** The bar's quiet text button: no border, a tint on hover. */
+const ACTION =
+  'v2-interactive inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 text-sm font-medium transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-40';
+
+/** One main action in the bar: its word from `sm:` up, its icon alone below. */
 export function BulkBarAction({
   icon: Icon,
   label,
@@ -82,7 +105,7 @@ export function BulkBarAction({
   disabled,
   destructive = false,
 }: {
-  icon: React.ComponentType<{ className?: string; 'aria-hidden'?: boolean }>;
+  icon: BulkIcon;
   label: string;
   onClick: () => void;
   disabled: boolean;
@@ -93,14 +116,59 @@ export function BulkBarAction({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={cn(
-        'v2-interactive inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-50',
-        destructive && 'text-destructive hover:bg-destructive/10',
-        FOCUS_RING,
-      )}
+      aria-label={label}
+      title={label}
+      className={cn(ACTION, destructive ? 'text-destructive hover:bg-destructive/10' : 'text-foreground', FOCUS_RING)}
     >
-      <Icon aria-hidden className="size-3.5" />
-      {label}
+      <Icon aria-hidden className="size-4 sm:hidden" />
+      <span aria-hidden className="max-sm:hidden">
+        {label}
+      </span>
     </button>
+  );
+}
+
+/** The More menu: the screen's other actions. */
+function BulkBarMore({ children }: { children: ReactNode }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label="More actions" className={cn(ACTION, 'text-foreground', FOCUS_RING)}>
+          <MoreHorizontal aria-hidden className="size-4 sm:hidden" />
+          <span aria-hidden className="max-sm:hidden">
+            More
+          </span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="end" className="min-w-48">
+        {children}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** One action in the More menu. */
+export function BulkBarMenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  destructive = false,
+}: {
+  icon: BulkIcon;
+  label: string;
+  onClick: () => void;
+  disabled: boolean;
+  destructive?: boolean;
+}) {
+  return (
+    <DropdownMenuItem
+      onSelect={onClick}
+      disabled={disabled}
+      className={cn('gap-2 whitespace-nowrap', destructive && 'text-destructive focus:text-destructive')}
+    >
+      <Icon aria-hidden className="size-4" />
+      {label}
+    </DropdownMenuItem>
   );
 }
