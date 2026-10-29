@@ -1,10 +1,12 @@
 import type {
   CreateSpaceTaskPayload,
+  Member,
   SpaceTask,
   SpaceTaskMove,
   SpaceTaskStage,
   SpaceTaskWritePayload,
 } from '@/types/collab';
+import { contentRoleOf } from '@/v2/features/collab/membership/content-role';
 import { TASK_STAGE_LABELS } from './task-board-model';
 
 /**
@@ -153,13 +155,14 @@ export function updatePayload(draft: TaskDraft, task: SpaceTask): SpaceTaskWrite
  */
 export function moveLine(move: SpaceTaskMove): string {
   const by = move.by?.name ?? 'Lawexa';
+  const to = stageWithPerson(move);
   if (move.from === null) {
     const owner = move.to_owner ? ` for ${move.to_owner.name}` : '';
-    return `${by} added it to ${TASK_STAGE_LABELS[move.to]}${owner}`;
+    return `${by} added it to ${to}${owner}`;
   }
   const parts: string[] = [];
   if (move.from !== move.to) {
-    parts.push(`moved it from ${TASK_STAGE_LABELS[move.from]} to ${TASK_STAGE_LABELS[move.to]}`);
+    parts.push(`moved it from ${TASK_STAGE_LABELS[move.from]} to ${to}`);
   }
   const ownerChanged = (move.from_owner?.uuid ?? null) !== (move.to_owner?.uuid ?? null);
   if (ownerChanged) {
@@ -169,4 +172,46 @@ export function moveLine(move: SpaceTaskMove): string {
   }
   if (parts.length === 0) parts.push(`changed it in ${TASK_STAGE_LABELS[move.to]}`);
   return `${by} ${parts.join(' and ')}`;
+}
+
+/** "Waiting on Stay" for a move into Waiting that names the person (the
+ *  techlead's decision on Tester's note, 29 October 2026); the stage alone
+ *  otherwise. */
+function stageWithPerson(move: SpaceTaskMove): string {
+  const stage = TASK_STAGE_LABELS[move.to];
+  return move.to === 'waiting' && move.waiting_on ? `${stage} on ${move.waiting_on.name}` : stage;
+}
+
+/** One choice in the sheet's Owner or Waiting on list. */
+export interface PersonOption {
+  uuid: string;
+  name: string;
+}
+
+/**
+ * The people the sheet offers, by name: the space's active members, plus
+ * anyone already on the task who is not among them (a person who left, or a
+ * viewer who owned a task before the rule below, keeps their place until
+ * changed).
+ *
+ * `movers`: only the members who may move tasks, the space's owners and
+ * editors. The Owner list takes only them (the techlead's decision on
+ * Tester's note, 29 October 2026: a viewer cannot move the task they would
+ * own); anyone may be waited on.
+ */
+export function personOptions(
+  members: readonly Pick<Member, 'user' | 'role' | 'content_role' | 'is_active' | 'is_pending'>[],
+  keep: readonly ({ uuid: string; name: string } | null)[],
+  { movers }: { movers: boolean },
+): PersonOption[] {
+  const options = new Map<string, PersonOption>();
+  for (const member of members) {
+    if (!member.is_active || member.is_pending) continue;
+    if (movers && contentRoleOf(member) === 'viewer') continue;
+    options.set(member.user.uuid, { uuid: member.user.uuid, name: member.user.name });
+  }
+  for (const person of keep) {
+    if (person && !options.has(person.uuid)) options.set(person.uuid, { uuid: person.uuid, name: person.name });
+  }
+  return [...options.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }

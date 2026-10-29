@@ -1935,6 +1935,9 @@ export interface SpaceTaskMove {
   by: SpaceTaskPerson | null;
   via: 'app' | 'agent';
   at: string;
+  /** Who the task waits on, on a move into Waiting; `null` otherwise (the
+   *  techlead's decision on Tester's note, 29 October 2026). */
+  waiting_on: SpaceTaskPerson | null;
 }
 
 export type SpaceTaskMoveListResponse = LengthAwareResponse<SpaceTaskMove>;

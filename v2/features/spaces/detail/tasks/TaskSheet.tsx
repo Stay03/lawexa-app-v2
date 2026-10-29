@@ -42,12 +42,14 @@ import {
   draftFromTask,
   hasErrors,
   moveLine,
+  personOptions,
   serverFieldErrors,
   stageTakesNote,
   TASK_NOTE_MAX,
   TASK_TITLE_MAX,
   updatePayload,
   withStage,
+  type PersonOption,
   type TaskDraft,
   type TaskField,
   type TaskFieldErrors,
@@ -177,10 +179,16 @@ function TaskSheetBody({
   // (the local run against the task board server, 29 October 2026).
   const viewerUuid = task ? null : session.userUuid;
   const viewerName = session.name;
-  const members = useMemo(() => {
+  // Only owners and editors may own a task (the techlead's decision on
+  // Tester's note, 29 October 2026); anyone in the space may be waited on.
+  const owners = useMemo(() => {
     const viewer = viewerUuid && viewerName ? { uuid: viewerUuid, name: viewerName } : null;
-    return personOptions(membersQuery.data ?? [], [task?.owner ?? null, task?.waiting_on ?? null, viewer]);
+    return personOptions(membersQuery.data ?? [], [task?.owner ?? null, viewer], { movers: true });
   }, [membersQuery.data, task, viewerUuid, viewerName]);
+  const waitable = useMemo(
+    () => personOptions(membersQuery.data ?? [], [task?.waiting_on ?? null], { movers: false }),
+    [membersQuery.data, task],
+  );
 
   const change = <K extends keyof TaskDraft>(key: K, value: TaskDraft[K], field: TaskField) => {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -275,7 +283,7 @@ function TaskSheetBody({
               <PersonSelect
                 id={`${uid}-owner`}
                 value={draft.owner}
-                options={members}
+                options={owners}
                 emptyLabel="Nobody yet"
                 invalid={!!errors.owner}
                 describedBy={errors.owner ? `${uid}-owner-error` : undefined}
@@ -308,7 +316,7 @@ function TaskSheetBody({
                 <PersonSelect
                   id={`${uid}-waiting`}
                   value={draft.waitingOn}
-                  options={members}
+                  options={waitable}
                   emptyLabel={null}
                   placeholder="Choose a person"
                   invalid={!!errors.waiting_on}
@@ -480,11 +488,6 @@ function StagePicker({ value, onChange }: { value: SpaceTaskStage; onChange: (st
       })}
     </div>
   );
-}
-
-interface PersonOption {
-  uuid: string;
-  name: string;
 }
 
 /** Radix Select refuses an empty value, so "nobody" has its own. */
@@ -676,23 +679,6 @@ function MoveRow({ move, now }: { move: SpaceTaskMove; now: number }) {
       ) : null}
     </li>
   );
-}
-
-/** The space's active members by name, plus anyone already on the task who
- *  is not in that list (a person who left keeps their place until changed). */
-function personOptions(
-  members: readonly { user: { uuid: string; name: string }; is_active: boolean; is_pending: boolean }[],
-  onTask: readonly ({ uuid: string; name: string } | null)[],
-): PersonOption[] {
-  const options = new Map<string, PersonOption>();
-  for (const member of members) {
-    if (!member.is_active || member.is_pending) continue;
-    options.set(member.user.uuid, { uuid: member.user.uuid, name: member.user.name });
-  }
-  for (const person of onTask) {
-    if (person && !options.has(person.uuid)) options.set(person.uuid, { uuid: person.uuid, name: person.name });
-  }
-  return [...options.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
 
 /** The rooms a task may point at: open to the whole space, each once, with

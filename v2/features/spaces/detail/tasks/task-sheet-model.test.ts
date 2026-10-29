@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { SpaceTask, SpaceTaskMove, SpaceTaskPerson } from '@/types/collab';
+import type { Member, SpaceTask, SpaceTaskMove, SpaceTaskPerson } from '@/types/collab';
 import {
   checkDraft,
   createPayload,
   draftFromTask,
   hasErrors,
   moveLine,
+  personOptions,
   serverFieldErrors,
   updatePayload,
   withStage,
@@ -138,6 +139,7 @@ const move = (overrides: Partial<SpaceTaskMove>): SpaceTaskMove => ({
   from_owner: BACKEND,
   to_owner: BACKEND,
   note: null,
+  waiting_on: null,
   by: BACKEND,
   via: 'agent',
   at: '2026-10-29T10:00:00Z',
@@ -158,4 +160,57 @@ test('a history line says who moved it and where, in plain words', () => {
   );
   assert.equal(moveLine(move({ by: null, from: 'working', to: 'done' })), 'Lawexa moved it from Working to Done');
   assert.equal(moveLine(move({ from: 'paused', to: 'paused', by: STAY })), 'Stay changed it in Paused');
+});
+
+test('history names who a task waits on, when the move says', () => {
+  // The techlead's decision on Tester's note, 29 October 2026.
+  assert.equal(
+    moveLine(move({ from: 'paused', to: 'waiting', by: STAY, waiting_on: BACKEND })),
+    'Stay moved it from Paused to Waiting on Backend Claude',
+  );
+  assert.equal(
+    moveLine(move({ from: null, to: 'waiting', by: STAY, to_owner: ADA, waiting_on: BACKEND })),
+    'Stay added it to Waiting on Backend Claude for Ada Obi',
+  );
+  // A move with nobody named, or into another stage, reads as before.
+  assert.equal(moveLine(move({ from: 'paused', to: 'waiting', by: STAY })), 'Stay moved it from Paused to Waiting');
+  assert.equal(moveLine(move({ from: 'waiting', to: 'working', by: STAY, waiting_on: BACKEND })), 'Stay moved it from Waiting to Working');
+});
+
+const member = (uuid: string, name: string, content_role: Member['content_role'], extra: Partial<Member> = {}) =>
+  ({
+    user: { uuid, name },
+    role: 'member',
+    content_role,
+    is_active: true,
+    is_pending: false,
+    ...extra,
+  }) as Pick<Member, 'user' | 'role' | 'content_role' | 'is_active' | 'is_pending'>;
+
+test('the Owner list holds only owners and editors; anyone may be waited on', () => {
+  const roster = [
+    member('u-own', 'Owen', 'owner'),
+    member('u-ed', 'Edi', 'editor'),
+    member('u-view', 'Vic', 'viewer'),
+    member('u-pend', 'Pat', 'editor', { is_pending: true }),
+    member('u-gone', 'Gil', 'editor', { is_active: false }),
+  ];
+  assert.deepEqual(
+    personOptions(roster, [], { movers: true }).map((p) => p.name),
+    ['Edi', 'Owen'],
+  );
+  assert.deepEqual(
+    personOptions(roster, [], { movers: false }).map((p) => p.name),
+    ['Edi', 'Owen', 'Vic'],
+  );
+  // A viewer who already owns the task stays visible until it is changed.
+  assert.deepEqual(
+    personOptions(roster, [{ uuid: 'u-view', name: 'Vic' }], { movers: true }).map((p) => p.name),
+    ['Edi', 'Owen', 'Vic'],
+  );
+  // A team-space member with no content role counts by their space role.
+  assert.deepEqual(
+    personOptions([member('u-old', 'Ola', undefined)], [], { movers: true }).map((p) => p.name),
+    ['Ola'],
+  );
 });
