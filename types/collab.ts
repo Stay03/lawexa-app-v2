@@ -1883,6 +1883,59 @@ export interface SpaceTaskListParams {
  *  board order (working, paused, waiting, queued, done). */
 export type SpaceTaskListResponse = LengthAwareResponse<SpaceTask>;
 
+/**
+ * What a write may send (Backend's task-board branch 439e6020): `POST
+ * /spaces/{uuid}/tasks` and `PATCH .../tasks/{taskUuid}`. Every person and the
+ * thread go by uuid. `null` clears the owner, the person waited on, the
+ * thread or the note. The server checks the stage rules (422): a paused task
+ * needs `stage_note`, a waiting one needs `waiting_on`, and it clears both
+ * when the task leaves that stage.
+ */
+export interface SpaceTaskWritePayload {
+  /** At most 200 characters; required when sent. */
+  title?: string;
+  stage?: SpaceTaskStage;
+  /** At most 140 characters. */
+  stage_note?: string | null;
+  /** A user uuid: an active member of the space. */
+  waiting_on?: string | null;
+  /** A user uuid: an active member of the space. */
+  owner?: string | null;
+  /** A thread or channel uuid every member of the space can read. */
+  thread?: string | null;
+}
+
+/** `POST /spaces/{uuid}/tasks`: the title is the one field it needs. */
+export interface CreateSpaceTaskPayload extends SpaceTaskWritePayload {
+  title: string;
+}
+
+/** `POST /spaces/{uuid}/tasks/reorder`: EVERY open task of one owner, each
+ *  once, in the new order. `owner_uuid: null` orders the tasks nobody has. */
+export interface ReorderSpaceTasksPayload {
+  owner_uuid: string | null;
+  uuids: string[];
+}
+
+/** A created or changed task: the same row `GET .../tasks` returns. */
+export type SpaceTaskItemResponse = ItemResponse<SpaceTask>;
+
+/** One move in a task's history (`GET .../tasks/{taskUuid}/moves`), newest
+ *  first. `from: null` is the task's creation. */
+export interface SpaceTaskMove {
+  from: SpaceTaskStage | null;
+  to: SpaceTaskStage;
+  from_owner: SpaceTaskPerson | null;
+  to_owner: SpaceTaskPerson | null;
+  note: string | null;
+  /** `null`: Lawexa itself, or a deleted account. */
+  by: SpaceTaskPerson | null;
+  via: 'app' | 'agent';
+  at: string;
+}
+
+export type SpaceTaskMoveListResponse = LengthAwareResponse<SpaceTaskMove>;
+
 /** The room kinds the feed adds only when asked (`include`), and only for a
  *  reader with team channels (researcher and above) in a team space: anyone
  *  else gets today's feed whatever is asked. */

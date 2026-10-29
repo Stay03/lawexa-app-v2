@@ -329,6 +329,25 @@ export const spacesQueries = {
       refetchOnMount: REFETCH_ON_VISIT,
     }),
 
+  /** Every cached history of one task. Under {@link tasksOf}, so whatever
+   *  re-reads the board re-reads an open history too. */
+  taskMovesOf: (spaceUuid: string, taskUuid: string) =>
+    [...spacesQueries.tasksOf(spaceUuid), 'moves', taskUuid] as const,
+
+  /**
+   * One task's history (`GET /spaces/{uuid}/tasks/{taskUuid}/moves`), newest
+   * first, the last 50: what the task sheet lists under History. A move by an
+   * agent lands while the sheet is open, so the live event marks it stale.
+   */
+  taskMoves: (spaceUuid: string, taskUuid: string, { viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...spacesQueries.taskMovesOf(spaceUuid, taskUuid), { viewerId }] as const,
+      queryFn: () => spaceTasksApi.moves(spaceUuid, taskUuid, { per_page: 50 }),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
   /** Invalidation handle for one space's member roster (all params variants). */
   membersOf: (spaceUuid: string) =>
     [...spacesQueries.all, 'members', spaceUuid] as const,

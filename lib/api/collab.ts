@@ -80,6 +80,11 @@ import type {
   SpaceResponse,
   SpaceTaskListParams,
   SpaceTaskListResponse,
+  CreateSpaceTaskPayload,
+  ReorderSpaceTasksPayload,
+  SpaceTaskItemResponse,
+  SpaceTaskMoveListResponse,
+  SpaceTaskWritePayload,
   TaskListItemResponse,
   TaskListItemsResponse,
   TaskListResponse,
@@ -529,6 +534,59 @@ export const spaceTasksApi = {
           page: params.page ?? 1,
         },
       },
+    );
+    return response.data;
+  },
+
+  /** A new task (201). The server's row comes back in `data`. */
+  create: async (spaceUuid: string, payload: CreateSpaceTaskPayload): Promise<SpaceTaskItemResponse> => {
+    const response = await apiClient.post<SpaceTaskItemResponse>(
+      `/spaces/${encodeURIComponent(spaceUuid)}/tasks`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /** Changes only the fields sent; `null` clears owner, waiting_on, thread or the note. */
+  update: async (
+    spaceUuid: string,
+    taskUuid: string,
+    payload: SpaceTaskWritePayload,
+  ): Promise<SpaceTaskItemResponse> => {
+    const response = await apiClient.patch<SpaceTaskItemResponse>(
+      `/spaces/${encodeURIComponent(spaceUuid)}/tasks/${encodeURIComponent(taskUuid)}`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /** A soft delete. */
+  remove: async (spaceUuid: string, taskUuid: string): Promise<ApiResponse<null>> => {
+    const response = await apiClient.delete<ApiResponse<null>>(
+      `/spaces/${encodeURIComponent(spaceUuid)}/tasks/${encodeURIComponent(taskUuid)}`,
+    );
+    return response.data;
+  },
+
+  /** One owner's open tasks in a new order: every one of them, each once. The
+   *  contract names no answer body, so nothing is read from it. */
+  reorder: async (spaceUuid: string, payload: ReorderSpaceTasksPayload): Promise<ApiResponse<unknown>> => {
+    const response = await apiClient.post<ApiResponse<unknown>>(
+      `/spaces/${encodeURIComponent(spaceUuid)}/tasks/reorder`,
+      payload,
+    );
+    return response.data;
+  },
+
+  /** A task's history, newest first. */
+  moves: async (
+    spaceUuid: string,
+    taskUuid: string,
+    params: { per_page?: number; page?: number } = {},
+  ): Promise<SpaceTaskMoveListResponse> => {
+    const response = await apiClient.get<SpaceTaskMoveListResponse>(
+      `/spaces/${encodeURIComponent(spaceUuid)}/tasks/${encodeURIComponent(taskUuid)}/moves`,
+      { params: { per_page: params.per_page ?? 50, page: params.page ?? 1 } },
     );
     return response.data;
   },

@@ -1,4 +1,4 @@
-import type { SlimUser } from '@/types/collab';
+import type { SlimUser, SpaceTask } from '@/types/collab';
 
 /**
  * protocol — the realtime WIRE contract the v2 spine listens on: Echo channel
@@ -63,4 +63,25 @@ export interface CollabBroadcastNotification {
   author?: SlimUser | null;
   preview?: string;
   action_url?: string;
+}
+
+/** Echo name of a space's private channel (wire: `private-spaces.{uuid}`).
+ *  The task board listens here for {@link EVT_TASK_CHANGED} (Backend's
+ *  task-board branch 439e6020, 29 October 2026). */
+export function spaceChannelName(spaceUuid: string): string {
+  return `spaces.${spaceUuid}`;
+}
+
+/** `.task.changed` — a task was created, changed or deleted, on `spaces.{uuid}`. */
+export const EVT_TASK_CHANGED = '.task.changed';
+
+/**
+ * Payload of {@link EVT_TASK_CHANGED}: the whole task as it is now, a FULL
+ * snapshot (the same row `GET /spaces/{uuid}/tasks` returns), so the board
+ * writes it in place and never refetches. Every member of the space gets it,
+ * which is why a task's thread must be one every member can read.
+ */
+export interface SpaceTaskChangedEvent {
+  action: 'created' | 'updated' | 'deleted';
+  task: SpaceTask;
 }
