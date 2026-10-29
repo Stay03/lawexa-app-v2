@@ -105,6 +105,7 @@ export function useFoldersBulk({ folderUuids, fileIds }: { folderUuids: readonly
       onToggleAll={select.toggleAll}
       onDone={select.stop}
       noun={NOUN}
+      selectAllInHead
       more={
         <>
           <BulkBarMenuItem icon={Users} label="Move to a space" disabled={none || busy} onClick={() => setDialog('space')} />
@@ -200,6 +201,12 @@ export function useFoldersBulk({ folderUuids, fileIds }: { folderUuids: readonly
     isSelected: select.isSelected,
     toggle: select.toggle,
     startWith: select.startWith,
+    headSelectAll: {
+      selecting: select.active,
+      state: select.allState,
+      onToggle: select.active ? select.toggleAll : select.startAll,
+      label: `Select all ${countOf(keys.length, NOUN)}`,
+    },
     startButton,
     bar,
     dialogs,

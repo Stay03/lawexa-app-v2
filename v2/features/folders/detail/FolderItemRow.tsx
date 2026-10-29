@@ -51,6 +51,7 @@ export const FolderItemRow = memo(function FolderItemRow({
   onView,
   selected,
   onToggleSelect,
+  onStartSelect,
   onMoveToFolder,
 }: {
   row: FolderItemRowModel;
@@ -69,6 +70,9 @@ export const FolderItemRow = memo(function FolderItemRow({
    *  viewer). `onToggleSelect` must be stable. */
   selected?: boolean;
   onToggleSelect?: (row: FolderItemRowModel) => void;
+  /** Not selecting yet: the row's tick, on hover, starts it with this item
+   *  ticked (computers only, `FileListRow`). Must be stable. */
+  onStartSelect?: (row: FolderItemRowModel) => void;
   /** Move a file to another folder: opens the picker. Must be stable. */
   onMoveToFolder?: (row: FolderItemRowModel) => void;
 }) {
@@ -77,6 +81,7 @@ export const FolderItemRow = memo(function FolderItemRow({
     <ItemMenu row={row} folderUuid={folderUuid} onMoveToFolder={onMoveToFolder} />
   ) : undefined;
   const select = onToggleSelect ? { checked: selected === true, onToggle: () => onToggleSelect(row) } : undefined;
+  const startSelect = onStartSelect ? () => onStartSelect(row) : undefined;
 
   if (row.type === 'file') {
     return (
@@ -89,6 +94,7 @@ export const FolderItemRow = memo(function FolderItemRow({
         index={index}
         menu={menu}
         select={select}
+        onStartSelect={startSelect}
         onView={row.view ? () => onView(row) : undefined}
       />
     );
@@ -104,6 +110,7 @@ export const FolderItemRow = memo(function FolderItemRow({
       index={index}
       menu={menu}
       select={select}
+      onStartSelect={startSelect}
       renderOpen={(className, content) =>
         href ? (
           <Link href={href} className={className}>

@@ -1,12 +1,13 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useId, type ComponentProps, type ReactNode } from 'react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import type { EntryLook } from './entry-look';
+import { TICK_GUTTER_WIDTH, tickCircleClass, tickGutterClass } from './tick-gutter';
 
 /**
  * FileListRow — one line of a folder list: a coloured type glyph, the name,
@@ -23,13 +24,19 @@ import type { EntryLook } from './entry-look';
  * hover it shows on the row's hover or focus, and while its menu is open, so a
  * long list reads as names and dates; on a touch screen it always shows.
  *
- * THE HOVER TICK BOX (Arthur, 27 October 2026: "hovering over an item should
- * show the tick at the side of the item just as it shows the three dots").
- * Where the pointer can hover and the host passes `onStartSelect`, a tick box
- * shows beside the "⋯" on the row's hover or focus. Ticking it starts select
- * mode with this row ticked, and every row then shows its box. It is a
- * keyboard stop like the "⋯", visible while focused. On a touch screen it is
- * not drawn: Select stays the way in there.
+ * THE TICK IS ON THE LEFT (Arthur, 29 October 2026, 07:05Z, thread 8aa04be0:
+ * "the tick box appears on the right and i have to go all the left to
+ * continue ticking others ... put the ticks to the left of the items"). A
+ * round tick sits in a narrow column before the icon (`tick-gutter.ts`).
+ * Where the pointer can hover and the host passes `onStartSelect`, it shows
+ * on the row's hover or focus, and ticking it starts select mode with this
+ * row ticked. While the list is being ticked every row shows its circle, so
+ * the reader ticks down the left edge without hovering. Where the pointer
+ * can hover the column is always kept, so nothing moves when a circle shows.
+ * On a touch screen the column shows only while ticking: Select stays the
+ * way in there. A row that cannot be ticked in a list that can (a subfolder
+ * on a folder's page) keeps the column empty (`selecting`), so the names
+ * line up.
  */
 
 /** The open control's classes: 52 px tall on a phone, 40 px on a computer.
@@ -59,6 +66,7 @@ export function FileListRow({
   srNote,
   select,
   onStartSelect,
+  selecting = false,
 }: {
   look: EntryLook;
   name: string;
@@ -83,10 +91,14 @@ export function FileListRow({
    * actions.
    */
   select?: { checked: boolean; onToggle: () => void };
-  /** Not selecting yet: the hover tick box starts it with this row ticked. */
+  /** Not selecting yet: the row's tick, on hover, starts it with this row ticked. */
   onStartSelect?: () => void;
+  /** The list is being ticked but this row cannot be: its tick column stays, empty. */
+  selecting?: boolean;
 }) {
   const Icon = look.icon;
+  const tickId = useId();
+  const ticking = select !== undefined || selecting;
   const content = (
     <>
       <span className="relative flex shrink-0">
@@ -126,28 +138,30 @@ export function FileListRow({
           select?.checked && 'bg-secondary/60',
         )}
       >
-        {select ? (
-          <label className={cn(FILE_LIST_OPEN_CLASS, 'cursor-pointer')}>
-            <Checkbox
+        <span className={cn(TICK_GUTTER_WIDTH, 'shrink-0 items-center justify-center', tickGutterClass(ticking))}>
+          {select ? (
+            <RowTick
+              id={tickId}
               checked={select.checked}
               onCheckedChange={select.onToggle}
               aria-label={`Select ${name}`}
-              className="shrink-0"
             />
+          ) : onStartSelect ? (
+            <RowTick
+              checked={false}
+              onCheckedChange={onStartSelect}
+              aria-label={`Select ${name}`}
+              className={tickCircleClass(false)}
+            />
+          ) : null}
+        </span>
+        {select ? (
+          <label htmlFor={tickId} className={cn(FILE_LIST_OPEN_CLASS, 'cursor-pointer')}>
             {content}
           </label>
         ) : (
           renderOpen(FILE_LIST_OPEN_CLASS, content)
         )}
-        {!select && onStartSelect ? (
-          <span className="hidden size-9 shrink-0 items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:hover)]:flex">
-            <Checkbox
-              checked={false}
-              onCheckedChange={onStartSelect}
-              aria-label={`Select ${name}`}
-            />
-          </span>
-        ) : null}
         {select ? (
           <span aria-hidden className="size-9 shrink-0" />
         ) : menu ? (
@@ -166,21 +180,60 @@ export function FileListRow({
 /**
  * The computer's column head over the list: "Name" and "Added". Hidden on a
  * phone, where the list has no date column.
+ *
+ * THE SELECT-ALL TICK (Arthur, 29 October 2026, 07:05Z, thread 8aa04be0)
+ * sits in the rows' tick column. While the list is being ticked it shows
+ * empty, a minus with some rows ticked, or a check with all; a click ticks
+ * every row or clears them all. Before that, where the pointer can hover, it
+ * shows on the head's hover or focus and starts select mode with every row
+ * ticked. A list that cannot be ticked passes no `selectAll`.
  */
-export function FileListHead({ dateLabel = 'Added' }: { dateLabel?: string }) {
+export function FileListHead({
+  dateLabel = 'Added',
+  selectAll,
+}: {
+  dateLabel?: string;
+  selectAll?: {
+    selecting: boolean;
+    state: boolean | 'indeterminate';
+    onToggle: () => void;
+    /** "Select all 12 items". */
+    label: string;
+  };
+}) {
+  const selecting = selectAll?.selecting ?? false;
   return (
-    <div
-      aria-hidden
-      className="hidden items-center gap-1 border-b border-border/60 pb-2 text-xs text-muted-foreground sm:flex"
-    >
-      <span className="flex min-w-0 flex-1 items-center gap-3 px-2">
+    <div className="group hidden items-center gap-1 border-b border-border/60 pb-2 text-xs text-muted-foreground sm:flex">
+      <span className={cn(TICK_GUTTER_WIDTH, 'shrink-0 items-center justify-center', tickGutterClass(selecting))}>
+        {selectAll ? (
+          <RowTick
+            checked={selectAll.state}
+            onCheckedChange={selectAll.onToggle}
+            aria-label={selectAll.label}
+            className={tickCircleClass(selecting)}
+          />
+        ) : null}
+      </span>
+      <span aria-hidden className="flex min-w-0 flex-1 items-center gap-3 px-2">
         <span className="w-[18px] shrink-0" />
         <span className="flex-1">Name</span>
         <span className={FILE_LIST_DATE_CLASS}>{dateLabel}</span>
       </span>
-      <span className="size-9 shrink-0" />
+      <span aria-hidden className="size-9 shrink-0" />
     </div>
   );
+}
+
+/**
+ * The round tick of a row and of the list head, the file library's circle:
+ * the codebase's `Checkbox`, round and a size up, a check when ticked and a
+ * minus for some of a list.
+ */
+function RowTick({
+  className,
+  ...props
+}: ComponentProps<typeof Checkbox>) {
+  return <Checkbox {...props} className={cn('size-[18px] rounded-full', className)} />;
 }
 
 /**
@@ -191,6 +244,7 @@ export function FileListHead({ dateLabel = 'Added' }: { dateLabel?: string }) {
 export function FileListRowSkeleton() {
   return (
     <div className="flex min-w-0 items-center gap-1">
+      <span className={cn(TICK_GUTTER_WIDTH, 'shrink-0', tickGutterClass(false))} />
       <div className="flex h-13 min-w-0 flex-1 items-center gap-3 px-2 sm:h-10">
         <Skeleton className="size-[18px] shrink-0 rounded" />
         <Skeleton className="h-4 w-3/5 rounded" />

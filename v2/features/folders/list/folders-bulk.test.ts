@@ -49,6 +49,8 @@ test('inside a folder, its items are taken out (asked first) or added to another
 
 test('a ticked row is its own tick box, and the menu steps aside', () => {
   const row = read('..', 'file-list', 'FileListRow.tsx');
-  assert.match(row, /<label className=\{cn\(FILE_LIST_OPEN_CLASS, 'cursor-pointer'\)\}>\s*<Checkbox/);
+  // The tick is in the column on the left; the rest of the line is its label.
+  assert.match(row, /\{select \? \(\s*<RowTick\s*id=\{tickId\}\s*checked=\{select\.checked\}\s*onCheckedChange=\{select\.onToggle\}/);
+  assert.match(row, /<label htmlFor=\{tickId\} className=\{cn\(FILE_LIST_OPEN_CLASS, 'cursor-pointer'\)\}>\s*\{content\}/);
   assert.match(row, /\{select \? \(\s*<span aria-hidden className="size-9 shrink-0" \/>/);
 });

@@ -43,6 +43,7 @@ export function LooseFilesSection({
   enabled,
   held,
   selection,
+  onStartSelect,
 }: {
   viewerId: number | null;
   /** The browser's frozen clock, for "added N ago". */
@@ -54,6 +55,9 @@ export function LooseFilesSection({
   held: boolean;
   /** Bulk select (the Folders page's `useFoldersBulk`): the rows tick instead of opening. */
   selection?: { isSelected: (id: number) => boolean; onToggle: (id: number) => void };
+  /** Not selecting yet: a row's tick, on hover, starts it with that file
+   *  ticked (Arthur, 29 October 2026, 07:05Z, thread 8aa04be0). Stable. */
+  onStartSelect?: (id: number) => void;
 }) {
   const query = useInfiniteQuery({ ...foldersQueries.looseFiles({ viewerId }), enabled });
 
@@ -134,6 +138,7 @@ export function LooseFilesSection({
                     onDelete={openDelete}
                     selected={selection?.isSelected(row.id)}
                     onToggleSelect={selection?.onToggle}
+                    onStartSelect={selection ? undefined : onStartSelect}
                   />
                 ))}
               </ul>

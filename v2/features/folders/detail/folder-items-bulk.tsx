@@ -73,6 +73,7 @@ export function useFolderItemsBulk({ folderUuid, items }: { folderUuid: string; 
       onToggleAll={select.toggleAll}
       onDone={select.stop}
       noun={NOUN}
+      selectAllInHead
     >
       <BulkBarAction icon={FolderInput} label="Add to another folder" disabled={none || busy} onClick={() => setDialog('add')} />
       <BulkBarAction icon={FolderMinus} label="Remove from this folder" disabled={none || busy} onClick={() => setDialog('remove')} />
@@ -109,6 +110,13 @@ export function useFolderItemsBulk({ folderUuid, items }: { folderUuid: string; 
     selecting: select.active,
     isSelected: select.isSelected,
     toggle: select.toggle,
+    startWith: select.startWith,
+    headSelectAll: {
+      selecting: select.active,
+      state: select.allState,
+      onToggle: select.active ? select.toggleAll : select.startAll,
+      label: `Select all ${countOf(keys.length, NOUN)}`,
+    },
     startButton,
     bar,
     dialogs,

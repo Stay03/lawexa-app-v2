@@ -422,10 +422,18 @@ function FolderBody({ uuid }: { uuid: string }) {
   // Bulk select (Arthur, 20 October 2026): the folder's items, for those who
   // may take them out (`canManageItems`).
   const bulk = useFolderItemsBulk({ folderUuid: uuid, items: itemRows });
-  const { toggle: toggleSelected, isSelected, selecting } = bulk;
+  const { toggle: toggleSelected, isSelected, selecting, startWith } = bulk;
   const toggleItem = useCallback(
     (row: FolderItemRowModel) => toggleSelected(`${row.type}:${row.contentId}`),
     [toggleSelected],
+  );
+  // A row's tick on hover, on a computer: select mode with it ticked (Arthur,
+  // 29 October 2026, 07:05Z, thread 8aa04be0: "why is there no tick in the
+  // space folder"). Only the Select button began it here before, so no row
+  // of any folder, a Space's or the reader's own, showed a tick on hover.
+  const startWithItem = useCallback(
+    (row: FolderItemRowModel) => startWith(`${row.type}:${row.contentId}`),
+    [startWith],
   );
   const actions = useMemo<readonly ScreenAction[]>(() => {
     if (!folder || !headerRow) return NO_SCREEN_ACTIONS;
@@ -701,8 +709,9 @@ function FolderBody({ uuid }: { uuid: string }) {
               genuinely still in flight. */}
           {hasRows ? (
             <>
-              {/* "Name" and "Added" over the columns, on a computer. */}
-              <FileListHead />
+              {/* "Name" and "Added" over the columns, on a computer, with the
+                  select-all tick for whoever may take items out. */}
+              <FileListHead selectAll={canManageItems && itemRows.length > 0 ? bulk.headSelectAll : undefined} />
               <ul className="mt-1 flex flex-col divide-y divide-border/40">
                 {/* The tree first, complete: `children` is unpaginated. */}
                 {showSubfolders
@@ -713,6 +722,7 @@ function FolderBody({ uuid }: { uuid: string }) {
                         index={index}
                         now={now}
                         onRename={openRename}
+                        selecting={selecting}
                       />
                     ))
                   : null}
@@ -729,6 +739,7 @@ function FolderBody({ uuid }: { uuid: string }) {
                     onView={openView}
                     selected={selecting ? isSelected(`${item.type}:${item.contentId}`) : undefined}
                     onToggleSelect={selecting ? toggleItem : undefined}
+                    onStartSelect={canManageItems && !selecting ? startWithItem : undefined}
                   />
                 ))}
               </ul>

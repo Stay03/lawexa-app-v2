@@ -51,3 +51,16 @@ test('nothing shows behind the bar: the Folders search pill steps aside while ro
     assert.match(read(...parts), /\{searchAtTop \|\| (bulk\.)?selecting \? null : \(/);
   }
 });
+
+test('clearing is said in words, and the file lists keep select-all in their head', () => {
+  // Arthur, 29 October 2026, 07:05Z, thread 8aa04be0: "the way to untick all is unintuitive".
+  const bar = read('v2', 'features', 'bulk', 'BulkBar.tsx');
+  assert.match(bar, /onClick=\{onDone\}\s*aria-label="Clear selection"/);
+  assert.match(bar, /<span aria-hidden className="max-sm:hidden">\s*Clear selection\s*<\/span>/);
+  assert.doesNotMatch(bar, /Stop selecting/);
+  // The bar's own box shows on a phone only where the list head carries it.
+  assert.match(bar, /className=\{cn\(selectAllInHead && 'sm:hidden'\)\}/);
+  for (const parts of [SCREENS[0], SCREENS[1]]) {
+    assert.match(read(...parts), /noun=\{[^}]*\}\s*selectAllInHead/, parts.at(-1));
+  }
+});

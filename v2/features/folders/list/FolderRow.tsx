@@ -44,6 +44,7 @@ export const FolderRow = memo(function FolderRow({
   selected,
   onToggleSelect,
   onStartSelect,
+  selecting = false,
 }: {
   row: FolderRowModel;
   /** Mark a folder that sits in a Space (the personal Folders page). */
@@ -66,6 +67,9 @@ export const FolderRow = memo(function FolderRow({
   /** Not selecting yet: the row's hover tick box starts it with this folder
    *  ticked (computers only, `FileListRow`). Stable, like `onToggleSelect`. */
   onStartSelect?: (uuid: string) => void;
+  /** The list is being ticked but this folder cannot be (a subfolder on a
+   *  folder's page): its tick column stays, empty, so the names line up. */
+  selecting?: boolean;
 }) {
   const hasMenu =
     onRename !== undefined || onMove !== undefined || onRemoveFromSpace !== undefined;
@@ -82,6 +86,7 @@ export const FolderRow = memo(function FolderRow({
       srNote={space ? spaceFolderNote(space) : undefined}
       select={onToggleSelect ? { checked: selected === true, onToggle: () => onToggleSelect(row.uuid) } : undefined}
       onStartSelect={onStartSelect ? () => onStartSelect(row.uuid) : undefined}
+      selecting={selecting}
       // The folder page draws this row's name at once, before any request
       // answers (`folder-peek.ts`, speed step 5).
       renderOpen={(className, content) => (

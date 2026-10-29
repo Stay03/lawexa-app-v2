@@ -28,6 +28,14 @@ import { countOf } from './model';
  * only. On a phone the main actions and More show their icons alone, with
  * their words for a screen reader, so the bar fits 390 px.
  *
+ * CLEARING IS SAID IN WORDS (Arthur, 29 October 2026, 07:05Z, thread
+ * 8aa04be0: "the way to untick all is unintuitive"). The close reads "Clear
+ * selection" from `sm:` up, its ✕ alone on a phone with the same name for a
+ * screen reader; it clears every tick and ends select mode. Escape does the
+ * same (`useBulkSelection`). Where the list's head carries the select-all
+ * tick (`selectAllInHead`, the file lists), the bar's own box shows on a
+ * phone only, where the head is hidden.
+ *
  * The screen decides what is main (`children`, each a {@link BulkBarAction}:
  * Move and Delete where it has them) and what goes in More (`more`, each a
  * {@link BulkBarMenuItem}). Every action is off while nothing is ticked.
@@ -41,6 +49,7 @@ export function BulkBar({
   noun,
   children,
   more,
+  selectAllInHead = false,
 }: {
   count: number;
   /** Rows in the current list: what select-all would tick. */
@@ -53,6 +62,8 @@ export function BulkBar({
   children: ReactNode;
   /** The rest, in the More menu. */
   more?: ReactNode;
+  /** The list's head has the select-all tick from `sm:` up (`FileListHead`). */
+  selectAllInHead?: boolean;
 }) {
   return (
     <div
@@ -66,8 +77,15 @@ export function BulkBar({
           onCheckedChange={onToggleAll}
           disabled={total === 0}
           aria-label={`Select all ${countOf(total, noun)}`}
+          className={cn(selectAllInHead && 'sm:hidden')}
         />
-        <span aria-live="polite" className="ml-2 shrink-0 whitespace-nowrap text-sm font-medium tabular-nums">
+        <span
+          aria-live="polite"
+          className={cn(
+            'ml-2 shrink-0 whitespace-nowrap text-sm font-medium tabular-nums',
+            selectAllInHead && 'sm:ml-0',
+          )}
+        >
           {count === 0 ? 'None selected' : `${count} selected`}
         </span>
         <div className="ml-auto flex min-w-0 items-center gap-0.5">
@@ -78,13 +96,17 @@ export function BulkBar({
         <button
           type="button"
           onClick={onDone}
-          aria-label="Stop selecting"
+          aria-label="Clear selection"
+          title="Clear selection (Esc)"
           className={cn(
-            'v2-interactive inline-flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground',
+            'v2-interactive inline-flex min-h-9 min-w-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:px-2.5',
             FOCUS_RING,
           )}
         >
           <X aria-hidden className="size-4" />
+          <span aria-hidden className="max-sm:hidden">
+            Clear selection
+          </span>
         </button>
       </div>
     </div>

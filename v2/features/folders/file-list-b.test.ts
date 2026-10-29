@@ -79,7 +79,7 @@ test('the folder page header is the name and Add, over a "Name / Added" head', (
   const header = screen.slice(screen.indexOf('<header className="grid'), screen.indexOf('</header>'));
   assert.ok(header.indexOf('<h1') < header.indexOf('<SpaceFolderLine') && header.indexOf('<SpaceFolderLine') < header.indexOf('<FolderAddMenu'));
   assert.doesNotMatch(screen, /FolderTile|countLabel|folderCountsLabel/);
-  assert.match(screen, /<FileListHead \/>\s*<ul className="mt-1 flex flex-col divide-y divide-border\/40">/);
+  assert.match(screen, /<FileListHead selectAll=\{canManageItems && itemRows\.length > 0 \? bulk\.headSelectAll : undefined\} \/>\s*<ul className="mt-1 flex flex-col divide-y divide-border\/40">/);
   // The wait draws the same head, so the rows do not move at the hand-off.
   assert.match(read('detail', 'states.tsx'), /<FileListHead \/>\s*<div className="mt-1">\s*<FolderStreamSkeleton \/>/);
 });
@@ -89,7 +89,7 @@ test('the Folders page header is "Folders" with Upload and New folder, and the f
   assert.match(browser, /<ScreenTitle className="mb-0 min-w-0 truncate" \/>\s*\{actions\}/);
   assert.match(browser, /<PageShell actions=\{actions\}>/);
   assert.doesNotMatch(browser, /'folder' : 'folders'|No more folders/);
-  assert.match(browser, /<FileListHead dateLabel=\{FOLDERS_DATE_LABEL\} \/>/);
+  assert.match(browser, /<FileListHead dateLabel=\{FOLDERS_DATE_LABEL\} selectAll=\{bulk\.headSelectAll\} \/>/);
   assert.match(read('list', 'states.tsx'), /export const FOLDERS_DATE_LABEL = 'Modified';/);
   const fallback = read('list', 'FoldersFallback.tsx');
   assert.match(fallback, /<ScreenTitle className="mb-0 min-w-0 truncate" \/>\s*<div className="flex shrink-0 items-center gap-2">/);

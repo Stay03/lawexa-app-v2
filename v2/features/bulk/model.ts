@@ -114,3 +114,45 @@ export function bulkOutcome(result: BulkResult, verb: BulkVerb, noun: { one: str
   }
   return `${verb.past} ${result.done} of ${countOf(total, noun)}${after}. ${result.failed} couldn't be ${verb.pastLower}${tail}`;
 }
+
+/* ── Ticking down the left edge (Arthur, 29 October 2026, 07:05Z, thread
+ * 8aa04be0) ─────────────────────────────────────────────────────────────── */
+
+/**
+ * How select mode began: the screen's Select button (`'button'`), or a row's
+ * or the list head's own tick on a computer (`'tick'`).
+ */
+export type SelectOrigin = 'button' | 'tick';
+
+/**
+ * Whether the list is still being ticked. Begun from a tick, it ends when the
+ * last tick is cleared, as in the file library Arthur showed: the circles go
+ * back to showing on hover only. Begun from Select (a phone's way in), it
+ * stays until Done, with "None selected" on the bar.
+ */
+export function stillSelecting({
+  active,
+  origin,
+  count,
+}: {
+  active: boolean;
+  origin: SelectOrigin;
+  count: number;
+}): boolean {
+  return active && !(origin === 'tick' && count === 0);
+}
+
+/** A key press, as the Escape guard reads it. */
+export interface EscapePress {
+  key: string;
+  defaultPrevented: boolean;
+  /** Focus is in a field: an input, a text area, a select or editable text. */
+  typing: boolean;
+  /** A dialog, a sheet or a menu is open: Escape is theirs to close. */
+  layerOpen: boolean;
+}
+
+/** Escape clears the ticks, unless the reader is typing or a layer above the list takes it. */
+export function escapeClearsSelection(press: EscapePress): boolean {
+  return press.key === 'Escape' && !press.defaultPrevented && !press.typing && !press.layerOpen;
+}

@@ -36,6 +36,7 @@ export function FileEntryRow({
   index,
   menu,
   select,
+  onStartSelect,
   onView,
 }: {
   fileId: number;
@@ -49,6 +50,8 @@ export function FileEntryRow({
   /** Bulk select (`FileListRow`): the row is its tick box and a tap ticks it,
    *  so neither the tab nor `onView` runs while the list is being ticked. */
   select?: { checked: boolean; onToggle: () => void };
+  /** Not selecting yet: the row's tick, on hover, starts it with this file ticked. */
+  onStartSelect?: () => void;
   /** Open the file here (a viewer or a player over the list) instead of in a
    *  new tab; absent for a file that only a tab can show. */
   onView?: () => void;
@@ -63,6 +66,7 @@ export function FileEntryRow({
       index={index}
       menu={menu}
       select={select}
+      onStartSelect={onStartSelect}
       renderOpen={(className, content) => (
         <button
           type="button"
@@ -75,13 +79,15 @@ export function FileEntryRow({
           {content}
         </button>
       )}
+      // The line under the name starts where the name does: past the tick
+      // column too where the pointer can hover.
       below={
         gone ? (
-          <p role="status" className="px-2 pb-2 pl-[2.375rem] text-xs text-muted-foreground">
+          <p role="status" className="px-2 pb-2 pl-[2.375rem] [@media(hover:hover)]:pl-[4.625rem] text-xs text-muted-foreground">
             This file is no longer available.
           </p>
         ) : failed ? (
-          <p role="status" className="px-2 pb-2 pl-[2.375rem] text-xs text-muted-foreground">
+          <p role="status" className="px-2 pb-2 pl-[2.375rem] [@media(hover:hover)]:pl-[4.625rem] text-xs text-muted-foreground">
             Couldn&rsquo;t open it.{' '}
             <button
               type="button"

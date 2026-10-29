@@ -171,8 +171,10 @@ export function FoldersBrowser() {
   const bulk = useFoldersBulk({ folderUuids, fileIds });
   const { toggle: toggleSelected, isSelected, selecting, startWith } = bulk;
   const toggleFolder = useCallback((uuid: string) => toggleSelected(folderKey(uuid)), [toggleSelected]);
-  // A folder row's hover tick box, on a computer: select mode with it ticked.
+  // A row's tick on hover, on a computer: select mode with it ticked (the
+  // folders and the files under them, Arthur, 29 October 2026, 07:05Z).
   const startWithFolder = useCallback((uuid: string) => startWith(folderKey(uuid)), [startWith]);
+  const startWithFile = useCallback((id: number) => startWith(fileKey(id)), [startWith]);
   const toggleFile = useCallback((id: number) => toggleSelected(fileKey(id)), [toggleSelected]);
   const looseSelection = useMemo(
     () => (selecting ? { isSelected: (id: number) => isSelected(fileKey(id)), onToggle: toggleFile } : undefined),
@@ -345,8 +347,9 @@ export function FoldersBrowser() {
             </div>
           ) : null}
 
-          {/* "Name" and "Modified" over the columns, on a computer. */}
-          <FileListHead dateLabel={FOLDERS_DATE_LABEL} />
+          {/* "Name" and "Modified" over the columns, on a computer, with the
+              select-all tick in the rows' tick column. */}
+          <FileListHead dateLabel={FOLDERS_DATE_LABEL} selectAll={bulk.headSelectAll} />
           <ul className="mt-1 flex flex-col divide-y divide-border/40">
             {rows.map((row, index) => (
               <FolderRow
@@ -379,6 +382,7 @@ export function FoldersBrowser() {
         enabled={!activeSearch}
         held={showSkeleton}
         selection={looseSelection}
+        onStartSelect={startWithFile}
       />
       {/* Room under the last row for the bar while it is up. */}
       {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
