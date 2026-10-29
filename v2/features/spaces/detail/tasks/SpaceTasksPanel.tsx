@@ -398,11 +398,16 @@ function TaskCard({ task, stage, now }: { task: SpaceTask; stage: SpaceTaskStage
         </p>
         <span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground max-md:hidden">{time}</span>
       </div>
-      <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground max-md:order-3 max-md:mt-auto max-md:pt-2">
+      {/* A phone's note is narrow: the name takes its own line, with the
+          Agent tag and the time on the line under it, so the name is whole
+          (the first sticky pictures cut "Fron…"). */}
+      <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground max-md:order-3 max-md:mt-auto max-md:flex-wrap max-md:gap-y-1.5 max-md:pt-2">
         <Initials person={task.owner} />
-        <span className="min-w-0 truncate">{task.owner?.name ?? 'Nobody yet'}</span>
-        {task.owner?.is_agent ? <AgentTag /> : null}
-        <span className="ml-auto shrink-0 pl-1 tabular-nums md:hidden">{time}</span>
+        <span className="min-w-0 truncate max-md:flex-1">{task.owner?.name ?? 'Nobody yet'}</span>
+        <span className="contents max-md:flex max-md:w-full max-md:items-center">
+          {task.owner?.is_agent ? <AgentTag /> : null}
+          <span className="ml-auto shrink-0 pl-1 tabular-nums md:hidden">{time}</span>
+        </span>
       </div>
       {note ? (
         <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground max-md:order-2 max-md:line-clamp-3">{note}</p>
