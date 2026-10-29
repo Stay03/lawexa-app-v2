@@ -361,6 +361,18 @@ function DraftEditorBody({
     }),
   );
 
+  // The device copy of what is typed (the note editor's mirror), ahead of the
+  // autosave, so typing a save never reached is offered back. It holds
+  // unsaved typing only: once a save lands with nothing more waiting, it is
+  // dropped, so a later Lawexa version never offers back text already saved
+  // (the pictures for Stay, 29 October 2026).
+  const mirrorKey = record ? noteMirrorKey(record.id) : `draft-panel:${conversationId}:${ordinal}`;
+  const { write: mirrorWrite, forget: mirrorForget } = useDraftMirrorWriter({
+    key: mirrorKey,
+    noteId: record?.id ?? null,
+    viewerId: savesToNote ? viewerId : null,
+  });
+
   // THE NOTE'S AUTOSAVE (drafts saved as notes): the note editor's own, so the
   // draft saves as the reader types, one save at a time, each made on the copy
   // it read (`base_updated_at`; a newer copy answers 409, `conflict`). Nothing
@@ -379,18 +391,11 @@ function DraftEditorBody({
     // The card's "Edited" (DraftCard.tsx) without reading the list again.
     onSaved: () => {
       if (mode.kind === 'note') markDraftEdited(queryClient, { conversationId, viewerId }, mode.documentKey);
+      if (autosave.currentStatus() === 'clean') mirrorForget(mirrorKey);
     },
   });
   const { change: reportDraft } = autosave;
 
-  // The device copy of what is typed (the note editor's mirror), ahead of the
-  // autosave, so typing a save never reached is offered back.
-  const mirrorKey = record ? noteMirrorKey(record.id) : `draft-panel:${conversationId}:${ordinal}`;
-  const { write: mirrorWrite, forget: mirrorForget } = useDraftMirrorWriter({
-    key: mirrorKey,
-    noteId: record?.id ?? null,
-    viewerId: savesToNote ? viewerId : null,
-  });
   const mirrorLookup = useQuery({
     ...draftMirrorQuery({ key: mirrorKey, viewerId, includeOrphan: false }),
     enabled: savesToNote,

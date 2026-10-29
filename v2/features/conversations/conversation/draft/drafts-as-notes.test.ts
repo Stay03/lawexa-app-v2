@@ -148,3 +148,11 @@ test('My notes shows all, the notes written here, or the drafts from chats, and 
   // Each filter is its own cached list.
   assert.match(queries, /\{ search: params\.search \?\? null, fromChats: params\.from_chats \?\? null \},/);
 });
+
+test('the device copy holds unsaved typing only: once a save lands with nothing waiting, it is dropped', () => {
+  const editor = read(...DRAFT, 'DraftEditor.tsx');
+  // Otherwise a later Lawexa version offers back text that was saved (seen in the pictures for Stay).
+  assert.match(editor, /onSaved: \(\) => \{[\s\S]*?if \(autosave\.currentStatus\(\) === 'clean'\) mirrorForget\(mirrorKey\);/);
+  // The copy is made before the autosave that drops it.
+  assert.ok(editor.indexOf('useDraftMirrorWriter({') < editor.indexOf('const autosave = useNoteAutosave({'));
+});
