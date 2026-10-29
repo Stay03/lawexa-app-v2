@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { LoadFailed } from '@/components/admin/case-enrichments/LoadFailed';
 import { useAdminAiSkillUsage } from '@/lib/hooks/useAdminAi';
 import type { AdminAiSkillDetail } from '@/types/admin-ai';
 import { usageLine } from './skill-model';
@@ -38,7 +39,7 @@ const WINDOWS = [7, 30] as const;
  */
 export function AiSkillUsageCard({ skill }: { skill: AdminAiSkillDetail }) {
   const [days, setDays] = useState<(typeof WINDOWS)[number]>(7);
-  const { data, isLoading } = useAdminAiSkillUsage(skill.id, days);
+  const { data, isLoading, isError, isFetching, refetch } = useAdminAiSkillUsage(skill.id, days);
   const usage = data?.data;
   const onDemand = (usage?.load_mode ?? skill.load_mode) === 'on_demand';
   const rows = (usage?.daily ?? []).map((day) => ({
@@ -75,7 +76,9 @@ export function AiSkillUsageCard({ skill }: { skill: AdminAiSkillDetail }) {
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading || !usage ? (
+        {isError && !usage ? (
+          <LoadFailed message="The usage did not load." onRetry={() => refetch()} retrying={isFetching} />
+        ) : isLoading || !usage ? (
           <Skeleton className="h-[220px] w-full" />
         ) : (
           <ChartContainer config={onDemand ? onDemandConfig : alwaysOnConfig} className="h-[220px] w-full">

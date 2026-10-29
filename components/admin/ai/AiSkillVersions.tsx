@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { AdminPagination } from '@/components/admin';
+import { LoadFailed } from '@/components/admin/case-enrichments/LoadFailed';
 import {
   useAdminAiSkillVersion,
   useAdminAiSkillVersions,
@@ -43,7 +44,7 @@ import {
 import { extractApiError } from '@/lib/utils/api-error';
 import { cn } from '@/lib/utils';
 import type { AdminAiSkillDetail, AdminAiSkillVersion } from '@/types/admin-ai';
-import { diffSummary, lineDiff, LOAD_MODE_LABEL, restoreQuestion, savedAsVersion } from './skill-model';
+import { diffSummary, lineDiff, LOAD_MODE_LABEL, restoredMessage, restoreQuestion } from './skill-model';
 
 /**
  * A skill's history, newest first: every create, edit and restore is a
@@ -55,7 +56,7 @@ export function AiSkillVersions({ skill }: { skill: AdminAiSkillDetail }) {
   const [page, setPage] = useState(1);
   const [viewing, setViewing] = useState<number | null>(null);
   const [restoring, setRestoring] = useState<AdminAiSkillVersion | null>(null);
-  const { data, isLoading } = useAdminAiSkillVersions(skill.id, page);
+  const { data, isLoading, isError, isFetching, refetch } = useAdminAiSkillVersions(skill.id, page);
   const restoreMutation = useRestoreAiSkillVersion();
 
   const restore = () => {
@@ -64,7 +65,9 @@ export function AiSkillVersions({ skill }: { skill: AdminAiSkillDetail }) {
       { id: skill.id, version: restoring.version },
       {
         onSuccess: (response) => {
-          toast.success(response.data ? savedAsVersion(response.data.version) : response.message);
+          toast.success(
+            response.data ? restoredMessage(restoring.version, skill.version, response.data.version) : response.message,
+          );
           setRestoring(null);
         },
         onError: (error) => toast.error(extractApiError(error).message),
@@ -82,7 +85,9 @@ export function AiSkillVersions({ skill }: { skill: AdminAiSkillDetail }) {
         <CardDescription>Every save is a version. Restoring one saves it again as the newest.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isLoading ? (
+        {isError && !data ? (
+          <LoadFailed message="The versions did not load." onRetry={() => refetch()} retrying={isFetching} />
+        ) : isLoading ? (
           <div className="space-y-2">
             {[...Array(3)].map((_, i) => (
               <Skeleton key={i} className="h-10 w-full" />

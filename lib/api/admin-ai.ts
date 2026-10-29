@@ -437,7 +437,7 @@ export const adminAiApi = {
       params: {
         page: params.page ?? 1,
         per_page: params.per_page ?? 15,
-        active_only: params.active_only,
+        is_active: params.is_active,
         load_mode: params.load_mode,
         search: params.search || undefined,
       },

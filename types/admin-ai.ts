@@ -468,7 +468,8 @@ export interface AdminAiSkillDetail extends AdminAiSkill {
 }
 
 export interface AdminAiSkillsParams {
-  active_only?: boolean;
+  /** True lists the active skills, false the inactive ones (woz's `is_active`; `active_only=false` filters nothing). */
+  is_active?: boolean;
   load_mode?: AdminAiSkillLoadMode;
   search?: string;
   per_page?: number;
