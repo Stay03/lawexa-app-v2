@@ -101,4 +101,9 @@ export const bulkApi = {
     inBatches(ids, (batch) =>
       post('/bulk/space-items', { action, space, items: batch.map((id) => ({ type: 'file', id })) }),
     ),
+
+  /** A Space's folders (uuids) and files (ids), taken out of it together:
+   *  the Space's Owner, from the Folders pill. Nothing is deleted. */
+  spaceItemsOut: (space: string, items: readonly { type: 'folder' | 'file'; id: string | number }[]) =>
+    inBatches(items, (batch) => post('/bulk/space-items', { action: 'remove', space, items: batch })),
 };

@@ -37,11 +37,11 @@ test('the Folders pill is the Folders page: its header, its folder rows, no day 
   const panel = content('SpaceContentPanel.tsx');
   assert.match(
     panel,
-    /\{tab === 'folders' \? \([\s\S]{0,700}?<FileListHead dateLabel=\{FOLDERS_DATE_LABEL\} \/>\s*<ul className="mt-1 flex flex-col divide-y divide-border\/40">\s*\{items\.map\(\(entry, index\) =>\s*entry\.type === 'folder' \? \(\s*<FolderRow key=\{itemKey\(entry\)\} row=\{folderRow\(entry\.item\)\} index=\{index\} now=\{now\} \/>/,
+    /\{tab === 'folders' \? \([\s\S]{0,700}?<FileListHead dateLabel=\{FOLDERS_DATE_LABEL\} selectAll=\{ticks\.head\} \/>\s*<ul className="mt-1 flex flex-col divide-y divide-border\/40">\s*\{items\.map\(\(entry, index\) =>\s*entry\.type === 'folder' \? \(\s*<FolderRow\s+key=\{itemKey\(entry\)\}\s+row=\{folderRow\(entry\.item\)\}\s+index=\{index\}\s+now=\{now\}/,
   );
   assert.match(
     panel,
-    /\{tab === 'folders' \? \(\s*<SpaceLooseFiles\s+spaceUuid=\{spaceUuid\}\s+viewerId=\{viewerId\}\s+enabled=\{enabled\}\s+held=\{query\.isPending\}\s+now=\{now\}\s+actionsFor=\{fileActions\}\s+fileSelect=\{fileSelect\}\s+afterFolders=\{items\.some\(\(entry\) => entry\.type === 'folder'\)\}\s+\/>\s*\) : null\}/,
+    /\{tab === 'folders' \? \(\s*<SpaceLooseFiles\s+spaceUuid=\{spaceUuid\}\s+viewerId=\{viewerId\}\s+enabled=\{enabled\}\s+held=\{query\.isPending\}\s+now=\{now\}\s+actionsFor=\{fileActions\}\s+fileSelect=\{fileSelect\}\s+onStartSelect=\{ticks\.selecting \? undefined : ticks\.startWithFile\}\s+afterFolders=\{items\.some\(\(entry\) => entry\.type === 'folder'\)\}\s+\/>\s*\) : null\}/,
   );
   const section = content('SpaceLooseFiles.tsx');
   // The Folders page's own file row, dividers and top rule (under folders

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useInfiniteQuery, type InfiniteData, type UseInfiniteQueryResult } from '@tanstack/react-query';
 import { FolderPlus, ListChecks, Plus, Upload, UserPlus } from 'lucide-react';
@@ -43,6 +43,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { TabRow } from '@/v2/shell/TabRow';
 import { useCopySpaceFileToMine, useUploadSpaceFile } from '../../content-mutations';
 import { useSpaceFilesBulk } from './space-files-bulk';
+import { spaceFileKey, spaceFolderKey } from './space-files-bulk-model';
 import {
   FILES_ACCEPT,
   canDeleteSpaceFile,
@@ -200,10 +201,43 @@ export function SpaceContentPanel({
     () => (tab === 'folders' && loosePages ? uniqueRowsById(loosePages, (file) => file.id) : NO_FILES),
     [tab, loosePages],
   );
-  const bulk = useSpaceFilesBulk({ space, files, canRemove: access.canRemove, viewerId });
+  // The pill's folders tick too, for the Space's Owner, who alone may take
+  // one out (Arthur, 29 October 2026, 07:05Z, thread 8aa04be0: "why is there
+  // no tick in the space folder"). They come from the feed's own read.
+  const canRemove = access.canRemove;
+  const feedPages = query.data?.pages;
+  const folderUuids = useMemo(
+    () =>
+      tab === 'folders' && canRemove && feedPages
+        ? uniqueRowsById(feedPages, itemKey)
+            .filter((entry): entry is Extract<SpaceItem, { type: 'folder' }> => entry.type === 'folder')
+            .map((entry) => entry.item.uuid)
+        : NO_UUIDS,
+    [tab, canRemove, feedPages],
+  );
+  const bulk = useSpaceFilesBulk({ space, folders: folderUuids, files, canRemove, viewerId });
   const selecting = bulk.selecting && tab === 'folders';
-  const { isSelected, toggle } = bulk;
-  const fileSelect = useMemo(() => (selecting ? { isSelected, toggle } : undefined), [selecting, isSelected, toggle]);
+  const { isSelected, toggle, startWith } = bulk;
+  const fileSelect = useMemo(
+    () =>
+      selecting
+        ? { isSelected: (id: number) => isSelected(spaceFileKey(id)), toggle: (id: number) => toggle(spaceFileKey(id)) }
+        : undefined,
+    [selecting, isSelected, toggle],
+  );
+  // A row's tick on hover, on a computer: select mode with it ticked.
+  const toggleFolder = useCallback((uuid: string) => toggle(spaceFolderKey(uuid)), [toggle]);
+  const startWithFolder = useCallback((uuid: string) => startWith(spaceFolderKey(uuid)), [startWith]);
+  const startWithFile = useCallback((id: number) => startWith(spaceFileKey(id)), [startWith]);
+  const ticks: PillTicks = {
+    selecting,
+    folders: canRemove,
+    isFolderSelected: (uuid) => isSelected(spaceFolderKey(uuid)),
+    toggleFolder,
+    startWithFolder,
+    startWithFile,
+    head: files.length + folderUuids.length > 0 ? bulk.headSelectAll : undefined,
+  };
   const changeTab = (next: SpaceTab) => {
     // Ticks belong to the list they were made on.
     bulk.stop();
@@ -213,7 +247,7 @@ export function SpaceContentPanel({
   // The Folders pill's one control at the bar's end: the gold + for whoever
   // may add, a plain Select for a Viewer with files to tick. Nothing while
   // the files are being ticked: the bar at the foot holds Done.
-  const canSelect = files.length > 0;
+  const canSelect = files.length + folderUuids.length > 0;
   const action =
     tab === 'radars' ? (
       access.canAdd ? <NewRadarButton spaceUuid={space.uuid} /> : null
@@ -248,6 +282,7 @@ export function SpaceContentPanel({
         onNewFolder={startFolder}
         onAttach={() => dock.current?.attach()}
         fileSelect={fileSelect}
+        ticks={ticks}
         looseFileCount={tab === 'folders' && !looseQuery.isPending ? files.length : null}
       />
     );
@@ -319,6 +354,24 @@ export function SpaceContentPanel({
   );
 }
 
+/**
+ * The Folders pill's ticks, decided by the panel (Arthur, 29 October 2026,
+ * 07:05Z, thread 8aa04be0): the rows' round tick on the left, the head's
+ * select-all, and which rows may be ticked.
+ */
+interface PillTicks {
+  /** The pill's rows are being ticked. */
+  selecting: boolean;
+  /** The reader may tick folders: the Space's Owner, who may take them out. */
+  folders: boolean;
+  isFolderSelected: (uuid: string) => boolean;
+  toggleFolder: (uuid: string) => void;
+  startWithFolder: (uuid: string) => void;
+  startWithFile: (id: number) => void;
+  /** The head's select-all tick; absent with nothing to tick. */
+  head?: ComponentProps<typeof FileListHead>['selectAll'];
+}
+
 /** The feed's read, as the list takes it from the panel. */
 type FeedQuery = UseInfiniteQueryResult<InfiniteData<SpaceItemsResponse>, Error>;
 
@@ -369,6 +422,7 @@ const pillClass = (selected: boolean): string =>
 /** Stable empty rows, so a pending list does not mint a new array per render. */
 const NO_ITEMS: readonly SpaceItem[] = [];
 const NO_FILES: readonly SpaceFile[] = [];
+const NO_UUIDS: readonly string[] = [];
 
 /** A feed row's identity across pages: the kind and that kind's own id. */
 const itemKey = (entry: SpaceItem): string =>
@@ -456,6 +510,7 @@ function SpaceFeed({
   onNewFolder,
   onAttach,
   fileSelect,
+  ticks,
   looseFileCount,
 }: {
   tab: SpaceContentTab;
@@ -470,6 +525,8 @@ function SpaceFeed({
   /** Bulk select on the Folders pill's files in no folder: the ticks, while
    *  they are being made. */
   fileSelect?: FeedRowMenus['fileSelect'];
+  /** The Folders pill's ticks (`PillTicks`). */
+  ticks: PillTicks;
   /** The Folders pill's files in no folder, from the panel's read of them;
    *  `null` while they load, and on the other pills. */
   looseFileCount: number | null;
@@ -662,13 +719,23 @@ function SpaceFeed({
           // you make it consistent with folders as is already?"): "Name" and
           // "Modified" over the columns on a computer, one folder per line,
           // no day headings, and the files in no folder continuing it below
-          // (`SpaceLooseFiles`). A folder's actions are on its own page.
+          // (`SpaceLooseFiles`). A folder's actions are on its own page; the
+          // Owner also ticks folders here, to take several out at once.
           <>
-            <FileListHead dateLabel={FOLDERS_DATE_LABEL} />
+            <FileListHead dateLabel={FOLDERS_DATE_LABEL} selectAll={ticks.head} />
             <ul className="mt-1 flex flex-col divide-y divide-border/40">
               {items.map((entry, index) =>
                 entry.type === 'folder' ? (
-                  <FolderRow key={itemKey(entry)} row={folderRow(entry.item)} index={index} now={now} />
+                  <FolderRow
+                    key={itemKey(entry)}
+                    row={folderRow(entry.item)}
+                    index={index}
+                    now={now}
+                    selected={ticks.selecting && ticks.folders ? ticks.isFolderSelected(entry.item.uuid) : undefined}
+                    onToggleSelect={ticks.selecting && ticks.folders ? ticks.toggleFolder : undefined}
+                    onStartSelect={!ticks.selecting && ticks.folders ? ticks.startWithFolder : undefined}
+                    selecting={ticks.selecting}
+                  />
                 ) : null,
               )}
             </ul>
@@ -695,6 +762,7 @@ function SpaceFeed({
           now={now}
           actionsFor={fileActions}
           fileSelect={fileSelect}
+          onStartSelect={ticks.selecting ? undefined : ticks.startWithFile}
           afterFolders={items.some((entry) => entry.type === 'folder')}
         />
       ) : null}

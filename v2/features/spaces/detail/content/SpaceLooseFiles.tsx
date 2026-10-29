@@ -45,10 +45,14 @@ export function SpaceLooseFiles({
   now,
   actionsFor,
   fileSelect,
+  onStartSelect,
 }: {
   /** Bulk select from the Folders pill's + (`useSpaceFilesBulk`): while it
    *  runs, each row is its tick box and a tap ticks it. */
   fileSelect?: { isSelected: (id: number) => boolean; toggle: (id: number) => void };
+  /** Not selecting yet: a row's tick, on hover, starts it with that file
+   *  ticked (Arthur, 29 October 2026, 07:05Z, thread 8aa04be0). */
+  onStartSelect?: (id: number) => void;
   spaceUuid: string;
   viewerId: number | null;
   /** The content read gate (`useContentReadGate`). */
@@ -145,6 +149,7 @@ export function SpaceLooseFiles({
                           ? { checked: fileSelect.isSelected(file.id), onToggle: () => fileSelect.toggle(file.id) }
                           : undefined
                       }
+                      onStartSelect={onStartSelect ? () => onStartSelect(file.id) : undefined}
                     />
                   );
                 })}
