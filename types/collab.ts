@@ -1869,6 +1869,9 @@ export interface SpaceTask {
   via: 'app' | 'agent' | null;
   created_at: string;
   created_by: SpaceTaskPerson | null;
+  /** Moves forward on every change, a move or not (the techlead's review, 29
+   *  October 2026): what orders live snapshots. */
+  updated_at: string;
 }
 
 export interface SpaceTaskListParams {

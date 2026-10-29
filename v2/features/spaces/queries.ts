@@ -2,6 +2,7 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { spacesApi, spaceTasksApi } from '@/lib/api/collab';
 import { spaceRadarsApi } from '@/lib/api/radars';
 import type {
+  Member,
   MemberListParams,
   SpaceItemsParams,
   SpaceItemsType,
@@ -368,7 +369,33 @@ export const spacesQueries = {
       gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,
     }),
+
+  /**
+   * Every active member, page after page: the task sheet's Owner and Waiting
+   * on choices (the techlead's review, 29 October 2026: the first 100 was not
+   * all of a big space). Under {@link membersOf}, so a membership change
+   * re-reads it with the roster.
+   */
+  allMembers: (spaceUuid: string, { viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...spacesQueries.membersOf(spaceUuid), 'all', { viewerId }] as const,
+      queryFn: () => readAllMembers(spaceUuid),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
 };
+
+/** Every active member of a space, 100 a page. */
+async function readAllMembers(spaceUuid: string): Promise<Member[]> {
+  const first = await spacesApi.getMembers(spaceUuid, { per_page: 100, page: 1 });
+  const rows = [...first.data];
+  for (let page = 2; page <= first.pagination.last_page; page += 1) {
+    const next = await spacesApi.getMembers(spaceUuid, { per_page: 100, page });
+    rows.push(...next.data);
+  }
+  return rows;
+}
 
 /** Every row of a space's task board, page after page, in the server's board order. */
 async function readWholeBoard(spaceUuid: string): Promise<SpaceTask[]> {

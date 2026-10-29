@@ -10,6 +10,7 @@ import {
   moveLine,
   serverFieldErrors,
   updatePayload,
+  withStage,
   type TaskDraft,
 } from './task-sheet-model';
 
@@ -40,11 +41,33 @@ function task(overrides: Partial<SpaceTask> = {}): SpaceTask {
     via: 'app',
     created_at: '2026-10-28T10:00:00Z',
     created_by: null,
+    updated_at: '2026-10-28T10:00:00Z',
     ...overrides,
   };
 }
 
 const draft = (overrides: Partial<TaskDraft> = {}): TaskDraft => ({ ...draftFromTask(task(), null), ...overrides });
+
+test('a note belongs to its stage: a new stage starts empty, the saved stage gets its note back', () => {
+  // The techlead's review, 29 October 2026: a waiting note became the pause reason.
+  const waiting = task({ stage: 'waiting', waiting_on: STAY, stage_note: 'A or B for the header' });
+  const start = draftFromTask(waiting, null);
+  const paused = withStage(start, 'paused', waiting);
+  assert.equal(paused.stage, 'paused');
+  assert.equal(paused.stageNote, '');
+  // Paused without a reason is still stopped, so the old note cannot slip through.
+  assert.equal(checkDraft(paused).stage_note, 'Say why it is paused.');
+  // Back to the saved stage: the saved note returns.
+  assert.equal(withStage(paused, 'waiting', waiting).stageNote, 'A or B for the header');
+  // Choosing the stage already chosen keeps what was typed.
+  const typed = { ...paused, stageNote: 'Switched to the release' };
+  assert.equal(withStage(typed, 'paused', waiting), typed);
+  // A new task has no saved stage: every stage starts empty.
+  assert.equal(withStage({ ...draftFromTask(null, null), stageNote: 'x' }, 'waiting', null).stageNote, '');
+  // The cleared note goes to the server as null with the new stage.
+  assert.deepEqual(updatePayload({ ...paused, stage: 'working' }, waiting), { stage: 'working' });
+  assert.deepEqual(updatePayload({ ...paused, stageNote: 'Blocked' }, waiting), { stage: 'paused', stage_note: 'Blocked' });
+});
 
 test('a new task starts in Queued with the viewer as its owner', () => {
   assert.deepEqual(draftFromTask(null, 'u-me'), {

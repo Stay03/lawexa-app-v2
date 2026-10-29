@@ -42,6 +42,7 @@ function task(uuid: string, overrides: Partial<SpaceTask> = {}): SpaceTask {
     via: 'app',
     created_at: '2026-10-28T09:00:00Z',
     created_by: null,
+    updated_at: '2026-10-28T10:00:00Z',
     ...overrides,
   };
 }

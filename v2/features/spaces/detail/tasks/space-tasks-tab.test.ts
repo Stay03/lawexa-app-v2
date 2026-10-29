@@ -41,15 +41,19 @@ test('only the Tasks pill takes the wider board column', () => {
   assert.match(screen, /<div className=\{tab === 'tasks' \? SPACE_BOARD_COLUMN : SPACE_PAGE_COLUMN\}>/);
 });
 
-test('the board follows .task.changed on the space channel and leaves it on unmount', () => {
+test('the board follows .task.changed on the space channel and stops only its own listener on unmount', () => {
   const protocol = read('v2', 'runtime', 'realtime', 'protocol.ts');
   assert.match(protocol, /export function spaceChannelName\(spaceUuid: string\): string \{\s*return `spaces\.\$\{spaceUuid\}`;/);
   assert.match(protocol, /export const EVT_TASK_CHANGED = '\.task\.changed';/);
   const live = read('v2', 'features', 'spaces', 'detail', 'tasks', 'use-task-board-live.ts');
   assert.match(live, /const echo = getV2Echo\(\);\s*if \(!echo\) return;/);
-  assert.match(live, /echo\.private\(name\)\.listen\(EVT_TASK_CHANGED,/);
-  assert.match(live, /applyTaskChanged\(list, event\)/);
-  assert.match(live, /return \(\) => \{\s*echo\.leave\(name\);\s*\};/);
+  assert.match(live, /const channel = echo\.private\(spaceChannelName\(spaceUuid\)\);\s*channel\.listen\(EVT_TASK_CHANGED, onChanged\);/);
+  // The uuids seen deleted go with every event, so a late update cannot revive one.
+  assert.match(live, /if \(event\.action === 'deleted'\) deleted\.add\(event\.task\.uuid\);/);
+  assert.match(live, /applyTaskChanged\(list, event, deleted\)/);
+  // The techlead's review: stop this listener, never leave the channel others may share.
+  assert.match(live, /return \(\) => \{\s*channel\.stopListening\(EVT_TASK_CHANGED, onChanged\);\s*\};/);
+  assert.doesNotMatch(live, /echo\.leave\(/);
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
   assert.match(board, /useTaskBoardLive\(spaceUuid, session\.userId, eligible\);/);
 });

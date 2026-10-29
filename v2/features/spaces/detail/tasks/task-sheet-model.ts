@@ -59,6 +59,19 @@ export function draftFromTask(task: SpaceTask | null, defaultOwner: string | nul
   };
 }
 
+/**
+ * The draft after a stage is chosen. A note belongs to one stage (the
+ * techlead's review, 29 October 2026): a waiting note must not become the
+ * pause reason, so a new stage starts with an empty note. Going back to the
+ * task's saved stage brings its saved note back; choosing the stage already
+ * chosen changes nothing.
+ */
+export function withStage(draft: TaskDraft, stage: SpaceTaskStage, task: SpaceTask | null): TaskDraft {
+  if (stage === draft.stage) return draft;
+  const stageNote = task && stage === task.stage ? (task.stage_note ?? '') : '';
+  return { ...draft, stage, stageNote };
+}
+
 /** What is wrong with the fields, in the words shown under each. Empty when
  *  the draft may be saved. */
 export function checkDraft(draft: TaskDraft): TaskFieldErrors {

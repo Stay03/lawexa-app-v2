@@ -47,6 +47,7 @@ import {
   TASK_NOTE_MAX,
   TASK_TITLE_MAX,
   updatePayload,
+  withStage,
   type TaskDraft,
   type TaskField,
   type TaskFieldErrors,
@@ -168,11 +169,11 @@ function TaskSheetBody({
   const saving = createTask.isPending || updateTask.isPending;
 
   const membersQuery = useQuery({
-    ...spacesQueries.members(spaceUuid, { viewerId }),
+    ...spacesQueries.allMembers(spaceUuid, { viewerId }),
     enabled: canEdit,
   });
   const members = useMemo(
-    () => personOptions(membersQuery.data?.data ?? [], [task?.owner ?? null, task?.waiting_on ?? null]),
+    () => personOptions(membersQuery.data ?? [], [task?.owner ?? null, task?.waiting_on ?? null]),
     [membersQuery.data, task],
   );
 
@@ -181,7 +182,7 @@ function TaskSheetBody({
     setErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
   };
   const chooseStage = (stage: SpaceTaskStage) => {
-    setDraft((current) => ({ ...current, stage }));
+    setDraft((current) => withStage(current, stage, task));
     setErrors((current) => ({ ...current, stage: undefined, stage_note: undefined, waiting_on: undefined }));
   };
 

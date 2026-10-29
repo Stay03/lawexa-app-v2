@@ -13,13 +13,17 @@ import { applyTaskChanged } from './task-cache';
  * 29 October 2026: live updates). People and agents move tasks through the
  * same API, and the server sends each change to every member on the space's
  * private channel as `.task.changed` with the whole task (Backend's
- * task-board branch 439e6020). The snapshot is written into the board's cache
- * through {@link applyTaskChanged}, so nothing is read again; the task's
- * history is marked stale, so an open sheet shows the new move.
+ * task-board branch). The snapshot is written into the board's cache through
+ * {@link applyTaskChanged}, so nothing is read again; the task's history is
+ * marked stale, so an open sheet shows the new move.
  *
- * The subscribe and leave follow the realtime spine's (`spine.tsx`): no Echo
- * (on the server, or with no Reverb settings) does nothing, and the board's
- * unmount leaves the channel. The spine owns the connection itself.
+ * The uuids seen deleted are kept while the board is open, so a late
+ * `updated` cannot bring a deleted task back (the techlead's review).
+ *
+ * Unmount stops THIS listener only (`stopListening`, the techlead's review):
+ * leaving the channel would also drop any other listener on `spaces.{uuid}`.
+ * No Echo (on the server, or with no Reverb settings) does nothing. The spine
+ * owns the connection itself.
  */
 export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, enabled: boolean): void {
   const queryClient = useQueryClient();
@@ -29,15 +33,18 @@ export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, ena
     const echo = getV2Echo();
     if (!echo) return;
 
-    const name = spaceChannelName(spaceUuid);
     const boardKey = spacesQueries.tasks(spaceUuid, { viewerId }).queryKey;
-    echo.private(name).listen(EVT_TASK_CHANGED, (event: SpaceTaskChangedEvent) => {
-      queryClient.setQueryData(boardKey, (list) => (list ? applyTaskChanged(list, event) : list));
+    const deleted = new Set<string>();
+    const onChanged = (event: SpaceTaskChangedEvent) => {
+      if (event.action === 'deleted') deleted.add(event.task.uuid);
+      queryClient.setQueryData(boardKey, (list) => (list ? applyTaskChanged(list, event, deleted) : list));
       void queryClient.invalidateQueries({ queryKey: spacesQueries.taskMovesOf(spaceUuid, event.task.uuid) });
-    });
+    };
+    const channel = echo.private(spaceChannelName(spaceUuid));
+    channel.listen(EVT_TASK_CHANGED, onChanged);
 
     return () => {
-      echo.leave(name);
+      channel.stopListening(EVT_TASK_CHANGED, onChanged);
     };
   }, [enabled, spaceUuid, viewerId, queryClient]);
 }

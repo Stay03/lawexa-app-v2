@@ -28,19 +28,24 @@ export function removeTask(list: readonly SpaceTask[], taskUuid: string): SpaceT
  * One `.task.changed` event on the cached board. `deleted` takes the row out;
  * `created` and `updated` put the snapshot in.
  *
- * A STALE SNAPSHOT IS IGNORED, AS FAR AS THE ROW CAN TELL. The snapshot has no
- * version or `updated_at`; the one time on it that only moves forward is
- * `stage_changed_at`, and a change that is not a move (a new title, a new
- * thread) keeps it as it was. So a snapshot is refused only when the cached
- * row is STRICTLY newer by `stage_changed_at`: an event that arrives after
- * this tab already saw a later move. Two edits inside one stage cannot be
- * told apart this way, and the later one to arrive wins; the board's next
- * read corrects it.
+ * EVENTS CAN ARRIVE OUT OF ORDER (the techlead's review, 29 October 2026):
+ * the server queues its broadcasts, so with more than one worker an
+ * `updated` can land after a later `updated`, or after the `deleted`.
+ * - A snapshot older than the cached row by `updated_at` is ignored.
+ *   `updated_at` moves forward on every change, so two edits inside one
+ *   stage are told apart too.
+ * - A task in `deleted` (the uuids this board has seen deleted) never comes
+ *   back from a late `created` or `updated`. A delete is soft and final.
  */
-export function applyTaskChanged(list: readonly SpaceTask[], event: SpaceTaskChangedEvent): SpaceTask[] {
+export function applyTaskChanged(
+  list: readonly SpaceTask[],
+  event: SpaceTaskChangedEvent,
+  deleted: ReadonlySet<string>,
+): SpaceTask[] {
   if (event.action === 'deleted') return removeTask(list, event.task.uuid);
+  if (deleted.has(event.task.uuid)) return [...list];
   const cached = list.find((row) => row.uuid === event.task.uuid);
-  if (cached && movedAt(cached) > movedAt(event.task)) return [...list];
+  if (cached && changedAt(cached) > changedAt(event.task)) return [...list];
   return upsertTask(list, event.task);
 }
 
@@ -90,4 +95,4 @@ export function applyReorder(list: readonly SpaceTask[], reorder: ReorderSpaceTa
   });
 }
 
-const movedAt = (task: SpaceTask): number => Date.parse(task.stage_changed_at) || 0;
+const changedAt = (task: SpaceTask): number => Date.parse(task.updated_at) || 0;
