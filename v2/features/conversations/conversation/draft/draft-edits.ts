@@ -1,11 +1,12 @@
 import type { JSONContent } from '@tiptap/core';
 
 /**
- * draft-edits — the reader's edits to a draft in a confidential chat, kept in
- * the page's memory while the app stays open, keyed by chat and the draft's
- * place (`?side=draft:N`), so closing the panel and opening it again does not
- * throw them away. A confidential chat keeps nothing on the server; every
- * other draft is a note, and its edits autosave into it (DraftEditor.tsx).
+ * draft-edits — the reader's edits to a draft in a chat that keeps no draft
+ * notes (a confidential chat, which keeps nothing on the server; a Radar
+ * report, for now), kept in the page's memory while the app stays open,
+ * keyed by chat and the draft's place (`?side=draft:N`), so closing the panel
+ * and opening it again does not throw them away. Every other draft is a
+ * note, and its edits autosave into it (DraftEditor.tsx).
  */
 
 const edits = new Map<string, JSONContent>();
