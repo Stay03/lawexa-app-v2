@@ -126,7 +126,9 @@ export function AiSkillVersions({ skill }: { skill: AdminAiSkillDetail }) {
                       <TableCell>
                         <Badge variant="outline">{LOAD_MODE_LABEL[version.load_mode]}</Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{version.change_note || '—'}</TableCell>
+                      <TableCell className="min-w-[160px] whitespace-normal break-words text-sm text-muted-foreground">
+                        {version.change_note || '—'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
                           <Button variant="ghost" size="sm" onClick={() => setViewing(version.version)}>
