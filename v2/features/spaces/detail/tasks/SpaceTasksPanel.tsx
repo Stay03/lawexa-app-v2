@@ -245,18 +245,33 @@ const COLUMN =
  * apart while the white cards on them stay the strongest thing on the board.
  */
 const STAGE_LANE: Readonly<Record<SpaceTaskStage, string>> = {
-  working: 'bg-blue-500/5 dark:bg-blue-400/8',
-  paused: 'bg-slate-500/6 dark:bg-slate-400/8',
-  waiting: 'bg-amber-500/6 dark:bg-amber-400/8',
-  queued: 'bg-violet-500/5 dark:bg-violet-400/8',
-  done: 'bg-emerald-500/5 dark:bg-emerald-400/8',
+  // A computer's lanes only: on a phone the notes carry the colour themselves.
+  working: 'md:bg-blue-500/5 md:dark:bg-blue-400/8',
+  paused: 'md:bg-slate-500/6 md:dark:bg-slate-400/8',
+  waiting: 'md:bg-amber-500/6 md:dark:bg-amber-400/8',
+  queued: 'md:bg-violet-500/5 md:dark:bg-violet-400/8',
+  done: 'md:bg-emerald-500/5 md:dark:bg-emerald-400/8',
+};
+
+/**
+ * A phone's sticky note (Stay, 29 October 2026, 04:18Z: "it should look like
+ * stick it notes cleanly done"): the lane's tint, stronger, as the note's own
+ * fill, the way Google Keep and FigJam colour a note rather than its column.
+ * No tilt, no tape, no handwriting: a flat square note with a soft shadow.
+ */
+const NOTE_FILL: Readonly<Record<SpaceTaskStage, string>> = {
+  working: 'max-md:bg-blue-100 max-md:dark:bg-blue-400/15',
+  paused: 'max-md:bg-slate-100 max-md:dark:bg-slate-400/15',
+  waiting: 'max-md:bg-amber-100 max-md:dark:bg-amber-400/15',
+  queued: 'max-md:bg-violet-100 max-md:dark:bg-violet-400/15',
+  done: 'max-md:bg-emerald-100 max-md:dark:bg-emerald-400/15',
 };
 
 function StageColumn({ stage, tasks, now }: { stage: SpaceTaskStage; tasks: SpaceTask[]; now: number }) {
   return (
     <section aria-label={`${TASK_STAGE_LABELS[stage]}, ${tasks.length}`} className={cn(COLUMN, STAGE_LANE[stage])}>
       <ColumnHead stage={stage} count={tasks.length} />
-      <CardList tasks={tasks} now={now} empty={EMPTY_WORDS[stage]} />
+      <CardList stage={stage} tasks={tasks} now={now} empty={EMPTY_WORDS[stage]} />
     </section>
   );
 }
@@ -310,7 +325,7 @@ function DoneColumn({
             </button>
           }
         />
-        <CardList tasks={tasks} now={now} empty={EMPTY_WORDS.done} />
+        <CardList stage="done" tasks={tasks} now={now} empty={EMPTY_WORDS.done} />
       </section>
     </>
   );
@@ -328,7 +343,17 @@ function ColumnHead({ stage, count, action }: { stage: SpaceTaskStage; count: nu
   );
 }
 
-function CardList({ tasks, now, empty }: { tasks: SpaceTask[]; now: number; empty: string }) {
+function CardList({
+  stage,
+  tasks,
+  now,
+  empty,
+}: {
+  stage: SpaceTaskStage;
+  tasks: SpaceTask[];
+  now: number;
+  empty: string;
+}) {
   if (tasks.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
@@ -337,33 +362,51 @@ function CardList({ tasks, now, empty }: { tasks: SpaceTask[]; now: number; empt
     );
   }
   return (
-    <ul className="flex flex-col gap-2">
+    // A phone lays the notes two to a row, as a sticky-note board does.
+    <ul className="flex flex-col gap-2 max-md:grid max-md:grid-cols-2 max-md:gap-3">
       {tasks.map((task) => (
-        <TaskCard key={task.uuid} task={task} now={now} />
+        <TaskCard key={task.uuid} task={task} stage={stage} now={now} />
       ))}
     </ul>
   );
 }
 
-function TaskCard({ task, now }: { task: SpaceTask; now: number }) {
+/**
+ * One task. On a computer, a white card: the title with the time in the stage
+ * at its right, then the owner's line, then the reason when paused or waiting.
+ * On a phone, a square sticky note in the stage's colour: the title (up to
+ * four lines), the reason, and the owner and the time pinned to the foot.
+ */
+function TaskCard({ task, stage, now }: { task: SpaceTask; stage: SpaceTaskStage; now: number }) {
   const note = taskNote(task);
+  const time = formatRelativeTime(task.stage_changed_at, now);
   return (
-    <li className="rounded-xl border border-border bg-card px-3 py-3 shadow-xs">
-      {/* The time in the stage rides the title's line, so the owner's line
-          keeps a whole name in a computer's narrow column (the first B
+    <li
+      className={cn(
+        'rounded-xl border border-border bg-card px-3 py-3 shadow-xs',
+        'max-md:flex max-md:aspect-square max-md:flex-col max-md:rounded-lg max-md:border-transparent max-md:p-3.5',
+        'max-md:shadow-[0_1px_2px_rgb(0_0_0/0.06),0_4px_12px_-4px_rgb(0_0_0/0.10)]',
+        NOTE_FILL[stage],
+      )}
+    >
+      {/* The time in the stage rides the title's line on a computer, so the
+          owner's line keeps a whole name in a narrow column (the first B
           pictures cut "Frontend Cl…"). */}
       <div className="flex items-start gap-2">
-        <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">{task.title}</p>
-        <span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground">
-          {formatRelativeTime(task.stage_changed_at, now)}
-        </span>
+        <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug text-foreground max-md:line-clamp-4 max-md:text-[15px]">
+          {task.title}
+        </p>
+        <span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground max-md:hidden">{time}</span>
       </div>
-      <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground max-md:order-3 max-md:mt-auto max-md:pt-2">
         <Initials person={task.owner} />
         <span className="min-w-0 truncate">{task.owner?.name ?? 'Nobody yet'}</span>
         {task.owner?.is_agent ? <AgentTag /> : null}
+        <span className="ml-auto shrink-0 pl-1 tabular-nums md:hidden">{time}</span>
       </div>
-      {note ? <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{note}</p> : null}
+      {note ? (
+        <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground max-md:order-2 max-md:line-clamp-3">{note}</p>
+      ) : null}
     </li>
   );
 }
@@ -373,7 +416,7 @@ function Initials({ person }: { person: SpaceTaskPerson | null }) {
   return (
     <span
       aria-hidden
-      className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[9px] font-semibold text-muted-foreground"
+      className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[9px] font-semibold text-muted-foreground max-md:bg-background/70"
     >
       {person ? getInitials(person.name) : <UserRound className="size-3" />}
     </span>
@@ -383,7 +426,7 @@ function Initials({ person }: { person: SpaceTaskPerson | null }) {
 /** The agent mark (Stay, 28 October 2026, 23:17Z: yes to the eight agent accounts). */
 function AgentTag() {
   return (
-    <span className="shrink-0 rounded-md bg-secondary px-1 py-px text-[10px] font-medium text-muted-foreground">
+    <span className="shrink-0 rounded-md bg-secondary px-1 py-px text-[10px] font-medium text-muted-foreground max-md:bg-background/70">
       Agent
     </span>
   );
