@@ -172,10 +172,15 @@ function TaskSheetBody({
     ...spacesQueries.allMembers(spaceUuid, { viewerId }),
     enabled: canEdit,
   });
-  const members = useMemo(
-    () => personOptions(membersQuery.data ?? [], [task?.owner ?? null, task?.waiting_on ?? null]),
-    [membersQuery.data, task],
-  );
+  // New task names the viewer as owner before the member list has loaded, so
+  // the viewer is a choice from the start: the Owner box never opens empty
+  // (the local run against the task board server, 29 October 2026).
+  const viewerUuid = task ? null : session.userUuid;
+  const viewerName = session.name;
+  const members = useMemo(() => {
+    const viewer = viewerUuid && viewerName ? { uuid: viewerUuid, name: viewerName } : null;
+    return personOptions(membersQuery.data ?? [], [task?.owner ?? null, task?.waiting_on ?? null, viewer]);
+  }, [membersQuery.data, task, viewerUuid, viewerName]);
 
   const change = <K extends keyof TaskDraft>(key: K, value: TaskDraft[K], field: TaskField) => {
     setDraft((current) => ({ ...current, [key]: value }));
