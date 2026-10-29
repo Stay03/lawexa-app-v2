@@ -93,6 +93,12 @@ export interface NoteRecord {
   source_conversation_uuid?: string | null;
   source_draft?: number | null;
   /**
+   * Made from a chat's draft (drafts saved as notes, woz, 29 October 2026):
+   * the notes list's "From chats" filter and label. Owner only, like the
+   * fields above; absent on servers from before it.
+   */
+  from_chat?: boolean;
+  /**
    * On a create from a draft only: `true` when the reader already had a note
    * for that draft, which the server returned (200) instead of making another.
    */
@@ -195,4 +201,91 @@ export interface NoteImageUpload {
     size: number;
     created_at: string;
   };
+}
+
+/**
+ * A chat's drafts as notes (`GET /conversations/{uuid}/draft-notes`, woz,
+ * 29 October 2026, thread 1e44eb39). One DOCUMENT is one draft and all its
+ * versions: the same `draftGroupKey` as the panel (`id:k3f9q2`, or
+ * `title:tenancy agreement` for a draft with no id), counted as the panel
+ * counts (draft-versions.ts). Every version Lawexa writes goes into the one
+ * note, and the reader's edits autosave into it, so Lawexa works from them.
+ */
+export interface DraftNoteDocument {
+  key: string;
+  title: string;
+  /** Every version's place in the chat (`?side=draft:N`), oldest first. */
+  ordinals: number[];
+  /** The newest version's place: the one the note is. */
+  latest_ordinal: number;
+  /** How many versions Lawexa has written (1, 2, 3), as `draftVersion` counts. */
+  lawexa_version: number;
+  /** The server id of the answer that holds the newest version. */
+  message_id: number;
+  /** The Lawexa version the note holds; behind `lawexa_version` for a moment while the server catches up. */
+  note_version: number;
+  /** The note's text differs from Lawexa's `note_version`: the reader edited it. */
+  edited: boolean;
+  /** By the note's own rules for this reader (a Space's Viewer reads only). */
+  can_edit: boolean;
+  /** `null` when there is no note: see `note_missing`. */
+  note: { id: number; slug: string; title: string | null; updated_at: string } | null;
+  /**
+   * Why there is no note: `deleted` (the reader deleted it; nothing brings it
+   * back), `limit` (the reader is at their plan's note limit; draft notes
+   * count like any other, Stay 29 October 2026; a read after the limit is
+   * raised makes it), `null` when there is one.
+   */
+  note_missing: 'deleted' | 'limit' | null;
+}
+
+export interface DraftNotesEnvelope {
+  success: boolean;
+  message?: string;
+  data: {
+    /** `false` in a confidential chat: no note is ever made, `documents` is empty. */
+    notes: boolean;
+    documents: DraftNoteDocument[];
+  };
+}
+
+/** Who wrote a revision: Lawexa (no user), or a person, who in a Space may not be the reader. */
+export interface NoteRevisionAuthor {
+  kind: 'lawexa' | 'person';
+  user: { uuid: string; name: string } | null;
+}
+
+/**
+ * One saved version of a draft's note (`GET /notes/{id}/revisions`, newest
+ * first): every Lawexa version, and the reader's text kept just before a
+ * Lawexa version replaced it. Plain autosaves make none.
+ */
+export interface NoteRevision {
+  revision: number;
+  author: NoteRevisionAuthor;
+  /** Lawexa's version, on its own revisions; `null` on a person's. */
+  lawexa_version: number | null;
+  title: string | null;
+  created_at: string;
+}
+
+export interface NoteRevisionsEnvelope {
+  success: boolean;
+  message?: string;
+  data: NoteRevision[];
+  pagination: PaginationMeta;
+  links: PaginationLinks;
+}
+
+export interface NoteRevisionEnvelope {
+  success: boolean;
+  message?: string;
+  data: NoteRevision & { content: string };
+}
+
+/** A restore saves the revision as the reader's new text: the note (its `updated_at` is the next save's base) and the revision it made. */
+export interface NoteRestoreEnvelope {
+  success: boolean;
+  message: string;
+  data: { note: NoteRecord; revision: number };
 }

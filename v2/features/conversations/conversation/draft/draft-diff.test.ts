@@ -74,6 +74,8 @@ test('the panel offers Show changes from version 2 on, off by default, and draws
   const strip = read('DraftVersionSwitch.tsx');
   assert.match(strip, /\{changes \? \(\s*<label[^>]*>\s*<Switch checked=\{changes\.on\} onCheckedChange=\{changes\.onChange\} \/>\s*Show changes/);
   const view = read('DraftChangesView.tsx');
-  assert.match(view, /if \(node\.diff === 'add'\) return <ins key=\{key\} className=\{ADDED\}>/);
-  assert.match(view, /if \(node\.diff === 'del'\) return <del key=\{key\} className=\{REMOVED\}>/);
+  assert.match(view, /if \(node\.diff === 'add'\) return <ins key=\{key\} className=\{ADDED_WORDS\}>/);
+  assert.match(view, /if \(node\.diff === 'del'\) return <del key=\{key\} className=\{REMOVED_WORDS\}>/);
+  // The version history draws a version against the draft now with the same renderer.
+  assert.match(view, /export function DiffDocument\(\{ diff, className \}: \{ diff: DiffNode; className\?: string \}\)/);
 });

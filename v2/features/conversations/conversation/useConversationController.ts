@@ -36,9 +36,11 @@ import { spacesQueries } from '@/v2/features/spaces/queries';
 import { radarsQueries } from '@/v2/features/radars/queries';
 import { radarToolChangesRadars } from '@/v2/features/radars/radar-tools';
 import type { RosterEntry } from './member-colour';
+import { flushDraftsBeforeSend, UNSAVED_DRAFT_LINE } from './draft/draft-flush';
 import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { toast } from 'sonner';
 import type { MentionOptions } from '@/v2/features/channels/model';
 import {
   askAgainRefusal,
@@ -1044,6 +1046,12 @@ export function useConversationController(
       queryClient.removeQueries({ queryKey: statusKey, exact: true });
       seenStatusRef.current = null;
       setRefusedTurn(null);
+      // LAWEXA SEES THE LAST WORD TYPED (drafts saved as notes, thread
+      // 1e44eb39): an open draft's edits are saved before the message goes,
+      // since Lawexa reads the draft's note for its answer. Never held past
+      // 3 s; a draft that did not save sends anyway, and says so wherever the
+      // composer is (the chat, the dock, the case page).
+      if ((await flushDraftsBeforeSend(conversationId)) === 'unsaved') toast.warning(UNSAVED_DRAFT_LINE);
       const fileIds = attachments.map((a) => a.file_id);
       const refusal = await send(message, {
         conversationId,
@@ -1143,6 +1151,8 @@ export function useConversationController(
     queryClient.removeQueries({ queryKey: statusKey, exact: true });
     seenStatusRef.current = null;
     setRefusedTurn(null);
+    // The same wait as a send: Lawexa answers again from the draft's note.
+    if ((await flushDraftsBeforeSend(conversationId)) === 'unsaved') toast.warning(UNSAVED_DRAFT_LINE);
     const refusal = await send(lastUserContent, {
       conversationId,
       streamMode: 'v2_stream',

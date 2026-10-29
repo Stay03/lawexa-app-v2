@@ -55,6 +55,8 @@ export interface NoteRowModel {
   isSpaceCopy: boolean;
   /** Edit and Delete in the row's menu (`mayEditNote`). */
   canEdit: boolean;
+  /** Made from a chat's draft (drafts saved as notes): "From a chat" on My notes. */
+  fromChat: boolean;
 }
 
 /** `viewerId` decides {@link NoteRowModel.canEdit}; without one, no row is editable. */
@@ -77,6 +79,7 @@ export function noteRow(note: NoteRecord, viewerId: number | null = null): NoteR
     isBookmarked: note.is_bookmarked,
     isSpaceCopy: noteSpace(note) !== null,
     canEdit: mayEditNote(note, viewerId),
+    fromChat: note.from_chat === true,
   };
 }
 

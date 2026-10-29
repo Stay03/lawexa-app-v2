@@ -318,8 +318,16 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
   const controller = readHere('useConversationController.ts');
   assert.match(
     controller,
-    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*seenStatusRef\.current = null;\s*setRefusedTurn\(null\);\s*const fileIds[\s\S]*?const refusal = await send\(/,
+    /queryClient\.removeQueries\(\{ queryKey: statusKey, exact: true \}\);\s*seenStatusRef\.current = null;\s*setRefusedTurn\(null\);[\s\S]*?const fileIds[\s\S]*?const refusal = await send\(/,
   );
+  // An open draft's edits are saved before the message goes (drafts saved as notes, thread 1e44eb39).
+  assert.match(
+    controller,
+    /setRefusedTurn\(null\);\s*(\/\/[^\n]*\n\s*)*if \(\(await flushDraftsBeforeSend\(conversationId\)\) === 'unsaved'\) toast\.warning\(UNSAVED_DRAFT_LINE\);\s*const fileIds/,
+  );
+  // Ask again waits too: it starts a turn from the same history.
+  const askAgain = controller.slice(controller.indexOf('const regenerate = useCallback'));
+  assert.match(askAgain, /if \(\(await flushDraftsBeforeSend\(conversationId\)\) === 'unsaved'\) toast\.warning\(UNSAVED_DRAFT_LINE\);\s*const refusal = await send\(lastUserContent/);
   assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{\s*refused: sendRefusal\(refusal, serverUserId\),\s*\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),\s*\};/);
   assert.match(controller, /\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked'\) \{\s*(\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
   assert.match(controller, /const heldBy = turn\.kind === 'colleague' \? turn\.name : null;/);

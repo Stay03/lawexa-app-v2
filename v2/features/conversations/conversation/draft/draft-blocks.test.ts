@@ -122,34 +122,37 @@ test('the status says finished, being written, or cut short in a saved answer', 
   assert.equal(draftStatus({ title: 'A', body, complete: false, font: null, size: null, id: null, version: null }, false), 'Unfinished · 3 words');
 });
 
-test('a failed Save as note names a newer copy and the size cap, else asks to retry', async () => {
-  const { saveFailureSentence } = await import('./draft-save-failure');
-  assert.equal(saveFailureSentence({ response: { status: 409 } }), 'This note was changed somewhere else. Open it to see the newer copy.');
-  assert.equal(saveFailureSentence({ response: { status: 413 } }), 'This draft is too large to save as one note.');
-  assert.equal(saveFailureSentence(new Error('offline')), "Couldn't save the note. Check your connection and try again.");
+test('a draft saves into its note as it is typed, with the note editor’s own autosave, mirror and stale-copy check', async () => {
+  const { readFileSync } = await import('node:fs');
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  // Drafts saved as notes (thread 1e44eb39): the note editor's autosave, made on the copy the editor opened.
+  assert.match(editor, /const autosave = useNoteAutosave\(\{/);
+  assert.match(editor, /\{ id: record\.id, draft: \{ title: record\.title, content: record\.content \?\? '' \}, updatedAt: record\.updated_at \?\? null \}/);
+  assert.match(editor, /paused: !savesToNote,/);
+  // Every change goes to the autosave and the device mirror; nothing saves from a panel that does not edit the note.
+  assert.match(editor, /if \(!savesToNote \|\| !record\) return;\s*const draft = \{ title: record\.title, content: instance\.getHTML\(\) \};\s*reportDraft\(draft\);\s*mirrorWrite\(draft\);/);
+  // A newer copy (409) stops saving and says so, with Reload.
+  assert.match(editor, /\{autosave\.status === 'conflict' \? \(\s*<DraftLineBar\s+tone="alert"/);
+  // Typing a save never reached is offered back to copy, never put over the note.
+  assert.match(editor, /const typingOffer = savesToNote && !offerDismissed \? pickRestoreCandidate\(mirrorLookup\.data, record\) : null;/);
+  assert.doesNotMatch(editor, /setContent\(typingOffer/);
+  // The note opens from the server, never a kept copy.
+  const queries = readFileSync(new URL('../../../notes/queries.ts', import.meta.url), 'utf8');
+  assert.match(queries, /draftNoteOpen: \(\{ id, viewerId \}: \{ id: number \} & ViewerScoped\) =>\s*queryOptions\(\{\s*queryKey: \[\.\.\.notesQueries\.all, 'draft-note-open', id, \{ viewerId \}\] as const,\s*queryFn: \(\) => notesApi\.byId\(id\),\s*staleTime: 0,\s*gcTime: 0,/);
 });
 
-test('Save as note makes a note once, then updates it with the copy it was made from', async () => {
+test('the panel’s note menu: Open note, both exports, Version history and Save to folder, on a phone too', async () => {
   const { readFileSync } = await import('node:fs');
-  const hook = readFileSync(new URL('./use-save-draft-note.ts', import.meta.url), 'utf8');
-  assert.match(hook, /notesApi\.update\(saved\.id, \{ title: cleanTitle, content: html, base_updated_at: saved\.updatedAt \}\)/);
-  // A create names its chat and draft; the server's existing note for that draft takes this save.
-  assert.match(hook, /source_conversation_uuid: conversationId,\s*source_draft: ordinal,/);
-  assert.match(hook, /if \(!created\.data\.existing\) return created;\s*\/\/[^\n]*\n\s*return notesApi\.update\(created\.data\.id, \{/);
-  // Opening a draft asks the server for its note and records it before the editor mounts.
-  const lookup = readFileSync(new URL('./use-draft-note.ts', import.meta.url), 'utf8');
-  assert.match(lookup, /const note = await notesApi\.byDraft\(conversationId, ordinal\);\s*if \(note\) \{\s*writeSavedDraftNote\(/);
-  const api = readFileSync(new URL('../../../notes/api.ts', import.meta.url), 'utf8');
-  assert.match(api, /apiClient\.get<NoteEnvelope>\('\/notes\/by-draft', \{\s*params: \{ conversation: conversationUuid, draft \},/);
-  assert.match(api, /if \(isNotFoundError\(error\)\) return null;/);
-  assert.match(hook, /invalidates: \[notesQueries\.lists\(\)\]/);
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
-  // The phone sheet's foot, once saved, is one row: the line and the saved note's ··· menu, 40px to tap
+  // The phone sheet's foot is one row: the save state and the note's ··· menu, 40px to tap
   // (Arthur's iPhone recording, 24 October 2026: four pills wrapped onto two rows).
-  assert.match(bar, /<SavedNoteMenu\s+slug=\{saved\.slug\}\s+dirty=\{dirty\}\s+folder=\{folderLabel\(space\)\}\s+onFolder=\{\(\) => draft\.setFolderOpen\(true\)\}\s+triggerClassName="size-10"\s+\/>/);
-  assert.doesNotMatch(bar, /<ExportMenu\b/);
-  assert.match(bar, /target=\{\{ type: 'note', contentId: saved\.id \}\}/);
+  const foot = bar.slice(bar.indexOf('export function DraftSaveBar'), bar.indexOf('function DownloadPill'));
+  assert.match(foot, /\{autosave \? <SaveIndicator \{\.\.\.autosave\} \/> : <span \/>\}/);
+  assert.match(foot, /<NoteMenu\s+note=\{note\}\s+saving=\{autosave !== null\}\s+folder=\{folderLabel\(space\)\}\s+onFolder=\{\(\) => tools\.setFolderOpen\(true\)\}\s+onHistory=\{onHistory\}\s+triggerClassName="size-10"\s+\/>/);
+  assert.match(bar, /target=\{\{ type: 'note', contentId: note\.id \}\}/);
   assert.match(bar, /space=\{space \?\? undefined\}/);
+  // No Save button: the note saves itself.
+  assert.doesNotMatch(bar, /NotebookPen|Save as note|useSaveDraftNote/);
 });
 
 test('a draft opens itself when Lawexa finishes it, unless the reader is writing in the message box', async () => {
@@ -189,7 +192,7 @@ test('the draft tag may carry the whole draft\'s font and size; other values are
  * the panel's width, no outlines. The phone sheet keeps its header, its
  * wrapped bar and its foot. */
 
-test('on a computer the draft panel has no title line and no foot: one bar holds Save and the close', async () => {
+test('on a computer the draft panel has no title line and no foot: one bar holds the save state and the close', async () => {
   const { readFileSync } = await import('node:fs');
   const panel = readFileSync(new URL('./DraftPanel.tsx', import.meta.url), 'utf8');
   const frame = readFileSync(new URL('../side-panel/ChatSidePanel.tsx', import.meta.url), 'utf8');
@@ -202,61 +205,54 @@ test('on a computer the draft panel has no title line and no foot: one bar holds
   assert.match(frame, /bare && 'xl:hidden',/);
   // The phone sheet keeps its header: the title, "Draft · 219 words" and the tile.
   assert.match(panel, /subtitle=\{draftStatus\(draft, Boolean\(streamingMessage\)\)\}/);
-  // One bar: the formatting, then Save, then the close; every state has the close.
+  // One bar: the formatting (where the draft is edited), then the save state and menu, then the close.
   assert.match(editor, /<div className="flex min-w-0 flex-1 items-center">\{tools\}<\/div>\s*\{actions\}\s*<SidePanelCloseButton \/>/);
-  assert.match(editor, /<DraftBar\s+tools=\{<DraftBarTools editor=\{editor\} frameRef=\{frameRef\} onFind=\{openFind\} \/>\}\s+actions=\{<DraftSaveControl draft=\{draft\} dirty=\{dirty\} space=\{space\} \/>\}\s+\/>/);
+  assert.match(editor, /<DraftBar\s+tools=\{editable \? <DraftBarTools editor=\{editor\} frameRef=\{frameRef\} onFind=\{openFind\} \/> : null\}\s+actions=\{<DraftSaveControl \{\.\.\.actions\} \/>\}\s+\/>/);
   assert.equal(panel.match(/<DraftBar \/>/g)?.length, 4);
   assert.match(frame, /export function SidePanelCloseButton\(\)/);
-  // The sheet's foot is not drawn on a computer; the bar's Save is drawn only there.
+  // The sheet's foot is not drawn on a computer; the bar's control is drawn only there.
   assert.match(bar, /<div className="v2-draft-save-foot sticky bottom-0 z-10 [^"]* xl:hidden">/);
-  assert.match(bar, /<div className=\{cn\('relative hidden shrink-0 items-center xl:flex', saved \? 'gap-0\.5' : 'gap-px'\)\}>/);
+  assert.match(bar, /<div className="relative hidden shrink-0 items-center gap-1 xl:flex">/);
   assert.match(editor, /className="v2-draft-bar sticky top-0 z-10 hidden h-12 shrink-0 items-center [^"]*xl:flex"/);
-  // One save and one folder picker serve both places.
-  assert.equal(editor.match(/useDraftSave\(/g)?.length, 1);
+  // One set of tools and one folder picker serve both places.
+  assert.equal(editor.match(/useDraftTools\(/g)?.length, 1);
   assert.equal(editor.match(/<DraftFolderPicker /g)?.length, 1);
 });
 
-test('Save is quiet everywhere: no gold fill, gold only on its icon (Stay, 25 October 2026)', async () => {
+test('the panel stays quiet: no gold fill, and the note editor’s transient save state, not a lit badge', async () => {
   const { readFileSync } = await import('node:fs');
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
   const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
-  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
-  // No gold fill on the computer's Save or its chevron: the bar's grey face, a gold icon.
+  // No gold fill anywhere in the panel (Stay, 25 October 2026: the gold button "looks ugly like a sore thumb").
   assert.doesNotMatch(bar, /\bbg-primary\b(?!\/)/);
-  assert.match(bar, /const SAVE_FACE =\s*'bg-foreground\/\[0\.06\] text-foreground transition-colors hover:bg-foreground\/10 dark:bg-white\/\[0\.08\] dark:hover:bg-white\/\[0\.12\]';/);
-  assert.match(control, /<NotebookPen aria-hidden className="size-\[15px\] text-primary" \/>/);
-  // The phone foot's Save wears the Word and PDF outline, with a gold icon.
-  const foot = bar.slice(bar.indexOf('v2-draft-save-foot'), bar.indexOf('function DownloadPill'));
-  assert.match(foot, /className=\{cn\(ACTION_PILL, 'font-medium text-foreground', FOCUS_RING\)\}/);
-  assert.match(foot, /<NotebookPen aria-hidden className="size-4 text-primary" \/>/);
-  // "Save" (Stay, 25 October 2026: "just have 'Save'"); a screen reader hears "Save as a note".
-  assert.match(bar, /return draft\.saved \? 'Save changes' : 'Save';/);
-  assert.match(bar, /return draft\.saved \|\| draft\.mutation\.isPending \? null : <span className="sr-only"> as a note<\/span>;/);
-  assert.doesNotMatch(bar.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, ''), />\s*Save as note\s*</);
-  // A narrow panel (a 1280 screen) says "Save", by the bar's own fold width.
-  assert.match(control, /<span className="@max-\[37\.5rem\]\/draft:hidden">\s*\{saveLabel\(draft\)\}\s*<SaveAsNoteHint draft=\{draft\} \/>\s*<\/span>\s*<span className="hidden @max-\[37\.5rem\]\/draft:inline">\s*\{shortSaveLabel\(draft\)\}\s*<SaveAsNoteHint draft=\{draft\} \/>\s*<\/span>/);
   assert.doesNotMatch(editor, /\bbg-primary\b(?!\/)/);
-  // A failed save still says why, beside the button.
-  assert.match(control, /role="alert"[\s\S]*?\{saveFailureSentence\(mutation\.error\)\}/);
+  // The save state is the note editor's SaveIndicator: silent while saved, a short "Saved", a chip with Retry.
+  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('export function DraftSaveBar'));
+  assert.match(control, /\{autosave \? <SaveIndicator \{\.\.\.autosave\} \/> : null\}/);
+  assert.match(editor, /const saveState = savesToNote \? \{ \.\.\.autosave, onRetry: autosave\.retry \} : null;/);
+  // A failed download still says why, under the control.
+  assert.match(control, /role="alert"[\s\S]*?\{tools\.downloads\.failure\}/);
 });
 
-test('once saved, a quiet Saved chip and a ··· menu with the note, both exports and Save to folder', async () => {
+test('the note menu lists, in order: what saving does, Open note, Export Word and PDF, Version history, Save to folder', async () => {
   const { readFileSync } = await import('node:fs');
   const bar = readFileSync(new URL('./DraftSaveBar.tsx', import.meta.url), 'utf8');
-  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
-  assert.match(control, /\{saved && !dirty \? \(\s*<span className="[^"]*bg-primary\/12[^"]*">\s*<Check aria-hidden className="size-\[15px\]" \/>\s*Saved\s*<\/span>/);
-  assert.match(control, /\{saved \? \(\s*<SavedNoteMenu/);
-  const menu = bar.slice(bar.indexOf('function SavedNoteMenu'), bar.indexOf('export function DraftFolderPicker'));
-  const order = ['Saved to your notes', 'Open note', 'Export Word', '.docx', 'Export PDF', '.pdf', '{folder}'];
+  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('export function DraftSaveBar'));
+  // Where there is a note, its menu; where there is none, the downloads.
+  assert.match(control, /\{note \? \(\s*<NoteMenu[\s\S]*?\) : \(\s*<DownloadMenu downloads=\{tools\.downloads\} \/>\s*\)\}/);
+  const menu = bar.slice(bar.indexOf('function NoteMenu'), bar.indexOf('export function DraftFolderPicker'));
+  const order = ['In your notes', 'Open note', 'Export Word', '.docx', 'Export PDF', '.pdf', 'Version history', '{folder}'];
   let at = -1;
   for (const word of order) {
     const next = menu.indexOf(word, at + 1);
     assert.ok(next > at, word);
     at = next;
   }
+  assert.match(menu, /'Your edits save as you type, and Lawexa sees them\.'/);
   assert.match(menu, /onSelect=\{\(\) => void download\('docx'\)\}/);
   assert.match(menu, /onSelect=\{\(\) => void download\('pdf'\)\}/);
-  assert.match(menu, /<Link href=\{`\/notes\/\$\{slug\}`\}>/);
+  assert.match(menu, /<Link href=\{`\/notes\/\$\{note\.slug\}`\}>/);
+  assert.match(menu, /<DropdownMenuItem onSelect=\{onHistory\}>/);
   assert.match(menu, /<DropdownMenuContent align="end" className=\{DRAFT_MENU\}>/);
 });
 

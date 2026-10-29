@@ -9,6 +9,7 @@ import { MarkdownText } from '@/v2/features/conversations/conversation/markdown/
 import { ChatSidePanel } from '@/v2/features/conversations/conversation/side-panel/ChatSidePanel';
 import { useSidePanel } from '@/v2/features/conversations/conversation/side-panel/SidePanelContext';
 import { draftStatus } from '@/v2/features/conversations/conversation/draft/draft-blocks';
+import { draftGroupKey } from '@/v2/features/conversations/conversation/draft/draft-versions';
 import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from '@/v2/features/conversations/conversation/draft/DraftEditor';
 import { reportDraftAt } from './report-drafts';
 
@@ -72,6 +73,8 @@ export function ReportDraftPanel({
               markdown={draft.body}
               font={{ font: draft.font, size: draft.size }}
               space={space}
+              groupKey={draftGroupKey(draft)}
+              latestOrdinal={target.ordinal}
             />
           ) : (
             // A report that stopped inside its draft: it reads, it does not edit.

@@ -45,38 +45,50 @@ export function DraftChangesView({
           <>
             <span>Changes since version {previousNumber}:</span>
             <span>
-              <ins className={ADDED}>added</ins>
+              <ins className={ADDED_WORDS}>added</ins>
             </span>
             <span>
-              <del className={REMOVED}>removed</del>
+              <del className={REMOVED_WORDS}>removed</del>
             </span>
           </>
         ) : (
           <span>No changes since version {previousNumber}.</span>
         )}
       </p>
-      <div
-        className={cn(
-          'v2-note-fonts v2-draft-doc prose prose-neutral max-w-none dark:prose-invert',
-          'text-base leading-relaxed prose-headings:font-semibold prose-headings:tracking-tight',
-          '[&_code]:before:content-none [&_code]:after:content-none',
-          '[&_.tableWrapper]:my-4 [&_.tableWrapper]:overflow-x-auto [&_.tableWrapper]:overscroll-x-contain',
-          '[&_table]:my-0 [&_table]:w-full [&_table]:border-collapse',
-          '[&_td]:min-w-[6em] [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top',
-          '[&_th]:min-w-[6em] [&_th]:border [&_th]:border-border [&_th]:bg-secondary/50 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:align-top',
-        )}
-      >
-        {(diff.content ?? []).map((node, index) => renderNode(node, `b${index}`))}
-      </div>
+      <DiffDocument diff={diff} />
     </div>
   );
 }
 
-/** Added words: underlined in green, on a faint green. */
-const ADDED =
+/**
+ * A compared document, drawn with the editor's own document classes: the
+ * "Show changes" view here, and a version against the current text in the
+ * draft's version history (DraftHistoryDialog.tsx).
+ */
+export function DiffDocument({ diff, className }: { diff: DiffNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        'v2-note-fonts v2-draft-doc prose prose-neutral max-w-none dark:prose-invert',
+        'text-base leading-relaxed prose-headings:font-semibold prose-headings:tracking-tight',
+        '[&_code]:before:content-none [&_code]:after:content-none',
+        '[&_.tableWrapper]:my-4 [&_.tableWrapper]:overflow-x-auto [&_.tableWrapper]:overscroll-x-contain',
+        '[&_table]:my-0 [&_table]:w-full [&_table]:border-collapse',
+        '[&_td]:min-w-[6em] [&_td]:border [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top',
+        '[&_th]:min-w-[6em] [&_th]:border [&_th]:border-border [&_th]:bg-secondary/50 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:align-top',
+        className,
+      )}
+    >
+      {(diff.content ?? []).map((node, index) => renderNode(node, `b${index}`))}
+    </div>
+  );
+}
+
+/** Added words: underlined in green, on a faint green (here and in the version history's key). */
+export const ADDED_WORDS =
   'rounded-[0.2em] bg-emerald-500/12 px-[0.05em] text-inherit underline decoration-emerald-600 decoration-2 underline-offset-[3px] dark:decoration-emerald-400';
 /** Removed words: struck through in red, on a faint red, a little quieter. */
-const REMOVED =
+export const REMOVED_WORDS =
   'rounded-[0.2em] bg-red-500/10 px-[0.05em] text-red-700 decoration-red-600 decoration-[1.5px] [text-decoration-line:line-through] dark:text-red-300 dark:decoration-red-400';
 
 /** A whole block that is new or gone: a bar at its side, so it is seen at a glance. */
@@ -139,8 +151,8 @@ function renderNode(node: DiffNode, key: string): ReactNode {
 function renderText(node: DiffNode, key: string): ReactNode {
   let out: ReactNode = node.text ?? '';
   for (const mark of node.marks ?? []) out = wrapMark(mark, out);
-  if (node.diff === 'add') return <ins key={key} className={ADDED}>{out}</ins>;
-  if (node.diff === 'del') return <del key={key} className={REMOVED}>{out}</del>;
+  if (node.diff === 'add') return <ins key={key} className={ADDED_WORDS}>{out}</ins>;
+  if (node.diff === 'del') return <del key={key} className={REMOVED_WORDS}>{out}</del>;
   return <span key={key}>{out}</span>;
 }
 

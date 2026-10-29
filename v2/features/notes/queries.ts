@@ -83,7 +83,7 @@ export const notesQueries = {
       queryKey: [
         ...notesQueries.lists(),
         'mine',
-        { search: params.search ?? null },
+        { search: params.search ?? null, fromChats: params.from_chats ?? null },
         { viewerId },
       ] as const,
       queryFn: ({ pageParam }) =>
@@ -143,17 +143,50 @@ export const notesQueries = {
     }),
 
   /**
-   * The reader's note saved from a chat's draft, or `null` (the draft panel,
-   * opening a finished draft). Like `editorOpen`, always the server's answer:
-   * never kept on the device and never reused by a later open, because the
-   * editor starts from it and a kept copy could be older than a save made since.
+   * A chat's drafts as notes (`notesApi.draftNotes`). Always the server's
+   * answer and never kept on the device, like `editorOpen`: the panel opens its
+   * editor on the note this names, and a kept copy could be older than a save
+   * made since. Refetched when an answer with a draft finishes, after a
+   * restore, and every 2 s while a note catches up (draft-note-state.ts).
    */
-  byDraft: ({ conversationId, draft, viewerId }: { conversationId: string; draft: number } & ViewerScoped) =>
+  draftNotes: ({ conversationId, viewerId }: { conversationId: string } & ViewerScoped) =>
     queryOptions({
-      queryKey: [...notesQueries.all, 'by-draft', conversationId, draft, { viewerId }] as const,
-      queryFn: () => notesApi.byDraft(conversationId, draft),
+      queryKey: [...notesQueries.all, 'draft-notes', conversationId, { viewerId }] as const,
+      queryFn: () => notesApi.draftNotes(conversationId),
+      staleTime: 0,
+      gcTime: GC_TIMES.list,
+      retry: retrySettledClientErrors,
+    }),
+
+  /**
+   * The draft panel's OPEN read of a draft's note, by id: always the server,
+   * never the device, as `editorOpen` (the editor starts from it, and a kept
+   * copy could be older than a save made since).
+   */
+  draftNoteOpen: ({ id, viewerId }: { id: number } & ViewerScoped) =>
+    queryOptions({
+      queryKey: [...notesQueries.all, 'draft-note-open', id, { viewerId }] as const,
+      queryFn: () => notesApi.byId(id),
       staleTime: 0,
       gcTime: 0,
+      retry: retrySettledClientErrors,
+    }),
+
+  /** A draft note's saved versions, a page at a time, newest first. Never kept on the device. */
+  revisions: ({ id, page }: { id: number; page: number }) =>
+    queryOptions({
+      queryKey: [...notesQueries.all, 'revisions', id, page] as const,
+      queryFn: () => notesApi.revisions(id, page),
+      staleTime: 0,
+      retry: retrySettledClientErrors,
+    }),
+
+  /** One saved version with its text: it never changes, so it is read once. */
+  revision: ({ id, revision }: { id: number; revision: number }) =>
+    queryOptions({
+      queryKey: [...notesQueries.all, 'revision', id, revision] as const,
+      queryFn: () => notesApi.revision(id, revision),
+      staleTime: Infinity,
       retry: retrySettledClientErrors,
     }),
 

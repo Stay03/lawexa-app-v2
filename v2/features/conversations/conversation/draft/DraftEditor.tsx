@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Content } from '@tiptap/core';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { Check, Copy, MoreHorizontal, Redo2, Search, Undo2 } from 'lucide-react';
@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { FOCUS_RING, formatRelativeTime } from '@/v2/shell/designs/modules';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { AlignMenu } from '@/v2/features/notes/editor/AlignMenu';
 import { FontMenu, FontSizeMenu, SizeMenu } from '@/v2/features/notes/editor/FontMenus';
@@ -35,6 +35,11 @@ import {
   type FormatState,
 } from '@/v2/features/notes/editor/formatting';
 import { createCaseMentionStore } from '@/v2/features/notes/editor/mention-store';
+import { draftMirrorQuery, noteMirrorKey } from '@/v2/features/notes/editor/draft-mirror';
+import { useNoteAutosave } from '@/v2/features/notes/editor/use-autosave';
+import { pickRestoreCandidate, useDraftMirrorWriter } from '@/v2/features/notes/editor/use-draft-mirror';
+import { notesQueries } from '@/v2/features/notes/queries';
+import type { NoteRecord } from '@/v2/features/notes/types';
 import { stripPastedPresentation } from '@/v2/features/notes/editor/paste-sanitizer';
 import { shortcutLabel, useIsMac } from '@/v2/features/notes/editor/shortcut-label';
 import { StyleSelect } from '@/v2/features/notes/editor/StyleSelect';
@@ -51,11 +56,22 @@ import '@/v2/features/notes/note-fonts.css';
 import './draft-panel.css';
 import type { ConversationSpaceRef } from '@/types/chat';
 import { SidePanelCloseButton } from '../side-panel/ChatSidePanel';
-import { readDraftEdit, readSavedDraftNote, writeDraftEdit } from './draft-edits';
+import { useSidePanel } from '../side-panel/SidePanelContext';
+import { readDraftEdit, writeDraftEdit } from './draft-edits';
+import { registerDraftFlush } from './draft-flush';
+import { CATCH_UP_LIMIT_MS, draftNoteLine, type DraftNoteState } from './draft-note-state';
+import { markDraftEdited, useDraftNoteState } from './use-draft-notes';
+import { DraftHistoryDialog } from './DraftHistoryDialog';
 import { findCardRoom } from './find-room';
-import { DRAFT_MENU, DraftFolderPicker, DraftSaveBar, DraftSaveControl, useDraftSave } from './DraftSaveBar';
+import {
+  DRAFT_MENU,
+  DraftFolderPicker,
+  DraftSaveBar,
+  DraftSaveControl,
+  useDraftTools,
+  type DraftNoteRef,
+} from './DraftSaveBar';
 import { markdownToDoc, type DraftFont } from './markdown-to-doc';
-import { useDraftNote } from './use-draft-note';
 
 /**
  * DraftEditor — a finished draft, editable in the side panel with the note
@@ -66,12 +82,23 @@ import { useDraftNote } from './use-draft-note';
  * style, bold, italic, underline, both lists, alignment, and font type and
  * size (FontMenus.tsx).
  *
- * It opens from, in order: the reader's edits this visit (draft-edits.ts); the
- * note it was saved as, on any device (`useDraftNote`, Lucy's live check,
- * 23 October 2026: a reopened draft had lost its fonts); else the draft's
- * Markdown (markdown-to-doc.ts). Every change is kept as it is typed. Save as
- * note (DraftSaveBar.tsx) keeps it for good, and offers the note's links once
- * it is one.
+ * EVERY DRAFT IS A NOTE (Stay's "go", 27 October 2026; thread 1e44eb39).
+ * One note holds a draft and all its versions: each version Lawexa writes
+ * goes into it, and the newest version opens here on that note, read from
+ * the server as it opens, and autosaves as the reader types with the note
+ * editor's own autosave and device copy. When the reader sends a message,
+ * the send waits for that save (draft-flush.ts), and Lawexa writes its next
+ * version on the reader's text. What the panel opens on is decided by
+ * draft-note-state.ts:
+ *
+ *   the note        the newest version: edited, or read by a reader who may
+ *                   not edit it.
+ *   Lawexa's text   an older version, a version the note has not caught up
+ *                   with, a deleted note or one not reached: read only, from
+ *                   the draft's Markdown (markdown-to-doc.ts), with a line
+ *                   saying why and the downloads.
+ *   the page's memory  a confidential chat, which keeps nothing: edited in
+ *                   memory for this visit (draft-edits.ts), with the downloads.
  *
  * ── TWO SHAPES, ONE EDITOR ─────────────────────────────────────────────────
  * The phone sheet (below xl) has the wrapped toolbar on top and Save in the
@@ -89,23 +116,99 @@ import { useDraftNote } from './use-draft-note';
  * (FindBar.tsx) for both shapes: a strip under the sheet's toolbar on a
  * phone, a card under the bar's right end on a computer.
  */
-export function DraftEditor(props: DraftEditorProps) {
-  const { conversationId, ordinal } = props;
-  const edited = readDraftEdit(conversationId, ordinal);
-  // The saved note is asked for only when this visit has no edits of its own.
-  const note = useDraftNote(conversationId, ordinal, edited === undefined);
+export function DraftEditor(props: Omit<DraftEditorProps, 'noteState' | 'line'> & { groupKey: string; latestOrdinal: number }) {
+  const { conversationId, ordinal, groupKey, latestOrdinal } = props;
+  const { state, waitedMs, retry } = useDraftNoteState(conversationId, { ordinal, key: groupKey, latestOrdinal });
+  const panel = useSidePanel();
+  const text = draftNoteLine(state, waitedMs);
+  const action =
+    state.kind === 'older'
+      ? { label: 'Open latest', onPress: () => panel?.open({ kind: 'draft', ordinal: state.latestOrdinal }) }
+      : state.kind === 'unlisted' || (state.kind === 'catching-up' && waitedMs >= CATCH_UP_LIMIT_MS)
+        ? { label: 'Try again', onPress: retry }
+        : null;
+  return <DraftEditorFor {...props} noteState={state} line={text ? { text, action } : null} />;
+}
 
-  if (edited !== undefined) return <DraftEditorBody {...props} initial={edited} />;
-  if (note.isPending) return <DraftEditorSkeleton versionSwitch={props.versionSwitch} />;
-  // A failed lookup opens the draft as Lawexa wrote it; a save then finds the
-  // note on the server anyway (`useSaveDraftNote`), so none is made twice.
-  const saved = note.data?.content;
-  return <DraftEditorBody {...props} initial={saved ? saved : markdownToDoc(props.markdown, props.font)} />;
+/** The editor for what the draft is to its note. */
+function DraftEditorFor(props: DraftEditorProps) {
+  const { noteState } = props;
+  switch (noteState.kind) {
+    case 'loading':
+      return <DraftEditorSkeleton versionSwitch={props.versionSwitch} />;
+    case 'editable':
+    case 'read-only':
+      return (
+        <DraftNoteOpen
+          key={noteState.note.id}
+          {...props}
+          noteId={noteState.note.id}
+          canEdit={noteState.kind === 'editable'}
+          documentKey={noteState.document.key}
+        />
+      );
+    case 'confidential': {
+      // Nothing is kept in a confidential chat: the edits live in the page's
+      // memory (draft-edits.ts), so closing the panel and opening it again
+      // keeps them for this visit.
+      const edited = readDraftEdit(props.conversationId, props.ordinal);
+      return (
+        <DraftEditorBody
+          key="memory"
+          {...props}
+          mode={{ kind: 'memory' }}
+          initial={edited ?? markdownToDoc(props.markdown, props.font)}
+        />
+      );
+    }
+    default:
+      return (
+        <DraftEditorBody
+          key="lawexa"
+          {...props}
+          mode={{ kind: 'lawexa' }}
+          initial={markdownToDoc(props.markdown, props.font)}
+        />
+      );
+  }
+}
+
+/**
+ * The draft's note, read from the server as it opens (never a kept copy), then
+ * the editor on it. The editor is drawn again only for a newer copy than the
+ * one it opened on (`updated_at`): its own saves never redraw it.
+ */
+function DraftNoteOpen(props: DraftEditorProps & { noteId: number; canEdit: boolean; documentKey: string }) {
+  const { userId: viewerId } = useV2Session();
+  const open = useQuery(notesQueries.draftNoteOpen({ id: props.noteId, viewerId }));
+  if (open.isPending) return <DraftEditorSkeleton versionSwitch={props.versionSwitch} />;
+  if (open.isError) {
+    return (
+      <DraftEditorBody
+        key="lawexa"
+        {...props}
+        mode={{ kind: 'lawexa' }}
+        initial={markdownToDoc(props.markdown, props.font)}
+        line={{ text: 'Your note couldn’t be opened.', action: { label: 'Try again', onPress: () => void open.refetch() } }}
+      />
+    );
+  }
+  const record = open.data.data;
+  return (
+    <DraftEditorBody
+      key={`${record.id}:${record.updated_at ?? ''}`}
+      {...props}
+      mode={{ kind: 'note', record, canEdit: props.canEdit, documentKey: props.documentKey }}
+      initial={record.content ?? ''}
+      onReload={() => void open.refetch()}
+    />
+  );
 }
 
 interface DraftEditorProps {
   conversationId: string;
   ordinal: number;
+  /** The download's name: the draft's title, with its version where it has more than one. */
   title: string;
   markdown: string;
   /** The draft's own font and size from its tag, put on all its text. */
@@ -114,7 +217,26 @@ interface DraftEditorProps {
   space: ConversationSpaceRef | null;
   /** The strip that switches between the draft's versions, under the bars (DraftVersionSwitch.tsx). */
   versionSwitch?: ReactNode;
+  /** What this draft is to its note (draft-note-state.ts), with its line and what the line offers. */
+  noteState: DraftNoteState;
+  /** The line under the bars, for a panel that does not edit the note (`draftNoteLine`). */
+  line?: DraftLine | null;
 }
+
+/** A line at the top of the draft, and the one thing it offers. */
+interface DraftLine {
+  text: string;
+  action: { label: string; onPress: () => void } | null;
+}
+
+/**
+ * What the editor is open on: the note (editing it, or reading it), the
+ * page's memory (a confidential chat), or Lawexa's own text, read only.
+ */
+type DraftEditorMode =
+  | { kind: 'note'; record: NoteRecord; canEdit: boolean; documentKey: string }
+  | { kind: 'memory' }
+  | { kind: 'lawexa' };
 
 /**
  * How far from the draft's own scroll area's edges the caret is kept when it
@@ -174,12 +296,17 @@ function DraftEditorBody({
   space,
   versionSwitch,
   initial,
-}: DraftEditorProps & { initial: Content }) {
-  // Changed since its last save, or never saved: what Save offers.
-  const [dirty, setDirty] = useState(() => readSavedDraftNote(conversationId, ordinal) === undefined);
+  mode,
+  line = null,
+  onReload,
+}: DraftEditorProps & { initial: Content; mode: DraftEditorMode; onReload?: () => void }) {
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
   const frameRef = useRef<HTMLDivElement | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const record = mode.kind === 'note' ? mode.record : null;
+  const savesToNote = mode.kind === 'note' && mode.canEdit;
+  const editable = savesToNote || mode.kind === 'memory';
   const [extensions] = useState(() =>
     createNoteExtensions({
       placeholder: 'Write your draft…',
@@ -187,13 +314,53 @@ function DraftEditorBody({
     }),
   );
 
+  // THE NOTE'S AUTOSAVE (drafts saved as notes): the note editor's own, so the
+  // draft saves as the reader types, one save at a time, each made on the copy
+  // it read (`base_updated_at`; a newer copy answers 409, `conflict`). Nothing
+  // saves from a panel that does not edit the note: the machine has no note
+  // and is paused, so it never sends.
+  const autosave = useNoteAutosave({
+    scopeId: record ? String(record.id) : `draft:${conversationId}:${ordinal}`,
+    initial: record
+      ? { id: record.id, draft: { title: record.title, content: record.content ?? '' }, updatedAt: record.updated_at ?? null }
+      : null,
+    paused: !savesToNote,
+    // The card's "Edited" (DraftCard.tsx) without reading the list again.
+    onSaved: () => {
+      if (mode.kind === 'note') markDraftEdited(queryClient, { conversationId, viewerId }, mode.documentKey);
+    },
+  });
+  const { change: reportDraft } = autosave;
+
+  // The device copy of what is typed (the note editor's mirror), ahead of the
+  // autosave, so typing a save never reached is offered back.
+  const mirrorKey = record ? noteMirrorKey(record.id) : `draft-panel:${conversationId}:${ordinal}`;
+  const { write: mirrorWrite, forget: mirrorForget } = useDraftMirrorWriter({
+    key: mirrorKey,
+    noteId: record?.id ?? null,
+    viewerId: savesToNote ? viewerId : null,
+  });
+  const mirrorLookup = useQuery({
+    ...draftMirrorQuery({ key: mirrorKey, viewerId, includeOrphan: false }),
+    enabled: savesToNote,
+  });
+  const [offerDismissed, setOfferDismissed] = useState(false);
+  const typingOffer = savesToNote && !offerDismissed ? pickRestoreCandidate(mirrorLookup.data, record) : null;
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions,
     content: initial,
+    editable,
     onUpdate: ({ editor: instance }) => {
-      writeDraftEdit(conversationId, ordinal, instance.getJSON());
-      setDirty(true);
+      if (mode.kind === 'memory') {
+        writeDraftEdit(conversationId, ordinal, instance.getJSON());
+        return;
+      }
+      if (!savesToNote || !record) return;
+      const draft = { title: record.title, content: instance.getHTML() };
+      reportDraft(draft);
+      mirrorWrite(draft);
     },
     editorProps: {
       transformPastedHTML: stripPastedPresentation,
@@ -202,6 +369,7 @@ function DraftEditorBody({
       scrollMargin: { top: CARET_MARGIN_TOP, bottom: CARET_MARGIN_BOTTOM, left: 0, right: 0 },
       attributes: {
         'aria-label': 'Draft',
+        'aria-readonly': editable ? 'false' : 'true',
         class: cn(
           'v2-note-fonts v2-draft-doc prose prose-neutral max-w-none dark:prose-invert',
           'min-h-[40vh] pb-10 text-base leading-relaxed focus:outline-none',
@@ -217,7 +385,32 @@ function DraftEditorBody({
     },
   });
 
-  const draft = useDraftSave({ editor, conversationId, ordinal, title, onSaved: () => setDirty(false) });
+  const tools = useDraftTools(editor, title);
+
+  // LAWEXA SEES THE LAST WORD TYPED: a message waits for this save
+  // (draft-flush.ts). The flusher saves now, then settles once all is saved,
+  // or at once with `false` on a failure the reader must act on.
+  const statusRef = useRef(autosave.status);
+  const waitersRef = useRef<((saved: boolean) => void)[]>([]);
+  useEffect(() => {
+    statusRef.current = autosave.status;
+    const settled = autosave.status === 'clean' ? true : SAVE_STOPPED.has(autosave.status) ? false : null;
+    if (settled === null) return;
+    const waiters = waitersRef.current;
+    waitersRef.current = [];
+    waiters.forEach((resolve) => resolve(settled));
+  }, [autosave.status]);
+  const { flush } = autosave;
+  useEffect(() => {
+    if (!savesToNote) return;
+    return registerDraftFlush(conversationId, ordinal, () => {
+      if (statusRef.current === 'clean') return Promise.resolve(true);
+      if (SAVE_STOPPED.has(statusRef.current)) return Promise.resolve(false);
+      const settled = new Promise<boolean>((resolve) => waitersRef.current.push(resolve));
+      flush();
+      return settled;
+    });
+  }, [conversationId, ordinal, savesToNote, flush]);
 
   // THE CARET STAYS IN VIEW AS THE KEYBOARD RISES (Arthur's iPhone, 24 October
   // 2026: "the tap on the specific portion of the note still takes the
@@ -288,6 +481,10 @@ function DraftEditorBody({
     return () => frame.removeEventListener('keydown', onKeyDown);
   }, [editor, mac, openFind]);
 
+  const note: DraftNoteRef | null = record ? { id: record.id, slug: record.slug } : null;
+  const saveState = savesToNote ? { ...autosave, onRetry: autosave.retry } : null;
+  const actions = { tools, note, autosave: saveState, space, onHistory: () => setHistoryOpen(true) };
+
   return (
     // THE DRAFT SCROLLS IN ITS OWN AREA, between the bars at the top and Save
     // at the foot, and the bars and the find box sit outside it (Arthur's
@@ -304,16 +501,18 @@ function DraftEditorBody({
         // strip under the sheet's toolbar, or a card under the computer bar's
         // right end (placed against this box).
         <div className="relative z-10 shrink-0">
-          <DraftToolbar editor={editor} onFind={openFind} />
+          {editable ? <DraftToolbar editor={editor} onFind={openFind} /> : null}
           {/* While the reader types on a phone (draft-panel.css): the computer bar's
               tools, folded to one row (undo, font, B I, ··· with the rest), in place
               of the three-row toolbar above, so the draft keeps its lines. */}
-          <div className="v2-draft-typing-tools sticky top-0 z-10 hidden h-11 shrink-0 items-center border-b border-border/70 bg-popover px-2">
-            <DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} />
-          </div>
+          {editable ? (
+            <div className="v2-draft-typing-tools sticky top-0 z-10 hidden h-11 shrink-0 items-center border-b border-border/70 bg-popover px-2">
+              <DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} />
+            </div>
+          ) : null}
           <DraftBar
-            tools={<DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} />}
-            actions={<DraftSaveControl draft={draft} dirty={dirty} space={space} />}
+            tools={editable ? <DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} /> : null}
+            actions={<DraftSaveControl {...actions} />}
           />
           {findOpen ? (
             // `contents`: no box of its own, so the card is placed exactly as
@@ -337,6 +536,26 @@ function DraftEditorBody({
         </>
       )}
       {versionSwitch}
+      {line ? <DraftLineBar line={line} /> : null}
+      {typingOffer && editor ? (
+        <DraftTypingOffer
+          savedAt={typingOffer.updated_at}
+          content={typingOffer.content}
+          onDiscard={() => {
+            setOfferDismissed(true);
+            mirrorForget(typingOffer.key);
+          }}
+        />
+      ) : null}
+      {autosave.status === 'conflict' ? (
+        <DraftLineBar
+          tone="alert"
+          line={{
+            text: 'This draft’s note changed since it opened here (Lawexa wrote a new version, or it was edited elsewhere). What you typed since then isn’t saved; copy it first if you need it.',
+            action: onReload ? { label: 'Reload', onPress: onReload } : null,
+          }}
+        />
+      ) : null}
       <div
         data-v2-draft-scroll
         className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain xl:scroll-pt-[var(--v2-draft-find-room)] xl:pt-[var(--v2-draft-find-room)]"
@@ -348,14 +567,94 @@ function DraftEditorBody({
       </div>
       {editor ? (
         <>
-          <DraftSaveBar draft={draft} dirty={dirty} space={space} />
-          <DraftFolderPicker draft={draft} space={space} />
+          <DraftSaveBar {...actions} />
+          <DraftFolderPicker tools={tools} note={note} space={space} />
         </>
+      ) : null}
+      {record ? (
+        <DraftHistoryDialog
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          noteId={record.id}
+          canRestore={savesToNote}
+          current={editor ? () => editor.getHTML() : null}
+          saving={savesToNote && autosave.status !== 'clean'}
+          onRestored={onReload}
+        />
       ) : null}
     </div>
   );
 }
 
+/** The autosave states a send cannot wait out: a failure, a newer copy, the plan's limit. */
+const SAVE_STOPPED: ReadonlySet<string> = new Set(['error', 'conflict', 'blocked']);
+
+/** A line under the bars: what the panel shows, and the one thing it offers. */
+function DraftLineBar({ line, tone = 'quiet' }: { line: DraftLine; tone?: 'quiet' | 'alert' }) {
+  return (
+    <div
+      role={tone === 'alert' ? 'alert' : 'status'}
+      className={cn(
+        'flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/70 px-5 py-2 text-[13px] xl:px-8',
+        tone === 'alert' ? 'bg-destructive/8 text-destructive' : 'bg-secondary/50 text-muted-foreground',
+      )}
+    >
+      <span className="min-w-0 flex-1">{line.text}</span>
+      {line.action ? (
+        <button
+          type="button"
+          onClick={line.action.onPress}
+          className={cn(
+            'v2-interactive shrink-0 rounded-md px-2 py-1 font-medium text-foreground transition-colors hover:bg-secondary',
+            FOCUS_RING,
+          )}
+        >
+          {line.action.label}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Typing a save never reached, kept on this device (the note editor's
+ * mirror), offered back as text to copy: never put over the note, which may
+ * hold a newer version of Lawexa's by now.
+ */
+function DraftTypingOffer({ savedAt, content, onDiscard }: { savedAt: string; content: string; onDiscard: () => void }) {
+  const [copied, setCopied] = useState(false);
+  // One reading of the clock, as RestoreDraftBar: never in a render body.
+  const [now] = useState(() => Date.now());
+  const relative = formatRelativeTime(savedAt, now);
+  const when = relative === '' || relative === 'now' ? 'a moment ago' : `${relative} ago`;
+  const copy = () => {
+    const holder = document.createElement('div');
+    holder.innerHTML = content;
+    void navigator.clipboard.writeText(holder.innerText || holder.textContent || '').then(() => setCopied(true));
+  };
+  return (
+    <div
+      role="status"
+      className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border/70 bg-secondary/50 px-5 py-2 text-[13px] text-muted-foreground xl:px-8"
+    >
+      <span className="min-w-0 flex-1">Typing from {when} wasn’t saved to this draft.</span>
+      <button
+        type="button"
+        onClick={copy}
+        className={cn('v2-interactive shrink-0 rounded-md px-2 py-1 font-medium text-foreground hover:bg-secondary', FOCUS_RING)}
+      >
+        {copied ? 'Copied' : 'Copy it'}
+      </button>
+      <button
+        type="button"
+        onClick={onDiscard}
+        className={cn('v2-interactive shrink-0 rounded-md px-2 py-1 font-medium text-foreground hover:bg-secondary', FOCUS_RING)}
+      >
+        Discard
+      </button>
+    </div>
+  );
+}
 const LIST_VERBS = BLOCK_VERBS.filter((verb) => verb.verb === 'bulletList' || verb.verb === 'orderedList');
 const MARK_VERBS = TEXT_VERBS.filter((verb) => verb.verb === 'bold' || verb.verb === 'italic' || verb.verb === 'underline');
 

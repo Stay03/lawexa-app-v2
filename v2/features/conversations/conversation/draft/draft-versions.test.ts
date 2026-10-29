@@ -126,8 +126,9 @@ test('the card labels its version and greys an older one', () => {
   assert.match(card, /\{versionLabel \? `\$\{versionLabel\} · \$\{status\}` : status\}/);
 });
 
-test('the panel switches versions in place and saves each under its own name', () => {
+test('the panel switches versions in place, and downloads each under its own name', () => {
   const panel = code(...DRAFT_DIR, 'DraftPanel.tsx');
+  // The downloads' name; the note is one for every version (drafts saved as notes).
   assert.match(panel, /title=\{draftVersionTitle\(draft\.title, version\)\}/);
   assert.match(panel, /versionSwitch=\{versionSwitch\}/);
   const strip = code(...DRAFT_DIR, 'DraftVersionSwitch.tsx');
@@ -140,7 +141,7 @@ test('the panel switches versions in place and saves each under its own name', (
   assert.match(strip, /first\.current && !first\.current\.disabled \? first\.current : second\.current/);
   const editor = code(...DRAFT_DIR, 'DraftEditor.tsx');
   assert.match(editor, /<DraftBar \/>\s*\{versionSwitch\}/);
-  assert.match(editor, /\)\}\s*\{versionSwitch\}\s*<div\s+data-v2-draft-scroll/);
+  assert.match(editor, /\)\}\s*\{versionSwitch\}\s*\{line \? <DraftLineBar line=\{line\} \/> : null\}/);
 });
 
 test('both chat frames hand the panel the version index', () => {
