@@ -85,7 +85,7 @@ test('a reader who may not edit (a Space’s Viewer) reads the note', () => {
 
 test('at the note limit no note is made: read only, with the downloads, and it says why', () => {
   const state = draftNoteState(listed(tenancy({ note: null, note_missing: 'limit' })), at(5));
-  assert.equal(state.kind, 'limit');
+  assert.equal(state.kind === 'missing' && state.reason, 'limit');
   assert.equal(draftEditable(state), false);
   assert.equal(draftNoteLine(state), 'You’ve reached your note limit, so this draft isn’t saved. Download it to keep it.');
   assert.equal(catchUpPoll(state, 0), false);
@@ -93,16 +93,31 @@ test('at the note limit no note is made: read only, with the downloads, and it s
 
 test('a deleted note stays deleted: read only, with the downloads', () => {
   const state = draftNoteState(listed(tenancy({ note: null, note_missing: 'deleted' })), at(5));
-  assert.equal(state.kind, 'deleted');
+  assert.equal(state.kind === 'missing' && state.reason, 'deleted');
   assert.equal(draftEditable(state), false);
   assert.equal(draftNoteLine(state), 'You deleted this draft’s note. Download it to keep a copy.');
+  // A server from before the reason: no note can only have been deleted.
+  assert.equal(draftNoteLine(draftNoteState(listed(tenancy({ note: null, note_missing: null })), at(5))), 'You deleted this draft’s note. Download it to keep a copy.');
 });
 
-test('a confidential chat keeps nothing: editing in the page’s memory, no note', () => {
+test('a chat moved since, or a note the reader may not see: read only, each saying why', () => {
+  const moved = draftNoteState(listed(tenancy({ note: null, note_missing: 'moved' })), at(5));
+  assert.equal(moved.kind === 'missing' && moved.reason, 'moved');
+  assert.equal(draftEditable(moved), false);
+  assert.equal(draftNoteLine(moved), 'This chat moved after the draft was saved, so its note stays where it was. Download this version to keep it.');
+  const hidden = draftNoteState(listed(tenancy({ note: null, note_missing: 'hidden' })), at(5));
+  assert.equal(draftEditable(hidden), false);
+  assert.equal(draftNoteLine(hidden), 'This draft’s note isn’t one you can open. Download it to keep a copy.');
+  // An older version is older whatever its note: it shows Lawexa's text.
+  assert.equal(draftNoteState(listed(tenancy({ note: null, note_missing: 'moved' })), at(3)).kind, 'older');
+});
+
+test('a chat that keeps no draft notes (confidential, or a Radar report for now): editing in the page’s memory, no note', () => {
   const state = draftNoteState({ status: 'success', notes: false, documents: [] }, at(0));
-  assert.equal(state.kind, 'confidential');
+  assert.equal(state.kind, 'notes-off');
   assert.equal(draftEditable(state), true);
-  assert.equal(draftNoteLine(state), 'This chat is confidential, so the draft isn’t saved. Download it to keep it.');
+  // Not "confidential": a Radar report answers `notes: false` too, and is not.
+  assert.equal(draftNoteLine(state), 'This draft isn’t saved as a note. Download it to keep it.');
 });
 
 test('a list that is loading, failed, or has no document for this draft never opens an editor', () => {

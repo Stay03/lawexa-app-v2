@@ -94,10 +94,12 @@ import { markdownToDoc, type DraftFont } from './markdown-to-doc';
  *   the note        the newest version: edited, or read by a reader who may
  *                   not edit it.
  *   Lawexa's text   an older version, a version the note has not caught up
- *                   with, a deleted note or one not reached: read only, from
+ *                   with, a note missing (deleted, the limit, a moved chat,
+ *                   one not theirs) or one not reached: read only, from
  *                   the draft's Markdown (markdown-to-doc.ts), with a line
  *                   saying why and the downloads.
- *   the page's memory  a confidential chat, which keeps nothing: edited in
+ *   the page's memory  a chat that keeps no draft notes (a confidential
+ *                   chat, which keeps nothing; a Radar report): edited in
  *                   memory for this visit (draft-edits.ts), with the downloads.
  *
  * ── TWO SHAPES, ONE EDITOR ─────────────────────────────────────────────────
@@ -147,8 +149,8 @@ function DraftEditorFor(props: DraftEditorProps) {
           documentKey={noteState.document.key}
         />
       );
-    case 'confidential': {
-      // Nothing is kept in a confidential chat: the edits live in the page's
+    case 'notes-off': {
+      // No note is kept for this chat: the edits live in the page's
       // memory (draft-edits.ts), so closing the panel and opening it again
       // keeps them for this visit.
       const edited = readDraftEdit(props.conversationId, props.ordinal);
@@ -231,7 +233,7 @@ interface DraftLine {
 
 /**
  * What the editor is open on: the note (editing it, or reading it), the
- * page's memory (a confidential chat), or Lawexa's own text, read only.
+ * page's memory (a chat that keeps no draft notes), or Lawexa's own text, read only.
  */
 type DraftEditorMode =
   | { kind: 'note'; record: NoteRecord; canEdit: boolean; documentKey: string }

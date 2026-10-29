@@ -230,14 +230,21 @@ export interface DraftNoteDocument {
   can_edit: boolean;
   /** `null` when there is no note: see `note_missing`. */
   note: { id: number; slug: string; title: string | null; updated_at: string } | null;
-  /**
-   * Why there is no note: `deleted` (the reader deleted it; nothing brings it
-   * back), `limit` (the reader is at their plan's note limit; draft notes
-   * count like any other, Stay 29 October 2026; a read after the limit is
-   * raised makes it), `null` when there is one.
-   */
-  note_missing: 'deleted' | 'limit' | null;
+  /** Why there is no note, or `null` when there is one. */
+  note_missing: DraftNoteMissing | null;
 }
+
+/**
+ * Why a draft has no note (woz, 29 October 2026):
+ *
+ *   deleted  the reader deleted it; nothing brings it back.
+ *   limit    the reader is at their plan's note limit; draft notes count
+ *            like any other (Stay); a read after the limit is raised makes it.
+ *   moved    the chat moved in or out of a Space since the note was made;
+ *            the note stays where it was and takes no new versions.
+ *   hidden   the note is one this reader may not see.
+ */
+export type DraftNoteMissing = 'deleted' | 'limit' | 'moved' | 'hidden';
 
 export interface DraftNotesEnvelope {
   success: boolean;

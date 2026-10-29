@@ -24,7 +24,8 @@ test('the API is woz’s: the list, the revisions, one revision, restore, and My
   // The manual Save as note's read is gone with it.
   assert.doesNotMatch(api, /by-draft/);
   const types = read('v2', 'features', 'notes', 'types.ts');
-  assert.match(types, /note_missing: 'deleted' \| 'limit' \| null;/);
+  assert.match(types, /note_missing: DraftNoteMissing \| null;/);
+  assert.match(types, /export type DraftNoteMissing = 'deleted' \| 'limit' \| 'moved' \| 'hidden';/);
   assert.match(types, /data: \{ note: NoteRecord; revision: number \};/);
 });
 
@@ -56,9 +57,9 @@ test('each state opens the right editor: the note, the page’s memory, or Lawex
   const pick = editor.slice(editor.indexOf('function DraftEditorFor'), editor.indexOf('function DraftNoteOpen'));
   assert.match(pick, /case 'loading':\s*return <DraftEditorSkeleton/);
   assert.match(pick, /case 'editable':\s*case 'read-only':\s*return \(\s*<DraftNoteOpen/);
-  assert.match(pick, /case 'confidential': \{[\s\S]*?mode=\{\{ kind: 'memory' \}\}/);
+  assert.match(pick, /case 'notes-off': \{[\s\S]*?mode=\{\{ kind: 'memory' \}\}/);
   assert.match(pick, /default:\s*return \(\s*<DraftEditorBody\s+key="lawexa"[\s\S]*?mode=\{\{ kind: 'lawexa' \}\}/);
-  // Only the note, edited, and a confidential chat's memory take typing; the bar's formatting is drawn only then.
+  // Only the note, edited, and the page's memory where no note is kept take typing; the bar's formatting is drawn only then.
   assert.match(editor, /const editable = savesToNote \|\| mode\.kind === 'memory';/);
   assert.match(editor, /editable,\s*onUpdate:/);
   assert.match(editor, /\{editable \? <DraftToolbar editor=\{editor\} onFind=\{openFind\} \/> : null\}/);
