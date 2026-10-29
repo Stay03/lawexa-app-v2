@@ -448,9 +448,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * The server said `stream_paused`: it closes this connection at its 5-minute
    * limit while the answer goes on (the 5-minute stream fix, 29 October 2026).
    * The drop that follows is planned, not a fault. The transport reconnects
-   * with Last-Event-ID as it does for any drop, but no stall clock starts, and
-   * the reconnect's `connected` does not re-seed the text the replay is about
-   * to add.
+   * with Last-Event-ID as it does for any drop, but no stall clock starts.
+   * Whether the reconnect re-seeds the text is the server's call alone
+   * (Backend's 6de74c55): `connected` carries `accumulated_text` only when it
+   * will not replay, so the app seeds whenever the seed is there.
    */
   let pausedRoll = false;
   let pollTickInFlight = false;
@@ -1257,13 +1258,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // Back after a drop: the handshake is not progress, so the reconnect's
       // own clock starts now (`stallVerdict`, 'reconnected-empty').
       if (reconnectingSince > 0) reconnectingSince = Date.now();
-      // Back after the planned drop: the text so far is already on screen up
-      // to the last event, and the replay brings the rest, so seeding it here
-      // as well would show part of the answer twice.
-      const rolled = pausedRoll;
+      // Back after the planned drop: the drop is over, and the next one is
+      // a fault again unless the server pauses once more.
       pausedRoll = false;
       const data = parseEvent<ConnectedEvent>((e as MessageEvent).data);
-      if (data?.accumulated_text && !rolled) {
+      if (data?.accumulated_text) {
         const iteration = currentIteration ?? 0;
         const msgId = ensureStreamingPlaceholder(iteration);
         seedText(msgId, data.accumulated_text);

@@ -23,13 +23,17 @@ test('stream_paused marks the next drop as planned, and nothing else', () => {
   assert.doesNotMatch(paused, /close\(|pollForCompletion|reportChatError|setState/);
 });
 
-test('the planned drop starts no stall clock, and its reconnect does not seed the text twice', () => {
+test('the planned drop starts no stall clock; the server alone decides when the text is seeded', () => {
   const source = engine();
   const onerror = source.slice(source.indexOf('es.onerror = () => {'));
   assert.match(onerror, /if \(es\.readyState === CONNECTING\) \{[\s\S]*?if \(pausedRoll\) return;\s*\/\/[^\n]*\n[^\n]*\n\s*reconnectingSince = Date\.now\(\);/);
-  const connected = source.slice(source.indexOf("es.addEventListener('connected'"));
-  assert.match(connected, /const rolled = pausedRoll;\s*pausedRoll = false;/);
-  assert.match(connected, /if \(data\?\.accumulated_text && !rolled\) \{/);
+  // Backend's 6de74c55: `connected` carries `accumulated_text` only when the
+  // server will not replay from Last-Event-ID, so the app seeds whenever it is
+  // there, after a pause too, and a pause only ends on its reconnect.
+  const connected = source.slice(source.indexOf("es.addEventListener('connected'"), source.indexOf('handlers.onConnected?.();'));
+  assert.match(connected, /pausedRoll = false;\s*const data = parseEvent<ConnectedEvent>/);
+  assert.match(connected, /if \(data\?\.accumulated_text\) \{/);
+  assert.doesNotMatch(connected, /rolled/);
 });
 
 test('with no stall clock, a quiet reconnect after the pause stays live', () => {
@@ -72,12 +76,11 @@ test('a planned drop never leaks into the next stream: the flag clears with ever
   assert.equal(clears, resets - 1, 'every reset but the declaration clears the flag');
 });
 
-test('the classic chat (staff on the classic design) rolls the same way: no doubled text, a 25-minute cap', () => {
+test('the classic chat (staff on the classic design) rolls too: it seeds as the server says, with a 25-minute cap', () => {
   const classic = readFileSync(join(process.cwd(), 'lib', 'hooks', 'useChatStream.ts'), 'utf8');
   assert.match(classic, /const POLL_MAX_DURATION_MS = 25 \* 60_000;/);
-  assert.match(classic, /eventSource\.addEventListener\('stream_paused', \(\) => \{\s*lastEventTimeRef\.current = Date\.now\(\);\s*pausedRollRef\.current = true;\s*\}\);/);
-  assert.match(classic, /const rolled = pausedRollRef\.current;\s*pausedRollRef\.current = false;/);
-  assert.match(classic, /if \(data\.accumulated_text && !rolled\) \{/);
-  // A new stream never inherits a planned drop.
-  assert.match(classic, /pausedRollRef\.current = false;\s*const eventSource = new AuthedEventSource\(streamUrl,/);
+  // The pause only freshens the 60 s watchdog's clock; no flag, no seed rule of its own.
+  assert.match(classic, /eventSource\.addEventListener\('stream_paused', \(\) => \{\s*lastEventTimeRef\.current = Date\.now\(\);\s*\}\);/);
+  assert.match(classic, /if \(data\.accumulated_text\) \{/);
+  assert.doesNotMatch(classic, /pausedRollRef|rolled/);
 });

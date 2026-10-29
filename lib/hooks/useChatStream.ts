@@ -93,10 +93,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastEventTimeRef = useRef<number>(0);
-  /** The server said `stream_paused` (its 5-minute limit for one connection):
-   *  the reconnect that follows replays from Last-Event-ID, so its `connected`
-   *  must not re-seed the text as well. */
-  const pausedRollRef = useRef(false);
   const conversationIdRef = useRef<string | null>(null);
   const executionIdRef = useRef<string | null>(null);
   const reconnectCountRef = useRef<number>(0);
@@ -672,8 +668,6 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // never in the address (addresses end up in logs and history).
       const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}`;
 
-      // A new stream starts with no planned drop, whatever the last one left.
-      pausedRollRef.current = false;
       const eventSource = new AuthedEventSource(streamUrl, {
         getToken: () => useAuthStore.getState().token,
       });
@@ -697,13 +691,12 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         reconnectCountRef.current = 0; // Reset on successful connection
         resetHeartbeatCounter();
-        // Back after the planned drop: the replay brings the rest of the text.
-        const rolled = pausedRollRef.current;
-        pausedRollRef.current = false;
 
         try {
           const data = JSON.parse((e as MessageEvent).data);
-          if (data.accumulated_text && !rolled) {
+          // The server sends the seed only when it will not replay (Backend's
+          // 6de74c55), so a reconnect after `stream_paused` gets none.
+          if (data.accumulated_text) {
             const iteration = currentIterationRef.current ?? 0;
             const msgId = ensureStreamingPlaceholder(iteration);
             textByIterationRef.current.set(iteration, data.accumulated_text);
@@ -918,10 +911,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
 
       // stream_paused — the server's 5-minute limit for one connection while the
       // answer goes on; it then ends the body without `end`, and the transport
-      // reconnects with Last-Event-ID. Only marks that reconnect as planned.
+      // reconnects with Last-Event-ID. The classic watchdog waits 60 s of
+      // silence, so the planned drop needs nothing but a fresh clock.
       eventSource.addEventListener('stream_paused', () => {
         lastEventTimeRef.current = Date.now();
-        pausedRollRef.current = true;
       });
 
       // Handle heartbeat — track consecutive heartbeats without data events.
