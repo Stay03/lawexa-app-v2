@@ -24,6 +24,14 @@ interface AiSkillDeleteDialogProps {
   onDeleted?: () => void;
 }
 
+/** The agents a refused delete names: woz sends `errors.agents` as `{ id, name }[]`. */
+function blockingAgentNames(agents: unknown): string[] {
+  if (!Array.isArray(agents)) return [];
+  return agents.flatMap((agent: unknown) =>
+    typeof agent === 'object' && agent !== null && 'name' in agent && typeof agent.name === 'string' ? [agent.name] : [],
+  );
+}
+
 /**
  * Delete a skill. Refused while the skill is on an agent (the server's 422:
  * "Detach this skill from all agents before deleting it."), so the button is
@@ -45,8 +53,7 @@ export function AiSkillDeleteDialog({ open, onOpenChange, skill, onDeleted }: Ai
       },
       onError: (error) => {
         const apiError = extractApiError(error);
-        const agents = (apiError.errors?.agents ?? []) as unknown as { name?: string }[];
-        const names = agents.map((agent) => agent?.name).filter(Boolean).join(', ');
+        const names = blockingAgentNames(apiError.errors?.agents).join(', ');
         toast.error(names ? `${apiError.message} (${names})` : apiError.message);
       },
     });
