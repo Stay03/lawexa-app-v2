@@ -95,6 +95,12 @@ export function TaskSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side={side}
+        // A saved task opens to be read: no field takes focus, so a phone's
+        // keyboard stays down and the title is not selected. New task starts
+        // in its title.
+        onOpenAutoFocus={(event) => {
+          if (target?.kind === 'task') event.preventDefault();
+        }}
         // Width and height per side: the primitive sizes with `data-[side=*]`
         // selectors, which outrank a bare utility.
         className={cn(
