@@ -24,13 +24,13 @@ function AiSkillsPageContent() {
 
   const params = useMemo<AdminAiSkillsParams>(() => {
     const loadMode = searchParams.get('load_mode');
-    const activeOnly = searchParams.get('active_only');
+    const isActive = searchParams.get('is_active');
     return {
       page: Number(searchParams.get('page')) || 1,
       per_page: Number(searchParams.get('per_page')) || 15,
       search: searchParams.get('search') || undefined,
       load_mode: loadMode === 'on_demand' || loadMode === 'always_on' ? loadMode : undefined,
-      active_only: activeOnly === null ? undefined : activeOnly === 'true',
+      is_active: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
     };
   }, [searchParams]);
 

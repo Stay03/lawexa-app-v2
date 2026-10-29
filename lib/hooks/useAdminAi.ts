@@ -503,34 +503,46 @@ export function useCreateAiSkill() {
   });
 }
 
-/** A save writes a version: the list, the skill and its versions all refresh. */
+/**
+ * A save writes a version: the list, the skill and its versions all refresh,
+ * and the agents too, whose pages show each skill's name, mode and Active.
+ */
 export function useUpdateAiSkill() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: AdminAiUpdateSkillData }) => adminAiApi.updateSkill(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agents() });
     },
   });
 }
 
+/**
+ * The deleted skill's own reads (its detail, versions and usage, all under its
+ * detail key) are dropped, not refetched: a refetch would flash "Skill not
+ * found" on its page before it leaves. The rest refresh.
+ */
 export function useDeleteAiSkill() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => adminAiApi.deleteSkill(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: adminAiKeys.skillDetail(id) });
       queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agents() });
     },
   });
 }
 
-/** A restore writes a new version: the list, the skill and its versions all refresh. */
+/** A restore writes a new version: the list, the skill, its versions and the agents all refresh. */
 export function useRestoreAiSkillVersion() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, version }: { id: number; version: number }) => adminAiApi.restoreSkillVersion(id, version),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agents() });
     },
   });
 }
