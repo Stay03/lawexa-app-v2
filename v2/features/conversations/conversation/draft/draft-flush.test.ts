@@ -1,7 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { flushDraftsBeforeSend, registerDraftFlush } from './draft-flush';
+import {
+  clearDraftSuperseded,
+  flushDraftsBeforeSend,
+  isDraftSuperseded,
+  markDraftSuperseded,
+  registerDraftFlush,
+  trackDraftSave,
+} from './draft-flush';
 
 /* A message waits for the open drafts' saves, so Lawexa reads the last words
  * typed (drafts saved as notes, thread 1e44eb39). */
@@ -62,4 +71,47 @@ test('a closed draft is no longer waited for, and an old registration never remo
   assert.equal(await flushDraftsBeforeSend('chat-e', 50), 'saved');
   offNew();
   assert.equal(await flushDraftsBeforeSend('chat-e', 50), 'saved');
+});
+
+test('a save sent as the panel closes is waited for by a send made at once', async () => {
+  let land: (saved: boolean) => void = () => {};
+  const leaving = new Promise<boolean>((resolve) => {
+    land = resolve;
+  });
+  trackDraftSave('chat-f', leaving);
+  const order: string[] = [];
+  const send = flushDraftsBeforeSend('chat-f', 500).then((outcome) => order.push(`send (${outcome})`));
+  await later(null, 20);
+  order.push('save lands');
+  land(true);
+  await send;
+  assert.deepEqual(order, ['save lands', 'send (saved)']);
+  // Once settled it is forgotten.
+  assert.equal(await flushDraftsBeforeSend('chat-f', 50), 'saved');
+  // A leaving save that fails says so.
+  trackDraftSave('chat-f', Promise.resolve(false));
+  assert.equal(await flushDraftsBeforeSend('chat-f', 50), 'unsaved');
+});
+
+test('an editor overtaken by Lawexa’s newer version is marked, so it sends nothing as it goes; editing again clears it', () => {
+  assert.equal(isDraftSuperseded('chat-g', 5, 2141), false);
+  markDraftSuperseded('chat-g', 5, 2141);
+  assert.equal(isDraftSuperseded('chat-g', 5, 2141), true);
+  // Another draft, or another note, is untouched.
+  assert.equal(isDraftSuperseded('chat-g', 7, 2141), false);
+  assert.equal(isDraftSuperseded('chat-g', 5, 9), false);
+  clearDraftSuperseded('chat-g', 5, 2141);
+  assert.equal(isDraftSuperseded('chat-g', 5, 2141), false);
+});
+
+test('a turn saves the open drafts before it posts the message (submit and Ask again)', () => {
+  const controller = readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'useConversationController.ts'), 'utf8');
+  for (const start of ['const submit = useCallback', 'const regenerate = useCallback']) {
+    const from = controller.indexOf(start);
+    // The turn's own body: up to the next hook after it.
+    const body = controller.slice(from, controller.indexOf('useCallback(', from + start.length));
+    const flush = body.indexOf('await flushDraftsBeforeSend(conversationId)');
+    const post = body.indexOf('await send(');
+    assert.ok(flush > 0 && post > flush, start);
+  }
 });

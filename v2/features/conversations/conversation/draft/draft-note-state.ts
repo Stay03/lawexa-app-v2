@@ -70,6 +70,33 @@ export interface DraftPlace {
   latestOrdinal: number;
 }
 
+/**
+ * The newest place in a draft's group the chat holds FINISHED: the server's
+ * `latest_ordinal` means exactly that, so a version cut off (Lawexa stopped
+ * halfway) never makes the finished one before it "older" (Frontend's
+ * review). `ordinals` oldest first; `ordinal` when none is finished.
+ */
+export function newestFinished(ordinals: readonly number[], finished: (ordinal: number) => boolean, ordinal: number): number {
+  for (let index = ordinals.length - 1; index >= 0; index -= 1) {
+    if (finished(ordinals[index])) return ordinals[index];
+  }
+  return ordinal;
+}
+
+/**
+ * The list as the panel reads it from its query. A failed read again keeps
+ * the last good answer (a focus refetch, or the server's lock wait ending in
+ * a 500, must not throw the reader out of the editor mid-sentence; Frontend's
+ * review); only a list never read is an error.
+ */
+export function draftNotesRead(query: {
+  isPending: boolean;
+  data?: { data: { notes: boolean; documents: readonly DraftNoteDocument[] } } | undefined;
+}): DraftNotesRead {
+  if (query.data) return { status: 'success', notes: query.data.data.notes, documents: query.data.data.documents };
+  return query.isPending ? { status: 'pending' } : { status: 'error' };
+}
+
 /** The document of a draft's group, or `null`. */
 export function documentFor(documents: readonly DraftNoteDocument[], key: string): DraftNoteDocument | null {
   return documents.find((document) => document.key === key) ?? null;
@@ -87,7 +114,7 @@ export function draftNoteState(read: DraftNotesRead, place: DraftPlace): DraftNo
   // A server from before the reason says nothing: it could only mean deleted then.
   if (!document.note) return { kind: 'missing', reason: document.note_missing ?? 'deleted', document };
   // The newest on screen, which the list has not reached, or whose note it has not caught up with.
-  if (document.latest_ordinal < place.ordinal || document.note_version < document.lawexa_version) {
+  if (document.latest_ordinal < place.ordinal || (document.note_version ?? 0) < document.lawexa_version) {
     return { kind: 'catching-up', document };
   }
   return document.can_edit

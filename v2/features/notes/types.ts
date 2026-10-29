@@ -222,8 +222,11 @@ export interface DraftNoteDocument {
   lawexa_version: number;
   /** The server id of the answer that holds the newest version. */
   message_id: number;
-  /** The Lawexa version the note holds; behind `lawexa_version` for a moment while the server catches up. */
-  note_version: number;
+  /**
+   * The Lawexa version the note holds; behind `lawexa_version` for a moment
+   * while the server catches up. `null` when there is no note.
+   */
+  note_version: number | null;
   /** The note's text differs from Lawexa's `note_version`: the reader edited it. */
   edited: boolean;
   /** By the note's own rules for this reader (a Space's Viewer reads only). */

@@ -16,6 +16,7 @@ import { locateDraft } from './draft-ordinals';
 import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
 import { DraftChangesView } from './DraftChangesView';
 import { draftGroupKey, draftVersionTitle } from './draft-versions';
+import { newestFinished } from './draft-note-state';
 import { DraftVersionSwitch } from './DraftVersionSwitch';
 
 /**
@@ -174,7 +175,7 @@ export function DraftPanel({
           space={space}
           versionSwitch={versionSwitch}
           groupKey={draftGroupKey(draft)}
-          latestOrdinal={version?.ordinals[version.count - 1] ?? ordinal}
+          latestOrdinal={newestFinished(version?.ordinals ?? [ordinal], (at) => draftAt(messages, at)?.complete === true, ordinal)}
         />
       ) : (
         <div className="@container/draft">

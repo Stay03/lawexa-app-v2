@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, PanelRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -11,6 +12,7 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, type DraftBlock } from './draft-blocks';
 import { draftGroupKey, draftVersionLabel } from './draft-versions';
 import { useDraftEdited } from './use-draft-notes';
+import { notesQueries } from '@/v2/features/notes/queries';
 
 /**
  * The chat's message box is focused or has words in it: the shell's box on a
@@ -63,6 +65,7 @@ export function DraftCard({
   // EDITED (drafts saved as notes): the reader changed the newest version in
   // its note, so Lawexa will work from their text.
   const chat = useV2ChatContext();
+  const queryClient = useQueryClient();
   const edited = useDraftEdited(chat?.conversationId, draftGroupKey(draft), Boolean(panel) && draft.complete && !older);
 
   // A DRAFT OPENS ITSELF WHEN LAWEXA FINISHES IT (Stay, 24 October 2026: "auto
@@ -79,8 +82,13 @@ export function DraftCard({
     }
     if (!seenWriting.current || !panel) return;
     seenWriting.current = false;
+    // A version just finished: the chat's draft notes are read again, so the
+    // cards and the panel catch up with it (Frontend's review: "Edited" went stale).
+    if (chat?.conversationId) {
+      void queryClient.invalidateQueries({ queryKey: [...notesQueries.all, 'draft-notes', chat.conversationId] });
+    }
     if (!readerIsTyping()) panel.open({ kind: 'draft', ordinal });
-  }, [draft.complete, live, panel, ordinal]);
+  }, [draft.complete, live, panel, ordinal, chat?.conversationId, queryClient]);
 
   if (!panel) {
     return (
