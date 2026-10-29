@@ -58,7 +58,13 @@ import type { ConversationSpaceRef } from '@/types/chat';
 import { SidePanelCloseButton } from '../side-panel/ChatSidePanel';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { readDraftEdit, writeDraftEdit } from './draft-edits';
-import { registerDraftFlush } from './draft-flush';
+import {
+  clearDraftSuperseded,
+  isDraftSuperseded,
+  markDraftSuperseded,
+  registerDraftFlush,
+  trackDraftSave,
+} from './draft-flush';
 import { CATCH_UP_LIMIT_MS, draftNoteLine, type DraftNoteState } from './draft-note-state';
 import { markDraftEdited, useDraftNoteState } from './use-draft-notes';
 import { DraftHistoryDialog } from './DraftHistoryDialog';
@@ -122,6 +128,20 @@ export function DraftEditor(props: Omit<DraftEditorProps, 'noteState' | 'line'> 
   const { conversationId, ordinal, groupKey, latestOrdinal } = props;
   const { state, waitedMs, retry } = useDraftNoteState(conversationId, { ordinal, key: groupKey, latestOrdinal });
   const panel = useSidePanel();
+
+  // THE OLDER COPY SENDS NOTHING AS IT GOES (Frontend's review). When this
+  // panel stops editing the note it edited (Lawexa's newer version took it,
+  // it went missing, or the reader may only read it now), the editor on the
+  // older copy unmounts, and its last edit must not be sent: made on the
+  // older copy, it could land on Lawexa's newer one. Marked here, as the new
+  // state is drawn and before the editor unmounts; the device copy keeps the
+  // typing (draft-flush.ts). The note it edited is remembered through the
+  // switch, since a missing note has no id in the list.
+  const listedNote = 'document' in state ? (state.document.note?.id ?? null) : null;
+  const [editedNote, setEditedNote] = useState<number | null>(null);
+  if (state.kind === 'editable' && listedNote !== null && listedNote !== editedNote) setEditedNote(listedNote);
+  if (state.kind === 'editable' && listedNote !== null) clearDraftSuperseded(conversationId, ordinal, listedNote);
+  else if (editedNote !== null) markDraftSuperseded(conversationId, ordinal, editedNote);
   const text = draftNoteLine(state, waitedMs);
   const action =
     state.kind === 'older'
@@ -177,14 +197,17 @@ function DraftEditorFor(props: DraftEditorProps) {
 
 /**
  * The draft's note, read from the server as it opens (never a kept copy), then
- * the editor on it. The editor is drawn again only for a newer copy than the
- * one it opened on (`updated_at`): its own saves never redraw it.
+ * the editor on it. The editor is drawn again only on Reload or a restore
+ * (`generation`), never for the reader's own saves or a refetch: a redraw
+ * loses the caret and the undo history (Frontend's review). A read that fails
+ * after one succeeded keeps the editor; only a note never read shows the error.
  */
 function DraftNoteOpen(props: DraftEditorProps & { noteId: number; canEdit: boolean; documentKey: string }) {
   const { userId: viewerId } = useV2Session();
   const open = useQuery(notesQueries.draftNoteOpen({ id: props.noteId, viewerId }));
-  if (open.isPending) return <DraftEditorSkeleton versionSwitch={props.versionSwitch} />;
-  if (open.isError) {
+  const [generation, setGeneration] = useState(0);
+  if (!open.data && open.isPending) return <DraftEditorSkeleton versionSwitch={props.versionSwitch} />;
+  if (!open.data) {
     return (
       <DraftEditorBody
         key="lawexa"
@@ -196,13 +219,15 @@ function DraftNoteOpen(props: DraftEditorProps & { noteId: number; canEdit: bool
     );
   }
   const record = open.data.data;
+  // Reload and restore read the note again, then open the editor on that copy.
+  const reload = () => void open.refetch().then(() => setGeneration((count) => count + 1));
   return (
     <DraftEditorBody
-      key={`${record.id}:${record.updated_at ?? ''}`}
+      key={`${record.id}:${generation}`}
       {...props}
       mode={{ kind: 'note', record, canEdit: props.canEdit, documentKey: props.documentKey }}
       initial={record.content ?? ''}
-      onReload={() => void open.refetch()}
+      onReload={reload}
     />
   );
 }
@@ -327,6 +352,10 @@ function DraftEditorBody({
       ? { id: record.id, draft: { title: record.title, content: record.content ?? '' }, updatedAt: record.updated_at ?? null }
       : null,
     paused: !savesToNote,
+    // An editor overtaken by Lawexa's newer version sends nothing as it goes;
+    // any other leaving save is one the chat's send waits for (draft-flush.ts).
+    flushOnUnmount: () => !(record && isDraftSuperseded(conversationId, ordinal, record.id)),
+    onUnmountSave: (settled) => trackDraftSave(conversationId, settled),
     // The card's "Edited" (DraftCard.tsx) without reading the list again.
     onSaved: () => {
       if (mode.kind === 'note') markDraftEdited(queryClient, { conversationId, viewerId }, mode.documentKey);
@@ -391,28 +420,29 @@ function DraftEditorBody({
 
   // LAWEXA SEES THE LAST WORD TYPED: a message waits for this save
   // (draft-flush.ts). The flusher saves now, then settles once all is saved,
-  // or at once with `false` on a failure the reader must act on.
-  const statusRef = useRef(autosave.status);
+  // or at once with `false` on a failure the reader must act on. It reads the
+  // machine's own status (`currentStatus`), never a copy an effect wrote.
   const waitersRef = useRef<((saved: boolean) => void)[]>([]);
   useEffect(() => {
-    statusRef.current = autosave.status;
     const settled = autosave.status === 'clean' ? true : SAVE_STOPPED.has(autosave.status) ? false : null;
     if (settled === null) return;
     const waiters = waitersRef.current;
     waitersRef.current = [];
     waiters.forEach((resolve) => resolve(settled));
   }, [autosave.status]);
-  const { flush } = autosave;
+  const { flush, currentStatus } = autosave;
   useEffect(() => {
     if (!savesToNote) return;
     return registerDraftFlush(conversationId, ordinal, () => {
-      if (statusRef.current === 'clean') return Promise.resolve(true);
-      if (SAVE_STOPPED.has(statusRef.current)) return Promise.resolve(false);
-      const settled = new Promise<boolean>((resolve) => waitersRef.current.push(resolve));
+      // The flush runs through the machine at once: right after it, its status
+      // says whether there was nothing to send, a failure, or a save on the wire.
       flush();
-      return settled;
+      const status = currentStatus();
+      if (status === 'clean') return Promise.resolve(true);
+      if (SAVE_STOPPED.has(status)) return Promise.resolve(false);
+      return new Promise<boolean>((resolve) => waitersRef.current.push(resolve));
     });
-  }, [conversationId, ordinal, savesToNote, flush]);
+  }, [conversationId, ordinal, savesToNote, flush, currentStatus]);
 
   // THE CARET STAYS IN VIEW AS THE KEYBOARD RISES (Arthur's iPhone, 24 October
   // 2026: "the tap on the specific portion of the note still takes the
@@ -630,9 +660,9 @@ function DraftTypingOffer({ savedAt, content, onDiscard }: { savedAt: string; co
   const relative = formatRelativeTime(savedAt, now);
   const when = relative === '' || relative === 'now' ? 'a moment ago' : `${relative} ago`;
   const copy = () => {
-    const holder = document.createElement('div');
-    holder.innerHTML = content;
-    void navigator.clipboard.writeText(holder.innerText || holder.textContent || '').then(() => setCopied(true));
+    // Parsed inert (DOMParser runs no script and no handler), never put into the page.
+    const text = new DOMParser().parseFromString(content, 'text/html').body.textContent ?? '';
+    void navigator.clipboard.writeText(text).then(() => setCopied(true));
   };
   return (
     <div

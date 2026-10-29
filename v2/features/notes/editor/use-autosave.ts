@@ -83,6 +83,12 @@ export interface NoteAutosave extends AutosaveView {
   retry: () => void;
   /** Our own other write (publish) moved the version: the next save's base. */
   rebase: (updatedAt: string | null | undefined) => void;
+  /**
+   * The machine's status this moment, read from the machine itself (not the
+   * rendered view, which trails it by a render): for a caller that must know
+   * whether everything typed is saved right now.
+   */
+  currentStatus: () => AutosaveStatus;
 }
 
 function viewOf(state: AutosaveState): AutosaveView {
@@ -131,6 +137,18 @@ export interface UseNoteAutosaveOptions {
    * next deadline carries the current text.
    */
   paused?: boolean;
+  /**
+   * Asked as the editor unmounts: may the last unsaved edit still be sent?
+   * The chat's draft panel says no when Lawexa's newer version has taken the
+   * note (a save made on the older copy must not land on it; the device copy
+   * keeps the typing). Absent: always yes, as the note editor needs.
+   */
+  flushOnUnmount?: () => boolean;
+  /**
+   * The save the unmount flush sends, settling `true` when it lands, `false`
+   * when it fails, so a caller can wait for it (the chat's send, draft-flush.ts).
+   */
+  onUnmountSave?: (settled: Promise<boolean>) => void;
 }
 
 export function useNoteAutosave({
@@ -138,6 +156,8 @@ export function useNoteAutosave({
   initial,
   onSaved,
   paused = false,
+  flushOnUnmount,
+  onUnmountSave,
 }: UseNoteAutosaveOptions): NoteAutosave {
   const { mutate } = useSaveNote(scopeId);
 
@@ -156,13 +176,17 @@ export function useNoteAutosave({
   const pausedRef = useRef(paused);
   const mountedRef = useRef(true);
   const onSavedRef = useRef<UseNoteAutosaveOptions['onSaved']>(onSaved);
+  const flushOnUnmountRef = useRef<UseNoteAutosaveOptions['flushOnUnmount']>(flushOnUnmount);
+  const onUnmountSaveRef = useRef<UseNoteAutosaveOptions['onUnmountSave']>(onUnmountSave);
   const dispatchRef = useRef<(event: AutosaveEvent) => void>(() => {});
-  const runSaveRef = useRef<(request: SaveRequest) => void>(() => {});
+  const runSaveRef = useRef<(request: SaveRequest, settle?: (saved: boolean) => void) => void>(() => {});
 
   // Keep the latest callback reachable from the stable closures below without
   // making them change identity (which would re-arm listeners on every render).
   useEffect(() => {
     onSavedRef.current = onSaved;
+    flushOnUnmountRef.current = flushOnUnmount;
+    onUnmountSaveRef.current = onUnmountSave;
   });
 
   const clearTimer = useCallback(() => {
@@ -192,9 +216,10 @@ export function useNoteAutosave({
   }, [clearTimer]);
 
   const runSave = useCallback(
-    (request: SaveRequest) => {
+    (request: SaveRequest, settle?: (saved: boolean) => void) => {
       mutate(request, {
         onSuccess: (envelope) => {
+          settle?.(true);
           // A save started by the unmount flush still reaches the server, but
           // its callbacks must not touch a screen that no longer exists.
           if (!mountedRef.current) return;
@@ -214,6 +239,7 @@ export function useNoteAutosave({
           void onSavedRef.current?.(record);
         },
         onError: (error) => {
+          settle?.(false);
           if (!mountedRef.current) return;
           dispatchRef.current({
             type: 'failed',
@@ -294,11 +320,14 @@ export function useNoteAutosave({
       mountedRef.current = false;
       clearTimer();
       if (pausedRef.current) return;
+      if (flushOnUnmountRef.current && !flushOnUnmountRef.current()) return;
       const { save } = reduceAutosave(stateRef.current, {
         type: 'flush',
         at: Date.now(),
       });
-      if (save !== null) runSaveRef.current(save);
+      if (save === null) return;
+      const settled = new Promise<boolean>((resolve) => runSaveRef.current(save, resolve));
+      onUnmountSaveRef.current?.(settled);
     };
   }, [clearTimer]);
 
@@ -308,5 +337,7 @@ export function useNoteAutosave({
     [dispatch],
   );
 
-  return { ...view, change, flush, retry, rebase };
+  const currentStatus = useCallback(() => stateRef.current.status, []);
+
+  return { ...view, change, flush, retry, rebase, currentStatus };
 }

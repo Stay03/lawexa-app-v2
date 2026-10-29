@@ -169,6 +169,8 @@ export const notesQueries = {
       queryFn: () => notesApi.byId(id),
       staleTime: 0,
       gcTime: 0,
+      // The editor opens on one read; coming back to the tab reads nothing again.
+      refetchOnWindowFocus: false,
       retry: retrySettledClientErrors,
     }),
 

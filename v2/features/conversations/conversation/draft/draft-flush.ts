@@ -31,6 +31,29 @@ export const SEND_FLUSH_LIMIT_MS = 3_000;
 
 const flushers = new Map<string, Map<number, DraftFlusher>>();
 
+/**
+ * Saves still on the wire from an editor that has gone (the panel closed, or
+ * moved to another draft): the send waits for them too, since no flusher is
+ * left to ask (Frontend's review: close the panel and send at once).
+ */
+const inFlight = new Map<string, Set<Promise<boolean>>>();
+
+/** Keep an unmounted editor's last save until it settles, so a send waits for it. */
+export function trackDraftSave(conversationId: string, settled: Promise<boolean>): void {
+  let chat = inFlight.get(conversationId);
+  if (!chat) {
+    chat = new Set();
+    inFlight.set(conversationId, chat);
+  }
+  chat.add(settled);
+  const forget = () => {
+    const current = inFlight.get(conversationId);
+    current?.delete(settled);
+    if (current?.size === 0) inFlight.delete(conversationId);
+  };
+  settled.then(forget, forget);
+}
+
 /** Register draft `ordinal`'s flusher while it edits; the returned function unregisters it. */
 export function registerDraftFlush(conversationId: string, ordinal: number, flusher: DraftFlusher): () => void {
   let chat = flushers.get(conversationId);
@@ -52,13 +75,14 @@ export async function flushDraftsBeforeSend(
   conversationId: string,
   limitMs: number = SEND_FLUSH_LIMIT_MS,
 ): Promise<DraftFlushOutcome> {
-  const chat = flushers.get(conversationId);
-  if (!chat || chat.size === 0) return 'saved';
+  const open = [...(flushers.get(conversationId)?.values() ?? [])];
+  const leaving = [...(inFlight.get(conversationId) ?? [])];
+  if (open.length === 0 && leaving.length === 0) return 'saved';
   let timer: ReturnType<typeof setTimeout> | undefined;
   const late = new Promise<false>((resolve) => {
     timer = setTimeout(() => resolve(false), limitMs);
   });
-  const saves = [...chat.values()].map((flusher) => flusher().catch(() => false));
+  const saves = [...open.map((flusher) => flusher().catch(() => false)), ...leaving.map((save) => save.catch(() => false))];
   try {
     const all = await Promise.race([Promise.all(saves).then((results) => results.every(Boolean)), late]);
     return all ? 'saved' : 'unsaved';
@@ -69,3 +93,32 @@ export async function flushDraftsBeforeSend(
 
 /** What a send whose draft edits did not all save says. */
 export const UNSAVED_DRAFT_LINE = 'Your last draft edits weren’t saved, so Lawexa may not see them.';
+
+/**
+ * Drafts whose open editor has been overtaken: Lawexa wrote a newer version
+ * into the note, or the panel lost the note, so the editor on the older copy
+ * must not send its last edit as it unmounts (it would be made on an older
+ * copy and could land on Lawexa's newer one; Frontend's review). The panel
+ * marks a draft when it stops editing its note, and clears the mark when it
+ * edits it again. The device copy keeps the typing, offered on the new
+ * version to copy.
+ */
+const superseded = new Set<string>();
+
+function placeKey(conversationId: string, ordinal: number, noteId: number): string {
+  return `${conversationId}:${ordinal}:${noteId}`;
+}
+
+/** Draft `ordinal`'s editor on note `noteId` no longer edits it: its unmount sends nothing. */
+export function markDraftSuperseded(conversationId: string, ordinal: number, noteId: number): void {
+  superseded.add(placeKey(conversationId, ordinal, noteId));
+}
+
+/** Draft `ordinal` edits note `noteId` again (after a restore, a Reload). */
+export function clearDraftSuperseded(conversationId: string, ordinal: number, noteId: number): void {
+  superseded.delete(placeKey(conversationId, ordinal, noteId));
+}
+
+export function isDraftSuperseded(conversationId: string, ordinal: number, noteId: number): boolean {
+  return superseded.has(placeKey(conversationId, ordinal, noteId));
+}

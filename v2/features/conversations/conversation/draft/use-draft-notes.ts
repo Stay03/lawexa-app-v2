@@ -10,6 +10,7 @@ import {
   CATCH_UP_LIMIT_MS,
   catchUpPoll,
   draftNoteState,
+  draftNotesRead,
   type DraftNoteState,
   type DraftNotesRead,
   type DraftPlace,
@@ -44,11 +45,7 @@ export function useDraftNoteState(conversationId: string, place: DraftPlace) {
     },
   });
 
-  const read: DraftNotesRead = query.isPending
-    ? { status: 'pending' }
-    : query.isError || !query.data
-      ? { status: 'error' }
-      : { status: 'success', notes: query.data.data.notes, documents: query.data.data.documents };
+  const read: DraftNotesRead = draftNotesRead(query);
   const state: DraftNoteState = draftNoteState(read, place);
 
   // The wait is timed from the read that first showed it, not from a clock read here.

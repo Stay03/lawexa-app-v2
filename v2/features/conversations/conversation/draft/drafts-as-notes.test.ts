@@ -42,7 +42,8 @@ test('the list is the server’s answer, never kept on the device, and is read a
 
 test('the panel finds its document by the draft’s group and knows the newest version on screen', () => {
   const panel = read(...DRAFT, 'DraftPanel.tsx');
-  assert.match(panel, /groupKey=\{draftGroupKey\(draft\)\}\s*latestOrdinal=\{version\?\.ordinals\[version\.count - 1\] \?\? ordinal\}/);
+  // The newest FINISHED version: a cut-off one never makes the finished one before it older.
+  assert.match(panel, /groupKey=\{draftGroupKey\(draft\)\}\s*latestOrdinal=\{newestFinished\(version\?\.ordinals \?\? \[ordinal\], \(at\) => draftAt\(messages, at\)\?\.complete === true, ordinal\)\}/);
   const report = read('v2', 'features', 'radars', 'report', 'ReportDraftPanel.tsx');
   assert.match(report, /groupKey=\{draftGroupKey\(draft\)\}\s*latestOrdinal=\{target\.ordinal\}/);
   const editor = read(...DRAFT, 'DraftEditor.tsx');
@@ -63,14 +64,33 @@ test('each state opens the right editor: the note, the page’s memory, or Lawex
   assert.match(editor, /const editable = savesToNote \|\| mode\.kind === 'memory';/);
   assert.match(editor, /editable,\s*onUpdate:/);
   assert.match(editor, /\{editable \? <DraftToolbar editor=\{editor\} onFind=\{openFind\} \/> : null\}/);
-  // The editor is drawn again only for a newer copy of the note, never for its own saves.
-  assert.match(editor, /key=\{`\$\{record\.id\}:\$\{record\.updated_at \?\? ''\}`\}/);
+  // The editor is drawn again only on Reload or a restore, never for its own saves or a refetch.
+  assert.match(editor, /key=\{`\$\{record\.id\}:\$\{generation\}`\}/);
+  assert.match(editor, /const reload = \(\) => void open\.refetch\(\)\.then\(\(\) => setGeneration\(\(count\) => count \+ 1\)\);/);
+  assert.doesNotMatch(editor, /record\.updated_at \?\? ''\}`/);
+  // A read that fails after one succeeded keeps the editor.
+  assert.match(editor, /if \(!open\.data && open\.isPending\) return <DraftEditorSkeleton/);
+  assert.match(editor, /if \(!open\.data\) \{/);
+  const queries = read('v2', 'features', 'notes', 'queries.ts');
+  assert.match(queries, /'draft-note-open', id, \{ viewerId \}\] as const,[\s\S]*?refetchOnWindowFocus: false,/);
 });
 
 test('an open draft registers its save with the send while it edits the note, and settles when all is saved', () => {
   const editor = read(...DRAFT, 'DraftEditor.tsx');
   assert.match(editor, /if \(!savesToNote\) return;\s*return registerDraftFlush\(conversationId, ordinal, \(\) => \{/);
-  assert.match(editor, /if \(statusRef\.current === 'clean'\) return Promise\.resolve\(true\);/);
+  // It reads the machine's own status, right after the flush, never a copy an effect wrote.
+  assert.match(editor, /flush\(\);\s*const status = currentStatus\(\);\s*if \(status === 'clean'\) return Promise\.resolve\(true\);/);
+  assert.doesNotMatch(editor, /statusRef/);
+  // A save sent as the editor leaves is waited for by the next send; an overtaken editor sends nothing.
+  assert.match(editor, /flushOnUnmount: \(\) => !\(record && isDraftSuperseded\(conversationId, ordinal, record\.id\)\),\s*onUnmountSave: \(settled\) => trackDraftSave\(conversationId, settled\),/);
+  // Marked as the new state is drawn, before the older editor unmounts.
+  assert.match(editor, /if \(state\.kind === 'editable' && listedNote !== null\) clearDraftSuperseded\(conversationId, ordinal, listedNote\);\s*else if \(editedNote !== null\) markDraftSuperseded\(conversationId, ordinal, editedNote\);/);
+  const hook = read('v2', 'features', 'notes', 'editor', 'use-autosave.ts');
+  assert.match(hook, /if \(pausedRef\.current\) return;\s*if \(flushOnUnmountRef\.current && !flushOnUnmountRef\.current\(\)\) return;/);
+  assert.match(hook, /const settled = new Promise<boolean>\(\(resolve\) => runSaveRef\.current\(save, resolve\)\);\s*onUnmountSaveRef\.current\?\.\(settled\);/);
+  // The saved typing is parsed inert, never put into the page.
+  assert.match(editor, /new DOMParser\(\)\.parseFromString\(content, 'text\/html'\)\.body\.textContent/);
+  assert.doesNotMatch(editor, /innerHTML/);
   assert.match(editor, /const SAVE_STOPPED: ReadonlySet<string> = new Set\(\['error', 'conflict', 'blocked'\]\);/);
   // A save of the reader's edits marks the card's document edited, without reading the list again.
   assert.match(editor, /onSaved: \(\) => \{\s*if \(mode\.kind === 'note'\) markDraftEdited\(queryClient, \{ conversationId, viewerId \}, mode\.documentKey\);/);
@@ -80,8 +100,10 @@ test('the version history: newest first, who and when, the chosen one against no
   const dialog = read(...DRAFT, 'DraftHistoryDialog.tsx');
   assert.match(dialog, /\{revisionAuthorLabel\(row, userUuid\)\}/);
   assert.match(dialog, /diffDocs\(generateJSON\(now, extensions\), generateJSON\(then, extensions\)\)/);
-  // Restore: never the newest, only for an editor, only once the draft's own edits are saved, and after a question.
-  assert.match(dialog, /\{chosen && canRestore && chosen\.revision !== newest \? \(/);
+  // Restore: any version, Lawexa's newest too (the reader may have edited it), only for an editor,
+  // only once the draft's own edits are saved, and after a question.
+  assert.match(dialog, /\{chosen && canRestore \? \(/);
+  assert.doesNotMatch(dialog, /!== newest|const newest/);
   assert.match(dialog, /disabled=\{saving \|\| restore\.isPending\}/);
   assert.match(dialog, /<AlertDialogTitle>Restore this version\?<\/AlertDialogTitle>/);
   assert.match(dialog, /if \(chosen\) restore\.mutate\(chosen\.revision\);/);

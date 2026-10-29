@@ -39,9 +39,10 @@ import { ADDED_WORDS, DiffDocument, REMOVED_WORDS } from './DraftChangesView';
  *
  * Choosing one shows it against the draft as it is now, marked as "Show
  * changes" marks a version (draft-diff.ts): what restoring it would take out,
- * struck through, and what it would put back, underlined. Restore asks
- * first, then saves that version as the reader's new text; the history keeps
- * everything, so a restore is never a loss. Only a reader who may edit the
+ * struck through, and what it would put back, underlined. Any version
+ * restores, Lawexa's newest too (the reader may have edited it since). Restore
+ * asks first, then saves that version as the reader's new text; the server
+ * keeps the text now as a revision first, so a restore is never a loss. Only a reader who may edit the
  * note restores, and only once the draft's own edits are saved.
  */
 export function DraftHistoryDialog({
@@ -86,7 +87,6 @@ export function DraftHistoryDialog({
   });
 
   const rows = list.data?.data ?? [];
-  const newest = page === 1 ? rows[0]?.revision : undefined;
   const pagination = list.data?.pagination;
 
   return (
@@ -135,7 +135,6 @@ export function DraftHistoryDialog({
                     >
                       <span className="font-medium text-foreground">
                         {revisionAuthorLabel(row, userUuid)}
-                        {row.revision === newest ? <span className="ml-1.5 text-xs text-muted-foreground">Now</span> : null}
                       </span>
                       <RevisionTime at={row.created_at} />
                     </button>
@@ -171,7 +170,9 @@ export function DraftHistoryDialog({
             )}
           </div>
         </div>
-        {chosen && canRestore && chosen.revision !== newest ? (
+        {/* Any version restores, the newest too: once the reader has edited it,
+            Lawexa's newest version is not the text now (Frontend's review). */}
+        {chosen && canRestore ? (
           <div className="flex flex-wrap items-center justify-end gap-3">
             {saving ? <span className="text-xs text-muted-foreground">Saving your last edits first…</span> : null}
             <Button type="button" onClick={() => setAsking(true)} disabled={saving || restore.isPending}>

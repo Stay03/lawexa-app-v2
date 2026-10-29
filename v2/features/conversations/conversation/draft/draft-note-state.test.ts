@@ -8,6 +8,8 @@ import {
   catchUpPoll,
   documentFor,
   draftEditable,
+  draftNotesRead,
+  newestFinished,
   draftNoteLine,
   draftNoteState,
   revisionAuthorLabel,
@@ -172,4 +174,33 @@ test('the chat can be ahead of the list: a version just written waits for the no
   // Once listed and caught up, the newest edits the note.
   const caught = listed(tenancy({ ordinals: [0, 3, 5, 7], latest_ordinal: 7, lawexa_version: 4, note_version: 4 }));
   assert.equal(draftNoteState(caught, at(7, 7)).kind, 'editable');
+});
+
+test('a version cut off (Lawexa stopped halfway) never makes the finished one before it older', () => {
+  // The chat holds versions at 0, 3 and 5; 5 was stopped halfway and is not finished.
+  const finished = new Set([0, 3]);
+  const latest = newestFinished([0, 3, 5], (ordinal) => finished.has(ordinal), 3);
+  assert.equal(latest, 3);
+  // So version 2 (draft 3) is the newest the panel edits; the server agrees (its latest_ordinal is 3).
+  const state = draftNoteState(listed(tenancy({ ordinals: [0, 3], latest_ordinal: 3, lawexa_version: 2, note_version: 2 })), at(3, latest));
+  assert.equal(state.kind, 'editable');
+  // Every version finished: the newest one.
+  assert.equal(newestFinished([0, 3, 5], () => true, 3), 5);
+  // None finished: the panel's own place.
+  assert.equal(newestFinished([0, 3], () => false, 3), 3);
+});
+
+test('a failed read again keeps the last good list, so the editor stays; only a list never read is an error', () => {
+  const data = { data: { notes: true, documents: [tenancy()] } };
+  // A focus refetch, or the server's lock wait ending in a 500, after a good read.
+  const kept = draftNotesRead({ isPending: false, data });
+  assert.equal(kept.status, 'success');
+  assert.equal(draftNoteState(kept, at(5)).kind, 'editable');
+  assert.equal(draftNotesRead({ isPending: false, data: undefined }).status, 'error');
+  assert.equal(draftNotesRead({ isPending: true, data: undefined }).status, 'pending');
+});
+
+test('a document with no note may say note_version null', () => {
+  const state = draftNoteState(listed(tenancy({ note: null, note_missing: 'limit', note_version: null })), at(5));
+  assert.equal(state.kind === 'missing' && state.reason, 'limit');
 });
