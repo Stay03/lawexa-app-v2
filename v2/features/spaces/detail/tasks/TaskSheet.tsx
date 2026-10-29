@@ -1,9 +1,9 @@
 'use client';
 
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -31,6 +31,7 @@ import { channelDisplayName } from '@/v2/features/channels/thread-model';
 import { ThreadStatusDot } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { revealAfterKeyboard, takesKeyboard } from '@/v2/shell/reveal-in-scroller';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { spacesQueries } from '../../queries';
 import { TASK_STAGE_LABELS, TASK_STAGE_TONE, TASK_STAGES, taskThreadHref } from './task-board-model';
@@ -43,6 +44,7 @@ import {
   hasErrors,
   moveLine,
   personOptions,
+  pickerChoices,
   serverFieldErrors,
   stageTakesNote,
   TASK_NOTE_MAX,
@@ -70,6 +72,20 @@ export type TaskSheetTarget = { kind: 'task'; taskUuid: string } | { kind: 'new'
  * as plain text. Every reader sees the history, newest first.
  *
  * The same sheet, empty, is New task: a title, Queued, owned by the viewer.
+ *
+ * ON A PHONE, ABOVE THE KEYBOARD (Arthur, 29 October 2026, 21:13Z, thread
+ * 7aa0c6d8: "The keyboard covers the entry form and the threads selection
+ * too"). The bottom sheet stood on the page's bottom, which iOS leaves behind
+ * the keyboard, so everything under the Title was hidden. It is now placed
+ * from the visible rectangle the keyboard hook publishes (`--visual-top`,
+ * `--visual-height`, use-keyboard-inset.ts), as the folder picker's phone
+ * sheet is: its top at the visible bottom, pulled up by its own height, and
+ * capped at the visible height less a 2.5rem strip. With the keyboard up its
+ * footer (Save, Add task) sits on the keyboard; with no visual viewport the
+ * fallbacks are the screen's `dvh`. A focused field is scrolled into view
+ * inside the sheet's body once the keyboard settles, and the pickers are the
+ * phone's own (`native`), so no list opens under the keyboard or off the
+ * screen. On a computer (side right) none of this applies.
  */
 export function TaskSheet({
   spaceUuid,
@@ -93,6 +109,7 @@ export function TaskSheet({
   now: number;
 }) {
   const side = useSheetSide();
+  const native = side === 'bottom';
   const task = target?.kind === 'task' ? (tasks.find((row) => row.uuid === target.taskUuid) ?? null) : null;
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -109,7 +126,11 @@ export function TaskSheet({
         className={cn(
           'flex flex-col gap-0 p-0 outline-none',
           'data-[side=right]:w-full data-[side=right]:sm:max-w-md',
-          'v2-safe-bottom data-[side=bottom]:max-h-[92svh] data-[side=bottom]:rounded-t-2xl',
+          'v2-safe-bottom data-[side=bottom]:rounded-t-2xl',
+          // On a phone, placed from the visible rectangle so it sits whole
+          // above the keyboard (see the note above the component). The
+          // primitive's `bottom-0` would stretch it to the page's bottom.
+          'data-[side=bottom]:bottom-auto data-[side=bottom]:top-[calc(var(--visual-top,0px)+var(--visual-height,100dvh))] data-[side=bottom]:-translate-y-full data-[side=bottom]:max-h-[calc(var(--visual-height,100dvh)-2.5rem)]',
         )}
       >
         {target === null ? null : target.kind === 'task' && !task ? (
@@ -123,6 +144,7 @@ export function TaskSheet({
             task={task}
             canEdit={canEdit}
             rooms={rooms}
+            native={native}
             now={now}
             onDone={() => onOpenChange(false)}
           />
@@ -148,6 +170,7 @@ function TaskSheetBody({
   task,
   canEdit,
   rooms,
+  native,
   now,
   onDone,
 }: {
@@ -156,6 +179,8 @@ function TaskSheetBody({
   task: SpaceTask | null;
   canEdit: boolean;
   rooms: boolean;
+  /** A phone: the pickers are the phone's own. */
+  native: boolean;
   now: number;
   onDone: () => void;
 }) {
@@ -169,6 +194,19 @@ function TaskSheetBody({
   const updateTask = useUpdateTask(spaceUuid);
   const deleteTask = useDeleteTask(spaceUuid);
   const saving = createTask.isPending || updateTask.isPending;
+
+  // A focused field is scrolled into view inside the body once the keyboard
+  // settles: the body shrinks as the sheet rises onto the keyboard, and a
+  // field low in it would sit under the footer (Arthur, 29 October 2026).
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const cancelReveal = useRef<(() => void) | null>(null);
+  const revealFocused = (event: FocusEvent<HTMLDivElement>) => {
+    const box = bodyRef.current;
+    if (!box || !takesKeyboard(event.target)) return;
+    cancelReveal.current?.();
+    cancelReveal.current = revealAfterKeyboard(box, event.target);
+  };
+  useEffect(() => () => cancelReveal.current?.(), []);
 
   const membersQuery = useQuery({
     ...spacesQueries.allMembers(spaceUuid, { viewerId }),
@@ -260,7 +298,11 @@ function TaskSheetBody({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4 pb-6">
+        <div
+          ref={bodyRef}
+          onFocus={revealFocused}
+          className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-4 pb-6"
+        >
           <FieldBlock label="Title" htmlFor={`${uid}-title`} error={errors.title} errorId={`${uid}-title-error`}>
             {canEdit ? (
               <Input
@@ -280,8 +322,9 @@ function TaskSheetBody({
 
           <FieldBlock label="Owner" htmlFor={`${uid}-owner`} error={errors.owner} errorId={`${uid}-owner-error`}>
             {canEdit ? (
-              <PersonSelect
+              <ChoiceSelect
                 id={`${uid}-owner`}
+                native={native}
                 value={draft.owner}
                 options={owners}
                 emptyLabel="Nobody yet"
@@ -313,8 +356,9 @@ function TaskSheetBody({
               errorId={`${uid}-waiting-error`}
             >
               {canEdit ? (
-                <PersonSelect
+                <ChoiceSelect
                   id={`${uid}-waiting`}
+                  native={native}
                   value={draft.waitingOn}
                   options={waitable}
                   emptyLabel={null}
@@ -357,6 +401,7 @@ function TaskSheetBody({
             {canEdit && rooms ? (
               <ThreadSelect
                 id={`${uid}-thread`}
+                native={native}
                 spaceUuid={spaceUuid}
                 value={draft.thread}
                 current={task?.thread ?? null}
@@ -493,8 +538,19 @@ function StagePicker({ value, onChange }: { value: SpaceTaskStage; onChange: (st
 /** Radix Select refuses an empty value, so "nobody" has its own. */
 const NONE = '__none__';
 
-function PersonSelect({
+/**
+ * A person or a thread to pick. On a computer, the house Radix list. On a
+ * phone (`native`), the phone's own picker: iOS shows its wheel and Android
+ * its dialog, both outside the page, so the list cannot open under the
+ * keyboard or run off the screen as the Radix list did over the task sheet's
+ * footer (Arthur, 29 October 2026, 21:13Z, thread 7aa0c6d8). The same
+ * choices either way: each shows its name and sends its uuid, the empty
+ * choice ("Nobody yet", "No thread") or the placeholder comes first, and the
+ * field keeps its id, `aria-invalid` and `aria-describedby`.
+ */
+function ChoiceSelect({
   id,
+  native,
   value,
   options,
   emptyLabel,
@@ -504,6 +560,7 @@ function PersonSelect({
   onChange,
 }: {
   id: string;
+  native: boolean;
   value: string | null;
   options: readonly PersonOption[];
   /** The "nobody" choice's words, or `null` for none. */
@@ -513,6 +570,36 @@ function PersonSelect({
   describedBy?: string;
   onChange: (value: string | null) => void;
 }) {
+  if (native) {
+    return (
+      <div className="relative">
+        <select
+          id={id}
+          value={value ?? ''}
+          onChange={(event) => onChange(event.target.value === '' ? null : event.target.value)}
+          aria-invalid={invalid || undefined}
+          aria-describedby={describedBy}
+          // The house input's look, and 16px text so iOS does not zoom in.
+          className={cn(
+            'h-9 w-full min-w-0 appearance-none truncate rounded-4xl border border-input bg-input/30 py-1 pl-3 pr-9 text-base text-foreground outline-none transition-colors',
+            'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+            'aria-invalid:border-destructive aria-invalid:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40',
+            value === null && emptyLabel === null && 'text-muted-foreground',
+          )}
+        >
+          {pickerChoices(options, emptyLabel, placeholder).map((choice) => (
+            <option key={choice.value} value={choice.value} disabled={choice.disabled}>
+              {choice.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+        />
+      </div>
+    );
+  }
   return (
     <Select value={value ?? (emptyLabel ? NONE : '')} onValueChange={(next) => onChange(next === NONE ? null : next)}>
       <SelectTrigger id={id} className="w-full" aria-invalid={invalid || undefined} aria-describedby={describedBy}>
@@ -538,6 +625,7 @@ function PersonSelect({
  */
 function ThreadSelect({
   id,
+  native,
   spaceUuid,
   value,
   current,
@@ -546,6 +634,7 @@ function ThreadSelect({
   onChange,
 }: {
   id: string;
+  native: boolean;
   spaceUuid: string;
   value: string | null;
   current: SpaceTask['thread'];
@@ -562,19 +651,16 @@ function ThreadSelect({
     [channels.data, threads.data, current],
   );
   return (
-    <Select value={value ?? NONE} onValueChange={(next) => onChange(next === NONE ? null : next)}>
-      <SelectTrigger id={id} className="w-full" aria-invalid={invalid || undefined} aria-describedby={describedBy}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NONE}>No thread</SelectItem>
-        {options.map((option) => (
-          <SelectItem key={option.uuid} value={option.uuid}>
-            {option.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <ChoiceSelect
+      id={id}
+      native={native}
+      value={value}
+      options={options}
+      emptyLabel="No thread"
+      invalid={invalid}
+      describedBy={describedBy}
+      onChange={onChange}
+    />
   );
 }
 

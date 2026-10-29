@@ -215,3 +215,33 @@ export function personOptions(
   }
   return [...options.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
 }
+
+/** One line in a phone's own picker (a native `<select>`). */
+export interface PickerChoice {
+  /** What the field sends: a uuid, or '' for the empty choice. */
+  value: string;
+  /** What the reader sees: a name, never a uuid. */
+  label: string;
+  /** The placeholder line: shown while nothing is picked, not pickable. */
+  disabled: boolean;
+}
+
+/**
+ * The lines of a phone's own picker for Owner, Waiting on or Thread (Arthur,
+ * 29 October 2026, 21:13Z, thread 7aa0c6d8: the list opened under the
+ * keyboard and off the screen). The same choices as the computer's list:
+ * first the empty choice ("Nobody yet", "No thread"), or, where there is
+ * none, the placeholder ("Choose a person"); then each option by its name,
+ * sending its uuid.
+ */
+export function pickerChoices(
+  options: readonly PersonOption[],
+  emptyLabel: string | null,
+  placeholder?: string,
+): PickerChoice[] {
+  const first: PickerChoice =
+    emptyLabel !== null
+      ? { value: '', label: emptyLabel, disabled: false }
+      : { value: '', label: placeholder ?? '', disabled: true };
+  return [first, ...options.map((option) => ({ value: option.uuid, label: option.name, disabled: false }))];
+}
