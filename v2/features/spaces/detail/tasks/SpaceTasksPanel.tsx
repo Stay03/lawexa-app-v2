@@ -43,8 +43,8 @@ import {
  * STAY'S B (29 October 2026, 00:45Z: "B but cleaner and better"), drawn to
  * the techlead's brief:
  * - One column per stage: Working, Paused, Waiting, Queued. A column's head
- *   is its name and count; the stage's colour is only the small dot before
- *   the name. No fills, no coloured bars, no limits.
+ *   is its name and count after the stage's small dot, and the column is a
+ *   lane in a faint wash of that colour (Stay, 02:49Z). No bars, no limits.
  * - A card is the title (two lines at most), then one grey line: the owner's
  *   initials and name, a grey "Agent" tag for an agent, and the time in the
  *   stage at the right. Paused adds the reason, Waiting "Waiting on Stay", as
@@ -236,7 +236,7 @@ function Board({ columns, now }: { columns: Record<SpaceTaskStage, SpaceTask[]>;
 }
 
 const COLUMN =
-  'flex min-w-0 flex-col gap-2 rounded-2xl p-2 max-md:w-full max-md:shrink-0 max-md:snap-start md:flex-1';
+  'flex min-w-0 flex-col gap-2 rounded-2xl p-1.5 max-md:w-full max-md:shrink-0 max-md:snap-start md:flex-1';
 
 /**
  * Each column is a lane in a faint wash of its stage's colour (Stay, 29
@@ -348,7 +348,7 @@ function CardList({ tasks, now, empty }: { tasks: SpaceTask[]; now: number; empt
 function TaskCard({ task, now }: { task: SpaceTask; now: number }) {
   const note = taskNote(task);
   return (
-    <li className="rounded-xl border border-border bg-card px-3.5 py-3 shadow-xs">
+    <li className="rounded-xl border border-border bg-card px-3 py-3 shadow-xs">
       {/* The time in the stage rides the title's line, so the owner's line
           keeps a whole name in a computer's narrow column (the first B
           pictures cut "Frontend Cl…"). */}
@@ -383,7 +383,7 @@ function Initials({ person }: { person: SpaceTaskPerson | null }) {
 /** The agent mark (Stay, 28 October 2026, 23:17Z: yes to the eight agent accounts). */
 function AgentTag() {
   return (
-    <span className="shrink-0 rounded-md bg-secondary px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+    <span className="shrink-0 rounded-md bg-secondary px-1 py-px text-[10px] font-medium text-muted-foreground">
       Agent
     </span>
   );
