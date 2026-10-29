@@ -34,11 +34,19 @@ test('the board reads one list, and its only colour is each stage’s thread-sta
   for (const tag of dots) assert.match(tag, /value=\{TASK_STAGE_TONE(\[[\w.]+\]|\.done)\}/);
 });
 
-test('only the Tasks pill takes the wider board column', () => {
-  const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
-  assert.match(parts, /export const SPACE_BOARD_COLUMN =\s*'mx-auto flex min-h-full w-full max-w-6xl flex-col/);
+test('every pill keeps the same page column; only the board widens, so the pills never jump', () => {
+  // Arthur, 29 October 2026, 19:11Z: on Tasks the whole page moved ~90px left
+  // and his next click landed on the wrong pill.
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /<div className=\{tab === 'tasks' \? SPACE_BOARD_COLUMN : SPACE_PAGE_COLUMN\}>/);
+  assert.match(screen, /<div className=\{SPACE_PANE\}>\s*<div className=\{SPACE_PAGE_COLUMN\}>/);
+  assert.doesNotMatch(screen, /tab === 'tasks' \?/);
+  assert.doesNotMatch(screen, /SPACE_BOARD_COLUMN/);
+  const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
+  assert.match(parts, /export const SPACE_PANE = '@container /);
+  assert.match(parts, /export const SPACE_BOARD_BLEED =\s*'md:mx-\[calc\(\(100%_-_min\(72rem,_100cqw_-_2rem\)\)_\/_2\)\]';/);
+  // The bleed wraps the board alone: the filter row stays in the column.
+  const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
+  assert.match(board, /<div className=\{SPACE_BOARD_BLEED\}>\s*<Board /);
 });
 
 test('the board follows .task.changed on the space channel, and the last board to unmount leaves it', () => {

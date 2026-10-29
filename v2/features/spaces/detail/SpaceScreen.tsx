@@ -28,7 +28,7 @@ import {
 } from '../model';
 import { CachedSpaceFrame } from './CachedSpaceFrame';
 import { SpaceContentPanel } from './content/SpaceContentPanel';
-import { SPACE_BOARD_COLUMN, SPACE_PAGE_COLUMN } from './lobby-parts';
+import { SPACE_PAGE_COLUMN, SPACE_PANE } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import { useCachedSpaceIdentity } from './cached-identity';
@@ -325,28 +325,30 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   }
 
   return (
-    <div className={tab === 'tasks' ? SPACE_BOARD_COLUMN : SPACE_PAGE_COLUMN}>
-      <SpacePlaceHeader
-        space={space}
-        membership={scope.membership}
-        onOpenAbout={openAbout}
-        onOpenRoster={scope.openRoster}
-        invitesSent={peopleReads ? pendingInvites.data?.pagination.total : undefined}
-      />
+    <div className={SPACE_PANE}>
+      <div className={SPACE_PAGE_COLUMN}>
+        <SpacePlaceHeader
+          space={space}
+          membership={scope.membership}
+          onOpenAbout={openAbout}
+          onOpenRoster={scope.openRoster}
+          invitesSent={peopleReads ? pendingInvites.data?.pagination.total : undefined}
+        />
 
-      <SpaceContentPanel space={space} tab={tab} onTabChange={setTab} />
+        <SpaceContentPanel space={space} tab={tab} onTabChange={setTab} />
 
-      <SpaceFormDialog
-        key={panel.keyFor('edit')}
-        space={space}
-        {...panel.bind('edit')}
-      />
-      <SpaceAboutSheet
-        space={space}
-        membership={scope.membership}
-        onEdit={canManage ? openEdit : undefined}
-        {...panel.bind('about')}
-      />
+        <SpaceFormDialog
+          key={panel.keyFor('edit')}
+          space={space}
+          {...panel.bind('edit')}
+        />
+        <SpaceAboutSheet
+          space={space}
+          membership={scope.membership}
+          onEdit={canManage ? openEdit : undefined}
+          {...panel.bind('about')}
+        />
+      </div>
     </div>
   );
 }

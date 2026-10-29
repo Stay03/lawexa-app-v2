@@ -22,10 +22,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 export const SPACE_PAGE_COLUMN =
   'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';
 
-/** The Tasks pill's column: the board's stage columns need the pane's width
- *  on a computer (Stay's B, 29 October 2026, 00:45Z). The same column, wider. */
-export const SPACE_BOARD_COLUMN =
-  'mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 pb-16 pt-5 sm:pt-6';
+/**
+ * The pane around the space's column: a size container, so the task board can
+ * measure the pane it sits in.
+ *
+ * THE COLUMN NEVER MOVES (Arthur, 29 October 2026, 19:11Z). The Tasks pill
+ * used to swap the whole page into a wider column, so the header and the
+ * pills jumped about 90px sideways and the next click landed on the wrong
+ * pill. Every pill now keeps {@link SPACE_PAGE_COLUMN}; only the board below
+ * the pills widens, with {@link SPACE_BOARD_BLEED}.
+ */
+export const SPACE_PANE = '@container flex min-h-full w-full flex-col';
+
+/** The task board's width on a computer: the pane's, up to `72rem`, centred
+ *  on the page column (Stay's B, 29 October 2026, 00:45Z: the stage columns
+ *  need the room). Equal negative margins on both sides, so the column, the
+ *  header and the pills stay where every other pill has them. */
+export const SPACE_BOARD_BLEED =
+  'md:mx-[calc((100%_-_min(72rem,_100cqw_-_2rem))_/_2)]';
 
 /** The pills and search held at the top of the pane: stacked on a phone, one
  *  row from `md:`. Shared by the live home and its silhouette, so the

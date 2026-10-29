@@ -423,9 +423,10 @@ test('every space takes the list’s column, in the page and its silhouette (B4)
   assert.match(parts, /export const SPACE_PAGE_COLUMN =\s*'mx-auto flex min-h-full w-full max-w-3xl flex-col/);
   assert.doesNotMatch(parts, /max-w-5xl/);
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  // The refusals, and the home on every pill but Tasks (the board's wider column).
-  assert.equal(screen.match(/<div className=\{SPACE_PAGE_COLUMN\}>/g)?.length, 1, 'the refusals');
-  assert.match(screen, /<div className=\{tab === 'tasks' \? SPACE_BOARD_COLUMN : SPACE_PAGE_COLUMN\}>/);
+  // The refusals, and the home on every pill, Tasks too: only the board itself
+  // widens (Arthur, 29 October 2026: the pills jumped when Tasks had its own column).
+  assert.equal(screen.match(/<div className=\{SPACE_PAGE_COLUMN\}>/g)?.length, 2, 'the refusals and the home');
+  assert.match(screen, /<div className=\{SPACE_PANE\}>\s*<div className=\{SPACE_PAGE_COLUMN\}>/);
   const states = read('v2', 'features', 'spaces', 'detail', 'states.tsx');
   assert.match(states, /<div className=\{SPACE_PAGE_COLUMN\}>/);
 });

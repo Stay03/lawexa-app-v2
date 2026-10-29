@@ -23,6 +23,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { SpaceContentErrorState, SpaceContentSkeleton } from '../content/states';
+import { SPACE_BOARD_BLEED } from '../lobby-parts';
 import { spacesQueries } from '../../queries';
 import {
   BOARD_STAGES,
@@ -142,7 +143,12 @@ export function SpaceTasksPanel({
         <OwnerFilter owners={owners} value={owner} onChange={setOwner} />
         {newTask ? <NewTaskButton onClick={newTask} /> : null}
       </div>
-      <Board columns={columns} now={now} onOpenTask={openTask} />
+      {/* Only the board widens on a computer; the filter row stays in the page
+          column with the pills (Arthur, 29 October 2026: nothing above the
+          board moves when the pill changes). */}
+      <div className={SPACE_BOARD_BLEED}>
+        <Board columns={columns} now={now} onOpenTask={openTask} />
+      </div>
       {sheet}
     </div>
   );
