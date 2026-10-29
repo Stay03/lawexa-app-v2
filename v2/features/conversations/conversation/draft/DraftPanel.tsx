@@ -173,6 +173,8 @@ export function DraftPanel({
           font={{ font: draft.font, size: draft.size }}
           space={space}
           versionSwitch={versionSwitch}
+          groupKey={draftGroupKey(draft)}
+          latestOrdinal={version?.ordinals[version.count - 1] ?? ordinal}
         />
       ) : (
         <div className="@container/draft">

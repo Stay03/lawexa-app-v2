@@ -6,9 +6,11 @@ import { FileText, Loader2, PanelRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { MarkdownText } from '../markdown/MarkdownText';
+import { useV2ChatContext } from '../chat-context';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { draftStatus, type DraftBlock } from './draft-blocks';
 import { draftGroupKey, draftVersionLabel } from './draft-versions';
+import { useDraftEdited } from './use-draft-notes';
 
 /**
  * The chat's message box is focused or has words in it: the shell's box on a
@@ -37,6 +39,10 @@ function readerIsTyping(): boolean {
  * a change reads "Version 2 · Draft · 1,240 words", and every older version's
  * card is greyed, so the newest one is the one the eye finds. An older card
  * still opens its own version.
+ *
+ * EDITED (drafts saved as notes, thread 1e44eb39). Every draft is a note, and
+ * the newest version's card adds "· Edited" once the reader has changed it,
+ * so they know Lawexa will work from their text.
  */
 export function DraftCard({
   draft,
@@ -54,6 +60,10 @@ export function DraftCard({
   const version = panel?.draftVersion(ordinal, draftGroupKey(draft)) ?? null;
   const versionLabel = draftVersionLabel(version);
   const older = version !== null && !version.latest;
+  // EDITED (drafts saved as notes): the reader changed the newest version in
+  // its note, so Lawexa will work from their text.
+  const chat = useV2ChatContext();
+  const edited = useDraftEdited(chat?.conversationId, draftGroupKey(draft), Boolean(panel) && draft.complete && !older);
 
   // A DRAFT OPENS ITSELF WHEN LAWEXA FINISHES IT (Stay, 24 October 2026: "auto
   // open when its done"). The card saw it being written, and its closing tag
@@ -115,6 +125,7 @@ export function DraftCard({
             <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />
           )}
           {versionLabel ? `${versionLabel} · ${status}` : status}
+          {edited ? ' · Edited' : null}
           {older ? <span className="sr-only">, an older version</span> : null}
         </span>
       </span>

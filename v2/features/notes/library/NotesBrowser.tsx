@@ -23,6 +23,8 @@ import { useShellScrollRoot } from '@/v2/shell/use-shell-scroll-root';
 import { notesQueries } from '../queries';
 import { canWriteNotes } from '../note-access';
 import { isLibraryListable, noteRow, type NoteRowModel } from '../note-row-model';
+import { fromChatsParam, parseNotesSource, type NotesSource } from './notes-source';
+import { NotesSourceFilter } from './NotesSourceFilter';
 import { NoteRow } from './NoteRow';
 import { NoteTabs, parseNotesTab, type NotesTab } from './NoteTabs';
 import { useNotesBulk } from './notes-bulk';
@@ -109,6 +111,7 @@ export function NotesBrowser() {
   const guestPassFailed = useGuestPassFailed();
   const searchParams = useSearchParams();
   const tab = parseNotesTab(searchParams.get('tab'));
+  const source = parseNotesSource(searchParams.get('from'));
   const { committedSearch, inputValue, onInputChange, onClear } = useUrlSearch();
   const activeSearch = committedSearch.trim();
   const canWrite = signedIn && canWriteNotes(role);
@@ -130,7 +133,7 @@ export function NotesBrowser() {
   });
 
   const mineQuery = useInfiniteQuery({
-    ...notesQueries.mine(params),
+    ...notesQueries.mine({ ...params, from_chats: fromChatsParam(source) }),
     // A guest can never own a note, so the request is never made — the panel
     // below is the answer, not an empty list from a call we knew the shape of.
     enabled: signedIn && canWrite && tab === 'mine',
@@ -176,6 +179,11 @@ export function NotesBrowser() {
     // Ticks belong to the list they were made on.
     bulk.stop();
     replaceUrlParams({ tab: next === 'all' ? null : next });
+  };
+
+  const setSource = (next: NotesSource) => {
+    bulk.stop();
+    replaceUrlParams({ from: next === 'all' ? null : next });
   };
 
   // The API's own reason, read once. A 4xx is a REFUSAL the server explained;
@@ -254,6 +262,13 @@ export function NotesBrowser() {
           </div>
         ) : null}
       </div>
+
+      {/* My notes' source filter (drafts saved as notes): a guest has no notes to filter. */}
+      {tab === 'mine' && canWrite ? (
+        <div className="mb-4">
+          <NotesSourceFilter value={source} onChange={setSource} />
+        </div>
+      ) : null}
 
       {/* Under the tab row when the developer switch puts it at the top (the
           owner's take A, 23 October 2026). */}

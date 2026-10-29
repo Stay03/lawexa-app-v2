@@ -77,49 +77,44 @@ test('the route posts the title, the html and the format, and reads a file', () 
   assert.match(bar, /const downloads = useDraftDownload\(editor, title\);/);
 });
 
-test('on a computer, before the first save, the chevron holds Save as note, Word and PDF', () => {
+test('on a computer, where nothing is saved, a Download menu holds Word and PDF', () => {
   const bar = read('./DraftSaveBar.tsx');
-  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('function SavedNoteMenu'));
-  // The chevron only before the first save; after it, the Saved chip and its ··· as before.
-  assert.match(control, /\{saved \? \(\s*<SavedNoteMenu[\s\S]*?\/>\s*\) : \(\s*<SaveMoreMenu draft=\{draft\} \/>\s*\)\}/);
-  assert.match(control, /saved \? 'rounded-\[9px\]' : 'rounded-l-\[9px\]',/);
-  assert.match(control, /\{saved && !dirty \? \(\s*<span className="[^"]*bg-primary\/12[^"]*">\s*<Check aria-hidden className="size-\[15px\]" \/>\s*Saved\s*<\/span>/);
-  // A failed download says why in the save failure's place.
-  assert.match(control, /<p role="alert" className=\{FAILURE_BOX\}>\s*\{downloads\.failure\}\s*<\/p>/);
-  const menu = bar.slice(bar.indexOf('function SaveMoreMenu'));
-  assert.match(menu, /<DropdownMenuTrigger\s+aria-label="More ways to save"/);
-  assert.match(menu, /'v2-interactive inline-flex h-8 w-7 items-center justify-center rounded-r-\[9px\]',\s*SAVE_FACE,/);
+  const control = bar.slice(bar.indexOf('export function DraftSaveControl'), bar.indexOf('export function DraftSaveBar'));
+  // An older version, a confidential chat, a deleted or unreached note: no note menu, the downloads.
+  assert.match(control, /\) : \(\s*<DownloadMenu downloads=\{tools\.downloads\} \/>\s*\)\}/);
+  // A failed download says why under the control.
+  assert.match(control, /<p role="alert" className=\{FAILURE_BOX\}>\s*\{tools\.downloads\.failure\}\s*<\/p>/);
+  const menu = bar.slice(bar.indexOf('function DownloadMenu'));
+  assert.match(menu, /<DropdownMenuTrigger\s+aria-label="Download"/);
   assert.match(menu, /\{downloading \? \(\s*<Loader2 /);
   assert.match(menu, /<DropdownMenuContent align="end" className=\{DRAFT_MENU\}>/);
-  const order = ['Save', ' as a note', 'Download Word', '.docx', 'Download PDF', '.pdf'];
+  const order = ['Download Word', '.docx', 'Download PDF', '.pdf'];
   let at = -1;
   for (const word of order) {
     const next = menu.indexOf(word, at + 1);
     assert.ok(next > at, word);
     at = next;
   }
-  assert.match(menu, /onSelect=\{draft\.press\}>\s*<NotebookPen aria-hidden className="size-4 text-foreground\/62" \/>/);
   assert.match(menu, /onSelect=\{\(\) => void download\('docx'\)\}>\s*<Download aria-hidden className="size-4 text-foreground\/62" \/>/);
   assert.match(menu, /onSelect=\{\(\) => void download\('pdf'\)\}>\s*<Download aria-hidden className="size-4 text-foreground\/62" \/>/);
-  // The saved note's ··· menu is unchanged.
-  const saved = bar.slice(bar.indexOf('function SavedNoteMenu'), bar.indexOf('export function DraftFolderPicker'));
-  assert.match(saved, /aria-label="Saved note"/);
-  assert.match(saved, /Export Word\s*<DropdownMenuShortcut>\.docx<\/DropdownMenuShortcut>/);
+  // The note's ··· menu exports the saved note.
+  const note = bar.slice(bar.indexOf('function NoteMenu'), bar.indexOf('export function DraftFolderPicker'));
+  assert.match(note, /aria-label="Draft note"/);
+  assert.match(note, /Export Word\s*<DropdownMenuShortcut>\.docx<\/DropdownMenuShortcut>/);
 });
 
-test('on the phone sheet, before the first save, the foot has Download Word and Download PDF', () => {
+test('on the phone sheet, where nothing is saved, the foot has Download Word and Download PDF', () => {
   const bar = read('./DraftSaveBar.tsx');
-  const foot = bar.slice(bar.indexOf('export function DraftSaveBar'), bar.indexOf('export function DraftSaveControl'));
+  const foot = bar.slice(bar.indexOf('export function DraftSaveBar'), bar.indexOf('function DownloadPill'));
   assert.match(
     foot,
-    /\) : \(\s*\/\/[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*<>\s*<DownloadPill downloads=\{draft\.downloads\} format="docx" label="Download Word" short="Word" \/>\s*<DownloadPill downloads=\{draft\.downloads\} format="pdf" label="Download PDF" short="PDF" \/>\s*<\/>\s*\)\}/,
+    /\) : \(\s*\/\/[^\n]*\n\s*<div className="flex items-center gap-2">\s*<DownloadPill downloads=\{tools\.downloads\} format="docx" label="Download Word" short="Word" \/>\s*<DownloadPill downloads=\{tools\.downloads\} format="pdf" label="Download PDF" short="PDF" \/>\s*<\/div>\s*\)\}/,
   );
-  // Short words, so the row stays one row beside Save as note on a phone;
-  // the button's name is the full one.
+  // Short words, so the row stays one row on a phone; the button's name is the full one.
   assert.match(bar, /aria-label=\{label\}\s*className=\{cn\(ACTION_PILL, FOCUS_RING\)\}/);
-  // Once saved, the foot is main's one row: the line and the saved note's menu.
-  assert.match(foot, /\{saved \? \(\s*<SavedNoteMenu\s*slug=\{saved\.slug\}/);
-  assert.match(foot, /<p role="alert" className="mt-2 text-xs text-destructive">\s*\{draft\.downloads\.failure\}/);
+  // With a note, the foot is one row: the save state and the note's menu.
+  assert.match(foot, /\{note \? \(\s*<NoteMenu/);
+  assert.match(foot, /<p role="alert" className="mt-2 text-xs text-destructive">\s*\{tools\.downloads\.failure\}/);
   const pill = bar.slice(bar.indexOf('function DownloadPill'));
   assert.match(pill, /className=\{cn\(ACTION_PILL, FOCUS_RING\)\}/);
   assert.match(pill, /\{downloads\.downloading === format \? \(\s*<Loader2 /);

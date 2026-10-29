@@ -5,7 +5,7 @@ import type { NotesTab } from './NoteTabs';
  * The grey meta line under a note row's summary (the owner's take A, 23
  * October 2026), as the text parts the row joins with a "·".
  *
- *   My notes    date            "23 Oct"
+ *   My notes    date            "23 Oct", or "23 Oct · From a chat"
  *   All notes   author · date   "Ada Okafor · 23 Oct"
  *
  * On My notes the author is always the reader, so their name is left out. On
@@ -16,9 +16,14 @@ import type { NotesTab } from './NoteTabs';
  * `now` is the list's frozen clock (no `Date.now()` in render): it only
  * decides whether the year is printed.
  */
-export function noteRowMeta(row: Pick<NoteRowModel, 'author' | 'updatedAt'>, tab: NotesTab, now: number): string[] {
+export function noteRowMeta(
+  row: Pick<NoteRowModel, 'author' | 'updatedAt'> & Partial<Pick<NoteRowModel, 'fromChat'>>,
+  tab: NotesTab,
+  now: number,
+): string[] {
   const date = formatRowDate(row.updatedAt, now);
-  const parts = tab === 'mine' ? [date] : [row.author ?? '', date];
+  // A draft Lawexa wrote, now the reader's note (drafts saved as notes).
+  const parts = tab === 'mine' ? [date, row.fromChat ? 'From a chat' : ''] : [row.author ?? '', date];
   return parts.filter((part) => part.length > 0);
 }
 

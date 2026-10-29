@@ -1,12 +1,14 @@
 import { apiClient } from '@/lib/api/client';
-import { isNotFoundError } from '@/lib/utils/api-error';
 import type {
+  DraftNotesEnvelope,
   NoteCreateInput,
   NoteEnvelope,
   NoteImageUpload,
   NoteListEnvelope,
+  NoteRestoreEnvelope,
+  NoteRevisionEnvelope,
+  NoteRevisionsEnvelope,
   NotePublishInput,
-  NoteRecord,
   NoteUpdateInput,
   SuggestedTagsEnvelope,
 } from './types';
@@ -32,6 +34,8 @@ export interface NotesListParams {
   search?: string;
   page?: number;
   per_page?: number;
+  /** My notes only: `true` the notes made from chats' drafts, `false` the rest; omit for all. */
+  from_chats?: boolean;
 }
 
 export const notesApi = {
@@ -59,8 +63,40 @@ export const notesApi = {
         page: params.page ?? 1,
         per_page: params.per_page ?? 20,
         search: params.search || undefined,
+        from_chats: params.from_chats,
       },
     });
+    return response.data;
+  },
+
+  /**
+   * A chat's drafts as notes, one per document (types.ts, `DraftNoteDocument`).
+   * The server makes any note still missing (an old chat), adopts one saved by
+   * hand, and brings a note up to Lawexa's newest version if its queued job
+   * has not yet.
+   */
+  draftNotes: async (conversationUuid: string): Promise<DraftNotesEnvelope> => {
+    const response = await apiClient.get<DraftNotesEnvelope>(
+      `/conversations/${encodeURIComponent(conversationUuid)}/draft-notes`,
+    );
+    return response.data;
+  },
+
+  /** A draft note's saved versions, newest first, without their text. */
+  revisions: async (id: number, page = 1): Promise<NoteRevisionsEnvelope> => {
+    const response = await apiClient.get<NoteRevisionsEnvelope>(`/notes/${id}/revisions`, { params: { page } });
+    return response.data;
+  },
+
+  /** One saved version, with its text. A saved version never changes. */
+  revision: async (id: number, revision: number): Promise<NoteRevisionEnvelope> => {
+    const response = await apiClient.get<NoteRevisionEnvelope>(`/notes/${id}/revisions/${revision}`);
+    return response.data;
+  },
+
+  /** Save a version as the reader's new text (a new revision too); 403 without `can_edit`. */
+  restoreRevision: async (id: number, revision: number): Promise<NoteRestoreEnvelope> => {
+    const response = await apiClient.post<NoteRestoreEnvelope>(`/notes/${id}/revisions/${revision}/restore`);
     return response.data;
   },
 
@@ -79,23 +115,6 @@ export const notesApi = {
   byId: async (id: number): Promise<NoteEnvelope> => {
     const response = await apiClient.get<NoteEnvelope>(`/notes/by-id/${id}`);
     return response.data;
-  },
-
-  /**
-   * The reader's own note saved from draft `draft` of a chat (the draft panel's
-   * Save as note), or `null` when they have none (the server's 404). Never
-   * anyone else's note.
-   */
-  byDraft: async (conversationUuid: string, draft: number): Promise<NoteRecord | null> => {
-    try {
-      const response = await apiClient.get<NoteEnvelope>('/notes/by-draft', {
-        params: { conversation: conversationUuid, draft },
-      });
-      return response.data.data;
-    } catch (error) {
-      if (isNotFoundError(error)) return null;
-      throw error;
-    }
   },
 
   /** Create a draft. Untitled is a first-class state — see `NoteCreateInput`. */
