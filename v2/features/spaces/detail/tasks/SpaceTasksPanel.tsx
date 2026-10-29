@@ -235,11 +235,26 @@ function Board({ columns, now }: { columns: Record<SpaceTaskStage, SpaceTask[]>;
   );
 }
 
-const COLUMN = 'flex min-w-0 flex-col gap-2 max-md:w-full max-md:shrink-0 max-md:snap-start md:flex-1';
+const COLUMN =
+  'flex min-w-0 flex-col gap-2 rounded-2xl p-2 max-md:w-full max-md:shrink-0 max-md:snap-start md:flex-1';
+
+/**
+ * Each column is a lane in a faint wash of its stage's colour (Stay, 29
+ * October 2026, 02:49Z: "some kind of low opacity thin back colour"), the
+ * same hue as its dot at about a twentieth of its strength, so the lanes read
+ * apart while the white cards on them stay the strongest thing on the board.
+ */
+const STAGE_LANE: Readonly<Record<SpaceTaskStage, string>> = {
+  working: 'bg-blue-500/5 dark:bg-blue-400/8',
+  paused: 'bg-slate-500/6 dark:bg-slate-400/8',
+  waiting: 'bg-amber-500/6 dark:bg-amber-400/8',
+  queued: 'bg-violet-500/5 dark:bg-violet-400/8',
+  done: 'bg-emerald-500/5 dark:bg-emerald-400/8',
+};
 
 function StageColumn({ stage, tasks, now }: { stage: SpaceTaskStage; tasks: SpaceTask[]; now: number }) {
   return (
-    <section aria-label={`${TASK_STAGE_LABELS[stage]}, ${tasks.length}`} className={COLUMN}>
+    <section aria-label={`${TASK_STAGE_LABELS[stage]}, ${tasks.length}`} className={cn(COLUMN, STAGE_LANE[stage])}>
       <ColumnHead stage={stage} count={tasks.length} />
       <CardList tasks={tasks} now={now} empty={EMPTY_WORDS[stage]} />
     </section>
@@ -266,7 +281,8 @@ function DoneColumn({
         aria-expanded={false}
         aria-label={`Show Done, the last ${DONE_WINDOW_DAYS} days: ${tasks.length}`}
         className={cn(
-          'v2-interactive hidden w-11 shrink-0 flex-col items-center gap-2 self-stretch rounded-xl border border-border py-3 text-xs text-muted-foreground transition-colors hover:text-foreground',
+          'v2-interactive hidden w-11 shrink-0 flex-col items-center gap-2 self-stretch rounded-2xl py-3 text-xs text-muted-foreground transition-colors hover:text-foreground',
+          STAGE_LANE.done,
           !open && 'md:flex',
           FOCUS_RING,
         )}
@@ -277,7 +293,7 @@ function DoneColumn({
       </button>
       <section
         aria-label={`Done, the last ${DONE_WINDOW_DAYS} days, ${tasks.length}`}
-        className={cn(COLUMN, !open && 'md:hidden')}
+        className={cn(COLUMN, STAGE_LANE.done, !open && 'md:hidden')}
       >
         <ColumnHead
           stage="done"
