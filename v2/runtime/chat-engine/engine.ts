@@ -789,6 +789,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     stopWatchdog();
     lastEventTime = Date.now();
     reconnectingSince = 0;
+    pausedRoll = false;
     watchdog = setInterval(() => {
       const verdict = stallVerdict({
         now: Date.now(),
@@ -826,6 +827,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       conversationId,
     });
     reconnectingSince = 0;
+    pausedRoll = false;
     reconnectCount = 0;
     const convId = conversationId;
     if (convId) {
@@ -1729,6 +1731,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         });
         reconnectCount = 0;
         reconnectingSince = 0;
+        pausedRoll = false;
         pollForCompletion(convId);
         return;
       }
@@ -2043,6 +2046,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     lastDataEventTime = 0;
     lastProgressAt = 0;
     reconnectingSince = 0;
+    pausedRoll = false;
     dedupKeys = new Set();
     // Clear text accumulators on FULL disconnect (but never on SSE reconnect — the
     // placeholder must persist so `completed` can replace it).
