@@ -22,6 +22,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 export const SPACE_PAGE_COLUMN =
   'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';
 
+/** The Tasks pill's column: the board's stage columns need the pane's width
+ *  on a computer (Stay's B, 29 October 2026, 00:45Z). The same column, wider. */
+export const SPACE_BOARD_COLUMN =
+  'mx-auto flex min-h-full w-full max-w-6xl flex-col px-4 pb-16 pt-5 sm:pt-6';
+
 /** The pills and search held at the top of the pane: stacked on a phone, one
  *  row from `md:`. Shared by the live home and its silhouette, so the
  *  hand-off moves nothing. `-mx-4 px-4` runs its rule and ground to the

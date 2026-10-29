@@ -15,16 +15,23 @@ test('the Tasks pill draws the task board, with no feed read, no file drop and n
   assert.match(panel, /const DOCK_TABS: ReadonlySet<SpaceTab> = new Set<SpaceTab>\(\['all', 'conversations', 'folders', 'radars'\]\);/);
 });
 
-test('the board reads one list, and its stage chip is the thread status chip under the stage’s word', () => {
+test('the board reads one list, and its only colour is each stage’s thread-status dot', () => {
   const queries = read('v2', 'features', 'spaces', 'queries.ts');
   assert.match(queries, /queryKey: \[\.\.\.spacesQueries\.tasksOf\(spaceUuid\), \{ viewerId \}\] as const,/);
   const api = read('lib', 'api', 'collab.ts');
   assert.match(api, /`\/spaces\/\$\{encodeURIComponent\(spaceUuid\)\}\/tasks`/);
-  const chip = read('v2', 'features', 'collab', 'kit', 'ThreadStatusChip.tsx');
-  assert.match(chip, /\{label \?\? threadStatusLabel\(value\)\}/);
-  // No new colours (techlead, 28 October 2026): every chip on the board takes a stage's thread tone.
+  // Stay's B (29 October 2026): no chips, badges or coloured fills; the stage
+  // colour is the small dot in a column's head and the phone's switcher.
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
-  const chips = board.match(/<ThreadStatusChip [^>]*\/>/g) ?? [];
-  assert.equal(chips.length, 2);
-  for (const tag of chips) assert.match(tag, /value=\{TASK_STAGE_TONE\[[\w.]+\]\} label=\{TASK_STAGE_LABELS\[[\w.]+\]\}/);
+  assert.doesNotMatch(board, /<ThreadStatusChip\b/);
+  const dots = board.match(/<ThreadStatusDot [^>]*\/>/g) ?? [];
+  assert.equal(dots.length, 3);
+  for (const tag of dots) assert.match(tag, /value=\{TASK_STAGE_TONE(\[[\w.]+\]|\.done)\}/);
+});
+
+test('only the Tasks pill takes the wider board column', () => {
+  const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
+  assert.match(parts, /export const SPACE_BOARD_COLUMN =\s*'mx-auto flex min-h-full w-full max-w-6xl flex-col/);
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(screen, /<div className=\{tab === 'tasks' \? SPACE_BOARD_COLUMN : SPACE_PAGE_COLUMN\}>/);
 });

@@ -28,7 +28,7 @@ import {
 } from '../model';
 import { CachedSpaceFrame } from './CachedSpaceFrame';
 import { SpaceContentPanel } from './content/SpaceContentPanel';
-import { SPACE_PAGE_COLUMN } from './lobby-parts';
+import { SPACE_BOARD_COLUMN, SPACE_PAGE_COLUMN } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import { useCachedSpaceIdentity } from './cached-identity';
@@ -325,7 +325,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   }
 
   return (
-    <div className={SPACE_PAGE_COLUMN}>
+    <div className={tab === 'tasks' ? SPACE_BOARD_COLUMN : SPACE_PAGE_COLUMN}>
       <SpacePlaceHeader
         space={space}
         membership={scope.membership}

@@ -1,59 +1,63 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, ListChecks, UserRound } from 'lucide-react';
+import { Check, ChevronDown, ChevronRight, ListChecks, UserRound } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { SpaceTask } from '@/types/collab';
+import { getInitials } from '@/lib/utils/collab';
+import type { SpaceTask, SpaceTaskPerson, SpaceTaskStage } from '@/types/collab';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
-import { ThreadStatusChip } from '@/v2/features/collab/kit/ThreadStatusChip';
-import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
+import { ThreadStatusDot } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { collabAccessState } from '@/v2/features/collab/model';
-import { RadarTabs, type RadarTab } from '@/v2/features/radars/RadarTabs';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
-import { FeedLine } from '../content/feed-rows';
 import { SpaceContentErrorState, SpaceContentSkeleton } from '../content/states';
 import { spacesQueries } from '../../queries';
 import {
-  doneFoldLabel,
-  groupByPerson,
-  groupByStage,
-  openTasks,
-  overCommitted,
-  personSummary,
+  BOARD_STAGES,
+  boardColumns,
+  DONE_WINDOW_DAYS,
+  filterByOwner,
+  ownerOptions,
   TASK_STAGE_LABELS,
   TASK_STAGE_TONE,
   taskNote,
-  type PersonGroup,
+  type OwnerOption,
 } from './task-board-model';
 
 /**
- * SpaceTasksPanel — the Tasks pill (thread 7aa0c6d8; Stay, 27 October 2026:
- * "A but in a clean UI/UX in the space that both humans and agent can use").
- * Who is doing what in the space, from `GET /spaces/{uuid}/tasks`.
+ * SpaceTasksPanel — the Tasks pill (thread 7aa0c6d8): who is doing what in
+ * the space, from `GET /spaces/{uuid}/tasks`.
  *
- * BY PERSON (the default): one block per owner under their face and name,
- * with a head line of what they have ("1 working · 3 next"). Their task in
- * progress comes first, then what is paused (with the reason), what waits on
- * someone (and on whom), and the queue in order. Their done tasks of the last
- * 14 days fold away under the block. Two tasks in progress at once turn the
- * head line amber, Needs Action's word colour; nothing moves on its own.
- *
- * BY STAGE: one block per stage under its chip, each row with the owner's
- * face. Done folds the same way.
- *
- * Every row is the feed's own row (`FeedLine`), so a task reads like
- * everything else in the space. The stage chip is the thread status chip in
- * that status's colours (techlead, 28 October 2026: no new colours, tiles or
- * badges). The time is how long the task has been in its stage.
+ * STAY'S B (29 October 2026, 00:45Z: "B but cleaner and better"), drawn to
+ * the techlead's brief:
+ * - One column per stage: Working, Paused, Waiting, Queued. A column's head
+ *   is its name and count; the stage's colour is only the small dot before
+ *   the name. No fills, no coloured bars, no limits.
+ * - A card is the title (two lines at most), then one grey line: the owner's
+ *   initials and name, a grey "Agent" tag for an agent, and the time in the
+ *   stage at the right. Paused adds the reason, Waiting "Waiting on Stay", as
+ *   a second grey line. No badges or chips.
+ * - Done keeps 14 days and folds into a thin strip at the right edge; a
+ *   click opens it as a column.
+ * - "Everyone" narrows the board to one owner.
+ * - Gold marks only what is chosen: the owner filter's tick, a phone's stage.
+ * - A phone shows one column at a time: the stage switcher at the top, with
+ *   counts, and a swipe moves between the columns.
  */
 export function SpaceTasksPanel({ spaceUuid }: { spaceUuid: string }) {
   const session = useV2Session();
-  const [view, setView] = useState<TaskView>('person');
   const query = useQuery({
     ...spacesQueries.tasks(spaceUuid, { viewerId: session.userId }),
     enabled: collabAccessState(session) === 'eligible',
@@ -61,214 +65,315 @@ export function SpaceTasksPanel({ spaceUuid }: { spaceUuid: string }) {
   const tasks = query.data ?? NO_TASKS;
   // Captured once, so no clock read runs in render (React Compiler purity).
   const [now] = useState(() => Date.now());
+  const [owner, setOwner] = useState<string | null>(null);
+  const owners = useMemo(() => ownerOptions(tasks), [tasks]);
+  const shown = useMemo(() => filterByOwner(tasks, owner), [tasks, owner]);
+  const columns = useMemo(() => boardColumns(shown), [shown]);
   // A refusal the server explained (403) is worth its own sentence.
   const apiError = query.error ? extractApiError(query.error) : null;
 
+  if (query.isPending) return <SpaceContentSkeleton />;
+  if (query.isError && tasks.length === 0) {
+    return (
+      <SpaceContentErrorState
+        tab="tasks"
+        message={apiError?.status === 403 ? apiError.message : undefined}
+        onRetry={() => void query.refetch()}
+      />
+    );
+  }
+  if (tasks.length === 0) {
+    return (
+      <CollabEmpty
+        icon={ListChecks}
+        title="No tasks in this space yet"
+        description="A task shows who has it, what stage it is at and how long it has been there. People and agents move their own."
+      />
+    );
+  }
   return (
-    <div className="flex flex-col gap-3">
-      {/* The strip is as wide as its two choices, like the space's pills. */}
-      <div className="self-start">
-        <RadarTabs
-          tabs={VIEW_TABS}
-          value={view}
-          onChange={setView}
-          ariaLabel="Show the space's tasks by person or by stage"
-          panelId={PANEL_ID}
-        />
-      </div>
-      <div id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${view}`}>
-        {query.isPending ? (
-          <SpaceContentSkeleton />
-        ) : query.isError && tasks.length === 0 ? (
-          <SpaceContentErrorState
-            tab="tasks"
-            message={apiError?.status === 403 ? apiError.message : undefined}
-            onRetry={() => void query.refetch()}
-          />
-        ) : tasks.length === 0 ? (
-          <CollabEmpty
-            icon={ListChecks}
-            title="No tasks in this space yet"
-            description="A task shows who has it, what stage it is at and its thread. People and agents move their own."
-          />
-        ) : view === 'person' ? (
-          <ByPerson tasks={tasks} now={now} />
-        ) : (
-          <ByStage tasks={tasks} now={now} />
-        )}
-      </div>
+    <div className="flex flex-col gap-4">
+      <OwnerFilter owners={owners} value={owner} onChange={setOwner} />
+      <Board columns={columns} now={now} />
     </div>
   );
 }
 
-function ByPerson({ tasks, now }: { tasks: readonly SpaceTask[]; now: number }) {
+function OwnerFilter({
+  owners,
+  value,
+  onChange,
+}: {
+  owners: readonly OwnerOption[];
+  value: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  const chosen = owners.find((option) => option.key === value) ?? null;
   return (
-    <div className="flex flex-col gap-5">
-      {groupByPerson(tasks).map((group) => (
-        <PersonBlock key={group.key} group={group} now={now} />
-      ))}
-    </div>
-  );
-}
-
-function PersonBlock({ group, now }: { group: PersonGroup; now: number }) {
-  const headingId = useId();
-  const open = openTasks(group);
-  const busy = overCommitted(group);
-  const name = group.owner?.name ?? 'Nobody yet';
-  return (
-    <section aria-labelledby={headingId} className="flex flex-col">
-      {/* A phone puts the head line under the name, so the name keeps its
-          whole width (the 390px pictures cut "Frontend Cl…"). */}
-      <div className="flex min-h-9 min-w-0 flex-wrap items-center gap-x-3 px-3 max-md:py-1">
-        {group.owner ? <MemberAvatar user={group.owner} size="sm" /> : <NobodyMark />}
-        <h3 id={headingId} className="flex min-w-0 flex-1 items-baseline gap-1.5">
-          <span className="min-w-0 truncate text-sm font-semibold text-foreground">{name}</span>
-          {group.owner?.is_agent ? <AgentWord /> : null}
-        </h3>
-        <span
-          className={cn(
-            'text-xs tabular-nums max-md:basis-full max-md:pl-9 md:ml-auto md:shrink-0',
-            busy ? 'font-medium text-amber-800 dark:text-amber-300' : 'text-muted-foreground',
-          )}
-        >
-          {personSummary(group)}
-          {busy ? <span className="sr-only">, more than one task in progress</span> : null}
-        </span>
-      </div>
-      {open.length > 0 ? (
-        <ul className="flex flex-col">
-          {open.map((task) => (
-            <TaskLine key={task.uuid} task={task} now={now} showOwner={false} />
+    <div className="flex items-center">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-1.5 rounded-full">
+            {chosen ? chosen.name : 'Everyone'}
+            <ChevronDown aria-hidden className="size-3.5 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-64">
+          <OwnerItem label="Everyone" selected={value === null} onSelect={() => onChange(null)} />
+          <DropdownMenuSeparator />
+          {owners.map((option) => (
+            <OwnerItem
+              key={option.key}
+              label={option.name}
+              agent={option.isAgent}
+              open={option.open}
+              selected={value === option.key}
+              onSelect={() => onChange(option.key)}
+            />
           ))}
-        </ul>
-      ) : null}
-      {group.done.length > 0 ? <DoneFold tasks={group.done} now={now} showOwner={false} /> : null}
-    </section>
-  );
-}
-
-function ByStage({ tasks, now }: { tasks: readonly SpaceTask[]; now: number }) {
-  return (
-    <div className="flex flex-col gap-5">
-      {groupByStage(tasks).map((group) =>
-        group.stage === 'done' ? (
-          <DoneFold key={group.stage} tasks={group.tasks} now={now} showOwner />
-        ) : (
-          <StageBlock key={group.stage} stage={group.stage} tasks={group.tasks} now={now} />
-        ),
-      )}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
 
-function StageBlock({ stage, tasks, now }: { stage: SpaceTask['stage']; tasks: SpaceTask[]; now: number }) {
-  const headingId = useId();
+function OwnerItem({
+  label,
+  agent = false,
+  open,
+  selected,
+  onSelect,
+}: {
+  label: string;
+  agent?: boolean;
+  /** Their open tasks; absent on "Everyone". */
+  open?: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   return (
-    <section aria-labelledby={headingId} className="flex flex-col">
-      <h3 id={headingId} className="flex min-h-9 items-center gap-2 px-3">
-        <ThreadStatusChip value={TASK_STAGE_TONE[stage]} label={TASK_STAGE_LABELS[stage]} />
-        <span className="text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
-      </h3>
-      <ul className="flex flex-col">
-        {tasks.map((task) => (
-          <TaskLine key={task.uuid} task={task} now={now} showOwner />
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/** A block's done tasks, folded under one quiet line until asked for. */
-function DoneFold({ tasks, now, showOwner }: { tasks: readonly SpaceTask[]; now: number; showOwner: boolean }) {
-  const [open, setOpen] = useState(false);
-  const listId = useId();
-  return (
-    <div className="flex flex-col">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={listId}
-        onClick={() => setOpen((value) => !value)}
-        className={cn(
-          'v2-interactive inline-flex min-h-9 items-center gap-1.5 self-start rounded-lg px-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
-          FOCUS_RING,
-        )}
-      >
-        <ChevronRight
-          aria-hidden
-          className={cn('size-3.5 transition-transform duration-150 motion-reduce:transition-none', open && 'rotate-90')}
-        />
-        {doneFoldLabel(tasks.length)}
-      </button>
-      {open ? (
-        <ul id={listId} className="flex flex-col">
-          {tasks.map((task) => (
-            <TaskLine key={task.uuid} task={task} now={now} showOwner={showOwner} />
-          ))}
-        </ul>
+    <DropdownMenuItem onSelect={onSelect} className="gap-2">
+      <Check aria-hidden className={cn('size-4 shrink-0 text-primary', !selected && 'invisible')} />
+      <span className="min-w-0 truncate">{label}</span>
+      {agent ? <AgentTag /> : null}
+      {open !== undefined ? (
+        <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{open}</span>
       ) : null}
-    </div>
+    </DropdownMenuItem>
   );
 }
 
 /**
- * One task: its title, then its stage chip on the by-person view (the
- * by-stage view's block head already names the stage), and how long it has
- * been there. Under it, who it waits on or why it is paused, then its
- * thread. On the by-stage view the owner's face leads the row and their
- * name leads the second line.
+ * The columns. On a computer, side by side, with Done as a strip at the
+ * right edge until opened. On a phone, one column the width of the screen,
+ * scroll-snapped, with the stage switcher above: a tap scrolls to that
+ * column, a swipe moves the switcher.
  */
-function TaskLine({ task, now, showOwner }: { task: SpaceTask; now: number; showOwner: boolean }) {
-  const meta = [showOwner ? ownerWords(task.owner) : null, taskNote(task), task.thread?.name ?? null]
-    .filter(Boolean)
-    .join(' · ');
+function Board({ columns, now }: { columns: Record<SpaceTaskStage, SpaceTask[]>; now: number }) {
+  const [doneOpen, setDoneOpen] = useState(false);
+  const [phoneStage, setPhoneStage] = useState(0);
+  const track = useRef<HTMLDivElement>(null);
+
+  const showStage = (index: number) => {
+    const element = track.current;
+    if (!element) return;
+    element.scrollTo({ left: index * element.clientWidth, behavior: 'smooth' });
+  };
+  const followSwipe = () => {
+    const element = track.current;
+    if (!element || element.clientWidth === 0) return;
+    setPhoneStage(Math.round(element.scrollLeft / element.clientWidth));
+  };
+
   return (
-    <FeedLine
-      line={{
-        lead: showOwner ? task.owner ? <MemberAvatar user={task.owner} size="sm" /> : <NobodyMark /> : undefined,
-        title: task.title,
-        quiet: task.stage === 'done',
-        status: showOwner ? undefined : (
-          <ThreadStatusChip value={TASK_STAGE_TONE[task.stage]} label={TASK_STAGE_LABELS[task.stage]} />
-        ),
-        meta: meta || undefined,
-        time: formatRelativeTime(task.stage_changed_at, now),
-      }}
-      render={(className, content) => <div className={className}>{content}</div>}
-    />
+    <div className="flex flex-col gap-3">
+      <div role="tablist" aria-label="Stage" className="-mx-4 flex gap-1 overflow-x-auto px-4 md:hidden">
+        {BOARD_STAGES.map((stage, index) => {
+          const selected = index === phoneStage;
+          return (
+            <button
+              key={stage}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              onClick={() => showStage(index)}
+              className={cn(
+                'v2-interactive relative inline-flex min-h-10 shrink-0 items-center gap-1.5 px-2.5 text-sm transition-colors',
+                selected ? 'font-medium text-primary' : 'text-muted-foreground',
+                FOCUS_RING,
+              )}
+            >
+              <ThreadStatusDot value={TASK_STAGE_TONE[stage]} />
+              {TASK_STAGE_LABELS[stage]}
+              <span className="tabular-nums opacity-70">{columns[stage].length}</span>
+              {selected ? <span aria-hidden className="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full bg-primary" /> : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        ref={track}
+        onScroll={followSwipe}
+        className="flex items-start max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto md:gap-4"
+      >
+        {BOARD_STAGES.map((stage) =>
+          stage === 'done' ? (
+            <DoneColumn
+              key={stage}
+              tasks={columns.done}
+              now={now}
+              open={doneOpen}
+              onToggle={() => setDoneOpen((value) => !value)}
+            />
+          ) : (
+            <StageColumn key={stage} stage={stage} tasks={columns[stage]} now={now} />
+          ),
+        )}
+      </div>
+    </div>
   );
 }
 
-/** The agent mark (Stay, 28 October 2026, 23:17Z: yes to the eight agent
- *  accounts): one quiet word after the name, no badge. */
-function AgentWord() {
-  return <span className="shrink-0 text-xs text-muted-foreground">Agent</span>;
-}
+const COLUMN = 'flex min-w-0 flex-col gap-2 max-md:w-full max-md:shrink-0 max-md:snap-start md:flex-1';
 
-/** The owner on a by-stage row's second line: "Backend Claude (agent)". */
-function ownerWords(owner: SpaceTask['owner']): string {
-  if (!owner) return 'Nobody yet';
-  return owner.is_agent ? `${owner.name} (agent)` : owner.name;
-}
-
-/** The face for the tasks nobody has yet. */
-function NobodyMark() {
+function StageColumn({ stage, tasks, now }: { stage: SpaceTaskStage; tasks: SpaceTask[]; now: number }) {
   return (
-    <span aria-hidden className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary">
-      <UserRound className="size-3.5 text-muted-foreground" />
+    <section aria-label={`${TASK_STAGE_LABELS[stage]}, ${tasks.length}`} className={COLUMN}>
+      <ColumnHead stage={stage} count={tasks.length} />
+      <CardList tasks={tasks} now={now} empty={EMPTY_WORDS[stage]} />
+    </section>
+  );
+}
+
+/** Done: a strip at a computer's right edge until opened; on a phone, a column like the rest. */
+function DoneColumn({
+  tasks,
+  now,
+  open,
+  onToggle,
+}: {
+  tasks: SpaceTask[];
+  now: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={false}
+        aria-label={`Show Done, the last ${DONE_WINDOW_DAYS} days: ${tasks.length}`}
+        className={cn(
+          'v2-interactive hidden w-11 shrink-0 flex-col items-center gap-2 self-stretch rounded-xl border border-border py-3 text-xs text-muted-foreground transition-colors hover:text-foreground',
+          !open && 'md:flex',
+          FOCUS_RING,
+        )}
+      >
+        <ThreadStatusDot value={TASK_STAGE_TONE.done} />
+        <span className="font-medium [writing-mode:vertical-rl]">Done</span>
+        <span className="tabular-nums">{tasks.length}</span>
+      </button>
+      <section
+        aria-label={`Done, the last ${DONE_WINDOW_DAYS} days, ${tasks.length}`}
+        className={cn(COLUMN, !open && 'md:hidden')}
+      >
+        <ColumnHead
+          stage="done"
+          count={tasks.length}
+          action={
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded
+              aria-label="Fold Done away"
+              className={cn('v2-interactive ml-auto hidden rounded-md p-1 text-muted-foreground hover:text-foreground md:inline-flex', FOCUS_RING)}
+            >
+              <ChevronRight aria-hidden className="size-4" />
+            </button>
+          }
+        />
+        <CardList tasks={tasks} now={now} empty={EMPTY_WORDS.done} />
+      </section>
+    </>
+  );
+}
+
+function ColumnHead({ stage, count, action }: { stage: SpaceTaskStage; count: number; action?: ReactNode }) {
+  // A phone names the column in the switcher above it.
+  return (
+    <div className="flex min-h-8 items-center gap-2 px-1 max-md:hidden">
+      <ThreadStatusDot value={TASK_STAGE_TONE[stage]} />
+      <h3 className="text-sm font-medium text-foreground">{TASK_STAGE_LABELS[stage]}</h3>
+      <span className="text-sm tabular-nums text-muted-foreground">{count}</span>
+      {action}
+    </div>
+  );
+}
+
+function CardList({ tasks, now, empty }: { tasks: SpaceTask[]; now: number; empty: string }) {
+  if (tasks.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+        {empty}
+      </p>
+    );
+  }
+  return (
+    <ul className="flex flex-col gap-2">
+      {tasks.map((task) => (
+        <TaskCard key={task.uuid} task={task} now={now} />
+      ))}
+    </ul>
+  );
+}
+
+function TaskCard({ task, now }: { task: SpaceTask; now: number }) {
+  const note = taskNote(task);
+  return (
+    <li className="rounded-xl border border-border bg-card px-3.5 py-3 shadow-xs">
+      <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{task.title}</p>
+      <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+        <Initials person={task.owner} />
+        <span className="min-w-0 truncate">{task.owner?.name ?? 'Nobody yet'}</span>
+        {task.owner?.is_agent ? <AgentTag /> : null}
+        <span className="ml-auto shrink-0 pl-2 tabular-nums">{formatRelativeTime(task.stage_changed_at, now)}</span>
+      </div>
+      {note ? <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{note}</p> : null}
+    </li>
+  );
+}
+
+/** An owner's mark: small initials, never a face (the techlead's brief for B). */
+function Initials({ person }: { person: SpaceTaskPerson | null }) {
+  return (
+    <span
+      aria-hidden
+      className="flex size-5 shrink-0 items-center justify-center rounded-full bg-secondary text-[9px] font-semibold text-muted-foreground"
+    >
+      {person ? getInitials(person.name) : <UserRound className="size-3" />}
     </span>
   );
 }
 
-type TaskView = 'person' | 'stage';
+/** The agent mark (Stay, 28 October 2026, 23:17Z: yes to the eight agent accounts). */
+function AgentTag() {
+  return (
+    <span className="shrink-0 rounded-md bg-secondary px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+      Agent
+    </span>
+  );
+}
 
-const VIEW_TABS: readonly RadarTab<TaskView>[] = [
-  { id: 'person', label: 'By person' },
-  { id: 'stage', label: 'By stage' },
-];
-
-const PANEL_ID = 'space-tasks-panel';
+/** What an empty column says: a quiet dashed box, never a blank. */
+const EMPTY_WORDS: Readonly<Record<SpaceTaskStage, string>> = {
+  working: 'Nothing in progress',
+  paused: 'Nothing paused',
+  waiting: 'Nothing waiting on anyone',
+  queued: 'Nothing queued',
+  done: `Nothing done in the last ${DONE_WINDOW_DAYS} days`,
+};
 
 /** Stable empty rows, so a pending board does not mint a new array per render. */
 const NO_TASKS: readonly SpaceTask[] = [];
