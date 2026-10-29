@@ -303,3 +303,9 @@ test('a failed read of the usage or the versions says so with Try again, never a
   const versions = read('components', 'admin', 'ai', 'AiSkillVersions.tsx');
   assert.match(versions, /\{isError && !data \? \(\s*<LoadFailed message="The versions did not load\." onRetry=\{\(\) => refetch\(\)\} retrying=\{isFetching\} \/>/);
 });
+
+test('a long change note wraps, so View and Restore stay in the versions card at 1440', () => {
+  const versions = read('components', 'admin', 'ai', 'AiSkillVersions.tsx');
+  // TableCell is whitespace-nowrap; the note cell opts out.
+  assert.match(versions, /<TableCell className="min-w-\[160px\] whitespace-normal break-words text-sm text-muted-foreground">\s*\{version\.change_note \|\| '—'\}/);
+});
