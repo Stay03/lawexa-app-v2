@@ -214,3 +214,14 @@ test('the Owner list holds only owners and editors; anyone may be waited on', ()
     ['Ola'],
   );
 });
+
+test('editing a task a viewer owns never sends owner, so the server does not re-check it', () => {
+  // Backend's a1726573 re-checks owner only when the body has it, and refuses a
+  // viewer there: a title edit on a viewer-owned task must leave owner out.
+  const VIEWER = person('u-viewer', 'Vic');
+  const owned = task({ owner: VIEWER });
+  assert.deepEqual(updatePayload({ ...draftFromTask(owned, null), title: 'Renamed' }, owned), { title: 'Renamed' });
+  assert.deepEqual(updatePayload({ ...draftFromTask(owned, null), stage: 'working' }, owned), { stage: 'working' });
+  // Choosing someone else does send it.
+  assert.deepEqual(updatePayload({ ...draftFromTask(owned, null), owner: 'u-ada' }, owned), { owner: 'u-ada' });
+});
