@@ -63,9 +63,9 @@ export function AiSkillFilters({ params, onParamsChange }: AiSkillFiltersProps) 
       </Select>
 
       <Select
-        value={params.active_only === undefined ? 'all' : params.active_only ? 'active' : 'inactive'}
+        value={params.is_active === undefined ? 'all' : params.is_active ? 'active' : 'inactive'}
         onValueChange={(value) =>
-          onParamsChange({ active_only: value === 'all' ? undefined : value === 'active', page: 1 })
+          onParamsChange({ is_active: value === 'all' ? undefined : value === 'active', page: 1 })
         }
       >
         <SelectTrigger className="w-[130px]" aria-label="Status">

@@ -11,8 +11,12 @@ import {
   lineDiff,
   loadModeHint,
   LOAD_MODE_LABEL,
+  changesVersion,
+  restoredMessage,
   restoreQuestion,
   savedAsVersion,
+  savedEditMessage,
+  SKILL_CHANGE_NOTE_MAX,
   SKILL_DESCRIPTION_MAX,
   SKILL_INSTRUCTIONS_MAX,
   SKILL_NAME_MAX,
@@ -167,7 +171,8 @@ test('the form fixes the name after create, counts the long fields and names the
   assert.match(form, /counterLabel\(description\.length, SKILL_DESCRIPTION_MAX\)/);
   assert.match(form, /counterLabel\(instructions\.length, SKILL_INSTRUCTIONS_MAX\)/);
   assert.match(form, /<FormDescription>\{loadModeHint\(loadMode, tokens\)\}<\/FormDescription>/);
-  assert.match(form, /toast\.success\(response\.data \? savedAsVersion\(response\.data\.version\) : response\.message\);/);
+  assert.match(form, /else if \(skill\) toast\.success\(savedEditMessage\(skill\.version, response\.data\.version, !!data\.change_note\?\.trim\(\)\)\);/);
+  assert.match(form, /else toast\.success\(savedAsVersion\(response\.data\.version\)\);/);
 });
 
 test('delete is refused while the skill is on an agent; restore asks first; an always-on skill shows its cost', () => {
@@ -224,4 +229,77 @@ test('only the list counts the loads: one skill’s page never reads loads_7d (w
   const page = read('app', '(admin)', 'admin', 'ai', 'skills', '[id]', 'page.tsx');
   assert.doesNotMatch(page, /loads_7d/);
   assert.match(page, /\{skill\.agents_count\.toLocaleString\('en-US'\)\}/);
+});
+
+test('Active and Inactive send is_active, which the server filters on both ways (active_only=false filters nothing)', () => {
+  const filters = read('components', 'admin', 'ai', 'AiSkillFilters.tsx');
+  assert.match(filters, /onParamsChange\(\{ is_active: value === 'all' \? undefined : value === 'active', page: 1 \}\)/);
+  assert.match(filters, /<SelectItem value="inactive">Inactive<\/SelectItem>/);
+  assert.doesNotMatch(filters, /active_only/);
+  const page = read('app', '(admin)', 'admin', 'ai', 'skills', 'page.tsx');
+  assert.match(page, /is_active: isActive === 'true' \? true : isActive === 'false' \? false : undefined,/);
+  const api = read('lib', 'api', 'admin-ai.ts');
+  const getSkills = api.slice(api.indexOf('getSkills:'), api.indexOf('getSkill:'));
+  assert.match(getSkills, /is_active: params\.is_active,/);
+  assert.doesNotMatch(getSkills, /active_only/);
+});
+
+test('only a change to a versioned field makes a version: Active alone keeps the number, and says so', () => {
+  const saved = { display_name: 'TEST DATA Research', description: 'One line.', instructions: '1. Read.', load_mode: 'on_demand' };
+  assert.equal(changesVersion(saved, { ...saved }), false);
+  // The server trims before it compares.
+  assert.equal(changesVersion(saved, { ...saved, instructions: '1. Read.  ' }), false);
+  assert.equal(changesVersion(saved, { ...saved, instructions: '1. Read.\n2. Answer.' }), true);
+  assert.equal(changesVersion(saved, { ...saved, load_mode: 'always_on' }), true);
+  assert.equal(changesVersion(saved, { ...saved, display_name: 'TEST DATA Research again' }), true);
+
+  assert.equal(savedEditMessage(4, 5, true), 'Saved as version 5.');
+  assert.equal(
+    savedEditMessage(4, 4, false),
+    'Saved. No change to the display name, description, steps or load mode, so it is still version 4.',
+  );
+  assert.equal(
+    savedEditMessage(4, 4, true),
+    'Saved. No change to the display name, description, steps or load mode, so it is still version 4. The change note was not kept: it goes with a new version.',
+  );
+  assert.equal(restoredMessage(2, 5, 6), 'Version 2 restored as version 6.');
+  assert.equal(restoredMessage(2, 5, 5), 'Version 2 is the same as version 5, so nothing changed.');
+
+  const form = read('components', 'admin', 'ai', 'AiSkillFormSheet.tsx');
+  assert.match(form, /`Saving makes version \$\{skill\.version \+ 1\}\. Earlier versions stay in the history\.`/);
+  assert.match(form, /Active alone keeps version \$\{skill\.version\}\.`/);
+  assert.match(form, /change_note: makesVersion \? data\.change_note\?\.trim\(\) \|\| undefined : undefined,/);
+  assert.match(form, /\{\.\.\.field\}\s*disabled=\{!makesVersion\}/);
+  assert.match(form, /\{!isEditMode \? 'Create Skill' : makesVersion \? 'Save version' : 'Save'\}/);
+  const versions = read('components', 'admin', 'ai', 'AiSkillVersions.tsx');
+  assert.match(versions, /restoredMessage\(restoring\.version, skill\.version, response\.data\.version\)/);
+});
+
+test('a fixed name is never checked on edit; the change note limit is the server’s 500', () => {
+  assert.equal(SKILL_CHANGE_NOTE_MAX, 500);
+  const form = read('components', 'admin', 'ai', 'AiSkillFormSheet.tsx');
+  assert.match(form, /name: isEditMode\s*\? z\.string\(\)\s*: z\.string\(\)\.superRefine/);
+  assert.match(form, /zodResolver\(skillFormSchema\(isEditMode\)\)/);
+  assert.match(form, /change_note: z\.string\(\)\.max\(SKILL_CHANGE_NOTE_MAX,/);
+});
+
+test('a refused delete names its agents through a guard; a delete drops the skill’s reads; edits refresh the agents', () => {
+  const remove = read('components', 'admin', 'ai', 'AiSkillDeleteDialog.tsx');
+  assert.doesNotMatch(remove, /as unknown as/);
+  assert.match(remove, /const names = blockingAgentNames\(apiError\.errors\?\.agents\)\.join\(', '\);/);
+  const hooks = read('lib', 'hooks', 'useAdminAi.ts');
+  const block = (name: string) => hooks.slice(hooks.indexOf(`export function ${name}`), hooks.indexOf('\n}\n', hooks.indexOf(`export function ${name}`)));
+  for (const name of ['useUpdateAiSkill', 'useRestoreAiSkillVersion', 'useDeleteAiSkill']) {
+    assert.match(block(name), /queryClient\.invalidateQueries\(\{ queryKey: adminAiKeys\.agents\(\) \}\);/, name);
+  }
+  const remove2 = block('useDeleteAiSkill');
+  assert.match(remove2, /queryClient\.removeQueries\(\{ queryKey: adminAiKeys\.skillDetail\(id\) \}\);/);
+  assert.ok(remove2.indexOf('removeQueries') < remove2.indexOf('invalidateQueries'), 'dropped before the refresh');
+});
+
+test('a failed read of the usage or the versions says so with Try again, never a skeleton or an empty table', () => {
+  const usage = read('components', 'admin', 'ai', 'AiSkillUsageCard.tsx');
+  assert.match(usage, /\{isError && !usage \? \(\s*<LoadFailed message="The usage did not load\." onRetry=\{\(\) => refetch\(\)\} retrying=\{isFetching\} \/>/);
+  const versions = read('components', 'admin', 'ai', 'AiSkillVersions.tsx');
+  assert.match(versions, /\{isError && !data \? \(\s*<LoadFailed message="The versions did not load\." onRetry=\{\(\) => refetch\(\)\} retrying=\{isFetching\} \/>/);
 });

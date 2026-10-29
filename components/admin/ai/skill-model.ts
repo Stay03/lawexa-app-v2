@@ -96,6 +96,39 @@ export function savedAsVersion(version: number): string {
   return `Saved as version ${version}.`;
 }
 
+/** The fields whose change makes a new version on the server (woz's `VERSIONED_FIELDS`); Active alone does not. */
+export const SKILL_VERSIONED_FIELDS = ['display_name', 'description', 'instructions', 'load_mode'] as const;
+
+/** The server's change note limit. */
+export const SKILL_CHANGE_NOTE_MAX = 500;
+
+type VersionedValues = Record<(typeof SKILL_VERSIONED_FIELDS)[number], string>;
+
+/**
+ * Whether a save makes a new version: a versioned field differs once trimmed
+ * (the server trims what it is sent before it compares).
+ */
+export function changesVersion(saved: VersionedValues, edited: VersionedValues): boolean {
+  return SKILL_VERSIONED_FIELDS.some((field) => saved[field].trim() !== edited[field].trim());
+}
+
+/**
+ * The toast after an edit: the version the server returns, which is the old
+ * one when nothing versioned changed (then a change note is not kept: it
+ * belongs to a version).
+ */
+export function savedEditMessage(before: number, after: number, noteGiven: boolean): string {
+  if (after > before) return savedAsVersion(after);
+  const note = noteGiven ? ' The change note was not kept: it goes with a new version.' : '';
+  return `Saved. No change to the display name, description, steps or load mode, so it is still version ${after}.${note}`;
+}
+
+/** The toast after a restore: a version the same as the current one writes nothing. */
+export function restoredMessage(restored: number, before: number, after: number): string {
+  if (after > before) return `Version ${restored} restored as version ${after}.`;
+  return `Version ${restored} is the same as version ${after}, so nothing changed.`;
+}
+
 /** One line of a diff between two versions' instructions. */
 export interface DiffLine {
   kind: 'same' | 'added' | 'removed';

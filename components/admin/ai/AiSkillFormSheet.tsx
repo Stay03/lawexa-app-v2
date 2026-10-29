@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -39,10 +39,13 @@ import { useCreateAiSkill, useUpdateAiSkill } from '@/lib/hooks/useAdminAi';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { AdminAiSkill } from '@/types/admin-ai';
 import {
+  changesVersion,
   counterLabel,
   estimateTokens,
   loadModeHint,
   savedAsVersion,
+  savedEditMessage,
+  SKILL_CHANGE_NOTE_MAX,
   SKILL_DESCRIPTION_MAX,
   SKILL_INSTRUCTIONS_MAX,
   skillNameProblem,
@@ -56,28 +59,36 @@ interface AiSkillFormSheetProps {
   skill?: AdminAiSkill | null;
 }
 
-const skillFormSchema = z.object({
-  name: z.string().superRefine((value, context) => {
-    const problem = skillNameProblem(value);
-    if (problem) context.addIssue({ code: 'custom', message: problem });
-  }),
-  display_name: z.string().trim().min(1, 'A display name is required').max(255),
-  description: z
-    .string()
-    .trim()
-    .min(1, 'A description is required: it is the one line Lawexa sees')
-    .max(SKILL_DESCRIPTION_MAX, `At most ${SKILL_DESCRIPTION_MAX} characters`),
-  instructions: z
-    .string()
-    .trim()
-    .min(1, 'The steps are required')
-    .max(SKILL_INSTRUCTIONS_MAX, `At most ${SKILL_INSTRUCTIONS_MAX.toLocaleString('en-US')} characters`),
-  load_mode: z.enum(['on_demand', 'always_on']),
-  is_active: z.boolean(),
-  change_note: z.string().max(255).optional(),
-});
+/**
+ * The form's rules. The name rule is for a new name only: on edit the name is
+ * fixed and may be one the server allows but the form's stricter rule does
+ * not (a seeded `foo_`), which must not stop a save.
+ */
+const skillFormSchema = (isEditMode: boolean) =>
+  z.object({
+    name: isEditMode
+      ? z.string()
+      : z.string().superRefine((value, context) => {
+          const problem = skillNameProblem(value);
+          if (problem) context.addIssue({ code: 'custom', message: problem });
+        }),
+    display_name: z.string().trim().min(1, 'A display name is required').max(255),
+    description: z
+      .string()
+      .trim()
+      .min(1, 'A description is required: it is the one line Lawexa sees')
+      .max(SKILL_DESCRIPTION_MAX, `At most ${SKILL_DESCRIPTION_MAX} characters`),
+    instructions: z
+      .string()
+      .trim()
+      .min(1, 'The steps are required')
+      .max(SKILL_INSTRUCTIONS_MAX, `At most ${SKILL_INSTRUCTIONS_MAX.toLocaleString('en-US')} characters`),
+    load_mode: z.enum(['on_demand', 'always_on']),
+    is_active: z.boolean(),
+    change_note: z.string().max(SKILL_CHANGE_NOTE_MAX, `At most ${SKILL_CHANGE_NOTE_MAX} characters`).optional(),
+  });
 
-type SkillFormData = z.infer<typeof skillFormSchema>;
+type SkillFormData = z.infer<ReturnType<typeof skillFormSchema>>;
 
 const EMPTY: SkillFormData = {
   name: '',
@@ -102,11 +113,16 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
   const updateMutation = useUpdateAiSkill();
   const isPending = createMutation.isPending || updateMutation.isPending;
 
-  const form = useForm<SkillFormData>({ resolver: zodResolver(skillFormSchema), defaultValues: EMPTY });
+  const resolver = useMemo(() => zodResolver(skillFormSchema(isEditMode)), [isEditMode]);
+  const form = useForm<SkillFormData>({ resolver, defaultValues: EMPTY });
+  const displayName = useWatch({ control: form.control, name: 'display_name' }) ?? '';
   const description = useWatch({ control: form.control, name: 'description' }) ?? '';
   const instructions = useWatch({ control: form.control, name: 'instructions' }) ?? '';
   const loadMode = useWatch({ control: form.control, name: 'load_mode' }) ?? 'on_demand';
   const tokens = estimateTokens(instructions);
+  const makesVersion =
+    !skill ||
+    changesVersion(skill, { display_name: displayName, description, instructions, load_mode: loadMode });
 
   useEffect(() => {
     if (!open) return;
@@ -128,7 +144,9 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
 
   const onSubmit = (data: SkillFormData) => {
     const onSuccess = (response: { message: string; data: AdminAiSkill | null }) => {
-      toast.success(response.data ? savedAsVersion(response.data.version) : response.message);
+      if (!response.data) toast.success(response.message);
+      else if (skill) toast.success(savedEditMessage(skill.version, response.data.version, !!data.change_note?.trim()));
+      else toast.success(savedAsVersion(response.data.version));
       onOpenChange(false);
     };
     const onError = (error: unknown) => {
@@ -153,7 +171,7 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
             instructions: data.instructions,
             load_mode: data.load_mode,
             is_active: data.is_active,
-            change_note: data.change_note?.trim() || undefined,
+            change_note: makesVersion ? data.change_note?.trim() || undefined : undefined,
           },
         },
         { onSuccess, onError },
@@ -179,8 +197,10 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
         <SheetHeader>
           <SheetTitle>{isEditMode ? 'Edit Skill' : 'New Skill'}</SheetTitle>
           <SheetDescription>
-            {isEditMode
-              ? `Saving makes version ${(skill?.version ?? 0) + 1}. Earlier versions stay in the history.`
+            {skill
+              ? makesVersion
+                ? `Saving makes version ${skill.version + 1}. Earlier versions stay in the history.`
+                : `A change to the display name, description, steps or load mode makes version ${skill.version + 1}; Active alone keeps version ${skill.version}.`
               : 'A named set of steps for one kind of task. Nothing reaches Lawexa until it is on an agent.'}
           </SheetDescription>
         </SheetHeader>
@@ -331,9 +351,17 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
                     <FormItem>
                       <FormLabel>Change note (optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Ask for the court before searching" {...field} />
+                        <Input
+                          placeholder="e.g. Ask for the court before searching"
+                          {...field}
+                          disabled={!makesVersion}
+                        />
                       </FormControl>
-                      <FormDescription>Shown beside this version in the history.</FormDescription>
+                      <FormDescription>
+                        {makesVersion
+                          ? 'Shown beside this version in the history.'
+                          : 'Goes with a new version: change the steps or another versioned field first.'}
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -347,7 +375,7 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
               </Button>
               <Button type="submit" disabled={isPending}>
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isEditMode ? 'Save version' : 'Create Skill'}
+                {!isEditMode ? 'Create Skill' : makesVersion ? 'Save version' : 'Save'}
               </Button>
             </SheetFooter>
           </form>
