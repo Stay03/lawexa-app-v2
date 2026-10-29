@@ -97,7 +97,8 @@ function ChangeRoleBody({
 
   const name = displayName(user.name);
   const current = asRole(user.role);
-  const currentLabel = current ? ROLE_LABELS[current] : user.role;
+  // "is a User now", as the approved design reads and as the toast says it.
+  const currentLabel = current ? roleWithArticle(current) : user.role;
   const offered = assignableRoles(actorRole, user.role);
   const rows = CHANGEABLE_ROLES.filter(
     (role) => role === current || offered.includes(role)
