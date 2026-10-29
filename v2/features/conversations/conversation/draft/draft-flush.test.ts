@@ -9,6 +9,7 @@ import {
   isDraftSuperseded,
   markDraftSuperseded,
   registerDraftFlush,
+  saveAllNow,
   trackDraftSave,
 } from './draft-flush';
 
@@ -114,4 +115,51 @@ test('a turn saves the open drafts before it posts the message (submit and Ask a
     const post = body.indexOf('await send(');
     assert.ok(flush > 0 && post > flush, start);
   }
+});
+
+/** An editor's save machine, as `saveAllNow` sees it, run by a script of statuses and saves. */
+function editorScript(steps: { status: string; save?: Promise<boolean> | null }[]) {
+  let at = -1;
+  let flushes = 0;
+  return {
+    flushes: () => flushes,
+    editor: {
+      flush: () => {
+        flushes += 1;
+        at = Math.min(at + 1, steps.length - 1);
+      },
+      currentStatus: () => steps[at].status,
+      lastSave: () => steps[at].save ?? null,
+      stopped: (status: string) => status === 'error' || status === 'conflict' || status === 'blocked',
+    },
+  };
+}
+
+test('saving now waits on the save itself, and goes round again while the reader typed on', async () => {
+  // Nothing typed: saved at once.
+  assert.equal(await saveAllNow(editorScript([{ status: 'clean' }]).editor), true);
+  // A save on the wire, then all saved.
+  const first = editorScript([{ status: 'saving', save: later(true, 10) }, { status: 'clean' }]);
+  assert.equal(await saveAllNow(first.editor), true);
+  // A save, more typing saved by a second save, then clean.
+  const two = editorScript([
+    { status: 'saving', save: later(true, 5) },
+    { status: 'saving', save: later(true, 5) },
+    { status: 'clean' },
+  ]);
+  assert.equal(await saveAllNow(two.editor), true);
+  assert.equal(two.flushes(), 3);
+});
+
+test('saving now says no on a failed save, a stopped machine, or typing held by the rate limit', async () => {
+  assert.equal(await saveAllNow(editorScript([{ status: 'saving', save: later(false, 5) }]).editor), false);
+  assert.equal(await saveAllNow(editorScript([{ status: 'conflict' }]).editor), false);
+  assert.equal(await saveAllNow(editorScript([{ status: 'pending', save: Promise.resolve(true) }]).editor), false);
+});
+
+test('a panel that closes while its save is on the wire still answers, from that save', async () => {
+  // The editor unmounts: its machine is no longer told, so it reads "saving" with the same save.
+  const save = later(true, 10);
+  const closing = editorScript([{ status: 'saving', save }, { status: 'saving', save }]);
+  assert.equal(await saveAllNow(closing.editor), true);
 });

@@ -122,3 +122,35 @@ export function clearDraftSuperseded(conversationId: string, ordinal: number, no
 export function isDraftSuperseded(conversationId: string, ordinal: number, noteId: number): boolean {
   return superseded.has(placeKey(conversationId, ordinal, noteId));
 }
+
+/**
+ * Save everything typed now, and settle `true` once it is saved, `false` on a
+ * failure: an editor's flusher. Waits on the saves themselves (`lastSave`,
+ * which settles even after the editor unmounts), never on a render. Goes
+ * round again while the reader typed on during a save; stops when a save
+ * fails, or when the same save comes back (the editor is gone and nothing
+ * newer can be sent from it).
+ */
+export async function saveAllNow(editor: {
+  flush: () => void;
+  currentStatus: () => string;
+  lastSave: () => Promise<boolean> | null;
+  stopped: (status: string) => boolean;
+}): Promise<boolean> {
+  let previous: Promise<boolean> | null = null;
+  for (let round = 0; round < 5; round += 1) {
+    editor.flush();
+    const status = editor.currentStatus();
+    if (status === 'clean') return true;
+    if (editor.stopped(status)) return false;
+    // Typing waiting out a rate-limit hold is not saved, and no save is on its way.
+    if (status !== 'saving') return false;
+    const save = editor.lastSave();
+    if (!save) return false;
+    // The same save again: the editor is gone, so its word is final.
+    if (save === previous) return save;
+    if (!(await save)) return false;
+    previous = save;
+  }
+  return editor.currentStatus() === 'clean';
+}
