@@ -29,7 +29,24 @@ import { scrollMatchToMiddle } from './scroll-to-match';
  * match starts, so a bold word stays bold. Replace all is ONE transaction, so
  * one undo brings every match back. With Match case off, each replacement
  * keeps the capitals of the text it replaces (`keepCase`).
+ *
+ * ── WHOLE WORD ──────────────────────────────────────────────────────────────
+ * With Whole word on (Stay, 29 October 2026; Lucy's case: "court" must not
+ * match inside "Courtroom"), a match counts only when the character before it
+ * and the one after it are not part of a word: a letter, a digit or an accent
+ * mark, in any script. So "court's" and "(court)" match, "Courtroom" and
+ * "tribunal-courtx" do not. The start or end of a block, and a wall (a chip,
+ * an image, a line break), count as a word's edge.
  */
+
+/** How the find box searches: the bar's two toggles. */
+export interface FindOptions {
+  caseSensitive: boolean;
+  wholeWord: boolean;
+}
+
+/** Both toggles off, as the bar opens. */
+export const FIND_DEFAULTS: FindOptions = { caseSensitive: false, wholeWord: false };
 
 /** One match, as document positions. */
 export interface FindRange {
@@ -40,7 +57,7 @@ export interface FindRange {
 /** What the find plugin holds for one editor. */
 export interface FindState {
   query: string;
-  caseSensitive: boolean;
+  options: FindOptions;
   matches: readonly FindRange[];
   /** The index of the current match in `matches`, or -1 when there is none. */
   current: number;
@@ -50,7 +67,7 @@ export interface FindState {
 }
 
 type FindMeta =
-  | { type: 'query'; query: string; caseSensitive: boolean; from: number }
+  | { type: 'query'; query: string; options: FindOptions; from: number }
   | { type: 'step'; delta: 1 | -1 }
   | { type: 'after'; pos: number };
 
@@ -74,9 +91,33 @@ function fold(text: string): string {
   return out;
 }
 
+/** A character that is part of a word: a letter, a digit or an accent mark, in any script. */
+const WORD_CHARACTER = /[\p{L}\p{N}\p{M}]/u;
+
+/** The whole character (a surrogate pair too) that ends just before `index`. */
+function characterBefore(text: string, index: number): string {
+  if (index <= 0) return '';
+  const low = text.charCodeAt(index - 1);
+  const high = index >= 2 ? text.charCodeAt(index - 2) : 0;
+  const pair = low >= 0xdc00 && low <= 0xdfff && high >= 0xd800 && high <= 0xdbff;
+  return text.slice(pair ? index - 2 : index - 1, index);
+}
+
+/** The whole character that starts at `index`. */
+function characterAt(text: string, index: number): string {
+  const point = text.codePointAt(index);
+  return point === undefined ? '' : String.fromCodePoint(point);
+}
+
+/** Whether `text[from, to)` stands as a whole word: no word character touches it on either side. */
+export function standsAlone(text: string, from: number, to: number): boolean {
+  return !WORD_CHARACTER.test(characterBefore(text, from)) && !WORD_CHARACTER.test(characterAt(text, to));
+}
+
 /** Every match of `query` in the document, in document order, none overlapping. */
-export function findMatches(doc: ProseMirrorNode, query: string, caseSensitive: boolean): FindRange[] {
+export function findMatches(doc: ProseMirrorNode, query: string, options: FindOptions): FindRange[] {
   if (query.length === 0) return [];
+  const { caseSensitive, wholeWord } = options;
   const needle = caseSensitive ? query : fold(query);
   const matches: FindRange[] = [];
 
@@ -85,6 +126,11 @@ export function findMatches(doc: ProseMirrorNode, query: string, caseSensitive: 
     const haystack = caseSensitive ? text : fold(text);
     let index = haystack.indexOf(needle);
     while (index !== -1) {
+      if (wholeWord && !standsAlone(text, index, index + needle.length)) {
+        // Not a word here; a match may still start inside it ("a a" in "ba a a").
+        index = haystack.indexOf(needle, index + 1);
+        continue;
+      }
       matches.push({ from: start + index, to: start + index + needle.length });
       index = haystack.indexOf(needle, index + needle.length);
     }
@@ -135,18 +181,18 @@ function decorate(doc: ProseMirrorNode, matches: readonly FindRange[], current: 
 function build(
   doc: ProseMirrorNode,
   query: string,
-  caseSensitive: boolean,
+  options: FindOptions,
   pickCurrent: (matches: readonly FindRange[]) => number,
   scroll: number,
 ): FindState {
-  const matches = findMatches(doc, query, caseSensitive);
+  const matches = findMatches(doc, query, options);
   const current = pickCurrent(matches);
-  return { query, caseSensitive, matches, current, decorations: decorate(doc, matches, current), scroll };
+  return { query, options, matches, current, decorations: decorate(doc, matches, current), scroll };
 }
 
 const EMPTY: FindState = {
   query: '',
-  caseSensitive: false,
+  options: FIND_DEFAULTS,
   matches: [],
   current: -1,
   decorations: DecorationSet.empty,
@@ -156,10 +202,10 @@ const EMPTY: FindState = {
 function applyFind(tr: Transaction, previous: FindState): FindState {
   const meta = tr.getMeta(findReplaceKey) as FindMeta | undefined;
   if (meta?.type === 'query') {
-    return build(tr.doc, meta.query, meta.caseSensitive, (matches) => firstFrom(matches, meta.from), previous.scroll + 1);
+    return build(tr.doc, meta.query, meta.options, (matches) => firstFrom(matches, meta.from), previous.scroll + 1);
   }
   if (meta?.type === 'after') {
-    return build(tr.doc, previous.query, previous.caseSensitive, (matches) => firstFrom(matches, meta.pos), previous.scroll + 1);
+    return build(tr.doc, previous.query, previous.options, (matches) => firstFrom(matches, meta.pos), previous.scroll + 1);
   }
   if (meta?.type === 'step') {
     const total = previous.matches.length;
@@ -172,7 +218,7 @@ function applyFind(tr: Transaction, previous: FindState): FindState {
   // the current one stays where it was, without scrolling.
   const was = previous.matches[previous.current];
   const anchor = was ? tr.mapping.map(was.from, -1) : 0;
-  return build(tr.doc, previous.query, previous.caseSensitive, (matches) => firstFrom(matches, anchor), previous.scroll);
+  return build(tr.doc, previous.query, previous.options, (matches) => firstFrom(matches, anchor), previous.scroll);
 }
 
 /** The plugin itself; the extension below adds it to an editor, the tests to a bare state. */
@@ -233,10 +279,10 @@ export function getFindState(state: EditorState): FindState {
 }
 
 /** Search for `query`; the current match is the first at or after the caret. */
-export function setFindQuery(query: string, caseSensitive: boolean): Command {
+export function setFindQuery(query: string, options: FindOptions): Command {
   return (state, dispatch) => {
     if (dispatch) {
-      const meta: FindMeta = { type: 'query', query, caseSensitive, from: state.selection.from };
+      const meta: FindMeta = { type: 'query', query, options, from: state.selection.from };
       dispatch(state.tr.setMeta(findReplaceKey, meta));
     }
     return true;
@@ -245,7 +291,7 @@ export function setFindQuery(query: string, caseSensitive: boolean): Command {
 
 /** Clear the query, the count and every tint. */
 export function clearFind(): Command {
-  return setFindQuery('', false);
+  return setFindQuery('', FIND_DEFAULTS);
 }
 
 function step(delta: 1 | -1): Command {
@@ -323,7 +369,7 @@ export function replaceCurrent(text: string): Command {
     if (!match) return false;
     if (dispatch) {
       const tr = state.tr;
-      const written = replaceRange(tr, match, text, find.caseSensitive);
+      const written = replaceRange(tr, match, text, find.options.caseSensitive);
       // The next match starts after the new text, so a replacement that
       // contains the query is not found again.
       const meta: FindMeta = { type: 'after', pos: match.from + written };
@@ -336,13 +382,13 @@ export function replaceCurrent(text: string): Command {
 /** Replace every match in one transaction, so one undo restores them all. */
 export function replaceAll(text: string): Command {
   return (state, dispatch) => {
-    const { matches, caseSensitive } = getFindState(state);
+    const { matches, options } = getFindState(state);
     if (matches.length === 0) return false;
     if (dispatch) {
       const tr = state.tr;
       // Last first, so the earlier positions still hold.
       for (let index = matches.length - 1; index >= 0; index -= 1) {
-        replaceRange(tr, matches[index], text, caseSensitive);
+        replaceRange(tr, matches[index], text, options.caseSensitive);
       }
       const meta: FindMeta = { type: 'after', pos: 0 };
       dispatch(tr.setMeta(findReplaceKey, meta));

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useEditorState, type Editor } from '@tiptap/react';
-import { CaseSensitive, ChevronDown, ChevronRight, ChevronUp, X, type LucideIcon } from 'lucide-react';
+import { CaseSensitive, ChevronDown, ChevronRight, ChevronUp, WholeWord, X, type LucideIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   clearFind,
+  FIND_DEFAULTS,
   findCountLabel,
   findNext,
   findPrevious,
@@ -19,6 +20,7 @@ import {
   replaceCurrent,
   runFind,
   setFindQuery,
+  type FindOptions,
 } from './find-replace';
 import { FindDebugPanel } from './FindDebugPanel';
 import './find-replace.css';
@@ -28,12 +30,13 @@ import './find-replace.css';
  * build", 24 October 2026). One bar for the note editor and the chat's draft
  * panel.
  *
- *   [›] [Find          3 of 12] [↑] [↓] [Aa] [×]
- *       [Replace with         ] [Replace] [Replace all]
+ *   [›] [Find        3 of 12] [↑] [↓] [Aa] [ab] [×]
+ *       [Replace with        ] [Replace] [Replace all]
  *
- * Enter goes to the next match and Shift+Enter to the previous one; Escape or
- * × closes the bar, clears every tint and puts the caret back in the note. The
- * chevron opens the replace row. A read-only editor has no chevron and no
+ * Aa is Match case and [ab] is Whole word (find-replace.ts), both off as the
+ * bar opens. Enter goes to the next match and Shift+Enter to the previous
+ * one; Escape or × closes the bar, clears every tint and puts the caret back
+ * in the note. The chevron opens the replace row. A read-only editor has no chevron and no
  * replace row, so it can find but not change.
  *
  * Three places to stand:
@@ -95,7 +98,7 @@ export function FindBar({
   const seedRef = useRef(seed);
   const [query, setQuery] = useState(seed);
   const [replacement, setReplacement] = useState('');
-  const [caseSensitive, setCaseSensitive] = useState(false);
+  const [options, setOptions] = useState<FindOptions>(FIND_DEFAULTS);
   const [replaceOpen, setReplaceOpen] = useState(false);
 
   const { total, current, editable } = useEditorState({
@@ -109,7 +112,7 @@ export function FindBar({
   // Search for the seed as the bar opens; clear every tint when it goes, by
   // any road (the × or Escape, or the screen unmounting it).
   useEffect(() => {
-    runFind(editor, setFindQuery(seedRef.current, false));
+    runFind(editor, setFindQuery(seedRef.current, FIND_DEFAULTS));
     return () => {
       if (!editor.isDestroyed) runFind(editor, clearFind());
     };
@@ -123,9 +126,15 @@ export function FindBar({
     input.select();
   }, [focusRequest]);
 
-  const search = (value: string, matchCase: boolean) => {
+  const search = (value: string) => {
     setQuery(value);
-    runFind(editor, setFindQuery(value, matchCase));
+    runFind(editor, setFindQuery(value, options));
+  };
+
+  const toggle = (option: keyof FindOptions) => {
+    const next = { ...options, [option]: !options[option] };
+    setOptions(next);
+    runFind(editor, setFindQuery(query, next));
   };
 
   const close = () => {
@@ -190,7 +199,7 @@ export function FindBar({
           <Input
             ref={findRef}
             value={query}
-            onChange={(event) => search(event.target.value, caseSensitive)}
+            onChange={(event) => search(event.target.value)}
             onKeyDown={onFindKey}
             placeholder="Find"
             aria-label="Find"
@@ -200,7 +209,10 @@ export function FindBar({
             autoCapitalize="off"
             spellCheck={false}
             enterKeyHint="search"
-            className={cn(CONTROL_HEIGHT[layout], 'rounded-lg pr-24')}
+            className={cn(CONTROL_HEIGHT[layout], 'rounded-lg')}
+            // Room for the count and no more, so on a phone, with Whole word
+            // beside Match case, the words typed stay in view.
+            style={count ? { paddingRight: `calc(${count.length}ch + 1rem)` } : undefined}
           />
           <span
             id={countId}
@@ -230,11 +242,15 @@ export function FindBar({
           layout={layout}
           icon={CaseSensitive}
           label="Match case"
-          pressed={caseSensitive}
-          onPress={() => {
-            setCaseSensitive(!caseSensitive);
-            runFind(editor, setFindQuery(query, !caseSensitive));
-          }}
+          pressed={options.caseSensitive}
+          onPress={() => toggle('caseSensitive')}
+        />
+        <FindIconButton
+          layout={layout}
+          icon={WholeWord}
+          label="Whole word"
+          pressed={options.wholeWord}
+          onPress={() => toggle('wholeWord')}
         />
         <FindIconButton layout={layout} icon={X} label="Close find" shortcut="Esc" onPress={close} />
       </div>
@@ -302,7 +318,7 @@ function FindIconButton({
   label: string;
   shortcut?: string;
   disabled?: boolean;
-  /** For a toggle (Match case): on or off. */
+  /** For a toggle (Match case, Whole word): on or off. */
   pressed?: boolean;
   /** For the chevron: whether the replace row is open. */
   expanded?: boolean;
