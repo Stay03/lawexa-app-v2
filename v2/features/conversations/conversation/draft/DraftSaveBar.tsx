@@ -72,8 +72,8 @@ interface DraftActionsProps {
   /** The note's autosave, while the reader edits it; `null` when nothing saves from here. */
   autosave: (Pick<AutosaveView, 'status' | 'savedAt' | 'failure' | 'retryScheduled'> & { onRetry: () => void }) | null;
   space: ConversationSpaceRef | null;
-  /** Opens the note's version history. */
-  onHistory: () => void;
+  /** Opens the note's version history; `null` for a reader who may not edit (the server refuses them it). */
+  onHistory: (() => void) | null;
 }
 
 function folderLabel(space: ConversationSpaceRef | null): string {
@@ -191,7 +191,7 @@ function NoteMenu({
   saving: boolean;
   folder: string;
   onFolder: () => void;
-  onHistory: () => void;
+  onHistory: (() => void) | null;
   triggerClassName?: string;
 }) {
   const { download, exporting } = useNoteExport(note.slug);
@@ -233,10 +233,12 @@ function NoteMenu({
           Export PDF
           <DropdownMenuShortcut>.pdf</DropdownMenuShortcut>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={onHistory}>
-          <History aria-hidden className="size-4 text-foreground/62" />
-          Version history
-        </DropdownMenuItem>
+        {onHistory ? (
+          <DropdownMenuItem onSelect={onHistory}>
+            <History aria-hidden className="size-4 text-foreground/62" />
+            Version history
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onFolder}>
           <FolderPlus aria-hidden className="size-4 text-foreground/62" />

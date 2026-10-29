@@ -1,6 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Content } from '@tiptap/core';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
@@ -136,12 +145,18 @@ export function DraftEditor(props: Omit<DraftEditorProps, 'noteState' | 'line'> 
   // older copy, it could land on Lawexa's newer one. Marked here, as the new
   // state is drawn and before the editor unmounts; the device copy keeps the
   // typing (draft-flush.ts). The note it edited is remembered through the
-  // switch, since a missing note has no id in the list.
+  // switch, since a missing note has no id in the list. A layout effect, not
+  // the render (a render React throws away must mark nothing): it runs before
+  // the older editor's own unmount, which is a passive effect.
   const listedNote = 'document' in state ? (state.document.note?.id ?? null) : null;
   const [editedNote, setEditedNote] = useState<number | null>(null);
   if (state.kind === 'editable' && listedNote !== null && listedNote !== editedNote) setEditedNote(listedNote);
-  if (state.kind === 'editable' && listedNote !== null) clearDraftSuperseded(conversationId, ordinal, listedNote);
-  else if (editedNote !== null) markDraftSuperseded(conversationId, ordinal, editedNote);
+  const editing = state.kind === 'editable' && listedNote !== null;
+  useLayoutEffect(() => {
+    if (editedNote === null) return;
+    if (editing) clearDraftSuperseded(conversationId, ordinal, editedNote);
+    else markDraftSuperseded(conversationId, ordinal, editedNote);
+  }, [conversationId, ordinal, editedNote, editing]);
   const text = draftNoteLine(state, waitedMs);
   const action =
     state.kind === 'older'
@@ -220,7 +235,11 @@ function DraftNoteOpen(props: DraftEditorProps & { noteId: number; canEdit: bool
   }
   const record = open.data.data;
   // Reload and restore read the note again, then open the editor on that copy.
-  const reload = () => void open.refetch().then(() => setGeneration((count) => count + 1));
+  const reload = () =>
+    void open.refetch().then((result) => {
+      // A failed read keeps the editor on the copy it has.
+      if (result.isSuccess) setGeneration((count) => count + 1);
+    });
   return (
     <DraftEditorBody
       key={`${record.id}:${generation}`}
@@ -515,7 +534,8 @@ function DraftEditorBody({
 
   const note: DraftNoteRef | null = record ? { id: record.id, slug: record.slug } : null;
   const saveState = savesToNote ? { ...autosave, onRetry: autosave.retry } : null;
-  const actions = { tools, note, autosave: saveState, space, onHistory: () => setHistoryOpen(true) };
+  // The history and restore need edit rights on the server (woz 6fcd3822): offered to an editor only.
+  const actions = { tools, note, autosave: saveState, space, onHistory: savesToNote ? () => setHistoryOpen(true) : null };
 
   return (
     // THE DRAFT SCROLLS IN ITS OWN AREA, between the bars at the top and Save

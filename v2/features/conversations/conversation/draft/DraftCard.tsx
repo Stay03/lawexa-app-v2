@@ -61,7 +61,8 @@ export function DraftCard({
   const status = draftStatus(draft, live);
   const version = panel?.draftVersion(ordinal, draftGroupKey(draft)) ?? null;
   const versionLabel = draftVersionLabel(version);
-  const older = version !== null && !version.latest;
+  // Greyed only once a newer FINISHED version follows (a cut-off one does not count).
+  const older = version !== null && version.superseded;
   // EDITED (drafts saved as notes): the reader changed the newest version in
   // its note, so Lawexa will work from their text.
   const chat = useV2ChatContext();

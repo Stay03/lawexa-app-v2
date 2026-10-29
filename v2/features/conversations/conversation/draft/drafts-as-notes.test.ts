@@ -66,7 +66,8 @@ test('each state opens the right editor: the note, the page’s memory, or Lawex
   assert.match(editor, /\{editable \? <DraftToolbar editor=\{editor\} onFind=\{openFind\} \/> : null\}/);
   // The editor is drawn again only on Reload or a restore, never for its own saves or a refetch.
   assert.match(editor, /key=\{`\$\{record\.id\}:\$\{generation\}`\}/);
-  assert.match(editor, /const reload = \(\) => void open\.refetch\(\)\.then\(\(\) => setGeneration\(\(count\) => count \+ 1\)\);/);
+  // Only a read that succeeded opens the editor again.
+  assert.match(editor, /void open\.refetch\(\)\.then\(\(result\) => \{[\s\S]*?if \(result\.isSuccess\) setGeneration\(\(count\) => count \+ 1\);/);
   assert.doesNotMatch(editor, /record\.updated_at \?\? ''\}`/);
   // A read that fails after one succeeded keeps the editor.
   assert.match(editor, /if \(!open\.data && open\.isPending\) return <DraftEditorSkeleton/);
@@ -83,11 +84,17 @@ test('an open draft registers its save with the send while it edits the note, an
   assert.doesNotMatch(editor, /statusRef/);
   // A save sent as the editor leaves is waited for by the next send; an overtaken editor sends nothing.
   assert.match(editor, /flushOnUnmount: \(\) => !\(record && isDraftSuperseded\(conversationId, ordinal, record\.id\)\),\s*onUnmountSave: \(settled\) => trackDraftSave\(conversationId, settled\),/);
-  // Marked as the new state is drawn, before the older editor unmounts.
-  assert.match(editor, /if \(state\.kind === 'editable' && listedNote !== null\) clearDraftSuperseded\(conversationId, ordinal, listedNote\);\s*else if \(editedNote !== null\) markDraftSuperseded\(conversationId, ordinal, editedNote\);/);
+  // Marked in a layout effect, which runs before the older editor's own unmount
+  // (a passive effect), never in the render (a render React discards must mark nothing).
+  assert.match(editor, /useLayoutEffect\(\(\) => \{\s*if \(editedNote === null\) return;\s*if \(editing\) clearDraftSuperseded\(conversationId, ordinal, editedNote\);\s*else markDraftSuperseded\(conversationId, ordinal, editedNote\);\s*\}, \[conversationId, ordinal, editedNote, editing\]\);/);
+  // The history needs edit rights on the server: offered to an editor only.
+  assert.match(editor, /onHistory: savesToNote \? \(\) => setHistoryOpen\(true\) : null/);
+  const bar = read(...DRAFT, 'DraftSaveBar.tsx');
+  assert.match(bar, /\{onHistory \? \(\s*<DropdownMenuItem onSelect=\{onHistory\}>/);
   const hook = read('v2', 'features', 'notes', 'editor', 'use-autosave.ts');
   assert.match(hook, /if \(pausedRef\.current\) return;\s*if \(flushOnUnmountRef\.current && !flushOnUnmountRef\.current\(\)\) return;/);
-  assert.match(hook, /const settled = new Promise<boolean>\(\(resolve\) => runSaveRef\.current\(save, resolve\)\);\s*onUnmountSaveRef\.current\?\.\(settled\);/);
+  // The mutation's own promise, which settles after unmount (leaving-save.test.ts proves it).
+  assert.match(hook, /onUnmountSaveRef\.current\?\.\(sendLeavingSave\(mutateAsyncRef\.current, save\)\);/);
   // The saved typing is parsed inert, never put into the page.
   assert.match(editor, /new DOMParser\(\)\.parseFromString\(content, 'text\/html'\)\.body\.textContent/);
   assert.doesNotMatch(editor, /innerHTML/);
