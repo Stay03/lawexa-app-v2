@@ -1810,17 +1810,6 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   }
 
   /**
-   * Finalize whatever streaming placeholder is still open, from the AUTHORITATIVE
-   * accumulator, and detach the streaming refs. Used by the real-error terminal,
-   * which previously abandoned the row mid-stream.
-   *
-   * CANNOT DOUBLE-FINALIZE: it no-ops when `streamingMessageId` is already null, and
-   * nulls it before returning. Every other terminal either nulls the same ref before
-   * this can run or cannot run at all afterwards (the EventSource is closed and
-   * `eventSource`/`executionId` nulled before this is reached, so no sibling listener
-   * and no `onerror` reconnect follows).
-   */
-  /**
    * A user's Stop. The text so far stays, marked "Stopped" at once, the same
    * mark a reload draws from the server's `partial` row (Tester, 27 October
    * 2026: a stopped answer had no mark until then). A stop before the first
@@ -1869,6 +1858,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     };
   }
 
+  /**
+   * Finalize whatever streaming placeholder is still open, from the AUTHORITATIVE
+   * accumulator, and detach the streaming refs. Used by the real-error terminal,
+   * which previously abandoned the row mid-stream.
+   *
+   * CANNOT DOUBLE-FINALIZE: it no-ops when `streamingMessageId` is already null, and
+   * nulls it before returning. Every other terminal either nulls the same ref before
+   * this can run or cannot run at all afterwards (the EventSource is closed and
+   * `eventSource`/`executionId` nulled before this is reached, so no sibling listener
+   * and no `onerror` reconnect follows).
+   */
   function finalizeOpenPlaceholder(reason: 'error'): void {
     const placeholderId = streamingMessageId;
     if (!placeholderId) return;
