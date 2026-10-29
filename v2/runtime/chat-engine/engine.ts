@@ -124,9 +124,14 @@ const isServerRowId = (id: string): boolean => id.startsWith(SERVER_ROW_PREFIX);
 // server finished the answer (Lucy, 20 October 2026).
 
 // Polling fallback: after reconnects are exhausted, poll status every 5s, giving
-// up after 10 minutes (a hard cap so a stuck execution can't poll forever).
+// up after 25 minutes (a hard cap so a stuck execution can't poll forever). The
+// job may run 20 minutes (AI_SERVICE_TIMEOUT 1200 s), and the server's sweep ends
+// any turn older than that, so the cap covers a turn that started polling at
+// once, with a margin. At 10 minutes a long answer showed "Response timed out"
+// while the server went on to save and charge it (the Fable review of the
+// 5-minute stream fix, 29 October 2026).
 const POLL_INTERVAL_MS = 5_000;
-const POLL_MAX_DURATION_MS = 600_000; // 10 minutes
+const POLL_MAX_DURATION_MS = 25 * 60_000; // 25 minutes
 
 // SSE reconnection: retry the live stream up to 3× (1s apart) before falling back
 // to polling. The backend resumes from Redis if still running, or returns the DB
@@ -439,6 +444,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   let lastProgressAt = 0;
   /** Set when the transport reconnects after a drop, then to the moment it is back. */
   let reconnectingSince = 0;
+  /**
+   * The server said `stream_paused`: it closes this connection at its 5-minute
+   * limit while the answer goes on (the 5-minute stream fix, 29 October 2026).
+   * The drop that follows is planned, not a fault. The transport reconnects
+   * with Last-Event-ID as it does for any drop, but no stall clock starts, and
+   * the reconnect's `connected` does not re-seed the text the replay is about
+   * to add.
+   */
+  let pausedRoll = false;
   let pollTickInFlight = false;
   let dedupKeys = new Set<number>();
   // v2_stream token-streaming placeholder tracking (per v1):
@@ -1241,8 +1255,13 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // Back after a drop: the handshake is not progress, so the reconnect's
       // own clock starts now (`stallVerdict`, 'reconnected-empty').
       if (reconnectingSince > 0) reconnectingSince = Date.now();
+      // Back after the planned drop: the text so far is already on screen up
+      // to the last event, and the replay brings the rest, so seeding it here
+      // as well would show part of the answer twice.
+      const rolled = pausedRoll;
+      pausedRoll = false;
       const data = parseEvent<ConnectedEvent>((e as MessageEvent).data);
-      if (data?.accumulated_text) {
+      if (data?.accumulated_text && !rolled) {
         const iteration = currentIteration ?? 0;
         const msgId = ensureStreamingPlaceholder(iteration);
         seedText(msgId, data.accumulated_text);
@@ -1434,6 +1453,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // heartbeat — socket alive but no data. Track consecutive heartbeats; over the
     // threshold, verify the AI actually finished (another tab may have consumed
     // the terminal events).
+    // stream_paused — the server's 5-minute limit for one connection, while the
+    // answer goes on (the 5-minute stream fix, 29 October 2026). The server
+    // then ends the body without `end`, and the transport reconnects with
+    // Last-Event-ID as for any drop. Here the drop is only marked as planned.
+    es.addEventListener('stream_paused', () => {
+      lastEventTime = Date.now();
+      pausedRoll = true;
+    });
+
     es.addEventListener('heartbeat', () => {
       lastEventTime = Date.now();
       /* Heartbeats keep `lastEventTime` fresh, so the 60s silence watchdog above
@@ -1783,6 +1811,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     es.onerror = () => {
       if (eventSource !== es) return;
       if (es.readyState === CONNECTING) {
+        // The planned drop after `stream_paused`: reconnecting with
+        // Last-Event-ID, with no stall clock, so a silent tool call right after
+        // it is not taken for a dead stream.
+        if (pausedRoll) return;
         // Reconnecting on its own, with Last-Event-ID. The watchdog gives the
         // reconnected stream a few seconds to carry progress (`./stall.ts`).
         reconnectingSince = Date.now();
