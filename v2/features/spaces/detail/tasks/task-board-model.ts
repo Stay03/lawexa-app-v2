@@ -126,7 +126,8 @@ function newestMoveFirst(a: SpaceTask, b: SpaceTask): number {
   return movedAt(b) - movedAt(a) || a.uuid.localeCompare(b.uuid);
 }
 
-function queueOrder(a: SpaceTask, b: SpaceTask): number {
+/** An owner's own queue order: position, then age, then uuid. */
+export function queueOrder(a: SpaceTask, b: SpaceTask): number {
   return a.position - b.position || a.created_at.localeCompare(b.created_at) || a.uuid.localeCompare(b.uuid);
 }
 
