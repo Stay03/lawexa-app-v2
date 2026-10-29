@@ -78,10 +78,10 @@ test('each state opens the right editor: the note, the page’s memory, or Lawex
 
 test('an open draft registers its save with the send while it edits the note, and settles when all is saved', () => {
   const editor = read(...DRAFT, 'DraftEditor.tsx');
-  assert.match(editor, /if \(!savesToNote\) return;\s*return registerDraftFlush\(conversationId, ordinal, \(\) => \{/);
-  // It reads the machine's own status, right after the flush, never a copy an effect wrote.
-  assert.match(editor, /flush\(\);\s*const status = currentStatus\(\);\s*if \(status === 'clean'\) return Promise\.resolve\(true\);/);
-  assert.doesNotMatch(editor, /statusRef/);
+  assert.match(editor, /if \(!savesToNote\) return;\s*return registerDraftFlush\(conversationId, ordinal, \(\) =>\s*saveAllNow\(/);
+  // It waits on the saves themselves and reads the machine's own status (draft-flush.test.ts runs it).
+  assert.match(editor, /saveAllNow\(\{ flush, currentStatus, lastSave, stopped: \(status\) => SAVE_STOPPED\.has\(status\) \}\)/);
+  assert.doesNotMatch(editor, /statusRef|waitersRef/);
   // A save sent as the editor leaves is waited for by the next send; an overtaken editor sends nothing.
   assert.match(editor, /flushOnUnmount: \(\) => !\(record && isDraftSuperseded\(conversationId, ordinal, record\.id\)\),\s*onUnmountSave: \(settled\) => trackDraftSave\(conversationId, settled\),/);
   // Marked in a layout effect, which runs before the older editor's own unmount
@@ -94,7 +94,7 @@ test('an open draft registers its save with the send while it edits the note, an
   const hook = read('v2', 'features', 'notes', 'editor', 'use-autosave.ts');
   assert.match(hook, /if \(pausedRef\.current\) return;\s*if \(flushOnUnmountRef\.current && !flushOnUnmountRef\.current\(\)\) return;/);
   // The mutation's own promise, which settles after unmount (leaving-save.test.ts proves it).
-  assert.match(hook, /onUnmountSaveRef\.current\?\.\(sendLeavingSave\(mutateAsyncRef\.current, save\)\);/);
+  assert.match(hook, /onUnmountSaveRef\.current\?\.\(runSaveRef\.current\(save\)\);/);
   // The saved typing is parsed inert, never put into the page.
   assert.match(editor, /new DOMParser\(\)\.parseFromString\(content, 'text\/html'\)\.body\.textContent/);
   assert.doesNotMatch(editor, /innerHTML/);

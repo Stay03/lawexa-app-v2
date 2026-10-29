@@ -90,6 +90,12 @@ export interface NoteAutosave extends AutosaveView {
    * whether everything typed is saved right now.
    */
   currentStatus: () => AutosaveStatus;
+  /**
+   * The newest save sent, settling `true` when it lands and `false` when it
+   * fails, even after the editor has unmounted; `null` before any. For a
+   * caller that saves now and waits (the chat's send, draft-flush.ts).
+   */
+  lastSave: () => Promise<boolean> | null;
 }
 
 function viewOf(state: AutosaveState): AutosaveView {
@@ -160,7 +166,7 @@ export function useNoteAutosave({
   flushOnUnmount,
   onUnmountSave,
 }: UseNoteAutosaveOptions): NoteAutosave {
-  const { mutate, mutateAsync } = useSaveNote(scopeId);
+  const { mutateAsync } = useSaveNote(scopeId);
 
   // The machine. A ref, not state — see the header. Seeded through a LAZY
   // `useState` initializer so `initialAutosaveState` runs exactly once (a
@@ -180,8 +186,7 @@ export function useNoteAutosave({
   const flushOnUnmountRef = useRef<UseNoteAutosaveOptions['flushOnUnmount']>(flushOnUnmount);
   const onUnmountSaveRef = useRef<UseNoteAutosaveOptions['onUnmountSave']>(onUnmountSave);
   const dispatchRef = useRef<(event: AutosaveEvent) => void>(() => {});
-  const runSaveRef = useRef<(request: SaveRequest) => void>(() => {});
-  const mutateAsyncRef = useRef(mutateAsync);
+  const runSaveRef = useRef<(request: SaveRequest) => Promise<boolean>>(() => Promise.resolve(true));
 
   // Keep the latest callback reachable from the stable closures below without
   // making them change identity (which would re-arm listeners on every render).
@@ -189,7 +194,6 @@ export function useNoteAutosave({
     onSavedRef.current = onSaved;
     flushOnUnmountRef.current = flushOnUnmount;
     onUnmountSaveRef.current = onUnmountSave;
-    mutateAsyncRef.current = mutateAsync;
   });
 
   const clearTimer = useCallback(() => {
@@ -218,39 +222,56 @@ export function useNoteAutosave({
     timerRef.current = { id, at: wakeAt };
   }, [clearTimer]);
 
+  // THE SAVE THROUGH THE MUTATION'S OWN PROMISE (`mutateAsync`), never
+  // `mutate` with per-call callbacks: TanStack runs those only while this
+  // hook's mutation observer has a listener, and a save still on the wire
+  // when the editor unmounts (a panel closing, a page left) must still
+  // settle for whoever waits on it (leaving-save.ts; Frontend's review, 29
+  // October 2026). The machine is told only while the editor is mounted.
+  // Each save's outcome is kept (`lastSaveRef`) for a caller waiting on it.
+  const lastSaveRef = useRef<Promise<boolean> | null>(null);
   const runSave = useCallback(
     (request: SaveRequest) => {
-      mutate(request, {
-        onSuccess: (envelope) => {
-          // A save started by the unmount flush still reaches the server, but
-          // its callbacks must not touch a screen that no longer exists.
-          if (!mountedRef.current) return;
-          const record = envelope.data;
-          // `confirmed` is what we SENT, never what came back. If the server
-          // normalised the body, adopting its echo would leave `working` and
-          // `confirmed` permanently unequal — an autosave loop that never
-          // settles. Only the id (which we may not have had) is taken from the
-          // response.
-          dispatchRef.current({
-            type: 'saved',
-            noteId: record.id,
-            draft: request.draft,
-            updatedAt: record.updated_at ?? null,
-            at: Date.now(),
-          });
-          void onSavedRef.current?.(record);
-        },
-        onError: (error) => {
-          if (!mountedRef.current) return;
-          dispatchRef.current({
-            type: 'failed',
-            failure: classifySaveFailure(error, request.mode, Date.now()),
-            at: Date.now(),
-          });
-        },
-      });
+      const settled = sendLeavingSave(
+        (sent: SaveRequest) =>
+          mutateAsync(sent).then(
+            (envelope) => {
+              // A save that lands after unmount still reached the server, but
+              // must not touch a screen that no longer exists.
+              if (!mountedRef.current) return envelope;
+              const record = envelope.data;
+              // `confirmed` is what we SENT, never what came back. If the server
+              // normalised the body, adopting its echo would leave `working` and
+              // `confirmed` permanently unequal — an autosave loop that never
+              // settles. Only the id (which we may not have had) is taken from the
+              // response.
+              dispatchRef.current({
+                type: 'saved',
+                noteId: record.id,
+                draft: sent.draft,
+                updatedAt: record.updated_at ?? null,
+                at: Date.now(),
+              });
+              void onSavedRef.current?.(record);
+              return envelope;
+            },
+            (error: unknown) => {
+              if (mountedRef.current) {
+                dispatchRef.current({
+                  type: 'failed',
+                  failure: classifySaveFailure(error, sent.mode, Date.now()),
+                  at: Date.now(),
+                });
+              }
+              throw error;
+            },
+          ),
+        request,
+      );
+      lastSaveRef.current = settled;
+      return settled;
     },
-    [mutate],
+    [mutateAsync],
   );
 
   const dispatch = useCallback(
@@ -327,9 +348,8 @@ export function useNoteAutosave({
         at: Date.now(),
       });
       if (save === null) return;
-      // The mutation's own promise: per-call callbacks no longer run once the
-      // component has unmounted (leaving-save.ts).
-      onUnmountSaveRef.current?.(sendLeavingSave(mutateAsyncRef.current, save));
+      // Its outcome is the mutation's own promise, which settles after unmount.
+      onUnmountSaveRef.current?.(runSaveRef.current(save));
     };
   }, [clearTimer]);
 
@@ -340,6 +360,7 @@ export function useNoteAutosave({
   );
 
   const currentStatus = useCallback(() => stateRef.current.status, []);
+  const lastSave = useCallback(() => lastSaveRef.current, []);
 
-  return { ...view, change, flush, retry, rebase, currentStatus };
+  return { ...view, change, flush, retry, rebase, currentStatus, lastSave };
 }

@@ -72,6 +72,7 @@ import {
   isDraftSuperseded,
   markDraftSuperseded,
   registerDraftFlush,
+  saveAllNow,
   trackDraftSave,
 } from './draft-flush';
 import { CATCH_UP_LIMIT_MS, draftNoteLine, type DraftNoteState } from './draft-note-state';
@@ -438,30 +439,20 @@ function DraftEditorBody({
   const tools = useDraftTools(editor, title);
 
   // LAWEXA SEES THE LAST WORD TYPED: a message waits for this save
-  // (draft-flush.ts). The flusher saves now, then settles once all is saved,
-  // or at once with `false` on a failure the reader must act on. It reads the
-  // machine's own status (`currentStatus`), never a copy an effect wrote.
-  const waitersRef = useRef<((saved: boolean) => void)[]>([]);
-  useEffect(() => {
-    const settled = autosave.status === 'clean' ? true : SAVE_STOPPED.has(autosave.status) ? false : null;
-    if (settled === null) return;
-    const waiters = waitersRef.current;
-    waitersRef.current = [];
-    waiters.forEach((resolve) => resolve(settled));
-  }, [autosave.status]);
-  const { flush, currentStatus } = autosave;
+  // (draft-flush.ts). The flusher saves now and waits on the saves themselves
+  // (`lastSave`, the mutation's own promise), never on a render: a panel
+  // closing is still mounted for its animation when the send comes, and its
+  // status would never be drawn again (Frontend's re-review). It reads the
+  // machine's own status (`currentStatus`), and goes round again while the
+  // reader typed on during a save, until all is saved, a save fails, or the
+  // editor is gone (the same save comes back).
+  const { flush, currentStatus, lastSave } = autosave;
   useEffect(() => {
     if (!savesToNote) return;
-    return registerDraftFlush(conversationId, ordinal, () => {
-      // The flush runs through the machine at once: right after it, its status
-      // says whether there was nothing to send, a failure, or a save on the wire.
-      flush();
-      const status = currentStatus();
-      if (status === 'clean') return Promise.resolve(true);
-      if (SAVE_STOPPED.has(status)) return Promise.resolve(false);
-      return new Promise<boolean>((resolve) => waitersRef.current.push(resolve));
-    });
-  }, [conversationId, ordinal, savesToNote, flush, currentStatus]);
+    return registerDraftFlush(conversationId, ordinal, () =>
+      saveAllNow({ flush, currentStatus, lastSave, stopped: (status) => SAVE_STOPPED.has(status) }),
+    );
+  }, [conversationId, ordinal, savesToNote, flush, currentStatus, lastSave]);
 
   // THE CARET STAYS IN VIEW AS THE KEYBOARD RISES (Arthur's iPhone, 24 October
   // 2026: "the tap on the specific portion of the note still takes the

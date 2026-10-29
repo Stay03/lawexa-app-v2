@@ -59,8 +59,13 @@ test('the leaving save settles false when it fails, after unmount', async () => 
   assert.equal(await settled, false);
 });
 
-test('the autosave hands the unmount save’s own promise to the caller, never a callback-made one', () => {
+test('every autosave goes through the mutation’s own promise, and the unmount save hands that promise on', () => {
   const hook = readFileSync(join(process.cwd(), 'v2', 'features', 'notes', 'editor', 'use-autosave.ts'), 'utf8');
-  assert.match(hook, /onUnmountSaveRef\.current\?\.\(sendLeavingSave\(mutateAsyncRef\.current, save\)\);/);
-  assert.doesNotMatch(hook, /settle\?\./);
+  // No per-call callbacks anywhere: they stop running once the editor unmounts.
+  assert.doesNotMatch(hook, /\bmutate\(request, \{/);
+  assert.match(hook, /const settled = sendLeavingSave\(\s*\(sent: SaveRequest\) =>\s*mutateAsync\(sent\)\.then\(/);
+  assert.match(hook, /lastSaveRef\.current = settled;\s*return settled;/);
+  assert.match(hook, /onUnmountSaveRef\.current\?\.\(runSaveRef\.current\(save\)\);/);
+  // The machine is told only while the editor is mounted.
+  assert.match(hook, /if \(!mountedRef\.current\) return envelope;/);
 });
