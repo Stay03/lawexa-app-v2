@@ -53,9 +53,11 @@ const generateId = () =>
 const WATCHDOG_SILENCE_MS = 60_000;
 const WATCHDOG_CHECK_MS = 10_000;
 
-// Polling: check status every N ms, stop after max duration
+// Polling: check status every N ms, stop after max duration. 25 minutes covers
+// the job's 20-minute limit (the 5-minute stream fix, 29 October 2026); at 10 a
+// long answer said "timed out" while the server went on to save it.
 const POLL_INTERVAL_MS = 5_000;
-const POLL_MAX_DURATION_MS = 600_000; // 10 minutes
+const POLL_MAX_DURATION_MS = 25 * 60_000; // 25 minutes
 
 // SSE reconnection: retry before falling back to polling
 const SSE_MAX_RECONNECTS = 3;
@@ -91,6 +93,10 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastEventTimeRef = useRef<number>(0);
+  /** The server said `stream_paused` (its 5-minute limit for one connection):
+   *  the reconnect that follows replays from Last-Event-ID, so its `connected`
+   *  must not re-seed the text as well. */
+  const pausedRollRef = useRef(false);
   const conversationIdRef = useRef<string | null>(null);
   const executionIdRef = useRef<string | null>(null);
   const reconnectCountRef = useRef<number>(0);
@@ -666,6 +672,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       // never in the address (addresses end up in logs and history).
       const streamUrl = `${API_BASE_URL}/api/chat/stream/${executionId}`;
 
+      // A new stream starts with no planned drop, whatever the last one left.
+      pausedRollRef.current = false;
       const eventSource = new AuthedEventSource(streamUrl, {
         getToken: () => useAuthStore.getState().token,
       });
@@ -689,10 +697,13 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
         lastEventTimeRef.current = Date.now();
         reconnectCountRef.current = 0; // Reset on successful connection
         resetHeartbeatCounter();
+        // Back after the planned drop: the replay brings the rest of the text.
+        const rolled = pausedRollRef.current;
+        pausedRollRef.current = false;
 
         try {
           const data = JSON.parse((e as MessageEvent).data);
-          if (data.accumulated_text) {
+          if (data.accumulated_text && !rolled) {
             const iteration = currentIterationRef.current ?? 0;
             const msgId = ensureStreamingPlaceholder(iteration);
             textByIterationRef.current.set(iteration, data.accumulated_text);
@@ -903,6 +914,14 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           streamingMessageIdRef.current = null;
           currentIterationRef.current = null;
         }
+      });
+
+      // stream_paused — the server's 5-minute limit for one connection while the
+      // answer goes on; it then ends the body without `end`, and the transport
+      // reconnects with Last-Event-ID. Only marks that reconnect as planned.
+      eventSource.addEventListener('stream_paused', () => {
+        lastEventTimeRef.current = Date.now();
+        pausedRollRef.current = true;
       });
 
       // Handle heartbeat — track consecutive heartbeats without data events.

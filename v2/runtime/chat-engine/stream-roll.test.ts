@@ -54,3 +54,30 @@ test('the status check outlasts the job: 25 minutes, past its 20-minute limit', 
   assert.match(source, /const POLL_MAX_DURATION_MS = 25 \* 60_000;/);
   assert.doesNotMatch(source, /POLL_MAX_DURATION_MS = 600_000/);
 });
+
+test('a planned drop never leaks into the next stream: the flag clears with every reset of the reconnect clock', () => {
+  const source = engine();
+  // Paused, then the turn fell back to polling: the watchdog's start, the stall
+  // recovery, the end-before-completed path and a new turn each clear it, so the
+  // next turn's first real drop arms the clock and its reconnect seeds the text.
+  const body = (name: string) => source.slice(source.indexOf(name), source.indexOf('\n  }\n', source.indexOf(name)));
+  assert.match(body('function startWatchdog() {'), /reconnectingSince = 0;\s*pausedRoll = false;/);
+  assert.match(body('function recoverFromStall('), /reconnectingSince = 0;\s*pausedRoll = false;/);
+  const ended = source.slice(source.indexOf("es.addEventListener('end'"), source.indexOf("es.addEventListener('timeout'"));
+  assert.match(ended, /reconnectingSince = 0;\s*pausedRoll = false;\s*pollForCompletion\(convId\);/);
+  assert.match(source, /lastProgressAt = 0;\s*reconnectingSince = 0;\s*pausedRoll = false;\s*dedupKeys = new Set\(\);/);
+  // Every reset of the clock clears the flag: none is missed.
+  const resets = source.match(/reconnectingSince = 0;/g)?.length ?? 0;
+  const clears = source.match(/reconnectingSince = 0;\s*pausedRoll = false;/g)?.length ?? 0;
+  assert.equal(clears, resets - 1, 'every reset but the declaration clears the flag');
+});
+
+test('the classic chat (staff on the classic design) rolls the same way: no doubled text, a 25-minute cap', () => {
+  const classic = readFileSync(join(process.cwd(), 'lib', 'hooks', 'useChatStream.ts'), 'utf8');
+  assert.match(classic, /const POLL_MAX_DURATION_MS = 25 \* 60_000;/);
+  assert.match(classic, /eventSource\.addEventListener\('stream_paused', \(\) => \{\s*lastEventTimeRef\.current = Date\.now\(\);\s*pausedRollRef\.current = true;\s*\}\);/);
+  assert.match(classic, /const rolled = pausedRollRef\.current;\s*pausedRollRef\.current = false;/);
+  assert.match(classic, /if \(data\.accumulated_text && !rolled\) \{/);
+  // A new stream never inherits a planned drop.
+  assert.match(classic, /pausedRollRef\.current = false;\s*const eventSource = new AuthedEventSource\(streamUrl,/);
+});
