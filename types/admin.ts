@@ -289,6 +289,16 @@ export interface AdminFreeMessagesBlockResponse {
   data: AdminFreeMessagesBlockUser;
 }
 
+/**
+ * Response of PUT /api/users/{uuid}/role (admin-only). The user is the same
+ * lean UserResource the free-messages-block endpoint returns.
+ */
+export interface AdminChangeUserRoleResponse {
+  success: boolean;
+  message: string;
+  data: AdminFreeMessagesBlockUser;
+}
+
 // ============================================
 // User List Types (GET /api/admin/users)
 // ============================================

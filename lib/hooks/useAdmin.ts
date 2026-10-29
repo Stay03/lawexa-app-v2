@@ -2,10 +2,12 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
+import type { ChangeableRole } from '@/components/admin/change-role-model';
 import type {
   AdminConversationsParams,
   AdminCourseConversationsParams,
   AdminFreeMessagesBlockPayload,
+  AdminUserDetailResponse,
   IAdminUserListParams,
   AdminUserConversationsParams,
   AdminUserTokenUsageParams,
@@ -355,6 +357,30 @@ export function useSetUserFreeMessagesBlock() {
       payload: AdminFreeMessagesBlockPayload;
     }) => adminApi.setUserFreeMessagesBlock(uuid, payload),
     onSuccess: () => {
+      // adminKeys.users() is the parent of both the list and detail keys.
+      queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+    },
+  });
+}
+
+/**
+ * Change a user's role (Arthur's option 3, 29 October 2026; design d0ed4466).
+ * The server answers with the lean user, so only its role is written into the
+ * cached detail; the detail and the users list are then refetched.
+ */
+export function useChangeUserRole() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, role }: { uuid: string; role: ChangeableRole }) =>
+      adminApi.changeUserRole(uuid, role),
+    onSuccess: (response, { uuid }) => {
+      queryClient.setQueryData<AdminUserDetailResponse>(
+        adminKeys.userDetail(uuid),
+        (cached) =>
+          cached && response.data?.uuid === uuid
+            ? { ...cached, data: { ...cached.data, role: response.data.role } }
+            : cached
+      );
       // adminKeys.users() is the parent of both the list and detail keys.
       queryClient.invalidateQueries({ queryKey: adminKeys.users() });
     },

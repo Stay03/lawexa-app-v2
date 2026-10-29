@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { ChangeableRole } from '@/components/admin/change-role-model';
 import type {
   AdminConversationsParams,
   AdminCourseConversationsParams,
@@ -7,6 +8,7 @@ import type {
   AdminUserDetailResponse,
   AdminFreeMessagesBlockPayload,
   AdminFreeMessagesBlockResponse,
+  AdminChangeUserRoleResponse,
   IAdminUserListParams,
   IAdminUserListResponse,
   AdminUserConversationsParams,
@@ -161,6 +163,23 @@ export const adminApi = {
   getUser: async (uuid: string): Promise<AdminUserDetailResponse> => {
     const response = await apiClient.get<AdminUserDetailResponse>(
       `/admin/users/${uuid}`
+    );
+    return response.data;
+  },
+
+  /**
+   * Change a user's role. Admin-only, under /users/{uuid}/... like the other
+   * admin write actions on a user. The server refuses your own role (400) and,
+   * for a non-superadmin, a target or a new role at or above their own. Returns
+   * the updated user (the lean UserResource, not the admin detail shape).
+   */
+  changeUserRole: async (
+    uuid: string,
+    role: ChangeableRole
+  ): Promise<AdminChangeUserRoleResponse> => {
+    const response = await apiClient.put<AdminChangeUserRoleResponse>(
+      `/users/${uuid}/role`,
+      { role }
     );
     return response.data;
   },
