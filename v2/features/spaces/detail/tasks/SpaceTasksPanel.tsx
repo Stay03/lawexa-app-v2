@@ -215,7 +215,7 @@ function Board({ columns, now }: { columns: Record<SpaceTaskStage, SpaceTask[]>;
       <div
         ref={track}
         onScroll={followSwipe}
-        className="flex items-start max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto md:gap-4"
+        className="flex items-start max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto md:gap-3"
       >
         {BOARD_STAGES.map((stage) =>
           stage === 'done' ? (
@@ -333,12 +333,19 @@ function TaskCard({ task, now }: { task: SpaceTask; now: number }) {
   const note = taskNote(task);
   return (
     <li className="rounded-xl border border-border bg-card px-3.5 py-3 shadow-xs">
-      <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{task.title}</p>
+      {/* The time in the stage rides the title's line, so the owner's line
+          keeps a whole name in a computer's narrow column (the first B
+          pictures cut "Frontend Cl…"). */}
+      <div className="flex items-start gap-2">
+        <p className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">{task.title}</p>
+        <span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground">
+          {formatRelativeTime(task.stage_changed_at, now)}
+        </span>
+      </div>
       <div className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
         <Initials person={task.owner} />
         <span className="min-w-0 truncate">{task.owner?.name ?? 'Nobody yet'}</span>
         {task.owner?.is_agent ? <AgentTag /> : null}
-        <span className="ml-auto shrink-0 pl-2 tabular-nums">{formatRelativeTime(task.stage_changed_at, now)}</span>
       </div>
       {note ? <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">{note}</p> : null}
     </li>
