@@ -104,6 +104,17 @@ test('a snapshot older than the cached row by updated_at is ignored, also inside
   assert.equal(fresh[0].title, 'Third title');
 });
 
+test('two edits in the same second tie, and the one that arrives last wins on purpose', () => {
+  // updated_at is whole seconds (the techlead's recheck): no order to read inside one.
+  const list = [task('a', { title: 'First', updated_at: '2026-10-29T11:00:00Z' })];
+  const tied = applyTaskChanged(
+    list,
+    { action: 'updated', task: task('a', { title: 'Second', updated_at: '2026-10-29T11:00:00Z' }) },
+    NONE_DELETED,
+  );
+  assert.equal(tied[0].title, 'Second');
+});
+
 test('an update that arrives after the delete does not bring the task back', () => {
   // The techlead's review, 29 October 2026: queued broadcasts can land out of order.
   const deleted = new Set<string>();

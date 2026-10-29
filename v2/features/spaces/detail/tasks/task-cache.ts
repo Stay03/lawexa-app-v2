@@ -32,8 +32,10 @@ export function removeTask(list: readonly SpaceTask[], taskUuid: string): SpaceT
  * the server queues its broadcasts, so with more than one worker an
  * `updated` can land after a later `updated`, or after the `deleted`.
  * - A snapshot older than the cached row by `updated_at` is ignored.
- *   `updated_at` moves forward on every change, so two edits inside one
- *   stage are told apart too.
+ *   `updated_at` moves forward on every change, a move or not, so edits
+ *   inside one stage are ordered too. It is whole seconds: two edits in the
+ *   same second tie, and a tie goes to the snapshot that arrives last, on
+ *   purpose. The board's next read settles it.
  * - A task in `deleted` (the uuids this board has seen deleted) never comes
  *   back from a late `created` or `updated`. A delete is soft and final.
  */

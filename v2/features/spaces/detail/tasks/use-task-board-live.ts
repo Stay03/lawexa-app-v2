@@ -7,6 +7,7 @@ import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { EVT_TASK_CHANGED, spaceChannelName, type SpaceTaskChangedEvent } from '@/v2/runtime/realtime/protocol';
 import { spacesQueries } from '../../queries';
 import { applyTaskChanged } from './task-cache';
+import { releaseChannel, retainChannel } from './channel-listeners';
 
 /**
  * useTaskBoardLive — the board moves while it is open (the techlead's brief,
@@ -20,8 +21,11 @@ import { applyTaskChanged } from './task-cache';
  * The uuids seen deleted are kept while the board is open, so a late
  * `updated` cannot bring a deleted task back (the techlead's review).
  *
- * Unmount stops THIS listener only (`stopListening`, the techlead's review):
- * leaving the channel would also drop any other listener on `spaces.{uuid}`.
+ * Unmount stops THIS listener (`stopListening`), and the channel is left
+ * only when the last board listening on it goes (the techlead's recheck, 29
+ * October 2026): leaving at once would drop another board's listener, and
+ * never leaving would keep every Space visited subscribed all session.
+ * {@link retainChannel} and {@link releaseChannel} count them.
  * No Echo (on the server, or with no Reverb settings) does nothing. The spine
  * owns the connection itself.
  */
@@ -40,11 +44,15 @@ export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, ena
       queryClient.setQueryData(boardKey, (list) => (list ? applyTaskChanged(list, event, deleted) : list));
       void queryClient.invalidateQueries({ queryKey: spacesQueries.taskMovesOf(spaceUuid, event.task.uuid) });
     };
-    const channel = echo.private(spaceChannelName(spaceUuid));
+    const name = spaceChannelName(spaceUuid);
+    const channel = echo.private(name);
     channel.listen(EVT_TASK_CHANGED, onChanged);
+    retainChannel(name);
 
     return () => {
       channel.stopListening(EVT_TASK_CHANGED, onChanged);
+      if (releaseChannel(name) === 0) echo.leave(name);
     };
   }, [enabled, spaceUuid, viewerId, queryClient]);
 }
+
