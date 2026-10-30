@@ -35,9 +35,10 @@ import { revealAfterKeyboard, takesKeyboard } from '@/v2/shell/reveal-in-scrolle
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { spacesQueries } from '../../queries';
 import { TASK_STAGE_LABELS, TASK_STAGE_TONE, TASK_STAGES, taskThreadHref } from './task-board-model';
-import { taskChatLine, taskChatState, threadAccess, type TaskBoxTab, type TaskChatState, type TaskPhoneTab } from './task-box-model';
+import { taskChatLine, taskChatState, taskThreadAccess, type TaskBoxTab, type TaskChatState, type TaskPhoneTab } from './task-box-model';
+import { TaskChatThread } from './TaskChatThread';
 import { reorderedQueue, type QueueDirection } from './task-cache';
-import { useCreateTask, useDeleteTask, useReorderTasks, useUpdateTask } from './task-mutations';
+import { useCreateTask, useDeleteTask, useReorderTasks, useStartTaskThread, useUpdateTask } from './task-mutations';
 import {
   checkDraft,
   createPayload,
@@ -217,13 +218,26 @@ function TaskBoxBody({
   const chat = taskChatState(
     task,
     canEdit,
-    threadAccess({
+    taskThreadAccess({
       isPending: threadQuery.isPending,
       data: threadQuery.data?.data,
       errorStatus: threadQuery.error ? extractApiError(threadQuery.error).status : null,
     }),
   );
   const retryChat = () => void threadQuery.refetch();
+  // Start a thread for a task with none: the board's copy takes it, and the pane opens on it.
+  const startThread = useStartTaskThread(spaceUuid);
+  const chatStart = {
+    pending: startThread.isPending,
+    onStart: task
+      ? () =>
+          startThread.mutate(task.uuid, {
+            // The form takes the new thread too, so Save never sends "no thread" and unlinks it.
+            onSuccess: (response) => setDraft((current) => ({ ...current, thread: response.data.thread?.uuid ?? current.thread })),
+          })
+      : null,
+  };
+  const threadChannel = threadQuery.data?.data ?? null;
 
   // A focused field is scrolled into view inside the body once the keyboard
   // settles: the body shrinks as the box sits on the keyboard, and a field low
@@ -479,7 +493,7 @@ function TaskBoxBody({
   return (
     <>
       {phone ? (
-        <form onSubmit={save} noValidate className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col">
           {head}
           {task ? (
             <BoxTabs
@@ -492,22 +506,23 @@ function TaskBoxBody({
               ]}
             />
           ) : null}
-          <div
-            ref={bodyRef}
-            onFocus={revealFocused}
-            className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-4 py-5"
-          >
-            {phoneTab === 'chat' && task ? (
-              <TaskChatPane state={chat} onRetry={retryChat} />
-            ) : (
-              <>
+          {phoneTab === 'chat' && task ? (
+            // Outside the details form, so the composer's Enter sends a message and never saves the task.
+            <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
+          ) : (
+            <form onSubmit={save} noValidate className="flex min-h-0 flex-1 flex-col">
+              <div
+                ref={bodyRef}
+                onFocus={revealFocused}
+                className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-4 py-5"
+              >
                 {details}
                 {history}
-              </>
-            )}
-          </div>
-          {phoneTab === 'details' ? foot : null}
-        </form>
+              </div>
+              {foot}
+            </form>
+          )}
+        </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px]">
           <form onSubmit={save} noValidate className="flex min-h-0 flex-col">
@@ -533,7 +548,7 @@ function TaskBoxBody({
             {foot}
           </form>
           <aside aria-label="Task chat" className="flex min-h-0 flex-col border-l border-border bg-secondary/40">
-            <TaskChatPane state={chat} onRetry={retryChat} />
+            <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
           </aside>
         </div>
       )}
@@ -599,11 +614,22 @@ function BoxTabs<T extends string>({
 }
 
 /**
- * The task's chat: its linked thread (task-box-model.ts decides what shows).
- * The thread itself opens on its own page; the messages and the composer come
- * in here with the server's flags (Backend 98f03c46).
+ * The task's chat: its linked thread (task-box-model.ts decides what shows),
+ * as its own feed and composer (TaskChatThread), with a way to its own page.
  */
-function TaskChatPane({ state, onRetry }: { state: TaskChatState; onRetry: () => void }) {
+function TaskChatPane({
+  state,
+  channel,
+  onRetry,
+  start,
+}: {
+  state: TaskChatState;
+  /** The thread, once its own answer has come. */
+  channel: Channel | null;
+  onRetry: () => void;
+  /** Start a thread, where the task has none and the reader may edit it. */
+  start: { pending: boolean; onStart: (() => void) | null };
+}) {
   const line = taskChatLine(state);
   const thread = 'thread' in state ? state.thread : null;
   return (
@@ -621,20 +647,30 @@ function TaskChatPane({ state, onRetry }: { state: TaskChatState; onRetry: () =>
           </Link>
         ) : null}
       </div>
-      <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 px-5 pb-5">
-        {state.kind === 'loading' ? (
-          <div className="flex flex-col gap-3" aria-hidden>
-            <Skeleton className="h-12 w-4/5 rounded-2xl" />
-            <Skeleton className="ml-auto h-10 w-3/5 rounded-2xl" />
-          </div>
-        ) : null}
-        {line ? <p className="text-sm text-muted-foreground">{line}</p> : null}
-        {state.kind === 'failed' ? (
-          <Button type="button" variant="outline" size="sm" className="w-fit" onClick={onRetry}>
-            Try again
-          </Button>
-        ) : null}
-      </div>
+      {(state.kind === 'read' || state.kind === 'post') && channel ? (
+        <TaskChatThread channel={channel} canPost={state.kind === 'post'} threadHref={taskThreadHref(state.thread)} />
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 px-5 pb-5">
+          {state.kind === 'loading' ? (
+            <div className="flex flex-col gap-3" aria-hidden>
+              <Skeleton className="h-12 w-4/5 rounded-2xl" />
+              <Skeleton className="ml-auto h-10 w-3/5 rounded-2xl" />
+            </div>
+          ) : null}
+          {line ? <p className="text-sm text-muted-foreground">{line}</p> : null}
+          {state.kind === 'failed' ? (
+            <Button type="button" variant="outline" size="sm" className="w-fit" onClick={onRetry}>
+              Try again
+            </Button>
+          ) : null}
+          {state.kind === 'none' && state.canStart && start.onStart ? (
+            <Button type="button" size="sm" className="w-fit gap-1.5" disabled={start.pending} onClick={start.onStart}>
+              {start.pending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <MessagesSquare aria-hidden className="size-4" />}
+              Start a thread
+            </Button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
