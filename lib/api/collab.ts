@@ -565,11 +565,18 @@ export const spaceTasksApi = {
    * thread"; Backend bfff1651). The server picks the Space's starter channel,
    * joins the caller to it if need be, and names the thread after the task.
    * 409: the task already has a thread. 422: the Space has no channel every
-   * member can read. 403: the caller may not.
+   * member can read. 403: the caller may not. `channel_uuid` picks the
+   * channel instead (Backend 45842ebc): a top-level `space_public` channel of
+   * this Space, else 422 on `channel_uuid`.
    */
-  startThread: async (spaceUuid: string, taskUuid: string): Promise<SpaceTaskItemResponse> => {
+  startThread: async (
+    spaceUuid: string,
+    taskUuid: string,
+    payload: { channel_uuid?: string } = {},
+  ): Promise<SpaceTaskItemResponse> => {
     const response = await apiClient.post<SpaceTaskItemResponse>(
       `/spaces/${encodeURIComponent(spaceUuid)}/tasks/${encodeURIComponent(taskUuid)}/thread`,
+      payload,
     );
     return response.data;
   },

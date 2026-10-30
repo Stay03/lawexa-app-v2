@@ -113,6 +113,15 @@ test('a new task sends only the fields that say something', () => {
   );
 });
 
+test('New task links an existing thread: the picked thread rides on the create (Stay, 30 October 2026)', () => {
+  assert.deepEqual(createPayload({ ...draftFromTask(null, 'u-me'), title: 'TEST DATA task', thread: 'th-motion' }), {
+    title: 'TEST DATA task',
+    stage: 'queued',
+    owner: 'u-me',
+    thread: 'th-motion',
+  });
+});
+
 test('Save sends only what changed, with null to clear, and nothing when nothing changed', () => {
   const saved = task({ thread: { uuid: 'th1', name: 'Board', channel_uuid: 'c1' } });
   assert.equal(updatePayload(draftFromTask(saved, null), saved), null);

@@ -35,7 +35,18 @@ import { revealAfterKeyboard, takesKeyboard } from '@/v2/shell/reveal-in-scrolle
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { spacesQueries } from '../../queries';
 import { TASK_STAGE_LABELS, TASK_STAGE_TONE, TASK_STAGES, taskThreadHref } from './task-board-model';
-import { taskChatLine, taskChatState, taskThreadAccess, type TaskBoxTab, type TaskChatState, type TaskPhoneTab } from './task-box-model';
+import {
+  startThreadChannels,
+  startThreadError,
+  startThreadPayload,
+  taskChatLine,
+  taskChatState,
+  taskThreadAccess,
+  type StartChannel,
+  type TaskBoxTab,
+  type TaskChatState,
+  type TaskPhoneTab,
+} from './task-box-model';
 import { TaskChatThread } from './TaskChatThread';
 import { reorderedQueue, type QueueDirection } from './task-cache';
 import { useCreateTask, useDeleteTask, useReorderTasks, useStartTaskThread, useUpdateTask } from './task-mutations';
@@ -227,16 +238,37 @@ function TaskBoxBody({
     }),
   );
   const retryChat = () => void threadQuery.refetch();
-  // Start a thread for a task with none: the board's copy takes it, and the pane opens on it.
+  // Start a thread for a task with none, in the channel picked (Stay, 22:40Z):
+  // the board's copy takes it, and the pane opens on it. The channels are the
+  // rail's own read (`CollabFrame`, 50 a page), so the pane reads nothing new.
   const startThread = useStartTaskThread(spaceUuid);
-  const chatStart = {
+  const mayStart = chat.kind === 'none' && chat.canStart;
+  const channelList = useQuery({ ...channelsQueries.bySpace({ spaceUuid, viewerId, per_page: 50 }), enabled: mayStart });
+  const startRooms = useMemo(() => startThreadChannels(channelList.data?.data ?? []), [channelList.data]);
+  const [pickedChannel, setPickedChannel] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  const startIn = pickedChannel ?? startRooms.preselected;
+  const chatStart: ChatStart = {
     pending: startThread.isPending,
+    channels: channelList.isSuccess ? startRooms.options : null,
+    channel: startIn,
+    onChannel: (uuid) => {
+      setPickedChannel(uuid);
+      setStartError(null);
+    },
+    error: startError,
     onStart: task
-      ? () =>
-          startThread.mutate(task.uuid, {
-            // The form takes the new thread too, so Save never sends "no thread" and unlinks it.
-            onSuccess: (response) => setDraft((current) => ({ ...current, thread: response.data.thread?.uuid ?? current.thread })),
-          })
+      ? () => {
+          setStartError(null);
+          startThread.mutate(
+            { taskUuid: task.uuid, payload: startThreadPayload(startIn, startRooms.preselected) },
+            {
+              // The form takes the new thread too, so Save never sends "no thread" and unlinks it.
+              onSuccess: (response) => setDraft((current) => ({ ...current, thread: response.data.thread?.uuid ?? current.thread })),
+              onError: (failure) => setStartError(startThreadError(extractApiError(failure))),
+            },
+          );
+        }
       : null,
   };
   const threadChannel = threadQuery.data?.data ?? null;
@@ -630,7 +662,7 @@ function TaskChatPane({
   channel: Channel | null;
   onRetry: () => void;
   /** Start a thread, where the task has none and the reader may edit it. */
-  start: { pending: boolean; onStart: (() => void) | null };
+  start: ChatStart;
 }) {
   const line = taskChatLine(state);
   const thread = 'thread' in state ? state.thread : null;
@@ -665,14 +697,68 @@ function TaskChatPane({
               Try again
             </Button>
           ) : null}
-          {state.kind === 'none' && state.canStart && start.onStart ? (
-            <Button type="button" size="sm" className="w-fit gap-1.5" disabled={start.pending} onClick={start.onStart}>
-              {start.pending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <MessagesSquare aria-hidden className="size-4" />}
-              Start a thread
-            </Button>
-          ) : null}
+          {state.kind === 'none' && state.canStart && start.onStart ? <StartThread start={start} onStart={start.onStart} /> : null}
         </div>
       )}
+    </div>
+  );
+}
+
+/** "Start a thread" and where it starts: the pane's way in for a task with none. */
+interface ChatStart {
+  pending: boolean;
+  /** The open channels it may start in, once the list has come; `null` before. */
+  channels: readonly StartChannel[] | null;
+  channel: string | null;
+  onChannel: (uuid: string | null) => void;
+  error: string | null;
+  onStart: (() => void) | null;
+}
+
+/**
+ * The channel picker over the button (Stay, 30 October 2026, 22:40Z; plan
+ * 0fba5ec3). Several open channels: a picker, the server's own default
+ * preselected. One: a line naming it. None: a line saying so, and no button,
+ * since the server would refuse. While the list is on its way, the button
+ * starts the thread where the server puts it.
+ */
+function StartThread({ start, onStart }: { start: ChatStart; onStart: () => void }) {
+  const uid = useId();
+  const native = useSheetSide() === 'bottom';
+  const channels = start.channels;
+  if (channels && channels.length === 0) {
+    return <p className="text-sm text-muted-foreground">This Space has no open channel to start a thread in.</p>;
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      {channels && channels.length > 1 ? (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={`${uid}-channel`} className="text-xs font-medium text-muted-foreground">
+            Start a thread in
+          </Label>
+          <ChoiceSelect
+            id={`${uid}-channel`}
+            native={native}
+            value={start.channel}
+            options={channels.map((channel) => ({ uuid: channel.uuid, name: `#${channel.name}` }))}
+            emptyLabel={null}
+            invalid={!!start.error}
+            describedBy={start.error ? `${uid}-error` : undefined}
+            onChange={start.onChannel}
+          />
+        </div>
+      ) : channels && channels.length === 1 ? (
+        <p className="text-sm text-muted-foreground">Starts in #{channels[0].name}</p>
+      ) : null}
+      <Button type="button" size="sm" className="w-fit gap-1.5" disabled={start.pending} onClick={onStart}>
+        {start.pending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <MessagesSquare aria-hidden className="size-4" />}
+        Start a thread
+      </Button>
+      {start.error ? (
+        <p id={`${uid}-error`} role="alert" className="text-xs text-destructive">
+          {start.error}
+        </p>
+      ) : null}
     </div>
   );
 }

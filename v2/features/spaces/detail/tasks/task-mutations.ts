@@ -88,7 +88,10 @@ export function usePatchTask(spaceUuid: string) {
 export function useStartTaskThread(spaceUuid: string) {
   const { write, reread } = useBoardCache(spaceUuid);
   return useMutation({
-    mutationFn: (taskUuid: string) => spaceTasksApi.startThread(spaceUuid, taskUuid),
+    mutationFn: ({ taskUuid, payload }: { taskUuid: string; payload: { channel_uuid?: string } }) =>
+      spaceTasksApi.startThread(spaceUuid, taskUuid, payload),
+    // The pane says a refusal under the picker, so no toast says it again.
+    meta: { silentError: true },
     onSuccess: (response) => write((list) => upsertTask(list, response.data)),
     onSettled: reread,
   });

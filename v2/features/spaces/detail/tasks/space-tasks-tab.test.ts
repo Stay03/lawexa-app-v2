@@ -124,3 +124,19 @@ test('the task chat is the thread’s own feed and composer, asked for only by t
   // On a phone the chat sits outside the details form: Enter in the composer sends, never saves.
   assert.match(box, /\{phoneTab === 'chat' && task \? \(\s*\/\/ Outside the details form/);
 });
+
+test('New task offers the Thread field, and Start a thread picks its channel from the rail’s own list', () => {
+  const box = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
+  // New task is the same box, empty: its Thread field is the saved task's, for every editor who sees the rooms.
+  assert.match(box, /<FieldBlock label="Thread"[^]*?\{canEdit && rooms \? \(\s*<ThreadSelect\b/);
+  assert.match(box, /createTask\.mutate\(createPayload\(draft\)/);
+  // The channels come from the rail's read, asked for only where a thread may start.
+  assert.match(box, /useQuery\(\{ \.\.\.channelsQueries\.bySpace\(\{ spaceUuid, viewerId, per_page: 50 \}\), enabled: mayStart \}\)/);
+  assert.match(box, /payload: startThreadPayload\(startIn, startRooms\.preselected\)/);
+  // A refusal shows under the picker, and once: no toast says it again.
+  assert.match(box, /onError: \(failure\) => setStartError\(startThreadError\(extractApiError\(failure\)\)\)/);
+  const mutations = read('v2', 'features', 'spaces', 'detail', 'tasks', 'task-mutations.ts');
+  assert.match(mutations, /spaceTasksApi\.startThread\(spaceUuid, taskUuid, payload\),\s*\/\/[^\n]*\n\s*meta: \{ silentError: true \},/);
+  const api = read('lib', 'api', 'collab.ts');
+  assert.match(api, /`\/spaces\/\$\{encodeURIComponent\(spaceUuid\)\}\/tasks\/\$\{encodeURIComponent\(taskUuid\)\}\/thread`,\s*payload,/);
+});

@@ -1,11 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { SpaceTask } from '@/types/collab';
+import type { Channel, SpaceTask } from '@/types/collab';
 import {
   cardClickRenames,
   initialPhoneTab,
   renameOutcome,
+  startThreadChannels,
+  startThreadError,
+  startThreadPayload,
   taskChatLine,
   taskChatState,
   taskThreadAccess,
@@ -121,4 +124,56 @@ test('a typed title sends only a real change: trimmed, never empty, never over t
   assert.deepEqual(save.kind === 'save' && save.payload, { title: 'Draft the TEST DATA lease review (v2)' });
   // The card shows the new title at once; nothing else about it changes.
   assert.deepEqual(save.kind === 'save' && save.shown, { ...card, title: 'Draft the TEST DATA lease review (v2)' });
+});
+
+/* Start a thread in a picked channel (Stay, 30 October 2026, 22:40Z; Backend 45842ebc). */
+
+function room(uuid: string, name: string, createdAt: string, extra: Partial<Channel> = {}): Channel {
+  return { uuid, name, created_at: createdAt, is_thread: false, visibility: 'space_public', ...extra } as Channel;
+}
+
+test('the channels a thread may start in: open, top-level, once each, in name order, the oldest preselected', () => {
+  const rooms = [
+    room('c-research', 'research', '2026-10-30T12:00:00Z'),
+    room('c-private', 'partners', '2026-10-01T09:00:00Z', { visibility: 'private' }),
+    room('c-thread', 'thread--x', '2026-09-01T09:00:00Z', { is_thread: true }),
+    room('c-general', 'general', '2026-10-02T09:00:00Z'),
+    room('c-research', 'research', '2026-10-30T12:00:00Z'),
+  ];
+  assert.deepEqual(startThreadChannels(rooms), {
+    options: [
+      { uuid: 'c-general', name: 'general' },
+      { uuid: 'c-research', name: 'research' },
+    ],
+    preselected: 'c-general',
+  });
+  // The default is the oldest by its own date, whatever order the list came in.
+  assert.equal(startThreadChannels([...rooms].reverse()).preselected, 'c-general');
+});
+
+test('no open channel: nothing to pick and nothing preselected', () => {
+  assert.deepEqual(startThreadChannels([]), { options: [], preselected: null });
+  assert.deepEqual(startThreadChannels([room('c-private', 'partners', '2026-10-01T09:00:00Z', { visibility: 'private' })]), {
+    options: [],
+    preselected: null,
+  });
+});
+
+test('the start names a channel only when it is not the server’s own pick', () => {
+  assert.deepEqual(startThreadPayload('c-general', 'c-general'), {});
+  assert.deepEqual(startThreadPayload(null, null), {});
+  assert.deepEqual(startThreadPayload('c-research', 'c-general'), { channel_uuid: 'c-research' });
+  // The list never came: the server picks, as before.
+  assert.deepEqual(startThreadPayload(null, 'c-general'), {});
+});
+
+test('a refused start says the server’s word on the channel, else its message', () => {
+  assert.equal(
+    startThreadError({
+      message: 'The given data was invalid.',
+      errors: { channel_uuid: ['The thread must go in a channel of this Space that every member can read.'] },
+    }),
+    'The thread must go in a channel of this Space that every member can read.',
+  );
+  assert.equal(startThreadError({ message: 'This task already has a thread.', errors: null }), 'This task already has a thread.');
 });

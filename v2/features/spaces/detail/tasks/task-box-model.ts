@@ -1,4 +1,4 @@
-import type { SpaceTask } from '@/types/collab';
+import type { Channel, SpaceTask } from '@/types/collab';
 
 /**
  * task-box-model — what the task box's chat pane shows, and which tab a phone
@@ -146,4 +146,42 @@ export function renameOutcome(task: SpaceTask, typed: string, max: number): Rena
   if (title === '') return { kind: 'invalid', message: 'A task needs a title.' };
   if (title.length > max) return { kind: 'invalid', message: `A title is at most ${max} characters.` };
   return { kind: 'save', payload: { title }, shown: { ...task, title } };
+}
+
+/** A channel a task's thread may start in. */
+export interface StartChannel {
+  uuid: string;
+  name: string;
+}
+
+/**
+ * Where "Start a thread" may put the task's thread (Stay, 30 October 2026,
+ * 22:40Z; Backend 45842ebc). The Space's top-level channels every member can
+ * read, in name order, from the rail's list. The preselected one is the
+ * oldest, the server's own default (its first `space_public` channel by id),
+ * read from the data rather than the list's order, so leaving the picker
+ * alone starts the thread where it always has.
+ */
+export function startThreadChannels(rooms: readonly Channel[]): { options: StartChannel[]; preselected: string | null } {
+  const open = new Map<string, Channel>();
+  for (const room of rooms) {
+    if (room.is_thread || room.visibility !== 'space_public' || open.has(room.uuid)) continue;
+    open.set(room.uuid, room);
+  }
+  const rows = [...open.values()];
+  const oldest = rows.reduce<Channel | null>((first, room) => (first === null || room.created_at < first.created_at ? room : first), null);
+  return {
+    options: rows.map((room) => ({ uuid: room.uuid, name: room.name })).sort((a, b) => a.name.localeCompare(b.name)),
+    preselected: oldest?.uuid ?? null,
+  };
+}
+
+/** The start's body: a channel named only when it is not the server's own pick. */
+export function startThreadPayload(picked: string | null, preselected: string | null): { channel_uuid?: string } {
+  return picked !== null && picked !== preselected ? { channel_uuid: picked } : {};
+}
+
+/** What a refused start says: the server's word on the channel, else its message. */
+export function startThreadError(failure: { message: string; errors: Record<string, string[]> | null }): string {
+  return failure.errors?.channel_uuid?.[0] ?? failure.message;
 }
