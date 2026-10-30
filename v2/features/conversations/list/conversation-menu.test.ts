@@ -105,9 +105,12 @@ test('a Space chat says it is shared with the Space only, where Share was (Arthu
   // The server refuses to make a Space chat public, so the menu never offers it, and says why.
   assert.equal(SPACE_CHAT_SHARE_NOTE, "Shared with this Space's members only.");
   assert.equal(showsSpaceShareNote(can({ share: true }), true), true);
-  // Only where Share would have been: not outside a Space, nor for a reader who couldn't share anyway.
-  assert.equal(showsSpaceShareNote(can({ share: true }), false), false);
-  assert.equal(showsSpaceShareNote(can({ share: false }), true), false);
+  // The server now sets share false on every Space chat: the owner (delete) still sees the line.
+  assert.equal(showsSpaceShareNote(can({ share: false, delete: true }), true), true);
+  // Only where Share would have been: not outside a Space, nor for a reader who couldn't share anyway
+  // (the Space's Owner on a member's chat has Remove only).
+  assert.equal(showsSpaceShareNote(can({ share: true, delete: true }), false), false);
+  assert.equal(showsSpaceShareNote(can({ share: false, remove: true }), true), false);
   assert.equal(showsSpaceShareNote(undefined, true), false);
   // Both menus draw it as a row that can't be chosen, above Delete.
   const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');

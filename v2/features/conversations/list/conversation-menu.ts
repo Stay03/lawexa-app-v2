@@ -33,10 +33,16 @@ const INSIDE_A_SPACE: readonly ConversationMenuItem[] = ['rename', 'move', 'remo
 /** The quiet line a Space chat's menu shows where Share was. */
 export const SPACE_CHAT_SHARE_NOTE = "Shared with this Space's members only.";
 
-/** Whether a chat's menu says it is shared with the Space only: a chat in a
- *  Space whose reader could otherwise share it. */
+/**
+ * Whether a chat's menu says it is shared with the Space only: a chat in a
+ * Space, for its owner, who is the one who would have shared it. The server
+ * sets `can.share` false for every Space chat once it refuses to publish one
+ * (Backend, 30 October 2026), so the owner is read from `can.delete`, which is
+ * true exactly for the owner outside channels and confidential chats, as
+ * `share` was. `share` still counts, for a server from before that change.
+ */
 export function showsSpaceShareNote(can: ConversationCan | null | undefined, inSpace: boolean): boolean {
-  return inSpace && can?.share === true;
+  return inSpace && (can?.delete === true || can?.share === true);
 }
 
 /** The words each item shows, Arthur's. */
