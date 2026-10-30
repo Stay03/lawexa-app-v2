@@ -2,7 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { SpaceTask } from '@/types/collab';
-import { initialPhoneTab, taskChatLine, taskChatState, taskThreadAccess, type ThreadAccess } from './task-box-model';
+import {
+  cardClickRenames,
+  initialPhoneTab,
+  renameOutcome,
+  taskChatLine,
+  taskChatState,
+  taskThreadAccess,
+  type ThreadAccess,
+} from './task-box-model';
 
 /* The task box's chat pane (Arthur's 1 + 2, thread 7aa0c6d8; design 1805492d).
  * TEST DATA throughout. */
@@ -89,4 +97,28 @@ test('a phone opens on the details, or on the chat when opened to reply; a new t
   assert.equal(initialPhoneTab(task(THREAD), 'details'), 'details');
   assert.equal(initialPhoneTab(task(THREAD), 'chat'), 'chat');
   assert.equal(initialPhoneTab(null, 'chat'), 'details');
+});
+
+test('a click on the title renames on a computer, for an editor; Enter, a phone, a viewer or the rest of the card opens the box', () => {
+  const click = { canEdit: true, computer: true, onTitle: true, detail: 1 };
+  assert.equal(cardClickRenames(click), true);
+  // Enter or Space on a focused card is a keyboard click: it opens the box (the drag plan's pin).
+  assert.equal(cardClickRenames({ ...click, detail: 0 }), false);
+  // A phone renames in the box only: there a press and hold is the drag.
+  assert.equal(cardClickRenames({ ...click, computer: false }), false);
+  assert.equal(cardClickRenames({ ...click, canEdit: false }), false);
+  assert.equal(cardClickRenames({ ...click, onTitle: false }), false);
+});
+
+test('a typed title sends only a real change: trimmed, never empty, never over the limit', () => {
+  const card = task(null);
+  assert.deepEqual(renameOutcome(card, 'Draft the TEST DATA lease review', 200), { kind: 'unchanged' });
+  assert.deepEqual(renameOutcome(card, '  Draft the TEST DATA lease review  ', 200), { kind: 'unchanged' });
+  assert.deepEqual(renameOutcome(card, '   ', 200), { kind: 'invalid', message: 'A task needs a title.' });
+  assert.deepEqual(renameOutcome(card, 'x'.repeat(201), 200), { kind: 'invalid', message: 'A title is at most 200 characters.' });
+  const save = renameOutcome(card, ' Draft the TEST DATA lease review (v2) ', 200);
+  assert.equal(save.kind, 'save');
+  assert.deepEqual(save.kind === 'save' && save.payload, { title: 'Draft the TEST DATA lease review (v2)' });
+  // The card shows the new title at once; nothing else about it changes.
+  assert.deepEqual(save.kind === 'save' && save.shown, { ...card, title: 'Draft the TEST DATA lease review (v2)' });
 });

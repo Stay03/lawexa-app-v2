@@ -115,3 +115,35 @@ export type TaskPhoneTab = 'details' | 'chat';
 export function initialPhoneTab(task: SpaceTask | null, openTo: TaskPhoneTab | null): TaskPhoneTab {
   return task && openTo === 'chat' ? 'chat' : 'details';
 }
+
+/**
+ * INLINE RENAME ON THE CARD (design 1805492d, item 2 of Arthur's choice): a
+ * click on a card's title text renames it in place, on a computer, for those
+ * who may edit; any other click opens the box. Enter on a focused card is a
+ * keyboard click (`detail` 0) and always opens the box, as the drag plan pins
+ * (Space lifts, Enter opens). A phone renames in the box only: there a press
+ * and hold is the drag (Frontend's review, f8e0bb68).
+ */
+export function cardClickRenames(click: {
+  canEdit: boolean;
+  computer: boolean;
+  onTitle: boolean;
+  /** The click's `detail`: 0 for a keyboard's Enter or Space. */
+  detail: number;
+}): boolean {
+  return click.canEdit && click.computer && click.onTitle && click.detail > 0;
+}
+
+/** What a typed title sends: nothing when unchanged, an error when empty, else the patch and the card as shown. */
+export type RenameOutcome =
+  | { kind: 'unchanged' }
+  | { kind: 'invalid'; message: string }
+  | { kind: 'save'; payload: { title: string }; shown: SpaceTask };
+
+export function renameOutcome(task: SpaceTask, typed: string, max: number): RenameOutcome {
+  const title = typed.trim();
+  if (title === task.title) return { kind: 'unchanged' };
+  if (title === '') return { kind: 'invalid', message: 'A task needs a title.' };
+  if (title.length > max) return { kind: 'invalid', message: `A title is at most ${max} characters.` };
+  return { kind: 'save', payload: { title }, shown: { ...task, title } };
+}

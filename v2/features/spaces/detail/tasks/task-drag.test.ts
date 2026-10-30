@@ -107,7 +107,7 @@ test('a mouse drags after 8px, a finger after a 300ms hold, the keyboard on Spac
 
 test('the board: owners and editors drag, every column and phone tab takes a drop, and the move is optimistic', () => {
   const board = here('SpaceTasksPanel.tsx');
-  assert.match(board, /useDraggable\(\{\s*id: task\.uuid,\s*data: \{ task \},\s*disabled: !canDrag,\s*\}\)/);
+  assert.match(board, /useDraggable\(\{\s*id: task\.uuid,\s*data: \{ task \},\s*disabled: !canDrag \|\| renaming,\s*\}\)/);
   assert.match(board, /canDrag=\{canEdit\}/);
   assert.match(board, /useDroppable\(\{ id: dropId\('column', stage\), disabled: !canDrag \}\)/);
   assert.match(board, /useDroppable\(\{ id: dropId\('tab', stage\), disabled: !droppable \}\)/);
