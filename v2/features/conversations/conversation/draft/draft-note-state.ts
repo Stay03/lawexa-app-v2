@@ -14,10 +14,14 @@ import type { DraftNoteDocument, DraftNoteMissing, NoteRevisionAuthor } from '@/
  *   editable      the newest version, the note caught up, the reader may edit:
  *                 the note in the editor, autosaving.
  *   read-only     the same, for a reader who may not edit (a Space's Viewer).
- *   catching-up   the newest version, but the note still holds the one
- *                 before (the server's job is queued): Lawexa's text, read
- *                 only, "Saving to your notes…", read again every 2 s, and
- *                 after 30 s a line with Try again.
+ *   catching-up   the newest version, which the list has not reached (a
+ *                 first draft not listed yet, or a document still at the
+ *                 version before) or whose note still holds the one before:
+ *                 Lawexa's text, read only, "Saving to your notes…". Once
+ *                 the answer has ended (the server saves it before the stream
+ *                 says so) the list is read again every 2 s, and 30 s after
+ *                 that a line with Try again (Arthur's report, 30 October
+ *                 2026: the list was read while Lawexa was still writing).
  *   older         an older version: Lawexa's text as it wrote it, read only,
  *                 with Open latest. Nothing in it saves, so it can never
  *                 write over the note.
@@ -31,10 +35,10 @@ import type { DraftNoteDocument, DraftNoteMissing, NoteRevisionAuthor } from '@/
  *                 server leaves out (woz, 29 October 2026: Radar reports,
  *                 until Stay decides). Today's editing in the
  *                 page's memory, with the downloads, and no Save.
- *   unlisted      the list has no document for this draft (it failed to load,
- *                 or the server has not listed it): Lawexa's text, read only,
- *                 with the downloads and Try again. Not editable, so typing
- *                 is never lost to the note opening a moment later.
+ *   unlisted      the list failed to load: "couldn't be reached", Lawexa's
+ *                 text, read only, with the downloads and Try again. Not
+ *                 editable, so typing is never lost to the note opening a
+ *                 moment later.
  *   loading       the list is on its way.
  *
  * Pure, so every rule is tested here; the panel only draws it.
@@ -46,7 +50,7 @@ export type DraftNoteState =
   | { kind: 'unlisted' }
   | { kind: 'missing'; reason: DraftNoteMissing; document: DraftNoteDocument }
   | { kind: 'older'; document: DraftNoteDocument; latestOrdinal: number }
-  | { kind: 'catching-up'; document: DraftNoteDocument }
+  | { kind: 'catching-up'; document: DraftNoteDocument | null }
   | { kind: 'read-only'; document: DraftNoteDocument; note: NonNullable<DraftNoteDocument['note']> }
   | { kind: 'editable'; document: DraftNoteDocument; note: NonNullable<DraftNoteDocument['note']> };
 
@@ -107,7 +111,8 @@ export function draftNoteState(read: DraftNotesRead, place: DraftPlace): DraftNo
   if (read.status === 'error') return { kind: 'unlisted' };
   if (!read.notes) return { kind: 'notes-off' };
   const document = documentFor(read.documents, place.key);
-  if (!document) return { kind: 'unlisted' };
+  // A finished draft the list has not reached: its answer is not saved yet, or was saved a moment ago.
+  if (!document) return { kind: 'catching-up', document: null };
   // Older by either count: the chat's (a version just written) or the server's.
   const latestOrdinal = Math.max(place.latestOrdinal, document.latest_ordinal);
   if (place.ordinal < latestOrdinal) return { kind: 'older', document, latestOrdinal };
@@ -128,9 +133,26 @@ export const CATCH_UP_POLL_MS = 2_000;
 /** How long it waits before it says the note has not caught up, and offers Try again. */
 export const CATCH_UP_LIMIT_MS = 30_000;
 
-/** Whether the panel should read the list again: only while a note catches up, and not past the limit. */
-export function catchUpPoll(state: DraftNoteState, waitedMs: number): number | false {
-  return state.kind === 'catching-up' && waitedMs < CATCH_UP_LIMIT_MS ? CATCH_UP_POLL_MS : false;
+/**
+ * Whether the panel should read the list again: only while a note catches up,
+ * once the answer has ended (before then the server has nothing new to list),
+ * and not past the limit.
+ */
+export function catchUpPoll(state: DraftNoteState, waitedMs: number, answerDone = true): number | false {
+  return answerDone && state.kind === 'catching-up' && waitedMs < CATCH_UP_LIMIT_MS ? CATCH_UP_POLL_MS : false;
+}
+
+/**
+ * When the 30 s wait starts, in the list query's own time (`dataUpdatedAt`):
+ * at the first read made after the answer ended, so a long answer after the
+ * draft never uses the wait up. `lastReadWhileWriting` is the newest read's
+ * time when the panel saw the answer end (`null` when it was already over).
+ * `null` while the answer is still arriving, or no read since has landed.
+ */
+export function catchUpClockStart(readAt: number, answerDone: boolean, lastReadWhileWriting: number | null): number | null {
+  if (!answerDone) return null;
+  if (lastReadWhileWriting !== null && readAt <= lastReadWhileWriting) return null;
+  return readAt;
 }
 
 /**

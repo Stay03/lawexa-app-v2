@@ -76,6 +76,7 @@ export function DraftCard({
   // where a sheet over the box would take their sentence away. A draft that was
   // already finished when the card appeared (a saved answer) opens only on a tap.
   const seenWriting = useRef(!draft.complete && live);
+  const readWhenSaved = useRef(false);
   useEffect(() => {
     if (!draft.complete) {
       if (live) seenWriting.current = true;
@@ -83,13 +84,25 @@ export function DraftCard({
     }
     if (!seenWriting.current || !panel) return;
     seenWriting.current = false;
-    // A version just finished: the chat's draft notes are read again, so the
-    // cards and the panel catch up with it (Frontend's review: "Edited" went stale).
+    readWhenSaved.current = true;
+    if (!readerIsTyping()) panel.open({ kind: 'draft', ordinal });
+  }, [draft.complete, live, panel, ordinal]);
+
+  // A version just finished: once its answer has ended, and so is saved, the
+  // chat's draft notes are read again, so the cards and the panel catch up
+  // with it (Frontend's review: "Edited" went stale). Not at the draft's
+  // closing tag: Lawexa may write on for a while, and the server lists a draft
+  // only once its whole answer is saved (Arthur's report, 30 October 2026).
+  // The chat stops streaming only after the turn's `completed`, which the
+  // server sends once the answer is saved.
+  const chatStreaming = Boolean(chat?.isStreaming);
+  useEffect(() => {
+    if (live || chatStreaming || !draft.complete || !readWhenSaved.current) return;
+    readWhenSaved.current = false;
     if (chat?.conversationId) {
       void queryClient.invalidateQueries({ queryKey: [...notesQueries.all, 'draft-notes', chat.conversationId] });
     }
-    if (!readerIsTyping()) panel.open({ kind: 'draft', ordinal });
-  }, [draft.complete, live, panel, ordinal, chat?.conversationId, queryClient]);
+  }, [draft.complete, live, chatStreaming, chat?.conversationId, queryClient]);
 
   if (!panel) {
     return (

@@ -161,8 +161,15 @@ test('a draft opens itself when Lawexa finishes it, unless the reader is writing
   // Only a draft the card saw being written opens by itself; a saved one waits for a tap.
   assert.match(card, /const seenWriting = useRef\(!draft\.complete && live\);/);
   assert.match(card, /if \(!seenWriting\.current \|\| !panel\) return;\s*seenWriting\.current = false;[\s\S]*?if \(!readerIsTyping\(\)\) panel\.open\(\{ kind: 'draft', ordinal \}\);/);
-  // A version just finished reads the chat's draft notes again (drafts saved as notes: "Edited" stays true).
-  assert.match(card, /void queryClient\.invalidateQueries\(\{ queryKey: \[\.\.\.notesQueries\.all, 'draft-notes', chat\.conversationId\] \}\);/);
+  // A version just finished reads the chat's draft notes again (drafts saved as notes: "Edited" stays true),
+  // once its answer has ended and so is saved, not at the draft's closing tag (Arthur's report, 30 October 2026).
+  assert.match(card, /seenWriting\.current = false;\s*readWhenSaved\.current = true;/);
+  assert.match(
+    card,
+    /if \(live \|\| chatStreaming \|\| !draft\.complete \|\| !readWhenSaved\.current\) return;\s*readWhenSaved\.current = false;\s*if \(chat\?\.conversationId\) \{\s*void queryClient\.invalidateQueries\(\{ queryKey: \[\.\.\.notesQueries\.all, 'draft-notes', chat\.conversationId\] \}\);/,
+  );
+  // The open at the closing tag no longer reads the list: the card reads it in one place only.
+  assert.equal(card.split('invalidateQueries').length - 1, 1);
   // Writing means the box is focused or holds words.
   // The shell's box on a chat's route, the case chat's own on a case page.
   assert.match(card, /document\.querySelector<HTMLTextAreaElement>\(\s*'\[data-v2-chat-dock\] textarea, \[data-v2-case-chat-composer\] textarea',\s*\)/);

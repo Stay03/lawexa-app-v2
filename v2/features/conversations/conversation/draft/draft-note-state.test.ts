@@ -5,6 +5,7 @@ import type { DraftNoteDocument } from '@/v2/features/notes/types';
 import {
   CATCH_UP_LIMIT_MS,
   CATCH_UP_POLL_MS,
+  catchUpClockStart,
   catchUpPoll,
   documentFor,
   draftEditable,
@@ -122,14 +123,58 @@ test('a chat that keeps no draft notes (confidential, or a Radar report for now)
   assert.equal(draftNoteLine(state), 'This draft isn’t saved as a note. Download it to keep it.');
 });
 
-test('a list that is loading, failed, or has no document for this draft never opens an editor', () => {
+test('a list that is loading or failed never opens an editor, and only a failed read says the note couldn’t be reached', () => {
   assert.equal(draftNoteState({ status: 'pending' }, at(5)).kind, 'loading');
   const failed = draftNoteState({ status: 'error' }, at(5));
   assert.equal(failed.kind, 'unlisted');
   assert.equal(draftEditable(failed), false);
   assert.equal(draftNoteLine(failed), 'Your note couldn’t be reached.');
-  // A draft whose group the server has not listed (cut off, or not yet seen) has no document.
-  assert.equal(draftNoteState(listed(tenancy()), at(4, 4, 'id:cut-off')).kind, 'unlisted');
+  assert.equal(catchUpPoll(failed, 0), false);
+});
+
+/* Arthur's report (30 October 2026, about 15:55): "Your note couldn't be
+ * reached" after a first draft, and "hasn't caught up yet" after a later one.
+ * The list was read at the draft's closing tag, while Lawexa was still writing
+ * the rest of the answer; the server lists a draft only once that answer is
+ * saved. TEST DATA throughout. */
+
+test('a first draft the list has not reached yet waits for its note, never “couldn’t be reached”', () => {
+  // The list answered, but holds only another draft: this one's answer is not saved yet.
+  const letter = tenancy({ key: 'title:test data letter', title: 'TEST DATA Letter' });
+  const state = draftNoteState(listed(letter), at(0, 0, 'id:first'));
+  assert.equal(state.kind, 'catching-up');
+  assert.equal(state.kind === 'catching-up' && state.document, null);
+  assert.equal(draftEditable(state), false);
+  assert.equal(draftNoteLine(state, 0), 'Saving to your notes…');
+  // An empty list is the same: the chat's first draft of all.
+  assert.equal(draftNoteState(listed(), at(0, 0, 'id:first')).kind, 'catching-up');
+  // Once listed and caught up, it opens the note to edit.
+  const first = tenancy({ key: 'id:first', ordinals: [0], latest_ordinal: 0, lawexa_version: 1, note_version: 1 });
+  assert.equal(draftNoteState(listed(letter, first), at(0, 0, 'id:first')).kind, 'editable');
+});
+
+test('while Lawexa is still writing the answer the list is not read again; once it ends, every 2 s up to the limit', () => {
+  const first = draftNoteState(listed(), at(0, 0, 'id:first'));
+  const behind = draftNoteState(listed(tenancy()), at(7, 7));
+  for (const state of [first, behind]) {
+    assert.equal(catchUpPoll(state, 0, false), false);
+    assert.equal(catchUpPoll(state, 0, true), CATCH_UP_POLL_MS);
+    assert.equal(catchUpPoll(state, CATCH_UP_LIMIT_MS - 1, true), CATCH_UP_POLL_MS);
+    assert.equal(catchUpPoll(state, CATCH_UP_LIMIT_MS, true), false);
+    assert.equal(draftNoteLine(state, CATCH_UP_LIMIT_MS), 'Your note hasn’t caught up yet.');
+  }
+});
+
+test('the 30 s wait starts at the first read after the answer ended, so a long answer after the draft never uses it up', () => {
+  // Still writing: no clock, whatever the reads.
+  assert.equal(catchUpClockStart(10_000, false, null), null);
+  // Ended while the panel watched, the newest read then at 4 s: that read and older ones don't start it.
+  assert.equal(catchUpClockStart(4_000, true, 4_000), null);
+  assert.equal(catchUpClockStart(3_000, true, 4_000), null);
+  // The first read after the end starts it.
+  assert.equal(catchUpClockStart(52_000, true, 4_000), 52_000);
+  // A panel opened on an answer already over starts it at its first read.
+  assert.equal(catchUpClockStart(8_000, true, null), 8_000);
 });
 
 test('each draft finds its own document among several', () => {

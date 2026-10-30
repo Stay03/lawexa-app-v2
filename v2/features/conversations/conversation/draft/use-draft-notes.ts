@@ -8,6 +8,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { notesQueries } from '@/v2/features/notes/queries';
 import {
   CATCH_UP_LIMIT_MS,
+  catchUpClockStart,
   catchUpPoll,
   draftNoteState,
   draftNotesRead,
@@ -23,17 +24,23 @@ import {
  * note catching up, so the list is read again as soon as an answer writes one.
  *
  * While the note catches up with Lawexa's newest version, the list is read
- * again every 2 s, for up to 30 s (`catchUpPoll`); the clock starts the first
- * time this panel sees it waiting, and `retry` starts it again. The server
- * brings the note up to date on the read itself when its job has not yet, so
- * the first read again usually ends the wait.
+ * again every 2 s, for up to 30 s (`catchUpPoll`). Both wait for the answer
+ * to end (`answerDone`): the server lists a draft only once the answer that
+ * holds it is saved, and saves it before the stream ends, so a read while
+ * Lawexa is still writing finds nothing new (Arthur's report, 30 October
+ * 2026). The clock starts at the first read after the answer ended
+ * (`catchUpClockStart`), and `retry` starts it again. The server brings the
+ * note up to date on the read itself, so that read usually ends the wait.
  */
-export function useDraftNoteState(conversationId: string, place: DraftPlace) {
+export function useDraftNoteState(conversationId: string, place: DraftPlace, answerDone: boolean) {
   const { userId: viewerId } = useV2Session();
   // When this panel first saw the note behind, or `null`. Set during render
   // (the house's "adjust state during render" pattern), never in an effect.
   const [waitingSince, setWaitingSince] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // The answer as this panel last saw it, and the newest read's time when it saw it end.
+  const [seenDone, setSeenDone] = useState(answerDone);
+  const [lastReadWhileWriting, setLastReadWhileWriting] = useState<number | null>(null);
 
   const query = useQuery({
     ...notesQueries.draftNotes({ conversationId, viewerId }),
@@ -41,15 +48,23 @@ export function useDraftNoteState(conversationId: string, place: DraftPlace) {
       const data = current.state.data?.data;
       if (!data) return false;
       const state = draftNoteState({ status: 'success', notes: data.notes, documents: data.documents }, place);
-      return catchUpPoll(state, waitingSince === null ? 0 : Date.now() - waitingSince);
+      return catchUpPoll(state, waitingSince === null ? 0 : Date.now() - waitingSince, answerDone);
     },
   });
 
   const read: DraftNotesRead = draftNotesRead(query);
   const state: DraftNoteState = draftNoteState(read, place);
 
-  // The wait is timed from the read that first showed it, not from a clock read here.
-  if (state.kind === 'catching-up' && waitingSince === null) setWaitingSince(query.dataUpdatedAt);
+  // The answer ended while this panel was open: reads made before then don't start the wait.
+  const answerChanged = answerDone !== seenDone;
+  if (answerChanged) {
+    setSeenDone(answerDone);
+    setLastReadWhileWriting(answerDone ? query.dataUpdatedAt : null);
+    setWaitingSince(null);
+  }
+  // The wait is timed from the first read after the answer ended, not from a clock read here.
+  const clockStart = !answerChanged && state.kind === 'catching-up' ? catchUpClockStart(query.dataUpdatedAt, answerDone, lastReadWhileWriting) : null;
+  if (clockStart !== null && waitingSince === null) setWaitingSince(clockStart);
   if (state.kind !== 'catching-up' && waitingSince !== null) setWaitingSince(null);
   const waitedMs = state.kind === 'catching-up' && waitingSince !== null ? Math.max(0, now - waitingSince) : 0;
 

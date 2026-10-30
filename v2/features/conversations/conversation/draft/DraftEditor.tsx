@@ -136,9 +136,17 @@ import { markdownToDoc, type DraftFont } from './markdown-to-doc';
  * (FindBar.tsx) for both shapes: a strip under the sheet's toolbar on a
  * phone, a card under the bar's right end on a computer.
  */
-export function DraftEditor(props: Omit<DraftEditorProps, 'noteState' | 'line'> & { groupKey: string; latestOrdinal: number }) {
+export function DraftEditor({
+  answerDone,
+  ...props
+}: Omit<DraftEditorProps, 'noteState' | 'line'> & {
+  groupKey: string;
+  latestOrdinal: number;
+  /** The answer holding this draft has ended, and so is saved: before then the server lists nothing new. */
+  answerDone: boolean;
+}) {
   const { conversationId, ordinal, groupKey, latestOrdinal } = props;
-  const { state, waitedMs, retry } = useDraftNoteState(conversationId, { ordinal, key: groupKey, latestOrdinal });
+  const { state, waitedMs, retry } = useDraftNoteState(conversationId, { ordinal, key: groupKey, latestOrdinal }, answerDone);
   const panel = useSidePanel();
 
   // THE OLDER COPY SENDS NOTHING AS IT GOES (Frontend's review). When this
@@ -151,7 +159,7 @@ export function DraftEditor(props: Omit<DraftEditorProps, 'noteState' | 'line'> 
   // switch, since a missing note has no id in the list. A layout effect, not
   // the render (a render React throws away must mark nothing): it runs before
   // the older editor's own unmount, which is a passive effect.
-  const listedNote = 'document' in state ? (state.document.note?.id ?? null) : null;
+  const listedNote = 'document' in state ? (state.document?.note?.id ?? null) : null;
   const [editedNote, setEditedNote] = useState<number | null>(null);
   if (state.kind === 'editable' && listedNote !== null && listedNote !== editedNote) setEditedNote(listedNote);
   const editing = state.kind === 'editable' && listedNote !== null;

@@ -35,9 +35,11 @@ test('the list is the server’s answer, never kept on the device, and is read a
   assert.doesNotMatch(leaf, /persist/);
   assert.match(leaf, /staleTime: 0,/);
   const hook = read(...DRAFT, 'use-draft-notes.ts');
-  assert.match(hook, /return catchUpPoll\(state, waitingSince === null \? 0 : Date\.now\(\) - waitingSince\);/);
-  // The wait is timed from the read that first showed it, never from a clock read in render.
-  assert.match(hook, /if \(state\.kind === 'catching-up' && waitingSince === null\) setWaitingSince\(query\.dataUpdatedAt\);/);
+  // Not read again while Lawexa is still writing the answer: the server has nothing new to list.
+  assert.match(hook, /return catchUpPoll\(state, waitingSince === null \? 0 : Date\.now\(\) - waitingSince, answerDone\);/);
+  // The wait is timed from the first read after the answer ended, never from a clock read in render.
+  assert.match(hook, /catchUpClockStart\(query\.dataUpdatedAt, answerDone, lastReadWhileWriting\)/);
+  assert.match(hook, /if \(clockStart !== null && waitingSince === null\) setWaitingSince\(clockStart\);/);
 });
 
 test('the panel finds its document by the draft’s group and knows the newest version on screen', () => {
@@ -47,7 +49,11 @@ test('the panel finds its document by the draft’s group and knows the newest v
   const report = read('v2', 'features', 'radars', 'report', 'ReportDraftPanel.tsx');
   assert.match(report, /groupKey=\{draftGroupKey\(draft\)\}\s*latestOrdinal=\{target\.ordinal\}/);
   const editor = read(...DRAFT, 'DraftEditor.tsx');
-  assert.match(editor, /useDraftNoteState\(conversationId, \{ ordinal, key: groupKey, latestOrdinal \}\)/);
+  assert.match(editor, /useDraftNoteState\(conversationId, \{ ordinal, key: groupKey, latestOrdinal \}, answerDone\)/);
+  // The answer has ended once its message is saved and no longer streaming; a report's draft always has.
+  assert.match(panel, /const answerDone =\s*savedMessage !== undefined && \(isEventMessage\(savedMessage\) \|\| !savedMessage\.isStreaming\) && !chat\?\.isStreaming;/);
+  assert.match(panel, /answerDone=\{answerDone\}/);
+  assert.match(report, /latestOrdinal=\{target\.ordinal\}\s*answerDone\s*\/>/);
   // An older version offers the latest; a list not reached, or a note slow to catch up, Try again.
   assert.match(editor, /state\.kind === 'older'\s*\?\s*\{ label: 'Open latest', onPress: \(\) => panel\?\.open\(\{ kind: 'draft', ordinal: state\.latestOrdinal \}\) \}/);
   assert.match(editor, /state\.kind === 'unlisted' \|\| \(state\.kind === 'catching-up' && waitedMs >= CATCH_UP_LIMIT_MS\)\s*\?\s*\{ label: 'Try again', onPress: retry \}/);

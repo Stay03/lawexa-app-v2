@@ -75,6 +75,7 @@ export function ReportDraftPanel({
               space={space}
               groupKey={draftGroupKey(draft)}
               latestOrdinal={target.ordinal}
+              answerDone
             />
           ) : (
             // A report that stopped inside its draft: it reads, it does not edit.

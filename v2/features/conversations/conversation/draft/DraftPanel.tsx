@@ -80,10 +80,15 @@ export function DraftPanel({
   const space = panel?.space ?? null;
   const [showChanges, setShowChanges] = useState(() => rememberedShowChanges);
 
+  const savedMessage = 'messageId' in place ? messages.find((candidate) => candidate.id === place.messageId) : undefined;
+  // The answer holding the draft has ended, and so is saved: the server saves it before it
+  // sends the turn's `completed`, and the chat stops streaming only after that (its row
+  // stops streaming earlier, at `text_done`).
+  const answerDone =
+    savedMessage !== undefined && (isEventMessage(savedMessage) || !savedMessage.isStreaming) && !chat?.isStreaming;
   let draft: DraftBlock | null = null;
   if ('messageId' in place) {
-    const message = messages.find((candidate) => candidate.id === place.messageId);
-    draft = message ? (draftsIn(message.content)[place.index] ?? null) : null;
+    draft = savedMessage ? (draftsIn(savedMessage.content)[place.index] ?? null) : null;
   } else if (streamingMessage) {
     draft = draftsIn(live, true)[place.streamingIndex] ?? null;
   }
@@ -179,6 +184,7 @@ export function DraftPanel({
           versionSwitch={versionSwitch}
           groupKey={draftGroupKey(draft)}
           latestOrdinal={newestFinished(version?.ordinals ?? [ordinal], (at) => draftAt(messages, at)?.complete === true, ordinal)}
+          answerDone={answerDone}
         />
       ) : (
         <div className="@container/draft">
