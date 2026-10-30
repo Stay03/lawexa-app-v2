@@ -48,7 +48,7 @@ test('every pill keeps the same page column, as wide as the board, so the pills 
   assert.doesNotMatch(parts, /SPACE_BOARD_BLEED/);
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
   assert.doesNotMatch(board, /SPACE_BOARD_BLEED|mx-\[calc/);
-  assert.match(board, /\{\/\* The board takes the page column's width[^}]*\*\/\}\s*<Board columns=\{columns\}/);
+  assert.match(board, /\{\/\* The board takes the page column's width[^}]*\*\/\}\s*<Board\s+columns=\{columns\}/);
   // The rows keep a readable preview line in the wider column.
   const rows = read('v2', 'features', 'spaces', 'detail', 'content', 'feed-rows.tsx');
   assert.match(rows, /<span className="block max-w-2xl truncate">\{line\.meta\}<\/span>/);
@@ -78,7 +78,7 @@ test('the board follows .task.changed on the space channel, and the last board t
 
 test('a card opens the task sheet, and only the owner and editors get New task', () => {
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
-  assert.match(board, /<button\s+type="button"\s+onClick=\{onOpen\}/);
+  assert.match(board, /<button\s+ref=\{setNodeRef\}\s+type="button"\s+onClick=\{onOpen\}/);
   assert.match(board, /const newTask = canEdit \? \(\) => openSheet\(\{ kind: 'new' \}\) : null;/);
   const sheet = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskSheet.tsx');
   // A viewer gets no Save, Delete or queue moves.

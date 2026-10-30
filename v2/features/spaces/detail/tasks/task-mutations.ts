@@ -59,6 +59,31 @@ export function useUpdateTask(spaceUuid: string) {
   });
 }
 
+/**
+ * One quick change to a task from the board itself: a card dropped on another
+ * column, and later a title renamed on the card (the task box design,
+ * 1805492d). Optimistic: `shown` is the card as it should look now
+ * (`movedTask`), written into the board at once; an error puts just that
+ * task back as it was, and the global toast says the server's message. One
+ * at a time per space, as each can move other rows' places; the board is
+ * read again when it settles, as the other writes do.
+ */
+export function usePatchTask(spaceUuid: string) {
+  const { queryClient, boardKey, write, reread } = useBoardCache(spaceUuid);
+  return useMutation({
+    mutationFn: ({ task, payload }: { task: SpaceTask; payload: SpaceTaskWritePayload; shown: SpaceTask }) =>
+      spaceTasksApi.update(spaceUuid, task.uuid, payload),
+    scope: { id: `space-task-patch:${spaceUuid}` },
+    onMutate: async ({ shown }) => {
+      await queryClient.cancelQueries({ queryKey: boardKey });
+      write((list) => upsertTask(list, shown));
+    },
+    onSuccess: (response) => write((list) => upsertTask(list, response.data)),
+    onError: (_error, { task }) => write((list) => upsertTask(list, task)),
+    onSettled: reread,
+  });
+}
+
 export function useDeleteTask(spaceUuid: string) {
   const { write, reread } = useBoardCache(spaceUuid);
   return useMutation({
