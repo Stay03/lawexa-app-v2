@@ -1,13 +1,23 @@
 'use client';
 
 import { useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  type Announcements,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, ChevronRight, ListChecks, Plus, UserRound } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { getInitials } from '@/lib/utils/collab';
-import type { SpaceTask, SpaceTaskPerson, SpaceTaskStage } from '@/types/collab';
+import type { SpaceTask, SpaceTaskPerson, SpaceTaskStage, SpaceTaskWritePayload } from '@/types/collab';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,6 +46,18 @@ import {
   type OwnerOption,
 } from './task-board-model';
 import { TaskSheet, type TaskSheetTarget } from './TaskSheet';
+import { TaskMoveDialog, type PendingMove } from './TaskMoveDialog';
+import { taskCollision, useTaskBoardSensors } from './board-dnd';
+import {
+  DRAG_WORDS,
+  MOVED_BY_SOMEONE_ELSE,
+  changedWhileDragged,
+  dropId,
+  dropOutcome,
+  movedTask,
+  stageOfDrop,
+} from './task-drag-model';
+import { usePatchTask } from './task-mutations';
 import { useTaskBoardLive } from './use-task-board-live';
 
 /**
@@ -63,6 +85,13 @@ import { useTaskBoardLive } from './use-task-board-live';
  * the owner and editors (`canEdit`) get "New task" beside the owner filter;
  * and the board follows `.task.changed` on the space's channel, so a move by
  * anyone, person or agent, shows without a reload.
+ *
+ * A CARD DRAGS TO ANOTHER COLUMN (Arthur, 30 October 2026, 18:38Z; the plan
+ * d589d99c): the owner and editors drag a card onto a column, or on a phone
+ * hold a note and drop it on a stage tab. Paused and Waiting ask first
+ * (`TaskMoveDialog`); the rest move at once and go back if the server
+ * refuses (`usePatchTask`). The rules are `task-drag-model.ts`; the sensors
+ * are `board-dnd.ts`.
  */
 export function SpaceTasksPanel({
   spaceUuid,
@@ -98,6 +127,18 @@ export function SpaceTasksPanel({
   };
   const openTask = (taskUuid: string) => openSheet({ kind: 'task', taskUuid });
   const newTask = canEdit ? () => openSheet({ kind: 'new' }) : null;
+
+  // A drop: Paused and Waiting ask first, the rest move at once.
+  const patch = usePatchTask(spaceUuid);
+  const [pending, setPending] = useState<PendingMove | null>(null);
+  const moveTask = (task: SpaceTask, payload: SpaceTaskWritePayload, waitingOn: SpaceTaskPerson | null) => {
+    patch.mutate({ task, payload, shown: movedTask(task, payload, new Date().toISOString(), waitingOn) });
+  };
+  const dropTask = (task: SpaceTask, stage: SpaceTaskStage) => {
+    const outcome = dropOutcome(task, stage);
+    if (outcome.kind === 'move') moveTask(task, outcome.payload, null);
+    else if (outcome.kind === 'ask') setPending({ task, stage: outcome.stage, draft: outcome.draft });
+  };
   const sheet = (
     <TaskSheet
       spaceUuid={spaceUuid}
@@ -144,8 +185,24 @@ export function SpaceTasksPanel({
       </div>
       {/* The board takes the page column's width, as every pill does (Arthur's
           C, 30 October 2026): nothing reaches past the header's margins. */}
-      <Board columns={columns} now={now} onOpenTask={openTask} />
+      <Board
+        columns={columns}
+        tasks={tasks}
+        now={now}
+        canDrag={canEdit}
+        onOpenTask={openTask}
+        onDrop={dropTask}
+      />
       {sheet}
+      <TaskMoveDialog
+        spaceUuid={spaceUuid}
+        pending={pending}
+        onCancel={() => setPending(null)}
+        onMove={(move, payload, waitingOn) => {
+          setPending(null);
+          moveTask(move.task, payload, waitingOn);
+        }}
+      />
     </div>
   );
 }
@@ -231,14 +288,25 @@ function OwnerItem({
  */
 function Board({
   columns,
+  tasks,
   now,
+  canDrag,
   onOpenTask,
+  onDrop,
 }: {
   columns: Record<SpaceTaskStage, SpaceTask[]>;
+  /** Every task, as the board has it now: a drop reads the card as it is at that moment. */
+  tasks: readonly SpaceTask[];
   now: number;
+  /** The owner and editors may drag; others only open tasks. */
+  canDrag: boolean;
   onOpenTask: (taskUuid: string) => void;
+  onDrop: (task: SpaceTask, stage: SpaceTaskStage) => void;
 }) {
   const [doneOpen, setDoneOpen] = useState(false);
+  const sensors = useTaskBoardSensors();
+  // The card as it was when lifted: a change by someone else meanwhile cancels the drop.
+  const [dragged, setDragged] = useState<SpaceTask | null>(null);
   const [phoneStage, setPhoneStage] = useState(0);
   const track = useRef<HTMLDivElement>(null);
 
@@ -253,56 +321,130 @@ function Board({
     setPhoneStage(Math.round(element.scrollLeft / element.clientWidth));
   };
 
-  return (
-    <div className="flex flex-col gap-3">
-      <div role="tablist" aria-label="Stage" className="-mx-4 flex gap-1 overflow-x-auto px-4 md:hidden">
-        {BOARD_STAGES.map((stage, index) => {
-          const selected = index === phoneStage;
-          return (
-            <button
-              key={stage}
-              type="button"
-              role="tab"
-              aria-selected={selected}
-              onClick={() => showStage(index)}
-              className={cn(
-                'v2-interactive relative inline-flex min-h-10 shrink-0 items-center gap-1.5 px-2.5 text-sm transition-colors',
-                selected ? 'font-medium text-primary' : 'text-muted-foreground',
-                FOCUS_RING,
-              )}
-            >
-              <ThreadStatusDot value={TASK_STAGE_TONE[stage]} />
-              {TASK_STAGE_LABELS[stage]}
-              <span className="tabular-nums opacity-70">{columns[stage].length}</span>
-              {selected ? <span aria-hidden className="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full bg-primary" /> : null}
-            </button>
-          );
-        })}
-      </div>
+  const onDragStart = ({ active }: DragStartEvent) => {
+    setDragged(tasks.find((task) => task.uuid === active.id) ?? null);
+  };
+  const onDragEnd = ({ over }: DragEndEvent) => {
+    const start = dragged;
+    setDragged(null);
+    const stage = stageOfDrop(over?.id);
+    if (!start || !stage || stage === start.stage) return;
+    const current = tasks.find((task) => task.uuid === start.uuid);
+    if (!current || changedWhileDragged(start, current)) {
+      toast(MOVED_BY_SOMEONE_ELSE);
+      return;
+    }
+    onDrop(current, stage);
+    // A phone's drop on a stage tab follows the note to its new column.
+    if (String(over?.id).startsWith('tab:')) showStage(BOARD_STAGES.indexOf(stage));
+  };
+  const titleOf = (id: string | number) => tasks.find((task) => task.uuid === id)?.title ?? 'The task';
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => DRAG_WORDS.start(titleOf(active.id)),
+    onDragOver: ({ active, over }) => DRAG_WORDS.over(titleOf(active.id), stageOfDrop(over?.id)),
+    onDragEnd: ({ active, over }) => DRAG_WORDS.end(titleOf(active.id), stageOfDrop(over?.id)),
+    onDragCancel: ({ active }) => DRAG_WORDS.cancel(titleOf(active.id)),
+  };
 
-      <div
-        ref={track}
-        onScroll={followSwipe}
-        className="flex items-start max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto md:gap-3"
-      >
-        {BOARD_STAGES.map((stage) =>
-          stage === 'done' ? (
-            <DoneColumn
+  return (
+    <DndContext
+      sensors={sensors}
+      collisionDetection={taskCollision}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onDragCancel={() => setDragged(null)}
+      accessibility={{ announcements, screenReaderInstructions: { draggable: DRAG_WORDS.instructions } }}
+    >
+      <div className="flex flex-col gap-3">
+        <div role="tablist" aria-label="Stage" className="-mx-4 flex gap-1 overflow-x-auto px-4 md:hidden">
+          {BOARD_STAGES.map((stage, index) => (
+            <PhoneStageTab
               key={stage}
-              tasks={columns.done}
-              now={now}
-              open={doneOpen}
-              onToggle={() => setDoneOpen((value) => !value)}
-              onOpenTask={onOpenTask}
+              stage={stage}
+              count={columns[stage].length}
+              selected={index === phoneStage}
+              droppable={canDrag}
+              onSelect={() => showStage(index)}
             />
-          ) : (
-            <StageColumn key={stage} stage={stage} tasks={columns[stage]} now={now} onOpenTask={onOpenTask} />
-          ),
-        )}
+          ))}
+        </div>
+
+        <div
+          ref={track}
+          onScroll={followSwipe}
+          className="flex items-start max-md:snap-x max-md:snap-mandatory max-md:overflow-x-auto md:gap-3"
+        >
+          {BOARD_STAGES.map((stage) =>
+            stage === 'done' ? (
+              <DoneColumn
+                key={stage}
+                tasks={columns.done}
+                now={now}
+                open={doneOpen}
+                canDrag={canDrag}
+                onToggle={() => setDoneOpen((value) => !value)}
+                onOpenTask={onOpenTask}
+              />
+            ) : (
+              <StageColumn
+                key={stage}
+                stage={stage}
+                tasks={columns[stage]}
+                now={now}
+                canDrag={canDrag}
+                onOpenTask={onOpenTask}
+              />
+            ),
+          )}
+        </div>
       </div>
-    </div>
+      {/* The lifted card follows the pointer; its place in the column stays, faded. */}
+      <DragOverlay dropAnimation={null}>
+        {dragged ? <CardFace task={dragged} stage={dragged.stage} now={now} lifted /> : null}
+      </DragOverlay>
+    </DndContext>
   );
 }
+
+/** A phone's stage tab: a tap shows that column, and a held note dropped on it moves there. */
+function PhoneStageTab({
+  stage,
+  count,
+  selected,
+  droppable,
+  onSelect,
+}: {
+  stage: SpaceTaskStage;
+  count: number;
+  selected: boolean;
+  droppable: boolean;
+  onSelect: () => void;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: dropId('tab', stage), disabled: !droppable });
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      role="tab"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={cn(
+        'v2-interactive relative inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-sm transition-colors',
+        selected ? 'font-medium text-primary' : 'text-muted-foreground',
+        isOver && DROP_TARGET,
+        FOCUS_RING,
+      )}
+    >
+      <ThreadStatusDot value={TASK_STAGE_TONE[stage]} />
+      {TASK_STAGE_LABELS[stage]}
+      <span className="tabular-nums opacity-70">{count}</span>
+      {selected ? <span aria-hidden className="absolute inset-x-2.5 bottom-0 h-0.5 rounded-full bg-primary" /> : null}
+    </button>
+  );
+}
+
+/** Where a lifted card would land: a soft gold ring, as the board marks only what is chosen in gold. */
+const DROP_TARGET = 'ring-2 ring-inset ring-primary/45';
 
 const COLUMN =
   'flex min-w-0 flex-col gap-2 rounded-2xl p-1.5 max-md:w-full max-md:shrink-0 max-md:snap-start md:flex-1';
@@ -340,17 +482,31 @@ function StageColumn({
   stage,
   tasks,
   now,
+  canDrag,
   onOpenTask,
 }: {
   stage: SpaceTaskStage;
   tasks: SpaceTask[];
   now: number;
+  canDrag: boolean;
   onOpenTask: (taskUuid: string) => void;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: dropId('column', stage), disabled: !canDrag });
   return (
-    <section aria-label={`${TASK_STAGE_LABELS[stage]}, ${tasks.length}`} className={cn(COLUMN, STAGE_LANE[stage])}>
+    <section
+      ref={setNodeRef}
+      aria-label={`${TASK_STAGE_LABELS[stage]}, ${tasks.length}`}
+      className={cn(COLUMN, STAGE_LANE[stage], isOver && DROP_TARGET)}
+    >
       <ColumnHead stage={stage} count={tasks.length} />
-      <CardList stage={stage} tasks={tasks} now={now} empty={EMPTY_WORDS[stage]} onOpenTask={onOpenTask} />
+      <CardList
+        stage={stage}
+        tasks={tasks}
+        now={now}
+        empty={EMPTY_WORDS[stage]}
+        canDrag={canDrag}
+        onOpenTask={onOpenTask}
+      />
     </section>
   );
 }
@@ -360,18 +516,30 @@ function DoneColumn({
   tasks,
   now,
   open,
+  canDrag,
   onToggle,
   onOpenTask,
 }: {
   tasks: SpaceTask[];
   now: number;
   open: boolean;
+  canDrag: boolean;
   onToggle: () => void;
   onOpenTask: (taskUuid: string) => void;
 }) {
+  // The folded strip takes a drop too, so Done needs no opening first.
+  const { setNodeRef: setStripRef, isOver: overStrip } = useDroppable({
+    id: dropId('strip', 'done'),
+    disabled: !canDrag || open,
+  });
+  const { setNodeRef: setColumnRef, isOver: overColumn } = useDroppable({
+    id: dropId('column', 'done'),
+    disabled: !canDrag,
+  });
   return (
     <>
       <button
+        ref={setStripRef}
         type="button"
         onClick={onToggle}
         aria-expanded={false}
@@ -380,6 +548,7 @@ function DoneColumn({
           'v2-interactive hidden w-11 shrink-0 flex-col items-center gap-2 self-stretch rounded-2xl py-3 text-xs text-muted-foreground transition-colors hover:text-foreground',
           STAGE_LANE.done,
           !open && 'md:flex',
+          overStrip && DROP_TARGET,
           FOCUS_RING,
         )}
       >
@@ -388,8 +557,9 @@ function DoneColumn({
         <span className="tabular-nums">{tasks.length}</span>
       </button>
       <section
+        ref={setColumnRef}
         aria-label={`Done, the last ${DONE_WINDOW_DAYS} days, ${tasks.length}`}
-        className={cn(COLUMN, STAGE_LANE.done, !open && 'md:hidden')}
+        className={cn(COLUMN, STAGE_LANE.done, !open && 'md:hidden', overColumn && DROP_TARGET)}
       >
         <ColumnHead
           stage="done"
@@ -406,7 +576,14 @@ function DoneColumn({
             </button>
           }
         />
-        <CardList stage="done" tasks={tasks} now={now} empty={EMPTY_WORDS.done} onOpenTask={onOpenTask} />
+        <CardList
+          stage="done"
+          tasks={tasks}
+          now={now}
+          empty={EMPTY_WORDS.done}
+          canDrag={canDrag}
+          onOpenTask={onOpenTask}
+        />
       </section>
     </>
   );
@@ -429,12 +606,14 @@ function CardList({
   tasks,
   now,
   empty,
+  canDrag,
   onOpenTask,
 }: {
   stage: SpaceTaskStage;
   tasks: SpaceTask[];
   now: number;
   empty: string;
+  canDrag: boolean;
   onOpenTask: (taskUuid: string) => void;
 }) {
   if (tasks.length === 0) {
@@ -448,7 +627,14 @@ function CardList({
     // A phone lays the notes two to a row, as a sticky-note board does.
     <ul className="flex flex-col gap-2 max-md:grid max-md:grid-cols-2 max-md:gap-3">
       {tasks.map((task) => (
-        <TaskCard key={task.uuid} task={task} stage={stage} now={now} onOpen={() => onOpenTask(task.uuid)} />
+        <TaskCard
+          key={task.uuid}
+          task={task}
+          stage={stage}
+          now={now}
+          canDrag={canDrag}
+          onOpen={() => onOpenTask(task.uuid)}
+        />
       ))}
     </ul>
   );
@@ -468,55 +654,92 @@ function TaskCard({
   task,
   stage,
   now,
+  canDrag,
   onOpen,
 }: {
   task: SpaceTask;
   stage: SpaceTaskStage;
   now: number;
+  canDrag: boolean;
   onOpen: () => void;
 }) {
-  const note = taskNote(task);
-  const time = formatRelativeTime(task.stage_changed_at, now);
+  // Keyed by the task, with the card itself in the data so a drop reads it.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.uuid,
+    data: { task },
+    disabled: !canDrag,
+  });
   return (
     <li className="flex">
       <button
+        ref={setNodeRef}
         type="button"
         onClick={onOpen}
+        {...(canDrag ? attributes : {})}
+        {...(canDrag ? listeners : {})}
         className={cn(
-          'v2-interactive block w-full rounded-xl border border-border bg-card px-3 py-3 text-left shadow-xs transition-colors hover:border-foreground/20',
-          'max-md:flex max-md:aspect-square max-md:flex-col max-md:rounded-lg max-md:border-transparent max-md:p-3.5',
-          'max-md:shadow-[0_1px_2px_rgb(0_0_0/0.06),0_4px_12px_-4px_rgb(0_0_0/0.10)]',
+          CARD,
           NOTE_FILL[stage],
+          // A held note must not open the phone's text menu or select its words.
+          canDrag && 'select-none [-webkit-touch-callout:none]',
+          // Its place stays in the column, faded, while the lifted copy moves.
+          isDragging && 'opacity-40',
           FOCUS_RING,
         )}
       >
-        {/* The time in the stage rides the title's line on a computer, so the
-            owner's line keeps a whole name in a narrow column (the first B
-            pictures cut "Frontend Cl…"). */}
-        <span className="flex items-start gap-2">
-          <span className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug text-foreground max-md:line-clamp-4 max-md:text-[15px]">
-            {task.title}
-          </span>
-          <span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground max-md:hidden">{time}</span>
-        </span>
-        {/* A phone's note is narrow: the name takes its own line, with the
-            Agent tag and the time on the line under it, so the name is whole
-            (the first sticky pictures cut "Fron…"). */}
-        <span className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground max-md:order-3 max-md:mt-auto max-md:flex-wrap max-md:gap-y-1.5 max-md:pt-2">
-          <Initials person={task.owner} />
-          <span className="min-w-0 truncate max-md:flex-1">{task.owner?.name ?? 'Nobody yet'}</span>
-          <span className="contents max-md:flex max-md:w-full max-md:items-center">
-            {task.owner?.is_agent ? <AgentTag /> : null}
-            <span className="ml-auto shrink-0 pl-1 tabular-nums md:hidden">{time}</span>
-          </span>
-        </span>
-        {note ? (
-          <span className="mt-1.5 line-clamp-2 text-xs text-muted-foreground max-md:order-2 max-md:line-clamp-3">
-            {note}
-          </span>
-        ) : null}
+        <CardBody task={task} now={now} />
       </button>
     </li>
+  );
+}
+
+const CARD = cn(
+  'v2-interactive block w-full rounded-xl border border-border bg-card px-3 py-3 text-left shadow-xs transition-colors hover:border-foreground/20',
+  'max-md:flex max-md:aspect-square max-md:flex-col max-md:rounded-lg max-md:border-transparent max-md:p-3.5',
+  'max-md:shadow-[0_1px_2px_rgb(0_0_0/0.06),0_4px_12px_-4px_rgb(0_0_0/0.10)]',
+);
+
+/** The lifted copy that follows the pointer: the same card, raised. */
+function CardFace({ task, stage, now, lifted }: { task: SpaceTask; stage: SpaceTaskStage; now: number; lifted: boolean }) {
+  return (
+    <div className={cn(CARD, NOTE_FILL[stage], lifted && 'cursor-grabbing shadow-lg ring-1 ring-primary/30')}>
+      <CardBody task={task} now={now} />
+    </div>
+  );
+}
+
+/** What a card says, the same on the board and when lifted. */
+function CardBody({ task, now }: { task: SpaceTask; now: number }) {
+  const note = taskNote(task);
+  const time = formatRelativeTime(task.stage_changed_at, now);
+  return (
+    <>
+      {/* The time in the stage rides the title's line on a computer, so the
+          owner's line keeps a whole name in a narrow column (the first B
+          pictures cut "Frontend Cl…"). */}
+      <span className="flex items-start gap-2">
+        <span className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug text-foreground max-md:line-clamp-4 max-md:text-[15px]">
+          {task.title}
+        </span>
+        <span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground max-md:hidden">{time}</span>
+      </span>
+      {/* A phone's note is narrow: the name takes its own line, with the
+          Agent tag and the time on the line under it, so the name is whole
+          (the first sticky pictures cut "Fron…"). */}
+      <span className="mt-2 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground max-md:order-3 max-md:mt-auto max-md:flex-wrap max-md:gap-y-1.5 max-md:pt-2">
+        <Initials person={task.owner} />
+        <span className="min-w-0 truncate max-md:flex-1">{task.owner?.name ?? 'Nobody yet'}</span>
+        <span className="contents max-md:flex max-md:w-full max-md:items-center">
+          {task.owner?.is_agent ? <AgentTag /> : null}
+          <span className="ml-auto shrink-0 pl-1 tabular-nums md:hidden">{time}</span>
+        </span>
+      </span>
+      {note ? (
+        <span className="mt-1.5 line-clamp-2 text-xs text-muted-foreground max-md:order-2 max-md:line-clamp-3">
+          {note}
+        </span>
+      ) : null}
+    </>
   );
 }
 

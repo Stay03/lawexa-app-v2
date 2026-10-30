@@ -473,7 +473,7 @@ function TaskSheetBody({
   );
 }
 
-function FieldBlock({
+export function FieldBlock({
   label,
   htmlFor,
   error,
@@ -548,7 +548,7 @@ const NONE = '__none__';
  * choice ("Nobody yet", "No thread") or the placeholder comes first, and the
  * field keeps its id, `aria-invalid` and `aria-describedby`.
  */
-function ChoiceSelect({
+export function ChoiceSelect({
   id,
   native,
   value,
