@@ -17,10 +17,17 @@ import { Skeleton } from '@/components/ui/skeleton';
  * moves nothing sideways. The wider lobby column went with the Channels tab.
  *
  * A full-height flex column, so the docked box sits at the bottom of the pane
- * when the list is short (`SpaceChatDock`'s `mt-auto`).
+ * when the list is short (`SpaceChatDock`'s `mt-auto`). Inside
+ * {@link SPACE_PANE} it is `flex-1` that makes it full height: the pane's own
+ * height comes from its `min-h-full`, and a percentage `min-height` against
+ * that counts as auto, so `min-h-full` alone stopped the column under its
+ * rows and the box floated up on every short pill (Arthur, 30 October 2026,
+ * 10:21Z: "why is the composer floating up as i click one tab to another";
+ * Stay: "It shouldn't move by the length of the content of the page").
+ * `min-h-full` stays for a column drawn straight in the scroller.
  */
 export const SPACE_PAGE_COLUMN =
-  'mx-auto flex min-h-full w-full max-w-3xl flex-col px-4 pb-16 pt-5 sm:pt-6';
+  'mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col px-4 pb-16 pt-5 sm:pt-6';
 
 /**
  * The pane around the space's column: a size container, so the task board can

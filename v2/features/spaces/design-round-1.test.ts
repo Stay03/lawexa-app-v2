@@ -420,7 +420,7 @@ test('the space name is a visible heading at every width, and the bar steps back
 
 test('every space takes the list’s column, in the page and its silhouette (B4)', () => {
   const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
-  assert.match(parts, /export const SPACE_PAGE_COLUMN =\s*'mx-auto flex min-h-full w-full max-w-3xl flex-col/);
+  assert.match(parts, /export const SPACE_PAGE_COLUMN =\s*'mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col/);
   assert.doesNotMatch(parts, /max-w-5xl/);
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
   // The refusals, and the home on every pill, Tasks too: only the board itself
