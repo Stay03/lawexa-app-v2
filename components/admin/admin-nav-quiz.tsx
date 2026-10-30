@@ -6,6 +6,7 @@ import {
   Activity,
   BarChart3,
   ChevronRight,
+  Compass,
   GraduationCap,
   History,
   ListChecks,
@@ -32,6 +33,8 @@ const quizNavItems = [
   { title: 'Generation', url: '/admin/quiz/generation', icon: Activity },
   { title: 'Sessions', url: '/admin/quiz/sessions', icon: History },
   { title: 'Analytics', url: '/admin/quiz/analytics', icon: BarChart3 },
+  // The new quizzes people play in Explore and channels (option A, thread e80a3d30).
+  { title: 'Explore quizzes', url: '/admin/quiz/explore', icon: Compass },
 ];
 
 export function AdminNavQuizSection() {

@@ -23,6 +23,7 @@ import {
 import { UserActivitySection } from '@/components/admin/activity/UserActivitySection';
 import { AdminUserQuizSection } from '@/components/admin/quiz/AdminUserQuizSection';
 import { AdminUserQuizSessions } from '@/components/admin/quiz/AdminUserQuizSessions';
+import { AdminUserChannelQuizPlays } from '@/components/admin/channel-quiz/AdminUserChannelQuizPlays';
 import {
   ADMIN_USER_TABS,
   ADMIN_USER_TAB_LABELS,
@@ -179,6 +180,7 @@ export default function AdminUserDetailPage({
           <div className="space-y-5">
             <AdminUserQuizSection uuid={uuid} />
             <AdminUserQuizSessions uuid={uuid} />
+            <AdminUserChannelQuizPlays uuid={uuid} />
           </div>
         </TabsContent>
 
