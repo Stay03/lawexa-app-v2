@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { extractApiError } from '@/lib/utils/api-error';
 
 /** A read that failed: what the server said, and Try again. */
@@ -27,4 +29,15 @@ export function AdminChannelQuizFilterChip({ label, onClear }: { label: string; 
       </Button>
     </span>
   );
+}
+
+/** The breadcrumb names the page by its quiz, not by the uuid in the path (as the AI agent pages do). */
+export function useBreadcrumbLabel(segment: string, label: string | undefined): void {
+  const setOverride = useBreadcrumbStore((state) => state.setOverride);
+  const clearOverride = useBreadcrumbStore((state) => state.clearOverride);
+  useEffect(() => {
+    if (!label) return;
+    setOverride(segment, label);
+    return () => clearOverride(segment);
+  }, [segment, label, setOverride, clearOverride]);
 }

@@ -9,7 +9,7 @@ import { formatSessionDate } from '@/lib/utils/quiz-format';
 import { useAdminChannelQuizAttempt } from '@/lib/hooks/useAdminChannelQuizzes';
 import { cn } from '@/lib/utils';
 import type { AdminChannelQuizAttemptQuestion } from '@/types/admin-channel-quizzes';
-import { AdminChannelQuizError } from './AdminChannelQuizStates';
+import { AdminChannelQuizError, useBreadcrumbLabel } from './AdminChannelQuizStates';
 import {
   ANSWER_OUTCOME_LABELS,
   EXPLORE_BASE,
@@ -40,6 +40,7 @@ const OUTCOME_CLASS: Record<AnswerOutcome, string> = {
 /** One play of a new quiz: its numbers, then each question with the answer given and the right one. */
 export function AdminChannelQuizPlayDetail({ uuid }: { uuid: string }) {
   const query = useAdminChannelQuizAttempt(uuid);
+  useBreadcrumbLabel(uuid, query.data?.data.quiz?.title ?? (query.data ? 'Play' : undefined));
 
   if (query.isPending) return <PlayDetailSkeleton />;
   if (query.isError) {
@@ -103,7 +104,7 @@ export function AdminChannelQuizPlayDetail({ uuid }: { uuid: string }) {
           ) : (
             <ol className="divide-y">
               {play.questions.map((question, index) => (
-                <QuestionRow key={index} number={question.position ?? index + 1} question={question} />
+                <QuestionRow key={index} question={question} />
               ))}
             </ol>
           )}
@@ -113,13 +114,15 @@ export function AdminChannelQuizPlayDetail({ uuid }: { uuid: string }) {
   );
 }
 
-function QuestionRow({ number, question }: { number: number; question: AdminChannelQuizAttemptQuestion }) {
+function QuestionRow({ question }: { question: AdminChannelQuizAttemptQuestion }) {
   const outcome = answerOutcome(question);
   const Icon = OUTCOME_ICON[outcome];
   const showAnswers = outcome === 'right' || outcome === 'wrong';
   return (
     <li className="flex gap-3 py-4">
-      <span className="w-6 shrink-0 pt-0.5 text-right text-sm tabular-nums text-muted-foreground">{number}.</span>
+      <span className="w-6 shrink-0 pt-0.5 text-right text-sm tabular-nums text-muted-foreground">
+        {question.position === null ? '—' : `${question.position}.`}
+      </span>
       <div className="min-w-0 flex-1 space-y-2">
         <p className={cn('text-sm', question.removed && 'italic text-muted-foreground')}>
           {question.removed ? 'This question was removed from the quiz.' : question.question}

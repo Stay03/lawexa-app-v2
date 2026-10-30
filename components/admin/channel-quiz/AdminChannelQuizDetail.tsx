@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatSessionDate } from '@/lib/utils/quiz-format';
 import { useAdminChannelQuiz } from '@/lib/hooks/useAdminChannelQuizzes';
 import type { AdminChannelQuizQuestionStat } from '@/types/admin-channel-quizzes';
-import { AdminChannelQuizError } from './AdminChannelQuizStates';
+import { AdminChannelQuizError, useBreadcrumbLabel } from './AdminChannelQuizStates';
 import { quizSetting } from './AdminChannelQuizzesTable';
 import { EXPLORE_BASE, percentLabel, playsForQuizHref } from './model';
 
@@ -34,6 +34,7 @@ export function hardestFirst(questions: readonly AdminChannelQuizQuestionStat[])
 /** One new quiz: its numbers, a link to its plays, and each question's percent right. */
 export function AdminChannelQuizDetail({ uuid }: { uuid: string }) {
   const query = useAdminChannelQuiz(uuid);
+  useBreadcrumbLabel(uuid, query.data?.data.title);
 
   if (query.isPending) {
     return (
@@ -101,7 +102,7 @@ export function AdminChannelQuizDetail({ uuid }: { uuid: string }) {
               {hardestFirst(quiz.questions).map((question, index) => (
                 <li key={`${question.position ?? 'x'}-${index}`} className="flex items-start gap-3 py-3">
                   <span className="w-6 shrink-0 pt-0.5 text-right text-sm tabular-nums text-muted-foreground">
-                    {question.position ?? '—'}.
+                    {question.position === null ? '—' : `${question.position}.`}
                   </span>
                   <p className="min-w-0 flex-1 text-sm">{question.question ?? 'Question removed'}</p>
                   <div className="shrink-0 text-right">
