@@ -1857,15 +1857,7 @@ export interface SpaceTask {
   /** The task's thread or channel, one every member of the space can read
    *  (Backend, 28 October 2026: the live snapshot reaches every member).
    *  `channel_uuid` is the thread's channel, or the channel itself. */
-  thread: {
-    uuid: string;
-    name: string;
-    channel_uuid: string;
-    /** The reader may read the thread (Backend 98f03c46). Absent from a server before it. */
-    can_read?: boolean;
-    /** The reader may post in it: a member of its channel. Absent from a server before it. */
-    can_post?: boolean;
-  } | null;
+  thread: { uuid: string; name: string; channel_uuid: string } | null;
   /** The task's place in its owner's queue, lowest first. */
   position: number;
   /** The first move to Working; `null` until then. */

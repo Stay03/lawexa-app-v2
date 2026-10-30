@@ -20,7 +20,7 @@ import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { spacesQueries } from '../../queries';
 import { TASK_STAGE_LABELS } from './task-board-model';
-import { ChoiceSelect, FieldBlock } from './TaskSheet';
+import { ChoiceSelect, FieldBlock } from './TaskBox';
 import {
   checkDraft,
   hasErrors,

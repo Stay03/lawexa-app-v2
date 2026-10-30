@@ -14,7 +14,7 @@ import { pickerChoices } from './task-sheet-model';
  * screen. */
 
 const read = (...parts: string[]) => readFileSync(path.join(process.cwd(), ...parts), 'utf8');
-const sheet = () => read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskSheet.tsx');
+const sheet = () => read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
 
 // ── The numbers ─────────────────────────────────────────────────────────────
 
@@ -156,22 +156,26 @@ test('the phone pickers show names and send uuids, with the same empty choice as
 
 // ── The sheet's source ──────────────────────────────────────────────────────
 
-test('the sheet moves onto the keyboard on the bottom side only', () => {
+test('the box fills the visible screen on a phone, so the keyboard never covers its foot; a computer\'s is centred', () => {
   const source = sheet();
   assert.match(
     source,
-    /'data-\[side=bottom\]:bottom-auto data-\[side=bottom\]:top-\[calc\(var\(--visual-top,0px\)\+var\(--visual-height,100dvh\)\)\] data-\[side=bottom\]:-translate-y-full data-\[side=bottom\]:max-h-\[calc\(var\(--visual-height,100dvh\)-2\.5rem\)\]'/,
+    /const PHONE_BOX = 'inset-x-0 top-\[var\(--visual-top,0px\)\] h-\[var\(--visual-height,100dvh\)\] w-full v2-safe-bottom';/,
   );
-  // Nothing keyboard-shaped reaches the computer's right-hand sheet.
-  assert.doesNotMatch(source, /data-\[side=right\]:[^\s']*(?:visual|keyboard)/);
-  assert.doesNotMatch(source, /(?<![\w\]:-])(?:top-\[calc\(var\(--visual|-translate-y-full)/);
+  assert.match(source, /phone \? PHONE_BOX : COMPUTER_BOX/);
+  // Nothing keyboard-shaped reaches the computer's centred box.
+  const from = source.indexOf('const COMPUTER_BOX');
+  const computer = source.slice(from, source.indexOf(';', from));
+  assert.match(computer, /left-1\/2 top-1\/2 h-\[min\(640px,calc\(100dvh-6rem\)\)\] w-\[min\(1000px,calc\(100vw-4rem\)\)\]/);
+  assert.doesNotMatch(computer, /visual|keyboard/);
   // The old cap stood on the page's bottom, behind the keyboard.
   assert.doesNotMatch(source, /max-h-\[92svh\]/);
 });
 
 test('the phone gets the native pickers, the computer keeps the Radix list', () => {
   const source = sheet();
-  assert.match(source, /const native = side === 'bottom';/);
+  assert.match(source, /const phone = useSheetSide\(\) === 'bottom';/);
+  assert.match(source, /const native = phone;/);
   assert.match(source, /if \(native\) \{\s*return \(\s*<div className="relative">\s*<select\s+id=\{id\}\s+value=\{value \?\? ''\}/);
   assert.match(source, /aria-invalid=\{invalid \|\| undefined\}\s+aria-describedby=\{describedBy\}/);
   assert.match(
