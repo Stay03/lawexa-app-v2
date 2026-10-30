@@ -61,7 +61,7 @@ export function AdminChannelQuizPlaysTable({
             const finished = play.finished_at !== null;
             return (
               <TableRow key={play.uuid}>
-                <TableCell className="max-w-[16rem]">
+                <TableCell className="min-w-[12rem] max-w-[18rem] whitespace-normal">
                   <Link href={playHref(play.uuid)} className="line-clamp-2 font-medium hover:underline">
                     {play.quiz?.title ?? 'Quiz removed'}
                   </Link>
@@ -87,7 +87,9 @@ export function AdminChannelQuizPlaysTable({
                 )}
                 <TableCell className="text-right text-sm tabular-nums">
                   <span className="font-medium">{finished ? percentLabel(play.score_percent) : '—'}</span>
-                  <span className="block text-xs text-muted-foreground">{rightOfScored(play.correct_count, play.scored_count)}</span>
+                  {finished ? (
+                    <span className="block text-xs text-muted-foreground">{rightOfScored(play.correct_count, play.scored_count)}</span>
+                  ) : null}
                 </TableCell>
                 <TableCell className="hidden text-right text-sm tabular-nums text-muted-foreground md:table-cell">{play.points ?? '—'}</TableCell>
                 <TableCell className="hidden md:table-cell">

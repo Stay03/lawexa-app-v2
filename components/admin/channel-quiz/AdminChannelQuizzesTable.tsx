@@ -48,7 +48,7 @@ export function AdminChannelQuizzesTable({ quizzes, isLoading }: { quizzes: Admi
             const setting = quizSetting(quiz);
             return (
               <TableRow key={quiz.uuid}>
-                <TableCell className="max-w-[18rem]">
+                <TableCell className="min-w-[12rem] max-w-[20rem] whitespace-normal">
                   <Link href={quizHref(quiz.uuid)} className="line-clamp-2 font-medium hover:underline">
                     {quiz.title}
                   </Link>

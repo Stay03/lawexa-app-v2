@@ -51,7 +51,7 @@ function AdminExploreTotalsContent() {
 
   return (
     <Card>
-      <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
           <CardTitle>Totals</CardTitle>
           <CardDescription>{totals ? formatPeriodWindow(totals.date_from, totals.date_to) : 'The last 30 days'}</CardDescription>

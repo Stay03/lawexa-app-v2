@@ -61,7 +61,7 @@ export function AdminChannelQuizDetail({ uuid }: { uuid: string }) {
     <div className="space-y-6">
       <BackLink />
       <Card>
-        <CardHeader className="gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-lg">{quiz.title}</CardTitle>
@@ -74,7 +74,7 @@ export function AdminChannelQuizDetail({ uuid }: { uuid: string }) {
               {quiz.author ? ` · by ${quiz.author.name}` : ''}
             </p>
           </div>
-          <Button asChild variant="outline" size="sm" className="self-start">
+          <Button asChild variant="outline" size="sm" className="w-fit shrink-0 self-start">
             <Link href={playsForQuizHref(quiz.uuid)}>See its plays</Link>
           </Button>
         </CardHeader>
