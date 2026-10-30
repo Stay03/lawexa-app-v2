@@ -2,6 +2,7 @@ import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 import { notesApi, type NotesListParams } from './api';
+import { noteFirstReadDelay, retryNoteFirstRead } from './first-read-retry';
 
 /**
  * Notes query factory — the `bookmarksQueries` exemplar applied to notes: a
@@ -155,7 +156,10 @@ export const notesQueries = {
       queryFn: () => notesApi.draftNotes(conversationId),
       staleTime: 0,
       gcTime: GC_TIMES.list,
-      retry: retrySettledClientErrors,
+      // The note is made by a job just after the answer: a 404 or a dropped
+      // request on the panel's first read is tried twice more (first-read-retry.ts).
+      retry: retryNoteFirstRead,
+      retryDelay: noteFirstReadDelay,
     }),
 
   /**
@@ -171,7 +175,8 @@ export const notesQueries = {
       gcTime: 0,
       // The editor opens on one read; coming back to the tab reads nothing again.
       refetchOnWindowFocus: false,
-      retry: retrySettledClientErrors,
+      retry: retryNoteFirstRead,
+      retryDelay: noteFirstReadDelay,
     }),
 
   /** A draft note's saved versions, a page at a time, newest first. Never kept on the device. */
