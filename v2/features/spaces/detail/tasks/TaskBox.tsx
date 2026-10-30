@@ -261,7 +261,7 @@ function TaskBoxBody({
       ? () => {
           setStartError(null);
           startThread.mutate(
-            { taskUuid: task.uuid, payload: startThreadPayload(startIn, startRooms.preselected) },
+            { taskUuid: task.uuid, payload: startThreadPayload(startIn) },
             {
               // The form takes the new thread too, so Save never sends "no thread" and unlinks it.
               onSuccess: (response) => setDraft((current) => ({ ...current, thread: response.data.thread?.uuid ?? current.thread })),

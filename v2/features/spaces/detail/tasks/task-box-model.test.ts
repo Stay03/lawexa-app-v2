@@ -159,12 +159,12 @@ test('no open channel: nothing to pick and nothing preselected', () => {
   });
 });
 
-test('the start names a channel only when it is not the server’s own pick', () => {
-  assert.deepEqual(startThreadPayload('c-general', 'c-general'), {});
-  assert.deepEqual(startThreadPayload(null, null), {});
-  assert.deepEqual(startThreadPayload('c-research', 'c-general'), { channel_uuid: 'c-research' });
-  // The list never came: the server picks, as before.
-  assert.deepEqual(startThreadPayload(null, 'c-general'), {});
+test('the start always names the channel the picker shows; nothing only before the list comes', () => {
+  // The preselected channel is sent too, so a tie on the date cannot send the thread elsewhere.
+  assert.deepEqual(startThreadPayload('c-general'), { channel_uuid: 'c-general' });
+  assert.deepEqual(startThreadPayload('c-research'), { channel_uuid: 'c-research' });
+  // The list never came (or the Space has none): the server picks, as before.
+  assert.deepEqual(startThreadPayload(null), {});
 });
 
 test('a refused start says the server’s word on the channel, else its message', () => {

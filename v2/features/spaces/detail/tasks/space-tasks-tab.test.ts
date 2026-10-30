@@ -132,7 +132,7 @@ test('New task offers the Thread field, and Start a thread picks its channel fro
   assert.match(box, /createTask\.mutate\(createPayload\(draft\)/);
   // The channels come from the rail's read, asked for only where a thread may start.
   assert.match(box, /useQuery\(\{ \.\.\.channelsQueries\.bySpace\(\{ spaceUuid, viewerId, per_page: 50 \}\), enabled: mayStart \}\)/);
-  assert.match(box, /payload: startThreadPayload\(startIn, startRooms\.preselected\)/);
+  assert.match(box, /payload: startThreadPayload\(startIn\) \}/);
   // A refusal shows under the picker, and once: no toast says it again.
   assert.match(box, /onError: \(failure\) => setStartError\(startThreadError\(extractApiError\(failure\)\)\)/);
   const mutations = read('v2', 'features', 'spaces', 'detail', 'tasks', 'task-mutations.ts');

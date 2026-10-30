@@ -176,9 +176,14 @@ export function startThreadChannels(rooms: readonly Channel[]): { options: Start
   };
 }
 
-/** The start's body: a channel named only when it is not the server's own pick. */
-export function startThreadPayload(picked: string | null, preselected: string | null): { channel_uuid?: string } {
-  return picked !== null && picked !== preselected ? { channel_uuid: picked } : {};
+/**
+ * The start's body: always the channel the picker shows (Frontend's review,
+ * 23:05Z), so what is shown is what happens even where two channels share a
+ * date and the server's "first by id" would part from it. Nothing only while
+ * the list is on its way: then the server picks, as before.
+ */
+export function startThreadPayload(shown: string | null): { channel_uuid?: string } {
+  return shown !== null ? { channel_uuid: shown } : {};
 }
 
 /** What a refused start says: the server's word on the channel, else its message. */
