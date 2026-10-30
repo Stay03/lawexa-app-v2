@@ -213,6 +213,10 @@ export interface ChannelFeedProps {
    *  ThreadOpening} names where the root came from. `null` on an ordinary
    *  channel, and while the name is still resolving. */
   parentName: string | null;
+  /** A thread with no first message opens on nothing rather than on the line
+   *  saying so: a task's own thread, started from the task box, never has one
+   *  (Frontend's call, 30 October 2026). A thread that has one keeps its quote. */
+  hideMissingRoot?: boolean;
   viewerId: number | null;
   viewerUuid: string | null;
   reporter: ChannelReadReporter;
@@ -253,6 +257,7 @@ export interface ChannelFeedProps {
 export function ChannelFeed({
   channel,
   parentName,
+  hideMissingRoot = false,
   viewerId,
   viewerUuid,
   reporter,
@@ -1412,7 +1417,7 @@ export function ChannelFeed({
      once and consumed by both call sites below — the empty state and the head
      of loaded history — so the two can never disagree about which block a
      thread gets. */
-  const threadOpening = channel.is_thread ? (
+  const threadOpening = channel.is_thread && !(hideMissingRoot && !channel.root_message) ? (
     <ThreadOpening channel={channel} parentName={parentName} />
   ) : null;
   const sheetIsMine =
