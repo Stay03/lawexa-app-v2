@@ -6,8 +6,10 @@ import { join } from 'node:path';
 import type { ConversationCan } from '@/types/chat';
 import {
   CONVERSATION_MENU_LABELS,
+  SPACE_CHAT_SHARE_NOTE,
   conversationMenuItems,
   conversationRemoveRoute,
+  showsSpaceShareNote,
 } from './conversation-menu';
 
 /* Arthur's "…" menu beside each conversation (Inside a space, 15 October
@@ -34,12 +36,12 @@ test('outside a space: Rename, Move to Space, Share, Delete, in that order', () 
   assert.deepEqual(conversationMenuItems(redacted, false), ['rename', 'share', 'delete']);
 });
 
-test('inside a space: Rename, Move, Remove, Share, Delete, each only when the server allows it', () => {
+test('inside a space: Rename, Move, Remove, Delete, each only when the server allows it; never Share', () => {
   const contributor = can({ rename: true, move: true, remove: true, share: true, delete: true });
-  assert.deepEqual(conversationMenuItems(contributor, true), ['rename', 'move', 'remove', 'share', 'delete']);
+  assert.deepEqual(conversationMenuItems(contributor, true), ['rename', 'move', 'remove', 'delete']);
   // A Viewer's own chat: no Move, no Remove.
   const viewer = can({ rename: true, share: true, delete: true });
-  assert.deepEqual(conversationMenuItems(viewer, true), ['rename', 'share', 'delete']);
+  assert.deepEqual(conversationMenuItems(viewer, true), ['rename', 'delete']);
   // The space's Owner on a member's chat: Remove only.
   assert.deepEqual(conversationMenuItems(can({ remove: true }), true), ['remove']);
   // Someone else's published chat, or nothing allowed: no menu.
@@ -97,4 +99,23 @@ test('the lists, the space home and the header all build the menu from `can`', (
   const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
   assert.match(row, /\{destructive && index > 0 \? <DropdownMenuSeparator \/> : null\}/);
   assert.match(row, /\{CONVERSATION_MENU_LABELS\[action\.id\]\}/);
+});
+
+test('a Space chat says it is shared with the Space only, where Share was (Arthur’s B, 30 October 2026)', () => {
+  // The server refuses to make a Space chat public, so the menu never offers it, and says why.
+  assert.equal(SPACE_CHAT_SHARE_NOTE, "Shared with this Space's members only.");
+  assert.equal(showsSpaceShareNote(can({ share: true }), true), true);
+  // Only where Share would have been: not outside a Space, nor for a reader who couldn't share anyway.
+  assert.equal(showsSpaceShareNote(can({ share: true }), false), false);
+  assert.equal(showsSpaceShareNote(can({ share: false }), true), false);
+  assert.equal(showsSpaceShareNote(undefined, true), false);
+  // Both menus draw it as a row that can't be chosen, above Delete.
+  const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+  const header = read('v2', 'features', 'conversations', 'conversation', 'ConversationActions.tsx');
+  assert.match(header, /const SPACE_SHARE_NOTE_ROW: ScreenAction = \{[\s\S]*?label: SPACE_CHAT_SHARE_NOTE,[\s\S]*?disabled: true,/);
+  assert.match(header, /return \[\.\.\.rows\.slice\(0, at\), SPACE_SHARE_NOTE_ROW, \.\.\.rows\.slice\(at\)\];/);
+  assert.match(read('v2', 'shell', 'V2HeaderMenu.tsx'), /disabled=\{action\.disabled\}/);
+  const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
+  assert.match(row, /note=\{showsSpaceShareNote\(conversation\.can, conversation\.space != null\) \? SPACE_CHAT_SHARE_NOTE : null\}/);
+  assert.match(row, /\{destructive && note \? \(\s*<DropdownMenuItem disabled>/);
 });

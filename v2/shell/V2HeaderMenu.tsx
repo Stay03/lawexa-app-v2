@@ -78,6 +78,7 @@ export function V2HeaderMenu({
               // 44px touch rows on mobile (a11y floor); default density on desktop.
               className="min-h-11 md:min-h-8"
               variant={action.destructive ? 'destructive' : 'default'}
+              disabled={action.disabled}
               onSelect={action.onSelect}
             >
               <action.icon aria-hidden className="size-4" />

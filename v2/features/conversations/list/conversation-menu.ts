@@ -15,14 +15,29 @@ import type { ConversationCan } from '@/types/chat';
  *
  * ── ARTHUR'S TWO LISTS ─────────────────────────────────────────────────────
  *  - Outside a space: Rename, Move to Space, Share, Delete.
- *  - Inside a space:  Rename, Move, Remove, Share, Delete.
+ *  - Inside a space:  Rename, Move, Remove, Delete.
  * Delete and Remove each ask first. Delete is last, under a rule.
+ *
+ * ── NO SHARE INSIDE A SPACE ────────────────────────────────────────────────
+ * A chat in a Space is read by the Space's members only and is never public
+ * (Arthur's B, 30 October 2026, thread d8d7e2cd; the server refuses with a
+ * 422). So the menu offers no Share there, and says why instead
+ * ({@link SPACE_CHAT_SHARE_NOTE}), where Share would have been.
  */
 
 export type ConversationMenuItem = 'rename' | 'move_to_space' | 'move' | 'remove' | 'share' | 'delete';
 
 const OUTSIDE_A_SPACE: readonly ConversationMenuItem[] = ['rename', 'move_to_space', 'share', 'delete'];
-const INSIDE_A_SPACE: readonly ConversationMenuItem[] = ['rename', 'move', 'remove', 'share', 'delete'];
+const INSIDE_A_SPACE: readonly ConversationMenuItem[] = ['rename', 'move', 'remove', 'delete'];
+
+/** The quiet line a Space chat's menu shows where Share was. */
+export const SPACE_CHAT_SHARE_NOTE = "Shared with this Space's members only.";
+
+/** Whether a chat's menu says it is shared with the Space only: a chat in a
+ *  Space whose reader could otherwise share it. */
+export function showsSpaceShareNote(can: ConversationCan | null | undefined, inSpace: boolean): boolean {
+  return inSpace && can?.share === true;
+}
 
 /** The words each item shows, Arthur's. */
 export const CONVERSATION_MENU_LABELS: Readonly<Record<ConversationMenuItem, string>> = {

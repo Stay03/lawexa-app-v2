@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Blocks, FolderOutput, Pencil, Share2, Trash2 } from 'lucide-react';
+import { Blocks, FolderOutput, Pencil, Share2, Trash2, Users } from 'lucide-react';
 
 import { stripPastedTags } from '@/lib/utils';
 import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
@@ -19,14 +19,25 @@ import { DeleteConversationDialog } from '../DeleteConversationDialog';
 import { RenameConversationDialog } from '../RenameConversationDialog';
 import {
   CONVERSATION_MENU_LABELS,
+  SPACE_CHAT_SHARE_NOTE,
   conversationMenuItems,
   conversationRemoveRoute,
+  showsSpaceShareNote,
   type ConversationMenuItem,
 } from '../list/conversation-menu';
 import { conversationsQueries } from '../queries';
 import { ConversationShare } from './ConversationShare';
 
 const NO_ACTIONS: readonly ScreenAction[] = [];
+
+/** The informing row a Space chat's menu shows where Share was; it can't be chosen. */
+const SPACE_SHARE_NOTE_ROW: ScreenAction = {
+  id: 'space-share-note',
+  label: SPACE_CHAT_SHARE_NOTE,
+  icon: Users,
+  onSelect: () => {},
+  disabled: true,
+};
 
 /**
  * The open chat's own rows in the header menu and the dialogs behind them.
@@ -109,9 +120,11 @@ export function ConversationActions({
         : [],
     [canShowPlace, detail, currentTitle],
   );
+  // A Space chat can't be shared outside the Space: its menu says so where Share was.
+  const spaceShareNote = canShowPlace && detail ? showsSpaceShareNote(detail.can, detail.space != null) : false;
   const actions = useMemo<readonly ScreenAction[]>(() => {
     if (items.length === 0) return NO_ACTIONS;
-    return items.map((item): ScreenAction => {
+    const rows = items.map((item): ScreenAction => {
       const label = CONVERSATION_MENU_LABELS[item];
       switch (item) {
         case 'rename':
@@ -143,7 +156,11 @@ export function ConversationActions({
           };
       }
     });
-  }, [items]);
+    if (!spaceShareNote) return rows;
+    const deleteAt = rows.findIndex((row) => row.destructive);
+    const at = deleteAt === -1 ? rows.length : deleteAt;
+    return [...rows.slice(0, at), SPACE_SHARE_NOTE_ROW, ...rows.slice(at)];
+  }, [items, spaceShareNote]);
 
   useEffect(() => {
     if (actions.length === 0) {

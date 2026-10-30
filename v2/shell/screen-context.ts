@@ -61,6 +61,9 @@ export interface ScreenAction {
   /** Draws a separator above this row, for a screen whose rows fall into
    *  more than one group (the space menu's Rename, after the people rows). */
   separatorBefore?: boolean;
+  /** A row that only informs and can't be chosen (a Space chat's "Shared with
+   *  this Space's members only."). Its `onSelect` never runs. */
+  disabled?: boolean;
 }
 
 /**
