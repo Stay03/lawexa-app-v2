@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +19,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { getInitials } from '@/lib/utils/collab';
 import type { SpaceTask, SpaceTaskPerson, SpaceTaskStage, SpaceTaskWritePayload } from '@/types/collab';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,7 +58,9 @@ import {
   movedTask,
   stageOfDrop,
 } from './task-drag-model';
+import { cardClickRenames, renameOutcome } from './task-box-model';
 import { usePatchTask } from './task-mutations';
+import { TASK_TITLE_MAX } from './task-sheet-model';
 import { useTaskBoardLive } from './use-task-board-live';
 
 /**
@@ -134,6 +137,8 @@ export function SpaceTasksPanel({
   const moveTask = (task: SpaceTask, payload: SpaceTaskWritePayload, waitingOn: SpaceTaskPerson | null) => {
     patch.mutate({ task, payload, shown: movedTask(task, payload, new Date().toISOString(), waitingOn) });
   };
+  // A title renamed on its card: the same optimistic patch as a drop.
+  const renameTask: RenameTask | null = canEdit ? (change) => patch.mutate(change) : null;
   const dropTask = (task: SpaceTask, stage: SpaceTaskStage) => {
     const outcome = dropOutcome(task, stage);
     if (outcome.kind === 'move') moveTask(task, outcome.payload, null);
@@ -185,14 +190,16 @@ export function SpaceTasksPanel({
       </div>
       {/* The board takes the page column's width, as every pill does (Arthur's
           C, 30 October 2026): nothing reaches past the header's margins. */}
-      <Board
-        columns={columns}
-        tasks={tasks}
-        now={now}
-        canDrag={canEdit}
-        onOpenTask={openTask}
-        onDrop={dropTask}
-      />
+      <TaskRenameContext value={renameTask}>
+        <Board
+          columns={columns}
+          tasks={tasks}
+          now={now}
+          canDrag={canEdit}
+          onOpenTask={openTask}
+          onDrop={dropTask}
+        />
+      </TaskRenameContext>
       {sheet}
       <TaskMoveDialog
         spaceUuid={spaceUuid}
@@ -649,15 +656,31 @@ function CardList({
   );
 }
 
+/** A rename from a card: the patch, and the card as it should show at once. */
+type RenameTask = (change: { task: SpaceTask; payload: { title: string }; shown: SpaceTask }) => void;
+
+/** The board's rename, for those who may edit; `null` for everyone else. */
+const TaskRenameContext = createContext<RenameTask | null>(null);
+
+/** Where a card's title renames in place: a computer (`md` and up). */
+const COMPUTER = '(min-width: 768px)';
+
 /**
  * One task. On a computer, a white card: the title with the time in the stage
  * at its right, then the owner's line, then the reason when paused or waiting.
  * On a phone, a square sticky note in the stage's colour: the title (up to
  * four lines), the reason, and the owner and the time pinned to the foot.
  *
- * The card is a button that opens the task sheet (the techlead's brief, 29
- * October 2026), so it takes a tab and Enter. Its look is the approved one:
- * the lines are spans, as a button holds no paragraphs.
+ * The card is a button that opens the task box, so it takes a tab and Enter.
+ * Its look is the approved one: the lines are spans, as a button holds no
+ * paragraphs.
+ *
+ * RENAME IN PLACE (Arthur's choice 1 + 2; design 1805492d). On a computer, an
+ * owner's or editor's click on the title text turns the card into a text field
+ * (`cardClickRenames`); any other click, and Enter on the focused card, opens
+ * the box. While renaming the card is a `div`, not the button: Enter in a field
+ * inside a button would press it and open the box. The field is
+ * `[data-no-dnd]`, so the board's sensors never start a drag from it.
  */
 function TaskCard({
   task,
@@ -672,18 +695,35 @@ function TaskCard({
   canDrag: boolean;
   onOpen: () => void;
 }) {
+  const rename = useContext(TaskRenameContext);
+  const [renaming, setRenaming] = useState(false);
   // Keyed by the task, with the card itself in the data so a drop reads it.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.uuid,
     data: { task },
-    disabled: !canDrag,
+    disabled: !canDrag || renaming,
   });
+  if (renaming && rename) {
+    return (
+      <li className="flex">
+        <RenameCard task={task} stage={stage} now={now} onSave={rename} onDone={() => setRenaming(false)} />
+      </li>
+    );
+  }
   return (
     <li className="flex">
       <button
         ref={setNodeRef}
         type="button"
-        onClick={onOpen}
+        onClick={(event) => {
+          const onTitle = event.target instanceof Element && event.target.closest('[data-card-title]') !== null;
+          const computer = window.matchMedia(COMPUTER).matches;
+          if (cardClickRenames({ canEdit: rename !== null, computer, onTitle, detail: event.detail })) {
+            setRenaming(true);
+            return;
+          }
+          onOpen();
+        }}
         {...(canDrag ? attributes : {})}
         {...(canDrag ? listeners : {})}
         className={cn(
@@ -696,9 +736,87 @@ function TaskCard({
           FOCUS_RING,
         )}
       >
-        <CardBody task={task} now={now} />
+        <CardBody task={task} now={now} renamable={rename !== null} />
       </button>
     </li>
+  );
+}
+
+/** A card while its title is renamed: Enter or a click away saves, Escape puts it back. */
+function RenameCard({
+  task,
+  stage,
+  now,
+  onSave,
+  onDone,
+}: {
+  task: SpaceTask;
+  stage: SpaceTaskStage;
+  now: number;
+  onSave: RenameTask;
+  onDone: () => void;
+}) {
+  const [typed, setTyped] = useState(task.title);
+  const [error, setError] = useState<string | null>(null);
+  const errorId = `task-rename-error-${task.uuid}`;
+  // The field's blur as it unmounts must not save again, or save what Escape dropped.
+  const ended = useRef(false);
+  const end = () => {
+    ended.current = true;
+    onDone();
+  };
+  const commit = () => {
+    if (ended.current) return;
+    const outcome = renameOutcome(task, typed, TASK_TITLE_MAX);
+    if (outcome.kind === 'invalid') {
+      setError(outcome.message);
+      return;
+    }
+    if (outcome.kind === 'save') onSave({ task, payload: outcome.payload, shown: outcome.shown });
+    end();
+  };
+  return (
+    <div className={cn(CARD, NOTE_FILL[stage], 'ring-2 ring-ring/40')}>
+      <CardBody
+        task={task}
+        now={now}
+        renamable={false}
+        title={
+          <span data-no-dnd className="flex min-w-0 flex-1 flex-col gap-1">
+            <Input
+              autoFocus
+              value={typed}
+              maxLength={TASK_TITLE_MAX}
+              aria-label="Task title"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? errorId : undefined}
+              onChange={(event) => {
+                setTyped(event.target.value);
+                setError(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commit();
+                }
+                if (event.key === 'Escape') {
+                  event.preventDefault();
+                  end();
+                }
+              }}
+              // A click away saves; with an error showing, it leaves the title as it was.
+              onBlur={() => (error ? end() : commit())}
+              className="h-8 text-sm"
+            />
+            {error ? (
+              <span id={errorId} role="alert" className="text-xs text-destructive">
+                {error}
+              </span>
+            ) : null}
+          </span>
+        }
+      />
+    </div>
   );
 }
 
@@ -717,8 +835,19 @@ function CardFace({ task, stage, now, lifted }: { task: SpaceTask; stage: SpaceT
   );
 }
 
-/** What a card says, the same on the board and when lifted. */
-function CardBody({ task, now }: { task: SpaceTask; now: number }) {
+/** What a card says, the same on the board and when lifted. `title` stands in for the title while it is renamed. */
+function CardBody({
+  task,
+  now,
+  renamable = false,
+  title,
+}: {
+  task: SpaceTask;
+  now: number;
+  /** The title text renames on a computer: it shows a text cursor there. */
+  renamable?: boolean;
+  title?: ReactNode;
+}) {
   const note = taskNote(task);
   const time = formatRelativeTime(task.stage_changed_at, now);
   return (
@@ -727,9 +856,17 @@ function CardBody({ task, now }: { task: SpaceTask; now: number }) {
           owner's line keeps a whole name in a narrow column (the first B
           pictures cut "Frontend Cl…"). */}
       <span className="flex items-start gap-2">
-        <span className="line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug text-foreground max-md:line-clamp-4 max-md:text-[15px]">
-          {task.title}
-        </span>
+        {title ?? (
+          <span
+            data-card-title
+            className={cn(
+              'line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug text-foreground max-md:line-clamp-4 max-md:text-[15px]',
+              renamable && 'md:cursor-text',
+            )}
+          >
+            {task.title}
+          </span>
+        )}
         <span className="shrink-0 pt-0.5 text-xs tabular-nums text-muted-foreground max-md:hidden">{time}</span>
       </span>
       {/* A phone's note is narrow: the name takes its own line, with the
