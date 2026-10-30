@@ -37,7 +37,7 @@ const lineRow = (minute: number, title = 'Lease agreement'): EngineMessage =>
     editorName: 'Stay',
     editorUuid: 'u-stay',
     draftTitle: title,
-    noteUuid: 'note-1',
+    noteId: 1,
   }) satisfies EventMessage;
 
 // ─── Groups and marks ────────────────────────────────────────────────────────
@@ -96,17 +96,19 @@ test('a line is never a reply target and holds no draft', () => {
   assert.deepEqual([...draftOffsets(rows).entries()], [...draftOffsets([rows[0], rows[2]]).entries()]);
 });
 
-test('the title opens the one draft of that title, else stays plain', () => {
-  const doc = (title: string, ordinal: number, noteTitle: string | null = title) => ({
-    title,
+test('the title opens the draft whose note the line names, else stays plain', () => {
+  // The line names its note by id (Backend 5c7ee620), as the draft list does.
+  const doc = (noteId: number | null, ordinal: number) => ({
     latest_ordinal: ordinal,
-    note: noteTitle === null ? null : { id: ordinal, slug: `n-${ordinal}`, title: noteTitle, updated_at: '' },
+    note: noteId === null ? null : { id: noteId, slug: `n-${noteId}`, title: 'Lease agreement', updated_at: '' },
   });
-  assert.equal(draftOrdinalForLine([doc('Lease agreement', 3), doc('Tenancy notice', 1)], 'Lease agreement'), 3);
-  assert.equal(draftOrdinalForLine([doc('Lease agreement', 3), doc('Lease agreement', 5)], 'Lease agreement'), null);
-  assert.equal(draftOrdinalForLine([doc('Draft', 2, 'Lease agreement')], 'Lease agreement'), 2, 'the note’s own title wins');
-  assert.equal(draftOrdinalForLine([doc('Lease agreement', 3)], 'Something else'), null);
-  assert.equal(draftOrdinalForLine(undefined, 'Lease agreement'), null);
+  assert.equal(draftOrdinalForLine([doc(41, 3), doc(42, 1)], 41), 3);
+  // Two drafts with one title are still told apart.
+  assert.equal(draftOrdinalForLine([doc(41, 3), doc(42, 5)], 42), 5);
+  // A draft with no note, or a note the list does not hold, opens nothing.
+  assert.equal(draftOrdinalForLine([doc(null, 2)], 41), null);
+  assert.equal(draftOrdinalForLine([doc(41, 3)], 99), null);
+  assert.equal(draftOrdinalForLine(undefined, 41), null);
 });
 
 test('the row is a quiet centred note: an icon, the words, the time; no bubble, actions or reply', () => {

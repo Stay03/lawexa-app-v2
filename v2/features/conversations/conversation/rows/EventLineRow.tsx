@@ -20,9 +20,9 @@ import { draftOrdinalForLine } from './event-line';
  * 30 October 2026, 02:16Z, thread 1e44eb39; design 9b43f942). No bubble, no
  * avatar, no actions, no reply: it is a note about the chat, not a turn.
  *
- * The title opens that draft in the side panel, as its card does, when the
- * chat's draft list names exactly one draft by that title (event-line.ts);
- * otherwise it stays plain text. The list is read from the cache the draft
+ * The title opens that draft in the side panel, as its card does, found in
+ * the chat's draft list by its note's id (event-line.ts); a draft the list
+ * does not hold leaves the title as plain text. The list is read from the cache the draft
  * cards fill, so the line sends no request of its own.
  */
 export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMessage }) {
@@ -33,7 +33,7 @@ export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMe
     ...notesQueries.draftNotes({ conversationId: chat?.conversationId ?? '', viewerId }),
     enabled: false,
   });
-  const ordinal = panel ? draftOrdinalForLine(drafts.data?.data.documents, line.draftTitle) : null;
+  const ordinal = panel ? draftOrdinalForLine(drafts.data?.data.documents, line.noteId) : null;
   const at = clockTime(line.editedAt);
   const title = `'${line.draftTitle}'`;
 

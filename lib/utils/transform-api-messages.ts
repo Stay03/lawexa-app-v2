@@ -56,7 +56,7 @@ export function parseToolResult(result: Pick<ApiMessage, 'content' | 'metadata'>
 export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
   if (apiMsg.role !== 'event') return null;
   const meta = apiMsg.metadata;
-  if (meta?.type !== 'draft_edit' || !meta.note_uuid) return null;
+  if (meta?.type !== 'draft_edit' || typeof meta.note_id !== 'number') return null;
   const at = new Date(apiMsg.created_at);
   if (Number.isNaN(at.getTime())) return null;
   const last = meta.last_edited_at ? new Date(meta.last_edited_at) : at;
@@ -71,7 +71,7 @@ export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
     editorName: meta.editor?.name?.trim() || 'Someone',
     editorUuid: meta.editor?.uuid ?? null,
     draftTitle: meta.draft_title?.trim() || 'Untitled draft',
-    noteUuid: meta.note_uuid,
+    noteId: meta.note_id,
   };
 }
 

@@ -35,7 +35,7 @@ function line(id: number, minutes: number, extra: Partial<NonNullable<ApiMessage
     content: "Stay edited 'Lease agreement'",
     metadata: {
       type: 'draft_edit',
-      note_uuid: 'note-1',
+      note_id: 1,
       draft_title: 'Lease agreement',
       editor: { uuid: 'u-stay', name: 'Stay' },
       first_edited_at: iso(minutes),
@@ -64,14 +64,14 @@ test('v2 reads a draft_edit row as a line: its place is created_at, its time is 
   assert.equal(drawn.editorName, 'Stay');
   assert.equal(drawn.editorUuid, 'u-stay');
   assert.equal(drawn.draftTitle, 'Lease agreement');
-  assert.equal(drawn.noteUuid, 'note-1');
+  assert.equal(drawn.noteId, 1);
   assert.equal(drawn.timestamp.toISOString(), iso(1));
   assert.equal(drawn.editedAt.toISOString(), iso(6));
 });
 
 test('an event of another type is dropped, and so is a draft_edit row with no note', () => {
   const other = { ...line(9, 1), metadata: { type: 'tool_call' as const } };
-  const noNote = line(10, 1, { note_uuid: undefined });
+  const noNote = line(10, 1, { note_id: undefined });
   const rows = transformApiMessages([turn(1, 'user', 0), other, noNote, turn(2, 'assistant', 2)], { events: true });
   assert.deepEqual(ids(rows), ['msg_1', 'msg_2']);
 });

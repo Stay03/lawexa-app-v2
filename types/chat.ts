@@ -217,7 +217,8 @@ export interface EventMessage {
   editorName: string;
   editorUuid: string | null;
   draftTitle: string;
-  noteUuid: string;
+  /** The draft's note (`metadata.note_id`; notes have no uuid). */
+  noteId: number;
 }
 
 // Union type for all message types
@@ -707,8 +708,8 @@ export interface ApiMessage {
       | 'narration'
       | 'radar_report'
       | 'draft_edit';
-    /** On a `draft_edit` event row: the draft's note, its title then, and who edited it. */
-    note_uuid?: string;
+    /** On a `draft_edit` event row: the draft's note (an id; notes have no uuid), its title then, and who edited it. */
+    note_id?: number;
     draft_title?: string;
     editor?: { uuid: string | null; name: string } | null;
     /** On a `draft_edit` event row: the editing session's first and last save. */
