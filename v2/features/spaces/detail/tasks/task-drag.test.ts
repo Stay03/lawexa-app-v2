@@ -124,7 +124,7 @@ test('the board: owners and editors drag, every column and phone tab takes a dro
 
 test('Paused and Waiting ask with the sheet’s own fields and checks', () => {
   const dialog = here('TaskMoveDialog.tsx');
-  assert.match(dialog, /import \{ ChoiceSelect, FieldBlock \} from '\.\/TaskSheet';/);
+  assert.match(dialog, /import \{ ChoiceSelect, FieldBlock \} from '\.\/TaskBox';/);
   assert.match(dialog, /const found = checkDraft\(draft\);/);
   assert.match(dialog, /const payload = updatePayload\(draft, pending\.task\);/);
   assert.match(dialog, /label=\{waiting \? 'Note \(optional\)' : 'Why is it paused\?'\}/);

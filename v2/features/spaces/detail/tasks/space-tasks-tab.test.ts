@@ -76,14 +76,14 @@ test('the board follows .task.changed on the space channel, and the last board t
   assert.match(board, /useTaskBoardLive\(spaceUuid, session\.userId, eligible\);/);
 });
 
-test('a card opens the task sheet, and only the owner and editors get New task', () => {
+test('a card opens the task box, and only the owner and editors get New task', () => {
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
   assert.match(board, /<button\s+ref=\{setNodeRef\}\s+type="button"\s+onClick=\{onOpen\}/);
   assert.match(board, /const newTask = canEdit \? \(\) => openSheet\(\{ kind: 'new' \}\) : null;/);
-  const sheet = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskSheet.tsx');
+  const sheet = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
   // A viewer gets no Save, Delete or queue moves.
-  assert.match(sheet, /\{canEdit \? \(\s*<SheetFooter/);
-  assert.match(sheet, /\{task && canEdit && task\.stage === 'queued' \? <QueueOrder/);
-  // Right on a computer, bottom on a phone, as the case page's panel picks.
-  assert.match(sheet, /const side = useSheetSide\(\);/);
+  assert.match(sheet, /const foot = canEdit \? \(/);
+  assert.match(sheet, /\{task && canEdit && task\.stage === 'queued' \? \(\s*<div className="sm:col-span-2">\s*<QueueOrder/);
+  // Centred on a computer, the whole screen on a phone, at the breakpoint the case page's panel uses.
+  assert.match(sheet, /const phone = useSheetSide\(\) === 'bottom';/);
 });

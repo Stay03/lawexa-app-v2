@@ -3,7 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FocusEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, Loader2, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ExternalLink, Loader2, MessagesSquare, Trash2, XIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -20,10 +20,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogClose, DialogDescription, DialogOverlay, DialogPortal, DialogSurface, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSheetSide } from '@/v2/features/cases/cited-by/use-sheet-side';
 import { channelsQueries } from '@/v2/features/channels/queries';
@@ -35,6 +35,7 @@ import { revealAfterKeyboard, takesKeyboard } from '@/v2/shell/reveal-in-scrolle
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { spacesQueries } from '../../queries';
 import { TASK_STAGE_LABELS, TASK_STAGE_TONE, TASK_STAGES, taskThreadHref } from './task-board-model';
+import { taskChatLine, taskChatState, threadAccess, type TaskBoxTab, type TaskChatState, type TaskPhoneTab } from './task-box-model';
 import { reorderedQueue, type QueueDirection } from './task-cache';
 import { useCreateTask, useDeleteTask, useReorderTasks, useUpdateTask } from './task-mutations';
 import {
@@ -57,37 +58,35 @@ import {
   type TaskFieldErrors,
 } from './task-sheet-model';
 
-/** Which task the sheet shows: one on the board, or a new one. */
-export type TaskSheetTarget = { kind: 'task'; taskUuid: string } | { kind: 'new' };
+/** Which task the box shows: one on the board, or a new one. */
+export type TaskBoxTarget = { kind: 'task'; taskUuid: string } | { kind: 'new' };
 
 /**
- * TaskSheet — one task, opened from its card or note (the techlead's brief, 29
- * October 2026, on the board Stay approved on thread 7aa0c6d8, "Yes" at
- * 10:01Z). From the right on a computer, from the bottom on a phone, as the
- * case page's "See all" panel does (`useSheetSide`).
+ * TaskBox — one task, opened from its card (Arthur's choice 1 + 2, thread
+ * 7aa0c6d8, 19:51Z: "the centred box with task chat", after Microsoft Planner;
+ * the combined design 1805492d, approved 11aefe48). It replaces the side sheet.
  *
- * The owner and editors change it: the title, who has it, the stage (Paused
- * asks why, Waiting asks who), its thread, its place in the queue, and Delete.
- * Save sends the changed fields in one PATCH. A viewer reads the same fields
- * as plain text. Every reader sees the history, newest first.
+ * On a computer, a centred box over the board: the task's details on the left
+ * (Details and History as two tabs) and its Task chat on the right. On a phone,
+ * the whole screen, with Details and Chat as two tabs.
  *
- * The same sheet, empty, is New task: a title, Queued, owned by the viewer.
+ * The details keep the sheet's fields and rules (task-sheet-model.ts): the
+ * owner and editors change the title, who has it, the stage (Paused asks why,
+ * Waiting asks who, the same `withStage` and `checkDraft` the drag dialog
+ * uses), its thread and its place in the queue, and Delete. Save sends the
+ * changed fields in one PATCH. A viewer reads the same fields as plain text.
+ * The same box, empty, is New task.
  *
  * ON A PHONE, ABOVE THE KEYBOARD (Arthur, 29 October 2026, 21:13Z, thread
- * 7aa0c6d8: "The keyboard covers the entry form and the threads selection
- * too"). The bottom sheet stood on the page's bottom, which iOS leaves behind
- * the keyboard, so everything under the Title was hidden. It is now placed
- * from the visible rectangle the keyboard hook publishes (`--visual-top`,
- * `--visual-height`, use-keyboard-inset.ts), as the folder picker's phone
- * sheet is: its top at the visible bottom, pulled up by its own height, and
- * capped at the visible height less a 2.5rem strip. With the keyboard up its
- * footer (Save, Add task) sits on the keyboard; with no visual viewport the
- * fallbacks are the screen's `dvh`. A focused field is scrolled into view
- * inside the sheet's body once the keyboard settles, and the pickers are the
- * phone's own (`native`), so no list opens under the keyboard or off the
- * screen. On a computer (side right) none of this applies.
+ * 7aa0c6d8: "The keyboard covers the entry form"). The box is placed from the
+ * visible rectangle the keyboard hook publishes (`--visual-top`,
+ * `--visual-height`, use-keyboard-inset.ts), so with the keyboard up its foot
+ * (Save, Add task) sits on the keyboard; a focused field is scrolled into view
+ * inside the body once the keyboard settles, and the pickers are the phone's
+ * own (`native`). A saved task opens to be read there, so no field takes focus
+ * and the keyboard stays down. On a computer the title takes focus.
  */
-export function TaskSheet({
+export function TaskBox({
   spaceUuid,
   tasks,
   target,
@@ -99,8 +98,8 @@ export function TaskSheet({
 }: {
   spaceUuid: string;
   tasks: readonly SpaceTask[];
-  /** Kept after the sheet closes, so it slides away with its content. */
-  target: TaskSheetTarget | null;
+  /** Kept after the box closes, so it fades away with its content. */
+  target: TaskBoxTarget | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   canEdit: boolean;
@@ -108,69 +107,79 @@ export function TaskSheet({
   rooms: boolean;
   now: number;
 }) {
-  const side = useSheetSide();
-  const native = side === 'bottom';
+  const phone = useSheetSide() === 'bottom';
   const task = target?.kind === 'task' ? (tasks.find((row) => row.uuid === target.taskUuid) ?? null) : null;
+  const surfaceRef = useRef<HTMLDivElement>(null);
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side={side}
-        // A saved task opens to be read: no field takes focus, so a phone's
-        // keyboard stays down and the title is not selected. New task starts
-        // in its title.
-        onOpenAutoFocus={(event) => {
-          if (target?.kind === 'task') event.preventDefault();
-        }}
-        // Width and height per side: the primitive sizes with `data-[side=*]`
-        // selectors, which outrank a bare utility.
-        className={cn(
-          'flex flex-col gap-0 p-0 outline-none',
-          'data-[side=right]:w-full data-[side=right]:sm:max-w-md',
-          'v2-safe-bottom data-[side=bottom]:rounded-t-2xl',
-          // On a phone, placed from the visible rectangle so it sits whole
-          // above the keyboard (see the note above the component). The
-          // primitive's `bottom-0` would stretch it to the page's bottom.
-          'data-[side=bottom]:bottom-auto data-[side=bottom]:top-[calc(var(--visual-top,0px)+var(--visual-height,100dvh))] data-[side=bottom]:-translate-y-full data-[side=bottom]:max-h-[calc(var(--visual-height,100dvh)-2.5rem)]',
-        )}
-      >
-        {target === null ? null : target.kind === 'task' && !task ? (
-          <GoneBody />
-        ) : (
-          <TaskSheetBody
-            // A new task, or another task, starts from its own fields.
-            key={task?.uuid ?? 'new'}
-            spaceUuid={spaceUuid}
-            tasks={tasks}
-            task={task}
-            canEdit={canEdit}
-            rooms={rooms}
-            native={native}
-            now={now}
-            onDone={() => onOpenChange(false)}
-          />
-        )}
-      </SheetContent>
-    </Sheet>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogSurface
+          ref={surfaceRef}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            // A phone keeps its keyboard down for a saved task; elsewhere the title takes focus.
+            if (phone && target?.kind === 'task') return;
+            surfaceRef.current?.querySelector<HTMLElement>('[data-task-title]')?.focus();
+          }}
+          className={cn(
+            'fixed z-50 flex flex-col overflow-hidden bg-background text-sm text-foreground outline-none',
+            'data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 duration-150',
+            phone ? PHONE_BOX : COMPUTER_BOX,
+          )}
+        >
+          {target === null ? null : target.kind === 'task' && !task ? (
+            <GoneBody />
+          ) : (
+            <TaskBoxBody
+              // A new task, or another task, starts from its own fields.
+              key={task?.uuid ?? 'new'}
+              spaceUuid={spaceUuid}
+              tasks={tasks}
+              task={task}
+              canEdit={canEdit}
+              rooms={rooms}
+              phone={phone}
+              now={now}
+              onDone={() => onOpenChange(false)}
+            />
+          )}
+          <DialogClose asChild>
+            <Button variant="ghost" size="icon-sm" className="absolute top-3 right-3 z-10">
+              <XIcon aria-hidden />
+              <span className="sr-only">Close</span>
+            </Button>
+          </DialogClose>
+        </DialogSurface>
+      </DialogPortal>
+    </Dialog>
   );
 }
 
-/** The task went while the sheet was open: someone deleted it. */
+/** A computer's box: centred, as wide as Planner's, never taller than the screen. */
+const COMPUTER_BOX =
+  'left-1/2 top-1/2 h-[min(640px,calc(100dvh-6rem))] w-[min(1000px,calc(100vw-4rem))] -translate-x-1/2 -translate-y-1/2 rounded-3xl ring-1 ring-foreground/5 shadow-2xl data-open:zoom-in-95 data-closed:zoom-out-95';
+
+/** A phone's box: the visible screen, so the keyboard never covers its foot. */
+const PHONE_BOX = 'inset-x-0 top-[var(--visual-top,0px)] h-[var(--visual-height,100dvh)] w-full v2-safe-bottom';
+
+/** The task went while the box was open: someone deleted it. */
 function GoneBody() {
   return (
-    <SheetHeader className="pr-12">
-      <SheetTitle>This task is gone</SheetTitle>
-      <SheetDescription>Someone deleted it.</SheetDescription>
-    </SheetHeader>
+    <div className="flex flex-col gap-1.5 p-6 pr-12">
+      <DialogTitle>This task is gone</DialogTitle>
+      <DialogDescription>Someone deleted it.</DialogDescription>
+    </div>
   );
 }
 
-function TaskSheetBody({
+function TaskBoxBody({
   spaceUuid,
   tasks,
   task,
   canEdit,
   rooms,
-  native,
+  phone,
   now,
   onDone,
 }: {
@@ -179,25 +188,46 @@ function TaskSheetBody({
   task: SpaceTask | null;
   canEdit: boolean;
   rooms: boolean;
-  /** A phone: the pickers are the phone's own. */
-  native: boolean;
+  /** A phone: the whole screen, two tabs, and the phone's own pickers. */
+  phone: boolean;
   now: number;
   onDone: () => void;
 }) {
   const uid = useId();
+  const native = phone;
   const session = useV2Session();
   const viewerId = session.userId;
   const [draft, setDraft] = useState<TaskDraft>(() => draftFromTask(task, session.userUuid));
   const [errors, setErrors] = useState<TaskFieldErrors>({});
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [tab, setTab] = useState<TaskBoxTab>('details');
+  const [phoneTab, setPhoneTab] = useState<TaskPhoneTab>('details');
   const createTask = useCreateTask(spaceUuid);
   const updateTask = useUpdateTask(spaceUuid);
   const deleteTask = useDeleteTask(spaceUuid);
   const saving = createTask.isPending || updateTask.isPending;
+  // The thread's own answer about this reader: may they read it, and post in it
+  // (Backend 8cd4dfe6). A 403 is a refusal, so it is not asked again.
+  const threadUuid = task?.thread?.uuid ?? null;
+  const threadQuery = useQuery({
+    ...channelsQueries.detail(threadUuid ?? '', { viewerId }),
+    enabled: threadUuid !== null,
+    retry: (failures, error) => extractApiError(error).status !== 403 && failures < 1,
+  });
+  const chat = taskChatState(
+    task,
+    canEdit,
+    threadAccess({
+      isPending: threadQuery.isPending,
+      data: threadQuery.data?.data,
+      errorStatus: threadQuery.error ? extractApiError(threadQuery.error).status : null,
+    }),
+  );
+  const retryChat = () => void threadQuery.refetch();
 
   // A focused field is scrolled into view inside the body once the keyboard
-  // settles: the body shrinks as the sheet rises onto the keyboard, and a
-  // field low in it would sit under the footer (Arthur, 29 October 2026).
+  // settles: the body shrinks as the box sits on the keyboard, and a field low
+  // in it would sit under the foot (Arthur, 29 October 2026).
   const bodyRef = useRef<HTMLDivElement>(null);
   const cancelReveal = useRef<(() => void) | null>(null);
   const revealFocused = (event: FocusEvent<HTMLDivElement>) => {
@@ -253,6 +283,8 @@ function TaskSheetBody({
     const found = checkDraft(draft);
     if (hasErrors(found)) {
       setErrors(found);
+      setTab('details');
+      setPhoneTab('details');
       return;
     }
     if (task === null) {
@@ -286,169 +318,225 @@ function TaskSheetBody({
     });
   };
 
-  return (
-    <>
-      <form onSubmit={save} noValidate className="flex min-h-0 flex-1 flex-col">
-        <SheetHeader className="pr-12">
-          <SheetTitle>{task ? 'Task' : 'New task'}</SheetTitle>
-          <SheetDescription>
-            {task
-              ? stageSince(task, now)
-              : 'Give it a title. You can change the rest later.'}
-          </SheetDescription>
-        </SheetHeader>
+  const titleField = (
+    <FieldBlock label="Title" htmlFor={`${uid}-title`} error={errors.title} errorId={`${uid}-title-error`}>
+      {canEdit ? (
+        <Input
+          id={`${uid}-title`}
+          data-task-title
+          value={draft.title}
+          onChange={(event) => change('title', event.target.value, 'title')}
+          maxLength={TASK_TITLE_MAX}
+          placeholder="What needs doing?"
+          autoComplete="off"
+          aria-invalid={!!errors.title || undefined}
+          aria-describedby={errors.title ? `${uid}-title-error` : undefined}
+        />
+      ) : (
+        <p className="text-base font-medium text-foreground">{task?.title}</p>
+      )}
+    </FieldBlock>
+  );
 
-        <div
-          ref={bodyRef}
-          onFocus={revealFocused}
-          className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-4 pb-6"
-        >
-          <FieldBlock label="Title" htmlFor={`${uid}-title`} error={errors.title} errorId={`${uid}-title-error`}>
+  const details = (
+    <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+      <div className="sm:col-span-2">{titleField}</div>
+
+      <div className="sm:col-span-2">
+        <FieldBlock label="Stage" error={errors.stage} errorId={`${uid}-stage-error`}>
+          {canEdit ? (
+            <StagePicker value={draft.stage} onChange={chooseStage} />
+          ) : (
+            <p className="flex items-center gap-2 text-sm text-foreground">
+              <ThreadStatusDot value={TASK_STAGE_TONE[draft.stage]} />
+              {TASK_STAGE_LABELS[draft.stage]}
+            </p>
+          )}
+        </FieldBlock>
+      </div>
+
+      <FieldBlock label="Owner" htmlFor={`${uid}-owner`} error={errors.owner} errorId={`${uid}-owner-error`}>
+        {canEdit ? (
+          <ChoiceSelect
+            id={`${uid}-owner`}
+            native={native}
+            value={draft.owner}
+            options={owners}
+            emptyLabel="Nobody yet"
+            invalid={!!errors.owner}
+            describedBy={errors.owner ? `${uid}-owner-error` : undefined}
+            onChange={(value) => change('owner', value, 'owner')}
+          />
+        ) : (
+          <p className="text-sm text-foreground">{task?.owner?.name ?? 'Nobody yet'}</p>
+        )}
+      </FieldBlock>
+
+      <FieldBlock label="Thread" htmlFor={`${uid}-thread`} error={errors.thread} errorId={`${uid}-thread-error`}>
+        {canEdit && rooms ? (
+          <ThreadSelect
+            id={`${uid}-thread`}
+            native={native}
+            spaceUuid={spaceUuid}
+            value={draft.thread}
+            current={task?.thread ?? null}
+            invalid={!!errors.thread}
+            describedBy={errors.thread ? `${uid}-thread-error` : undefined}
+            onChange={(value) => change('thread', value, 'thread')}
+          />
+        ) : (
+          <p className="text-sm text-foreground">{task?.thread?.name ?? 'No thread'}</p>
+        )}
+      </FieldBlock>
+
+      {draft.stage === 'waiting' ? (
+        <FieldBlock label="Waiting on" htmlFor={`${uid}-waiting`} error={errors.waiting_on} errorId={`${uid}-waiting-error`}>
+          {canEdit ? (
+            <ChoiceSelect
+              id={`${uid}-waiting`}
+              native={native}
+              value={draft.waitingOn}
+              options={waitable}
+              emptyLabel={null}
+              placeholder="Choose a person"
+              invalid={!!errors.waiting_on}
+              describedBy={errors.waiting_on ? `${uid}-waiting-error` : undefined}
+              onChange={(value) => change('waitingOn', value, 'waiting_on')}
+            />
+          ) : (
+            <p className="text-sm text-foreground">{task?.waiting_on?.name ?? 'Nobody named'}</p>
+          )}
+        </FieldBlock>
+      ) : null}
+
+      {stageTakesNote(draft.stage) && (canEdit || draft.stageNote) ? (
+        <div className="sm:col-span-2">
+          <FieldBlock
+            label={draft.stage === 'paused' ? 'Why is it paused?' : 'Note (optional)'}
+            htmlFor={`${uid}-note`}
+            error={errors.stage_note}
+            errorId={`${uid}-note-error`}
+          >
             {canEdit ? (
               <Input
-                id={`${uid}-title`}
-                value={draft.title}
-                onChange={(event) => change('title', event.target.value, 'title')}
-                maxLength={TASK_TITLE_MAX}
-                placeholder="What needs doing?"
+                id={`${uid}-note`}
+                value={draft.stageNote}
+                onChange={(event) => change('stageNote', event.target.value, 'stage_note')}
+                maxLength={TASK_NOTE_MAX}
+                placeholder={draft.stage === 'paused' ? 'Switched to the failed-answer fix' : 'A or B for the header'}
                 autoComplete="off"
-                aria-invalid={!!errors.title || undefined}
-                aria-describedby={errors.title ? `${uid}-title-error` : undefined}
+                aria-invalid={!!errors.stage_note || undefined}
+                aria-describedby={errors.stage_note ? `${uid}-note-error` : undefined}
               />
             ) : (
-              <p className="text-sm font-medium text-foreground">{task?.title}</p>
+              <p className="text-sm text-foreground">{draft.stageNote}</p>
             )}
           </FieldBlock>
-
-          <FieldBlock label="Owner" htmlFor={`${uid}-owner`} error={errors.owner} errorId={`${uid}-owner-error`}>
-            {canEdit ? (
-              <ChoiceSelect
-                id={`${uid}-owner`}
-                native={native}
-                value={draft.owner}
-                options={owners}
-                emptyLabel="Nobody yet"
-                invalid={!!errors.owner}
-                describedBy={errors.owner ? `${uid}-owner-error` : undefined}
-                onChange={(value) => change('owner', value, 'owner')}
-              />
-            ) : (
-              <p className="text-sm text-foreground">{task?.owner?.name ?? 'Nobody yet'}</p>
-            )}
-          </FieldBlock>
-
-          <FieldBlock label="Stage" error={errors.stage} errorId={`${uid}-stage-error`}>
-            {canEdit ? (
-              <StagePicker value={draft.stage} onChange={chooseStage} />
-            ) : (
-              <p className="flex items-center gap-2 text-sm text-foreground">
-                <ThreadStatusDot value={TASK_STAGE_TONE[draft.stage]} />
-                {TASK_STAGE_LABELS[draft.stage]}
-              </p>
-            )}
-          </FieldBlock>
-
-          {draft.stage === 'waiting' ? (
-            <FieldBlock
-              label="Waiting on"
-              htmlFor={`${uid}-waiting`}
-              error={errors.waiting_on}
-              errorId={`${uid}-waiting-error`}
-            >
-              {canEdit ? (
-                <ChoiceSelect
-                  id={`${uid}-waiting`}
-                  native={native}
-                  value={draft.waitingOn}
-                  options={waitable}
-                  emptyLabel={null}
-                  placeholder="Choose a person"
-                  invalid={!!errors.waiting_on}
-                  describedBy={errors.waiting_on ? `${uid}-waiting-error` : undefined}
-                  onChange={(value) => change('waitingOn', value, 'waiting_on')}
-                />
-              ) : (
-                <p className="text-sm text-foreground">{task?.waiting_on?.name ?? 'Nobody named'}</p>
-              )}
-            </FieldBlock>
-          ) : null}
-
-          {stageTakesNote(draft.stage) && (canEdit || draft.stageNote) ? (
-            <FieldBlock
-              label={draft.stage === 'paused' ? 'Why is it paused?' : 'Note (optional)'}
-              htmlFor={`${uid}-note`}
-              error={errors.stage_note}
-              errorId={`${uid}-note-error`}
-            >
-              {canEdit ? (
-                <Input
-                  id={`${uid}-note`}
-                  value={draft.stageNote}
-                  onChange={(event) => change('stageNote', event.target.value, 'stage_note')}
-                  maxLength={TASK_NOTE_MAX}
-                  placeholder={draft.stage === 'paused' ? 'Switched to the failed-answer fix' : 'A or B for the header'}
-                  autoComplete="off"
-                  aria-invalid={!!errors.stage_note || undefined}
-                  aria-describedby={errors.stage_note ? `${uid}-note-error` : undefined}
-                />
-              ) : (
-                <p className="text-sm text-foreground">{draft.stageNote}</p>
-              )}
-            </FieldBlock>
-          ) : null}
-
-          <FieldBlock label="Thread" htmlFor={`${uid}-thread`} error={errors.thread} errorId={`${uid}-thread-error`}>
-            {canEdit && rooms ? (
-              <ThreadSelect
-                id={`${uid}-thread`}
-                native={native}
-                spaceUuid={spaceUuid}
-                value={draft.thread}
-                current={task?.thread ?? null}
-                invalid={!!errors.thread}
-                describedBy={errors.thread ? `${uid}-thread-error` : undefined}
-                onChange={(value) => change('thread', value, 'thread')}
-              />
-            ) : (
-              <p className="text-sm text-foreground">{task?.thread?.name ?? 'No thread'}</p>
-            )}
-            {task?.thread && draft.thread === task.thread.uuid ? (
-              <Link
-                href={taskThreadHref(task.thread)}
-                className={cn('inline-flex w-fit items-center gap-1 rounded-sm text-xs text-primary hover:underline', FOCUS_RING)}
-              >
-                Open the thread
-                <ExternalLink aria-hidden className="size-3" />
-              </Link>
-            ) : null}
-          </FieldBlock>
-
-          {task && canEdit && task.stage === 'queued' ? <QueueOrder spaceUuid={spaceUuid} tasks={tasks} task={task} /> : null}
-
-          {task ? <History spaceUuid={spaceUuid} taskUuid={task.uuid} now={now} /> : null}
         </div>
+      ) : null}
 
-        {canEdit ? (
-          <SheetFooter className="flex-row items-center border-t border-border">
+      {task && canEdit && task.stage === 'queued' ? (
+        <div className="sm:col-span-2">
+          <QueueOrder spaceUuid={spaceUuid} tasks={tasks} task={task} />
+        </div>
+      ) : null}
+    </div>
+  );
+
+  const history = task ? <History spaceUuid={spaceUuid} taskUuid={task.uuid} now={now} /> : null;
+
+  // The words above the fields: which task, and how long at its stage.
+  const head = (
+    <div className="flex flex-col gap-1 px-6 pt-5 pr-14">
+      <DialogTitle className="truncate text-base font-semibold">{task ? task.title : 'New task'}</DialogTitle>
+      <DialogDescription className="text-xs">
+        {task ? stageSince(task, now) : 'Give it a title. You can change the rest later.'}
+      </DialogDescription>
+    </div>
+  );
+
+  const foot = canEdit ? (
+    <div className="flex items-center gap-2 border-t border-border px-6 py-3">
+      {task ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className="mr-auto gap-1.5 text-destructive hover:text-destructive"
+          onClick={() => setConfirmingDelete(true)}
+          disabled={saving}
+        >
+          <Trash2 aria-hidden className="size-4" />
+          Delete
+        </Button>
+      ) : null}
+      <Button type="submit" className="ml-auto gap-1.5" disabled={!canSave}>
+        {saving ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+        {task ? 'Save' : 'Add task'}
+      </Button>
+    </div>
+  ) : null;
+
+  return (
+    <>
+      {phone ? (
+        <form onSubmit={save} noValidate className="flex min-h-0 flex-1 flex-col">
+          {head}
+          {task ? (
+            <BoxTabs
+              label="Task"
+              value={phoneTab}
+              onChange={setPhoneTab}
+              tabs={[
+                { value: 'details', label: 'Details' },
+                { value: 'chat', label: 'Chat' },
+              ]}
+            />
+          ) : null}
+          <div
+            ref={bodyRef}
+            onFocus={revealFocused}
+            className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-4 py-5"
+          >
+            {phoneTab === 'chat' && task ? (
+              <TaskChatPane state={chat} onRetry={retryChat} />
+            ) : (
+              <>
+                {details}
+                {history}
+              </>
+            )}
+          </div>
+          {phoneTab === 'details' ? foot : null}
+        </form>
+      ) : (
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px]">
+          <form onSubmit={save} noValidate className="flex min-h-0 flex-col">
+            {head}
             {task ? (
-              <Button
-                type="button"
-                variant="ghost"
-                className="mr-auto gap-1.5 text-destructive hover:text-destructive"
-                onClick={() => setConfirmingDelete(true)}
-                disabled={saving}
-              >
-                <Trash2 aria-hidden className="size-4" />
-                Delete
-              </Button>
+              <BoxTabs
+                label="Task"
+                value={tab}
+                onChange={setTab}
+                tabs={[
+                  { value: 'details', label: 'Details' },
+                  { value: 'history', label: 'History' },
+                ]}
+              />
             ) : null}
-            <Button type="submit" className="ml-auto gap-1.5" disabled={!canSave}>
-              {saving ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-              {task ? 'Save' : 'Add task'}
-            </Button>
-          </SheetFooter>
-        ) : null}
-      </form>
+            <div
+              ref={bodyRef}
+              onFocus={revealFocused}
+              className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-6 py-5"
+            >
+              {tab === 'history' && task ? history : details}
+            </div>
+            {foot}
+          </form>
+          <aside aria-label="Task chat" className="flex min-h-0 flex-col border-l border-border bg-secondary/40">
+            <TaskChatPane state={chat} onRetry={retryChat} />
+          </aside>
+        </div>
+      )}
 
       {task && canEdit ? (
         <AlertDialog open={confirmingDelete} onOpenChange={setConfirmingDelete}>
@@ -470,6 +558,84 @@ function TaskSheetBody({
         </AlertDialog>
       ) : null}
     </>
+  );
+}
+
+/** Two tabs under the box's head: Details and History, or on a phone Details and Chat. */
+function BoxTabs<T extends string>({
+  label,
+  value,
+  onChange,
+  tabs,
+}: {
+  label: string;
+  value: T;
+  onChange: (value: T) => void;
+  tabs: readonly { value: T; label: string }[];
+}) {
+  return (
+    <div role="tablist" aria-label={label} className="flex gap-1.5 px-6 pt-3">
+      {tabs.map((item) => {
+        const selected = item.value === value;
+        return (
+          <button
+            key={item.value}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(item.value)}
+            className={cn(
+              'v2-interactive inline-flex h-8 items-center rounded-full px-3.5 text-sm transition-colors',
+              selected ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+              FOCUS_RING,
+            )}
+          >
+            {item.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The task's chat: its linked thread (task-box-model.ts decides what shows).
+ * The thread itself opens on its own page; the messages and the composer come
+ * in here with the server's flags (Backend 98f03c46).
+ */
+function TaskChatPane({ state, onRetry }: { state: TaskChatState; onRetry: () => void }) {
+  const line = taskChatLine(state);
+  const thread = 'thread' in state ? state.thread : null;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center gap-2 px-5 pt-5 pr-12 pb-3">
+        <MessagesSquare aria-hidden className="size-4 text-muted-foreground" />
+        <h3 className="text-sm font-semibold">Task chat</h3>
+        {thread && state.kind !== 'hidden' ? (
+          <Link
+            href={taskThreadHref(thread)}
+            className={cn('ml-auto inline-flex items-center gap-1 rounded-sm text-xs text-primary hover:underline', FOCUS_RING)}
+          >
+            Open the thread
+            <ExternalLink aria-hidden className="size-3" />
+          </Link>
+        ) : null}
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col justify-end gap-3 px-5 pb-5">
+        {state.kind === 'loading' ? (
+          <div className="flex flex-col gap-3" aria-hidden>
+            <Skeleton className="h-12 w-4/5 rounded-2xl" />
+            <Skeleton className="ml-auto h-10 w-3/5 rounded-2xl" />
+          </div>
+        ) : null}
+        {line ? <p className="text-sm text-muted-foreground">{line}</p> : null}
+        {state.kind === 'failed' ? (
+          <Button type="button" variant="outline" size="sm" className="w-fit" onClick={onRetry}>
+            Try again
+          </Button>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
@@ -643,7 +809,7 @@ function ThreadSelect({
   onChange: (value: string | null) => void;
 }) {
   const { userId: viewerId } = useV2Session();
-  // The rail's own entry (`CollabFrame`, 50 a page), so the sheet reads nothing new.
+  // The rail's own entry (`CollabFrame`, 50 a page), so the box reads nothing new.
   const channels = useQuery(channelsQueries.bySpace({ spaceUuid, viewerId, per_page: 50 }));
   const threads = useQuery(channelsQueries.threadsBySpace({ spaceUuid, viewerId, per_page: 50 }));
   const options = useMemo(
@@ -779,7 +945,7 @@ function roomOptions(rooms: readonly Channel[], current: SpaceTask['thread']): P
   return [...options.values()];
 }
 
-/** The sheet's subtitle: "Waiting for 12m", or "Queued just now" inside the
+/** The box's subtitle: "Waiting for 12m", or "Queued just now" inside the
  *  first minute (the local run read "Queued for now"). */
 function stageSince(task: SpaceTask, now: number): string {
   // The helper says "now" inside the first minute, and "" before the clock is read.
