@@ -117,14 +117,16 @@ export interface NoteListEnvelope {
 /**
  * What a draft note's save (`PUT /notes/{note}`) and restore answer beside
  * `data`, for the chat's "edited" line (Stay, 30 October 2026, 02:16Z, thread
- * 1e44eb39; design 9b43f942): the line this save made or moved, and the id of
- * a line it took away because the note is back to Lawexa's version. Each is
- * `null` when there is none, and both are absent while the server's
- * DRAFT_EDIT_LINES flag is off and on a note not made from a chat.
+ * 1e44eb39; design 9b43f942): the line this save made or moved, and the ids
+ * of the lines it took away because the note is back to Lawexa's version
+ * (every open line about that draft, whoever opened it; Backend 938f80ce).
+ * The line is `null` and the list empty when there is none, and both are
+ * absent while the server's DRAFT_EDIT_LINES flag is off and on a note not
+ * made from a chat.
  */
 export interface DraftEditLineFields {
   draft_edit_line?: ApiMessage | null;
-  draft_edit_line_removed_id?: number | null;
+  draft_edit_line_removed_ids?: number[] | null;
 }
 
 export interface NoteEnvelope extends DraftEditLineFields {

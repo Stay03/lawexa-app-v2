@@ -157,7 +157,7 @@ test('the draft panel waits for an answer due under a line too', () => {
 
 // ─── The save and the restore ────────────────────────────────────────────────
 
-test('a save’s answer takes away the removed line, then draws the new one; absent fields do nothing', () => {
+test('a save’s answer takes away every removed line, then draws the new one; absent fields do nothing', () => {
   const calls: string[] = [];
   const engine = {
     upsertEvent: (row: ApiMessage) => {
@@ -170,10 +170,11 @@ test('a save’s answer takes away the removed line, then draws the new one; abs
     },
   };
   const row = { id: 9 } as ApiMessage;
-  applyDraftEditLine(engine, { draft_edit_line: row, draft_edit_line_removed_id: 4 });
+  applyDraftEditLine(engine, { draft_edit_line: row, draft_edit_line_removed_ids: [4, 7] });
   applyDraftEditLine(engine, {});
-  applyDraftEditLine(engine, { draft_edit_line: null, draft_edit_line_removed_id: null });
-  assert.deepEqual(calls, ['remove 4', 'upsert 9']);
+  applyDraftEditLine(engine, { draft_edit_line: null, draft_edit_line_removed_ids: null });
+  applyDraftEditLine(engine, { draft_edit_line: null, draft_edit_line_removed_ids: [] });
+  assert.deepEqual(calls, ['remove 4', 'remove 7', 'upsert 9']);
 });
 
 test('the draft save and the restore both hand their answer to the chat', () => {
