@@ -149,7 +149,11 @@ export function FeedLine({
         </span>
         {line.meta || mentions > 0 || count ? (
           <span className="mt-0.5 flex min-w-0 items-center gap-2">
-            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{line.meta}</span>
+            {/* A readable line in the wide space column (Arthur's C, 30 October 2026): the preview stops at
+                42rem, while the line still fills the row, so a count stays under the time. */}
+            <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+              <span className="block max-w-2xl truncate">{line.meta}</span>
+            </span>
             {mentions > 0 ? (
               <CountBadge
                 count={mentions}

@@ -11,10 +11,12 @@ import { Skeleton } from '@/components/ui/skeleton';
  * block wears.
  *
  * ── ONE COLUMN (design round 1, 12 October 2026; B4, 17 October 2026) ──────
- * A space is a stack of rows (its conversations, files and folders) and takes
- * the list column, `max-w-3xl`, the width the `/spaces` list and the
- * Conversations and Folders screens use, so going from the list into a space
- * moves nothing sideways. The wider lobby column went with the Channels tab.
+ * A space is a stack of rows (its conversations, files and folders) in one
+ * column that every pill keeps. It is `max-w-6xl`, the task board's width
+ * (Arthur's C, 30 October 2026, 19:03Z, thread 7aa0c6d8): the board used to
+ * reach past the header's margins on the Tasks pill, so now the header, the
+ * pills and every list line up with the board instead. The list rows keep
+ * their text to a readable width inside it (`FeedLine`).
  *
  * A full-height flex column, so the docked box sits at the bottom of the pane
  * when the list is short (`SpaceChatDock`'s `mt-auto`). Inside
@@ -27,26 +29,19 @@ import { Skeleton } from '@/components/ui/skeleton';
  * `min-h-full` stays for a column drawn straight in the scroller.
  */
 export const SPACE_PAGE_COLUMN =
-  'mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col px-4 pb-16 pt-5 sm:pt-6';
+  'mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col px-4 pb-16 pt-5 sm:pt-6';
 
 /**
- * The pane around the space's column: a size container, so the task board can
- * measure the pane it sits in.
+ * The pane around the space's column: a size container.
  *
  * THE COLUMN NEVER MOVES (Arthur, 29 October 2026, 19:11Z). The Tasks pill
  * used to swap the whole page into a wider column, so the header and the
  * pills jumped about 90px sideways and the next click landed on the wrong
- * pill. Every pill now keeps {@link SPACE_PAGE_COLUMN}; only the board below
- * the pills widens, with {@link SPACE_BOARD_BLEED}.
+ * pill. Every pill keeps {@link SPACE_PAGE_COLUMN}, which is now as wide as
+ * the board (Stay's B, 29 October 2026, 00:45Z: the stage columns need the
+ * room), so the board needs no wider band of its own.
  */
 export const SPACE_PANE = '@container flex min-h-full w-full flex-col';
-
-/** The task board's width on a computer: the pane's, up to `72rem`, centred
- *  on the page column (Stay's B, 29 October 2026, 00:45Z: the stage columns
- *  need the room). Equal negative margins on both sides, so the column, the
- *  header and the pills stay where every other pill has them. */
-export const SPACE_BOARD_BLEED =
-  'md:mx-[calc((100%_-_min(72rem,_100cqw_-_2rem))_/_2)]';
 
 /** The pills and search held at the top of the pane: stacked on a phone, one
  *  row from `md:`. Shared by the live home and its silhouette, so the

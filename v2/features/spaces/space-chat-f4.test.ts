@@ -89,7 +89,7 @@ test('the home has the message box at its bottom, for the Owner and Contributors
   const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
   assert.match(dock, /className="sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto px-4 pt-6 v2-safe-bottom"/);
   const parts = read('v2', 'features', 'spaces', 'detail', 'lobby-parts.tsx');
-  assert.match(parts, /'mx-auto flex min-h-full w-full max-w-3xl flex-1 flex-col px-4 pb-16 pt-5 sm:pt-6'/);
+  assert.match(parts, /'mx-auto flex min-h-full w-full max-w-6xl flex-1 flex-col px-4 pb-16 pt-5 sm:pt-6'/);
   // In the size-container pane the column fills by growing: the pane is a flex
   // column, and the column is `flex-1` in it (Arthur, 30 October 2026, 10:21Z:
   // on a short pill the box floated 267px up when the column only had
