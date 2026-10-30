@@ -10,7 +10,7 @@ import { spaceMarks } from './space-marks';
 import { turnBegan, turnChanged } from './space-turn';
 import { replyTargetOf } from './reply-target';
 import { draftOrdinalForLine } from './rows/event-line';
-import { applyDraftEditLine } from './draft/draft-edit-line';
+import { applyDraftEditLine, editedAfterSave } from './draft/draft-edit-line';
 import { draftOffsets } from './draft/draft-ordinals';
 
 /* The draft "edited" line in the chat (Stay, 30 October 2026, 02:16Z, thread
@@ -188,4 +188,14 @@ test('the draft save and the restore both hand their answer to the chat', () => 
   const screen = here('ConversationScreen.tsx');
   assert.match(screen, /applyDraftEditLine\(\{ upsertEvent, removeEvent \}, answer\)/);
   assert.match(screen, /applyDraftEditLine=\{onDraftEditLine\}/);
+});
+
+test('a save that takes lines away clears the card’s "Edited"; any other save sets it', () => {
+  assert.equal(editedAfterSave({ draft_edit_line: null, draft_edit_line_removed_ids: [175] }), false);
+  assert.equal(editedAfterSave({ draft_edit_line: { id: 9 } as ApiMessage, draft_edit_line_removed_ids: [] }), true);
+  // The switch off, or an older server: the fields are absent, and a save is an edit as before.
+  assert.equal(editedAfterSave({}), true);
+  assert.equal(editedAfterSave(undefined), true);
+  const editor = here('draft', 'DraftEditor.tsx');
+  assert.match(editor, /markDraftEdited\(queryClient, \{ conversationId, viewerId \}, mode\.documentKey, editedAfterSave\(envelope\)\);/);
 });

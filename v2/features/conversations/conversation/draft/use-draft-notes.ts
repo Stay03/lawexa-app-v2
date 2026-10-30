@@ -93,6 +93,7 @@ export function markDraftEdited(
   queryClient: QueryClient,
   { conversationId, viewerId }: { conversationId: string; viewerId: number | null },
   key: string,
+  edited = true,
 ): void {
   queryClient.setQueryData<DraftNotesEnvelope>(notesQueries.draftNotes({ conversationId, viewerId }).queryKey, (current) =>
     current
@@ -100,7 +101,7 @@ export function markDraftEdited(
           ...current,
           data: {
             ...current.data,
-            documents: current.data.documents.map((document) => (document.key === key ? { ...document, edited: true } : document)),
+            documents: current.data.documents.map((document) => (document.key === key ? { ...document, edited } : document)),
           },
         }
       : current,

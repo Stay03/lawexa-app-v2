@@ -66,6 +66,7 @@ import './draft-panel.css';
 import type { ConversationSpaceRef } from '@/types/chat';
 import { SidePanelCloseButton } from '../side-panel/ChatSidePanel';
 import { useSidePanel } from '../side-panel/SidePanelContext';
+import { editedAfterSave } from './draft-edit-line';
 import { readDraftEdit, writeDraftEdit } from './draft-edits';
 import {
   clearDraftSuperseded,
@@ -394,7 +395,9 @@ function DraftEditorBody({
     // the chat's "edited" line at once (Stay, 30 October 2026, 02:16Z, thread
     // 1e44eb39; draft-edit-line.ts).
     onSaved: (_record, envelope) => {
-      if (mode.kind === 'note') markDraftEdited(queryClient, { conversationId, viewerId }, mode.documentKey);
+      if (mode.kind === 'note') {
+        markDraftEdited(queryClient, { conversationId, viewerId }, mode.documentKey, editedAfterSave(envelope));
+      }
       chat?.applyDraftEditLine(envelope);
       if (autosave.currentStatus() === 'clean') mirrorForget(mirrorKey);
     },

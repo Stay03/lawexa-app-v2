@@ -100,7 +100,7 @@ test('an open draft registers its save with the send while it edits the note, an
   assert.doesNotMatch(editor, /innerHTML/);
   assert.match(editor, /const SAVE_STOPPED: ReadonlySet<string> = new Set\(\['error', 'conflict', 'blocked'\]\);/);
   // A save of the reader's edits marks the card's document edited, without reading the list again.
-  assert.match(editor, /onSaved: \(_record, envelope\) => \{\s*if \(mode\.kind === 'note'\) markDraftEdited\(queryClient, \{ conversationId, viewerId \}, mode\.documentKey\);/);
+  assert.match(editor, /onSaved: \(_record, envelope\) => \{\s*if \(mode\.kind === 'note'\) \{\s*markDraftEdited\(queryClient, \{ conversationId, viewerId \}, mode\.documentKey, editedAfterSave\(envelope\)\);/);
 });
 
 test('the version history: newest first, who and when, the chosen one against now, and Restore that asks first', () => {

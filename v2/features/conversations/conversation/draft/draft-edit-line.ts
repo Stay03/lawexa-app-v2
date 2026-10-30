@@ -20,3 +20,14 @@ export function applyDraftEditLine(
   }
   if (answer.draft_edit_line) engine.upsertEvent(answer.draft_edit_line);
 }
+
+/**
+ * Whether a save left the draft edited, for its card. A save that took lines
+ * away (`draft_edit_line_removed_ids`) brought the note back to Lawexa's text,
+ * so it is no longer edited (the edit line run, 30 October 2026: undoing
+ * every edit dropped the line but the card still said "Edited"). Any other
+ * save is an edit, as before.
+ */
+export function editedAfterSave(answer: DraftEditLineFields | undefined): boolean {
+  return !(answer?.draft_edit_line_removed_ids && answer.draft_edit_line_removed_ids.length > 0);
+}
