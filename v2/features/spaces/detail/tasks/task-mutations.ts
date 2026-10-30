@@ -59,6 +59,16 @@ export function useUpdateTask(spaceUuid: string) {
   });
 }
 
+/** Start a thread for a task and link it: the board's copy takes the new thread at once. */
+export function useStartTaskThread(spaceUuid: string) {
+  const { write, reread } = useBoardCache(spaceUuid);
+  return useMutation({
+    mutationFn: (taskUuid: string) => spaceTasksApi.startThread(spaceUuid, taskUuid),
+    onSuccess: (response) => write((list) => upsertTask(list, response.data)),
+    onSettled: reread,
+  });
+}
+
 export function useDeleteTask(spaceUuid: string) {
   const { write, reread } = useBoardCache(spaceUuid);
   return useMutation({

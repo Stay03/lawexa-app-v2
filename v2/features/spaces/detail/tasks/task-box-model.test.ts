@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { SpaceTask } from '@/types/collab';
-import { initialPhoneTab, taskChatLine, taskChatState, threadAccess, type ThreadAccess } from './task-box-model';
+import { initialPhoneTab, taskChatLine, taskChatState, taskThreadAccess, type ThreadAccess } from './task-box-model';
 
 /* The task box's chat pane (Arthur's 1 + 2, thread 7aa0c6d8; design 1805492d).
  * TEST DATA throughout. */
@@ -67,13 +67,13 @@ test('the thread’s own answer decides the pane, not the board role', () => {
 });
 
 test('the thread query reads as an answer: flags, a 403, another failure, or still on its way', () => {
-  assert.deepEqual(threadAccess({ isPending: true, errorStatus: null }), { status: 'pending' });
-  assert.deepEqual(threadAccess({ isPending: false, data: { can_read: true, can_post: false }, errorStatus: null }), access(true, false));
-  // A channel row from before the flags reads like the thread page: readable and open to post.
-  assert.deepEqual(threadAccess({ isPending: false, data: {}, errorStatus: null }), access(true, true));
-  assert.deepEqual(threadAccess({ isPending: false, errorStatus: 403 }), { status: 'forbidden' });
-  assert.deepEqual(threadAccess({ isPending: false, errorStatus: 500 }), { status: 'failed' });
-  assert.deepEqual(threadAccess({ isPending: false, errorStatus: null }), { status: 'failed' });
+  assert.deepEqual(taskThreadAccess({ isPending: true, errorStatus: null }), { status: 'pending' });
+  assert.deepEqual(taskThreadAccess({ isPending: false, data: { can_read: true, can_post: false }, errorStatus: null }), access(true, false));
+  // As on the thread's own page, only a true opens: a row with no flags is closed.
+  assert.deepEqual(taskThreadAccess({ isPending: false, data: {}, errorStatus: null }), access(false, false));
+  assert.deepEqual(taskThreadAccess({ isPending: false, errorStatus: 403 }), { status: 'forbidden' });
+  assert.deepEqual(taskThreadAccess({ isPending: false, errorStatus: 500 }), { status: 'failed' });
+  assert.deepEqual(taskThreadAccess({ isPending: false, errorStatus: null }), { status: 'failed' });
 });
 
 test('a phone opens on the details, or on the chat when opened to reply; a new task always on the details', () => {
