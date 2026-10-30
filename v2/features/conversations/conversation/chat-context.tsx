@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useMemo } from 'react';
 
+import type { DraftEditLineFields } from '@/v2/features/notes/types';
+
 /**
  * V2 conversation chat context — the v2-native replacement for v1's
  * `lib/contexts/chat-context` (boundary-blocked). Inline result cards (quiz,
@@ -22,6 +24,12 @@ interface V2ChatContextValue {
   canSend: boolean;
   /** The open chat's id: a step's result is fetched under it (tools/use-tool-result.ts). */
   conversationId: string;
+  /**
+   * A draft save or restore answered: draw, move or take away the chat's
+   * "edited" line at once (draft/draft-edit-line.ts; Stay, 30 October 2026,
+   * 02:16Z, thread 1e44eb39). Stable: it only reaches the chat's engine.
+   */
+  applyDraftEditLine: (answer: DraftEditLineFields) => void;
 }
 
 const V2ChatContext = createContext<V2ChatContextValue | null>(null);
@@ -32,19 +40,21 @@ export function V2ChatProvider({
   isStreaming,
   canSend,
   conversationId,
+  applyDraftEditLine,
 }: {
   children: React.ReactNode;
   sendMessage: (message: string) => void;
   isStreaming: boolean;
   canSend: boolean;
   conversationId: string;
+  applyDraftEditLine: (answer: DraftEditLineFields) => void;
 }) {
   // Stable value — only changes when the streaming flag (or `canSend`) flips, never per token
   // (tokens flow through the per-message streaming store, not this context), so
   // the card subtree never re-renders on stream growth.
   const value = useMemo<V2ChatContextValue>(
-    () => ({ sendMessage, isStreaming, canSend, conversationId }),
-    [sendMessage, isStreaming, canSend, conversationId],
+    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine }),
+    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine],
   );
   return <V2ChatContext.Provider value={value}>{children}</V2ChatContext.Provider>;
 }

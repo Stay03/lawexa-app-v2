@@ -100,7 +100,7 @@ test('an open draft registers its save with the send while it edits the note, an
   assert.doesNotMatch(editor, /innerHTML/);
   assert.match(editor, /const SAVE_STOPPED: ReadonlySet<string> = new Set\(\['error', 'conflict', 'blocked'\]\);/);
   // A save of the reader's edits marks the card's document edited, without reading the list again.
-  assert.match(editor, /onSaved: \(\) => \{\s*if \(mode\.kind === 'note'\) markDraftEdited\(queryClient, \{ conversationId, viewerId \}, mode\.documentKey\);/);
+  assert.match(editor, /onSaved: \(_record, envelope\) => \{\s*if \(mode\.kind === 'note'\) markDraftEdited\(queryClient, \{ conversationId, viewerId \}, mode\.documentKey\);/);
 });
 
 test('the version history: newest first, who and when, the chosen one against now, and Restore that asks first', () => {
@@ -152,7 +152,7 @@ test('My notes shows all, the notes written here, or the drafts from chats, and 
 test('the device copy holds unsaved typing only: once a save lands with nothing waiting, it is dropped', () => {
   const editor = read(...DRAFT, 'DraftEditor.tsx');
   // Otherwise a later Lawexa version offers back text that was saved (seen in the pictures for Stay).
-  assert.match(editor, /onSaved: \(\) => \{[\s\S]*?if \(autosave\.currentStatus\(\) === 'clean'\) mirrorForget\(mirrorKey\);/);
+  assert.match(editor, /onSaved: \(_record, envelope\) => \{[\s\S]*?if \(autosave\.currentStatus\(\) === 'clean'\) mirrorForget\(mirrorKey\);/);
   // The copy is made before the autosave that drops it.
   assert.ok(editor.indexOf('useDraftMirrorWriter({') < editor.indexOf('const autosave = useNoteAutosave({'));
 });

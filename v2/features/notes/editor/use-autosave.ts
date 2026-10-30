@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { NoteRecord } from '../types';
+import type { NoteEnvelope, NoteRecord } from '../types';
 import { useSaveNote } from '../mutations';
 import {
   initialAutosaveState,
@@ -134,9 +134,11 @@ export interface UseNoteAutosaveOptions {
    * The server's record after every successful save (slug, timestamps, id).
    * May be async — the editor's handler awaits an IndexedDB re-key on the first
    * save — and its promise is deliberately not awaited here: nothing about the
-   * save machine's next step depends on it.
+   * save machine's next step depends on it. The whole answer comes too: a
+   * draft's save carries the chat's "edited" line beside the record
+   * (`DraftEditLineFields`).
    */
-  onSaved?: (record: NoteRecord) => void | Promise<void>;
+  onSaved?: (record: NoteRecord, envelope: NoteEnvelope) => void | Promise<void>;
   /**
    * Suspend scheduling without losing the working copy — used when the body is
    * past the backend's character limit, where a save could only be refused.
@@ -252,7 +254,7 @@ export function useNoteAutosave({
                 updatedAt: record.updated_at ?? null,
                 at: Date.now(),
               });
-              void onSavedRef.current?.(record);
+              void onSavedRef.current?.(record, envelope);
               return envelope;
             },
             (error: unknown) => {

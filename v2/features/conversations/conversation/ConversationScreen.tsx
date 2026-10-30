@@ -27,6 +27,8 @@ import {
 } from './embedded-composer';
 import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './route-composer';
 import { draftOffsets } from './draft/draft-ordinals';
+import { applyDraftEditLine } from './draft/draft-edit-line';
+import type { DraftEditLineFields } from '@/v2/features/notes/types';
 import { draftVersion, draftVersionIndex } from './draft/draft-versions';
 import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
 import { useSidePanelHost } from './side-panel/side-panel-host';
@@ -100,7 +102,15 @@ export function ConversationScreen({
     isCancelling,
     error,
     retryLastMessage,
+    upsertEvent,
+    removeEvent,
   } = stream;
+  // A draft save's "edited" line, drawn at once for the reader who saved
+  // (draft/draft-edit-line.ts). The engine's own functions, so this never changes.
+  const onDraftEditLine = useCallback(
+    (answer: DraftEditLineFields) => applyDraftEditLine({ upsertEvent, removeEvent }, answer),
+    [upsertEvent, removeEvent],
+  );
   // An answer being written: nothing pops up over it (screen-hold.ts).
   useScreenHold(isStreaming);
   // Each person's colour in a space chat (member-colour.ts): the roster's order,
@@ -407,6 +417,7 @@ export function ConversationScreen({
       isStreaming={isStreaming}
       canSend={canSend}
       conversationId={conversationId}
+      applyDraftEditLine={onDraftEditLine}
     >
       {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
           own route, a draft or a file opens beside the transcript on a

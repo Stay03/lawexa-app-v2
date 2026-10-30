@@ -77,6 +77,7 @@ import {
 } from './draft-flush';
 import { CATCH_UP_LIMIT_MS, draftNoteLine, type DraftNoteState } from './draft-note-state';
 import { markDraftEdited, useDraftNoteState } from './use-draft-notes';
+import { useV2ChatContext } from '../chat-context';
 import { DraftHistoryDialog } from './DraftHistoryDialog';
 import { findCardRoom } from './find-room';
 import {
@@ -349,6 +350,7 @@ function DraftEditorBody({
 }: DraftEditorProps & { initial: Content; mode: DraftEditorMode; onReload?: () => void }) {
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
+  const chat = useV2ChatContext();
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const record = mode.kind === 'note' ? mode.record : null;
@@ -388,9 +390,12 @@ function DraftEditorBody({
     // any other leaving save is one the chat's send waits for (draft-flush.ts).
     flushOnUnmount: () => !(record && isDraftSuperseded(conversationId, ordinal, record.id)),
     onUnmountSave: (settled) => trackDraftSave(conversationId, settled),
-    // The card's "Edited" (DraftCard.tsx) without reading the list again.
-    onSaved: () => {
+    // The card's "Edited" (DraftCard.tsx) without reading the list again, and
+    // the chat's "edited" line at once (Stay, 30 October 2026, 02:16Z, thread
+    // 1e44eb39; draft-edit-line.ts).
+    onSaved: (_record, envelope) => {
       if (mode.kind === 'note') markDraftEdited(queryClient, { conversationId, viewerId }, mode.documentKey);
+      chat?.applyDraftEditLine(envelope);
       if (autosave.currentStatus() === 'clean') mirrorForget(mirrorKey);
     },
   });

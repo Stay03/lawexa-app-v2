@@ -27,6 +27,7 @@ import { notesApi } from '@/v2/features/notes/api';
 import { notesQueries } from '@/v2/features/notes/queries';
 import type { NoteRevision } from '@/v2/features/notes/types';
 import { extractApiError } from '@/lib/utils/api-error';
+import { useV2ChatContext } from '../chat-context';
 import { diffDocs, hasChanges } from './draft-diff';
 import { revisionAuthorLabel } from './draft-note-state';
 import { ADDED_WORDS, DiffDocument, REMOVED_WORDS } from './DraftChangesView';
@@ -68,6 +69,7 @@ export function DraftHistoryDialog({
 }) {
   const { userUuid } = useV2Session();
   const queryClient = useQueryClient();
+  const chat = useV2ChatContext();
   const [page, setPage] = useState(1);
   const [chosen, setChosen] = useState<NoteRevision | null>(null);
   const [asking, setAsking] = useState(false);
@@ -76,7 +78,10 @@ export function DraftHistoryDialog({
   const restore = useMutation({
     mutationFn: (revision: number) => notesApi.restoreRevision(noteId, revision),
     meta: { silentError: true },
-    onSuccess: () => {
+    onSuccess: (answer) => {
+      // The chat's "edited" line follows the restore at once (Stay, 30 October
+      // 2026, 02:16Z, thread 1e44eb39; draft-edit-line.ts).
+      chat?.applyDraftEditLine(answer);
       void queryClient.invalidateQueries({ queryKey: [...notesQueries.all, 'draft-notes'] });
       void queryClient.invalidateQueries({ queryKey: [...notesQueries.all, 'revisions', noteId] });
       setAsking(false);

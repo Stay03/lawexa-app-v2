@@ -1,3 +1,4 @@
+import type { ApiMessage } from '@/types/chat';
 import type { NoteStatus, NoteUser } from '@/types/note';
 import type { PaginationLinks, PaginationMeta } from '@/types/case';
 
@@ -113,7 +114,20 @@ export interface NoteListEnvelope {
   links: PaginationLinks;
 }
 
-export interface NoteEnvelope {
+/**
+ * What a draft note's save (`PUT /notes/{note}`) and restore answer beside
+ * `data`, for the chat's "edited" line (Stay, 30 October 2026, 02:16Z, thread
+ * 1e44eb39; design 9b43f942): the line this save made or moved, and the id of
+ * a line it took away because the note is back to Lawexa's version. Each is
+ * `null` when there is none, and both are absent while the server's
+ * DRAFT_EDIT_LINES flag is off and on a note not made from a chat.
+ */
+export interface DraftEditLineFields {
+  draft_edit_line?: ApiMessage | null;
+  draft_edit_line_removed_id?: number | null;
+}
+
+export interface NoteEnvelope extends DraftEditLineFields {
   success: boolean;
   message: string;
   data: NoteRecord;
@@ -294,7 +308,7 @@ export interface NoteRevisionEnvelope {
 }
 
 /** A restore saves the revision as the reader's new text: the note (its `updated_at` is the next save's base) and the revision it made. */
-export interface NoteRestoreEnvelope {
+export interface NoteRestoreEnvelope extends DraftEditLineFields {
   success: boolean;
   message: string;
   data: { note: NoteRecord; revision: number };

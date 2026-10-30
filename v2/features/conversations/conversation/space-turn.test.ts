@@ -415,7 +415,7 @@ test('a reader who may not send gets disabled card actions, and the screen sends
   const screen = readHere('ConversationScreen.tsx');
   assert.match(screen, /canSend=\{canSend\}\s*conversationId=\{conversationId\}/);
   assert.match(screen, /\(message: string\) => \{\s*if \(!canSend\) return;/);
-  assert.match(readHere('chat-context.tsx'), /\(\) => \(\{ sendMessage, isStreaming, canSend, conversationId \}\)/);
+  assert.match(readHere('chat-context.tsx'), /\(\) => \(\{ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine \}\)/);
   for (const card of ['DeepResearchPromptCard', 'MultiQuestionPlanCard', 'MultiQuestionPromptCard', 'NextQuestionPromptCard']) {
     assert.match(
       readHere(join('cards', `${card}.tsx`)),
