@@ -209,15 +209,17 @@ function TaskBoxBody({
   const saving = createTask.isPending || updateTask.isPending;
   // The thread's own answer about this reader: may they read it, and post in it
   // (Backend 8cd4dfe6). A 403 is a refusal, so it is not asked again.
+  // Task chat is for Researchers (Stay's choice A, 20:24Z): nobody else's box asks for the thread.
+  const canChat = session.canAccessTeamChannels;
   const threadUuid = task?.thread?.uuid ?? null;
   const threadQuery = useQuery({
     ...channelsQueries.detail(threadUuid ?? '', { viewerId }),
-    enabled: threadUuid !== null,
+    enabled: canChat && threadUuid !== null,
     retry: (failures, error) => extractApiError(error).status !== 403 && failures < 1,
   });
   const chat = taskChatState(
     task,
-    canEdit,
+    { canEdit, canChat },
     taskThreadAccess({
       isPending: threadQuery.isPending,
       data: threadQuery.data?.data,
