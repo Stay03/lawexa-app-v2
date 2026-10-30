@@ -110,7 +110,7 @@ test('the task chat is the thread’s own feed and composer, asked for only by t
   const chat = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskChatThread.tsx');
   assert.match(chat, /<ChannelFeed\b/);
   // A thread started from the box has no first message: the feed shows no line saying so.
-  assert.match(chat, /hideMissingRoot\n/);
+  assert.match(chat, /hideMissingRoot\r?\n/);
   const feed = read('v2', 'features', 'channels', 'feed', 'ChannelFeed.tsx');
   assert.match(feed, /const quietHead = channel\.is_thread && hideMissingRoot && !channel\.root_message;/);
   // Neither the missing-root line nor a channel's own intro, empty or at the head of history.
