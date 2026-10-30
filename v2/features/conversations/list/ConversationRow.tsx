@@ -13,7 +13,6 @@ import {
   Share2,
   ShieldCheck,
   Trash2,
-  Users,
 } from 'lucide-react';
 
 import { cn, stripPastedTags } from '@/lib/utils';
@@ -28,12 +27,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { ConversationListItem } from '@/types/chat';
 import { lastActivityAt } from '../activity';
-import {
-  CONVERSATION_MENU_LABELS,
-  SPACE_CHAT_SHARE_NOTE,
-  showsSpaceShareNote,
-  type ConversationMenuItem,
-} from './conversation-menu';
+import { CONVERSATION_MENU_LABELS, type ConversationMenuItem } from './conversation-menu';
 import { conversationOrigin, fullTime } from './conversation-origin';
 import {
   FOCUS_RING,
@@ -268,11 +262,7 @@ export function ConversationRow({
         {select ? (
           <span aria-hidden className="size-9 shrink-0" />
         ) : hasMenu ? (
-          <ConversationRowMenu
-            title={cleanTitle}
-            actions={actions}
-            note={showsSpaceShareNote(conversation.can, conversation.space != null) ? SPACE_CHAT_SHARE_NOTE : null}
-          />
+          <ConversationRowMenu title={cleanTitle} actions={actions} />
         ) : menuColumn ? (
           <span aria-hidden className="size-9 shrink-0" />
         ) : null}
@@ -304,13 +294,9 @@ const MENU_ICONS: Readonly<Record<ConversationMenuItem, typeof Trash2>> = {
 function ConversationRowMenu({
   title,
   actions,
-  note,
 }: {
   title: string;
   actions: readonly ConversationMenuAction[];
-  /** A line that informs, where a missing row would leave the reader asking why
-   *  (a Space chat's Share). Drawn above Delete, and never chosen. */
-  note: string | null;
 }) {
   return (
     <DropdownMenu>
@@ -332,12 +318,6 @@ function ConversationRowMenu({
           const destructive = action.id === 'delete';
           return (
             <Fragment key={action.id}>
-              {destructive && note ? (
-                <DropdownMenuItem disabled>
-                  <Users />
-                  {note}
-                </DropdownMenuItem>
-              ) : null}
               {destructive && index > 0 ? <DropdownMenuSeparator /> : null}
               <DropdownMenuItem
                 variant={destructive ? 'destructive' : 'default'}

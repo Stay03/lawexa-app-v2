@@ -6,10 +6,8 @@ import { join } from 'node:path';
 import type { ConversationCan } from '@/types/chat';
 import {
   CONVERSATION_MENU_LABELS,
-  SPACE_CHAT_SHARE_NOTE,
   conversationMenuItems,
   conversationRemoveRoute,
-  showsSpaceShareNote,
 } from './conversation-menu';
 
 /* Arthur's "…" menu beside each conversation (Inside a space, 15 October
@@ -101,24 +99,14 @@ test('the lists, the space home and the header all build the menu from `can`', (
   assert.match(row, /\{CONVERSATION_MENU_LABELS\[action\.id\]\}/);
 });
 
-test('a Space chat says it is shared with the Space only, where Share was (Arthur’s B, 30 October 2026)', () => {
-  // The server refuses to make a Space chat public, so the menu never offers it, and says why.
-  assert.equal(SPACE_CHAT_SHARE_NOTE, "Shared with this Space's members only.");
-  assert.equal(showsSpaceShareNote(can({ share: true }), true), true);
-  // The server now sets share false on every Space chat: the owner (delete) still sees the line.
-  assert.equal(showsSpaceShareNote(can({ share: false, delete: true }), true), true);
-  // Only where Share would have been: not outside a Space, nor for a reader who couldn't share anyway
-  // (the Space's Owner on a member's chat has Remove only).
-  assert.equal(showsSpaceShareNote(can({ share: true, delete: true }), false), false);
-  assert.equal(showsSpaceShareNote(can({ share: false, remove: true }), true), false);
-  assert.equal(showsSpaceShareNote(undefined, true), false);
-  // Both menus draw it as a row that can't be chosen, above Delete.
+test('a Space chat has no Share and no line in its place (Stay, 30 October 2026, 20:23Z)', () => {
   const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
-  const header = read('v2', 'features', 'conversations', 'conversation', 'ConversationActions.tsx');
-  assert.match(header, /const SPACE_SHARE_NOTE_ROW: ScreenAction = \{[\s\S]*?label: SPACE_CHAT_SHARE_NOTE,[\s\S]*?disabled: true,/);
-  assert.match(header, /return \[\.\.\.rows\.slice\(0, at\), SPACE_SHARE_NOTE_ROW, \.\.\.rows\.slice\(at\)\];/);
-  assert.match(read('v2', 'shell', 'V2HeaderMenu.tsx'), /disabled=\{action\.disabled\}/);
-  const row = read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx');
-  assert.match(row, /note=\{showsSpaceShareNote\(conversation\.can, conversation\.space != null\) \? SPACE_CHAT_SHARE_NOTE : null\}/);
-  assert.match(row, /\{destructive && note \? \(\s*<DropdownMenuItem disabled>/);
+  for (const file of [
+    read('v2', 'features', 'conversations', 'conversation', 'ConversationActions.tsx'),
+    read('v2', 'features', 'conversations', 'list', 'ConversationRow.tsx'),
+  ]) {
+    assert.doesNotMatch(file, /Shared with this Space|SHARE_NOTE|DropdownMenuItem disabled/);
+  }
+  // Personal chats keep Share.
+  assert.ok(conversationMenuItems(can({ share: true }), false).includes('share'));
 });
