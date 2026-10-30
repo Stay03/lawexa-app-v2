@@ -51,6 +51,8 @@ export function TaskChatThread({ channel, canPost, threadHref }: { channel: Chan
           ref={feedRef}
           channel={channel}
           parentName={channel.parent_channel_name ?? null}
+          // A thread started from the task box has no first message: no line saying so.
+          hideMissingRoot
           viewerId={session.userId}
           viewerUuid={session.userUuid}
           reporter={reporter}

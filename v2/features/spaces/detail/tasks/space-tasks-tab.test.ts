@@ -78,7 +78,7 @@ test('the board follows .task.changed on the space channel, and the last board t
 
 test('a card opens the task box, and only the owner and editors get New task', () => {
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
-  assert.match(board, /<button\s+ref=\{setNodeRef\}\s+type="button"\s+onClick=\{\(event\) => \{[\s\S]*?onOpen\(\);\s*\}\}/);
+  assert.match(board, /<button\s+ref=\{\(node\) => \{\s*setNodeRef\(node\);[\s\S]*?type="button"\s+onClick=\{\(event\) => \{[\s\S]*?onOpen\(\);\s*\}\}/);
   assert.match(board, /const newTask = canEdit \? \(\) => openSheet\(\{ kind: 'new' \}\) : null;/);
   const sheet = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
   // A viewer gets no Save, Delete or queue moves.
@@ -98,7 +98,10 @@ test('a click on a card’s title renames it in place on a computer; Enter on th
   assert.match(board, /<div className=\{cn\(CARD, NOTE_FILL\[stage\], 'ring-2 ring-ring\/40'\)\}>/);
   assert.match(board, /<span data-no-dnd className="flex min-w-0 flex-1 flex-col gap-1">\s*<Input/);
   // The field's blur as it unmounts never saves twice, nor saves what Escape dropped.
-  assert.match(board, /const commit = \(\) => \{\s*if \(ended\.current\) return;/);
+  assert.match(board, /const commit = \(byKey: boolean\) => \{\s*if \(ended\.current\) return;/);
+  // Enter and Escape give focus back to the card; a click away leaves it where the click put it.
+  assert.match(board, /commit\(true\);[\s\S]*?end\(true\);[\s\S]*?onBlur=\{\(\) => \(error \? end\(false\) : commit\(false\)\)\}/);
+  assert.match(board, /if \(node && refocus\.current\) \{\s*refocus\.current = false;\s*node\.focus\(\);/);
   // The rename is the drop's own optimistic patch, for those who may edit.
   assert.match(board, /const renameTask: RenameTask \| null = canEdit \? \(change\) => patch\.mutate\(change\) : null;/);
 });
@@ -106,6 +109,10 @@ test('a click on a card’s title renames it in place on a computer; Enter on th
 test('the task chat is the thread’s own feed and composer, asked for only by those who may open channels', () => {
   const chat = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskChatThread.tsx');
   assert.match(chat, /<ChannelFeed\b/);
+  // A thread started from the box has no first message: the feed shows no line saying so.
+  assert.match(chat, /hideMissingRoot\n/);
+  const feed = read('v2', 'features', 'channels', 'feed', 'ChannelFeed.tsx');
+  assert.match(feed, /const threadOpening = channel\.is_thread && !\(hideMissingRoot && !channel\.root_message\) \? \(/);
   assert.match(chat, /<ChannelComposer\b/);
   assert.match(chat, /useChannelRoom\(channel\.uuid, \{ enabled: canPost \}\)/);
   assert.match(chat, /useChannelReadPointer\(channel\.uuid, \{ enabled: threadAccess\(channel\)\.isFollowing \}\)/);

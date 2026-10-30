@@ -697,6 +697,9 @@ function TaskCard({
 }) {
   const rename = useContext(TaskRenameContext);
   const [renaming, setRenaming] = useState(false);
+  // After Enter or Escape the card takes focus back as it returns, so a keyboard
+  // or a screen reader stays on it (Frontend's review): never the page's body.
+  const refocus = useRef(false);
   // Keyed by the task, with the card itself in the data so a drop reads it.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.uuid,
@@ -706,14 +709,29 @@ function TaskCard({
   if (renaming && rename) {
     return (
       <li className="flex">
-        <RenameCard task={task} stage={stage} now={now} onSave={rename} onDone={() => setRenaming(false)} />
+        <RenameCard
+          task={task}
+          stage={stage}
+          now={now}
+          onSave={rename}
+          onDone={(byKey) => {
+            refocus.current = byKey;
+            setRenaming(false);
+          }}
+        />
       </li>
     );
   }
   return (
     <li className="flex">
       <button
-        ref={setNodeRef}
+        ref={(node) => {
+          setNodeRef(node);
+          if (node && refocus.current) {
+            refocus.current = false;
+            node.focus();
+          }
+        }}
         type="button"
         onClick={(event) => {
           const onTitle = event.target instanceof Element && event.target.closest('[data-card-title]') !== null;
@@ -754,18 +772,19 @@ function RenameCard({
   stage: SpaceTaskStage;
   now: number;
   onSave: RenameTask;
-  onDone: () => void;
+  /** `byKey`: Enter or Escape ended it, so focus goes back to the card. */
+  onDone: (byKey: boolean) => void;
 }) {
   const [typed, setTyped] = useState(task.title);
   const [error, setError] = useState<string | null>(null);
   const errorId = `task-rename-error-${task.uuid}`;
   // The field's blur as it unmounts must not save again, or save what Escape dropped.
   const ended = useRef(false);
-  const end = () => {
+  const end = (byKey: boolean) => {
     ended.current = true;
-    onDone();
+    onDone(byKey);
   };
-  const commit = () => {
+  const commit = (byKey: boolean) => {
     if (ended.current) return;
     const outcome = renameOutcome(task, typed, TASK_TITLE_MAX);
     if (outcome.kind === 'invalid') {
@@ -773,7 +792,7 @@ function RenameCard({
       return;
     }
     if (outcome.kind === 'save') onSave({ task, payload: outcome.payload, shown: outcome.shown });
-    end();
+    end(byKey);
   };
   return (
     <div className={cn(CARD, NOTE_FILL[stage], 'ring-2 ring-ring/40')}>
@@ -797,15 +816,16 @@ function RenameCard({
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   event.preventDefault();
-                  commit();
+                  commit(true);
                 }
                 if (event.key === 'Escape') {
                   event.preventDefault();
-                  end();
+                  end(true);
                 }
               }}
               // A click away saves; with an error showing, it leaves the title as it was.
-              onBlur={() => (error ? end() : commit())}
+              // Focus stays where the click put it.
+              onBlur={() => (error ? end(false) : commit(false))}
               className="h-8 text-sm"
             />
             {error ? (
