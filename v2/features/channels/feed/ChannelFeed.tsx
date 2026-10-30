@@ -1417,7 +1417,11 @@ export function ChannelFeed({
      once and consumed by both call sites below — the empty state and the head
      of loaded history — so the two can never disagree about which block a
      thread gets. */
-  const threadOpening = channel.is_thread && !(hideMissingRoot && !channel.root_message) ? (
+  /* A thread with no first message, where the screen asked for quiet: the head
+     of the transcript is nothing at all, never the line saying so and never a
+     channel's own intro, which would call the thread a channel. */
+  const quietHead = channel.is_thread && hideMissingRoot && !channel.root_message;
+  const threadOpening = channel.is_thread ? (
     <ThreadOpening channel={channel} parentName={parentName} />
   ) : null;
   const sheetIsMine =
@@ -1458,7 +1462,7 @@ export function ChannelFeed({
                  is none left to fetch — with older pages outstanding the feed
                  branch renders, carrying its "Load older messages" button. */
           renderItems.length === 0 && !hasNextPage ? (
-            (threadOpening ?? (
+            quietHead ? null : (threadOpening ?? (
               <ChannelIntro
                 channel={channel}
                 members={members}
@@ -1493,7 +1497,7 @@ export function ChannelFeed({
                    a channel should teach what it is every time you reach its
                    beginning, not only on the one day it was empty. Without the
                    write-first action — there already is a first message. */
-                (threadOpening ?? (
+                quietHead ? null : (threadOpening ?? (
                   <ChannelIntro
                     channel={channel}
                     members={members}
