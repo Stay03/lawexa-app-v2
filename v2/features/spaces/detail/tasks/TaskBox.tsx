@@ -514,7 +514,7 @@ function TaskBoxBody({
               <div
                 ref={bodyRef}
                 onFocus={revealFocused}
-                className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-4 py-5"
+                className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-y-contain px-4 py-5"
               >
                 {details}
                 {history}
@@ -541,7 +541,7 @@ function TaskBoxBody({
             <div
               ref={bodyRef}
               onFocus={revealFocused}
-              className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-6 py-5"
+              className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-y-contain px-6 py-5"
             >
               {tab === 'history' && task ? history : details}
             </div>
