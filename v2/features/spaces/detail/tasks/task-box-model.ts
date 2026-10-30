@@ -13,6 +13,8 @@ import type { SpaceTask } from '@/types/collab';
  * Posting needs membership of the thread's channel, as on the thread's own
  * page; the board role does not decide it.
  *
+ *   closed    the reader may not open channels at all (Stay's choice A, 20:24Z:
+ *             task chat is for Researchers): a line saying so, nothing asked.
  *   new       a task not saved yet: nothing to chat about.
  *   none      no thread linked: "Start a thread" for those who may edit the task.
  *   loading   the thread's answer is on its way.
@@ -32,6 +34,7 @@ export type ThreadAccess =
   | { status: 'read'; canRead: boolean; canPost: boolean };
 
 export type TaskChatState =
+  | { kind: 'closed' }
   | { kind: 'new' }
   | { kind: 'none'; canStart: boolean }
   | { kind: 'loading'; thread: TaskThread }
@@ -40,7 +43,16 @@ export type TaskChatState =
   | { kind: 'read'; thread: TaskThread }
   | { kind: 'post'; thread: TaskThread };
 
-export function taskChatState(task: SpaceTask | null, canEdit: boolean, access: ThreadAccess): TaskChatState {
+/**
+ * `canChat` is the server's own flag for channels (`canAccessTeamChannels`
+ * from `/auth/me`, Researchers and above): every channel door reads it.
+ */
+export function taskChatState(
+  task: SpaceTask | null,
+  { canEdit, canChat }: { canEdit: boolean; canChat: boolean },
+  access: ThreadAccess,
+): TaskChatState {
+  if (!canChat) return { kind: 'closed' };
   if (!task) return { kind: 'new' };
   const thread = task.thread;
   if (!thread) return { kind: 'none', canStart: canEdit };
@@ -75,6 +87,8 @@ export function taskThreadAccess(query: {
 /** The line the pane shows where it has no messages to show. */
 export function taskChatLine(state: TaskChatState): string | null {
   switch (state.kind) {
+    case 'closed':
+      return 'Task chat is for Researchers, so it isn’t open to you.';
     case 'new':
       return 'Save the task first to chat about it.';
     case 'none':

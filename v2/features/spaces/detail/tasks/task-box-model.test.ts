@@ -32,37 +32,45 @@ function task(thread: SpaceTask['thread']): SpaceTask {
 const PENDING: ThreadAccess = { status: 'pending' };
 const access = (canRead: boolean, canPost: boolean): ThreadAccess => ({ status: 'read', canRead, canPost });
 
+test('task chat is for Researchers (Stay’s A): anyone else gets a line saying why, and nothing is asked', () => {
+  for (const subject of [null, task(null), task(THREAD)]) {
+    const state = taskChatState(subject, { canEdit: true, canChat: false }, access(true, true));
+    assert.equal(state.kind, 'closed');
+    assert.equal(taskChatLine(state), 'Task chat is for Researchers, so it isn’t open to you.');
+  }
+});
+
 test('a new task has nothing to chat about yet', () => {
-  const state = taskChatState(null, true, PENDING);
+  const state = taskChatState(null, { canEdit: true, canChat: true }, PENDING);
   assert.equal(state.kind, 'new');
   assert.equal(taskChatLine(state), 'Save the task first to chat about it.');
 });
 
 test('a task with no thread offers Start a thread only to those who may edit it', () => {
-  assert.deepEqual(taskChatState(task(null), true, PENDING), { kind: 'none', canStart: true });
-  assert.deepEqual(taskChatState(task(null), false, PENDING), { kind: 'none', canStart: false });
-  assert.equal(taskChatLine(taskChatState(task(null), true, PENDING)), 'No chat for this task yet.');
+  assert.deepEqual(taskChatState(task(null), { canEdit: true, canChat: true }, PENDING), { kind: 'none', canStart: true });
+  assert.deepEqual(taskChatState(task(null), { canEdit: false, canChat: true }, PENDING), { kind: 'none', canStart: false });
+  assert.equal(taskChatLine(taskChatState(task(null), { canEdit: true, canChat: true }, PENDING)), 'No chat for this task yet.');
 });
 
 test('the thread’s own answer decides the pane, not the board role', () => {
-  assert.equal(taskChatState(task(THREAD), true, PENDING).kind, 'loading');
+  assert.equal(taskChatState(task(THREAD), { canEdit: true, canChat: true }, PENDING).kind, 'loading');
   // Not readable: a 403 (no researcher role) or can_read false, whatever the board role.
   for (const canEdit of [true, false]) {
     for (const answer of [{ status: 'forbidden' } as const, access(false, false)]) {
-      const hidden = taskChatState(task(THREAD), canEdit, answer);
+      const hidden = taskChatState(task(THREAD), { canEdit: canEdit, canChat: true }, answer);
       assert.equal(hidden.kind, 'hidden');
       assert.equal(taskChatLine(hidden), 'You can’t see this task’s thread.');
     }
   }
   // Readable, not in the channel: the messages and Join to reply.
-  assert.equal(taskChatState(task(THREAD), true, access(true, false)).kind, 'read');
+  assert.equal(taskChatState(task(THREAD), { canEdit: true, canChat: true }, access(true, false)).kind, 'read');
   // In the channel: the composer, for a board Viewer too (as on the thread's own page).
-  const post = taskChatState(task(THREAD), false, access(true, true));
+  const post = taskChatState(task(THREAD), { canEdit: false, canChat: true }, access(true, true));
   assert.equal(post.kind, 'post');
   assert.equal(post.kind === 'post' && post.thread.uuid, 'thread-uuid-1');
   assert.equal(taskChatLine(post), null);
   // Any other failure is worth a retry.
-  const failed = taskChatState(task(THREAD), true, { status: 'failed' });
+  const failed = taskChatState(task(THREAD), { canEdit: true, canChat: true }, { status: 'failed' });
   assert.equal(taskChatLine(failed), 'The chat didn’t load.');
 });
 
