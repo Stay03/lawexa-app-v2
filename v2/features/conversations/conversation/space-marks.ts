@@ -1,4 +1,4 @@
-import type { MessageGroup } from './message-groups';
+import { isLineGroup, type MessageGroup } from './message-groups';
 import { isNewDay } from './day-label';
 
 /**
@@ -27,13 +27,21 @@ export function groupTime(group: MessageGroup): Date | null {
   return at instanceof Date && !Number.isNaN(at.getTime()) ? at : null;
 }
 
+/**
+ * A line beside the turns (the draft "edited" line; Stay, 30 October 2026,
+ * 02:16Z, thread 1e44eb39) never carries Lawexa's mark, and an answer after a
+ * line that follows a question is still the answer to that question.
+ */
 export function spaceMarks(groups: readonly MessageGroup[]): GroupMarks[] {
   let lastTime: Date | null = null;
-  return groups.map((group, index) => {
+  let previousTurn: MessageGroup | null = null;
+  return groups.map((group) => {
     const at = groupTime(group);
     const day = at !== null && isNewDay(lastTime, at) ? at : null;
     if (at !== null) lastTime = at;
-    const answer = !isQuestion(group) && (index === 0 || isQuestion(groups[index - 1])) ? at : null;
+    if (isLineGroup(group)) return { day, answer: null };
+    const answer = !isQuestion(group) && (previousTurn === null || isQuestion(previousTurn)) ? at : null;
+    previousTurn = group;
     return { day, answer };
   });
 }

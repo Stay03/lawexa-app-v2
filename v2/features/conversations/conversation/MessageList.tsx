@@ -18,13 +18,15 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
   isErrorMessage,
+  isEventMessage,
   type ConversationReference,
   type ErrorMessage,
   type MessageReplyTo,
 } from '@/types/chat';
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
+import { turnRowCount } from '@/v2/runtime/turn-rows';
 import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
-import { groupMessages, type MessageGroup } from './message-groups';
+import { groupMessages, isLineGroup, lastTurnGroupIndex, type MessageGroup } from './message-groups';
 import { computeStreamStart } from './stream-start';
 import { splitOpenTail, type OpenTailLimit } from './open-tail';
 import { UserMessageRow } from './rows/UserMessageRow';
@@ -35,6 +37,7 @@ import { dayLabel, useNowMinute } from './day-label';
 import { spaceMarks } from './space-marks';
 import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
+import { EventLineRow } from './rows/EventLineRow';
 import { CompactToolChain } from './tools/CompactToolChain';
 import { CreatedQuizCards } from './cards/CreatedQuizCard';
 import { isFileListStep } from './files/chat-files';
@@ -418,9 +421,14 @@ export function MessageList({
    * ordering question instead of racing it, and takes two pieces of state and two
    * refs out of the component.
    */
+  //
+  // It counts TURNS, never lines: a draft's "edited" line (Stay, 30 October
+  // 2026, 02:16Z, thread 1e44eb39) is not a new message, so `detachedAt` holds
+  // the turn count and the pill subtracts from the turn count.
   const [detachedAt, setDetachedAt] = useState<number | null>(null);
+  const turnCount = useMemo(() => turnRowCount(messages), [messages]);
   const showPill = detachedAt !== null;
-  const pillCount = detachedAt === null ? 0 : Math.max(0, messages.length - detachedAt);
+  const pillCount = detachedAt === null ? 0 : Math.max(0, turnCount - detachedAt);
 
   // Keyed on the (structurally stable) messages reference — stable group objects
   // across token flushes and unrelated parent re-renders, so GroupRow's memo holds.
@@ -432,6 +440,10 @@ export function MessageList({
   const streamStartTime = useMemo(() => computeStreamStart(messages), [messages]);
   const activityStart = heldSince ?? sentAt ?? streamStartTime;
   const lastGroupIndex = groups.length - 1;
+  // The last TURN's group: a line after the answer (a draft's "edited" line)
+  // leaves the answer being written, its "Ask again" and the working row where
+  // they were.
+  const lastTurnIndex = lastTurnGroupIndex(groups);
   /** Off-screen groups are only estimated where the browser can keep the
    *  reader's place while the estimate is corrected. See the module. */
   const canAnchor = useScrollAnchoring();
@@ -492,7 +504,7 @@ export function MessageList({
    * `groups.length` means "after everything"; any smaller index means "before that
    * group". `-1` is "not shown".
    */
-  const lastGroup = groups[lastGroupIndex];
+  const lastGroup = groups[lastTurnIndex];
   // The answer BEING WRITTEN, not any assistant row: in a space chat the screen
   // can follow a colleague's turn while the transcript still ends with the
   // finished answer to an earlier question (Spaces F4), and the row belongs
@@ -506,7 +518,7 @@ export function MessageList({
   const activityIndex = !showActivity
     ? -1
     : lastGroupIsAnswer
-      ? lastGroupIndex
+      ? lastTurnIndex
       : groups.length;
 
   // ── THE FIRST PAINT LANDS AT THE BOTTOM, BEFORE THE BROWSER DRAWS ANYTHING. ──
@@ -655,7 +667,7 @@ export function MessageList({
     } else if (detachedAt === null) {
       // Only the FIRST scroll away sets the mark — later scrolls while already
       // detached must not keep resetting it, or the count would never grow.
-      setDetachedAt(messages.length);
+      setDetachedAt(turnCount);
       onScrolledUpChange?.(true);
     }
   };
@@ -749,7 +761,7 @@ export function MessageList({
                       // on, so they must be MEASURED, not estimated, or the view
                       // settles under them after the first paint.
                       virtualize={canAnchor && gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
-                      isLastGroup={gi === lastGroupIndex}
+                      isLastGroup={gi === lastTurnIndex}
                       hasLaterUserTurn={
                         group.type === 'single' &&
                         group.message.role === 'assistant' &&
@@ -966,7 +978,9 @@ const GroupRow = memo(function GroupRow({
     );
   } else {
     const message = group.message;
-    if (isErrorMessage(message)) {
+    if (isEventMessage(message)) {
+      body = <EventLineRow line={message} />;
+    } else if (isErrorMessage(message)) {
       body = (
         <ErrorRow message={message as ErrorMessage} onRetry={onRetry} isStreaming={isStreaming} />
       );
@@ -1002,7 +1016,8 @@ const GroupRow = memo(function GroupRow({
   }
 
   // A question or an answer is found by its saved id (a reply's quote, `?m=`).
-  const messageId = group.type === 'single' ? savedIdOf(group.message) : null;
+  // A line is never a reply's target, so it carries no id to jump to.
+  const messageId = group.type === 'single' && !isLineGroup(group) ? savedIdOf(group.message) : null;
   return (
     <div
       style={style}

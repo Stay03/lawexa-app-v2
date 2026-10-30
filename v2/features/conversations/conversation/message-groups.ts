@@ -1,4 +1,5 @@
 import {
+  isEventMessage,
   isToolMessage,
   isHandoverMessage,
   type ToolMessage,
@@ -54,4 +55,24 @@ export function groupMessages(messages: readonly EngineMessage[]): MessageGroup[
   }
 
   return groups;
+}
+
+/**
+ * A group that is a quiet line beside the turns (the draft "edited" line;
+ * Stay, 30 October 2026, 02:16Z, thread 1e44eb39), never a question or an answer.
+ */
+export function isLineGroup(group: MessageGroup): boolean {
+  return group.type === 'single' && isEventMessage(group.message);
+}
+
+/**
+ * The last group that is a turn, `-1` when there is none: the answer being
+ * written, "Ask again" and the working row all read this one, so a line under
+ * the last answer changes none of them.
+ */
+export function lastTurnGroupIndex(groups: readonly MessageGroup[]): number {
+  for (let i = groups.length - 1; i >= 0; i -= 1) {
+    if (!isLineGroup(groups[i])) return i;
+  }
+  return -1;
 }
