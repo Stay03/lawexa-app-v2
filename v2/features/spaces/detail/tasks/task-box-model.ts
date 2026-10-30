@@ -59,15 +59,15 @@ export function taskChatState(task: SpaceTask | null, canEdit: boolean, access: 
 
 /**
  * The thread's answer from its query: a 403 is a refusal to this reader, any
- * other failure is worth a retry. A thread answer with no flags (a channel
- * row from before them) reads as the thread page reads it.
+ * other failure is worth a retry. The flags read as the thread's own page
+ * reads them (`threadAccess` in collab/access.tsx): only a `true` opens.
  */
-export function threadAccess(query: {
+export function taskThreadAccess(query: {
   isPending: boolean;
   data?: { can_read?: boolean; can_post?: boolean } | undefined;
   errorStatus: number | null;
 }): ThreadAccess {
-  if (query.data) return { status: 'read', canRead: query.data.can_read !== false, canPost: query.data.can_post !== false };
+  if (query.data) return { status: 'read', canRead: query.data.can_read === true, canPost: query.data.can_post === true };
   if (query.isPending) return { status: 'pending' };
   return query.errorStatus === 403 ? { status: 'forbidden' } : { status: 'failed' };
 }
