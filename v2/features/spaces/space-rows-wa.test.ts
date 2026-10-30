@@ -17,7 +17,7 @@ test('the @you count sits under the time, ending line 2', () => {
   const source = rows();
   assert.match(
     source,
-    /<span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">\{line\.meta\}<\/span>\s*\{mentions > 0 \? \(\s*<CountBadge/,
+    /<span className="min-w-0 flex-1 text-xs text-muted-foreground">\s*<span className="block max-w-2xl truncate">\{line\.meta\}<\/span>\s*<\/span>\s*\{mentions > 0 \? \(\s*<CountBadge/,
   );
   // Never in the menu column any more.
   assert.doesNotMatch(source, /line\.menu \?\?\s*\(/);
