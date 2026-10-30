@@ -112,7 +112,10 @@ test('the board: owners and editors drag, every column and phone tab takes a dro
   assert.match(board, /useDroppable\(\{ id: dropId\('column', stage\), disabled: !canDrag \}\)/);
   assert.match(board, /useDroppable\(\{ id: dropId\('tab', stage\), disabled: !droppable \}\)/);
   assert.match(board, /id: dropId\('strip', 'done'\),/);
-  assert.match(board, /if \(!current \|\| changedWhileDragged\(start, current\)\) \{\s*toast\(MOVED_BY_SOMEONE_ELSE\);/);
+  assert.match(board, /if \(current && !changedWhileDragged\(start, current\)\) return current;\s*toast\(MOVED_BY_SOMEONE_ELSE\);/);
+  // A drop and a drag dnd-kit ends itself (the card left its column) both check.
+  assert.match(board, /const current = changedMeanwhile\(start\);/);
+  assert.match(board, /onDragCancel=\{\(\) => \{\s*if \(dragged\) changedMeanwhile\(dragged\);/);
   assert.match(board, /shown: movedTask\(task, payload, new Date\(\)\.toISOString\(\), waitingOn\)/);
   const mutations = here('task-mutations.ts');
   assert.match(mutations, /onMutate: async \(\{ shown \}\) => \{[\s\S]*?write\(\(list\) => upsertTask\(list, shown\)\);/);

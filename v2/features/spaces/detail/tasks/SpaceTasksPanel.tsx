@@ -324,16 +324,22 @@ function Board({
   const onDragStart = ({ active }: DragStartEvent) => {
     setDragged(tasks.find((task) => task.uuid === active.id) ?? null);
   };
+  // Someone else's change can reach the board while the card is in the air. If it
+  // moves the card out of its column, dnd-kit ends the drag itself; either way
+  // nothing is sent, and the board says why.
+  const changedMeanwhile = (start: SpaceTask) => {
+    const current = tasks.find((task) => task.uuid === start.uuid);
+    if (current && !changedWhileDragged(start, current)) return current;
+    toast(MOVED_BY_SOMEONE_ELSE);
+    return null;
+  };
   const onDragEnd = ({ over }: DragEndEvent) => {
     const start = dragged;
     setDragged(null);
+    if (!start) return;
+    const current = changedMeanwhile(start);
     const stage = stageOfDrop(over?.id);
-    if (!start || !stage || stage === start.stage) return;
-    const current = tasks.find((task) => task.uuid === start.uuid);
-    if (!current || changedWhileDragged(start, current)) {
-      toast(MOVED_BY_SOMEONE_ELSE);
-      return;
-    }
+    if (!current || !stage || stage === start.stage) return;
     onDrop(current, stage);
     // A phone's drop on a stage tab follows the note to its new column.
     if (String(over?.id).startsWith('tab:')) showStage(BOARD_STAGES.indexOf(stage));
@@ -352,7 +358,10 @@ function Board({
       collisionDetection={taskCollision}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      onDragCancel={() => setDragged(null)}
+      onDragCancel={() => {
+        if (dragged) changedMeanwhile(dragged);
+        setDragged(null);
+      }}
       accessibility={{ announcements, screenReaderInstructions: { draggable: DRAG_WORDS.instructions } }}
     >
       <div className="flex flex-col gap-3">
