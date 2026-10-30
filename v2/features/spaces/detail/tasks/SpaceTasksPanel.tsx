@@ -36,7 +36,7 @@ import {
   taskNote,
   type OwnerOption,
 } from './task-board-model';
-import { TaskSheet, type TaskSheetTarget } from './TaskSheet';
+import { TaskBox, type TaskBoxTarget } from './TaskBox';
 import { useTaskBoardLive } from './use-task-board-live';
 
 /**
@@ -91,16 +91,16 @@ export function SpaceTasksPanel({
   const shown = useMemo(() => filterByOwner(tasks, owner), [tasks, owner]);
   const columns = useMemo(() => boardColumns(shown), [shown]);
   // The target stays after the sheet closes, so its content slides out with it.
-  const [sheetTarget, setSheetTarget] = useState<TaskSheetTarget | null>(null);
+  const [sheetTarget, setSheetTarget] = useState<TaskBoxTarget | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const openSheet = (target: TaskSheetTarget) => {
+  const openSheet = (target: TaskBoxTarget) => {
     setSheetTarget(target);
     setSheetOpen(true);
   };
   const openTask = (taskUuid: string) => openSheet({ kind: 'task', taskUuid });
   const newTask = canEdit ? () => openSheet({ kind: 'new' }) : null;
   const sheet = (
-    <TaskSheet
+    <TaskBox
       spaceUuid={spaceUuid}
       tasks={tasks}
       target={sheetTarget}

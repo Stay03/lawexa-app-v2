@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { SpaceTask } from '@/types/collab';
-import { initialPhoneTab, taskChatLine, taskChatState } from './task-box-model';
+import { initialPhoneTab, taskChatLine, taskChatState, threadAccess, type ThreadAccess } from './task-box-model';
 
 /* The task box's chat pane (Arthur's 1 + 2, thread 7aa0c6d8; design 1805492d).
  * TEST DATA throughout. */
@@ -29,36 +29,51 @@ function task(thread: SpaceTask['thread']): SpaceTask {
   };
 }
 
+const PENDING: ThreadAccess = { status: 'pending' };
+const access = (canRead: boolean, canPost: boolean): ThreadAccess => ({ status: 'read', canRead, canPost });
+
 test('a new task has nothing to chat about yet', () => {
-  const state = taskChatState(null, true);
+  const state = taskChatState(null, true, PENDING);
   assert.equal(state.kind, 'new');
   assert.equal(taskChatLine(state), 'Save the task first to chat about it.');
 });
 
 test('a task with no thread offers Start a thread only to those who may edit it', () => {
-  assert.deepEqual(taskChatState(task(null), true), { kind: 'none', canStart: true });
-  assert.deepEqual(taskChatState(task(null), false), { kind: 'none', canStart: false });
-  assert.equal(taskChatLine(taskChatState(task(null), true)), 'No chat for this task yet.');
+  assert.deepEqual(taskChatState(task(null), true, PENDING), { kind: 'none', canStart: true });
+  assert.deepEqual(taskChatState(task(null), false, PENDING), { kind: 'none', canStart: false });
+  assert.equal(taskChatLine(taskChatState(task(null), true, PENDING)), 'No chat for this task yet.');
 });
 
-test('the server’s flags decide the pane, not the board role', () => {
-  // Not readable (the researcher role): the pane says so, whatever the board role.
+test('the thread’s own answer decides the pane, not the board role', () => {
+  assert.equal(taskChatState(task(THREAD), true, PENDING).kind, 'loading');
+  // Not readable: a 403 (no researcher role) or can_read false, whatever the board role.
   for (const canEdit of [true, false]) {
-    const hidden = taskChatState(task({ ...THREAD, can_read: false, can_post: false }), canEdit);
-    assert.equal(hidden.kind, 'hidden');
-    assert.equal(taskChatLine(hidden), 'You can’t see this task’s thread.');
+    for (const answer of [{ status: 'forbidden' } as const, access(false, false)]) {
+      const hidden = taskChatState(task(THREAD), canEdit, answer);
+      assert.equal(hidden.kind, 'hidden');
+      assert.equal(taskChatLine(hidden), 'You can’t see this task’s thread.');
+    }
   }
   // Readable, not in the channel: the messages and Join to reply.
-  assert.equal(taskChatState(task({ ...THREAD, can_read: true, can_post: false }), true).kind, 'read');
+  assert.equal(taskChatState(task(THREAD), true, access(true, false)).kind, 'read');
   // In the channel: the composer, for a board Viewer too (as on the thread's own page).
-  assert.equal(taskChatState(task({ ...THREAD, can_read: true, can_post: true }), false).kind, 'post');
-  assert.equal(taskChatLine(taskChatState(task({ ...THREAD, can_read: true, can_post: true }), false)), null);
+  const post = taskChatState(task(THREAD), false, access(true, true));
+  assert.equal(post.kind, 'post');
+  assert.equal(post.kind === 'post' && post.thread.uuid, 'thread-uuid-1');
+  assert.equal(taskChatLine(post), null);
+  // Any other failure is worth a retry.
+  const failed = taskChatState(task(THREAD), true, { status: 'failed' });
+  assert.equal(taskChatLine(failed), 'The chat didn’t load.');
 });
 
-test('a server from before the flags reads like the thread page: readable and open to post', () => {
-  const state = taskChatState(task(THREAD), false);
-  assert.equal(state.kind, 'post');
-  assert.equal(state.kind === 'post' && state.thread.uuid, 'thread-uuid-1');
+test('the thread query reads as an answer: flags, a 403, another failure, or still on its way', () => {
+  assert.deepEqual(threadAccess({ isPending: true, errorStatus: null }), { status: 'pending' });
+  assert.deepEqual(threadAccess({ isPending: false, data: { can_read: true, can_post: false }, errorStatus: null }), access(true, false));
+  // A channel row from before the flags reads like the thread page: readable and open to post.
+  assert.deepEqual(threadAccess({ isPending: false, data: {}, errorStatus: null }), access(true, true));
+  assert.deepEqual(threadAccess({ isPending: false, errorStatus: 403 }), { status: 'forbidden' });
+  assert.deepEqual(threadAccess({ isPending: false, errorStatus: 500 }), { status: 'failed' });
+  assert.deepEqual(threadAccess({ isPending: false, errorStatus: null }), { status: 'failed' });
 });
 
 test('a phone opens on the details, or on the chat when opened to reply; a new task always on the details', () => {
