@@ -214,10 +214,11 @@ test('the chat screen moves its chat up on an answer and on a turn the poll sees
   // after a 409) reads the space off the cached record when it ends.
   assert.match(block(controller, '    onCompleted: () => {', '    onError: '), TOUCH_WITH_CACHED_SPACE);
   // The poll moves it once per new turn (a colleague's question or answer),
-  // never on its first read.
+  // never on its first read, and never for a draft's "edited" line alone
+  // (`turnBegan`; the line only reads the transcript again).
   assert.match(
     controller,
-    /const changed = previous !== null && turnChanged\(previous, statusData\);\s*if \(changed\) conversationsCache\.touch\(queryClient, conversationId, \{ spaceUuid \}\);/,
+    /const changed = previous !== null && turnChanged\(previous, statusData\);\s*if \(previous !== null && turnBegan\(previous, statusData\)\) conversationsCache\.touch\(queryClient, conversationId, \{ spaceUuid \}\);/,
   );
   // Nothing else in the screen moves a chat: accepted, completed, the poll.
   assert.equal(controller.match(/conversationsCache\.touch\(/g)?.length, 3);

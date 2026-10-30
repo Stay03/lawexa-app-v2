@@ -10,6 +10,7 @@ import {
   recoverWithRetry,
   type SendRefusal,
 } from '@/v2/runtime/chat-engine';
+import { lastTurnRow } from '@/v2/runtime/turn-rows';
 import type {
   ConversationReference,
   ConversationSpaceRef,
@@ -50,6 +51,7 @@ import {
   isOwnTurn,
   sendRefusal,
   stopsPolling,
+  turnBegan,
   turnChanged,
   UNKNOWN_TURN_LABEL,
   viewOnlyReason,
@@ -963,7 +965,7 @@ export function useConversationController(
     // lists. The first read compares with nothing; the lists' own fetch has the
     // order up to then.
     const changed = previous !== null && turnChanged(previous, statusData);
-    if (changed) conversationsCache.touch(queryClient, conversationId, { spaceUuid });
+    if (previous !== null && turnBegan(previous, statusData)) conversationsCache.touch(queryClient, conversationId, { spaceUuid });
     if (statusData.status !== 'pending') {
       if (changed) void queryClient.refetchQueries({ queryKey: detailKey, exact: true });
       return;
@@ -1120,14 +1122,17 @@ export function useConversationController(
   // so it is offered only on the owner's own question.
   const lastUserTurn = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
-      if (messages[i].role === 'user') return messages[i];
+      const row = messages[i];
+      if (row.role === 'user') return row;
     }
     return null;
   }, [messages]);
   const lastUserContent = lastUserTurn?.content ?? null;
 
+  // The last TURN: a draft's "edited" line under the answer leaves "Ask again"
+  // where it was (Stay, 30 October 2026, 02:16Z, thread 1e44eb39).
   const lastIsCompletedAssistant = useMemo(() => {
-    const last = messages[messages.length - 1];
+    const last = lastTurnRow(messages);
     return (
       !!last &&
       last.role === 'assistant' &&

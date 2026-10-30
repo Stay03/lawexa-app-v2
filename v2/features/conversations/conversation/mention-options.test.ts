@@ -207,9 +207,9 @@ test('the writer’s own question takes the server copy’s tags, keeping its ow
   assert.equal(adoptServerFields([{ ...drawn, savedId: undefined } as EngineMessage], [serverCopy]).length, 1);
   // Both merges use it.
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
-  assert.match(engine, /messages: \[\.\.\.adoptServerFields\(prev\.messages\.slice\(0, cutIndex\), transformed\), \.\.\.transformed\],/);
-  assert.match(engine, /const enriched = adoptServerFields\(state\.messages, next\);\s*if \(added\.length === 0 && enriched === state\.messages\) return false;/);
-  assert.match(engine, /messages: \[\.\.\.adoptServerFields\(prev\.messages, next\), \.\.\.added\],/);
+  assert.match(engine, /\.\.\.adoptServerFields\(prev\.messages\.slice\(0, cutIndex\), transformed\),\s*\.\.\.transformed,/);
+  assert.match(engine, /const enriched = adoptServerFields\(state\.messages, next\);[\s\S]{0,400}?if \(added\.length === 0 && enriched === state\.messages && lined === state\.messages\) return false;/);
+  assert.match(engine, /applySnapshotEvents\(\[\.\.\.adoptServerFields\(prev\.messages, next\), \.\.\.added\], next, unconfirmedEventIds\)/);
 });
 
 test('the review of ecaf2d5 and the rendered check: what each finding changed', () => {

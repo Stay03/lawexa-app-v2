@@ -2,7 +2,7 @@ import { afterEach, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { chatApi } from '@/lib/api/chat';
-import type { ApiMessage } from '@/types/chat';
+import type { ApiMessage, ChatMessage } from '@/types/chat';
 import { createChatEngine } from './engine';
 import { STALL_CHECK_MS, STALL_SILENCE_MS } from './stall';
 
@@ -123,7 +123,7 @@ test('a turn after a recovery by status shows its answer', async () => {
   await advance(2_000);
 
   assert.deepEqual(assistantText(engine), ['The first answer, from the server.', 'The second answer.']);
-  assert.ok(engine.getSnapshot().messages.every((m) => !m.isStreaming));
+  assert.ok(engine.getSnapshot().messages.every((m) => m.role === 'event' || !m.isStreaming));
   engine.disconnect();
 });
 
@@ -265,7 +265,7 @@ test('a reload mid-answer shows the text so far once, under the saved copy of it
   await advance(2_000);
 
   // History's saved line, then the answer being written, each once.
-  const live = engine.getSnapshot().messages.filter((m) => m.role === 'assistant');
+  const live = engine.getSnapshot().messages.filter((m) => m.role === 'assistant').map((m) => m as ChatMessage);
   assert.equal(live.length, 2, JSON.stringify(live.map((m) => [m.content, m.isStreaming])));
   assert.equal(live[0].content, "I'll create the quiz.");
   assert.equal(live[1].isStreaming, true);

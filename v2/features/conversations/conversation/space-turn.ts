@@ -131,18 +131,29 @@ export function askingLabel(name: string): string {
   return `${name} is asking`;
 }
 
-/** The three fields that move when a turn begins (backend B5 answer, and
- *  `last_message_id` from 1135730). */
-type TurnMarks = Pick<ConversationStatusData, 'execution_id' | 'pending_since' | 'last_message_id'>;
+/** The fields that move when a turn begins (backend B5 answer, and
+ *  `last_message_id` from 1135730), and `last_event_at`, which moves when a
+ *  draft's "edited" line is made or changed (Stay, 30 October 2026, 02:16Z,
+ *  thread 1e44eb39). */
+type TurnMarks = Pick<ConversationStatusData, 'execution_id' | 'pending_since' | 'last_message_id' | 'last_event_at'>;
 
 /** Whether a turn began between two status reads, even one that also ended
- *  between them: then the transcript is read again. */
-export function turnChanged(previous: TurnMarks, next: TurnMarks): boolean {
+ *  between them: then the chat moves to the top of the lists. A line alone
+ *  does not move it. */
+export function turnBegan(previous: TurnMarks, next: TurnMarks): boolean {
   return (
     previous.execution_id !== next.execution_id ||
     previous.pending_since !== next.pending_since ||
     previous.last_message_id !== next.last_message_id
   );
+}
+
+/** Whether a turn began between two status reads, or a line was made or
+ *  changed: then the transcript is read again, and the merge brings the line
+ *  in. A server without `last_event_at` leaves it absent on both reads, which
+ *  is no change. */
+export function turnChanged(previous: TurnMarks, next: TurnMarks): boolean {
+  return turnBegan(previous, next) || (previous.last_event_at ?? null) !== (next.last_event_at ?? null);
 }
 
 /** A status read the server refused (403, 404): the reader left the space or

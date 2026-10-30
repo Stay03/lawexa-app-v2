@@ -5,6 +5,8 @@
  * browser (device_cache_plan.md, with its two amendments of 6 October 2026).
  */
 
+import { lastTurnRow } from '@/v2/runtime/turn-rows';
+
 /**
  * How a query leaf opts in, through `meta.persist`. Nothing is kept unless a
  * leaf says so.
@@ -91,8 +93,10 @@ export function isStorableAnswer(answer: unknown): boolean {
   if (payload.has_access === false) return false;
   if (payload.is_confidential === true || payload.is_redacted === true) return false;
   if (Array.isArray(payload.messages) && payload.messages.length > 0) {
-    const last = asRecord(payload.messages[payload.messages.length - 1]);
-    if (last?.role === 'user') return false;
+    // The last TURN: a draft's "edited" line under the question (role `event`;
+    // Stay, 30 October 2026, 02:16Z, thread 1e44eb39) does not answer it.
+    const rows = payload.messages.map(asRecord).filter((row): row is Record<string, unknown> => row !== null);
+    if (lastTurnRow(rows)?.role === 'user') return false;
   }
   return true;
 }

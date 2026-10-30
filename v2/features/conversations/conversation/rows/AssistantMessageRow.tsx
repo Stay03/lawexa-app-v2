@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import {
   useStreamingText,
   useStreamingReasoning,
-  type EngineMessage,
+  type EngineTurnRow,
   type StreamingSource,
 } from '@/v2/runtime/chat-engine';
 import type { ChatMessage, MessageReplyTo } from '@/types/chat';
@@ -49,7 +49,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   onRegenerate,
   onReply = null,
 }: {
-  message: EngineMessage;
+  message: EngineTurnRow;
   streamingText: StreamingSource;
   reasoning: StreamingSource;
   isInteracted: boolean;

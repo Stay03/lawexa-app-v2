@@ -16,6 +16,7 @@
  */
 
 import type {
+  ApiMessage,
   ConversationMessage,
   MessageAttachment,
   MessageReplyTo,
@@ -54,6 +55,9 @@ export interface ReasoningTrace {
  * `transformApiMessages`) remain assignable to `EngineMessage[]`.
  */
 export type EngineMessage = ConversationMessage & ReasoningTrace & SavedIdentity;
+
+/** Every engine row but a line beside the turns (role `event`, the draft "edited" line). */
+export type EngineTurnRow = Exclude<EngineMessage, { role: 'event' }>;
 
 /**
  * The server's `Message.id` for a row this engine drew itself, set once the
@@ -376,6 +380,16 @@ export interface ChatEngine {
    * whether it started following. Idle otherwise.
    */
   followUntilAnswered(conversationId: string): boolean;
+  /**
+   * Draw or refresh a line beside the turns from a server row (the draft
+   * "edited" line a draft save answers with; Stay, 30 October 2026, 02:16Z,
+   * thread 1e44eb39): placed in its time, replacing the line with the same id.
+   * Applies while a stream is live, never touching it. A row of another kind,
+   * or of another chat, is ignored. Returns whether the rows changed.
+   */
+  upsertEvent(row: ApiMessage): boolean;
+  /** Take away the line of this server id (its draft went back to Lawexa's version). */
+  removeEvent(serverId: number): boolean;
 
   /**
    * Replace the live callbacks + mode resolvers on a long-lived engine. The React

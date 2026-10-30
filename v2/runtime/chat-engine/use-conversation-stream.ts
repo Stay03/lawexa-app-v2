@@ -96,6 +96,8 @@ export interface UseConversationStreamResult {
   retryLastMessage: ChatEngine['retryLastMessage'];
   recoverPendingState: ChatEngine['recoverPendingState'];
   followUntilAnswered: ChatEngine['followUntilAnswered'];
+  upsertEvent: ChatEngine['upsertEvent'];
+  removeEvent: ChatEngine['removeEvent'];
 }
 
 export function useConversationStream(
@@ -176,5 +178,7 @@ export function useConversationStream(
     retryLastMessage: engine.retryLastMessage,
     recoverPendingState: engine.recoverPendingState,
     followUntilAnswered: engine.followUntilAnswered,
+    upsertEvent: engine.upsertEvent,
+    removeEvent: engine.removeEvent,
   };
 }

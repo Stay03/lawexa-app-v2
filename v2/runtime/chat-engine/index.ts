@@ -28,6 +28,7 @@ export type {
   ChatEngineConfig,
   ChatEngineSnapshot,
   EngineMessage,
+  EngineTurnRow,
   ReasoningTrace,
   RecoverResult,
   SendRefusal,

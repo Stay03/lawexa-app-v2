@@ -194,8 +194,42 @@ export interface NarrationMessage extends ChatMessage {
   agentSlug?: string;
 }
 
+/**
+ * A quiet line in the chat about something done beside it, not a turn (role
+ * `event` on the server). The one kind drawn today is `draft_edit`: "Stay
+ * edited 'Lease agreement' · 17:49", once per editing session of a draft made
+ * from this chat (Stay, 30 October 2026, 02:16Z, thread 1e44eb39; design
+ * 9b43f942). Its place is `timestamp` (the session's first save, the row's
+ * `created_at`); the time it shows is `editedAt` (the session's last save).
+ * Only v2 draws these: v1's transform never returns one.
+ */
+export interface EventMessage {
+  /** `msg_{serverId}`, as every row read from the server is named. */
+  id: string;
+  role: 'event';
+  eventType: 'draft_edit';
+  /** The server's message id: a later save replaces or removes the line by it. */
+  serverId: number;
+  /** The server's sentence, kept for reading aloud; the row builds its own words. */
+  content: string;
+  timestamp: Date;
+  editedAt: Date;
+  editorName: string;
+  editorUuid: string | null;
+  draftTitle: string;
+  noteUuid: string;
+}
+
 // Union type for all message types
-export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage | ErrorMessage;
+export type ConversationMessage = ChatMessage | ToolMessage | HandoverMessage | ErrorMessage | EventMessage;
+
+/** Every row but a line: a question, an answer, a step, a handover, an error. v1 holds only these. */
+export type TurnMessage = Exclude<ConversationMessage, EventMessage>;
+
+/** A line beside the turns (see {@link EventMessage}), never a question or an answer. */
+export function isEventMessage(message: { role: string }): message is EventMessage {
+  return message.role === 'event';
+}
 
 // Type guard for tool messages
 export function isToolMessage(message: ConversationMessage): message is ToolMessage {
@@ -483,6 +517,13 @@ export interface ConversationStatusData {
    * also ended between them.
    */
   last_message_id?: number | null;
+  /**
+   * When an event row (a draft's "edited" line) was last made or changed,
+   * `null` when the chat has none; absent while the server's DRAFT_EDIT_LINES
+   * flag is off. A change between two reads reads the transcript again (Stay,
+   * 30 October 2026, 02:16Z, thread 1e44eb39).
+   */
+  last_event_at?: string | null;
 }
 
 export interface ConversationStatusResponse {
@@ -653,10 +694,26 @@ export interface ApiMessage {
   id: number;
   conversation_id: string;
   agent_id: number | null;
-  role: 'user' | 'assistant' | 'tool';
+  /** `event`: a line beside the turns ({@link EventMessage}); only v2 asks for them to be drawn. */
+  role: 'user' | 'assistant' | 'tool' | 'event';
   content: string;
   metadata: {
-    type?: 'tool_call' | 'tool_result' | 'handover' | 'handover_result' | 'error' | 'narration' | 'radar_report';
+    type?:
+      | 'tool_call'
+      | 'tool_result'
+      | 'handover'
+      | 'handover_result'
+      | 'error'
+      | 'narration'
+      | 'radar_report'
+      | 'draft_edit';
+    /** On a `draft_edit` event row: the draft's note, its title then, and who edited it. */
+    note_uuid?: string;
+    draft_title?: string;
+    editor?: { uuid: string | null; name: string } | null;
+    /** On a `draft_edit` event row: the editing session's first and last save. */
+    first_edited_at?: string;
+    last_edited_at?: string;
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
     success?: boolean;

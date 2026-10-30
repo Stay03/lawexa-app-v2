@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { RedactionSummary } from '@/types/chat';
+import type { ChatMessage, RedactionSummary } from '@/types/chat';
 import { createChatEngine } from './engine';
 
 /* A new redacted chat's first message is sent from the home screen, and the
@@ -37,7 +37,7 @@ test("the handoff's redaction summary lands on the chat's first message", () => 
 test('a handoff with no summary draws the message without one', () => {
   const engine = createChatEngine({ getToken: () => 'test-token' });
   engine.connectToStream('exec-2', 'Hello');
-  assert.equal(engine.getSnapshot().messages[0].redaction, undefined);
+  assert.equal((engine.getSnapshot().messages[0] as ChatMessage).redaction, undefined);
   engine.dispose();
 });
 

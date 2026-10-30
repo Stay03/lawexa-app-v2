@@ -22,13 +22,14 @@
 
 import { AxiosError } from 'axios';
 import { chatApi } from '@/lib/api/chat';
-import { transformApiMessages } from '@/lib/utils/transform-api-messages';
+import { eventFromApi, transformApiMessages } from '@/lib/utils/transform-api-messages';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { extractBlockedReason } from '@/lib/utils/api-error';
 import { AuthedEventSource, CLOSED, CONNECTING } from '@/lib/stream/authed-event-source';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import {
   isErrorMessage,
+  isEventMessage,
   type ChatMessage,
   type ToolMessage,
   type HandoverMessage,
@@ -76,6 +77,8 @@ import type {
 } from './types';
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { adoptServerFields } from './server-fields';
+import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
+import { isTurnRow, lastTurnRow } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import { largestSavedId, savedTurnId } from './saved-turn';
 import { STALL_CHECK_MS, stallVerdict, type StallVerdict } from './stall';
@@ -416,6 +419,13 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    */
   const authoredMessageIds = new Set<string>();
   /**
+   * Lines ({@link upsertEvent}) this screen drew from the reader's own save that
+   * no server snapshot has shown yet. A merge keeps them though its snapshot
+   * lacks them (the snapshot may predate the save); once a snapshot holds one, it
+   * leaves this set and the server's word is final for it.
+   */
+  const unconfirmedEventIds = new Set<string>();
+  /**
    * Turns this engine started whose persisted ids never arrived.
    *
    * The backend delivers `persisted_message_ids` on the live relay, on catchup
@@ -659,7 +669,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // messages after the last user message with the authoritative API messages.
   function mergeMissedMessages(apiMessages: ApiMessage[]) {
     if (apiMessages.length === 0) return;
-    const transformed = transformApiMessages(apiMessages);
+    const transformed = transformApiMessages(apiMessages, { events: true });
     // MIXED IDENTITY COMES OUT OF HERE: the rows kept up to and including the last
     // user message are the LOCAL ones this client drew, spliced in front of server
     // rows. That is fine for the merge — local ids are their own namespace
@@ -678,10 +688,19 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       }
       const cutIndex = prev.messages.length - lastUserIdx;
       // The kept rows include the question this client drew; the server's rows
-      // may carry its copy, with who it tags (server-fields.ts).
+      // may carry its copy, with who it tags (server-fields.ts). A line held
+      // after the question is not the turn's: it goes back in its place unless
+      // the server's rows bring it themselves.
+      let merged: readonly EngineMessage[] = [
+        ...adoptServerFields(prev.messages.slice(0, cutIndex), transformed),
+        ...transformed,
+      ];
+      for (const row of prev.messages.slice(cutIndex)) {
+        if (isEventMessage(row) && !merged.some((held) => held.id === row.id)) merged = placeEvent(merged, row);
+      }
       return {
         ...prev,
-        messages: [...adoptServerFields(prev.messages.slice(0, cutIndex), transformed), ...transformed],
+        messages: [...merged],
         isStreaming: false,
         isCancelling: false,
         error: null,
@@ -733,7 +752,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           try {
             const conv = await chatApi.getConversation(convId, { lazyResults: true });
             if (conv.success && conv.data.messages) {
-              const transformed = transformApiMessages(conv.data.messages);
+              const transformed = transformApiMessages(conv.data.messages, { events: true });
               setState((prev) => ({
                 ...prev,
                 messages: transformed,
@@ -861,7 +880,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         try {
           const conv = await chatApi.getConversation(convId, { lazyResults: true });
           if (conv.success && conv.data.messages) {
-            const transformed = transformApiMessages(conv.data.messages);
+            const transformed = transformApiMessages(conv.data.messages, { events: true });
             setState((prev) => ({
               ...prev,
               messages: transformed,
@@ -935,7 +954,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     messagesConversationId = data.id;
     appliedHistory = data;
     dedupKeys = dedupFromHistory(data.messages);
-    const transformedMessages = transformApiMessages(data.messages);
+    const transformedMessages = transformApiMessages(data.messages, { events: true });
     setState((prev) => ({
       ...prev,
       conversationId: data.id,
@@ -990,7 +1009,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * still skips the right events (see {@link appliedHistory}).
    */
   function mergeServerHistory(data: ConversationData): boolean {
-    const next = transformApiMessages(data.messages);
+    const next = transformApiMessages(data.messages, { events: true });
     const nextIds = new Set(next.map((m) => m.id));
 
     // EXTEND ONLY. Every row we show must still exist in the new snapshot, or this
@@ -1008,13 +1027,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // drop it. Bailing here leaves the screen exactly as it was and waits for a
     // snapshot that agrees; `appliedHistory` and `dedupKeys` are deliberately left
     // pointing at the history the rows really came from.
+    //
+    // Lines are exempt too: the server may take one away (its draft went back to
+    // Lawexa's version), and the lines are applied by their own rule below.
     for (const row of state.messages) {
-      if (!isServerRowId(row.id)) continue;
+      if (!isServerRowId(row.id) || isEventMessage(row)) continue;
       if (!nextIds.has(row.id)) return false;
     }
 
     const held = new Set(state.messages.map((m) => m.id));
-    const added = next.filter((row) => !isAlreadyOnScreen(row, held));
+    const added = next.filter((row) => isTurnRow(row) && !isAlreadyOnScreen(row, held));
+    for (const id of nextIds) unconfirmedEventIds.delete(id);
 
     // Re-point the dedup/history bookkeeping at the snapshot the rows now describe,
     // whether or not anything was appended — a revalidation that changed nothing
@@ -1024,13 +1047,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // The questions this engine drew take the fields only the server's copies
     // have: who they tag, who asked (server-fields.ts). Their ids stay local.
     const enriched = adoptServerFields(state.messages, next);
-    if (added.length === 0 && enriched === state.messages) return false;
+    // The snapshot's lines (the draft "edited" line), each in its place in time:
+    // new ones placed, held ones refreshed by id, ones the server took away gone.
+    const lined = applySnapshotEvents(state.messages, next, unconfirmedEventIds);
+    if (added.length === 0 && enriched === state.messages && lined === state.messages) return false;
 
     // Appended rows are the SERVER's and keep their `msg_` ids, so a later merge
-    // recognises them through `held` exactly as it does the seeded ones.
+    // recognises them through `held` exactly as it does the seeded ones. The
+    // return value still says whether TURNS were added; a line alone is not one.
     setState((prev) => ({
       ...prev,
-      messages: [...adoptServerFields(prev.messages, next), ...added],
+      messages: [...applySnapshotEvents([...adoptServerFields(prev.messages, next), ...added], next, unconfirmedEventIds)],
       conversationTitle: data.title || prev.conversationTitle,
     }));
     return added.length > 0;
@@ -2088,6 +2115,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // Both belong to the conversation being cleared: the ids identify ITS rows, and
     // an unsettled turn of ITS cannot bind a different conversation's merge.
     authoredMessageIds.clear();
+    unconfirmedEventIds.clear();
     turnsAwaitingIds = 0;
     jurisdiction = { mode: 'auto' };
     state = INITIAL_SNAPSHOT;
@@ -2492,9 +2520,36 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     }
   }
 
+  // ─── Lines beside the turns (the draft "edited" line) ───────────────────────
+  //
+  // Stay, 30 October 2026, 02:16Z, thread 1e44eb39; design 9b43f942. A draft
+  // save answers with its line (or the id of a line it took away), and the
+  // line shows at once for the reader who saved. Neither touches a stream, so
+  // both apply while one is live, unlike a history merge.
+
+  function upsertEvent(row: ApiMessage): boolean {
+    if (disposed || messagesConversationId === null) return false;
+    if (row.conversation_id && row.conversation_id !== messagesConversationId) return false;
+    const line = eventFromApi(row);
+    if (!line) return false;
+    const next = placeEvent(state.messages, line);
+    if (next === state.messages) return false;
+    unconfirmedEventIds.add(line.id);
+    setState((prev) => ({ ...prev, messages: [...placeEvent(prev.messages, line)] }));
+    return true;
+  }
+
+  function removeEvent(serverId: number): boolean {
+    if (disposed) return false;
+    unconfirmedEventIds.delete(`${SERVER_ROW_PREFIX}${serverId}`);
+    if (withoutEvent(state.messages, serverId) === state.messages) return false;
+    setState((prev) => ({ ...prev, messages: [...withoutEvent(prev.messages, serverId)] }));
+    return true;
+  }
+
   function followUntilAnswered(convId: string): boolean {
     if (disposed || eventSource || pollInterval || state.isStreaming) return false;
-    const last = state.messages[state.messages.length - 1];
+    const last = lastTurnRow(state.messages);
     if (!last || last.role !== 'user') return false;
     pollForCompletion(convId);
     return true;
@@ -2529,7 +2584,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     state = {
       ...INITIAL_SNAPSHOT,
       conversationId: seed.id,
-      messages: transformApiMessages(seed.messages),
+      messages: transformApiMessages(seed.messages, { events: true }),
       conversationTitle: seed.title || null,
     };
   }
@@ -2570,6 +2625,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     retryLastMessage,
     recoverPendingState,
     followUntilAnswered,
+    upsertEvent,
+    removeEvent,
     updateHandlers(next) {
       handlers = next;
     },

@@ -5,7 +5,9 @@ import { FileText } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { isEventMessage } from '@/types/chat';
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine/types';
+import { lastTurnRow } from '@/v2/runtime/turn-rows';
 import { useStreamingText } from '@/v2/runtime/chat-engine/use-conversation-stream';
 import { useV2ChatContext } from '../chat-context';
 import { MarkdownText } from '../markdown/MarkdownText';
@@ -70,7 +72,7 @@ export function DraftPanel({
   streamingText: StreamingSource;
 }) {
   const place = locateDraft(messages, ordinal);
-  const streamingMessage = 'streamingIndex' in place ? messages.findLast((message) => message.isStreaming) : undefined;
+  const streamingMessage = 'streamingIndex' in place ? messages.findLast((message) => !isEventMessage(message) && message.isStreaming) : undefined;
   const live = useStreamingText(streamingText, streamingMessage?.id ?? '');
   const chat = useV2ChatContext();
   const conversationId = chat?.conversationId;
@@ -86,7 +88,8 @@ export function DraftPanel({
     draft = draftsIn(live, true)[place.streamingIndex] ?? null;
   }
 
-  const answerDue = Boolean(chat?.isStreaming) || messages[messages.length - 1]?.role === 'user';
+  // A line under the question (the draft "edited" line) does not answer it.
+  const answerDue = Boolean(chat?.isStreaming) || lastTurnRow(messages)?.role === 'user';
   if (!draft && answerDue) {
     return (
       <ChatSidePanel label="Draft" title="Draft" icon={<DraftIcon />} bare>

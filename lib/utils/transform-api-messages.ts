@@ -5,6 +5,8 @@ import type {
   ToolMessage,
   HandoverMessage,
   ErrorMessage,
+  EventMessage,
+  TurnMessage,
 } from '@/types/chat';
 import { isRedactionSummary } from './redaction-summary';
 
@@ -44,8 +46,48 @@ export function parseToolResult(result: Pick<ApiMessage, 'content' | 'metadata'>
   }
 }
 
-export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMessage[] {
+/**
+ * A `draft_edit` event row as the line v2 draws ("Stay edited 'Lease
+ * agreement' · 17:49"; Stay, 30 October 2026, 02:16Z, thread 1e44eb39,
+ * design 9b43f942). `null` for any other row, any other event type, and a
+ * draft_edit row missing what the line needs: a line that cannot be drawn
+ * right is not drawn.
+ */
+export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
+  if (apiMsg.role !== 'event') return null;
+  const meta = apiMsg.metadata;
+  if (meta?.type !== 'draft_edit' || !meta.note_uuid) return null;
+  const at = new Date(apiMsg.created_at);
+  if (Number.isNaN(at.getTime())) return null;
+  const last = meta.last_edited_at ? new Date(meta.last_edited_at) : at;
+  return {
+    id: `msg_${apiMsg.id}`,
+    role: 'event',
+    eventType: 'draft_edit',
+    serverId: apiMsg.id,
+    content: apiMsg.content,
+    timestamp: at,
+    editedAt: Number.isNaN(last.getTime()) ? at : last,
+    editorName: meta.editor?.name?.trim() || 'Someone',
+    editorUuid: meta.editor?.uuid ?? null,
+    draftTitle: meta.draft_title?.trim() || 'Untitled draft',
+    noteUuid: meta.note_uuid,
+  };
+}
+
+/**
+ * What the transform returns. Event rows (role `event`) are kept only when
+ * the caller asks with `{ events: true }`, which only v2 does: v1's chat and
+ * the floating panel never receive a line they do not draw.
+ */
+export function transformApiMessages(apiMessages: ApiMessage[]): TurnMessage[];
+export function transformApiMessages(apiMessages: ApiMessage[], options: { events: true }): ConversationMessage[];
+export function transformApiMessages(
+  apiMessages: ApiMessage[],
+  options?: { events?: boolean },
+): ConversationMessage[] {
   const messages: ConversationMessage[] = [];
+  const keepEvents = options?.events === true;
 
   // Option A heuristic: classify untagged assistant text messages as narration
   // if they are followed by tool/handover work in the same turn (before the
@@ -96,6 +138,12 @@ export function transformApiMessages(apiMessages: ApiMessage[]): ConversationMes
   const failedTurnsShown = new Set<string>();
 
   for (const apiMsg of apiMessages) {
+    // A line beside the turns: drawn by v2 when it is a kind it knows, else dropped.
+    if (apiMsg.role === 'event') {
+      const line = keepEvents ? eventFromApi(apiMsg) : null;
+      if (line) messages.push(line);
+      continue;
+    }
     if (apiMsg.role === 'assistant' && apiMsg.status === 'failed') {
       const turn = apiMsg.metadata?.execution_id ?? `row-${apiMsg.id}`;
       if (failedTurnsShown.has(turn)) continue;

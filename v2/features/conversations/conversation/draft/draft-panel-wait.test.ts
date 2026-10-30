@@ -11,7 +11,8 @@ import { readFileSync } from 'node:fs';
 const panel = readFileSync(new URL('./DraftPanel.tsx', import.meta.url), 'utf8');
 
 test('a draft not found while the answer is still due shows a waiting skeleton, not "no longer in the chat"', () => {
-  assert.match(panel, /const answerDue = Boolean\(chat\?\.isStreaming\) \|\| messages\[messages\.length - 1\]\?\.role === 'user';/);
+  // The last TURN (turn-rows.ts): a draft's "edited" line under the question does not answer it.
+  assert.match(panel, /const answerDue = Boolean\(chat\?\.isStreaming\) \|\| lastTurnRow\(messages\)\?\.role === 'user';/);
   const wait = panel.indexOf('if (!draft && answerDue) {');
   const gone = panel.indexOf('This draft is no longer in the chat.');
   assert.ok(wait > 0 && gone > wait, 'the wait is decided before the "gone" message');
