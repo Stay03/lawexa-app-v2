@@ -209,6 +209,11 @@ export const ANSWER_OUTCOME_LABELS: Readonly<Record<AnswerOutcome, string>> = {
   wrong: 'Wrong',
 };
 
+/** A count with its word, singular for one: "1 play", "3 plays", "1 quiz", "2 quizzes". */
+export function countLabel(count: number, one: string, many: string): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
 /** A response time in ms, as "4.2s"; `—` for none. */
 export function responseTimeLabel(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || !Number.isFinite(ms) || ms < 0) return '—';

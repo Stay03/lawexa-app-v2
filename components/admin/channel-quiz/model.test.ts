@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import {
   ANSWER_OUTCOME_LABELS,
   answerOutcome,
+  countLabel,
   durationLabel,
   exploreSection,
   nextSearch,
@@ -98,6 +99,8 @@ test('what a row says: percent, duration, status and score', () => {
   assert.equal(rightOfScored(7, 10), '7/10');
   assert.equal(responseTimeLabel(4200), '4.2s');
   assert.equal(responseTimeLabel(null), '—');
+  assert.equal(countLabel(1, 'quiz', 'quizzes'), '1 quiz');
+  assert.equal(countLabel(0, 'quiz', 'quizzes'), '0 quizzes');
 });
 
 test('a question in one play: removed, not answered, right or wrong', () => {

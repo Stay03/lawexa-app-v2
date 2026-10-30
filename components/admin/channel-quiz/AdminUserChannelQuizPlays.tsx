@@ -8,7 +8,7 @@ import { useAdminUserChannelQuizAttempts } from '@/lib/hooks/useAdminChannelQuiz
 import type { AdminChannelQuizAttemptListParams } from '@/types/admin-channel-quizzes';
 import { AdminChannelQuizPlaysTable } from './AdminChannelQuizPlaysTable';
 import { AdminChannelQuizError } from './AdminChannelQuizStates';
-import { percentLabel, type PlayStatusFilter } from './model';
+import { countLabel, percentLabel, type PlayStatusFilter } from './model';
 
 /**
  * One person's plays of the new quizzes, on the admin user page's Quiz tab
@@ -35,8 +35,8 @@ export function AdminUserChannelQuizPlays({ uuid }: { uuid: string }) {
           <CardTitle className="text-base">Explore quizzes (new)</CardTitle>
           {summary ? (
             <CardDescription>
-              {summary.plays} plays · {summary.finished_plays} finished · average {percentLabel(summary.average_score_percent)} ·{' '}
-              {summary.quizzes_made} quizzes made
+              {countLabel(summary.plays, 'play', 'plays')} · {summary.finished_plays} finished · average{' '}
+              {percentLabel(summary.average_score_percent)} · {countLabel(summary.quizzes_made, 'quiz', 'quizzes')} made
             </CardDescription>
           ) : null}
         </div>
