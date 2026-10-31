@@ -36,6 +36,7 @@ import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { spacesQueries } from '../../queries';
 import { TASK_STAGE_LABELS, TASK_STAGE_TONE, TASK_STAGES, taskThreadHref } from './task-board-model';
 import {
+  seededDraft,
   startThreadChannels,
   startThreadError,
   startThreadPayload,
@@ -44,6 +45,7 @@ import {
   taskThreadAccess,
   type StartChannel,
   type TaskBoxTab,
+  type TaskSeed,
   type TaskChatState,
   type TaskPhoneTab,
 } from './task-box-model';
@@ -71,7 +73,8 @@ import {
 } from './task-sheet-model';
 
 /** Which task the box shows: one on the board, or a new one. */
-export type TaskBoxTarget = { kind: 'task'; taskUuid: string } | { kind: 'new' };
+/** A saved task, or New task; New task from a thread carries that thread and its title. */
+export type TaskBoxTarget = { kind: 'task'; taskUuid: string } | { kind: 'new'; seed?: TaskSeed };
 
 /**
  * TaskBox — one task, opened from its card (Arthur's choice 1 + 2, thread
@@ -149,6 +152,7 @@ export function TaskBox({
               spaceUuid={spaceUuid}
               tasks={tasks}
               task={task}
+              seed={target.kind === 'new' ? target.seed : undefined}
               canEdit={canEdit}
               rooms={rooms}
               phone={phone}
@@ -189,6 +193,7 @@ function TaskBoxBody({
   spaceUuid,
   tasks,
   task,
+  seed,
   canEdit,
   rooms,
   phone,
@@ -198,6 +203,8 @@ function TaskBoxBody({
   spaceUuid: string;
   tasks: readonly SpaceTask[];
   task: SpaceTask | null;
+  /** New task from a thread: its Thread and Title start filled in. */
+  seed?: TaskSeed;
   canEdit: boolean;
   rooms: boolean;
   /** A phone: the whole screen, two tabs, and the phone's own pickers. */
@@ -209,7 +216,7 @@ function TaskBoxBody({
   const native = phone;
   const session = useV2Session();
   const viewerId = session.userId;
-  const [draft, setDraft] = useState<TaskDraft>(() => draftFromTask(task, session.userUuid));
+  const [draft, setDraft] = useState<TaskDraft>(() => seededDraft(draftFromTask(task, session.userUuid), seed));
   const [errors, setErrors] = useState<TaskFieldErrors>({});
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [tab, setTab] = useState<TaskBoxTab>('details');
@@ -427,7 +434,7 @@ function TaskBoxBody({
             native={native}
             spaceUuid={spaceUuid}
             value={draft.thread}
-            current={task?.thread ?? null}
+            current={task?.thread ?? seed?.thread ?? null}
             invalid={!!errors.thread}
             describedBy={errors.thread ? `${uid}-thread-error` : undefined}
             onChange={(value) => change('thread', value, 'thread')}

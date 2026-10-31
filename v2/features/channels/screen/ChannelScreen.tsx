@@ -10,6 +10,7 @@ import {
   Bookmark,
   ChevronLeft,
   GitBranch,
+  ListPlus,
   Loader2,
   LogOut,
   Pencil,
@@ -103,6 +104,7 @@ import {
 } from './states';
 import { LawexaMark } from '../ui/avatars';
 import { useTabTitle } from '@/v2/shell/use-tab-title';
+import { useMakeTaskFromThread } from '@/v2/features/spaces/detail/tasks/MakeTaskFromThread';
 
 /**
  * ChannelScreen — the W2 channel client root: detail three-state, ONE header
@@ -265,6 +267,8 @@ export function ChannelScreen({
   useTabTitle(channel ? channelDisplayName(channel) : null);
   const isThread = channel?.is_thread === true;
   const parentUuid = channel?.parent_channel_uuid ?? null;
+  // "Make a task" in a thread (Stay, 31 October 2026): New task with this thread in it.
+  const makeTask = useMakeTaskFromThread(channel);
 
   /* ── NO SECOND FETCH FOR A THREAD, SINCE 2026-08-12 ───────────────────────
         This screen used to fetch the PARENT's detail before it could paint
@@ -884,6 +888,12 @@ export function ChannelScreen({
           Quizzes
         </DropdownMenuItem>
       )}
+      {makeTask.offered && (
+        <DropdownMenuItem onClick={makeTask.open}>
+          <ListPlus aria-hidden className="size-4" />
+          Make a task
+        </DropdownMenuItem>
+      )}
       {canGovernChannel && (
         <DropdownMenuItem onClick={() => panel.show('requests')}>
           <UserCheck aria-hidden className="size-4" />
@@ -1444,6 +1454,7 @@ export function ChannelScreen({
           heading. Deleting it lands on the parent at the branched message —
           the conversation the tangent came out of is the place to be returned
           to, and the space's channel list never held the thread anyway. */}
+      {makeTask.box}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

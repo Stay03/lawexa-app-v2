@@ -1,4 +1,8 @@
-import type { Channel, SpaceTask } from '@/types/collab';
+import type { Channel, Space, SpaceTask } from '@/types/collab';
+import { channelDisplayName } from '@/v2/features/channels/thread-model';
+import { canAddContent } from '@/v2/features/spaces/model';
+
+import { TASK_TITLE_MAX, type TaskDraft } from './task-sheet-model';
 
 /**
  * task-box-model — what the task box's chat pane shows, and which tab a phone
@@ -189,4 +193,37 @@ export function startThreadPayload(shown: string | null): { channel_uuid?: strin
 /** What a refused start says: the server's word on the channel, else its message. */
 export function startThreadError(failure: { message: string; errors: Record<string, string[]> | null }): string {
   return failure.errors?.channel_uuid?.[0] ?? failure.message;
+}
+
+/** What "Make a task" in a thread hands New task: that thread, and its title. */
+export interface TaskSeed {
+  thread: TaskThread;
+  title: string;
+}
+
+/**
+ * Whether a thread offers "Make a task" (Stay, 31 October 2026, a284e4fe):
+ * a thread every member of its Space can read, since a task's thread must be
+ * one (the server's rule), seen by someone who may make tasks there (the
+ * board's own New task rule: the Space's owner and editors).
+ */
+export function canMakeTaskFrom(
+  channel: Pick<Channel, 'is_thread' | 'visibility'>,
+  space: Pick<Space, 'my_content_role'> | null | undefined,
+): boolean {
+  return channel.is_thread && channel.visibility === 'space_public' && !!space && canAddContent(space);
+}
+
+/** New task from a thread: the thread in its Thread field, its title as the task's (cut to fit). */
+export function taskSeedFromThread(channel: Pick<Channel, 'uuid' | 'is_thread' | 'title' | 'name' | 'parent_channel_uuid'>): TaskSeed {
+  const name = channelDisplayName(channel);
+  return {
+    thread: { uuid: channel.uuid, name, channel_uuid: channel.parent_channel_uuid ?? '' },
+    title: name.trim().slice(0, TASK_TITLE_MAX),
+  };
+}
+
+/** The New task form with a seed's thread and title in it. */
+export function seededDraft(draft: TaskDraft, seed: TaskSeed | undefined): TaskDraft {
+  return seed ? { ...draft, title: seed.title, thread: seed.thread.uuid } : draft;
 }

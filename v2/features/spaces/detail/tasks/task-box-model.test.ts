@@ -2,15 +2,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { Channel, SpaceTask } from '@/types/collab';
+import { draftFromTask } from './task-sheet-model';
 import {
+  canMakeTaskFrom,
   cardClickRenames,
   initialPhoneTab,
   renameOutcome,
+  seededDraft,
   startThreadChannels,
   startThreadError,
   startThreadPayload,
   taskChatLine,
   taskChatState,
+  taskSeedFromThread,
   taskThreadAccess,
   type ThreadAccess,
 } from './task-box-model';
@@ -176,4 +180,37 @@ test('a refused start says the server’s word on the channel, else its message'
     'The thread must go in a channel of this Space that every member can read.',
   );
   assert.equal(startThreadError({ message: 'This task already has a thread.', errors: null }), 'This task already has a thread.');
+});
+
+/* "Make a task" in a thread (Stay, 31 October 2026, a284e4fe). */
+
+test('a thread offers Make a task only where every member can read it, to the Space’s owner and editors', () => {
+  const thread = { is_thread: true, visibility: 'space_public' } as const;
+  assert.equal(canMakeTaskFrom(thread, { my_content_role: 'owner' }), true);
+  assert.equal(canMakeTaskFrom(thread, { my_content_role: 'editor' }), true);
+  assert.equal(canMakeTaskFrom(thread, { my_content_role: 'viewer' }), false);
+  // The Space's details have not come: nothing yet.
+  assert.equal(canMakeTaskFrom(thread, undefined), false);
+  // A private thread cannot be a task's thread (the server's rule), and a channel is not a thread.
+  assert.equal(canMakeTaskFrom({ is_thread: true, visibility: 'private' }, { my_content_role: 'owner' }), false);
+  assert.equal(canMakeTaskFrom({ is_thread: false, visibility: 'space_public' }, { my_content_role: 'owner' }), false);
+});
+
+test('New task from a thread starts with that thread and its title, cut to fit', () => {
+  const seed = taskSeedFromThread({
+    uuid: 'th-1',
+    is_thread: true,
+    title: ' TEST DATA serve the witness ',
+    name: 'thread--th-1',
+    parent_channel_uuid: 'c-general',
+  });
+  assert.deepEqual(seed, {
+    thread: { uuid: 'th-1', name: ' TEST DATA serve the witness ', channel_uuid: 'c-general' },
+    title: 'TEST DATA serve the witness',
+  });
+  assert.equal(taskSeedFromThread({ uuid: 'th-2', is_thread: true, title: 'x'.repeat(260), name: 'n', parent_channel_uuid: null }).title.length, 200);
+  const draft = draftFromTask(null, 'u-me');
+  assert.deepEqual(seededDraft(draft, seed), { ...draft, title: 'TEST DATA serve the witness', thread: 'th-1' });
+  // Plain New task is untouched.
+  assert.equal(seededDraft(draft, undefined), draft);
 });

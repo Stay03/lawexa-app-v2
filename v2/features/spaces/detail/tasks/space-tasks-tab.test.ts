@@ -140,3 +140,17 @@ test('New task offers the Thread field, and Start a thread picks its channel fro
   const api = read('lib', 'api', 'collab.ts');
   assert.match(api, /`\/spaces\/\$\{encodeURIComponent\(spaceUuid\)\}\/tasks\/\$\{encodeURIComponent\(taskUuid\)\}\/thread`,\s*payload,/);
 });
+
+test('a thread’s More menu offers Make a task, which opens New task with the thread in it', () => {
+  const screen = read('v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx');
+  assert.match(screen, /const makeTask = useMakeTaskFromThread\(channel\);/);
+  assert.match(screen, /\{makeTask\.offered && \(\s*<DropdownMenuItem onClick=\{makeTask\.open\}>[^]*?Make a task/);
+  assert.match(screen, /\{makeTask\.box\}/);
+  const make = read('v2', 'features', 'spaces', 'detail', 'tasks', 'MakeTaskFromThread.tsx');
+  assert.match(make, /canMakeTaskFrom\(channel, space\.data\?\.data\)/);
+  assert.match(make, /setTarget\(\{ kind: 'new', seed: taskSeedFromThread\(channel\) \}\)/);
+  const box = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
+  assert.match(box, /seededDraft\(draftFromTask\(task, session\.userUuid\), seed\)/);
+  // The thread stays a choice even when the list's first page does not carry it.
+  assert.match(box, /current=\{task\?\.thread \?\? seed\?\.thread \?\? null\}/);
+});
