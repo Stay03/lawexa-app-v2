@@ -441,6 +441,13 @@ export interface Channel {
    * root), so a trimmed payload must not be mistaken for one.
    */
   root_message_uuid?: string | null;
+  /**
+   * The task this thread is the chat of (Backend, 31 October 2026, plan
+   * 4e14d2d4): on a thread's own show only, the oldest task linking it, or
+   * `null`. Absent from lists, and from a server without the field, which the
+   * page reads as "not known" and draws as before.
+   */
+  task?: { uuid: string; title: string } | null;
   description: string | null;
   visibility: ChannelVisibility;
   visibility_label: string;

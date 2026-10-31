@@ -9,6 +9,7 @@ import type {
   SpaceTask,
   SpaceTaskWritePayload,
 } from '@/types/collab';
+import { channelsQueries } from '@/v2/features/channels/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { spacesQueries } from '../../queries';
 import { applyReorder, removeTask, upsertTask } from './task-cache';
@@ -40,10 +41,15 @@ function useBoardCache(spaceUuid: string) {
 }
 
 export function useCreateTask(spaceUuid: string) {
-  const { write, reread } = useBoardCache(spaceUuid);
+  const { queryClient, write, reread } = useBoardCache(spaceUuid);
   return useMutation({
     mutationFn: (payload: CreateSpaceTaskPayload) => spaceTasksApi.create(spaceUuid, payload),
-    onSuccess: (response) => write((list) => upsertTask(list, response.data)),
+    onSuccess: (response) => {
+      write((list) => upsertTask(list, response.data));
+      // The linked thread now names its task (its own show's `task`): a thread page open on it reads it again.
+      const thread = response.data.thread;
+      if (thread) void queryClient.invalidateQueries({ queryKey: channelsQueries.detailsOf(thread.uuid) });
+    },
     onSettled: reread,
   });
 }

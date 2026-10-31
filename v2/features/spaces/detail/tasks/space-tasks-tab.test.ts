@@ -154,3 +154,13 @@ test('a thread’s More menu offers Make a task, which opens New task with the t
   // The thread stays a choice even when the list's first page does not carry it.
   assert.match(box, /current=\{task\?\.thread \?\? seed\?\.thread \?\? null\}/);
 });
+
+test('a task’s thread page opens on no missing-first-message line, and a new task linking it says so at once', () => {
+  const screen = read('v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx');
+  // The thread's own show names its task (Backend's `task`); without it the page draws as before.
+  assert.match(screen, /hideMissingRoot=\{channel\.task != null\}/);
+  const types = read('types', 'collab.ts');
+  assert.match(types, /task\?: \{ uuid: string; title: string \} \| null;/);
+  const mutations = read('v2', 'features', 'spaces', 'detail', 'tasks', 'task-mutations.ts');
+  assert.match(mutations, /if \(thread\) void queryClient\.invalidateQueries\(\{ queryKey: channelsQueries\.detailsOf\(thread\.uuid\) \}\);/);
+});

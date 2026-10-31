@@ -1111,6 +1111,8 @@ export function ChannelScreen({
             <ChannelFeed
               ref={feedRef}
               channel={channel}
+              // A task's thread starts with no first message: no line saying so (Stay, 31 October 2026).
+              hideMissingRoot={channel.task != null}
               parentName={parentName}
               viewerId={viewerId}
               viewerUuid={viewerUuid}
