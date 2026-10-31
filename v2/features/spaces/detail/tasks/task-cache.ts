@@ -99,3 +99,43 @@ export function applyReorder(list: readonly SpaceTask[], reorder: ReorderSpaceTa
 }
 
 const changedAt = (task: SpaceTask): number => Date.parse(task.updated_at) || 0;
+
+/**
+ * A write refused with 404 (Stay's B, Backend fb826d73): the task is gone
+ * from this person's board, deleted or now linked to a thread they may not
+ * read. The card comes off the board rather than being put back.
+ */
+export function failedTaskWrite(list: readonly SpaceTask[], status: number | null, before: SpaceTask | null, taskUuid: string): SpaceTask[] {
+  if (status === 404) return removeTask(list, taskUuid);
+  return before ? upsertTask(list, before) : [...list];
+}
+
+/**
+ * One call `waitMs` after the last of a burst (Frontend's review of B, 11:54Z:
+ * each `refresh` would otherwise start its own read). `cancel` drops a call
+ * still waiting. The clock is passed in, so a test can drive it.
+ */
+export function trailingCall(
+  run: () => void,
+  waitMs: number,
+  clock: { set: (fn: () => void, ms: number) => unknown; clear: (handle: unknown) => void } = {
+    set: (fn, ms) => setTimeout(fn, ms),
+    clear: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  },
+): { call: () => void; cancel: () => void } {
+  let waiting: unknown = null;
+  const cancel = () => {
+    if (waiting !== null) clock.clear(waiting);
+    waiting = null;
+  };
+  return {
+    call: () => {
+      cancel();
+      waiting = clock.set(() => {
+        waiting = null;
+        run();
+      }, waitMs);
+    },
+    cancel,
+  };
+}

@@ -70,7 +70,7 @@ test('the board follows .task.changed on the space channel, and the last board t
   // The techlead's review and recheck: stop this listener, and leave only when no board listens.
   assert.match(
     live,
-    /return \(\) => \{\s*channel\.stopListening\(EVT_TASK_CHANGED, onChanged\);\s*if \(releaseChannel\(name\) === 0\) echo\.leave\(name\);\s*\};/,
+    /return \(\) => \{\s*refresh\.cancel\(\);\s*channel\.stopListening\(EVT_TASK_CHANGED, onChanged\);\s*if \(releaseChannel\(name\) === 0\) echo\.leave\(name\);\s*\};/,
   );
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
   assert.match(board, /useTaskBoardLive\(spaceUuid, session\.userId, eligible\);/);
@@ -126,7 +126,13 @@ test('the task chat is the thread’s own feed and composer, asked for only by t
   // Stay's B (Backend fb826d73): a card linked to a thread someone may not read never reaches them,
   // so a refresh event (no task in it) has the board read its own list again, and writes nothing itself.
   const live = read('v2', 'features', 'spaces', 'detail', 'tasks', 'use-task-board-live.ts');
-  assert.match(live, /if \(event\.action === 'refresh'\) \{\s*(?:\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.tasksOf\(spaceUuid\) \}\);\s*return;\s*\}/);
+  assert.match(live, /const refresh = trailingCall\(\(\) => void queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.tasksOf\(spaceUuid\) \}\), 300\);/);
+  assert.match(live, /if \(event\.action === 'refresh'\) \{\s*refresh\.call\(\);\s*return;\s*\}/);
+  assert.match(live, /return \(\) => \{\s*refresh\.cancel\(\);/);
+  // A write refused with 404 takes the card off the board instead of putting it back.
+  const mutations = read('v2', 'features', 'spaces', 'detail', 'tasks', 'task-mutations.ts');
+  assert.match(mutations, /onError: \(error, \{ task \}\) => failed\(error, task\.uuid, task\),/);
+  assert.equal(mutations.match(/onError: \(error, (?:\{ taskUuid \}|taskUuid)\) => failed\(error, taskUuid, null\),/g)?.length, 3);
   const protocol = read('v2', 'runtime', 'realtime', 'protocol.ts');
   assert.match(protocol, /export type SpaceTaskChangedEvent = SpaceTaskSnapshotEvent \| SpaceTaskRefreshEvent;/);
   // A card that leaves the board while its box is open says so truly, for a delete or for B.

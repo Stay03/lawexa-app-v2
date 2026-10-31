@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { spaceTasksApi } from '@/lib/api/collab';
+import { extractApiError } from '@/lib/utils/api-error';
 import type {
   CreateSpaceTaskPayload,
   ReorderSpaceTasksPayload,
@@ -12,7 +13,7 @@ import type {
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { spacesQueries } from '../../queries';
-import { applyReorder, removeTask, upsertTask } from './task-cache';
+import { applyReorder, failedTaskWrite, removeTask, upsertTask } from './task-cache';
 
 /**
  * task-mutations — the board's writes (the techlead's brief, 29 October 2026:
@@ -40,13 +41,16 @@ function useBoardCache(spaceUuid: string) {
   /** The thread a task links, from the board's copy, before a write changes it. */
   const threadOf = (taskUuid: string) =>
     queryClient.getQueryData<SpaceTask[]>(boardKey)?.find((row) => row.uuid === taskUuid)?.thread?.uuid ?? null;
+  /** A write refused: a 404 takes the card off the board (Stay's B), anything else puts `before` back if there is one. */
+  const failed = (error: unknown, taskUuid: string, before: SpaceTask | null) =>
+    write((list) => failedTaskWrite(list, extractApiError(error).status, before, taskUuid));
   /** A thread's own show names its task (`task`): a page open on a thread whose link changed reads it again. */
   const rereadThreads = (uuids: readonly (string | null | undefined)[]) => {
     for (const uuid of new Set(uuids)) {
       if (uuid) void queryClient.invalidateQueries({ queryKey: channelsQueries.detailsOf(uuid) });
     }
   };
-  return { queryClient, boardKey, write, reread, threadOf, rereadThreads };
+  return { queryClient, boardKey, write, reread, threadOf, rereadThreads, failed };
 }
 
 export function useCreateTask(spaceUuid: string) {
@@ -62,7 +66,7 @@ export function useCreateTask(spaceUuid: string) {
 }
 
 export function useUpdateTask(spaceUuid: string) {
-  const { write, reread, threadOf, rereadThreads } = useBoardCache(spaceUuid);
+  const { write, reread, threadOf, rereadThreads, failed } = useBoardCache(spaceUuid);
   return useMutation({
     mutationFn: ({ taskUuid, payload }: { taskUuid: string; payload: SpaceTaskWritePayload }) =>
       spaceTasksApi.update(spaceUuid, taskUuid, payload),
@@ -73,6 +77,7 @@ export function useUpdateTask(spaceUuid: string) {
       const threadAfter = response.data.thread?.uuid ?? null;
       if (context?.threadBefore !== threadAfter) rereadThreads([context?.threadBefore, threadAfter]);
     },
+    onError: (error, { taskUuid }) => failed(error, taskUuid, null),
     // The board's key is the history's prefix: both are read again.
     onSettled: reread,
   });
@@ -88,7 +93,7 @@ export function useUpdateTask(spaceUuid: string) {
  * read again when it settles, as the other writes do.
  */
 export function usePatchTask(spaceUuid: string) {
-  const { queryClient, boardKey, write, reread } = useBoardCache(spaceUuid);
+  const { queryClient, boardKey, write, reread, failed } = useBoardCache(spaceUuid);
   return useMutation({
     mutationFn: ({ task, payload }: { task: SpaceTask; payload: SpaceTaskWritePayload; shown: SpaceTask }) =>
       spaceTasksApi.update(spaceUuid, task.uuid, payload),
@@ -98,26 +103,27 @@ export function usePatchTask(spaceUuid: string) {
       write((list) => upsertTask(list, shown));
     },
     onSuccess: (response) => write((list) => upsertTask(list, response.data)),
-    onError: (_error, { task }) => write((list) => upsertTask(list, task)),
+    onError: (error, { task }) => failed(error, task.uuid, task),
     onSettled: reread,
   });
 }
 
 /** Start a thread for a task and link it: the board's copy takes the new thread at once. */
 export function useStartTaskThread(spaceUuid: string) {
-  const { write, reread } = useBoardCache(spaceUuid);
+  const { write, reread, failed } = useBoardCache(spaceUuid);
   return useMutation({
     mutationFn: ({ taskUuid, payload }: { taskUuid: string; payload: { channel_uuid?: string } }) =>
       spaceTasksApi.startThread(spaceUuid, taskUuid, payload),
     // The pane says a refusal under the picker, so no toast says it again.
     meta: { silentError: true },
     onSuccess: (response) => write((list) => upsertTask(list, response.data)),
+    onError: (error, { taskUuid }) => failed(error, taskUuid, null),
     onSettled: reread,
   });
 }
 
 export function useDeleteTask(spaceUuid: string) {
-  const { write, reread, threadOf, rereadThreads } = useBoardCache(spaceUuid);
+  const { write, reread, threadOf, rereadThreads, failed } = useBoardCache(spaceUuid);
   return useMutation({
     mutationFn: (taskUuid: string) => spaceTasksApi.remove(spaceUuid, taskUuid),
     onMutate: (taskUuid) => ({ threadBefore: threadOf(taskUuid) }),
@@ -126,6 +132,7 @@ export function useDeleteTask(spaceUuid: string) {
       // Its thread may name no task now: the line about a missing first message comes back.
       rereadThreads([context?.threadBefore]);
     },
+    onError: (error, taskUuid) => failed(error, taskUuid, null),
     onSettled: reread,
   });
 }
