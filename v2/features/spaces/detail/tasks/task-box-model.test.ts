@@ -14,8 +14,10 @@ import {
   startThreadPayload,
   taskChatLine,
   taskChatState,
+  taskChatShown,
   taskSeedFromThread,
   taskThreadAccess,
+  threadChoices,
   type ThreadAccess,
 } from './task-box-model';
 
@@ -184,16 +186,15 @@ test('a refused start says the server’s word on the channel, else its message'
 
 /* "Make a task" in a thread (Stay, 31 October 2026, a284e4fe). */
 
-test('a thread offers Make a task only where every member can read it, to the Space’s owner and editors', () => {
-  const thread = { is_thread: true, visibility: 'space_public' } as const;
+test('a thread offers Make a task to the Space’s owner and editors, private threads included', () => {
+  const thread = { is_thread: true } as const;
   assert.equal(canMakeTaskFrom(thread, { my_content_role: 'owner' }), true);
   assert.equal(canMakeTaskFrom(thread, { my_content_role: 'editor' }), true);
   assert.equal(canMakeTaskFrom(thread, { my_content_role: 'viewer' }), false);
   // The Space's details have not come: nothing yet.
   assert.equal(canMakeTaskFrom(thread, undefined), false);
-  // A private thread cannot be a task's thread (the server's rule), and a channel is not a thread.
-  assert.equal(canMakeTaskFrom({ is_thread: true, visibility: 'private' }, { my_content_role: 'owner' }), false);
-  assert.equal(canMakeTaskFrom({ is_thread: false, visibility: 'space_public' }, { my_content_role: 'owner' }), false);
+  // A channel is not a thread.
+  assert.equal(canMakeTaskFrom({ is_thread: false }, { my_content_role: 'owner' }), false);
 });
 
 test('New task from a thread starts with that thread and its title, cut to fit', () => {
@@ -213,4 +214,67 @@ test('New task from a thread starts with that thread and its title, cut to fit',
   assert.deepEqual(seededDraft(draft, seed), { ...draft, title: 'TEST DATA serve the witness', thread: 'th-1' });
   // Plain New task is untouched.
   assert.equal(seededDraft(draft, undefined), draft);
+});
+
+/* Private threads on tasks (Stay's A; Backend 5a1b7543). */
+
+test('a card whose thread this reader may not read shows no chat at all, before any other rule', () => {
+  const concealed = { ...task(null), has_hidden_thread: true };
+  for (const flags of [
+    { canEdit: true, canChat: true },
+    { canEdit: false, canChat: false },
+  ]) {
+    const state = taskChatState(concealed, flags, PENDING);
+    assert.deepEqual(state, { kind: 'concealed' });
+    assert.equal(taskChatShown(state), false);
+    // No line about it either (Stay, through the techlead, 05:06Z).
+    assert.equal(taskChatLine(state), null);
+  }
+  // A reader's copy of the same card carries the thread and no flag: the pane as before.
+  assert.equal(taskChatShown(taskChatState({ ...task(THREAD), has_hidden_thread: false }, { canEdit: true, canChat: true }, PENDING)), true);
+  // A card with no thread at all still offers Start a thread.
+  assert.deepEqual(taskChatState({ ...task(null), has_hidden_thread: false }, { canEdit: true, canChat: true }, PENDING), {
+    kind: 'none',
+    canStart: true,
+  });
+});
+
+test('Start a thread may go in an open channel or a private one the starter is in; the default stays the oldest open one', () => {
+  const rooms = [
+    room('c-partners', 'partners', '2026-09-01T09:00:00Z', { visibility: 'private', is_member: true }),
+    room('c-board', 'board', '2026-09-02T09:00:00Z', { visibility: 'private', is_member: false }),
+    room('c-general', 'general', '2026-10-02T09:00:00Z'),
+  ];
+  assert.deepEqual(startThreadChannels(rooms), {
+    options: [
+      { uuid: 'c-general', name: 'general' },
+      { uuid: 'c-partners', name: 'partners' },
+    ],
+    // The private channel is older, but the server's default is its first open one.
+    preselected: 'c-general',
+  });
+  // Only private channels the starter is in: offered, with nothing preselected (the server's default would 422).
+  assert.deepEqual(startThreadChannels([rooms[0]]), { options: [{ uuid: 'c-partners', name: 'partners' }], preselected: null });
+});
+
+test('the Thread field offers what the person can read: open and joined channels, and threads they can read', () => {
+  const choices = threadChoices(
+    [
+      room('c-general', 'general', '2026-10-02T09:00:00Z'),
+      room('c-partners', 'partners', '2026-09-01T09:00:00Z', { visibility: 'private', is_member: true }),
+      room('c-board', 'board', '2026-09-02T09:00:00Z', { visibility: 'private', is_member: false }),
+      room('t-fee', 'thread--t-fee', '2026-10-30T09:00:00Z', { is_thread: true, visibility: 'private', title: 'TEST DATA fee note', can_read: true }),
+      room('t-secret', 'thread--t-secret', '2026-10-30T09:00:00Z', { is_thread: true, visibility: 'private', title: 'x', can_read: false }),
+      room('t-old', 'thread--t-old', '2026-10-30T09:00:00Z', { is_thread: true, title: 'no flag' }),
+      room('c-general', 'general', '2026-10-02T09:00:00Z'),
+    ],
+    { uuid: 't-linked', name: 'TEST DATA linked', channel_uuid: 'c-board' },
+  );
+  assert.deepEqual(choices, [
+    { uuid: 'c-general', name: 'general' },
+    { uuid: 'c-partners', name: 'partners' },
+    { uuid: 't-fee', name: 'TEST DATA fee note' },
+    // The task's own thread stays a choice.
+    { uuid: 't-linked', name: 'TEST DATA linked' },
+  ]);
 });

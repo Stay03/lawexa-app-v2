@@ -17,6 +17,9 @@ import { TASK_TITLE_MAX, type TaskDraft } from './task-sheet-model';
  * Posting needs membership of the thread's channel, as on the thread's own
  * page; the board role does not decide it.
  *
+ *   concealed the task has a thread this reader may not read (Backend
+ *             5a1b7543: `has_hidden_thread`): no pane, no tab and no Thread
+ *             field, and no line about it (Stay, through the techlead, 05:06Z).
  *   closed    the reader may not open channels at all (Stay's choice A, 20:24Z:
  *             task chat is for Researchers): a line saying so, nothing asked.
  *   new       a task not saved yet: nothing to chat about.
@@ -38,6 +41,7 @@ export type ThreadAccess =
   | { status: 'read'; canRead: boolean; canPost: boolean };
 
 export type TaskChatState =
+  | { kind: 'concealed' }
   | { kind: 'closed' }
   | { kind: 'new' }
   | { kind: 'none'; canStart: boolean }
@@ -56,6 +60,7 @@ export function taskChatState(
   { canEdit, canChat }: { canEdit: boolean; canChat: boolean },
   access: ThreadAccess,
 ): TaskChatState {
+  if (task && !task.thread && task.has_hidden_thread) return { kind: 'concealed' };
   if (!canChat) return { kind: 'closed' };
   if (!task) return { kind: 'new' };
   const thread = task.thread;
@@ -158,26 +163,59 @@ export interface StartChannel {
   name: string;
 }
 
+/** Whether the task box shows a chat at all: not on a card whose thread this reader may not read. */
+export function taskChatShown(state: TaskChatState): boolean {
+  return state.kind !== 'concealed';
+}
+
 /**
  * Where "Start a thread" may put the task's thread (Stay, 30 October 2026,
- * 22:40Z; Backend 45842ebc). The Space's top-level channels every member can
- * read, in name order, from the rail's list. The preselected one is the
- * oldest, the server's own default (its first `space_public` channel by id),
+ * 22:40Z; Backend 45842ebc, 5a1b7543). The Space's top-level channels the
+ * starter may post in: every open one, and the private ones they are in
+ * (`is_member` is real membership on a channel, unlike on a thread), in name
+ * order, from the rail's list. The preselected one is the oldest open
+ * channel, the server's own default (its first `space_public` channel by id),
  * read from the data rather than the list's order, so leaving the picker
  * alone starts the thread where it always has.
  */
 export function startThreadChannels(rooms: readonly Channel[]): { options: StartChannel[]; preselected: string | null } {
-  const open = new Map<string, Channel>();
+  const postable = new Map<string, Channel>();
   for (const room of rooms) {
-    if (room.is_thread || room.visibility !== 'space_public' || open.has(room.uuid)) continue;
-    open.set(room.uuid, room);
+    if (room.is_thread || postable.has(room.uuid)) continue;
+    if (room.visibility !== 'space_public' && room.is_member !== true) continue;
+    postable.set(room.uuid, room);
   }
-  const rows = [...open.values()];
-  const oldest = rows.reduce<Channel | null>((first, room) => (first === null || room.created_at < first.created_at ? room : first), null);
+  const rows = [...postable.values()];
+  const oldest = rows
+    .filter((room) => room.visibility === 'space_public')
+    .reduce<Channel | null>((first, room) => (first === null || room.created_at < first.created_at ? room : first), null);
   return {
     options: rows.map((room) => ({ uuid: room.uuid, name: room.name })).sort((a, b) => a.name.localeCompare(b.name)),
     preselected: oldest?.uuid ?? null,
   };
+}
+
+/** A room the Thread field offers: its uuid and the name it shows. */
+export interface ThreadChoice {
+  uuid: string;
+  name: string;
+}
+
+/**
+ * The rooms a task may point at (Backend 5a1b7543: any thread of the Space
+ * the person linking can read): open channels and the private ones they are
+ * in, and threads they can read (`can_read`, stamped per viewer on the
+ * threads list), each once, with the task's own thread kept.
+ */
+export function threadChoices(rooms: readonly Channel[], current: SpaceTask['thread']): ThreadChoice[] {
+  const choices = new Map<string, ThreadChoice>();
+  for (const room of rooms) {
+    if (choices.has(room.uuid)) continue;
+    const readable = room.is_thread ? room.can_read === true : room.visibility === 'space_public' || room.is_member === true;
+    if (readable) choices.set(room.uuid, { uuid: room.uuid, name: channelDisplayName(room) });
+  }
+  if (current && !choices.has(current.uuid)) choices.set(current.uuid, { uuid: current.uuid, name: current.name });
+  return [...choices.values()];
 }
 
 /**
@@ -203,15 +241,16 @@ export interface TaskSeed {
 
 /**
  * Whether a thread offers "Make a task" (Stay, 31 October 2026, a284e4fe):
- * a thread every member of its Space can read, since a task's thread must be
- * one (the server's rule), seen by someone who may make tasks there (the
- * board's own New task rule: the Space's owner and editors).
+ * any thread, private ones included, since whoever has its page open can
+ * read it and that is the link rule (Backend 5a1b7543), seen by someone who
+ * may make tasks there (the board's own New task rule: the Space's owner and
+ * editors).
  */
 export function canMakeTaskFrom(
-  channel: Pick<Channel, 'is_thread' | 'visibility'>,
+  channel: Pick<Channel, 'is_thread'>,
   space: Pick<Space, 'my_content_role'> | null | undefined,
 ): boolean {
-  return channel.is_thread && channel.visibility === 'space_public' && !!space && canAddContent(space);
+  return channel.is_thread && !!space && canAddContent(space);
 }
 
 /** New task from a thread: the thread in its Thread field, its title as the task's (cut to fit). */

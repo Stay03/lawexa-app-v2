@@ -27,7 +27,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSheetSide } from '@/v2/features/cases/cited-by/use-sheet-side';
 import { channelsQueries } from '@/v2/features/channels/queries';
-import { channelDisplayName } from '@/v2/features/channels/thread-model';
 import { ThreadStatusDot } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -41,7 +40,9 @@ import {
   startThreadError,
   startThreadPayload,
   taskChatLine,
+  taskChatShown,
   taskChatState,
+  threadChoices,
   taskThreadAccess,
   type StartChannel,
   type TaskBoxTab,
@@ -244,6 +245,7 @@ function TaskBoxBody({
       errorStatus: threadQuery.error ? extractApiError(threadQuery.error).status : null,
     }),
   );
+  const chatShown = taskChatShown(chat);
   const retryChat = () => void threadQuery.refetch();
   // Start a thread for a task with none, in the channel picked (Stay, 22:40Z):
   // the board's copy takes it, and the pane opens on it. The channels are the
@@ -427,6 +429,8 @@ function TaskBoxBody({
         )}
       </FieldBlock>
 
+      {/* A thread this reader may not read: nothing of it, the field included (Stay, 05:06Z). */}
+      {chatShown ? (
       <FieldBlock label="Thread" htmlFor={`${uid}-thread`} error={errors.thread} errorId={`${uid}-thread-error`}>
         {canEdit && rooms ? (
           <ThreadSelect
@@ -443,6 +447,7 @@ function TaskBoxBody({
           <p className="text-sm text-foreground">{task?.thread?.name ?? 'No thread'}</p>
         )}
       </FieldBlock>
+      ) : null}
 
       {draft.stage === 'waiting' ? (
         <FieldBlock label="Waiting on" htmlFor={`${uid}-waiting`} error={errors.waiting_on} errorId={`${uid}-waiting-error`}>
@@ -536,7 +541,7 @@ function TaskBoxBody({
       {phone ? (
         <div className="flex min-h-0 flex-1 flex-col">
           {head}
-          {task ? (
+          {task && chatShown ? (
             <BoxTabs
               label="Task"
               value={phoneTab}
@@ -547,7 +552,7 @@ function TaskBoxBody({
               ]}
             />
           ) : null}
-          {phoneTab === 'chat' && task ? (
+          {phoneTab === 'chat' && task && chatShown ? (
             // Outside the details form, so the composer's Enter sends a message and never saves the task.
             <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
           ) : (
@@ -565,7 +570,7 @@ function TaskBoxBody({
           )}
         </div>
       ) : (
-        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px]">
+        <div className={cn('grid min-h-0 flex-1', chatShown ? 'grid-cols-[minmax(0,1fr)_360px]' : 'grid-cols-1')}>
           <form onSubmit={save} noValidate className="flex min-h-0 flex-col">
             {head}
             {task ? (
@@ -588,9 +593,11 @@ function TaskBoxBody({
             </div>
             {foot}
           </form>
-          <aside aria-label="Task chat" className="flex min-h-0 flex-col border-l border-border bg-secondary/40">
-            <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
-          </aside>
+          {chatShown ? (
+            <aside aria-label="Task chat" className="flex min-h-0 flex-col border-l border-border bg-secondary/40">
+              <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
+            </aside>
+          ) : null}
         </div>
       )}
 
@@ -944,7 +951,7 @@ function ThreadSelect({
   const channels = useQuery(channelsQueries.bySpace({ spaceUuid, viewerId, per_page: 50 }));
   const threads = useQuery(channelsQueries.threadsBySpace({ spaceUuid, viewerId, per_page: 50 }));
   const options = useMemo(
-    () => roomOptions([...(channels.data?.data ?? []), ...(threads.data?.data ?? [])], current),
+    () => threadChoices([...(channels.data?.data ?? []), ...(threads.data?.data ?? [])], current),
     [channels.data, threads.data, current],
   );
   return (
@@ -1062,18 +1069,6 @@ function MoveRow({ move, now }: { move: SpaceTaskMove; now: number }) {
       ) : null}
     </li>
   );
-}
-
-/** The rooms a task may point at: open to the whole space, each once, with
- *  the task's own thread kept. */
-function roomOptions(rooms: readonly Channel[], current: SpaceTask['thread']): PersonOption[] {
-  const options = new Map<string, PersonOption>();
-  for (const room of rooms) {
-    if (room.visibility !== 'space_public' || options.has(room.uuid)) continue;
-    options.set(room.uuid, { uuid: room.uuid, name: channelDisplayName(room) });
-  }
-  if (current && !options.has(current.uuid)) options.set(current.uuid, { uuid: current.uuid, name: current.name });
-  return [...options.values()];
 }
 
 /** The box's subtitle: "Waiting for 12m", or "Queued just now" inside the
