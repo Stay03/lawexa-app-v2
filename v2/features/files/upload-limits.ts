@@ -45,6 +45,32 @@ export const TODAY_UPLOAD_LIMITS: UploadLimits = {
 
 const MB = 1024 * 1024;
 
+/**
+ * The most the server takes at all (Backend 527ce6a4: 500 MB documents and
+ * media since uploads go straight to storage; 20 files per message). A
+ * signed-in person's file is checked against these while their own limits are
+ * still loading, so a file picked in the first moment is not refused at
+ * today's 10 MB when their plan takes more; the server's start refuses
+ * anything over the plan, with its own sentence and the plans link
+ * (techlead, 31 October 2026). Pictures keep their own 5 MB.
+ */
+export const CEILING_UPLOAD_LIMITS: UploadLimits = {
+  documentBytes: 500 * MB,
+  imageBytes: MAX_IMAGE_SIZE,
+  mediaBytes: 500 * MB,
+  filesPerMessage: 20,
+};
+
+/**
+ * The limits to check against: the person's own once read; the server's
+ * ceilings while a signed-in person's read is on its way; today's values for
+ * a guest or a server that sends none.
+ */
+export function pickUploadLimits(uploads: Partial<IUserUploadLimits> | null | undefined, loading: boolean): UploadLimits {
+  if (uploads) return uploadLimitsFrom(uploads);
+  return loading ? CEILING_UPLOAD_LIMITS : TODAY_UPLOAD_LIMITS;
+}
+
 /** A usable number from the server: positive and finite, else the fallback. */
 function positive(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;

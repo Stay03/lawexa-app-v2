@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  CEILING_UPLOAD_LIMITS,
+  pickUploadLimits,
   attachmentCapError,
   attachmentHint,
   attachmentHintIn,
@@ -134,4 +136,20 @@ test('every upload path reads the plan’s limits, and a space’s uploads the s
   assert.match(panel, /<FileDropZone spaceName=\{space\.name\} onDrop=\{addFiles\}>/);
   assert.match(panel, /if \(event\.target\.files\) addFiles\(event\.target\.files\);/);
   assert.match(loose, /uploadPrecheck\(file, 'a folder', limits\)/);
+});
+
+test('while a signed-in person’s limits load, a file is checked against the server’s ceilings, not today’s 10 MB', () => {
+  // Picked in the first moment: a 40 MB PDF passes here and the server's start judges it against the plan.
+  const early = pickUploadLimits(null, true);
+  assert.equal(early, CEILING_UPLOAD_LIMITS);
+  assert.deepEqual(CEILING_UPLOAD_LIMITS, { documentBytes: 500 * MB, imageBytes: 5 * MB, mediaBytes: 500 * MB, filesPerMessage: 20 });
+  const pdf = { name: 'TEST DATA bundle.pdf', type: 'application/pdf', size: 40 * MB };
+  assert.equal(uploadPrecheck(pdf, 'a folder', early), null);
+  assert.match(uploadPrecheck({ ...pdf, size: 501 * MB }, 'a folder', early) ?? '', /larger than 500 MB/);
+  // Once read, the plan's own; a guest, or a server that sends none, keeps today's values.
+  assert.deepEqual(pickUploadLimits(BASIC, false), uploadLimitsFrom(BASIC));
+  assert.equal(pickUploadLimits(null, false), TODAY_UPLOAD_LIMITS);
+  const hook = read('v2', 'features', 'files', 'use-upload-limits.ts');
+  assert.match(hook, /const loading = viewerId !== null && personal\.isPending;/);
+  assert.match(hook, /const own = pickUploadLimits\(uploads, loading\);/);
 });
