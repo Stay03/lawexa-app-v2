@@ -6,7 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { EVT_TASK_CHANGED, spaceChannelName, type SpaceTaskChangedEvent } from '@/v2/runtime/realtime/protocol';
 import { spacesQueries } from '../../queries';
-import { applyTaskChanged } from './task-cache';
+import { spaceTasksApi } from '@/lib/api/collab';
+import { applyTaskChanged, createCardReader, upsertTask } from './task-cache';
 import { releaseChannel, retainChannel } from './channel-listeners';
 
 /**
@@ -39,10 +40,17 @@ export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, ena
 
     const boardKey = spacesQueries.tasks(spaceUuid, { viewerId }).queryKey;
     const deleted = new Set<string>();
+    // A card whose thread is hidden from some: this viewer's own copy, read once more (Backend 5a1b7543).
+    const readCard = createCardReader(async (taskUuid) => {
+      const response = await spaceTasksApi.show(spaceUuid, taskUuid);
+      if (deleted.has(taskUuid)) return;
+      queryClient.setQueryData(boardKey, (list) => (list ? upsertTask(list, response.data) : list));
+    });
     const onChanged = (event: SpaceTaskChangedEvent) => {
       if (event.action === 'deleted') deleted.add(event.task.uuid);
       queryClient.setQueryData(boardKey, (list) => (list ? applyTaskChanged(list, event, deleted) : list));
       void queryClient.invalidateQueries({ queryKey: spacesQueries.taskMovesOf(spaceUuid, event.task.uuid) });
+      if (event.action !== 'deleted' && event.task.has_hidden_thread) readCard(event.task.uuid);
     };
     const name = spaceChannelName(spaceUuid);
     const channel = echo.private(name);

@@ -122,7 +122,16 @@ test('the task chat is the thread’s own feed and composer, asked for only by t
   assert.match(box, /const canChat = session\.canAccessTeamChannels;/);
   assert.match(box, /enabled: canChat && threadUuid !== null,/);
   // On a phone the chat sits outside the details form: Enter in the composer sends, never saves.
-  assert.match(box, /\{phoneTab === 'chat' && task \? \(\s*\/\/ Outside the details form/);
+  assert.match(box, /\{phoneTab === 'chat' && task && chatShown \? \(\s*\/\/ Outside the details form/);
+  // A card whose thread this reader may not read: no pane, no Chat tab and no Thread field (Backend 5a1b7543).
+  assert.match(box, /const chatShown = taskChatShown\(chat\);/);
+  assert.match(box, /\{chatShown \? \(\s*<aside aria-label="Task chat"/);
+  assert.match(box, /\{task && chatShown \? \(\s*<BoxTabs/);
+  assert.match(box, /\{chatShown \? \(\s*<FieldBlock label="Thread"/);
+  // The board reads such a card again, as this viewer may see it.
+  const live = read('v2', 'features', 'spaces', 'detail', 'tasks', 'use-task-board-live.ts');
+  assert.match(live, /if \(event\.action !== 'deleted' && event\.task\.has_hidden_thread\) readCard\(event\.task\.uuid\);/);
+  assert.match(live, /await spaceTasksApi\.show\(spaceUuid, taskUuid\)/);
 });
 
 test('New task offers the Thread field, and Start a thread picks its channel from the rail’s own list', () => {
