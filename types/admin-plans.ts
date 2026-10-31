@@ -69,7 +69,8 @@ export interface AdminPlanUpdatePayload {
 
 // Limit input for PUT /api/admin/plans/{id}/limits
 export type AdminLimitType = 'ai_messages' | 'bookmarks' | 'note_creations' | TUploadLimitType;
-export type AdminLimitPeriod = 'month' | 'day' | 'lifetime' | 'billing_interval';
+// The two periods the server takes for a plan limit (UpdatePlanLimitsRequest).
+export type AdminLimitPeriod = 'lifetime' | 'billing_interval';
 
 export interface AdminPlanLimitInput {
   limit_type: AdminLimitType;

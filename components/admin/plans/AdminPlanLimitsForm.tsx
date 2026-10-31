@@ -38,6 +38,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import type { AdminPlanDetail, AdminLimitPeriod } from '@/types/admin-plans';
 import type { IPlanLimit } from '@/types/subscription';
 import { limitsSavedToast } from './plan-limits-saved';
+import { formPeriod, LIMIT_PERIOD_OPTIONS } from './plan-limit-period';
 import {
   FILE_LIMIT_FIELDS,
   fileLimitError,
@@ -54,7 +55,7 @@ import {
 
 const limitSchema = z.object({
   limit_value: z.number().int().min(-1, 'Min value is -1'),
-  period: z.enum(['month', 'day', 'lifetime', 'billing_interval']),
+  period: z.enum(['lifetime', 'billing_interval']),
 });
 
 const fileLimitSchema = z.object({
@@ -104,13 +105,6 @@ const LIMIT_LABELS: Record<string, string> = {
   note_creations: 'Note Creations',
 };
 
-const PERIOD_OPTIONS: { value: AdminLimitPeriod; label: string }[] = [
-  { value: 'billing_interval', label: 'Per Billing Interval' },
-  { value: 'month', label: 'Per Month' },
-  { value: 'day', label: 'Per Day' },
-  { value: 'lifetime', label: 'Lifetime' },
-];
-
 /******************************************************************************
                                  Helpers
 ******************************************************************************/
@@ -122,7 +116,7 @@ function findLimit(
   const found = limits.find((l) => l.type === type);
   return {
     limit_value: found?.value ?? 0,
-    period: (found?.period as AdminLimitPeriod) ?? 'month',
+    period: formPeriod(found?.period),
   };
 }
 
@@ -269,7 +263,7 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {PERIOD_OPTIONS.map((opt) => (
+                            {LIMIT_PERIOD_OPTIONS.map((opt) => (
                               <SelectItem key={opt.value} value={opt.value}>
                                 {opt.label}
                               </SelectItem>
