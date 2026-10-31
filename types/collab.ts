@@ -1861,15 +1861,10 @@ export interface SpaceTask {
   waiting_on: SpaceTaskPerson | null;
   /** `null`: nobody has it yet. */
   owner: SpaceTaskPerson | null;
-  /** The task's thread or channel, for a viewer who may read it (Backend
-   *  5a1b7543: each viewer gets their own copy; private threads may be
-   *  linked). `channel_uuid` is the thread's channel, or the channel itself. */
+  /** The task's thread or channel. A task may link a private thread; whoever
+   *  may not read it never receives the card (Stay's B, Backend fb826d73).
+   *  `channel_uuid` is the thread's channel, or the channel itself. */
   thread: { uuid: string; name: string; channel_uuid: string } | null;
-  /** The task has a thread this viewer may not read: `thread` is then `null`,
-   *  and nothing of the thread is in the card. On a `task.changed` snapshot it
-   *  means the thread is private to some: each viewer reads the card again.
-   *  Absent from a server without the field. */
-  has_hidden_thread?: boolean;
   /** The task's place in its owner's queue, lowest first. */
   position: number;
   /** The first move to Working; `null` until then. */

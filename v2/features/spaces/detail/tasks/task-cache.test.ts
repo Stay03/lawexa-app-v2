@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { SpaceTask, SpaceTaskPerson } from '@/types/collab';
-import { applyReorder, applyTaskChanged, createCardReader, removeTask, reorderedQueue, upsertTask } from './task-cache';
+import { applyReorder, applyTaskChanged, removeTask, reorderedQueue, upsertTask } from './task-cache';
 
 const person = (uuid: string, name: string): SpaceTaskPerson => ({
   uuid,
@@ -181,54 +181,4 @@ test('a reorder applied to the cache gives each named task its place as its posi
   );
   // A row that did not move is the same object.
   assert.equal(next[2], tasks[2]);
-});
-
-/* Private threads (Backend 5a1b7543): the broadcast withholds a thread some may not read. */
-
-test('a snapshot with a hidden thread keeps the cached card’s own thread until the card is read again', () => {
-  const linked = { uuid: 'th-fee', name: 'TEST DATA fee note', channel_uuid: 'c-partners' };
-  const cached = task('t1', { thread: linked, has_hidden_thread: false, updated_at: '2026-10-31T05:00:00Z' });
-  const snapshot = task('t1', { title: 'TEST DATA renamed', thread: null, has_hidden_thread: true, updated_at: '2026-10-31T05:01:00Z' });
-  const [after] = applyTaskChanged([cached], { action: 'updated', task: snapshot }, NONE_DELETED);
-  assert.equal(after.title, 'TEST DATA renamed');
-  assert.deepEqual(after.thread, linked);
-  assert.equal(after.has_hidden_thread, false);
-  // A non-reader's card keeps its own hidden copy too.
-  const hidden = task('t2', { thread: null, has_hidden_thread: true, updated_at: '2026-10-31T05:00:00Z' });
-  const [still] = applyTaskChanged([hidden], { action: 'updated', task: { ...snapshot, uuid: 't2' } }, NONE_DELETED);
-  assert.equal(still.thread, null);
-  assert.equal(still.has_hidden_thread, true);
-  // A snapshot without the flag goes in whole, as before: an unlinked thread is gone.
-  const [unlinked] = applyTaskChanged(
-    [cached],
-    { action: 'updated', task: { ...snapshot, has_hidden_thread: false } },
-    NONE_DELETED,
-  );
-  assert.equal(unlinked.thread, null);
-});
-
-test('a card is read one at a time: a burst of changes costs two reads, not one per change', async () => {
-  const reads: string[] = [];
-  const finish = new Map<string, () => void>();
-  const read = createCardReader(
-    (taskUuid) =>
-      new Promise<void>((resolve) => {
-        reads.push(taskUuid);
-        finish.set(taskUuid, resolve);
-      }),
-  );
-  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
-  read('t1');
-  read('t1');
-  read('t1');
-  read('t2');
-  assert.deepEqual(reads, ['t1', 't2']);
-  finish.get('t1')?.();
-  await settle();
-  // The three t1 changes made one more read, not two.
-  assert.deepEqual(reads, ['t1', 't2', 't1']);
-  finish.get('t1')?.();
-  finish.get('t2')?.();
-  await settle();
-  assert.deepEqual(reads, ['t1', 't2', 't1']);
 });

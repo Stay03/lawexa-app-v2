@@ -14,7 +14,6 @@ import {
   startThreadPayload,
   taskChatLine,
   taskChatState,
-  taskChatShown,
   taskSeedFromThread,
   taskThreadAccess,
   threadChoices,
@@ -217,27 +216,6 @@ test('New task from a thread starts with that thread and its title, cut to fit',
 });
 
 /* Private threads on tasks (Stay's A; Backend 5a1b7543). */
-
-test('a card whose thread this reader may not read shows no chat at all, before any other rule', () => {
-  const concealed = { ...task(null), has_hidden_thread: true };
-  for (const flags of [
-    { canEdit: true, canChat: true },
-    { canEdit: false, canChat: false },
-  ]) {
-    const state = taskChatState(concealed, flags, PENDING);
-    assert.deepEqual(state, { kind: 'concealed' });
-    assert.equal(taskChatShown(state), false);
-    // No line about it either (Stay, through the techlead, 05:06Z).
-    assert.equal(taskChatLine(state), null);
-  }
-  // A reader's copy of the same card carries the thread and no flag: the pane as before.
-  assert.equal(taskChatShown(taskChatState({ ...task(THREAD), has_hidden_thread: false }, { canEdit: true, canChat: true }, PENDING)), true);
-  // A card with no thread at all still offers Start a thread.
-  assert.deepEqual(taskChatState({ ...task(null), has_hidden_thread: false }, { canEdit: true, canChat: true }, PENDING), {
-    kind: 'none',
-    canStart: true,
-  });
-});
 
 test('Start a thread may go in an open channel or a private one the starter is in; the default stays the oldest open one', () => {
   const rooms = [

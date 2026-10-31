@@ -78,10 +78,21 @@ export const EVT_TASK_CHANGED = '.task.changed';
 /**
  * Payload of {@link EVT_TASK_CHANGED}: the whole task as it is now, a FULL
  * snapshot (the same row `GET /spaces/{uuid}/tasks` returns), so the board
- * writes it in place and never refetches. Every member of the space gets it,
- * which is why a task's thread must be one every member can read.
+ * writes it in place and never refetches. Every member of the space gets it.
  */
-export interface SpaceTaskChangedEvent {
+export interface SpaceTaskSnapshotEvent {
   action: 'created' | 'updated' | 'deleted';
   task: SpaceTask;
 }
+
+/**
+ * A change to a task some members may not see (one linked to a private
+ * thread; Stay's B, Backend fb826d73): no task at all, since the broadcast
+ * reaches every member. Each board reads its own list again, which the
+ * server filters per person.
+ */
+export interface SpaceTaskRefreshEvent {
+  action: 'refresh';
+}
+
+export type SpaceTaskChangedEvent = SpaceTaskSnapshotEvent | SpaceTaskRefreshEvent;

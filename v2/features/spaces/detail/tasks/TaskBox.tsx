@@ -40,7 +40,6 @@ import {
   startThreadError,
   startThreadPayload,
   taskChatLine,
-  taskChatShown,
   taskChatState,
   threadChoices,
   taskThreadAccess,
@@ -185,7 +184,7 @@ function GoneBody() {
   return (
     <div className="flex flex-col gap-1.5 p-6 pr-12">
       <DialogTitle>This task is gone</DialogTitle>
-      <DialogDescription>Someone deleted it.</DialogDescription>
+      <DialogDescription>It isn’t on your board any more.</DialogDescription>
     </div>
   );
 }
@@ -245,7 +244,6 @@ function TaskBoxBody({
       errorStatus: threadQuery.error ? extractApiError(threadQuery.error).status : null,
     }),
   );
-  const chatShown = taskChatShown(chat);
   const retryChat = () => void threadQuery.refetch();
   // Start a thread for a task with none, in the channel picked (Stay, 22:40Z):
   // the board's copy takes it, and the pane opens on it. The channels are the
@@ -429,8 +427,6 @@ function TaskBoxBody({
         )}
       </FieldBlock>
 
-      {/* A thread this reader may not read: nothing of it, the field included (Stay, 05:06Z). */}
-      {chatShown ? (
       <FieldBlock label="Thread" htmlFor={`${uid}-thread`} error={errors.thread} errorId={`${uid}-thread-error`}>
         {canEdit && rooms ? (
           <ThreadSelect
@@ -447,7 +443,6 @@ function TaskBoxBody({
           <p className="text-sm text-foreground">{task?.thread?.name ?? 'No thread'}</p>
         )}
       </FieldBlock>
-      ) : null}
 
       {draft.stage === 'waiting' ? (
         <FieldBlock label="Waiting on" htmlFor={`${uid}-waiting`} error={errors.waiting_on} errorId={`${uid}-waiting-error`}>
@@ -541,7 +536,7 @@ function TaskBoxBody({
       {phone ? (
         <div className="flex min-h-0 flex-1 flex-col">
           {head}
-          {task && chatShown ? (
+          {task ? (
             <BoxTabs
               label="Task"
               value={phoneTab}
@@ -552,7 +547,7 @@ function TaskBoxBody({
               ]}
             />
           ) : null}
-          {phoneTab === 'chat' && task && chatShown ? (
+          {phoneTab === 'chat' && task ? (
             // Outside the details form, so the composer's Enter sends a message and never saves the task.
             <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
           ) : (
@@ -570,7 +565,7 @@ function TaskBoxBody({
           )}
         </div>
       ) : (
-        <div className={cn('grid min-h-0 flex-1', chatShown ? 'grid-cols-[minmax(0,1fr)_360px]' : 'grid-cols-1')}>
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_360px]">
           <form onSubmit={save} noValidate className="flex min-h-0 flex-col">
             {head}
             {task ? (
@@ -593,11 +588,9 @@ function TaskBoxBody({
             </div>
             {foot}
           </form>
-          {chatShown ? (
-            <aside aria-label="Task chat" className="flex min-h-0 flex-col border-l border-border bg-secondary/40">
-              <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
-            </aside>
-          ) : null}
+          <aside aria-label="Task chat" className="flex min-h-0 flex-col border-l border-border bg-secondary/40">
+            <TaskChatPane state={chat} channel={threadChannel} onRetry={retryChat} start={chatStart} />
+          </aside>
         </div>
       )}
 
@@ -922,9 +915,9 @@ export function ChoiceSelect({
 }
 
 /**
- * The space's channels and threads that every member can read (the server's
- * rule for a task's thread), from the two reads the rail and the lobby
- * already keep. The task's own thread stays a choice even when neither list
+ * The space's channels and threads the person can read (`threadChoices`, the
+ * server's rule for a task's thread), from the two reads the rail and the
+ * lobby already keep. The task's own thread stays a choice even when neither list
  * has it.
  */
 function ThreadSelect({
