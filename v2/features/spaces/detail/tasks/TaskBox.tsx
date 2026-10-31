@@ -731,8 +731,8 @@ interface ChatStart {
 
 /**
  * The channel picker over the button (Stay, 30 October 2026, 22:40Z; plan
- * 0fba5ec3). Several open channels: a picker, the server's own default
- * preselected. One: a line naming it. None: a line saying so, and no button,
+ * 0fba5ec3). Several channels the starter may post in: a picker, the
+ * server's own default preselected. One: a line naming it. None: a line saying so, and no button,
  * since the server would refuse. While the list is on its way, the button
  * starts the thread where the server puts it.
  */
@@ -741,7 +741,7 @@ function StartThread({ start, onStart }: { start: ChatStart; onStart: () => void
   const native = useSheetSide() === 'bottom';
   const channels = start.channels;
   if (channels && channels.length === 0) {
-    return <p className="text-sm text-muted-foreground">This Space has no open channel to start a thread in.</p>;
+    return <p className="text-sm text-muted-foreground">This Space has no channel you can post in to start a thread.</p>;
   }
   return (
     <div className="flex flex-col gap-3">

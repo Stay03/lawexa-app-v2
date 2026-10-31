@@ -176,7 +176,9 @@ export function taskChatShown(state: TaskChatState): boolean {
  * order, from the rail's list. The preselected one is the oldest open
  * channel, the server's own default (its first `space_public` channel by id),
  * read from the data rather than the list's order, so leaving the picker
- * alone starts the thread where it always has.
+ * alone starts the thread where it always has; in a Space whose channels the
+ * starter may post in are all private, the oldest of those (Frontend's
+ * review, 05:26Z), since the start always names the channel shown.
  */
 export function startThreadChannels(rooms: readonly Channel[]): { options: StartChannel[]; preselected: string | null } {
   const postable = new Map<string, Channel>();
@@ -186,9 +188,9 @@ export function startThreadChannels(rooms: readonly Channel[]): { options: Start
     postable.set(room.uuid, room);
   }
   const rows = [...postable.values()];
-  const oldest = rows
-    .filter((room) => room.visibility === 'space_public')
-    .reduce<Channel | null>((first, room) => (first === null || room.created_at < first.created_at ? room : first), null);
+  const oldestOf = (list: readonly Channel[]) =>
+    list.reduce<Channel | null>((first, room) => (first === null || room.created_at < first.created_at ? room : first), null);
+  const oldest = oldestOf(rows.filter((room) => room.visibility === 'space_public')) ?? oldestOf(rows);
   return {
     options: rows.map((room) => ({ uuid: room.uuid, name: room.name })).sort((a, b) => a.name.localeCompare(b.name)),
     preselected: oldest?.uuid ?? null,
