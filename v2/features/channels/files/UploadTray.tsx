@@ -5,6 +5,7 @@ import { CircleAlert, RotateCcw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { formatBytes } from '@/lib/utils/format-bytes';
+import { PlansLink } from '@/v2/features/files/PlansLink';
 import type { UploadEntry, UploadQueue } from './use-upload-queue';
 
 /**
@@ -82,7 +83,15 @@ function UploadRow({
         </div>
 
         {settled ? (
-          <p className="mt-0.5 text-xs text-foreground/80">{entry.message}</p>
+          <p className="mt-0.5 text-xs text-foreground/80">
+            {entry.message}
+            {entry.plans ? (
+              <>
+                {' '}
+                <PlansLink />
+              </>
+            ) : null}
+          </p>
         ) : (
           <div
             className={cn(BAR, 'mt-1.5')}

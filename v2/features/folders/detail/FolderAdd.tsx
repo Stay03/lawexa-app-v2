@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { BookOpen, Blocks, Check, FileText, FolderPlus, Loader2, Plus, Upload, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
@@ -23,6 +24,7 @@ import {
 import { filesApi } from '@/lib/api/files';
 import { spacesApi } from '@/lib/api/collab';
 import { formatBytes } from '@/lib/utils/format-bytes';
+import { plansToastAction } from '@/v2/features/files/PlansLink';
 import { FILES_ACCEPT, fileTypeLabel } from '@/v2/features/spaces/content-model';
 import { invalidateSpaceContents } from '@/v2/features/spaces/content-mutations';
 import { spacesQueries } from '@/v2/features/spaces/queries';
@@ -35,7 +37,7 @@ import {
   useAddItemToFolder,
   type FolderItemTarget,
 } from '../item-mutations';
-import { FiledAfterUploadError, sendFolderUpload } from './folder-upload';
+import { FiledAfterUploadError, sendFolderUpload, type UploadNotices } from './folder-upload';
 
 /**
  * FolderAdd — how things get INTO a folder from the folder itself (Arthur, 17
@@ -176,9 +178,20 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
     },
   });
   const uploadAsync = upload.mutateAsync;
+  const router = useRouter();
+  // The toasts, with the way to the plans on a refusal a bigger plan allows.
+  const notices: UploadNotices = {
+    loading: (message) => toast.loading(message),
+    success: (message, options) => toast.success(message, options),
+    error: (message, options) =>
+      toast.error(message, {
+        id: options?.id,
+        ...(options?.plans && { action: plansToastAction((href) => router.push(href)) }),
+      }),
+  };
 
   const send = (file: File) => {
-    void sendFolderUpload(file, { folder, upload: uploadAsync, notices: toast });
+    void sendFolderUpload(file, { folder, upload: uploadAsync, notices });
   };
 
   const input = (

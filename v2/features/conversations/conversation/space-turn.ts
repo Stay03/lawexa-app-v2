@@ -170,6 +170,9 @@ export interface SendRefused {
   refused: string;
   /** The reply's original is gone: give the words back, not the quote. */
   dropReply?: true;
+  /** Refused at a plan's files limit: the line is a fault to fix (remove a
+   *  file), and `plans` adds the way to them when a bigger plan allows more. */
+  limit?: { plans: boolean };
 }
 
 /** The composer's line when the send never reached the server. */
@@ -190,6 +193,7 @@ export function sendRefusal(refusal: SendRefusal, viewerId: number | null): stri
   if (refusal.kind === 'forbidden') return VIEW_ONLY_COPY.viewer;
   if (refusal.kind === 'reply-gone') return REPLY_GONE_COPY;
   if (refusal.kind === 'unsent') return UNSENT_COPY;
+  if (refusal.kind === 'upload-limit') return refusal.message;
   if (refusal.by === null) return 'Someone is asking right now. Your message is kept.';
   if (refusal.by.id === viewerId) {
     return 'Your last question is still being answered. Your message is kept.';
@@ -208,6 +212,7 @@ export function askAgainRefusal(refusal: SendRefusal, viewerId: number | null): 
   // "Ask again" never replies to anything; said plainly should it ever happen.
   if (refusal.kind === 'reply-gone') return 'That message is no longer available.';
   if (refusal.kind === 'unsent') return "Couldn't reach Lawexa. Ask again in a moment.";
+  if (refusal.kind === 'upload-limit') return refusal.message;
   if (refusal.by === null) return 'Someone is asking right now. Ask again once the answer is in.';
   if (refusal.by.id === viewerId) return 'Your last question is still being answered.';
   return `${refusal.by.name} is asking right now. Ask again once their answer is in.`;

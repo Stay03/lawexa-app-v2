@@ -91,3 +91,32 @@ export function getFieldError(
 ): string | undefined {
   return errors?.[field]?.[0];
 }
+
+/** An upload the server refused at a plan limit: what to show, and whether a bigger plan allows more. */
+export interface UploadLimitRefusal {
+  /** The server's sentence, ready to show ("Your plan takes files up to 10 MB. This one is 10.1 MB."). */
+  message: string;
+  /** A paid plan allows more: the screen adds a link to the plans. */
+  upgrade: boolean;
+  /** Which limit: upload_size_mb, media_size_mb, storage_mb or files_per_message. */
+  limitType: string;
+}
+
+/**
+ * Extract an upload refused at a plan limit (Backend eeceb2b2, thread
+ * 1c93152c): a 422 with `code: "UPLOAD_LIMIT_REACHED"` from `POST
+ * /files/documents`, `POST /spaces/{space}/files` and `POST /chat`. Any other
+ * error is `null`, so a screen keeps its own handling for it.
+ */
+export function extractUploadLimit(error: unknown): UploadLimitRefusal | null {
+  if (!(error instanceof AxiosError) || error.response?.status !== 422) return null;
+  const data = error.response.data as
+    | { code?: unknown; message?: unknown; upgrade?: unknown; limit_type?: unknown }
+    | undefined;
+  if (data?.code !== 'UPLOAD_LIMIT_REACHED' || typeof data.message !== 'string' || data.message === '') return null;
+  return {
+    message: data.message,
+    upgrade: data.upgrade === true,
+    limitType: typeof data.limit_type === 'string' ? data.limit_type : '',
+  };
+}

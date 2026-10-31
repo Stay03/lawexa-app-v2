@@ -179,6 +179,11 @@ export type SendRefusal =
   /** The send never reached the server (no answer at all: the signal dropped,
    *  the network is down). The words and the quote go back to the box. */
   | { kind: 'unsent' }
+  /** The server would not take this many files on one message for this plan
+   *  (422 `UPLOAD_LIMIT_REACHED`, `files_per_message`; Backend eeceb2b2). The
+   *  words and the files go back to the box with the server's own sentence;
+   *  `upgrade` says a bigger plan allows more. */
+  | { kind: 'upload-limit'; message: string; upgrade: boolean }
   /** The server would not take a message from this account now: no messages
    *  left, or a flagged account. The row under the chat already says why and
    *  offers the plans, so the composer adds no line of its own; the words go

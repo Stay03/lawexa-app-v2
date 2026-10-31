@@ -328,8 +328,8 @@ test('submit drops the old status first, and a refusal by role re-reads the reco
   // Ask again waits too: it starts a turn from the same history.
   const askAgain = controller.slice(controller.indexOf('const regenerate = useCallback'));
   assert.match(askAgain, /if \(\(await flushDraftsBeforeSend\(conversationId\)\) === 'unsaved'\) toast\.warning\(UNSAVED_DRAFT_LINE\);\s*const refusal = await send\(lastUserContent/);
-  assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{\s*refused: sendRefusal\(refusal, serverUserId\),\s*\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),\s*\};/);
-  assert.match(controller, /\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked'\) \{\s*(\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
+  assert.match(controller, /if \(refusal === null\) return undefined;\s*takeRefusal\(refusal\);\s*return \{\s*refused: sendRefusal\(refusal, serverUserId\),\s*\.\.\.\(refusal\.kind === 'reply-gone' && \{ dropReply: true as const \}\),\s*\.\.\.\(refusal\.kind === 'upload-limit' && \{ limit: \{ plans: refusal\.upgrade \} \}\),\s*\};/);
+  assert.match(controller, /\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked' && refusal\.kind !== 'upload-limit'\) \{\s*(\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/);
   assert.match(controller, /const heldBy = turn\.kind === 'colleague' \? turn\.name : null;/);
 });
 
@@ -339,16 +339,16 @@ test('the composer gives a refused message back, with its pasted cards and files
   assert.match(composer, /outcome = await onSubmit\(fullMessage, attachmentsSnapshot, draft\.reply\);/);
   assert.match(
     composer,
-    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)*if \(draft\.reply && !outcome\.dropReply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*(\/\/[^\n]*\n\s*)*if \(outcome\.refused\) showError\(outcome\.refused, 'notice'\);/,
+    /updateInput\(\(current\) => \(current\.trim\(\) === '' \? draft\.input : current\)\);\s*for \(const text of draft\.pasted\) addPasted\(text\);\s*setUploads\(\(current\) => \[\.\.\.draft\.uploads, \.\.\.current\]\);\s*(\/\/[^\n]*\n\s*)*if \(draft\.reply && !outcome\.dropReply\) updateReply\(\(current\) => current \?\? draft\.reply\);\s*(\/\/[^\n]*\n\s*)*if \(outcome\.refused\) showError\(outcome\.refused, outcome\.limit \? 'error' : 'notice', outcome\.limit\?\.plans === true\);/,
   );
   // A held send is a wait, not a fault: a muted status with a clock, never the red
   // alert (Stay, 13 October 2026). File errors keep the red box.
   assert.match(composer, /role=\{errorTone === 'notice' \? 'status' : 'alert'\}/);
   assert.match(composer, /errorTone === 'notice'\s*\? 'text-muted-foreground px-1 text-xs'\s*: 'border-destructive\/40 bg-destructive\/10 text-destructive rounded-xl border px-3 py-2 text-sm',/);
   assert.match(composer, /errorTone === 'notice' \? \(\s*<Clock className="mt-px size-3\.5 shrink-0" aria-hidden \/>\s*\) : \(\s*<AlertCircle/);
-  assert.match(composer, /const showError = \(message: string, tone: 'error' \| 'notice' = 'error'\) => \{/);
+  assert.match(composer, /const showError = \(message: string, tone: 'error' \| 'notice' = 'error', plans = false\) => \{/);
   // Every file error still calls showError with the default (red) tone.
-  assert.equal(composer.match(/showError\([^)]*'notice'\)/g)?.length, 1, 'only the refused send passes notice');
+  assert.equal(composer.match(/showError\([^)]*'notice'/g)?.length, 1, 'only the refused send passes notice');
   // A sent tray's thumbnails are released only once the send was taken.
   assert.match(composer, /if \(!outcome\) for \(const u of draft\.uploads\) if \(u\.preview\) URL\.revokeObjectURL\(u\.preview\);/);
   // The case dock passes the refusal through.
@@ -493,7 +493,7 @@ test('a refused Ask again says why in the composer’s banner, for a 409 and for
   // Both refusals change the screen as a refused send does.
   assert.match(
     controller,
-    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);[\s\S]*?void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId, true\);\s*\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked'\) \{\s*(\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
+    /if \(refusal\.kind === 'held'\) \{\s*setRefusedTurn\(\{ by: refusal\.by, since: refusal\.since \}\);[\s\S]*?void followTurn\(refusal\.executionId, \(\) => liveRef\.current === conversationId, true\);\s*\} else if \(refusal\.kind !== 'unsent' && refusal\.kind !== 'blocked' && refusal\.kind !== 'upload-limit'\) \{\s*(\/\/[^\n]*\n\s*)*void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);/,
   );
   const screen = readHere('ConversationScreen.tsx');
   assert.match(

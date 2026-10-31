@@ -24,7 +24,7 @@ import { AxiosError } from 'axios';
 import { chatApi } from '@/lib/api/chat';
 import { eventFromApi, transformApiMessages } from '@/lib/utils/transform-api-messages';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
-import { extractBlockedReason } from '@/lib/utils/api-error';
+import { extractBlockedReason, extractUploadLimit } from '@/lib/utils/api-error';
 import { AuthedEventSource, CLOSED, CONNECTING } from '@/lib/stream/authed-event-source';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import {
@@ -2331,6 +2331,16 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         removeMessage(optimisticMsg.id);
         setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
         return { kind: 'forbidden' };
+      }
+
+      // 422 UPLOAD_LIMIT_REACHED — more files than this plan takes on one
+      // message (Backend eeceb2b2). A refusal, not an error: nothing was saved,
+      // and the host gives the words and the files back with the server's words.
+      const uploadLimit = extractUploadLimit(err);
+      if (uploadLimit) {
+        removeMessage(optimisticMsg.id);
+        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        return { kind: 'upload-limit', message: uploadLimit.message, upgrade: uploadLimit.upgrade };
       }
 
       // 422 on `reply_to_message_id` — the message this turn replies to is no

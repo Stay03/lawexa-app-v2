@@ -85,6 +85,8 @@ export interface UploadEntry {
   retryable: boolean;
   /** Whether aborting would actually stop anything — see the docblock. */
   cancellable: boolean;
+  /** Refused at a plan limit a bigger plan allows: the row links to the plans. */
+  plans?: boolean;
 }
 
 export interface UploadQueue {
@@ -114,6 +116,8 @@ export interface UploadAttempt {
 export interface UploadFailureNote {
   message: string;
   retryable: boolean;
+  /** A plan limit a bigger plan allows (`UPLOAD_LIMIT_REACHED` with `upgrade`). */
+  plans?: boolean;
 }
 
 /** A failed attempt when the surface has no better words: the server's own
@@ -216,6 +220,7 @@ export function useUploadQueueFor(
           message: note.message,
           retryable: note.retryable,
           cancellable: false,
+          plans: note.plans === true,
         });
       }
     },

@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { extractApiError } from '@/lib/utils/api-error';
+import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
 import { formatDayLabel } from '@/lib/utils/collab';
 import type {
   Space,
@@ -806,12 +806,15 @@ function SpaceFeed({
 
 /**
  * How a refused upload's row reads: the rules refusal's own reason (under
- * `errors.file`), and no Retry for a refusal the server would repeat
- * (`uploadRefusal`). Module-level, so the queue's callbacks stay stable.
+ * `errors.file`, where a plan limit's sentence is too), and no Retry for a
+ * refusal the server would repeat (`uploadRefusal`). Module-level, so the
+ * queue's callbacks stay stable.
  */
 function describeUploadFailure(error: unknown): UploadFailureNote {
   const apiError = extractApiError(error);
-  return uploadRefusal(apiError.status, apiError.errors?.file?.[0] ?? null, apiError.message);
+  const refusal = uploadRefusal(apiError.status, apiError.errors?.file?.[0] ?? null, apiError.message);
+  // A plan limit (a 422, so no Retry): the way to the plans when a bigger one allows the file.
+  return extractUploadLimit(error)?.upgrade ? { ...refusal, plans: true } : refusal;
 }
 
 /**

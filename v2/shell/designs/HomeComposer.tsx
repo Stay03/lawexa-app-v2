@@ -45,7 +45,8 @@ import { ActivityStatus } from '@/v2/features/conversations/conversation/Activit
 import { REDACTING_LABEL } from '@/v2/features/conversations/conversation/redaction-wait';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
-import { extractApiError, extractBlockedReason } from '@/lib/utils/api-error';
+import { extractApiError, extractBlockedReason, extractUploadLimit } from '@/lib/utils/api-error';
+import { PlansLink } from '@/v2/features/files/PlansLink';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { UserRole } from '@/types/auth';
 import type { ChatReference } from '@/types/chat';
@@ -134,10 +135,23 @@ interface FileUploadEntry {
   /** From the upload's answer, so the sent message can show a picture as one. */
   mime_type?: string;
   error?: string;
+  /** Refused at a plan limit a bigger plan allows (`upgrade`): the chip links to the plans. */
+  plans?: boolean;
 }
 
 /** Attachment exit window — must clear before the row leaves the DOM. */
 const CHIP_EXIT_MS = 160;
+
+/** A chip whose upload failed: the server's sentence, and the plans when a bigger plan allows the file. */
+function failedUpload(entry: FileUploadEntry, error: unknown): FileUploadEntry {
+  const limit = extractUploadLimit(error);
+  return {
+    ...entry,
+    status: 'failed',
+    error: limit?.message ?? extractApiError(error).message,
+    plans: limit?.upgrade === true,
+  };
+}
 
 /** Compact human file size — pure, so it is safe to call in render. */
 function formatBytes(bytes: number): string {
@@ -251,6 +265,9 @@ export function HomeComposer({
   /** When Send was pressed (epoch ms), for the redaction wait's clock. */
   const [submittedAt, setSubmittedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The send refusal the plans link belongs to (a plan's files limit a bigger
+  // plan allows): kept as its words, so any later error shows without the link.
+  const [plansFor, setPlansFor] = useState<string | null>(null);
   // A server BLOCK (message cap / plan gate) is not a failure — it gets its own
   // reason-aware banner with the upgrade path, mirroring v1's MessageBlockBanner
   // semantics (v2-native rendering; the v1 banner component is boundary-blocked).
@@ -370,13 +387,7 @@ export function HomeComposer({
             ),
           );
         } catch (err) {
-          setUploads((prev) =>
-            prev.map((u) =>
-              u.key === entry.key
-                ? { ...u, status: 'failed', error: extractApiError(err).message }
-                : u,
-            ),
-          );
+          setUploads((prev) => prev.map((u) => (u.key === entry.key ? failedUpload(u, err) : u)));
         }
       }),
     );
@@ -492,12 +503,18 @@ export function HomeComposer({
       // a double-submit before the home unmounts.
     } catch (err) {
       // Failure: keep the draft + attachments so the user can simply retry.
+      const limit = extractUploadLimit(err);
       if (err instanceof RedactionUnavailableError) {
         setError(
           err.retryAfter
             ? `Redaction service is temporarily unavailable. Try again in ${err.retryAfter}s.`
             : 'Redaction service is temporarily unavailable. Please try again shortly.',
         );
+      } else if (limit) {
+        // More files than this plan takes on one message: the server's own
+        // sentence, in a space too, and the plans when a bigger one allows more.
+        setError(limit.message);
+        setPlansFor(limit.upgrade ? limit.message : null);
       } else if (extractBlockedReason(err)) {
         // Server block (limits / plan gating) — the reason-aware banner, not a
         // raw error string (v1 parity: page.tsx branches the same way).
@@ -560,7 +577,15 @@ export function HomeComposer({
           className="mb-2 flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-200"
         >
           <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <span className="flex-1">{shownError}</span>
+          <span className="flex-1">
+            {shownError}
+            {plansFor !== null && plansFor === error ? (
+              <>
+                {' '}
+                <PlansLink />
+              </>
+            ) : null}
+          </span>
         </div>
       ) : null}
 
@@ -666,7 +691,15 @@ export function HomeComposer({
                     {/* The server's whole message, on its own line: see the
                         conversation composer's chip. */}
                     {isFailed && upload.error ? (
-                      <span className="basis-full break-words opacity-80">{upload.error}</span>
+                      <span className="basis-full break-words opacity-80">
+                        {upload.error}
+                        {upload.plans ? (
+                          <>
+                            {' '}
+                            <PlansLink />
+                          </>
+                        ) : null}
+                      </span>
                     ) : null}
                   </div>
                 );

@@ -1,4 +1,4 @@
-import { extractApiError } from '@/lib/utils/api-error';
+import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
 import { uploadPrecheck } from '@/v2/features/spaces/content-model';
 
 /**
@@ -27,7 +27,8 @@ export class FiledAfterUploadError extends Error {
 export interface UploadNotices {
   loading(message: string): string | number;
   success(message: string, options: { id: string | number }): unknown;
-  error(message: string, options?: { id: string | number }): unknown;
+  /** `plans`: refused at a plan limit a bigger plan allows, so the notice offers the plans. */
+  error(message: string, options?: { id: string | number; plans?: boolean }): unknown;
 }
 
 /**
@@ -66,6 +67,12 @@ export async function sendFolderUpload(
     if (error instanceof FiledAfterUploadError) {
       const where = folder.space ? `It is in ${folder.space.name}` : 'It is in your files';
       notices.error(`“${file.name}” uploaded, but couldn’t be added to ${folder.name}. ${where}.`, { id });
+      return;
+    }
+    // A plan limit: the server's own sentence, and the plans when a bigger one allows the file.
+    const limit = extractUploadLimit(error);
+    if (limit) {
+      notices.error(`Couldn’t upload “${file.name}”. ${limit.message}`, { id, plans: limit.upgrade });
       return;
     }
     notices.error(`Couldn’t upload “${file.name}”. ${extractApiError(error).message}`, { id });

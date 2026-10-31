@@ -1030,9 +1030,9 @@ export function useConversationController(
         // The follow waits on a transcript read: it attaches only if this
         // screen still shows this chat when the read lands.
         void followTurn(refusal.executionId, () => liveRef.current === conversationId, true);
-      } else if (refusal.kind !== 'unsent' && refusal.kind !== 'blocked') {
-        // An unsent turn reached nobody (likely offline), and a blocked one
-        // saved nothing: there is nothing new to re-read.
+      } else if (refusal.kind !== 'unsent' && refusal.kind !== 'blocked' && refusal.kind !== 'upload-limit') {
+        // An unsent turn reached nobody (likely offline), and a blocked one or
+        // one over the files limit saved nothing: there is nothing new to re-read.
         void queryClient.invalidateQueries({ queryKey: detailKey });
       }
     },
@@ -1067,6 +1067,7 @@ export function useConversationController(
       return {
         refused: sendRefusal(refusal, serverUserId),
         ...(refusal.kind === 'reply-gone' && { dropReply: true as const }),
+        ...(refusal.kind === 'upload-limit' && { limit: { plans: refusal.upgrade } }),
       };
     },
     [send, conversationId, jurisdiction, queryClient, statusKey, takeRefusal, serverUserId],

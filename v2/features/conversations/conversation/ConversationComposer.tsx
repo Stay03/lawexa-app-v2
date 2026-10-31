@@ -34,7 +34,8 @@ import {
 } from '@/components/ui/prompt-input';
 import { cn, serializePastedContent } from '@/lib/utils';
 import { uploadAttachment } from '@/v2/features/conversations/attachment-upload';
-import { extractApiError } from '@/lib/utils/api-error';
+import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
+import { PlansLink } from '@/v2/features/files/PlansLink';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
@@ -113,6 +114,21 @@ import { usePastedContent } from './usePastedContent';
 /** Attachment exit window — must clear before the row leaves the DOM. */
 const CHIP_EXIT_MS = 160;
 
+/**
+ * A chip whose upload failed: the server's own sentence, and the way to the
+ * plans when it refused at a plan limit a bigger plan allows (Backend
+ * eeceb2b2: `UPLOAD_LIMIT_REACHED` with `upgrade`).
+ */
+function failedUpload(entry: FileUploadEntry, error: unknown): FileUploadEntry {
+  const limit = extractUploadLimit(error);
+  return {
+    ...entry,
+    status: 'failed',
+    error: limit?.message ?? extractApiError(error).message,
+    plans: limit?.upgrade === true,
+  };
+}
+
 interface FileUploadEntry {
   key: string;
   file_name: string;
@@ -126,6 +142,8 @@ interface FileUploadEntry {
   /** From the upload's answer, so the sent message can show a picture as one. */
   mime_type?: string;
   error?: string;
+  /** Refused at a plan limit a bigger plan allows (`upgrade`): the chip links to the plans. */
+  plans?: boolean;
 }
 
 /** Compact human file size — pure, safe in render. */
@@ -390,6 +408,8 @@ export function ConversationComposer({
   // October 2026: the red banner "seems trying to sabotage the beauty of the
   // page"). Kept with the text, so a dismiss animates out in its own tone.
   const [errorTone, setErrorTone] = useState<'error' | 'notice'>('error');
+  // A send refused at a plan's files limit a bigger plan allows: the line links to the plans.
+  const [errorPlans, setErrorPlans] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // The reader's own turn locks the pill; any other (a colleague's, or one
@@ -397,9 +417,10 @@ export function ConversationComposer({
   // with Send held.
   const ownTurnRunning = isStreaming && canStop;
 
-  const showError = (message: string, tone: 'error' | 'notice' = 'error') => {
+  const showError = (message: string, tone: 'error' | 'notice' = 'error', plans = false) => {
     setErrorText(message);
     setErrorTone(tone);
+    setErrorPlans(plans);
     setErrorOpen(true);
   };
   const hideError = () => setErrorOpen(false);
@@ -503,11 +524,7 @@ export function ConversationComposer({
             ),
           );
         } catch (err) {
-          setUploads((prev) =>
-            prev.map((u) =>
-              u.key === entry.key ? { ...u, status: 'failed', error: extractApiError(err).message } : u,
-            ),
-          );
+          setUploads((prev) => prev.map((u) => (u.key === entry.key ? failedUpload(u, err) : u)));
         }
       }),
     );
@@ -594,7 +611,8 @@ export function ConversationComposer({
     // original is what was refused (it is gone: the words alone come back).
     if (draft.reply && !outcome.dropReply) updateReply((current) => current ?? draft.reply);
     // No messages left: the row under the chat already says so (finding 20).
-    if (outcome.refused) showError(outcome.refused, 'notice');
+    // Over the plan's files limit: a fault to fix (remove a file), with the plans when a bigger one allows more.
+    if (outcome.refused) showError(outcome.refused, outcome.limit ? 'error' : 'notice', outcome.limit?.plans === true);
   };
 
   const stop = (event: React.SyntheticEvent) => event.stopPropagation();
@@ -739,7 +757,15 @@ export function ConversationComposer({
               ) : (
                 <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
               )}
-              <span className="flex-1">{errorText}</span>
+              <span className="flex-1">
+                {errorText}
+                {errorPlans ? (
+                  <>
+                    {' '}
+                    <PlansLink />
+                  </>
+                ) : null}
+              </span>
             </div>
           </div>
         </div>
@@ -804,7 +830,15 @@ export function ConversationComposer({
                       file was refused. The owner said yes to showing it in full,
                       24 September 2026. */}
                   {u.status === 'failed' && u.error && (
-                    <span className="basis-full break-words opacity-80">{u.error}</span>
+                    <span className="basis-full break-words opacity-80">
+                      {u.error}
+                      {u.plans ? (
+                        <>
+                          {' '}
+                          <PlansLink />
+                        </>
+                      ) : null}
+                    </span>
                   )}
                 </div>
               );

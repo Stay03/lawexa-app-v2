@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { extractApiError } from '@/lib/utils/api-error';
+import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
 import { FileViewers } from '@/v2/features/files/FileViewers';
+import { plansToastAction } from '@/v2/features/files/PlansLink';
 import { useFileViewer } from '@/v2/features/files/use-file-viewer';
 import { listViewable } from '@/v2/features/files/viewable';
 import { FILES_ACCEPT, uploadPrecheck } from '@/v2/features/spaces/content-model';
@@ -186,6 +188,7 @@ export function useLooseFileUpload(): { pick: () => void; input: ReactNode } {
   const inputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadLooseFile();
   const uploadAsync = upload.mutateAsync;
+  const router = useRouter();
 
   const send = (file: File) => {
     const refusal = uploadPrecheck(file, 'a folder');
@@ -196,8 +199,14 @@ export function useLooseFileUpload(): { pick: () => void; input: ReactNode } {
     const id = toast.loading(`Uploading “${file.name}”`);
     uploadAsync(file).then(
       () => toast.success(`Uploaded “${file.name}”`, { id }),
-      (error: unknown) =>
-        toast.error(`Couldn’t upload “${file.name}”. ${extractApiError(error).message}`, { id }),
+      (error: unknown) => {
+        // A plan limit: the server's own sentence, and the plans when a bigger one allows the file.
+        const limit = extractUploadLimit(error);
+        toast.error(`Couldn’t upload “${file.name}”. ${limit?.message ?? extractApiError(error).message}`, {
+          id,
+          ...(limit?.upgrade && { action: plansToastAction((href) => router.push(href)) }),
+        });
+      },
     );
   };
 
