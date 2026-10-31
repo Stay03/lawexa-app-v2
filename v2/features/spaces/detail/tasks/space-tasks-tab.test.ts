@@ -162,5 +162,10 @@ test('a task’s thread page opens on no missing-first-message line, and a new t
   const types = read('types', 'collab.ts');
   assert.match(types, /task\?: \{ uuid: string; title: string \} \| null;/);
   const mutations = read('v2', 'features', 'spaces', 'detail', 'tasks', 'task-mutations.ts');
-  assert.match(mutations, /if \(thread\) void queryClient\.invalidateQueries\(\{ queryKey: channelsQueries\.detailsOf\(thread\.uuid\) \}\);/);
+  assert.match(mutations, /if \(uuid\) void queryClient\.invalidateQueries\(\{ queryKey: channelsQueries\.detailsOf\(uuid\) \}\);/);
+  // Every write that can change a thread's link reads that thread again: create, a changed Thread field (both ends), delete.
+  assert.match(mutations, /rereadThreads\(\[response\.data\.thread\?\.uuid\]\);/);
+  assert.match(mutations, /if \(context\?\.threadBefore !== threadAfter\) rereadThreads\(\[context\?\.threadBefore, threadAfter\]\);/);
+  assert.match(mutations, /removeTask\(list, taskUuid\)\);\s*\/\/[^\n]*\n\s*rereadThreads\(\[context\?\.threadBefore\]\);/);
+  assert.equal(mutations.match(/onMutate: \((?:\{ )?taskUuid(?: \})?\) => \(\{ threadBefore: threadOf\(taskUuid\) \}\)/g)?.length, 2);
 });
