@@ -242,6 +242,23 @@ export interface SpaceLatestMessage {
   author: { uuid?: string; name: string } | null;
 }
 
+/**
+ * A space's upload limits, from its owner's plan (Backend 2a209254). Sizes are
+ * MB. `null` means no limit, except `storage_used_mb`, which only the space's
+ * owner receives (it is their pooled total), and `documents_count`, which is
+ * null when there is no `max_documents`.
+ */
+export interface SpaceUploadLimits {
+  upload_size_mb: number;
+  media_size_mb: number;
+  files_per_upload: number | null;
+  storage_mb: number | null;
+  storage_used_mb: number | null;
+  max_pdf_pages: number | null;
+  max_documents: number | null;
+  documents_count: number | null;
+}
+
 export interface Space {
   uuid: string;
   name: string;
@@ -285,6 +302,9 @@ export interface Space {
   conversations_count?: number;
   folders_count?: number;
   files_count?: number;
+  /** The upload limits of the space, from its owner's plan (Backend 2a209254), on
+   *  `show` only. Absent on an older server: the app then uses today's values. */
+  upload_limits?: SpaceUploadLimits | null;
   /**
    * The newest message of the space's newest chat (backend, 15 October 2026),
    * on the `GET /spaces` list only: personal chats, not confidential, not

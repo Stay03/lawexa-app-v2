@@ -1,3 +1,4 @@
+import type { SpaceUploadLimits } from '@/types/collab';
 import type { IUserUploadLimits } from '@/types/message-pack';
 import {
   isImageAttachment,
@@ -16,9 +17,10 @@ import { MEDIA_MAX_SIZE_BYTES } from '@/v2/features/channels/model';
  * document, 5 MB per picture, 100 MB per video or audio file, 10 files per
  * message). Those are today's values still, but a plan an admin sets higher
  * would be refused here before the server ever saw the file. So the checks
- * read the person's own limits from `GET /users/limits` (`uploads`), and fall
- * back to today's values when a field is missing (an older server, a guest,
- * or a Space, whose own limits wait on Arthur's answers).
+ * read the person's own limits from `GET /users/limits` (`uploads`). An upload
+ * into a space reads that space's sizes from its owner's plan
+ * (`upload_limits`, Backend 2a209254). Any missing field falls back to today's
+ * values (an older server, a guest, a read still on its way).
  *
  * The server still decides: a file over a limit the app could not know (a
  * PDF's page count, storage) comes back as `UPLOAD_LIMIT_REACHED`, which every
@@ -57,6 +59,37 @@ export function uploadLimitsFrom(uploads: Partial<IUserUploadLimits> | null | un
     mediaBytes: positive(uploads.media_size_mb, MEDIA_MAX_SIZE_BYTES / MB) * MB,
     filesPerMessage: Math.floor(positive(uploads.files_per_message, MAX_FILES_PER_TURN)),
   };
+}
+
+/**
+ * An upload into a space: the space's own sizes (its owner's plan, Backend
+ * 2a209254), and the person's own count of files per chat message, which the
+ * server checks against the sender's plan. Pictures keep their own cap. A
+ * missing or odd size keeps the person's value.
+ */
+export function spaceUploadLimitsFrom(
+  space: Partial<SpaceUploadLimits> | null | undefined,
+  personal: UploadLimits,
+): UploadLimits {
+  if (!space) return personal;
+  return {
+    ...personal,
+    documentBytes: positive(space.upload_size_mb, personal.documentBytes / MB) * MB,
+    mediaBytes: positive(space.media_size_mb, personal.mediaBytes / MB) * MB,
+  };
+}
+
+/** How many files one pick may add to a space, or `null` for no limit. */
+export function spaceFilesPerUpload(space: Partial<SpaceUploadLimits> | null | undefined): number | null {
+  const value = space?.files_per_upload;
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+}
+
+/** Said when one pick or drop holds more files than a space takes at a time. */
+export function spaceFilesPerUploadError(perUpload: number): string {
+  return perUpload === 1
+    ? 'This space takes one file at a time, so only the first was added.'
+    : `This space takes ${perUpload} files at a time, so only the first ${perUpload} were added.`;
 }
 
 /** A size limit as people read it: "10" for 10 MB, "2.5" for 2.5 MB. */

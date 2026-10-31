@@ -190,7 +190,7 @@ export function useLooseFileUpload(): { pick: () => void; input: ReactNode } {
   const upload = useUploadLooseFile();
   const uploadAsync = upload.mutateAsync;
   const router = useRouter();
-  const limits = useUploadLimits({ inSpace: false });
+  const limits = useUploadLimits({ spaceUuid: null });
 
   const send = (file: File) => {
     const refusal = uploadPrecheck(file, 'a folder', limits);

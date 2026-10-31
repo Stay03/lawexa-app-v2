@@ -203,7 +203,8 @@ test('a refused upload shows the rule in place, and no Retry for a refusal that 
   // The tab reads the rules refusal off `errors.file`.
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /uploadRefusal\(apiError\.status, apiError\.errors\?\.file\?\.\[0\] \?\? null, apiError\.message\)/);
-  assert.match(panel, /useUploadQueueFor\(upload\.mutateAsync, uploadPrecheck, describeUploadFailure\)/);
+  // The precheck runs with the space's own limits (upload-limits.ts).
+  assert.match(panel, /useUploadQueueFor\(upload\.mutateAsync, validate, describeUploadFailure\)/);
 });
 
 test('the upload precheck runs the document rules before a byte is sent', () => {

@@ -430,9 +430,9 @@ export function ConversationComposer({
 
   /** The private mode that limits files here, fixed for the conversation. */
   const privateMode = privateModeOf(isRedacted, isConfidential);
-  // The plan's own upload limits; a Space chat's files go to the Space, whose
-  // limits come from its owner's plan, so it keeps today's values for now.
-  const uploadLimits = useUploadLimits({ inSpace: spaceUuid !== null });
+  // The plan's own upload limits; a Space chat's files go to the Space, so
+  // their sizes are the Space's (its owner's plan).
+  const uploadLimits = useUploadLimits({ spaceUuid });
 
   const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
   const isUploading = uploads.some((u) => u.status === 'uploading');

@@ -180,8 +180,8 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
   });
   const uploadAsync = upload.mutateAsync;
   const router = useRouter();
-  // A personal folder checks against the plan's limits; a space folder keeps today's values for now.
-  const limits = useUploadLimits({ inSpace: folder.space !== null });
+  // A personal folder checks against the person's plan; a space folder against the space's.
+  const limits = useUploadLimits({ spaceUuid: folder.space?.uuid ?? null });
   // The toasts, with the way to the plans on a refusal a bigger plan allows.
   const notices: UploadNotices = {
     loading: (message) => toast.loading(message),

@@ -54,7 +54,7 @@ export async function sendFolderUpload(
     folder: UploadFolder;
     upload: (file: File) => Promise<unknown>;
     notices: UploadNotices;
-    /** The plan's upload limits; today's values when not given (a space folder, for now). */
+    /** The upload limits: the person's, or the space's for a space folder; today's when not given. */
     limits?: UploadLimits;
   },
 ): Promise<void> {

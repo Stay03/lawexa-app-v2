@@ -23,6 +23,7 @@ import type {
   SpaceItem,
   SpaceItemsResponse,
   SpaceItemsType,
+  SpaceUploadLimits,
 } from '@/types/collab';
 import { UploadTray } from '@/v2/features/channels/files/UploadTray';
 import {
@@ -33,6 +34,8 @@ import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { FileViewers } from '@/v2/features/files/FileViewers';
 import { useFileViewer } from '@/v2/features/files/use-file-viewer';
+import { spaceFilesPerUpload, spaceFilesPerUploadError } from '@/v2/features/files/upload-limits';
+import { useUploadLimits } from '@/v2/features/files/use-upload-limits';
 import { listViewable, type ViewKind } from '@/v2/features/files/viewable';
 import { FolderNameDialog } from '@/v2/features/folders/FolderNameDialog';
 import { folderRow } from '@/v2/features/folders/folder-row-model';
@@ -180,7 +183,7 @@ export function SpaceContentPanel({
     ...spacesQueries.items(space.uuid, { viewerId, type, rooms }),
     enabled: enabled && !ownList,
   });
-  const { queue, pickFiles, picker } = useSpaceUploads(space.uuid);
+  const { addFiles, pickFiles, picker } = useSpaceUploads(space.uuid, space.upload_limits ?? null);
   const [creatingFolder, setCreatingFolder] = useState(false);
   const startFolder = () => setCreatingFolder(true);
   // Upload files opens the docked box's own picker on an empty All or
@@ -313,7 +316,7 @@ export function SpaceContentPanel({
         {/* Files dropped on the list upload into the space; a Viewer gets the
             list and nothing to drop onto. */}
         {access.canAdd && !ownList ? (
-          <FileDropZone spaceName={space.name} onDrop={queue.add}>
+          <FileDropZone spaceName={space.name} onDrop={addFiles}>
             {list}
           </FileDropZone>
         ) : (
@@ -824,9 +827,25 @@ function describeUploadFailure(error: unknown): UploadFailureNote {
  * each file's progress and refusal; the host renders it only for a reader who
  * may add.
  */
-function useSpaceUploads(spaceUuid: string) {
+function useSpaceUploads(spaceUuid: string, spaceLimits: SpaceUploadLimits | null) {
   const upload = useUploadSpaceFile(spaceUuid);
-  const queue = useUploadQueueFor(upload.mutateAsync, uploadPrecheck, describeUploadFailure);
+  // The space's own sizes, from its owner's plan (Backend 2a209254); today's
+  // where the server sends none.
+  const limits = useUploadLimits({ spaceUuid });
+  const validate = useCallback((file: File) => uploadPrecheck(file, 'a space', limits), [limits]);
+  const queue = useUploadQueueFor(upload.mutateAsync, validate, describeUploadFailure);
+  // How many files one pick or drop may add: the server takes one file a
+  // request, so the app holds this limit. The first ones go, and a toast says why.
+  const perUpload = spaceFilesPerUpload(spaceLimits);
+  const addFiles = (files: FileList | readonly File[]) => {
+    const list = Array.from(files);
+    if (perUpload !== null && list.length > perUpload) {
+      toast.error(spaceFilesPerUploadError(perUpload));
+      queue.add(list.slice(0, perUpload));
+      return;
+    }
+    queue.add(list);
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const pickFiles = () => inputRef.current?.click();
   const picker = (
@@ -840,7 +859,7 @@ function useSpaceUploads(spaceUuid: string) {
         tabIndex={-1}
         aria-hidden
         onChange={(event) => {
-          if (event.target.files) queue.add(event.target.files);
+          if (event.target.files) addFiles(event.target.files);
           // Cleared so choosing the same file again still fires a change.
           event.target.value = '';
         }}
@@ -848,7 +867,7 @@ function useSpaceUploads(spaceUuid: string) {
       <UploadTray queue={queue} placement="inline" />
     </>
   );
-  return { queue, pickFiles, picker };
+  return { addFiles, pickFiles, picker };
 }
 
 /**

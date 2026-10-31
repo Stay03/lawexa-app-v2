@@ -291,8 +291,8 @@ export function HomeComposer({
      not stored: switching the mode off, or removing the file, clears it. */
   const privateMode = privateModeOf(redacted, confidential);
   // The plan's own upload limits; a new chat in a Space sends its files to the
-  // Space, whose limits come from its owner's plan, so it keeps today's values for now.
-  const uploadLimits = useUploadLimits({ inSpace: Boolean(space) });
+  // Space, so their sizes are the Space's (its owner's plan).
+  const uploadLimits = useUploadLimits({ spaceUuid: space?.uuid ?? null });
   const refusedByMode = uploads.filter(
     (u) => u.status !== 'failed' && !allowedInMode(u, privateMode),
   );
