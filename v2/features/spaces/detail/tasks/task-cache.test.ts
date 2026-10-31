@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { SpaceTask, SpaceTaskPerson } from '@/types/collab';
-import { applyReorder, applyTaskChanged, removeTask, reorderedQueue, upsertTask } from './task-cache';
+import { applyReorder, applyTaskChanged, failedTaskWrite, removeTask, reorderedQueue, trailingCall, upsertTask } from './task-cache';
 
 const person = (uuid: string, name: string): SpaceTaskPerson => ({
   uuid,
@@ -181,4 +181,55 @@ test('a reorder applied to the cache gives each named task its place as its posi
   );
   // A row that did not move is the same object.
   assert.equal(next[2], tasks[2]);
+});
+
+/* Stay's B (Backend fb826d73): cards some members may not see. */
+
+test('a write refused with 404 takes the card off the board; any other refusal puts it back as it was', () => {
+  const before = task('t1', { title: 'TEST DATA before' });
+  const shown = task('t1', { title: 'TEST DATA moved' });
+  const other = task('t2');
+  assert.deepEqual(failedTaskWrite([shown, other], 404, before, 't1'), [other]);
+  assert.deepEqual(failedTaskWrite([shown, other], 422, before, 't1'), upsertTask([shown, other], before));
+  // A write that was not optimistic has nothing to put back.
+  assert.deepEqual(failedTaskWrite([shown, other], 500, null, 't1'), [shown, other]);
+});
+
+test('a burst of refreshes reads the board once, after the last of them', () => {
+  let now = 0;
+  const pending: { at: number; fn: () => void; id: number }[] = [];
+  let ids = 0;
+  const clock = {
+    set: (fn: () => void, ms: number) => {
+      pending.push({ at: now + ms, fn, id: ++ids });
+      return ids;
+    },
+    clear: (handle: unknown) => {
+      const at = pending.findIndex((entry) => entry.id === handle);
+      if (at >= 0) pending.splice(at, 1);
+    },
+  };
+  const advance = (ms: number) => {
+    now += ms;
+    for (const entry of pending.filter((item) => item.at <= now)) {
+      pending.splice(pending.indexOf(entry), 1);
+      entry.fn();
+    }
+  };
+  let reads = 0;
+  const refresh = trailingCall(() => reads++, 300, clock);
+  refresh.call();
+  advance(100);
+  refresh.call();
+  advance(100);
+  refresh.call();
+  advance(299);
+  assert.equal(reads, 0);
+  advance(1);
+  assert.equal(reads, 1);
+  // A board that closes drops a read still waiting.
+  refresh.call();
+  refresh.cancel();
+  advance(300);
+  assert.equal(reads, 1);
 });

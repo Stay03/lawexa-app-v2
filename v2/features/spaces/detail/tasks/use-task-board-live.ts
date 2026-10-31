@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { EVT_TASK_CHANGED, spaceChannelName, type SpaceTaskChangedEvent } from '@/v2/runtime/realtime/protocol';
 import { spacesQueries } from '../../queries';
-import { applyTaskChanged } from './task-cache';
+import { applyTaskChanged, trailingCall } from './task-cache';
 import { releaseChannel, retainChannel } from './channel-listeners';
 
 /**
@@ -39,13 +39,13 @@ export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, ena
 
     const boardKey = spacesQueries.tasks(spaceUuid, { viewerId }).queryKey;
     const deleted = new Set<string>();
+    // A task some members may not see: no task in the event, so the board
+    // reads its own list again, which the server filters per person (Stay's
+    // B), once, 300 ms after the last refresh of a burst.
+    const refresh = trailingCall(() => void queryClient.invalidateQueries({ queryKey: spacesQueries.tasksOf(spaceUuid) }), 300);
     const onChanged = (event: SpaceTaskChangedEvent) => {
-      // A task some members may not see: no task in the event, so the board
-      // reads its own list again, which the server filters per person (Stay's
-      // B). A read already out is cancelled for the new one, so only the
-      // last read of a burst writes the board.
       if (event.action === 'refresh') {
-        void queryClient.invalidateQueries({ queryKey: spacesQueries.tasksOf(spaceUuid) });
+        refresh.call();
         return;
       }
       if (event.action === 'deleted') deleted.add(event.task.uuid);
@@ -58,6 +58,7 @@ export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, ena
     retainChannel(name);
 
     return () => {
+      refresh.cancel();
       channel.stopListening(EVT_TASK_CHANGED, onChanged);
       if (releaseChannel(name) === 0) echo.leave(name);
     };
