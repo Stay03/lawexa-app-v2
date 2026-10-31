@@ -73,7 +73,7 @@ test('a refused file says so and starts no toast; a filing refusal says where th
 test('the folder page awaits each file (mutateAsync), never per-call mutate callbacks', () => {
   const add = read('detail', 'FolderAdd.tsx');
   assert.match(add, /const uploadAsync = upload\.mutateAsync;/);
-  assert.match(add, /void sendFolderUpload\(file, \{ folder, upload: uploadAsync, notices \}\);/);
+  assert.match(add, /void sendFolderUpload\(file, \{ folder, upload: uploadAsync, notices, limits \}\);/);
   assert.doesNotMatch(add, /\.mutate\(file, \{|uploadMutate\(/);
 });
 

@@ -25,6 +25,7 @@ import { filesApi } from '@/lib/api/files';
 import { spacesApi } from '@/lib/api/collab';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import { plansToastAction } from '@/v2/features/files/PlansLink';
+import { useUploadLimits } from '@/v2/features/files/use-upload-limits';
 import { FILES_ACCEPT, fileTypeLabel } from '@/v2/features/spaces/content-model';
 import { invalidateSpaceContents } from '@/v2/features/spaces/content-mutations';
 import { spacesQueries } from '@/v2/features/spaces/queries';
@@ -179,6 +180,8 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
   });
   const uploadAsync = upload.mutateAsync;
   const router = useRouter();
+  // A personal folder checks against the plan's limits; a space folder keeps today's values for now.
+  const limits = useUploadLimits({ inSpace: folder.space !== null });
   // The toasts, with the way to the plans on a refusal a bigger plan allows.
   const notices: UploadNotices = {
     loading: (message) => toast.loading(message),
@@ -191,7 +194,7 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
   };
 
   const send = (file: File) => {
-    void sendFolderUpload(file, { folder, upload: uploadAsync, notices });
+    void sendFolderUpload(file, { folder, upload: uploadAsync, notices, limits });
   };
 
   const input = (

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
 import { FileViewers } from '@/v2/features/files/FileViewers';
 import { plansToastAction } from '@/v2/features/files/PlansLink';
+import { useUploadLimits } from '@/v2/features/files/use-upload-limits';
 import { useFileViewer } from '@/v2/features/files/use-file-viewer';
 import { listViewable } from '@/v2/features/files/viewable';
 import { FILES_ACCEPT, uploadPrecheck } from '@/v2/features/spaces/content-model';
@@ -189,9 +190,10 @@ export function useLooseFileUpload(): { pick: () => void; input: ReactNode } {
   const upload = useUploadLooseFile();
   const uploadAsync = upload.mutateAsync;
   const router = useRouter();
+  const limits = useUploadLimits({ inSpace: false });
 
   const send = (file: File) => {
-    const refusal = uploadPrecheck(file, 'a folder');
+    const refusal = uploadPrecheck(file, 'a folder', limits);
     if (refusal) {
       toast.error(refusal);
       return;

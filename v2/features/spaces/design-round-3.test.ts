@@ -42,8 +42,12 @@ test('the space precheck reads the chat composer’s rules, not a copy', () => {
   const model = read('v2', 'features', 'spaces', 'content-model.ts');
   assert.match(
     model,
-    /import \{\s*ACCEPTED_FILE_TYPES,\s*ALLOWED_FILE_TYPES,\s*isImageAttachment,\s*MAX_DOCUMENT_SIZE,\s*MAX_IMAGE_SIZE,\s*PICTURE_EXTENSIONS,\s*\} from '@\/v2\/features\/conversations\/attachment-rules';/,
+    /import \{\s*ACCEPTED_FILE_TYPES,\s*ALLOWED_FILE_TYPES,\s*isImageAttachment,\s*PICTURE_EXTENSIONS,\s*\} from '@\/v2\/features\/conversations\/attachment-rules';/,
   );
+  // The sizes are the plan's (upload-limits.ts), whose fallback is the composer's own constants.
+  assert.match(model, /import \{ megabytes, TODAY_UPLOAD_LIMITS, type UploadLimits \} from '@\/v2\/features\/files\/upload-limits';/);
+  const limits = read('v2', 'features', 'files', 'upload-limits.ts');
+  assert.match(limits, /documentBytes: MAX_DOCUMENT_SIZE,\s*imageBytes: MAX_IMAGE_SIZE,\s*mediaBytes: MEDIA_MAX_SIZE_BYTES,\s*filesPerMessage: MAX_FILES_PER_TURN,/);
   assert.doesNotMatch(model, /1024 \* 1024/);
 });
 

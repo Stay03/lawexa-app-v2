@@ -47,6 +47,13 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { extractApiError, extractBlockedReason, extractUploadLimit } from '@/lib/utils/api-error';
 import { PlansLink } from '@/v2/features/files/PlansLink';
+import {
+  attachmentCapError,
+  attachmentHintIn,
+  attachmentSizeError,
+  attachmentSizeLimit,
+} from '@/v2/features/files/upload-limits';
+import { useUploadLimits } from '@/v2/features/files/use-upload-limits';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { UserRole } from '@/types/auth';
 import type { ChatReference } from '@/types/chat';
@@ -57,15 +64,11 @@ import {
 } from '@/v2/features/conversations/start-conversation';
 import {
   ALLOWED_FILE_TYPES,
-  ATTACHMENT_SIZE_ERROR,
   ATTACHMENT_TYPE_ERROR,
-  MAX_FILES_PER_TURN,
   acceptedTypesFor,
   allowedInMode,
   allowedTypesFor,
-  attachmentHintFor,
   isImageAttachment,
-  maxSizeFor,
   privateModeFileError,
   privateModeOf,
 } from '@/v2/features/conversations/attachment-rules';
@@ -287,6 +290,9 @@ export function HomeComposer({
      alone would let a PDF through to a redacted chat. The refusal is derived,
      not stored: switching the mode off, or removing the file, clears it. */
   const privateMode = privateModeOf(redacted, confidential);
+  // The plan's own upload limits; a new chat in a Space sends its files to the
+  // Space, whose limits come from its owner's plan, so it keeps today's values for now.
+  const uploadLimits = useUploadLimits({ inSpace: Boolean(space) });
   const refusedByMode = uploads.filter(
     (u) => u.status !== 'failed' && !allowedInMode(u, privateMode),
   );
@@ -305,7 +311,7 @@ export function HomeComposer({
     // Reserve slots — accept up to the remaining cap, dedupe by name+size against
     // anything already listed (uploading, done, or failed). v1's exact rules.
     const existingKeys = new Set(uploads.map((u) => `${u.file_name}::${u.file_size}`));
-    const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
+    const remainingSlots = uploadLimits.filesPerMessage - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
     let rejectedByMode = false;
@@ -319,7 +325,7 @@ export function HomeComposer({
         else rejectedType = true;
         continue;
       }
-      if (file.size > maxSizeFor(file)) {
+      if (file.size > attachmentSizeLimit(file, uploadLimits)) {
         rejectedSize = true;
         continue;
       }
@@ -354,9 +360,9 @@ export function HomeComposer({
     } else if (rejectedType) {
       setError(ATTACHMENT_TYPE_ERROR);
     } else if (rejectedSize) {
-      setError(ATTACHMENT_SIZE_ERROR);
+      setError(attachmentSizeError(uploadLimits));
     } else if (rejectedCap) {
-      setError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
+      setError(attachmentCapError(uploadLimits));
     } else if (rejectedDuplicate && accepted.length === 0) {
       setError('That file is already attached.');
     }
@@ -755,7 +761,7 @@ export function HomeComposer({
                       <Paperclip className="text-muted-foreground" />
                       <span className="flex-1">Attach files</span>
                       <span className="text-xs text-muted-foreground">
-                        {attachmentHintFor(privateMode)}
+                        {attachmentHintIn(privateMode, uploadLimits)}
                       </span>
                     </DropdownMenuItem>
 

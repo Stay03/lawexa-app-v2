@@ -155,6 +155,21 @@ export interface IUserLimitsPayg {
   balance: number;
 }
 
+/**
+ * The person's own upload limits, resolved by the server for their plan
+ * (Backend f2eb6ff9): the plan's row, else the free row, else today's values.
+ * Sizes are MB. `null` means no limit (storage, PDF pages).
+ */
+export interface IUserUploadLimits {
+  upload_size_mb: number;
+  image_size_mb: number;
+  media_size_mb: number;
+  files_per_message: number;
+  storage_mb: number | null;
+  storage_used_mb: number;
+  max_pdf_pages: number | null;
+}
+
 // GET /users/limits response data
 export interface IUserLimits {
   plan: IUserLimitsPlan;
@@ -162,4 +177,6 @@ export interface IUserLimits {
   note_creations: IGenericLimit;
   bookmarks: IGenericLimit;
   ai_messages: IAiMessagesLimit;
+  /** Absent on a server from before the upload limits; the app then uses today's values. */
+  uploads?: IUserUploadLimits;
 }

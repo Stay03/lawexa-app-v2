@@ -43,17 +43,20 @@ import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField
 import { PastedContentCard } from './PastedContentCard';
 import {
   ALLOWED_FILE_TYPES,
-  ATTACHMENT_SIZE_ERROR,
   ATTACHMENT_TYPE_ERROR,
-  MAX_FILES_PER_TURN,
   acceptedTypesFor,
   allowedTypesFor,
-  attachmentHintFor,
   isImageAttachment,
-  maxSizeFor,
   privateModeFileError,
   privateModeOf,
 } from '../attachment-rules';
+import {
+  attachmentCapError,
+  attachmentHintIn,
+  attachmentSizeError,
+  attachmentSizeLimit,
+} from '@/v2/features/files/upload-limits';
+import { useUploadLimits } from '@/v2/features/files/use-upload-limits';
 import { TEXT_DRAFT, useDraft } from './draft-store';
 import { REPLY_DRAFT, replyAuthorLabel, replyDraftKey, replySnippet, type QuoteTone } from './reply-target';
 import { QuoteFrame } from './rows/QuoteFrame';
@@ -427,6 +430,9 @@ export function ConversationComposer({
 
   /** The private mode that limits files here, fixed for the conversation. */
   const privateMode = privateModeOf(isRedacted, isConfidential);
+  // The plan's own upload limits; a Space chat's files go to the Space, whose
+  // limits come from its owner's plan, so it keeps today's values for now.
+  const uploadLimits = useUploadLimits({ inSpace: spaceUuid !== null });
 
   const uploadedFiles = uploads.filter((u) => u.status === 'uploaded');
   const isUploading = uploads.some((u) => u.status === 'uploading');
@@ -447,7 +453,7 @@ export function ConversationComposer({
     if (errorOpen) hideError();
 
     const existingKeys = new Set(uploads.map((u) => `${u.file_name}::${u.file_size}`));
-    const remainingSlots = MAX_FILES_PER_TURN - uploads.length;
+    const remainingSlots = uploadLimits.filesPerMessage - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
     let rejectedByMode = false;
@@ -465,7 +471,7 @@ export function ConversationComposer({
         else rejectedType = true;
         continue;
       }
-      if (file.size > maxSizeFor(file)) {
+      if (file.size > attachmentSizeLimit(file, uploadLimits)) {
         rejectedSize = true;
         continue;
       }
@@ -497,8 +503,8 @@ export function ConversationComposer({
 
     if (rejectedByMode && privateMode) showError(privateModeFileError(privateMode));
     else if (rejectedType) showError(ATTACHMENT_TYPE_ERROR);
-    else if (rejectedSize) showError(ATTACHMENT_SIZE_ERROR);
-    else if (rejectedCap) showError(`You can attach at most ${MAX_FILES_PER_TURN} files per message.`);
+    else if (rejectedSize) showError(attachmentSizeError(uploadLimits));
+    else if (rejectedCap) showError(attachmentCapError(uploadLimits));
     else if (rejectedDuplicate && accepted.length === 0) showError('That file is already attached.');
 
     if (accepted.length === 0) return;
@@ -1014,7 +1020,7 @@ export function ConversationComposer({
                       after watching it upload. Two numbers because the caps
                       genuinely differ, and one of them would be a lie. */}
                   <span className="text-muted-foreground text-xs">
-                    {attachmentHintFor(privateMode)}
+                    {attachmentHintIn(privateMode, uploadLimits)}
                   </span>
                 </DropdownMenuItem>
 

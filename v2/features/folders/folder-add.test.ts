@@ -70,7 +70,7 @@ test('an upload goes to its store first, then into the folder', () => {
   // is checked first (folder-upload.ts, each file on its own toast).
   const send = read('detail', 'folder-upload.ts');
   assert.match(send, /uploaded, but couldn’t be added to \$\{folder\.name\}\. \$\{where\}\./);
-  assert.match(send, /const refusal = uploadPrecheck\(file, folder\.space \? 'a space' : 'a folder'\);/);
+  assert.match(send, /const refusal = uploadPrecheck\(file, folder\.space \? 'a space' : 'a folder', limits\);/);
 });
 
 test('the refusal names a folder when the upload is a folder’s', () => {

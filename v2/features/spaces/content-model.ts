@@ -9,11 +9,10 @@ import {
   ACCEPTED_FILE_TYPES,
   ALLOWED_FILE_TYPES,
   isImageAttachment,
-  MAX_DOCUMENT_SIZE,
-  MAX_IMAGE_SIZE,
   PICTURE_EXTENSIONS,
 } from '@/v2/features/conversations/attachment-rules';
-import { MEDIA_EXTENSIONS, MEDIA_MAX_SIZE_BYTES } from '@/v2/features/channels/model';
+import { MEDIA_EXTENSIONS } from '@/v2/features/channels/model';
+import { megabytes, TODAY_UPLOAD_LIMITS, type UploadLimits } from '@/v2/features/files/upload-limits';
 import { canAddContent, type SpaceTab } from './model';
 
 /**
@@ -294,11 +293,12 @@ export function isMediaUpload(file: Pick<File, 'name' | 'type'>): boolean {
 export function uploadPrecheck(
   file: Pick<File, 'name' | 'type' | 'size'>,
   place: 'a space' | 'a folder' = 'a space',
+  limits: UploadLimits = TODAY_UPLOAD_LIMITS,
 ): string | null {
   const extension = file.name.toLowerCase().split('.').pop() ?? '';
   if (isMediaUpload(file)) {
-    return file.size > MEDIA_MAX_SIZE_BYTES
-      ? `“${file.name}” is larger than 100 MB, the most ${place} takes for a video or audio file.`
+    return file.size > limits.mediaBytes
+      ? `“${file.name}” is larger than ${megabytes(limits.mediaBytes)} MB, the most ${place} takes for a video or audio file.`
       : null;
   }
   const typeKnown = file.type !== '' && ALLOWED_FILE_TYPES.includes(file.type);
@@ -306,15 +306,16 @@ export function uploadPrecheck(
     const takes = place === 'a space' ? 'A space takes' : 'A folder takes';
     return `“${file.name}” can’t be added. ${takes} PDF, Word, RTF, image (JPG, PNG, WebP), video and audio files.`;
   }
-  // A picture is capped at 5 MB, as the server's rule caps it. A file the
-  // system sent with no type is judged a picture by its name.
+  // A picture has its own cap, as the server's rule has. A file the system
+  // sent with no type is judged a picture by its name. The caps are the plan's
+  // (`upload-limits.ts`), today's values where the plan's are not known.
   const picture =
     isImageAttachment(file) || (file.type === '' && PICTURE_EXTENSIONS.includes(extension));
-  if (picture && file.size > MAX_IMAGE_SIZE) {
-    return `“${file.name}” is larger than 5 MB, the most ${place} takes for a picture.`;
+  if (picture && file.size > limits.imageBytes) {
+    return `“${file.name}” is larger than ${megabytes(limits.imageBytes)} MB, the most ${place} takes for a picture.`;
   }
-  if (file.size > MAX_DOCUMENT_SIZE) {
-    return `“${file.name}” is larger than 10 MB, the most ${place} takes.`;
+  if (file.size > limits.documentBytes) {
+    return `“${file.name}” is larger than ${megabytes(limits.documentBytes)} MB, the most ${place} takes.`;
   }
   return null;
 }

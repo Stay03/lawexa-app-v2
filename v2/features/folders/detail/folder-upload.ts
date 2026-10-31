@@ -1,4 +1,5 @@
 import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
+import type { UploadLimits } from '@/v2/features/files/upload-limits';
 import { uploadPrecheck } from '@/v2/features/spaces/content-model';
 
 /**
@@ -48,13 +49,16 @@ export async function sendFolderUpload(
     folder,
     upload,
     notices,
+    limits,
   }: {
     folder: UploadFolder;
     upload: (file: File) => Promise<unknown>;
     notices: UploadNotices;
+    /** The plan's upload limits; today's values when not given (a space folder, for now). */
+    limits?: UploadLimits;
   },
 ): Promise<void> {
-  const refusal = uploadPrecheck(file, folder.space ? 'a space' : 'a folder');
+  const refusal = uploadPrecheck(file, folder.space ? 'a space' : 'a folder', limits);
   if (refusal) {
     notices.error(refusal);
     return;
