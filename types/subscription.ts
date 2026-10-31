@@ -2,6 +2,13 @@ import type { TCurrency, TPaymentProvider } from '@/types/payment';
 
 // Limit types
 export type TLimitType = 'ai_messages' | 'bookmarks' | 'note_creations';
+// The plan's file limits, sent on the same `limits[]` rows (sizes and storage in MB).
+export type TUploadLimitType =
+  | 'upload_size_mb'
+  | 'media_size_mb'
+  | 'storage_mb'
+  | 'files_per_message'
+  | 'max_pdf_pages';
 export type TLimitPeriod = 'month' | 'billing_interval' | 'lifetime';
 
 // Subscription statuses
@@ -12,7 +19,7 @@ export type TInvoiceStatus = 'pending' | 'success' | 'failed';
 
 // Plan limit
 export interface IPlanLimit {
-  type: TLimitType;
+  type: TLimitType | TUploadLimitType;
   value: number;
   is_unlimited: boolean;
   period: TLimitPeriod;

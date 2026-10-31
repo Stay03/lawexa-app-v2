@@ -5,6 +5,7 @@ import {
   formatPlanMonthlyFromAnnual,
 } from '@/lib/utils/payment-format';
 import { TIER_FEATURES } from '@/lib/constants/plan-features';
+import { DOCUMENT_LINE_PREFIX, fileLines, withFileLines } from '@/lib/utils/plan-file-lines';
 import type { TCurrency } from '@/types/payment';
 import type { ICurrentSubscriptionData, IPlan, IPlanLimit, TLimitType } from '@/types/subscription';
 import { formatBillingDate } from '@/v2/features/settings/billing/model';
@@ -272,10 +273,18 @@ export function tierBenefits(key: string): CardLines | null {
 /**
  * What one card lists for the plan it shows. The benefits belong to the tier,
  * so Monthly and Yearly list the same lines; only a tier without v1's lines
- * reads its limits off the plan shown (see the docblock).
+ * reads its limits off the plan shown (see the docblock). The file lines are
+ * the exception: v1's typed-in document size is swapped for the plan's own
+ * size, files per message and storage (`lib/utils/plan-file-lines.ts`).
  */
 export function cardLines(tier: Pick<Tier, 'key'>, plan: IPlan): CardLines {
-  return tierBenefits(tier.key) ?? { highlighted: limitLines(plan), more: [] };
+  const benefits = tierBenefits(tier.key);
+  if (!benefits) {
+    // A bare "Chat with Document" says nothing on a card of numbers.
+    const files = fileLines(plan).filter((line) => line !== DOCUMENT_LINE_PREFIX);
+    return { highlighted: [...limitLines(plan), ...files], more: [] };
+  }
+  return { highlighted: withFileLines(benefits.highlighted, plan), more: benefits.more };
 }
 
 /** The page's three tabs, in the order the row lists them. */

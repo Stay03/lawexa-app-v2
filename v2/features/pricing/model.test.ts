@@ -197,7 +197,7 @@ const V1_LIBRARY = ['Access to Case, Statute & Notes Library', 'Foreign & Local 
 const V1_STUDY = ['Study Mode', 'Flashcards', 'Quizzes', 'Connect to a Lawyer'];
 const V1_COUNSEL = {
   highlighted: [
-    'Unlimited AI Messages', 'Unlimited Library Access', 'Chat with Document (No size limit)', 'Chat with Statute',
+    'Unlimited AI Messages', 'Unlimited Library Access', 'Chat with Document', 'Chat with Statute',
     'Legal Drafting', 'Deep Legal Research', 'Deep Contract Review',
   ],
   more: [...V1_LIBRARY, 'Natural Language Search', 'AI Tutor', ...V1_STUDY, 'Twitter Bot for legal updates'],
@@ -205,14 +205,14 @@ const V1_COUNSEL = {
 const V1_LINES: Record<string, { highlighted: string[]; more: string[] }> = {
   basic: {
     highlighted: [
-      '50 AI Messages', 'Unlimited Library Access', 'Chat with Document (10MB limit)', 'Chat with Statute', 'AI Tutor',
+      '50 AI Messages', 'Unlimited Library Access', 'Chat with Document', 'Chat with Statute', 'AI Tutor',
       'Natural Language Search',
     ],
     more: [...V1_LIBRARY, ...V1_STUDY],
   },
   pro: {
     highlighted: [
-      '200 AI Messages', 'Unlimited Library Access', '50 Deep Legal Research', 'Chat with Document (25MB limit)',
+      '200 AI Messages', 'Unlimited Library Access', '50 Deep Legal Research', 'Chat with Document',
       'Chat with Statute', 'AI Tutor', 'Natural Language Search',
     ],
     more: [...V1_LIBRARY, ...V1_STUDY],
@@ -221,7 +221,7 @@ const V1_LINES: Record<string, { highlighted: string[]; more: string[] }> = {
   'ai-counsel': V1_COUNSEL,
 };
 
-test('each of the four cards lists v1\'s lines for its tier, word for word, and not its limits', () => {
+test('each of the four cards lists v1\'s lines for its tier, with no typed-in document size, and not its limits', () => {
   const tiers = buildTiers(LIVE, 'USD');
   assert.deepEqual(tiers.map((tier) => tier.key), ['basic', 'pro', 'plus', 'ai-counsel']);
   for (const tier of tiers) {
@@ -320,4 +320,19 @@ test("the Enterprise tab says v1's words", () => {
     'Custom integrations and API access',
   ]);
   assert.equal(ENTERPRISE_EMAIL, 'enterprise@lawexa.com');
+});
+
+test('a card prints the plan’s own file limits in place of v1’s typed-in size', () => {
+  const sized = (p: IPlan): IPlan => ({ ...p, limits: [...p.limits, counted('upload_size_mb', 25), counted('files_per_message', 5), counted('storage_mb', 2048)] });
+  const [basic] = buildTiers(LIVE.map((p) => (p.slug_base.startsWith('basic') ? sized(p) : p)), 'USD');
+  assert.ok(basic && basic.byPeriod.monthly);
+  assert.deepEqual(cardLines(basic, basic.byPeriod.monthly).highlighted.slice(2, 5), [
+    'Chat with Document (25MB limit)', 'Up to 5 Files per Message', '2GB File Storage',
+  ]);
+  // A tier with no v1 lines lists its counts, then its files.
+  const [gold] = buildTiers([sized(plan({ id: 91, name: 'Gold Monthly USD', slug_base: 'gold-monthly', limits: [counted('ai_messages', 500)] }))], 'USD');
+  assert.ok(gold && gold.byPeriod.monthly);
+  assert.deepEqual(cardLines(gold, gold.byPeriod.monthly).highlighted, [
+    '500 AI messages a month', 'Chat with Document (25MB limit)', 'Up to 5 Files per Message', '2GB File Storage',
+  ]);
 });

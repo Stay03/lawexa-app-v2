@@ -37,6 +37,7 @@ import {
 import { extractApiError } from '@/lib/utils/api-error';
 import type { AdminPlanDetail, AdminLimitPeriod } from '@/types/admin-plans';
 import type { IPlanLimit } from '@/types/subscription';
+import { limitsSavedToast } from './plan-limits-saved';
 
 /******************************************************************************
                                  Schema
@@ -137,10 +138,9 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (mutation as any).mutate(mutateArgs, {
-        onSuccess: (response: { message?: string }) => {
-          toast.success(
-            response.message || 'Plan limits updated successfully.'
-          );
+        onSuccess: (response: { data?: unknown }) => {
+          const saved = limitsSavedToast(plan.is_free, response.data);
+          toast.success(saved.title, { description: saved.description });
           form.reset(data);
         },
         onError: (error: unknown) => {
