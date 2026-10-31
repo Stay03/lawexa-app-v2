@@ -3,6 +3,7 @@ import { MessagesSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { casePartyName } from '@/lib/utils/party-name';
 import type { CaseArgument, CaseArgumentAuthority, CaseArgumentStatus } from '@/types/case';
+import { authorityKey, authorityLabel } from './case-argument-authority';
 
 interface CaseArgumentsSectionProps {
   arguments: CaseArgument[];
@@ -113,12 +114,14 @@ function CaseArgumentsSection({
 /**
  * An authority the submission stands on.
  *
- * `cited_case_id` and `slug` stay null until the reporter key resolves to a
- * case we hold, so an unresolved authority prints its name or its key and
- * never becomes a link to nowhere.
+ * `cited_case_id` and `slug` stay null until the cited case is one we hold,
+ * so an unresolved authority prints its name and never becomes a link to
+ * nowhere. The public payload carries no reporter key (Stay's A, thread
+ * b74f2724): the server fills `display_title` from the citation's own words
+ * instead, and a row with no title is left out.
  */
 function Authority({ authority }: { authority: CaseArgumentAuthority }) {
-  const label = authority.display_title ?? authority.nwlr_key ?? null;
+  const label = authorityLabel(authority);
   if (!label) return null;
   if (authority.slug) {
     return (
@@ -128,10 +131,6 @@ function Authority({ authority }: { authority: CaseArgumentAuthority }) {
     );
   }
   return <span>{label}</span>;
-}
-
-function authorityKey(authority: CaseArgumentAuthority, index: number): string {
-  return `${authority.cited_case_id ?? authority.nwlr_key ?? authority.display_title ?? 'row'}-${index}`;
 }
 
 const STATUS_LABELS: Record<Exclude<CaseArgumentStatus, null>, string> = {

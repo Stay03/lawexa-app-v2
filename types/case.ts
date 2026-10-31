@@ -99,9 +99,6 @@ export interface CitedCaseEdge {
   slug: string | null;
   citation: string | null;
   treatment: CaseTreatment | null;
-  /** The reporter key of the cited report, `part_1_page`, or null when the
-   *  printed citation gives no part. Null is "unreadable", never "none". */
-  nwlr_key?: string | null;
 }
 
 // A reverse citation (cited_by): the old related-case shape plus a treatment label.
@@ -283,13 +280,13 @@ export type CaseArgumentStatus =
 /**
  * A case this submission stands on.
  *
- * `cited_case_id` and `slug` are null until the reporter key resolves to a
- * case we hold, so anything rendering this must print the key or the name
- * rather than build a link to nowhere.
+ * `cited_case_id` and `slug` are null until the cited case is one we hold, so
+ * anything rendering this prints the name rather than build a link to
+ * nowhere. The public payload carries no reporter key (Stay's A, thread
+ * b74f2724); `display_title` comes from the citation's own words instead.
  */
 export interface CaseArgumentAuthority {
   cited_case_id: number | null;
-  nwlr_key: string | null;
   slug: string | null;
   display_title: string | null;
 }
@@ -497,7 +494,6 @@ export interface CaseDetail extends Case {
    * provider began sending it (5 September 2026).
    */
   report_published_date?: string | null;
-  nwlr_key?: string | null;
 
   /* ── FOUR LISTS WHOSE ABSENCE MEANS SOMETHING ─────────────────────────────
      `parties`, `counsel`, `cited_cases` and `cited_by` are ALWAYS PRESENT on
