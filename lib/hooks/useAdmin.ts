@@ -388,6 +388,30 @@ export function useChangeUserRole() {
 }
 
 /**
+ * Mark a user as a verified author, or not (Arthur, 31 October 2026). The
+ * server answers with the user, so its flag is written into the cached detail
+ * at once; the detail and the users list are then read again.
+ */
+export function useSetUserVerifiedAuthor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ uuid, isVerifiedAuthor }: { uuid: string; isVerifiedAuthor: boolean }) =>
+      adminApi.setUserVerifiedAuthor(uuid, isVerifiedAuthor),
+    onSuccess: (response, { uuid }) => {
+      queryClient.setQueryData<AdminUserDetailResponse>(
+        adminKeys.userDetail(uuid),
+        (cached) =>
+          cached && response.data?.uuid === uuid
+            ? { ...cached, data: { ...cached.data, is_verified_author: response.data.is_verified_author } }
+            : cached
+      );
+      // adminKeys.users() is the parent of both the list and detail keys.
+      queryClient.invalidateQueries({ queryKey: adminKeys.users() });
+    },
+  });
+}
+
+/**
  * Hook for cancelling an admin subscription
  * Invalidates subscription caches on success
  */

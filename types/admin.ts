@@ -232,6 +232,13 @@ export interface AdminUserDetail {
   role: string;
   is_creator: boolean;
   is_verified: boolean;
+  /**
+   * May list quizzes for everyone, and their published public notes feed
+   * Lawexa's answers (Arthur, 31 October 2026). Optional: the admin detail
+   * sends it only from Backend's one-line addition to UserDetailResource; the
+   * page shows the switch once it is here.
+   */
+  is_verified_author?: boolean;
   // True when the user's free AI messages are blocked — set by BOTH the
   // automatic device-abuse detection and the admin manual block. The flag is
   // source-neutral (it says blocked, not why); the manual-vs-auto distinction
@@ -297,6 +304,13 @@ export interface AdminChangeUserRoleResponse {
   success: boolean;
   message: string;
   data: AdminFreeMessagesBlockUser;
+}
+
+/** PUT /api/users/{uuid}/verified-author: the user (UserResource), with the new flag. */
+export interface AdminVerifiedAuthorResponse {
+  success: boolean;
+  message: string;
+  data: AdminFreeMessagesBlockUser & { is_verified_author: boolean };
 }
 
 // ============================================

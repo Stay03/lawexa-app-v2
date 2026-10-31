@@ -27,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { ChangeRoleDialog } from './ChangeRoleDialog';
 import { asRole, canChangeRole } from './change-role-model';
+import { VerifiedAuthorSwitch } from './VerifiedAuthorSwitch';
 
 interface UserDetailHeaderProps {
   user: AdminUserDetail;
@@ -179,6 +180,18 @@ export function UserDetailHeader({ user, onToggleBlock }: UserDetailHeaderProps)
           className="hidden shrink-0 sm:inline-flex"
         />
       </div>
+
+      {/* Verified author (Arthur's B, 31 October 2026), beside the role and
+          creator marks: shown once the admin detail sends the flag. */}
+      {typeof user.is_verified_author === 'boolean' && (
+        <div className="mt-4 rounded-xl border bg-muted/30 px-3 py-2.5">
+          <VerifiedAuthorSwitch
+            uuid={user.uuid}
+            name={user.name}
+            isVerifiedAuthor={user.is_verified_author}
+          />
+        </div>
+      )}
 
       {/* Meta — clean labelled rows */}
       <div className="mt-4 space-y-2.5 text-sm">

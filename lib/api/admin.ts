@@ -9,6 +9,7 @@ import type {
   AdminFreeMessagesBlockPayload,
   AdminFreeMessagesBlockResponse,
   AdminChangeUserRoleResponse,
+  AdminVerifiedAuthorResponse,
   IAdminUserListParams,
   IAdminUserListResponse,
   AdminUserConversationsParams,
@@ -180,6 +181,23 @@ export const adminApi = {
     const response = await apiClient.put<AdminChangeUserRoleResponse>(
       `/users/${uuid}/role`,
       { role }
+    );
+    return response.data;
+  },
+
+  /**
+   * Mark a user as a verified author, or not (Arthur, 31 October 2026): a
+   * verified author may list quizzes for everyone, and their published public
+   * notes are used in Lawexa's answers. Admin-only, under /users/{uuid}/...
+   * like the other admin writes on a user. Returns the updated user.
+   */
+  setUserVerifiedAuthor: async (
+    uuid: string,
+    isVerifiedAuthor: boolean
+  ): Promise<AdminVerifiedAuthorResponse> => {
+    const response = await apiClient.put<AdminVerifiedAuthorResponse>(
+      `/users/${uuid}/verified-author`,
+      { is_verified_author: isVerifiedAuthor }
     );
     return response.data;
   },
