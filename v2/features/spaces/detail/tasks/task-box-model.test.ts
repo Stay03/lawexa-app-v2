@@ -157,7 +157,7 @@ test('the channels a thread may start in: open, top-level, once each, in name or
   assert.equal(startThreadChannels([...rooms].reverse()).preselected, 'c-general');
 });
 
-test('no open channel: nothing to pick and nothing preselected', () => {
+test('no channel the starter may post in: nothing to pick and nothing preselected', () => {
   assert.deepEqual(startThreadChannels([]), { options: [], preselected: null });
   assert.deepEqual(startThreadChannels([room('c-private', 'partners', '2026-10-01T09:00:00Z', { visibility: 'private' })]), {
     options: [],
@@ -253,8 +253,20 @@ test('Start a thread may go in an open channel or a private one the starter is i
     // The private channel is older, but the server's default is its first open one.
     preselected: 'c-general',
   });
-  // Only private channels the starter is in: offered, with nothing preselected (the server's default would 422).
-  assert.deepEqual(startThreadChannels([rooms[0]]), { options: [{ uuid: 'c-partners', name: 'partners' }], preselected: null });
+  // Only private channels the starter is in: the oldest of them is preselected, and the start names it.
+  const privateOnly = [
+    room('c-later', 'later', '2026-09-20T09:00:00Z', { visibility: 'private', is_member: true }),
+    rooms[0],
+    rooms[1],
+  ];
+  assert.deepEqual(startThreadChannels(privateOnly), {
+    options: [
+      { uuid: 'c-later', name: 'later' },
+      { uuid: 'c-partners', name: 'partners' },
+    ],
+    preselected: 'c-partners',
+  });
+  assert.deepEqual(startThreadPayload(startThreadChannels(privateOnly).preselected), { channel_uuid: 'c-partners' });
 });
 
 test('the Thread field offers what the person can read: open and joined channels, and threads they can read', () => {
