@@ -72,7 +72,7 @@ test('every write that files, unfiles or deletes a file re-asks the loose list',
   // Upload: every file, pictures included, to POST /files/documents, in no
   // folder. POST /files saves a picture as a note's content image, which the
   // Folders page never lists (backend's local run, 22 October 2026).
-  assert.match(mutations, /mutationFn: \(file: File\) => filesApi\.uploadDocument\(file\),/);
+  assert.match(mutations, /mutationFn: \(file: File\) => uploadFile\(file, \{ kind: 'my_files' \}, \(\) => filesApi\.uploadDocument\(file\)\),/);
   assert.doesNotMatch(mutations, /uploadImage/);
   assert.doesNotMatch(mutations, /addItem/);
   assert.match(mutations, /invalidates: \[foldersQueries\.looseFilesKey\(\)\] \}/);

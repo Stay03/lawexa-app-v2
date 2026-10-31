@@ -6,6 +6,8 @@ import type { IPlanLimit, TUploadLimitType } from '@/types/subscription';
  * changes"; techlead's go, thread 1c93152c, 31 October 2026). The rules are
  * the server's own (`UpdatePlanLimitsRequest::after`, `FileLimitService`), so
  * the form refuses what the server would refuse before the save is sent.
+ * The three sizes stop at 500 MB since uploads go straight to storage
+ * (Backend 527ce6a4); before that a request to our server carried 100 MB.
  */
 export type FileLimitGroup = 'files' | 'spaces';
 
@@ -26,14 +28,14 @@ export interface FileLimitField {
 }
 
 export const FILE_LIMIT_FIELDS: readonly FileLimitField[] = [
-  { type: 'upload_size_mb', label: 'Document size', group: 'files', unit: 'MB', max: 100, noLimit: false, zero: false, fallback: 10 },
-  { type: 'media_size_mb', label: 'Video and audio size', group: 'files', unit: 'MB', max: 100, noLimit: false, zero: false, fallback: 100 },
+  { type: 'upload_size_mb', label: 'Document size', group: 'files', unit: 'MB', max: 500, noLimit: false, zero: false, fallback: 10 },
+  { type: 'media_size_mb', label: 'Video and audio size', group: 'files', unit: 'MB', max: 500, noLimit: false, zero: false, fallback: 100 },
   { type: 'files_per_message', label: 'Files per chat message', group: 'files', unit: 'files', max: 20, noLimit: false, zero: false, fallback: 10 },
   { type: 'storage_mb', label: 'File storage', group: 'files', unit: 'MB', max: null, noLimit: true, zero: true, fallback: -1 },
   { type: 'scan_pages', label: 'Scanned pages read per PDF', group: 'files', unit: 'pages', max: 50, noLimit: false, zero: false, fallback: 10 },
   { type: 'max_pdf_pages', label: 'Pages per PDF', group: 'files', unit: 'pages', max: null, noLimit: true, zero: false, fallback: -1 },
   { type: 'space_storage_mb', label: 'Storage across owned Spaces', group: 'spaces', unit: 'MB', max: null, noLimit: true, zero: false, fallback: -1 },
-  { type: 'space_upload_size_mb', label: 'File size in a Space', group: 'spaces', unit: 'MB', max: 100, noLimit: true, zero: false, fallback: -1 },
+  { type: 'space_upload_size_mb', label: 'File size in a Space', group: 'spaces', unit: 'MB', max: 500, noLimit: true, zero: false, fallback: -1 },
   { type: 'files_per_space_upload', label: 'Files per Space upload', group: 'spaces', unit: 'files', max: null, noLimit: true, zero: false, fallback: -1 },
   { type: 'max_space_documents', label: 'Files per Space', group: 'spaces', unit: 'files', max: null, noLimit: true, zero: false, fallback: -1 },
 ];
@@ -43,7 +45,7 @@ export const FILE_LIMIT_TYPES = FILE_LIMIT_FIELDS.map((field) => field.type);
 /** The period a file row is saved with: a size or a count per upload does not reset over time. */
 export const FILE_LIMIT_PERIOD = 'lifetime';
 
-/** "1 to 100 MB", "-1 for no limit, or 1 and up", "-1 for no limit, 0 for none, or any size in MB". */
+/** "1 to 500 MB", "-1 for no limit, or 1 and up", "-1 for no limit, 0 for none, or any size in MB". */
 export function fileLimitHint(field: FileLimitField): string {
   const unit = field.unit === 'MB' ? ' MB' : ` ${field.unit}`;
   if (!field.noLimit) return `1 to ${field.max}${unit}`;

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { filesApi } from '@/lib/api/files';
 import { spacesApi } from '@/lib/api/collab';
+import { uploadFile } from '@/lib/api/uploads';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import { plansToastAction } from '@/v2/features/files/PlansLink';
 import { useUploadLimits } from '@/v2/features/files/use-upload-limits';
@@ -164,9 +165,11 @@ export function useFolderUpload(folder: AddTarget): { pick: () => void; input: R
     mutationFn: async (file: File) => {
       // A picture goes to POST /files/documents too, which files it as an
       // image; POST /files is the note editor's store (`file-mutations.ts`).
-      const stored = folder.space
-        ? await spacesApi.uploadFile(folder.space.uuid, file)
-        : await filesApi.uploadDocument(file);
+      // Straight to storage, with today's upload as the fallback (`lib/api/uploads.ts`).
+      const space = folder.space;
+      const stored = space
+        ? await uploadFile(file, { kind: 'space', spaceUuid: space.uuid }, () => spacesApi.uploadFile(space.uuid, file))
+        : await uploadFile(file, { kind: 'my_files' }, () => filesApi.uploadDocument(file));
       try {
         await foldersApi.addItem(folder.uuid, { type: 'file', id: stored.data.id });
       } catch (error) {

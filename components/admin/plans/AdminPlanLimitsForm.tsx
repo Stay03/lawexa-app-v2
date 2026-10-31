@@ -207,7 +207,9 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+          {/* noValidate: the form's own messages say the server's range; the
+              browser's number check would stop the save before they show. */}
+          <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
             {/* Header row — hidden on mobile */}
             <div className="hidden sm:grid grid-cols-[1fr_100px_170px] gap-3 px-3">
               <p className="text-xs font-medium text-muted-foreground">Limit</p>

@@ -3,6 +3,7 @@
 import { useMutation } from '@tanstack/react-query';
 
 import { filesApi } from '@/lib/api/files';
+import { uploadFile } from '@/lib/api/uploads';
 import { foldersQueries } from './queries';
 
 /**
@@ -24,7 +25,8 @@ import { foldersQueries } from './queries';
  */
 export function useUploadLooseFile() {
   return useMutation({
-    mutationFn: (file: File) => filesApi.uploadDocument(file),
+    // Straight to storage, with today's upload as the fallback (`lib/api/uploads.ts`).
+    mutationFn: (file: File) => uploadFile(file, { kind: 'my_files' }, () => filesApi.uploadDocument(file)),
     meta: { silentError: true, invalidates: [foldersQueries.looseFilesKey()] },
   });
 }

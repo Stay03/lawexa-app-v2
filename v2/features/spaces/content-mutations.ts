@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { spaceMovesApi, spacesApi } from '@/lib/api/collab';
+import { uploadFile } from '@/lib/api/uploads';
 import type { CreateSpaceFolderPayload, SpaceItemRef } from '@/types/collab';
 import type { UploadAttempt } from '@/v2/features/channels/files/use-upload-queue';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
@@ -110,8 +111,12 @@ export function useCreateSpaceFolder(spaceUuid: string) {
 export function useUploadSpaceFile(spaceUuid: string) {
   const queryClient = useQueryClient();
   return useMutation({
+    // Straight to storage, with today's upload as the fallback (`lib/api/uploads.ts`).
     mutationFn: ({ file, onProgress, signal }: UploadAttempt) =>
-      spacesApi.uploadFile(spaceUuid, file, { onProgress, signal }),
+      uploadFile(file, { kind: 'space', spaceUuid }, (options) => spacesApi.uploadFile(spaceUuid, file, options), {
+        onProgress,
+        signal,
+      }),
     meta: { silentError: true },
     onSuccess: () => invalidateSpaceContents(queryClient, spaceUuid),
   });

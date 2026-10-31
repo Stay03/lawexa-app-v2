@@ -27,9 +27,9 @@ test('a plan’s rows become the card’s file lines', () => {
 
 test('unlimited storage says so; unlimited or oversized capped values read as the server’s ceiling', () => {
   const top = { limits: [row('upload_size_mb', -1), row('files_per_message', -1), row('storage_mb', -1)] };
-  assert.deepEqual(fileLines(top), ['Chat with Document (100MB limit)', 'Up to 20 Files per Message', 'Unlimited File Storage']);
-  const over = { limits: [row('upload_size_mb', 500), row('files_per_message', 50)] };
-  assert.deepEqual(fileLines(over), ['Chat with Document (100MB limit)', 'Up to 20 Files per Message']);
+  assert.deepEqual(fileLines(top), ['Chat with Document (500MB limit)', 'Up to 20 Files per Message', 'Unlimited File Storage']);
+  const over = { limits: [row('upload_size_mb', 900), row('files_per_message', 50)] };
+  assert.deepEqual(fileLines(over), ['Chat with Document (500MB limit)', 'Up to 20 Files per Message']);
   // No storage for the plan: no storage line.
   assert.deepEqual(fileLines({ limits: [row('storage_mb', 0)] }), ['Chat with Document']);
 });

@@ -1,5 +1,6 @@
 import { chatApi } from '@/lib/api/chat';
 import { spacesApi } from '@/lib/api/collab';
+import { uploadFile } from '@/lib/api/uploads';
 
 /** What a composer keeps of an uploaded attachment, from either upload. */
 export interface UploadedAttachment {
@@ -15,9 +16,11 @@ export interface AttachmentUploads {
   uploadSpaceFile: (spaceUuid: string, file: File) => Promise<{ data: UploadedAttachment }>;
 }
 
+// Straight to storage, with today's upload as the fallback (`lib/api/uploads.ts`).
 const LIVE_UPLOADS: AttachmentUploads = {
-  uploadDocument: (file) => chatApi.uploadDocument(file),
-  uploadSpaceFile: (spaceUuid, file) => spacesApi.uploadFile(spaceUuid, file),
+  uploadDocument: (file) => uploadFile(file, { kind: 'my_files' }, () => chatApi.uploadDocument(file)),
+  uploadSpaceFile: (spaceUuid, file) =>
+    uploadFile(file, { kind: 'space', spaceUuid }, () => spacesApi.uploadFile(spaceUuid, file)),
 };
 
 /**

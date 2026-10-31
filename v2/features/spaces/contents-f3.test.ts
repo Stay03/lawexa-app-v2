@@ -343,7 +343,7 @@ test('each write invalidates the space lists, the item’s own list and the coun
   // Upload: the space.
   assert.match(
     mutations,
-    /spacesApi\.uploadFile\(spaceUuid, file, \{ onProgress, signal \}\),\s*meta: \{ silentError: true \},\s*onSuccess: \(\) => invalidateSpaceContents\(queryClient, spaceUuid\),/,
+    /uploadFile\(file, \{ kind: 'space', spaceUuid \}, \(options\) => spacesApi\.uploadFile\(spaceUuid, file, options\), \{\s*onProgress,\s*signal,\s*\}\),\s*meta: \{ silentError: true \},\s*onSuccess: \(\) => invalidateSpaceContents\(queryClient, spaceUuid\),/,
   );
   // Remove from Space: the space and the item's family.
   assert.match(

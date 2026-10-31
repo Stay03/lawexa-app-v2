@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { channelFilesApi, channelListsApi } from '@/lib/api/collab';
 import { filesApi } from '@/lib/api/files';
+import { uploadFile } from '@/lib/api/uploads';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type {
   AddListItemPayload,
@@ -411,7 +412,9 @@ export function useUploadChannelFile(channelUuid: string) {
   return useMutation({
     mutationFn: (input: UploadChannelFileInput) => {
       const { file, onProgress, signal } = uploadVariables(input);
-      return channelFilesApi.upload(channelUuid, file, { onProgress, signal });
+      // Straight to storage, with today's upload as the fallback (`lib/api/uploads.ts`).
+      return uploadFile(file, { kind: 'channel', channelUuid }, (options) =>
+        channelFilesApi.upload(channelUuid, file, options), { onProgress, signal });
     },
     meta: { silentError: true },
     onSuccess: (response) => {

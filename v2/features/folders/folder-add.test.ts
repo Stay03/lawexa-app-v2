@@ -60,7 +60,7 @@ test('an upload goes to its store first, then into the folder', () => {
   // A space folder's file belongs to the space; a personal one's to the reader.
   assert.match(
     add,
-    /const stored = folder\.space\s*\? await spacesApi\.uploadFile\(folder\.space\.uuid, file\)\s*: await filesApi\.uploadDocument\(file\);/,
+    /const stored = space\s*\? await uploadFile\(file, \{ kind: 'space', spaceUuid: space\.uuid \}, \(\) => spacesApi\.uploadFile\(space\.uuid, file\)\)\s*: await uploadFile\(file, \{ kind: 'my_files' \}, \(\) => filesApi\.uploadDocument\(file\)\);/,
   );
   // A picture too: POST /files would save it as a note's content image,
   // which no file list shows (backend's local run, 22 October 2026).

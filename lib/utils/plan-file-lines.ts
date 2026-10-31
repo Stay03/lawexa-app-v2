@@ -11,7 +11,8 @@ import type { IPlan, IPlanLimit, TUploadLimitType } from '@/types/subscription';
  * the ceiling. Storage has no ceiling, so -1 there is unlimited.
  */
 const CEILINGS: Partial<Record<TUploadLimitType, number>> = {
-  upload_size_mb: 100,
+  // 500 MB since uploads go straight to storage (Backend 527ce6a4).
+  upload_size_mb: 500,
   files_per_message: 20,
 };
 
