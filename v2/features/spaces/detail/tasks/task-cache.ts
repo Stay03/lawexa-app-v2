@@ -1,5 +1,5 @@
 import type { ReorderSpaceTasksPayload, SpaceTask } from '@/types/collab';
-import type { SpaceTaskChangedEvent } from '@/v2/runtime/realtime/protocol';
+import type { SpaceTaskSnapshotEvent } from '@/v2/runtime/realtime/protocol';
 import { queueOrder } from './task-board-model';
 
 /**
@@ -38,50 +38,18 @@ export function removeTask(list: readonly SpaceTask[], taskUuid: string): SpaceT
  *   purpose. The board's next read settles it.
  * - A task in `deleted` (the uuids this board has seen deleted) never comes
  *   back from a late `created` or `updated`. A delete is soft and final.
- *
- * A SNAPSHOT WITH `has_hidden_thread` (Backend 5a1b7543) is the copy every
- * member may see, not this viewer's: its thread is withheld from everyone.
- * Its other fields go in, and the cached row keeps its own thread fields
- * until the board reads the card again (`useTaskBoardLive`), so a reader's
- * link does not blink out on every change someone else makes.
+
  */
 export function applyTaskChanged(
   list: readonly SpaceTask[],
-  event: SpaceTaskChangedEvent,
+  event: SpaceTaskSnapshotEvent,
   deleted: ReadonlySet<string>,
 ): SpaceTask[] {
   if (event.action === 'deleted') return removeTask(list, event.task.uuid);
   if (deleted.has(event.task.uuid)) return [...list];
   const cached = list.find((row) => row.uuid === event.task.uuid);
   if (cached && changedAt(cached) > changedAt(event.task)) return [...list];
-  if (cached && event.task.has_hidden_thread) {
-    return upsertTask(list, { ...event.task, thread: cached.thread, has_hidden_thread: cached.has_hidden_thread });
-  }
   return upsertTask(list, event.task);
-}
-
-/**
- * Reads of one card, one at a time per task (Frontend's review, 05:11Z): a
- * read asked for while that card's read is out runs once more after it, not
- * once per event, so a burst of changes costs two reads at most.
- */
-export function createCardReader(read: (taskUuid: string) => Promise<void>): (taskUuid: string) => void {
-  const running = new Set<string>();
-  const again = new Set<string>();
-  const run = (taskUuid: string) => {
-    if (running.has(taskUuid)) {
-      again.add(taskUuid);
-      return;
-    }
-    running.add(taskUuid);
-    void read(taskUuid)
-      .catch(() => undefined)
-      .finally(() => {
-        running.delete(taskUuid);
-        if (again.delete(taskUuid)) run(taskUuid);
-      });
-  };
-  return run;
 }
 
 export type QueueDirection = 'up' | 'down';

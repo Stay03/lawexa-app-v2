@@ -538,15 +538,6 @@ export const spaceTasksApi = {
     return response.data;
   },
 
-  /** One task, as this viewer may see it (Backend 5a1b7543): the board reads it
-   *  again after a `task.changed` whose thread is hidden from some. */
-  show: async (spaceUuid: string, taskUuid: string): Promise<SpaceTaskItemResponse> => {
-    const response = await apiClient.get<SpaceTaskItemResponse>(
-      `/spaces/${encodeURIComponent(spaceUuid)}/tasks/${encodeURIComponent(taskUuid)}`,
-    );
-    return response.data;
-  },
-
   /** A new task (201). The server's row comes back in `data`. */
   create: async (spaceUuid: string, payload: CreateSpaceTaskPayload): Promise<SpaceTaskItemResponse> => {
     const response = await apiClient.post<SpaceTaskItemResponse>(

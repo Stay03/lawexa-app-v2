@@ -17,9 +17,6 @@ import { TASK_TITLE_MAX, type TaskDraft } from './task-sheet-model';
  * Posting needs membership of the thread's channel, as on the thread's own
  * page; the board role does not decide it.
  *
- *   concealed the task has a thread this reader may not read (Backend
- *             5a1b7543: `has_hidden_thread`): no pane, no tab and no Thread
- *             field, and no line about it (Stay, through the techlead, 05:06Z).
  *   closed    the reader may not open channels at all (Stay's choice A, 20:24Z:
  *             task chat is for Researchers): a line saying so, nothing asked.
  *   new       a task not saved yet: nothing to chat about.
@@ -41,7 +38,6 @@ export type ThreadAccess =
   | { status: 'read'; canRead: boolean; canPost: boolean };
 
 export type TaskChatState =
-  | { kind: 'concealed' }
   | { kind: 'closed' }
   | { kind: 'new' }
   | { kind: 'none'; canStart: boolean }
@@ -60,7 +56,6 @@ export function taskChatState(
   { canEdit, canChat }: { canEdit: boolean; canChat: boolean },
   access: ThreadAccess,
 ): TaskChatState {
-  if (task && !task.thread && task.has_hidden_thread) return { kind: 'concealed' };
   if (!canChat) return { kind: 'closed' };
   if (!task) return { kind: 'new' };
   const thread = task.thread;
@@ -161,11 +156,6 @@ export function renameOutcome(task: SpaceTask, typed: string, max: number): Rena
 export interface StartChannel {
   uuid: string;
   name: string;
-}
-
-/** Whether the task box shows a chat at all: not on a card whose thread this reader may not read. */
-export function taskChatShown(state: TaskChatState): boolean {
-  return state.kind !== 'concealed';
 }
 
 /**
