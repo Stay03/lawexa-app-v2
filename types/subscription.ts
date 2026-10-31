@@ -8,7 +8,12 @@ export type TUploadLimitType =
   | 'media_size_mb'
   | 'storage_mb'
   | 'files_per_message'
-  | 'max_pdf_pages';
+  | 'scan_pages'
+  | 'max_pdf_pages'
+  | 'space_storage_mb'
+  | 'space_upload_size_mb'
+  | 'files_per_space_upload'
+  | 'max_space_documents';
 export type TLimitPeriod = 'month' | 'billing_interval' | 'lifetime';
 
 // Subscription statuses

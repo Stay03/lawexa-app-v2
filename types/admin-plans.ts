@@ -4,7 +4,7 @@
 // ============================================
 
 import type { AdminConversationsPagination, AdminConversationsLinks } from './admin';
-import type { IPlanLimit } from './subscription';
+import type { IPlanLimit, TUploadLimitType } from './subscription';
 
 // Plan list item (GET /api/admin/plans)
 export interface AdminPlanListItem {
@@ -68,7 +68,7 @@ export interface AdminPlanUpdatePayload {
 }
 
 // Limit input for PUT /api/admin/plans/{id}/limits
-export type AdminLimitType = 'ai_messages' | 'bookmarks' | 'note_creations';
+export type AdminLimitType = 'ai_messages' | 'bookmarks' | 'note_creations' | TUploadLimitType;
 export type AdminLimitPeriod = 'month' | 'day' | 'lifetime' | 'billing_interval';
 
 export interface AdminPlanLimitInput {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch, type Control } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Loader2, Save, Gauge } from 'lucide-react';
@@ -38,6 +38,15 @@ import { extractApiError } from '@/lib/utils/api-error';
 import type { AdminPlanDetail, AdminLimitPeriod } from '@/types/admin-plans';
 import type { IPlanLimit } from '@/types/subscription';
 import { limitsSavedToast } from './plan-limits-saved';
+import {
+  FILE_LIMIT_FIELDS,
+  fileLimitError,
+  fileLimitHint,
+  fileLimitRows,
+  fileLimitValues,
+  gigabytesHint,
+  type FileLimitField,
+} from './plan-file-limits';
 
 /******************************************************************************
                                  Schema
@@ -48,11 +57,38 @@ const limitSchema = z.object({
   period: z.enum(['month', 'day', 'lifetime', 'billing_interval']),
 });
 
-const limitsFormSchema = z.object({
-  ai_messages: limitSchema,
-  bookmarks: limitSchema,
-  note_creations: limitSchema,
+const fileLimitSchema = z.object({
+  limit_value: z.number(),
+  set: z.boolean(),
 });
+
+const limitsFormSchema = z
+  .object({
+    ai_messages: limitSchema,
+    bookmarks: limitSchema,
+    note_creations: limitSchema,
+    files: z.object({
+      upload_size_mb: fileLimitSchema,
+      media_size_mb: fileLimitSchema,
+      files_per_message: fileLimitSchema,
+      storage_mb: fileLimitSchema,
+      scan_pages: fileLimitSchema,
+      max_pdf_pages: fileLimitSchema,
+      space_storage_mb: fileLimitSchema,
+      space_upload_size_mb: fileLimitSchema,
+      files_per_space_upload: fileLimitSchema,
+      max_space_documents: fileLimitSchema,
+    }),
+  })
+  // The server's own rules for each file limit (UpdatePlanLimitsRequest).
+  .superRefine((values, ctx) => {
+    for (const field of FILE_LIMIT_FIELDS) {
+      const message = fileLimitError(field, values.files[field.type].limit_value);
+      if (message) {
+        ctx.addIssue({ code: 'custom', path: ['files', field.type, 'limit_value'], message });
+      }
+    }
+  });
 
 type LimitsFormValues = z.infer<typeof limitsFormSchema>;
 
@@ -109,6 +145,7 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
       ai_messages: findLimit(plan.limits, 'ai_messages'),
       bookmarks: findLimit(plan.limits, 'bookmarks'),
       note_creations: findLimit(plan.limits, 'note_creations'),
+      files: fileLimitValues(plan.limits),
     },
   });
 
@@ -118,17 +155,21 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
       ai_messages: findLimit(plan.limits, 'ai_messages'),
       bookmarks: findLimit(plan.limits, 'bookmarks'),
       note_creations: findLimit(plan.limits, 'note_creations'),
+      files: fileLimitValues(plan.limits),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan.id, plan.limits]);
 
   const onSubmit = useCallback(
     (data: LimitsFormValues) => {
-      const limits = LIMIT_TYPES.map((type) => ({
-        limit_type: type,
-        limit_value: data[type].limit_value,
-        period: data[type].period,
-      }));
+      const limits = [
+        ...LIMIT_TYPES.map((type) => ({
+          limit_type: type,
+          limit_value: data[type].limit_value,
+          period: data[type].period,
+        })),
+        ...fileLimitRows(data.files, fileLimitValues(plan.limits)),
+      ];
 
       const payload = { limits };
 
@@ -149,7 +190,7 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
         },
       });
     },
-    [form, mutation, plan.id, plan.is_free]
+    [form, mutation, plan.id, plan.is_free, plan.limits]
   );
 
   return (
@@ -243,6 +284,24 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
               ))}
             </div>
 
+            {/* Files and uploads (Arthur's spec: every limit set here, no code change) */}
+            <div className="space-y-2 pt-4">
+              <div>
+                <p className="text-sm font-semibold">Files and uploads</p>
+                <p className="text-xs text-muted-foreground">
+                  Sizes and storage are in MB. The pricing page reads document
+                  size, files per message and storage.
+                </p>
+              </div>
+              {FILE_LIMIT_FIELDS.filter((field) => field.group === 'files').map((field) => (
+                <FileLimitRow key={field.type} field={field} control={form.control} isFree={plan.is_free} />
+              ))}
+              <p className="pt-3 text-xs font-semibold text-muted-foreground">Spaces</p>
+              {FILE_LIMIT_FIELDS.filter((field) => field.group === 'spaces').map((field) => (
+                <FileLimitRow key={field.type} field={field} control={form.control} isFree={plan.is_free} />
+              ))}
+            </div>
+
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-2">
               <Button
@@ -269,5 +328,61 @@ export function AdminPlanLimitsForm({ plan }: AdminPlanLimitsFormProps) {
         </Form>
       </CardContent>
     </Card>
+  );
+}
+
+/** One file limit: its name and the server's range, the value, and a GB reading for large sizes. */
+function FileLimitRow({
+  field,
+  control,
+  isFree,
+}: {
+  field: FileLimitField;
+  control: Control<LimitsFormValues>;
+  isFree: boolean;
+}) {
+  const value = useWatch({ control, name: `files.${field.type}` });
+  const gigabytes = gigabytesHint(field, value.limit_value);
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-x-3 gap-y-1.5 items-center rounded-lg border px-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{field.label}</p>
+        <p className="text-xs text-muted-foreground">{fileLimitHint(field)}</p>
+        {!value.set && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            {isFree
+              ? 'Not set yet. Until it is saved, the server default shown applies.'
+              : 'Not set on this plan. Until it is saved, the free plan’s value applies.'}
+          </p>
+        )}
+      </div>
+      <FormField
+        control={control}
+        name={`files.${field.type}.limit_value`}
+        render={({ field: input }) => (
+          <FormItem className="space-y-1">
+            <FormControl>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={field.noLimit ? -1 : 1}
+                max={field.max ?? undefined}
+                aria-label={field.label}
+                value={Number.isNaN(input.value) ? '' : input.value}
+                onChange={(e) =>
+                  input.onChange(
+                    e.target.value === '' ? Number.NaN : parseInt(e.target.value, 10)
+                  )
+                }
+              />
+            </FormControl>
+            {gigabytes && (
+              <p className="text-xs tabular-nums text-muted-foreground">= {gigabytes}</p>
+            )}
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    </div>
   );
 }
