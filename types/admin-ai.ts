@@ -667,7 +667,8 @@ export interface AdminPageReaderOption {
 }
 
 export interface AdminPageReaders {
-  first: string;
+  /** null when the setting holds no reader yet. */
+  first: string | null;
   backup: string | null;
   options: AdminPageReaderOption[];
 }

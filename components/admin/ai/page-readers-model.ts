@@ -33,9 +33,14 @@ export function readerName(choices: readonly AdminPageReaderOption[], reader: st
   return choices.find((option) => option.reader === reader)?.name ?? reader;
 }
 
+/** What the form starts from: the saved choice, with no first reader as '' and no backup as `NO_BACKUP`. */
+export function pageReadersStart(data: AdminPageReaders): { first: string; backup: string } {
+  return { first: data.first ?? '', backup: data.backup ?? NO_BACKUP };
+}
+
 /** What stops the save before it is sent: the server refuses a backup equal to the first. */
-export function pageReadersError(first: string, backup: string): string | null {
-  if (first === '') return 'Choose the model that reads scanned pages first.';
+export function pageReadersError(first: string | null, backup: string): string | null {
+  if (!first) return 'Choose the model that reads scanned pages first.';
   if (backup !== NO_BACKUP && backup === first) return 'The backup must be a different model from the first.';
   return null;
 }

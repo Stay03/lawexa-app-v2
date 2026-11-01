@@ -18,32 +18,51 @@ import { isReadingPages, SCAN_POLL_MS, scanLines } from './scan-reading';
  * nothing. The lines come from `scan-reading.ts`.
  *
  * It reads the file's own answer (`GET /files/{id}`, `filesQueries.detail`),
- * the entry the chat's side panel already holds, so there it adds no request
- * until the pages are being read.
+ * the entry the chat's side panel also holds, and ASKS AGAIN EACH TIME THE
+ * READER OPENS: a fresh upload can answer before its reading has begun, and
+ * an upgrade reads pages a cached "past your plan" still counts, so a kept
+ * answer of up to 5 minutes would show neither (techlead's review,
+ * 1 November 2026).
+ *
+ * A screen reader hears the start and the end (`announce`), not each count:
+ * the live region stays mounted and the counting text sits outside it.
  */
 export function ScanReadingStatus({ fileId, className }: { fileId: number; className?: string }) {
   const detail = useQuery({
     ...filesQueries.detail(fileId),
     select: (response) => response.data ?? null,
+    refetchOnMount: 'always',
     refetchInterval: (query) => (isReadingPages(query.state.data?.data) ? SCAN_POLL_MS : false),
   });
   const lines = scanLines(detail.data);
-  if (!lines.reading && !lines.pastPlan && !lines.unread) return null;
+  const shown = Boolean(lines.reading || lines.pastPlan || lines.unread);
 
   return (
-    <div role="status" aria-live="polite" className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground', className)}>
-      {lines.reading ? (
-        <span className="inline-flex items-center gap-1.5 tabular-nums">
-          <Loader2 aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
-          {lines.reading}
-        </span>
+    <>
+      <span role="status" aria-live="polite" className="sr-only">
+        {lines.announce}
+      </span>
+      {shown ? (
+        <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground', className)}>
+          {lines.reading ? (
+            <span className="inline-flex items-center gap-1.5 tabular-nums">
+              <Loader2 aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
+              {lines.reading}
+            </span>
+          ) : null}
+          {lines.pastPlan ? (
+            <span>
+              {lines.pastPlan}.{lines.plansLink ? (
+                <>
+                  {' '}
+                  <PlansLink />
+                </>
+              ) : null}
+            </span>
+          ) : null}
+          {lines.unread ? <span>{lines.unread}</span> : null}
+        </div>
       ) : null}
-      {lines.pastPlan ? (
-        <span>
-          {lines.pastPlan}. <PlansLink />
-        </span>
-      ) : null}
-      {lines.unread ? <span>{lines.unread}</span> : null}
-    </div>
+    </>
   );
 }

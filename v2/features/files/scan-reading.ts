@@ -18,15 +18,23 @@ export interface ScanFacts {
   scanned_pages?: number | null;
   ocr_pages_read?: number | null;
   ocr_pages_cap?: number | null;
+  ocr_cap_from?: 'own_plan' | 'space_plan' | null;
 }
 
 export interface ScanLines {
   /** "Reading pages… 40 of 250", while the pages are being read. */
   reading: string | null;
-  /** "12 pages of this scan are past your plan", shown with the plans link. */
+  /** "12 pages of this scan are past your plan". */
   pastPlan: string | null;
+  /** Whether the plans link goes with `pastPlan`: only for the reader's own plan. */
+  plansLink: boolean;
   /** "Some pages couldn’t be read.", for a failed or partly unread scan. */
   unread: string | null;
+  /**
+   * What a screen reader hears, once at the start and once at the end, not
+   * on every count: the region holding it stays mounted.
+   */
+  announce: string;
 }
 
 /** How often the reader asks again while the pages are being read. */
@@ -47,8 +55,19 @@ export function isReadingPages(facts: ScanFacts | null | undefined): boolean {
   return facts?.ocr_status === 'pending';
 }
 
+/**
+ * Whose plan the pages past the cap belong to. A Space or channel file is read
+ * to the Space holder's plan, so a member is not sent to the plans for it; a
+ * server that does not say keeps the plain words and no link.
+ */
+function pastPlanWords(facts: ScanFacts): { place: string; plansLink: boolean } {
+  if (facts.ocr_cap_from === 'own_plan') return { place: 'your plan', plansLink: true };
+  if (facts.ocr_cap_from === 'space_plan') return { place: 'this Space’s plan', plansLink: false };
+  return { place: 'the plan’s limit', plansLink: false };
+}
+
 export function scanLines(facts: ScanFacts | null | undefined): ScanLines {
-  const none: ScanLines = { reading: null, pastPlan: null, unread: null };
+  const none: ScanLines = { reading: null, pastPlan: null, plansLink: false, unread: null, announce: '' };
   if (!facts?.ocr_status) return none;
   const past = pagesPastPlan(facts);
   const scanned = facts.scanned_pages ?? null;
@@ -64,8 +83,9 @@ export function scanLines(facts: ScanFacts | null | undefined): ScanLines {
     }
   }
 
+  const words = pastPlanWords(facts);
   const pastPlan =
-    past > 0 ? `${count(past)} ${past === 1 ? 'page' : 'pages'} of this scan ${past === 1 ? 'is' : 'are'} past your plan` : null;
+    past > 0 ? `${count(past)} ${past === 1 ? 'page' : 'pages'} of this scan ${past === 1 ? 'is' : 'are'} past ${words.place}` : null;
 
   // `partial` with nothing past the plan means some pages could not be read.
   const unread =
@@ -73,5 +93,12 @@ export function scanLines(facts: ScanFacts | null | undefined): ScanLines {
       ? 'Some pages couldn’t be read.'
       : null;
 
-  return { reading, pastPlan, unread };
+  const announce =
+    facts.ocr_status === 'pending'
+      ? 'Reading the scanned pages.'
+      : facts.ocr_status === 'done'
+        ? 'The scanned pages are read.'
+        : [pastPlan, unread].filter(Boolean).join(' ');
+
+  return { reading, pastPlan, plansLink: past > 0 && words.plansLink, unread, announce };
 }

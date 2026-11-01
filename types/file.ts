@@ -31,6 +31,8 @@ export interface UserFile {
   ocr_pages_read?: number | null;
   /** How many scanned pages the plan reads for this file; null = no limit. */
   ocr_pages_cap?: number | null;
+  /** Whose plan sets that cap: the uploader's own, or the Space holder's (a Space or channel file). */
+  ocr_cap_from?: 'own_plan' | 'space_plan' | null;
 }
 
 // File detail (includes uploader)
