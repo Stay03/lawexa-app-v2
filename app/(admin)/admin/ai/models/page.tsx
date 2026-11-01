@@ -11,6 +11,7 @@ import { AiModelFilters } from '@/components/admin/ai/AiModelFilters';
 import { AiModelsTable } from '@/components/admin/ai/AiModelsTable';
 import { AiModelFormSheet } from '@/components/admin/ai/AiModelFormSheet';
 import { AiModelDeleteDialog } from '@/components/admin/ai/AiModelDeleteDialog';
+import { PageReadersCard } from '@/components/admin/ai/PageReadersCard';
 import { useAdminAiModels } from '@/lib/hooks/useAdminAi';
 import type { AdminAiModelsParams, AdminAiModel } from '@/types/admin-ai';
 
@@ -116,6 +117,8 @@ function AiModelsPageContent() {
 
   return (
     <div className="space-y-6">
+      {/* Which models read scanned pages (Stay, 1 November 2026). */}
+      <PageReadersCard />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>AI Models</CardTitle>

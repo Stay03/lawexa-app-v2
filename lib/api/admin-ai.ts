@@ -47,9 +47,27 @@ import type {
   AdminAiUpdateWorkflowData,
   AdminAiCopyWorkflowData,
   AdminAiWorkflow,
+  AdminPageReadersResponse,
+  AdminPageReadersUpdate,
 } from '@/types/admin-ai';
 
 export const adminAiApi = {
+  // ============================================
+  // Page readers
+  // ============================================
+
+  /** The models that read scanned pages, first and backup, and the picture-reading models to choose from. */
+  getPageReaders: async (): Promise<AdminPageReadersResponse> => {
+    const response = await apiClient.get<AdminPageReadersResponse>('/admin/page-readers');
+    return response.data;
+  },
+
+  /** Save the first page reader and the optional backup; answers the same shape. */
+  updatePageReaders: async (data: AdminPageReadersUpdate): Promise<AdminPageReadersResponse> => {
+    const response = await apiClient.put<AdminPageReadersResponse>('/admin/page-readers', data);
+    return response.data;
+  },
+
   // ============================================
   // Providers
   // ============================================

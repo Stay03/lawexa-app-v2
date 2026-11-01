@@ -653,3 +653,32 @@ export interface AdminAiWorkflowDetailResponse {
   message: string;
   data: AdminAiWorkflowDetail;
 }
+
+// ============================================
+// Page readers (the models that read scanned pages; Backend 649ad95c, 1 November 2026)
+// ============================================
+
+/** A model that can read pictures, offered as a page reader. */
+export interface AdminPageReaderOption {
+  model_id: number;
+  name: string;
+  /** The exact `model@provider` string to save for this model. */
+  reader: string;
+}
+
+export interface AdminPageReaders {
+  first: string;
+  backup: string | null;
+  options: AdminPageReaderOption[];
+}
+
+export interface AdminPageReadersResponse {
+  success: boolean;
+  message: string;
+  data: AdminPageReaders;
+}
+
+export interface AdminPageReadersUpdate {
+  first: string;
+  backup: string | null;
+}

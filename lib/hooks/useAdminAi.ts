@@ -23,6 +23,7 @@ import type {
   AdminAiCreateWorkflowData,
   AdminAiUpdateWorkflowData,
   AdminAiCopyWorkflowData,
+  AdminPageReadersUpdate,
 } from '@/types/admin-ai';
 
 // ============================================
@@ -31,6 +32,9 @@ import type {
 
 export const adminAiKeys = {
   all: ['admin', 'ai'] as const,
+
+  // Page readers
+  pageReaders: () => [...adminAiKeys.all, 'page-readers'] as const,
 
   // Providers
   providers: () => [...adminAiKeys.all, 'providers'] as const,
@@ -652,6 +656,29 @@ export function useCopyAiWorkflow() {
       adminAiApi.copyWorkflow(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminAiKeys.workflows() });
+    },
+  });
+}
+
+/**
+ * The models that read scanned pages (`GET /admin/page-readers`): first,
+ * backup, and the picture-reading models to choose from.
+ */
+export function usePageReaders() {
+  return useQuery({
+    queryKey: adminAiKeys.pageReaders(),
+    queryFn: () => adminAiApi.getPageReaders(),
+    staleTime: 30 * 1000,
+  });
+}
+
+/** Save the page readers; the answer replaces the cached choice. */
+export function useUpdatePageReaders() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AdminPageReadersUpdate) => adminAiApi.updatePageReaders(data),
+    onSuccess: (response) => {
+      queryClient.setQueryData(adminAiKeys.pageReaders(), response);
     },
   });
 }
