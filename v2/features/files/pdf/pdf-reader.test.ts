@@ -70,7 +70,7 @@ test('the chat file panel picks the reader for a PDF', () => {
   assert.equal(filePanelBody({ mime_type: 'application/pdf', original_name: 'TEST DATA Chapter 2.pdf', size: 1_258_291 }), 'pdf');
   assert.equal(filePanelBody({ mime_type: 'application/octet-stream', original_name: 'scan.PDF' }), 'pdf');
   const panel = read('v2', 'features', 'conversations', 'conversation', 'files', 'FilePanel.tsx');
-  assert.match(panel, /case 'pdf':\n\s+return \(\n\s+<div[^>]*>\n\s+<PdfReader\n\s+fileId=\{file\.id\}/);
+  assert.match(panel, /case 'pdf':\n\s+return \(\n\s+<div[^>]*>\n\s+<ScanReadingStatus fileId=\{file\.id\} className="mb-3" \/>\n\s+<PdfReader\n\s+fileId=\{file\.id\}/);
   // The side panel's header lost its slim line and its controls slot to the
   // draft panel's bar (9c51e145), so the reader draws its zoom over the pages
   // itself; the dialog still puts it on its own bar.

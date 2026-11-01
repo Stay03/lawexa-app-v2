@@ -11,6 +11,9 @@ export type FileCategory = 'content-image' | 'document';
 export type FileUploadStatus = 'completed' | 'pending' | 'failed';
 
 // File resource
+// A scanned PDF's pages being read into text (Backend dc79c07d, 1 November 2026).
+export type OcrStatus = 'pending' | 'done' | 'partial' | 'failed';
+
 export interface UserFile {
   id: number;
   url: string | null;
@@ -20,6 +23,14 @@ export interface UserFile {
   category: FileCategory;
   upload_status: FileUploadStatus;
   created_at: string;
+  /** null when the file has no scanned pages or is not a PDF. */
+  ocr_status?: OcrStatus | null;
+  /** Pages with no text of their own; null until the file has been looked at. */
+  scanned_pages?: number | null;
+  /** Of those, how many are read into text so far. */
+  ocr_pages_read?: number | null;
+  /** How many scanned pages the plan reads for this file; null = no limit. */
+  ocr_pages_cap?: number | null;
 }
 
 // File detail (includes uploader)

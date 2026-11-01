@@ -15,6 +15,7 @@ import { MediaPlayer } from '@/v2/features/files/MediaPlayer';
 import { PdfReader } from '@/v2/features/files/pdf/PdfReader';
 import { pageCountLabel } from '@/v2/features/files/pdf/pdf-model';
 import { filesQueries } from '@/v2/features/files/queries';
+import { ScanReadingStatus } from '@/v2/features/files/ScanReadingStatus';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { ChatSidePanel } from '../side-panel/ChatSidePanel';
 import { chatFileLine, filePanelBody } from './chat-files';
@@ -129,6 +130,7 @@ function FileBody({
     case 'pdf':
       return (
         <div className="mx-auto w-full max-w-[68ch] px-5 pt-4 pb-24 xl:px-10 xl:pt-5">
+          <ScanReadingStatus fileId={file.id} className="mb-3" />
           <PdfReader
             fileId={file.id}
             name={file.original_name}

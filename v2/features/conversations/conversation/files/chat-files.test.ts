@@ -173,7 +173,7 @@ test('the panel shows pictures, media, Word pages and PDFs itself; the rest go t
   // reader took `pdf` (piece b); the placeholder keeps `other`.
   const panel = readHere('FilePanel.tsx');
   assert.match(panel, /case 'word':\n\s+return <WordPages file=\{file\} \/>;/);
-  assert.match(panel, /case 'pdf':\n\s+return \(\n\s+<div[^>]*>\n\s+<PdfReader\n/);
+  assert.match(panel, /case 'pdf':\n\s+return \(\n\s+<div[^>]*>\n\s+<ScanReadingStatus fileId=\{file\.id\} className="mb-3" \/>\n\s+<PdfReader\n/);
   assert.match(panel, /case 'other':\n\s+return <FileDocumentPlaceholder file=\{file\} kind=\{kind\} \/>;/);
   assert.equal(panel.match(/function FileBody\(/g)?.length, 1);
 });

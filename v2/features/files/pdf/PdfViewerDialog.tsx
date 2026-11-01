@@ -11,6 +11,7 @@ import { fileSize } from '@/v2/features/folders/item-row-model';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useBackGuard } from '@/v2/runtime/use-back-guard';
+import { ScanReadingStatus } from '../ScanReadingStatus';
 import { pageCountLabel } from './pdf-model';
 import { PdfReader } from './PdfReader';
 import type { PdfViewer } from './use-pdf-viewer';
@@ -116,6 +117,8 @@ function PdfBar({ file, children }: { file: NonNullable<PdfViewer['file']>; chil
           <ExternalLink aria-hidden className="size-4" />
         </BarButton>
       </div>
+      {/* A scanned PDF's pages being read, on its own line under the controls. */}
+      <ScanReadingStatus fileId={file.id} className="basis-full px-1 pb-0.5" />
     </div>
   );
 }

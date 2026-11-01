@@ -41,7 +41,7 @@ test('each limit takes what the server takes and refuses what it refuses', () =>
   take('upload_size_mb', 1, 25, 250, 500); refuse('upload_size_mb', -1, 0, 501);
   take('media_size_mb', 1, 500); refuse('media_size_mb', -1, 0, 501);
   take('files_per_message', 1, 20); refuse('files_per_message', -1, 0, 21);
-  take('scan_pages', 1, 50); refuse('scan_pages', -1, 0, 51);
+  take('scan_pages', 1, 50, 1000); refuse('scan_pages', -1, 0, 1001);
   // Storage: -1, 0 or any size.
   take('storage_mb', -1, 0, 51200);
   // -1 or at least 1.
@@ -57,7 +57,7 @@ test('each limit takes what the server takes and refuses what it refuses', () =>
 test('the hints say the range, and a large size reads in GB', () => {
   assert.equal(fileLimitHint(field('upload_size_mb')), '1 to 500 MB');
   assert.equal(fileLimitHint(field('files_per_message')), '1 to 20 files');
-  assert.equal(fileLimitHint(field('scan_pages')), '1 to 50 pages');
+  assert.equal(fileLimitHint(field('scan_pages')), '1 to 1,000 pages');
   assert.equal(fileLimitHint(field('storage_mb')), '-1 for no limit, 0 for none, or any size in MB');
   assert.equal(fileLimitHint(field('space_upload_size_mb')), '-1 for no limit, or 1 to 500 MB');
   assert.equal(fileLimitHint(field('max_space_documents')), '-1 for no limit, or 1 and up');
