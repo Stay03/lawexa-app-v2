@@ -26,15 +26,15 @@ const DATA: AdminPageReaders = {
   first: FIRST,
   backup: 'openai/gpt-6-luna@openai',
   options: [
-    { model_id: 212, name: 'Claude Haiku 5.5', reader: 'anthropic/claude-haiku-5.5@anthropic' },
-    { model_id: 198, name: 'GPT-6 Luna', reader: 'openai/gpt-6-luna@openai' },
+    { model_id: 'anthropic/claude-haiku-5.5', name: 'Claude Haiku 5.5', reader: 'anthropic/claude-haiku-5.5@anthropic' },
+    { model_id: 'openai/gpt-6-luna', name: 'GPT-6 Luna', reader: 'openai/gpt-6-luna@openai' },
   ],
 };
 
 test('the choices are the server’s picture models, and a saved reader outside them still shows', () => {
   assert.deepEqual(readerChoices(DATA).map((option) => option.name), ['Claude Haiku 5.5', 'GPT-6 Luna']);
   const old = { ...DATA, backup: 'deepseek/deepseek-v4.1-flash@deepseek' };
-  assert.deepEqual(readerChoices(old).at(-1), { model_id: 0, name: 'deepseek/deepseek-v4.1-flash@deepseek', reader: 'deepseek/deepseek-v4.1-flash@deepseek' });
+  assert.deepEqual(readerChoices(old).at(-1), { model_id: 'deepseek/deepseek-v4.1-flash@deepseek', name: 'deepseek/deepseek-v4.1-flash@deepseek', reader: 'deepseek/deepseek-v4.1-flash@deepseek' });
   assert.equal(readerName(readerChoices(DATA), 'openai/gpt-6-luna@openai'), 'GPT-6 Luna');
 });
 

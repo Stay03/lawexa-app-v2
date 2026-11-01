@@ -22,7 +22,7 @@ export function readerChoices(data: AdminPageReaders): AdminPageReaderOption[] {
   const choices = [...data.options];
   for (const saved of [data.first, data.backup]) {
     if (saved && !choices.some((option) => option.reader === saved)) {
-      choices.push({ model_id: 0, name: saved, reader: saved });
+      choices.push({ model_id: saved, name: saved, reader: saved });
     }
   }
   return choices;

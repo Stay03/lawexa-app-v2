@@ -660,7 +660,8 @@ export interface AdminAiWorkflowDetailResponse {
 
 /** A model that can read pictures, offered as a page reader. */
 export interface AdminPageReaderOption {
-  model_id: number;
+  /** The model's id string, such as "anthropic/claude-haiku-5.5". */
+  model_id: string;
   name: string;
   /** The exact `model@provider` string to save for this model. */
   reader: string;
