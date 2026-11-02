@@ -173,8 +173,12 @@ const PLAIN_PARAGRAPH = /^<p\s*>(.*)<\/p\s*>$/i;
 /** A heading inside an aligned `p`: `<h2>words</h2>`, or `## words`. */
 const INNER_HEADING = /^<(h[1-3])\s*>(.*)<\/\1\s*>$/i;
 const HASH_HEADING = /^(#{1,3})\s+(.*)$/;
-/** A line inside a split block that is a tag of its own (not the font span or a `<br>`): the block stays text. */
-const TAG_LINE = /^<\/?(?!span\b|br\b)[a-z]/i;
+/**
+ * A line inside a split block that is a tag of its own: the block stays text.
+ * The font span, a `<br>` and the mark tags are words, not tags of their own
+ * (review 0a8878ca: `<strong>Company No. 123</strong>` in a split block).
+ */
+const TAG_LINE = /^<\/?(?!(?:span|br)\b|(?:strong|b|em|i|u)\s*>)[a-z]/i;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const HALF_TAG = /^ {0,3}<\/?[a-z0-9]*$/i;
 /** A line holding only `<br>`s, up to three spaces in as the server reads it (woz af6173d6): a gap, one empty paragraph. */

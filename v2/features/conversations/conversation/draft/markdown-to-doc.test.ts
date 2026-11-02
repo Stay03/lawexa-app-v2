@@ -416,3 +416,39 @@ test('Stay’s live draft (c48fc782): bold and the numbered points are kept arou
   );
   assert.equal(tight?.[2].content?.length, 2);
 });
+
+/* Review 0a8878ca: parity with the server. */
+
+test('a split block’s line may be made of words and mark tags', () => {
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">\n<strong>TEST DATA No. 123</strong>\n<em>TEST</em> DATA\n</p>').content, [
+    centred([{ type: 'text', text: 'TEST DATA No. 123', marks: [{ type: 'bold' }] }]),
+    centred([{ type: 'text', text: 'TEST', marks: [{ type: 'italic' }] }, ...words(' DATA')]),
+  ]);
+  // Any other tag line still keeps the block text.
+  assert.equal(markdownToDoc('<p style="text-align: center">\n<span class="x">TEST</span>\n<div>DATA</div>\n</p>').content?.some((node) => node.attrs?.textAlign), false);
+});
+
+test('mark tags: spaces before >, code spans, crossed tags, and an open tag before the body', () => {
+  const bold = { type: 'bold' };
+  const italic = { type: 'italic' };
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><strong >TEST</strong ></p>').content, [
+    centred([{ type: 'text', text: 'TEST', marks: [bold] }]),
+  ]);
+  // Inside a code span a tag is literal.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">`<b>TEST</b>`</p>').content, [
+    centred([{ type: 'text', text: '<b>TEST</b>', marks: [{ type: 'code' }] }]),
+  ]);
+  // Crossed tags: a closing tag ends the latest of its kind, so <b>a<i>b</b>c</i> is a bold, b bold italic, c italic.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><b>a<i>b</b>c</i></p>').content, [
+    centred([
+      { type: 'text', text: 'a', marks: [bold] },
+      { type: 'text', text: 'b', marks: [bold, italic] },
+      { type: 'text', text: 'c', marks: [italic] },
+    ]),
+  ]);
+  // An unclosed <strong> marks the rest of its line only: the body after it is untouched.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">TEST <strong>DATA</p>\n\n**TEST DATA resolution** passed.').content, [
+    centred([...words('TEST '), { type: 'text', text: 'DATA', marks: [bold] }]),
+    body,
+  ]);
+});
