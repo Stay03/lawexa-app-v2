@@ -84,6 +84,43 @@ test('unknown alignments, other elements and plain text are left as before', () 
   assert.equal(stripPastedPresentation('<pre>TEST</pre><param align="center">'), '<pre>TEST</pre><param align="center">');
   assert.equal(stripPastedPresentation('TEST DATA, align="center" in prose'), 'TEST DATA, align="center" in prose');
   assert.equal(stripPastedPresentation('<p>TEST</p>'), '<p>TEST</p>');
-  // The carrier can't be pasted in to smuggle a style.
-  assert.equal(stripPastedPresentation('<p data-v2-paste-align="center">TEST</p>'), '<p>TEST</p>');
+});
+
+/* Review e5d2b521. */
+
+test('an attribute posing as the carrier, nested or in prose, never becomes a style', () => {
+  assert.equal(stripPastedPresentation('<p data-v2-align-x="center">TEST</p>'), '<p data-v2-align-x="center">TEST</p>');
+  const nested = stripPastedPresentation('<p data-v2-paste-align=" data-v2-paste-align="center"center">TEST</p>');
+  assert.doesNotMatch(nested, /text-align/);
+  assert.equal(stripPastedPresentation('<p>TEST data-v2-paste-align="right" DATA</p>'), '<p>TEST data-v2-paste-align="right" DATA</p>');
+});
+
+test('an item, cell or row ends at the next one or at its list’s or table’s end; a self-closed div holds nothing', () => {
+  assert.equal(
+    stripPastedPresentation('<ul><li align="center"><p>a</p><li><p>b</p></ul><p>After</p>'),
+    '<ul><li align="center"><p style="text-align: center">a</p><li><p>b</p></ul><p>After</p>',
+  );
+  assert.equal(stripPastedPresentation('<div align="center"/><p>After</p>'), '<div align="center"/><p>After</p>');
+  assert.equal(
+    stripPastedPresentation('<table><tr><td align="right"><p>a</p><td><p>b</p><tr><th align="center"><p>c</p></table><p>After</p>'),
+    '<table><tr><td align="right"><p style="text-align: right">a</p><td><p>b</p><tr><th align="center"><p style="text-align: center">c</p></table><p>After</p>',
+  );
+  // An unclosed div inside a cell ends with the cell.
+  assert.equal(
+    stripPastedPresentation('<table><tr><td><div align="center"><p>a</p></td></tr></table><p>After</p>'),
+    '<table><tr><td><div align="center"><p style="text-align: center">a</p></td></tr></table><p>After</p>',
+  );
+});
+
+test('the last text-align declaration wins, as in CSS', () => {
+  assert.equal(stripPastedPresentation('<p style="text-align:left;text-align:center">TEST</p>'), '<p style="text-align: center">TEST</p>');
+  assert.equal(stripPastedPresentation('<p style="text-align:center; text-align: left">TEST</p>'), '<p>TEST</p>');
+});
+
+test('a Google Docs paste keeps its centred paragraph', () => {
+  const docs =
+    '<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-4d5e6f">' +
+    '<p dir="ltr" style="line-height:1.38;margin-top:0pt;text-align:center;"><span style="font-size:11pt;font-weight:700;">TEST DATA</span></p>' +
+    '<p dir="ltr" style="line-height:1.38;"><span style="font-size:11pt;">Body</span></p></b>';
+  assert.equal(stripPastedPresentation(docs), '<meta charset="utf-8"><p dir="ltr" style="text-align: center"><span>TEST DATA</span></p><p dir="ltr"><span>Body</span></p></b>');
 });

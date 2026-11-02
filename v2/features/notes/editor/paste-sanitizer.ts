@@ -66,12 +66,19 @@ const ANY_TAG = /<(\/?)([a-z][a-z0-9]*)\b([^>]*)>/gi;
 const ALIGNABLE = /^(?:p|h[1-6])$/;
 /** The elements whose alignment the paragraphs and headings inside them take. */
 const CONTAINERS = /^(?:div|li|td|th)$/;
+/** The lists and table parts that end the items and cells inside them. */
+const STRUCTURE = /^(?:ul|ol|table|thead|tbody|tfoot|tr)$/;
+/** What a new item, cell or row closes when its own end tag was left out: the one before it, up to its parent. */
+const IMPLIED_END: Record<string, { ends: ReadonlySet<string>; parents: ReadonlySet<string> }> = {
+  li: { ends: new Set(['li']), parents: new Set(['ul', 'ol']) },
+  td: { ends: new Set(['td', 'th']), parents: new Set(['tr', 'table']) },
+  th: { ends: new Set(['td', 'th']), parents: new Set(['tr', 'table']) },
+  tr: { ends: new Set(['tr', 'td', 'th']), parents: new Set(['thead', 'tbody', 'tfoot', 'table']) },
+};
 const STYLE_VALUE = /\sstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i;
-const TEXT_ALIGN = /(?:^|;)\s*text-align\s*:\s*([a-z]+)\s*(?:!important\s*)?(?:;|$)/i;
+const TEXT_ALIGN = /(?:^|;)\s*text-align\s*:\s*([a-z-]+)\s*(?:!important\s*)?(?=;|$)/gi;
 const ALIGN_ATTRIBUTE = /\salign\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i;
 const ALIGNMENTS: ReadonlySet<string> = new Set(['left', 'center', 'right', 'justify']);
-/** Carries an alignment past the strip; written back as the one style kept. */
-const KEPT_ALIGN = /\sdata-v2-paste-align="(center|right|justify)"/g;
 
 /** A known alignment, in lower case, or `null`. */
 function alignment(value: string | undefined): string | null {
@@ -79,27 +86,41 @@ function alignment(value: string | undefined): string | null {
   return word && ALIGNMENTS.has(word) ? word : null;
 }
 
-/** An element's own alignment: its `text-align` style, else its `align`. */
+/** An element's own alignment: its last `text-align` declaration, as CSS reads it, else its `align`. */
 function ownAlignment(attributes: string): string | null {
   const style = STYLE_VALUE.exec(attributes);
+  const declarations = [...(style?.[1] ?? style?.[2] ?? '').matchAll(TEXT_ALIGN)];
   const attribute = ALIGN_ATTRIBUTE.exec(attributes);
-  return alignment(TEXT_ALIGN.exec(style?.[1] ?? style?.[2] ?? '')?.[1]) ?? alignment(attribute?.[1] ?? attribute?.[2] ?? attribute?.[3]);
+  return alignment(declarations.at(-1)?.[1]) ?? alignment(attribute?.[1] ?? attribute?.[2] ?? attribute?.[3]);
 }
 
 /**
- * Each paragraph's and heading's alignment, set aside before the strip: its
- * own, else that of the nearest aligned `div`, list item or cell around it.
+ * Each paragraph's and heading's alignment, set aside before the strip under
+ * `carrier`: its own, else that of the nearest aligned `div`, list item or
+ * cell it is still inside. An item, cell or row also ends at the next one or
+ * at its list's or table's end, as HTML ends them; a self-closed container
+ * holds nothing.
  */
-function keepAlignment(html: string): string {
+function keepAlignment(html: string, carrier: string): string {
   const around: { name: string; align: string | null }[] = [];
+  const closeLast = (names: ReadonlySet<string>, stopAt: ReadonlySet<string> = new Set()) => {
+    for (let at = around.length - 1; at >= 0; at--) {
+      if (stopAt.has(around[at].name)) return;
+      if (names.has(around[at].name)) {
+        around.length = at;
+        return;
+      }
+    }
+  };
   return html.replace(ANY_TAG, (tag, closing: string, rawName: string, attributes: string) => {
     const name = rawName.toLowerCase();
-    if (CONTAINERS.test(name)) {
+    if (CONTAINERS.test(name) || STRUCTURE.test(name)) {
       if (closing) {
-        const at = around.map((entry) => entry.name).lastIndexOf(name);
-        if (at >= 0) around.length = at;
-      } else {
-        around.push({ name, align: ownAlignment(attributes) });
+        closeLast(new Set([name]));
+      } else if (!attributes.trimEnd().endsWith('/')) {
+        const implied = IMPLIED_END[name];
+        if (implied) closeLast(implied.ends, implied.parents);
+        around.push({ name, align: CONTAINERS.test(name) ? ownAlignment(attributes) : null });
       }
       return tag;
     }
@@ -107,16 +128,19 @@ function keepAlignment(html: string): string {
     const align = ownAlignment(attributes) ?? around.findLast((entry) => entry.align)?.align ?? null;
     const rest = attributes.replace(ALIGN_ATTRIBUTE, '');
     // Left is the editor's own default, so it is written as no alignment (and stops one from around it).
-    if (align && align !== 'left') return `<${rawName}${rest} data-v2-paste-align="${align}">`;
+    if (align && align !== 'left') return `<${rawName}${rest} ${carrier}="${align}">`;
     return rest !== attributes ? `<${rawName}${rest}>` : tag;
   });
 }
 
 export function stripPastedPresentation(html: string): string {
-  return keepAlignment(html.replace(KEPT_ALIGN, ''))
+  // A new name on every paste, so nothing in the clipboard can pose as a kept alignment.
+  const carrier = `data-v2-align-${Math.random().toString(36).slice(2)}`;
+  const kept = new RegExp(`\\s${carrier}="(center|right|justify)"`, 'g');
+  return keepAlignment(html, carrier)
     .replace(NOT_BOLD_OPEN, '')
     .replace(FONT_TAGS, '')
     .replace(STYLE_ATTRIBUTE, '')
     .replace(PRESENTATION_ATTRIBUTES, '')
-    .replace(KEPT_ALIGN, (_marker, align: string) => ` style="text-align: ${align}"`);
+    .replace(kept, (_carrier, align: string) => ` style="text-align: ${align}"`);
 }
