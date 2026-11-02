@@ -169,8 +169,8 @@ const HASH_HEADING = /^(#{1,3})\s+(.*)$/;
 const TAG_LINE = /^<\/?(?!span\b|br\b)[a-z]/i;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const HALF_TAG = /^ {0,3}<\/?[a-z0-9]*$/i;
-/** A line holding only `<br>`s: a gap, one empty paragraph. */
-const BREAKS_ONLY = /^ {0,3}(?:<br\s*\/?>\s*)+$/i;
+/** A line holding only `<br>`s, at the line's start (an indented one may be inside a list item): a gap, one empty paragraph. */
+const BREAKS_ONLY = /^(?:<br\s*\/?>[ \t]*)+$/i;
 
 function alignedLine(tag: string, align: string, words: string): string {
   return `<${tag} style="text-align: ${align}">${words}</${tag}>`;

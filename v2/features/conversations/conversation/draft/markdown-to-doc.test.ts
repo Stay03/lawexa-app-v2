@@ -254,6 +254,16 @@ test('anything else around an aligned block stays text', () => {
   // Inside a code fence, or indented as code.
   assert.equal(markdownToDoc('```\n<p style="text-align: center">\n## TEST\n</p>\n```').content?.[0].type, 'codeBlock');
   assert.equal(markdownToDoc('    <p style="text-align: center">## TEST</p>').content?.[0].type, 'codeBlock');
+  // A fence line inside a split block, or a closing tag that doesn't match (review 9510d959).
+  assert.equal(markdownToDoc('<p style="text-align: center">\n```\n</p>\n```').content?.some((node) => node.attrs?.textAlign), false);
+  assert.equal(markdownToDoc('<h2 style="text-align: center">\nTEST\n</h3>\n\nDATA').content?.some((node) => node.attrs?.textAlign), false);
+  // A script, or an attribute on the inner heading, inside shape 1.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><h2 class="x">TEST</h2></p>').content, [centred(words('<h2 class="x">TEST</h2>'))]);
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><h2><script>alert(1)</script></h2></p>').content, [
+    centredHeading(2, words('<script>alert(1)</script>')),
+  ]);
+  // A `#` the person typed, written back escaped, stays a `#` (review 9510d959, item 1).
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">&#35;# TEST</p>').content, [centred(words('## TEST'))]);
 });
 
 test('while a split block is being written, its lines show aligned before the closing tag', () => {
@@ -271,11 +281,13 @@ test('a line holding only <br>s is a gap, one empty paragraph (woz d3643d84)', (
     { type: 'paragraph' },
     centred([...words('A. TEST'), { type: 'hardBreak' }, ...words('Director')]),
   ]);
-  assert.deepEqual(markdownToDoc('TEST\n\n <br/> <BR />\n\nDATA').content, [
+  assert.deepEqual(markdownToDoc('TEST\n\n<br/> <BR />\n\nDATA').content, [
     { type: 'paragraph', content: words('TEST') },
     { type: 'paragraph' },
     { type: 'paragraph', content: words('DATA') },
   ]);
+  // Indented, it may belong to a list item: not a gap there.
+  assert.equal(markdownToDoc('- TEST\n\n  <br>\n\n  DATA').content?.length, 1);
   // A <br> with words beside it is not a gap.
   assert.equal(markdownToDoc('<br> TEST').content?.some((node) => !node.content), false);
 });
