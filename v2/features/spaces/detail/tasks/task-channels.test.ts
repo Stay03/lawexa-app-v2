@@ -223,3 +223,15 @@ test('the board reads open cards page after page and Done a page at a time, for 
   assert.match(box, /<FieldBlock label="Channel"/);
   assert.match(box, /onChange=\{chooseThread\}/);
 });
+
+test('Done shows no number until it has come, and a task’s thread starts in the card’s channel', () => {
+  const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
+  // The first local run showed "Done 0" while the read was on its way.
+  assert.match(board, /count: doneQuery\.isPending\s*\? null/);
+  // The first local run offered #general for a card in #product.
+  const box = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
+  assert.match(
+    box,
+    /\(cardChannel && startRooms\.options\.some\(\(option\) => option\.uuid === cardChannel\) \? cardChannel : startRooms\.preselected\)/,
+  );
+});

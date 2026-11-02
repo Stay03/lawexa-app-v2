@@ -141,9 +141,14 @@ export function SpaceTasksPanel({
   const shown = useMemo(() => filterByOwner(tasks, owner), [tasks, owner]);
   const columns = useMemo(() => boardColumns(shown), [shown]);
   // Done's count is the server's total for the channel; one owner's is what shows.
+  // No number until Done has come: a 0 while it loads would read as none.
   const doneTotal = doneQuery.data?.pages[0]?.pagination.total ?? null;
   const done: DoneState = {
-    count: owner === null ? doneCount(columns.done.length, doneTotal) : columns.done.length,
+    count: doneQuery.isPending
+      ? null
+      : owner === null
+        ? doneCount(columns.done.length, doneTotal)
+        : columns.done.length,
     hasMore: doneQuery.hasNextPage,
     loading: doneQuery.isFetchingNextPage,
     onLoadMore: () => void doneQuery.fetchNextPage(),
@@ -533,7 +538,8 @@ function PhoneStageTab({
   onSelect,
 }: {
   stage: SpaceTaskStage;
-  count: number;
+  /** `null` while the column's cards are on their way: no number shows. */
+  count: number | null;
   selected: boolean;
   droppable: boolean;
   onSelect: () => void;
@@ -631,7 +637,8 @@ function StageColumn({
 
 /** What Done shows beyond its cards: its count, and whether more pages wait. */
 interface DoneState {
-  count: number;
+  /** `null` until Done's first page has come. */
+  count: number | null;
   hasMore: boolean;
   loading: boolean;
   onLoadMore: () => void;
@@ -675,7 +682,7 @@ function DoneColumn({
         type="button"
         onClick={onToggle}
         aria-expanded={false}
-        aria-label={`Show Done, the last ${DONE_WINDOW_DAYS} days: ${done.count}`}
+        aria-label={`Show Done, the last ${DONE_WINDOW_DAYS} days${done.count === null ? '' : `: ${done.count}`}`}
         className={cn(
           'v2-interactive hidden w-11 shrink-0 flex-col items-center gap-2 self-stretch rounded-2xl py-3 text-xs text-muted-foreground transition-colors hover:text-foreground',
           STAGE_LANE.done,
@@ -690,7 +697,7 @@ function DoneColumn({
       </button>
       <section
         ref={setColumnRef}
-        aria-label={`Done, the last ${DONE_WINDOW_DAYS} days, ${done.count}`}
+        aria-label={`Done, the last ${DONE_WINDOW_DAYS} days${done.count === null ? '' : `, ${done.count}`}`}
         className={cn(COLUMN, STAGE_LANE.done, !open && 'md:hidden', overColumn && DROP_TARGET)}
       >
         <ColumnHead
@@ -734,7 +741,7 @@ function DoneColumn({
   );
 }
 
-function ColumnHead({ stage, count, action }: { stage: SpaceTaskStage; count: number; action?: ReactNode }) {
+function ColumnHead({ stage, count, action }: { stage: SpaceTaskStage; count: number | null; action?: ReactNode }) {
   // A phone names the column in the switcher above it.
   return (
     <div className="flex min-h-8 items-center gap-2 px-1 max-md:hidden">
