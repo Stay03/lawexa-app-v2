@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { mayEditNote, noteSpace } from './note-copy';
+import { mayEditNote, noteSpace, offersNoteHistory } from './note-copy';
 
 /* A Space's copy of a note (Stay, 18 October 2026: "adding a note from my
  * notes to space creates a copy of that note so my original one remains as
@@ -59,4 +59,35 @@ test('the reader and the editor follow the copy rules', () => {
   assert.match(editor, /\{record && !copySpace \? \(\s*<PublishSheet/);
   // And no Delete: a copy leaves its space by being removed from its folder.
   assert.match(editor, /\{copySpace \? null : \(\s*<DropdownMenuItem\s*variant="destructive"/);
+});
+
+/* Version history on the note's own page (Stay, 2 November 2026, 61db64b3;
+ * Techlead 9a08b24d): for the note's owner only. */
+
+test('the note page offers version history to its author alone', () => {
+  // The author of their own note.
+  assert.equal(offersNoteHistory({ user: author }, 7), true);
+  // Any other reader, or nobody signed in.
+  assert.equal(offersNoteHistory({ user: author }, 9), false);
+  assert.equal(offersNoteHistory({ user: author }, null), false);
+  // A Space's copy: its author while the server lets them edit it, never a Contributor who did not write it.
+  assert.equal(offersNoteHistory({ is_space_copy: true, can_edit: true, user: author }, 7), true);
+  assert.equal(offersNoteHistory({ is_space_copy: true, can_edit: true, user: author }, 9), false);
+  assert.equal(offersNoteHistory({ is_space_copy: true, can_edit: false, user: author }, 7), false);
+});
+
+test('the note page wires its version history to the draft panel’s dialog', () => {
+  assert.match(read('reader', 'NoteScreen.tsx'), /history=\{offersNoteHistory\(note, userId\)\}/);
+  const doc = read('reader', 'NoteDocument.tsx');
+  // The button opens it only where the page offers history, and the dialog loads on the first open.
+  assert.match(doc, /onHistory=\{\s*history\s*\?/);
+  assert.match(doc, /\{history && historyLoaded \? \(\s*<DraftHistoryDialog\s+of="note"/);
+  // Restoring works as in the panel, then the page reads the note again.
+  assert.match(doc, /canRestore\s/);
+  assert.match(doc, /onRestored=\{\(\) => void queryClient\.invalidateQueries\(\{ queryKey: notesQueries\.details\(\) \}\)\}/);
+  // No button for anyone else.
+  assert.match(read('reader', 'NoteActions.tsx'), /\{onHistory \? \(\s*<button type="button" onClick=\{onHistory\}/);
+  const dialog = read('..', 'conversations', 'conversation', 'draft', 'DraftHistoryDialog.tsx');
+  assert.match(dialog, /const words = HISTORY_WORDS\[of\];/);
+  assert.match(dialog, /becomes: 'becomes the note’s text\.'/);
 });

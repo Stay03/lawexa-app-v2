@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Download, Loader2, Pencil } from 'lucide-react';
+import { Download, History, Loader2, Pencil } from 'lucide-react';
 
 import {
   DropdownMenu,
@@ -40,6 +40,9 @@ import { ShareButton } from '@/v2/features/sharing/ShareButton';
  * simply renders what it is given. Not a security boundary — the editor route
  * and the API both refuse a stranger's save — but a link that leads to a
  * refusal is a link that should not have been drawn.
+ *
+ * VERSION HISTORY sits after Edit, for the author alone (`offersNoteHistory`,
+ * Stay 61db64b3): it opens the draft panel's history dialog over the page.
  */
 export function NoteActions({
   noteId,
@@ -50,6 +53,7 @@ export function NoteActions({
   canExport,
   editHref,
   canAddToFolder,
+  onHistory = null,
 }: {
   noteId: number;
   slug: string;
@@ -66,6 +70,8 @@ export function NoteActions({
    *  folders (422 "A note from another Space cannot be added here."), so the
    *  picker would offer folders that refuse it. */
   canAddToFolder: boolean;
+  /** Opens the note's version history; `null` for anyone but its author. */
+  onHistory?: (() => void) | null;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -83,6 +89,12 @@ export function NoteActions({
           <Pencil aria-hidden className="size-4" />
           Edit
         </Link>
+      ) : null}
+      {onHistory ? (
+        <button type="button" onClick={onHistory} className={cn(ACTION_PILL, FOCUS_RING)}>
+          <History aria-hidden className="size-4" />
+          Version history
+        </button>
       ) : null}
       <FeedbackButton type="note" contentId={noteId} />
     </div>
