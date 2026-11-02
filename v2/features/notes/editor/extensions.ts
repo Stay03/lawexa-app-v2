@@ -9,6 +9,7 @@ import TextAlign from '@tiptap/extension-text-align';
 import { createCaseMentionExtension } from './case-mention';
 import { FindReplace } from './find-replace';
 import { FontStyle } from './font-style';
+import { PasteAlignment } from './paste-alignment';
 import type { CaseMentionStore } from './mention-store';
 
 /**
@@ -123,6 +124,8 @@ export function createNoteExtensions({
     // a plugin whose tints are decorations, so it adds nothing to the schema
     // and nothing to the saved note (find-replace.ts).
     FindReplace,
+    // The first pasted line keeps its own alignment (paste-alignment.ts).
+    PasteAlignment,
   ];
 }
 
