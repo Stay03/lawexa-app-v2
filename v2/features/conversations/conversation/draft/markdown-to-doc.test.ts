@@ -281,13 +281,13 @@ test('a line holding only <br>s is a gap, one empty paragraph (woz d3643d84)', (
     { type: 'paragraph' },
     centred([...words('A. TEST'), { type: 'hardBreak' }, ...words('Director')]),
   ]);
-  assert.deepEqual(markdownToDoc('TEST\n\n<br/> <BR />\n\nDATA').content, [
+  assert.deepEqual(markdownToDoc('TEST\n\n   <br/> <BR />\n\nDATA').content, [
     { type: 'paragraph', content: words('TEST') },
     { type: 'paragraph' },
     { type: 'paragraph', content: words('DATA') },
   ]);
-  // Indented, it may belong to a list item: not a gap there.
-  assert.equal(markdownToDoc('- TEST\n\n  <br>\n\n  DATA').content?.length, 1);
+  // Four spaces in, it is code.
+  assert.equal(markdownToDoc('TEST\n\n    <br>').content?.[1].type, 'codeBlock');
   // A <br> with words beside it is not a gap.
   assert.equal(markdownToDoc('<br> TEST').content?.some((node) => !node.content), false);
 });
