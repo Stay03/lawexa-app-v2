@@ -1,5 +1,6 @@
 import type { ApiMessage } from '@/types/chat';
 import type { NoteStatus, NoteUser } from '@/types/note';
+import type { NoteVisibleTo } from './note-privacy';
 import type { PaginationLinks, PaginationMeta } from '@/types/case';
 
 /**
@@ -53,6 +54,11 @@ export interface NoteRecord {
   content_preview_html?: string;
   /** Detail only. */
   is_private?: boolean;
+  /**
+   * Who the note's own settings let open it (`note-privacy.ts`). Absent on a
+   * server from before the field.
+   */
+  visible_to?: NoteVisibleTo;
   tags: string[] | null;
   is_free: boolean;
   /** Detail only — list rows signal paid via `is_free: false`. */

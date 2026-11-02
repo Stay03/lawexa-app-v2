@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import type { NoteRecord } from '../types';
 import { noteSpace } from '../note-copy';
+import { noteOwnerMark } from '../note-privacy';
 import { noteTags } from '../note-row-model';
 import { formatNoteDate, noteDisplayTitle, noteHasTitle } from '../note-text';
 import { NoteTagList } from '../note-tag-list';
@@ -34,8 +35,9 @@ const DraftHistoryDialog = dynamic(
  *   kicker      author · updated {date} — provenance before the name, the
  *               same order the case and statute headers use
  *   title       the note's name, or "Untitled" in a quieter ink
- *   draft mark  ONLY on the author's own unpublished note, and it says what
- *               being a draft actually means rather than just labelling it
+ *   owner mark  ONLY on the author's own note that only they can open: a draft,
+ *               or a published private note (`note-privacy.ts`); it says what
+ *               that means rather than just labelling the status
  *   actions     save · copy link · export · edit · version history
  *
  * v1's `NoteDetailHeader` put a thumbnail, a tag row, a price and a status
@@ -82,7 +84,7 @@ export function NoteDocument({
   // empty one.
   const body = note.content?.trim() ?? '';
   const isOwn = editHref !== null;
-  const isOwnDraft = isOwn && note.status !== 'published';
+  const ownerMark = noteOwnerMark(note, isOwn);
   // A Space's copy reads as a plain note (Stay, 19 October 2026: "No need
   // for all that", like a copied file in a file explorer): no Space label,
   // no link to the original. It only offers no "Add to folder", since the
@@ -122,13 +124,13 @@ export function NoteDocument({
           {title}
         </h1>
 
-        {/* The draft mark says the CONSEQUENCE, not just the status: a draft is
-            private to its author, and that is the fact an author needs while
-            deciding whether to share the link they are looking at. */}
-        {isOwnDraft ? (
+        {/* The owner mark says the CONSEQUENCE, not just the status: only the
+            author can open this note, and that is the fact an author needs
+            while deciding whether to share the link they are looking at. */}
+        {ownerMark ? (
           <p>
             <span className="inline-flex min-h-6 items-center rounded-full bg-amber-500/15 px-2.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-              Draft · only you can see this
+              {ownerMark}
             </span>
           </p>
         ) : null}
