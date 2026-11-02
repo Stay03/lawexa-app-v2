@@ -96,3 +96,89 @@ test('a line break inside a paragraph is a hard break, as the chat shows it', ()
   assert.ok(JSON.stringify(doc).includes('Dear Sir,'));
   assert.ok(!(doc.content ?? []).some((node) => (node.content ?? []).some((child) => child.text?.includes('\n'))));
 });
+
+/* Alignment (Stay, 2 November 2026, thread 20a87a84; the shape agreed in 384c, 3cff2de9 and ee444601). */
+
+const centred = (content: unknown[]) => ({ type: 'paragraph', attrs: { textAlign: 'center' }, content });
+
+test('an aligned line in the editor’s own form becomes that paragraph or heading, its words read as Markdown', () => {
+  const doc = markdownToDoc(
+    '<h1 style="text-align: center">**TEST DATA BOARD RESOLUTION**</h1>\n\nResolved as follows.\n\n<p style="text-align: right">Dated *1 November*</p>\n\n<h3 style="text-align: justify">Notes</h3>',
+  );
+  assert.deepEqual(doc.content?.[0], {
+    type: 'heading',
+    attrs: { level: 1, textAlign: 'center' },
+    content: [{ type: 'text', text: 'TEST DATA BOARD RESOLUTION', marks: [{ type: 'bold' }] }],
+  });
+  assert.deepEqual(doc.content?.[1], { type: 'paragraph', content: [{ type: 'text', text: 'Resolved as follows.' }] });
+  assert.deepEqual(doc.content?.[2], {
+    type: 'paragraph',
+    attrs: { textAlign: 'right' },
+    content: [
+      { type: 'text', text: 'Dated ' },
+      { type: 'text', text: '1 November', marks: [{ type: 'italic' }] },
+    ],
+  });
+  assert.deepEqual(doc.content?.[3].attrs, { level: 3, textAlign: 'justify' });
+});
+
+test('the style is read forgivingly: case, spaces, a closing semicolon and either quote', () => {
+  for (const line of [
+    '<P STYLE="Text-Align:CENTER">TEST DATA</P>',
+    "<p style='text-align : center;'>TEST DATA</p>",
+    '<p style="text-align:center">TEST DATA</p>',
+  ]) {
+    assert.deepEqual(markdownToDoc(line).content, [centred([{ type: 'text', text: 'TEST DATA' }])], line);
+  }
+});
+
+test('lines one under the other each become a block, and <br> inside one is a line break', () => {
+  const doc = markdownToDoc(
+    '<p style="text-align: center">A. TEST DATA Name<br>Director</p>\n<p style="text-align: center">B. TEST DATA Name<br/>Secretary</p>',
+  );
+  assert.deepEqual(doc.content, [
+    centred([{ type: 'text', text: 'A. TEST DATA Name' }, { type: 'hardBreak' }, { type: 'text', text: 'Director' }]),
+    centred([{ type: 'text', text: 'B. TEST DATA Name' }, { type: 'hardBreak' }, { type: 'text', text: 'Secretary' }]),
+  ]);
+});
+
+test('an aligned line with no blank line around it is still read, and the Markdown beside it stays Markdown', () => {
+  const doc = markdownToDoc('<h2 style="text-align: center">TEST DATA Title</h2>\nThe **first** paragraph.\n- one\n- two');
+  assert.deepEqual(doc.content?.[0], {
+    type: 'heading',
+    attrs: { level: 2, textAlign: 'center' },
+    content: [{ type: 'text', text: 'TEST DATA Title' }],
+  });
+  assert.deepEqual(doc.content?.[1].content?.[1], { type: 'text', text: 'first', marks: [{ type: 'bold' }] });
+  assert.equal(doc.content?.[2].type, 'bulletList');
+});
+
+test('the font span inside an aligned line keeps its font; the draft’s own font reaches a heading but not its size', () => {
+  const doc = markdownToDoc(
+    '<p style="text-align: center"><span data-font="Georgia" data-size="16">TEST DATA</span></p>\n\n<h1 style="text-align: center">Head</h1>',
+    { font: 'Arial', size: 12 },
+  );
+  assert.deepEqual(doc.content?.[0], centred([{ type: 'text', text: 'TEST DATA', marks: [{ type: 'fontStyle', attrs: { font: 'Georgia', size: 16 } }] }]));
+  assert.deepEqual(doc.content?.[1].content?.[0].marks, [{ type: 'fontStyle', attrs: { font: 'Arial', size: null } }]);
+});
+
+test('anything outside the agreed shape stays text, as before', () => {
+  for (const line of [
+    '<p style="text-align: left">TEST DATA</p>',
+    '<p style="text-align: center; color: red">TEST DATA</p>',
+    '<p class="x" style="text-align: center">TEST DATA</p>',
+    '<h4 style="text-align: center">TEST DATA</h4>',
+    '<div style="text-align: center">TEST DATA</div>',
+  ]) {
+    const doc = markdownToDoc(`${line}\n\nAfter.`);
+    assert.deepEqual(doc.content?.[0], { type: 'paragraph', content: [{ type: 'text', text: line }] }, line);
+  }
+  // Not the draft's last block: an aligned line missing its closing tag is not read.
+  const unclosed = '<p style="text-align: center">TEST DATA';
+  assert.deepEqual(markdownToDoc(`${unclosed}\n\nAfter.`).content?.[0], { type: 'paragraph', content: [{ type: 'text', text: unclosed }] });
+});
+
+test('while the draft is being written, its last aligned line shows before its closing tag, and a half-typed tag shows nothing', () => {
+  assert.deepEqual(markdownToDoc('Intro.\n\n<p style="text-align: center">**TEST DA').content?.[1], centred([{ type: 'text', text: '**TEST DA' }]));
+  assert.deepEqual(markdownToDoc('Intro.\n\n<p style="text-al').content, [{ type: 'paragraph', content: [{ type: 'text', text: 'Intro.' }] }]);
+});

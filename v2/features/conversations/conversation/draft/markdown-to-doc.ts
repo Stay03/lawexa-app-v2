@@ -32,8 +32,20 @@ import { FONT_STYLE } from '@/v2/features/notes/editor/font-style';
  *   - `<span data-font="…" data-size="…">words</span>` inside the Markdown,
  *     which wins over `base` for its words.
  * Only allowed values are kept (lib/notes/note-fonts.ts); a span with none is
- * dropped and its words stay. The span is the one tag read: any other HTML is
- * still text. Code takes no font, as in the editor.
+ * dropped and its words stay. Code takes no font, as in the editor.
+ *
+ * ALIGNMENT (Stay, 2 November 2026, thread 20a87a84: centring in drafts as in
+ * notes; the shape agreed in thread 384c). A line alone in the editor's own
+ * form, `<p style="text-align: center">words</p>` or `<h1>` to `<h3>` with
+ * center, right or justify, becomes that paragraph or heading with its
+ * alignment, its words read as inline Markdown; `<br>` inside it is a line
+ * break (a signature block centred with Shift+Enter, woz ee444601). It is
+ * read whenever it stands alone on its line, blank lines around it or not:
+ * lines written one under the other each become their own block, and the
+ * Markdown lines beside it are read as Markdown. While the draft is still being written
+ * the last line may not have its closing tag yet: it is read as aligned all
+ * the same, and an opening tag still being typed shows nothing. The font span
+ * and this line are the only tags read: any other HTML is still text.
  */
 
 type Mark = NonNullable<JSONContent['marks']>[number];
@@ -54,7 +66,8 @@ const parser = unified().use(remarkParse).use(remarkBreaks).use(remarkGfm);
 
 export function markdownToDoc(markdown: string, base: DraftFont = NO_FONT): JSONContent {
   const root = parser.runSync(parser.parse(markdown)) as Root;
-  const content = blocks(root.children, base);
+  const last = root.children[root.children.length - 1];
+  const content = root.children.flatMap((node) => block(node, base, node === last));
   return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
 }
 
@@ -74,7 +87,80 @@ function blocks(nodes: readonly RootContent[], font: DraftFont): JSONContent[] {
   return nodes.flatMap((node) => block(node, font));
 }
 
-function block(node: RootContent, font: DraftFont): JSONContent[] {
+type Align = 'center' | 'right' | 'justify';
+
+/**
+ * One aligned line: the tag, its one style (any case, spaces around the
+ * colon, a closing `;`, either quote), its words, and the closing tag.
+ */
+const ALIGNED_LINE = /^<(p|h[1-3])\s+style\s*=\s*(["'])\s*text-align\s*:\s*(center|right|justify)\s*;?\s*\2\s*>(.*?)(<\/\1\s*>)?$/i;
+
+/** An aligned line's opening tag still being typed: nothing to show yet. */
+const OPENING_TAG = /^<(?:p|h[1-3])(?:\s[^>]*)?$/i;
+
+/**
+ * An HTML block's lines, each an aligned paragraph or heading where it is one;
+ * `null` when no line is, so the block stays text as before. `streaming`: the
+ * block is the draft's last, so its last line may lack its closing tag.
+ */
+function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONContent[] | null {
+  const lines = value.split('\n');
+  const content: JSONContent[] = [];
+  // The lines between aligned ones, read as Markdown together (a paragraph may run over several).
+  let others: string[] = [];
+  const flush = () => {
+    if (others.some((line) => line.trim())) content.push(...(markdownToDoc(others.join('\n'), font).content ?? []));
+    others = [];
+  };
+  let aligned = false;
+  lines.forEach((raw, index) => {
+    const line = raw.trim();
+    const open = streaming && index === lines.length - 1;
+    const match = ALIGNED_LINE.exec(line);
+    if (match && (match[5] || open)) {
+      aligned = true;
+      flush();
+      const tag = match[1].toLowerCase();
+      const align = match[3].toLowerCase() as Align;
+      content.push(
+        tag === 'p'
+          ? withContent({ type: 'paragraph', attrs: { textAlign: align } }, inlineMarkdown(match[4], font))
+          : // A heading keeps its own size, as a `#` heading does.
+            withContent(
+              { type: 'heading', attrs: { level: Number(tag[1]), textAlign: align } },
+              inlineMarkdown(match[4], { font: font.font, size: null }),
+            ),
+      );
+      return;
+    }
+    if (open && OPENING_TAG.test(line)) return;
+    others.push(raw);
+  });
+  if (!aligned) return null;
+  flush();
+  return content;
+}
+
+/** `<br>`, `<br/>` or `<br />`: a line break inside an aligned line. */
+const LINE_BREAK = /<br\s*\/?>/i;
+
+/**
+ * An aligned line's words, read as inline Markdown: bold, italic, links and
+ * the font span, with each `<br>` a line break between its parts.
+ */
+function inlineMarkdown(words: string, font: DraftFont): JSONContent[] {
+  return words.split(LINE_BREAK).flatMap((part, index) => [...(index > 0 ? [{ type: 'hardBreak' }] : []), ...inlinePart(part, font)]);
+}
+
+function inlinePart(words: string, font: DraftFont): JSONContent[] {
+  const root = parser.runSync(parser.parse(words)) as Root;
+  const first = root.children[0];
+  if (root.children.length === 1 && first.type === 'paragraph') return inline(first.children, font);
+  const text = root.children.map(textOf).join(' ');
+  return text ? [textNode(text, [], font)] : [];
+}
+
+function block(node: RootContent, font: DraftFont, last = false): JSONContent[] {
   switch (node.type) {
     case 'heading':
       // A heading keeps its own size: the draft's font reaches it, the draft's size does not.
@@ -106,6 +192,10 @@ function block(node: RootContent, font: DraftFont): JSONContent[] {
       const value = node.value.trim();
       // A font span's tag alone on its line opens or closes nothing across blocks: drop it.
       if (!value || SPAN_OPEN.test(value) || SPAN_CLOSE.test(value)) return [];
+      const aligned = alignedLines(value, font, last);
+      if (aligned) return aligned;
+      // An aligned line's opening tag still arriving at the draft's end shows nothing yet.
+      if (last && OPENING_TAG.test(value)) return [];
       return [{ type: 'paragraph', content: [textNode(node.value, [], font)] }];
     }
     default: {
