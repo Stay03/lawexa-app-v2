@@ -16,12 +16,20 @@
  *   empty     "No text to read in this file"
  *   skipped   the same: a file with no text the server can read
  *
+ * A SCAN HAS NO TEXT OF ITS OWN, so its extraction is `empty` while its pages
+ * are read as pictures (`ocr_status`, live since the scanned-page reading).
+ * For an empty or skipped file the scan's state decides (techlead's review,
+ * 2 November 2026): `pending` is still "Reading…", `done` or `partial` (pages
+ * read, some perhaps past the plan) is "Read", and `failed` or no scan is "No
+ * text to read in this file".
+ *
  * A server without the field shows no line. No React, so node:test reads it.
  */
 export type ExtractionStatus = 'pending' | 'done' | 'empty' | 'failed' | 'skipped';
 
 export interface ReadingFacts {
   extraction_status?: ExtractionStatus | null;
+  ocr_status?: 'pending' | 'done' | 'partial' | 'failed' | null;
   pages_read?: number | null;
   page_count?: number | null;
 }
@@ -36,6 +44,10 @@ export interface ReadingLine {
 
 const count = (n: number) => n.toLocaleString('en-GB');
 
+const READING_ANNOUNCE = 'Reading the file.';
+const READ: ReadingLine = { text: 'Read', tone: 'settled', announce: 'The file is read.' };
+const NO_TEXT: ReadingLine = { text: 'No text to read in this file', tone: 'settled', announce: 'No text to read in this file.' };
+
 function wholeNumber(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
 }
@@ -48,15 +60,18 @@ export function readingLine(facts: ReadingFacts | null | undefined): ReadingLine
       const text = read !== null && total !== null && total > 0
         ? `Reading… ${count(Math.min(read, total))} of ${count(total)} ${total === 1 ? 'page' : 'pages'}`
         : 'Reading…';
-      return { text, tone: 'reading', announce: 'Reading the file.' };
+      return { text, tone: 'reading', announce: READING_ANNOUNCE };
     }
     case 'done':
-      return { text: 'Read', tone: 'settled', announce: 'The file is read.' };
+      return READ;
     case 'failed':
       return { text: 'Couldn’t read this file', tone: 'failed', announce: 'Couldn’t read this file.' };
     case 'empty':
     case 'skipped':
-      return { text: 'No text to read in this file', tone: 'settled', announce: 'No text to read in this file.' };
+      // A scan: its pages decide.
+      if (facts.ocr_status === 'pending') return { text: 'Reading…', tone: 'reading', announce: READING_ANNOUNCE };
+      if (facts.ocr_status === 'done' || facts.ocr_status === 'partial') return READ;
+      return NO_TEXT;
     default:
       return null;
   }
@@ -74,7 +89,7 @@ export function readingAnnouncement(line: ReadingLine | null, answers: number): 
 }
 
 export function isReading(facts: ReadingFacts | null | undefined): boolean {
-  return facts?.extraction_status === 'pending';
+  return readingLine(facts)?.tone === 'reading';
 }
 
 /**

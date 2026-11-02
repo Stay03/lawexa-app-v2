@@ -22,6 +22,20 @@ test('each reading state has its line, and a server without the field shows none
   assert.equal(readingLine({ extraction_status: null }), null);
 });
 
+test('a scan has no text of its own, so its pages decide: reading, read, or nothing to read', () => {
+  // Pages still being read: "Reading…", and asked about again.
+  assert.deepEqual(readingLine({ extraction_status: 'empty', ocr_status: 'pending' }), { text: 'Reading…', tone: 'reading', announce: 'Reading the file.' });
+  assert.equal(isReading({ extraction_status: 'empty', ocr_status: 'pending' }), true);
+  // Pages read (some may be past the plan): "Read".
+  assert.equal(readingLine({ extraction_status: 'empty', ocr_status: 'done' })?.text, 'Read');
+  assert.equal(readingLine({ extraction_status: 'empty', ocr_status: 'partial' })?.text, 'Read');
+  assert.equal(isReading({ extraction_status: 'empty', ocr_status: 'done' }), false);
+  // The scan failed, or there is no scan: nothing to read.
+  assert.equal(readingLine({ extraction_status: 'empty', ocr_status: 'failed' })?.text, 'No text to read in this file');
+  assert.equal(readingLine({ extraction_status: 'empty', ocr_status: null })?.text, 'No text to read in this file');
+  assert.equal(readingLine({ extraction_status: 'skipped', ocr_status: 'pending' })?.text, 'Reading…');
+});
+
 test('a later server’s page counts slot into the reading line', () => {
   assert.equal(readingLine({ extraction_status: 'pending', pages_read: 120, page_count: 1600 })?.text, 'Reading… 120 of 1,600 pages');
   assert.equal(readingLine({ extraction_status: 'pending', pages_read: 0, page_count: 1 })?.text, 'Reading… 0 of 1 page');
