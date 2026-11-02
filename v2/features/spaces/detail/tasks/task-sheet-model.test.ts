@@ -78,6 +78,7 @@ test('a new task starts in Queued with the viewer as its owner', () => {
     waitingOn: null,
     owner: 'u-me',
     thread: null,
+    channel: null,
   });
 });
 

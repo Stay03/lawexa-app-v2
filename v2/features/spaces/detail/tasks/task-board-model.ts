@@ -1,4 +1,4 @@
-import type { SpaceTask, SpaceTaskPerson, SpaceTaskStage, ThreadStatusValue } from '@/types/collab';
+import type { Channel, SpaceTask, SpaceTaskChannel, SpaceTaskPerson, SpaceTaskStage, ThreadStatusValue } from '@/types/collab';
 
 /**
  * task-board-model — what a space's task board shows (thread 7aa0c6d8). Pure,
@@ -109,6 +109,72 @@ export function taskNote(task: SpaceTask): string | null {
     return note ? `${waiting} · ${note}` : waiting;
   }
   return task.stage === 'paused' ? note : null;
+}
+
+/** A channel the board's filter and the task box's Channel field offer. */
+export type ChannelOption = SpaceTaskChannel;
+
+type BoardRoom = Pick<Channel, 'uuid' | 'name' | 'is_thread' | 'visibility' | 'is_member' | 'created_at'>;
+
+/** A top-level channel this reader can read: open to the Space, or one they are in. */
+function readableChannel(room: BoardRoom): boolean {
+  return !room.is_thread && (room.visibility === 'space_public' || room.is_member === true);
+}
+
+/**
+ * The channels a card may sit in, by name (thread 550bf0ab): the Space's
+ * top-level channels this reader can read, the server's own rule. `keep` (a
+ * card's channel) stays a choice even when the list does not have it.
+ */
+export function boardChannelOptions(rooms: readonly BoardRoom[], keep: SpaceTaskChannel | null = null): ChannelOption[] {
+  const options = new Map<string, ChannelOption>();
+  for (const room of rooms) {
+    if (readableChannel(room) && !options.has(room.uuid)) options.set(room.uuid, { uuid: room.uuid, name: room.name });
+  }
+  if (keep && !options.has(keep.uuid)) options.set(keep.uuid, keep);
+  return [...options.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+/** The Space's starter channel, as the server picks it: its oldest channel open to the whole Space. */
+export function starterChannel(rooms: readonly BoardRoom[]): string | null {
+  let first: BoardRoom | null = null;
+  for (const room of rooms) {
+    if (room.is_thread || room.visibility !== 'space_public') continue;
+    if (first === null || room.created_at < first.created_at) first = room;
+  }
+  return first?.uuid ?? null;
+}
+
+/**
+ * A new card's channel before anyone picks one (the techlead's brief): the
+ * channel of its thread, else the channel the board is filtered to, else the
+ * starter channel. `null` while none is known, and the server picks.
+ */
+export function newTaskChannel({
+  threadChannel,
+  filter,
+  starter,
+}: {
+  threadChannel: string | null;
+  filter: string | null;
+  starter: string | null;
+}): string | null {
+  return threadChannel || (filter && filter !== 'none' ? filter : null) || starter;
+}
+
+/** The top-level channel of a thread or channel the lists have: a thread's parent, or the channel itself. */
+export function roomChannel(
+  rooms: readonly Pick<Channel, 'uuid' | 'is_thread' | 'parent_channel_uuid'>[],
+  roomUuid: string,
+): string | null {
+  const room = rooms.find((row) => row.uuid === roomUuid);
+  if (!room) return null;
+  return room.is_thread ? (room.parent_channel_uuid ?? null) : room.uuid;
+}
+
+/** A card's channel as the board writes it: `#product`. */
+export function channelLabel(channel: SpaceTaskChannel): string {
+  return `#${channel.name}`;
 }
 
 /** A task's thread, inside the app. */

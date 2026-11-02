@@ -118,7 +118,7 @@ test('the board: owners and editors drag, every column and phone tab takes a dro
   assert.match(board, /onDragCancel=\{\(\) => \{\s*if \(dragged\) changedMeanwhile\(dragged\);/);
   assert.match(board, /shown: movedTask\(task, payload, new Date\(\)\.toISOString\(\), waitingOn\)/);
   const mutations = here('task-mutations.ts');
-  assert.match(mutations, /onMutate: async \(\{ shown \}\) => \{[\s\S]*?write\(\(list\) => upsertTask\(list, shown\)\);/);
+  assert.match(mutations, /onMutate: async \(\{ shown \}\) => \{[\s\S]*?board\.put\(shown\);/);
   // A refused move puts the card back, unless the refusal is a 404: then it is off this board (Stay's B).
   assert.match(mutations, /onError: \(error, \{ task \}\) => failed\(error, task\.uuid, task\),/);
 });

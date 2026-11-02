@@ -8,6 +8,7 @@ import type {
   SpaceItemsType,
   SpaceListParams,
   SpaceTask,
+  SpaceTaskStage,
 } from '@/types/collab';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
 
@@ -313,18 +314,49 @@ export const spacesQueries = {
   /** Every cached read of one space's task board. */
   tasksOf: (spaceUuid: string) => [...spacesQueries.all, 'tasks', spaceUuid] as const,
 
+  /** Every cached read of one space's open cards, whatever the channel. */
+  openTasksOf: (spaceUuid: string) => [...spacesQueries.tasksOf(spaceUuid), 'open'] as const,
+
   /**
-   * The space's task board (`GET /spaces/{uuid}/tasks`, thread 7aa0c6d8): every
-   * open task and the last 14 days of done ones (the server's window). The
-   * board groups by person, so it needs every row before it draws: the read
-   * takes every page in turn (100 a page; a space's board is one page).
-   * Agents move tasks while the reader is away, so an arrival asks
-   * (`REFETCH_ON_VISIT`).
+   * The space's open cards (`GET /spaces/{uuid}/tasks`, thread 7aa0c6d8),
+   * under one channel filter (thread 550bf0ab): `null` every channel, a
+   * channel's uuid, or `none`. The board groups by person, so it needs every
+   * row before it draws: the read takes every page in turn, 100 a page, until
+   * the last. Done comes from {@link doneTasks}. Agents move tasks while the
+   * reader is away, so an arrival asks (`REFETCH_ON_VISIT`).
    */
-  tasks: (spaceUuid: string, { viewerId }: ViewerScoped) =>
+  tasks: (spaceUuid: string, { viewerId, channel = null }: ViewerScoped & { channel?: string | null }) =>
     queryOptions({
-      queryKey: [...spacesQueries.tasksOf(spaceUuid), { viewerId }] as const,
-      queryFn: () => readWholeBoard(spaceUuid),
+      queryKey: [...spacesQueries.openTasksOf(spaceUuid), { channel }, { viewerId }] as const,
+      queryFn: () => readOpenBoard(spaceUuid, channel),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchOnMount: REFETCH_ON_VISIT,
+    }),
+
+  /** Every cached read of one space's done cards, whatever the channel. */
+  doneTasksOf: (spaceUuid: string) => [...spacesQueries.tasksOf(spaceUuid), 'done'] as const,
+
+  /**
+   * The space's done cards from the server's window (14 days), in its board
+   * order, a page at a time: the board's "Load more" asks for the next. The same
+   * channel filter as {@link tasks}. A re-read repeats every page loaded.
+   */
+  doneTasks: (spaceUuid: string, { viewerId, channel = null }: ViewerScoped & { channel?: string | null }) =>
+    infiniteQueryOptions({
+      queryKey: [...spacesQueries.doneTasksOf(spaceUuid), { channel }, { viewerId }] as const,
+      queryFn: ({ pageParam }) =>
+        spaceTasksApi.getList(spaceUuid, {
+          stage: ['done'],
+          channel: channel ?? undefined,
+          per_page: DONE_TASKS_PER_PAGE,
+          page: pageParam,
+        }),
+      initialPageParam: 1,
+      getNextPageParam: (last) => {
+        const { current_page, last_page } = last.pagination;
+        return current_page < last_page ? current_page + 1 : undefined;
+      },
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,
@@ -397,12 +429,20 @@ async function readAllMembers(spaceUuid: string): Promise<Member[]> {
   return rows;
 }
 
-/** Every row of a space's task board, page after page, in the server's board order. */
-async function readWholeBoard(spaceUuid: string): Promise<SpaceTask[]> {
-  const first = await spaceTasksApi.getList(spaceUuid, { page: 1 });
+/** The stages the board reads together; Done is read a page at a time. */
+export const OPEN_TASK_STAGES: readonly SpaceTaskStage[] = ['queued', 'working', 'paused', 'waiting'];
+
+/** One page of Done; each "Load more" brings the next. */
+export const DONE_TASKS_PER_PAGE = 20;
+
+/** Every open card of a space under one channel filter, page after page, in the server's board order. */
+async function readOpenBoard(spaceUuid: string, channel: string | null): Promise<SpaceTask[]> {
+  const read = (page: number) =>
+    spaceTasksApi.getList(spaceUuid, { stage: OPEN_TASK_STAGES, channel: channel ?? undefined, per_page: 100, page });
+  const first = await read(1);
   const rows = [...first.data];
   for (let page = 2; page <= first.pagination.last_page; page += 1) {
-    const next = await spaceTasksApi.getList(spaceUuid, { page });
+    const next = await read(page);
     rows.push(...next.data);
   }
   return rows;

@@ -33,10 +33,13 @@ export interface TaskDraft {
   waitingOn: string | null;
   owner: string | null;
   thread: string | null;
+  /** The card's channel (thread 550bf0ab). `null` on a new card nobody has
+   *  picked one for: the box shows, and sends, its default instead. */
+  channel: string | null;
 }
 
 /** The server's field names: its 422 errors and the sheet's checks share them. */
-export type TaskField = 'title' | 'stage' | 'stage_note' | 'waiting_on' | 'owner' | 'thread';
+export type TaskField = 'title' | 'stage' | 'stage_note' | 'waiting_on' | 'owner' | 'thread' | 'channel';
 
 export type TaskFieldErrors = Partial<Record<TaskField, string>>;
 
@@ -49,7 +52,7 @@ export function stageTakesNote(stage: SpaceTaskStage): boolean {
  *  owned by `defaultOwner` (the viewer, when they are a member). */
 export function draftFromTask(task: SpaceTask | null, defaultOwner: string | null): TaskDraft {
   if (!task) {
-    return { title: '', stage: 'queued', stageNote: '', waitingOn: null, owner: defaultOwner, thread: null };
+    return { title: '', stage: 'queued', stageNote: '', waitingOn: null, owner: defaultOwner, thread: null, channel: null };
   }
   return {
     title: task.title,
@@ -58,6 +61,7 @@ export function draftFromTask(task: SpaceTask | null, defaultOwner: string | nul
     waitingOn: task.waiting_on?.uuid ?? null,
     owner: task.owner?.uuid ?? null,
     thread: task.thread?.uuid ?? null,
+    channel: task.channel?.uuid ?? null,
   };
 }
 
@@ -106,7 +110,7 @@ export function serverFieldErrors(errors: Record<string, string[]> | null): Task
   return result;
 }
 
-const TASK_FIELDS: readonly TaskField[] = ['title', 'stage', 'stage_note', 'waiting_on', 'owner', 'thread'];
+const TASK_FIELDS: readonly TaskField[] = ['title', 'stage', 'stage_note', 'waiting_on', 'owner', 'thread', 'channel'];
 
 /** A new task's body: the title, the stage, and only the fields that say
  *  something. */
@@ -119,6 +123,7 @@ export function createPayload(draft: TaskDraft): CreateSpaceTaskPayload {
     ...(draft.stage === 'waiting' && draft.waitingOn ? { waiting_on: draft.waitingOn } : {}),
     ...(draft.owner ? { owner: draft.owner } : {}),
     ...(draft.thread ? { thread: draft.thread } : {}),
+    ...(draft.channel ? { channel: draft.channel } : {}),
   };
 }
 
@@ -143,6 +148,8 @@ export function updatePayload(draft: TaskDraft, task: SpaceTask): SpaceTaskWrite
   }
   if (draft.owner !== (task.owner?.uuid ?? null)) payload.owner = draft.owner;
   if (draft.thread !== (task.thread?.uuid ?? null)) payload.thread = draft.thread;
+  // A card moves between channels but is never taken out of one.
+  if (draft.channel !== null && draft.channel !== (task.channel?.uuid ?? null)) payload.channel = draft.channel;
   return Object.keys(payload).length > 0 ? payload : null;
 }
 
@@ -170,8 +177,25 @@ export function moveLine(move: SpaceTaskMove): string {
     else if (move.by && move.to_owner.uuid === move.by.uuid) parts.push('took it');
     else parts.push(`gave it to ${move.to_owner.name}`);
   }
+  const channelMove = channelMoveWords(move);
+  if (channelMove) parts.push(channelMove);
   if (parts.length === 0) parts.push(`changed it in ${TASK_STAGE_LABELS[move.to]}`);
   return `${by} ${parts.join(' and ')}`;
+}
+
+/**
+ * A move between channels (thread 550bf0ab): "moved it from #general to
+ * #product". The server names only a channel the reader can open, so one
+ * side may be missing: "moved it to #product", "moved it out of #general".
+ * `null` when the channel did not change.
+ */
+function channelMoveWords(move: SpaceTaskMove): string | null {
+  const from = move.from_channel ?? null;
+  const to = move.to_channel ?? null;
+  if (from && to) return from.uuid === to.uuid ? null : `moved it from #${from.name} to #${to.name}`;
+  if (to) return `moved it to #${to.name}`;
+  if (from) return `moved it out of #${from.name}`;
+  return null;
 }
 
 /** "Waiting on Stay" for a move into Waiting that names the person (the

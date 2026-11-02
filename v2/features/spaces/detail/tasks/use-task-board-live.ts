@@ -6,7 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { EVT_TASK_CHANGED, spaceChannelName, type SpaceTaskChangedEvent } from '@/v2/runtime/realtime/protocol';
 import { spacesQueries } from '../../queries';
-import { applyTaskChanged, trailingCall } from './task-cache';
+import { boardCache } from './board-cache';
+import { trailingCall } from './task-cache';
 import { releaseChannel, retainChannel } from './channel-listeners';
 
 /**
@@ -14,8 +15,9 @@ import { releaseChannel, retainChannel } from './channel-listeners';
  * 29 October 2026: live updates). People and agents move tasks through the
  * same API, and the server sends each change to every member on the space's
  * private channel as `.task.changed` with the whole task (Backend's
- * task-board branch). The snapshot is written into the board's cache through
- * {@link applyTaskChanged}, so nothing is read again; the task's history is
+ * task-board branch). The snapshot is written into every read of the board
+ * (`board-cache.ts`: each channel filter, open and done), so nothing is read
+ * again; the task's history is
  * marked stale, so an open sheet shows the new move.
  *
  * The uuids seen deleted are kept while the board is open, so a late
@@ -37,7 +39,8 @@ export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, ena
     const echo = getV2Echo();
     if (!echo) return;
 
-    const boardKey = spacesQueries.tasks(spaceUuid, { viewerId }).queryKey;
+    // Every read of the board this viewer has: each channel filter, open and done.
+    const board = boardCache(queryClient, spaceUuid, viewerId);
     const deleted = new Set<string>();
     // A task some members may not see: no task in the event, so the board
     // reads its own list again, which the server filters per person (Stay's
@@ -49,7 +52,7 @@ export function useTaskBoardLive(spaceUuid: string, viewerId: number | null, ena
         return;
       }
       if (event.action === 'deleted') deleted.add(event.task.uuid);
-      queryClient.setQueryData(boardKey, (list) => (list ? applyTaskChanged(list, event, deleted) : list));
+      board.applyEvent(event, deleted);
       void queryClient.invalidateQueries({ queryKey: spacesQueries.taskMovesOf(spaceUuid, event.task.uuid) });
     };
     const name = spaceChannelName(spaceUuid);

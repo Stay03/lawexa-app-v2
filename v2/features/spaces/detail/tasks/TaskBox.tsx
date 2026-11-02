@@ -33,7 +33,18 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { revealAfterKeyboard, takesKeyboard } from '@/v2/shell/reveal-in-scroller';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { spacesQueries } from '../../queries';
-import { TASK_STAGE_LABELS, TASK_STAGE_TONE, TASK_STAGES, taskThreadHref } from './task-board-model';
+import {
+  boardChannelOptions,
+  channelLabel,
+  newTaskChannel,
+  roomChannel,
+  starterChannel,
+  TASK_STAGE_LABELS,
+  TASK_STAGE_TONE,
+  TASK_STAGES,
+  taskThreadHref,
+} from './task-board-model';
+import type { BoardChannel } from './task-cache';
 import {
   seededDraft,
   startThreadChannels,
@@ -109,6 +120,7 @@ export function TaskBox({
   onOpenChange,
   canEdit,
   rooms,
+  filterChannel = null,
   now,
 }: {
   spaceUuid: string;
@@ -120,6 +132,8 @@ export function TaskBox({
   canEdit: boolean;
   /** The space shows its channels to this reader: the Thread field lists them. */
   rooms: boolean;
+  /** The board's channel filter: a new card starts in that channel. */
+  filterChannel?: BoardChannel;
   now: number;
 }) {
   const phone = useSheetSide() === 'bottom';
@@ -155,6 +169,7 @@ export function TaskBox({
               seed={target.kind === 'new' ? target.seed : undefined}
               canEdit={canEdit}
               rooms={rooms}
+              filterChannel={filterChannel}
               phone={phone}
               now={now}
               onDone={() => onOpenChange(false)}
@@ -196,6 +211,7 @@ function TaskBoxBody({
   seed,
   canEdit,
   rooms,
+  filterChannel,
   phone,
   now,
   onDone,
@@ -207,6 +223,7 @@ function TaskBoxBody({
   seed?: TaskSeed;
   canEdit: boolean;
   rooms: boolean;
+  filterChannel: BoardChannel;
   /** A phone: the whole screen, two tabs, and the phone's own pickers. */
   phone: boolean;
   now: number;
@@ -280,6 +297,41 @@ function TaskBoxBody({
   };
   const threadChannel = threadQuery.data?.data ?? null;
 
+  // The card's channel (thread 550bf0ab), from the two reads the Thread field
+  // already keeps (the rail's own, 50 a page), so the box reads nothing new.
+  const pickChannel = canEdit && rooms;
+  const spaceChannels = useQuery({ ...channelsQueries.bySpace({ spaceUuid, viewerId, per_page: 50 }), enabled: pickChannel });
+  const spaceThreads = useQuery({ ...channelsQueries.threadsBySpace({ spaceUuid, viewerId, per_page: 50 }), enabled: pickChannel });
+  const channelOptions = useMemo(
+    () =>
+      boardChannelOptions(spaceChannels.data?.data ?? [], task?.channel ?? null).map((option) => ({
+        uuid: option.uuid,
+        name: channelLabel(option),
+      })),
+    [spaceChannels.data, task],
+  );
+  /** The channel a thread or channel sits in, from the lists, else from the card or the seed. */
+  const channelOfRoom = (roomUuid: string): string | null =>
+    roomChannel([...(spaceChannels.data?.data ?? []), ...(spaceThreads.data?.data ?? [])], roomUuid) ??
+    (task?.thread?.uuid === roomUuid ? task.thread.channel_uuid : null) ??
+    (seed?.thread.uuid === roomUuid ? seed.thread.channel_uuid || null : null);
+  // A new card starts in its thread's channel, else the board's filter, else the starter channel.
+  const shownChannel =
+    draft.channel ??
+    (task
+      ? null
+      : newTaskChannel({
+          threadChannel: draft.thread ? channelOfRoom(draft.thread) : null,
+          filter: filterChannel,
+          starter: starterChannel(spaceChannels.data?.data ?? []),
+        }));
+  /** A thread picked: the card follows it into the thread's channel. */
+  const chooseThread = (value: string | null) => {
+    const followed = value ? channelOfRoom(value) : null;
+    setDraft((current) => ({ ...current, thread: value, channel: followed ?? current.channel }));
+    setErrors((current) => (current.thread || current.channel ? { ...current, thread: undefined, channel: undefined } : current));
+  };
+
   // A focused field is scrolled into view inside the body once the keyboard
   // settles: the body shrinks as the box sits on the keyboard, and a field low
   // in it would sit under the foot (Arthur, 29 October 2026).
@@ -343,7 +395,8 @@ function TaskBoxBody({
       return;
     }
     if (task === null) {
-      createTask.mutate(createPayload(draft), {
+      // What the Channel field shows is what is sent, its default included.
+      createTask.mutate(createPayload({ ...draft, channel: pickChannel ? shownChannel : null }), {
         onSuccess: () => {
           toast.success('Task added');
           onDone();
@@ -437,12 +490,32 @@ function TaskBoxBody({
             current={task?.thread ?? seed?.thread ?? null}
             invalid={!!errors.thread}
             describedBy={errors.thread ? `${uid}-thread-error` : undefined}
-            onChange={(value) => change('thread', value, 'thread')}
+            onChange={chooseThread}
           />
         ) : (
           <p className="text-sm text-foreground">{task?.thread?.name ?? 'No thread'}</p>
         )}
       </FieldBlock>
+
+      {pickChannel || task?.channel ? (
+        <FieldBlock label="Channel" htmlFor={`${uid}-channel`} error={errors.channel} errorId={`${uid}-channel-error`}>
+          {pickChannel ? (
+            <ChoiceSelect
+              id={`${uid}-channel`}
+              native={native}
+              value={shownChannel}
+              options={channelOptions}
+              emptyLabel={null}
+              placeholder="Choose a channel"
+              invalid={!!errors.channel}
+              describedBy={errors.channel ? `${uid}-channel-error` : undefined}
+              onChange={(value) => change('channel', value, 'channel')}
+            />
+          ) : (
+            <p className="text-sm text-foreground">{task?.channel ? channelLabel(task.channel) : 'No channel'}</p>
+          )}
+        </FieldBlock>
+      ) : null}
 
       {draft.stage === 'waiting' ? (
         <FieldBlock label="Waiting on" htmlFor={`${uid}-waiting`} error={errors.waiting_on} errorId={`${uid}-waiting-error`}>

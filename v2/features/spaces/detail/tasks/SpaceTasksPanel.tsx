@@ -10,8 +10,8 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core';
-import { useQuery } from '@tanstack/react-query';
-import { Check, ChevronDown, ChevronRight, ListChecks, Plus, UserRound } from 'lucide-react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { Check, ChevronDown, ChevronRight, ListChecks, Loader2, Plus, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -27,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { channelsQueries } from '@/v2/features/channels/queries';
 import { CollabEmpty } from '@/v2/features/collab/kit/CollabEmpty';
 import { ThreadStatusDot } from '@/v2/features/collab/kit/ThreadStatusChip';
 import { collabAccessState } from '@/v2/features/collab/model';
@@ -37,15 +38,19 @@ import { SpaceContentErrorState, SpaceContentSkeleton } from '../content/states'
 import { spacesQueries } from '../../queries';
 import {
   BOARD_STAGES,
+  boardChannelOptions,
   boardColumns,
+  channelLabel,
   DONE_WINDOW_DAYS,
   filterByOwner,
   ownerOptions,
   TASK_STAGE_LABELS,
   TASK_STAGE_TONE,
   taskNote,
+  type ChannelOption,
   type OwnerOption,
 } from './task-board-model';
+import { doneCount, mergeBoard, NO_CHANNEL, type BoardChannel } from './task-cache';
 import { TaskBox, type TaskBoxTarget } from './TaskBox';
 import { TaskMoveDialog, type PendingMove } from './TaskMoveDialog';
 import { taskCollision, useTaskBoardSensors } from './board-dnd';
@@ -78,7 +83,9 @@ import { useTaskBoardLive } from './use-task-board-live';
  *   a second grey line. No badges or chips.
  * - Done keeps 14 days and folds into a thin strip at the right edge; a
  *   click opens it as a column.
- * - "Everyone" narrows the board to one owner.
+ * - "Everyone" narrows the board to one owner, and the channel filter beside
+ *   it to one channel's cards (Arthur, thread 550bf0ab). Each card names its
+ *   channel on a small last line.
  * - Gold marks only what is chosen: the owner filter's tick, a phone's stage.
  * - A phone shows one column at a time: the stage switcher at the top, with
  *   counts, and a swipe moves between the columns.
@@ -108,19 +115,44 @@ export function SpaceTasksPanel({
   rooms: boolean;
 }) {
   const session = useV2Session();
+  const viewerId = session.userId;
   const eligible = collabAccessState(session) === 'eligible';
+  // The channel filter (thread 550bf0ab): every channel, one, or the cards with none.
+  const [channel, setChannel] = useState<BoardChannel>(null);
   const query = useQuery({
-    ...spacesQueries.tasks(spaceUuid, { viewerId: session.userId }),
+    ...spacesQueries.tasks(spaceUuid, { viewerId, channel }),
     enabled: eligible,
   });
-  useTaskBoardLive(spaceUuid, session.userId, eligible);
-  const tasks = query.data ?? NO_TASKS;
+  const doneQuery = useInfiniteQuery({
+    ...spacesQueries.doneTasks(spaceUuid, { viewerId, channel }),
+    enabled: eligible,
+  });
+  // The rail's own read of the Space's channels (`CollabFrame`, 50 a page).
+  const channelList = useQuery({ ...channelsQueries.bySpace({ spaceUuid, viewerId, per_page: 50 }), enabled: eligible && rooms });
+  const channelOptions = useMemo(() => boardChannelOptions(channelList.data?.data ?? []), [channelList.data]);
+  useTaskBoardLive(spaceUuid, viewerId, eligible);
+  const openTasks = query.data ?? NO_TASKS;
+  const doneTasks = useMemo(() => doneQuery.data?.pages.flatMap((page) => page.data) ?? NO_TASKS, [doneQuery.data]);
+  const tasks = useMemo(() => mergeBoard(openTasks, doneTasks), [openTasks, doneTasks]);
   // Captured once, so no clock read runs in render (React Compiler purity).
   const [now] = useState(() => Date.now());
   const [owner, setOwner] = useState<string | null>(null);
   const owners = useMemo(() => ownerOptions(tasks), [tasks]);
   const shown = useMemo(() => filterByOwner(tasks, owner), [tasks, owner]);
   const columns = useMemo(() => boardColumns(shown), [shown]);
+  // Done's count is the server's total for the channel; one owner's is what shows.
+  const doneTotal = doneQuery.data?.pages[0]?.pagination.total ?? null;
+  const done: DoneState = {
+    count: owner === null ? doneCount(columns.done.length, doneTotal) : columns.done.length,
+    hasMore: doneQuery.hasNextPage,
+    loading: doneQuery.isFetchingNextPage,
+    onLoadMore: () => void doneQuery.fetchNextPage(),
+  };
+  const chooseChannel = (next: BoardChannel) => {
+    setChannel(next);
+    // Another channel has other owners: the owner filter starts again at Everyone.
+    setOwner(null);
+  };
   // The target stays after the sheet closes, so its content slides out with it.
   const [sheetTarget, setSheetTarget] = useState<TaskBoxTarget | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -153,23 +185,50 @@ export function SpaceTasksPanel({
       onOpenChange={setSheetOpen}
       canEdit={canEdit}
       rooms={rooms}
+      filterChannel={channel}
       now={now}
     />
   );
   // A refusal the server explained (403) is worth its own sentence.
   const apiError = query.error ? extractApiError(query.error) : null;
+  // The filters stay above the board while another channel's cards load or fail.
+  const toolbar = (
+    <div className="flex flex-wrap items-center gap-2">
+      <OwnerFilter owners={owners} value={owner} onChange={setOwner} />
+      {rooms ? <ChannelFilter options={channelOptions} value={channel} onChange={chooseChannel} /> : null}
+      {newTask ? <NewTaskButton onClick={newTask} /> : null}
+    </div>
+  );
+  const errorState = (
+    <SpaceContentErrorState
+      tab="tasks"
+      message={apiError?.status === 403 ? apiError.message : undefined}
+      onRetry={() => void query.refetch()}
+    />
+  );
 
-  if (query.isPending) return <SpaceContentSkeleton />;
-  if (query.isError && tasks.length === 0) {
-    return (
-      <SpaceContentErrorState
-        tab="tasks"
-        message={apiError?.status === 403 ? apiError.message : undefined}
-        onRetry={() => void query.refetch()}
-      />
+  if (query.isPending) {
+    return channel === null ? (
+      <SpaceContentSkeleton />
+    ) : (
+      <div className="flex flex-col gap-4">
+        {toolbar}
+        <SpaceContentSkeleton />
+      </div>
     );
   }
-  if (tasks.length === 0) {
+  if (query.isError && tasks.length === 0) {
+    return channel === null ? (
+      errorState
+    ) : (
+      <div className="flex flex-col gap-4">
+        {toolbar}
+        {errorState}
+      </div>
+    );
+  }
+  // An empty Space says so; an empty channel keeps its board, so another channel is one choice away.
+  if (tasks.length === 0 && channel === null) {
     return (
       <>
         <CollabEmpty
@@ -184,15 +243,13 @@ export function SpaceTasksPanel({
   }
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <OwnerFilter owners={owners} value={owner} onChange={setOwner} />
-        {newTask ? <NewTaskButton onClick={newTask} /> : null}
-      </div>
+      {toolbar}
       {/* The board takes the page column's width, as every pill does (Arthur's
           C, 30 October 2026): nothing reaches past the header's margins. */}
       <TaskRenameContext value={renameTask}>
         <Board
           columns={columns}
+          done={done}
           tasks={tasks}
           now={now}
           canDrag={canEdit}
@@ -261,6 +318,48 @@ function OwnerFilter({
   );
 }
 
+/**
+ * The channel filter (Arthur, thread 550bf0ab): the channels this reader can
+ * read, then the cards with no channel yet. The server filters, and gives
+ * nothing for a channel the reader cannot open, so the list never names one.
+ */
+function ChannelFilter({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly ChannelOption[];
+  value: BoardChannel;
+  onChange: (next: BoardChannel) => void;
+}) {
+  const chosen = options.find((option) => option.uuid === value) ?? null;
+  const label = value === null ? 'All channels' : value === NO_CHANNEL ? 'No channel' : chosen ? channelLabel(chosen) : 'All channels';
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="max-w-56 gap-1.5 rounded-full" aria-label={`Channel: ${label}`}>
+          <span className="min-w-0 truncate">{label}</span>
+          <ChevronDown aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-80 w-64 overflow-y-auto">
+        <OwnerItem label="All channels" selected={value === null} onSelect={() => onChange(null)} />
+        <DropdownMenuSeparator />
+        {options.map((option) => (
+          <OwnerItem
+            key={option.uuid}
+            label={channelLabel(option)}
+            selected={value === option.uuid}
+            onSelect={() => onChange(option.uuid)}
+          />
+        ))}
+        {options.length > 0 ? <DropdownMenuSeparator /> : null}
+        <OwnerItem label="No channel" selected={value === NO_CHANNEL} onSelect={() => onChange(NO_CHANNEL)} />
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 function OwnerItem({
   label,
   agent = false,
@@ -295,6 +394,7 @@ function OwnerItem({
  */
 function Board({
   columns,
+  done,
   tasks,
   now,
   canDrag,
@@ -302,6 +402,7 @@ function Board({
   onDrop,
 }: {
   columns: Record<SpaceTaskStage, SpaceTask[]>;
+  done: DoneState;
   /** Every task, as the board has it now: a drop reads the card as it is at that moment. */
   tasks: readonly SpaceTask[];
   now: number;
@@ -377,7 +478,7 @@ function Board({
             <PhoneStageTab
               key={stage}
               stage={stage}
-              count={columns[stage].length}
+              count={stage === 'done' ? done.count : columns[stage].length}
               selected={index === phoneStage}
               droppable={canDrag}
               onSelect={() => showStage(index)}
@@ -395,6 +496,7 @@ function Board({
               <DoneColumn
                 key={stage}
                 tasks={columns.done}
+                done={done}
                 now={now}
                 open={doneOpen}
                 canDrag={canDrag}
@@ -527,9 +629,22 @@ function StageColumn({
   );
 }
 
-/** Done: a strip at a computer's right edge until opened; on a phone, a column like the rest. */
+/** What Done shows beyond its cards: its count, and whether more pages wait. */
+interface DoneState {
+  count: number;
+  hasMore: boolean;
+  loading: boolean;
+  onLoadMore: () => void;
+}
+
+/**
+ * Done: a strip at a computer's right edge until opened; on a phone, a column
+ * like the rest. Its cards come a page at a time (thread 550bf0ab): "Load
+ * more" under the last brings the next.
+ */
 function DoneColumn({
   tasks,
+  done,
   now,
   open,
   canDrag,
@@ -537,6 +652,7 @@ function DoneColumn({
   onOpenTask,
 }: {
   tasks: SpaceTask[];
+  done: DoneState;
   now: number;
   open: boolean;
   canDrag: boolean;
@@ -559,7 +675,7 @@ function DoneColumn({
         type="button"
         onClick={onToggle}
         aria-expanded={false}
-        aria-label={`Show Done, the last ${DONE_WINDOW_DAYS} days: ${tasks.length}`}
+        aria-label={`Show Done, the last ${DONE_WINDOW_DAYS} days: ${done.count}`}
         className={cn(
           'v2-interactive hidden w-11 shrink-0 flex-col items-center gap-2 self-stretch rounded-2xl py-3 text-xs text-muted-foreground transition-colors hover:text-foreground',
           STAGE_LANE.done,
@@ -570,16 +686,16 @@ function DoneColumn({
       >
         <ThreadStatusDot value={TASK_STAGE_TONE.done} />
         <span className="font-medium [writing-mode:vertical-rl]">Done</span>
-        <span className="tabular-nums">{tasks.length}</span>
+        <span className="tabular-nums">{done.count}</span>
       </button>
       <section
         ref={setColumnRef}
-        aria-label={`Done, the last ${DONE_WINDOW_DAYS} days, ${tasks.length}`}
+        aria-label={`Done, the last ${DONE_WINDOW_DAYS} days, ${done.count}`}
         className={cn(COLUMN, STAGE_LANE.done, !open && 'md:hidden', overColumn && DROP_TARGET)}
       >
         <ColumnHead
           stage="done"
-          count={tasks.length}
+          count={done.count}
           action={
             <button
               type="button"
@@ -600,6 +716,19 @@ function DoneColumn({
           canDrag={canDrag}
           onOpenTask={onOpenTask}
         />
+        {done.hasMore ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 self-center text-muted-foreground"
+            onClick={done.onLoadMore}
+            disabled={done.loading}
+          >
+            {done.loading ? <Loader2 aria-hidden className="size-3.5 animate-spin" /> : null}
+            Load more
+          </Button>
+        ) : null}
       </section>
     </>
   );
@@ -903,6 +1032,12 @@ function CardBody({
       {note ? (
         <span className="mt-1.5 line-clamp-2 text-xs text-muted-foreground max-md:order-2 max-md:line-clamp-3">
           {note}
+        </span>
+      ) : null}
+      {/* The card's channel (thread 550bf0ab): small and quiet, the last line. */}
+      {task.channel ? (
+        <span className="mt-1.5 block truncate text-[11px] text-muted-foreground/80 max-md:order-2">
+          {channelLabel(task.channel)}
         </span>
       ) : null}
     </>

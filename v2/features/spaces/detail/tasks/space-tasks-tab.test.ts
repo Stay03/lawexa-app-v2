@@ -22,7 +22,7 @@ test('the Tasks pill draws the task board, with no feed read, no file drop and n
 
 test('the board reads one list, and its only colour is each stage’s thread-status dot', () => {
   const queries = read('v2', 'features', 'spaces', 'queries.ts');
-  assert.match(queries, /queryKey: \[\.\.\.spacesQueries\.tasksOf\(spaceUuid\), \{ viewerId \}\] as const,/);
+  assert.match(queries, /queryKey: \[\.\.\.spacesQueries\.openTasksOf\(spaceUuid\), \{ channel \}, \{ viewerId \}\] as const,/);
   const api = read('lib', 'api', 'collab.ts');
   assert.match(api, /`\/spaces\/\$\{encodeURIComponent\(spaceUuid\)\}\/tasks`/);
   // Stay's B (29 October 2026): no chips, badges or coloured fills; the stage
@@ -66,14 +66,15 @@ test('the board follows .task.changed on the space channel, and the last board t
   );
   // The uuids seen deleted go with every event, so a late update cannot revive one.
   assert.match(live, /if \(event\.action === 'deleted'\) deleted\.add\(event\.task\.uuid\);/);
-  assert.match(live, /applyTaskChanged\(list, event, deleted\)/);
+  // Into every read of the board: each channel filter, open and done (board-cache.ts).
+  assert.match(live, /board\.applyEvent\(event, deleted\);/);
   // The techlead's review and recheck: stop this listener, and leave only when no board listens.
   assert.match(
     live,
     /return \(\) => \{\s*refresh\.cancel\(\);\s*channel\.stopListening\(EVT_TASK_CHANGED, onChanged\);\s*if \(releaseChannel\(name\) === 0\) echo\.leave\(name\);\s*\};/,
   );
   const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
-  assert.match(board, /useTaskBoardLive\(spaceUuid, session\.userId, eligible\);/);
+  assert.match(board, /useTaskBoardLive\(spaceUuid, viewerId, eligible\);/);
 });
 
 test('a card opens the task box, and only the owner and editors get New task', () => {
@@ -143,7 +144,8 @@ test('New task offers the Thread field, and Start a thread picks its channel fro
   const box = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
   // New task is the same box, empty: its Thread field is the saved task's, for every editor who sees the rooms.
   assert.match(box, /<FieldBlock label="Thread"[^]*?\{canEdit && rooms \? \(\s*<ThreadSelect\b/);
-  assert.match(box, /createTask\.mutate\(createPayload\(draft\)/);
+  // What the Channel field shows is what is sent, its default included.
+  assert.match(box, /createTask\.mutate\(createPayload\(\{ \.\.\.draft, channel: pickChannel \? shownChannel : null \}\)/);
   // The channels come from the rail's read, asked for only where a thread may start.
   assert.match(box, /useQuery\(\{ \.\.\.channelsQueries\.bySpace\(\{ spaceUuid, viewerId, per_page: 50 \}\), enabled: mayStart \}\)/);
   assert.match(box, /payload: startThreadPayload\(startIn\) \}/);
@@ -180,6 +182,6 @@ test('a task’s thread page opens on no missing-first-message line, and a new t
   // Every write that can change a thread's link reads that thread again: create, a changed Thread field (both ends), delete.
   assert.match(mutations, /rereadThreads\(\[response\.data\.thread\?\.uuid\]\);/);
   assert.match(mutations, /if \(context\?\.threadBefore !== threadAfter\) rereadThreads\(\[context\?\.threadBefore, threadAfter\]\);/);
-  assert.match(mutations, /removeTask\(list, taskUuid\)\);\s*\/\/[^\n]*\n\s*rereadThreads\(\[context\?\.threadBefore\]\);/);
+  assert.match(mutations, /board\.drop\(taskUuid\);\s*\/\/[^\n]*\n\s*rereadThreads\(\[context\?\.threadBefore\]\);/);
   assert.equal(mutations.match(/onMutate: \((?:\{ )?taskUuid(?: \})?\) => \(\{ threadBefore: threadOf\(taskUuid\) \}\)/g)?.length, 2);
 });

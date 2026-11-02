@@ -1885,6 +1885,11 @@ export interface SpaceTask {
    *  may not read it never receives the card (Stay's B, Backend fb826d73).
    *  `channel_uuid` is the thread's channel, or the channel itself. */
   thread: { uuid: string; name: string; channel_uuid: string } | null;
+  /** The channel the card belongs to (thread 550bf0ab): its thread's channel
+   *  when it links one, else the one picked. `null` for a card with no channel
+   *  yet, or one in a channel this reader cannot open; absent from a server
+   *  before channels. */
+  channel?: SpaceTaskChannel | null;
   /** The task's place in its owner's queue, lowest first. */
   position: number;
   /** The first move to Working; `null` until then. */
@@ -1901,7 +1906,17 @@ export interface SpaceTask {
   updated_at: string;
 }
 
+/** A card's channel, or one end of a move between channels. */
+export interface SpaceTaskChannel {
+  uuid: string;
+  name: string;
+}
+
 export interface SpaceTaskListParams {
+  /** Only these stages (`stage[]`). */
+  stage?: readonly SpaceTaskStage[];
+  /** One channel's cards by uuid, or `none` for the cards with no channel. */
+  channel?: string;
   /** Done tasks moved since then come too (ISO time); the server's default is 14 days. */
   done_since?: string;
   /** At most 100. */
@@ -1933,6 +1948,10 @@ export interface SpaceTaskWritePayload {
   owner?: string | null;
   /** A thread or channel uuid every member of the space can read. */
   thread?: string | null;
+  /** The card's channel (a top-level channel uuid). With a thread it must be
+   *  the thread's channel (422 on `channel` otherwise); a card is never taken
+   *  out of a channel, so there is no `null`. */
+  channel?: string;
 }
 
 /** `POST /spaces/{uuid}/tasks`: the title is the one field it needs. */
@@ -1965,6 +1984,11 @@ export interface SpaceTaskMove {
   /** Who the task waits on, on a move into Waiting; `null` otherwise (the
    *  techlead's decision on Tester's note, 29 October 2026). */
   waiting_on: SpaceTaskPerson | null;
+  /** A move between channels: where the card was and where it went. Both
+   *  `null` when the channel did not change; one `null` when the reader cannot
+   *  open that channel, or the card had none. */
+  from_channel?: SpaceTaskChannel | null;
+  to_channel?: SpaceTaskChannel | null;
 }
 
 export type SpaceTaskMoveListResponse = LengthAwareResponse<SpaceTaskMove>;

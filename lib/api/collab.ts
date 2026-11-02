@@ -529,6 +529,9 @@ export const spaceTasksApi = {
       `/spaces/${encodeURIComponent(spaceUuid)}/tasks`,
       {
         params: {
+          // axios writes an array as `stage[]=queued&stage[]=working`.
+          stage: params.stage && params.stage.length > 0 ? params.stage : undefined,
+          channel: params.channel || undefined,
           done_since: params.done_since || undefined,
           per_page: params.per_page ?? 100,
           page: params.page ?? 1,

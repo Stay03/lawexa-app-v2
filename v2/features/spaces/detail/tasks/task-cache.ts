@@ -1,4 +1,6 @@
-import type { ReorderSpaceTasksPayload, SpaceTask } from '@/types/collab';
+import type { InfiniteData } from '@tanstack/react-query';
+
+import type { ReorderSpaceTasksPayload, SpaceTask, SpaceTaskListResponse } from '@/types/collab';
 import type { SpaceTaskSnapshotEvent } from '@/v2/runtime/realtime/protocol';
 import { queueOrder } from './task-board-model';
 
@@ -8,7 +10,81 @@ import { queueOrder } from './task-board-model';
  * October 2026). Pure, so every rule is a unit test. The board's cache entry
  * is `SpaceTask[]` (`spacesQueries.tasks`), in the server's board order; the
  * columns sort it again, so a write only has to put the row in or take it out.
+ *
+ * TWO READS PER CHANNEL (Arthur's yes, thread 550bf0ab): the open cards, every
+ * page (`spacesQueries.tasks`), and the done ones a page at a time
+ * (`spacesQueries.doneTasks`), each for one channel filter. A write goes into
+ * every open read whose channel the card is in, and out of the others; a done
+ * read only ever loses a card, until the board reads it again. The board joins
+ * the two with {@link mergeBoard}, the newer copy of a card winning, so a card
+ * moved to Done shows there at once from the open read's copy.
  */
+
+/** The board's channel filter: every channel (`null`), one by uuid, or the cards with none. */
+export type BoardChannel = string | null;
+
+/** The filter's word for the cards with no channel (`channel=none`). */
+export const NO_CHANNEL = 'none';
+
+/** Whether a card shows under a channel filter. */
+export function taskInChannel(task: Pick<SpaceTask, 'channel'>, channel: BoardChannel): boolean {
+  if (channel === null) return true;
+  if (channel === NO_CHANNEL) return !task.channel;
+  return task.channel?.uuid === channel;
+}
+
+/** An open read with this card written in: put in where its channel is shown, taken out where not. */
+export function placeTask(list: readonly SpaceTask[], task: SpaceTask, channel: BoardChannel): SpaceTask[] {
+  return taskInChannel(task, channel) ? upsertTask(list, task) : removeTask(list, task.uuid);
+}
+
+/** A done read with this card written in: it keeps the card only while the card is done and in its channel. */
+export function placeDoneTask(
+  data: InfiniteData<SpaceTaskListResponse>,
+  task: SpaceTask,
+  channel: BoardChannel,
+): InfiniteData<SpaceTaskListResponse> {
+  const keep = task.stage === 'done' && taskInChannel(task, channel);
+  // A late snapshot never replaces a newer copy.
+  return mapDonePages(data, (rows) =>
+    keep
+      ? rows.map((row) => (row.uuid === task.uuid && changedAt(task) >= changedAt(row) ? task : row))
+      : rows.filter((row) => row.uuid !== task.uuid),
+  );
+}
+
+/** A done read without this card. */
+export function dropDoneTask(data: InfiniteData<SpaceTaskListResponse>, taskUuid: string): InfiniteData<SpaceTaskListResponse> {
+  return mapDonePages(data, (rows) => rows.filter((row) => row.uuid !== taskUuid));
+}
+
+function mapDonePages(
+  data: InfiniteData<SpaceTaskListResponse>,
+  change: (rows: readonly SpaceTask[]) => SpaceTask[],
+): InfiniteData<SpaceTaskListResponse> {
+  return { ...data, pages: data.pages.map((page) => ({ ...page, data: change(page.data) })) };
+}
+
+/**
+ * The board's cards: the open read and the done pages, each card once. Where
+ * both hold a card, the newer by `updated_at` wins (a tie goes to the open
+ * read, where writes land), so a card just moved to Done or back shows in its
+ * new column before either read is repeated.
+ */
+export function mergeBoard(open: readonly SpaceTask[], done: readonly SpaceTask[]): SpaceTask[] {
+  const cards = new Map<string, SpaceTask>();
+  for (const task of done) cards.set(task.uuid, task);
+  for (const task of open) {
+    const other = cards.get(task.uuid);
+    if (!other || changedAt(task) >= changedAt(other)) cards.set(task.uuid, task);
+  }
+  return [...cards.values()];
+}
+
+/** What Done's head counts: the server's total, or the cards shown when more are. */
+export function doneCount(shown: number, total: number | null): number {
+  return total === null ? shown : Math.max(shown, total);
+}
 
 /** The list with this task in it: the cached row replaced, or the task added. */
 export function upsertTask(list: readonly SpaceTask[], task: SpaceTask): SpaceTask[] {
@@ -44,12 +120,13 @@ export function applyTaskChanged(
   list: readonly SpaceTask[],
   event: SpaceTaskSnapshotEvent,
   deleted: ReadonlySet<string>,
+  channel: BoardChannel = null,
 ): SpaceTask[] {
   if (event.action === 'deleted') return removeTask(list, event.task.uuid);
   if (deleted.has(event.task.uuid)) return [...list];
   const cached = list.find((row) => row.uuid === event.task.uuid);
   if (cached && changedAt(cached) > changedAt(event.task)) return [...list];
-  return upsertTask(list, event.task);
+  return placeTask(list, event.task, channel);
 }
 
 export type QueueDirection = 'up' | 'down';
