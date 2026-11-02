@@ -142,6 +142,26 @@ test('lines one under the other each become a block, and <br> inside one is a li
   ]);
 });
 
+test('bold, italic or a link may run across a <br>, and an escaped < reads as itself (review 20cedfc0)', () => {
+  const bold = [{ type: 'bold' }];
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">**A. TEST DATA Name<br>Director**</p>').content, [
+    centred([{ type: 'text', text: 'A. TEST DATA Name', marks: bold }, { type: 'hardBreak' }, { type: 'text', text: 'Director', marks: bold }]),
+  ]);
+  const link = [{ type: 'link', attrs: { href: 'https://example.com' } }];
+  const linked = markdownToDoc('<p style="text-align: center">[TEST<br>DATA](https://example.com)<br><br>*end*</p>').content;
+  assert.deepEqual(
+    linked?.[0].content?.map((node) => (node.type === 'hardBreak' ? '|' : `${node.text}:${node.marks?.map((mark) => mark.type).join(',')}`)),
+    ['TEST:link', '|', 'DATA:link', '|', '|', 'end:italic'],
+  );
+  assert.deepEqual(linked?.[0].content?.[0].marks?.[0].attrs?.href, link[0].attrs.href);
+  // The server writes < and & inside an aligned line as &lt; and &amp;.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">Smith &lt;Plaintiff&gt; &amp; Co</p>').content, [
+    centred([{ type: 'text', text: 'Smith <Plaintiff> & Co' }]),
+  ]);
+  // The stand-in for <br> can't be smuggled in.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">TEST\uE000DATA</p>').content, [centred([{ type: 'text', text: 'TESTDATA' }])]);
+});
+
 test('an aligned line with no blank line around it is still read, and the Markdown beside it stays Markdown', () => {
   const doc = markdownToDoc('<h2 style="text-align: center">TEST DATA Title</h2>\nThe **first** paragraph.\n- one\n- two');
   assert.deepEqual(doc.content?.[0], {

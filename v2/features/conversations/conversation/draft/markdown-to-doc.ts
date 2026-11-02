@@ -142,14 +142,24 @@ function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONC
 }
 
 /** `<br>`, `<br/>` or `<br />`: a line break inside an aligned line. */
-const LINE_BREAK = /<br\s*\/?>/i;
+const LINE_BREAK = /<br\s*\/?>/gi;
+/** Stands in for each `<br>` while the words are read, so bold, italic or a link may run across one. */
+const BREAK_MARK = '\uE000';
 
 /**
  * An aligned line's words, read as inline Markdown: bold, italic, links and
- * the font span, with each `<br>` a line break between its parts.
+ * the font span, with each `<br>` a line break. The words are read once, so
+ * `**A. Name<br>Director**` is bold on both lines.
  */
 function inlineMarkdown(words: string, font: DraftFont): JSONContent[] {
-  return words.split(LINE_BREAK).flatMap((part, index) => [...(index > 0 ? [{ type: 'hardBreak' }] : []), ...inlinePart(part, font)]);
+  const marked = words.replaceAll(BREAK_MARK, '').replace(LINE_BREAK, BREAK_MARK);
+  return inlinePart(marked, font).flatMap((node): JSONContent[] => {
+    if (node.type !== 'text' || !node.text?.includes(BREAK_MARK)) return [node];
+    return node.text.split(BREAK_MARK).flatMap((text, index) => [
+      ...(index > 0 ? [{ type: 'hardBreak' }] : []),
+      ...(text ? [{ ...node, text }] : []),
+    ]);
+  });
 }
 
 function inlinePart(words: string, font: DraftFont): JSONContent[] {
