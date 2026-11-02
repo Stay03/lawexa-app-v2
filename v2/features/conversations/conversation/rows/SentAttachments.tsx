@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useQueries } from '@tanstack/react-query';
-import { FileText, ImageOff } from 'lucide-react';
+import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { FileText, ImageOff, Loader2 } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { filesApi } from '@/lib/api/files';
@@ -20,11 +20,13 @@ import {
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
 import { PdfViewerDialog } from '@/v2/features/files/pdf/PdfViewerDialog';
+import { filesQueries } from '@/v2/features/files/queries';
 import { usePdfViewer } from '@/v2/features/files/pdf/use-pdf-viewer';
 import { isPdfFile } from '@/v2/features/files/viewable';
 import { reportChatError } from '@/v2/runtime/chat-errors/report';
 import { isPictureAttachment } from '../../attachment-rules';
 import { useV2ChatContext } from '../chat-context';
+import { isReading, readingAnnouncement, readingLine, readingPollDelay } from './reading-line';
 
 /**
  * SentAttachments — the files under a message the person sent to the AI.
@@ -59,6 +61,13 @@ import { useV2ChatContext } from '../chat-context';
  * 2026). The pages are what the AI was sent, each named "scan.pdf (page 1)",
  * so they show as pictures. Naming the PDF instead would mean guessing its
  * name from theirs.
+ *
+ * ── A DOCUMENT SAYS HOW FAR ITS READING HAS GOT ────────────────────────────
+ * Under each document, "Reading…", then "Read", "Couldn't read this file" or
+ * "No text to read in this file" (`reading-line.ts`; Stay, thread 4b936d0d).
+ * It reads the file's own state from `GET /files/{id}`, only once the message
+ * is near the screen, and asks again with a growing wait only while the
+ * reading is pending. Leaving the chat stops the asking.
  *
  * ── SEVERAL PICTURES SHARE ONE ROW ─────────────────────────────────────────
  * One picture gets a wide tile. Several get square tiles in a strip that
@@ -176,21 +185,23 @@ export function SentAttachments({ attachments }: { attachments: readonly Message
       {documents.length > 0 && (
         <div className="flex max-w-full flex-wrap justify-end gap-1.5">
           {documents.map((document) => (
-            <DocumentChip
-              key={document.file_id}
-              document={document}
-              onRead={
-                isPdf(document)
-                  ? () =>
-                      pdf.open({
-                        id: document.file_id,
-                        name: document.file_name,
-                        mimeType: document.mime_type || 'application/pdf',
-                        size: document.file_size,
-                      })
-                  : null
-              }
-            />
+            <div key={document.file_id} className="flex max-w-full flex-col items-end gap-0.5">
+              <DocumentChip
+                document={document}
+                onRead={
+                  isPdf(document)
+                    ? () =>
+                        pdf.open({
+                          id: document.file_id,
+                          name: document.file_name,
+                          mimeType: document.mime_type || 'application/pdf',
+                          size: document.file_size,
+                        })
+                    : null
+                }
+              />
+              <DocumentReadingLine fileId={document.file_id} enabled={near} />
+            </div>
           ))}
         </div>
       )}
@@ -410,5 +421,40 @@ function DocumentChip({
               : formatFileSize(document.file_size)}
       </span>
     </button>
+  );
+}
+
+/** How far the server has got with reading one sent document (`reading-line.ts`). */
+function DocumentReadingLine({ fileId, enabled }: { fileId: number; enabled: boolean }) {
+  const queryClient = useQueryClient();
+  const detail = useQuery({
+    ...filesQueries.detail(fileId),
+    enabled,
+    select: (response) => response.data ?? null,
+    refetchInterval: (query) =>
+      isReading(query.state.data?.data) ? readingPollDelay(query.state.dataUpdateCount) : false,
+  });
+  const line = readingLine(detail.data);
+  const answers = queryClient.getQueryState(filesQueries.detail(fileId).queryKey)?.dataUpdateCount ?? 0;
+  return (
+    <>
+      {/* Mounted with or without a line, so the start and the end are announced, not each count. */}
+      <span role="status" aria-live="polite" className="sr-only">
+        {readingAnnouncement(line, answers)}
+      </span>
+      {line ? (
+        <span
+          className={cn(
+            'inline-flex items-center gap-1 px-2 text-[11px] tabular-nums',
+            line.tone === 'failed' ? 'text-destructive' : 'text-muted-foreground',
+          )}
+        >
+          {line.tone === 'reading' ? (
+            <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />
+          ) : null}
+          {line.text}
+        </span>
+      ) : null}
+    </>
   );
 }

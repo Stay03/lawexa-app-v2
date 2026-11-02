@@ -23,6 +23,14 @@ export interface UserFile {
   category: FileCategory;
   upload_status: FileUploadStatus;
   created_at: string;
+  /**
+   * How far the server has got with reading the file's text (Backend,
+   * `chat-no-extract`, 2 November 2026). Absent on a server from before it.
+   */
+  extraction_status?: 'pending' | 'done' | 'empty' | 'failed' | 'skipped' | null;
+  /** A later server: pages read so far, and the file's page count. */
+  pages_read?: number | null;
+  page_count?: number | null;
   /** null when the file has no scanned pages or is not a PDF. */
   ocr_status?: OcrStatus | null;
   /** Pages with no text of their own; null until the file has been looked at. */
