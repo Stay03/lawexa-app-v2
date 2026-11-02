@@ -36,6 +36,15 @@ test('a scan has no text of its own, so its pages decide: reading, read, or noth
   assert.equal(readingLine({ extraction_status: 'skipped', ocr_status: 'pending' })?.text, 'Reading…');
 });
 
+test('a mixed PDF is read once its scanned pages are, not when its typed text is', () => {
+  assert.equal(readingLine({ extraction_status: 'done', ocr_status: 'pending' })?.text, 'Reading…');
+  assert.equal(isReading({ extraction_status: 'done', ocr_status: 'pending' }), true);
+  for (const ocr of ['done', 'partial', 'failed', null] as const) {
+    assert.equal(readingLine({ extraction_status: 'done', ocr_status: ocr })?.text, 'Read', String(ocr));
+  }
+  assert.equal(isReading({ extraction_status: 'done', ocr_status: 'done' }), false);
+});
+
 test('a later server’s page counts slot into the reading line', () => {
   assert.equal(readingLine({ extraction_status: 'pending', pages_read: 120, page_count: 1600 })?.text, 'Reading… 120 of 1,600 pages');
   assert.equal(readingLine({ extraction_status: 'pending', pages_read: 0, page_count: 1 })?.text, 'Reading… 0 of 1 page');

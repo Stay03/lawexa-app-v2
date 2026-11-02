@@ -21,7 +21,9 @@
  * For an empty or skipped file the scan's state decides (techlead's review,
  * 2 November 2026): `pending` is still "Reading…", `done` or `partial` (pages
  * read, some perhaps past the plan) is "Read", and `failed` or no scan is "No
- * text to read in this file".
+ * text to read in this file". A mixed PDF (typed pages and scanned ones)
+ * is `done` while its scanned pages are still read, so `done` with the scan
+ * `pending` is "Reading…" too.
  *
  * A server without the field shows no line. No React, so node:test reads it.
  */
@@ -63,6 +65,8 @@ export function readingLine(facts: ReadingFacts | null | undefined): ReadingLine
       return { text, tone: 'reading', announce: READING_ANNOUNCE };
     }
     case 'done':
+      // A mixed PDF: its typed pages are read, its scanned ones may not be yet.
+      if (facts.ocr_status === 'pending') return { text: 'Reading…', tone: 'reading', announce: READING_ANNOUNCE };
       return READ;
     case 'failed':
       return { text: 'Couldn’t read this file', tone: 'failed', announce: 'Couldn’t read this file.' };
