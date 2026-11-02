@@ -46,6 +46,18 @@ import { FONT_STYLE } from '@/v2/features/notes/editor/font-style';
  * the last line may not have its closing tag yet: it is read as aligned all
  * the same, and an opening tag still being typed shows nothing. The font span
  * and this line are the only tags read: any other HTML is still text.
+ *
+ * Three slips Lawexa makes are read as the same blocks (Tester's live check,
+ * 85466156; the shapes agreed with woz, b2e6ef86 and 9282c136), and nothing
+ * else: a heading inside the aligned `p` on one line, `<h2>words</h2>` or
+ * `## words`, is that heading, aligned; and a block split over lines, its
+ * opening and closing tags each alone on a line, is read line by line as one
+ * aligned block each (a `#` line a heading; inside an `h1` to `h3`, its lines
+ * are one heading). Blank lines inside make nothing. A split block with
+ * another tag inside, inside a code fence, or with no closing tag stays text,
+ * except at the very end of a draft still being written, where its lines show
+ * aligned before the closing tag arrives. A line holding only `<br>`s, a gap
+ * Lawexa leaves before signature lines (woz d3643d84), is one empty paragraph.
  */
 
 type Mark = NonNullable<JSONContent['marks']>[number];
@@ -65,7 +77,7 @@ const NO_FONT: DraftFont = { font: null, size: null };
 const parser = unified().use(remarkParse).use(remarkBreaks).use(remarkGfm);
 
 export function markdownToDoc(markdown: string, base: DraftFont = NO_FONT): JSONContent {
-  const root = parser.runSync(parser.parse(markdown)) as Root;
+  const root = parser.runSync(parser.parse(alignedSlipsAsLines(markdown))) as Root;
   const last = root.children[root.children.length - 1];
   const content = root.children.flatMap((node) => block(node, base, node === last));
   return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
@@ -116,6 +128,12 @@ function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONC
   lines.forEach((raw, index) => {
     const line = raw.trim();
     const open = streaming && index === lines.length - 1;
+    if (BREAKS_ONLY.test(line)) {
+      aligned = true;
+      flush();
+      content.push({ type: 'paragraph' });
+      return;
+    }
     const match = ALIGNED_LINE.exec(line);
     if (match && (match[5] || open)) {
       aligned = true;
@@ -139,6 +157,107 @@ function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONC
   if (!aligned) return null;
   flush();
   return content;
+}
+
+/** An aligned block's opening tag alone on its line, up to three spaces in (four is code). */
+const OPENING_LINE = /^ {0,3}<(p|h[1-3])\s+style\s*=\s*(["'])\s*text-align\s*:\s*(center|right|justify)\s*;?\s*\2\s*>\s*$/i;
+const CLOSING_LINE = /^ {0,3}<\/(p|h[1-3])\s*>\s*$/i;
+/** A heading inside an aligned `p`: `<h2>words</h2>`, or `## words`. */
+const INNER_HEADING = /^<(h[1-3])\s*>(.*)<\/\1\s*>$/i;
+const HASH_HEADING = /^(#{1,3})\s+(.*)$/;
+/** A line inside a split block that is a tag of its own (not the font span or a `<br>`): the block stays text. */
+const TAG_LINE = /^<\/?(?!span\b|br\b)[a-z]/i;
+const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const HALF_TAG = /^ {0,3}<\/?[a-z0-9]*$/i;
+/** A line holding only `<br>`s: a gap, one empty paragraph. */
+const BREAKS_ONLY = /^ {0,3}(?:<br\s*\/?>\s*)+$/i;
+
+function alignedLine(tag: string, align: string, words: string): string {
+  return `<${tag} style="text-align: ${align}">${words}</${tag}>`;
+}
+
+/** A `p` line's words as a heading's, when they are one: `[tag, words]`, else `null`. */
+function headingInside(words: string): [string, string] | null {
+  const inner = INNER_HEADING.exec(words.trim());
+  if (inner) return [inner[1].toLowerCase(), inner[2]];
+  const hashes = HASH_HEADING.exec(words.trim());
+  return hashes ? [`h${hashes[1].length}`, hashes[2]] : null;
+}
+
+/** One aligned line, with a heading inside its `p` (or `#`s inside its `h`) made the heading itself. */
+function oneAlignedLine(line: string): string {
+  const match = /^ {0,3}\S/.test(line) ? ALIGNED_LINE.exec(line.trim()) : null;
+  if (!match || !match[5]) return line;
+  const tag = match[1].toLowerCase();
+  const align = match[3].toLowerCase();
+  if (tag === 'p') {
+    const heading = headingInside(match[4]);
+    return heading ? alignedLine(heading[0], align, heading[1]) : line;
+  }
+  return alignedLine(tag, align, match[4].replace(/^\s*#{1,3}\s+/, ''));
+}
+
+/** A split block's lines, as one-line aligned blocks; `null` when one is a tag of its own. */
+function splitBlockLines(tag: string, align: string, inner: readonly string[]): string[] | null {
+  const lines = inner.map((line) => line.trim()).filter(Boolean);
+  if (lines.some((line) => TAG_LINE.test(line))) return null;
+  if (lines.length === 0) return [];
+  if (tag !== 'p') return [alignedLine(tag, align, lines.map((line) => line.replace(/^#{1,3}\s+/, '')).join('<br>'))];
+  return lines.map((line) => {
+    const heading = headingInside(line);
+    return heading ? alignedLine(heading[0], align, heading[1]) : alignedLine('p', align, line);
+  });
+}
+
+/**
+ * The slips Lawexa makes around an aligned block, rewritten as the one-line
+ * blocks they mean before the Markdown is parsed; every other line as it was.
+ */
+function alignedSlipsAsLines(markdown: string): string {
+  const lines = markdown.split('\n');
+  const out: string[] = [];
+  let fence: string | null = null;
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const fenceMark = FENCE.exec(line)?.[1];
+    if (fence !== null) {
+      if (fenceMark && fenceMark[0] === fence[0] && fenceMark.length >= fence.length) fence = null;
+      out.push(line);
+      continue;
+    }
+    if (fenceMark) {
+      fence = fenceMark;
+      out.push(line);
+      continue;
+    }
+    if (BREAKS_ONLY.test(line)) {
+      // Alone between blank lines, so it is an HTML block of its own and not a break inside a paragraph.
+      out.push('', '<br>', '');
+      continue;
+    }
+    const opening = OPENING_LINE.exec(line);
+    if (!opening) {
+      out.push(oneAlignedLine(line));
+      continue;
+    }
+    const tag = opening[1].toLowerCase();
+    const align = opening[3].toLowerCase();
+    let end = index + 1;
+    while (end < lines.length && !FENCE.test(lines[end]) && CLOSING_LINE.exec(lines[end])?.[1].toLowerCase() !== tag) end++;
+    const closed = end < lines.length && !FENCE.test(lines[end]);
+    // No closing tag: only the end of a draft still being written, with no blank line in what follows, reads as open.
+    const open = !closed && end === lines.length && !lines.slice(index + 1).some((rest) => !rest.trim());
+    // A closing tag still being typed shows nothing.
+    const inner = lines.slice(index + 1, end).filter((rest, at, all) => !(open && at === all.length - 1 && HALF_TAG.test(rest)));
+    const block = closed || open ? splitBlockLines(tag, align, inner) : null;
+    if (!block) {
+      out.push(line);
+      continue;
+    }
+    out.push('', ...block, '');
+    index = end;
+  }
+  return out.join('\n');
 }
 
 /** `<br>`, `<br/>` or `<br />`: a line break inside an aligned line. */
