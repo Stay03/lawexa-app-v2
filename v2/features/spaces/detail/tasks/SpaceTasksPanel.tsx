@@ -50,7 +50,7 @@ import {
   type ChannelOption,
   type OwnerOption,
 } from './task-board-model';
-import { doneCount, mergeBoard, NO_CHANNEL, type BoardChannel } from './task-cache';
+import { activeBoardChannel, doneHeadCount, mergeBoard, NO_CHANNEL, type BoardChannel } from './task-cache';
 import { TaskBox, type TaskBoxTarget } from './TaskBox';
 import { TaskMoveDialog, type PendingMove } from './TaskMoveDialog';
 import { taskCollision, useTaskBoardSensors } from './board-dnd';
@@ -117,8 +117,13 @@ export function SpaceTasksPanel({
   const session = useV2Session();
   const viewerId = session.userId;
   const eligible = collabAccessState(session) === 'eligible';
-  // The channel filter (thread 550bf0ab): every channel, one, or the cards with none.
-  const [channel, setChannel] = useState<BoardChannel>(null);
+  // The rail's own read of the Space's channels (`CollabFrame`, 50 a page).
+  const channelList = useQuery({ ...channelsQueries.bySpace({ spaceUuid, viewerId, per_page: 50 }), enabled: eligible && rooms });
+  const channelOptions = useMemo(() => boardChannelOptions(channelList.data?.data ?? []), [channelList.data]);
+  // The channel filter (thread 550bf0ab): every channel, one, or the cards with
+  // none. A chosen channel the list no longer has shows every channel instead.
+  const [chosenChannel, setChosenChannel] = useState<BoardChannel>(null);
+  const channel = activeBoardChannel(chosenChannel, channelOptions, channelList.isSuccess);
   const query = useQuery({
     ...spacesQueries.tasks(spaceUuid, { viewerId, channel }),
     enabled: eligible,
@@ -127,9 +132,6 @@ export function SpaceTasksPanel({
     ...spacesQueries.doneTasks(spaceUuid, { viewerId, channel }),
     enabled: eligible,
   });
-  // The rail's own read of the Space's channels (`CollabFrame`, 50 a page).
-  const channelList = useQuery({ ...channelsQueries.bySpace({ spaceUuid, viewerId, per_page: 50 }), enabled: eligible && rooms });
-  const channelOptions = useMemo(() => boardChannelOptions(channelList.data?.data ?? []), [channelList.data]);
   useTaskBoardLive(spaceUuid, viewerId, eligible);
   const openTasks = query.data ?? NO_TASKS;
   const doneTasks = useMemo(() => doneQuery.data?.pages.flatMap((page) => page.data) ?? NO_TASKS, [doneQuery.data]);
@@ -140,21 +142,25 @@ export function SpaceTasksPanel({
   const owners = useMemo(() => ownerOptions(tasks), [tasks]);
   const shown = useMemo(() => filterByOwner(tasks, owner), [tasks, owner]);
   const columns = useMemo(() => boardColumns(shown), [shown]);
-  // Done's count is the server's total for the channel; one owner's is what shows.
-  // No number until Done has come: a 0 while it loads would read as none.
-  const doneTotal = doneQuery.data?.pages[0]?.pagination.total ?? null;
+  // Done's count is the server's total for the channel; one owner's is what
+  // shows. No number while it loads or after it failed (`doneHeadCount`).
+  const doneFailed = doneQuery.isError && doneTasks.length === 0;
   const done: DoneState = {
-    count: doneQuery.isPending
-      ? null
-      : owner === null
-        ? doneCount(columns.done.length, doneTotal)
-        : columns.done.length,
+    count: doneHeadCount({
+      pending: doneQuery.isPending,
+      failed: doneFailed,
+      ownerFiltered: owner !== null,
+      shown: columns.done.length,
+      total: doneQuery.data?.pages[0]?.pagination.total ?? null,
+    }),
+    failed: doneFailed,
+    onRetry: () => void doneQuery.refetch(),
     hasMore: doneQuery.hasNextPage,
     loading: doneQuery.isFetchingNextPage,
     onLoadMore: () => void doneQuery.fetchNextPage(),
   };
   const chooseChannel = (next: BoardChannel) => {
-    setChannel(next);
+    setChosenChannel(next);
     // Another channel has other owners: the owner filter starts again at Everyone.
     setOwner(null);
   };
@@ -232,8 +238,11 @@ export function SpaceTasksPanel({
       </div>
     );
   }
-  // An empty Space says so; an empty channel keeps its board, so another channel is one choice away.
-  if (tasks.length === 0 && channel === null) {
+  // An empty Space says so; an empty channel keeps its board, so another channel
+  // is one choice away. A Space with only done cards is not empty: the board
+  // waits for Done before saying so, and a failed Done shows its retry instead.
+  if (tasks.length === 0 && channel === null && doneQuery.isPending) return <SpaceContentSkeleton />;
+  if (tasks.length === 0 && channel === null && doneQuery.isSuccess) {
     return (
       <>
         <CollabEmpty
@@ -637,8 +646,11 @@ function StageColumn({
 
 /** What Done shows beyond its cards: its count, and whether more pages wait. */
 interface DoneState {
-  /** `null` until Done's first page has come. */
+  /** `null` until Done's first page has come, and when it failed. */
   count: number | null;
+  /** Done's read failed: the column says so and offers to try again. */
+  failed: boolean;
+  onRetry: () => void;
   hasMore: boolean;
   loading: boolean;
   onLoadMore: () => void;
@@ -715,14 +727,23 @@ function DoneColumn({
             </button>
           }
         />
-        <CardList
-          stage="done"
-          tasks={tasks}
-          now={now}
-          empty={EMPTY_WORDS.done}
-          canDrag={canDrag}
-          onOpenTask={onOpenTask}
-        />
+        {done.failed ? (
+          <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-border px-3 py-5 text-center text-xs text-muted-foreground">
+            Done didn’t load.
+            <Button type="button" variant="outline" size="sm" onClick={done.onRetry}>
+              Try again
+            </Button>
+          </div>
+        ) : (
+          <CardList
+            stage="done"
+            tasks={tasks}
+            now={now}
+            empty={EMPTY_WORDS.done}
+            canDrag={canDrag}
+            onOpenTask={onOpenTask}
+          />
+        )}
         {done.hasMore ? (
           <Button
             type="button"

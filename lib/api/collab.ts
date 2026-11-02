@@ -524,10 +524,16 @@ export const spacesApi = {
  * since `done_since`. Every member reads it; the owner and editors move tasks.
  */
 export const spaceTasksApi = {
-  getList: async (spaceUuid: string, params: SpaceTaskListParams = {}): Promise<SpaceTaskListResponse> => {
+  getList: async (
+    spaceUuid: string,
+    params: SpaceTaskListParams = {},
+    /** The query's signal: a changed filter stops the reads it no longer needs. */
+    signal?: AbortSignal,
+  ): Promise<SpaceTaskListResponse> => {
     const response = await apiClient.get<SpaceTaskListResponse>(
       `/spaces/${encodeURIComponent(spaceUuid)}/tasks`,
       {
+        signal,
         params: {
           // axios writes an array as `stage[]=queued&stage[]=working`.
           stage: params.stage && params.stage.length > 0 ? params.stage : undefined,

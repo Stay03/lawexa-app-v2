@@ -47,6 +47,7 @@ import {
 import type { BoardChannel } from './task-cache';
 import {
   seededDraft,
+  startThreadChannel,
   startThreadChannels,
   startThreadError,
   startThreadPayload,
@@ -271,12 +272,13 @@ function TaskBoxBody({
   const startRooms = useMemo(() => startThreadChannels(channelList.data?.data ?? []), [channelList.data]);
   const [pickedChannel, setPickedChannel] = useState<string | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
-  // A card is in the channel of its thread (thread 550bf0ab): a thread starts in
-  // the card's own channel when the reader may post there.
-  const cardChannel = task?.channel?.uuid ?? null;
-  const startIn =
-    pickedChannel ??
-    (cardChannel && startRooms.options.some((option) => option.uuid === cardChannel) ? cardChannel : startRooms.preselected);
+  // A thread starts in the card's own channel when the reader may post there.
+  const startIn = startThreadChannel({
+    picked: pickedChannel,
+    cardChannel: task?.channel?.uuid ?? null,
+    options: startRooms.options,
+    preselected: startRooms.preselected,
+  });
   const chatStart: ChatStart = {
     pending: startThread.isPending,
     channels: channelList.isSuccess ? startRooms.options : null,

@@ -11,6 +11,7 @@ import type {
   SpaceTaskStage,
 } from '@/types/collab';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
+import { readTaskPages } from './task-pages';
 
 /** A read this recent is the visit's own: a list mounting after the frame
  *  started its read uses it instead of asking again. */
@@ -328,7 +329,7 @@ export const spacesQueries = {
   tasks: (spaceUuid: string, { viewerId, channel = null }: ViewerScoped & { channel?: string | null }) =>
     queryOptions({
       queryKey: [...spacesQueries.openTasksOf(spaceUuid), { channel }, { viewerId }] as const,
-      queryFn: () => readOpenBoard(spaceUuid, channel),
+      queryFn: ({ signal }) => readOpenBoard(spaceUuid, channel, signal),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
       refetchOnMount: REFETCH_ON_VISIT,
@@ -345,13 +346,17 @@ export const spacesQueries = {
   doneTasks: (spaceUuid: string, { viewerId, channel = null }: ViewerScoped & { channel?: string | null }) =>
     infiniteQueryOptions({
       queryKey: [...spacesQueries.doneTasksOf(spaceUuid), { channel }, { viewerId }] as const,
-      queryFn: ({ pageParam }) =>
-        spaceTasksApi.getList(spaceUuid, {
-          stage: ['done'],
-          channel: channel ?? undefined,
-          per_page: DONE_TASKS_PER_PAGE,
-          page: pageParam,
-        }),
+      queryFn: ({ pageParam, signal }) =>
+        spaceTasksApi.getList(
+          spaceUuid,
+          {
+            stage: ['done'],
+            channel: channel ?? undefined,
+            per_page: DONE_TASKS_PER_PAGE,
+            page: pageParam,
+          },
+          signal,
+        ),
       initialPageParam: 1,
       getNextPageParam: (last) => {
         const { current_page, last_page } = last.pagination;
@@ -435,15 +440,9 @@ export const OPEN_TASK_STAGES: readonly SpaceTaskStage[] = ['queued', 'working',
 /** One page of Done; each "Load more" brings the next. */
 export const DONE_TASKS_PER_PAGE = 20;
 
-/** Every open card of a space under one channel filter, page after page, in the server's board order. */
-async function readOpenBoard(spaceUuid: string, channel: string | null): Promise<SpaceTask[]> {
-  const read = (page: number) =>
-    spaceTasksApi.getList(spaceUuid, { stage: OPEN_TASK_STAGES, channel: channel ?? undefined, per_page: 100, page });
-  const first = await read(1);
-  const rows = [...first.data];
-  for (let page = 2; page <= first.pagination.last_page; page += 1) {
-    const next = await read(page);
-    rows.push(...next.data);
-  }
-  return rows;
+/** Every open card of a space under one channel filter, page after page, each once (`task-pages.ts`). */
+function readOpenBoard(spaceUuid: string, channel: string | null, signal?: AbortSignal): Promise<SpaceTask[]> {
+  return readTaskPages((page) =>
+    spaceTasksApi.getList(spaceUuid, { stage: OPEN_TASK_STAGES, channel: channel ?? undefined, per_page: 100, page }, signal),
+  );
 }

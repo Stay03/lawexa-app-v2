@@ -211,6 +211,27 @@ export function threadChoices(rooms: readonly Channel[], current: SpaceTask['thr
 }
 
 /**
+ * The channel "Start a thread" shows: the one picked, else the card's own
+ * channel when the reader may post there (a card is in the channel of its
+ * thread, thread 550bf0ab), else the list's own first choice.
+ */
+export function startThreadChannel({
+  picked,
+  cardChannel,
+  options,
+  preselected,
+}: {
+  picked: string | null;
+  cardChannel: string | null;
+  options: readonly { uuid: string }[];
+  preselected: string | null;
+}): string | null {
+  if (picked) return picked;
+  if (cardChannel && options.some((option) => option.uuid === cardChannel)) return cardChannel;
+  return preselected;
+}
+
+/**
  * The start's body: always the channel the picker shows (Frontend's review,
  * 23:05Z), so what is shown is what happens even where two channels share a
  * date and the server's "first by id" would part from it. Nothing only while

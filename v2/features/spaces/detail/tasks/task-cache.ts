@@ -33,9 +33,20 @@ export function taskInChannel(task: Pick<SpaceTask, 'channel'>, channel: BoardCh
   return task.channel?.uuid === channel;
 }
 
-/** An open read with this card written in: put in where its channel is shown, taken out where not. */
+/**
+ * An open read with this card written in: put in where its channel is shown,
+ * taken out where not.
+ *
+ * "NO CHANNEL" ONLY UPDATES (the techlead's review of 8f1f842e): a card in a
+ * channel this viewer cannot open also comes with `channel: null`, but the
+ * server's `channel=none` leaves it out. So a card with no channel is never
+ * added to that read, only changed where it already is; the next read of the
+ * board brings in any that belong.
+ */
 export function placeTask(list: readonly SpaceTask[], task: SpaceTask, channel: BoardChannel): SpaceTask[] {
-  return taskInChannel(task, channel) ? upsertTask(list, task) : removeTask(list, task.uuid);
+  if (!taskInChannel(task, channel)) return removeTask(list, task.uuid);
+  if (channel === NO_CHANNEL && !list.some((row) => row.uuid === task.uuid)) return [...list];
+  return upsertTask(list, task);
 }
 
 /** A done read with this card written in: it keeps the card only while the card is done and in its channel. */
@@ -84,6 +95,43 @@ export function mergeBoard(open: readonly SpaceTask[], done: readonly SpaceTask[
 /** What Done's head counts: the server's total, or the cards shown when more are. */
 export function doneCount(shown: number, total: number | null): number {
   return total === null ? shown : Math.max(shown, total);
+}
+
+/**
+ * Done's number, or `null` for none: while its first page is on its way, and
+ * when it failed (the column says so and offers to try again), since a 0
+ * then would read as nothing done. One owner's count is the cards shown.
+ */
+export function doneHeadCount({
+  pending,
+  failed,
+  ownerFiltered,
+  shown,
+  total,
+}: {
+  pending: boolean;
+  failed: boolean;
+  ownerFiltered: boolean;
+  shown: number;
+  total: number | null;
+}): number | null {
+  if (pending || failed) return null;
+  return ownerFiltered ? shown : doneCount(shown, total);
+}
+
+/**
+ * The channel the board shows (the techlead's review of 8f1f842e): the one
+ * chosen, unless the channel list has come without it (deleted, or the reader
+ * left it), and then every channel, so the button never says "All channels"
+ * over a board still filtered to a channel that is gone.
+ */
+export function activeBoardChannel(
+  chosen: BoardChannel,
+  options: readonly { uuid: string }[],
+  listLoaded: boolean,
+): BoardChannel {
+  if (chosen === null || chosen === NO_CHANNEL || !listLoaded) return chosen;
+  return options.some((option) => option.uuid === chosen) ? chosen : null;
 }
 
 /** The list with this task in it: the cached row replaced, or the task added. */

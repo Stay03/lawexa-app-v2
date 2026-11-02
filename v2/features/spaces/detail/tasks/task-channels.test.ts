@@ -1,10 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
 import type { InfiniteData } from '@tanstack/react-query';
 import type { Channel, SpaceTask, SpaceTaskListResponse, SpaceTaskMove } from '@/types/collab';
+import { readTaskPages } from '../../task-pages';
 import {
   boardChannelOptions,
   channelLabel,
@@ -12,15 +11,24 @@ import {
   roomChannel,
   starterChannel,
 } from './task-board-model';
-import { doneCount, dropDoneTask, mergeBoard, NO_CHANNEL, placeDoneTask, placeTask, taskInChannel } from './task-cache';
+import { startThreadChannel } from './task-box-model';
+import {
+  activeBoardChannel,
+  doneCount,
+  doneHeadCount,
+  dropDoneTask,
+  mergeBoard,
+  NO_CHANNEL,
+  placeDoneTask,
+  placeTask,
+  taskInChannel,
+} from './task-cache';
 import { createPayload, draftFromTask, moveLine, serverFieldErrors, updatePayload } from './task-sheet-model';
 
 /* Every card belongs to a channel (Arthur's yes, thread 550bf0ab; Backend's
  * task-cards 0bc04772): the board filters by channel, each card names its
  * channel, New task and the task box pick one, and the history says when a
  * card moved between channels. Done comes a page at a time. */
-
-const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
 
 const GENERAL = { uuid: 'c-general', name: 'general' };
 const PRODUCT = { uuid: 'c-product', name: 'product' };
@@ -205,33 +213,74 @@ test('the history says when a card moved between channels', () => {
   assert.equal(moveLine(move({})), 'Stay changed it in Queued');
 });
 
-test('the board reads open cards page after page and Done a page at a time, for the channel chosen', () => {
-  const queries = read('v2', 'features', 'spaces', 'queries.ts');
-  assert.match(queries, /export const OPEN_TASK_STAGES: readonly SpaceTaskStage\[\] = \['queued', 'working', 'paused', 'waiting'\];/);
-  assert.match(queries, /for \(let page = 2; page <= first\.pagination\.last_page; page \+= 1\)/);
-  assert.match(queries, /stage: \['done'\],\s*channel: channel \?\? undefined,\s*per_page: DONE_TASKS_PER_PAGE,\s*page: pageParam,/);
-  const api = read('lib', 'api', 'collab.ts');
-  assert.match(api, /stage: params\.stage && params\.stage\.length > 0 \? params\.stage : undefined,\s*channel: params\.channel \|\| undefined,/);
-  const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
-  assert.match(board, /\{rooms \? <ChannelFilter options=\{channelOptions\} value=\{channel\} onChange=\{chooseChannel\} \/> : null\}/);
-  assert.match(board, /\{done\.hasMore \? \(\s*<Button/);
-  assert.match(board, /\{task\.channel \? \(\s*<span className="mt-1\.5 block truncate text-\[11px\] text-muted-foreground\/80 max-md:order-2">\s*\{channelLabel\(task\.channel\)\}/);
-  // A write and a live event go into every read of the board, each channel and Done.
-  const mutations = read('v2', 'features', 'spaces', 'detail', 'tasks', 'task-mutations.ts');
-  assert.match(mutations, /const board = boardCache\(queryClient, spaceUuid, viewerId\);/);
-  const box = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
-  assert.match(box, /<FieldBlock label="Channel"/);
-  assert.match(box, /onChange=\{chooseThread\}/);
+test('the open read takes every page in turn, each card once, and one page when the board is empty', async () => {
+  const page = (current: number, last: number, cards: SpaceTask[]): SpaceTaskListResponse =>
+    ({
+      success: true,
+      message: '',
+      data: cards,
+      pagination: { current_page: current, per_page: 100, total: 0, last_page: last, from: null, to: null },
+      links: { first: null, last: null, prev: null, next: null },
+    }) as unknown as SpaceTaskListResponse;
+  const asked: number[] = [];
+  const pages: Record<number, SpaceTaskListResponse> = {
+    1: page(1, 3, [task('a'), task('b')]),
+    // A card moved between two reads comes on two pages: it shows once.
+    2: page(2, 3, [task('b'), task('c')]),
+    3: page(3, 3, [task('d')]),
+  };
+  const rows = await readTaskPages(async (n) => {
+    asked.push(n);
+    return pages[n];
+  });
+  assert.deepEqual(asked, [1, 2, 3]);
+  assert.deepEqual(rows.map((row) => row.uuid), ['a', 'b', 'c', 'd']);
+  // An empty board answers last_page 0 on page 1: one read, no cards.
+  const emptyAsked: number[] = [];
+  const none = await readTaskPages(async (n) => {
+    emptyAsked.push(n);
+    return page(1, 0, []);
+  });
+  assert.deepEqual(emptyAsked, [1]);
+  assert.deepEqual(none, []);
 });
 
-test('Done shows no number until it has come, and a task’s thread starts in the card’s channel', () => {
-  const board = read('v2', 'features', 'spaces', 'detail', 'tasks', 'SpaceTasksPanel.tsx');
-  // The first local run showed "Done 0" while the read was on its way.
-  assert.match(board, /count: doneQuery\.isPending\s*\? null/);
+test('"No channel" changes a card it has but never takes one in, since an unreadable channel also comes as none', () => {
+  const shown = task('a', { channel: null });
+  const changed = task('a', { channel: null, title: 'Renamed' });
+  assert.equal(placeTask([shown], changed, NO_CHANNEL)[0].title, 'Renamed');
+  // A card the viewer cannot place: not added to "No channel", left to the next read.
+  assert.deepEqual(placeTask([shown], task('z', { channel: null }), NO_CHANNEL).map((row) => row.uuid), ['a']);
+  // Every channel still takes it in; a card that gained a channel leaves "No channel".
+  assert.deepEqual(placeTask([], task('z', { channel: null }), null).map((row) => row.uuid), ['z']);
+  assert.deepEqual(placeTask([shown], task('a', { channel: PRODUCT }), NO_CHANNEL), []);
+});
+
+test('Done shows no number while it loads or after it failed, the total for everyone, and the cards shown for one owner', () => {
+  const base = { pending: false, failed: false, ownerFiltered: false, shown: 20, total: 24 };
+  assert.equal(doneHeadCount({ ...base, pending: true }), null);
+  assert.equal(doneHeadCount({ ...base, failed: true }), null);
+  assert.equal(doneHeadCount(base), 24);
+  assert.equal(doneHeadCount({ ...base, ownerFiltered: true, shown: 3 }), 3);
+  assert.equal(doneHeadCount({ ...base, shown: 25 }), 25);
+});
+
+test('a chosen channel the list no longer has shows every channel, never a filter the button does not name', () => {
+  const options = [GENERAL, PRODUCT];
+  assert.equal(activeBoardChannel(PRODUCT.uuid, options, true), PRODUCT.uuid);
+  assert.equal(activeBoardChannel('c-gone', options, true), null);
+  // Until the list has come, the choice stands.
+  assert.equal(activeBoardChannel('c-gone', [], false), 'c-gone');
+  assert.equal(activeBoardChannel(NO_CHANNEL, options, true), NO_CHANNEL);
+  assert.equal(activeBoardChannel(null, options, true), null);
+});
+
+test('a task’s thread starts in the card’s own channel when the reader may post there', () => {
+  const options = [GENERAL, PRODUCT];
   // The first local run offered #general for a card in #product.
-  const box = read('v2', 'features', 'spaces', 'detail', 'tasks', 'TaskBox.tsx');
-  assert.match(
-    box,
-    /\(cardChannel && startRooms\.options\.some\(\(option\) => option\.uuid === cardChannel\) \? cardChannel : startRooms\.preselected\)/,
-  );
+  assert.equal(startThreadChannel({ picked: null, cardChannel: PRODUCT.uuid, options, preselected: GENERAL.uuid }), PRODUCT.uuid);
+  assert.equal(startThreadChannel({ picked: GENERAL.uuid, cardChannel: PRODUCT.uuid, options, preselected: GENERAL.uuid }), GENERAL.uuid);
+  // A channel the reader cannot post in is not offered: the list's first choice.
+  assert.equal(startThreadChannel({ picked: null, cardChannel: 'c-private', options, preselected: GENERAL.uuid }), GENERAL.uuid);
+  assert.equal(startThreadChannel({ picked: null, cardChannel: null, options, preselected: null }), null);
 });
