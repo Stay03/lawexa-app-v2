@@ -1,16 +1,28 @@
 'use client';
 
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useQueryClient } from '@tanstack/react-query';
+
 import { cn } from '@/lib/utils';
 import type { NoteRecord } from '../types';
 import { noteSpace } from '../note-copy';
 import { noteTags } from '../note-row-model';
 import { formatNoteDate, noteDisplayTitle, noteHasTitle } from '../note-text';
 import { NoteTagList } from '../note-tag-list';
+import { notesQueries } from '../queries';
 import { NoteActions } from './NoteActions';
 import { NoteContent } from './NoteContent';
 import { NoteEmptyBodyState } from './states';
 import './note-masthead.css';
 import './note-document.css';
+
+// The history dialog brings the note editor's schema to compare versions: it
+// loads on the first open, not with the page.
+const DraftHistoryDialog = dynamic(
+  () => import('@/v2/features/conversations/conversation/draft/DraftHistoryDialog').then((m) => m.DraftHistoryDialog),
+  { ssr: false },
+);
 
 /**
  * NoteDocument — the note as a calm document, in the case page's TWO-VOICE
@@ -24,7 +36,7 @@ import './note-document.css';
  *   title       the note's name, or "Untitled" in a quieter ink
  *   draft mark  ONLY on the author's own unpublished note, and it says what
  *               being a draft actually means rather than just labelling it
- *   actions     save · copy link · export · edit
+ *   actions     save · copy link · export · edit · version history
  *
  * v1's `NoteDetailHeader` put a thumbnail, a tag row, a price and a status
  * chip above the title. The thumbnail and the price are marketplace furniture
@@ -46,13 +58,20 @@ import './note-document.css';
 export function NoteDocument({
   note,
   editHref,
+  history = false,
 }: {
   note: NoteRecord;
   /** `/notes/{slug}/edit` when the viewer owns this note, else `null`. The
    *  ownership comparison lives in `NoteScreen`, against the server-verified
    *  session id — this component only renders the answer. */
   editHref: string | null;
+  /** The viewer wrote this note and may edit it (`offersNoteHistory`), so the
+   *  page offers its version history. */
+  history?: boolean;
 }) {
+  const queryClient = useQueryClient();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const title = noteDisplayTitle(note.title);
   const hasTitle = noteHasTitle(note.title);
   const author = note.user?.name?.trim() || null;
@@ -123,6 +142,14 @@ export function NoteDocument({
           canExport={body.length > 0}
           editHref={editHref}
           canAddToFolder={!isSpaceCopy}
+          onHistory={
+            history
+              ? () => {
+                  setHistoryLoaded(true);
+                  setHistoryOpen(true);
+                }
+              : null
+          }
         />
       </header>
 
@@ -131,6 +158,19 @@ export function NoteDocument({
       ) : (
         <NoteEmptyBodyState editHref={editHref} />
       )}
+
+      {history && historyLoaded ? (
+        <DraftHistoryDialog
+          of="note"
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          noteId={note.id}
+          canRestore
+          current={() => note.content ?? ''}
+          // A restore saves a new text: the page reads the note again.
+          onRestored={() => void queryClient.invalidateQueries({ queryKey: notesQueries.details() })}
+        />
+      ) : null}
 
       {/* Every tag as a grey pill, wrapping on a narrow screen. Not links,
           since the notes list has no tag filter to link to. */}

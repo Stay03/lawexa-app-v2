@@ -45,6 +45,10 @@ import { ADDED_WORDS, DiffDocument, REMOVED_WORDS } from './DraftChangesView';
  * asks first, then saves that version as the reader's new text; the server
  * keeps the text now as a revision first, so a restore is never a loss. Only a reader who may edit the
  * note restores, and only once the draft's own edits are saved.
+ *
+ * The note's own page opens it too (`of: 'note'`, Stay, 2 November 2026,
+ * 61db64b3): the same list and restore, worded for a note, against the note
+ * as it was read.
  */
 export function DraftHistoryDialog({
   open,
@@ -54,6 +58,7 @@ export function DraftHistoryDialog({
   current,
   saving = false,
   onRestored,
+  of = 'draft',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -66,7 +71,10 @@ export function DraftHistoryDialog({
   saving?: boolean;
   /** After a restore: the panel reads the note again and opens on it. */
   onRestored?: () => void;
+  /** Where it opens: the draft panel, or the note's own page. */
+  of?: 'draft' | 'note';
 }) {
+  const words = HISTORY_WORDS[of];
   const { userUuid } = useV2Session();
   const queryClient = useQueryClient();
   const chat = useV2ChatContext();
@@ -105,9 +113,7 @@ export function DraftHistoryDialog({
       <DialogContent className="flex max-h-[85vh] flex-col gap-4 sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Version history</DialogTitle>
-          <DialogDescription>
-            Every version Lawexa wrote, and your text from just before each new one. Restoring one keeps the rest.
-          </DialogDescription>
+          <DialogDescription>{words.description}</DialogDescription>
         </DialogHeader>
         <div className="grid min-h-0 flex-1 gap-4 sm:grid-cols-[15rem_1fr]">
           <div className="min-h-0 overflow-y-auto rounded-lg border">
@@ -124,6 +130,8 @@ export function DraftHistoryDialog({
                   Try again
                 </Button>
               </div>
+            ) : rows.length === 0 ? (
+              <p className="p-3 text-sm text-muted-foreground">No earlier versions yet.</p>
             ) : (
               <ol aria-label="Versions">
                 {rows.map((row) => (
@@ -169,9 +177,9 @@ export function DraftHistoryDialog({
           </div>
           <div className="min-h-0 overflow-y-auto rounded-lg border p-4">
             {chosen ? (
-              <RevisionAgainstNow noteId={noteId} revision={chosen} current={current} />
+              <RevisionAgainstNow noteId={noteId} revision={chosen} current={current} same={words.same} />
             ) : (
-              <p className="text-sm text-muted-foreground">Choose a version to see it against the draft as it is now.</p>
+              <p className="text-sm text-muted-foreground">{words.choose}</p>
             )}
           </div>
         </div>
@@ -193,8 +201,8 @@ export function DraftHistoryDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>Restore this version?</AlertDialogTitle>
             <AlertDialogDescription>
-              {chosen ? `${revisionAuthorLabel(chosen, userUuid)} becomes the draft’s text. ` : ''}
-              The draft as it is now stays in the history, and Lawexa works from the restored text.
+              {chosen ? `${revisionAuthorLabel(chosen, userUuid)} ${words.becomes} ` : ''}
+              {words.kept}
             </AlertDialogDescription>
           </AlertDialogHeader>
           {restore.isError ? (
@@ -221,6 +229,24 @@ export function DraftHistoryDialog({
   );
 }
 
+/** The dialog's words, for a draft in the panel and for a note on its own page. */
+const HISTORY_WORDS = {
+  draft: {
+    description: 'Every version Lawexa wrote, and your text from just before each new one. Restoring one keeps the rest.',
+    choose: 'Choose a version to see it against the draft as it is now.',
+    same: 'The same as the draft now.',
+    becomes: 'becomes the draft’s text.',
+    kept: 'The draft as it is now stays in the history, and Lawexa works from the restored text.',
+  },
+  note: {
+    description: 'Earlier versions of this note, kept each time Lawexa changed it. Restoring one keeps the rest.',
+    choose: 'Choose a version to see it against the note as it is now.',
+    same: 'The same as the note now.',
+    becomes: 'becomes the note’s text.',
+    kept: 'The note as it is now stays in the history.',
+  },
+} as const;
+
 /** "12 minutes ago", read once: the clock is never read in a render body. */
 function RevisionTime({ at }: { at: string }) {
   const [now] = useState(() => Date.now());
@@ -237,10 +263,13 @@ function RevisionAgainstNow({
   noteId,
   revision,
   current,
+  same,
 }: {
   noteId: number;
   revision: NoteRevision;
   current: (() => string) | null;
+  /** The line for a version no different from the text now. */
+  same: string;
 }) {
   const queryClient = useQueryClient();
   const { userId: viewerId } = useV2Session();
@@ -272,7 +301,7 @@ function RevisionAgainstNow({
             </span>
           </>
         ) : (
-          <span>The same as the draft now.</span>
+          <span>{same}</span>
         )}
       </p>
       <DiffDocument diff={diff} className="text-[15px]" />

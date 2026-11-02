@@ -33,3 +33,16 @@ export function mayEditNote(
   if (note.is_space_copy === true) return note.can_edit === true;
   return viewerId !== null && note.user?.id === viewerId;
 }
+
+/**
+ * Whether the note's own page offers its version history (Stay, 2 November
+ * 2026, 61db64b3; Techlead 9a08b24d): the note's author only, and only while
+ * they may edit it, as the server reads and restores versions for an editor
+ * alone. A Space's Contributor who did not write the note sees no history here.
+ */
+export function offersNoteHistory(
+  note: Pick<NoteRecord, 'is_space_copy' | 'can_edit' | 'user'>,
+  viewerId: number | null,
+): boolean {
+  return mayEditNote(note, viewerId) && viewerId !== null && note.user?.id === viewerId;
+}

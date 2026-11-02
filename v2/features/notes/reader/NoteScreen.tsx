@@ -12,7 +12,7 @@ import {
 } from '@/v2/shell/screen-context';
 import { useTabTitle } from '@/v2/shell/use-tab-title';
 import { notesQueries } from '../queries';
-import { mayEditNote, noteSpace } from '../note-copy';
+import { mayEditNote, noteSpace, offersNoteHistory } from '../note-copy';
 import { noteDisplayTitle } from '../note-text';
 import { useNotePeek } from '../note-peek';
 import { NoteDocument } from './NoteDocument';
@@ -177,7 +177,7 @@ export function NoteScreen({ slug }: { slug: string }) {
             : 'motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300'
         }
       >
-        <NoteDocument note={note} editHref={editHref} />
+        <NoteDocument note={note} editHref={editHref} history={offersNoteHistory(note, userId)} />
       </div>
     </div>
   );
