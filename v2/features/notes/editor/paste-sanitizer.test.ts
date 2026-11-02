@@ -39,3 +39,51 @@ test('colour, font tags and presentation attributes are still stripped', () => {
     '<p>text</p><td>x</td>',
   );
 });
+
+/* Stay, 2 November 2026 (Techlead d164e8ed): a pasted centred line stays
+ * centred. Tester's paste (259cd69c) had a centred "Signed:" line written as
+ * the old align="center", which came in left-aligned. */
+
+test('align="…" on a paragraph or heading comes in as its text-align', () => {
+  assert.equal(
+    stripPastedPresentation('<p align="center">Signed: TEST DATA Person</p><h2 align=RIGHT>TEST</h2><h3 align=\'justify\'>DATA</h3>'),
+    '<p style="text-align: center">Signed: TEST DATA Person</p><h2 style="text-align: right">TEST</h2><h3 style="text-align: justify">DATA</h3>',
+  );
+  // Word's own class and other attributes go as before; only the alignment is kept.
+  assert.equal(
+    stripPastedPresentation('<p class="MsoNormal" align="center" style="margin:0;color:red"><span style="font-size:12pt">TEST</span></p>'),
+    '<p class="MsoNormal" style="text-align: center"><span>TEST</span></p>',
+  );
+});
+
+test('a text-align style is kept, and wins over align', () => {
+  assert.equal(stripPastedPresentation('<p style="margin:0; text-align: Center;">TEST</p>'), '<p style="text-align: center">TEST</p>');
+  assert.equal(stripPastedPresentation('<p align="right" style="text-align:center">TEST</p>'), '<p style="text-align: center">TEST</p>');
+  // Left is the editor's default: written as no alignment.
+  assert.equal(stripPastedPresentation('<p align="left">TEST</p><p style="text-align:left">DATA</p>'), '<p>TEST</p><p>DATA</p>');
+  // An unknown style value leaves align to decide.
+  assert.equal(stripPastedPresentation('<p align="right" style="text-align:start">TEST</p>'), '<p style="text-align: right">TEST</p>');
+});
+
+test('a paragraph or heading takes the alignment of the div, item or cell around it, unless it has its own', () => {
+  assert.equal(
+    stripPastedPresentation('<div align="center"><p>TEST</p><h2 align="left">DATA</h2><div><p>Ltd</p></div></div><p>After</p>'),
+    '<div align="center"><p style="text-align: center">TEST</p><h2>DATA</h2><div><p style="text-align: center">Ltd</p></div></div><p>After</p>',
+  );
+  assert.equal(
+    stripPastedPresentation('<table><tr><td style="text-align:right"><p class="MsoNormal">TEST</p></td><td><p>DATA</p></td></tr></table>'),
+    '<table><tr><td><p class="MsoNormal" style="text-align: right">TEST</p></td><td><p>DATA</p></td></tr></table>',
+  );
+  assert.equal(stripPastedPresentation('<ul><li align="center"><p>TEST</p></li><li><p>DATA</p></li></ul>'), '<ul><li align="center"><p style="text-align: center">TEST</p></li><li><p>DATA</p></li></ul>');
+});
+
+test('unknown alignments, other elements and plain text are left as before', () => {
+  assert.equal(stripPastedPresentation('<p align="middle">TEST</p><p align="">DATA</p>'), '<p>TEST</p><p>DATA</p>');
+  // The editor keeps alignment only on paragraphs and headings: words straight in a div or cell stay as before.
+  assert.equal(stripPastedPresentation('<div align="center" style="text-align:center">TEST</div><td align="center">DATA</td>'), '<div align="center">TEST</div><td align="center">DATA</td>');
+  assert.equal(stripPastedPresentation('<pre>TEST</pre><param align="center">'), '<pre>TEST</pre><param align="center">');
+  assert.equal(stripPastedPresentation('TEST DATA, align="center" in prose'), 'TEST DATA, align="center" in prose');
+  assert.equal(stripPastedPresentation('<p>TEST</p>'), '<p>TEST</p>');
+  // The carrier can't be pasted in to smuggle a style.
+  assert.equal(stripPastedPresentation('<p data-v2-paste-align="center">TEST</p>'), '<p>TEST</p>');
+});
