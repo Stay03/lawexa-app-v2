@@ -365,3 +365,54 @@ test('an aligned div reads as an aligned p, on one line or split, with plain hea
   // While streaming, a div's opening tag shows nothing yet.
   assert.deepEqual(markdownToDoc('TEST.\n\n<div style="text-al').content, [{ type: 'paragraph', content: words('TEST.') }]);
 });
+
+test('Stay’s live draft (c48fc782): bold and the numbered points are kept around centred lines', () => {
+  const doc = markdownToDoc(
+    [
+      '<h2 style="text-align: center"><strong>TEST DATA BOARD RESOLUTION</strong></h2>',
+      '<p style="text-align: center"><strong>TEST DATA Holdings Ltd</strong></p>',
+      '',
+      '**WHEREAS:**',
+      '1. The company needs a TEST DATA account.',
+      '2. The board has met.',
+      '',
+      '**RESOLVED** that:',
+      '1. The account is opened.',
+      '',
+      '<p style="text-align: center">A. TEST DATA<br>Director</p>',
+      '<p style="text-align: center">B. TEST DATA<br>Secretary</p>',
+    ].join('\n'),
+  ).content;
+  const bold = [{ type: 'bold' }];
+  assert.deepEqual(
+    doc?.map((node) => [node.type, node.attrs?.textAlign ?? '-']),
+    [
+      ['heading', 'center'],
+      ['paragraph', 'center'],
+      ['paragraph', '-'],
+      ['orderedList', '-'],
+      ['paragraph', '-'],
+      ['orderedList', '-'],
+      ['paragraph', 'center'],
+      ['paragraph', 'center'],
+    ],
+  );
+  assert.deepEqual(doc?.[0].content, [{ type: 'text', text: 'TEST DATA BOARD RESOLUTION', marks: bold }]);
+  assert.deepEqual(doc?.[2].content, [{ type: 'text', text: 'WHEREAS:', marks: bold }]);
+  assert.equal(doc?.[3].content?.length, 2);
+  assert.deepEqual(doc?.[4].content?.[0], { type: 'text', text: 'RESOLVED', marks: bold });
+  // The same with no blank lines anywhere: the body lines sit in the centred lines' HTML block, and still read as Markdown.
+  const tight = markdownToDoc(
+    '<p style="text-align: center"><strong>TEST DATA Holdings Ltd</strong></p>\n**WHEREAS:**\n1. The company needs a TEST DATA account.\n2. The board has met.\n<p style="text-align: center">A. TEST DATA<br>Director</p>',
+  ).content;
+  assert.deepEqual(
+    tight?.map((node) => [node.type, node.attrs?.textAlign ?? '-']),
+    [
+      ['paragraph', 'center'],
+      ['paragraph', '-'],
+      ['orderedList', '-'],
+      ['paragraph', 'center'],
+    ],
+  );
+  assert.equal(tight?.[2].content?.length, 2);
+});
