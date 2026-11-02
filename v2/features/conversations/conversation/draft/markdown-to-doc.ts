@@ -58,6 +58,12 @@ import { FONT_STYLE } from '@/v2/features/notes/editor/font-style';
  * except at the very end of a draft still being written, where its lines show
  * aligned before the closing tag arrives. A line holding only `<br>`s, a gap
  * Lawexa leaves before signature lines (woz d3643d84), is one empty paragraph.
+ *
+ * Inside an aligned line, and nowhere else, `<strong>` and `<b>`, `<em>` and
+ * `<i>`, and `<u>` are bold, italic and underline (Techlead ee4398e5; shapes
+ * 1966bfb1). An aligned `div` reads as an aligned `p`, on one line or split;
+ * inside a split `p` or `div`, a plain `<h1>`–`<h3>` or `<p>` line is that
+ * block, aligned. Any other tag still stays text.
  */
 
 type Mark = NonNullable<JSONContent['marks']>[number];
@@ -105,10 +111,10 @@ type Align = 'center' | 'right' | 'justify';
  * One aligned line: the tag, its one style (any case, spaces around the
  * colon, a closing `;`, either quote), its words, and the closing tag.
  */
-const ALIGNED_LINE = /^<(p|h[1-3])\s+style\s*=\s*(["'])\s*text-align\s*:\s*(center|right|justify)\s*;?\s*\2\s*>(.*?)(<\/\1\s*>)?$/i;
+const ALIGNED_LINE = /^<(p|h[1-3]|div)\s+style\s*=\s*(["'])\s*text-align\s*:\s*(center|right|justify)\s*;?\s*\2\s*>(.*?)(<\/\1\s*>)?$/i;
 
 /** An aligned line's opening tag still being typed: nothing to show yet. */
-const OPENING_TAG = /^<(?:p|h[1-3])(?:\s[^>]*)?$/i;
+const OPENING_TAG = /^<(?:p|h[1-3]|div)(?:\s[^>]*)?$/i;
 
 /**
  * An HTML block's lines, each an aligned paragraph or heading where it is one;
@@ -141,7 +147,7 @@ function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONC
       const tag = match[1].toLowerCase();
       const align = match[3].toLowerCase() as Align;
       content.push(
-        tag === 'p'
+        tag === 'p' || tag === 'div'
           ? withContent({ type: 'paragraph', attrs: { textAlign: align } }, inlineMarkdown(match[4], font))
           : // A heading keeps its own size, as a `#` heading does.
             withContent(
@@ -160,8 +166,10 @@ function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONC
 }
 
 /** An aligned block's opening tag alone on its line, up to three spaces in (four is code). */
-const OPENING_LINE = /^ {0,3}<(p|h[1-3])\s+style\s*=\s*(["'])\s*text-align\s*:\s*(center|right|justify)\s*;?\s*\2\s*>\s*$/i;
-const CLOSING_LINE = /^ {0,3}<\/(p|h[1-3])\s*>\s*$/i;
+const OPENING_LINE = /^ {0,3}<(p|h[1-3]|div)\s+style\s*=\s*(["'])\s*text-align\s*:\s*(center|right|justify)\s*;?\s*\2\s*>\s*$/i;
+const CLOSING_LINE = /^ {0,3}<\/(p|h[1-3]|div)\s*>\s*$/i;
+/** A plain `<p>words</p>` line inside a split `p` or `div`. */
+const PLAIN_PARAGRAPH = /^<p\s*>(.*)<\/p\s*>$/i;
 /** A heading inside an aligned `p`: `<h2>words</h2>`, or `## words`. */
 const INNER_HEADING = /^<(h[1-3])\s*>(.*)<\/\1\s*>$/i;
 const HASH_HEADING = /^(#{1,3})\s+(.*)$/;
@@ -190,9 +198,10 @@ function oneAlignedLine(line: string): string {
   if (!match || !match[5]) return line;
   const tag = match[1].toLowerCase();
   const align = match[3].toLowerCase();
-  if (tag === 'p') {
+  if (tag === 'p' || tag === 'div') {
     const heading = headingInside(match[4]);
-    return heading ? alignedLine(heading[0], align, heading[1]) : line;
+    if (heading) return alignedLine(heading[0], align, heading[1]);
+    return tag === 'div' ? alignedLine('p', align, match[4]) : line;
   }
   return alignedLine(tag, align, match[4].replace(/^\s*#{1,3}\s+/, ''));
 }
@@ -200,12 +209,16 @@ function oneAlignedLine(line: string): string {
 /** A split block's lines, as one-line aligned blocks; `null` when one is a tag of its own. */
 function splitBlockLines(tag: string, align: string, inner: readonly string[]): string[] | null {
   const lines = inner.map((line) => line.trim()).filter(Boolean);
-  if (lines.some((line) => TAG_LINE.test(line))) return null;
+  const paragraphs = tag === 'p' || tag === 'div';
+  // A plain heading or paragraph line is allowed inside a split `p` or `div`; any other tag line keeps the block text.
+  const allowed = (line: string) => paragraphs && (INNER_HEADING.test(line) || PLAIN_PARAGRAPH.test(line));
+  if (lines.some((line) => TAG_LINE.test(line) && !allowed(line))) return null;
   if (lines.length === 0) return [];
-  if (tag !== 'p') return [alignedLine(tag, align, lines.map((line) => line.replace(/^#{1,3}\s+/, '')).join('<br>'))];
+  if (!paragraphs) return [alignedLine(tag, align, lines.map((line) => line.replace(/^#{1,3}\s+/, '')).join('<br>'))];
   return lines.map((line) => {
     const heading = headingInside(line);
-    return heading ? alignedLine(heading[0], align, heading[1]) : alignedLine('p', align, line);
+    if (heading) return alignedLine(heading[0], align, heading[1]);
+    return alignedLine('p', align, PLAIN_PARAGRAPH.exec(line)?.[1] ?? line);
   });
 }
 
@@ -284,7 +297,7 @@ function inlineMarkdown(words: string, font: DraftFont): JSONContent[] {
 function inlinePart(words: string, font: DraftFont): JSONContent[] {
   const root = parser.runSync(parser.parse(words)) as Root;
   const first = root.children[0];
-  if (root.children.length === 1 && first.type === 'paragraph') return inline(first.children, font);
+  if (root.children.length === 1 && first.type === 'paragraph') return inline(first.children, font, [], true);
   const text = root.children.map(textOf).join(' ');
   return text ? [textNode(text, [], font)] : [];
 }
@@ -360,28 +373,51 @@ function table(node: Table, font: DraftFont): JSONContent {
  * along the siblings: an open pushes, a close pops, and a close with nothing
  * open is dropped.
  */
-function inline(nodes: readonly PhrasingContent[], outer: DraftFont, marks: readonly Mark[] = []): JSONContent[] {
+/**
+ * `<strong>`, `<b>`, `<em>`, `<i>` and `<u>` with no attributes, opening or
+ * closing: read as marks inside an aligned line only (`tags`). One left open
+ * marks the rest of the line.
+ */
+const MARK_TAG = /^<(\/?)(strong|b|em|i|u)\s*>$/i;
+const TAG_MARK: Record<string, Mark['type']> = { strong: 'bold', b: 'bold', em: 'italic', i: 'italic', u: 'underline' };
+
+function inline(nodes: readonly PhrasingContent[], outer: DraftFont, outerMarks: readonly Mark[] = [], tags = false): JSONContent[] {
   const fonts: DraftFont[] = [outer];
   const font = () => fonts[fonts.length - 1];
+  // Marks opened by a tag and not yet closed, on everything after them.
+  const opened: Mark[] = [];
+  const marks = () => [...outerMarks, ...opened];
   return nodes.flatMap((node): JSONContent[] => {
     switch (node.type) {
       case 'text':
-        return node.value ? [textNode(node.value, marks, font())] : [];
+        return node.value ? [textNode(node.value, marks(), font())] : [];
       case 'strong':
-        return inline(node.children, font(), [...marks, { type: 'bold' }]);
+        return inline(node.children, font(), [...marks(), { type: 'bold' }], tags);
       case 'emphasis':
-        return inline(node.children, font(), [...marks, { type: 'italic' }]);
+        return inline(node.children, font(), [...marks(), { type: 'italic' }], tags);
       case 'delete':
-        return inline(node.children, font(), [...marks, { type: 'strike' }]);
+        return inline(node.children, font(), [...marks(), { type: 'strike' }], tags);
       case 'inlineCode':
-        return node.value ? [textNode(node.value, [...marks, { type: 'code' }], NO_FONT)] : [];
+        return node.value ? [textNode(node.value, [...marks(), { type: 'code' }], NO_FONT)] : [];
       case 'link':
-        return inline(node.children, font(), [...marks, { type: 'link', attrs: { href: node.url } }]);
+        return inline(node.children, font(), [...marks(), { type: 'link', attrs: { href: node.url } }], tags);
       case 'break':
         return [{ type: 'hardBreak' }];
       case 'image':
-        return node.alt ? [textNode(node.alt, marks, font())] : [];
+        return node.alt ? [textNode(node.alt, marks(), font())] : [];
       case 'html': {
+        const tag = tags ? MARK_TAG.exec(node.value.trim()) : null;
+        if (tag) {
+          const type = TAG_MARK[tag[2].toLowerCase()];
+          if (!tag[1]) {
+            opened.push({ type });
+          } else {
+            // A closing tag ends the latest of its kind; a stray one is dropped (woz 2fe1cc54).
+            const at = opened.findLastIndex((mark) => mark.type === type);
+            if (at >= 0) opened.splice(at, 1);
+          }
+          return [];
+        }
         const open = SPAN_OPEN.exec(node.value.trim());
         if (open) {
           fonts.push(spanFont(open[1], font()));
@@ -391,10 +427,10 @@ function inline(nodes: readonly PhrasingContent[], outer: DraftFont, marks: read
           if (fonts.length > 1) fonts.pop();
           return [];
         }
-        return node.value ? [textNode(node.value, marks, font())] : [];
+        return node.value ? [textNode(node.value, marks(), font())] : [];
       }
       default:
-        return textOf(node) ? [textNode(textOf(node), marks, font())] : [];
+        return textOf(node) ? [textNode(textOf(node), marks(), font())] : [];
     }
   });
 }

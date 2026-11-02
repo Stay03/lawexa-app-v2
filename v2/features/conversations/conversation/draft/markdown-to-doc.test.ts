@@ -188,7 +188,7 @@ test('anything outside the agreed shape stays text, as before', () => {
     '<p style="text-align: center; color: red">TEST DATA</p>',
     '<p class="x" style="text-align: center">TEST DATA</p>',
     '<h4 style="text-align: center">TEST DATA</h4>',
-    '<div style="text-align: center">TEST DATA</div>',
+    '<section style="text-align: center">TEST DATA</section>',
   ]) {
     const doc = markdownToDoc(`${line}\n\nAfter.`);
     assert.deepEqual(doc.content?.[0], { type: 'paragraph', content: [{ type: 'text', text: line }] }, line);
@@ -247,7 +247,7 @@ test('anything else around an aligned block stays text', () => {
   text('<p><h2 style="text-align: center">TEST DATA</h2></p>');
   // An h4 inside an aligned p stays its words as typed, as before.
   assert.deepEqual(markdownToDoc('<p style="text-align: center"><h4>TEST DATA</h4></p>').content, [centred(words('<h4>TEST DATA</h4>'))]);
-  text('<p style="text-align: center">\n<p>TEST DATA</p>\n</p>');
+  text('<p style="text-align: center">\n<p class="x">TEST DATA</p>\n</p>');
   text('<p style="text-align: center">\n<div>TEST DATA</div>\n</p>');
   // No closing tag, with more of the draft after it.
   assert.equal(markdownToDoc('<p style="text-align: center">\n## TEST\n\nDATA').content?.some((node) => node.attrs?.textAlign), false);
@@ -290,4 +290,78 @@ test('a line holding only <br>s is a gap, one empty paragraph (woz d3643d84)', (
   assert.equal(markdownToDoc('TEST\n\n    <br>').content?.[1].type, 'codeBlock');
   // A <br> with words beside it is not a gap.
   assert.equal(markdownToDoc('<br> TEST').content?.some((node) => !node.content), false);
+});
+
+/* Drafts judged HTML by a stray aligned line (Techlead ee4398e5; Tester's run
+ * 2, b8417987; shapes 1966bfb1 and woz d03f0a6f). */
+
+const body = { type: 'paragraph', content: [{ type: 'text', text: 'TEST DATA resolution', marks: [{ type: 'bold' }] }, ...words(' passed.')] };
+
+test('bold, italic and underline tags inside an aligned line are marks, and the body below stays Markdown', () => {
+  // Tester's run 2 shape.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><strong>TEST DATA Ltd</strong></p>\n **TEST DATA resolution** passed.').content, [
+    centred([{ type: 'text', text: 'TEST DATA Ltd', marks: [{ type: 'bold' }] }]),
+    body,
+  ]);
+  assert.deepEqual(markdownToDoc('<h2 style="text-align: center"><B>TEST</B> <i>DATA</i> <U>Ltd</U></h2>').content, [
+    centredHeading(2, [
+      { type: 'text', text: 'TEST', marks: [{ type: 'bold' }] },
+      ...words(' '),
+      { type: 'text', text: 'DATA', marks: [{ type: 'italic' }] },
+      ...words(' '),
+      { type: 'text', text: 'Ltd', marks: [{ type: 'underline' }] },
+    ]),
+  ]);
+  // Nested, with Markdown and a line break inside.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><em>A. <strong>TEST</strong><br>*Director*</em></p>').content, [
+    centred([
+      { type: 'text', text: 'A. ', marks: [{ type: 'italic' }] },
+      { type: 'text', text: 'TEST', marks: [{ type: 'italic' }, { type: 'bold' }] },
+      { type: 'hardBreak' },
+      { type: 'text', text: 'Director', marks: [{ type: 'italic' }, { type: 'italic' }] },
+    ]),
+  ]);
+});
+
+test('an open mark tag marks the rest of the line; with attributes or outside an aligned line, tags stay text', () => {
+  const bold = [{ type: 'bold' }];
+  assert.deepEqual(markdownToDoc('<p style="text-align: center">TEST <strong>DATA</p>').content, [
+    centred([...words('TEST '), { type: 'text', text: 'DATA', marks: bold }]),
+  ]);
+  // A stray closing tag is dropped.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><b>TEST</i> DATA</b></p>').content, [
+    centred([
+      { type: 'text', text: 'TEST', marks: bold },
+      { type: 'text', text: ' DATA', marks: bold },
+    ]),
+  ]);
+  // An opening tag with an attribute stays text; its closing tag is then a stray one, dropped.
+  assert.deepEqual(markdownToDoc('<p style="text-align: center"><b class="x">TEST</b></p>').content, [
+    centred([...words('<b class="x">'), ...words('TEST')]),
+  ]);
+  assert.deepEqual(markdownToDoc('TEST <strong>DATA</strong>').content, [
+    { type: 'paragraph', content: [...words('TEST '), ...words('<strong>'), ...words('DATA'), ...words('</strong>')] },
+  ]);
+  // An extra attribute on the aligned tag keeps the line text; the body below stays Markdown.
+  const extra = markdownToDoc('<h2 style="text-align: center" class="title">TEST</h2>\n\n **TEST DATA resolution** passed.').content;
+  assert.equal(extra?.[0].attrs?.textAlign, undefined);
+  assert.deepEqual(extra?.[1], body);
+});
+
+test('an aligned div reads as an aligned p, on one line or split, with plain heading and p lines inside', () => {
+  assert.deepEqual(markdownToDoc('<div style="text-align: center">**TEST** DATA</div>').content, [
+    centred([{ type: 'text', text: 'TEST', marks: [{ type: 'bold' }] }, ...words(' DATA')]),
+  ]);
+  // woz's div wrapper around the title block.
+  assert.deepEqual(
+    markdownToDoc('<div style="text-align: center">\n<h2>TEST DATA RESOLUTION</h2>\n<p>TEST DATA Ltd</p>\n## Minutes\nOf the board\n</div>\n\n **TEST DATA resolution** passed.').content,
+    [centredHeading(2, words('TEST DATA RESOLUTION')), centred(words('TEST DATA Ltd')), centredHeading(2, words('Minutes')), centred(words('Of the board')), body],
+  );
+  // The same plain lines inside a split p; a line with attributes keeps the block text.
+  assert.deepEqual(markdownToDoc('<p style="text-align: right">\n<h3>TEST</h3>\n</p>').content, [
+    { type: 'heading', attrs: { level: 3, textAlign: 'right' }, content: words('TEST') },
+  ]);
+  assert.equal(markdownToDoc('<div style="text-align: center">\n<p class="x">TEST</p>\n</div>').content?.some((node) => node.attrs?.textAlign), false);
+  // While streaming, a div's opening tag shows nothing yet.
+  assert.deepEqual(markdownToDoc('TEST.\n\n<div style="text-al').content, [{ type: 'paragraph', content: words('TEST.') }]);
 });
