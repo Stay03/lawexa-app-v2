@@ -3,6 +3,7 @@ import type {
   AmbassadorFinancialRow,
   MoneyByCurrency,
 } from '@/types/ambassador';
+import { quizzesOf, spacesOf } from './created-content';
 
 /**
  * The list behind the ambassador financials table: joining, searching,
@@ -244,7 +245,7 @@ export function facetOptions(
 
 /* ── Sorting ──────────────────────────────────────────────────────────────── */
 
-export type SortColumn = 'referred_count' | 'paid_count' | 'gifted_messages' | 'revenue';
+export type SortColumn = 'referred_count' | 'paid_count' | 'gifted_messages' | 'revenue' | 'spaces' | 'quizzes';
 
 export interface SortState {
   column: SortColumn;
@@ -333,6 +334,9 @@ export function sortRows(rows: FinancialsRow[], sort: SortState | null): Financi
     }
 
     if (sort.column === 'revenue') return 0;
+    // Spaces and quizzes rank by how many were made (`created-content.ts`).
+    if (sort.column === 'spaces') return factor * (spacesOf(a.spaces).count - spacesOf(b.spaces).count);
+    if (sort.column === 'quizzes') return factor * (quizzesOf(a.quizzes).count - quizzesOf(b.quizzes).count);
     return factor * (a[sort.column] - b[sort.column]);
   });
 }

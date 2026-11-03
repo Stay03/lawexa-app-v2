@@ -7,6 +7,8 @@ import {
   CalendarClock,
   Download,
   Gift,
+  LayoutGrid,
+  ListChecks,
   Loader2,
   UserRound,
   Users,
@@ -29,6 +31,13 @@ import {
   type ObservabilityColumn,
 } from '@/components/admin/observability';
 import { currencySymbol, moneyLines } from '@/components/admin/ambassadors/money';
+import {
+  createdContentRows,
+  memberLabel,
+  playLabel,
+  quizzesOf,
+  spacesOf,
+} from '@/components/admin/ambassadors/created-content';
 import { FinancialsFilterBar } from '@/components/admin/ambassadors/FinancialsFilterBar';
 import { SortButton, SortIcon } from '@/components/admin/ambassadors/SortButton';
 import {
@@ -106,6 +115,13 @@ import type { AmbassadorFinancialRow } from '@/types/ambassador';
  * last 7 days", not "last 7 days". The counts and the money stay all-time
  * whatever is chosen, and the filter bar repeats that in words when a window is
  * on.
+ *
+ * ── WHAT THE REFERRALS MADE ────────────────────────────────────────────────
+ * Arthur's option A (via Richard, 3 November 2026): beside the money, the
+ * Spaces the referred people created, with their members, and the quizzes
+ * they created, with their plays (`created-content.ts`). A count opens the
+ * ambassador's detail, which lists them under the signups by day; the flag's
+ * button opens the same detail.
  */
 
 const AMBASSADOR_COLUMN: ObservabilityColumn = { key: 'ambassador', label: 'Ambassador' };
@@ -186,62 +202,138 @@ function SpentHeader({
   );
 }
 
-/** The evidence behind the flag, on demand. */
-function DailySignupsDialog({
+/** A count that opens the ambassador's detail, or a plain zero. */
+function CountCell({
+  count,
+  detail,
+  label,
+  onOpen,
+}: {
+  count: number;
+  detail: string;
+  label: string;
+  onOpen: () => void;
+}) {
+  if (count === 0) return <span className="text-muted-foreground tabular-nums">0</span>;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="-mr-2 h-auto flex-col items-end gap-0 px-2 py-1 font-normal"
+      aria-label={`${count} ${label}, ${detail}. Show them`}
+      onClick={onOpen}
+    >
+      <span className="tabular-nums">{count}</span>
+      <span className="text-xs text-muted-foreground">{detail}</span>
+    </Button>
+  );
+}
+
+/** One of the detail's lists: a heading, then the rows or a line saying there are none. */
+function DetailSection({
+  title,
+  pending,
+  empty,
+  rows,
+}: {
+  title: string;
+  pending: boolean;
+  empty: string;
+  rows: { key: string; name: string; value: string }[];
+}) {
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-medium">{title}</h3>
+      {pending ? (
+        <div className="flex items-center py-3 text-sm text-muted-foreground">
+          <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />
+          Loading
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="py-3 text-sm text-muted-foreground">{empty}</p>
+      ) : (
+        <ul className="max-h-60 space-y-1 overflow-y-auto">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm odd:bg-muted/40"
+            >
+              <span className="min-w-0 truncate">{row.name}</span>
+              <span className="shrink-0 tabular-nums">{row.value}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * An ambassador's detail, on demand: the signups by day (the evidence behind
+ * the flag), then the Spaces and quizzes their referrals made.
+ */
+function AmbassadorDetailDialog({
   row,
   onOpenChange,
 }: {
   row: AmbassadorFinancialRow | null;
   onOpenChange: (open: boolean) => void;
 }) {
-  const query = useQuery({
+  const signups = useQuery({
     queryKey: ['ambassador-daily-signups', row?.user_uuid],
     queryFn: () => adminAmbassadorsApi.getDailySignups(row!.user_uuid, 30),
     enabled: row !== null,
   });
+  const content = useQuery({
+    queryKey: ['ambassador-created-content', row?.user_uuid],
+    queryFn: () => adminAmbassadorsApi.getCreatedContent(row!.user_uuid),
+    enabled: row !== null,
+  });
 
-  const days = query.data?.data?.signups ?? [];
+  const days = signups.data?.data?.signups ?? [];
+  const made = createdContentRows(content.data?.data);
 
   return (
     <Dialog open={row !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{row?.name}</DialogTitle>
           <DialogDescription>
-            Signups by day, newest first. Only days with signups are listed.
+            Signups by day, then what the people they referred have made. Newest first.
           </DialogDescription>
         </DialogHeader>
-        {query.isPending ? (
-          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            <Loader2 aria-hidden className="mr-2 size-4 animate-spin" />
-            Loading
-          </div>
-        ) : days.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            No signups in the last 30 days.
-          </p>
-        ) : (
-          <ul className="max-h-80 space-y-1 overflow-y-auto">
-            {days.map((day) => (
-              <li
-                key={day.date}
-                className="flex items-center justify-between rounded-lg px-3 py-2 text-sm odd:bg-muted/40"
-              >
-                <span>{dayLabel(day.date)}</span>
-                <span className="tabular-nums">
-                  {day.signups === 1 ? '1 person' : `${day.signups} people`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="space-y-5">
+          <DetailSection
+            title="Signups by day"
+            pending={signups.isPending}
+            empty="No signups in the last 30 days."
+            rows={days.map((day) => ({
+              key: day.date,
+              name: dayLabel(day.date),
+              value: day.signups === 1 ? '1 person' : `${day.signups} people`,
+            }))}
+          />
+          <DetailSection
+            title="Spaces their referrals created"
+            pending={content.isPending}
+            empty={content.isError ? 'The Spaces did not load. Close and open this again.' : 'None yet.'}
+            rows={made.spaces.map((space) => ({ key: space.uuid, name: space.name, value: space.detail }))}
+          />
+          <DetailSection
+            title="Quizzes their referrals created"
+            pending={content.isPending}
+            empty={content.isError ? 'The quizzes did not load. Close and open this again.' : 'None yet.'}
+            rows={made.quizzes.map((quiz) => ({ key: quiz.uuid, name: quiz.title, value: quiz.detail }))}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
 
 export default function AmbassadorFinancialsPage() {
-  const [evidenceFor, setEvidenceFor] = useState<AmbassadorFinancialRow | null>(null);
+  const [detailFor, setDetailFor] = useState<AmbassadorFinancialRow | null>(null);
   const [filters, setFilters] = useState<FinancialsFilters>(NO_FILTERS);
   const [sort, setSort] = useState<SortState | null>(null);
 
@@ -341,6 +433,16 @@ export default function AmbassadorFinancialsPage() {
         ),
         className: 'text-right',
       },
+      {
+        key: 'spaces',
+        label: <SortHeader label="Their referrals' Spaces" sort={sort} column="spaces" onSort={toggleSort} />,
+        className: 'text-right',
+      },
+      {
+        key: 'quizzes',
+        label: <SortHeader label="Their referrals' quizzes" sort={sort} column="quizzes" onSort={toggleSort} />,
+        className: 'text-right',
+      },
       ACTIVITY_COLUMN,
     ],
     [currencies, sort, toggleSort]
@@ -354,9 +456,11 @@ export default function AmbassadorFinancialsPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {query.isPending || !totals ? (
             <>
+              <SummaryStatCardSkeleton />
+              <SummaryStatCardSkeleton />
               <SummaryStatCardSkeleton />
               <SummaryStatCardSkeleton />
               <SummaryStatCardSkeleton />
@@ -391,6 +495,18 @@ export default function AmbassadorFinancialsPage() {
                     : 'Referrals have spent nothing yet'
                 }
               />
+              <SummaryStatCard
+                icon={LayoutGrid}
+                label="Their referrals' Spaces"
+                value={spacesOf(totals.spaces).count}
+                hint={memberLabel(spacesOf(totals.spaces).members)}
+              />
+              <SummaryStatCard
+                icon={ListChecks}
+                label="Their referrals' quizzes"
+                value={quizzesOf(totals.quizzes).count}
+                hint={playLabel(quizzesOf(totals.quizzes).plays)}
+              />
             </>
           )}
         </div>
@@ -399,7 +515,7 @@ export default function AmbassadorFinancialsPage() {
             broken. */}
         {filtering && (
           <p className="text-xs text-muted-foreground">
-            These four count every ambassador. The filters below apply to the table.
+            These six count every ambassador. The filters below apply to the table.
           </p>
         )}
       </div>
@@ -442,6 +558,8 @@ export default function AmbassadorFinancialsPage() {
           >
             {visible.map((row) => {
               const spent = moneyLines(row.revenue);
+              const spaces = spacesOf(row.spaces);
+              const quizzes = quizzesOf(row.quizzes);
               const profile = [row.university, row.level, row.country]
                 .filter(Boolean)
                 .join(' · ');
@@ -493,6 +611,22 @@ export default function AmbassadorFinancialsPage() {
                   <TableCell className="text-right tabular-nums">
                     {row.gifted_messages}
                   </TableCell>
+                  <TableCell className="text-right">
+                    <CountCell
+                      count={spaces.count}
+                      detail={memberLabel(spaces.members)}
+                      label="Spaces"
+                      onOpen={() => setDetailFor(row)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <CountCell
+                      count={quizzes.count}
+                      detail={playLabel(quizzes.plays)}
+                      label="quizzes"
+                      onOpen={() => setDetailFor(row)}
+                    />
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
@@ -509,7 +643,7 @@ export default function AmbassadorFinancialsPage() {
                           variant="ghost"
                           size="sm"
                           className="h-7 gap-1.5 px-2 text-xs text-muted-foreground"
-                          onClick={() => setEvidenceFor(row)}
+                          onClick={() => setDetailFor(row)}
                         >
                           <CalendarClock aria-hidden className="size-3.5" />
                           {row.busiest_day.signups} in a day
@@ -524,10 +658,10 @@ export default function AmbassadorFinancialsPage() {
         </CardContent>
       </Card>
 
-      <DailySignupsDialog
-        row={evidenceFor}
+      <AmbassadorDetailDialog
+        row={detailFor}
         onOpenChange={(open) => {
-          if (!open) setEvidenceFor(null);
+          if (!open) setDetailFor(null);
         }}
       />
     </div>

@@ -1,3 +1,4 @@
+import { quizzesOf, spacesOf } from './created-content';
 import type { FinancialsRow } from './financials';
 
 /**
@@ -157,6 +158,10 @@ export function financialsCsv(rows: FinancialsRow[], currencies: string[]): stri
     'Ever paid',
     ...currencies.map((code) => `Their referrals spent (${code})`),
     'Free messages given',
+    "Their referrals' Spaces",
+    'Members in those Spaces',
+    "Their referrals' quizzes",
+    'Plays of those quizzes',
     'Last referral',
     'Busiest day',
     'Most signups in a day',
@@ -175,6 +180,10 @@ export function financialsCsv(rows: FinancialsRow[], currencies: string[]): stri
       row.paid_count,
       ...currencies.map((code) => csvAmount(row.revenue?.[code])),
       row.gifted_messages,
+      spacesOf(row.spaces).count,
+      spacesOf(row.spaces).members,
+      quizzesOf(row.quizzes).count,
+      quizzesOf(row.quizzes).plays,
       localDayOf(row.last_referral_at),
       localDayOf(row.busiest_day?.date ?? null),
       row.busiest_day?.signups ?? 0,

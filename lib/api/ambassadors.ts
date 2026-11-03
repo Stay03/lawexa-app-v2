@@ -4,6 +4,7 @@ import type {
   AmbassadorApplication,
   AmbassadorCodeState,
   AmbassadorDailySignup,
+  AmbassadorCreatedContent,
   AmbassadorFinancials,
   AmbassadorListParams,
   AmbassadorPerformance,
@@ -131,6 +132,14 @@ export const adminAmbassadorsApi = {
     const response = await apiClient.get<
       ApiResponse<{ days: number; signups: AmbassadorDailySignup[] }>
     >(`/admin/ambassadors/${userUuid}/daily-signups`, { params: { days } });
+    return response.data;
+  },
+
+  /** The Spaces and quizzes this ambassador's referrals made, newest first. */
+  getCreatedContent: async (userUuid: string): Promise<ApiResponse<AmbassadorCreatedContent>> => {
+    const response = await apiClient.get<ApiResponse<AmbassadorCreatedContent>>(
+      `/admin/ambassadors/${userUuid}/created-content`
+    );
     return response.data;
   },
 };

@@ -178,6 +178,21 @@ export interface AmbassadorFinancialRow {
   last_referral_at: string | null;
   busiest_day: BusiestDay;
   unusual_activity: boolean;
+  /** What the people this ambassador referred have made (Arthur's option A,
+   *  3 November 2026): Spaces with their members, quizzes with their plays.
+   *  Zeros when none; absent on a server from before it. */
+  spaces?: AmbassadorSpaceTally;
+  quizzes?: AmbassadorQuizTally;
+}
+
+export interface AmbassadorSpaceTally {
+  count: number;
+  members: number;
+}
+
+export interface AmbassadorQuizTally {
+  count: number;
+  plays: number;
 }
 
 export interface AmbassadorFinancialTotals {
@@ -186,11 +201,22 @@ export interface AmbassadorFinancialTotals {
   paid_count: number;
   revenue: MoneyByCurrency;
   gifted_messages: number;
+  spaces?: AmbassadorSpaceTally;
+  quizzes?: AmbassadorQuizTally;
 }
 
 export interface AmbassadorFinancials {
   ambassadors: AmbassadorFinancialRow[];
   totals: AmbassadorFinancialTotals;
+}
+
+/**
+ * The Spaces and quizzes an ambassador's referrals made, newest first
+ * (`GET /admin/ambassadors/{user_uuid}/created-content`, admin only).
+ */
+export interface AmbassadorCreatedContent {
+  spaces: { uuid: string; name: string; members: number; created_at: string }[];
+  quizzes: { uuid: string; title: string; plays: number; created_at: string }[];
 }
 
 /** One day on an ambassador's record — the evidence behind the flag. */
