@@ -7,6 +7,7 @@
  *   draft:3          the chat's fourth draft (0-based, in transcript order)
  *   file:812         a file by id
  *   note:my-note     a note by slug
+ *   machine:live     Lawexa's machine (Userbox v1, staff)
  *
  * A draft is named by its PLACE among the chat's drafts, not by its message
  * id: an answer streamed in this visit carries a local id and the same answer
@@ -16,7 +17,8 @@
 export type SidePanelTarget =
   | { kind: 'draft'; ordinal: number }
   | { kind: 'file'; id: number }
-  | { kind: 'note'; slug: string };
+  | { kind: 'note'; slug: string }
+  | { kind: 'machine' };
 
 export const SIDE_PANEL_PARAM = 'side';
 
@@ -28,6 +30,8 @@ export function sidePanelValue(target: SidePanelTarget): string {
       return `file:${target.id}`;
     case 'note':
       return `note:${encodeURIComponent(target.slug)}`;
+    case 'machine':
+      return 'machine:live';
   }
 }
 
@@ -53,5 +57,6 @@ export function parseSidePanelValue(value: string | null): SidePanelTarget | nul
     }
     return slug ? { kind, slug } : null;
   }
+  if (kind === 'machine') return rest === 'live' ? { kind } : null;
   return null;
 }

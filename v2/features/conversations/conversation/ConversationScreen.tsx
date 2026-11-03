@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -33,6 +34,7 @@ import { draftVersion, draftVersionIndex } from './draft/draft-versions';
 import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
 import { useSidePanelHost } from './side-panel/side-panel-host';
 import { SidePanelSlot } from './side-panel/SidePanelSlot';
+import type { UserBoxDoneResult } from '@/types/user-box';
 import { useScreenHold } from '@/v2/runtime/screen-hold';
 
 /** The composer's height, read by the transcript's bottom padding and the
@@ -110,6 +112,21 @@ export function ConversationScreen({
   const onDraftEditLine = useCallback(
     (answer: DraftEditLineFields) => applyDraftEditLine({ upsertEvent, removeEvent }, answer),
     [upsertEvent, removeEvent],
+  );
+  // Done on Lawexa's machine continued a chat (Userbox v1): follow its new
+  // turn here, or open the chat it continued.
+  const router = useRouter();
+  const { followResumedTurn } = controller;
+  const onMachineResumed = useCallback(
+    (result: UserBoxDoneResult) => {
+      if (!result.execution_id) return;
+      if (result.conversation_uuid && result.conversation_uuid !== conversationId) {
+        router.push(`/c/${result.conversation_uuid}`);
+        return;
+      }
+      followResumedTurn(result.execution_id);
+    },
+    [conversationId, followResumedTurn, router],
   );
   // An answer being written: nothing pops up over it (screen-hold.ts).
   useScreenHold(isStreaming);
@@ -438,7 +455,7 @@ export function ConversationScreen({
           >
             {transcript}
             {panelHost.element && !isLoadingHistory
-              ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} />, panelHost.element)
+              ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />, panelHost.element)
               : null}
           </SidePanelValueProvider>
         ) : (
@@ -448,7 +465,7 @@ export function ConversationScreen({
         <SidePanelProvider offsets={offsets} versions={draftVersions} space={controller.space}>
           <div className="flex h-full min-h-0">
             {transcript}
-            <SidePanelSlot messages={messages} streamingText={streamingText} />
+            <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />
           </div>
         </SidePanelProvider>
       )}

@@ -28,6 +28,9 @@ export function presenceChannelName(channelUuid: string): string {
 /** `.channel.unread` — the unread/mention count event on `users.{uuid}`. */
 export const EVT_CHANNEL_UNREAD = '.channel.unread';
 
+/** `.userbox.control` — control of Lawexa's machine moved (Userbox v1), on `users.{uuid}`. */
+export const EVT_USERBOX_CONTROL = '.userbox.control';
+
 /**
  * Payload of {@link EVT_CHANNEL_UNREAD}. Counts are ABSOLUTE, recomputed
  * server-side — assign, never increment (digest §D). No message content ever

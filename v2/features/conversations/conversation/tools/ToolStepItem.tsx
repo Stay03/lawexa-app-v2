@@ -28,6 +28,8 @@ import {
 import type { ToolMessage } from '@/types/chat';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 import { failedStepLine, stepFailed } from './step-failure';
+import { isBoxTool } from '@/v2/features/userbox/machine-model';
+import { OpenMachineButton } from '@/v2/features/userbox/OpenMachineButton';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -293,6 +295,16 @@ function ToolStepBody({
 }) {
   const createdNote = extractCreatedNote(message);
   if (createdNote) return <NoteLinkCard note={createdNote} />;
+
+  // A step on Lawexa's machine (Userbox v1): its details, and the way to watch it.
+  if (isBoxTool(message.toolName)) {
+    return (
+      <>
+        <ToolCallDetails message={message} />
+        <OpenMachineButton />
+      </>
+    );
+  }
 
   if (extractStatuteData(message)) {
     return <StatuteResultsDisplay message={message} />;

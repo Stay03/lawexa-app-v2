@@ -308,6 +308,8 @@ export interface ConversationController {
    * confidential/redacted marks, refreshes the recents, and navigates home.
    */
   deleteConfidential: () => Promise<void>;
+  /** Follow a turn the server started for this chat (Done on Lawexa's machine, Userbox v1). */
+  followResumedTurn: (executionId: string) => void;
 }
 
 /**
@@ -949,6 +951,14 @@ export function useConversationController(
     [queryClient, detailKey, adoptConversationHistory, connectToStream, statusOptions, recoverPendingState, conversationId],
   );
 
+  // Done on Lawexa's machine started this chat's next turn (Userbox v1): follow it.
+  const followResumedTurn = useCallback(
+    (executionId: string) => {
+      void followTurn(executionId, () => liveRef.current === conversationId, true);
+    },
+    [followTurn, conversationId],
+  );
+
   // React to each new status read, once. An engine action and query calls,
   // no setState, so it is React-Compiler-clean in an effect.
   //  - A turn is running and this screen is idle: follow it (`followTurn`).
@@ -1201,5 +1211,6 @@ export function useConversationController(
     regenerate,
     canRegenerate,
     deleteConfidential,
+    followResumedTurn,
   };
 }

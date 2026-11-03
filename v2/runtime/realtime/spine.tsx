@@ -26,12 +26,15 @@ import {
   sumSpaceMentions,
 } from '@/v2/features/spaces/cache';
 import { SPACES_BASELINE_PARAMS, spacesQueries } from '@/v2/features/spaces/queries';
+import { landUserBoxControl } from '@/v2/features/userbox/queries';
+import type { UserBoxControlEvent } from '@/types/user-box';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { resetAppBadge, setAppMentionBadge } from './app-badge';
 import { dispatchChannelUnread, type ResolvedChannelContext } from './dispatcher';
 import { disconnectV2Echo, getV2Echo } from './echo';
 import {
   EVT_CHANNEL_UNREAD,
+  EVT_USERBOX_CONTROL,
   userChannelName,
   type ChannelUnreadEvent,
 } from './protocol';
@@ -306,6 +309,13 @@ export function RealtimeSpine() {
       handleChannelUnread(queryClient, payload, viewerId, (href) =>
         router.push(href),
       );
+    });
+
+    // Lawexa's machine (Userbox v1): who drives it moved, so an open panel
+    // shows Take over or Lawexa's request and Done at once. Written into the
+    // read the panel holds; nothing is read when no panel is open.
+    channel.listen(EVT_USERBOX_CONTROL, (payload: UserBoxControlEvent) => {
+      landUserBoxControl(queryClient, payload);
     });
 
     // Reconnect gap recovery: between drop and re-establish, every event was
