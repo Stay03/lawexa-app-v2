@@ -320,6 +320,8 @@ interface ToolStepItemProps {
   isExpanded: boolean;
   onToggle: () => void;
   showSearchResults?: boolean;
+  /** In the chat's last answer: a machine hand-over shows "Open the machine and press Done". */
+  inLastAnswer?: boolean;
   className?: string;
 }
 
@@ -329,6 +331,7 @@ export function ToolStepItem({
   isExpanded,
   onToggle,
   showSearchResults = true,
+  inLastAnswer = false,
   className,
 }: ToolStepItemProps) {
   const isComplete = message.toolStatus === 'complete';
@@ -372,7 +375,8 @@ export function ToolStepItem({
   const zeroHint = isSuccess && isSearchLikeTool(message.toolName) && detectEmptyResult(message);
   const bodyId = useId();
   const boxStep = isBoxTool(message.toolName);
-  const handOver = message.toolName === HAND_OVER_TOOL && isComplete;
+  // Only in the chat's last answer: an older hand-over keeps the small button on its line.
+  const handOver = message.toolName === HAND_OVER_TOOL && isComplete && inLastAnswer;
 
   return (
     <div className={cn('relative pb-1', className)}>

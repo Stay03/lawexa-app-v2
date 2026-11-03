@@ -70,6 +70,19 @@ export function isLineGroup(group: MessageGroup): boolean {
  * written, "Ask again" and the working row all read this one, so a line under
  * the last answer changes none of them.
  */
+/**
+ * The last question's group, or -1 before any: the groups after it are the
+ * chat's last answer (Lawexa's machine hand-over shows its full button only
+ * there, Userbox v1).
+ */
+export function lastQuestionGroupIndex(groups: readonly MessageGroup[]): number {
+  for (let i = groups.length - 1; i >= 0; i -= 1) {
+    const group = groups[i];
+    if (group.type === 'single' && group.message.role === 'user') return i;
+  }
+  return -1;
+}
+
 export function lastTurnGroupIndex(groups: readonly MessageGroup[]): number {
   for (let i = groups.length - 1; i >= 0; i -= 1) {
     if (!isLineGroup(groups[i])) return i;

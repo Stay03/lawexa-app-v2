@@ -129,3 +129,18 @@ test('the open button sits on every machine step’s line, and the hand-over ste
   assert.ok(step.indexOf('<OpenMachineButton />') < step.indexOf('<StepCollapse'));
   assert.equal(isBoxTool('box_hand_to_user'), true);
 });
+
+test('the hand-over’s full button is for the chat’s last answer: the groups after its last question', async () => {
+  const { lastQuestionGroupIndex } = await import('@/v2/features/conversations/conversation/message-groups');
+  const user = { type: 'single', message: { role: 'user' } };
+  const answer = { type: 'single', message: { role: 'assistant' } };
+  const chain = { type: 'tool-chain', messages: [] };
+  const groups = [user, chain, answer, user, chain, answer] as unknown as Parameters<typeof lastQuestionGroupIndex>[0];
+  assert.equal(lastQuestionGroupIndex(groups), 3);
+  // Only the second chain (index 4) is after it.
+  assert.deepEqual([1, 4].map((gi) => gi > lastQuestionGroupIndex(groups)), [false, true]);
+  assert.equal(lastQuestionGroupIndex([] as unknown as Parameters<typeof lastQuestionGroupIndex>[0]), -1);
+  const { readFileSync } = await import('node:fs');
+  const step = readFileSync(new URL('../conversations/conversation/tools/ToolStepItem.tsx', import.meta.url), 'utf8');
+  assert.match(step, /message\.toolName === HAND_OVER_TOOL && isComplete && inLastAnswer/);
+});

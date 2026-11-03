@@ -40,6 +40,8 @@ import { chainSummaryLabel } from './chain-summary';
 interface CompactToolChainProps {
   messages: ToolMessage[];
   showSearchResults?: boolean;
+  /** The chain is in the chat's last answer: a hand-over of Lawexa's machine shows its full button. */
+  inLastAnswer?: boolean;
 }
 
 /** The fresh-step entrance — a soft fade + rise, reduced-motion-guarded. */
@@ -49,6 +51,7 @@ const STEP_REVEAL =
 export function CompactToolChain({
   messages,
   showSearchResults = true,
+  inLastAnswer = false,
 }: CompactToolChainProps) {
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
@@ -138,6 +141,7 @@ export function CompactToolChain({
                 isExpanded={expandedSteps.has(message.id)}
                 onToggle={() => toggleStep(message.id)}
                 showSearchResults={showSearchResults}
+                inLastAnswer={inLastAnswer}
               />
             ))}
           </div>
@@ -159,6 +163,7 @@ export function CompactToolChain({
           isExpanded={expandedSteps.has(currentMessage.id)}
           onToggle={() => toggleStep(currentMessage.id)}
           showSearchResults={showSearchResults}
+          inLastAnswer={inLastAnswer}
         />
       </div>
     </div>

@@ -26,7 +26,7 @@ import {
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
 import { turnRowCount } from '@/v2/runtime/turn-rows';
 import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
-import { groupMessages, isLineGroup, lastTurnGroupIndex, type MessageGroup } from './message-groups';
+import { groupMessages, isLineGroup, lastQuestionGroupIndex, lastTurnGroupIndex, type MessageGroup } from './message-groups';
 import { computeStreamStart } from './stream-start';
 import { splitOpenTail, type OpenTailLimit } from './open-tail';
 import { UserMessageRow } from './rows/UserMessageRow';
@@ -444,6 +444,8 @@ export function MessageList({
   // leaves the answer being written, its "Ask again" and the working row where
   // they were.
   const lastTurnIndex = lastTurnGroupIndex(groups);
+  // The groups after it are the chat's last answer.
+  const lastQuestionIndex = lastQuestionGroupIndex(groups);
   /** Off-screen groups are only estimated where the browser can keep the
    *  reader's place while the estimate is corrected. See the module. */
   const canAnchor = useScrollAnchoring();
@@ -762,6 +764,7 @@ export function MessageList({
                       // settles under them after the first paint.
                       virtualize={canAnchor && gi < lastGroupIndex - UNVIRTUALIZED_TAIL}
                       isLastGroup={gi === lastTurnIndex}
+                      inLastAnswer={gi > lastQuestionIndex}
                       hasLaterUserTurn={
                         group.type === 'single' &&
                         group.message.role === 'assistant' &&
@@ -899,6 +902,7 @@ const GroupRow = memo(function GroupRow({
   group,
   virtualize,
   isLastGroup,
+  inLastAnswer,
   hasLaterUserTurn,
   streamingText,
   reasoning,
@@ -920,6 +924,8 @@ const GroupRow = memo(function GroupRow({
   group: MessageGroup;
   virtualize: boolean;
   isLastGroup: boolean;
+  /** After the chat's last question: part of its last answer. */
+  inLastAnswer: boolean;
   hasLaterUserTurn: boolean;
   streamingText: StreamingSource;
   reasoning: StreamingSource;
@@ -969,7 +975,7 @@ const GroupRow = memo(function GroupRow({
     const fileSteps = steps.filter(isFileListStep);
     body = (
       <>
-        <CompactToolChain messages={steps} />
+        <CompactToolChain messages={steps} inLastAnswer={inLastAnswer} />
         <CreatedQuizCards steps={steps} />
         {fileSteps.map((step) => (
           <ChatFileListCard key={step.id} message={step} />
