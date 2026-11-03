@@ -98,6 +98,22 @@ test('a file named for several passages is one row, with every reason and the fi
   );
 });
 
+test("a file's row opens from its first item that names a passage, so the reader can step (review of 80428475)", () => {
+  const [row] = affectedRows([
+    // Radar gave the first no page: its link has no affected item.
+    { type: 'file', id: 7, name: 'TEST DATA lease.pdf', reason: 'Mentions the date.', url: '/spaces/s-1?tab=files&file=7', exists: true },
+    { type: 'file', id: 7, name: 'TEST DATA lease.pdf', reason: 'Clause 9 repeats it.', url: '/spaces/s-1?tab=files&file=7&page=8&affected=a-8', exists: true },
+  ]);
+  assert.equal(row.href, '/spaces/s-1?tab=files&file=7&page=8&affected=a-8');
+  assert.equal(row.detail, 'File · 2 passages');
+  // No item names a passage: the first one's link.
+  const [plain] = affectedRows([
+    { type: 'file', id: 9, name: 'b', reason: 'x', url: '/spaces/s-1?tab=files&file=9', exists: true },
+    { type: 'file', id: 9, name: 'b', reason: 'y', url: '/spaces/s-1?tab=files&file=9&page=2', exists: true },
+  ]);
+  assert.equal(plain.href, '/spaces/s-1?tab=files&file=9');
+});
+
 test('an affected item opens its page inside the app, and only an item page', () => {
   const [onAnotherHost, notAnItemPage, protocolRelative, broken] = affectedRows([
     { type: 'note', id: 1, name: 'a', reason: '', url: 'https://elsewhere.test/notes/a', exists: true },

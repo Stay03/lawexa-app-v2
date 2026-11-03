@@ -13,8 +13,11 @@ import type { RadarAffectedItem, RadarAffectedItemType } from '@/types/radar';
  * ONE ROW PER FILE (Arthur, 3 November 2026, option 2): a report can name the
  * same file for several passages, one item each. They are one row, at the
  * first one's place, with every reason under the name and how many passages
- * there are; its link is the first item's, whose read lists every passage of
- * that file, so the reader steps through them there (`SpaceLinkedFile`).
+ * there are. Its link is the first item's that names a passage (`&affected=`;
+ * the techlead's review of 80428475: an item Radar gave no page opens no
+ * read, and the stepper would never show), else the first item's; that read
+ * lists every passage of the file, so the reader steps through them there
+ * (`SpaceLinkedFile`).
  * Notes and chats keep a row each.
  *
  * Pure, so the test can run it; `AffectedItems.tsx` draws it.
@@ -44,7 +47,7 @@ export const AFFECTED_GONE = 'No longer in the Space';
 
 export function affectedRows(items: readonly RadarAffectedItem[] | undefined): AffectedRow[] {
   // The items in order, a file's later items folded into its first.
-  const groups: { item: RadarAffectedItem; index: number; reasons: string[] }[] = [];
+  const groups: { item: RadarAffectedItem; index: number; reasons: string[]; links: (string | null)[] }[] = [];
   const fileGroup = new Map<string, (typeof groups)[number]>();
   (items ?? []).forEach((item, index) => {
     const reason = item.reason?.trim() || '';
@@ -52,14 +55,15 @@ export function affectedRows(items: readonly RadarAffectedItem[] | undefined): A
     const known = fileKey === null ? undefined : fileGroup.get(fileKey);
     if (known) {
       known.reasons.push(reason);
+      known.links.push(itemPath(item.url));
       return;
     }
-    const group = { item, index, reasons: [reason] };
+    const group = { item, index, reasons: [reason], links: [itemPath(item.url)] };
     groups.push(group);
     if (fileKey !== null) fileGroup.set(fileKey, group);
   });
 
-  return groups.map(({ item, index, reasons }) => {
+  return groups.map(({ item, index, reasons, links }) => {
     const gone = !item.exists;
     const word = TYPE_WORDS[item.type] ?? 'Item';
     const several = reasons.length > 1;
@@ -70,10 +74,15 @@ export function affectedRows(items: readonly RadarAffectedItem[] | undefined): A
       name: item.name?.trim() || `Untitled ${word.toLowerCase()}`,
       detail: [word, gone ? AFFECTED_GONE : null, said].filter(Boolean).join(' · '),
       reasons: several ? reasons.filter(Boolean) : [],
-      href: gone ? null : itemPath(item.url),
+      href: gone ? null : (links.find(namesPassage) ?? links[0]),
       gone,
     };
   });
+}
+
+/** A file's link that opens it on a passage: it names the affected item. */
+function namesPassage(path: string | null): path is string {
+  return path !== null && new URLSearchParams(path.split('?')[1] ?? '').has('affected');
 }
 
 /** The three pages an item opens: a space's file card, a note, a chat. */
