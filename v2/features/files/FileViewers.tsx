@@ -9,7 +9,7 @@ import type { ViewerImage } from '@/v2/features/channels/feed/image-target';
 import type { PictureSource } from '@/v2/features/channels/feed/picture-source';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
 import { PdfViewerDialog } from './pdf/PdfViewerDialog';
-import type { FileViewer } from './use-file-viewer';
+import type { ShownFiles } from './use-file-viewer';
 import { ViewerMedia } from './ViewerMedia';
 import { pictureSetAt } from './viewable';
 
@@ -107,7 +107,8 @@ export function FileViewers({
   pictures,
   place,
 }: {
-  viewer: FileViewer;
+  /** What is open, from `useFileViewer`, or one linked file's own (`SpaceLinkedFile`). */
+  viewer: ShownFiles;
   /** The list's loaded viewable files, in its order (`listViewable`). */
   pictures: readonly ViewerImage[];
   place: FileListPlace;

@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 
-import { usePdfViewer, type PdfViewer } from './pdf/use-pdf-viewer';
+import { usePdfViewer, type PdfViewer, type ShownPdf } from './pdf/use-pdf-viewer';
 import { pictureTarget, type ViewKind } from './viewable';
 
 /**
@@ -34,6 +34,9 @@ export interface FileViewer {
   /** The open PDF, drawn by `FileViewers` as the reader's dialog. */
   pdf: PdfViewer;
 }
+
+/** What the viewers draw from (`FileViewers`): which file is open, and how it closes. */
+export type ShownFiles = Pick<FileViewer, 'picture' | 'setPicture' | 'returnTo'> & { pdf: ShownPdf };
 
 /** What `view` is told about a file. A PDF's type and size are for its
  *  dialog's Download and facts; a payload without a type gives a PDF's. */

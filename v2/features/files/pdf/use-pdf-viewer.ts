@@ -31,6 +31,9 @@ export interface PdfViewer {
   returnTo: HTMLElement | null;
 }
 
+/** What the reader's dialog draws from (`PdfViewerDialog`): the open PDF, and how it closes. */
+export type ShownPdf = Pick<PdfViewer, 'file' | 'close' | 'returnTo'>;
+
 export function usePdfViewer(): PdfViewer {
   const [file, setFile] = useState<PdfTarget | null>(null);
   const [returnTo, setReturnTo] = useState<HTMLElement | null>(null);

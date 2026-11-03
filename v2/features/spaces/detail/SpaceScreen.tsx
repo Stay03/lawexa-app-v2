@@ -27,6 +27,7 @@ import {
   type SpaceTab,
 } from '../model';
 import { CachedSpaceFrame } from './CachedSpaceFrame';
+import { parseLinkedFileId } from './content/linked-file';
 import { SpaceContentPanel } from './content/SpaceContentPanel';
 import { SPACE_PAGE_COLUMN, SPACE_PANE } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
@@ -120,6 +121,21 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     },
     [],
   );
+  // The file a link names (`&file=`, a Radar report's affected file; Arthur,
+  // 3 November 2026), opened over the pill. Held the same way as the tab, and
+  // taken out of the address once it closes or does not open.
+  const urlFile = searchParams.get('file');
+  const [fileParam, setFileParam] = useState<string | null>(urlFile);
+  const [seenUrlFile, setSeenUrlFile] = useState<string | null>(urlFile);
+  if (urlFile !== seenUrlFile) {
+    setSeenUrlFile(urlFile);
+    setFileParam(urlFile);
+  }
+  const linkedFileId = parseLinkedFileId(fileParam);
+  const closeLinkedFile = useCallback(() => {
+    setFileParam(null);
+    quietReplaceUrlParams({ file: null });
+  }, []);
   // Back and Forward restore the address but not this state (the quiet write
   // never told the router), so the tab is re-read from the address on each.
   useEffect(() => {
@@ -335,7 +351,13 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
           invitesSent={peopleReads ? pendingInvites.data?.pagination.total : undefined}
         />
 
-        <SpaceContentPanel space={space} tab={tab} onTabChange={setTab} />
+        <SpaceContentPanel
+          space={space}
+          tab={tab}
+          onTabChange={setTab}
+          linkedFileId={linkedFileId}
+          onLinkedFileClose={closeLinkedFile}
+        />
 
         <SpaceFormDialog
           key={panel.keyFor('edit')}

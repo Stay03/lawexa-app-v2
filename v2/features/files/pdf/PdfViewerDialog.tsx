@@ -14,7 +14,7 @@ import { useBackGuard } from '@/v2/runtime/use-back-guard';
 import { ScanReadingStatus } from '../ScanReadingStatus';
 import { pageCountLabel } from './pdf-model';
 import { PdfReader } from './PdfReader';
-import type { PdfViewer } from './use-pdf-viewer';
+import type { PdfViewer, ShownPdf } from './use-pdf-viewer';
 
 /**
  * PdfViewerDialog — the PDF reader's second host (the techlead, 24 October
@@ -38,7 +38,7 @@ import type { PdfViewer } from './use-pdf-viewer';
  * Escape and the scrim take the step first (`release`), so none leaves it
  * behind.
  */
-export function PdfViewerDialog({ viewer }: { viewer: PdfViewer }) {
+export function PdfViewerDialog({ viewer }: { viewer: ShownPdf }) {
   const backGuard = useBackGuard(viewer.file !== null, viewer.close);
   const file = useHeldValue(viewer.file);
   const [counted, setCounted] = useState<{ id: number; pages: number } | null>(null);
