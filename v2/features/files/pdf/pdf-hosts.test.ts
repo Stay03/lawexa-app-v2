@@ -81,7 +81,9 @@ test('the dialog is the responsive overlay, with Download and Open in a new tab 
   const dialog = read('v2', 'features', 'files', 'pdf', 'PdfViewerDialog.tsx');
   assert.match(dialog, /<ResponsiveOverlay\s/);
   assert.match(dialog, /<PdfReader\s/);
-  assert.match(dialog, /renderControls=\{\(controls\) => <PdfBar file=\{file\}>\{controls\}<\/PdfBar>\}/);
+  assert.match(dialog, /renderControls=\{\(controls\) => \(\s*<PdfBar file=\{file\} stepper=\{stepper\}>\s*\{controls\}\s*<\/PdfBar>\s*\)\}/);
+  // A file named for several passages steps through them in the bar (option 2).
+  assert.match(dialog, /<PassageStepper\s/);
   assert.match(dialog, /label=\{download\.ready \? 'Save' : 'Download'\}/);
   assert.match(dialog, /label="Open in a new tab"/);
 });
