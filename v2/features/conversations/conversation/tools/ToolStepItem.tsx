@@ -29,7 +29,7 @@ import type { ToolMessage } from '@/types/chat';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 import { failedStepLine, stepFailed } from './step-failure';
 import { isBoxTool } from '@/v2/features/userbox/machine-model';
-import { OpenMachineButton } from '@/v2/features/userbox/OpenMachineButton';
+import { HAND_OVER_TOOL, OpenMachineButton } from '@/v2/features/userbox/OpenMachineButton';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -296,15 +296,6 @@ function ToolStepBody({
   const createdNote = extractCreatedNote(message);
   if (createdNote) return <NoteLinkCard note={createdNote} />;
 
-  // A step on Lawexa's machine (Userbox v1): its details, and the way to watch it.
-  if (isBoxTool(message.toolName)) {
-    return (
-      <>
-        <ToolCallDetails message={message} />
-        <OpenMachineButton />
-      </>
-    );
-  }
 
   if (extractStatuteData(message)) {
     return <StatuteResultsDisplay message={message} />;
@@ -380,6 +371,8 @@ export function ToolStepItem({
   // it on the COLLAPSED line, so a user need not expand to learn it found nothing.
   const zeroHint = isSuccess && isSearchLikeTool(message.toolName) && detectEmptyResult(message);
   const bodyId = useId();
+  const boxStep = isBoxTool(message.toolName);
+  const handOver = message.toolName === HAND_OVER_TOOL && isComplete;
 
   return (
     <div className={cn('relative pb-1', className)}>
@@ -435,7 +428,11 @@ export function ToolStepItem({
             />
           )}
         </button>
+        {/* A step on Lawexa's machine (Userbox v1): the way to watch it, on the line itself. */}
+        {boxStep && !handOver ? <OpenMachineButton /> : null}
       </div>
+      {/* Lawexa handed the machine over: its answer asks for Done, which is on the machine. */}
+      {handOver ? <OpenMachineButton handOver /> : null}
 
       <StepCollapse id={bodyId} open={isExpanded}>
         <div className="border-border ml-[9px] mt-1.5 border-l pl-4">

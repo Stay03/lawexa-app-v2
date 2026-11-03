@@ -119,3 +119,13 @@ test('the chat’s side panel opens Lawexa’s machine as machine:live, and noth
   assert.deepEqual(parseSidePanelValue('machine:live'), { kind: 'machine' });
   assert.equal(parseSidePanelValue('machine:other'), null);
 });
+
+test('the open button sits on every machine step’s line, and the hand-over step gets the full button', async () => {
+  const { readFileSync } = await import('node:fs');
+  const step = readFileSync(new URL('../conversations/conversation/tools/ToolStepItem.tsx', import.meta.url), 'utf8');
+  assert.match(step, /\{boxStep && !handOver \? <OpenMachineButton \/> : null\}/);
+  assert.match(step, /\{handOver \? <OpenMachineButton handOver \/> : null\}/);
+  // On the line, so it shows without opening the step.
+  assert.ok(step.indexOf('<OpenMachineButton />') < step.indexOf('<StepCollapse'));
+  assert.equal(isBoxTool('box_hand_to_user'), true);
+});
