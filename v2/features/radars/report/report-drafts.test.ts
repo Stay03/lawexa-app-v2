@@ -67,6 +67,37 @@ test('affected items read with their kind and reason, and open their page', () =
   );
 });
 
+test('a file named for several passages is one row, with every reason and the first link (option 2)', () => {
+  const lease = (reason: string, page: number) => ({
+    type: 'file' as const,
+    id: 7,
+    name: 'TEST DATA lease.pdf',
+    reason,
+    url: `/spaces/s-1?tab=files&file=7&page=${page}&affected=a-${page}`,
+    exists: true,
+  });
+  const rows = affectedRows([
+    lease('Clause 4 cites the old date.', 3),
+    { type: 'note', id: 'n-1', name: 'TEST DATA note', reason: 'Quotes clause 4.', url: '/notes/n-1', exists: true },
+    lease('Clause 9 repeats it.', 8),
+    { type: 'file', id: 9, name: 'TEST DATA brief.pdf', reason: 'Relies on the date.', url: '/spaces/s-1?tab=files&file=9', exists: true },
+    lease('', 11),
+  ]);
+  assert.deepEqual(
+    rows.map(({ name, detail, reasons, href }) => ({ name, detail, reasons, href })),
+    [
+      {
+        name: 'TEST DATA lease.pdf',
+        detail: 'File · 3 passages',
+        reasons: ['Clause 4 cites the old date.', 'Clause 9 repeats it.'],
+        href: '/spaces/s-1?tab=files&file=7&page=3&affected=a-3',
+      },
+      { name: 'TEST DATA note', detail: 'Note · Quotes clause 4.', reasons: [], href: '/notes/n-1' },
+      { name: 'TEST DATA brief.pdf', detail: 'File · Relies on the date.', reasons: [], href: '/spaces/s-1?tab=files&file=9' },
+    ],
+  );
+});
+
 test('an affected item opens its page inside the app, and only an item page', () => {
   const [onAnotherHost, notAnItemPage, protocolRelative, broken] = affectedRows([
     { type: 'note', id: 1, name: 'a', reason: '', url: 'https://elsewhere.test/notes/a', exists: true },

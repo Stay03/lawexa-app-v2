@@ -2,6 +2,8 @@
 
 import { useCallback, useState } from 'react';
 
+import type { PdfPassage } from './pdf-passages';
+
 /**
  * use-pdf-viewer — which PDF a screen has open in the reader dialog
  * (`PdfViewerDialog`), held in state.
@@ -18,9 +20,11 @@ export interface PdfTarget {
   mimeType: string;
   /** Bytes, for the dialog's facts; 0 or absent when the payload had none. */
   size?: number | null;
-  /** The page to open on, and words to mark there (a Radar report's affected file). */
-  page?: number | null;
-  passage?: string | null;
+  /** Where to open and what to mark, in order (a Radar report's affected
+   *  file): the reader opens on the first, and the bar steps through them. */
+  passages?: readonly PdfPassage[];
+  /** Which of `passages` to open on (the one a link was for); the first when left out. */
+  startPassage?: number;
 }
 
 export interface PdfViewer {

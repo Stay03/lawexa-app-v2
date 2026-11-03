@@ -59,6 +59,12 @@ function AffectedRowView({ row }: { row: AffectedRow }) {
           {row.name}
         </span>
         <span className="mt-0.5 block text-xs text-muted-foreground">{row.detail}</span>
+        {/* A file named for several passages: why, for each, under the count. */}
+        {row.reasons.map((reason, index) => (
+          <span key={index} className="mt-0.5 block border-l border-border pl-2 text-xs text-muted-foreground">
+            {reason}
+          </span>
+        ))}
       </span>
     </>
   );

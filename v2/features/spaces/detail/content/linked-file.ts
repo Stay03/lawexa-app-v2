@@ -1,3 +1,5 @@
+import type { SpaceRadarAffected } from '@/types/collab';
+import type { PdfPassage } from '@/v2/features/files/pdf/pdf-passages';
 import { viewKind, type ViewableFile } from '@/v2/features/files/viewable';
 
 /**
@@ -40,18 +42,33 @@ export function parseLinkedFile(params: { file: string | null; page: string | nu
 }
 
 /**
- * Where the linked PDF opens and what it marks. The affected item's read
- * wins once it is in, when it is about this file: its page, and its passage
- * there. Until then, and when the read finds nothing (404) or speaks of
- * another file, the link's page with no mark.
+ * Where the linked PDF opens and what it marks, in order, and which of them
+ * the link was for. The affected item's read wins once it is in, when it is
+ * about this file: its passages (every passage of that file in the report, in
+ * its order, the clicked one among them; Arthur, 3 November 2026, option 2),
+ * opened on the clicked one; from a server before that list, its one page
+ * and quote. Until then, and when the read finds nothing (404) or speaks of
+ * another file, the link's page with no mark; no page, nothing.
  */
-export function linkedPassage(
+export function linkedPassages(
   link: Pick<LinkedFile, 'fileId' | 'page'>,
-  affected: { file_id: number; page: number | null; quote: string | null } | null,
-): { page: number | null; passage: string | null } {
-  if (!affected || affected.file_id !== link.fileId) return { page: link.page, passage: null };
-  if (affected.page === null) return { page: link.page, passage: null };
-  return { page: affected.page, passage: affected.quote?.trim() || null };
+  affected: SpaceRadarAffected | null,
+): { passages: PdfPassage[]; start: number } {
+  const fallback = { passages: link.page === null ? [] : [{ page: link.page, quote: null }], start: 0 };
+  if (!affected || affected.file_id !== link.fileId) return fallback;
+  const clicked: PdfPassage | null = affected.page === null ? null : { page: affected.page, quote: tidy(affected.quote) };
+  const listed = (affected.passages ?? [])
+    .filter((passage) => Number.isInteger(passage.page) && passage.page >= 1)
+    .map((passage) => ({ page: passage.page, quote: tidy(passage.quote) }));
+  if (listed.length > 0) {
+    const at = clicked ? listed.findIndex((passage) => passage.page === clicked.page && passage.quote === clicked.quote) : -1;
+    return { passages: listed, start: Math.max(0, at) };
+  }
+  return clicked ? { passages: [clicked], start: 0 } : fallback;
+}
+
+function tidy(quote: string | null | undefined): string | null {
+  return quote?.trim() || null;
 }
 
 /**

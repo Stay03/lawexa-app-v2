@@ -173,6 +173,12 @@ export interface RadarAffectedItem {
   url: string | null;
   /** False once the item has left the Space or been deleted. */
   exists: boolean;
+  /** A later server (Backend, 3 November 2026): the item's own id, and for a
+   *  PDF the page (1-based) and passage it is affected at. Absent on older
+   *  reports. */
+  uuid?: string | null;
+  page?: number | null;
+  quote?: string | null;
 }
 
 /**

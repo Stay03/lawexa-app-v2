@@ -1851,6 +1851,9 @@ export interface SpaceRadarAffected {
   file_id: number;
   page: number | null;
   quote: string | null;
+  /** Every passage of this file in the same scan, in the report's order
+   *  (option 2, Backend, 3 November 2026). Absent on a server before it. */
+  passages?: { page: number; quote: string | null }[];
 }
 
 export type SpaceRadarAffectedResponse = ItemResponse<SpaceRadarAffected>;

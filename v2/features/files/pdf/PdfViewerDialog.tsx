@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { Download, ExternalLink, Loader2, RotateCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, ExternalLink, Loader2, RotateCw } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useBackGuard } from '@/v2/runtime/use-back-guard';
 import { ScanReadingStatus } from '../ScanReadingStatus';
 import { pageCountLabel } from './pdf-model';
+import { passageLabel, stepPassage } from './pdf-passages';
 import { PdfReader } from './PdfReader';
 import type { PdfViewer, ShownPdf } from './use-pdf-viewer';
 
@@ -37,6 +38,11 @@ import type { PdfViewer, ShownPdf } from './use-pdf-viewer';
  * discard does): Back takes that step and the reader closes. The close button,
  * Escape and the scrim take the step first (`release`), so none leaves it
  * behind.
+ *
+ * PASSAGES (a Radar report's affected file; Arthur, 3 November 2026): a host
+ * may name the places to show, in order. The reader opens on the first with
+ * its words marked, and when there are more than one the bar steps through
+ * them, saying which it is on ("Passage 2 of 3").
  */
 export function PdfViewerDialog({ viewer }: { viewer: ShownPdf }) {
   const backGuard = useBackGuard(viewer.file !== null, viewer.close);
@@ -47,6 +53,20 @@ export function PdfViewerDialog({ viewer }: { viewer: ShownPdf }) {
   const facts = ['PDF', size, pages === null ? null : pageCountLabel(pages)]
     .filter(Boolean)
     .join(' · ');
+  // The passage shown, for this file: another file starts at its first.
+  const passages = file?.passages ?? [];
+  const [step, setStep] = useState<{ id: number; index: number } | null>(null);
+  const last = Math.max(0, passages.length - 1);
+  const index = Math.min(file && step?.id === file.id ? step.index : (file?.startPassage ?? 0), last);
+  const passage = passages[index] ?? null;
+  const stepper =
+    file && passages.length > 1 ? (
+      <PassageStepper
+        index={index}
+        count={passages.length}
+        onStep={(delta) => setStep({ id: file.id, index: stepPassage(index, passages.length, delta) })}
+      />
+    ) : null;
 
   return (
     <ResponsiveOverlay
@@ -65,9 +85,13 @@ export function PdfViewerDialog({ viewer }: { viewer: ShownPdf }) {
           fileId={file.id}
           name={file.name}
           onPageCount={(count) => setCounted({ id: file.id, pages: count })}
-          startPage={file.page}
-          passage={file.passage}
-          renderControls={(controls) => <PdfBar file={file}>{controls}</PdfBar>}
+          startPage={passage?.page ?? null}
+          passage={passage?.quote ?? null}
+          renderControls={(controls) => (
+            <PdfBar file={file} stepper={stepper}>
+              {controls}
+            </PdfBar>
+          )}
           fallback={(message, retry) => (
             <>
               <PdfBar file={file} />
@@ -93,13 +117,23 @@ export function PdfViewerDialog({ viewer }: { viewer: ShownPdf }) {
  * The reader's bar: its zoom (when the PDF is open), then Download and Open
  * in a new tab. It sticks to the top of the dialog's scrolling body.
  */
-function PdfBar({ file, children }: { file: NonNullable<PdfViewer['file']>; children?: ReactNode }) {
+function PdfBar({
+  file,
+  stepper,
+  children,
+}: {
+  file: NonNullable<PdfViewer['file']>;
+  /** Back and Next through the passages a host named, when there are several. */
+  stepper?: ReactNode;
+  children?: ReactNode;
+}) {
   const download = useOpenFileInNewTab();
   const show = useShowFileInNewTab();
   const failed = download.failed || show.failed;
   return (
     <div className="sticky top-0 z-10 -mx-4 -mt-4 mb-3 flex w-[calc(100%+2rem)] flex-wrap items-center gap-1 border-b border-border/70 bg-popover/95 px-3 py-1.5 backdrop-blur-sm md:-mx-6 md:mt-0 md:w-[calc(100%+3rem)] md:px-5">
       <div className="flex items-center gap-0.5">{children}</div>
+      {stepper}
       <div className="ml-auto flex items-center gap-1">
         {failed ? (
           <span role="status" className="mr-1 text-xs text-muted-foreground">
@@ -152,5 +186,31 @@ function BarButton({
         {label}
       </span>
     </button>
+  );
+}
+
+/**
+ * "Passage 2 of 3" between Previous and Next: the passages a host named, one
+ * at a time. The words are announced as they change, so a screen reader hears
+ * where a step landed.
+ */
+function PassageStepper({ index, count, onStep }: { index: number; count: number; onStep: (delta: -1 | 1) => void }) {
+  const button = cn(
+    'v2-interactive flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40',
+    'xl:size-7.5 xl:rounded-lg',
+    FOCUS_RING,
+  );
+  return (
+    <div className="flex items-center gap-0.5 border-l border-border/70 pl-1.5">
+      <button type="button" onClick={() => onStep(-1)} disabled={index === 0} aria-label="Previous passage" title="Previous passage" className={button}>
+        <ChevronUp aria-hidden className="size-4" />
+      </button>
+      <span aria-live="polite" className="px-1 text-xs font-medium whitespace-nowrap text-muted-foreground tabular-nums">
+        {passageLabel(index, count)}
+      </span>
+      <button type="button" onClick={() => onStep(1)} disabled={index === count - 1} aria-label="Next passage" title="Next passage" className={button}>
+        <ChevronDown aria-hidden className="size-4" />
+      </button>
+    </div>
   );
 }

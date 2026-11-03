@@ -13,7 +13,7 @@ import { listViewable, pictureTarget } from '@/v2/features/files/viewable';
 import { SpaceFileCard } from './SpaceFileCard';
 import type { SpaceFileActions } from './SpaceFileMenu';
 import { spacesQueries } from '../../queries';
-import { linkedFileFrame, linkedFileRefusal, linkedPassage, type LinkedFile } from './linked-file';
+import { linkedFileFrame, linkedFileRefusal, linkedPassages, type LinkedFile } from './linked-file';
 
 /**
  * SpaceLinkedFile — the one file a link names (`&file=`), opened over the
@@ -34,7 +34,8 @@ import { linkedFileFrame, linkedFileRefusal, linkedPassage, type LinkedFile } fr
  * passage, which is the file's own text: the item's read gives it
  * (`spacesQueries.radarAffected`). The PDF opens on the link's page at once,
  * and the mark follows when the read lands; a 404 or a passage the page does
- * not have leaves the page open with no mark and no note (`linkedPassage`).
+ * not have leaves the page open with no mark and no note (`linkedPassages`).
+ * A file named for several passages steps through them in the reader's bar.
  *
  * A FILE THAT DOES NOT OPEN SAYS SO ONCE, as a toast, and the pill stays as
  * it is. Closing the file, or that note, takes `&file=` out of the address
@@ -60,7 +61,7 @@ export function SpaceLinkedFile({
     ...spacesQueries.radarAffected(spaceUuid, link.affected ?? '', { viewerId }),
     enabled: link.affected !== null,
   });
-  const { page, passage } = linkedPassage(link, affected.data?.data ?? null);
+  const { passages, start } = linkedPassages(link, affected.data?.data ?? null);
   const file: SpaceFile | null = detail.data?.data ?? null;
   const [closed, setClosed] = useState(false);
   const frame = file ? linkedFileFrame(file) : null;
@@ -96,8 +97,8 @@ export function SpaceLinkedFile({
               name: file.original_name,
               mimeType: file.mime_type || 'application/pdf',
               size: file.size,
-              page,
-              passage,
+              passages,
+              startPassage: start,
             }
           : null,
       close,

@@ -209,12 +209,13 @@ function PdfDocumentView({
   }, [url]);
 
   // The page asked for, once the pages are laid out at fit width: scrolled to
-  // once, so a later zoom leaves the reader where they are.
+  // when it is asked for (opening, or a step to another passage), never on a
+  // zoom, which leaves the reader where they are.
   const target = state.status === 'ready' ? openingPage(startPage, state.doc.numPages) : null;
-  const scrolledTo = useRef(false);
+  const scrolledTo = useRef<number | null>(null);
   useEffect(() => {
-    if (target === null || columnWidth === 0 || scrolledTo.current) return;
-    scrolledTo.current = true;
+    if (target === null || columnWidth === 0 || scrolledTo.current === target) return;
+    scrolledTo.current = target;
     columnRef.current?.querySelector(`[data-pdf-page="${target}"]`)?.scrollIntoView({ block: 'start' });
   }, [target, columnWidth]);
 
@@ -381,17 +382,22 @@ function PdfPageView({
   }, [doc, pageNumber, scale, near]);
 
   // The passage, placed on the text layer as drawn, and scrolled to the
-  // middle of the screen the first time it is found.
-  const markScrolled = useRef(false);
+  // middle of the screen the first time each passage is found here.
+  const markScrolled = useRef<string | null>(null);
   useEffect(() => {
+    // A page left behind by a step forgets it, so a step back scrolls again.
+    if (!passage) {
+      markScrolled.current = null;
+      return;
+    }
     const text = textRef.current;
-    if (!text || !passage || !near || textDraws === 0) return;
+    if (!text || !near || textDraws === 0) return;
     if (typeof CSS === 'undefined' || !('highlights' in CSS) || typeof Highlight === 'undefined') return;
     const range = passageRange(text, passage);
     if (!range) return;
     CSS.highlights.set(PASSAGE_HIGHLIGHT, new Highlight(range));
-    if (!markScrolled.current) {
-      markScrolled.current = true;
+    if (markScrolled.current !== passage) {
+      markScrolled.current = passage;
       range.startContainer.parentElement?.scrollIntoView({ block: 'center' });
     }
     return () => {
