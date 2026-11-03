@@ -12,7 +12,8 @@ import type { ShownFiles } from '@/v2/features/files/use-file-viewer';
 import { listViewable, pictureTarget } from '@/v2/features/files/viewable';
 import { SpaceFileCard } from './SpaceFileCard';
 import type { SpaceFileActions } from './SpaceFileMenu';
-import { linkedFileFrame, linkedFileRefusal } from './linked-file';
+import { spacesQueries } from '../../queries';
+import { linkedFileFrame, linkedFileRefusal, linkedPassage, type LinkedFile } from './linked-file';
 
 /**
  * SpaceLinkedFile — the one file a link names (`&file=`), opened over the
@@ -28,21 +29,38 @@ import { linkedFileFrame, linkedFileRefusal } from './linked-file';
  * what is open is worked out from that read and one "closed" flag rather than
  * set when the read lands.
  *
+ * A RADAR LINK OPENS A PDF ON ITS PAGE, WITH THE PASSAGE MARKED (Arthur, 3
+ * November 2026). The link carries the page and the affected item, never the
+ * passage, which is the file's own text: the item's read gives it
+ * (`spacesQueries.radarAffected`). The PDF opens on the link's page at once,
+ * and the mark follows when the read lands; a 404 or a passage the page does
+ * not have leaves the page open with no mark and no note (`linkedPassage`).
+ *
  * A FILE THAT DOES NOT OPEN SAYS SO ONCE, as a toast, and the pill stays as
  * it is. Closing the file, or that note, takes `&file=` out of the address
  * (`onClose`), so a reload shows the pill alone.
  */
 export function SpaceLinkedFile({
-  fileId,
+  spaceUuid,
+  viewerId,
+  link,
   actionsFor,
   onClose,
 }: {
-  fileId: number;
+  spaceUuid: string;
+  viewerId: number | null;
+  /** The file the link names, and a Radar link's page and affected item. */
+  link: LinkedFile;
   /** What this reader may do to a file of the space (the feed's own rules). */
   actionsFor: (file: SpaceFile) => SpaceFileActions;
   onClose: () => void;
 }) {
-  const detail = useQuery(filesQueries.detail(fileId));
+  const detail = useQuery(filesQueries.detail(link.fileId));
+  const affected = useQuery({
+    ...spacesQueries.radarAffected(spaceUuid, link.affected ?? '', { viewerId }),
+    enabled: link.affected !== null,
+  });
+  const { page, passage } = linkedPassage(link, affected.data?.data ?? null);
   const file: SpaceFile | null = detail.data?.data ?? null;
   const [closed, setClosed] = useState(false);
   const frame = file ? linkedFileFrame(file) : null;
@@ -73,7 +91,14 @@ export function SpaceLinkedFile({
     pdf: {
       file:
         open && frame === 'pdf'
-          ? { id: file.id, name: file.original_name, mimeType: file.mime_type || 'application/pdf', size: file.size }
+          ? {
+              id: file.id,
+              name: file.original_name,
+              mimeType: file.mime_type || 'application/pdf',
+              size: file.size,
+              page,
+              passage,
+            }
           : null,
       close,
       returnTo: null,

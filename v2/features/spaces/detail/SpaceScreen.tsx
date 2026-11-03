@@ -27,7 +27,7 @@ import {
   type SpaceTab,
 } from '../model';
 import { CachedSpaceFrame } from './CachedSpaceFrame';
-import { parseLinkedFileId } from './content/linked-file';
+import { parseLinkedFile, type LinkedFile } from './content/linked-file';
 import { SpaceContentPanel } from './content/SpaceContentPanel';
 import { SPACE_PAGE_COLUMN, SPACE_PANE } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
@@ -122,19 +122,24 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
     [],
   );
   // The file a link names (`&file=`, a Radar report's affected file; Arthur,
-  // 3 November 2026), opened over the pill. Held the same way as the tab, and
-  // taken out of the address once it closes or does not open.
-  const urlFile = searchParams.get('file');
-  const [fileParam, setFileParam] = useState<string | null>(urlFile);
-  const [seenUrlFile, setSeenUrlFile] = useState<string | null>(urlFile);
-  if (urlFile !== seenUrlFile) {
-    setSeenUrlFile(urlFile);
-    setFileParam(urlFile);
+  // 3 November 2026), with the page and the affected item a Radar link adds
+  // (`&page=`, `&affected=`), opened over the pill. Held the same way as the
+  // tab, and taken out of the address once it closes or does not open.
+  const urlLink = {
+    file: searchParams.get('file'),
+    page: searchParams.get('page'),
+    affected: searchParams.get('affected'),
+  };
+  const urlLinkKey = `${urlLink.file}|${urlLink.page}|${urlLink.affected}`;
+  const [linkedFile, setLinkedFile] = useState<LinkedFile | null>(() => parseLinkedFile(urlLink));
+  const [seenUrlLinkKey, setSeenUrlLinkKey] = useState(urlLinkKey);
+  if (urlLinkKey !== seenUrlLinkKey) {
+    setSeenUrlLinkKey(urlLinkKey);
+    setLinkedFile(parseLinkedFile(urlLink));
   }
-  const linkedFileId = parseLinkedFileId(fileParam);
   const closeLinkedFile = useCallback(() => {
-    setFileParam(null);
-    quietReplaceUrlParams({ file: null });
+    setLinkedFile(null);
+    quietReplaceUrlParams({ file: null, page: null, affected: null });
   }, []);
   // Back and Forward restore the address but not this state (the quiet write
   // never told the router), so the tab is re-read from the address on each.
@@ -355,7 +360,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
           space={space}
           tab={tab}
           onTabChange={setTab}
-          linkedFileId={linkedFileId}
+          linkedFile={linkedFile}
           onLinkedFileClose={closeLinkedFile}
         />
 

@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 import { filenameFromDisposition, type ExportedFile } from './export';
 import type { ApiResponse } from '@/types/api';
-import type { SpaceRadarListParams, SpaceRadarListResponse } from '@/types/collab';
+import type { SpaceRadarAffectedResponse, SpaceRadarListParams, SpaceRadarListResponse } from '@/types/collab';
 import type {
   CreateRadarPayload,
   CreateSpaceRadarPayload,
@@ -298,6 +298,14 @@ export const spaceRadarsApi = {
       blob: response.data,
       filename: filenameFromDisposition(response.headers['content-disposition'], radarReportFallbackName(format)),
     };
+  },
+
+  /** A report's affected file: its page and passage, for the link that opens it there. */
+  getAffected: async (spaceUuid: string, affectedUuid: string): Promise<SpaceRadarAffectedResponse> => {
+    const response = await apiClient.get<SpaceRadarAffectedResponse>(
+      `/spaces/${encodeURIComponent(spaceUuid)}/radar-affected/${encodeURIComponent(affectedUuid)}`,
+    );
+    return response.data;
   },
 };
 

@@ -1840,6 +1840,21 @@ export interface SpaceRadarListItem extends Omit<Radar, 'unread_reports_count'> 
 
 export type SpaceRadarListResponse = LengthAwareResponse<SpaceRadarListItem>;
 
+/**
+ * Where a Radar report's affected file is affected (`GET
+ * /spaces/{uuid}/radar-affected/{uuid}`, Backend, 3 November 2026): the page
+ * (1-based) and the passage on it. `quote` is null when the server could not
+ * find it in that page's text, both when the page was not real; a quote never
+ * comes without a page. 404 for anything the reader may not see.
+ */
+export interface SpaceRadarAffected {
+  file_id: number;
+  page: number | null;
+  quote: string | null;
+}
+
+export type SpaceRadarAffectedResponse = ItemResponse<SpaceRadarAffected>;
+
 export interface SpaceRadarListParams {
   /** `archived` lists the space's archived Radars; absent, the live ones. */
   status?: 'archived';

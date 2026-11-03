@@ -18,6 +18,9 @@ export interface PdfTarget {
   mimeType: string;
   /** Bytes, for the dialog's facts; 0 or absent when the payload had none. */
   size?: number | null;
+  /** The page to open on, and words to mark there (a Radar report's affected file). */
+  page?: number | null;
+  passage?: string | null;
 }
 
 export interface PdfViewer {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { linkedFileFrame, linkedFileRefusal, parseLinkedFileId } from './linked-file';
+import { linkedFileFrame, linkedFileRefusal, linkedPassage, parseLinkedFile, parseLinkedFileId } from './linked-file';
 
 /* A link that names a space's file opens that file, not only the Files tab
  * (Arthur, 3 November 2026, on a Radar report's affected file). */
@@ -30,4 +30,28 @@ test('a removed or closed-off file says it is not available; other failures ask 
   assert.match(linkedFileRefusal(403), /isn’t available/);
   assert.match(linkedFileRefusal(500), /try the link again/);
   assert.match(linkedFileRefusal(0), /try the link again/);
+});
+
+const AFFECTED = '3f1c2b9a-8d7e-4c6b-9a5f-1e2d3c4b5a69';
+
+test('a Radar link names the page and the affected item; the passage never rides in the address', () => {
+  assert.deepEqual(parseLinkedFile({ file: '7', page: '12', affected: AFFECTED }), { fileId: 7, page: 12, affected: AFFECTED });
+  assert.deepEqual(parseLinkedFile({ file: '7', page: null, affected: null }), { fileId: 7, page: null, affected: null });
+  // A bad page or affected id is dropped; the file still opens.
+  assert.deepEqual(parseLinkedFile({ file: '7', page: 'two', affected: 'not-a-uuid' }), { fileId: 7, page: null, affected: null });
+  assert.equal(parseLinkedFile({ file: null, page: '12', affected: AFFECTED }), null);
+});
+
+test('the affected read gives the page and the passage, for this file only', () => {
+  const link = { fileId: 7, page: 12 };
+  // In: its page and its passage.
+  assert.deepEqual(linkedPassage(link, { file_id: 7, page: 12, quote: ' Clause 4 cites the old date. ' }), { page: 12, passage: 'Clause 4 cites the old date.' });
+  // Not in yet, or 404: the link's page, no mark.
+  assert.deepEqual(linkedPassage(link, null), { page: 12, passage: null });
+  // The server could not place the quote: the page, no mark.
+  assert.deepEqual(linkedPassage(link, { file_id: 7, page: 12, quote: null }), { page: 12, passage: null });
+  // The page was not real: the link's page, no mark.
+  assert.deepEqual(linkedPassage(link, { file_id: 7, page: null, quote: null }), { page: 12, passage: null });
+  // About another file: ignored.
+  assert.deepEqual(linkedPassage(link, { file_id: 8, page: 3, quote: 'elsewhere' }), { page: 12, passage: null });
 });

@@ -21,6 +21,7 @@ import {
   zoomOut,
   type PdfFailure,
 } from './pdf-model';
+import { findPdfQuote, indexPdfText } from './pdf-quote';
 import './pdf-reader.css';
 
 /**
@@ -44,6 +45,13 @@ import './pdf-reader.css';
  *
  * ZOOM is a multiple of fit width (pdf-model.ts): minus, the middle control
  * (back to fit), plus. Above fit, the column scrolls sideways.
+ *
+ * A HOST MAY NAME A PAGE AND A PASSAGE (a Radar report's affected file;
+ * Arthur, 3 November 2026). The reader opens on that page, and once the
+ * page's text layer is drawn it marks the passage there with the CSS Custom
+ * Highlight API, as the case page marks a judgment's passage: nothing is
+ * added to the page. A passage the page does not have, or a page with no
+ * text (a scan), opens on the page with no mark (`pdf-quote.ts`).
  */
 export function PdfReader({
   fileId,
@@ -53,6 +61,8 @@ export function PdfReader({
   fallback,
   className,
   columnClassName,
+  startPage,
+  passage,
 }: {
   fileId: number;
   /** The file's name, for the pages' accessible names. */
@@ -67,6 +77,10 @@ export function PdfReader({
   className?: string;
   /** The pages' column, inside the reader (its width, its padding). */
   columnClassName?: string;
+  /** The page to open on (1-based); the first when left out or past the end. */
+  startPage?: number | null;
+  /** Words to mark on `startPage`. */
+  passage?: string | null;
 }) {
   const link = useQuery(filesQueries.inlineUrl(fileId));
   const [relinked, setRelinked] = useState(false);
@@ -96,6 +110,8 @@ export function PdfReader({
       renderControls={renderControls}
       className={className}
       columnClassName={columnClassName}
+      startPage={startPage ?? null}
+      passage={passage ?? null}
       fallback={fallback}
       onExpired={
         relinked
@@ -123,6 +139,8 @@ function PdfDocumentView({
   renderControls,
   className,
   columnClassName,
+  startPage,
+  passage,
   fallback,
   onExpired,
   onRetry,
@@ -133,6 +151,8 @@ function PdfDocumentView({
   renderControls?: (controls: ReactNode | null) => ReactNode;
   className?: string;
   columnClassName?: string;
+  startPage: number | null;
+  passage: string | null;
   fallback: (message: string, retry: (() => void) | null) => ReactNode;
   /** Ask for a fresh link, once; `null` once it has been asked. */
   onExpired: (() => void) | null;
@@ -188,6 +208,16 @@ function PdfDocumentView({
     };
   }, [url]);
 
+  // The page asked for, once the pages are laid out at fit width: scrolled to
+  // once, so a later zoom leaves the reader where they are.
+  const target = state.status === 'ready' ? openingPage(startPage, state.doc.numPages) : null;
+  const scrolledTo = useRef(false);
+  useEffect(() => {
+    if (target === null || columnWidth === 0 || scrolledTo.current) return;
+    scrolledTo.current = true;
+    columnRef.current?.querySelector(`[data-pdf-page="${target}"]`)?.scrollIntoView({ block: 'start' });
+  }, [target, columnWidth]);
+
   // The column's width, for fit width.
   useEffect(() => {
     const column = columnRef.current;
@@ -226,6 +256,7 @@ function PdfDocumentView({
                   scale={pageScale(columnWidth, state.pageWidth, zoom)}
                   fallbackWidth={state.pageWidth}
                   fallbackHeight={state.pageHeight}
+                  passage={index + 1 === target ? passage : null}
                 />
               ))}
             </div>
@@ -249,6 +280,7 @@ function PdfPageView({
   scale,
   fallbackWidth,
   fallbackHeight,
+  passage,
 }: {
   doc: PDFDocumentProxy;
   pageNumber: number;
@@ -258,6 +290,8 @@ function PdfPageView({
   /** The first page's size in points, until this page has been read. */
   fallbackWidth: number;
   fallbackHeight: number;
+  /** Words to mark on this page, or `null`. */
+  passage: string | null;
 }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -265,6 +299,8 @@ function PdfPageView({
   const [near, setNear] = useState(pageNumber <= 2);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [drawn, setDrawn] = useState(false);
+  // Counts the text layer's draws, so the passage is placed on each new one.
+  const [textDraws, setTextDraws] = useState(0);
 
   const width = (size?.width ?? fallbackWidth) * scale;
   const height = (size?.height ?? fallbackHeight) * scale;
@@ -331,6 +367,7 @@ function PdfPageView({
           viewport,
         });
         await textLayer.render();
+        if (live) setTextDraws((count) => count + 1);
       })
       .catch(() => {
         // A cancelled draw is the normal end of a page that scrolled away or
@@ -343,11 +380,31 @@ function PdfPageView({
     };
   }, [doc, pageNumber, scale, near]);
 
+  // The passage, placed on the text layer as drawn, and scrolled to the
+  // middle of the screen the first time it is found.
+  const markScrolled = useRef(false);
+  useEffect(() => {
+    const text = textRef.current;
+    if (!text || !passage || !near || textDraws === 0) return;
+    if (typeof CSS === 'undefined' || !('highlights' in CSS) || typeof Highlight === 'undefined') return;
+    const range = passageRange(text, passage);
+    if (!range) return;
+    CSS.highlights.set(PASSAGE_HIGHLIGHT, new Highlight(range));
+    if (!markScrolled.current) {
+      markScrolled.current = true;
+      range.startContainer.parentElement?.scrollIntoView({ block: 'center' });
+    }
+    return () => {
+      CSS.highlights.delete(PASSAGE_HIGHLIGHT);
+    };
+  }, [passage, near, textDraws]);
+
   return (
     <div
       ref={boxRef}
       role="group"
       aria-label={`${name}, page ${pageNumber} of ${count}`}
+      data-pdf-page={pageNumber}
       className="v2-pdf-page shrink-0"
     >
       {!drawn ? <Skeleton aria-hidden className="absolute inset-0 rounded-none bg-neutral-100" /> : null}
@@ -355,6 +412,30 @@ function PdfPageView({
       <div ref={textRef} className="textLayer" />
     </div>
   );
+}
+
+/** The highlight a passage is painted with (`pdf-reader.css`). */
+const PASSAGE_HIGHLIGHT = 'pdf-passage';
+
+/** The page to open on: the one asked for when the PDF has it. */
+function openingPage(asked: number | null, count: number): number | null {
+  return asked !== null && asked >= 1 && asked <= count ? asked : null;
+}
+
+/** The passage on one page's text layer, as a Range over its text nodes. */
+function passageRange(layer: HTMLElement, passage: string): Range | null {
+  const pieces: { text: string; handle: Text }[] = [];
+  const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node as Text;
+    if (text.data) pieces.push({ text: text.data, handle: text });
+  }
+  const found = findPdfQuote(indexPdfText(pieces), passage);
+  if (!found) return null;
+  const range = document.createRange();
+  range.setStart(found.start.handle, found.start.offset);
+  range.setEnd(found.end.handle, found.end.offset);
+  return range;
 }
 
 /** Minus, Fit, plus: the reader's three zoom controls. */

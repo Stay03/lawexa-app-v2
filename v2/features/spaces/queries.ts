@@ -312,6 +312,21 @@ export const spacesQueries = {
       refetchOnMount: REFETCH_ON_VISIT,
     }),
 
+  /**
+   * Where a Radar report's affected file is affected (its page and passage),
+   * for the link that opens the file there (`SpaceLinkedFile`). Kept for the
+   * visit: a report's findings do not move. `retry: false` and no toast: a
+   * 404 opens the file on the link's page, unmarked.
+   */
+  radarAffected: (spaceUuid: string, affectedUuid: string, { viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...spacesQueries.all, 'radar-affected', spaceUuid, affectedUuid, { viewerId }] as const,
+      queryFn: () => spaceRadarsApi.getAffected(spaceUuid, affectedUuid),
+      staleTime: Infinity,
+      retry: false,
+      meta: { silentError: true },
+    }),
+
   /** Every cached read of one space's task board. */
   tasksOf: (spaceUuid: string) => [...spacesQueries.all, 'tasks', spaceUuid] as const,
 

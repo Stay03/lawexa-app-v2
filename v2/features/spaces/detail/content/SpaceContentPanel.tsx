@@ -79,6 +79,7 @@ import { RemoveFromSpaceDialog } from './RemoveFromSpaceDialog';
 import { SPACE_COMPOSER_PLACEHOLDER, SPACE_RADAR_COMPOSER_PLACEHOLDER, SpaceChatDock } from './SpaceChatDock';
 import { SpaceFileCard } from './SpaceFileCard';
 import { SpaceLinkedFile } from './SpaceLinkedFile';
+import type { LinkedFile } from './linked-file';
 import type { SpaceFileActions } from './SpaceFileMenu';
 import { SpaceLooseFiles } from './SpaceLooseFiles';
 import { FileListHead } from '@/v2/features/folders/file-list/FileListRow';
@@ -148,14 +149,14 @@ export function SpaceContentPanel({
   space,
   tab,
   onTabChange,
-  linkedFileId,
+  linkedFile,
   onLinkedFileClose,
 }: {
   space: Space;
   tab: SpaceTab;
   onTabChange: (next: SpaceTab) => void;
   /** The file a link named (`&file=`), opened over the pill; `null` for none. */
-  linkedFileId: number | null;
+  linkedFile: LinkedFile | null;
   /** That file closed, or did not open. */
   onLinkedFileClose: () => void;
 }) {
@@ -294,7 +295,7 @@ export function SpaceContentPanel({
         fileSelect={fileSelect}
         ticks={ticks}
         looseFileCount={tab === 'folders' && !looseQuery.isPending ? files.length : null}
-        linkedFileId={linkedFileId}
+        linkedFile={linkedFile}
         onLinkedFileClose={onLinkedFileClose}
       />
     );
@@ -524,7 +525,7 @@ function SpaceFeed({
   fileSelect,
   ticks,
   looseFileCount,
-  linkedFileId,
+  linkedFile,
   onLinkedFileClose,
 }: {
   tab: SpaceContentTab;
@@ -545,7 +546,7 @@ function SpaceFeed({
    *  `null` while they load, and on the other pills. */
   looseFileCount: number | null;
   /** The file a link named, opened over this list (`SpaceLinkedFile`). */
-  linkedFileId: number | null;
+  linkedFile: LinkedFile | null;
   onLinkedFileClose: () => void;
 }) {
   const { spaceUuid, spaceName, canAdd, canRemove } = access;
@@ -794,8 +795,15 @@ function SpaceFeed({
         onView={viewFile}
       />
       <FileViewers viewer={viewer} pictures={pictures} place="space" />
-      {linkedFileId !== null ? (
-        <SpaceLinkedFile key={linkedFileId} fileId={linkedFileId} actionsFor={fileActions} onClose={onLinkedFileClose} />
+      {linkedFile !== null ? (
+        <SpaceLinkedFile
+          key={`${linkedFile.fileId}|${linkedFile.affected}`}
+          spaceUuid={spaceUuid}
+          viewerId={viewerId}
+          link={linkedFile}
+          actionsFor={fileActions}
+          onClose={onLinkedFileClose}
+        />
       ) : null}
       {dialogs}
       {filing ? (

@@ -90,6 +90,15 @@ function foldChar(value: string, index: number): string {
   return value[index];
 }
 
+/**
+ * One character as the match reads it (contract steps 4, 5 and the lower
+ * case), and whether it is whitespace (step 3): for a reader whose text needs
+ * its own projection, the PDF reader's text layer (`pdf-quote.ts`).
+ */
+export function foldForMatch(value: string, index: number): { char: string; space: boolean } {
+  return { char: foldChar(value, index).toLowerCase(), space: isSpace(value.charCodeAt(index)) };
+}
+
 /** Contract steps 3 to 7 on a plain string — used for the text being sought. */
 export function normalizeForMatch(value: string): string {
   let out = '';

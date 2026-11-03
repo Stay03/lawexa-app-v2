@@ -207,8 +207,8 @@ test('the space page: pills from the model, one panel, no channel read (B4)', ()
   assert.match(screen, /quietReplaceUrlParams\(\{ tab: value \}\)/);
   assert.match(screen, /<SpaceContentPanel\s+space=\{space\}\s+tab=\{tab\}\s+onTabChange=\{setTab\}/);
   // A link's `&file=` opens that file over the pill (Arthur, 3 November 2026).
-  assert.match(screen, /const linkedFileId = parseLinkedFileId\(fileParam\);/);
-  assert.match(screen, /quietReplaceUrlParams\(\{ file: null \}\)/);
+  assert.match(screen, /setLinkedFile\(parseLinkedFile\(urlLink\)\);/);
+  assert.match(screen, /quietReplaceUrlParams\(\{ file: null, page: null, affected: null \}\)/);
   assert.doesNotMatch(screen, /SpaceTabs|threadsBySpace|showsChannels/);
   const panel = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceContentPanel.tsx');
   assert.match(panel, /<TabRow\s+tabs=\{PILLS\}/);

@@ -65,6 +65,8 @@ export function PdfViewerDialog({ viewer }: { viewer: ShownPdf }) {
           fileId={file.id}
           name={file.name}
           onPageCount={(count) => setCounted({ id: file.id, pages: count })}
+          startPage={file.page}
+          passage={file.passage}
           renderControls={(controls) => <PdfBar file={file}>{controls}</PdfBar>}
           fallback={(message, retry) => (
             <>

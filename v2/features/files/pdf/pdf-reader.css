@@ -101,3 +101,12 @@
 .v2-pdf-page .textLayer.selecting .endOfContent {
   top: 0;
 }
+
+/* The passage a host asked the reader to mark (a Radar report's affected
+   file): a wash of the app's colour behind the transparent text layer, over
+   the drawn words. Only the background: the layer's text stays unseen, so
+   the canvas's own letters show through. Scoped to the page, so Chrome does
+   not test it on every element of the app. */
+.v2-pdf-page ::highlight(pdf-passage) {
+  background-color: color-mix(in oklab, var(--primary) 32%, transparent);
+}
