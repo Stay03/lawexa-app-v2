@@ -148,7 +148,7 @@ test('in a reopened chat the rule waits for the loaded results, so no refusal sh
 
 test('the cards read every quiz step loaded, through the same cache the card reads', () => {
   const list = readFileSync(join(here, '..', 'MessageList.tsx'), 'utf8');
-  assert.match(list, /<CompactToolChain messages=\{steps\} \/>\s*<CreatedQuizCards steps=\{steps\} \/>/);
+  assert.match(list, /<CompactToolChain messages=\{steps\} inLastAnswer=\{inLastAnswer\} \/>\s*<CreatedQuizCards steps=\{steps\} \/>/);
   const cards = readFileSync(join(here, '..', 'cards', 'CreatedQuizCard.tsx'), 'utf8');
   assert.match(cards, /const quizSteps = steps\.filter\(isQuizCardStep\);\s*const loaded = useToolResults\(quizSteps\);\s*return quizCards\(loaded\)\.map\(\(entry\) => <CreatedQuizCard key=\{entry\.key\} message=\{entry\.step\} refused=\{entry\.refused\} \/>\);/);
   const hook = readFileSync(join(here, 'use-tool-result.ts'), 'utf8');
