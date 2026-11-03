@@ -45,7 +45,7 @@ test('a case chat answer splits its draft into the main chat’s card', () => {
   // chat's own context, drawn where the page keeps room for it.
   assert.match(
     embedded,
-    /panelHost\.element && !isLoadingHistory\s*\? createPortal\(<SidePanelSlot messages=\{messages\} streamingText=\{streamingText\} \/>, panelHost\.element\)/,
+    /panelHost\.element && !isLoadingHistory\s*\? createPortal\(<SidePanelSlot messages=\{messages\} streamingText=\{streamingText\} onMachineResumed=\{onMachineResumed\} \/>, panelHost\.element\)/,
   );
 });
 
