@@ -81,7 +81,7 @@ import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './
 import { isTurnRow, lastTurnRow } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import { largestSavedId, savedTurnId } from './saved-turn';
-import { STALL_CHECK_MS, stallVerdict, type StallVerdict } from './stall';
+import { STALL_CHECK_MS, hiddenDuring, quietCheckDue, stallVerdict, type StallVerdict } from './stall';
 import { reportChatError } from '../chat-errors/report';
 import type { IBlockedReason } from '@/types/message-pack';
 
@@ -454,6 +454,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   let lastProgressAt = 0;
   /** Set when the transport reconnects after a drop, then to the moment it is back. */
   let reconnectingSince = 0;
+  /** When the quiet stream last had its status check (`quietCheckDue`); 0 = not yet. */
+  let quietCheckedAt = 0;
+  /** When the page last went hidden while a stream was open, and when it came back (`hiddenDuring`). */
+  let hiddenFrom = 0;
+  let hiddenUntil = 0;
   /**
    * The server said `stream_paused`: it closes this connection at its 5-minute
    * limit while the answer goes on (the 5-minute stream fix, 29 October 2026).
@@ -803,6 +808,41 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       clearInterval(watchdog);
       watchdog = null;
     }
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisibility);
+  }
+
+  /**
+   * The watchdog's look at the stream: a stall is recovered (`recoverFromStall`),
+   * and a stream quiet past one missed heartbeat has its status checked once
+   * while it stays open (`checkStaleStream`), so a saved answer whose final
+   * event never came is loaded then.
+   */
+  function watch() {
+    const now = Date.now();
+    const verdict = stallVerdict({ now, lastEventAt: lastEventTime, lastProgressAt, reconnectingSince });
+    if (verdict !== 'live') {
+      recoverFromStall(verdict);
+      return;
+    }
+    if (quietCheckDue({ now, lastEventAt: lastEventTime, checkedAt: quietCheckedAt })) {
+      quietCheckedAt = now;
+      void checkStaleStream({ quietSince: lastEventTime });
+    }
+  }
+
+  /**
+   * The page went to the background or came back. The time away is noted, so a
+   * gap a phone made by freezing the page is reported apart from a stall, and on
+   * return the stream is looked at at once, not on the next second.
+   */
+  function onVisibility() {
+    if (document.visibilityState === 'hidden') {
+      hiddenFrom = Date.now();
+      hiddenUntil = 0;
+      return;
+    }
+    hiddenUntil = Date.now();
+    if (watchdog) watch();
   }
 
   function startWatchdog() {
@@ -810,15 +850,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     lastEventTime = Date.now();
     reconnectingSince = 0;
     pausedRoll = false;
-    watchdog = setInterval(() => {
-      const verdict = stallVerdict({
-        now: Date.now(),
-        lastEventAt: lastEventTime,
-        lastProgressAt,
-        reconnectingSince,
-      });
-      if (verdict !== 'live') recoverFromStall(verdict);
-    }, STALL_CHECK_MS);
+    quietCheckedAt = 0;
+    hiddenUntil = 0;
+    hiddenFrom = typeof document !== 'undefined' && document.visibilityState === 'hidden' ? Date.now() : 0;
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisibility);
+    watchdog = setInterval(watch, STALL_CHECK_MS);
   }
 
   /**
@@ -837,15 +873,27 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       eventSource.close();
       eventSource = null;
     }
-    const quietMs = Date.now() - (verdict === 'silent' ? lastEventTime : reconnectingSince);
-    reportChatError({
-      code: 'stream_stall',
-      message:
-        verdict === 'silent'
-          ? `No stream event for ${Math.round(quietMs / 1000)} s; followed the turn by its status.`
-          : `Reconnected, then no progress for ${Math.round(quietMs / 1000)} s; followed the turn by its status.`,
-      conversationId,
-    });
+    const now = Date.now();
+    const quietMs = now - (verdict === 'silent' ? lastEventTime : reconnectingSince);
+    const hiddenMs = hiddenDuring({ now, lastEventAt: lastEventTime, hiddenFrom, hiddenUntil });
+    reportChatError(
+      hiddenMs > 0
+        ? {
+            code: 'stream_background',
+            message: `The page was in the background for ${Math.round(hiddenMs / 1000)} s of ${Math.round(quietMs / 1000)} s with no stream event; followed the turn by its status.`,
+            conversationId,
+            executionId,
+          }
+        : {
+            code: 'stream_stall',
+            message:
+              verdict === 'silent'
+                ? `No stream event for ${Math.round(quietMs / 1000)} s; followed the turn by its status.`
+                : `Reconnected, then no progress for ${Math.round(quietMs / 1000)} s; followed the turn by its status.`,
+            conversationId,
+            executionId,
+          },
+    );
     reconnectingSince = 0;
     pausedRoll = false;
     reconnectCount = 0;
@@ -860,7 +908,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // ─── Stale-stream check ──────────────────────────────────────────────────────
   // SSE alive (heartbeats flowing) but no data — e.g. another tab already consumed
   // the terminal events. Confirm via status and finalize from the DB if finished.
-  async function checkStaleStream() {
+  // Also asked by the watchdog for a stream with no event at all for a while
+  // (`quiet`, `STALL_QUIET_CHECK_MS`): a saved answer whose final event never
+  // came is loaded then, and reported, since the server cannot see it.
+  async function checkStaleStream(quiet?: { quietSince: number }) {
     const convId = conversationId;
     if (!convId || staleCheckInFlight) return;
     staleCheckInFlight = true;
@@ -870,7 +921,30 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // The stream finished the turn itself while the status was on its way:
       // its terminal already drew the answer, so nothing is reloaded over it.
       if (eventSource !== checked) return;
+      // The quiet stream spoke again while the status was on its way: it is
+      // alive, and finishes the turn itself.
+      if (quiet && lastEventTime !== quiet.quietSince) return;
       if (response.data.status !== 'pending') {
+        if (quiet) {
+          const now = Date.now();
+          const quietMs = now - quiet.quietSince;
+          const hiddenMs = hiddenDuring({ now, lastEventAt: quiet.quietSince, hiddenFrom, hiddenUntil });
+          reportChatError(
+            hiddenMs > 0
+              ? {
+                  code: 'stream_background',
+                  message: `The page was in the background for ${Math.round(hiddenMs / 1000)} s of ${Math.round(quietMs / 1000)} s with no stream event; loaded the saved answer.`,
+                  conversationId: convId,
+                  executionId,
+                }
+              : {
+                  code: 'stream_end_missing',
+                  message: `The answer was saved, but the stream's final event never came (${Math.round(quietMs / 1000)} s quiet); loaded the saved answer.`,
+                  conversationId: convId,
+                  executionId,
+                },
+          );
+        }
         stopWatchdog();
         if (eventSource) {
           eventSource.close();
@@ -1754,6 +1828,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           code: 'stream_stall',
           message: 'The stream ended before the answer was complete; followed the turn by its status.',
           conversationId: convId,
+          executionId: execId,
         });
         reconnectCount = 0;
         reconnectingSince = 0;
