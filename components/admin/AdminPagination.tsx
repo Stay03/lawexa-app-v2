@@ -57,7 +57,7 @@ export function AdminPagination({
             value={String(perPage)}
             onValueChange={(value) => onPerPageChange(parseInt(value))}
           >
-            <SelectTrigger className="h-8 w-[92px] shrink-0">
+            <SelectTrigger className="h-8 shrink-0">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
