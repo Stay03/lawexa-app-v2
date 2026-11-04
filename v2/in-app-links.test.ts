@@ -15,8 +15,10 @@ import { isMigratedToV2 } from './routes.manifest';
 
 /** v1 pages v2 links to on purpose: each renders a page of its own. `/admin`
  *  is the admin dashboard, reached from the account menu by an admin only
- *  (Stay, 26 October 2026); v2 has no admin pages. */
-const V1_PAGES_V2_SENDS_TO = new Set(['/login', '/register', '/check-email', '/ambassadors', '/admin']);
+ *  (Stay, 26 October 2026); v2 has no admin pages. `/wrapped` is Lawexa
+ *  Wrapped, a root route that answers everybody alike (app/wrapped, 4 November
+ *  2026), opened from the home banner and the menu. */
+const V1_PAGES_V2_SENDS_TO = new Set(['/login', '/register', '/check-email', '/ambassadors', '/admin', '/wrapped']);
 
 const V2_ROOT = join(process.cwd(), 'v2');
 

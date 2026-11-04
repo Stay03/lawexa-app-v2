@@ -47,6 +47,8 @@ import {
   type ProfileFormValues,
 } from './form-model';
 import { useSaveProfile } from './mutations';
+import { mayHaveWrapped } from '@/lib/wrapped/access';
+import { WrappedPrivacyGroup } from '@/v2/features/wrapped/WrappedPrivacyGroup';
 import { profileQueries, universityQueries } from './queries';
 import {
   ProfileErrorState,
@@ -150,6 +152,7 @@ export function ProfileScreen() {
       {/* Keyed on the account, so signing in as somebody else re-seeds the form
           rather than showing one person's edits over another's record. */}
       <ProfileForm key={user.id} user={user} />
+      {mayHaveWrapped(user) ? <WrappedPrivacyGroup user={user} /> : null}
     </ProfileColumn>
   );
 }

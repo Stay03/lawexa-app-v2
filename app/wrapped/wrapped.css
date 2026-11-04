@@ -1,0 +1,416 @@
+/*
+ * Lawexa Wrapped, Bar Finals edition (thread f833c285). Loaded only by the
+ * /wrapped route. Colours come from lib/wrapped/theme.ts as CSS variables (the
+ * share image reads the same file); fonts come from app/wrapped/layout.tsx: Unbounded for display, Inter
+ * for body. Every frame is a 9:16 box (`.wr-frame`, container-type: size), and
+ * sizes inside it are in container units, so a frame lays out the same on a
+ * 360-pixel phone and a desktop window: 1cqw is 1/100 of the frame's width.
+ */
+
+.wrapped-root {
+  /* --wr-cream, --wr-ink, --wr-gold, --wr-lilac, --wr-coral, --wr-lime, --wr-ink-soft and
+     --wr-cream-soft are set by app/wrapped/layout.tsx from lib/wrapped/theme.ts, the one
+     place the colours live. */
+  --wr-display: var(--font-wrapped-display), 'Arial Black', system-ui, sans-serif;
+  --wr-body: var(--font-wrapped-body), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--wr-body);
+  color: var(--wr-ink);
+  background: var(--wr-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── The story viewer ─────────────────────────────────────────────────────── */
+
+.wr-stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--wr-ink);
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  z-index: 50;
+}
+
+/* As large as fits: full height on a phone, a centred column on a desktop. */
+.wr-viewport {
+  position: relative;
+  height: 100%;
+  max-height: 100dvh;
+  aspect-ratio: 9 / 16;
+  max-width: 100vw;
+}
+
+@media (max-aspect-ratio: 9 / 16) {
+  .wr-viewport {
+    height: auto;
+    width: 100vw;
+  }
+}
+
+@media (min-width: 768px) {
+  .wr-viewport {
+    height: min(100dvh - 48px, 920px);
+    border-radius: 20px;
+    overflow: hidden;
+  }
+}
+
+.wr-frame {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 18cqw 8cqw 10cqw;
+  gap: 4cqw;
+}
+
+.wr-frame[data-ground='cream'] {
+  background: var(--wr-cream);
+  color: var(--wr-ink);
+}
+
+.wr-frame[data-ground='ink'] {
+  background: var(--wr-ink);
+  color: var(--wr-cream);
+}
+
+/* A frame's arrival: the parts rise in, once (the viewer's one motion moment). */
+.wr-rise {
+  animation: wr-rise 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@keyframes wr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(3cqw);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-rise {
+    animation: none;
+  }
+}
+
+.wr-progress {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 3cqw);
+  left: 4cqw;
+  right: 4cqw;
+  display: flex;
+  gap: 1.2cqw;
+  z-index: 3;
+  container-type: inline-size;
+}
+
+.wr-progress > span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, currentColor 28%, transparent);
+  overflow: hidden;
+}
+
+.wr-progress > span > i {
+  display: block;
+  height: 100%;
+  background: currentColor;
+  transform-origin: left;
+}
+
+.wr-chrome {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 6cqw);
+  left: 4cqw;
+  right: 4cqw;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 3;
+  font: 600 3.4cqw/1 var(--wr-body);
+}
+
+.wr-chrome button {
+  display: grid;
+  place-items: center;
+  width: 9cqw;
+  height: 9cqw;
+  min-width: 40px;
+  min-height: 40px;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+}
+
+.wr-chrome button:focus-visible,
+.wr-share-bar button:focus-visible,
+.wr-share-bar a:focus-visible {
+  outline: 3px solid var(--wr-gold);
+  outline-offset: 2px;
+}
+
+/* ── Type inside a frame ──────────────────────────────────────────────────── */
+
+.wr-kicker {
+  font: 600 3.8cqw/1.2 var(--wr-body);
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.wr-title {
+  font: 800 10.5cqw/1.02 var(--wr-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.wr-huge {
+  font: 800 22cqw/0.95 var(--wr-display);
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.wr-big {
+  font: 800 8cqw/1.05 var(--wr-display);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.wr-body {
+  font: 500 4.6cqw/1.35 var(--wr-body);
+  text-wrap: pretty;
+}
+
+.wr-small {
+  font: 500 3.6cqw/1.35 var(--wr-body);
+  opacity: 0.85;
+}
+
+.wr-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A sticker: a slightly tilted label with a hard edge. */
+.wr-sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 2cqw;
+  align-self: flex-start;
+  padding: 2.4cqw 4.4cqw;
+  border-radius: 999px;
+  border: 0.8cqw solid currentColor;
+  font: 800 4.6cqw/1 var(--wr-display);
+  transform: rotate(-3deg);
+}
+
+.wr-sticker[data-tone='gold'] {
+  background: var(--wr-gold);
+  color: var(--wr-ink);
+  border-color: var(--wr-ink);
+}
+
+.wr-sticker[data-tone='ink'] {
+  background: var(--wr-ink);
+  color: var(--wr-gold);
+  border-color: var(--wr-ink);
+}
+
+/* Frame 01: the report slip. */
+.wr-slip {
+  background: color-mix(in srgb, var(--wr-cream) 55%, white);
+  color: var(--wr-ink);
+  border: 0.6cqw solid var(--wr-ink);
+  border-radius: 2cqw;
+  padding: 5cqw 5cqw 4cqw;
+  transform: rotate(-2.5deg);
+  box-shadow: 2cqw 2.4cqw 0 var(--wr-ink);
+}
+
+.wr-slip-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1cqw 3cqw;
+  padding: 2.6cqw 0;
+  border-top: 0.3cqw dashed color-mix(in srgb, var(--wr-ink) 40%, transparent);
+}
+
+.wr-done {
+  font: 800 3.4cqw/1 var(--wr-display);
+  color: var(--wr-coral);
+  border: 0.5cqw solid currentColor;
+  border-radius: 1cqw;
+  padding: 1.2cqw 1.8cqw;
+  transform: rotate(-8deg);
+  grid-row: span 2;
+}
+
+/* A list of ranked items (frame 03). */
+.wr-list {
+  display: grid;
+  gap: 1.8cqw;
+  counter-reset: wr-rank;
+}
+
+.wr-list > li {
+  display: grid;
+  grid-template-columns: 6cqw 1fr auto;
+  gap: 2cqw;
+  align-items: baseline;
+  font: 600 4.2cqw/1.25 var(--wr-body);
+}
+
+.wr-list > li::before {
+  counter-increment: wr-rank;
+  content: counter(wr-rank);
+  font: 800 4.2cqw/1 var(--wr-display);
+}
+
+/* Placeholder art: where a frame's illustration lands from Arthur's canvas. */
+.wr-art {
+  margin-top: auto;
+  align-self: stretch;
+  min-height: 22cqw;
+  border-radius: 4cqw;
+  background:
+    radial-gradient(circle at 20% 30%, color-mix(in srgb, currentColor 18%, transparent) 0 6cqw, transparent 6.2cqw),
+    radial-gradient(circle at 70% 60%, color-mix(in srgb, currentColor 12%, transparent) 0 10cqw, transparent 10.2cqw);
+}
+
+/* ── Frame 08: the share card and its bar (app UI, not in the image) ────── */
+
+.wr-share-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wr-share-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4cqw 4cqw calc(env(safe-area-inset-bottom, 0px) + 4cqw);
+  background: linear-gradient(to top, var(--wr-ink) 70%, transparent);
+  color: var(--wr-cream);
+  display: grid;
+  gap: 2.4cqw;
+  z-index: 4;
+  container-type: inline-size;
+}
+
+.wr-share-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2cqw;
+  min-height: 48px;
+  border-radius: 999px;
+  background: var(--wr-gold);
+  color: var(--wr-ink);
+  font: 800 4.2cqw/1 var(--wr-display);
+}
+
+.wr-share-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2cqw;
+}
+
+.wr-share-row > * {
+  display: grid;
+  justify-items: center;
+  gap: 1.2cqw;
+  min-height: 48px;
+  padding: 1.6cqw 0;
+  border-radius: 3cqw;
+  font: 600 2.9cqw/1.1 var(--wr-body);
+  color: var(--wr-cream);
+  background: color-mix(in srgb, var(--wr-cream) 10%, transparent);
+  text-decoration: none;
+}
+
+/* ── The landing page (lawexa.com/wrapped for a non-user) ─────────────────── */
+
+.wr-landing {
+  min-height: 100dvh;
+  background: var(--wr-cream);
+  color: var(--wr-ink);
+  padding-inline: 20px;
+}
+
+.wr-landing-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding-block: 28px 64px;
+  display: grid;
+  gap: 48px;
+}
+
+.wr-landing h1 {
+  font: 800 clamp(2.6rem, 8vw, 5.4rem)/0.98 var(--wr-display);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.wr-landing h2 {
+  font: 800 clamp(1.4rem, 3.4vw, 2rem)/1.1 var(--wr-display);
+  letter-spacing: -0.01em;
+}
+
+.wr-landing p {
+  font: 500 1.0625rem/1.55 var(--wr-body);
+  max-width: 60ch;
+  color: var(--wr-ink-soft);
+}
+
+.wr-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 28px;
+  border-radius: 999px;
+  background: var(--wr-ink);
+  color: var(--wr-cream);
+  font: 800 1rem/1 var(--wr-display);
+  text-decoration: none;
+}
+
+.wr-cta[data-tone='gold'] {
+  background: var(--wr-gold);
+  color: var(--wr-ink);
+}
+
+.wr-cta:focus-visible {
+  outline: 3px solid var(--wr-gold);
+  outline-offset: 3px;
+}
+
+.wr-landing-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.wr-landing-card {
+  border: 2px solid var(--wr-ink);
+  border-radius: 20px;
+  padding: 20px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.wr-landing-card strong {
+  font: 800 1.15rem/1.2 var(--wr-display);
+}

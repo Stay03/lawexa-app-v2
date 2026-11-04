@@ -10,6 +10,7 @@ import {
   PenSquare,
   Scale,
   BookText,
+  Sparkles,
   Tag,
   type LucideIcon,
 } from 'lucide-react';
@@ -83,6 +84,11 @@ export interface V2NavItem extends V2NavLeaf {
    * role. Takes the place of `canAccess` on that row.
    */
   teamChannels?: true;
+  /**
+   * The row is Lawexa Wrapped: shown only while the signed-in student has a
+   * Wrapped to open (until 31 December 2026), never by role.
+   */
+  wrapped?: true;
   /** Optional live unread signal on this row. See {@link V2NavSignalId}. */
   signalId?: V2NavSignalId;
   /**
@@ -107,6 +113,8 @@ export function isNavItemActive(
 export interface V2NavViewer {
   role: UserRole | null;
   canAccessTeamChannels: boolean;
+  /** The student has a Lawexa Wrapped to open (v2/features/wrapped/queries.ts). */
+  hasWrapped?: boolean;
 }
 
 /** The gold primary action pinned at the top of the sidebar / bottom of the drawer. */
@@ -201,6 +209,10 @@ export const v2NavItems: V2NavItem[] = [
     icon: Tag,
     canAccess: isVisitor,
   },
+  // LAWEXA WRAPPED, Bar Finals edition (thread f833c285, live 8 November
+  // 2026): in the menu until 31 December, so a finalist can come back and share
+  // again. Only for a student who has one; it opens the full-screen story.
+  { label: 'Your Wrapped', href: '/wrapped', icon: Sparkles, wrapped: true },
 ];
 
 /** No account yet: signed out, or browsing on a guest pass. */
@@ -214,6 +226,10 @@ function isVisitor(role: UserRole | null): boolean {
  */
 export function visibleNavItems(viewer: V2NavViewer): V2NavItem[] {
   return v2NavItems.filter((item) =>
-    item.teamChannels ? viewer.canAccessTeamChannels : (item.canAccess?.(viewer.role) ?? true),
+    item.wrapped
+      ? viewer.hasWrapped === true
+      : item.teamChannels
+        ? viewer.canAccessTeamChannels
+        : (item.canAccess?.(viewer.role) ?? true),
   );
 }

@@ -9,6 +9,7 @@ import { HomeComposer } from './HomeComposer';
 import { HomeComposerProvider, useHomeComposer } from './home-composer-context';
 import { useAskArrival } from './composer/ask-param';
 import { HOME_COMPOSER_DOCK, HOME_DOCK_FADE, HOME_FRAME, HOME_FRAME_CONTENT } from './home-frame';
+import { WrappedHomeBanner } from '@/v2/features/wrapped/WrappedHomeBanner';
 
 /**
  * HomeFrame — the home layout's body: the tab's content, and under it the ONE
@@ -36,7 +37,10 @@ export function HomeFrame({ children }: { children: ReactNode }) {
   return (
     <HomeComposerProvider key={userId ?? 'visitor'}>
       <div className={HOME_FRAME}>
-        <div className={HOME_FRAME_CONTENT}>{children}</div>
+        <div className={HOME_FRAME_CONTENT}>
+          {signedIn ? <WrappedHomeBanner /> : null}
+          {children}
+        </div>
         <HomeDock signedIn={signedIn} role={role ?? undefined} />
       </div>
     </HomeComposerProvider>

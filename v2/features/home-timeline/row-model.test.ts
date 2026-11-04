@@ -606,7 +606,8 @@ test('one chat box, in the home layout, under all three tabs, at the foot of the
     assert.match(read('app', 'v2', '(home)', ...page), /return <V2Home tab="(chat|work|study)" \/>;/);
   }
   const frame = read('v2', 'shell', 'designs', 'HomeFrame.tsx');
-  assert.match(frame, /<HomeComposerProvider key=\{userId \?\? 'visitor'\}>\s*<div className=\{HOME_FRAME\}>\s*<div className=\{HOME_FRAME_CONTENT\}>\{children\}<\/div>\s*<HomeDock signedIn=\{signedIn\} role=\{role \?\? undefined\} \/>/);
+  // Lawexa Wrapped's banner (8 November to 31 December 2026) sits above the tab's content, inside it.
+  assert.match(frame, /<HomeComposerProvider key=\{userId \?\? 'visitor'\}>\s*<div className=\{HOME_FRAME\}>\s*<div className=\{HOME_FRAME_CONTENT\}>\s*\{signedIn \? <WrappedHomeBanner \/> : null\}\s*\{children\}\s*<\/div>\s*<HomeDock signedIn=\{signedIn\} role=\{role \?\? undefined\} \/>/);
   assert.match(frame, /<div data-home-dock="" className=\{HOME_COMPOSER_DOCK\}>\s*<div aria-hidden className=\{HOME_DOCK_FADE\} \/>\s*\{\/\*[\s\S]*?\*\/\}\s*<div ref=\{areaRef\} className="md:mx-auto md:w-full md:max-w-md">\s*<HomeComposer/);
   // On a computer the box is the Space's size (Stay, 24 October 2026: "Use
   // the one in the space area its smaller"), with its text size.

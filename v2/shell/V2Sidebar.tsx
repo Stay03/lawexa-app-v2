@@ -50,6 +50,7 @@ import {
 import { MoveFirstLink } from './move-first';
 import { RecentChatLabel, recentSpaceName } from './recent-chat-label';
 import { isAccountRole } from '@/v2/runtime/account';
+import { useHasWrapped } from '@/v2/features/wrapped/queries';
 
 /**
  * V2Sidebar — the desktop navigation rail, built on the shadcn sidebar
@@ -190,6 +191,8 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
   // early-return too.
   const freshIds = useFreshIds(recents.map((row) => row.id));
 
+  // Read before the mobile return: a hook may not sit behind a branch.
+  const hasWrapped = useHasWrapped();
   if (isMobile) return null;
 
   const isActive = (href: string) =>
@@ -202,6 +205,7 @@ export function V2Sidebar({ user }: { user: SessionUser | null }) {
   const navItems = visibleNavItems({
     role: user?.role ?? null,
     canAccessTeamChannels: user?.can_access_team_channels ?? false,
+    hasWrapped,
   });
 
   return (

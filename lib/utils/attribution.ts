@@ -145,6 +145,7 @@ function buildPayload(): AttributionPayload {
  */
 export function captureAttribution(): void {
   if (typeof window === 'undefined') return;
+  captureWrappedShare();
   if (sessionStorage.getItem(ATTRIBUTION_KEY) !== null) return;
 
   const payload = buildPayload();
@@ -203,7 +204,47 @@ export function getStoredAttribution(): AttributionPayload {
     if (remembered) payload.referral_code = remembered.code;
   }
 
+  const wrapped = readWrappedShare();
+  if (wrapped) payload.wrapped_share_code = wrapped;
+
   return payload;
+}
+
+/**
+ * A LAWEXA WRAPPED SHARE IS ITS OWN CREDIT (thread f833c285, 4 November 2026).
+ * A finalist posts their card; a friend taps `lawexa.com/wrapped?r=CODE` and
+ * signs up, maybe days later. The code goes up as `wrapped_share_code`, beside
+ * and never instead of an ambassador's `referral_code`. It is read on every
+ * visit to /wrapped, not only a tab's first page, since a friend may already be
+ * browsing when they tap, and it is remembered for the same 30 days.
+ */
+const WRAPPED_SHARE_KEY = 'lawexa-wrapped-share';
+
+function captureWrappedShare(): void {
+  if (!window.location.pathname.startsWith('/wrapped')) return;
+  const code = clamp(new URLSearchParams(window.location.search).get('r'), UTM_MAX);
+  if (!code || !REFERRAL_CODE_RE.test(code)) return;
+  try {
+    localStorage.setItem(WRAPPED_SHARE_KEY, JSON.stringify({ code, at: Date.now() }));
+  } catch {
+    // Storage refused: the code rides this visit only.
+  }
+}
+
+function readWrappedShare(): string | null {
+  try {
+    const raw = localStorage.getItem(WRAPPED_SHARE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { code?: unknown; at?: unknown };
+    if (typeof parsed.code !== 'string' || !REFERRAL_CODE_RE.test(parsed.code)) return null;
+    if (typeof parsed.at !== 'number' || Date.now() - parsed.at > REFERRAL_MEMORY_MS) {
+      localStorage.removeItem(WRAPPED_SHARE_KEY);
+      return null;
+    }
+    return parsed.code;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -220,6 +261,7 @@ export function clearAttribution(): void {
      not bring. */
   try {
     localStorage.removeItem(REFERRAL_KEY);
+    localStorage.removeItem(WRAPPED_SHARE_KEY);
   } catch {
     // Storage refused. Nothing was remembered to begin with.
   }

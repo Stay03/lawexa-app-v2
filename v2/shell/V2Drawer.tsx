@@ -51,6 +51,7 @@ import {
   readContent,
   type ArmedDrawerClose,
 } from './drawer-close';
+import { useHasWrapped } from '@/v2/features/wrapped/queries';
 
 /**
  * V2Drawer — the mobile navigation drawer (Nav D, locked). ChatGPT-style
@@ -263,9 +264,11 @@ export function V2Drawer({ user }: { user: SessionUser | null }) {
   const freshIds = useFreshIds(recents.map((row) => row.id));
   // Same filter, same source, same server-verified role as the rail — see
   // `visibleNavItems`. The two surfaces cannot drift on what exists.
+  const hasWrapped = useHasWrapped();
   const navItems = visibleNavItems({
     role: user?.role ?? null,
     canAccessTeamChannels: user?.can_access_team_channels ?? false,
+    hasWrapped,
   });
   // The Channels row's live unread signal. Read UNCONDITIONALLY (a hook may
   // not be called behind a branch) and off the cache entry the realtime spine

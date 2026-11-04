@@ -90,6 +90,8 @@ export interface User {
    * (v2/features/redesign-intro/model.ts).
    */
   v2_intro_seen_at?: string | null;
+  /** Hide from Wrapped is on (Lawexa Wrapped, 4 November 2026). Only on the caller's own user; absent means off. */
+  wrapped_hidden?: boolean;
 }
 
 export interface AuthResponse {
@@ -155,4 +157,6 @@ export interface AttributionPayload {
   referrer_url?: string;
   landing_url?: string;
   referral_code?: string;
+  /** The code on a Lawexa Wrapped share (`/wrapped?r=CODE`), so sign-ups count per sharer. Separate from an ambassador's referral_code. */
+  wrapped_share_code?: string;
 }
