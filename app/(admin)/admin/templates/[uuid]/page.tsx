@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useMemo, useState } from 'react';
+import { use, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Download, Loader2, RotateCw, Trash2, Undo2 } from 'lucide-react';
@@ -31,6 +31,7 @@ import {
   useTemplateAction,
   useUpdateTemplate,
 } from '@/lib/hooks/useAdminTemplates';
+import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import type { AdminTemplateDetail } from '@/types/admin-templates';
 
 const NO_COUNTRY = '_none';
@@ -47,6 +48,14 @@ export default function AdminTemplateReviewPage({ params }: { params: Promise<{ 
   const { uuid } = use(params);
   const template = useAdminTemplate(uuid);
 
+  // The breadcrumb names the template, not its id.
+  const { setOverride, clearOverride } = useBreadcrumbStore();
+  const title = template.data ? template.data.name || template.data.source.original_name : null;
+  useEffect(() => {
+    if (title) setOverride(uuid, title);
+    return () => clearOverride(uuid);
+  }, [title, uuid, setOverride, clearOverride]);
+
   if (template.isPending) return <ReviewSkeleton />;
   if (template.isError || !template.data) {
     return (
@@ -61,8 +70,9 @@ export default function AdminTemplateReviewPage({ params }: { params: Promise<{ 
       </div>
     );
   }
-  // Keyed on the template's last change, so a save, a retry or a new reading starts the form from the server's copy.
-  return <TemplateReview key={`${template.data.uuid}:${template.data.updated_at}:${template.data.status}`} detail={template.data} />;
+  // Keyed on the status, so a retry or a finished reading starts the form from the server's copy. A save
+  // keeps the form (its fields then match what was saved), so "Approve, make live" can save and approve in one go.
+  return <TemplateReview key={`${template.data.uuid}:${template.data.status}`} detail={template.data} />;
 }
 
 function TemplateReview({ detail }: { detail: AdminTemplateDetail }) {

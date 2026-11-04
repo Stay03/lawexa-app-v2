@@ -96,7 +96,7 @@ export function TemplatesTable({
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.uuid}>
-              <TableCell className="max-w-[320px]">
+              <TableCell className="max-w-[280px]">
                 <Link href={`/admin/templates/${row.uuid}`} className="block truncate font-medium hover:underline">
                   {row.name || row.source.original_name}
                 </Link>
@@ -107,7 +107,7 @@ export function TemplatesTable({
               <TableCell>{row.practice_area ?? <span className="text-muted-foreground">—</span>}</TableCell>
               <TableCell>{row.document_type ?? <span className="text-muted-foreground">—</span>}</TableCell>
               <TableCell>{row.country?.name ?? <span className="text-muted-foreground">—</span>}</TableCell>
-              <TableCell className="max-w-[240px]">
+              <TableCell className="max-w-[200px]">
                 <TemplateStatusBadge status={row.status} />
                 {row.status === 'failed' && row.error ? (
                   <p className="mt-1 line-clamp-2 text-xs text-red-700 dark:text-red-400">{row.error}</p>
@@ -116,9 +116,9 @@ export function TemplatesTable({
               <TableCell className="text-right tabular-nums text-muted-foreground">
                 {row.status === 'processing' ? '—' : blanksLabel(row.blanks_count)}
               </TableCell>
-              <TableCell className="whitespace-nowrap">
-                <p className="text-sm">{row.uploaded_by?.name ?? '—'}</p>
-                <p className="text-xs text-muted-foreground">{whenLabel(row.created_at)}</p>
+              <TableCell className="max-w-[150px]">
+                <p className="truncate text-sm">{row.uploaded_by?.name ?? '—'}</p>
+                <p className="whitespace-nowrap text-xs text-muted-foreground">{whenLabel(row.created_at)}</p>
               </TableCell>
               <TableCell>
                 <DropdownMenu>
