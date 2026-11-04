@@ -103,18 +103,19 @@ export function foldersLabel(count: number): string {
 }
 
 /**
- * The folders a file sits in below the top folder, as its suggested practice
- * area (Arthur, 4 November 2026: his folders are named that way):
- * `Library/Property/Leases/lease.docx` gives "Property / Leases". The server
- * takes the nearest name that is one of Lawexa's practice areas, then the one
- * above it, so Leases inside Property becomes Property. A file in the top
- * folder itself, or dropped loose, gives none. Over the server's 255
- * characters, the folders farthest from the file go first.
+ * The folders a file sits in, the top folder included, as its suggested
+ * practice area (Arthur, 4 November 2026: his library is filed by area):
+ * `Property/Leases/lease.docx` gives "Property / Leases", and a file directly
+ * in a top folder called Property gives "Property". The server takes the
+ * nearest name that is one of Lawexa's practice areas, then the one above it,
+ * so Leases inside Property becomes Property, and a top folder such as
+ * "Library" is passed over. A file dropped loose gives none. Over the
+ * server's 255 characters, the folders farthest from the file go first.
  */
 export function folderPathOf(path: string): string | null {
   const folders = path
     .split('/')
-    .slice(1, -1)
+    .slice(0, -1)
     .map((name) => name.trim())
     .filter((name) => name !== '');
   while (folders.length > 1 && folders.join(FOLDER_PATH_JOIN).length > PRACTICE_AREA_MAX) folders.shift();
@@ -135,8 +136,7 @@ export interface UploadBatch<F> {
 /**
  * A folder upload's requests, 20 files at most each. With `byFolder`, the
  * files of one folder go together, its path as their practice area
- * (`folderPathOf`), and the top folder's own files go without one; without
- * it, the files go in the order found, with none.
+ * (`folderPathOf`); without it, the files go in the order found, with none.
  */
 export function batchesFor<F extends { name: string; size: number }>(
   files: readonly FolderFile<F>[],

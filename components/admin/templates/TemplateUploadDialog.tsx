@@ -42,12 +42,6 @@ const NOTHING_YET = { created: 0, refused: [] as Refused[] };
 
 const fileCount = (batches: readonly UploadBatch<File>[]) => batches.reduce((sum, batch) => sum + batch.files.length, 0);
 
-/** "Leases, Property and Corporate", "Leases, Property, Corporate and 4 more". */
-function areasLine(areas: readonly string[]): string {
-  if (areas.length <= 3) return areas.length > 1 ? `${areas.slice(0, -1).join(', ')} and ${areas[areas.length - 1]}` : areas.join('');
-  return `${areas.slice(0, 3).join(', ')} and ${areas.length - 3} more`;
-}
-
 /**
  * Upload templates (Arthur loads his library, over 300 files in folders with
  * subfolders): pick or drop up to 20 Word, RTF and PDF files, or a whole
@@ -218,8 +212,8 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
                   <label htmlFor="template-folder-areas" className="min-w-0 flex-1 cursor-pointer">
                     <span className="block font-medium">Use each folder&rsquo;s name as the practice area</span>
                     <span className="block text-muted-foreground">
-                      {areasLine(areas)}. A folder name that is not one of Lawexa&rsquo;s practice areas is passed over for the folder
-                      above it; if none matches, Lawexa works it out from the document, as it does for files in {folder.name} itself.
+                      Each file&rsquo;s folders are checked from the nearest up; the first that is one of Lawexa&rsquo;s practice areas is
+                      used, otherwise Lawexa works it out from the document.
                     </span>
                   </label>
                 </div>
