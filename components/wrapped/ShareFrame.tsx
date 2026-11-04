@@ -110,17 +110,17 @@ export function ShareFrame({ record, fonts }: { record: WrappedRecord; fonts: Sh
   const xHref = `https://x.com/intent/post?text=${encodeURIComponent(`My post-Bar Finals vibe: ${vibeFor(record.vibe.id).line}`)}&url=${encodeURIComponent(link)}`;
 
   return (
-    <section className="wr-frame" data-ground="ink" aria-label="Your share card" style={{ padding: 0 }}>
-      {poster ? (
-        // eslint-disable-next-line @next/next/no-img-element -- a blob of the drawn poster, not a remote image
-        <img className="wr-share-preview" src={poster.url} alt={`Share card: ${vibeFor(record.vibe.id).line}`} />
-      ) : (
-        <div className="wr-share-preview" style={{ display: 'grid', placeItems: 'center' }} role="status">
-          <p className="wr-body" style={{ opacity: 0.7 }}>
+    <section className="wr-frame wr-share-frame" data-ground="ink" aria-label="Your share card">
+      <div className="wr-share-stage">
+        {poster ? (
+          // eslint-disable-next-line @next/next/no-img-element -- a blob of the drawn poster, not a remote image
+          <img className="wr-share-preview" src={poster.url} alt={`Share card: ${vibeFor(record.vibe.id).line}`} />
+        ) : (
+          <p className="wr-body" role="status" style={{ opacity: 0.7 }}>
             {failed ? 'Your card could not be drawn on this device.' : 'Drawing your card…'}
           </p>
-        </div>
-      )}
+        )}
+      </div>
       <div className="wr-share-bar" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
         <button type="button" className="wr-share-primary" disabled={!poster} onClick={() => void shareToStory('Saved. Add it to your WhatsApp Status.')}>
           <Share2 aria-hidden size={18} />

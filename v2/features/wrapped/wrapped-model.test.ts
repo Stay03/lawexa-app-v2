@@ -14,6 +14,22 @@ import {
 } from '@/lib/wrapped/copy';
 import { FRAME_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide } from '@/lib/wrapped/story-model';
 import { fitText, wrapWords } from '@/lib/wrapped/text-fit';
+import { shareLayout } from '@/lib/wrapped/share-image';
+import { SHARE_HEIGHT } from '@/lib/wrapped/theme';
+
+test('the share card’s bottom block never overlaps, and the face takes the room the vibe line leaves', () => {
+  for (const lineBottom of [300, 520, 640]) {
+    const at = shareLayout(lineBottom);
+    // Top to bottom: face (and its prop label), stickers, persona, name, link, all on the poster.
+    assert.ok(at.faceTop + at.faceSize + 38 + 40 <= at.stickersY, `face clears the stickers at ${lineBottom}`);
+    assert.ok(at.stickersY + 3 * at.stickerH + 2 * at.stickerGap < at.personaY);
+    assert.ok(at.personaY + at.personaH < at.nameY - 30);
+    assert.ok(at.nameY < at.footY && at.footY <= SHARE_HEIGHT - 60);
+    assert.ok(at.faceSize >= 320 && at.faceSize <= 600);
+  }
+  // A short line leaves room for the biggest face.
+  assert.equal(shareLayout(300).faceSize, 600);
+});
 
 /* Lawexa Wrapped, Bar Finals edition (thread f833c285, live 8 November 2026):
  * the vibe bank, the number rules and the story viewer's taps. */

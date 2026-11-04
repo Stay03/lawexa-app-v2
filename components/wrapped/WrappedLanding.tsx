@@ -30,7 +30,7 @@ export function WrappedLanding({ signedIn }: { signedIn: boolean }) {
           <div style={{ display: 'grid', gap: 20 }}>
             <p style={{ font: '700 0.95rem/1 var(--wr-body)', color: 'var(--wr-ink)' }}>Lawexa Wrapped · Bar Finals 2026</p>
             <h1>
-              Your Bar Finals year, <span style={{ background: 'var(--wr-gold)', padding: '0 0.12em', borderRadius: 8 }}>in eight cards.</span>
+              Your Bar Finals year, <span className="wr-mark">in eight cards.</span>
             </h1>
             <p>
               Every finalist who studied on Lawexa gets their own story: the courses you married, the overnights you pulled, the cases you
@@ -84,7 +84,12 @@ export function WrappedLanding({ signedIn }: { signedIn: boolean }) {
 
         <footer style={{ display: 'grid', gap: 8 }}>
           <p style={{ font: '800 clamp(1.4rem, 4vw, 2.2rem)/1.1 var(--wr-display)', color: 'var(--wr-ink)', maxWidth: 'none' }}>
-            {CAMPAIGN_LINE.join(' ')}
+            {CAMPAIGN_LINE.map((part, i) => (
+              <span key={part} className="wr-nowrap">
+                {part}
+                {i < CAMPAIGN_LINE.length - 1 ? ' ' : null}
+              </span>
+            ))}
           </p>
           <p style={{ fontSize: '0.9rem' }}>
             Only you see your Wrapped. Nothing posts unless you press Share, and your card shows your first name and last initial only.

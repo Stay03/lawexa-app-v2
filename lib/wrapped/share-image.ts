@@ -60,6 +60,25 @@ export function loadImage(url: string | null): Promise<HTMLImageElement | null> 
   });
 }
 
+/**
+ * Where everything sits on the 1080 × 1920 poster, worked out from the bottom
+ * edge up, so the bottom block (stickers, persona, name, link) never overlaps
+ * and the face takes the room the vibe line leaves. Pure, so a test pins it.
+ */
+export function shareLayout(lineBottom: number) {
+  const footY = SHARE_HEIGHT - PAD; // "Get yours · lawexa.com/wrapped"
+  const nameY = footY - 60;
+  const personaH = 96;
+  const personaY = nameY - 40 - 34 - personaH;
+  const stickerH = 108;
+  const stickerGap = 18;
+  const stickersY = personaY - 44 - (3 * stickerH + 2 * stickerGap);
+  const faceTop = lineBottom + 56;
+  const faceBottom = stickersY - 84; // room for the prop label under the card
+  const faceSize = Math.max(320, Math.min(600, faceBottom - faceTop));
+  return { footY, nameY, personaY, personaH, stickersY, stickerH, stickerGap, faceTop, faceSize };
+}
+
 export function drawShareCard(
   canvas: HTMLCanvasElement,
   record: WrappedRecord,
@@ -72,6 +91,7 @@ export function drawShareCard(
   if (!ctx) return;
   const vibe = vibeFor(record.vibe.id);
   const ink = WRAPPED_COLOURS.ink;
+  const cream = WRAPPED_COLOURS.cream;
   const display = (size: number) => `700 ${size}px ${fonts.display}`;
   const body = (size: number, weight = 500) => `${weight} ${size}px ${fonts.body}`;
   const measureDisplay: Measure = (text, size) => {
@@ -82,114 +102,115 @@ export function drawShareCard(
   // Ground, to the bottom edge.
   ctx.fillStyle = VIBE_BACKGROUNDS[vibe.colour];
   ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT);
-
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = ink;
+  ctx.textAlign = 'left';
 
   // The kicker and the vibe line.
-  let y = PAD + 52;
+  ctx.fillStyle = ink;
   ctx.font = body(40, 600);
+  let y = PAD + 52;
   ctx.fillText('My post-Bar Finals vibe:', PAD, y);
-  y += 36;
-  const line = fitText(vibe.line, { width: SHARE_WIDTH - PAD * 2, maxLines: 4, max: 104, min: 64 }, measureDisplay);
+  y += 30;
+  const line = fitText(vibe.line, { width: SHARE_WIDTH - PAD * 2, maxLines: 4, max: 104, min: 60 }, measureDisplay);
   ctx.font = display(line.size);
   for (const text of line.lines) {
     y += line.size * 1.08;
     ctx.fillText(text, PAD, y);
   }
+  const at = shareLayout(y + line.size * 0.25);
 
   // The face card: the photo, else the placeholder face; the prop sits on top.
-  const faceSize = 600;
-  const faceX = (SHARE_WIDTH - faceSize) / 2;
-  const faceY = Math.max(y + 64, 640);
+  const faceX = (SHARE_WIDTH - at.faceSize) / 2;
+  const radius = Math.round(at.faceSize * 0.09);
   ctx.save();
-  roundRect(ctx, faceX, faceY, faceSize, faceSize, 56);
-  ctx.fillStyle = WRAPPED_COLOURS.cream;
+  roundRect(ctx, faceX, at.faceTop, at.faceSize, at.faceSize, radius);
+  ctx.fillStyle = cream;
   ctx.fill();
   ctx.clip();
   if (photo) {
-    drawCover(ctx, photo, faceX, faceY, faceSize, faceSize);
+    drawCover(ctx, photo, faceX, at.faceTop, at.faceSize, at.faceSize);
   } else {
     ctx.fillStyle = ink;
-    ctx.font = display(260);
+    ctx.font = display(Math.round(at.faceSize * 0.44));
     ctx.textAlign = 'center';
-    ctx.fillText(record.student.first_name.charAt(0).toUpperCase() || 'L', SHARE_WIDTH / 2, faceY + faceSize / 2 + 92);
+    ctx.fillText(record.student.first_name.charAt(0).toUpperCase() || 'L', SHARE_WIDTH / 2, at.faceTop + at.faceSize * 0.66);
     ctx.textAlign = 'left';
   }
   ctx.restore();
   ctx.lineWidth = 10;
   ctx.strokeStyle = ink;
-  roundRect(ctx, faceX, faceY, faceSize, faceSize, 56);
+  roundRect(ctx, faceX, at.faceTop, at.faceSize, at.faceSize, radius);
   ctx.stroke();
   // The prop label stands in for the prop art until it arrives.
   ctx.font = body(32, 700);
   const propText = vibe.prop.toUpperCase();
-  const propWidth = Math.min(faceSize - 40, ctx.measureText(propText).width + 56);
-  const propX = SHARE_WIDTH / 2 - propWidth / 2;
-  const propY = faceY + faceSize - 44;
+  const propW = Math.min(at.faceSize + 120, ctx.measureText(propText).width + 56);
+  const propY = at.faceTop + at.faceSize - 38;
   ctx.fillStyle = ink;
-  roundRect(ctx, propX, propY, propWidth, 76, 38);
+  roundRect(ctx, SHARE_WIDTH / 2 - propW / 2, propY, propW, 76, 38);
   ctx.fill();
-  ctx.fillStyle = WRAPPED_COLOURS.cream;
+  ctx.fillStyle = cream;
   ctx.textAlign = 'center';
-  ctx.fillText(propText, SHARE_WIDTH / 2, propY + 50, faceSize - 80);
+  ctx.fillText(propText, SHARE_WIDTH / 2, propY + 50, propW - 40);
   ctx.textAlign = 'left';
 
   // Three stat stickers, and the campaign line stacked beside them.
-  const stickersY = faceY + faceSize + 96;
-  const stickerW = 560;
+  const stickerW = 520;
   record.stickers.slice(0, 3).forEach((sticker, i) => {
     const { value, label } = stickerText(sticker);
-    const sy = stickersY + i * 132;
-    ctx.fillStyle = WRAPPED_COLOURS.cream;
-    roundRect(ctx, PAD, sy, stickerW, 112, 28);
+    const sy = at.stickersY + i * (at.stickerH + at.stickerGap);
+    ctx.fillStyle = cream;
+    roundRect(ctx, PAD, sy, stickerW, at.stickerH, 28);
     ctx.fill();
     ctx.lineWidth = 6;
     ctx.strokeStyle = ink;
     ctx.stroke();
     ctx.fillStyle = ink;
-    ctx.font = display(56);
-    ctx.fillText(value, PAD + 32, sy + 76, 230);
-    const valueWidth = Math.min(230, ctx.measureText(value).width);
-    ctx.font = body(32, 600);
-    ctx.fillText(label, PAD + 32 + valueWidth + 20, sy + 70, stickerW - valueWidth - 84);
+    ctx.font = display(54);
+    ctx.fillText(value, PAD + 30, sy + 74, 220);
+    const valueW = Math.min(220, ctx.measureText(value).width);
+    ctx.font = body(30, 600);
+    ctx.fillText(label, PAD + 30 + valueW + 18, sy + 68, stickerW - valueW - 78);
   });
-  const campaignX = PAD + stickerW + 52;
+  const campaignX = PAD + stickerW + 48;
+  const campaignW = SHARE_WIDTH - PAD - campaignX;
+  // One size for the three lines, the largest at which "The Bench." and its highlight fit.
+  let campaignSize = 58;
+  while (campaignSize > 34 && measureDisplay(CAMPAIGN_LINE[2], campaignSize) + 32 > campaignW) campaignSize -= 2;
   CAMPAIGN_LINE.forEach((text, i) => {
-    const cy = stickersY + 74 + i * 132;
-    ctx.font = display(58);
+    const cy = at.stickersY + 74 + i * (at.stickerH + at.stickerGap);
+    ctx.font = display(campaignSize);
     if (i === CAMPAIGN_LINE.length - 1) {
       // "The Bench." is highlighted (spec).
-      const width = ctx.measureText(text).width;
       ctx.fillStyle = ink;
-      roundRect(ctx, campaignX - 16, cy - 62, width + 32, 84, 16);
+      roundRect(ctx, campaignX, cy - campaignSize * 1.02, measureDisplay(text, campaignSize) + 32, campaignSize * 1.42, 14);
       ctx.fill();
-      ctx.fillStyle = WRAPPED_COLOURS.cream;
+      ctx.fillStyle = cream;
+      ctx.font = display(campaignSize);
+      ctx.fillText(text, campaignX + 16, cy);
     } else {
       ctx.fillStyle = ink;
+      ctx.fillText(text, campaignX + 16, cy);
     }
-    ctx.fillText(text, campaignX, cy, SHARE_WIDTH - campaignX - PAD + 16);
   });
 
   // The persona sticker.
-  const personaY = stickersY + 3 * 132 + 28;
   const persona = PERSONAS[record.persona.key]?.name ?? PERSONAS.steady_learned_friend.name;
-  ctx.font = display(48);
+  ctx.font = display(46);
   const personaW = Math.min(SHARE_WIDTH - PAD * 2, ctx.measureText(persona).width + 72);
   ctx.fillStyle = ink;
-  roundRect(ctx, PAD, personaY, personaW, 96, 48);
+  roundRect(ctx, PAD, at.personaY, personaW, at.personaH, at.personaH / 2);
   ctx.fill();
   ctx.fillStyle = WRAPPED_COLOURS.gold;
-  ctx.fillText(persona, PAD + 36, personaY + 66, personaW - 72);
+  ctx.fillText(persona, PAD + 36, at.personaY + 64, personaW - 72);
 
   // Who, and where to get one.
-  const footY = SHARE_HEIGHT - PAD;
   ctx.fillStyle = ink;
   ctx.font = body(36, 700);
   const campus = record.student.campus ? ` · ${CAMPUS_NAMES[record.student.campus]} Campus` : '';
-  ctx.fillText(`${shareName(record.student.first_name, record.student.last_initial)}${campus}`, PAD, footY - 64);
+  ctx.fillText(`${shareName(record.student.first_name, record.student.last_initial)}${campus}`, PAD, at.nameY, SHARE_WIDTH - PAD * 2);
   ctx.font = body(36, 500);
-  ctx.fillText(`Get yours · ${WRAPPED_URL}`, PAD, footY);
+  ctx.fillText(`Get yours · ${WRAPPED_URL}`, PAD, at.footY, SHARE_WIDTH - PAD * 2);
 }
 
 /** The canvas as a PNG file, for the share sheet and Save image. */
