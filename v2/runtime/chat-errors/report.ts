@@ -26,6 +26,13 @@ export type ChatErrorCode =
   | 'send_network'
   /** A live answer's stream stopped carrying it; the app followed the turn by its status. */
   | 'stream_stall'
+  /**
+   * A live answer's stream went quiet while the page was in the background (a
+   * phone freezes it), counted apart from a stall: the gap is the time away.
+   */
+  | 'stream_background'
+  /** The answer was saved, but the stream's final event never came; the app loaded the saved answer. */
+  | 'stream_end_missing'
   /** A picture in a chat message did not load. */
   | 'picture_load_failed'
   /** The chat screen crashed and showed its error state. */
@@ -38,6 +45,8 @@ export interface ChatErrorReport {
   httpStatus?: number;
   /** The chat's id, as in its address. */
   conversationId?: string | null;
+  /** The answer's run on the server, so a report can be matched to the server's stream log. */
+  executionId?: string | null;
 }
 
 export interface ChatErrorPayload {
@@ -45,6 +54,7 @@ export interface ChatErrorPayload {
   message?: string;
   http_status?: number;
   conversation_id?: string;
+  execution_id?: string;
   platform: string;
   app_version?: string;
 }
@@ -66,6 +76,7 @@ export function chatErrorPayload(
     payload.http_status = report.httpStatus;
   }
   if (report.conversationId) payload.conversation_id = report.conversationId.slice(0, 64);
+  if (report.executionId) payload.execution_id = report.executionId.slice(0, 64);
   if (context.appVersion) payload.app_version = context.appVersion.slice(0, 12);
   return payload;
 }
@@ -126,6 +137,16 @@ function listenForOnline(): void {
   );
 }
 
+/**
+ * The deploy the page runs, as a commit. Next writes the deployment id into the
+ * client code at build time; the HTML's `<html data-dpl-id>` is only in the
+ * server's HTML, not in the running page (measured on live, 7 October 2026), so
+ * reading it sent no version on any report (56 of 56, 29 October to 4 November).
+ */
+function appVersion(): string | null {
+  return process.env.NEXT_DEPLOYMENT_ID || document.documentElement.getAttribute('data-dpl-id');
+}
+
 /** Reports one chat error. Fire and forget: it never throws and never shows. */
 export function reportChatError(report: ChatErrorReport): void {
   void sendChatError(report);
@@ -142,7 +163,7 @@ export function sendChatError(report: ChatErrorReport): Promise<void> {
     if (!allow(report, Date.now())) return Promise.resolve();
     const payload = chatErrorPayload(report, {
       userAgent: navigator.userAgent,
-      appVersion: document.documentElement.getAttribute('data-dpl-id'),
+      appVersion: appVersion(),
     });
     return post(payload);
   } catch {

@@ -24,6 +24,22 @@ test('the payload holds the code, a message cut to 300 characters, the chat and 
   assert.equal(payload.app_version, '0557f82145db');
 });
 
+test("the answer's run goes with the report, so it can be matched to the server's stream log", () => {
+  const payload = chatErrorPayload(
+    { code: 'stream_stall', conversationId: 'chat-a', executionId: '9f1c2e4a-0b7d-4c55-8f0e-3a2b1c0d9e8f' },
+    { userAgent: DESKTOP, appVersion: null },
+  );
+  assert.equal(payload.execution_id, '9f1c2e4a-0b7d-4c55-8f0e-3a2b1c0d9e8f');
+  assert.equal(chatErrorPayload({ code: 'stream_stall', executionId: null }, { userAgent: DESKTOP, appVersion: null }).execution_id, undefined);
+});
+
+test('the build is read from the deploy id Next writes into the client code, not from the HTML', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('./report.ts', import.meta.url), 'utf8');
+  assert.match(source, /process\.env\.NEXT_DEPLOYMENT_ID \|\| document\.documentElement\.getAttribute\('data-dpl-id'\)/);
+  assert.match(source, /appVersion: appVersion\(\)/);
+});
+
 test('empty and out-of-range fields are left out', () => {
   const payload = chatErrorPayload(
     { code: 'send_network', message: '   ', httpStatus: 700, conversationId: null },
