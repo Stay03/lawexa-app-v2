@@ -116,4 +116,6 @@ export interface WrappedRecord {
   vibe: { id: number; campus: WrappedCampus | null };
   stickers: WrappedSticker[];
   share_code: string;
+  /** How many people signed up from this student's shares so far. */
+  share_signups?: number;
 }

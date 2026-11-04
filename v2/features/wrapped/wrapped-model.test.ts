@@ -7,6 +7,8 @@ import {
   formatCount,
   formatWords,
   ordinal,
+  percentileLine,
+  personaReason,
   shareName,
   shareUrl,
   VIBES,
@@ -45,6 +47,21 @@ test('the vibe bank holds Arthur’s 30 lines and the seven campus lines, each s
   assert.equal(vibeFor(38).id, 1);
   for (const vibe of VIBES.values()) assert.ok(['gold', 'lilac', 'coral', 'lime'].includes(vibe.colour));
   assert.deepEqual([...CAMPAIGN_LINE], ['The Law.', 'The Bar.', 'The Bench.']);
+});
+
+test('the persona’s reason and the percentile line read Backend’s metric keys, and an unknown key shows nothing', () => {
+  assert.equal(personaReason({ metric: 'statute_share_pct', value: 46 }), 'Statutes made up 46% of your reading.');
+  assert.equal(personaReason({ metric: 'case_share_pct', value: 31 }), 'Cases made up 31% of your reading.');
+  assert.equal(personaReason({ metric: 'overnight_share_pct', value: 38 }), '38% of your study days ran past midnight.');
+  assert.equal(personaReason({ metric: 'drafts', value: 22 }), 'Lawexa drafted 22 times for you.');
+  assert.equal(personaReason({ metric: 'last_minute_share_pct', value: 61 }), '61% of your study days came in the last three weeks.');
+  assert.equal(personaReason({ metric: 'something_new', value: 9 }), null);
+  assert.equal(percentileLine({ metric: 'judgments_read', value: 94 }), 'You read more judgments than 94% of students on Lawexa.');
+  assert.equal(percentileLine({ metric: 'judgments_read', value: 100 }), null);
+  assert.equal(percentileLine(null), null);
+  // Arthur's campus props (4 November).
+  assert.equal(vibeFor(31).prop, 'Wig with an ÈKÓ tag');
+  assert.equal(vibeFor(37).prop, 'Hard hat');
 });
 
 test('numbers get commas and a 9,999+ cap; words keep their size; the clock reads like a person', () => {

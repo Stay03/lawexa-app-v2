@@ -5,8 +5,8 @@ import type { WrappedCampus, WrappedCourseKey, WrappedCourseStatus, WrappedGaniF
  * October 2026: "slide definitions, copy banks and vibe banks are data, not
  * code", so the 1 December edition swaps the banks, not the screens). The vibe
  * lines, statuses, campaign line and persona names are Arthur's, or agreed with
- * him in thread f833c285 on 4 November. The persona one-liners and the campus
- * vibes' props are drafts for the techlead to check before launch.
+ * him in thread f833c285 on 4 November, the persona one-liners and campus
+ * props included (approved by the techlead and Arthur, 4 November).
  * Results are not out when this ships: nothing here judges, grades or predicts.
  */
 
@@ -115,13 +115,13 @@ const LINES: readonly (readonly [string, string, WrappedCampus?])[] = [
   ['Civ Lit, you tried. I tried harder.', 'Trophy'],
   ['Revision week done. Enjoyment week loading.', 'Loading bar 74%'],
   // 31 to 37: one line per campus (thread f833c285, 4 November). 38 is spare.
-  ['Eko o ni baje. My wig no go spoil too.', 'Danfo bus', 'lagos'],
+  ['Eko o ni baje. My wig no go spoil too.', 'Wig with an ÈKÓ tag', 'lagos'],
   ['Agbani tested my patience. Bar Finals no fit.', 'Keke', 'enugu'],
-  ['Oil City finalist. Five papers, well oiled.', 'Oil drum', 'port_harcourt'],
+  ['Oil City finalist. Five papers, well oiled.', 'Oil drop', 'port_harcourt'],
   ['Yenagoa to the wig, no paddle needed.', 'Canoe paddle', 'bayelsa'],
   ['Bar Finals dry me like kilishi. Still spicy.', 'Pack of kilishi', 'kano'],
-  ['Yola heat prepared me. Exam hall no fit burn me.', 'Sun with shades', 'yola'],
-  ['Wike dey build flyover. I dey build Esq.', 'Flyover', 'abuja'],
+  ['Yola heat prepared me. Exam hall no fit burn me.', 'Hand fan', 'yola'],
+  ['Wike dey build flyover. I dey build Esq.', 'Hard hat', 'abuja'],
 ];
 
 /** Vibes 1 to 37, keyed by the id Backend picks; colours rotate gold, lilac, coral, lime. */
@@ -186,7 +186,10 @@ export function shareUrl(code: string | null | undefined, origin = 'https://lawe
  * app has no sentence for shows no reason line: never a guessed sentence.
  */
 const REASONS: Record<string, (value: string) => string> = {
-  section_share_pct: (v) => `Statute sections were in ${v}% of your reading.`,
+  // Backend's keys (thread f833c285, 4 November): statute_share_pct, overnight_share_pct,
+  // case_share_pct, drafts, last_minute_share_pct. The rest are fallbacks.
+  statute_share_pct: (v) => `Statutes made up ${v}% of your reading.`,
+  case_share_pct: (v) => `Cases made up ${v}% of your reading.`,
   statutes_read: (v) => `You opened ${v} statutes.`,
   sections_highlighted: (v) => `You highlighted ${v} sections.`,
   overnight_share_pct: (v) => `${v}% of your study days ran past midnight.`,
@@ -196,7 +199,7 @@ const REASONS: Record<string, (value: string) => string> = {
   bookmarks: (v) => `You kept ${v} cases for later.`,
   drafts: (v) => `Lawexa drafted ${v} times for you.`,
   words_written: (v) => `Lawexa wrote ${v} words for you.`,
-  last_weeks_share_pct: (v) => `${v}% of your study came in the last three weeks.`,
+  last_minute_share_pct: (v) => `${v}% of your study days came in the last three weeks.`,
   days_active: (v) => `You showed up on ${v} days.`,
 };
 
