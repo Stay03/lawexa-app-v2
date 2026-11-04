@@ -64,7 +64,8 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 18cqw 8cqw 10cqw;
+  /* The foot is kept clear for the pattern block and the scribble (.wr-pattern). */
+  padding: 18cqw 8cqw 36cqw;
   gap: 4cqw;
 }
 
@@ -88,26 +89,26 @@
 .wr-pattern {
   position: absolute;
   right: 0;
-  bottom: 14cqw;
-  width: 30cqw;
-  height: 30cqw;
+  bottom: 9cqw;
+  width: 24cqw;
+  height: 24cqw;
   pointer-events: none;
 }
 
 .wr-pattern[data-kind='checks'] {
-  background: conic-gradient(currentColor 25%, transparent 0 50%, currentColor 0 75%, transparent 0) 0 0 / 15cqw 15cqw;
+  background: conic-gradient(currentColor 25%, transparent 0 50%, currentColor 0 75%, transparent 0) 0 0 / 12cqw 12cqw;
 }
 
 .wr-pattern[data-kind='dots'] {
-  background: radial-gradient(circle, currentColor 0 3.2cqw, transparent 3.4cqw) 0 0 / 7.5cqw 7.5cqw;
+  background: radial-gradient(circle, currentColor 0 2.6cqw, transparent 2.8cqw) 0 0 / 6cqw 6cqw;
 }
 
 .wr-pattern[data-kind='stripes'] {
-  background: repeating-linear-gradient(90deg, currentColor 0 4cqw, transparent 4cqw 8.4cqw);
+  background: repeating-linear-gradient(90deg, currentColor 0 3.2cqw, transparent 3.2cqw 6.8cqw);
 }
 
 .wr-pattern[data-kind='rings'] {
-  background: repeating-radial-gradient(circle at 100% 100%, currentColor 0 3cqw, transparent 3cqw 6cqw);
+  background: repeating-radial-gradient(circle at 100% 100%, currentColor 0 2.4cqw, transparent 2.4cqw 4.8cqw);
 }
 
 .wr-scribble {
