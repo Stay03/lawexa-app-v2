@@ -1,30 +1,66 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { FileText, Loader2, Upload, X } from 'lucide-react';
+import { FileText, FolderOpen, FolderUp, Loader2, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
 import { formatBytes } from '@/lib/utils/format-bytes';
+import { extractApiError } from '@/lib/utils/api-error';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useUploadTemplates } from '@/lib/hooks/useAdminTemplates';
-import type { AdminTemplateUploadResult } from '@/types/admin-templates';
-import { precheckUpload, refusalSentence, TEMPLATE_ACCEPT, TEMPLATE_UPLOAD, type TemplateRefusal } from './template-model';
+import { useUploadTemplateFolder, useUploadTemplates } from '@/lib/hooks/useAdminTemplates';
+import { droppedEntries, dropName, filesOfEntries, filesOfPickedFolder } from './folder-files';
+import {
+  foldersLabel,
+  precheckUpload,
+  refusalSentence,
+  sortFolderFiles,
+  TEMPLATE_ACCEPT,
+  TEMPLATE_UPLOAD,
+  type BatchProgress,
+  type FolderFile,
+  type TemplateRefusal,
+} from './template-model';
+
+type Refused = { name: string; reason: TemplateRefusal };
+
+/** A folder the admin picked or dropped, sorted (`sortFolderFiles`). */
+interface FolderPick {
+  name: string;
+  take: File[];
+  skipped: number;
+  tooBig: Refused[];
+  folders: number;
+}
+
+const NOTHING_YET = { created: 0, refused: [] as Refused[] };
 
 /**
- * Upload several files at once (Arthur loads his library in batches): pick
- * or drop Word, RTF and PDF files, see which go and which are held back and
- * why, then upload. Each file becomes a draft while Lawexa reads it, and the
- * answer says which the server turned down (a type, the size, or a file
+ * Upload templates (Arthur loads his library, over 300 files in folders with
+ * subfolders): pick or drop up to 20 Word, RTF and PDF files, or a whole
+ * folder. A folder's files, all the way down its subfolders, go 20 to a
+ * request, one after another, with one progress line; other files in it are
+ * skipped and counted. Each file becomes a draft while Lawexa reads it, and
+ * the answer says which the server turned down (a type, the size, or a file
  * already uploaded).
  */
 export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
   const [picked, setPicked] = useState<File[]>([]);
   const [dragging, setDragging] = useState(false);
-  const [result, setResult] = useState<AdminTemplateUploadResult | null>(null);
+  const [reading, setReading] = useState(false);
+  const [folder, setFolder] = useState<FolderPick | null>(null);
+  const [progress, setProgress] = useState<BatchProgress | null>(null);
+  const [stopped, setStopped] = useState<{ remaining: File[]; message: string } | null>(null);
+  /** What runs before a stop uploaded, added to the run that finishes the folder. */
+  const [earlier, setEarlier] = useState(NOTHING_YET);
+  const [result, setResult] = useState<{ created: number; refused: Refused[] } | null>(null);
   const upload = useUploadTemplates();
+  const folderUpload = useUploadTemplateFolder();
   const { send, refused } = precheckUpload(picked);
+  const busy = upload.isPending || folderUpload.isPending || reading;
 
   const add = (files: FileList | null) => {
     if (!files) return;
@@ -36,13 +72,38 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
     setResult(null);
   };
 
+  const openFolder = (name: string, found: FolderFile[]) => {
+    setFolder({ name, ...sortFolderFiles(found) });
+    setPicked([]);
+    setResult(null);
+    setProgress(null);
+    setStopped(null);
+    setEarlier(NOTHING_YET);
+  };
+
+  const readDropped = async (entries: FileSystemEntry[]) => {
+    setReading(true);
+    try {
+      openFolder(dropName(entries), await filesOfEntries(entries));
+    } catch {
+      toast.error('The folder could not be read. Try "Choose a folder" instead.');
+    } finally {
+      setReading(false);
+    }
+  };
+
   const close = (next: boolean) => {
-    if (!next && upload.isPending) return;
+    if (!next && busy) return;
     onOpenChange(next);
     if (!next) {
       setPicked([]);
+      setFolder(null);
+      setProgress(null);
+      setStopped(null);
+      setEarlier(NOTHING_YET);
       setResult(null);
       upload.reset();
+      folderUpload.reset();
     }
   };
 
@@ -50,10 +111,37 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
     if (send.length === 0) return;
     upload.mutate(send, {
       onSuccess: (answer) => {
-        setResult(answer.data ?? { created: [], refused: [] });
+        const data = answer.data ?? { created: [], refused: [] };
+        setResult({ created: data.created.length, refused: data.refused.map((item) => ({ name: item.original_name, reason: item.reason })) });
         setPicked([]);
       },
     });
+  };
+
+  const sendFolder = (files: File[]) => {
+    if (files.length === 0) return;
+    setStopped(null);
+    setProgress({ total: files.length, sent: 0, created: 0, refused: [] });
+    folderUpload.mutate(
+      { files, onProgress: setProgress },
+      {
+        onSuccess: (outcome) => {
+          const sofar = { created: earlier.created + outcome.created, refused: [...earlier.refused, ...outcome.refused] };
+          if (outcome.stoppedAt === null) {
+            setResult(sofar);
+            setFolder(null);
+            setProgress(null);
+            setEarlier(NOTHING_YET);
+            return;
+          }
+          setEarlier(sofar);
+          setStopped({
+            remaining: files.slice(outcome.stoppedAt),
+            message: (extractApiError(outcome.error).message || 'the connection dropped').replace(/\.$/, ''),
+          });
+        },
+      },
+    );
   };
 
   return (
@@ -62,25 +150,59 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
         <DialogHeader>
           <DialogTitle>Upload templates</DialogTitle>
           <DialogDescription>
-            Word, RTF or PDF, up to {TEMPLATE_UPLOAD.maxFiles} files at a time and 20 MB each. Each one becomes a draft while Lawexa
-            blanks out names, dates and amounts and suggests its labels.
+            Word, RTF or PDF, 20 MB each. Choose up to {TEMPLATE_UPLOAD.maxFiles} files, or a whole folder: every file in it and its
+            subfolders goes, {TEMPLATE_UPLOAD.maxFiles} at a time. Each one becomes a draft while Lawexa blanks out names, dates and
+            amounts and suggests its labels.
           </DialogDescription>
         </DialogHeader>
 
         {result ? (
           <div className="space-y-3 text-sm">
             <p>
-              {result.created.length === 1 ? '1 file uploaded.' : `${result.created.length} files uploaded.`}{' '}
-              {result.created.length > 0 ? 'Lawexa is reading them now; each shows as a draft when it is ready to review.' : null}
+              {result.created === 1 ? '1 file uploaded.' : `${result.created} files uploaded.`}{' '}
+              {result.created > 0 ? 'Lawexa is reading them now; each shows as a draft when it is ready to review.' : null}
             </p>
-            {result.refused.length > 0 ? (
-              <RefusedList items={result.refused.map((item) => ({ name: item.original_name, reason: item.reason }))} title="Not uploaded" />
-            ) : null}
+            {result.refused.length > 0 ? <RefusedList items={result.refused} title="Not uploaded" /> : null}
+          </div>
+        ) : folder ? (
+          <div className="space-y-3">
+            <div className="space-y-3 rounded-lg border px-4 py-3 text-sm">
+              <div className="flex items-start gap-3">
+                <FolderOpen aria-hidden className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{folder.name}</p>
+                  <p className="text-muted-foreground">
+                    {folder.take.length === 1 ? '1 file' : `${folder.take.length} files`} to upload, in {foldersLabel(folder.folders)}.
+                    {folder.skipped > 0
+                      ? ` ${folder.skipped === 1 ? '1 other file is' : `${folder.skipped} other files are`} skipped (not a Word, RTF or PDF document).`
+                      : null}
+                  </p>
+                </div>
+                {!busy && !progress ? (
+                  <button
+                    type="button"
+                    aria-label="Choose another folder"
+                    className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setFolder(null)}
+                  >
+                    <X className="size-4" />
+                  </button>
+                ) : null}
+              </div>
+              {progress ? <UploadProgress progress={progress} running={folderUpload.isPending} /> : null}
+              {stopped ? (
+                <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+                  The upload stopped: {stopped.message}. The files sent before it are uploaded; {stopped.remaining.length} are left.
+                </p>
+              ) : null}
+            </div>
+            {folder.tooBig.length > 0 ? <RefusedList items={folder.tooBig} title="Held back" /> : null}
           </div>
         ) : (
           <div className="space-y-3">
             <button
               type="button"
+              disabled={reading}
               onClick={() => inputRef.current?.click()}
               onDragOver={(event) => {
                 event.preventDefault();
@@ -90,16 +212,38 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
               onDrop={(event) => {
                 event.preventDefault();
                 setDragging(false);
-                add(event.dataTransfer.files);
+                const entries = droppedEntries(event.dataTransfer.items);
+                if (entries) void readDropped(entries);
+                else add(event.dataTransfer.files);
               }}
               className={cn(
                 'flex w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-8 text-sm text-muted-foreground transition-colors hover:bg-muted/50',
                 dragging && 'border-primary bg-muted/50',
               )}
             >
-              <Upload aria-hidden className="size-5" />
-              <span>Drop files here, or click to choose</span>
+              {reading ? (
+                <>
+                  <Loader2 aria-hidden className="size-5 animate-spin motion-reduce:animate-none" />
+                  <span>Reading the folder</span>
+                </>
+              ) : (
+                <>
+                  <Upload aria-hidden className="size-5" />
+                  <span>Drop files or a folder here, or click to choose files</span>
+                </>
+              )}
             </button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5"
+              disabled={reading}
+              onClick={() => folderInputRef.current?.click()}
+            >
+              <FolderUp aria-hidden className="size-4" />
+              Choose a folder
+            </Button>
             <input
               ref={inputRef}
               type="file"
@@ -108,6 +252,23 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
               className="hidden"
               onChange={(event) => {
                 add(event.target.files);
+                event.target.value = '';
+              }}
+            />
+            <input
+              ref={(element) => {
+                folderInputRef.current = element;
+                // The folder picker: React has no prop for it.
+                element?.setAttribute('webkitdirectory', '');
+              }}
+              type="file"
+              className="hidden"
+              onChange={(event) => {
+                const files = event.target.files;
+                if (files && files.length > 0) {
+                  const found = filesOfPickedFolder(files);
+                  openFolder(found[0].path.split('/')[0] || 'Folder', found);
+                }
                 event.target.value = '';
               }}
             />
@@ -143,12 +304,36 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
               </Button>
               <Button onClick={() => close(false)}>Done</Button>
             </>
-          ) : (
+          ) : folder ? (
             <>
-              <Button variant="outline" onClick={() => close(false)} disabled={upload.isPending}>
+              <Button variant="outline" onClick={() => close(false)} disabled={busy}>
                 Cancel
               </Button>
-              <Button onClick={submit} disabled={send.length === 0 || upload.isPending} className="gap-1.5">
+              <Button
+                onClick={() => sendFolder(stopped ? stopped.remaining : folder.take)}
+                disabled={busy || folder.take.length === 0}
+                className="gap-1.5"
+              >
+                {folderUpload.isPending ? (
+                  <Loader2 aria-hidden className="size-4 animate-spin motion-reduce:animate-none" />
+                ) : (
+                  <Upload aria-hidden className="size-4" />
+                )}
+                {folderUpload.isPending
+                  ? 'Uploading'
+                  : stopped
+                    ? `Upload the remaining ${stopped.remaining.length}`
+                    : folder.take.length > 1
+                      ? `Upload ${folder.take.length} files`
+                      : 'Upload'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" onClick={() => close(false)} disabled={busy}>
+                Cancel
+              </Button>
+              <Button onClick={submit} disabled={send.length === 0 || busy} className="gap-1.5">
                 {upload.isPending ? <Loader2 aria-hidden className="size-4 animate-spin motion-reduce:animate-none" /> : <Upload aria-hidden className="size-4" />}
                 {send.length > 1 ? `Upload ${send.length} files` : 'Upload'}
               </Button>
@@ -160,7 +345,34 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
   );
 }
 
-function RefusedList({ items, title }: { items: readonly { name: string; reason: TemplateRefusal }[]; title: string }) {
+/** "120 of 312 sent", with a bar; the files the server turned down so far are counted. */
+function UploadProgress({ progress, running }: { progress: BatchProgress; running: boolean }) {
+  const share = progress.total > 0 ? Math.round((progress.sent / progress.total) * 100) : 0;
+  return (
+    <div className="space-y-1.5">
+      <div
+        role="progressbar"
+        aria-label="Upload progress"
+        aria-valuemin={0}
+        aria-valuemax={progress.total}
+        aria-valuenow={progress.sent}
+        className="h-1.5 overflow-hidden rounded-full bg-muted"
+      >
+        <div
+          className="h-full rounded-full bg-primary transition-[width] duration-300 motion-reduce:transition-none"
+          style={{ width: `${share}%` }}
+        />
+      </div>
+      <p className="text-xs tabular-nums text-muted-foreground">
+        {running ? 'Uploading: ' : null}
+        {progress.sent} of {progress.total} sent
+        {progress.refused.length > 0 ? `, ${progress.refused.length} not uploaded` : null}
+      </p>
+    </div>
+  );
+}
+
+function RefusedList({ items, title }: { items: readonly Refused[]; title: string }) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-muted-foreground">{title}</p>

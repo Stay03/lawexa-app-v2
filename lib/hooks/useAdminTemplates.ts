@@ -5,7 +5,12 @@ import { toast } from 'sonner';
 
 import { adminTemplatesApi } from '@/lib/api/admin-templates';
 import { extractApiError } from '@/lib/utils/api-error';
-import { anyProcessing, PROCESSING_POLL_MS } from '@/components/admin/templates/template-model';
+import {
+  anyProcessing,
+  PROCESSING_POLL_MS,
+  uploadInBatches,
+  type BatchProgress,
+} from '@/components/admin/templates/template-model';
 import type { AdminTemplateListParams, AdminTemplateUpdatePayload } from '@/types/admin-templates';
 
 export const adminTemplateKeys = {
@@ -64,6 +69,25 @@ export function useUploadTemplates() {
     mutationFn: (files: readonly File[]) => adminTemplatesApi.upload(files),
     onSuccess: () => refresh(),
     onError: (error) => toast.error(extractApiError(error).message || 'The upload did not go through.'),
+  });
+}
+
+/**
+ * A folder upload: every file, 20 to a request, one request after another,
+ * with its progress after each (`uploadInBatches`). The list is asked again
+ * once, when the run ends. A run that stops on a failed request settles with
+ * where it stopped; it does not throw.
+ */
+export function useUploadTemplateFolder() {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: ({ files, onProgress }: { files: readonly File[]; onProgress: (progress: BatchProgress) => void }) =>
+      uploadInBatches(
+        files,
+        async (batch) => (await adminTemplatesApi.upload(batch)).data ?? { created: [], refused: [] },
+        onProgress,
+      ),
+    onSettled: () => refresh(),
   });
 }
 

@@ -63,6 +63,80 @@ export function precheckUpload<F extends { name: string; size: number }>(
   return { send, refused };
 }
 
+/** A file found in a folder, with where it sits in it (`Contracts/Leases/TEST DATA lease.docx`). */
+export interface FolderFile<F extends { name: string; size: number } = File> {
+  file: F;
+  path: string;
+}
+
+/**
+ * What a folder upload takes (Arthur, 4 November 2026: over 300 templates in
+ * folders with subfolders, uploaded in one go): every Word, RTF and PDF file in
+ * the folder and its subfolders. Other files are skipped and only counted, and
+ * so are Word's lock files (`~$lease.docx`, left beside a document open in
+ * Word) and hidden files. A file over the cap is held back and named.
+ */
+export function sortFolderFiles<F extends { name: string; size: number }>(
+  found: readonly FolderFile<F>[],
+): { take: F[]; skipped: number; tooBig: { name: string; reason: TemplateRefusal }[]; folders: number } {
+  const take: F[] = [];
+  const tooBig: { name: string; reason: TemplateRefusal }[] = [];
+  const folders = new Set<string>();
+  let skipped = 0;
+  for (const { file, path } of found) {
+    const lockOrHidden = file.name.startsWith('~$') || file.name.startsWith('.');
+    if (lockOrHidden || !(TEMPLATE_UPLOAD.extensions as readonly string[]).includes(extensionOf(file.name))) {
+      skipped += 1;
+    } else if (file.size > TEMPLATE_UPLOAD.maxBytes) {
+      tooBig.push({ name: path || file.name, reason: 'size' });
+    } else {
+      take.push(file);
+      folders.add(path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+    }
+  }
+  return { take, skipped, tooBig, folders: folders.size };
+}
+
+/** "1 folder", "14 folders". */
+export function foldersLabel(count: number): string {
+  return count === 1 ? '1 folder' : `${count} folders`;
+}
+
+/** Where a folder upload has got to. */
+export interface BatchProgress {
+  total: number;
+  sent: number;
+  created: number;
+  refused: { name: string; reason: TemplateRefusal }[];
+}
+
+/**
+ * A folder upload: the files go 20 to a request, one request after another
+ * (the server's cap, and no burst against it), and `onProgress` hears after
+ * each. A request that fails stops the run there: the files before it are
+ * uploaded, and `stoppedAt` says where to pick up again.
+ */
+export async function uploadInBatches<F>(
+  files: readonly F[],
+  send: (batch: readonly F[]) => Promise<{ created: readonly unknown[]; refused: readonly { original_name: string; reason: TemplateRefusal }[] }>,
+  onProgress: (progress: BatchProgress) => void,
+): Promise<BatchProgress & { stoppedAt: number | null; error: unknown }> {
+  const progress: BatchProgress = { total: files.length, sent: 0, created: 0, refused: [] };
+  for (let at = 0; at < files.length; at += TEMPLATE_UPLOAD.maxFiles) {
+    const batch = files.slice(at, at + TEMPLATE_UPLOAD.maxFiles);
+    try {
+      const answer = await send(batch);
+      progress.sent += batch.length;
+      progress.created += answer.created.length;
+      progress.refused = [...progress.refused, ...answer.refused.map((item) => ({ name: item.original_name, reason: item.reason }))];
+      onProgress({ ...progress });
+    } catch (error) {
+      return { ...progress, stoppedAt: at, error };
+    }
+  }
+  return { ...progress, stoppedAt: null, error: null };
+}
+
 export const STATUS_LABELS: Record<AdminTemplateStatus, string> = {
   processing: 'Reading',
   draft: 'Draft',

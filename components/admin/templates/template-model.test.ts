@@ -9,8 +9,12 @@ import {
   blanksLabel,
   changedFields,
   fieldsOf,
+  foldersLabel,
   precheckUpload,
   refusalSentence,
+  sortFolderFiles,
+  uploadInBatches,
+  type BatchProgress,
 } from './template-model';
 
 /* The admin templates page (Stay's go 4 November 2026, thread 2b658111):
@@ -82,4 +86,79 @@ test('the list keeps asking while any template is being read', () => {
   assert.equal(anyProcessing([{ status: 'draft' }, { status: 'processing' }]), true);
   assert.equal(anyProcessing([{ status: 'draft' }, { status: 'live' }, { status: 'failed' }]), false);
   assert.equal(anyProcessing([]), false);
+});
+
+/* A folder upload (Arthur, 4 November 2026: over 300 templates in folders
+ * with subfolders, in one go). */
+
+const at = (path: string, size = MB) => ({ file: file(path.slice(path.lastIndexOf('/') + 1), size), path });
+
+test('a folder upload takes every Word, RTF and PDF file in its subfolders; the rest is skipped and counted', () => {
+  const sorted = sortFolderFiles([
+    at('Library/TEST DATA lease.docx'),
+    at('Library/Property/TEST DATA deed.pdf'),
+    at('Library/Property/Leases/TEST DATA tenancy.DOC'),
+    at('Library/Corporate/TEST DATA resolution.rtf'),
+    at('Library/Corporate/notes.txt'),
+    at('Library/Corporate/logo.png'),
+    // Word's lock file beside an open document, and a hidden file.
+    at('Library/Property/~$TEST DATA deed.docx', 162),
+    at('Library/.DS_Store', 6),
+    at('Library/Property/TEST DATA scan.pdf', 25 * MB),
+  ]);
+  assert.deepEqual(sorted.take.map((f) => f.name), ['TEST DATA lease.docx', 'TEST DATA deed.pdf', 'TEST DATA tenancy.DOC', 'TEST DATA resolution.rtf']);
+  assert.equal(sorted.skipped, 4);
+  // Too big is named, with where it sits.
+  assert.deepEqual(sorted.tooBig, [{ name: 'Library/Property/TEST DATA scan.pdf', reason: 'size' }]);
+  // The folders the taken files sit in: Library, Property, Leases, Corporate.
+  assert.equal(sorted.folders, 4);
+  assert.equal(foldersLabel(1), '1 folder');
+  assert.equal(foldersLabel(4), '4 folders');
+});
+
+test('a folder goes 20 files to a request, one request after another, with progress after each', async () => {
+  const files = Array.from({ length: 45 }, (_, i) => `TEST DATA ${i}.docx`);
+  const batches: string[][] = [];
+  let inFlight = 0;
+  let mostInFlight = 0;
+  const seen: BatchProgress[] = [];
+  const outcome = await uploadInBatches(
+    files,
+    async (batch) => {
+      inFlight += 1;
+      mostInFlight = Math.max(mostInFlight, inFlight);
+      batches.push([...batch]);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight -= 1;
+      // The server turns down the first file of each batch as already uploaded.
+      return { created: batch.slice(1), refused: [{ original_name: batch[0], reason: 'duplicate' as const }] };
+    },
+    (progress) => seen.push(progress),
+  );
+  assert.deepEqual(batches.map((batch) => batch.length), [20, 20, 5]);
+  assert.equal(mostInFlight, 1);
+  assert.deepEqual(seen.map((progress) => progress.sent), [20, 40, 45]);
+  assert.equal(outcome.stoppedAt, null);
+  assert.equal(outcome.created, 42);
+  assert.deepEqual(outcome.refused.map((item) => item.name), ['TEST DATA 0.docx', 'TEST DATA 20.docx', 'TEST DATA 40.docx']);
+});
+
+test('a failed request stops the folder there, and says where to pick up', async () => {
+  const files = Array.from({ length: 50 }, (_, i) => i);
+  let calls = 0;
+  const outcome = await uploadInBatches(
+    files,
+    async (batch) => {
+      calls += 1;
+      if (calls === 2) throw new Error('offline');
+      return { created: [...batch], refused: [] };
+    },
+    () => {},
+  );
+  assert.equal(calls, 2);
+  assert.equal(outcome.stoppedAt, 20);
+  assert.equal(outcome.sent, 20);
+  assert.equal(outcome.created, 20);
+  assert.equal((outcome.error as Error).message, 'offline');
+  assert.deepEqual(files.slice(outcome.stoppedAt ?? 0).length, 30);
 });
