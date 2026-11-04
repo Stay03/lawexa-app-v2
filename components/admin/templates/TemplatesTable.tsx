@@ -100,7 +100,8 @@ export function TemplatesTable({
               {pageHasDrafts ? (
                 <Checkbox
                   aria-label="Select the drafts on this page"
-                  checked={selection.page === 'all' ? true : selection.page === 'some' ? 'indeterminate' : false}
+                  // Ticked only when every draft here is: the kit's box draws a part-ticked state as a full tick.
+                  checked={selection.page === 'all'}
                   onCheckedChange={selection.onTogglePage}
                 />
               ) : null}

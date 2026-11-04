@@ -8,6 +8,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import {
   anyProcessing,
   PROCESSING_POLL_MS,
+  approveInRounds,
   uploadInBatches,
   type BatchProgress,
   type UploadBatch,
@@ -127,8 +128,8 @@ export function useTemplateAction(uuid: string, action: 'approve' | 'unpublish' 
 export function useApproveTemplates() {
   const refresh = useRefresh();
   return useMutation({
-    mutationFn: async (payload: AdminTemplateBulkApprovePayload) =>
-      (await adminTemplatesApi.approveMany(payload)).data ?? { approved: 0, skipped: [] },
+    mutationFn: ({ payload, onRound }: { payload: AdminTemplateBulkApprovePayload; onRound: (approvedSoFar: number) => void }) =>
+      approveInRounds(payload, async (body) => (await adminTemplatesApi.approveMany(body)).data ?? { approved: 0, skipped: [], remaining: 0 }, onRound),
     onSettled: () => refresh(),
     onError: (error) => toast.error(extractApiError(error).message || 'Approving did not go through. Try again.'),
   });

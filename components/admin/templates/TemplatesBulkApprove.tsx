@@ -40,6 +40,7 @@ export function TemplatesBulkApprove({
   params: AdminTemplateListParams;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [approvedSoFar, setApprovedSoFar] = useState<number | null>(null);
   const approve = useApproveTemplates();
   const count = selectedCount(selection, draftTotal ?? 0);
   const allSelected = selection.kind === 'all';
@@ -47,7 +48,9 @@ export function TemplatesBulkApprove({
   if (!draftTotal) return null;
 
   const run = () => {
-    approve.mutate(bulkApprovePayload(selection, params), {
+    setApprovedSoFar(0);
+    approve.mutate({ payload: bulkApprovePayload(selection, params), onRound: setApprovedSoFar }, {
+      onSettled: () => setApprovedSoFar(null),
       onSuccess: (result) => {
         const message = bulkApproveMessage(result);
         if (result.skipped.length > 0) toast.warning(message.title, { description: message.detail ?? undefined, duration: 10_000 });
@@ -82,6 +85,11 @@ export function TemplatesBulkApprove({
             <AlertDialogDescription>
               Lawexa starts using {count === 1 ? 'it' : 'them'} when it drafts. A draft without a name or text is skipped, and the list says why.
             </AlertDialogDescription>
+            {approve.isPending && approvedSoFar !== null && allSelected ? (
+              <p role="status" className="text-sm tabular-nums text-muted-foreground">
+                Approved {approvedSoFar.toLocaleString()} of {count.toLocaleString()}…
+              </p>
+            ) : null}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={approve.isPending}>Cancel</AlertDialogCancel>

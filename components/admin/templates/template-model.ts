@@ -362,6 +362,49 @@ export function bulkApprovePayload(
   return { all_drafts: true, ...filters };
 }
 
+/**
+ * "Select all drafts" in rounds (Backend, cc41a9e7): each call approves the
+ * oldest 500 matching drafts, so the app calls again while a call approved
+ * some AND some remain. Never on `remaining` alone: a draft with no name or
+ * text stays a draft, so it stays in `remaining` for good. The rounds are
+ * added up into one result.
+ */
+export const BULK_ROUNDS_MAX = 50;
+
+export function approvedCount(result: Pick<AdminTemplateBulkApproveResult, 'approved'>): number {
+  return Array.isArray(result.approved) ? result.approved.length : result.approved;
+}
+
+export function shouldCallAgain(result: AdminTemplateBulkApproveResult): boolean {
+  return approvedCount(result) > 0 && (result.remaining ?? 0) > 0;
+}
+
+export async function approveInRounds(
+  payload: AdminTemplateBulkApprovePayload,
+  send: (payload: AdminTemplateBulkApprovePayload) => Promise<AdminTemplateBulkApproveResult>,
+  onRound: (approvedSoFar: number) => void,
+): Promise<AdminTemplateBulkApproveResult> {
+  let approved = 0;
+  const skipped: AdminTemplateBulkApproveResult['skipped'] = [];
+  const seen = new Set<string>();
+  let remaining = 0;
+  for (let round = 0; round < BULK_ROUNDS_MAX; round += 1) {
+    const result = await send(payload);
+    approved += approvedCount(result);
+    // A skipped draft stays a draft, so a later round may name it again: count it once.
+    for (const item of result.skipped) {
+      if (!seen.has(item.uuid)) {
+        seen.add(item.uuid);
+        skipped.push(item);
+      }
+    }
+    remaining = result.remaining ?? 0;
+    onRound(approved);
+    if (!('all_drafts' in payload) || !shouldCallAgain(result)) break;
+  }
+  return { approved, skipped, remaining };
+}
+
 const SKIP_REASONS: Record<string, string> = {
   not_draft: 'no longer a draft',
   no_name: 'no name yet',
@@ -375,7 +418,7 @@ const SKIP_REASONS: Record<string, string> = {
 
 /** "12 approved, 3 skipped" and, under it, why: "2 no name yet, 1 still being read". */
 export function bulkApproveMessage(result: AdminTemplateBulkApproveResult): { title: string; detail: string | null } {
-  const approved = Array.isArray(result.approved) ? result.approved.length : result.approved;
+  const approved = approvedCount(result);
   const skipped = result.skipped.length;
   const title = skipped > 0 ? `${approved} approved, ${skipped} skipped` : approved === 1 ? '1 template is live.' : `${approved} templates are live.`;
   if (skipped === 0) return { title, detail: null };

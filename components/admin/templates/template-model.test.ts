@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   anyProcessing,
   approveBlocker,
+  approveInRounds,
   batchesFor,
   blankSegments,
   bulkApproveMessage,
@@ -260,4 +261,33 @@ test('the result says how many went live and why the rest were skipped', () => {
     }),
     { title: '9 approved, 4 skipped', detail: '2 no name yet, 1 still being read, 1 something else' },
   );
+});
+
+test('"Select all drafts" calls again while drafts go live and some remain, never on remaining alone', async () => {
+  // 812 drafts, 500 a call; 2 have no name and stay drafts for good.
+  const answers = [
+    { approved: 500, skipped: [{ uuid: 'n1', reason: 'no_name' }], remaining: 312 },
+    { approved: 310, skipped: [{ uuid: 'n1', reason: 'no_name' }, { uuid: 'n2', reason: 'no_name' }], remaining: 2 },
+    { approved: 0, skipped: [{ uuid: 'n1', reason: 'no_name' }, { uuid: 'n2', reason: 'no_name' }], remaining: 2 },
+  ];
+  let calls = 0;
+  const progress: number[] = [];
+  const result = await approveInRounds({ all_drafts: true }, async () => answers[calls++], (n) => progress.push(n));
+  // The third call approved none: it stops though 2 remain.
+  assert.equal(calls, 3);
+  assert.deepEqual(progress, [500, 810, 810]);
+  assert.equal(result.approved, 810);
+  // A draft skipped in two rounds is counted once.
+  assert.deepEqual(result.skipped.map((item) => item.uuid), ['n1', 'n2']);
+  assert.deepEqual(bulkApproveMessage(result), { title: '810 approved, 2 skipped', detail: '2 no name yet' });
+});
+
+test('ticked drafts go in one call, whatever remains', async () => {
+  let calls = 0;
+  const result = await approveInRounds({ uuids: ['a', 'b'] }, async () => {
+    calls += 1;
+    return { approved: 2, skipped: [], remaining: 40 };
+  }, () => {});
+  assert.equal(calls, 1);
+  assert.equal(result.approved, 2);
 });

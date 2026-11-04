@@ -92,7 +92,9 @@ export type AdminTemplateBulkApprovePayload =
   | ({ all_drafts: true } & Pick<AdminTemplateListParams, 'search' | 'practice_area' | 'document_type' | 'country_id'>);
 
 export interface AdminTemplateBulkApproveResult {
-  /** How many went live (a count, or their uuids). */
+  /** How many went live in this call (a count, or their uuids). */
   approved: number | string[];
   skipped: { uuid: string; reason: string }[];
+  /** Drafts still matching after this call (all_drafts approves 500 a call, oldest first). */
+  remaining?: number;
 }
