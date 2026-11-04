@@ -12,7 +12,7 @@ import {
   fieldsOf,
   folderAreas,
   foldersLabel,
-  nearestSubfolder,
+  folderPathOf,
   precheckUpload,
   refusalSentence,
   sortFolderFiles,
@@ -119,15 +119,20 @@ test('a folder upload takes every Word, RTF and PDF file in its subfolders; the 
   assert.equal(foldersLabel(4), '4 folders');
 });
 
-test("each subfolder's name is its files' practice area; the top folder's own files get none", () => {
-  assert.equal(nearestSubfolder('Library/Property/Leases/TEST DATA lease.docx'), 'Leases');
-  assert.equal(nearestSubfolder('Library/Corporate/TEST DATA resolution.rtf'), 'Corporate');
-  assert.equal(nearestSubfolder('Library/TEST DATA lease.docx'), null);
+test("each folder's path below the top folder is its files' practice area; the top folder's own files get none", () => {
+  // The server matches from the nearest name up: Leases inside Property becomes Property.
+  assert.equal(folderPathOf('Library/Property/Leases/TEST DATA lease.docx'), 'Property / Leases');
+  assert.equal(folderPathOf('Library/Corporate/TEST DATA resolution.rtf'), 'Corporate');
+  assert.equal(folderPathOf('Library/TEST DATA lease.docx'), null);
   // Dropped loose, not in a folder.
-  assert.equal(nearestSubfolder('TEST DATA lease.docx'), null);
-  // Within the server's 100 characters, trimmed; a blank name is none.
-  assert.equal(nearestSubfolder(`Library/  ${'P'.repeat(120)}/TEST DATA deed.pdf`), 'P'.repeat(100));
-  assert.equal(nearestSubfolder('Library/   /TEST DATA deed.pdf'), null);
+  assert.equal(folderPathOf('TEST DATA lease.docx'), null);
+  // Names trimmed, a blank one left out.
+  assert.equal(folderPathOf('Library/ Property /   /Leases/TEST DATA deed.pdf'), 'Property / Leases');
+  assert.equal(folderPathOf('Library/   /TEST DATA deed.pdf'), null);
+  // Within the server's 255 characters: the folders farthest from the file go first.
+  const deep = `Library/${'A'.repeat(200)}/${'B'.repeat(100)}/Leases/TEST DATA deed.pdf`;
+  assert.equal(folderPathOf(deep), `${'B'.repeat(100)} / Leases`);
+  assert.equal(folderPathOf(`Library/${'P'.repeat(300)}/TEST DATA deed.pdf`), 'P'.repeat(255));
 
   const found = [
     at('Library/TEST DATA general.docx'),
@@ -139,9 +144,9 @@ test("each subfolder's name is its files' practice area; the top folder's own fi
   // One subfolder per request, 20 at most: Property's 25 take two.
   assert.deepEqual(
     byFolder.map((batch) => [batch.practiceArea, batch.files.length]),
-    [[null, 1], ['Property', 20], ['Property', 5], ['Corporate', 1], ['Leases', 1]],
+    [[null, 1], ['Property', 20], ['Property', 5], ['Corporate', 1], ['Property / Leases', 1]],
   );
-  assert.deepEqual(folderAreas(found), ['Property', 'Corporate', 'Leases']);
+  assert.deepEqual(folderAreas(found), ['Property', 'Corporate', 'Property / Leases']);
   // Switched off: in the order found, 20 to a request, none with a practice area.
   const plain = batchesFor(found, false);
   assert.deepEqual(plain.map((batch) => [batch.practiceArea, batch.files.length]), [[null, 20], [null, 8]]);

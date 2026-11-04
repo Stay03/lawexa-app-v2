@@ -218,8 +218,8 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
                   <label htmlFor="template-folder-areas" className="min-w-0 flex-1 cursor-pointer">
                     <span className="block font-medium">Use each folder&rsquo;s name as the practice area</span>
                     <span className="block text-muted-foreground">
-                      {areasLine(areas)}. A name that is not one of Lawexa&rsquo;s practice areas is left out, and Lawexa works the
-                      practice area out from the document, as it does for files in {folder.name} itself.
+                      {areasLine(areas)}. A folder name that is not one of Lawexa&rsquo;s practice areas is passed over for the folder
+                      above it; if none matches, Lawexa works it out from the document, as it does for files in {folder.name} itself.
                     </span>
                   </label>
                 </div>

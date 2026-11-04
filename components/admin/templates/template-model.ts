@@ -103,22 +103,30 @@ export function foldersLabel(count: number): string {
 }
 
 /**
- * The folder a file sits in directly, under the top folder: its suggested
- * practice area (Arthur, 4 November 2026: his folders are named that way).
- * `Library/Property/Leases/lease.docx` is in Leases; a file in the top folder
- * itself, or dropped loose, is in none.
+ * The folders a file sits in below the top folder, as its suggested practice
+ * area (Arthur, 4 November 2026: his folders are named that way):
+ * `Library/Property/Leases/lease.docx` gives "Property / Leases". The server
+ * takes the nearest name that is one of Lawexa's practice areas, then the one
+ * above it, so Leases inside Property becomes Property. A file in the top
+ * folder itself, or dropped loose, gives none. Over the server's 255
+ * characters, the folders farthest from the file go first.
  */
-export function nearestSubfolder(path: string): string | null {
-  const folders = path.split('/').slice(0, -1);
-  if (folders.length < 2) return null;
-  // The server's practice area: at most 100 characters, trimmed (Backend's 8aa36eb2).
-  return folders[folders.length - 1].trim().slice(0, PRACTICE_AREA_MAX).trim() || null;
+export function folderPathOf(path: string): string | null {
+  const folders = path
+    .split('/')
+    .slice(1, -1)
+    .map((name) => name.trim())
+    .filter((name) => name !== '');
+  while (folders.length > 1 && folders.join(FOLDER_PATH_JOIN).length > PRACTICE_AREA_MAX) folders.shift();
+  if (folders.length === 0) return null;
+  return folders.join(FOLDER_PATH_JOIN).slice(0, PRACTICE_AREA_MAX);
 }
 
-/** The longest practice area the server keeps. */
-export const PRACTICE_AREA_MAX = 100;
+/** The longest practice area the server takes, and how a folder path is written in it. */
+export const PRACTICE_AREA_MAX = 255;
+const FOLDER_PATH_JOIN = ' / ';
 
-/** One request of a folder upload: up to 20 files, and the practice area they start with. */
+/** One request of a folder upload: up to 20 files, and the folder path they go with as their practice area. */
 export interface UploadBatch<F> {
   practiceArea: string | null;
   files: F[];
@@ -126,9 +134,9 @@ export interface UploadBatch<F> {
 
 /**
  * A folder upload's requests, 20 files at most each. With `byFolder`, the
- * files of one subfolder go together, its name as their practice area, and
- * the top folder's own files go without one; without it, the files go in the
- * order found, with none.
+ * files of one folder go together, its path as their practice area
+ * (`folderPathOf`), and the top folder's own files go without one; without
+ * it, the files go in the order found, with none.
  */
 export function batchesFor<F extends { name: string; size: number }>(
   files: readonly FolderFile<F>[],
@@ -136,7 +144,7 @@ export function batchesFor<F extends { name: string; size: number }>(
 ): UploadBatch<F>[] {
   const groups = new Map<string | null, F[]>();
   for (const { file, path } of files) {
-    const area = byFolder ? nearestSubfolder(path) : null;
+    const area = byFolder ? folderPathOf(path) : null;
     const group = groups.get(area);
     if (group) group.push(file);
     else groups.set(area, [file]);
@@ -150,11 +158,11 @@ export function batchesFor<F extends { name: string; size: number }>(
   return batches;
 }
 
-/** The distinct practice areas a folder upload would give, in the order found. */
+/** The distinct folder paths a folder upload would send, in the order found. */
 export function folderAreas(files: readonly { path: string }[]): string[] {
   const areas = new Set<string>();
   for (const { path } of files) {
-    const area = nearestSubfolder(path);
+    const area = folderPathOf(path);
     if (area) areas.add(area);
   }
   return [...areas];
