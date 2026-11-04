@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 import { useSetWrappedHidden } from './queries';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { User } from '@/types/auth';
 import { SettingsFormGroup } from '@/v2/features/settings/SettingsForm';
 import { SettingsToggleRow } from '@/v2/features/settings/SettingsToggleRow';
 
@@ -17,9 +16,10 @@ import { SettingsToggleRow } from '@/v2/features/settings/SettingsToggleRow';
  * for a Law School profile, the only accounts with a Bar Finals Wrapped. The
  * switch shows the asked-for state while it saves, and goes back if it fails.
  */
-export function WrappedPrivacyGroup({ user }: { user: User }) {
+export function WrappedPrivacyGroup({ serverHidden }: { serverHidden: boolean }) {
+  // A save this visit wins over the profile read it came after.
   const storeHidden = useAuthStore((state) => state.user?.wrapped_hidden);
-  const saved = storeHidden ?? user.wrapped_hidden ?? false;
+  const saved = storeHidden ?? serverHidden;
   const setHidden = useSetWrappedHidden();
   const checked = setHidden.isPending && setHidden.variables !== undefined ? setHidden.variables : saved;
 

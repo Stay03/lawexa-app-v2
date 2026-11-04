@@ -87,7 +87,8 @@ export const authApi = {
 
   // Protected endpoints
   me: async () => {
-    const response = await apiClient.get<ApiResponse<{ user: User }>>('/auth/me');
+    // `wrapped_hidden` may sit beside `user` (Backend's Wrapped switch, 4 November 2026).
+    const response = await apiClient.get<ApiResponse<{ user: User; wrapped_hidden?: boolean }>>('/auth/me');
     return response.data;
   },
 

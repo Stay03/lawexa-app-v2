@@ -152,7 +152,9 @@ export function ProfileScreen() {
       {/* Keyed on the account, so signing in as somebody else re-seeds the form
           rather than showing one person's edits over another's record. */}
       <ProfileForm key={user.id} user={user} />
-      {mayHaveWrapped(user) ? <WrappedPrivacyGroup user={user} /> : null}
+      {mayHaveWrapped(user) ? (
+        <WrappedPrivacyGroup serverHidden={query.data?.data?.wrapped_hidden ?? user.wrapped_hidden ?? false} />
+      ) : null}
     </ProfileColumn>
   );
 }
