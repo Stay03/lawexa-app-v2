@@ -42,9 +42,11 @@ export const adminTemplatesApi = {
     return response.data;
   },
 
-  upload: async (files: readonly File[]): Promise<ApiResponse<AdminTemplateUploadResult>> => {
+  /** `practiceArea`: every template from this upload starts with it, and Lawexa's reading keeps it. */
+  upload: async (files: readonly File[], practiceArea?: string | null): Promise<ApiResponse<AdminTemplateUploadResult>> => {
     const form = new FormData();
     for (const file of files) form.append('files[]', file);
+    if (practiceArea) form.append('practice_area', practiceArea);
     const response = await apiClient.post<ApiResponse<AdminTemplateUploadResult>>(BASE, form, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

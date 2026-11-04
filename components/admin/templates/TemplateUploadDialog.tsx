@@ -8,10 +8,13 @@ import { cn } from '@/lib/utils';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import { extractApiError } from '@/lib/utils/api-error';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useUploadTemplateFolder, useUploadTemplates } from '@/lib/hooks/useAdminTemplates';
 import { droppedEntries, dropName, filesOfEntries, filesOfPickedFolder } from './folder-files';
 import {
+  batchesFor,
+  folderAreas,
   foldersLabel,
   precheckUpload,
   refusalSentence,
@@ -21,6 +24,7 @@ import {
   type BatchProgress,
   type FolderFile,
   type TemplateRefusal,
+  type UploadBatch,
 } from './template-model';
 
 type Refused = { name: string; reason: TemplateRefusal };
@@ -28,13 +32,21 @@ type Refused = { name: string; reason: TemplateRefusal };
 /** A folder the admin picked or dropped, sorted (`sortFolderFiles`). */
 interface FolderPick {
   name: string;
-  take: File[];
+  take: FolderFile[];
   skipped: number;
   tooBig: Refused[];
   folders: number;
 }
 
 const NOTHING_YET = { created: 0, refused: [] as Refused[] };
+
+const fileCount = (batches: readonly UploadBatch<File>[]) => batches.reduce((sum, batch) => sum + batch.files.length, 0);
+
+/** "Leases, Property and Corporate", "Leases, Property, Corporate and 4 more". */
+function areasLine(areas: readonly string[]): string {
+  if (areas.length <= 3) return areas.length > 1 ? `${areas.slice(0, -1).join(', ')} and ${areas[areas.length - 1]}` : areas.join('');
+  return `${areas.slice(0, 3).join(', ')} and ${areas.length - 3} more`;
+}
 
 /**
  * Upload templates (Arthur loads his library, over 300 files in folders with
@@ -53,7 +65,9 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
   const [reading, setReading] = useState(false);
   const [folder, setFolder] = useState<FolderPick | null>(null);
   const [progress, setProgress] = useState<BatchProgress | null>(null);
-  const [stopped, setStopped] = useState<{ remaining: File[]; message: string } | null>(null);
+  const [stopped, setStopped] = useState<{ remaining: UploadBatch<File>[]; message: string } | null>(null);
+  /** Each folder's name as its files' practice area (Arthur's yes, 4 November 2026); on unless turned off. */
+  const [byFolder, setByFolder] = useState(true);
   /** What runs before a stop uploaded, added to the run that finishes the folder. */
   const [earlier, setEarlier] = useState(NOTHING_YET);
   const [result, setResult] = useState<{ created: number; refused: Refused[] } | null>(null);
@@ -74,6 +88,7 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
 
   const openFolder = (name: string, found: FolderFile[]) => {
     setFolder({ name, ...sortFolderFiles(found) });
+    setByFolder(true);
     setPicked([]);
     setResult(null);
     setProgress(null);
@@ -118,12 +133,12 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
     });
   };
 
-  const sendFolder = (files: File[]) => {
-    if (files.length === 0) return;
+  const sendFolder = (batches: UploadBatch<File>[]) => {
+    if (batches.length === 0) return;
     setStopped(null);
-    setProgress({ total: files.length, sent: 0, created: 0, refused: [] });
+    setProgress({ total: fileCount(batches), sent: 0, created: 0, refused: [] });
     folderUpload.mutate(
-      { files, onProgress: setProgress },
+      { batches, onProgress: setProgress },
       {
         onSuccess: (outcome) => {
           const sofar = { created: earlier.created + outcome.created, refused: [...earlier.refused, ...outcome.refused] };
@@ -136,13 +151,15 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
           }
           setEarlier(sofar);
           setStopped({
-            remaining: files.slice(outcome.stoppedAt),
+            remaining: batches.slice(outcome.stoppedAt),
             message: (extractApiError(outcome.error).message || 'the connection dropped').replace(/\.$/, ''),
           });
         },
       },
     );
   };
+
+  const areas = folder ? folderAreas(folder.take) : [];
 
   return (
     <Dialog open={open} onOpenChange={close}>
@@ -189,10 +206,27 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
                   </button>
                 ) : null}
               </div>
+              {areas.length > 0 ? (
+                <div className="flex items-start gap-3 border-t pt-3">
+                  <Switch
+                    id="template-folder-areas"
+                    checked={byFolder}
+                    onCheckedChange={setByFolder}
+                    disabled={busy || progress !== null}
+                    className="mt-0.5"
+                  />
+                  <label htmlFor="template-folder-areas" className="min-w-0 flex-1 cursor-pointer">
+                    <span className="block font-medium">Use each folder&rsquo;s name as the practice area</span>
+                    <span className="block text-muted-foreground">
+                      {areasLine(areas)}. Files in {folder.name} itself get none; Lawexa still suggests the other labels.
+                    </span>
+                  </label>
+                </div>
+              ) : null}
               {progress ? <UploadProgress progress={progress} running={folderUpload.isPending} /> : null}
               {stopped ? (
                 <p role="alert" className="text-sm text-red-700 dark:text-red-400">
-                  The upload stopped: {stopped.message}. The files sent before it are uploaded; {stopped.remaining.length} are left.
+                  The upload stopped: {stopped.message}. The files sent before it are uploaded; {fileCount(stopped.remaining)} are left.
                 </p>
               ) : null}
             </div>
@@ -310,7 +344,7 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
                 Cancel
               </Button>
               <Button
-                onClick={() => sendFolder(stopped ? stopped.remaining : folder.take)}
+                onClick={() => sendFolder(stopped ? stopped.remaining : batchesFor(folder.take, byFolder && areas.length > 0))}
                 disabled={busy || folder.take.length === 0}
                 className="gap-1.5"
               >
@@ -322,7 +356,7 @@ export function TemplateUploadDialog({ open, onOpenChange }: { open: boolean; on
                 {folderUpload.isPending
                   ? 'Uploading'
                   : stopped
-                    ? `Upload the remaining ${stopped.remaining.length}`
+                    ? `Upload the remaining ${fileCount(stopped.remaining)}`
                     : folder.take.length > 1
                       ? `Upload ${folder.take.length} files`
                       : 'Upload'}

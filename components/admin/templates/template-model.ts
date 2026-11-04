@@ -78,8 +78,8 @@ export interface FolderFile<F extends { name: string; size: number } = File> {
  */
 export function sortFolderFiles<F extends { name: string; size: number }>(
   found: readonly FolderFile<F>[],
-): { take: F[]; skipped: number; tooBig: { name: string; reason: TemplateRefusal }[]; folders: number } {
-  const take: F[] = [];
+): { take: FolderFile<F>[]; skipped: number; tooBig: { name: string; reason: TemplateRefusal }[]; folders: number } {
+  const take: FolderFile<F>[] = [];
   const tooBig: { name: string; reason: TemplateRefusal }[] = [];
   const folders = new Set<string>();
   let skipped = 0;
@@ -90,7 +90,7 @@ export function sortFolderFiles<F extends { name: string; size: number }>(
     } else if (file.size > TEMPLATE_UPLOAD.maxBytes) {
       tooBig.push({ name: path || file.name, reason: 'size' });
     } else {
-      take.push(file);
+      take.push({ file, path });
       folders.add(path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
     }
   }
@@ -102,6 +102,64 @@ export function foldersLabel(count: number): string {
   return count === 1 ? '1 folder' : `${count} folders`;
 }
 
+/**
+ * The folder a file sits in directly, under the top folder: its suggested
+ * practice area (Arthur, 4 November 2026: his folders are named that way).
+ * `Library/Property/Leases/lease.docx` is in Leases; a file in the top folder
+ * itself, or dropped loose, is in none.
+ */
+export function nearestSubfolder(path: string): string | null {
+  const folders = path.split('/').slice(0, -1);
+  if (folders.length < 2) return null;
+  // The server's practice area: at most 100 characters, trimmed (Backend's 8aa36eb2).
+  return folders[folders.length - 1].trim().slice(0, PRACTICE_AREA_MAX).trim() || null;
+}
+
+/** The longest practice area the server keeps. */
+export const PRACTICE_AREA_MAX = 100;
+
+/** One request of a folder upload: up to 20 files, and the practice area they start with. */
+export interface UploadBatch<F> {
+  practiceArea: string | null;
+  files: F[];
+}
+
+/**
+ * A folder upload's requests, 20 files at most each. With `byFolder`, the
+ * files of one subfolder go together, its name as their practice area, and
+ * the top folder's own files go without one; without it, the files go in the
+ * order found, with none.
+ */
+export function batchesFor<F extends { name: string; size: number }>(
+  files: readonly FolderFile<F>[],
+  byFolder: boolean,
+): UploadBatch<F>[] {
+  const groups = new Map<string | null, F[]>();
+  for (const { file, path } of files) {
+    const area = byFolder ? nearestSubfolder(path) : null;
+    const group = groups.get(area);
+    if (group) group.push(file);
+    else groups.set(area, [file]);
+  }
+  const batches: UploadBatch<F>[] = [];
+  for (const [practiceArea, group] of groups) {
+    for (let at = 0; at < group.length; at += TEMPLATE_UPLOAD.maxFiles) {
+      batches.push({ practiceArea, files: group.slice(at, at + TEMPLATE_UPLOAD.maxFiles) });
+    }
+  }
+  return batches;
+}
+
+/** The distinct practice areas a folder upload would give, in the order found. */
+export function folderAreas(files: readonly { path: string }[]): string[] {
+  const areas = new Set<string>();
+  for (const { path } of files) {
+    const area = nearestSubfolder(path);
+    if (area) areas.add(area);
+  }
+  return [...areas];
+}
+
 /** Where a folder upload has got to. */
 export interface BatchProgress {
   total: number;
@@ -111,22 +169,26 @@ export interface BatchProgress {
 }
 
 /**
- * A folder upload: the files go 20 to a request, one request after another
- * (the server's cap, and no burst against it), and `onProgress` hears after
- * each. A request that fails stops the run there: the files before it are
- * uploaded, and `stoppedAt` says where to pick up again.
+ * A folder upload: its requests (`batchesFor`) go one after another (no burst
+ * against the server), and `onProgress` hears after each. A request that
+ * fails stops the run there: the requests before it are uploaded, and
+ * `stoppedAt` is the first request still to send.
  */
 export async function uploadInBatches<F>(
-  files: readonly F[],
-  send: (batch: readonly F[]) => Promise<{ created: readonly unknown[]; refused: readonly { original_name: string; reason: TemplateRefusal }[] }>,
+  batches: readonly UploadBatch<F>[],
+  send: (
+    files: readonly F[],
+    practiceArea: string | null,
+  ) => Promise<{ created: readonly unknown[]; refused: readonly { original_name: string; reason: TemplateRefusal }[] }>,
   onProgress: (progress: BatchProgress) => void,
 ): Promise<BatchProgress & { stoppedAt: number | null; error: unknown }> {
-  const progress: BatchProgress = { total: files.length, sent: 0, created: 0, refused: [] };
-  for (let at = 0; at < files.length; at += TEMPLATE_UPLOAD.maxFiles) {
-    const batch = files.slice(at, at + TEMPLATE_UPLOAD.maxFiles);
+  const total = batches.reduce((sum, batch) => sum + batch.files.length, 0);
+  const progress: BatchProgress = { total, sent: 0, created: 0, refused: [] };
+  for (let at = 0; at < batches.length; at += 1) {
+    const batch = batches[at];
     try {
-      const answer = await send(batch);
-      progress.sent += batch.length;
+      const answer = await send(batch.files, batch.practiceArea);
+      progress.sent += batch.files.length;
       progress.created += answer.created.length;
       progress.refused = [...progress.refused, ...answer.refused.map((item) => ({ name: item.original_name, reason: item.reason }))];
       onProgress({ ...progress });

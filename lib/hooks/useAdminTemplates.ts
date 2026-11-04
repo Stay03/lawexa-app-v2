@@ -10,6 +10,7 @@ import {
   PROCESSING_POLL_MS,
   uploadInBatches,
   type BatchProgress,
+  type UploadBatch,
 } from '@/components/admin/templates/template-model';
 import type { AdminTemplateListParams, AdminTemplateUpdatePayload } from '@/types/admin-templates';
 
@@ -73,18 +74,18 @@ export function useUploadTemplates() {
 }
 
 /**
- * A folder upload: every file, 20 to a request, one request after another,
- * with its progress after each (`uploadInBatches`). The list is asked again
+ * A folder upload: its requests (`batchesFor`), one after another, with its
+ * progress after each (`uploadInBatches`). The list is asked again
  * once, when the run ends. A run that stops on a failed request settles with
  * where it stopped; it does not throw.
  */
 export function useUploadTemplateFolder() {
   const refresh = useRefresh();
   return useMutation({
-    mutationFn: ({ files, onProgress }: { files: readonly File[]; onProgress: (progress: BatchProgress) => void }) =>
+    mutationFn: ({ batches, onProgress }: { batches: readonly UploadBatch<File>[]; onProgress: (progress: BatchProgress) => void }) =>
       uploadInBatches(
-        files,
-        async (batch) => (await adminTemplatesApi.upload(batch)).data ?? { created: [], refused: [] },
+        batches,
+        async (files, practiceArea) => (await adminTemplatesApi.upload(files, practiceArea)).data ?? { created: [], refused: [] },
         onProgress,
       ),
     onSettled: () => refresh(),

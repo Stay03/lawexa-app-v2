@@ -4,12 +4,15 @@ import assert from 'node:assert/strict';
 import {
   anyProcessing,
   approveBlocker,
+  batchesFor,
   blankSegments,
   blanksIn,
   blanksLabel,
   changedFields,
   fieldsOf,
+  folderAreas,
   foldersLabel,
+  nearestSubfolder,
   precheckUpload,
   refusalSentence,
   sortFolderFiles,
@@ -106,7 +109,7 @@ test('a folder upload takes every Word, RTF and PDF file in its subfolders; the 
     at('Library/.DS_Store', 6),
     at('Library/Property/TEST DATA scan.pdf', 25 * MB),
   ]);
-  assert.deepEqual(sorted.take.map((f) => f.name), ['TEST DATA lease.docx', 'TEST DATA deed.pdf', 'TEST DATA tenancy.DOC', 'TEST DATA resolution.rtf']);
+  assert.deepEqual(sorted.take.map((f) => f.file.name), ['TEST DATA lease.docx', 'TEST DATA deed.pdf', 'TEST DATA tenancy.DOC', 'TEST DATA resolution.rtf']);
   assert.equal(sorted.skipped, 4);
   // Too big is named, with where it sits.
   assert.deepEqual(sorted.tooBig, [{ name: 'Library/Property/TEST DATA scan.pdf', reason: 'size' }]);
@@ -116,26 +119,58 @@ test('a folder upload takes every Word, RTF and PDF file in its subfolders; the 
   assert.equal(foldersLabel(4), '4 folders');
 });
 
+test("each subfolder's name is its files' practice area; the top folder's own files get none", () => {
+  assert.equal(nearestSubfolder('Library/Property/Leases/TEST DATA lease.docx'), 'Leases');
+  assert.equal(nearestSubfolder('Library/Corporate/TEST DATA resolution.rtf'), 'Corporate');
+  assert.equal(nearestSubfolder('Library/TEST DATA lease.docx'), null);
+  // Dropped loose, not in a folder.
+  assert.equal(nearestSubfolder('TEST DATA lease.docx'), null);
+  // Within the server's 100 characters, trimmed; a blank name is none.
+  assert.equal(nearestSubfolder(`Library/  ${'P'.repeat(120)}/TEST DATA deed.pdf`), 'P'.repeat(100));
+  assert.equal(nearestSubfolder('Library/   /TEST DATA deed.pdf'), null);
+
+  const found = [
+    at('Library/TEST DATA general.docx'),
+    ...Array.from({ length: 25 }, (_, i) => at(`Library/Property/TEST DATA deed ${i}.pdf`)),
+    at('Library/Corporate/TEST DATA resolution.rtf'),
+    at('Library/Property/Leases/TEST DATA tenancy.docx'),
+  ];
+  const byFolder = batchesFor(found, true);
+  // One subfolder per request, 20 at most: Property's 25 take two.
+  assert.deepEqual(
+    byFolder.map((batch) => [batch.practiceArea, batch.files.length]),
+    [[null, 1], ['Property', 20], ['Property', 5], ['Corporate', 1], ['Leases', 1]],
+  );
+  assert.deepEqual(folderAreas(found), ['Property', 'Corporate', 'Leases']);
+  // Switched off: in the order found, 20 to a request, none with a practice area.
+  const plain = batchesFor(found, false);
+  assert.deepEqual(plain.map((batch) => [batch.practiceArea, batch.files.length]), [[null, 20], [null, 8]]);
+  assert.equal(plain[0].files[0].name, 'TEST DATA general.docx');
+});
+
 test('a folder goes 20 files to a request, one request after another, with progress after each', async () => {
-  const files = Array.from({ length: 45 }, (_, i) => `TEST DATA ${i}.docx`);
+  const files = Array.from({ length: 45 }, (_, i) => at(`Library/TEST DATA ${i}.docx`));
   const batches: string[][] = [];
+  const areas: (string | null)[] = [];
   let inFlight = 0;
   let mostInFlight = 0;
   const seen: BatchProgress[] = [];
   const outcome = await uploadInBatches(
-    files,
-    async (batch) => {
+    batchesFor(files, true),
+    async (batch, practiceArea) => {
       inFlight += 1;
       mostInFlight = Math.max(mostInFlight, inFlight);
-      batches.push([...batch]);
+      areas.push(practiceArea);
+      batches.push(batch.map((f) => f.name));
       await new Promise((resolve) => setTimeout(resolve, 1));
       inFlight -= 1;
       // The server turns down the first file of each batch as already uploaded.
-      return { created: batch.slice(1), refused: [{ original_name: batch[0], reason: 'duplicate' as const }] };
+      return { created: batch.slice(1), refused: [{ original_name: batch[0].name, reason: 'duplicate' as const }] };
     },
     (progress) => seen.push(progress),
   );
   assert.deepEqual(batches.map((batch) => batch.length), [20, 20, 5]);
+  assert.deepEqual(areas, [null, null, null]);
   assert.equal(mostInFlight, 1);
   assert.deepEqual(seen.map((progress) => progress.sent), [20, 40, 45]);
   assert.equal(outcome.stoppedAt, null);
@@ -144,10 +179,10 @@ test('a folder goes 20 files to a request, one request after another, with progr
 });
 
 test('a failed request stops the folder there, and says where to pick up', async () => {
-  const files = Array.from({ length: 50 }, (_, i) => i);
+  const batches = batchesFor(Array.from({ length: 50 }, (_, i) => at(`Library/TEST DATA ${i}.docx`)), true);
   let calls = 0;
   const outcome = await uploadInBatches(
-    files,
+    batches,
     async (batch) => {
       calls += 1;
       if (calls === 2) throw new Error('offline');
@@ -156,9 +191,10 @@ test('a failed request stops the folder there, and says where to pick up', async
     () => {},
   );
   assert.equal(calls, 2);
-  assert.equal(outcome.stoppedAt, 20);
+  // The second request is the first still to send.
+  assert.equal(outcome.stoppedAt, 1);
   assert.equal(outcome.sent, 20);
   assert.equal(outcome.created, 20);
   assert.equal((outcome.error as Error).message, 'offline');
-  assert.deepEqual(files.slice(outcome.stoppedAt ?? 0).length, 30);
+  assert.equal(batches.slice(outcome.stoppedAt ?? 0).reduce((sum, batch) => sum + batch.files.length, 0), 30);
 });
