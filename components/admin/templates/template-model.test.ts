@@ -253,22 +253,27 @@ test('the result says how many went live and why the rest were skipped', () => {
     bulkApproveMessage({
       approved: 9,
       skipped: [
-        { uuid: 'a', reason: 'no_name' },
-        { uuid: 'b', reason: 'no_name' },
-        { uuid: 'c', reason: 'processing' },
-        { uuid: 'd', reason: 'something_else' },
+        { uuid: 'a', code: 'missing_name_or_text', reason: 'A template needs a name and its text before it can go live.' },
+        { uuid: 'b', code: 'missing_name_or_text', reason: 'A template needs a name and its text before it can go live.' },
+        { uuid: 'c', code: 'not_found', reason: 'No template with this id.' },
+        { uuid: 'd', code: 'something_new', reason: 'It is locked by another admin.' },
       ],
     }),
-    { title: '9 approved, 4 skipped', detail: '2 no name yet, 1 still being read, 1 something else' },
+    { title: '9 approved, 4 skipped', detail: '2 missing a name or text; 1 deleted; 1: It is locked by another admin' },
+  );
+  // Before Backend sends codes: grouped by its sentence.
+  assert.deepEqual(
+    bulkApproveMessage({ approved: 1, skipped: [{ uuid: 'a', reason: 'Only a draft can be approved.' }, { uuid: 'b', reason: 'Only a draft can be approved.' }] }),
+    { title: '1 approved, 2 skipped', detail: '2: Only a draft can be approved' },
   );
 });
 
 test('"Select all drafts" calls again while drafts go live and some remain, never on remaining alone', async () => {
   // 812 drafts, 500 a call; 2 have no name and stay drafts for good.
   const answers = [
-    { approved: 500, skipped: [{ uuid: 'n1', reason: 'no_name' }], remaining: 312 },
-    { approved: 310, skipped: [{ uuid: 'n1', reason: 'no_name' }, { uuid: 'n2', reason: 'no_name' }], remaining: 2 },
-    { approved: 0, skipped: [{ uuid: 'n1', reason: 'no_name' }, { uuid: 'n2', reason: 'no_name' }], remaining: 2 },
+    { approved: 500, skipped: [{ uuid: 'n1', code: 'missing_name_or_text', reason: 'x' }], remaining: 312 },
+    { approved: 310, skipped: [{ uuid: 'n1', code: 'missing_name_or_text', reason: 'x' }, { uuid: 'n2', code: 'missing_name_or_text', reason: 'x' }], remaining: 2 },
+    { approved: 0, skipped: [{ uuid: 'n1', code: 'missing_name_or_text', reason: 'x' }, { uuid: 'n2', code: 'missing_name_or_text', reason: 'x' }], remaining: 2 },
   ];
   let calls = 0;
   const progress: number[] = [];
@@ -279,7 +284,7 @@ test('"Select all drafts" calls again while drafts go live and some remain, neve
   assert.equal(result.approved, 810);
   // A draft skipped in two rounds is counted once.
   assert.deepEqual(result.skipped.map((item) => item.uuid), ['n1', 'n2']);
-  assert.deepEqual(bulkApproveMessage(result), { title: '810 approved, 2 skipped', detail: '2 no name yet' });
+  assert.deepEqual(bulkApproveMessage(result), { title: '810 approved, 2 skipped', detail: '2 missing a name or text' });
 });
 
 test('ticked drafts go in one call, whatever remains', async () => {

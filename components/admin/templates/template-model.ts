@@ -405,27 +405,27 @@ export async function approveInRounds(
   return { approved, skipped, remaining };
 }
 
-const SKIP_REASONS: Record<string, string> = {
+/** Backend's skip codes, in a few words each (the techlead, 4 November 2026). */
+const SKIP_CODES: Record<string, string> = {
   not_draft: 'no longer a draft',
-  no_name: 'no name yet',
-  missing_name: 'no name yet',
-  no_text: 'no text',
-  missing_text: 'no text',
-  processing: 'still being read',
-  failed: 'reading failed',
+  missing_name_or_text: 'missing a name or text',
   not_found: 'deleted',
 };
 
-/** "12 approved, 3 skipped" and, under it, why: "2 no name yet, 1 still being read". */
+/** "12 approved, 3 skipped" and, under it, why: "2 missing a name or text; 1 deleted". A code the app does not know shows Backend's own sentence. */
 export function bulkApproveMessage(result: AdminTemplateBulkApproveResult): { title: string; detail: string | null } {
   const approved = approvedCount(result);
   const skipped = result.skipped.length;
   const title = skipped > 0 ? `${approved} approved, ${skipped} skipped` : approved === 1 ? '1 template is live.' : `${approved} templates are live.`;
   if (skipped === 0) return { title, detail: null };
-  const counts = new Map<string, number>();
-  for (const { reason } of result.skipped) {
-    const label = SKIP_REASONS[reason] ?? reason.replace(/_/g, ' ');
-    counts.set(label, (counts.get(label) ?? 0) + 1);
+  const counts = new Map<string, { count: number; known: boolean }>();
+  for (const { reason, code } of result.skipped) {
+    const known = code ? SKIP_CODES[code] : undefined;
+    const label = known ?? (reason.trim().replace(/\.$/, '') || 'not approved');
+    const entry = counts.get(label) ?? { count: 0, known: Boolean(known) };
+    entry.count += 1;
+    counts.set(label, entry);
   }
-  return { title, detail: [...counts].map(([label, count]) => `${count} ${label}`).join(', ') };
+  const parts = [...counts].map(([label, { count, known }]) => (known ? `${count} ${label}` : `${count}: ${label}`));
+  return { title, detail: parts.join('; ') };
 }

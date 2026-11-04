@@ -94,7 +94,8 @@ export type AdminTemplateBulkApprovePayload =
 export interface AdminTemplateBulkApproveResult {
   /** How many went live in this call (a count, or their uuids). */
   approved: number | string[];
-  skipped: { uuid: string; reason: string }[];
+  /** `reason` is Backend's sentence; `code` names it for grouping (not_draft, missing_name_or_text, not_found). */
+  skipped: { uuid: string; reason: string; code?: string }[];
   /** Drafts still matching after this call (all_drafts approves 500 a call, oldest first). */
   remaining?: number;
 }

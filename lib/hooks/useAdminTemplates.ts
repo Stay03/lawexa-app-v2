@@ -123,13 +123,23 @@ export function useTemplateAction(uuid: string, action: 'approve' | 'unpublish' 
 
 /**
  * Bulk approve: the ticked drafts, or every draft matching the filters. The
- * caller says what came of it (`bulkApproveMessage`); the list is read again.
+ * caller says what came of it (`bulkApproveMessage`); the list and the draft
+ * total are read again after each round and when the run ends, failed or not.
  */
 export function useApproveTemplates() {
   const refresh = useRefresh();
   return useMutation({
     mutationFn: ({ payload, onRound }: { payload: AdminTemplateBulkApprovePayload; onRound: (approvedSoFar: number) => void }) =>
-      approveInRounds(payload, async (body) => (await adminTemplatesApi.approveMany(body)).data ?? { approved: 0, skipped: [], remaining: 0 }, onRound),
+      approveInRounds(
+        payload,
+        async (body) => (await adminTemplatesApi.approveMany(body)).data ?? { approved: 0, skipped: [], remaining: 0 },
+        (approvedSoFar) => {
+          // The list and the draft total are read again after every round, so a row
+          // shows Live as soon as it is, and a run that stops part way still shows what went live.
+          refresh();
+          onRound(approvedSoFar);
+        },
+      ),
     onSettled: () => refresh(),
     onError: (error) => toast.error(extractApiError(error).message || 'Approving did not go through. Try again.'),
   });
