@@ -24,8 +24,9 @@ import type { WrappedCourseKey, WrappedRecord, WrappedSlideNumber } from '@/lib/
  * words agreed in thread f833c285 (4 November 2026): every number is the
  * student's own reading, quizzes and active time, never their questions, and
  * nothing judges how they did. A frame draws only what the record holds; the
- * server has already skipped a frame with nothing to show. The art boxes
- * (`.wr-art`) stand in for Arthur's canvas until it arrives.
+ * server has already skipped a frame with nothing to show. Arthur's design
+ * system dresses each frame (Paper or Ink, a pattern block, a scribble), and
+ * the type is large and centred in the frame's height (his pick, B).
  */
 
 /** The share cards' four pattern kinds (Arthur's frames), one per frame in turn. */
@@ -34,7 +35,7 @@ const PATTERNS = ['rings', 'checks', 'dots', 'stripes'] as const;
 function Frame({ slide, children, label }: { slide: WrappedSlideNumber; children: ReactNode; label: string }) {
   const theme = FRAME_THEMES[slide];
   return (
-    <section className="wr-frame" data-ground={theme.ground} aria-label={label} style={{ ['--wr-accent' as string]: `var(--wr-${theme.accent})` }}>
+    <section className="wr-frame" data-slide={slide} data-ground={theme.ground} aria-label={label} style={{ ['--wr-accent' as string]: `var(--wr-${theme.accent})` }}>
       {/* The system's pattern block, bleeding off the lower right, and its scribble near the foot. */}
       <span aria-hidden className="wr-pattern" data-kind={PATTERNS[slide % PATTERNS.length]} style={{ color: theme.ground === 'ink' ? 'var(--wr-accent)' : 'var(--wr-ink)' }} />
       <svg aria-hidden className="wr-scribble" style={{ bottom: '6cqw' }} viewBox="0 0 1080 130" preserveAspectRatio="none">
@@ -107,7 +108,6 @@ function Overnight({ record }: { record: WrappedRecord }) {
         <span className="wr-num">{formatCount(night.working_days)}</span> working days, or{' '}
         <span className="wr-num">{formatCount(night.ikorodu_vi_trips)}</span> Ikorodu to VI trips in traffic.
       </p>
-      <div className="wr-art" aria-hidden />
     </Frame>
   );
 }
@@ -170,7 +170,7 @@ function BigFive({ record }: { record: WrappedRecord }) {
         </p>
       ) : null}
       {mostTime ? (
-        <span className="wr-sticker wr-rise" data-tone="ink" style={{ marginTop: 'auto', animationDelay: '320ms' }}>
+        <span className="wr-sticker wr-rise" data-tone="ink" style={{ animationDelay: '320ms' }}>
           Most Time Spent: {mostTime}
         </span>
       ) : null}
@@ -200,7 +200,6 @@ function Obsession({ record }: { record: WrappedRecord }) {
           {thing.gani.subject} all year? A little {GANI_FIGURES[thing.gani.figure]} in you.
         </p>
       ) : null}
-      <div className="wr-art" aria-hidden />
     </Frame>
   );
 }
@@ -230,7 +229,7 @@ function NoGree({ record }: { record: WrappedRecord }) {
         ) : null}
       </ul>
       {league ? (
-        <p className="wr-body wr-rise" style={{ marginTop: 'auto', animationDelay: '220ms' }}>
+        <p className="wr-body wr-rise" style={{ animationDelay: '220ms' }}>
           {CAMPUS_NAMES[league.top_campus]} read the most judgments per finalist this year.
           {record.student.campus && record.student.campus !== league.top_campus ? (
             <>
@@ -279,7 +278,7 @@ function Drafting({ record }: { record: WrappedRecord }) {
         ) : null}
       </ul>
       {rise ? (
-        <p className="wr-big wr-rise" style={{ marginTop: 'auto', animationDelay: '260ms' }}>
+        <p className="wr-big wr-rise" style={{ animationDelay: '260ms' }}>
           {courseName(rise.course_key, record)}: {Math.round(rise.from_pct)}% in {rise.from_month},{' '}
           <span style={accent}>
             {Math.round(rise.to_pct)}% in {rise.to_month}
@@ -320,7 +319,7 @@ function Personality({ record }: { record: WrappedRecord }) {
           {percentile}
         </p>
       ) : null}
-      <p className="wr-small wr-rise" style={{ marginTop: 'auto', animationDelay: '320ms' }}>
+      <p className="wr-small wr-rise" style={{ animationDelay: '320ms' }}>
         Also in the class: {others.join(', ')}.
       </p>
     </Frame>

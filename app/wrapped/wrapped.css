@@ -64,9 +64,13 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  /* The foot is kept clear for the pattern block and the scribble (.wr-pattern). */
-  padding: 18cqw 8cqw 36cqw;
-  gap: 4cqw;
+  /* The content sits in the middle of the frame's height (Arthur, 4 November: no
+     dead space at the foot); the foot stays clear for the pattern and scribble. */
+  justify-content: center;
+  /* A frame taller than the screen keeps its top in view rather than cropping both ends. */
+  justify-content: safe center;
+  padding: 18cqw 8cqw 34cqw;
+  gap: 5cqw;
 }
 
 /* The tokens' Paper theme (default) and Ink theme. */
@@ -200,7 +204,7 @@
 
 /* --eyebrow: Inter 700 28px, caps, 12px tracking. */
 .wr-kicker {
-  font: 700 2.8cqw/1.2 var(--wr-body);
+  font: 700 3.2cqw/1.2 var(--wr-body);
   letter-spacing: 1.1cqw;
   text-transform: uppercase;
   color: var(--wr-muted);
@@ -208,35 +212,35 @@
 
 /* --display-l: Unbounded 900 120px/0.9, sentence case. */
 .wr-title {
-  font: 900 10cqw/0.95 var(--wr-display);
+  font: 900 12.4cqw/0.95 var(--wr-display);
   letter-spacing: -0.3cqw;
   text-wrap: balance;
 }
 
 /* --display-xl: Unbounded 900 240px/0.9, the big number. */
 .wr-huge {
-  font: 900 22cqw/0.9 var(--wr-display);
+  font: 900 32cqw/0.88 var(--wr-display);
   letter-spacing: -0.3cqw;
   font-variant-numeric: tabular-nums;
 }
 
 /* --display-m: Unbounded 900 72px/1. */
 .wr-big {
-  font: 900 6.7cqw/1.02 var(--wr-display);
+  font: 900 8.6cqw/1.02 var(--wr-display);
   letter-spacing: -0.1cqw;
   text-wrap: balance;
 }
 
 /* --body: Inter 500 40px/1.3. */
 .wr-body {
-  font: 500 3.9cqw/1.3 var(--wr-body);
+  font: 500 5cqw/1.3 var(--wr-body);
   letter-spacing: -0.06cqw;
   text-wrap: pretty;
 }
 
 /* --label: Inter 500 30px/1.2. */
 .wr-small {
-  font: 500 3cqw/1.25 var(--wr-body);
+  font: 500 3.8cqw/1.3 var(--wr-body);
   color: var(--wr-muted);
 }
 
@@ -252,7 +256,7 @@
   align-self: flex-start;
   padding: 2.4cqw 3.6cqw;
   border: 0.4cqw solid currentColor;
-  font: 900 4.4cqw/1 var(--wr-display);
+  font: 900 5.4cqw/1 var(--wr-display);
   transform: rotate(-3deg);
 }
 
@@ -309,23 +313,16 @@
   grid-template-columns: 6cqw 1fr auto;
   gap: 2cqw;
   align-items: baseline;
-  font: 700 3.7cqw/1.25 var(--wr-body);
+  font: 700 4.4cqw/1.25 var(--wr-body);
   letter-spacing: -0.06cqw;
 }
 
 .wr-list > li::before {
   counter-increment: wr-rank;
   content: counter(wr-rank);
-  font: 900 3.7cqw/1 var(--wr-display);
+  font: 900 4.4cqw/1 var(--wr-display);
 }
 
-/* Placeholder art: where a frame's illustration lands from Arthur's canvas. */
-.wr-art {
-  margin-top: auto;
-  align-self: stretch;
-  min-height: 22cqw;
-  /* Empty until the frame's illustration arrives: the room is kept, nothing is drawn. */
-}
 
 /* ── Frame 08: the share card and its bar (app UI, not in the image) ────── */
 
@@ -481,4 +478,19 @@
 
 .wr-landing-card strong {
   font: 900 1.1rem/1.2 var(--wr-display);
+}
+
+/* Frame 03 holds two ranked lists: a step smaller, so it fits a computer's column. */
+.wr-frame[data-slide='3'] .wr-list > li,
+.wr-frame[data-slide='3'] .wr-list > li::before {
+  font-size: 3.9cqw;
+}
+
+.wr-frame[data-slide='3'] .wr-title,
+.wr-frame[data-slide='3'] .wr-big {
+  font-size: 7.4cqw;
+}
+
+.wr-frame[data-slide='3'] .wr-body {
+  font-size: 4.4cqw;
 }
