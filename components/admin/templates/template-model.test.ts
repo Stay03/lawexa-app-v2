@@ -6,6 +6,9 @@ import {
   approveBlocker,
   batchesFor,
   blankSegments,
+  bulkApproveMessage,
+  bulkApprovePayload,
+  canTick,
   blanksIn,
   blanksLabel,
   changedFields,
@@ -13,6 +16,10 @@ import {
   folderAreas,
   foldersLabel,
   folderPathOf,
+  NO_SELECTION,
+  selectedCount,
+  toggleDraft,
+  togglePage,
   precheckUpload,
   refusalSentence,
   sortFolderFiles,
@@ -203,4 +210,54 @@ test('a failed request stops the folder there, and says where to pick up', async
   assert.equal(outcome.created, 20);
   assert.equal((outcome.error as Error).message, 'offline');
   assert.equal(batches.slice(outcome.stoppedAt ?? 0).reduce((sum, batch) => sum + batch.files.length, 0), 30);
+});
+
+/* Bulk approve (Arthur, thread 2b658111, 4 November 2026: 300 drafts,
+ * approved in one go, not one by one). */
+
+test('only drafts can be ticked; a reading, failed or live template has no box', () => {
+  assert.equal(canTick({ status: 'draft' }), true);
+  for (const status of ['processing', 'failed', 'live'] as const) assert.equal(canTick({ status }), false);
+});
+
+test('ticks, the page box and "Select all drafts" make the selection the button approves', () => {
+  const page = ['a', 'b', 'c'];
+  let selection = toggleDraft(NO_SELECTION, 'a', page);
+  assert.equal(selectedCount(selection, 300), 1);
+  selection = togglePage(selection, page);
+  assert.equal(selectedCount(selection, 300), 3);
+  // All on: the page box clears them.
+  selection = togglePage(selection, page);
+  assert.equal(selectedCount(selection, 300), 0);
+  // Every draft under the filters, on every page: counted from the server's total.
+  assert.equal(selectedCount({ kind: 'all' }, 300), 300);
+  // Unticking one with all selected keeps the rest of this page ticked.
+  const after = toggleDraft({ kind: 'all' }, 'b', page);
+  assert.deepEqual(after.kind === 'some' ? [...after.uuids].sort() : [], ['a', 'c']);
+});
+
+test('the server gets the ticked uuids, or every draft under the current filters', () => {
+  assert.deepEqual(bulkApprovePayload({ kind: 'some', uuids: new Set(['a', 'b']) }, { practice_area: 'Property' }), { uuids: ['a', 'b'] });
+  assert.deepEqual(bulkApprovePayload({ kind: 'all' }, { practice_area: 'Property', search: '', country_id: 160 }), {
+    all_drafts: true,
+    practice_area: 'Property',
+    country_id: 160,
+  });
+});
+
+test('the result says how many went live and why the rest were skipped', () => {
+  assert.deepEqual(bulkApproveMessage({ approved: 12, skipped: [] }), { title: '12 templates are live.', detail: null });
+  assert.deepEqual(bulkApproveMessage({ approved: ['x'], skipped: [] }), { title: '1 template is live.', detail: null });
+  assert.deepEqual(
+    bulkApproveMessage({
+      approved: 9,
+      skipped: [
+        { uuid: 'a', reason: 'no_name' },
+        { uuid: 'b', reason: 'no_name' },
+        { uuid: 'c', reason: 'processing' },
+        { uuid: 'd', reason: 'something_else' },
+      ],
+    }),
+    { title: '9 approved, 4 skipped', detail: '2 no name yet, 1 still being read, 1 something else' },
+  );
 });

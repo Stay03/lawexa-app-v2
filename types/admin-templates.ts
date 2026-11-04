@@ -81,3 +81,18 @@ export interface AdminTemplateUpdatePayload {
   country_id?: number | null;
   text?: string;
 }
+
+/**
+ * Bulk approve (Arthur, thread 2b658111, 4 November 2026: 300 drafts, not one
+ * at a time): either the ticked drafts, or every draft matching the list's
+ * current filters. `POST /api/admin/templates/approve`.
+ */
+export type AdminTemplateBulkApprovePayload =
+  | { uuids: string[] }
+  | ({ all_drafts: true } & Pick<AdminTemplateListParams, 'search' | 'practice_area' | 'document_type' | 'country_id'>);
+
+export interface AdminTemplateBulkApproveResult {
+  /** How many went live (a count, or their uuids). */
+  approved: number | string[];
+  skipped: { uuid: string; reason: string }[];
+}

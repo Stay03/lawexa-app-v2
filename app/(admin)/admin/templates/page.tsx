@@ -9,9 +9,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AdminPagination } from '@/components/admin';
 import { TemplateDeleteDialog } from '@/components/admin/templates/TemplateDeleteDialog';
 import { TemplatesFilters } from '@/components/admin/templates/TemplatesFilters';
+import { TemplatesBulkApprove } from '@/components/admin/templates/TemplatesBulkApprove';
 import { TemplatesTable } from '@/components/admin/templates/TemplatesTable';
+import { NO_SELECTION, canTick, toggleDraft, togglePage, type DraftSelection } from '@/components/admin/templates/template-model';
 import { TemplateUploadDialog } from '@/components/admin/templates/TemplateUploadDialog';
-import { useAdminTemplateFacets, useAdminTemplates, useDownloadTemplateSource } from '@/lib/hooks/useAdminTemplates';
+import { useAdminTemplateFacets, useAdminTemplates, useDownloadTemplateSource, useDraftCount } from '@/lib/hooks/useAdminTemplates';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import type { AdminTemplateListParams, AdminTemplateRow, AdminTemplateStatus } from '@/types/admin-templates';
 
@@ -21,7 +23,8 @@ import type { AdminTemplateListParams, AdminTemplateRow, AdminTemplateStatus } f
  * PDF files at once; each is a draft while Lawexa blanks out names, dates and
  * amounts and suggests its labels, and goes live once an admin approves it.
  * Only live templates reach Lawexa. The filters live in the address, as on
- * the other admin lists (Files).
+ * the other admin lists (Files). Drafts can be ticked and approved together,
+ * or all drafts under the filters at once (Arthur, 4 November 2026).
  */
 function AdminTemplatesContent() {
   const router = useRouter();
@@ -47,6 +50,19 @@ function AdminTemplatesContent() {
 
   const list = useAdminTemplates(params);
   const facets = useAdminTemplateFacets();
+
+  // Bulk approve: the selection belongs to the filters it was made under, so a
+  // change of filters starts a fresh one (a draft ticked under "Property" is not
+  // quietly approved after switching to "Corporate").
+  const filterKey = JSON.stringify([params.search, params.status, params.practice_area, params.document_type, params.country_id]);
+  const [picked, setPicked] = useState<{ key: string; selection: DraftSelection }>({ key: filterKey, selection: NO_SELECTION });
+  const selection = picked.key === filterKey ? picked.selection : NO_SELECTION;
+  const setSelection = (next: DraftSelection) => setPicked({ key: filterKey, selection: next });
+  const showsDrafts = !params.status || params.status === 'draft';
+  const drafts = useDraftCount(params, showsDrafts);
+  const pageDrafts = (list.data?.data ?? []).filter(canTick).map((row) => row.uuid);
+  const ticked = (uuid: string) => selection.kind === 'all' || selection.uuids.has(uuid);
+  const tickedOnPage = pageDrafts.filter(ticked).length;
 
   const updateParams = useCallback(
     (updates: Partial<AdminTemplateListParams>) => {
@@ -92,7 +108,17 @@ function AdminTemplatesContent() {
         onParamsChange={updateParams}
       />
 
+      {showsDrafts ? (
+        <TemplatesBulkApprove selection={selection} onSelectionChange={setSelection} draftTotal={drafts.data ?? null} params={params} />
+      ) : null}
+
       <TemplatesTable
+        selection={{
+          isTicked: ticked,
+          onToggle: (uuid) => setSelection(toggleDraft(selection, uuid, pageDrafts)),
+          page: tickedOnPage === 0 ? 'none' : tickedOnPage === pageDrafts.length ? 'all' : 'some',
+          onTogglePage: () => setSelection(togglePage(selection, pageDrafts)),
+        }}
         rows={list.data?.data ?? []}
         isLoading={list.isPending}
         filtered={filtered}

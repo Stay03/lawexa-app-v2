@@ -12,7 +12,7 @@ import {
   type BatchProgress,
   type UploadBatch,
 } from '@/components/admin/templates/template-model';
-import type { AdminTemplateListParams, AdminTemplateUpdatePayload } from '@/types/admin-templates';
+import type { AdminTemplateBulkApprovePayload, AdminTemplateListParams, AdminTemplateUpdatePayload } from '@/types/admin-templates';
 
 export const adminTemplateKeys = {
   all: ['admin', 'templates'] as const,
@@ -117,6 +117,30 @@ export function useTemplateAction(uuid: string, action: 'approve' | 'unpublish' 
       toast.success(done);
     },
     onError: (error) => toast.error(extractApiError(error).message || 'That did not go through. Try again.'),
+  });
+}
+
+/**
+ * Bulk approve: the ticked drafts, or every draft matching the filters. The
+ * caller says what came of it (`bulkApproveMessage`); the list is read again.
+ */
+export function useApproveTemplates() {
+  const refresh = useRefresh();
+  return useMutation({
+    mutationFn: async (payload: AdminTemplateBulkApprovePayload) =>
+      (await adminTemplatesApi.approveMany(payload)).data ?? { approved: 0, skipped: [] },
+    onSettled: () => refresh(),
+    onError: (error) => toast.error(extractApiError(error).message || 'Approving did not go through. Try again.'),
+  });
+}
+
+/** How many drafts match the list's filters (one row asked for; the total is read). */
+export function useDraftCount(params: AdminTemplateListParams, enabled: boolean) {
+  const draftParams: AdminTemplateListParams = { ...params, status: 'draft', page: 1, per_page: 1 };
+  return useQuery({
+    queryKey: [...adminTemplateKeys.list(draftParams), 'draft-count'] as const,
+    queryFn: async () => (await adminTemplatesApi.getList(draftParams)).pagination?.total ?? 0,
+    enabled,
   });
 }
 

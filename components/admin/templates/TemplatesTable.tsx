@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +18,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { AdminTemplateRow, AdminTemplateStatus } from '@/types/admin-templates';
-import { blanksLabel, STATUS_LABELS } from './template-model';
+import { blanksLabel, canTick, STATUS_LABELS } from './template-model';
 
 /** The admin pages' status colours (AdminFilesTable), in light and dark. */
 const STATUS_STYLES: Record<AdminTemplateStatus, string> = {
@@ -41,10 +42,19 @@ function whenLabel(iso: string): string {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/** The tick boxes' state, from the page (template-model's selection rules). */
+export interface TemplatesTableSelection {
+  isTicked: (uuid: string) => boolean;
+  onToggle: (uuid: string) => void;
+  /** The header box: every draft on this page, some, or none. */
+  page: 'all' | 'some' | 'none';
+  onTogglePage: () => void;
+}
+
 /**
- * The templates, newest first: name and source file, the labels, status
- * (with the reason when reading failed), blanks, and who uploaded it when.
- * The name opens the review screen.
+ * The templates, newest first: a tick box on each draft (bulk approve), name
+ * and source file, the labels, status (with the reason when reading failed),
+ * blanks, and who uploaded it when. The name opens the review screen.
  */
 export function TemplatesTable({
   rows,
@@ -52,6 +62,7 @@ export function TemplatesTable({
   filtered,
   onDownload,
   onDelete,
+  selection,
 }: {
   rows: readonly AdminTemplateRow[];
   isLoading: boolean;
@@ -59,7 +70,9 @@ export function TemplatesTable({
   filtered: boolean;
   onDownload: (row: AdminTemplateRow) => void;
   onDelete: (row: AdminTemplateRow) => void;
+  selection: TemplatesTableSelection;
 }) {
+  const pageHasDrafts = rows.some(canTick);
   if (isLoading) {
     return (
       <div className="space-y-2">
@@ -83,6 +96,15 @@ export function TemplatesTable({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-10">
+              {pageHasDrafts ? (
+                <Checkbox
+                  aria-label="Select the drafts on this page"
+                  checked={selection.page === 'all' ? true : selection.page === 'some' ? 'indeterminate' : false}
+                  onCheckedChange={selection.onTogglePage}
+                />
+              ) : null}
+            </TableHead>
             <TableHead>Name</TableHead>
             <TableHead>Practice area</TableHead>
             <TableHead>Document type</TableHead>
@@ -95,7 +117,17 @@ export function TemplatesTable({
         </TableHeader>
         <TableBody>
           {rows.map((row) => (
-            <TableRow key={row.uuid}>
+            <TableRow key={row.uuid} data-state={canTick(row) && selection.isTicked(row.uuid) ? 'selected' : undefined}>
+              <TableCell className="w-10">
+                {/* Only a draft can go live: a template being read, failed or live has no box. */}
+                {canTick(row) ? (
+                  <Checkbox
+                    aria-label={`Select ${row.name || row.source.original_name}`}
+                    checked={selection.isTicked(row.uuid)}
+                    onCheckedChange={() => selection.onToggle(row.uuid)}
+                  />
+                ) : null}
+              </TableCell>
               <TableCell className="max-w-[280px]">
                 <Link href={`/admin/templates/${row.uuid}`} className="block truncate font-medium hover:underline">
                   {row.name || row.source.original_name}

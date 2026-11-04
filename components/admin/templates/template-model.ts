@@ -1,4 +1,12 @@
-import type { AdminTemplateDetail, AdminTemplateRefusalReason, AdminTemplateRow, AdminTemplateStatus } from '@/types/admin-templates';
+import type {
+  AdminTemplateBulkApprovePayload,
+  AdminTemplateBulkApproveResult,
+  AdminTemplateDetail,
+  AdminTemplateListParams,
+  AdminTemplateRefusalReason,
+  AdminTemplateRow,
+  AdminTemplateStatus,
+} from '@/types/admin-templates';
 
 /**
  * The rules of the admin templates page (Stay's go 4 November 2026, thread
@@ -299,4 +307,82 @@ export function approveBlocker(status: AdminTemplateStatus, fields: Pick<Templat
 export function blanksLabel(count: number): string {
   if (count === 0) return 'No blanks';
   return count === 1 ? '1 blank' : `${count} blanks`;
+}
+
+/**
+ * Bulk approve (Arthur, thread 2b658111, 4 November 2026: approving 300 one by
+ * one makes no sense). Only drafts can be ticked: a template being read, one
+ * that failed, or one already live has no box. "Select all drafts" takes every
+ * draft matching the list's filters, on every page, not only those showing.
+ */
+export function canTick(row: Pick<AdminTemplateRow, 'status'>): boolean {
+  return row.status === 'draft';
+}
+
+export type DraftSelection = { kind: 'some'; uuids: ReadonlySet<string> } | { kind: 'all' };
+
+export const NO_SELECTION: DraftSelection = { kind: 'some', uuids: new Set() };
+
+/** Tick or untick one draft. With all drafts selected, untick leaves the rest of this page ticked. */
+export function toggleDraft(selection: DraftSelection, uuid: string, pageDrafts: readonly string[]): DraftSelection {
+  const current = selection.kind === 'all' ? new Set(pageDrafts) : new Set(selection.uuids);
+  if (current.has(uuid)) current.delete(uuid);
+  else current.add(uuid);
+  return { kind: 'some', uuids: current };
+}
+
+/** The header box: ticks every draft on this page, or clears them when they all are. */
+export function togglePage(selection: DraftSelection, pageDrafts: readonly string[]): DraftSelection {
+  if (selection.kind === 'all') return NO_SELECTION;
+  const current = new Set(selection.uuids);
+  const allOn = pageDrafts.length > 0 && pageDrafts.every((uuid) => current.has(uuid));
+  for (const uuid of pageDrafts) {
+    if (allOn) current.delete(uuid);
+    else current.add(uuid);
+  }
+  return { kind: 'some', uuids: current };
+}
+
+/** How many the button approves. */
+export function selectedCount(selection: DraftSelection, allDrafts: number): number {
+  return selection.kind === 'all' ? allDrafts : selection.uuids.size;
+}
+
+/** What goes to the server: the ticked uuids, or every draft under the current filters. */
+export function bulkApprovePayload(
+  selection: DraftSelection,
+  params: Pick<AdminTemplateListParams, 'search' | 'practice_area' | 'document_type' | 'country_id'>,
+): AdminTemplateBulkApprovePayload {
+  if (selection.kind === 'some') return { uuids: [...selection.uuids] };
+  const filters: Pick<AdminTemplateListParams, 'search' | 'practice_area' | 'document_type' | 'country_id'> = {};
+  if (params.search) filters.search = params.search;
+  if (params.practice_area) filters.practice_area = params.practice_area;
+  if (params.document_type) filters.document_type = params.document_type;
+  if (params.country_id) filters.country_id = params.country_id;
+  return { all_drafts: true, ...filters };
+}
+
+const SKIP_REASONS: Record<string, string> = {
+  not_draft: 'no longer a draft',
+  no_name: 'no name yet',
+  missing_name: 'no name yet',
+  no_text: 'no text',
+  missing_text: 'no text',
+  processing: 'still being read',
+  failed: 'reading failed',
+  not_found: 'deleted',
+};
+
+/** "12 approved, 3 skipped" and, under it, why: "2 no name yet, 1 still being read". */
+export function bulkApproveMessage(result: AdminTemplateBulkApproveResult): { title: string; detail: string | null } {
+  const approved = Array.isArray(result.approved) ? result.approved.length : result.approved;
+  const skipped = result.skipped.length;
+  const title = skipped > 0 ? `${approved} approved, ${skipped} skipped` : approved === 1 ? '1 template is live.' : `${approved} templates are live.`;
+  if (skipped === 0) return { title, detail: null };
+  const counts = new Map<string, number>();
+  for (const { reason } of result.skipped) {
+    const label = SKIP_REASONS[reason] ?? reason.replace(/_/g, ' ');
+    counts.set(label, (counts.get(label) ?? 0) + 1);
+  }
+  return { title, detail: [...counts].map(([label, count]) => `${count} ${label}`).join(', ') };
 }

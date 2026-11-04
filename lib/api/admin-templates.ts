@@ -2,6 +2,8 @@ import { apiClient } from './client';
 import { filenameFromDisposition, type ExportedFile } from './export';
 import type { ApiResponse } from '@/types/api';
 import type {
+  AdminTemplateBulkApprovePayload,
+  AdminTemplateBulkApproveResult,
   AdminTemplateDetail,
   AdminTemplateFacets,
   AdminTemplateListParams,
@@ -60,6 +62,12 @@ export const adminTemplatesApi = {
 
   update: async (uuid: string, payload: AdminTemplateUpdatePayload): Promise<ApiResponse<AdminTemplateDetail>> => {
     const response = await apiClient.patch<ApiResponse<AdminTemplateDetail>>(path(uuid), payload);
+    return response.data;
+  },
+
+  /** Many drafts live at once: the ticked ones, or every draft matching the filters. */
+  approveMany: async (payload: AdminTemplateBulkApprovePayload): Promise<ApiResponse<AdminTemplateBulkApproveResult>> => {
+    const response = await apiClient.post<ApiResponse<AdminTemplateBulkApproveResult>>(`${BASE}/approve`, payload);
     return response.data;
   },
 
