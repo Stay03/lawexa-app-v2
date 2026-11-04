@@ -110,7 +110,7 @@ export function TemplatesTable({
               <TableCell className="max-w-[200px]">
                 <TemplateStatusBadge status={row.status} />
                 {row.status === 'failed' && row.error ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-red-700 dark:text-red-400">{row.error}</p>
+                  <p className="mt-1 line-clamp-2 whitespace-normal text-xs text-red-700 dark:text-red-400">{row.error}</p>
                 ) : null}
               </TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground">
