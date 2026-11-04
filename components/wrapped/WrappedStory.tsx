@@ -99,7 +99,7 @@ export function WrappedStory({ record, fonts, onClose }: { record: WrappedRecord
             </span>
           ))}
         </div>
-        <div className="wr-chrome" style={{ color: chromeColour }}>
+        <div className="wr-chrome" style={{ color: chromeColour, ['--wr-chrome-ground' as string]: ground === 'ink' ? 'var(--wr-ink)' : 'var(--wr-cream)' }}>
           <span aria-live="polite">
             {state.index + 1} of {count}
           </span>

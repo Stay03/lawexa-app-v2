@@ -1,6 +1,6 @@
 import { CAMPAIGN_LINE, CAMPUS_NAMES, PERSONAS, STICKER_LABELS, WRAPPED_URL, formatCount, shareName, vibeFor } from './copy';
 import { fitText, type Measure } from './text-fit';
-import { SHARE_HEIGHT, SHARE_WIDTH, VIBE_BACKGROUNDS, WRAPPED_COLOURS } from './theme';
+import { POLAROID, SHARE_HEIGHT, SHARE_WIDTH, STROKE_OUTLINE, VIBE_BACKGROUNDS, WRAPPED_COLOURS } from './theme';
 import type { WrappedRecord, WrappedSticker } from './types';
 
 /**
@@ -12,8 +12,9 @@ import type { WrappedRecord, WrappedSticker } from './types';
  * canvas rather than captured from the page, so the PNG is the same on every
  * phone, whatever the screen's size or zoom.
  *
- * The face card shows the profile photo when there is one, else a placeholder
- * until Arthur's 30 illustrated faces arrive.
+ * Arthur's art (frame, face, prop for each vibe) and the student's photo are
+ * loaded by the caller; a picture that does not load is left out, never
+ * replaced by a made-up one.
  */
 
 export interface ShareFonts {
@@ -27,16 +28,6 @@ const PAD = 84;
 function stickerText(sticker: WrappedSticker): { value: string; label: string } {
   const value = typeof sticker.value === 'number' ? formatCount(sticker.value) : String(sticker.value);
   return { value, label: STICKER_LABELS[sticker.key] ?? '' };
-}
-
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.arcTo(x + w, y, x + w, y + h, r);
-  ctx.arcTo(x + w, y + h, x, y + h, r);
-  ctx.arcTo(x, y + h, x, y, r);
-  ctx.arcTo(x, y, x + w, y, r);
-  ctx.closePath();
 }
 
 /** The photo, cropped to cover the box. */
@@ -61,156 +52,168 @@ export function loadImage(url: string | null): Promise<HTMLImageElement | null> 
 }
 
 /**
- * Where everything sits on the 1080 × 1920 poster, worked out from the bottom
- * edge up, so the bottom block (stickers, persona, name, link) never overlaps
- * and the face takes the room the vibe line leaves. Pure, so a test pins it.
+ * Where the live words sit on Arthur's share-card frame (handoff manifest, 4
+ * November 2026). The frame brings the background, the pattern, the scribbles,
+ * the polaroid and the Lawexa mark; the app adds the vibe line in the band
+ * above the polaroid, the three stickers and the campaign line in the band
+ * below it, the persona as a sticker on the polaroid's corner, the name in the
+ * polaroid's caption, and the link beside the mark. Pure, so a test pins it.
  */
-export function shareLayout(lineBottom: number) {
-  const footY = SHARE_HEIGHT - PAD; // "Get yours · lawexa.com/wrapped"
-  const nameY = footY - 60;
-  const personaH = 96;
-  const personaY = nameY - 40 - 34 - personaH;
-  const stickerH = 108;
-  const stickerGap = 18;
-  const stickersY = personaY - 44 - (3 * stickerH + 2 * stickerGap);
-  const faceTop = lineBottom + 56;
-  const faceBottom = stickersY - 84; // room for the prop label under the card
-  const faceSize = Math.max(320, Math.min(600, faceBottom - faceTop));
-  return { footY, nameY, personaY, personaH, stickersY, stickerH, stickerGap, faceTop, faceSize };
+export const SHARE_LAYOUT = {
+  /** The band between the top scribble and the polaroid. */
+  top: { x: PAD, kickerY: 330, lineTop: 352, lineBottom: 528, width: SHARE_WIDTH - PAD * 2 },
+  /** The band between the polaroid and the bottom scribble. */
+  bottom: { x: PAD, y: 1372, stickerW: 560, stickerH: 88, gap: 12 },
+  persona: { x: 586, y: 1248, h: 92, maxW: 430, rotationDeg: 4 },
+  /** Beside Arthur's Lawexa mark (an ink disc, 64 px from the bottom and left). */
+  link: { x: 186, y: 1822 },
+} as const;
+
+function trackedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, spacing: number, maxWidth?: number) {
+  // letterSpacing is in Chrome, Edge and Safari 17+; elsewhere the text is drawn untracked.
+  const withSpacing = ctx as CanvasRenderingContext2D & { letterSpacing?: string };
+  const before = withSpacing.letterSpacing;
+  if (before !== undefined) withSpacing.letterSpacing = `${spacing}px`;
+  if (maxWidth) ctx.fillText(text, x, y, maxWidth);
+  else ctx.fillText(text, x, y);
+  if (before !== undefined) withSpacing.letterSpacing = before;
 }
 
-export function drawShareCard(
-  canvas: HTMLCanvasElement,
-  record: WrappedRecord,
-  fonts: ShareFonts,
-  photo: HTMLImageElement | null,
-): void {
+export interface ShareArt {
+  frame: HTMLImageElement | null;
+  face: HTMLImageElement | null;
+  prop: HTMLImageElement | null;
+  photo: HTMLImageElement | null;
+}
+
+export function drawShareCard(canvas: HTMLCanvasElement, record: WrappedRecord, fonts: ShareFonts, art: ShareArt): void {
   canvas.width = SHARE_WIDTH;
   canvas.height = SHARE_HEIGHT;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   const vibe = vibeFor(record.vibe.id);
   const ink = WRAPPED_COLOURS.ink;
-  const cream = WRAPPED_COLOURS.cream;
-  const display = (size: number) => `700 ${size}px ${fonts.display}`;
+  const display = (size: number) => `900 ${size}px ${fonts.display}`;
   const body = (size: number, weight = 500) => `${weight} ${size}px ${fonts.body}`;
   const measureDisplay: Measure = (text, size) => {
     ctx.font = display(size);
     return ctx.measureText(text).width;
   };
-
-  // Ground, to the bottom edge.
-  ctx.fillStyle = VIBE_BACKGROUNDS[vibe.colour];
-  ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT);
+  const L = SHARE_LAYOUT;
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
 
-  // The kicker and the vibe line.
-  ctx.fillStyle = ink;
-  ctx.font = body(40, 600);
-  let y = PAD + 52;
-  ctx.fillText('My post-Bar Finals vibe:', PAD, y);
-  y += 30;
-  const line = fitText(vibe.line, { width: SHARE_WIDTH - PAD * 2, maxLines: 4, max: 104, min: 60 }, measureDisplay);
-  ctx.font = display(line.size);
-  for (const text of line.lines) {
-    y += line.size * 1.08;
-    ctx.fillText(text, PAD, y);
-  }
-  const at = shareLayout(y + line.size * 0.25);
+  // Arthur's frame; without it (offline), the card's colour, so the words still read.
+  ctx.fillStyle = VIBE_BACKGROUNDS[vibe.colour];
+  ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT);
+  if (art.frame) ctx.drawImage(art.frame, 0, 0, SHARE_WIDTH, SHARE_HEIGHT);
 
-  // The face card: the photo, else the placeholder face; the prop sits on top.
-  const faceX = (SHARE_WIDTH - at.faceSize) / 2;
-  const radius = Math.round(at.faceSize * 0.09);
+  // In the polaroid, turned with it: the photo in the circle, else the face; the prop across the top.
   ctx.save();
-  roundRect(ctx, faceX, at.faceTop, at.faceSize, at.faceSize, radius);
-  ctx.fillStyle = cream;
-  ctx.fill();
-  ctx.clip();
-  if (photo) {
-    drawCover(ctx, photo, faceX, at.faceTop, at.faceSize, at.faceSize);
-  } else {
-    ctx.fillStyle = ink;
-    ctx.font = display(Math.round(at.faceSize * 0.44));
-    ctx.textAlign = 'center';
-    ctx.fillText(record.student.first_name.charAt(0).toUpperCase() || 'L', SHARE_WIDTH / 2, at.faceTop + at.faceSize * 0.66);
-    ctx.textAlign = 'left';
+  ctx.translate(POLAROID.origin[0], POLAROID.origin[1]);
+  ctx.rotate((POLAROID.rotationDeg * Math.PI) / 180);
+  ctx.translate(-POLAROID.origin[0], -POLAROID.origin[1]);
+  const [wx, wy, ww, wh] = POLAROID.window;
+  if (art.photo) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(POLAROID.circle.cx, POLAROID.circle.cy, POLAROID.circle.r, 0, Math.PI * 2);
+    ctx.clip();
+    const r = POLAROID.circle.r;
+    drawCover(ctx, art.photo, POLAROID.circle.cx - r, POLAROID.circle.cy - r, r * 2, r * 2);
+    ctx.restore();
+  } else if (art.face) {
+    ctx.drawImage(art.face, wx, wy, ww, wh);
+  }
+  if (art.prop) {
+    const [px, py, pw, ph] = POLAROID.prop;
+    ctx.drawImage(art.prop, px, py, pw, ph);
+  }
+  // The caption: who, on the polaroid's white edge.
+  const [cx, cy, cw] = POLAROID.caption;
+  ctx.fillStyle = ink;
+  ctx.font = body(40, 700);
+  ctx.fillText(shareName(record.student.first_name, record.student.last_initial), cx, cy + 62, cw * 0.62);
+  if (record.student.campus) {
+    ctx.fillStyle = WRAPPED_COLOURS.inkMuted;
+    ctx.font = body(30, 500);
+    ctx.fillText(`${CAMPUS_NAMES[record.student.campus]} Campus`, cx, cy + 106, cw * 0.62);
   }
   ctx.restore();
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = ink;
-  roundRect(ctx, faceX, at.faceTop, at.faceSize, at.faceSize, radius);
-  ctx.stroke();
-  // The prop label stands in for the prop art until it arrives.
-  ctx.font = body(32, 700);
-  const propText = vibe.prop.toUpperCase();
-  const propW = Math.min(at.faceSize + 120, ctx.measureText(propText).width + 56);
-  const propY = at.faceTop + at.faceSize - 38;
-  ctx.fillStyle = ink;
-  roundRect(ctx, SHARE_WIDTH / 2 - propW / 2, propY, propW, 76, 38);
-  ctx.fill();
-  ctx.fillStyle = cream;
-  ctx.textAlign = 'center';
-  ctx.fillText(propText, SHARE_WIDTH / 2, propY + 50, propW - 40);
-  ctx.textAlign = 'left';
 
-  // Three stat stickers, and the campaign line stacked beside them.
-  const stickerW = 520;
+  // The vibe line, above the polaroid.
+  ctx.fillStyle = ink;
+  ctx.font = body(28, 700);
+  trackedText(ctx, 'MY POST-BAR FINALS VIBE:', L.top.x, L.top.kickerY, 8);
+  const room = L.top.lineBottom - L.top.lineTop;
+  let line = fitText(vibe.line, { width: L.top.width, maxLines: 2, max: 96, min: 52, step: 2 }, measureDisplay);
+  if (line.lines.length * line.size * 0.95 > room || line.lines.length > 2) {
+    line = fitText(vibe.line, { width: L.top.width, maxLines: 3, max: 64, min: 46, step: 2 }, measureDisplay);
+  }
+  ctx.font = display(line.size);
+  let y = L.top.lineTop;
+  for (const text of line.lines) {
+    y += line.size * 0.95;
+    ctx.fillText(text, L.top.x, y);
+  }
+
+  // Three stat stickers (square, outlined, the raised surface) and the campaign line beside them.
   record.stickers.slice(0, 3).forEach((sticker, i) => {
     const { value, label } = stickerText(sticker);
-    const sy = at.stickersY + i * (at.stickerH + at.stickerGap);
-    ctx.fillStyle = cream;
-    roundRect(ctx, PAD, sy, stickerW, at.stickerH, 28);
-    ctx.fill();
-    ctx.lineWidth = 6;
+    const sx = L.bottom.x;
+    const sy = L.bottom.y + i * (L.bottom.stickerH + L.bottom.gap);
+    ctx.fillStyle = WRAPPED_COLOURS.white;
+    ctx.fillRect(sx, sy, L.bottom.stickerW, L.bottom.stickerH);
+    ctx.lineWidth = STROKE_OUTLINE;
     ctx.strokeStyle = ink;
-    ctx.stroke();
+    ctx.strokeRect(sx, sy, L.bottom.stickerW, L.bottom.stickerH);
     ctx.fillStyle = ink;
-    ctx.font = display(54);
-    ctx.fillText(value, PAD + 30, sy + 74, 220);
-    const valueW = Math.min(220, ctx.measureText(value).width);
-    ctx.font = body(30, 600);
-    ctx.fillText(label, PAD + 30 + valueW + 18, sy + 68, stickerW - valueW - 78);
+    ctx.font = body(56, 700);
+    ctx.fillText(value, sx + 24, sy + 64, 230);
+    const valueW = Math.min(230, ctx.measureText(value).width);
+    ctx.font = body(30, 500);
+    ctx.fillText(label, sx + 24 + valueW + 16, sy + 58, L.bottom.stickerW - valueW - 64);
   });
-  const campaignX = PAD + stickerW + 48;
+  const campaignX = L.bottom.x + L.bottom.stickerW + 36;
   const campaignW = SHARE_WIDTH - PAD - campaignX;
-  // One size for the three lines, the largest at which "The Bench." and its highlight fit.
-  let campaignSize = 58;
-  while (campaignSize > 34 && measureDisplay(CAMPAIGN_LINE[2], campaignSize) + 32 > campaignW) campaignSize -= 2;
+  let campaignSize = 52;
+  while (campaignSize > 30 && measureDisplay(CAMPAIGN_LINE[2], campaignSize) + 24 > campaignW) campaignSize -= 2;
   CAMPAIGN_LINE.forEach((text, i) => {
-    const cy = at.stickersY + 74 + i * (at.stickerH + at.stickerGap);
+    const ty = L.bottom.y + 62 + i * (L.bottom.stickerH + L.bottom.gap);
     ctx.font = display(campaignSize);
     if (i === CAMPAIGN_LINE.length - 1) {
-      // "The Bench." is highlighted (spec).
+      // "The Bench." is highlighted (spec): ink block, cream type, square as the system is.
       ctx.fillStyle = ink;
-      roundRect(ctx, campaignX, cy - campaignSize * 1.02, measureDisplay(text, campaignSize) + 32, campaignSize * 1.42, 14);
-      ctx.fill();
-      ctx.fillStyle = cream;
+      ctx.fillRect(campaignX, ty - campaignSize, measureDisplay(text, campaignSize) + 24, campaignSize * 1.34);
+      ctx.fillStyle = WRAPPED_COLOURS.cream;
       ctx.font = display(campaignSize);
-      ctx.fillText(text, campaignX + 16, cy);
+      ctx.fillText(text, campaignX + 12, ty);
     } else {
       ctx.fillStyle = ink;
-      ctx.fillText(text, campaignX + 16, cy);
+      ctx.fillText(text, campaignX + 12, ty);
     }
   });
 
-  // The persona sticker.
+  // The persona, as a sticker on the polaroid's lower right corner.
   const persona = PERSONAS[record.persona.key]?.name ?? PERSONAS.steady_learned_friend.name;
-  ctx.font = display(46);
-  const personaW = Math.min(SHARE_WIDTH - PAD * 2, ctx.measureText(persona).width + 72);
+  let personaSize = 40;
+  while (personaSize > 26 && measureDisplay(persona, personaSize) + 56 > L.persona.maxW) personaSize -= 2;
+  const personaW = measureDisplay(persona, personaSize) + 56;
+  ctx.save();
+  ctx.translate(L.persona.x + personaW / 2, L.persona.y + L.persona.h / 2);
+  ctx.rotate((L.persona.rotationDeg * Math.PI) / 180);
   ctx.fillStyle = ink;
-  roundRect(ctx, PAD, at.personaY, personaW, at.personaH, at.personaH / 2);
-  ctx.fill();
+  ctx.fillRect(-personaW / 2, -L.persona.h / 2, personaW, L.persona.h);
   ctx.fillStyle = WRAPPED_COLOURS.gold;
-  ctx.fillText(persona, PAD + 36, at.personaY + 64, personaW - 72);
+  ctx.font = display(personaSize);
+  ctx.textAlign = 'center';
+  ctx.fillText(persona, 0, personaSize * 0.36);
+  ctx.restore();
 
-  // Who, and where to get one.
+  // Where to get one, beside the mark.
   ctx.fillStyle = ink;
-  ctx.font = body(36, 700);
-  const campus = record.student.campus ? ` · ${CAMPUS_NAMES[record.student.campus]} Campus` : '';
-  ctx.fillText(`${shareName(record.student.first_name, record.student.last_initial)}${campus}`, PAD, at.nameY, SHARE_WIDTH - PAD * 2);
-  ctx.font = body(36, 500);
-  ctx.fillText(`Get yours · ${WRAPPED_URL}`, PAD, at.footY, SHARE_WIDTH - PAD * 2);
+  ctx.font = body(34, 700);
+  trackedText(ctx, `GET YOURS · ${WRAPPED_URL.toUpperCase()}`, L.link.x, L.link.y, 2, SHARE_WIDTH - L.link.x - PAD);
 }
 
 /** The canvas as a PNG file, for the share sheet and Save image. */

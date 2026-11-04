@@ -16,25 +16,30 @@ import {
 } from '@/lib/wrapped/copy';
 import { FRAME_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide } from '@/lib/wrapped/story-model';
 import { fitText, wrapWords } from '@/lib/wrapped/text-fit';
-import { shareLayout } from '@/lib/wrapped/share-image';
-import { SHARE_HEIGHT } from '@/lib/wrapped/theme';
+import { SHARE_LAYOUT } from '@/lib/wrapped/share-image';
+import { POLAROID, SHARE_HEIGHT, wrappedArt } from '@/lib/wrapped/theme';
 
-test('the share card’s bottom block never overlaps, and the face takes the room the vibe line leaves', () => {
-  for (const lineBottom of [300, 520, 640]) {
-    const at = shareLayout(lineBottom);
-    // Top to bottom: face (and its prop label), stickers, persona, name, link, all on the poster.
-    assert.ok(at.faceTop + at.faceSize + 38 + 40 <= at.stickersY, `face clears the stickers at ${lineBottom}`);
-    assert.ok(at.stickersY + 3 * at.stickerH + 2 * at.stickerGap < at.personaY);
-    assert.ok(at.personaY + at.personaH < at.nameY - 30);
-    assert.ok(at.nameY < at.footY && at.footY <= SHARE_HEIGHT - 60);
-    assert.ok(at.faceSize >= 320 && at.faceSize <= 600);
-  }
-  // A short line leaves room for the biggest face.
-  assert.equal(shareLayout(300).faceSize, 600);
+test('the share card’s words sit around Arthur’s polaroid, never on it, and the link clears his mark', () => {
+  // The polaroid, turned −3° around (540, 960): its highest and lowest points.
+  const [ox, oy, ow, oh] = POLAROID.outer;
+  const turn = (POLAROID.rotationDeg * Math.PI) / 180;
+  const corners = [
+    [ox, oy],
+    [ox + ow, oy],
+    [ox, oy + oh],
+    [ox + ow, oy + oh],
+  ].map(([x, y]) => (x - 540) * Math.sin(turn) + (y - 960) * Math.cos(turn) + 960);
+  const top = Math.min(...corners);
+  const bottom = Math.max(...corners);
+  assert.ok(SHARE_LAYOUT.top.lineBottom < top, 'the vibe line ends above the polaroid');
+  assert.ok(SHARE_LAYOUT.bottom.y > bottom, 'the stickers start below the polaroid');
+  const stickersEnd = SHARE_LAYOUT.bottom.y + 3 * SHARE_LAYOUT.bottom.stickerH + 2 * SHARE_LAYOUT.bottom.gap;
+  // Arthur's foot scribble runs at about y 1690; his mark is an ink disc 64 px in, 96 px wide.
+  assert.ok(stickersEnd < 1690, 'the stickers end above the foot scribble');
+  assert.ok(SHARE_LAYOUT.link.x > 64 + 96 + 16 && SHARE_LAYOUT.link.y < SHARE_HEIGHT - 64);
+  assert.equal(wrappedArt('frame', 7), '/wrapped/frames/frame-07.webp');
+  assert.equal(wrappedArt('prop', 31), '/wrapped/props/prop-31.webp');
 });
-
-/* Lawexa Wrapped, Bar Finals edition (thread f833c285, live 8 November 2026):
- * the vibe bank, the number rules and the story viewer's taps. */
 
 test('the vibe bank holds Arthur’s 30 lines and the seven campus lines, each shown only to its campus', () => {
   assert.equal(VIBES.size, 37);
@@ -46,6 +51,9 @@ test('the vibe bank holds Arthur’s 30 lines and the seven campus lines, each s
   // 38 is spare on the server: the main card stands in, never a blank one.
   assert.equal(vibeFor(38).id, 1);
   for (const vibe of VIBES.values()) assert.ok(['gold', 'lilac', 'coral', 'lime'].includes(vibe.colour));
+  // Each card's colours are Arthur's manifest's: 01 lilac on a gold circle, 37 gold on lilac.
+  assert.deepEqual([vibeFor(1).colour, vibeFor(1).circle], ['lilac', 'gold']);
+  assert.deepEqual([vibeFor(37).colour, vibeFor(37).circle], ['gold', 'lilac']);
   assert.deepEqual([...CAMPAIGN_LINE], ['The Law.', 'The Bar.', 'The Bench.']);
 });
 

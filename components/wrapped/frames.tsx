@@ -28,10 +28,18 @@ import type { WrappedCourseKey, WrappedRecord, WrappedSlideNumber } from '@/lib/
  * (`.wr-art`) stand in for Arthur's canvas until it arrives.
  */
 
+/** The share cards' four pattern kinds (Arthur's frames), one per frame in turn. */
+const PATTERNS = ['rings', 'checks', 'dots', 'stripes'] as const;
+
 function Frame({ slide, children, label }: { slide: WrappedSlideNumber; children: ReactNode; label: string }) {
   const theme = FRAME_THEMES[slide];
   return (
     <section className="wr-frame" data-ground={theme.ground} aria-label={label} style={{ ['--wr-accent' as string]: `var(--wr-${theme.accent})` }}>
+      {/* The system's pattern block, bleeding off the lower right, and its scribble near the foot. */}
+      <span aria-hidden className="wr-pattern" data-kind={PATTERNS[slide % PATTERNS.length]} style={{ color: theme.ground === 'ink' ? 'var(--wr-accent)' : 'var(--wr-ink)' }} />
+      <svg aria-hidden className="wr-scribble" style={{ bottom: '6cqw' }} viewBox="0 0 1080 130" preserveAspectRatio="none">
+        <path d="M0 60 C 180 30, 300 80, 480 60 S 760 30, 1080 55" fill="none" stroke="currentColor" strokeWidth="5" opacity="0.85" />
+      </svg>
       {children}
     </section>
   );
@@ -55,7 +63,7 @@ function ReportSlip({ record }: { record: WrappedRecord }) {
         Your Special Lawexa Bar Finals Report <span style={accent}>is out.</span>
       </h2>
       <div className="wr-slip wr-rise" style={{ animationDelay: '120ms' }}>
-        <p className="wr-small" style={{ opacity: 1, fontWeight: 700 }}>
+        <p className="wr-small" style={{ color: 'var(--wr-ink)', fontWeight: 700 }}>
           {shareName(student.first_name, student.last_initial)}
         </p>
         <p className="wr-small">{campus}Class of 2026</p>
@@ -130,7 +138,7 @@ function BigFive({ record }: { record: WrappedRecord }) {
       ) : null}
       {big.top_sections.length > 0 ? (
         <div className="wr-rise" style={{ animationDelay: '120ms' }}>
-          <h3 className="wr-body" style={{ fontWeight: 800, marginBottom: '1.6cqw' }}>
+          <h3 className="wr-body" style={{ fontWeight: 700, marginBottom: '1.6cqw' }}>
             Sections you highlighted most
           </h3>
           <ol className="wr-list">

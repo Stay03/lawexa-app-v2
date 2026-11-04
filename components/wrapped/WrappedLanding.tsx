@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
 import { CAMPAIGN_LINE } from '@/lib/wrapped/copy';
+import { POLAROID, SHARE_HEIGHT, SHARE_WIDTH, wrappedArt } from '@/lib/wrapped/theme';
 
 /**
  * lawexa.com/wrapped for someone without a Wrapped: a friend who tapped a
@@ -16,11 +17,11 @@ export function WrappedLanding({ signedIn }: { signedIn: boolean }) {
     <main className="wr-landing">
       <div className="wr-landing-inner">
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link href="/" style={{ font: '800 1.1rem/1 var(--wr-display)', color: 'inherit', textDecoration: 'none' }}>
+          <Link href="/" style={{ font: '900 1.1rem/1 var(--wr-display)', color: 'inherit', textDecoration: 'none' }}>
             Lawexa
           </Link>
           {signedIn ? null : (
-            <Link href="/login" style={{ font: '600 0.95rem/1 var(--wr-body)', color: 'inherit' }}>
+            <Link href="/login" style={{ font: '700 0.95rem/1 var(--wr-body)', color: 'inherit' }}>
               Sign in
             </Link>
           )}
@@ -83,7 +84,7 @@ export function WrappedLanding({ signedIn }: { signedIn: boolean }) {
         </section>
 
         <footer style={{ display: 'grid', gap: 8 }}>
-          <p style={{ font: '800 clamp(1.4rem, 4vw, 2.2rem)/1.1 var(--wr-display)', color: 'var(--wr-ink)', maxWidth: 'none' }}>
+          <p style={{ font: '900 clamp(1.4rem, 4vw, 2.2rem)/1.1 var(--wr-display)', color: 'var(--wr-ink)', maxWidth: 'none' }}>
             {CAMPAIGN_LINE.map((part, i) => (
               <span key={part} className="wr-nowrap">
                 {part}
@@ -100,44 +101,40 @@ export function WrappedLanding({ signedIn }: { signedIn: boolean }) {
   );
 }
 
-/** A made-up card, plainly labelled, so a visitor sees what they would get. */
+/**
+ * An example card, plainly labelled, built from Arthur's art for vibe 14 at the
+ * manifest's places (the polaroid's window and prop strip, turned −3°), with
+ * made-up words, so a visitor sees what they would get and no real student.
+ */
+const EXAMPLE_VIBE = 14;
+const pct = (value: number, of: number) => `${(value / of) * 100}%`;
+
 function ExampleCard() {
+  const [wx, wy, ww, wh] = POLAROID.window;
+  const [px, py, pw, ph] = POLAROID.prop;
   return (
     <figure style={{ justifySelf: 'center', width: 'min(100%, 340px)', margin: 0 }}>
-      <div
-        aria-hidden
-        style={{
-          aspectRatio: '9 / 16',
-          borderRadius: 24,
-          background: 'var(--wr-lilac)',
-          border: '3px solid var(--wr-ink)',
-          padding: '9%',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '5%',
-          containerType: 'size',
-          transform: 'rotate(2deg)',
-          boxShadow: '10px 12px 0 var(--wr-ink)',
-        }}
-      >
-        <p style={{ font: '600 4cqw/1.2 var(--wr-body)' }}>My post-Bar Finals vibe:</p>
-        <p style={{ font: '800 10cqw/1.04 var(--wr-display)', letterSpacing: '-0.02em' }}>Esq. loading…</p>
-        <div style={{ flex: 1, borderRadius: 18, background: 'var(--wr-cream)', border: '3px solid var(--wr-ink)', display: 'grid', placeItems: 'center' }}>
-          <span style={{ font: '800 26cqw/1 var(--wr-display)' }}>A</span>
+      <div aria-hidden style={{ position: 'relative', aspectRatio: '9 / 16', containerType: 'size', border: '4px solid var(--wr-ink)', boxShadow: '10px 10px 0 var(--wr-ink)', overflow: 'hidden' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- Arthur's static art, composed by position */}
+        <img src={wrappedArt('frame', EXAMPLE_VIBE)} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
+        <div style={{ position: 'absolute', inset: 0, transform: `rotate(${POLAROID.rotationDeg}deg)`, transformOrigin: `${pct(POLAROID.origin[0], SHARE_WIDTH)} ${pct(POLAROID.origin[1], SHARE_HEIGHT)}` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- Arthur's static art */}
+          <img src={wrappedArt('face', EXAMPLE_VIBE)} alt="" style={{ position: 'absolute', left: pct(wx, SHARE_WIDTH), top: pct(wy, SHARE_HEIGHT), width: pct(ww, SHARE_WIDTH), height: pct(wh, SHARE_HEIGHT) }} />
+          {/* eslint-disable-next-line @next/next/no-img-element -- Arthur's static art */}
+          <img src={wrappedArt('prop', EXAMPLE_VIBE)} alt="" style={{ position: 'absolute', left: pct(px, SHARE_WIDTH), top: pct(py, SHARE_HEIGHT), width: pct(pw, SHARE_WIDTH), height: pct(ph, SHARE_HEIGHT) }} />
         </div>
-        <div style={{ display: 'flex', gap: '3%', flexWrap: 'wrap' }}>
-          {['14 overnights', '412 judgments', '21-day streak'].map((text) => (
-            <span key={text} style={{ font: '700 3.6cqw/1 var(--wr-body)', background: 'var(--wr-cream)', border: '2px solid var(--wr-ink)', borderRadius: 999, padding: '2.4cqw 3.4cqw' }}>
+        <p style={{ position: 'absolute', left: '7.8%', top: '16.5%', font: '700 2.6cqw/1 var(--wr-body)', letterSpacing: '0.8cqw' }}>MY POST-BAR FINALS VIBE:</p>
+        <p style={{ position: 'absolute', left: '7.8%', top: '19.5%', font: '900 8.8cqw/0.95 var(--wr-display)', letterSpacing: '-0.2cqw' }}>Esq. loading…</p>
+        <p style={{ position: 'absolute', left: '7.8%', top: '72%', display: 'grid', gap: '1.4cqw', font: '700 3.4cqw/1 var(--wr-body)' }}>
+          {['14 overnights', '412 judgments read', '21 day streak'].map((text) => (
+            <span key={text} style={{ background: 'var(--wr-white)', border: '0.4cqw solid var(--wr-ink)', padding: '2cqw 2.4cqw' }}>
               {text}
             </span>
           ))}
-        </div>
-        <span style={{ alignSelf: 'flex-start', font: '800 4.4cqw/1 var(--wr-display)', background: 'var(--wr-ink)', color: 'var(--wr-gold)', borderRadius: 999, padding: '3cqw 4cqw' }}>
-          The Section Quoter
-        </span>
-        <p style={{ font: '600 3.4cqw/1 var(--wr-body)' }}>Get yours · lawexa.com/wrapped</p>
+        </p>
+        <p style={{ position: 'absolute', left: '17%', top: '93.6%', font: '700 3.1cqw/1 var(--wr-body)', letterSpacing: '0.2cqw' }}>GET YOURS · LAWEXA.COM/WRAPPED</p>
       </div>
-      <figcaption style={{ marginTop: 18, textAlign: 'center', font: '600 0.85rem/1.4 var(--wr-body)', color: 'var(--wr-ink-soft)' }}>
+      <figcaption style={{ marginTop: 18, textAlign: 'center', font: '500 0.85rem/1.4 var(--wr-body)', color: 'var(--wr-ink-muted)' }}>
         An example card, with made-up numbers.
       </figcaption>
     </figure>

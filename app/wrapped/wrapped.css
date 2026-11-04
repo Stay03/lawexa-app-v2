@@ -1,16 +1,18 @@
 /*
- * Lawexa Wrapped, Bar Finals edition (thread f833c285). Loaded only by the
- * /wrapped route. Colours come from lib/wrapped/theme.ts as CSS variables (the
- * share image reads the same file); fonts come from app/wrapped/layout.tsx: Unbounded for display, Inter
- * for body. Every frame is a 9:16 box (`.wr-frame`, container-type: size), and
- * sizes inside it are in container units, so a frame lays out the same on a
- * 360-pixel phone and a desktop window: 1cqw is 1/100 of the frame's width.
+ * Lawexa Wrapped, Bar Finals edition (thread f833c285), in Arthur's design
+ * system (lawexa-wrapped-tokens, 4 November 2026). Loaded only by the /wrapped
+ * route. Colours come from lib/wrapped/theme.ts as CSS variables (the share
+ * image reads the same file); fonts come from app/wrapped/fonts.ts: Unbounded
+ * 900 for display, Inter 500 and 700 for the rest. The look is square: no
+ * rounded corners, except the badge disc and the mark. Sizes inside a frame are
+ * the tokens' px at 1080 wide, in container units (1cqw = 10.8 px of the
+ * 1080 frame), so a frame lays out the same on a phone and a desktop column.
  */
 
 .wrapped-root {
-  /* --wr-cream, --wr-ink, --wr-gold, --wr-lilac, --wr-coral, --wr-lime, --wr-ink-soft and
-     --wr-cream-soft are set by app/wrapped/layout.tsx from lib/wrapped/theme.ts, the one
-     place the colours live. */
+  /* --wr-cream, --wr-ink, --wr-gold, --wr-lilac, --wr-coral, --wr-lime, --wr-white,
+     --wr-ink-muted, --wr-ink-soft and the rest are set by app/wrapped/layout.tsx from
+     lib/wrapped/theme.ts, the one place the colours live. */
   --wr-display: var(--font-wrapped-display), 'Arial Black', system-ui, sans-serif;
   --wr-body: var(--font-wrapped-body), system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-family: var(--wr-body);
@@ -51,7 +53,6 @@
     width: auto;
     height: min(100dvh - 48px, 920px);
     aspect-ratio: 9 / 16;
-    border-radius: 20px;
     overflow: hidden;
   }
 }
@@ -67,14 +68,55 @@
   gap: 4cqw;
 }
 
+/* The tokens' Paper theme (default) and Ink theme. */
 .wr-frame[data-ground='cream'] {
   background: var(--wr-cream);
   color: var(--wr-ink);
+  --wr-muted: var(--wr-ink-muted);
+  --wr-raised: var(--wr-white);
 }
 
 .wr-frame[data-ground='ink'] {
   background: var(--wr-ink);
   color: var(--wr-cream);
+  --wr-muted: var(--wr-ink-soft);
+  --wr-raised: var(--wr-ink-raised);
+}
+
+/* The system's pattern block, in the four kinds the share cards use, bleeding
+   off the frame's lower right edge (the top is the viewer's chrome). */
+.wr-pattern {
+  position: absolute;
+  right: 0;
+  bottom: 14cqw;
+  width: 30cqw;
+  height: 30cqw;
+  pointer-events: none;
+}
+
+.wr-pattern[data-kind='checks'] {
+  background: conic-gradient(currentColor 25%, transparent 0 50%, currentColor 0 75%, transparent 0) 0 0 / 15cqw 15cqw;
+}
+
+.wr-pattern[data-kind='dots'] {
+  background: radial-gradient(circle, currentColor 0 3.2cqw, transparent 3.4cqw) 0 0 / 7.5cqw 7.5cqw;
+}
+
+.wr-pattern[data-kind='stripes'] {
+  background: repeating-linear-gradient(90deg, currentColor 0 4cqw, transparent 4cqw 8.4cqw);
+}
+
+.wr-pattern[data-kind='rings'] {
+  background: repeating-radial-gradient(circle at 100% 100%, currentColor 0 3cqw, transparent 3cqw 6cqw);
+}
+
+.wr-scribble {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 12cqw;
+  pointer-events: none;
+  color: inherit;
 }
 
 /* A frame's arrival: the parts rise in, once (the viewer's one motion moment). */
@@ -130,7 +172,7 @@
   align-items: center;
   justify-content: space-between;
   z-index: 3;
-  font: 600 3.4cqw/1 var(--wr-body);
+  font: 700 3.2cqw/1 var(--wr-body);
 }
 
 .wr-chrome button {
@@ -141,7 +183,8 @@
   min-width: 40px;
   min-height: 40px;
   border-radius: 999px;
-  background: transparent;
+  /* A disc in the frame's own surface, so the icon reads over the pattern block. */
+  background: var(--wr-chrome-ground, transparent);
   color: inherit;
 }
 
@@ -154,54 +197,61 @@
 
 /* ── Type inside a frame ──────────────────────────────────────────────────── */
 
+/* --eyebrow: Inter 700 28px, caps, 12px tracking. */
 .wr-kicker {
-  font: 600 3.8cqw/1.2 var(--wr-body);
-  letter-spacing: 0.02em;
-  opacity: 0.8;
+  font: 700 2.8cqw/1.2 var(--wr-body);
+  letter-spacing: 1.1cqw;
+  text-transform: uppercase;
+  color: var(--wr-muted);
 }
 
+/* --display-l: Unbounded 900 120px/0.9, sentence case. */
 .wr-title {
-  font: 800 10.5cqw/1.02 var(--wr-display);
-  letter-spacing: -0.02em;
+  font: 900 10cqw/0.95 var(--wr-display);
+  letter-spacing: -0.3cqw;
   text-wrap: balance;
 }
 
+/* --display-xl: Unbounded 900 240px/0.9, the big number. */
 .wr-huge {
-  font: 800 22cqw/0.95 var(--wr-display);
-  letter-spacing: -0.04em;
+  font: 900 22cqw/0.9 var(--wr-display);
+  letter-spacing: -0.3cqw;
   font-variant-numeric: tabular-nums;
 }
 
+/* --display-m: Unbounded 900 72px/1. */
 .wr-big {
-  font: 800 8cqw/1.05 var(--wr-display);
-  letter-spacing: -0.02em;
+  font: 900 6.7cqw/1.02 var(--wr-display);
+  letter-spacing: -0.1cqw;
   text-wrap: balance;
 }
 
+/* --body: Inter 500 40px/1.3. */
 .wr-body {
-  font: 500 4.6cqw/1.35 var(--wr-body);
+  font: 500 3.9cqw/1.3 var(--wr-body);
+  letter-spacing: -0.06cqw;
   text-wrap: pretty;
 }
 
+/* --label: Inter 500 30px/1.2. */
 .wr-small {
-  font: 500 3.6cqw/1.35 var(--wr-body);
-  opacity: 0.85;
+  font: 500 3cqw/1.25 var(--wr-body);
+  color: var(--wr-muted);
 }
 
 .wr-num {
   font-variant-numeric: tabular-nums;
 }
 
-/* A sticker: a slightly tilted label with a hard edge. */
+/* A sticker: square, outlined (--stroke-outline 4px), slightly turned. */
 .wr-sticker {
   display: inline-flex;
   align-items: center;
   gap: 2cqw;
   align-self: flex-start;
-  padding: 2.4cqw 4.4cqw;
-  border-radius: 999px;
-  border: 0.8cqw solid currentColor;
-  font: 800 4.6cqw/1 var(--wr-display);
+  padding: 2.4cqw 3.6cqw;
+  border: 0.4cqw solid currentColor;
+  font: 900 4.4cqw/1 var(--wr-display);
   transform: rotate(-3deg);
 }
 
@@ -219,13 +269,12 @@
 
 /* Frame 01: the report slip. */
 .wr-slip {
-  background: color-mix(in srgb, var(--wr-cream) 55%, white);
+  background: var(--wr-white);
   color: var(--wr-ink);
-  border: 0.6cqw solid var(--wr-ink);
-  border-radius: 2cqw;
+  border: 0.4cqw solid var(--wr-ink);
   padding: 5cqw 5cqw 4cqw;
-  transform: rotate(-2.5deg);
-  box-shadow: 2cqw 2.4cqw 0 var(--wr-ink);
+  transform: rotate(-3deg);
+  box-shadow: 1.6cqw 1.6cqw 0 var(--wr-ink);
 }
 
 .wr-slip-row {
@@ -234,14 +283,13 @@
   align-items: center;
   gap: 1cqw 3cqw;
   padding: 2.6cqw 0;
-  border-top: 0.3cqw dashed color-mix(in srgb, var(--wr-ink) 40%, transparent);
+  border-top: 0.28cqw dashed color-mix(in srgb, var(--wr-ink) 45%, transparent);
 }
 
 .wr-done {
-  font: 800 3.4cqw/1 var(--wr-display);
+  font: 900 3.2cqw/1 var(--wr-display);
   color: var(--wr-coral);
-  border: 0.5cqw solid currentColor;
-  border-radius: 1cqw;
+  border: 0.4cqw solid currentColor;
   padding: 1.2cqw 1.8cqw;
   transform: rotate(-8deg);
   grid-row: span 2;
@@ -254,18 +302,20 @@
   counter-reset: wr-rank;
 }
 
+/* --list-item: Inter 700 40px/1.25. */
 .wr-list > li {
   display: grid;
   grid-template-columns: 6cqw 1fr auto;
   gap: 2cqw;
   align-items: baseline;
-  font: 600 4.2cqw/1.25 var(--wr-body);
+  font: 700 3.7cqw/1.25 var(--wr-body);
+  letter-spacing: -0.06cqw;
 }
 
 .wr-list > li::before {
   counter-increment: wr-rank;
   content: counter(wr-rank);
-  font: 800 4.2cqw/1 var(--wr-display);
+  font: 900 3.7cqw/1 var(--wr-display);
 }
 
 /* Placeholder art: where a frame's illustration lands from Arthur's canvas. */
@@ -297,7 +347,6 @@
   max-height: 100%;
   aspect-ratio: 9 / 16;
   object-fit: contain;
-  border-radius: 3cqw;
   box-shadow: 0 2cqw 6cqw rgb(0 0 0 / 0.35);
 }
 
@@ -318,10 +367,11 @@
   justify-content: center;
   gap: 2cqw;
   min-height: 48px;
-  border-radius: 999px;
+  border-radius: 8px;
+  border: 3px solid var(--wr-ink);
   background: var(--wr-gold);
   color: var(--wr-ink);
-  font: 800 4.2cqw/1 var(--wr-display);
+  font: 900 4cqw/1 var(--wr-display);
 }
 
 .wr-share-row {
@@ -336,8 +386,8 @@
   gap: 1.2cqw;
   min-height: 48px;
   padding: 1.6cqw 0;
-  border-radius: 3cqw;
-  font: 600 2.9cqw/1.1 var(--wr-body);
+  border-radius: 8px;
+  font: 700 2.9cqw/1.1 var(--wr-body);
   color: var(--wr-cream);
   background: color-mix(in srgb, var(--wr-cream) 10%, transparent);
   text-decoration: none;
@@ -363,7 +413,6 @@
 .wr-mark {
   background: var(--wr-gold);
   padding: 0 0.12em;
-  border-radius: 8px;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
@@ -373,20 +422,20 @@
 }
 
 .wr-landing h1 {
-  font: 800 clamp(2.6rem, 8vw, 5.4rem)/0.98 var(--wr-display);
+  font: 900 clamp(2.6rem, 8vw, 5.4rem)/0.95 var(--wr-display);
   letter-spacing: -0.03em;
   text-wrap: balance;
 }
 
 .wr-landing h2 {
-  font: 800 clamp(1.4rem, 3.4vw, 2rem)/1.1 var(--wr-display);
+  font: 900 clamp(1.4rem, 3.4vw, 2rem)/1.1 var(--wr-display);
   letter-spacing: -0.01em;
 }
 
 .wr-landing p {
   font: 500 1.0625rem/1.55 var(--wr-body);
   max-width: 60ch;
-  color: var(--wr-ink-soft);
+  color: var(--wr-ink-muted);
 }
 
 .wr-cta {
@@ -396,10 +445,11 @@
   gap: 8px;
   min-height: 52px;
   padding: 0 28px;
-  border-radius: 999px;
+  border-radius: 8px;
+  border: 3px solid var(--wr-ink);
   background: var(--wr-ink);
   color: var(--wr-cream);
-  font: 800 1rem/1 var(--wr-display);
+  font: 900 1rem/1 var(--wr-display);
   text-decoration: none;
 }
 
@@ -420,8 +470,8 @@
 }
 
 .wr-landing-card {
-  border: 2px solid var(--wr-ink);
-  border-radius: 20px;
+  border: 4px solid var(--wr-ink);
+  background: var(--wr-white);
   padding: 20px;
   display: grid;
   gap: 8px;
@@ -429,5 +479,5 @@
 }
 
 .wr-landing-card strong {
-  font: 800 1.15rem/1.2 var(--wr-display);
+  font: 900 1.1rem/1.2 var(--wr-display);
 }

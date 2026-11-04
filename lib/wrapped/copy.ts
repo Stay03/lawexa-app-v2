@@ -74,14 +74,27 @@ export type VibeColour = 'gold' | 'lilac' | 'coral' | 'lime';
 export interface Vibe {
   id: number;
   line: string;
-  /** What the face card acts out; the art arrives from Arthur's canvas. */
+  /** What the face card acts out, in words: the picture's alt text (the art is Arthur's prop-NN). */
   prop: string;
+  /** The card's background (Arthur's manifest). */
   colour: VibeColour;
+  /** The circle behind the face in the polaroid (manifest; 'paper' is cream). */
+  circle: VibeColour | 'paper';
   /** Shown only to that campus. */
   campus?: WrappedCampus;
 }
 
-const COLOURS: readonly VibeColour[] = ['gold', 'lilac', 'coral', 'lime'];
+/** Accent and circle per card, 1 to 37, from Arthur's manifest.json (4 November 2026). */
+const CARD_COLOURS: readonly (readonly [VibeColour, VibeColour | 'paper'])[] = [
+  ['lilac', 'gold'], ['coral', 'paper'], ['lime', 'gold'], ['gold', 'lilac'], ['lilac', 'lime'],
+  ['coral', 'gold'], ['gold', 'coral'], ['lime', 'lilac'], ['lilac', 'gold'], ['coral', 'lime'],
+  ['gold', 'lilac'], ['lime', 'coral'], ['lilac', 'lime'], ['gold', 'paper'], ['coral', 'gold'],
+  ['lime', 'coral'], ['gold', 'lilac'], ['lilac', 'gold'], ['coral', 'lilac'], ['lime', 'gold'],
+  ['gold', 'coral'], ['lilac', 'coral'], ['coral', 'lime'], ['lime', 'gold'], ['gold', 'lime'],
+  ['lilac', 'gold'], ['coral', 'paper'], ['lime', 'lilac'], ['gold', 'coral'], ['lilac', 'lime'],
+  ['coral', 'gold'], ['lime', 'lilac'], ['gold', 'lime'], ['lilac', 'coral'], ['coral', 'lime'],
+  ['lime', 'gold'], ['gold', 'lilac'],
+];
 
 const LINES: readonly (readonly [string, string, WrappedCampus?])[] = [
   ['No rage bait me.', 'Raised palm, "ABEG, NO."'],
@@ -124,11 +137,12 @@ const LINES: readonly (readonly [string, string, WrappedCampus?])[] = [
   ['Wike dey build flyover. I dey build Esq.', 'Hard hat', 'abuja'],
 ];
 
-/** Vibes 1 to 37, keyed by the id Backend picks; colours rotate gold, lilac, coral, lime. */
+/** Vibes 1 to 37, keyed by the id Backend picks, with the card colours from Arthur's manifest. */
 export const VIBES: ReadonlyMap<number, Vibe> = new Map(
   LINES.map(([line, prop, campus], index) => {
     const id = index + 1;
-    return [id, { id, line, prop, colour: COLOURS[index % COLOURS.length], ...(campus ? { campus } : {}) }];
+    const [colour, circle] = CARD_COLOURS[index];
+    return [id, { id, line, prop, colour, circle, ...(campus ? { campus } : {}) }];
   }),
 );
 

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { shareUrl, vibeFor } from '@/lib/wrapped/copy';
 import { canvasToFile, drawShareCard, loadImage, type ShareFonts } from '@/lib/wrapped/share-image';
+import { wrappedArt } from '@/lib/wrapped/theme';
 import type { WrappedRecord } from '@/lib/wrapped/types';
 
 /**
@@ -56,10 +57,17 @@ export function ShareFrame({ record, fonts }: { record: WrappedRecord; fonts: Sh
     void (async () => {
       try {
         // The canvas draws with whatever font is loaded: wait for both.
-        await Promise.all([document.fonts.load(`700 80px ${fonts.display}`), document.fonts.load(`600 40px ${fonts.body}`)]);
-        const photo = await loadImage(record.student.photo_url);
+        await Promise.all([document.fonts.load(`900 80px ${fonts.display}`), document.fonts.load(`700 40px ${fonts.body}`), document.fonts.load(`500 30px ${fonts.body}`)]);
+        // Arthur's frame, face and prop for this vibe, and the student's photo, all at once.
+        const id = record.vibe.id;
+        const [frame, face, prop, photo] = await Promise.all([
+          loadImage(wrappedArt('frame', id)),
+          loadImage(wrappedArt('face', id)),
+          loadImage(wrappedArt('prop', id)),
+          loadImage(record.student.photo_url),
+        ]);
         const canvas = document.createElement('canvas');
-        drawShareCard(canvas, record, fonts, photo);
+        drawShareCard(canvas, record, fonts, { frame, face, prop, photo });
         const file = await canvasToFile(canvas);
         if (cancelled) return;
         if (!file) {
