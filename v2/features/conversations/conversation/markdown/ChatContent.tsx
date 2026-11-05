@@ -16,6 +16,7 @@ import { MultiQuestionCompleteCard } from '../cards/MultiQuestionCompleteCard';
 import { NoteLinkCard } from '../cards/NoteLinkCard';
 import { GeneratingIndicator } from '../cards/GeneratingIndicator';
 import { DraftCard } from '../draft/DraftCard';
+import { DraftEditCard } from '../draft/DraftEditCard';
 import { mayHoldDraft, splitDrafts } from '../draft/draft-blocks';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 
@@ -44,7 +45,8 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
  * becomes a card that opens the draft in the chat's side panel; the reply text
  * around it renders as before. The split runs only when the text may hold one
  * (`<d`), and the first part keeps the `text-0` keys, so an answer that starts
- * a draft mid-stream reconciles its opening prose in place.
+ * a draft mid-stream reconciles its opening prose in place. A `<draft-edit>`,
+ * a change to part of a draft, becomes its own card (DraftEditCard).
  *
  * HOT-PATH COST. `parseContent` (14 global regex sweeps plus the unclosed-tag scan)
  * must never run on plain prose, so the fast path is preserved — and guarded further
@@ -91,7 +93,7 @@ export const ChatContent = memo(function ChatContent({
   const revealing = isStreaming || isDraining;
 
   const parts = content.includes('<') && mayHoldDraft(content) ? splitDrafts(content, revealing) : null;
-  if (parts && parts.some((part) => part.kind === 'draft')) {
+  if (parts && parts.some((part) => part.kind !== 'text')) {
     const offset = messageId && panel ? panel.draftOffset(messageId) : 0;
     // Each draft part's place among this answer's drafts, counted up front.
     const ordinals = parts.map((_, index) => offset + parts.slice(0, index).filter((part) => part.kind === 'draft').length);
@@ -101,6 +103,13 @@ export const ChatContent = memo(function ChatContent({
         return [
           <div key={`draft-${index}`} className="not-prose">
             <DraftCard draft={part.draft} ordinal={ordinal} live={revealing} />
+          </div>,
+        ];
+      }
+      if (part.kind === 'edit') {
+        return [
+          <div key={`edit-${index}`} className="not-prose">
+            <DraftEditCard edit={part.edit} live={revealing} />
           </div>,
         ];
       }

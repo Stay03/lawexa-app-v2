@@ -27,6 +27,8 @@ import type { DraftSourceMessage } from './draft-ordinals';
 export interface DraftVersionEntry {
   ordinal: number;
   key: string;
+  /** The title this version was written under. */
+  title: string;
   /** The draft's closing tag arrived: a version cut off (Lawexa stopped) is not finished. */
   finished: boolean;
 }
@@ -70,7 +72,7 @@ export function draftVersionIndex(messages: readonly DraftSourceMessage[]): Draf
   for (const message of messages) {
     if (message.role !== 'assistant') continue;
     for (const draft of draftsIn(message.content)) {
-      entries.push({ ordinal, key: draftGroupKey(draft), finished: draft.complete });
+      entries.push({ ordinal, key: draftGroupKey(draft), title: draft.title, finished: draft.complete });
       ordinal += 1;
     }
   }
@@ -85,6 +87,11 @@ export function draftVersion(index: DraftVersionIndex, ordinal: number, key: str
   const version = ordinals.indexOf(ordinal) + 1;
   const superseded = index.some((entry) => entry.key === key && entry.ordinal > ordinal && entry.finished);
   return { version, count: ordinals.length, ordinals, latest: version === ordinals.length, superseded };
+}
+
+/** The title of a group's newest version (a draft's title may change between versions); `null` for an unknown group. */
+export function draftGroupTitle(index: DraftVersionIndex, key: string): string | null {
+  return index.findLast((entry) => entry.key === key)?.title ?? null;
 }
 
 /** "Version 2", for a draft with more than one version; `null` for a draft with one. */

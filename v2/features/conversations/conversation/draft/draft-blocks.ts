@@ -32,6 +32,21 @@
  * growing. A tag cut off mid-name at the very end (`<dra`, `<draft title="Ten`)
  * is held back, never shown as text, so no half tag flashes in the reply.
  *
+ * EDITS (Stay, option A, thread 803b7234; spec 76a6d14b). A change to part of
+ * a draft comes as find/replace pairs, not a whole new version:
+ *
+ *   <draft-edit id="k3f9q2" version="3">
+ *   <find>passage copied exactly from the latest version</find>
+ *   <replace>the new passage</replace>
+ *   </draft-edit>
+ *
+ * It is read here like a draft: complete only once `</draft-edit>` arrives,
+ * its pairs in order, a pair complete once its `</replace>` arrives. While it
+ * streams, a half-written last pair is shown as far as it has got, and a tag
+ * cut off at the end is held back. The finds and replaces are kept exactly as
+ * written; the server applies them (DraftEditApplier) and sends back the full
+ * new version, which the panel shows.
+ *
  * Pure, so the rules are tested here and the card and the panel only draw them.
  */
 
@@ -52,11 +67,35 @@ export interface DraftBlock {
   version: number | null;
 }
 
-export type DraftPart = { kind: 'text'; text: string } | { kind: 'draft'; draft: DraftBlock };
+/** One find/replace pair of an edit; `replace` is empty for a deletion. */
+export interface DraftEditPair {
+  find: string;
+  replace: string;
+  /** The pair's `</replace>` has arrived. */
+  complete: boolean;
+}
+
+export interface DraftEditBlock {
+  /** The id of the draft it changes, as on the draft's own tag; `null` without a valid one. */
+  id: string | null;
+  /** The version the edit makes; `null` without a valid one. */
+  version: number | null;
+  pairs: DraftEditPair[];
+  /** The closing tag has arrived. */
+  complete: boolean;
+}
+
+export type DraftPart =
+  | { kind: 'text'; text: string }
+  | { kind: 'draft'; draft: DraftBlock }
+  | { kind: 'edit'; edit: DraftEditBlock };
 
 /** `<draft title="…">`, with any other double-quoted attributes after the title. */
 const OPEN = /<draft\s+title="([^"]*)"((?:\s+[a-z-]+="[^"]*")*)\s*>/gi;
 const CLOSE = '</draft>';
+/** `<draft-edit id="…" version="…">`, its attributes in any order. */
+const EDIT_OPEN = /<draft-edit((?:\s+[a-z-]+="[^"]*")*)\s*>/gi;
+const EDIT_CLOSE = '</draft-edit>';
 
 /** The two entities a title may carry. */
 function decodeTitle(raw: string): string {
@@ -81,6 +120,57 @@ function draftVersionNumber(raw: string | null): number | null {
   return version >= 1 ? version : null;
 }
 
+/** `text` without a closing tag still being written at its very end (`</fi`, `</draft-e`). */
+function withoutPartialClose(text: string, close: string): string {
+  const at = text.lastIndexOf('<');
+  return at >= 0 && close.startsWith(text.slice(at).toLowerCase()) ? text.slice(0, at) : text;
+}
+
+/**
+ * A find's or replace's text: one line break straight after its opening tag
+ * and one straight before its closing tag are dropped, so a passage may sit on
+ * lines of its own; breaks inside are kept (the server's DraftEditParser, woz
+ * 73a6d912). One still being written keeps its end as it is.
+ */
+function pairText(raw: string, closed: boolean): string {
+  const opened = raw.replace(/^\r?\n/, '');
+  return closed ? opened.replace(/\r?\n$/, '') : opened;
+}
+
+/**
+ * An edit's find/replace pairs, in order. A pair still being written at the
+ * end is kept as far as it has got; anything that is not a pair ends the read.
+ */
+function editPairs(body: string, streaming: boolean): DraftEditPair[] {
+  const pairs: DraftEditPair[] = [];
+  let at = 0;
+  while (true) {
+    const findOpen = /^\s*<find>/i.exec(body.slice(at));
+    if (!findOpen) return pairs;
+    const findStart = at + findOpen[0].length;
+    const findEnd = body.toLowerCase().indexOf('</find>', findStart);
+    if (findEnd < 0) {
+      if (streaming) pairs.push({ find: pairText(withoutPartialClose(body.slice(findStart), '</find>'), false), replace: '', complete: false });
+      return pairs;
+    }
+    const find = pairText(body.slice(findStart, findEnd), true);
+    at = findEnd + '</find>'.length;
+    const replaceOpen = /^\s*<replace>/i.exec(body.slice(at));
+    if (!replaceOpen) {
+      if (streaming && !body.slice(at).trim().includes('>')) pairs.push({ find, replace: '', complete: false });
+      return pairs;
+    }
+    const replaceStart = at + replaceOpen[0].length;
+    const replaceEnd = body.toLowerCase().indexOf('</replace>', replaceStart);
+    if (replaceEnd < 0) {
+      if (streaming) pairs.push({ find, replace: pairText(withoutPartialClose(body.slice(replaceStart), '</replace>'), false), complete: false });
+      return pairs;
+    }
+    pairs.push({ find, replace: pairText(body.slice(replaceStart, replaceEnd), true), complete: true });
+    at = replaceEnd + '</replace>'.length;
+  }
+}
+
 /** How much of `text`'s end could still grow into `<draft title="…">`. */
 function heldTail(text: string): number {
   const lt = text.lastIndexOf('<');
@@ -88,7 +178,7 @@ function heldTail(text: string): number {
   const tail = text.slice(lt);
   if (tail.includes('>')) return 0;
   const lower = tail.toLowerCase();
-  // `<`, `<d` … `<draft` and anything after it up to the closing `>`.
+  // `<`, `<d` … `<draft` and anything after it up to the closing `>`, `<draft-edit` too.
   return '<draft'.startsWith(lower) || lower.startsWith('<draft') ? tail.length : 0;
 }
 
@@ -104,9 +194,33 @@ export function mayHoldDraft(content: string): boolean {
 export function splitDrafts(content: string, streaming = false): DraftPart[] {
   const parts: DraftPart[] = [];
   let cursor = 0;
-  OPEN.lastIndex = 0;
-  let open: RegExpExecArray | null;
-  while ((open = OPEN.exec(content)) !== null) {
+  while (true) {
+    OPEN.lastIndex = cursor;
+    EDIT_OPEN.lastIndex = cursor;
+    const draftOpen = OPEN.exec(content);
+    const editOpen = EDIT_OPEN.exec(content);
+    if (editOpen && (!draftOpen || editOpen.index < draftOpen.index)) {
+      const before = content.slice(cursor, editOpen.index);
+      if (before.trim()) parts.push({ kind: 'text', text: before });
+      const bodyStart = editOpen.index + editOpen[0].length;
+      const closeAt = content.toLowerCase().indexOf(EDIT_CLOSE, bodyStart);
+      const body = content.slice(bodyStart, closeAt < 0 ? content.length : closeAt);
+      const attributes = editOpen[1] ?? '';
+      parts.push({
+        kind: 'edit',
+        edit: {
+          id: draftId(attribute(attributes, 'id')),
+          version: draftVersionNumber(attribute(attributes, 'version')),
+          pairs: editPairs(body, closeAt < 0 && streaming),
+          complete: closeAt >= 0,
+        },
+      });
+      if (closeAt < 0) return parts;
+      cursor = closeAt + EDIT_CLOSE.length;
+      continue;
+    }
+    const open = draftOpen;
+    if (!open) break;
     const before = content.slice(cursor, open.index);
     if (before.trim()) parts.push({ kind: 'text', text: before });
     const bodyStart = open.index + open[0].length;
@@ -135,7 +249,6 @@ export function splitDrafts(content: string, streaming = false): DraftPart[] {
     });
     if (closeAt < 0) return parts;
     cursor = closeAt + CLOSE.length;
-    OPEN.lastIndex = cursor;
   }
   let rest = content.slice(cursor);
   if (streaming) rest = rest.slice(0, rest.length - heldTail(rest));
@@ -147,6 +260,12 @@ export function splitDrafts(content: string, streaming = false): DraftPart[] {
 export function draftsIn(content: string, streaming = false): DraftBlock[] {
   if (!mayHoldDraft(content)) return [];
   return splitDrafts(content, streaming).flatMap((part) => (part.kind === 'draft' ? [part.draft] : []));
+}
+
+/** The edits alone, in order. */
+export function editsIn(content: string, streaming = false): DraftEditBlock[] {
+  if (!mayHoldDraft(content)) return [];
+  return splitDrafts(content, streaming).flatMap((part) => (part.kind === 'edit' ? [part.edit] : []));
 }
 
 /** How many drafts the text holds, counting one still being written. */
@@ -162,6 +281,18 @@ export function countDrafts(content: string): number {
 export function draftStatus(draft: DraftBlock, live: boolean): string {
   if (draft.complete) return `Draft · ${draftWordsLabel(draft.body)}`;
   return live ? `Writing · ${draftWordsLabel(draft.body)}` : `Unfinished · ${draftWordsLabel(draft.body)}`;
+}
+
+/**
+ * An edit card's status line: "Editing · 2 changes" while it streams, "2
+ * changes" once it is written, and "Unfinished" for a saved answer that
+ * stopped inside it.
+ */
+export function draftEditStatus(edit: DraftEditBlock, live: boolean): string {
+  const count = edit.pairs.length;
+  const changes = count === 0 ? 'No changes yet' : `${count} ${count === 1 ? 'change' : 'changes'}`;
+  if (edit.complete) return count === 0 ? 'No changes' : changes;
+  return live ? `Editing · ${changes}` : `Unfinished · ${changes}`;
 }
 
 /** "about 420 words": the body's length, for the card while it is written. */

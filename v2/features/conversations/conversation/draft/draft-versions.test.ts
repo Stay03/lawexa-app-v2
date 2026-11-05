@@ -165,9 +165,11 @@ test('both chat frames hand the panel the version index', () => {
   const screen = code('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
   assert.match(
     screen,
-    /const draftVersions = useMemo\(\(\) => \{\s*const index = draftVersionIndex\(messages\);\s*return \(ordinal: number, key: string\) => draftVersion\(index, ordinal, key\);\s*\}, \[messages\]\);/,
+    /const \{ draftVersions, draftTitles \} = useMemo\(\(\) => \{\s*const index = draftVersionIndex\(messages\);\s*return \{\s*draftVersions: \(ordinal: number, key: string\) => draftVersion\(index, ordinal, key\),[\s\S]*?draftTitles: \(key: string\) => draftGroupTitle\(index, key\),\s*\};\s*\}, \[messages\]\);/,
   );
   assert.equal(screen.match(/versions=\{draftVersions\}/g)?.length, 2);
+  // And the titles, so an edit's card names the draft it changes (draft-edits.test.ts).
+  assert.equal(screen.match(/titles=\{draftTitles\}/g)?.length, 2);
   // The case page loads the side panel's context before its chat opens, and no
   // draft code: the context takes the lookup, and imports only its type.
   const context = code('v2', 'features', 'conversations', 'conversation', 'side-panel', 'SidePanelContext.tsx');
