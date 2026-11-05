@@ -21,7 +21,7 @@ export function WrappedLanding({ signedIn, reason }: { signedIn: boolean; reason
             Lawexa
           </Link>
           {signedIn ? null : (
-            <Link href="/login" style={{ font: '700 0.95rem/1 var(--wr-body)', color: 'inherit' }}>
+            <Link href="/login?redirect=/wrapped" style={{ font: '700 0.95rem/1 var(--wr-body)', color: 'inherit' }}>
               Sign in
             </Link>
           )}
@@ -54,7 +54,7 @@ export function WrappedLanding({ signedIn, reason }: { signedIn: boolean; reason
                   <Link className="wr-cta" data-tone="gold" href="/register">
                     Get yours <ArrowRight aria-hidden size={18} />
                   </Link>
-                  <Link className="wr-cta" href="/login">
+                  <Link className="wr-cta" href="/login?redirect=/wrapped">
                     I have an account
                   </Link>
                 </>

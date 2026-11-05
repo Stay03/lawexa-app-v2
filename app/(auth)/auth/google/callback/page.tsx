@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { clearAttribution } from '@/lib/utils/attribution';
+import { takeReturnPath } from '@/lib/utils/auth-return';
 
 function GoogleCallbackContent() {
   const router = useRouter();
@@ -38,7 +39,9 @@ function GoogleCallbackContent() {
 
           // Check if user needs onboarding (profession is set after completing onboarding)
           const needsOnboarding = !(response.data.user.profile?.onboarding_completed_at || response.data.user.profile?.profession);
-          router.push(needsOnboarding ? '/onboarding' : '/');
+          // Back where sign-in started (a ?redirect= kept before leaving for Google), else the home.
+          const back = takeReturnPath();
+          router.push(needsOnboarding ? '/onboarding' : (back ?? '/'));
         }
       } catch {
         router.push('/login?error=google_auth_failed');

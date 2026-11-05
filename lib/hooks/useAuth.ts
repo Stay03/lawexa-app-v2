@@ -11,14 +11,13 @@ import { useNotificationPrefsStore } from '@/lib/stores/notificationPrefsStore';
 import { clearAllTranscripts } from '@/lib/storage/confidentialTranscriptStore';
 import { extractApiError, type ApiError } from '@/lib/utils/api-error';
 import { clearAttribution } from '@/lib/utils/attribution';
+import { keepReturnPath, returnPathFromLocation } from '@/lib/utils/auth-return';
 import type { LoginFormData, RegisterFormData } from '@/types/auth';
 
 // Honor a ?redirect= return URL (safe internal paths only) set by pages that
-// gate on auth — e.g. the /ambassadors landing. Falls back to the home page.
+// gate on auth, e.g. the /ambassadors landing and /wrapped. Falls back to the home page.
 function getSafeRedirect(): string {
-  if (typeof window === 'undefined') return '/';
-  const target = new URLSearchParams(window.location.search).get('redirect');
-  return target && target.startsWith('/') && !target.startsWith('//') ? target : '/';
+  return returnPathFromLocation() ?? '/';
 }
 
 export function useAuth() {
@@ -114,6 +113,8 @@ export function useAuth() {
     mutationFn: () => authApi.googleAuthUrl(),
     onSuccess: (response) => {
       if (response.success && response.data) {
+        // Google comes back on /auth/google/callback, without ?redirect=.
+        keepReturnPath();
         window.location.href = response.data.url;
       }
     },
