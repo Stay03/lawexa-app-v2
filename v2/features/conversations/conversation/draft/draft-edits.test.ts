@@ -216,3 +216,27 @@ test('the text an edit was applied to comes with the answer, for the panel to co
   ]);
   assert.deepEqual((message as { draftEditBases?: Record<string, string> }).draftEditBases, draftEditBases(withBase));
 });
+
+test('two blocks with the same id and version in one answer are one version, written at the last, never an empty second one (Tester c34637ea)', () => {
+  const two = [
+    'Moved the Notices clause.',
+    '<draft-edit id="k3f9q2" version="2"><find>Pets allowed.</find><replace></replace></draft-edit>',
+    '<draft-edit id="k3f9q2" version="2"><find>Rent: ₦1,200,000.</find><replace>Rent: ₦1,200,000.\nPets allowed.</replace></draft-edit>',
+    'Nothing else changed.',
+  ].join('\n');
+  const resolved = resolveDraftEdits(two, { 'k3f9q2:2': { body: 'Rent: ₦1,200,000.\nPets allowed.', base_body: null, title: 'TEST Lease' } });
+  assert.equal(draftsIn(resolved).length, 1);
+  assert.equal(editsIn(resolved).length, 0);
+  // Written at the last block, as the server writes it (woz 36b33e5d).
+  assert.match(resolved, /^Moved the Notices clause\.\n\n<draft title="TEST Lease"[^>]*>\nRent: ₦1,200,000\.\nPets allowed\.\n<\/draft>\nNothing else changed\.$/);
+  // Failed: every block of the key says so, and no version.
+  const failed = resolveDraftEdits(two, { 'k3f9q2:2': { body: null, failed: [{ pair: 1, find: 'x', matches: 0 }] } });
+  assert.equal(draftsIn(failed).length, 0);
+  assert.deepEqual(editsIn(failed).map((edit) => edit.failed), [true, true]);
+  // Blocks for two different versions stay two versions.
+  const distinct = resolveDraftEdits(two.replace('version="2"><find>Rent', 'version="3"><find>Rent'), {
+    'k3f9q2:2': { body: 'Rent: ₦1,200,000.', title: 'TEST Lease' },
+    'k3f9q2:3': { body: 'Rent: ₦1,200,000.\nPets allowed.', title: 'TEST Lease' },
+  });
+  assert.equal(draftsIn(distinct).length, 2);
+});
