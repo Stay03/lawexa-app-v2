@@ -151,33 +151,6 @@ export function DraftPanel({
     : null;
   const versionSwitch = <DraftVersionSwitch version={version} changes={changes} />;
 
-  if (comparable && showChanges && before !== null && version) {
-    return (
-      <ChatSidePanel
-        label="Draft"
-        title={draft.title}
-        subtitle={draftStatus(draft, false)}
-        icon={<DraftIcon />}
-        bare
-      >
-        <div className="@container/draft flex h-full min-h-0 flex-col">
-          <DraftBar />
-          {versionSwitch}
-          <div data-v2-draft-scroll className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
-            <div className={DRAFT_DOCUMENT}>
-              <DraftChangesView
-                before={before}
-                after={draft.body}
-                font={{ font: draft.font, size: draft.size }}
-                previousNumber={version.version - 1}
-              />
-            </div>
-          </div>
-        </div>
-      </ChatSidePanel>
-    );
-  }
-
   return (
     <ChatSidePanel
       label="Draft"
@@ -195,6 +168,17 @@ export function DraftPanel({
           font={{ font: draft.font, size: draft.size }}
           space={space}
           versionSwitch={versionSwitch}
+          // Show changes in place of the document, with the note menu still there (Techlead d5d5ddaf).
+          changesView={
+            comparable && showChanges && before !== null && version ? (
+              <DraftChangesView
+                before={before}
+                after={draft.body}
+                font={{ font: draft.font, size: draft.size }}
+                previousNumber={version.version - 1}
+              />
+            ) : null
+          }
           groupKey={draftGroupKey(draft)}
           latestOrdinal={newestFinished(version?.ordinals ?? [ordinal], (at) => draftAt(messages, at)?.complete === true, ordinal)}
           answerDone={answerDone}

@@ -240,3 +240,14 @@ test('two blocks with the same id and version in one answer are one version, wri
   });
   assert.equal(draftsIn(distinct).length, 2);
 });
+
+test('Show changes keeps the note menu: it is drawn inside the editor, which stays open behind it (Techlead d5d5ddaf)', () => {
+  const panel = read('DraftPanel.tsx');
+  assert.match(panel, /changesView=\{\s*comparable && showChanges && before !== null && version \? \(\s*<DraftChangesView/);
+  const editor = read('DraftEditor.tsx');
+  assert.match(editor, /const showTools = editable && !changesView;/);
+  assert.match(editor, /\{changesView \? <div className=\{DRAFT_DOCUMENT\}>\{changesView\}<\/div> : null\}/);
+  assert.match(editor, /<div className=\{cn\(DRAFT_DOCUMENT, changesView && 'hidden'\)\}>\s*<EditorContent editor=\{editor\} \/>/);
+  // The save bar and its menu are drawn whatever the view.
+  assert.match(editor, /actions=\{<DraftSaveControl \{\.\.\.actions\} \/>\}/);
+});
