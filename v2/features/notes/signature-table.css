@@ -13,6 +13,12 @@
   vertical-align: top;
 }
 
+/* The typography plugin (`prose`, used by Show changes and the chat's card)
+   rules each row of a table body: none here. */
+:is(.v2-note-fonts, .ProseMirror) table[data-type='signature'] :is(thead, tbody, tr) {
+  border: 0;
+}
+
 /* While editing, a faint dashed guide shows where each cell is, so a line can
    be put in the right column. It is drawn by the page only: it is never saved,
    read or printed. */

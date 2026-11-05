@@ -142,6 +142,8 @@ test('the note reader keeps the signature mark on a table, and only the exact va
 test('every surface draws the signing table without borders: one stylesheet, imported where a draft or note is drawn', () => {
   const css = read('notes', 'signature-table.css');
   assert.match(css, /:is\(\.v2-note-fonts, \.ProseMirror\) table\[data-type='signature'\] :is\(td, th\) \{\s*border: 0;/);
+  // The typography plugin's row rules go too (Show changes and the chat's card use `prose`).
+  assert.match(css, /:is\(\.v2-note-fonts, \.ProseMirror\) table\[data-type='signature'\] :is\(thead, tbody, tr\) \{\s*border: 0;/);
   for (const parts of [
     ['notes', 'reader', 'NoteContent.tsx'],
     ['notes', 'editor', 'NoteEditorScreen.tsx'],
