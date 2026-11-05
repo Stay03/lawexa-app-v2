@@ -405,7 +405,15 @@
   margin: 0 auto;
   padding-block: 28px 64px;
   display: grid;
+  /* One column no wider than the screen: without minmax(0, …) the column grows to its widest line. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 48px;
+}
+
+.wr-landing p a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
 }
 
 .wr-mark {
@@ -459,6 +467,10 @@
 .wr-cta:focus-visible {
   outline: 3px solid var(--wr-gold);
   outline-offset: 3px;
+}
+
+.wr-error .wr-cta[data-tone='gold'] {
+  border-color: var(--wr-gold);
 }
 
 .wr-cta[data-tone='outline'] {

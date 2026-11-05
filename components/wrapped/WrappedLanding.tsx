@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 
@@ -89,11 +90,12 @@ export function WrappedLanding({ signedIn, reason }: { signedIn: boolean; reason
 
         <footer style={{ display: 'grid', gap: 8 }}>
           <p style={{ font: '900 clamp(1.4rem, 4vw, 2.2rem)/1.1 var(--wr-display)', color: 'var(--wr-ink)', maxWidth: 'none' }}>
+            {/* Each part stays whole; the spaces sit between the parts, so the line breaks there on a phone. */}
             {CAMPAIGN_LINE.map((part, i) => (
-              <span key={part} className="wr-nowrap">
-                {part}
-                {i < CAMPAIGN_LINE.length - 1 ? ' ' : null}
-              </span>
+              <Fragment key={part}>
+                {i > 0 ? ' ' : null}
+                <span className="wr-nowrap">{part}</span>
+              </Fragment>
             ))}
           </p>
           <p style={{ fontSize: '0.9rem' }}>
