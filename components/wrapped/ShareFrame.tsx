@@ -56,8 +56,10 @@ export function ShareFrame({ record, fonts }: { record: WrappedRecord; fonts: Sh
     let made: string | null = null;
     void (async () => {
       try {
-        // The canvas draws with whatever font is loaded: wait for both.
-        await Promise.all([document.fonts.load(`900 80px ${fonts.display}`), document.fonts.load(`700 40px ${fonts.body}`), document.fonts.load(`500 30px ${fonts.body}`)]);
+        // The canvas draws with whatever font is loaded: wait for both. Settled, not all: next/font's
+        // fallback face is local("Arial"), and a phone without Arial rejects the load even though
+        // Unbounded and Inter themselves loaded, which left the card undrawn.
+        await Promise.allSettled([document.fonts.load(`900 80px ${fonts.display}`), document.fonts.load(`700 40px ${fonts.body}`), document.fonts.load(`500 30px ${fonts.body}`)]);
         // Arthur's frame, face and prop for this vibe, and the student's photo, all at once.
         const id = record.vibe.id;
         const [frame, face, prop, photo] = await Promise.all([

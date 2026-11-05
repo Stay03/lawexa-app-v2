@@ -210,3 +210,9 @@ test('the share card leaves out a sticker whose number is 0, and shows at most t
   assert.equal(shownStickers(four).length, 3);
   assert.equal(shownStickers([{ key: 'best_mock_pct', value: '72' }]).length, 1);
 });
+
+test('the share card is drawn even when a fallback font face cannot load (no Arial on the phone)', () => {
+  const frame = readFileSync(join(process.cwd(), 'components', 'wrapped', 'ShareFrame.tsx'), 'utf8');
+  assert.match(frame, /await Promise\.allSettled\(\[document\.fonts\.load\(/);
+  assert.doesNotMatch(frame, /await Promise\.all\(\[document\.fonts\.load\(/);
+});
