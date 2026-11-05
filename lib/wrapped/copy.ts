@@ -43,6 +43,12 @@ export const STATUS_LABELS: Record<WrappedCourseStatus, string> = {
   talking_stage: 'Talking stage',
 };
 
+/** What the report slip's verdict sticker says: Arthur's line when the server sends one, else "Verdict: Survived". */
+export function verdictText(line: string | null | undefined): string {
+  const trimmed = line?.trim();
+  return trimmed ? trimmed : 'Verdict: Survived';
+}
+
 export const PERSONAS: Record<WrappedPersonaKey, { name: string; line: string }> = {
   section_quoter: { name: 'The Section Quoter', line: 'You read the statute before anyone asked.' },
   overnight_scholar: { name: 'The Overnight Scholar', line: 'The night shift was your shift.' },

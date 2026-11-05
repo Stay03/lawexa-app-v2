@@ -39,7 +39,8 @@ export interface WrappedStudent {
 export interface WrappedCourse {
   key: WrappedCourseKey;
   name: string;
-  status: WrappedCourseStatus;
+  /** Null for a course the student never read for: the slip shows only its DONE stamp. */
+  status: WrappedCourseStatus | null;
   reads: number;
   quiz_answers: number;
 }
@@ -118,6 +119,14 @@ export interface WrappedRecord {
   drafting: WrappedDrafting | null;
   /** `reason` is null for the default persona, The Steady Learned Friend. */
   persona: { key: WrappedPersonaKey; reason: WrappedMetric | null };
+  /**
+   * Arthur's line for a student with little activity (thread f833c285, 5
+   * November 2026), shown on the report slip in place of "Verdict: Survived";
+   * null, or absent on an older record, keeps "Verdict: Survived".
+   */
+  verdict_line?: string | null;
+  /** Days active, banded (Backend 24794b36); absent on an older record, which reads as "full". */
+  activity?: 'none' | 'very_low' | 'low' | 'full';
   percentile: WrappedMetric | null;
   vibe: { id: number; campus: WrappedCampus | null };
   stickers: WrappedSticker[];

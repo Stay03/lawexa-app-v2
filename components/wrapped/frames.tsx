@@ -11,6 +11,7 @@ import {
   formatClock,
   formatCount,
   formatWords,
+  verdictText,
   ordinal,
   percentileLine,
   personaReason,
@@ -70,20 +71,25 @@ function ReportSlip({ record }: { record: WrappedRecord }) {
         <p className="wr-small">{campus}Class of 2026</p>
         <ul style={{ marginTop: '3cqw' }}>
           {record.report_slip.courses.map((course) => (
-            <li key={course.key} className="wr-slip-row">
+            <li key={course.key} className="wr-slip-row" data-status={course.status ? undefined : 'none'}>
               <span className="wr-body" style={{ fontWeight: 700, lineHeight: 1.15 }}>
                 {course.name}
               </span>
               <span className="wr-done" aria-label="Done">
                 DONE
               </span>
-              <span className="wr-small">{STATUS_LABELS[course.status]}</span>
+              {course.status ? <span className="wr-small">{STATUS_LABELS[course.status]}</span> : null}
             </li>
           ))}
         </ul>
       </div>
-      <span className="wr-sticker wr-rise" data-tone="gold" style={{ marginTop: '2cqw', animationDelay: '260ms' }}>
-        Verdict: Survived
+      <span
+        className="wr-sticker wr-rise"
+        data-tone="gold"
+        data-verdict={record.verdict_line?.trim() ? 'line' : undefined}
+        style={{ marginTop: '2cqw', animationDelay: '260ms' }}
+      >
+        {verdictText(record.verdict_line)}
       </span>
     </Frame>
   );

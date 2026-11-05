@@ -25,6 +25,15 @@ export interface ShareFonts {
 
 const PAD = 84;
 
+/**
+ * The stat stickers the card shows: at most three, leaving out any whose
+ * number is 0, so a quiet student's card never says "0 overnights". Pure, so
+ * a test pins it.
+ */
+export function shownStickers(stickers: readonly WrappedSticker[]): WrappedSticker[] {
+  return stickers.filter((sticker) => !(typeof sticker.value === 'number' ? sticker.value === 0 : /^\s*0+(\.0+)?\s*$/.test(sticker.value))).slice(0, 3);
+}
+
 function stickerText(sticker: WrappedSticker): { value: string; label: string } {
   const value = typeof sticker.value === 'number' ? formatCount(sticker.value) : String(sticker.value);
   return { value, label: STICKER_LABELS[sticker.key] ?? '' };
@@ -175,7 +184,7 @@ export function drawShareCard(canvas: HTMLCanvasElement, record: WrappedRecord, 
   }
 
   // Three stat stickers (square, outlined, the raised surface) and the campaign line beside them.
-  record.stickers.slice(0, 3).forEach((sticker, i) => {
+  shownStickers(record.stickers).forEach((sticker, i) => {
     const { value, label } = stickerText(sticker);
     const sx = L.bottom.x;
     const sy = L.bottom.y + i * (L.bottom.stickerH + L.bottom.gap);

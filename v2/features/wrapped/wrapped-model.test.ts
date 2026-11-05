@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import {
   CAMPAIGN_LINE,
@@ -12,11 +14,12 @@ import {
   shareName,
   shareUrl,
   VIBES,
+  verdictText,
   vibeFor,
 } from '@/lib/wrapped/copy';
 import { FRAME_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide } from '@/lib/wrapped/story-model';
 import { fitText, wrapWords } from '@/lib/wrapped/text-fit';
-import { SHARE_LAYOUT, corsPhotoUrl } from '@/lib/wrapped/share-image';
+import { SHARE_LAYOUT, corsPhotoUrl, shownStickers } from '@/lib/wrapped/share-image';
 import { POLAROID, SHARE_HEIGHT, wrappedArt } from '@/lib/wrapped/theme';
 import { wrappedSignedIn } from '@/lib/wrapped/access';
 import type { WrappedRecord } from '@/lib/wrapped/types';
@@ -165,4 +168,45 @@ test('the share card asks for the photo at its own URL, so a cached copy without
   assert.equal(corsPhotoUrl('https://cdn.lawexa.com/avatars/a.jpg'), 'https://cdn.lawexa.com/avatars/a.jpg?wr=1');
   assert.equal(corsPhotoUrl('https://cdn.lawexa.com/avatars/a.jpg?v=3'), 'https://cdn.lawexa.com/avatars/a.jpg?v=3&wr=1');
   assert.equal(corsPhotoUrl(null), null);
+});
+
+/* Quiet students (Techlead 3a8433a0, Arthur's lines, thread f833c285, 5 November 2026). TEST DATA. */
+
+test('the report slip shows Arthur’s line in place of "Verdict: Survived", and keeps it when there is none', () => {
+  assert.equal(verdictText(null), 'Verdict: Survived');
+  assert.equal(verdictText(undefined), 'Verdict: Survived');
+  assert.equal(verdictText('   '), 'Verdict: Survived');
+  const line = 'You made a brief appearance. The Court looks forward to seeing more of you.';
+  assert.equal(verdictText(line), line);
+  assert.equal(verdictText(`  ${line} `), line);
+  const frames = readFileSync(join(process.cwd(), 'components', 'wrapped', 'frames.tsx'), 'utf8');
+  assert.match(frames, /\{verdictText\(record\.verdict_line\)\}/);
+  assert.doesNotMatch(frames, />\s*Verdict: Survived\s*</);
+  // A line wraps inside the frame: the sticker is capped at the frame's width.
+  const css = readFileSync(join(process.cwd(), 'app', 'wrapped', 'wrapped.css'), 'utf8');
+  assert.match(css, /\.wr-sticker\[data-verdict='line'\] \{\s*max-width: 100%;/);
+});
+
+test('a course with no status shows its name and DONE stamp, and no status line', () => {
+  const frames = readFileSync(join(process.cwd(), 'components', 'wrapped', 'frames.tsx'), 'utf8');
+  assert.match(frames, /\{course\.status \? <span className="wr-small">\{STATUS_LABELS\[course\.status\]\}<\/span> : null\}/);
+  assert.match(frames, /data-status=\{course\.status \? undefined : 'none'\}/);
+  const css = readFileSync(join(process.cwd(), 'app', 'wrapped', 'wrapped.css'), 'utf8');
+  assert.match(css, /\.wr-slip-row\[data-status='none'\] \.wr-done \{\s*grid-row: auto;/);
+});
+
+test('the share card leaves out a sticker whose number is 0, and shows at most three', () => {
+  const allZero = [
+    { key: 'overnights', value: 0 },
+    { key: 'judgments_read', value: 0 },
+    { key: 'longest_streak', value: 0 },
+  ];
+  assert.deepEqual(shownStickers(allZero), []);
+  assert.deepEqual(
+    shownStickers([{ key: 'overnights', value: 0 }, { key: 'judgments_read', value: 4 }, { key: 'longest_streak', value: '0' }, { key: 'days_active', value: 1 }]).map((s) => s.key),
+    ['judgments_read', 'days_active'],
+  );
+  const four = ['overnights', 'judgments_read', 'longest_streak', 'days_active'].map((key, i) => ({ key, value: i + 1 }));
+  assert.equal(shownStickers(four).length, 3);
+  assert.equal(shownStickers([{ key: 'best_mock_pct', value: '72' }]).length, 1);
 });
