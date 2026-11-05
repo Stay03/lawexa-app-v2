@@ -59,15 +59,40 @@ export function draftEditBases(edits: Record<string, DraftEditResult> | null | u
   return bases.length > 0 ? Object.fromEntries(bases) : undefined;
 }
 
-/** The answer with each resolved edit written out as its whole draft, and each failed one marked. */
+/**
+ * The answer with each resolved edit written out as its whole draft, and each
+ * failed one marked.
+ *
+ * SEVERAL BLOCKS, ONE VERSION (Tester's live check, c34637ea). Lawexa may
+ * split one change into two `<draft-edit>` blocks with the same id and
+ * version. The server applies them in order as one version, one entry per
+ * key; so the LAST block of a key is written out as that version and the
+ * earlier ones are folded into it (left out), never a second, empty version,
+ * as the server's resolvedContent writes it (woz 36b33e5d).
+ * When the entry failed, every block of the key says so.
+ */
 export function resolveDraftEdits(content: string, edits: Record<string, DraftEditResult> | null | undefined): string {
   if (!edits || !content.includes('<draft-edit')) return content;
-  return content.replace(EDIT, (block, rest: string) => {
+  const keyOf = (rest: string) => {
     const id = attribute(rest, 'id');
     const version = attribute(rest, 'version');
-    const result = id && version ? edits[`${id}:${version}`] : undefined;
-    if (!result) return block;
+    return id && version ? `${id}:${version}` : null;
+  };
+  // How many complete blocks each key still has to come, so the last one is known.
+  const remaining = new Map<string, number>();
+  for (const match of content.matchAll(EDIT)) {
+    const key = keyOf(match[1] ?? '');
+    if (key) remaining.set(key, (remaining.get(key) ?? 0) + 1);
+  }
+  return content.replace(EDIT, (block, rest: string) => {
+    const key = keyOf(rest);
+    const result = key ? edits[key] : undefined;
+    if (!key || !result) return block;
     if (result.body === null) return block.replace(/^<draft-edit/i, '<draft-edit failed="true"');
+    const left = (remaining.get(key) ?? 1) - 1;
+    remaining.set(key, left);
+    if (left > 0) return '';
+    const [id, version] = key.split(':');
     const font = result.font ? ` font="${encodeTitle(result.font)}"` : '';
     const size = result.size ? ` size="${result.size}"` : '';
     // `from-edit` tells the panel this version was an edit, so it opens showing the changes.
