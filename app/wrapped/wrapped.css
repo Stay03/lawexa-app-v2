@@ -266,6 +266,14 @@
   border-color: var(--wr-ink);
 }
 
+/* Arthur's verdict line (up to about 75 characters): smaller, and wraps to two lines inside the frame. */
+.wr-sticker[data-verdict='line'] {
+  max-width: 100%;
+  font: 700 4.4cqw/1.2 var(--wr-body);
+  text-wrap: balance;
+  transform: rotate(-2deg);
+}
+
 .wr-sticker[data-tone='ink'] {
   background: var(--wr-ink);
   color: var(--wr-gold);
@@ -298,6 +306,11 @@
   padding: 1.2cqw 1.8cqw;
   transform: rotate(-8deg);
   grid-row: span 2;
+}
+
+/* A course with no status (never read for): the name and its stamp, on one row. */
+.wr-slip-row[data-status='none'] .wr-done {
+  grid-row: auto;
 }
 
 /* A list of ranked items (frame 03). */
