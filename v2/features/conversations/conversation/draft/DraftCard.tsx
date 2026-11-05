@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, PanelRight } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { MarkdownText } from '../markdown/MarkdownText';
 import { useV2ChatContext } from '../chat-context';
 import { useSidePanel } from '../side-panel/SidePanelContext';
+import { DiffDocument } from './DraftChangesView';
 import { draftStatus, type DraftBlock } from './draft-blocks';
+import { markdownToDoc } from './markdown-to-doc';
 import { draftGroupKey, draftVersionLabel } from './draft-versions';
 import { useDraftEdited } from './use-draft-notes';
 import { notesQueries } from '@/v2/features/notes/queries';
@@ -108,7 +109,7 @@ export function DraftCard({
     return (
       <div className="rounded-2xl border border-border bg-card px-4 py-3">
         <p className="mb-2 text-sm font-semibold text-foreground">{draft.title}</p>
-        <MarkdownText content={draft.body} />
+        <DraftDocument draft={draft} />
       </div>
     );
   }
@@ -162,4 +163,16 @@ export function DraftCard({
       </span>
     </button>
   );
+}
+
+/**
+ * The draft itself, where there is no side panel to open it in: read as the
+ * panel reads it (markdown-to-doc.ts) and drawn with the editor's document
+ * classes, so a template's centred lines and its signature table look as they
+ * do in the panel, not as a code box or as typed tags (template layout, thread
+ * 2b658111).
+ */
+function DraftDocument({ draft }: { draft: DraftBlock }) {
+  const doc = useMemo(() => markdownToDoc(draft.body, { font: draft.font, size: draft.size }), [draft.body, draft.font, draft.size]);
+  return <DiffDocument diff={doc} />;
 }

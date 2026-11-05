@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, type CSSProperties, type ReactNode } from 'react';
 import type { JSONContent } from '@tiptap/core';
 
 import { cn } from '@/lib/utils';
 import { diffDocs, hasChanges, type DiffMark, type DiffNode } from './draft-diff';
 import { markdownToDoc, type DraftFont } from './markdown-to-doc';
+import '@/v2/features/notes/note-fonts.css';
+import '@/v2/features/notes/signature-table.css';
 
 /**
  * DraftChangesView — the draft panel with "Show changes" on (Stay, 27 October
@@ -106,11 +108,11 @@ function renderNode(node: DiffNode, key: string): ReactNode {
   const tone = blockTone(node.diff);
   switch (node.type) {
     case 'paragraph':
-      return <p key={key} className={tone}>{children(node, key)}</p>;
+      return <p key={key} className={tone} style={alignment(node)}>{children(node, key)}</p>;
     case 'heading': {
       const level = Number(node.attrs?.level ?? 2);
       const Tag = level <= 1 ? 'h1' : level === 2 ? 'h2' : 'h3';
-      return <Tag key={key} className={tone}>{children(node, key)}</Tag>;
+      return <Tag key={key} className={tone} style={alignment(node)}>{children(node, key)}</Tag>;
     }
     case 'bulletList':
       return <ul key={key} className={tone}>{children(node, key)}</ul>;
@@ -127,7 +129,7 @@ function renderNode(node: DiffNode, key: string): ReactNode {
     case 'table':
       return (
         <div key={key} className={cn('tableWrapper', tone)}>
-          <table>
+          <table data-type={node.attrs?.signature ? 'signature' : undefined}>
             <tbody>{children(node, key)}</tbody>
           </table>
         </div>
@@ -145,6 +147,12 @@ function renderNode(node: DiffNode, key: string): ReactNode {
     default:
       return <span key={key}>{children(node, key)}</span>;
   }
+}
+
+/** A paragraph's or heading's alignment, as the editor draws it; none for the page's own left. */
+function alignment(node: DiffNode): CSSProperties | undefined {
+  const align = node.attrs?.textAlign;
+  return align === 'center' || align === 'right' || align === 'justify' ? { textAlign: align } : undefined;
 }
 
 /** A run of text in its marks (bold, italic, fonts…), then marked added or removed. */

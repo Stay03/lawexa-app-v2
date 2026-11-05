@@ -1,0 +1,23 @@
+/* A template's signing table: `<table data-type="signature">`, two or more
+   signature blocks side by side (template layout, thread 2b658111). It has no
+   borders anywhere, as in the Word export: in the note reader, the draft panel,
+   Show changes and both editors. The selector outranks each surface's own cell
+   rules (Tailwind's `[&_td]:border`, `.v2-draft-doc td`, and
+   `.v2-note-doc .v2-note-body td`), so one rule covers them all. */
+
+:is(.v2-note-fonts, .ProseMirror) table[data-type='signature'] :is(td, th) {
+  border: 0;
+  background: none;
+  padding: 0.25em 1.5em 0.25em 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+/* While editing, a faint dashed guide shows where each cell is, so a line can
+   be put in the right column. It is drawn by the page only: it is never saved,
+   read or printed. */
+.ProseMirror table[data-type='signature'] :is(td, th) {
+  outline: 1px dashed color-mix(in oklab, var(--border) 80%, transparent);
+  outline-offset: -1px;
+  padding-left: 0.5em;
+}

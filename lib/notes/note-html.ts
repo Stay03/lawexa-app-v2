@@ -143,6 +143,9 @@ export type NoteNode =
       /** A `span`'s font and size, each an allowed value (note-fonts.ts). */
       font?: NoteFont;
       size?: NoteSize;
+      /** A `table` the editor marked `data-type="signature"`: a template's
+       *  signing table, drawn without borders (template layout, thread 2b658111). */
+      signature?: true;
       children: NoteNode[];
     }
   /** A table cell. A span is there only when it is more than one. */
@@ -722,7 +725,15 @@ function pushConverted(
       children = children.filter((child) => child.kind !== 'text');
     }
     const align = ALIGNABLE.has(rendered) ? textAlign(element) : undefined;
-    out.push({ kind: 'element', key: keys.take(), tag: rendered, ...(align && { align }), children });
+    const signature = rendered === 'table' && isSignatureTable(element);
+    out.push({
+      kind: 'element',
+      key: keys.take(),
+      tag: rendered,
+      ...(align && { align }),
+      ...(signature && { signature: true as const }),
+      children,
+    });
     return;
   }
 
@@ -750,6 +761,15 @@ function pushConverted(
   if (SEPARATE_AFTER_UNWRAP.has(tag) || rendered === 'p') {
     out.push({ kind: 'text', key: keys.take(), text: ' ' });
   }
+}
+
+/**
+ * A template's signing table: a `<table>` the editor wrote with
+ * `data-type="signature"` (template layout, thread 2b658111). The one value
+ * read from a table's attributes, and only this exact one.
+ */
+export function isSignatureTable(element: Pick<Element, 'getAttribute'>): boolean {
+  return element.getAttribute('data-type') === 'signature';
 }
 
 /** The tags that hold only other table parts, never text of their own. */

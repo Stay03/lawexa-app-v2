@@ -116,8 +116,11 @@ test('the highlight is a plain mark with one colour, and alignment never stores 
   assert.match(extensions, /TableKit\.configure\(\{ table: false \}\),\s*EditorTable\.configure\(\{ resizable: false \}\),/);
   // The table is drawn by Tiptap's TableView, which redraws its columns after a
   // column is deleted and gives a wide table its own sideways scroll (Tester,
-  // 20 October 2026).
-  assert.match(extensions, /addNodeView\(\) \{\s*return \(\{ node \}\) => new TableView\(node, this\.options\.cellMinWidth\);/);
+  // 20 October 2026). A subclass adds only the signature mark (thread 2b658111)
+  // and calls TableView's own constructor and update first.
+  assert.match(extensions, /addNodeView\(\) \{\s*return \(\{ node \}\) => new MarkedTableView\(node, this\.options\.cellMinWidth\);/);
+  assert.match(extensions, /class MarkedTableView extends TableView \{\s*constructor\(node: ProseMirrorNode, cellMinWidth: number\) \{\s*super\(node, cellMinWidth\);/);
+  assert.match(extensions, /update\(node: ProseMirrorNode\): boolean \{\s*if \(!super\.update\(node\)\) return false;/);
   const screen = read('NoteEditorScreen.tsx');
   assert.match(screen, /\[&_\.tableWrapper\]:overflow-x-auto/);
   assert.match(screen, /\[&_td\]:min-w-\[6em\]/);

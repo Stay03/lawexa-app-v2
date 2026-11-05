@@ -1,4 +1,5 @@
 import { Extension, type Extensions } from '@tiptap/core';
+import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { Placeholder } from '@tiptap/extensions';
 import Image from '@tiptap/extension-image';
@@ -138,7 +139,46 @@ export function createNoteExtensions({
  * table sideways. Editor only: the stored HTML is `renderHTML`'s, unchanged.
  */
 const EditorTable = Table.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      /**
+       * A template's signing table (template layout, thread 2b658111): stored
+       * as `<table data-type="signature">`, drawn without borders here, in the
+       * reader and in the Word export. Read from stored HTML and written back
+       * on every save, so editing a draft keeps it.
+       */
+      signature: {
+        default: false,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-type') === 'signature',
+        renderHTML: (attributes: { signature?: boolean }) => (attributes.signature ? { 'data-type': 'signature' } : {}),
+      },
+    };
+  },
   addNodeView() {
-    return ({ node }) => new TableView(node, this.options.cellMinWidth);
+    return ({ node }) => new MarkedTableView(node, this.options.cellMinWidth);
   },
 });
+
+/**
+ * Tiptap's `TableView` with the signature mark on its `<table>`, so the
+ * editor's CSS can drop the borders. The node view draws the table itself,
+ * so the mark the saved HTML carries would otherwise never reach the page.
+ */
+class MarkedTableView extends TableView {
+  constructor(node: ProseMirrorNode, cellMinWidth: number) {
+    super(node, cellMinWidth);
+    markSignature(this.table, node);
+  }
+
+  update(node: ProseMirrorNode): boolean {
+    if (!super.update(node)) return false;
+    markSignature(this.table, node);
+    return true;
+  }
+}
+
+function markSignature(table: HTMLTableElement, node: ProseMirrorNode) {
+  if (node.attrs.signature) table.setAttribute('data-type', 'signature');
+  else table.removeAttribute('data-type');
+}

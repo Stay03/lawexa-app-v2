@@ -62,6 +62,7 @@ import {
   UNDO_KEYS,
 } from '@/v2/features/notes/editor/toolbar-verbs';
 import '@/v2/features/notes/note-fonts.css';
+import '@/v2/features/notes/signature-table.css';
 import './draft-panel.css';
 import type { ConversationSpaceRef } from '@/types/chat';
 import { SidePanelCloseButton } from '../side-panel/ChatSidePanel';

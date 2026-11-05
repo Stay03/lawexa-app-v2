@@ -59,6 +59,7 @@ import { useNoteAutosave } from './use-autosave';
 import { useCoarsePointer } from './use-coarse-pointer';
 import { pickRestoreCandidate, useDraftMirrorWriter } from './use-draft-mirror';
 import { IMAGE_INPUT_ACCEPT, useNoteImageUploads } from './use-image-uploads';
+import '@/v2/features/notes/signature-table.css';
 
 /**
  * NoteEditorScreen — the page IS the paper.

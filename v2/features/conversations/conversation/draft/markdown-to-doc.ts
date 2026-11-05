@@ -59,6 +59,11 @@ import { FONT_STYLE } from '@/v2/features/notes/editor/font-style';
  * aligned before the closing tag arrives. A line holding only `<br>`s, a gap
  * Lawexa leaves before signature lines (woz d3643d84), is one empty paragraph.
  *
+ * SIGNATURE BLOCKS (template layout, thread 2b658111). A ```signature fence is
+ * a template's side-by-side signing table: a borderless table marked
+ * `signature`, a row per line and a cell per "|", by the server's own rule
+ * ({@link signatureRows}). The editor keeps the mark when the draft is saved.
+ *
  * Inside an aligned line, and nowhere else, `<strong>` and `<b>`, `<em>` and
  * `<i>`, and `<u>` are bold, italic and underline (Techlead ee4398e5; shapes
  * 1966bfb1). An aligned `div` reads as an aligned `p`, on one line or split;
@@ -329,6 +334,7 @@ function block(node: RootContent, font: DraftFont, last = false): JSONContent[] 
     case 'blockquote':
       return [{ type: 'blockquote', content: nonEmptyBlocks(node.children, font) }];
     case 'code':
+      if (isSignatureFence(node.lang, node.meta)) return signatureTable(node.value, font);
       return [withContent({ type: 'codeBlock', attrs: { language: node.lang ?? null } }, node.value ? [{ type: 'text', text: node.value }] : [])];
     case 'thematicBreak':
       return [{ type: 'horizontalRule' }];
@@ -369,6 +375,65 @@ function table(node: Table, font: DraftFont): JSONContent {
       })),
     })),
   };
+}
+
+/**
+ * A ```signature fence: the fence's tag alone, in any case, with nothing after
+ * it, as the server reads it (DraftHtml::setSignaturesApart, Backend df7ae449).
+ * A fence with words after the tag is code, as it is on the server.
+ */
+function isSignatureFence(lang: string | null | undefined, meta: string | null | undefined): boolean {
+  return lang?.toLowerCase() === 'signature' && !meta?.trim();
+}
+
+/**
+ * A signature block's rows, by the server's rule (DraftHtml::setSignaturesApart,
+ * Backend df7ae449): each line one row, its cells split on a "|" that has no
+ * backslash before it, each cell trimmed. The cells keep their Markdown: a
+ * "\|" inside one is read as a bar when the cell is read.
+ */
+export function signatureRows(value: string): string[][] {
+  if (value === '') return [];
+  return value.split('\n').map((line) => line.split(/(?<!\\)\|/).map((cell) => cell.trim()));
+}
+
+/**
+ * A template's signing table (thread 2b658111): a borderless table marked
+ * `signature`, which the editor saves as `<table data-type="signature">` and
+ * the Word export draws without borders. Every cell is a plain cell, short rows
+ * get empty cells up to the widest, and each cell's words are read as inline
+ * Markdown. No rows makes nothing, as on the server.
+ */
+function signatureTable(value: string, font: DraftFont): JSONContent[] {
+  const rows = signatureRows(value);
+  if (rows.length === 0) return [];
+  const columns = Math.max(...rows.map((cells) => cells.length));
+  return [
+    {
+      type: 'table',
+      attrs: { signature: true },
+      content: rows.map((cells) => ({
+        type: 'tableRow',
+        content: Array.from({ length: columns }, (_, index) => ({
+          type: 'tableCell',
+          content: [withContent({ type: 'paragraph' }, cells[index] ? signatureCell(cells[index], font) : [])],
+        })),
+      })),
+    },
+  ];
+}
+
+/**
+ * One signature cell's words, as the server reads them: inline Markdown when
+ * the cell reads as one paragraph, else its own text as written. A line of
+ * underscores to sign on would read as a rule, and `# Name` as a heading; the
+ * server shows both as typed, and so does this.
+ */
+function signatureCell(cell: string, font: DraftFont): JSONContent[] {
+  const root = parser.runSync(parser.parse(cell)) as Root;
+  const first = root.children[0];
+  if (root.children.length === 1 && first.type === 'paragraph') return inline(first.children, font);
+  return [textNode(cell, [], font)];
 }
 
 /**

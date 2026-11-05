@@ -7,6 +7,7 @@ import { CaseMentionLink } from '@/v2/features/conversations/conversation/markdo
 import { parseNoteHtml, type NoteNode, type NoteTag } from '@/lib/notes/note-html';
 import { NOTE_ALIGN_CLASS } from '@/lib/notes/note-elements';
 import '@/v2/features/notes/note-fonts.css';
+import '@/v2/features/notes/signature-table.css';
 
 /**
  * NoteContent — the note body, as REACT ELEMENTS.
@@ -82,7 +83,7 @@ function renderNode(node: NoteNode): ReactNode {
       if (node.tag === 'table') {
         return (
           <div key={node.key} className="v2-note-table">
-            <table>{renderNodes(node.children)}</table>
+            <table data-type={node.signature ? 'signature' : undefined}>{renderNodes(node.children)}</table>
           </div>
         );
       }
