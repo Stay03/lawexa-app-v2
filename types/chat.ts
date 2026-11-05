@@ -71,9 +71,10 @@ export interface ChatMessage {
   /**
    * The text each of the answer's edits was applied to, by "id:version": the
    * person's own edited text when they changed the draft, else Lawexa's
-   * version (the server's `draft_edits[…].base_body`). The panel compares a
-   * version made by an edit against it, so the person's own edits are never
-   * shown as Lawexa's. Absent when the server sends none.
+   * version (the server's `draft_edits[…].base_body`, sent only when the
+   * person changed the version before; Techlead a9c46e69). The panel compares
+   * a version made by an edit against it, so the person's own edits are never
+   * shown as Lawexa's, and against the version before when it is absent.
    */
   draftEditBases?: Record<string, string>;
   /**

@@ -26,7 +26,11 @@ export interface DraftEditResult {
   /** The changed parts of `body`, in UTF-16 code units. */
   ranges?: { start: number; end: number }[];
   base_version?: number | null;
-  /** The exact text the edit was applied to; `null` on a failed edit with no base. */
+  /**
+   * The exact text the edit was applied to, sent only when the person had
+   * changed the version before (Techlead a9c46e69); `null` when it was
+   * Lawexa's own version, and on a failed edit.
+   */
   base_body?: string | null;
   failed?: { pair: number | null; find: string | null; matches: number }[];
   title?: string | null;
