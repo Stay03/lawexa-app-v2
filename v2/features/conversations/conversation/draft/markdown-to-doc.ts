@@ -186,6 +186,13 @@ const HASH_HEADING = /^(#{1,3})\s+(.*)$/;
 const TAG_LINE = /^<\/?(?!(?:span|br)\b|(?:strong|b|em|i|u)\s*>)[a-z]/i;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const HALF_TAG = /^ {0,3}<\/?[a-z0-9]*$/i;
+/**
+ * A line of underscores alone, up to three spaces in: a line to sign on in a
+ * template ("_______________"), which Markdown would read as a horizontal
+ * rule. It is text, as on the server (Backend's DraftHtml, Tester 394c79d9);
+ * `***` and `---` stay rules, and a line inside a code fence is left alone.
+ */
+const UNDERSCORES_ONLY = /^ {0,3}_{3,}\s*$/;
 /** A line holding only `<br>`s, up to three spaces in as the server reads it (woz af6173d6): a gap, one empty paragraph. */
 const BREAKS_ONLY = /^ {0,3}(?:<br\s*\/?>[ \t]*)+$/i;
 
@@ -255,6 +262,11 @@ function alignedSlipsAsLines(markdown: string): string {
     if (BREAKS_ONLY.test(line)) {
       // Alone between blank lines, so it is an HTML block of its own and not a break inside a paragraph.
       out.push('', '<br>', '');
+      continue;
+    }
+    if (UNDERSCORES_ONLY.test(line)) {
+      // A line to sign on, not a rule: each underscore escaped, so Markdown keeps it as text.
+      out.push(line.replace(/_/g, '\\_'));
       continue;
     }
     const opening = OPENING_LINE.exec(line);

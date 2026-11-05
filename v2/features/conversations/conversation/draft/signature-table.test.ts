@@ -166,3 +166,26 @@ test('Show changes and the chat card draw a template draft as the panel does: al
   // And the centred line it reads is a centred paragraph, not typed tags.
   assert.deepEqual(markdownToDoc('<p style="text-align: center">**TEST DATA TENANCY AGREEMENT**</p>').content?.[0].attrs, { textAlign: 'center' });
 });
+
+test('a line of underscores alone is a line to sign on, not a rule; --- and *** stay rules (Tester 394c79d9)', () => {
+  const line = '_______________________________';
+  const doc = markdownToDoc(['IN WITNESS of which the parties have signed.', '', line, '', 'TEST DATA Ada Obi'].join('\n'));
+  assert.deepEqual(doc.content?.[1], { type: 'paragraph', content: [{ type: 'text', text: line }] });
+  assert.ok(!doc.content?.some((node) => node.type === 'horizontalRule'));
+  // Up to three spaces in, and trailing spaces, as the server reads it.
+  assert.deepEqual(markdownToDoc(`   ${line}  `).content?.[0], { type: 'paragraph', content: [{ type: 'text', text: line }] });
+  for (const rule of ['---', '***', '- - -']) {
+    assert.equal(markdownToDoc(`TEST DATA\n\n${rule}\n\nmore`).content?.[1].type, 'horizontalRule', rule);
+  }
+  // Inside a signature fence the line stays one cell's text; inside a code fence it stays code.
+  assert.equal(cellText(tableOf(markdownToDoc(`\`\`\`signature\n${line} | ${line}\n\`\`\``)).content?.[0].content?.[0]), line);
+  const code = markdownToDoc(`\`\`\`\n${line}\n\`\`\``).content?.[0];
+  assert.deepEqual(code, { type: 'codeBlock', attrs: { language: null }, content: [{ type: 'text', text: line }] });
+});
+
+test('the chat card without a panel and Show changes read a draft with the same parse, so the signing line shows there too', () => {
+  const card = read('conversations', 'conversation', 'draft', 'DraftCard.tsx');
+  assert.match(card, /markdownToDoc\(draft\.body/);
+  const view = read('conversations', 'conversation', 'draft', 'DraftChangesView.tsx');
+  assert.match(view, /diffDocs\(markdownToDoc\(before, font\), markdownToDoc\(after, font\)\)/);
+});
