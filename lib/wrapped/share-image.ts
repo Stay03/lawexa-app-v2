@@ -90,7 +90,7 @@ export const SHARE_LAYOUT = {
   top: { x: PAD, kickerY: 330, lineTop: 352, lineBottom: 528, width: SHARE_WIDTH - PAD * 2 },
   /** The band between the polaroid and the bottom scribble. */
   bottom: { x: PAD, y: 1372, stickerW: 560, stickerH: 88, gap: 12 },
-  persona: { x: 586, y: 1248, h: 92, maxW: 430, rotationDeg: 4 },
+  persona: { x: 586, y: 1248, h: 92, maxW: 430, rotationDeg: 4, pad: 28, edge: 48 },
   /** Beside Arthur's Lawexa mark (an ink disc, 64 px from the bottom and left). */
   link: { x: 186, y: 1822 },
 } as const;
@@ -103,6 +103,43 @@ function trackedText(ctx: CanvasRenderingContext2D, text: string, x: number, y: 
   if (maxWidth) ctx.fillText(text, x, y, maxWidth);
   else ctx.fillText(text, x, y);
   if (before !== undefined) withSpacing.letterSpacing = before;
+}
+
+const PERSONA_LEADING = 1.1;
+
+export interface PersonaBanner {
+  size: number;
+  lines: string[];
+  /** The banner's width and height before it is turned, and its centre. */
+  w: number;
+  h: number;
+  cx: number;
+  cy: number;
+  /** The right-most point of the turned banner. */
+  right: number;
+}
+
+/**
+ * The persona sticker's type and place (Techlead 61f7c6f8). One line from 40 px
+ * down to 32 px; a name too long for that ("The Steady Learned Friend", the
+ * default persona) takes two lines, growing upward so the stickers below stay
+ * clear. The banner keeps its corner of the polaroid and moves left only as far
+ * as it must to leave `edge` px before the card's right edge, once turned.
+ */
+export function personaBanner(name: string, measure: Measure): PersonaBanner {
+  const P = SHARE_LAYOUT.persona;
+  const room = P.maxW - P.pad * 2;
+  const one = fitText(name, { width: room, maxLines: 1, max: 40, min: 32, step: 2 }, measure);
+  const fits = one.lines.length === 1 && measure(one.lines[0], one.size) <= room;
+  const fitted = fits ? one : fitText(name, { width: room, maxLines: 2, max: 40, min: 26, step: 2 }, measure);
+  const textW = Math.max(...fitted.lines.map((line) => measure(line, fitted.size)));
+  const w = Math.min(textW, room) + P.pad * 2;
+  const h = Math.max(P.h, Math.round(fitted.lines.length * fitted.size * PERSONA_LEADING + 48));
+  const turn = (P.rotationDeg * Math.PI) / 180;
+  const half = (w * Math.cos(turn) + h * Math.sin(turn)) / 2;
+  const cx = Math.min(P.x + w / 2, SHARE_WIDTH - P.edge - half);
+  const cy = P.y + P.h - h / 2;
+  return { size: fitted.size, lines: fitted.lines, w, h, cx, cy, right: cx + half };
 }
 
 export interface ShareArt {
@@ -222,18 +259,18 @@ export function drawShareCard(canvas: HTMLCanvasElement, record: WrappedRecord, 
 
   // The persona, as a sticker on the polaroid's lower right corner.
   const persona = PERSONAS[record.persona.key]?.name ?? PERSONAS.steady_learned_friend.name;
-  let personaSize = 40;
-  while (personaSize > 26 && measureDisplay(persona, personaSize) + 56 > L.persona.maxW) personaSize -= 2;
-  const personaW = measureDisplay(persona, personaSize) + 56;
+  const banner = personaBanner(persona, measureDisplay);
   ctx.save();
-  ctx.translate(L.persona.x + personaW / 2, L.persona.y + L.persona.h / 2);
+  ctx.translate(banner.cx, banner.cy);
   ctx.rotate((L.persona.rotationDeg * Math.PI) / 180);
   ctx.fillStyle = ink;
-  ctx.fillRect(-personaW / 2, -L.persona.h / 2, personaW, L.persona.h);
+  ctx.fillRect(-banner.w / 2, -banner.h / 2, banner.w, banner.h);
   ctx.fillStyle = WRAPPED_COLOURS.gold;
-  ctx.font = display(personaSize);
+  ctx.font = display(banner.size);
   ctx.textAlign = 'center';
-  ctx.fillText(persona, 0, personaSize * 0.36);
+  banner.lines.forEach((text, i) => {
+    ctx.fillText(text, 0, banner.size * 0.36 + (i - (banner.lines.length - 1) / 2) * banner.size * PERSONA_LEADING, banner.w - L.persona.pad * 2);
+  });
   ctx.restore();
 
   // Where to get one, beside the mark.
