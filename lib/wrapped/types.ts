@@ -55,8 +55,9 @@ export interface WrappedOvernight {
 
 export interface WrappedBigFive {
   top_statutes: { name: string; opens: number }[];
+  /** `section` is "Section 22", or the part's own title when it has no number. */
   top_sections: { statute: string; section: string; highlights: number }[];
-  top_case: { title: string; citation: string; opens: number } | null;
+  top_case: { title: string; citation: string | null; opens: number } | null;
   judgments_read: number;
   law_report_pages: number;
   most_time_course: WrappedCourseKey | null;
@@ -100,6 +101,10 @@ export interface WrappedSticker {
 }
 
 export interface WrappedRecord {
+  /** "bar-finals-2026". */
+  edition: string;
+  /** When the night job built this record, ISO 8601 in WAT. */
+  built_at: string;
   /** The frames to show, in order: the server has already applied the skip rules. */
   slides: WrappedSlideNumber[];
   /** "short" is [1, 7, 8]. */
@@ -111,11 +116,12 @@ export interface WrappedRecord {
   obsession: WrappedObsession | null;
   no_gree: WrappedNoGree;
   drafting: WrappedDrafting | null;
-  persona: { key: WrappedPersonaKey; reason: WrappedMetric };
+  /** `reason` is null for the default persona, The Steady Learned Friend. */
+  persona: { key: WrappedPersonaKey; reason: WrappedMetric | null };
   percentile: WrappedMetric | null;
   vibe: { id: number; campus: WrappedCampus | null };
   stickers: WrappedSticker[];
   share_code: string;
-  /** How many people signed up from this student's shares so far. */
-  share_signups?: number;
+  /** How many people signed up from this student's shares so far; guests are not counted. */
+  share_signups: number;
 }
