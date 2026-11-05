@@ -8,6 +8,7 @@ import type {
   EventMessage,
   TurnMessage,
 } from '@/types/chat';
+import { draftEditBases, resolveDraftEdits } from './draft-edits';
 import { isRedactionSummary } from './redaction-summary';
 
 /**
@@ -80,6 +81,12 @@ export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
  * the caller asks with `{ events: true }`, which only v2 does: v1's chat and
  * the floating panel never receive a line they do not draw.
  */
+/** The base text of each of an answer's resolved edits, when the server sent it (lib/utils/draft-edits.ts). */
+function withDraftEditBases(apiMsg: ApiMessage): { draftEditBases?: Record<string, string> } {
+  const bases = draftEditBases(apiMsg.metadata?.draft_edits);
+  return bases ? { draftEditBases: bases } : {};
+}
+
 export function transformApiMessages(apiMessages: ApiMessage[]): TurnMessage[];
 export function transformApiMessages(apiMessages: ApiMessage[], options: { events: true }): ConversationMessage[];
 export function transformApiMessages(
@@ -303,7 +310,8 @@ export function transformApiMessages(
       messages.push({
         id: `msg_${apiMsg.id}`,
         role: 'assistant',
-        content: apiMsg.content,
+        content: resolveDraftEdits(apiMsg.content, apiMsg.metadata?.draft_edits),
+        ...withDraftEditBases(apiMsg),
         timestamp: new Date(apiMsg.created_at),
         partial: {
           // A stop is a stop whatever reason was saved with it.
@@ -334,7 +342,8 @@ export function transformApiMessages(
       messages.push({
         id: `msg_${apiMsg.id}`,
         role: 'assistant',
-        content: apiMsg.content,
+        content: resolveDraftEdits(apiMsg.content, apiMsg.metadata?.draft_edits),
+        ...withDraftEditBases(apiMsg),
         timestamp: new Date(apiMsg.created_at),
         kind: 'radar_report',
       } as ChatMessage);
@@ -349,7 +358,8 @@ export function transformApiMessages(
       messages.push({
         id: `msg_${apiMsg.id}`,
         role: 'assistant',
-        content: apiMsg.content,
+        content: resolveDraftEdits(apiMsg.content, apiMsg.metadata?.draft_edits),
+        ...withDraftEditBases(apiMsg),
         timestamp: new Date(apiMsg.created_at),
       } as ChatMessage);
     }
