@@ -69,7 +69,7 @@ test('each state opens the right editor: the note, the page’s memory, or Lawex
   // Only the note, edited, and the page's memory where no note is kept take typing; the bar's formatting is drawn only then.
   assert.match(editor, /const editable = savesToNote \|\| mode\.kind === 'memory';/);
   assert.match(editor, /editable,\s*onUpdate:/);
-  assert.match(editor, /\{editable \? <DraftToolbar editor=\{editor\} onFind=\{openFind\} \/> : null\}/);
+  assert.match(editor, /\{showTools \? <DraftToolbar editor=\{editor\} onFind=\{openFind\} \/> : null\}/);
   // The editor is drawn again only on Reload or a restore, never for its own saves or a refetch.
   assert.match(editor, /key=\{`\$\{record\.id\}:\$\{generation\}`\}/);
   // Only a read that succeeded opens the editor again.

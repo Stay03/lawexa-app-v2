@@ -278,6 +278,13 @@ interface DraftEditorProps {
   noteState: DraftNoteState;
   /** The line under the bars, for a panel that does not edit the note (`draftNoteLine`). */
   line?: DraftLine | null;
+  /**
+   * "Show changes" is on (DraftChangesView): drawn in place of the document,
+   * with the formatting tools put away. The editor stays open behind it, so
+   * the note menu (save, Word, PDF, Save to folder) still works on the
+   * version's full text (Techlead d5d5ddaf, option A).
+   */
+  changesView?: ReactNode;
 }
 
 /** A line at the top of the draft, and the one thing it offers. */
@@ -355,6 +362,7 @@ function DraftEditorBody({
   initial,
   mode,
   line = null,
+  changesView = null,
   onReload,
 }: DraftEditorProps & { initial: Content; mode: DraftEditorMode; onReload?: () => void }) {
   const queryClient = useQueryClient();
@@ -365,6 +373,8 @@ function DraftEditorBody({
   const record = mode.kind === 'note' ? mode.record : null;
   const savesToNote = mode.kind === 'note' && mode.canEdit;
   const editable = savesToNote || mode.kind === 'memory';
+  // Show changes is a comparison to read: the formatting tools wait until it is off.
+  const showTools = editable && !changesView;
   const [extensions] = useState(() =>
     createNoteExtensions({
       placeholder: 'Write your draft…',
@@ -565,17 +575,17 @@ function DraftEditorBody({
         // strip under the sheet's toolbar, or a card under the computer bar's
         // right end (placed against this box).
         <div className="relative z-10 shrink-0">
-          {editable ? <DraftToolbar editor={editor} onFind={openFind} /> : null}
+          {showTools ? <DraftToolbar editor={editor} onFind={openFind} /> : null}
           {/* While the reader types on a phone (draft-panel.css): the computer bar's
               tools, folded to one row (undo, font, B I, ··· with the rest), in place
               of the three-row toolbar above, so the draft keeps its lines. */}
-          {editable ? (
+          {showTools ? (
             <div className="v2-draft-typing-tools sticky top-0 z-10 hidden h-11 shrink-0 items-center border-b border-border/70 bg-popover px-2">
               <DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} />
             </div>
           ) : null}
           <DraftBar
-            tools={editable ? <DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} /> : null}
+            tools={showTools ? <DraftBarTools editor={editor} frameRef={frameRef} onFind={openFind} /> : null}
             actions={<DraftSaveControl {...actions} />}
           />
           {findOpen ? (
@@ -625,7 +635,9 @@ function DraftEditorBody({
         className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain xl:scroll-pt-[var(--v2-draft-find-room)] xl:pt-[var(--v2-draft-find-room)]"
         style={{ '--v2-draft-find-room': `${findRoom}px` } as CSSProperties}
       >
-        <div className={DRAFT_DOCUMENT}>
+        {changesView ? <div className={DRAFT_DOCUMENT}>{changesView}</div> : null}
+        {/* Kept open behind Show changes, so save and export read its text. */}
+        <div className={cn(DRAFT_DOCUMENT, changesView && 'hidden')}>
           <EditorContent editor={editor} />
         </div>
       </div>
