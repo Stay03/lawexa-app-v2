@@ -219,9 +219,11 @@ function NoGree({ record }: { record: WrappedRecord }) {
         <li>
           <strong className="wr-num">{formatCount(gree.days_active)}</strong> days studied.
         </li>
-        <li>
-          Revision week: <strong className="wr-num">{Math.min(5, Math.max(0, gree.revision_week_days))} of 5</strong>.
-        </li>
+        {gree.revision_week_days > 0 ? (
+          <li>
+            Revision week: <strong className="wr-num">{Math.min(5, gree.revision_week_days)} of 5</strong>.
+          </li>
+        ) : null}
         {gree.weekend_share_pct > 0 ? (
           <li>
             <strong className="wr-num">{Math.round(gree.weekend_share_pct)}%</strong> of your reading happened on weekends.

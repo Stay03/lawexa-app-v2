@@ -1,4 +1,4 @@
-import type { WrappedSlideNumber } from './types';
+import type { WrappedRecord, WrappedSlideNumber } from './types';
 
 /**
  * The story viewer's rules, with no React, so a test pins each one (Arthur's
@@ -79,11 +79,21 @@ export function tapSide(x: number, width: number): 'back' | 'next' {
   return width > 0 && x / width < BACK_ZONE ? 'back' : 'next';
 }
 
-/** The frames to play: the server's list, kept in story order and unique, with the share card always last. */
-export function framesToPlay(slides: readonly number[]): WrappedSlideNumber[] {
+/**
+ * The frames to play: the server's list, kept in story order and unique, with
+ * the share card always last. Frames 2, 4 and 6 are dropped when their block
+ * is null, so a list that names one without its data never plays a blank frame.
+ */
+export function framesToPlay(
+  record: { slides: readonly number[] } & Pick<WrappedRecord, 'overnight' | 'obsession' | 'drafting'>,
+): WrappedSlideNumber[] {
+  const missing = new Set<number>();
+  if (!record.overnight) missing.add(2);
+  if (!record.obsession) missing.add(4);
+  if (!record.drafting) missing.add(6);
   const known = new Set<WrappedSlideNumber>();
-  for (const slide of slides) {
-    if (Number.isInteger(slide) && slide >= 1 && slide <= 8) known.add(slide as WrappedSlideNumber);
+  for (const slide of record.slides) {
+    if (Number.isInteger(slide) && slide >= 1 && slide <= 8 && !missing.has(slide)) known.add(slide as WrappedSlideNumber);
   }
   known.add(8);
   return [...known].sort((a, b) => a - b);

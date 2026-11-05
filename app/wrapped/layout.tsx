@@ -17,12 +17,19 @@ import './wrapped.css';
 const title = 'Lawexa Wrapped: Bar Finals 2026';
 const description = 'Your Bar Finals year on Lawexa, in eight cards. The Law. The Bar. The Bench. Get yours.';
 
+/**
+ * The link-preview picture, 1200×630, from Arthur's art for vibe 14 and the
+ * campaign line. Set in both blocks: this route's `openGraph` replaces the
+ * root's whole, so the root opengraph-image is not inherited.
+ */
+const image = { url: '/wrapped/og.png', width: 1200, height: 630, alt: 'Your Bar Finals Report is out. The Law. The Bar. The Bench. Lawexa Wrapped.' };
+
 export const metadata: Metadata = {
   title,
   description,
   alternates: { canonical: '/wrapped' },
-  openGraph: { title, description, url: `${getAppUrl()}/wrapped`, siteName: SEO.siteName, type: 'website' },
-  twitter: { card: 'summary_large_image', title, description },
+  openGraph: { title, description, url: `${getAppUrl()}/wrapped`, siteName: SEO.siteName, type: 'website', images: [image] },
+  twitter: { card: 'summary_large_image', title, description, images: [image] },
 };
 
 /** The palette as CSS variables (`--wr-cream`, `--wr-ink-soft`, …), so CSS and the canvas share one source. */

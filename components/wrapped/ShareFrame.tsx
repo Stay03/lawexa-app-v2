@@ -5,7 +5,7 @@ import { Copy, Download, Instagram, Music2, Share2, Twitter } from 'lucide-react
 import { toast } from 'sonner';
 
 import { shareUrl, vibeFor } from '@/lib/wrapped/copy';
-import { canvasToFile, drawShareCard, loadImage, type ShareFonts } from '@/lib/wrapped/share-image';
+import { canvasToFile, corsPhotoUrl, drawShareCard, loadImage, type ShareFonts } from '@/lib/wrapped/share-image';
 import { wrappedArt } from '@/lib/wrapped/theme';
 import type { WrappedRecord } from '@/lib/wrapped/types';
 
@@ -64,7 +64,7 @@ export function ShareFrame({ record, fonts }: { record: WrappedRecord; fonts: Sh
           loadImage(wrappedArt('frame', id)),
           loadImage(wrappedArt('face', id)),
           loadImage(wrappedArt('prop', id)),
-          loadImage(record.student.photo_url),
+          loadImage(corsPhotoUrl(record.student.photo_url)),
         ]);
         const canvas = document.createElement('canvas');
         drawShareCard(canvas, record, fonts, { frame, face, prop, photo });

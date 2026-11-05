@@ -12,7 +12,7 @@ import { POLAROID, SHARE_HEIGHT, SHARE_WIDTH, wrappedArt } from '@/lib/wrapped/t
  * the sharer is counted. The example card is marked as an example: it shows
  * no real student.
  */
-export function WrappedLanding({ signedIn }: { signedIn: boolean }) {
+export function WrappedLanding({ signedIn, reason }: { signedIn: boolean; reason?: 'not-ready' | 'hidden' }) {
   return (
     <main className="wr-landing">
       <div className="wr-landing-inner">
@@ -37,7 +37,11 @@ export function WrappedLanding({ signedIn }: { signedIn: boolean }) {
               Every finalist who studied on Lawexa gets their own story: the courses you married, the overnights you pulled, the cases you
               kept opening, and a card made to post on your status.
             </p>
-            {signedIn ? (
+            {reason === 'hidden' ? (
+              <p>
+                You&rsquo;ve hidden your Wrapped. Turn it back on in <Link href="/settings/profile">Profile</Link>.
+              </p>
+            ) : reason === 'not-ready' ? (
               <p>Your Wrapped isn&rsquo;t ready on this account. The Wrapped for every Lawexa user arrives on 1 December.</p>
             ) : null}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>

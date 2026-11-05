@@ -14,12 +14,12 @@ import { ShareFrame } from './ShareFrame';
  * The story viewer (Arthur's spec, 10 October 2026): full screen, tap the right
  * of the screen for the next frame and the left to go back, hold to pause, a
  * progress bar across the top. The arrow keys and the space bar do the same on
- * a computer. It pauses while the tab is in the background, and the share card
+ * a computer, except that Space on a focused button or link presses it. It pauses while the tab is in the background, and the share card
  * at the end waits for the student. The frames come from the record's `slides`,
  * where the server has already skipped what has no data.
  */
 export function WrappedStory({ record, fonts, onClose }: { record: WrappedRecord; fonts: ShareFonts; onClose: () => void }) {
-  const frames = useMemo(() => framesToPlay(record.slides), [record.slides]);
+  const frames = useMemo(() => framesToPlay(record), [record]);
   const count = frames.length;
   const [state, dispatch] = useReducer((current: ReturnType<typeof initialStory>, action: Parameters<typeof storyReducer>[2]) => storyReducer(count, current, action), undefined, initialStory);
   const slide = frames[state.index] ?? 8;
@@ -44,14 +44,28 @@ export function WrappedStory({ record, fonts, onClose }: { record: WrappedRecord
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
+  // Into the dialog on open, so the keyboard starts inside the story and Tab reaches its buttons.
+  const pauseButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    pauseButton.current?.focus({ preventScroll: true });
+  }, []);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+        return;
+      }
+      // A focused field keeps every key; a focused button or link keeps Space, which presses it.
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (event.key === ' ' && target?.closest('button, a')) return;
       if (event.key === 'ArrowRight') dispatch({ type: 'next' });
       else if (event.key === 'ArrowLeft') dispatch({ type: 'back' });
       else if (event.key === ' ') {
         event.preventDefault();
         dispatch({ type: 'toggle' });
-      } else if (event.key === 'Escape') onClose();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -104,7 +118,7 @@ export function WrappedStory({ record, fonts, onClose }: { record: WrappedRecord
             {state.index + 1} of {count}
           </span>
           <span style={{ display: 'flex', gap: 4 }}>
-            <button type="button" onClick={() => dispatch({ type: 'toggle' })} aria-label={state.paused ? 'Play' : 'Pause'}>
+            <button ref={pauseButton} type="button" onClick={() => dispatch({ type: 'toggle' })} aria-label={state.paused ? 'Play' : 'Pause'}>
               {state.paused ? <Play aria-hidden size={20} /> : <Pause aria-hidden size={20} />}
             </button>
             <button type="button" onClick={onClose} aria-label="Close Wrapped">

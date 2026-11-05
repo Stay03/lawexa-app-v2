@@ -28,6 +28,15 @@ export function mayHaveWrapped(
   return Boolean(profile && (profile.study_institution_type === 'law_school' || (profile.law_school ?? '').trim()));
 }
 
+/**
+ * Signed in for Wrapped: a token and a user, not a guest. The /wrapped route
+ * and its query use this one rule, so the page never waits on a query that is
+ * not asked (a token whose user has not loaded).
+ */
+export function wrappedSignedIn(auth: { token: string | null | undefined; user: unknown; isGuest: boolean }): boolean {
+  return Boolean(auth.token && auth.user && !auth.isGuest);
+}
+
 /** Whether the edition is still on at `now`. */
 export function wrappedRunning(now: number): boolean {
   return now < WRAPPED_ENDS_AT;

@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { wrappedApi } from '@/lib/api/wrapped';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { WRAPPED_STALE_MS, wrappedKeys } from '@/lib/wrapped/access';
+import { WRAPPED_STALE_MS, wrappedKeys, wrappedSignedIn } from '@/lib/wrapped/access';
 
 /**
  * The signed-in student's Wrapped, for the /wrapped route (a root route, so it
@@ -16,7 +16,7 @@ export function useWrapped(options: { enabled?: boolean } = {}) {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);
   const isGuest = useAuthStore((state) => state.isGuest);
-  const signedIn = Boolean(token && user && !isGuest);
+  const signedIn = wrappedSignedIn({ token, user, isGuest });
   return useQuery({
     queryKey: wrappedKeys.me(user?.id ?? null),
     queryFn: wrappedApi.me,

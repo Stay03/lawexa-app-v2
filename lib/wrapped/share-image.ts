@@ -38,6 +38,23 @@ function drawCover(ctx: CanvasRenderingContext2D, image: CanvasImageSource & { w
   ctx.drawImage(image, (image.width - sw) / 2, (image.height - sh) / 2, sw, sh, x, y, w, h);
 }
 
+/**
+ * The student's photo URL for the canvas, with `wr=1` added. The avatar shows
+ * elsewhere in the app without CORS, and the browser may reuse that cached
+ * copy, which has no CORS headers and fails a crossOrigin load. A distinct URL
+ * makes the browser ask the storage again, with CORS.
+ */
+export function corsPhotoUrl(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url, 'https://lawexa.com');
+    parsed.searchParams.set('wr', '1');
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 /** Loads a picture for the canvas; null when it cannot (no CORS, offline): the placeholder face shows. */
 export function loadImage(url: string | null): Promise<HTMLImageElement | null> {
   if (!url) return Promise.resolve(null);

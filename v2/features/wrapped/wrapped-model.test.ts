@@ -16,8 +16,10 @@ import {
 } from '@/lib/wrapped/copy';
 import { FRAME_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide } from '@/lib/wrapped/story-model';
 import { fitText, wrapWords } from '@/lib/wrapped/text-fit';
-import { SHARE_LAYOUT } from '@/lib/wrapped/share-image';
+import { SHARE_LAYOUT, corsPhotoUrl } from '@/lib/wrapped/share-image';
 import { POLAROID, SHARE_HEIGHT, wrappedArt } from '@/lib/wrapped/theme';
+import { wrappedSignedIn } from '@/lib/wrapped/access';
+import type { WrappedRecord } from '@/lib/wrapped/types';
 
 test('the share card’s words sit around Arthur’s polaroid, never on it, and the link clears his mark', () => {
   // The polaroid, turned −3° around (540, 960): its highest and lowest points.
@@ -138,7 +140,29 @@ test('a vibe line takes the biggest size that fits its lines, and never splits a
 });
 
 test('the frames play in story order as the server lists them, with the share card always last', () => {
-  assert.deepEqual(framesToPlay([1, 7, 8]), [1, 7, 8]);
-  assert.deepEqual(framesToPlay([8, 3, 1, 3, 9, 0]), [1, 3, 8]);
-  assert.deepEqual(framesToPlay([]), [8]);
+  const blocks = { overnight: {}, obsession: {}, drafting: {} } as unknown as Pick<WrappedRecord, 'overnight' | 'obsession' | 'drafting'>;
+  assert.deepEqual(framesToPlay({ ...blocks, slides: [1, 7, 8] }), [1, 7, 8]);
+  assert.deepEqual(framesToPlay({ ...blocks, slides: [8, 3, 1, 3, 9, 0] }), [1, 3, 8]);
+  assert.deepEqual(framesToPlay({ ...blocks, slides: [] }), [8]);
+});
+
+test('a frame whose block is null is never played, even when the server lists it', () => {
+  const record = { slides: [1, 2, 3, 4, 5, 6, 7, 8], overnight: null, obsession: null, drafting: null } as Pick<
+    WrappedRecord,
+    'slides' | 'overnight' | 'obsession' | 'drafting'
+  >;
+  assert.deepEqual(framesToPlay(record), [1, 3, 5, 7, 8]);
+});
+
+test('Wrapped counts as signed in only with a token and a user, and never for a guest', () => {
+  assert.equal(wrappedSignedIn({ token: 't', user: { id: 1 }, isGuest: false }), true);
+  assert.equal(wrappedSignedIn({ token: 't', user: null, isGuest: false }), false);
+  assert.equal(wrappedSignedIn({ token: null, user: { id: 1 }, isGuest: false }), false);
+  assert.equal(wrappedSignedIn({ token: 't', user: { id: 1 }, isGuest: true }), false);
+});
+
+test('the share card asks for the photo at its own URL, so a cached copy without CORS is not reused', () => {
+  assert.equal(corsPhotoUrl('https://cdn.lawexa.com/avatars/a.jpg'), 'https://cdn.lawexa.com/avatars/a.jpg?wr=1');
+  assert.equal(corsPhotoUrl('https://cdn.lawexa.com/avatars/a.jpg?v=3'), 'https://cdn.lawexa.com/avatars/a.jpg?v=3&wr=1');
+  assert.equal(corsPhotoUrl(null), null);
 });
