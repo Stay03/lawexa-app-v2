@@ -66,11 +66,18 @@ export type DraftVersionLookup = (ordinal: number, key: string) => DraftVersion 
 
 const NO_VERSIONS: DraftVersionLookup = () => null;
 
+/** A draft group's newest title (draft-versions.ts), so an edit's card can name the draft it changes. */
+export type DraftTitleLookup = (key: string) => string | null;
+
+const NO_TITLES: DraftTitleLookup = () => null;
+
 export interface SidePanelApi extends SidePanelUrlState {
   /** How many drafts come before an answer's own (0 for an answer not in the map). */
   draftOffset: (messageId: string) => number;
   /** Draft `ordinal`'s place among its versions; `null` where the chat keeps no versions (a Radar report). */
   draftVersion: DraftVersionLookup;
+  /** A draft group's newest title; `null` where the chat keeps no versions. */
+  draftTitle: DraftTitleLookup;
   /** The chat's Space, where a draft's Save to folder files it; `null` outside one. */
   space: ConversationSpaceRef | null;
   frame: SidePanelFrame;
@@ -119,17 +126,19 @@ export function useSidePanelUrl(): SidePanelUrlState {
 export function SidePanelProvider({
   offsets,
   versions,
+  titles,
   space,
   children,
 }: {
   offsets: ReadonlyMap<string, number>;
   versions?: DraftVersionLookup;
+  titles?: DraftTitleLookup;
   space: ConversationSpaceRef | null;
   children: ReactNode;
 }) {
   const url = useSidePanelUrl();
   return (
-    <SidePanelValueProvider url={url} offsets={offsets} versions={versions} space={space} frame="beside">
+    <SidePanelValueProvider url={url} offsets={offsets} versions={versions} titles={titles} space={space} frame="beside">
       {children}
     </SidePanelValueProvider>
   );
@@ -140,6 +149,7 @@ export function SidePanelValueProvider({
   url,
   offsets,
   versions,
+  titles,
   space,
   frame,
   children,
@@ -148,14 +158,16 @@ export function SidePanelValueProvider({
   offsets: ReadonlyMap<string, number>;
   /** The chat's drafts by group; absent where drafts have no versions. */
   versions?: DraftVersionLookup;
+  /** The chat's draft groups' titles; absent where drafts have no versions. */
+  titles?: DraftTitleLookup;
   space: ConversationSpaceRef | null;
   frame: SidePanelFrame;
   children: ReactNode;
 }) {
   const draftOffset = useCallback((messageId: string) => offsets.get(messageId) ?? 0, [offsets]);
   const api = useMemo<SidePanelApi>(
-    () => ({ ...url, draftOffset, draftVersion: versions ?? NO_VERSIONS, space, frame }),
-    [url, draftOffset, versions, space, frame],
+    () => ({ ...url, draftOffset, draftVersion: versions ?? NO_VERSIONS, draftTitle: titles ?? NO_TITLES, space, frame }),
+    [url, draftOffset, versions, titles, space, frame],
   );
   return <SidePanelContext.Provider value={api}>{children}</SidePanelContext.Provider>;
 }

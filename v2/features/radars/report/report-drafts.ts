@@ -29,9 +29,12 @@ export type ReportPart =
 export function reportParts(narrative: string, draftOffset: number): ReportPart[] {
   if (!mayHoldDraft(narrative)) return [{ kind: 'text', text: narrative }];
   let index = 0;
-  return splitDrafts(narrative).map((part) =>
-    part.kind === 'text' ? part : { kind: 'draft', draft: part.draft, ordinal: draftOffset + index++ },
-  );
+  // A report holds whole drafts only: an edit (`<draft-edit>`) is a chat's, so it is left out here.
+  return splitDrafts(narrative).flatMap((part): ReportPart[] => {
+    if (part.kind === 'text') return [part];
+    if (part.kind === 'edit') return [];
+    return [{ kind: 'draft', draft: part.draft, ordinal: draftOffset + index++ }];
+  });
 }
 
 /** Draft number `ordinal` of the Radar's chat, when it is one of this report's. */

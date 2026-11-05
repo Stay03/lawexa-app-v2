@@ -30,7 +30,7 @@ import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './rou
 import { draftOffsets } from './draft/draft-ordinals';
 import { applyDraftEditLine } from './draft/draft-edit-line';
 import type { DraftEditLineFields } from '@/v2/features/notes/types';
-import { draftVersion, draftVersionIndex } from './draft/draft-versions';
+import { draftGroupTitle, draftVersion, draftVersionIndex } from './draft/draft-versions';
 import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
 import { useSidePanelHost } from './side-panel/side-panel-host';
 import { SidePanelSlot } from './side-panel/SidePanelSlot';
@@ -150,9 +150,13 @@ export function ConversationScreen({
   // does not change `messages`, so this does not run per word.
   const offsets = useMemo(() => draftOffsets(messages), [messages]);
   // The same drafts by group, so a card reads "Version 2" (draft-versions.ts).
-  const draftVersions = useMemo(() => {
+  const { draftVersions, draftTitles } = useMemo(() => {
     const index = draftVersionIndex(messages);
-    return (ordinal: number, key: string) => draftVersion(index, ordinal, key);
+    return {
+      draftVersions: (ordinal: number, key: string) => draftVersion(index, ordinal, key),
+      // A draft's newest title, so an edit's card names the draft it changes.
+      draftTitles: (key: string) => draftGroupTitle(index, key),
+    };
   }, [messages]);
   // Embedded, the page around the chat may show its side panel (the case
   // page's draft editor, side-panel-host.tsx).
@@ -450,6 +454,7 @@ export function ConversationScreen({
             url={panelHost.url}
             offsets={offsets}
             versions={draftVersions}
+            titles={draftTitles}
             space={controller.space}
             frame="card"
           >
@@ -462,7 +467,7 @@ export function ConversationScreen({
           transcript
         )
       ) : (
-        <SidePanelProvider offsets={offsets} versions={draftVersions} space={controller.space}>
+        <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} space={controller.space}>
           <div className="flex h-full min-h-0">
             {transcript}
             <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />
