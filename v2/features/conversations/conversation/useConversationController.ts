@@ -39,6 +39,7 @@ import { radarsQueries } from '@/v2/features/radars/queries';
 import { radarToolChangesRadars } from '@/v2/features/radars/radar-tools';
 import type { RosterEntry } from './member-colour';
 import { flushDraftsBeforeSend, UNSAVED_DRAFT_LINE } from './draft/draft-flush';
+import { draftEditRecheckDelay, hasUnresolvedDraftEdits } from '@/lib/utils/draft-edits';
 import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
 import { awaitsBackgroundJob } from './background-jobs/model';
@@ -752,6 +753,36 @@ export function useConversationController(
   useEffect(() => {
     if (detailData) adoptConversationHistory(detailData);
   }, [detailData, adoptConversationHistory]);
+
+  // DRAFT EDITS THE SERVER HAS NOT ANSWERED YET (Tester 394c79d9, Techlead
+  // 53aeb072). The server applies an answer's `<draft-edit>`s in a job after
+  // it is saved, so the read at the answer's end usually comes too soon; the
+  // transcript is read again, a few times over about a minute, until each edit
+  // is a version or marked failed, and the merge gives the answer the result
+  // (server-fields.ts). Never for a confidential chat, which the server keeps no copy of.
+  const awaitingDraftEdits = useMemo(
+    () =>
+      !isStreaming &&
+      !isConfidential &&
+      messages.some((message) => message.role === 'assistant' && typeof message.content === 'string' && hasUnresolvedDraftEdits(message.content)),
+    [messages, isStreaming, isConfidential],
+  );
+  const draftEditRechecks = useRef(0);
+  const detailReadAt = detailQuery.dataUpdatedAt;
+  useEffect(() => {
+    if (!awaitingDraftEdits) {
+      draftEditRechecks.current = 0;
+      return;
+    }
+    const delay = draftEditRecheckDelay(draftEditRechecks.current);
+    if (delay === null) return;
+    // Re-armed by each read (`detailReadAt`), until the edits are answered or the reads are spent.
+    const timer = setTimeout(() => {
+      draftEditRechecks.current += 1;
+      void queryClient.invalidateQueries({ queryKey: detailKey });
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [awaitingDraftEdits, detailReadAt, queryClient, detailKey]);
 
   // ── Header context publish (§A7-43 seam; consumed by the header work). ──
   // Push the conversation title + confidential flag into the shared header store

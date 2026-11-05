@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { draftEditStatus, draftsIn, editsIn, splitDrafts } from './draft-blocks';
 import { draftGroupTitle, draftVersionIndex } from './draft-versions';
 import { reportParts } from '../../../radars/report/report-drafts';
-import { draftEditBases, resolveDraftEdits } from '../../../../../lib/utils/draft-edits';
+import { draftEditBases, draftEditRecheckDelay, hasUnresolvedDraftEdits, resolveDraftEdits } from '../../../../../lib/utils/draft-edits';
+import { adoptDraftEditResults } from '../../../../runtime/chat-engine/server-fields';
+import type { EngineMessage } from '../../../../runtime/chat-engine/types';
 import { transformApiMessages } from '../../../../../lib/utils/transform-api-messages';
 import type { ApiMessage } from '../../../../../types/chat';
 
@@ -250,4 +252,94 @@ test('Show changes keeps the note menu: it is drawn inside the editor, which sta
   assert.match(editor, /<div className=\{cn\(DRAFT_DOCUMENT, changesView && 'hidden'\)\}>\s*<EditorContent editor=\{editor\} \/>/);
   // The save bar and its menu are drawn whatever the view.
   assert.match(editor, /actions=\{<DraftSaveControl \{\.\.\.actions\} \/>\}/);
+});
+
+/* A failed edit read as applied (Tester 394c79d9, Techlead 53aeb072): the
+ * answer on screen kept its edits as Lawexa wrote them, because the server
+ * applies them in a job after the answer is saved and the merge only added
+ * rows. TEST DATA throughout. */
+
+const TWO_BLOCKS = [
+  'TEST DATA. Changing clause 8.1.',
+  '<draft-edit id="k3f9q2" version="4">',
+  '<find>1. **RESTRICTIVE COVENANTS**</find>',
+  '<replace>1. **RESTRICTIVE COVENANTS**</replace>',
+  '</draft-edit>',
+  'Wait, that edit is wrong.',
+  '<draft-edit id="k3f9q2" version="4">',
+  '<find>for 12 months</find>',
+  '<replace>for 6 months</replace>',
+  '</draft-edit>',
+  'Changes made: clause 8.1.',
+].join('\n');
+
+const FAILED = { 'k3f9q2:4': { body: null, ranges: [], base_version: null, base_body: null, failed: [{ pair: 0, find: '1. **RESTRICTIVE COVENANTS**', matches: 0 }], title: null } };
+
+test('an answer with an edit the server has not answered is told apart from one it has', () => {
+  assert.equal(hasUnresolvedDraftEdits(TWO_BLOCKS), true);
+  assert.equal(hasUnresolvedDraftEdits('TEST DATA. No edits here.'), false);
+  // Failed: every block of the key is marked, so nothing is left unanswered.
+  const failed = resolveDraftEdits(TWO_BLOCKS, FAILED);
+  assert.equal(failed.match(/<draft-edit failed="true"/g)?.length, 2);
+  assert.equal(hasUnresolvedDraftEdits(failed), false);
+  // Made: the version is written out, and no edit is left.
+  const made = resolveDraftEdits(TWO_BLOCKS, { 'k3f9q2:4': { body: 'TEST DATA body, 6 months.', title: 'TEST Lease' } });
+  assert.equal(hasUnresolvedDraftEdits(made), false);
+  // Cut off mid-block (stopped): not a complete edit, so not waited for.
+  assert.equal(hasUnresolvedDraftEdits('<draft-edit id="k3f9q2" version="4">\n<find>TEST'), false);
+});
+
+test('the transcript is read again a few times over about a minute, then no more', () => {
+  const delays = [0, 1, 2, 3, 4, 5].map(draftEditRecheckDelay);
+  assert.deepEqual(delays, [2000, 4000, 8000, 15000, 30000, null]);
+  assert.ok((delays.slice(0, 5) as number[]).reduce((a, b) => a + b, 0) <= 60_000);
+});
+
+test('the answer drawn from the stream takes the server’s failed marks once the server has them', () => {
+  const live = { id: 'local_7', role: 'assistant', content: TWO_BLOCKS, isStreaming: false, savedId: 501 } as unknown as EngineMessage;
+  const question = { id: 'local_6', role: 'user', content: 'TEST DATA. Make it 6 months.' } as unknown as EngineMessage;
+  // Read before the job ran: the server's copy is still as written, so the row is left alone.
+  const early = transformApiMessages([{ id: 501, role: 'assistant', content: TWO_BLOCKS, created_at: '2026-11-05T17:47:00Z' } as unknown as ApiMessage]);
+  const rows = [question, live];
+  assert.equal(adoptDraftEditResults(rows, early), rows);
+  // Read after: the failed marks come in on the same row, which keeps its id.
+  const late = transformApiMessages([{ id: 501, role: 'assistant', content: TWO_BLOCKS, metadata: { draft_edits: FAILED }, created_at: '2026-11-05T17:47:00Z' } as unknown as ApiMessage]);
+  const adopted = adoptDraftEditResults(rows, late);
+  assert.notEqual(adopted, rows);
+  assert.equal(adopted[0], question);
+  assert.equal(adopted[1].id, 'local_7');
+  assert.equal((adopted[1].content as string).match(/<draft-edit failed="true"/g)?.length, 2);
+  assert.deepEqual(editsIn(adopted[1].content as string).map((edit) => edit.failed), [true, true]);
+});
+
+test('an answer read from history before the job ran takes the version, and its base text, when it comes', () => {
+  const held = transformApiMessages([{ id: 502, role: 'assistant', content: TWO_BLOCKS, created_at: '2026-11-05T17:47:00Z' } as unknown as ApiMessage]) as unknown as EngineMessage[];
+  assert.equal(held[0].id, 'msg_502');
+  const made = { 'k3f9q2:4': { body: 'TEST DATA body, 6 months.', title: 'TEST Lease', base_body: 'TEST DATA body, 12 months, edited.' } };
+  const late = transformApiMessages([{ id: 502, role: 'assistant', content: TWO_BLOCKS, metadata: { draft_edits: made }, created_at: '2026-11-05T17:47:00Z' } as unknown as ApiMessage]);
+  const adopted = adoptDraftEditResults(held, late);
+  assert.equal(draftsIn(adopted[0].content as string).length, 1);
+  assert.equal(draftsIn(adopted[0].content as string)[0].fromEdit, true);
+  assert.deepEqual((adopted[0] as unknown as { draftEditBases?: Record<string, string> }).draftEditBases, { 'k3f9q2:4': 'TEST DATA body, 12 months, edited.' });
+  // Once answered, a later read changes nothing.
+  assert.equal(adoptDraftEditResults(adopted, late), adopted);
+});
+
+test('an answer still being written, or with no saved copy, is never touched', () => {
+  const late = transformApiMessages([{ id: 503, role: 'assistant', content: TWO_BLOCKS, metadata: { draft_edits: FAILED }, created_at: '2026-11-05T17:47:00Z' } as unknown as ApiMessage]);
+  const writing = [{ id: 'local_9', role: 'assistant', content: TWO_BLOCKS, isStreaming: true, savedId: 503 } as unknown as EngineMessage];
+  assert.equal(adoptDraftEditResults(writing, late), writing);
+  const unsaved = [{ id: 'local_10', role: 'assistant', content: TWO_BLOCKS, isStreaming: false } as unknown as EngineMessage];
+  assert.equal(adoptDraftEditResults(unsaved, late), unsaved);
+});
+
+test('the merge gives answers on screen the result, and the chat reads again until it has it', () => {
+  const engine = read('..', '..', '..', '..', 'runtime', 'chat-engine', 'engine.ts');
+  assert.equal(engine.match(/adoptDraftEditResults\(adoptServerFields\(/g)?.length, 2);
+  const controller = read('..', 'useConversationController.ts');
+  assert.match(controller, /hasUnresolvedDraftEdits\(message\.content\)/);
+  assert.match(controller, /const delay = draftEditRecheckDelay\(draftEditRechecks\.current\);/);
+  assert.match(controller, /void queryClient\.invalidateQueries\(\{ queryKey: detailKey \}\);\s*\}, delay\);/);
+  assert.match(controller, /\[awaitingDraftEdits, detailReadAt, queryClient, detailKey\]/);
+  assert.match(controller, /!isConfidential &&/);
 });

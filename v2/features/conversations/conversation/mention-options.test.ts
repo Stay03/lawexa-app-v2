@@ -208,8 +208,8 @@ test('the writer’s own question takes the server copy’s tags, keeping its ow
   // Both merges use it.
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /\.\.\.adoptServerFields\(prev\.messages\.slice\(0, cutIndex\), transformed\),\s*\.\.\.transformed,/);
-  assert.match(engine, /const enriched = adoptServerFields\(state\.messages, next\);[\s\S]{0,400}?if \(added\.length === 0 && enriched === state\.messages && lined === state\.messages\) return false;/);
-  assert.match(engine, /applySnapshotEvents\(\[\.\.\.adoptServerFields\(prev\.messages, next\), \.\.\.added\], next, unconfirmedEventIds\)/);
+  assert.match(engine, /const enriched = adoptDraftEditResults\(adoptServerFields\(state\.messages, next\), next\);[\s\S]{0,400}?if \(added\.length === 0 && enriched === state\.messages && lined === state\.messages\) return false;/);
+  assert.match(engine, /applySnapshotEvents\(\[\.\.\.adoptDraftEditResults\(adoptServerFields\(prev\.messages, next\), next\), \.\.\.added\], next, unconfirmedEventIds\)/);
 });
 
 test('the review of ecaf2d5 and the rendered check: what each finding changed', () => {
