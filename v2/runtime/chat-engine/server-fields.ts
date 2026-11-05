@@ -1,4 +1,5 @@
 import type { ChatMessage, ConversationMessage } from '@/types/chat';
+import { hasUnresolvedDraftEdits } from '@/lib/utils/draft-edits';
 import type { EngineMessage } from './types';
 
 /** The server's prefix on a row id read from history (`msg_{id}`). */
@@ -54,6 +55,45 @@ export function adoptServerFields(
     if (Object.keys(fields).length === 0) return row;
     changed = true;
     return { ...row, ...fields } as EngineMessage;
+  });
+  return changed ? next : (rows as EngineMessage[]);
+}
+
+/**
+ * Give an answer on screen the server's word on its draft edits (Tester
+ * 394c79d9, Techlead 53aeb072). An answer is drawn from the stream as Lawexa
+ * wrote it, `<draft-edit>` blocks and all; the server applies them after the
+ * answer is saved, in a job, and the transcript then reads each one as the
+ * version it made, or marks it failed (lib/utils/draft-edits.ts). The merge
+ * only adds rows, so without this the answer kept its edits as written, and a
+ * failed one read "Changes to …" until the chat was opened again.
+ *
+ * The server's copy is found by the answer's saved id (a row this engine drew)
+ * or its own row id (one read from history before the job ran). Its text and
+ * the edits' base texts are taken only once the copy has no edit left
+ * unanswered; until then the row stays as it is. Returns the same array when
+ * nothing changed.
+ */
+export function adoptDraftEditResults(
+  rows: readonly EngineMessage[],
+  serverRows: readonly ConversationMessage[],
+): EngineMessage[] {
+  const copies = new Map<string, ChatMessage>();
+  for (const row of serverRows) {
+    if (row.role !== 'assistant' || !row.id.startsWith(SERVER_ROW_PREFIX)) continue;
+    copies.set(row.id, row as ChatMessage);
+  }
+  if (copies.size === 0) return rows as EngineMessage[];
+
+  let changed = false;
+  const next = rows.map((row) => {
+    if (row.role !== 'assistant') return row;
+    const local = row as EngineMessage & ChatMessage;
+    if (local.isStreaming || typeof local.content !== 'string' || !hasUnresolvedDraftEdits(local.content)) return row;
+    const copy = copies.get(row.id.startsWith(SERVER_ROW_PREFIX) ? row.id : `${SERVER_ROW_PREFIX}${row.savedId ?? ''}`);
+    if (!copy || typeof copy.content !== 'string' || hasUnresolvedDraftEdits(copy.content) || copy.content === local.content) return row;
+    changed = true;
+    return { ...row, content: copy.content, draftEditBases: copy.draftEditBases } as EngineMessage;
   });
   return changed ? next : (rows as EngineMessage[]);
 }

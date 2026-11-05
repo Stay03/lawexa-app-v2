@@ -76,7 +76,7 @@ import type {
   StreamSmoothingConfig,
 } from './types';
 import { answerMessageId, stampAnswerId } from './answer-id';
-import { adoptServerFields } from './server-fields';
+import { adoptDraftEditResults, adoptServerFields } from './server-fields';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isTurnRow, lastTurnRow } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
@@ -1120,7 +1120,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     dedupKeys = dedupFromHistory(data.messages);
     // The questions this engine drew take the fields only the server's copies
     // have: who they tag, who asked (server-fields.ts). Their ids stay local.
-    const enriched = adoptServerFields(state.messages, next);
+    // An answer on screen takes the server's word on its draft edits (server-fields.ts).
+    const enriched = adoptDraftEditResults(adoptServerFields(state.messages, next), next);
     // The snapshot's lines (the draft "edited" line), each in its place in time:
     // new ones placed, held ones refreshed by id, ones the server took away gone.
     const lined = applySnapshotEvents(state.messages, next, unconfirmedEventIds);
@@ -1131,7 +1132,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // return value still says whether TURNS were added; a line alone is not one.
     setState((prev) => ({
       ...prev,
-      messages: [...applySnapshotEvents([...adoptServerFields(prev.messages, next), ...added], next, unconfirmedEventIds)],
+      messages: [...applySnapshotEvents([...adoptDraftEditResults(adoptServerFields(prev.messages, next), next), ...added], next, unconfirmedEventIds)],
       conversationTitle: data.title || prev.conversationTitle,
     }));
     return added.length > 0;

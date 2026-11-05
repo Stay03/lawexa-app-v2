@@ -99,3 +99,27 @@ export function resolveDraftEdits(content: string, edits: Record<string, DraftEd
     return `<draft title="${encodeTitle(result.title?.trim() || 'Draft')}" id="${id}" version="${version}"${font}${size} from-edit="true">\n${result.body}\n</draft>`;
   });
 }
+
+/**
+ * Whether an answer still holds a complete `<draft-edit>` the server has not
+ * answered for: neither written out as a version nor marked failed. The server
+ * applies edits in a job after the answer is saved (SyncDraftNotes), so an
+ * answer read straight after it ends, live or from history, holds its edits as
+ * Lawexa wrote them until the transcript is read again (Tester 394c79d9: a
+ * failed edit still read as applied).
+ */
+export function hasUnresolvedDraftEdits(content: string): boolean {
+  if (!content.includes('<draft-edit')) return false;
+  for (const match of content.matchAll(EDIT)) {
+    if (!/\sfailed="true"/i.test(match[1] ?? '')) return true;
+  }
+  return false;
+}
+
+/** How long after an answer ends the transcript is read again while its edits are unanswered: about a minute in all. */
+export const DRAFT_EDIT_RECHECK_MS = [2_000, 4_000, 8_000, 15_000, 30_000] as const;
+
+/** The wait before the next read, or null once the reads are spent. */
+export function draftEditRecheckDelay(attempt: number): number | null {
+  return DRAFT_EDIT_RECHECK_MS[attempt] ?? null;
+}
