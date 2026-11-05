@@ -78,7 +78,8 @@ export function DraftPanel({
   const conversationId = chat?.conversationId;
   const panel = useSidePanel();
   const space = panel?.space ?? null;
-  const [showChanges, setShowChanges] = useState(() => rememberedShowChanges);
+  // The reader's choice on this version, once they make one; until then the last one they made.
+  const [showChangesChoice, setShowChanges] = useState<boolean | null>(null);
 
   const savedMessage = 'messageId' in place ? messages.find((candidate) => candidate.id === place.messageId) : undefined;
   // The answer holding the draft has ended, and so is saved: the server saves it before it
@@ -126,7 +127,18 @@ export function DraftPanel({
   // version before, both as Lawexa wrote them and both finished.
   const previous =
     version && version.version >= 2 ? draftAt(messages, version.ordinals[version.version - 2]) : null;
-  const comparable = draft.complete && previous?.complete === true;
+  // A version made by an edit to part of the draft (thread 803b7234) is
+  // compared against the exact text the edit was applied to, the person's own
+  // edited text when they changed it (Techlead 3f293dc2), so their own edits
+  // are never shown as Lawexa's; it opens showing its changes, which are what
+  // the reader asked for. Without that text it is read like a whole version.
+  const editBase =
+    draft.fromEdit && draft.id && draft.version && savedMessage && !isEventMessage(savedMessage)
+      ? (savedMessage.draftEditBases?.[`${draft.id}:${draft.version}`] ?? null)
+      : null;
+  const before = editBase ?? (previous?.complete ? previous.body : null);
+  const comparable = draft.complete && before !== null;
+  const showChanges = showChangesChoice ?? (editBase !== null || rememberedShowChanges);
   const changes = comparable
     ? {
         on: showChanges,
@@ -138,7 +150,7 @@ export function DraftPanel({
     : null;
   const versionSwitch = <DraftVersionSwitch version={version} changes={changes} />;
 
-  if (comparable && showChanges && previous && version) {
+  if (comparable && showChanges && before !== null && version) {
     return (
       <ChatSidePanel
         label="Draft"
@@ -153,7 +165,7 @@ export function DraftPanel({
           <div data-v2-draft-scroll className="v2-quiet-scroll min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
             <div className={DRAFT_DOCUMENT}>
               <DraftChangesView
-                before={previous.body}
+                before={before}
                 after={draft.body}
                 font={{ font: draft.font, size: draft.size }}
                 previousNumber={version.version - 1}

@@ -69,8 +69,10 @@ test('the panel offers Show changes from version 2 on, off by default, and draws
   const panel = read('DraftPanel.tsx');
   assert.match(panel, /let rememberedShowChanges = false;/);
   assert.match(panel, /version && version\.version >= 2 \? draftAt\(messages, version\.ordinals\[version\.version - 2\]\) : null;/);
-  assert.match(panel, /const comparable = draft\.complete && previous\?\.complete === true;/);
-  assert.match(panel, /<DraftChangesView\s+before=\{previous\.body\}\s+after=\{draft\.body\}/);
+  // Against the version before, both finished; a version made by an edit against its base text (draft-edits.test.ts).
+  assert.match(panel, /const before = editBase \?\? \(previous\?\.complete \? previous\.body : null\);/);
+  assert.match(panel, /const comparable = draft\.complete && before !== null;/);
+  assert.match(panel, /<DraftChangesView\s+before=\{before\}\s+after=\{draft\.body\}/);
   const strip = read('DraftVersionSwitch.tsx');
   assert.match(strip, /\{changes \? \(\s*<label[^>]*>\s*<Switch checked=\{changes\.on\} onCheckedChange=\{changes\.onChange\} \/>\s*Show changes/);
   const view = read('DraftChangesView.tsx');

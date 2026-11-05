@@ -65,6 +65,12 @@ export interface DraftBlock {
   id: string | null;
   /** The version number Lawexa gave it; `null` without one. The app counts versions itself. */
   version: number | null;
+  /**
+   * The version was made by an edit to part of the draft, which the
+   * transcript's reader wrote out whole (`from-edit="true"`,
+   * lib/utils/draft-edits.ts): the panel opens it showing its changes.
+   */
+  fromEdit?: true;
 }
 
 /** One find/replace pair of an edit; `replace` is empty for a deletion. */
@@ -83,6 +89,12 @@ export interface DraftEditBlock {
   pairs: DraftEditPair[];
   /** The closing tag has arrived. */
   complete: boolean;
+  /**
+   * The server could not make the change (a passage was not found exactly
+   * once), so it made no version: `failed="true"`, which the transcript's
+   * reader writes onto it (lib/utils/draft-edits.ts).
+   */
+  failed: boolean;
 }
 
 export type DraftPart =
@@ -120,6 +132,18 @@ function draftVersionNumber(raw: string | null): number | null {
   return version >= 1 ? version : null;
 }
 
+/**
+ * Where `tag` next starts in `text` from `from`, in any case; -1 when it does
+ * not. Searched in the text itself: lower-casing it first can change its
+ * length (an "İ" becomes two code units), and every slice after it would be
+ * off (Techlead's review, 5e5b3216).
+ */
+function indexOfTag(text: string, tag: string, from: number): number {
+  const pattern = new RegExp(tag.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'), 'gi');
+  pattern.lastIndex = from;
+  return pattern.exec(text)?.index ?? -1;
+}
+
 /** `text` without a closing tag still being written at its very end (`</fi`, `</draft-e`). */
 function withoutPartialClose(text: string, close: string): string {
   const at = text.lastIndexOf('<');
@@ -148,7 +172,7 @@ function editPairs(body: string, streaming: boolean): DraftEditPair[] {
     const findOpen = /^\s*<find>/i.exec(body.slice(at));
     if (!findOpen) return pairs;
     const findStart = at + findOpen[0].length;
-    const findEnd = body.toLowerCase().indexOf('</find>', findStart);
+    const findEnd = indexOfTag(body, '</find>', findStart);
     if (findEnd < 0) {
       if (streaming) pairs.push({ find: pairText(withoutPartialClose(body.slice(findStart), '</find>'), false), replace: '', complete: false });
       return pairs;
@@ -161,7 +185,7 @@ function editPairs(body: string, streaming: boolean): DraftEditPair[] {
       return pairs;
     }
     const replaceStart = at + replaceOpen[0].length;
-    const replaceEnd = body.toLowerCase().indexOf('</replace>', replaceStart);
+    const replaceEnd = indexOfTag(body, '</replace>', replaceStart);
     if (replaceEnd < 0) {
       if (streaming) pairs.push({ find, replace: pairText(withoutPartialClose(body.slice(replaceStart), '</replace>'), false), complete: false });
       return pairs;
@@ -203,7 +227,7 @@ export function splitDrafts(content: string, streaming = false): DraftPart[] {
       const before = content.slice(cursor, editOpen.index);
       if (before.trim()) parts.push({ kind: 'text', text: before });
       const bodyStart = editOpen.index + editOpen[0].length;
-      const closeAt = content.toLowerCase().indexOf(EDIT_CLOSE, bodyStart);
+      const closeAt = indexOfTag(content, EDIT_CLOSE, bodyStart);
       const body = content.slice(bodyStart, closeAt < 0 ? content.length : closeAt);
       const attributes = editOpen[1] ?? '';
       parts.push({
@@ -213,6 +237,7 @@ export function splitDrafts(content: string, streaming = false): DraftPart[] {
           version: draftVersionNumber(attribute(attributes, 'version')),
           pairs: editPairs(body, closeAt < 0 && streaming),
           complete: closeAt >= 0,
+          failed: attribute(attributes, 'failed') === 'true',
         },
       });
       if (closeAt < 0) return parts;
@@ -245,6 +270,7 @@ export function splitDrafts(content: string, streaming = false): DraftPart[] {
         size: noteSize(attribute(rest, 'size')),
         id: draftId(attribute(rest, 'id')),
         version: draftVersionNumber(attribute(rest, 'version')),
+        ...(attribute(rest, 'from-edit') === 'true' && { fromEdit: true as const }),
       },
     });
     if (closeAt < 0) return parts;
@@ -289,6 +315,7 @@ export function draftStatus(draft: DraftBlock, live: boolean): string {
  * stopped inside it.
  */
 export function draftEditStatus(edit: DraftEditBlock, live: boolean): string {
+  if (edit.failed) return 'No new version';
   const count = edit.pairs.length;
   const changes = count === 0 ? 'No changes yet' : `${count} ${count === 1 ? 'change' : 'changes'}`;
   if (edit.complete) return count === 0 ? 'No changes' : changes;

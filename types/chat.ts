@@ -69,6 +69,14 @@ export interface ChatMessage {
    */
   kind?: 'radar_report';
   /**
+   * The text each of the answer's edits was applied to, by "id:version": the
+   * person's own edited text when they changed the draft, else Lawexa's
+   * version (the server's `draft_edits[…].base_body`). The panel compares a
+   * version made by an edit against it, so the person's own edits are never
+   * shown as Lawexa's. Absent when the server sends none.
+   */
+  draftEditBases?: Record<string, string>;
+  /**
    * The message this turn answers (space chat replies, 14 October 2026): the
    * server's {@link ApiMessage.reply_to}, or, on the row this client drew, the
    * target the writer picked. Absent when the turn replies to nothing.
@@ -708,6 +716,11 @@ export interface ApiMessage {
       | 'narration'
       | 'radar_report'
       | 'draft_edit';
+    /**
+     * On an answer: each `<draft-edit>` it holds, applied by the server once
+     * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).
+     */
+    draft_edits?: Record<string, import('@/lib/utils/draft-edits').DraftEditResult>;
     /** On a `draft_edit` event row: the draft's note (an id; notes have no uuid), its title then, and who edited it. */
     note_id?: number;
     draft_title?: string;
