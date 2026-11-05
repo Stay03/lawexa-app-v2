@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import {
   CAMPAIGN_LINE,
+  PERSONAS,
   formatClock,
   formatCount,
   formatWords,
@@ -19,7 +20,7 @@ import {
 } from '@/lib/wrapped/copy';
 import { FRAME_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide } from '@/lib/wrapped/story-model';
 import { fitText, wrapWords } from '@/lib/wrapped/text-fit';
-import { SHARE_LAYOUT, corsPhotoUrl, shownStickers } from '@/lib/wrapped/share-image';
+import { SHARE_LAYOUT, corsPhotoUrl, personaBanner, shownStickers } from '@/lib/wrapped/share-image';
 import { POLAROID, SHARE_HEIGHT, wrappedArt } from '@/lib/wrapped/theme';
 import { wrappedSignedIn } from '@/lib/wrapped/access';
 import type { WrappedRecord } from '@/lib/wrapped/types';
@@ -215,4 +216,22 @@ test('the share card is drawn even when a fallback font face cannot load (no Ari
   const frame = readFileSync(join(process.cwd(), 'components', 'wrapped', 'ShareFrame.tsx'), 'utf8');
   assert.match(frame, /await Promise\.allSettled\(\[document\.fonts\.load\(/);
   assert.doesNotMatch(frame, /await Promise\.all\(\[document\.fonts\.load\(/);
+});
+
+test('every persona fits its banner, 48 px clear of the card’s right edge and above the stickers (Techlead 61f7c6f8)', () => {
+  // Unbounded 900 is wide: about 0.82 of the size per letter, a little more than the real face measures.
+  const unbounded = (text: string, size: number) => text.length * size * 0.82;
+  const turn = (SHARE_LAYOUT.persona.rotationDeg * Math.PI) / 180;
+  for (const { name } of Object.values(PERSONAS)) {
+    const banner = personaBanner(name, unbounded);
+    assert.ok(banner.right <= 1080 - 48, `${name} ends ${1080 - banner.right} px from the edge`);
+    assert.ok(banner.lines.length <= 2 && banner.size >= 26, name);
+    assert.equal(banner.lines.join(' '), name, 'no word is lost or split');
+    for (const line of banner.lines) assert.ok(unbounded(line, banner.size) <= banner.w - SHARE_LAYOUT.persona.pad * 2, `${name}: "${line}" fits inside`);
+    const lowest = banner.cy + (banner.h * Math.cos(turn) + banner.w * Math.sin(turn)) / 2;
+    assert.ok(lowest < SHARE_LAYOUT.bottom.y, `${name} stays above the stickers`);
+  }
+  // The default persona, on 57% of cards, takes two lines; a short name stays on one at full size.
+  assert.equal(personaBanner('The Steady Learned Friend', unbounded).lines.length, 2);
+  assert.deepEqual(personaBanner('The Don', unbounded), { ...personaBanner('The Don', unbounded), size: 40, lines: ['The Don'] });
 });
