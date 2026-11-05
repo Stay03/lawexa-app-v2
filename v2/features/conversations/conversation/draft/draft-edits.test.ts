@@ -150,12 +150,12 @@ test('a resolved edit is read as the whole version it makes; the reply around it
   });
   // A draft Lawexa wrote whole is not marked.
   assert.equal(draftsIn(LEASE)[0].fromEdit, undefined);
-  // The panel compares a version made by an edit against the text it was applied to, and opens
-  // showing its changes; without that text it is a whole version, at the reader's last choice.
+  // The panel opens a version made by an edit showing its changes, against the person's edited
+  // text when the server sends it, else against the version before (Techlead a9c46e69).
   const panel = read('DraftPanel.tsx');
   assert.match(panel, /savedMessage\.draftEditBases\?\.\[`\$\{draft\.id\}:\$\{draft\.version\}`\]/);
   assert.match(panel, /const before = editBase \?\? \(previous\?\.complete \? previous\.body : null\);/);
-  assert.match(panel, /const showChanges = showChangesChoice \?\? \(editBase !== null \|\| rememberedShowChanges\);/);
+  assert.match(panel, /const showChanges = showChangesChoice \?\? \(draft\.fromEdit === true \|\| rememberedShowChanges\);/);
   assert.match(panel, /before=\{before\}/);
   // So it is version 2 of the draft, like any version.
   const index = draftVersionIndex([

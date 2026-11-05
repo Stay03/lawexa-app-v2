@@ -127,18 +127,19 @@ export function DraftPanel({
   // version before, both as Lawexa wrote them and both finished.
   const previous =
     version && version.version >= 2 ? draftAt(messages, version.ordinals[version.version - 2]) : null;
-  // A version made by an edit to part of the draft (thread 803b7234) is
-  // compared against the exact text the edit was applied to, the person's own
-  // edited text when they changed it (Techlead 3f293dc2), so their own edits
-  // are never shown as Lawexa's; it opens showing its changes, which are what
-  // the reader asked for. Without that text it is read like a whole version.
+  // A version made by an edit to part of the draft (thread 803b7234) opens
+  // showing its changes, which are what the reader asked for. It is compared
+  // against the exact text the edit was applied to: the person's own edited
+  // text, which the server sends only when they changed the version before
+  // (Techlead 3f293dc2, a9c46e69), so their edits are never shown as Lawexa's;
+  // else that version as Lawexa wrote it.
   const editBase =
     draft.fromEdit && draft.id && draft.version && savedMessage && !isEventMessage(savedMessage)
       ? (savedMessage.draftEditBases?.[`${draft.id}:${draft.version}`] ?? null)
       : null;
   const before = editBase ?? (previous?.complete ? previous.body : null);
   const comparable = draft.complete && before !== null;
-  const showChanges = showChangesChoice ?? (editBase !== null || rememberedShowChanges);
+  const showChanges = showChangesChoice ?? (draft.fromEdit === true || rememberedShowChanges);
   const changes = comparable
     ? {
         on: showChanges,
