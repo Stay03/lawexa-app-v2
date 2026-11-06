@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Pause, Play, X } from 'lucide-react';
 
+import { wrappedApi } from '@/lib/api/wrapped';
+import { createProgressTracker } from '@/lib/wrapped/progress';
 import { FRAME_THEMES } from '@/lib/wrapped/theme';
 import { HOLD_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide } from '@/lib/wrapped/story-model';
 import type { ShareFonts } from '@/lib/wrapped/share-image';
@@ -23,6 +25,17 @@ export function WrappedStory({ record, fonts, onClose }: { record: WrappedRecord
   const count = frames.length;
   const [state, dispatch] = useReducer((current: ReturnType<typeof initialStory>, action: Parameters<typeof storyReducer>[2]) => storyReducer(count, current, action), undefined, initialStory);
   const slide = frames[state.index] ?? 8;
+
+  // The view counts (lib/wrapped/progress.ts): opened, each card shown, the
+  // end reached, each share. Fire-and-forget, once per visit, never in the way.
+  const [tracker] = useState(() => createProgressTracker(wrappedApi.progress));
+  useEffect(() => {
+    tracker.open();
+  }, [tracker]);
+  useEffect(() => {
+    tracker.card(slide);
+    if (state.index === count - 1) tracker.finish();
+  }, [tracker, slide, state.index, count]);
   const ground = FRAME_THEMES[slide].ground;
 
   // The clock: one animation frame at a time, so a paused or hidden tab costs nothing.
@@ -134,7 +147,7 @@ export function WrappedStory({ record, fonts, onClose }: { record: WrappedRecord
           onPointerLeave={onPointerCancel}
           onContextMenu={(event) => event.preventDefault()}
         >
-          {slide === 8 ? <ShareFrame record={record} fonts={fonts} /> : <StoryFrame key={slide} slide={slide} record={record} />}
+          {slide === 8 ? <ShareFrame record={record} fonts={fonts} onShared={tracker.share} /> : <StoryFrame key={slide} slide={slide} record={record} />}
         </div>
       </div>
     </div>

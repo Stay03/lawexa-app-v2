@@ -308,35 +308,63 @@ test('the word follows the number shown, not the raw value (Tester 11ad1a73: 0.6
   assert.match(frames, /isOne\(draft\.novels\) \? 'novel' : 'novels'/);
 });
 
-/* Wrapped view tracking (Techlead 462b8946). TEST DATA. */
+/* Wrapped view tracking (Techlead 462b8946, Backend's contract e717a1af). TEST DATA. */
 
-test('each progress event is sent once per visit, and once per card', async () => {
+test('open, each card and finish go once per visit; a share goes every time it succeeds', async () => {
   const { createProgressTracker } = await import('@/lib/wrapped/progress');
   const sent: string[] = [];
   const tracker = createProgressTracker((progress) => {
-    sent.push(`${progress.event}:${progress.card}`);
+    sent.push(progress.event === 'card' ? `card:${progress.card}` : progress.event);
   });
-  tracker.open(1);
-  tracker.open(1);
+  tracker.open();
+  tracker.open();
   tracker.card(1);
-  tracker.card(2);
+  tracker.card(7);
   tracker.card(1);
   tracker.card(8);
-  tracker.finish(8);
-  tracker.finish(8);
-  tracker.share(8);
-  tracker.share(8);
-  assert.deepEqual(sent, ['open:1', 'card:1', 'card:2', 'card:8', 'finish:8', 'share:8']);
+  tracker.finish();
+  tracker.finish();
+  tracker.share();
+  tracker.share();
+  assert.deepEqual(sent, ['open', 'card:1', 'card:7', 'card:8', 'finish', 'share', 'share']);
+});
+
+test('the body follows the contract: card only on "card"', async () => {
+  const { createProgressTracker } = await import('@/lib/wrapped/progress');
+  const bodies: unknown[] = [];
+  const tracker = createProgressTracker((progress) => {
+    bodies.push(progress);
+  });
+  tracker.open();
+  tracker.card(3);
+  tracker.finish();
+  tracker.share();
+  assert.deepEqual(bodies, [{ event: 'open' }, { event: 'card', card: 3 }, { event: 'finish' }, { event: 'share' }]);
 });
 
 test('a failed or throwing send never reaches the story', async () => {
   const { createProgressTracker } = await import('@/lib/wrapped/progress');
   const rejecting = createProgressTracker(() => Promise.reject(new Error('TEST offline')));
-  assert.doesNotThrow(() => rejecting.open(1));
+  assert.doesNotThrow(() => rejecting.open());
   const throwing = createProgressTracker(() => {
     throw new Error('TEST bad');
   });
   assert.doesNotThrow(() => throwing.card(2));
+  assert.doesNotThrow(() => throwing.share());
   // Let the rejected promise settle: an unhandled rejection would fail the run.
   await new Promise((resolve) => setTimeout(resolve, 10));
+});
+
+test('the story reports its steps, and a lapsed session is never sent to sign in mid-story', () => {
+  const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+  const api = read('lib', 'api', 'wrapped.ts');
+  assert.match(api, /apiClient\.post\('\/wrapped\/me\/progress', step, \{ headers: \{ 'X-Silent-Auth': 'true' \} \}\)/);
+  const story = read('components', 'wrapped', 'WrappedStory.tsx');
+  assert.match(story, /useState\(\(\) => createProgressTracker\(wrappedApi\.progress\)\)/);
+  assert.match(story, /tracker\.card\(slide\);\s*if \(state\.index === count - 1\) tracker\.finish\(\);/);
+  assert.match(story, /<ShareFrame record=\{record\} fonts=\{fonts\} onShared=\{tracker\.share\} \/>/);
+  const share = read('components', 'wrapped', 'ShareFrame.tsx');
+  // After the share sheet resolves (not on a cancel), and after each download.
+  assert.match(share, /await navigator\.share\(\{[^}]*\}\);\s*onShared\?\.\(\);/);
+  assert.equal(share.match(/download\(poster\.url, poster\.file\.name\);\s*onShared\?\.\(\);/g)?.length, 2);
 });
