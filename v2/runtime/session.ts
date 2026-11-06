@@ -6,6 +6,7 @@ import { apiFetch } from './api-server';
 import { resolveSessionWith, type SessionResolution } from './session-resolve';
 import { getSessionToken } from './session-token';
 import { onboardingFinished } from './onboarding-finished';
+import { mayHaveWrapped } from '@/lib/wrapped/access';
 
 export { getSessionToken };
 
@@ -108,6 +109,15 @@ export interface SessionUser {
    * browser mark then decides (redesign-intro/model.ts).
    */
   v2_intro_seen: boolean;
+  /**
+   * Whether this profile names a Law School, so the Wrapped entry points ask
+   * `/wrapped/me` (lib/wrapped/access.ts), read fresh on each page load. The
+   * copy of the user saved at sign-in goes stale: a student whose Law School
+   * was set after they signed in was never asked (Tester a710ccc3).
+   */
+  may_have_wrapped: boolean;
+  /** "Hide from Wrapped", top-level on `/auth/me`; `false` when not sent. */
+  wrapped_hidden: boolean;
 }
 
 export interface SessionDTO {
@@ -116,7 +126,7 @@ export interface SessionDTO {
 
 /** The minimal DTO from an `/auth/me` answer, or null when it names no user. */
 function toSessionDTO(
-  data: { user?: User; is_ambassador?: boolean; can_access_team_channels?: boolean } | null | undefined,
+  data: { user?: User; is_ambassador?: boolean; can_access_team_channels?: boolean; wrapped_hidden?: boolean } | null | undefined,
 ): SessionDTO | null {
   const user = data?.user;
   if (!user) return null;
@@ -142,6 +152,8 @@ function toSessionDTO(
       onboarding_complete: onboardingFinished(user.profile),
       is_verified_author: user.is_verified_author === true,
       v2_intro_seen: typeof user.v2_intro_seen_at === 'string' && user.v2_intro_seen_at !== '',
+      may_have_wrapped: mayHaveWrapped(user),
+      wrapped_hidden: data?.wrapped_hidden === true,
     },
   };
 }
@@ -160,7 +172,7 @@ export const resolveSession = cache(async (): Promise<SessionResolution<SessionD
   const token = await getSessionToken();
   return resolveSessionWith(token, async (signal) => {
     const result = await apiFetch<
-      ApiResponse<{ user: User; is_ambassador?: boolean; can_access_team_channels?: boolean }>
+      ApiResponse<{ user: User; is_ambassador?: boolean; can_access_team_channels?: boolean; wrapped_hidden?: boolean }>
     >('/auth/me', { signal });
     return { user: toSessionDTO(result.data) };
   });

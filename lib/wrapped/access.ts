@@ -29,6 +29,14 @@ export function mayHaveWrapped(
 }
 
 /**
+ * Whether the Wrapped entry points ask `/wrapped/me`: signed in, a Law School
+ * profile, and not hidden. Pure, so a test pins the rule.
+ */
+export function wrappedAskable(state: { signedIn: boolean; lawSchool: boolean; hidden: boolean }): boolean {
+  return state.signedIn && state.lawSchool && !state.hidden;
+}
+
+/**
  * Signed in for Wrapped: a token and a user, not a guest. The /wrapped route
  * and its query use this one rule, so the page never waits on a query that is
  * not asked (a token whose user has not loaded).

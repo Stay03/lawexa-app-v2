@@ -31,6 +31,8 @@ const user = (over: Partial<SessionUser> = {}): SessionUser => ({
   onboarding_complete: true,
   is_verified_author: false,
   v2_intro_seen: false,
+  may_have_wrapped: false,
+  wrapped_hidden: false,
   ...over,
 });
 

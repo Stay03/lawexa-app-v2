@@ -159,6 +159,14 @@ export interface V2SessionSnapshot {
    * signed out or not sent.
    */
   readonly isVerifiedAuthor: boolean;
+  /**
+   * Whether the profile names a Law School, from this page load's `/auth/me`:
+   * the Wrapped entry points ask `/wrapped/me` on it (v2/features/wrapped).
+   * `false` when signed out.
+   */
+  readonly mayHaveWrapped: boolean;
+  /** "Hide from Wrapped", from the same `/auth/me`. `false` when signed out or not sent. */
+  readonly wrappedHidden: boolean;
 }
 
 /**
@@ -196,6 +204,8 @@ export function V2SessionProvider({
   isLawyer,
   canAccessTeamChannels,
   isVerifiedAuthor,
+  mayHaveWrapped,
+  wrappedHidden,
   children,
 }: V2SessionSnapshot & { children: React.ReactNode }) {
   const value = useMemo<V2SessionSnapshot>(
@@ -217,6 +227,8 @@ export function V2SessionProvider({
       isLawyer,
       canAccessTeamChannels,
       isVerifiedAuthor,
+      mayHaveWrapped,
+      wrappedHidden,
     }),
     [
       signedIn,
@@ -236,6 +248,8 @@ export function V2SessionProvider({
       isLawyer,
       canAccessTeamChannels,
       isVerifiedAuthor,
+      mayHaveWrapped,
+      wrappedHidden,
     ],
   );
 
