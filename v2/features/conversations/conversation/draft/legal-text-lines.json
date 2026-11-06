@@ -1,0 +1,288 @@
+{
+  "version": 3,
+  "about": "Lawexa draft legal text: each case is a draft body (markdown), the canonical HTML every reader must produce from it (html), and the text an edit's find is matched against (plain). Spec: thread 384c 79af858a, revised 8ee0785c. Byte-identical copies in lawexa-api tests/Fixtures/legal-text/lines.json and the app's v2/features/conversations/conversation/draft/legal-text-lines.json.",
+  "cases": [
+    {
+      "id": "blank-inline-with-bold",
+      "markdown": "THIS AGREEMENT is made this ______ day of ______________, 20____ BETWEEN **TEST DATA Lender Ltd** of ____________________",
+      "html": "<p>THIS AGREEMENT is made this ______ day of ______________, 20____ BETWEEN <strong>TEST DATA Lender Ltd</strong> of ____________________</p>",
+      "plain": "THIS AGREEMENT is made this ______ day of ______________, 20____ BETWEEN **TEST DATA Lender Ltd** of ____________________"
+    },
+    {
+      "id": "signing-line-alone",
+      "markdown": "____________________",
+      "html": "<p>____________________</p>",
+      "plain": "____________________"
+    },
+    {
+      "id": "signing-line-spaced",
+      "markdown": "_ _ _ _ _ _",
+      "html": "<p>_ _ _ _ _ _</p>",
+      "plain": "_ _ _ _ _ _"
+    },
+    {
+      "id": "signing-and-date-on-one-line",
+      "markdown": "Signed: ____________   Date: ________",
+      "html": "<p>Signed: ____________   Date: ________</p>",
+      "plain": "Signed: ____________   Date: ________"
+    },
+    {
+      "id": "underscores-never-format",
+      "markdown": "file_ref_2026, _not italic_ and __not bold__",
+      "html": "<p>file_ref_2026, _not italic_ and __not bold__</p>",
+      "plain": "file_ref_2026, _not italic_ and __not bold__"
+    },
+    {
+      "id": "blank-inside-bold",
+      "markdown": "**Name: ____________**",
+      "html": "<p><strong>Name: ____________</strong></p>",
+      "plain": "**Name: ____________**"
+    },
+    {
+      "id": "stars-format",
+      "markdown": "**Bold**, *italic* and ***both***",
+      "html": "<p><strong>Bold</strong>, <em>italic</em> and <em><strong>both</strong></em></p>",
+      "plain": "**Bold**, *italic* and ***both***"
+    },
+    {
+      "id": "lone-stars-are-text",
+      "markdown": "Rent* is payable. 5 * 3 = 15\n*Delete as appropriate",
+      "html": "<p>Rent* is payable. 5 * 3 = 15<br>*Delete as appropriate</p>",
+      "plain": "Rent* is payable. 5 * 3 = 15\n*Delete as appropriate"
+    },
+    {
+      "id": "clause-numbers-are-text",
+      "markdown": "1. Definitions\n1.1 In this Agreement:\n(a) \"Rent\" means the yearly rent;\n(i) payable in advance.",
+      "html": "<p data-hang=\"1\">1. Definitions</p><p data-hang=\"1\">1.1 In this Agreement:</p><p data-hang=\"1\">(a) \"Rent\" means the yearly rent;</p><p data-hang=\"1\">(i) payable in advance.</p>",
+      "plain": "1. Definitions\n1.1 In this Agreement:\n(a) \"Rent\" means the yearly rent;\n(i) payable in advance."
+    },
+    {
+      "id": "clause-numbers-as-paragraphs",
+      "markdown": "1. Term\n\n2. Rent\n\n10. Notices",
+      "html": "<p data-hang=\"1\">1. Term</p><p data-hang=\"1\">2. Rent</p><p data-hang=\"1\">10. Notices</p>",
+      "plain": "1. Term\n\n2. Rent\n\n10. Notices"
+    },
+    {
+      "id": "clause-number-with-bracket",
+      "markdown": "2) Payment shall be made within 14 days.",
+      "html": "<p data-hang=\"1\">2) Payment shall be made within 14 days.</p>",
+      "plain": "2) Payment shall be made within 14 days."
+    },
+    {
+      "id": "legacy-escaped-clause-number",
+      "markdown": "1\\. Definitions\n2\\) Interpretation",
+      "html": "<p data-hang=\"1\">1. Definitions</p><p data-hang=\"1\">2) Interpretation</p>",
+      "plain": "1. Definitions\n2) Interpretation"
+    },
+    {
+      "id": "dash-bullets",
+      "markdown": "The Tenant shall:\n\n- pay the rent;\n- keep the premises in repair.",
+      "html": "<p>The Tenant shall:</p><ul><li>pay the rent;</li><li>keep the premises in repair.</li></ul>",
+      "plain": "The Tenant shall:\n\n- pay the rent;\n- keep the premises in repair."
+    },
+    {
+      "id": "star-and-plus-at-line-start-are-text",
+      "markdown": "* Delete as appropriate\n+ VAT where applicable",
+      "html": "<p>* Delete as appropriate<br>+ VAT where applicable</p>",
+      "plain": "* Delete as appropriate\n+ VAT where applicable"
+    },
+    {
+      "id": "headings",
+      "markdown": "# DEED OF LEASE\n\n## 1. PARTIES\n\n#### Deeper heading",
+      "html": "<h1>DEED OF LEASE</h1><h2>1. PARTIES</h2><h3>Deeper heading</h3>",
+      "plain": "# DEED OF LEASE\n\n## 1. PARTIES\n\n#### Deeper heading"
+    },
+    {
+      "id": "hash-mid-line-is-text",
+      "markdown": "Plot #5, Suit No. #FHC/L/CS/12/2026 and #hashtag",
+      "html": "<p>Plot #5, Suit No. #FHC/L/CS/12/2026 and #hashtag</p>",
+      "plain": "Plot #5, Suit No. #FHC/L/CS/12/2026 and #hashtag"
+    },
+    {
+      "id": "dash-rule-never-makes-a-heading",
+      "markdown": "Above the line\n---\nBelow the line",
+      "html": "<p>Above the line</p><hr><p>Below the line</p>",
+      "plain": "Above the line\n---\nBelow the line"
+    },
+    {
+      "id": "equals-line-is-text",
+      "markdown": "Title\n=====",
+      "html": "<p>Title<br>=====</p>",
+      "plain": "Title\n====="
+    },
+    {
+      "id": "star-rule",
+      "markdown": "End of Part A\n\n***\n\nPart B",
+      "html": "<p>End of Part A</p><hr><p>Part B</p>",
+      "plain": "End of Part A\n\n***\n\nPart B"
+    },
+    {
+      "id": "table",
+      "markdown": "| Item | Amount |\n|---|---|\n| Rent | N1,200,000 |\n| Service charge | N150,000 |",
+      "html": "<table><tbody><tr><th>Item</th><th>Amount</th></tr><tr><td>Rent</td><td>N1,200,000</td></tr><tr><td>Service charge</td><td>N150,000</td></tr></tbody></table>",
+      "plain": "| Item | Amount |\n|---|---|\n| Rent | N1,200,000 |\n| Service charge | N150,000 |"
+    },
+    {
+      "id": "bar-outside-a-table-is-text",
+      "markdown": "Option A | Option B",
+      "html": "<p>Option A | Option B</p>",
+      "plain": "Option A | Option B"
+    },
+    {
+      "id": "signature-block",
+      "markdown": "```signature\nSigned by the Landlord: ____________ | Signed by the Tenant: ____________\nName: | Name:\nDate: ________ | Date: ________\n```",
+      "html": "<table data-type=\"signature\"><tbody><tr><td>Signed by the Landlord: ____________</td><td>Signed by the Tenant: ____________</td></tr><tr><td>Name:</td><td>Name:</td></tr><tr><td>Date: ________</td><td>Date: ________</td></tr></tbody></table>",
+      "plain": "```signature\nSigned by the Landlord: ____________ | Signed by the Tenant: ____________\nName: | Name:\nDate: ________ | Date: ________\n```"
+    },
+    {
+      "id": "signature-escaped-bar-and-short-row",
+      "markdown": "```signature\nA \\| B Ltd | C Ltd\nWitness:\n```",
+      "html": "<table data-type=\"signature\"><tbody><tr><td>A | B Ltd</td><td>C Ltd</td></tr><tr><td>Witness:</td><td></td></tr></tbody></table>",
+      "plain": "```signature\nA | B Ltd | C Ltd\nWitness:\n```"
+    },
+    {
+      "id": "centred-title",
+      "markdown": "<p style=\"text-align: center\">**DEED OF ASSIGNMENT**</p>\n\nTHIS DEED is made this ______ day of ________ 20____",
+      "html": "<p style=\"text-align: center\"><strong>DEED OF ASSIGNMENT</strong></p><p>THIS DEED is made this ______ day of ________ 20____</p>",
+      "plain": "<p style=\"text-align: center\">**DEED OF ASSIGNMENT**</p>\n\nTHIS DEED is made this ______ day of ________ 20____"
+    },
+    {
+      "id": "right-aligned-with-break",
+      "markdown": "<p style=\"text-align: right\">TEST Chambers<br>12 Broad Street, Lagos</p>",
+      "html": "<p style=\"text-align: right\">TEST Chambers<br>12 Broad Street, Lagos</p>",
+      "plain": "<p style=\"text-align: right\">TEST Chambers<br>12 Broad Street, Lagos</p>"
+    },
+    {
+      "id": "schedule",
+      "markdown": "**SCHEDULE 1**\nThe Property\n1. All that piece of land at Plot 5, Lekki Phase 1, Lagos.\n2. The building on it.",
+      "html": "<p><strong>SCHEDULE 1</strong><br>The Property</p><p data-hang=\"1\">1. All that piece of land at Plot 5, Lekki Phase 1, Lagos.</p><p data-hang=\"1\">2. The building on it.</p>",
+      "plain": "**SCHEDULE 1**\nThe Property\n1. All that piece of land at Plot 5, Lekki Phase 1, Lagos.\n2. The building on it."
+    },
+    {
+      "id": "defined-terms-and-bracket-blanks",
+      "markdown": "\"Landlord\" means [PARTY A] of [ADDRESS] (the \"Landlord\").",
+      "html": "<p>\"Landlord\" means [PARTY A] of [ADDRESS] (the \"Landlord\").</p>",
+      "plain": "\"Landlord\" means [PARTY A] of [ADDRESS] (the \"Landlord\")."
+    },
+    {
+      "id": "tilde",
+      "markdown": "Interest of ~5% and ~~struck words~~",
+      "html": "<p>Interest of ~5% and <s>struck words</s></p>",
+      "plain": "Interest of ~5% and ~~struck words~~"
+    },
+    {
+      "id": "other-html-is-text",
+      "markdown": "Rent < N5m and a <b>tag</b> stay as typed",
+      "html": "<p>Rent &lt; N5m and a &lt;b&gt;tag&lt;/b&gt; stay as typed</p>",
+      "plain": "Rent < N5m and a <b>tag</b> stay as typed"
+    },
+    {
+      "id": "backslash-before-a-letter-is-text",
+      "markdown": "Saved at C:\\Users\\Lawexa",
+      "html": "<p>Saved at C:\\Users\\Lawexa</p>",
+      "plain": "Saved at C:\\Users\\Lawexa"
+    },
+    {
+      "id": "inline-code-keeps-underscores",
+      "markdown": "Ref `a___b` and a____b",
+      "html": "<p>Ref <code>a___b</code> and a____b</p>",
+      "plain": "Ref `a___b` and a____b"
+    },
+    {
+      "id": "link",
+      "markdown": "See [the Act](https://lawexa.com/statutes/1) and https://lawexa.com",
+      "html": "<p>See <a href=\"https://lawexa.com/statutes/1\">the Act</a> and <a href=\"https://lawexa.com\">https://lawexa.com</a></p>",
+      "plain": "See [the Act](https://lawexa.com/statutes/1) and https://lawexa.com"
+    },
+    {
+      "id": "indented-line-is-text",
+      "markdown": "    Indented clause text",
+      "html": "<p>    Indented clause text</p>",
+      "plain": "    Indented clause text"
+    },
+    {
+      "id": "plain-fence",
+      "markdown": "```\ncode_line *x* 1. a\n```",
+      "html": "<pre><code>code_line *x* 1. a</code></pre>",
+      "plain": "```\ncode_line *x* 1. a\n```"
+    },
+    {
+      "id": "number-after-bullet",
+      "markdown": "- 1. Pay the rent",
+      "html": "<ul><li>1. Pay the rent</li></ul>",
+      "plain": "- 1. Pay the rent"
+    },
+    {
+      "id": "indented-clause-number",
+      "markdown": "   1. Term",
+      "html": "<p data-hang=\"1\">1. Term</p>",
+      "plain": "   1. Term"
+    },
+    {
+      "id": "email-with-underscore",
+      "markdown": "Email john_doe@lawexa.test",
+      "html": "<p>Email <a href=\"mailto:john_doe@lawexa.test\">john_doe@lawexa.test</a></p>",
+      "plain": "Email john_doe@lawexa.test"
+    },
+    {
+      "id": "line-final-backslash",
+      "markdown": "Path: C:\\\nNext line",
+      "html": "<p>Path: C:\\<br>Next line</p>",
+      "plain": "Path: C:\\\nNext line"
+    },
+    {
+      "id": "quote",
+      "markdown": "> N5,000,000 in value\nRent > N1m",
+      "html": "<blockquote><p>N5,000,000 in value<br>Rent &gt; N1m</p></blockquote>",
+      "plain": "> N5,000,000 in value\nRent > N1m"
+    },
+    {
+      "id": "greater-than-mid-line-is-text",
+      "markdown": "Rent > N1m and < N5m",
+      "html": "<p>Rent &gt; N1m and &lt; N5m</p>",
+      "plain": "Rent > N1m and < N5m"
+    },
+    {
+      "id": "clause-with-continuation-line",
+      "markdown": "1. Term\nThe term is two years from the Commencement Date.\n2. Rent",
+      "html": "<p data-hang=\"1\">1. Term<br>The term is two years from the Commencement Date.</p><p data-hang=\"1\">2. Rent</p>",
+      "plain": "1. Term\nThe term is two years from the Commencement Date.\n2. Rent"
+    },
+    {
+      "id": "clause-after-plain-line",
+      "markdown": "The parties agree as follows:\n1. Rent is N1,200,000.\n(a) payable yearly.",
+      "html": "<p>The parties agree as follows:</p><p data-hang=\"1\">1. Rent is N1,200,000.</p><p data-hang=\"1\">(a) payable yearly.</p>",
+      "plain": "The parties agree as follows:\n1. Rent is N1,200,000.\n(a) payable yearly."
+    },
+    {
+      "id": "year-at-line-start-is-not-a-clause",
+      "markdown": "2026 rent is due in March.\n12 months from today.",
+      "html": "<p>2026 rent is due in March.<br>12 months from today.</p>",
+      "plain": "2026 rent is due in March.\n12 months from today."
+    },
+    {
+      "id": "clause-numbered-sub-levels",
+      "markdown": "1.1.2 The Tenant shall pay.\n(iv) on demand;\n(viii) in Naira.",
+      "html": "<p data-hang=\"1\">1.1.2 The Tenant shall pay.</p><p data-hang=\"1\">(iv) on demand;</p><p data-hang=\"1\">(viii) in Naira.</p>",
+      "plain": "1.1.2 The Tenant shall pay.\n(iv) on demand;\n(viii) in Naira."
+    },
+    {
+      "id": "legacy-escaped-underscores",
+      "markdown": "file\\_ref and \\_\\_not bold\\_\\_",
+      "html": "<p>file_ref and __not bold__</p>",
+      "plain": "file_ref and __not bold__"
+    },
+    {
+      "id": "clause-bracketed-number",
+      "markdown": "(12) The Landlord may re-enter.",
+      "html": "<p data-hang=\"1\">(12) The Landlord may re-enter.</p>",
+      "plain": "(12) The Landlord may re-enter."
+    },
+    {
+      "id": "clause-number-inside-aligned-line",
+      "markdown": "<p style=\"text-align: center\">1. Term</p>",
+      "html": "<p style=\"text-align: center\">1. Term</p>",
+      "plain": "<p style=\"text-align: center\">1. Term</p>"
+    }
+  ]
+}

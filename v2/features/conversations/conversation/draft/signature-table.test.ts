@@ -157,7 +157,7 @@ test('every surface draws the signing table without borders: one stylesheet, imp
 test('Show changes and the chat card draw a template draft as the panel does: aligned lines aligned, the signing table marked', () => {
   const view = read('conversations', 'conversation', 'draft', 'DraftChangesView.tsx');
   assert.match(view, /<table data-type=\{node\.attrs\?\.signature \? 'signature' : undefined\}>/);
-  assert.match(view, /case 'paragraph':\s*return <p key=\{key\} className=\{tone\} style=\{alignment\(node\)\}>/);
+  assert.match(view, /case 'paragraph':\s*return \(\s*<p key=\{key\} className=\{tone\} style=\{alignment\(node\)\}/);
   const card = read('conversations', 'conversation', 'draft', 'DraftCard.tsx');
   // Without a side panel the card reads the draft as the panel reads it, not as chat Markdown.
   assert.match(card, /<DraftDocument draft=\{draft\} \/>/);

@@ -1,0 +1,11 @@
+/* A numbered clause in a draft or note (legal-text rules R3, thread 384c):
+   `<p data-hang="1">`, its number kept in the text as typed, drawn with a
+   hanging indent so the clause's lines sit under its words and not under its
+   number, as in a printed agreement. The Word export draws the same indent
+   (left 0.5in, first line -0.5in). One rule for the reader, the draft panel,
+   Show changes and both editors. */
+
+:is(.v2-note-fonts, .ProseMirror) p[data-hang='1'] {
+  padding-left: 2em;
+  text-indent: -2em;
+}

@@ -85,13 +85,145 @@ const NO_FONT: DraftFont = { font: null, size: null };
 // saved as <br>). Without it the newline stayed inside the text, showed in the
 // editor, and was folded into a space once saved and reopened (Lucy's live
 // check, 24 October 2026).
-const parser = unified().use(remarkParse).use(remarkBreaks).use(remarkGfm);
+// A single `~` is text: only `~~x~~` strikes (spec R11).
+const parser = unified().use(remarkParse).use(remarkBreaks).use(remarkGfm, { singleTilde: false });
 
 export function markdownToDoc(markdown: string, base: DraftFont = NO_FONT): JSONContent {
-  const root = parser.runSync(parser.parse(alignedSlipsAsLines(markdown))) as Root;
-  const last = root.children[root.children.length - 1];
-  const content = root.children.flatMap((node) => block(node, base, node === last));
+  const source = alignedSlipsAsLines(legalText(markdown));
+  const root = parser.runSync(parser.parse(source)) as Root;
+  const nodes = root.children.flatMap((node) => indentedCodeAsText(node, source));
+  const last = nodes[nodes.length - 1];
+  const content = nodes.flatMap((node) => block(node, base, node === last)).map(withHang);
   return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
+}
+
+/**
+ * A clause number at the start of a paragraph (spec R3 v3): `1.` `2)` `1.1`
+ * `1.1.2` `(a)` `(iv)` `(12)`, then a space or the end. The number stays in
+ * the text exactly as typed.
+ */
+const CLAUSE_NUMBER = /^(?:\d{1,9}\\?[.)]|\d{1,9}(?:\.\d{1,9})+\.?|\((?:[a-z]{1,2}|[ivxlc]{1,6}|\d{1,3})\))(?=\s|$)/;
+
+/**
+ * A numbered clause's paragraph keeps its layout with a hanging indent:
+ * `hang: 1` on the paragraph, saved as `<p data-hang="1">` (spec R3 v3). Only
+ * a paragraph of the draft's own: never a heading, a list item, a quote, a
+ * cell, or an aligned line.
+ */
+function withHang(node: JSONContent): JSONContent {
+  if (node.type !== 'paragraph' || node.attrs?.textAlign) return node;
+  const first = node.content?.[0];
+  if (first?.type !== 'text' || !CLAUSE_NUMBER.test(first.text ?? '')) return node;
+  return { ...node, attrs: { ...node.attrs, hang: 1 } };
+}
+
+/*
+ * LEGAL TEXT (spec 384c fc292022 + 55809600, approved 8ee0785c; the shared
+ * fixture file legal-text-lines.json pins it, byte for byte the server's).
+ * A draft is legal text: what a lawyer types as text stays text. Before the
+ * Markdown is read, the marks the rules make text are backslash-escaped, so
+ * the stock parser shows them as typed. The server runs the same pass.
+ *   R1  every `_` is text: blanks, signing lines, `_x_` (stars format, not underscores)
+ *   R3  a clause number at the start of a line, `1.` `1)` `10.`, is text, never a
+ *       list; a clause line starts its own paragraph, which hangs ({@link withHang})
+ *   R4  `* ` and `+ ` at the start of a line are text; only `- ` starts a bullet
+ *   R5  `>` at the start of a line is a quote, as in Markdown (v3: drafts use it)
+ *   R6  `####`+ reads as `###`
+ *   R7  `---` and `***` alone are a rule and never make the line above a heading;
+ *       a line of `=` is text
+ *   R11 a single `~` is text
+ *   R13 a backslash at the end of a line is text (CommonMark would make it a break)
+ * The line-start rules hold up to three spaces in, and again after a `- `
+ * marker. Code fences and the signature fence are left as written (a signature
+ * cell gets the inline rules when it is read), and so are the allowed HTML
+ * lines (their words get the inline rules when they are read). In a line,
+ * code spans, link targets, URLs and email addresses are left as written.
+ */
+
+/** The parts of a line the inline rules leave as written: code spans, a link's target, URLs and email addresses. */
+const KEEP_AS_WRITTEN = /(`+[^`]*`+|\]\([^)\s]*\)|<[a-z][a-z0-9+.-]*:[^>\s]*>|(?:https?:\/\/|www\.)[^\s<>]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+)/i;
+
+/** The inline rules (R1, R11, R13) on one line or one cell's words. */
+function legalInline(text: string): string {
+  const escaped = text
+    .split(KEEP_AS_WRITTEN)
+    .map((part, index) => (index % 2 === 1 ? part : part.replace(/(?<!\\)_/g, '\\_').replace(/(?<![\\~])~(?!~)/g, '\\~')))
+    .join('');
+  // An odd run of backslashes at the end leaves one to make a break: double the last.
+  const trailing = /\\+$/.exec(escaped)?.[0].length ?? 0;
+  return trailing % 2 === 1 ? `${escaped}\\` : escaped;
+}
+
+/** Up to three spaces, then an optional `- ` bullet marker: where a line's line-start rules apply. */
+const LINE_START = /^( {0,3}(?:- +)?)/;
+/** An allowed HTML line (aligned block, a `<br>`-only line, a font span line): its words are read later. */
+const ALLOWED_HTML_LINE = /^ {0,3}<\/?(?:p|h[1-6]|div|span|br)\b/i;
+const RULE_LINE = /^ {0,3}(?:-{3,}|\*{3,})\s*$/;
+
+/** The line-start rules (R3, R4, R6, R7) on one line, after the inline rules. */
+function legalLineStart(line: string): string {
+  const deep = /^( {0,3})#{4,}(?=\s|$)/.exec(line);
+  if (deep) return `${deep[1]}###${line.slice(deep[0].length)}`;
+  if (/^ {0,3}=+\s*$/.test(line)) return line.replace('=', '\\=');
+  const start = LINE_START.exec(line)?.[1] ?? '';
+  const rest = line.slice(start.length);
+  const escaped = rest.replace(/^(\d{1,9})([.)])(?=\s|$)/, '$1\\$2').replace(/^([*+])(?=\s)/, '\\$1');
+  return start + escaped;
+}
+
+/** A clause line of the draft's own (R3 v3): a clause number up to three spaces in, outside a list item or a quote. */
+const CLAUSE_LINE = /^ {0,3}(?:\d{1,9}\\?[.)]|\d{1,9}(?:\.\d{1,9})+\.?|\((?:[a-z]{1,2}|[ivxlc]{1,6}|\d{1,3})\))(?=\s|$)/;
+
+/** A draft body under the legal-text rules, ready for the stock parser. */
+export function legalText(markdown: string): string {
+  const out: string[] = [];
+  let fence: string | null = null;
+  for (const line of markdown.split('\n')) {
+    const mark = FENCE.exec(line)?.[1];
+    if (fence !== null) {
+      if (mark && mark[0] === fence[0] && mark.length >= fence.length) fence = null;
+      out.push(line);
+      continue;
+    }
+    if (mark) {
+      fence = mark;
+      out.push(line);
+      continue;
+    }
+    if (ALLOWED_HTML_LINE.test(line)) {
+      out.push(line);
+      continue;
+    }
+    // A rule never turns the line above into a heading: a blank line before it.
+    if (RULE_LINE.test(line)) {
+      if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
+      out.push(line);
+      continue;
+    }
+    // A clause line starts its own paragraph, so its hanging indent is its own (R3 v3).
+    if (CLAUSE_LINE.test(line) && out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
+    out.push(legalLineStart(legalInline(line)));
+  }
+  return out.join('\n');
+}
+
+/**
+ * A line indented four or more spaces is text with its indent kept (spec
+ * R10), as the server keeps it: never a code block. The indent becomes
+ * non-breaking spaces, so it shows; each line is one line of a paragraph.
+ */
+function indentedCodeAsText(node: RootContent, source: string): RootContent[] {
+  if (node.type !== 'code' || !node.position) return [node];
+  const start = node.position.start.offset ?? 0;
+  const end = node.position.end.offset ?? start;
+  if (FENCE.test(source.slice(source.lastIndexOf('\n', start - 1) + 1, end))) return [node];
+  const lines = source.slice(start, end).split('\n');
+  const children: PhrasingContent[] = lines.flatMap((line, index) => [
+    ...(index > 0 ? [{ type: 'break' as const }] : []),
+    // The pre-pass escaped this line's marks; a code block reads none, so they fold back here.
+    { type: 'text' as const, value: foldEscapes(line).replace(/^ +/, (spaces) => '\u00a0'.repeat(spaces.length)) },
+  ]);
+  return [{ type: 'paragraph', children }];
 }
 
 /** `<span …>` alone (a font run opening), or `</span>`. */
@@ -186,13 +318,6 @@ const HASH_HEADING = /^(#{1,3})\s+(.*)$/;
 const TAG_LINE = /^<\/?(?!(?:span|br)\b|(?:strong|b|em|i|u)\s*>)[a-z]/i;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 const HALF_TAG = /^ {0,3}<\/?[a-z0-9]*$/i;
-/**
- * A line of underscores alone, up to three spaces in: a line to sign on in a
- * template ("_______________"), which Markdown would read as a horizontal
- * rule. It is text, as on the server (Backend's DraftHtml, Tester 394c79d9);
- * `***` and `---` stay rules, and a line inside a code fence is left alone.
- */
-const UNDERSCORES_ONLY = /^ {0,3}_{3,}\s*$/;
 /** A line holding only `<br>`s, up to three spaces in as the server reads it (woz af6173d6): a gap, one empty paragraph. */
 const BREAKS_ONLY = /^ {0,3}(?:<br\s*\/?>[ \t]*)+$/i;
 
@@ -264,11 +389,6 @@ function alignedSlipsAsLines(markdown: string): string {
       out.push('', '<br>', '');
       continue;
     }
-    if (UNDERSCORES_ONLY.test(line)) {
-      // A line to sign on, not a rule: each underscore escaped, so Markdown keeps it as text.
-      out.push(line.replace(/_/g, '\\_'));
-      continue;
-    }
     const opening = OPENING_LINE.exec(line);
     if (!opening) {
       out.push(oneAlignedLine(line));
@@ -305,7 +425,9 @@ const BREAK_MARK = '\uE000';
  * `**A. Name<br>Director**` is bold on both lines.
  */
 function inlineMarkdown(words: string, font: DraftFont): JSONContent[] {
-  const marked = words.replaceAll(BREAK_MARK, '').replace(LINE_BREAK, BREAK_MARK);
+  // The words of an aligned line get the legal-text inline rules here (the pre-pass left the HTML line as written).
+  // A clause number at its start stays text too (R3), with no hanging indent in an aligned line.
+  const marked = legalLineStart(legalInline(words.replaceAll(BREAK_MARK, ''))).replace(LINE_BREAK, BREAK_MARK);
   return inlinePart(marked, font).flatMap((node): JSONContent[] => {
     if (node.type !== 'text' || !node.text?.includes(BREAK_MARK)) return [node];
     return node.text.split(BREAK_MARK).flatMap((text, index) => [
@@ -442,7 +564,8 @@ function signatureTable(value: string, font: DraftFont): JSONContent[] {
  * server shows both as typed, and so does this.
  */
 function signatureCell(cell: string, font: DraftFont): JSONContent[] {
-  const root = parser.runSync(parser.parse(cell)) as Root;
+  // A cell gets the inline rules only: it is never a block (spec R9).
+  const root = parser.runSync(parser.parse(legalInline(cell))) as Root;
   const first = root.children[0];
   if (root.children.length === 1 && first.type === 'paragraph') return inline(first.children, font);
   return [textNode(cell, [], font)];
@@ -531,3 +654,16 @@ function textOf(node: Nodes): string {
   if ('children' in node) return (node.children as Nodes[]).map(textOf).join('');
   return '';
 }
+
+/**
+ * A draft body as the text an edit's find is matched against (spec R13 and
+ * §4, 384c fc292022): every backslash escape before ASCII punctuation folded
+ * to the mark it escapes, so "1\. Rent" and "1. Rent" are the same text. A
+ * backslash before anything else (a letter, a space, the end of a line) stays.
+ */
+export function foldEscapes(markdown: string): string {
+  return markdown.replace(ESCAPED_PUNCTUATION, '$1');
+}
+
+/** A backslash before one ASCII punctuation mark: !"#$%&'()*+,-./ :;<=>?@ [\]^_` {|}~ */
+const ESCAPED_PUNCTUATION = /\\([!-/:-@[-`{-~])/g;

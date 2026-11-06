@@ -8,6 +8,7 @@ import { parseNoteHtml, type NoteNode, type NoteTag } from '@/lib/notes/note-htm
 import { NOTE_ALIGN_CLASS } from '@/lib/notes/note-elements';
 import '@/v2/features/notes/note-fonts.css';
 import '@/v2/features/notes/signature-table.css';
+import '@/v2/features/notes/legal-text.css';
 
 /**
  * NoteContent — the note body, as REACT ELEMENTS.
@@ -98,7 +99,12 @@ function renderNode(node: NoteNode): ReactNode {
       }
       return createElement(
         node.tag,
-        node.align ? { key: node.key, className: NOTE_ALIGN_CLASS[node.align] } : { key: node.key },
+        {
+          key: node.key,
+          ...(node.align && { className: NOTE_ALIGN_CLASS[node.align] }),
+          // A numbered clause hangs (legal-text.css).
+          ...(node.hang && { 'data-hang': '1' }),
+        },
         renderNodes(node.children),
       );
 

@@ -26,13 +26,12 @@ test('headings, paragraphs and inline marks become the editor schema', () => {
   assert.deepEqual(doc.content?.[2].attrs, { level: 3 });
 });
 
-test('lists keep their numbering start, and a table keeps its header row', () => {
+test('numbered clauses keep their numbers as typed and hang, bullets stay a list, and a table keeps its header row', () => {
   const doc = markdownToDoc('3. Third\n4. Fourth\n\n- One\n- Two\n\n| Item | Detail |\n| --- | --- |\n| Rent | ₦2,400,000 |');
-  const [ordered, bullet, table] = doc.content ?? [];
-  assert.equal(ordered.type, 'orderedList');
-  assert.deepEqual(ordered.attrs, { start: 3 });
-  assert.equal(ordered.content?.length, 2);
-  assert.deepEqual(ordered.content?.[0], { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Third' }] }] });
+  const [third, fourth, bullet, table] = doc.content ?? [];
+  // Legal text (R3 v3): a clause number is text, never a list, and its paragraph hangs.
+  assert.deepEqual(third, { type: 'paragraph', attrs: { hang: 1 }, content: [{ type: 'text', text: '3. Third' }] });
+  assert.deepEqual(fourth, { type: 'paragraph', attrs: { hang: 1 }, content: [{ type: 'text', text: '4. Fourth' }] });
   assert.equal(bullet.type, 'bulletList');
   assert.equal(bullet.attrs, undefined);
   assert.equal(table.type, 'table');
@@ -251,9 +250,12 @@ test('anything else around an aligned block stays text', () => {
   text('<p style="text-align: center">\n<div>TEST DATA</div>\n</p>');
   // No closing tag, with more of the draft after it.
   assert.equal(markdownToDoc('<p style="text-align: center">\n## TEST\n\nDATA').content?.some((node) => node.attrs?.textAlign), false);
-  // Inside a code fence, or indented as code.
+  // Inside a code fence it is code; indented four spaces it is text with its indent kept (legal text R10).
   assert.equal(markdownToDoc('```\n<p style="text-align: center">\n## TEST\n</p>\n```').content?.[0].type, 'codeBlock');
-  assert.equal(markdownToDoc('    <p style="text-align: center">## TEST</p>').content?.[0].type, 'codeBlock');
+  assert.deepEqual(markdownToDoc('    <p style="text-align: center">## TEST</p>').content?.[0], {
+    type: 'paragraph',
+    content: [{ type: 'text', text: '    <p style="text-align: center">## TEST</p>' }],
+  });
   // A fence line inside a split block, or a closing tag that doesn't match (review 9510d959).
   assert.equal(markdownToDoc('<p style="text-align: center">\n```\n</p>\n```').content?.some((node) => node.attrs?.textAlign), false);
   assert.equal(markdownToDoc('<h2 style="text-align: center">\nTEST\n</h3>\n\nDATA').content?.some((node) => node.attrs?.textAlign), false);
@@ -286,8 +288,8 @@ test('a line holding only <br>s is a gap, one empty paragraph (woz d3643d84)', (
     { type: 'paragraph' },
     { type: 'paragraph', content: words('DATA') },
   ]);
-  // Four spaces in, it is code.
-  assert.equal(markdownToDoc('TEST\n\n    <br>').content?.[1].type, 'codeBlock');
+  // Four spaces in, it is text with its indent kept, not a gap and not code (legal text R10).
+  assert.deepEqual(markdownToDoc('TEST\n\n    <br>').content?.[1], { type: 'paragraph', content: [{ type: 'text', text: '    <br>' }] });
   // A <br> with words beside it is not a gap.
   assert.equal(markdownToDoc('<br> TEST').content?.some((node) => !node.content), false);
 });
@@ -384,37 +386,35 @@ test('Stay’s live draft (c48fc782): bold and the numbered points are kept arou
     ].join('\n'),
   ).content;
   const bold = [{ type: 'bold' }];
-  assert.deepEqual(
-    doc?.map((node) => [node.type, node.attrs?.textAlign ?? '-']),
-    [
-      ['heading', 'center'],
-      ['paragraph', 'center'],
-      ['paragraph', '-'],
-      ['orderedList', '-'],
-      ['paragraph', '-'],
-      ['orderedList', '-'],
-      ['paragraph', 'center'],
-      ['paragraph', 'center'],
-    ],
-  );
+  // Legal text (R3 v3): each numbered point is its own paragraph, its number kept as typed, with a hanging indent.
+  const shape = (node: { type?: string; attrs?: Record<string, unknown> }) => [node.type, node.attrs?.textAlign ?? (node.attrs?.hang ? 'hang' : '-')];
+  assert.deepEqual(doc?.map(shape), [
+    ['heading', 'center'],
+    ['paragraph', 'center'],
+    ['paragraph', '-'],
+    ['paragraph', 'hang'],
+    ['paragraph', 'hang'],
+    ['paragraph', '-'],
+    ['paragraph', 'hang'],
+    ['paragraph', 'center'],
+    ['paragraph', 'center'],
+  ]);
   assert.deepEqual(doc?.[0].content, [{ type: 'text', text: 'TEST DATA BOARD RESOLUTION', marks: bold }]);
   assert.deepEqual(doc?.[2].content, [{ type: 'text', text: 'WHEREAS:', marks: bold }]);
-  assert.equal(doc?.[3].content?.length, 2);
-  assert.deepEqual(doc?.[4].content?.[0], { type: 'text', text: 'RESOLVED', marks: bold });
+  assert.deepEqual(doc?.[3].content, [{ type: 'text', text: '1. The company needs a TEST DATA account.' }]);
+  assert.deepEqual(doc?.[5].content?.[0], { type: 'text', text: 'RESOLVED', marks: bold });
   // The same with no blank lines anywhere: the body lines sit in the centred lines' HTML block, and still read as Markdown.
   const tight = markdownToDoc(
     '<p style="text-align: center"><strong>TEST DATA Holdings Ltd</strong></p>\n**WHEREAS:**\n1. The company needs a TEST DATA account.\n2. The board has met.\n<p style="text-align: center">A. TEST DATA<br>Director</p>',
   ).content;
-  assert.deepEqual(
-    tight?.map((node) => [node.type, node.attrs?.textAlign ?? '-']),
-    [
-      ['paragraph', 'center'],
-      ['paragraph', '-'],
-      ['orderedList', '-'],
-      ['paragraph', 'center'],
-    ],
-  );
-  assert.equal(tight?.[2].content?.length, 2);
+  assert.deepEqual(tight?.map(shape), [
+    ['paragraph', 'center'],
+    ['paragraph', '-'],
+    ['paragraph', 'hang'],
+    ['paragraph', 'hang'],
+    ['paragraph', 'center'],
+  ]);
+  assert.deepEqual(tight?.[3].content, [{ type: 'text', text: '2. The board has met.' }]);
 });
 
 /* Review 0a8878ca: parity with the server. */

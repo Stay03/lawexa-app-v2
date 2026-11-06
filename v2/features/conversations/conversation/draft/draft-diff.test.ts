@@ -53,7 +53,8 @@ test('formatting is kept: bold and headings stay, only the changed words are mar
 
 test('a list item that changed is compared inside, by its words', () => {
   assert.equal(
-    show('1. Pay rent on time.\n2. Keep it clean.', '1. Pay rent on the 1st.\n2. Keep it clean.'),
+    // A "- " list (numbered clauses are paragraphs under the legal-text rules, R3).
+    show('- Pay rent on time.\n- Keep it clean.', '- Pay rent on the 1st.\n- Keep it clean.'),
     'Pay rent on [-time.-]{+the 1st.+}\nKeep it clean.',
   );
 });

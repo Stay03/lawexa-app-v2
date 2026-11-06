@@ -60,6 +60,7 @@ import { useCoarsePointer } from './use-coarse-pointer';
 import { pickRestoreCandidate, useDraftMirrorWriter } from './use-draft-mirror';
 import { IMAGE_INPUT_ACCEPT, useNoteImageUploads } from './use-image-uploads';
 import '@/v2/features/notes/signature-table.css';
+import '@/v2/features/notes/legal-text.css';
 
 /**
  * NoteEditorScreen — the page IS the paper.

@@ -57,6 +57,30 @@ export interface NoteExtensionsConfig {
 }
 
 /**
+ * A numbered clause's hanging indent (legal-text rules R3, thread 384c): a
+ * paragraph attribute read from and written as `data-hang="1"`, so a draft's
+ * clause layout survives a save, the reader and the Word export. Only the one
+ * value; anything else on the attribute is dropped.
+ */
+const ClauseHang = Extension.create({
+  name: 'clauseHang',
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['paragraph'],
+        attributes: {
+          hang: {
+            default: null,
+            parseHTML: (element: HTMLElement) => (element.getAttribute('data-hang') === '1' ? 1 : null),
+            renderHTML: (attributes: { hang?: number | null }) => (attributes.hang === 1 ? { 'data-hang': '1' } : {}),
+          },
+        },
+      },
+    ];
+  },
+});
+
+/**
  * Clear formatting on `Mod-\`, as in Google Docs (Arthur's editor step 1). The
  * same rule as the toolbar's button (`clearFormatting` in `formatting.ts`): the
  * text marks and the highlight come off and a heading goes back to normal text;
@@ -114,6 +138,7 @@ export function createNoteExtensions({
       types: ['heading', 'paragraph'],
       alignments: ['left', 'center', 'right', 'justify'],
     }),
+    ClauseHang,
     TableKit.configure({ table: false }),
     EditorTable.configure({ resizable: false }),
     // Font type and size (the draft editor, 23 October 2026): one span with

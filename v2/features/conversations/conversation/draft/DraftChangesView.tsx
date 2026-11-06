@@ -8,6 +8,7 @@ import { diffDocs, hasChanges, type DiffMark, type DiffNode } from './draft-diff
 import { markdownToDoc, type DraftFont } from './markdown-to-doc';
 import '@/v2/features/notes/note-fonts.css';
 import '@/v2/features/notes/signature-table.css';
+import '@/v2/features/notes/legal-text.css';
 
 /**
  * DraftChangesView — the draft panel with "Show changes" on (Stay, 27 October
@@ -108,7 +109,11 @@ function renderNode(node: DiffNode, key: string): ReactNode {
   const tone = blockTone(node.diff);
   switch (node.type) {
     case 'paragraph':
-      return <p key={key} className={tone} style={alignment(node)}>{children(node, key)}</p>;
+      return (
+        <p key={key} className={tone} style={alignment(node)} data-hang={node.attrs?.hang === 1 ? '1' : undefined}>
+          {children(node, key)}
+        </p>
+      );
     case 'heading': {
       const level = Number(node.attrs?.level ?? 2);
       const Tag = level <= 1 ? 'h1' : level === 2 ? 'h2' : 'h3';

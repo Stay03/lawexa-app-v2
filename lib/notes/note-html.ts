@@ -146,6 +146,9 @@ export type NoteNode =
       /** A `table` the editor marked `data-type="signature"`: a template's
        *  signing table, drawn without borders (template layout, thread 2b658111). */
       signature?: true;
+      /** A `p` the draft marked `data-hang="1"`: a numbered clause, drawn with
+       *  a hanging indent (legal-text rules R3, 384c). */
+      hang?: true;
       children: NoteNode[];
     }
   /** A table cell. A span is there only when it is more than one. */
@@ -726,12 +729,14 @@ function pushConverted(
     }
     const align = ALIGNABLE.has(rendered) ? textAlign(element) : undefined;
     const signature = rendered === 'table' && isSignatureTable(element);
+    const hang = rendered === 'p' && isHangingClause(element);
     out.push({
       kind: 'element',
       key: keys.take(),
       tag: rendered,
       ...(align && { align }),
       ...(signature && { signature: true as const }),
+      ...(hang && { hang: true as const }),
       children,
     });
     return;
@@ -770,6 +775,15 @@ function pushConverted(
  */
 export function isSignatureTable(element: Pick<Element, 'getAttribute'>): boolean {
   return element.getAttribute('data-type') === 'signature';
+}
+
+/**
+ * A numbered clause's paragraph: a `<p>` with `data-hang="1"` (legal-text
+ * rules R3, thread 384c). The one value read from a paragraph's attributes
+ * besides its alignment, and only this exact one.
+ */
+export function isHangingClause(element: Pick<Element, 'getAttribute'>): boolean {
+  return element.getAttribute('data-hang') === '1';
 }
 
 /** The tags that hold only other table parts, never text of their own. */
