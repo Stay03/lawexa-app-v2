@@ -1,5 +1,5 @@
 {
-  "version": 4,
+  "version": 5,
   "about": "Lawexa draft legal text: each case is a draft body (markdown), the canonical HTML every reader must produce from it (html), and the text an edit's find is matched against (plain). Spec: thread 384c 79af858a, revised 8ee0785c. Byte-identical copies in lawexa-api tests/Fixtures/legal-text/lines.json and the app's v2/features/conversations/conversation/draft/legal-text-lines.json.",
   "cases": [
     {
@@ -319,6 +319,24 @@
       "markdown": "    Indented a_b *x* 1. y",
       "html": "<p>    Indented a_b *x* 1. y</p>",
       "plain": "    Indented a_b *x* 1. y"
+    },
+    {
+      "id": "placeholder-angle-brackets",
+      "markdown": "The Landlord is <Name of Tenant> of <ADDRESS>.",
+      "html": "<p>The Landlord is &lt;Name of Tenant&gt; of &lt;ADDRESS&gt;.</p>",
+      "plain": "The Landlord is <Name of Tenant> of <ADDRESS>."
+    },
+    {
+      "id": "placeholder-with-underscores",
+      "markdown": "Signed by <TENANT_NAME> on <DATE_OF_SIGNING>",
+      "html": "<p>Signed by &lt;TENANT_NAME&gt; on &lt;DATE_OF_SIGNING&gt;</p>",
+      "plain": "Signed by <TENANT_NAME> on <DATE_OF_SIGNING>"
+    },
+    {
+      "id": "placeholder-alone-on-a-line",
+      "markdown": "<Name of Tenant>",
+      "html": "<p>&lt;Name of Tenant&gt;</p>",
+      "plain": "<Name of Tenant>"
     }
   ]
 }

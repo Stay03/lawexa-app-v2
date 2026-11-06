@@ -21,7 +21,7 @@ import { foldEscapes, markdownToDoc } from './markdown-to-doc';
 
 const FIXTURE = join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'draft', 'legal-text-lines.json');
 /** The hash recorded on both sides (lawexa-api tests/Fixtures/legal-text/lines.json). */
-const FIXTURE_SHA256 = 'a729c25991f650cd415732635c854ef54285aea9cdb339a617293227ae22844e';
+const FIXTURE_SHA256 = 'c4e04ef79395895b4900e2f7b26b5aa43abf47e471ddf48dc94459a85a4528d4';
 
 interface LegalCase {
   id: string;
