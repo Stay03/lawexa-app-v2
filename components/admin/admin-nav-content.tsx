@@ -22,6 +22,7 @@ import {
   MessagesSquare,
   ClipboardList,
   FileStack,
+  Gift,
 } from 'lucide-react';
 import {
   Collapsible,
@@ -46,6 +47,7 @@ const contentNavItems = [
   // financials page is open — the same shape as Cases below.
   { title: 'Ambassadors', url: '/admin/ambassadors', icon: GraduationCap, excludePaths: ['/admin/ambassadors/financials'] },
   { title: 'Ambassador Money', url: '/admin/ambassadors/financials', icon: Coins },
+  { title: 'Wrapped', url: '/admin/wrapped', icon: Gift },
   { title: 'Cases', url: '/admin/cases', icon: Scale, excludePaths: ['/admin/cases/enrichments', '/admin/cases/principle-review', '/admin/cases/argument-review', '/admin/cases/data-review'] },
   { title: 'Case Enrichment', url: '/admin/cases/enrichments', icon: Sparkles },
   { title: 'Principle Review', url: '/admin/cases/principle-review', icon: ClipboardCheck },
@@ -67,7 +69,7 @@ export function AdminNavContentSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/ambassadors') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/courses') || pathname.startsWith('/admin/statutes') || pathname.startsWith('/admin/templates') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views') || pathname.startsWith('/admin/lawyer-connect');
+  const isSectionActive = pathname.startsWith('/admin/content-requests') || pathname.startsWith('/admin/ambassadors') || pathname.startsWith('/admin/wrapped') || pathname.startsWith('/admin/cases') || pathname.startsWith('/admin/courses') || pathname.startsWith('/admin/statutes') || pathname.startsWith('/admin/templates') || pathname.startsWith('/admin/notifications') || pathname.startsWith('/admin/views') || pathname.startsWith('/admin/lawyer-connect');
 
   return (
     <SidebarGroup>
