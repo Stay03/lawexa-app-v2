@@ -46,7 +46,7 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function ShareFrame({ record, fonts }: { record: WrappedRecord; fonts: ShareFonts }) {
+export function ShareFrame({ record, fonts, onShared }: { record: WrappedRecord; fonts: ShareFonts; onShared?: () => void }) {
   const [poster, setPoster] = useState<Poster | null>(null);
   const [failed, setFailed] = useState(false);
   const link = shareUrl(record.share_code);
@@ -96,12 +96,14 @@ export function ShareFrame({ record, fonts }: { record: WrappedRecord; fonts: Sh
     if (canShareFile(poster.file)) {
       try {
         await navigator.share({ files: [poster.file], text: shareText(record, link) });
+        onShared?.();
       } catch (error) {
         if ((error as DOMException)?.name !== 'AbortError') toast.error('Sharing did not open. Save the image and post it instead.');
       }
       return;
     }
     download(poster.url, poster.file.name);
+    onShared?.();
     const copied = await copyText(link);
     toast.success(copied ? `${afterSave} Your link is copied too.` : afterSave);
   };
@@ -109,6 +111,7 @@ export function ShareFrame({ record, fonts }: { record: WrappedRecord; fonts: Sh
   const save = () => {
     if (!poster) return;
     download(poster.url, poster.file.name);
+    onShared?.();
     toast.success('Saved to your downloads.');
   };
 
