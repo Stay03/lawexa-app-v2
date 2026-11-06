@@ -350,12 +350,16 @@
   display: grid;
   place-items: center;
   padding: 0 6cqw 3cqw;
+  /* Its own size container, so the poster fits the room above the bar on any
+     window: a percentage height in a grid cell did not hold it, and at
+     1440x900 the poster ran under the buttons (Tester a710ccc3). */
+  container-type: size;
 }
 
 /* The poster whole, never cropped: what the student sees is what they post. */
 .wr-share-preview {
-  max-width: 100%;
-  max-height: 100%;
+  max-width: 100cqw;
+  max-height: 100cqh;
   aspect-ratio: 9 / 16;
   object-fit: contain;
   box-shadow: 0 2cqw 6cqw rgb(0 0 0 / 0.35);
