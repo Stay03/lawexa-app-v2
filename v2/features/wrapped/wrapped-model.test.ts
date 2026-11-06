@@ -307,3 +307,36 @@ test('the word follows the number shown, not the raw value (Tester 11ad1a73: 0.6
   assert.doesNotMatch(frames, /=== 1 \?/);
   assert.match(frames, /isOne\(draft\.novels\) \? 'novel' : 'novels'/);
 });
+
+/* Wrapped view tracking (Techlead 462b8946). TEST DATA. */
+
+test('each progress event is sent once per visit, and once per card', async () => {
+  const { createProgressTracker } = await import('@/lib/wrapped/progress');
+  const sent: string[] = [];
+  const tracker = createProgressTracker((progress) => {
+    sent.push(`${progress.event}:${progress.card}`);
+  });
+  tracker.open(1);
+  tracker.open(1);
+  tracker.card(1);
+  tracker.card(2);
+  tracker.card(1);
+  tracker.card(8);
+  tracker.finish(8);
+  tracker.finish(8);
+  tracker.share(8);
+  tracker.share(8);
+  assert.deepEqual(sent, ['open:1', 'card:1', 'card:2', 'card:8', 'finish:8', 'share:8']);
+});
+
+test('a failed or throwing send never reaches the story', async () => {
+  const { createProgressTracker } = await import('@/lib/wrapped/progress');
+  const rejecting = createProgressTracker(() => Promise.reject(new Error('TEST offline')));
+  assert.doesNotThrow(() => rejecting.open(1));
+  const throwing = createProgressTracker(() => {
+    throw new Error('TEST bad');
+  });
+  assert.doesNotThrow(() => throwing.card(2));
+  // Let the rejected promise settle: an unhandled rejection would fail the run.
+  await new Promise((resolve) => setTimeout(resolve, 10));
+});
