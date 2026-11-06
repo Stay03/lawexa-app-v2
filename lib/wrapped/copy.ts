@@ -160,6 +160,11 @@ export function vibeFor(id: number): Vibe {
 /** "9,999+" past the cap, commas below it; never an invented number. */
 export const DISPLAY_CAP = 9999;
 
+/** A count with its noun, singular for exactly 1: "1 working day", "5 hours" (Techlead d4c4a981). */
+export function countOf(count: number, one: string, many: string): string {
+  return `${formatCount(count)} ${count === 1 ? one : many}`;
+}
+
 export function formatCount(value: number): string {
   if (!Number.isFinite(value)) return '0';
   const whole = Math.max(0, Math.round(value));

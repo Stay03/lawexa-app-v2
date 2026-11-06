@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import {
   CAMPAIGN_LINE,
+  countOf,
   PERSONAS,
   formatClock,
   formatCount,
@@ -22,7 +23,7 @@ import { FRAME_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide
 import { fitText, wrapWords } from '@/lib/wrapped/text-fit';
 import { SHARE_LAYOUT, corsPhotoUrl, personaBanner, shownStickers } from '@/lib/wrapped/share-image';
 import { POLAROID, SHARE_HEIGHT, wrappedArt } from '@/lib/wrapped/theme';
-import { wrappedSignedIn } from '@/lib/wrapped/access';
+import { mayHaveWrapped, wrappedAskable, wrappedSignedIn } from '@/lib/wrapped/access';
 import type { WrappedRecord } from '@/lib/wrapped/types';
 
 test('the share card’s words sit around Arthur’s polaroid, never on it, and the link clears his mark', () => {
@@ -234,4 +235,59 @@ test('every persona fits its banner, 48 px clear of the card’s right edge and 
   // The default persona, on 57% of cards, takes two lines; a short name stays on one at full size.
   assert.equal(personaBanner('The Steady Learned Friend', unbounded).lines.length, 2);
   assert.deepEqual(personaBanner('The Don', unbounded), { ...personaBanner('The Don', unbounded), size: 40, lines: ['The Don'] });
+});
+
+/* Signed-in students who never saw Wrapped (Tester a710ccc3, Techlead d4c4a981, 2f72f5a0). TEST DATA. */
+
+test('a session saved before the profile got its Law School still asks for Wrapped', () => {
+  // The copy of the user saved at sign-in: no Law School yet.
+  const savedAtSignIn = { id: 15107, profile: { law_school: '', study_institution_type: null } };
+  assert.equal(mayHaveWrapped(savedAtSignIn), false);
+  // This page load's /auth/me: the profile now names one.
+  const fromAuthMe = { profile: { law_school: 'lagos', study_institution_type: 'law_school' as const } };
+  const fresh = mayHaveWrapped(fromAuthMe);
+  assert.equal(fresh, true);
+  // The entry points ask on the fresh answer, whatever the saved copy says.
+  assert.equal(wrappedAskable({ signedIn: true, lawSchool: fresh || mayHaveWrapped(savedAtSignIn), hidden: false }), true);
+  // Before the fix, only the saved copy counted, and nothing was asked.
+  assert.equal(wrappedAskable({ signedIn: true, lawSchool: mayHaveWrapped(savedAtSignIn), hidden: false }), false);
+  // Hidden, signed out or not a Law School: never asked.
+  assert.equal(wrappedAskable({ signedIn: true, lawSchool: true, hidden: true }), false);
+  assert.equal(wrappedAskable({ signedIn: false, lawSchool: true, hidden: false }), false);
+  assert.equal(wrappedAskable({ signedIn: true, lawSchool: false, hidden: false }), false);
+});
+
+test('the entry points read the Law School and hidden flags from the page load’s /auth/me', () => {
+  const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+  const session = read('v2', 'runtime', 'session.ts');
+  assert.match(session, /may_have_wrapped: mayHaveWrapped\(user\),/);
+  assert.match(session, /wrapped_hidden: data\?\.wrapped_hidden === true,/);
+  const layout = read('app', 'v2', 'layout.tsx');
+  assert.match(layout, /mayHaveWrapped=\{user\?\.may_have_wrapped \?\? false\}/);
+  assert.match(layout, /wrappedHidden=\{user\?\.wrapped_hidden \?\? false\}/);
+  const queries = read('v2', 'features', 'wrapped', 'queries.ts');
+  assert.match(queries, /lawSchool: session\.mayHaveWrapped \|\| mayHaveWrapped\(user\),/);
+  // A switch made in this tab wins over the page load's word; else the server's.
+  assert.match(queries, /hidden: user\?\.wrapped_hidden \?\? session\.wrappedHidden,/);
+});
+
+test('card 2 says "1 working day", and keeps the plural for every other count', () => {
+  assert.equal(countOf(1, 'working day', 'working days'), '1 working day');
+  assert.equal(countOf(0, 'working day', 'working days'), '0 working days');
+  assert.equal(countOf(2, 'working day', 'working days'), '2 working days');
+  assert.equal(countOf(1, 'hour', 'hours'), '1 hour');
+  assert.equal(countOf(12000, 'hour', 'hours'), '9,999+ hours');
+  const frames = readFileSync(join(process.cwd(), 'components', 'wrapped', 'frames.tsx'), 'utf8');
+  assert.match(frames, /countOf\(night\.working_days, 'working day', 'working days'\)/);
+  assert.match(frames, /countOf\(night\.total_hours, 'hour', 'hours'\)/);
+  assert.doesNotMatch(frames, /\} working days/);
+});
+
+test('the share card fits the room above its bar on any window (1440x900 ran it under the buttons)', () => {
+  const css = readFileSync(join(process.cwd(), 'app', 'wrapped', 'wrapped.css'), 'utf8');
+  const stage = css.slice(css.indexOf('.wr-share-stage {'), css.indexOf('}', css.indexOf('.wr-share-stage {')));
+  assert.match(stage, /container-type: size;/);
+  const preview = css.slice(css.indexOf('.wr-share-preview {'), css.indexOf('}', css.indexOf('.wr-share-preview {')));
+  assert.match(preview, /max-width: 100cqw;\s*max-height: 100cqh;/);
+  assert.match(preview, /aspect-ratio: 9 \/ 16;/);
 });

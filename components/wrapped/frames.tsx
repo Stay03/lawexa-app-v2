@@ -4,6 +4,7 @@ import {
   CAMPAIGN_LINE,
   CAMPUS_NAMES,
   COURSE_NAMES,
+  countOf,
   GANI_FIGURES,
   PERSONAS,
   PERSONA_ORDER,
@@ -110,9 +111,9 @@ function Overnight({ record }: { record: WrappedRecord }) {
         Latest log-off: <strong className="wr-num">{formatClock(night.latest_logoff)}</strong>.
       </p>
       <p className="wr-body wr-rise" style={{ animationDelay: '200ms' }}>
-        <strong className="wr-num">{formatCount(night.total_hours)} hours</strong> on Lawexa. That&rsquo;s{' '}
-        <span className="wr-num">{formatCount(night.working_days)}</span> working days, or{' '}
-        <span className="wr-num">{formatCount(night.ikorodu_vi_trips)}</span> Ikorodu to VI trips in traffic.
+        <strong className="wr-num">{countOf(night.total_hours, 'hour', 'hours')}</strong> on Lawexa. That&rsquo;s{' '}
+        <span className="wr-num">{countOf(night.working_days, 'working day', 'working days')}</span>, or{' '}
+        <span className="wr-num">{countOf(night.ikorodu_vi_trips, 'Ikorodu to VI trip', 'Ikorodu to VI trips')}</span> in traffic.
       </p>
     </Frame>
   );
