@@ -8,7 +8,6 @@ import {
   CLEAR_FILTERS,
   editionLabel,
   filterUpdate,
-  funnelSteps,
   isFiltered,
   isFilterableCampus,
   lagosTime,
@@ -19,6 +18,8 @@ import {
   progressText,
   readStudentView,
   splitRows,
+  storyFunnels,
+  storyFunnelSteps,
   storyLabel,
   trackingLine,
 } from './wrapped-admin';
@@ -30,6 +31,16 @@ const SUMMARY: WrappedAdminSummary = {
   edition: 'bar-finals-2026',
   totals: { have: 200, opened: 100, finished: 40, shared: 10, shares: 14, notified: 0, hidden: 3, share_signups: 5 },
   reached: { '1': 100, '2': 90, '3': 80, '4': 70, '5': 60, '6': 55, '7': 50, '8': 40 },
+  reached_by_story: {
+    short: { have: 168, opened: 84, reached: { '1': 80, '7': 60, '8': 35 }, finished: 35, shared: 8 },
+    full: {
+      have: 32,
+      opened: 16,
+      reached: { '1': 16, '2': 15, '3': 14, '4': 12, '5': 10, '6': 9, '7': 8, '8': 5 },
+      finished: 5,
+      shared: 2,
+    },
+  },
   by_persona: {
     drafting_don: { have: 50, opened: 20, finished: 9, shared: 3 },
     section_quoter: { have: 80, opened: 50, finished: 20, shared: 5 },
@@ -53,28 +64,56 @@ test('a percentage is whole, and a share of nothing is a dash, never 0% or NaN%'
   assert.equal(percentText(42), '42%');
 });
 
-test('the funnel runs have, opened, cards 1 to 8, finished, shared, each against have and the step before', () => {
-  const steps = funnelSteps(SUMMARY);
+test('each story has its own funnel, the full story first: the full story runs cards 1 to 8, the short story 1, 7 and the share card', () => {
+  const funnels = storyFunnels(SUMMARY);
   assert.deepEqual(
-    steps.map((step) => step.key),
+    funnels.map((funnel) => [funnel.story, funnel.title, funnel.have]),
+    [
+      ['full', 'Full story', 32],
+      ['short', 'Short story', 168],
+    ]
+  );
+  assert.deepEqual(
+    funnels[0].steps.map((step) => step.key),
     ['have', 'opened', 'card-1', 'card-2', 'card-3', 'card-4', 'card-5', 'card-6', 'card-7', 'card-8', 'finished', 'shared']
   );
-  assert.deepEqual(steps[0], { key: 'have', label: 'Have a Wrapped', count: 200, ofHave: 100, ofPrevious: null });
-  assert.deepEqual(steps[1], { key: 'opened', label: 'Opened it', count: 100, ofHave: 50, ofPrevious: 50 });
-  assert.equal(steps[3].label, 'Reached card 2');
-  assert.equal(steps[3].ofPrevious, 90);
-  assert.deepEqual(steps.at(-1), { key: 'shared', label: 'Shared', count: 10, ofHave: 5, ofPrevious: 25 });
+  assert.deepEqual(
+    funnels[1].steps.map((step) => step.label),
+    ['Have this story', 'Opened it', 'Reached card 1', 'Reached card 7', 'Reached the share card', 'Finished', 'Shared']
+  );
 });
 
-test('a card the summary leaves out counts as 0, and an edition with nobody shows dashes', () => {
-  const steps = funnelSteps({ ...SUMMARY, reached: {} });
-  assert.equal(steps.find((step) => step.key === 'card-4')?.count, 0);
-  const empty = funnelSteps({
-    ...SUMMARY,
-    totals: { ...SUMMARY.totals, have: 0, opened: 0, finished: 0, shared: 0 },
-    reached: {},
-  });
-  assert.ok(empty.every((step) => step.ofHave === null));
+test('every step is against its own story’s students and the step before', () => {
+  const [full, short] = storyFunnels(SUMMARY);
+  assert.deepEqual(full.steps[0], { key: 'have', label: 'Have this story', count: 32, ofHave: 100, ofPrevious: null });
+  assert.deepEqual(full.steps[1], { key: 'opened', label: 'Opened it', count: 16, ofHave: 50, ofPrevious: 50 });
+  assert.deepEqual(short.steps[3], { key: 'card-7', label: 'Reached card 7', count: 60, ofHave: 36, ofPrevious: 75 });
+  assert.deepEqual(short.steps.at(-1), { key: 'shared', label: 'Shared', count: 8, ofHave: 5, ofPrevious: 23 });
+});
+
+test('a card the server leaves out counts as 0, and a story with nobody shows dashes', () => {
+  const steps = storyFunnelSteps('short', { have: 10, opened: 4, reached: { '1': 4 }, finished: 0, shared: 0 });
+  assert.deepEqual(
+    steps.map((step) => [step.key, step.count]),
+    [
+      ['have', 10],
+      ['opened', 4],
+      ['card-1', 4],
+      ['card-7', 0],
+      ['card-8', 0],
+      ['finished', 0],
+      ['shared', 0],
+    ]
+  );
+  const nobody = { have: 0, opened: 0, reached: {}, finished: 0, shared: 0 };
+  assert.ok(storyFunnelSteps('full', nobody).every((step) => step.ofHave === null));
+  // A story the page does not know draws the cards the server counted, in order.
+  assert.deepEqual(
+    storyFunnelSteps('teaser', { ...nobody, have: 5, opened: 2, reached: { '8': 1, '1': 2 } }).map((step) => step.key),
+    ['have', 'opened', 'card-1', 'card-8', 'finished', 'shared']
+  );
+  // An edition with no per-story counts shows no funnel rather than a wrong one.
+  assert.deepEqual(storyFunnels({ ...SUMMARY, reached_by_story: undefined }), []);
 });
 
 test('personas and campuses read as the story names them; an unknown key shows as sent', () => {

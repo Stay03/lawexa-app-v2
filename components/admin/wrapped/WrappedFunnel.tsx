@@ -4,13 +4,13 @@ import { cn } from '@/lib/utils';
 import { percentText, type FunnelStep } from './wrapped-admin';
 
 /**
- * The funnel, one row per step: the bar is the share of students who have a
- * Wrapped, the right-hand numbers are the count, that share, and the share of
+ * One story's funnel, one row per step: the bar is the share of that story's
+ * students, the right-hand numbers are the count, that share, and the share of
  * the step before (where the drop between two steps shows).
  */
-export function WrappedFunnel({ steps }: { steps: FunnelStep[] }) {
+export function WrappedFunnel({ steps, label }: { steps: FunnelStep[]; label: string }) {
   return (
-    <ol className="space-y-1.5" aria-label="Wrapped funnel">
+    <ol className="space-y-1.5" aria-label={label}>
       {steps.map((step) => (
         <li
           key={step.key}

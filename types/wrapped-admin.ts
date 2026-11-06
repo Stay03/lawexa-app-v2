@@ -26,12 +26,32 @@ export interface WrappedAdminTotals extends WrappedAdminCounts {
   share_signups: number;
 }
 
+/**
+ * One story's funnel counts (Backend 318a345a). `reached` covers only the
+ * cards that story shows, over that story's students only: the full story
+ * 1 to 8, the short story 1, 7 and 8.
+ */
+export interface WrappedStoryFunnel {
+  have: number;
+  opened: number;
+  reached: Record<string, number>;
+  /** Students of this story who finished it, and who shared (Backend 92295bc1). */
+  finished: number;
+  shared: number;
+}
+
 /** `GET /admin/wrapped/summary` */
 export interface WrappedAdminSummary {
   edition: string;
   totals: WrappedAdminTotals;
-  /** How many reached at least card n. Always "1" to "8". */
+  /**
+   * How many reached at least card n, over both stories. Kept by the server for
+   * compatibility; the page draws `reached_by_story`, since short-story students
+   * never see cards 2 to 6.
+   */
   reached: Record<string, number>;
+  /** Keyed by story ("full", "short"), as a student's `story`. */
+  reached_by_story?: Record<string, WrappedStoryFunnel>;
   /** Keyed by persona key (`section_quoter` ...). */
   by_persona: Record<string, WrappedAdminCounts>;
   /** Keyed by campus; `unknown` holds students with no campus. */

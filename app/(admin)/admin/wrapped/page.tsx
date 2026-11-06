@@ -18,7 +18,6 @@ import {
   CLEAR_FILTERS,
   editionLabel,
   filterUpdate,
-  funnelSteps,
   isFiltered,
   isFilterableCampus,
   pageUpdate,
@@ -30,6 +29,7 @@ import {
   splitRows,
   STUDENT_STATUS_LABELS,
   STUDENT_STATUSES,
+  storyFunnels,
   STUDENTS_PER_PAGE,
   trackingLine,
   type SplitRow,
@@ -142,7 +142,7 @@ function WrappedPageContent() {
   );
   const students = useWrappedStudents(studentQuery);
 
-  const steps = useMemo(() => (summary.data ? funnelSteps(summary.data) : []), [summary.data]);
+  const funnels = useMemo(() => (summary.data ? storyFunnels(summary.data) : []), [summary.data]);
   const personaRows = useMemo(
     () => (summary.data ? splitRows(summary.data.by_persona, personaLabel) : []),
     [summary.data]
@@ -218,12 +218,31 @@ function WrappedPageContent() {
             <CardHeader>
               <CardTitle>Funnel</CardTitle>
               <CardDescription>
-                Each bar is the share of students who have a Wrapped. A short story shows cards 1, 7 and 8, so a
-                student at card 7 counts as past cards 2 to 6.
+                One funnel per story, since the short story skips cards 2 to 6. Each bar is the share of that
+                story&apos;s students.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <WrappedFunnel steps={steps} />
+              {funnels.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No story counts yet.</p>
+              ) : (
+                <div className="grid gap-8 xl:grid-cols-2">
+                  {funnels.map((funnel) => (
+                    <section key={funnel.story} aria-labelledby={`funnel-${funnel.story}`} className="space-y-3">
+                      <div>
+                        <h3 id={`funnel-${funnel.story}`} className="text-sm font-semibold">
+                          {funnel.title}
+                          <span className="ml-2 font-normal text-muted-foreground tabular-nums">
+                            {funnel.have.toLocaleString()} {funnel.have === 1 ? 'student' : 'students'}
+                          </span>
+                        </h3>
+                        {funnel.note && <p className="text-xs text-muted-foreground">{funnel.note}</p>}
+                      </div>
+                      <WrappedFunnel steps={funnel.steps} label={`${funnel.title} funnel`} />
+                    </section>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

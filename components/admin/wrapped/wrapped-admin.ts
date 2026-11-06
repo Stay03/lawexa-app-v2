@@ -4,6 +4,7 @@ import type {
   WrappedAdminCounts,
   WrappedAdminStudent,
   WrappedAdminSummary,
+  WrappedStoryFunnel,
   WrappedStudentStatus,
 } from '@/types/wrapped-admin';
 
@@ -12,10 +13,13 @@ import type {
  * list's view, read from Backend's summary and student list (thread 384c,
  * e717a1af). Everything here is pure, so the page only draws.
  *
- * ── PERCENTAGES ARE OF THE STUDENTS WHO HAVE A WRAPPED ────────────────────
- * Each funnel step says how many of `have` got there, and how many of the step
- * before. A share of nothing is no share at all, so a zero base shows a dash,
- * never "0%" or "NaN%".
+ * ── ONE FUNNEL PER STORY ───────────────────────────────────────────────────
+ * Most students have the short story, which shows cards 1, 7 and 8, so one
+ * funnel over both would count them at cards they never see (techlead's
+ * review). Each story gets its own funnel from `reached_by_story`, and each
+ * step says how many of that story's students got there, and how many of the
+ * step before. A share of nothing is no share at all, so a zero base shows a
+ * dash, never "0%" or "NaN%".
  *
  * ── LABELS FALL BACK TO THE KEY ───────────────────────────────────────────
  * Persona and campus keys are named from the story's own copy. A key the copy
@@ -46,24 +50,73 @@ export interface FunnelStep {
   ofPrevious: number | null;
 }
 
-/** have → opened → each card → finished → shared. */
-export function funnelSteps(summary: WrappedAdminSummary): FunnelStep[] {
-  const { totals, reached } = summary;
+/** The cards each story shows (Backend 318a345a): the short story is for students with little activity. */
+export const STORY_CARD_NUMBERS: Record<string, readonly number[]> = {
+  full: [1, 2, 3, 4, 5, 6, 7, 8],
+  short: [1, 7, 8],
+};
+
+/** Card 8 is the share card in both stories. */
+function cardLabel(card: number): string {
+  return card === STORY_CARDS ? 'Reached the share card' : `Reached card ${card}`;
+}
+
+/**
+ * have → opened → each card the story shows → finished → shared, each step
+ * against the story's own `have` and the step before.
+ */
+export function storyFunnelSteps(story: string, funnel: WrappedStoryFunnel): FunnelStep[] {
   const raw: { key: string; label: string; count: number }[] = [
-    { key: 'have', label: 'Have a Wrapped', count: totals.have },
-    { key: 'opened', label: 'Opened it', count: totals.opened },
+    { key: 'have', label: 'Have this story', count: funnel.have },
+    { key: 'opened', label: 'Opened it', count: funnel.opened },
   ];
-  for (let card = 1; card <= STORY_CARDS; card += 1) {
-    raw.push({ key: `card-${card}`, label: `Reached card ${card}`, count: reached[String(card)] ?? 0 });
+  // The story's own cards, else whichever cards the server counted, in order.
+  const cards =
+    STORY_CARD_NUMBERS[story] ??
+    Object.keys(funnel.reached)
+      .map(Number)
+      .filter((card) => Number.isInteger(card) && card > 0)
+      .sort((a, b) => a - b);
+  for (const card of cards) {
+    raw.push({ key: `card-${card}`, label: cardLabel(card), count: funnel.reached[String(card)] ?? 0 });
   }
-  raw.push({ key: 'finished', label: 'Finished', count: totals.finished });
-  raw.push({ key: 'shared', label: 'Shared', count: totals.shared });
+  raw.push({ key: 'finished', label: 'Finished', count: funnel.finished });
+  raw.push({ key: 'shared', label: 'Shared', count: funnel.shared });
 
   return raw.map((step, index) => ({
     ...step,
-    ofHave: percentOf(step.count, totals.have),
+    ofHave: percentOf(step.count, funnel.have),
     ofPrevious: index === 0 ? null : percentOf(step.count, raw[index - 1].count),
   }));
+}
+
+export interface StoryFunnel {
+  story: string;
+  title: string;
+  /** What the story is, under its title. */
+  note: string;
+  have: number;
+  steps: FunnelStep[];
+}
+
+const STORY_NOTES: Record<string, string> = {
+  full: 'All eight cards.',
+  short: 'For students with little activity: cards 1, 7 and the share card.',
+};
+
+/** One funnel per story, the full story first. An edition with no per-story counts shows none. */
+export function storyFunnels(summary: WrappedAdminSummary): StoryFunnel[] {
+  const stories = summary.reached_by_story ?? {};
+  const order = (story: string) => (story === 'full' ? 0 : story === 'short' ? 1 : 2);
+  return Object.entries(stories)
+    .sort(([a], [b]) => order(a) - order(b) || a.localeCompare(b))
+    .map(([story, funnel]) => ({
+      story,
+      title: `${storyLabel(story)} story`,
+      note: STORY_NOTES[story] ?? '',
+      have: funnel.have,
+      steps: storyFunnelSteps(story, funnel),
+    }));
 }
 
 /** The key Backend uses for students with no campus. */
