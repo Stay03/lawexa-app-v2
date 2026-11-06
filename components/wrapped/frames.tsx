@@ -5,6 +5,7 @@ import {
   CAMPUS_NAMES,
   COURSE_NAMES,
   countOf,
+  isOne,
   GANI_FIGURES,
   PERSONAS,
   PERSONA_ORDER,
@@ -106,7 +107,7 @@ function Overnight({ record }: { record: WrappedRecord }) {
       <p className="wr-huge wr-rise" style={accent}>
         {formatCount(night.overnights)}
       </p>
-      <p className="wr-big wr-rise">{night.overnights === 1 ? 'overnight.' : 'overnights.'}</p>
+      <p className="wr-big wr-rise">{isOne(night.overnights) ? 'overnight.' : 'overnights.'}</p>
       <p className="wr-body wr-rise" style={{ animationDelay: '120ms' }}>
         Latest log-off: <strong className="wr-num">{formatClock(night.latest_logoff)}</strong>.
       </p>
@@ -221,7 +222,7 @@ function NoGree({ record }: { record: WrappedRecord }) {
       <p className="wr-huge wr-rise" style={accent}>
         {formatCount(gree.longest_streak)}
       </p>
-      <p className="wr-big wr-rise">{gree.longest_streak === 1 ? 'day in a row.' : 'days in a row.'}</p>
+      <p className="wr-big wr-rise">{isOne(gree.longest_streak) ? 'day in a row.' : 'days in a row.'}</p>
       <ul className="wr-body wr-rise" style={{ display: 'grid', gap: '2cqw', animationDelay: '120ms' }}>
         <li>
           <strong className="wr-num">{formatCount(gree.days_active)}</strong> days studied.
@@ -269,7 +270,7 @@ function Drafting({ record }: { record: WrappedRecord }) {
           </h2>
           {draft.novels >= 1 ? (
             <p className="wr-body wr-rise" style={{ animationDelay: '120ms' }}>
-              That&rsquo;s about <strong className="wr-num">{formatCount(draft.novels)}</strong> {draft.novels === 1 ? 'novel' : 'novels'}.
+              That&rsquo;s about <strong className="wr-num">{formatCount(draft.novels)}</strong> {isOne(draft.novels) ? 'novel' : 'novels'}.
             </p>
           ) : null}
         </>

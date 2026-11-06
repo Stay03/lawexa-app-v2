@@ -160,9 +160,20 @@ export function vibeFor(id: number): Vibe {
 /** "9,999+" past the cap, commas below it; never an invented number. */
 export const DISPLAY_CAP = 9999;
 
-/** A count with its noun, singular for exactly 1: "1 working day", "5 hours" (Techlead d4c4a981). */
+/**
+ * A count with its noun, singular when the number SHOWN is 1: "1 working
+ * day", "5 hours" (Techlead d4c4a981). The word follows the rounded number,
+ * not the raw one: 0.6 working days shows as "1" and must read "1 working
+ * day" (Tester 11ad1a73).
+ */
 export function countOf(count: number, one: string, many: string): string {
-  return `${formatCount(count)} ${count === 1 ? one : many}`;
+  const shown = formatCount(count);
+  return `${shown} ${isOne(count) ? one : many}`;
+}
+
+/** Whether a count shows as "1" once rounded for the card. */
+export function isOne(count: number): boolean {
+  return formatCount(count) === '1';
 }
 
 export function formatCount(value: number): string {

@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import {
   CAMPAIGN_LINE,
   countOf,
+  isOne,
   PERSONAS,
   formatClock,
   formatCount,
@@ -290,4 +291,19 @@ test('the share card fits the room above its bar on any window (1440x900 ran it 
   const preview = css.slice(css.indexOf('.wr-share-preview {'), css.indexOf('}', css.indexOf('.wr-share-preview {')));
   assert.match(preview, /max-width: 100cqw;\s*max-height: 100cqh;/);
   assert.match(preview, /aspect-ratio: 9 \/ 16;/);
+});
+
+test('the word follows the number shown, not the raw value (Tester 11ad1a73: 0.6 working days read "1 working days")', () => {
+  assert.equal(countOf(0.6, 'working day', 'working days'), '1 working day');
+  assert.equal(countOf(1.4, 'working day', 'working days'), '1 working day');
+  assert.equal(countOf(0.4, 'working day', 'working days'), '0 working days');
+  assert.equal(countOf(1.5, 'working day', 'working days'), '2 working days');
+  assert.equal(countOf(4.5, 'hour', 'hours'), '5 hours');
+  assert.equal(countOf(0.6, 'hour', 'hours'), '1 hour');
+  assert.equal(isOne(0.6), true);
+  assert.equal(isOne(2), false);
+  // Every singular on the cards asks the shown number: overnights, the streak, novels.
+  const frames = readFileSync(join(process.cwd(), 'components', 'wrapped', 'frames.tsx'), 'utf8');
+  assert.doesNotMatch(frames, /=== 1 \?/);
+  assert.match(frames, /isOne\(draft\.novels\) \? 'novel' : 'novels'/);
 });
