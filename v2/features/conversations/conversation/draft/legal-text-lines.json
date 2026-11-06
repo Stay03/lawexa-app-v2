@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "about": "Lawexa draft legal text: each case is a draft body (markdown), the canonical HTML every reader must produce from it (html), and the text an edit's find is matched against (plain). Spec: thread 384c 79af858a, revised 8ee0785c. Byte-identical copies in lawexa-api tests/Fixtures/legal-text/lines.json and the app's v2/features/conversations/conversation/draft/legal-text-lines.json.",
   "cases": [
     {
@@ -283,6 +283,42 @@
       "markdown": "<p style=\"text-align: center\">1. Term</p>",
       "html": "<p style=\"text-align: center\">1. Term</p>",
       "plain": "<p style=\"text-align: center\">1. Term</p>"
+    },
+    {
+      "id": "font-span-line-with-blank",
+      "markdown": "<span data-font=\"Georgia\" data-size=\"12\">Dated this ______ day of ______, 20____ by _the_ Landlord</span>",
+      "html": "<p>Dated this ______ day of ______, 20____ by _the_ Landlord</p>",
+      "plain": "<span data-font=\"Georgia\" data-size=\"12\">Dated this ______ day of ______, 20____ by _the_ Landlord</span>"
+    },
+    {
+      "id": "font-span-tags-on-own-lines",
+      "markdown": "<span data-font=\"Georgia\">\nDated this ______ day of __bold?__\n</span>",
+      "html": "<p>Dated this ______ day of __bold?__</p>",
+      "plain": "<span data-font=\"Georgia\">\nDated this ______ day of __bold?__\n</span>"
+    },
+    {
+      "id": "br-line-then-text",
+      "markdown": "<br>\nWitness: ______ and _x_",
+      "html": "<p></p><p>Witness: ______ and _x_</p>",
+      "plain": "<br>\nWitness: ______ and _x_"
+    },
+    {
+      "id": "br-with-words-is-text",
+      "markdown": "<br> Witness: ______ and _x_",
+      "html": "<p>&lt;br&gt; Witness: ______ and _x_</p>",
+      "plain": "<br> Witness: ______ and _x_"
+    },
+    {
+      "id": "font-span-around-a-clause",
+      "markdown": "<span data-font=\"Georgia\">1. Rent is due on the first day.</span>",
+      "html": "<p data-hang=\"1\">1. Rent is due on the first day.</p>",
+      "plain": "<span data-font=\"Georgia\">1. Rent is due on the first day.</span>"
+    },
+    {
+      "id": "indented-line-keeps-its-marks-as-typed",
+      "markdown": "    Indented a_b *x* 1. y",
+      "html": "<p>    Indented a_b *x* 1. y</p>",
+      "plain": "    Indented a_b *x* 1. y"
     }
   ]
 }

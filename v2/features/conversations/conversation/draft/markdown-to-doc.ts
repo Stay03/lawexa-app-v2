@@ -140,8 +140,12 @@ function withHang(node: JSONContent): JSONContent {
  * code spans, link targets, URLs and email addresses are left as written.
  */
 
-/** The parts of a line the inline rules leave as written: code spans, a link's target, URLs and email addresses. */
-const KEEP_AS_WRITTEN = /(`+[^`]*`+|\]\([^)\s]*\)|<[a-z][a-z0-9+.-]*:[^>\s]*>|(?:https?:\/\/|www\.)[^\s<>]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+)/i;
+/**
+ * The parts of a line the inline rules leave as written: code spans, a link's
+ * target, autolinks, URLs, email addresses, and HTML tags themselves (a font
+ * span's attributes, a `<br>`), whose words around them still get the rules.
+ */
+const KEEP_AS_WRITTEN = /(`+[^`]*`+|\]\([^)\s]*\)|<[a-z][a-z0-9+.-]*:[^>\s]*>|(?:https?:\/\/|www\.)[^\s<>]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|<\/?[a-z][a-z0-9-]*(?:\s[^<>]*)?\/?>)/i;
 
 /** The inline rules (R1, R11, R13) on one line or one cell's words. */
 function legalInline(text: string): string {
@@ -156,8 +160,19 @@ function legalInline(text: string): string {
 
 /** Up to three spaces, then an optional `- ` bullet marker: where a line's line-start rules apply. */
 const LINE_START = /^( {0,3}(?:- +)?)/;
-/** An allowed HTML line (aligned block, a `<br>`-only line, a font span line): its words are read later. */
-const ALLOWED_HTML_LINE = /^ {0,3}<\/?(?:p|h[1-6]|div|span|br)\b/i;
+/**
+ * A line the aligned-line reader needs as written (alignedSlipsAsLines): a
+ * one-line aligned block (its words get the inline rules when they are read),
+ * a split block's opening or closing tag, or a line of only `<br>`s. Every
+ * other line with a tag in it, a font span with words, `<br> words`, gets the
+ * rules, its tags left as written ({@link KEEP_AS_WRITTEN}).
+ */
+function isRawHtmlLine(line: string): boolean {
+  return ALIGNED_LINE.test(line.trim()) || OPENING_LINE.test(line) || CLOSING_LINE.test(line) || BREAKS_ONLY.test(line);
+}
+
+/** A font span's opening or closing tag alone on its line. */
+const SPAN_TAG_LINE = /^ {0,3}(?:<span\b[^>]*>|<\/span\s*>)\s*$/i;
 const RULE_LINE = /^ {0,3}(?:-{3,}|\*{3,})\s*$/;
 
 /** The line-start rules (R3, R4, R6, R7) on one line, after the inline rules. */
@@ -190,8 +205,15 @@ export function legalText(markdown: string): string {
       out.push(line);
       continue;
     }
-    if (ALLOWED_HTML_LINE.test(line)) {
+    if (isRawHtmlLine(line)) {
       out.push(line);
+      continue;
+    }
+    // A span tag alone on its line opens or closes nothing across lines: its own block, dropped as
+    // before, so the words between are read as the draft's own lines and get the rules.
+    if (SPAN_TAG_LINE.test(line)) {
+      if (out.length > 0 && out[out.length - 1].trim() !== '') out.push('');
+      out.push(line, '');
       continue;
     }
     // A rule never turns the line above into a heading: a blank line before it.
