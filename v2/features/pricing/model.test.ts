@@ -26,6 +26,8 @@ import {
   priceView,
   pricingTabParam,
   recommendedTierKey,
+  renewalNotice,
+  renewalPeriod,
   savingHint,
   tierBenefits,
   tierKey,
@@ -335,4 +337,45 @@ test('a card prints the plan’s own file limits in place of v1’s typed-in siz
   assert.deepEqual(cardLines(gold, gold.byPeriod.monthly).highlighted, [
     '500 AI messages a month', 'Chat with Document (25MB limit)', 'Up to 5 Files per Message', '2GB File Storage',
   ]);
+});
+
+// ── The renewal notice (Richard 433760d9, wording approved by Arthur and the techlead) ──
+
+test('the renewal notice names the plan’s own amount and period, in its own currency', () => {
+  assert.equal(
+    renewalNotice(plan(), false),
+    'Your plan renews automatically every month at $9.99 until you cancel. You can cancel any time in Settings.'
+  );
+  // Most students pay in naira (Richard 9f60e8e7): Pro ₦15,000 and Basic ₦4,900 a month.
+  assert.equal(
+    renewalNotice(plan({ currency: 'NGN', amount_minor: 1500000 }), false),
+    'Your plan renews automatically every month at ₦15,000 until you cancel. You can cancel any time in Settings.'
+  );
+  assert.equal(
+    renewalNotice(plan({ currency: 'NGN', amount_minor: 490000 }), false),
+    'Your plan renews automatically every month at ₦4,900 until you cancel. You can cancel any time in Settings.'
+  );
+  assert.equal(
+    renewalNotice(plan({ currency: 'USD', amount_minor: 4999 }), false),
+    'Your plan renews automatically every month at $49.99 until you cancel. You can cancel any time in Settings.'
+  );
+  assert.equal(
+    renewalNotice(plan({ interval: 'annually', amount_minor: 9999 }), false),
+    'Your plan renews automatically every year at $99.99 until you cancel. You can cancel any time in Settings.'
+  );
+});
+
+test('a trial’s notice starts "After the trial,"; a free plan has none', () => {
+  assert.equal(
+    renewalNotice(plan(), true),
+    'After the trial, your plan renews automatically every month at $9.99 until you cancel. You can cancel any time in Settings.'
+  );
+  assert.equal(renewalNotice(plan({ amount_minor: 0, is_free: true }), false), null);
+});
+
+test('the renewal period: every month, every 3 months, every year, every day', () => {
+  assert.equal(renewalPeriod({ interval: 'monthly', interval_count: 1 }), 'every month');
+  assert.equal(renewalPeriod({ interval: 'monthly', interval_count: 3 }), 'every 3 months');
+  assert.equal(renewalPeriod({ interval: 'annually', interval_count: 1 }), 'every year');
+  assert.equal(renewalPeriod({ interval: 'daily', interval_count: 1 }), 'every day');
 });

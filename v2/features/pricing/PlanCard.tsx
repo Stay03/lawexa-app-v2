@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { IPlan } from '@/types/subscription';
-import { REGISTER_HREF, actionLabel, cardLines, priceView, type PlanAction, type Tier } from './model';
+import { REGISTER_HREF, actionLabel, cardLines, priceView, renewalNotice, type PlanAction, type Tier } from './model';
 
 /**
  * PlanCard — one tier at the chosen period: its name, the plan's own
@@ -67,6 +67,8 @@ export function PlanCard({
   const lines = cardLines(tier, plan);
   const leads = !isCurrent && (recommended || trialOffer);
   const badge = isCurrent ? 'Your plan' : trialOffer ? 'Free trial' : recommended ? 'Recommended' : null;
+  // Said under the button, before anyone pays: how often and how much the plan charges again.
+  const notice = renewalNotice(plan, trialOffer);
 
   return (
     <Card
@@ -121,6 +123,7 @@ export function PlanCard({
           onChoose={onChoose}
           onTrial={onTrial}
         />
+        {notice ? <p className="text-center text-[13px] leading-snug text-muted-foreground tabular-nums">{notice}</p> : null}
       </div>
     </Card>
   );

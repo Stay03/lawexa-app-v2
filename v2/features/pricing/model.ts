@@ -202,6 +202,25 @@ export function perPeriod(plan: Pick<IPlan, 'interval' | 'interval_count'>): str
   return plan.interval_count > 1 ? `every ${plan.interval_count} ${noun}s` : `a ${noun}`;
 }
 
+/** "every month", "every 3 months", "every year": how often a plan charges again. */
+export function renewalPeriod(plan: Pick<IPlan, 'interval' | 'interval_count'>): string {
+  const noun = oneOffPeriodNoun(plan.interval);
+  return plan.interval_count > 1 ? `every ${plan.interval_count} ${noun}s` : `every ${noun}`;
+}
+
+/**
+ * The renewal notice under a paid plan's button and in the trial dialog
+ * (Richard 433760d9, approved by Arthur and the techlead; the wording is
+ * fixed): the plan's own currency, amount and period, said before anyone
+ * pays. A trial offer says when the charging starts. A free plan renews
+ * nothing, so it has no notice.
+ */
+export function renewalNotice(plan: IPlan, trial: boolean): string | null {
+  if (!(plan.amount_minor > 0)) return null;
+  const rest = `renews automatically ${renewalPeriod(plan)} at ${formatPlanAmount(plan)} until you cancel. You can cancel any time in Settings.`;
+  return trial ? `After the trial, your plan ${rest}` : `Your plan ${rest}`;
+}
+
 export interface PriceView {
   /** "$9.99". */
   amount: string;

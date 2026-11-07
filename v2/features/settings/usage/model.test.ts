@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { IAiMessagesLimit } from '@/types/message-pack';
-import { aiMessagesView, barTone, formatUsageDate, limitView } from './model';
+import { aiMessagesView, barTone, formatUsageDate, limitView, offersCancel } from './model';
 
 test('a paid plan with no plan limit but a hard cap of 999 is COUNTED, not unlimited (v1 said "Unlimited")', () => {
   // The live shape for the 63 paying accounts (21 September 2026): plan_limit
@@ -70,4 +70,21 @@ test('dates read "1 Oct 2026", and a missing or broken date reads as nothing', (
   assert.equal(formatUsageDate('2026-10-01T12:00:00Z'), '1 Oct 2026');
   assert.equal(formatUsageDate(null), '');
   assert.equal(formatUsageDate('not a date'), '');
+});
+
+test('"Cancel any time" shows only for a paid plan that will renew', () => {
+  const sub = (status: 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired', ends_at: string | null = null) => ({
+    status,
+    start_date: '2026-10-01',
+    next_payment_date: '2026-12-01',
+    ends_at,
+  });
+  assert.equal(offersCancel({ is_free: false, subscription: sub('active') }), true);
+  assert.equal(offersCancel({ is_free: false, subscription: sub('trialing') }), true);
+  assert.equal(offersCancel({ is_free: false, subscription: sub('past_due') }), true);
+  assert.equal(offersCancel({ is_free: false, subscription: sub('cancelled', '2026-12-01') }), false);
+  assert.equal(offersCancel({ is_free: false, subscription: sub('expired') }), false);
+  // One paid period that ends by itself: nothing renews, nothing to cancel.
+  assert.equal(offersCancel({ is_free: false, subscription: sub('active', '2026-12-01') }), false);
+  assert.equal(offersCancel({ is_free: true, subscription: null }), false);
 });

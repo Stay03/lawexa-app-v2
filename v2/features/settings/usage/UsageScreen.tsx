@@ -20,7 +20,7 @@ import type { IUserLimitsPlan } from '@/types/message-pack';
 import { SETTINGS_COLUMN } from '../SettingsList';
 import { SettingsFormGroup } from '../SettingsForm';
 import { SettingsState } from '../SettingsState';
-import { aiMessagesView, barTone, formatUsageDate, limitView, type LimitView } from './model';
+import { aiMessagesView, barTone, formatUsageDate, limitView, offersCancel, type LimitView } from './model';
 import { usageQueries } from './queries';
 import { UsageFallback } from './states';
 import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
@@ -136,7 +136,7 @@ const STATUS: Record<string, string> = {
   expired: 'Expired',
 };
 
-/** The plan, its state and its next date, and the way to a bigger one. */
+/** The plan, its state and its next date, the way to a bigger one, and the way to cancel one that renews. */
 function PlanRow({ plan }: { plan: IUserLimitsPlan }) {
   const sub = plan.subscription;
   const ends = formatUsageDate(sub?.ends_at);
@@ -154,6 +154,14 @@ function PlanRow({ plan }: { plan: IUserLimitsPlan }) {
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[15px] leading-snug font-medium text-foreground">{plan.name}</span>
         {detail ? <span className="truncate text-[13px] leading-snug text-muted-foreground">{detail}</span> : null}
+        {offersCancel(plan) ? (
+          <Link
+            href="/settings/billing"
+            className="self-start rounded text-[13px] leading-snug font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Cancel any time
+          </Link>
+        ) : null}
       </span>
       <Button asChild size="sm" variant={plan.is_free ? 'default' : 'outline'} className="shrink-0">
         <Link href="/pricing">{plan.is_free ? 'Upgrade' : 'Change plan'}</Link>

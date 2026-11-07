@@ -7,7 +7,7 @@ import { DialogClose } from '@/components/ui/dialog';
 import { formatPlanAmount } from '@/lib/utils/payment-format';
 import type { IPlan } from '@/types/subscription';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
-import { perPeriod, tierName } from './model';
+import { perPeriod, renewalNotice, tierName } from './model';
 
 /**
  * TrialDialog — what a free trial costs before Paystack's card check opens.
@@ -35,6 +35,8 @@ export function TrialDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
+  // The renewal notice, said before the card check: the plan charges again on its own once the trial ends.
+  const notice = plan ? renewalNotice(plan, true) : null;
   return (
     <ResponsiveOverlay
       open={open}
@@ -77,6 +79,7 @@ export function TrialDialog({
             </span>
             . You can cancel the trial in Billing before then.
           </p>
+          {notice ? <p className="text-[13px] leading-snug tabular-nums">{notice}</p> : null}
         </div>
       ) : null}
     </ResponsiveOverlay>

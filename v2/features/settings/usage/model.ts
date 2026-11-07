@@ -1,4 +1,4 @@
-import type { IAiMessagesLimit, IGenericLimit } from '@/types/message-pack';
+import type { IAiMessagesLimit, IGenericLimit, IUserLimitsPlan } from '@/types/message-pack';
 
 /**
  * What one usage limit shows: counted, or truly unlimited.
@@ -80,4 +80,15 @@ export function formatUsageDate(iso: string | null | undefined): string {
   if (!iso) return '';
   const time = Date.parse(iso);
   return Number.isNaN(time) ? '' : DATE.format(time);
+}
+
+/**
+ * Whether the plan row offers "Cancel any time" (Richard 433760d9): a paid plan
+ * that will renew. A free plan, a cancelled or expired one, and one that only
+ * ends (`ends_at` set) have nothing to cancel, as Billing's own Cancel row.
+ */
+export function offersCancel(plan: Pick<IUserLimitsPlan, 'is_free' | 'subscription'>): boolean {
+  const sub = plan.subscription;
+  if (plan.is_free || !sub || sub.ends_at) return false;
+  return sub.status === 'active' || sub.status === 'trialing' || sub.status === 'past_due';
 }

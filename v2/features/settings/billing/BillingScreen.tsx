@@ -18,7 +18,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import type { IInvoice } from '@/types/subscription';
-import { SETTINGS_BLOCK, SETTINGS_COLUMN } from '../SettingsList';
+import { SETTINGS_COLUMN } from '../SettingsList';
 import { SettingsFormGroup } from '../SettingsForm';
 import { SettingsState } from '../SettingsState';
 import { CancelPlanDialog } from './CancelPlanDialog';
@@ -106,6 +106,26 @@ export function BillingScreen() {
                 <Link href="/pricing">{summary.isFree ? 'Upgrade' : 'Change plan'}</Link>
               </Button>
             </li>
+            {/* Cancelling sits with the plan it ends, above the invoices, so it is
+                found without scrolling past a long invoice list (Richard 433760d9). */}
+            {summary.cancel ? (
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setCancelKind(summary.cancel)}
+                  className={cn(
+                    'v2-interactive flex min-h-14 w-full items-center gap-3.5 px-4 py-2.5 text-left',
+                    'text-destructive transition-colors duration-150 hover:bg-destructive/[0.06] motion-reduce:transition-none',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                  )}
+                >
+                  <XCircle aria-hidden className="size-5 shrink-0" />
+                  <span className="text-[15px] leading-snug font-medium">
+                    {summary.cancel === 'trial' ? 'Cancel free trial' : 'Cancel plan'}
+                  </span>
+                </button>
+              </li>
+            ) : null}
           </SettingsFormGroup>
           {summary.note ? (
             <p
@@ -145,27 +165,6 @@ export function BillingScreen() {
             </li>
           ) : null}
         </SettingsFormGroup>
-
-        {summary.cancel ? (
-          <ul className={SETTINGS_BLOCK}>
-            <li>
-              <button
-                type="button"
-                onClick={() => setCancelKind(summary.cancel)}
-                className={cn(
-                  'v2-interactive flex min-h-14 w-full items-center gap-3.5 px-4 py-2.5 text-left',
-                  'text-destructive transition-colors duration-150 hover:bg-destructive/[0.06] motion-reduce:transition-none',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
-                )}
-              >
-                <XCircle aria-hidden className="size-5 shrink-0" />
-                <span className="text-[15px] leading-snug font-medium">
-                  {summary.cancel === 'trial' ? 'Cancel free trial' : 'Cancel plan'}
-                </span>
-              </button>
-            </li>
-          </ul>
-        ) : null}
       </div>
 
       <CancelPlanDialog
