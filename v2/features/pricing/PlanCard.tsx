@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { IPlan } from '@/types/subscription';
+import type { ICurrentSubscriptionData, IPlan } from '@/types/subscription';
 import { REGISTER_HREF, actionLabel, cardLines, priceView, renewalNotice, type PlanAction, type Tier } from './model';
 
 /**
@@ -38,6 +38,7 @@ export function PlanCard({
   saving,
   action,
   isCurrent,
+  account,
   recommended,
   trialOffer,
   viewer,
@@ -52,6 +53,8 @@ export function PlanCard({
   action: PlanAction;
   /** The account is on one of this tier's plans (any period). */
   isCurrent: boolean;
+  /** The account's plan and subscription, or null signed out: a held plan that will not renew gets no renewal notice. */
+  account: ICurrentSubscriptionData | null;
   /** The tier the page recommends (`recommendedTierKey`). */
   recommended: boolean;
   trialOffer: boolean;
@@ -68,7 +71,7 @@ export function PlanCard({
   const leads = !isCurrent && (recommended || trialOffer);
   const badge = isCurrent ? 'Your plan' : trialOffer ? 'Free trial' : recommended ? 'Recommended' : null;
   // Said under the button, before anyone pays: how often and how much the plan charges again.
-  const notice = renewalNotice(plan, trialOffer);
+  const notice = renewalNotice(plan, trialOffer, account);
 
   return (
     <Card

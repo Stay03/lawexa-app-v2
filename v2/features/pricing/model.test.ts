@@ -379,3 +379,24 @@ test('the renewal period: every month, every 3 months, every year, every day', (
   assert.equal(renewalPeriod({ interval: 'annually', interval_count: 1 }), 'every year');
   assert.equal(renewalPeriod({ interval: 'daily', interval_count: 1 }), 'every day');
 });
+
+test('the account’s own plan says nothing about renewing when it will not renew: one period, cancelled or expired', () => {
+  const held = plan({ currency: 'NGN', amount_minor: 1500000 });
+  const RENEWS = 'Your plan renews automatically every month at ₦15,000 until you cancel. You can cancel any time in Settings.';
+  // Renewing by card: the notice stays, on its own card too.
+  assert.equal(renewalNotice(held, false, current(held)), RENEWS);
+  // One period paid by bank transfer (renews: false, ends_at set): no notice.
+  assert.equal(renewalNotice(held, false, current(held, false, { renews: false, ends_at: '2026-12-01T00:00:00Z' })), null);
+  // Cancelled, or expired, even from an older server that sends no `renews`.
+  assert.equal(renewalNotice(held, false, current(held, false, { status: 'cancelled', ends_at: '2026-12-01T00:00:00Z' })), null);
+  assert.equal(renewalNotice(held, false, current(held, false, { status: 'expired' })), null);
+  // Other plans on the page still carry the notice: they would be new payments.
+  const other = plan({ id: 99, currency: 'NGN', amount_minor: 490000 });
+  assert.equal(
+    renewalNotice(other, false, current(held, false, { renews: false, ends_at: '2026-12-01T00:00:00Z' })),
+    'Your plan renews automatically every month at ₦4,900 until you cancel. You can cancel any time in Settings.'
+  );
+  // Signed out, or on the free plan: every paid card has it.
+  assert.equal(renewalNotice(held, false, null), RENEWS);
+  assert.equal(renewalNotice(held, false, current(plan({ id: 4, amount_minor: 0, is_free: true }), true)), RENEWS);
+});

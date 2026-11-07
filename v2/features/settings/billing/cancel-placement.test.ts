@@ -26,6 +26,6 @@ test('Usage: the plan row links "Cancel any time" to Billing when the plan renew
 });
 
 test('the plan card and the trial dialog show the renewal notice', () => {
-  assert.match(read('pricing', 'PlanCard.tsx'), /const notice = renewalNotice\(plan, trialOffer\);/);
+  assert.match(read('pricing', 'PlanCard.tsx'), /const notice = renewalNotice\(plan, trialOffer, account\);/);
   assert.match(read('pricing', 'TrialDialog.tsx'), /renewalNotice\(plan, true\)/);
 });

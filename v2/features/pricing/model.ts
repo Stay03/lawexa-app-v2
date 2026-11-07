@@ -1,4 +1,4 @@
-import { oneOffPeriodNoun } from '@/lib/utils/one-period-subscription';
+import { isOnePeriodSubscription, oneOffPeriodNoun } from '@/lib/utils/one-period-subscription';
 import {
   calculateAnnualSavingsPct,
   formatPlanAmount,
@@ -214,11 +214,27 @@ export function renewalPeriod(plan: Pick<IPlan, 'interval' | 'interval_count'>):
  * fixed): the plan's own currency, amount and period, said before anyone
  * pays. A trial offer says when the charging starts. A free plan renews
  * nothing, so it has no notice.
+ *
+ * "Renews or not" is the subscription's, not the plan's: no plan carries a
+ * one-off marker, and a period paid by a method Paystack cannot charge again
+ * (a bank transfer) becomes one period after payment (`renews: false`,
+ * backend 08eb8edb). So the card the account already holds says nothing when
+ * that subscription will not renew: one period, cancelled or expired, the
+ * same plans Billing shows no Cancel for.
  */
-export function renewalNotice(plan: IPlan, trial: boolean): string | null {
+export function renewalNotice(plan: IPlan, trial: boolean, account: ICurrentSubscriptionData | null = null): string | null {
   if (!(plan.amount_minor > 0)) return null;
+  if (account && !account.is_free_tier && account.plan.id === plan.id && !accountRenews(account)) return null;
   const rest = `renews automatically ${renewalPeriod(plan)} at ${formatPlanAmount(plan)} until you cancel. You can cancel any time in Settings.`;
   return trial ? `After the trial, your plan ${rest}` : `Your plan ${rest}`;
+}
+
+/** Whether the account's own subscription charges again: not one period, not cancelled, not expired. */
+function accountRenews(account: ICurrentSubscriptionData): boolean {
+  const sub = account.subscription;
+  if (!sub) return false;
+  if (isOnePeriodSubscription(sub) || sub.renews === false) return false;
+  return sub.status !== 'cancelled' && sub.status !== 'expired';
 }
 
 export interface PriceView {

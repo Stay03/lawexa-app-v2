@@ -349,6 +349,7 @@ function Plans({ viewer, offersDaily }: { viewer: 'account' | 'guest'; offersDai
                   saving={tierSaving(tier)}
                   action={action}
                   isCurrent={isCurrentTier(tier, account)}
+                  account={account}
                   recommended={tier.key === recommended}
                   trialOffer={trialOffered && action === 'subscribe' && plan.trial_eligible}
                   viewer={viewer}
