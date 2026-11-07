@@ -339,50 +339,51 @@ test('a card prints the plan’s own file limits in place of v1’s typed-in siz
   ]);
 });
 
-// ── The renewal notice (Richard 433760d9, wording approved by Arthur and the techlead) ──
+// ── The renewal notice (Richard 433760d9; Arthur 384c e37fc384: one short faint line) ──
 
-test('the renewal notice names the plan’s own amount and period, in its own currency', () => {
+test('the renewal notice is one short line with the plan’s own period, in naira or dollars alike', () => {
   assert.equal(
     renewalNotice(plan(), false),
-    'Your plan renews automatically every month at $9.99 until you cancel. You can cancel any time in Settings.'
+    'Auto-renews monthly. Cancel anytime.'
   );
   // Most students pay in naira (Richard 9f60e8e7): Pro ₦15,000 and Basic ₦4,900 a month.
   assert.equal(
     renewalNotice(plan({ currency: 'NGN', amount_minor: 1500000 }), false),
-    'Your plan renews automatically every month at ₦15,000 until you cancel. You can cancel any time in Settings.'
+    'Auto-renews monthly. Cancel anytime.'
   );
   assert.equal(
     renewalNotice(plan({ currency: 'NGN', amount_minor: 490000 }), false),
-    'Your plan renews automatically every month at ₦4,900 until you cancel. You can cancel any time in Settings.'
+    'Auto-renews monthly. Cancel anytime.'
   );
   assert.equal(
     renewalNotice(plan({ currency: 'USD', amount_minor: 4999 }), false),
-    'Your plan renews automatically every month at $49.99 until you cancel. You can cancel any time in Settings.'
+    'Auto-renews monthly. Cancel anytime.'
   );
   assert.equal(
     renewalNotice(plan({ interval: 'annually', amount_minor: 9999 }), false),
-    'Your plan renews automatically every year at $99.99 until you cancel. You can cancel any time in Settings.'
+    'Auto-renews yearly. Cancel anytime.'
   );
 });
 
 test('a trial’s notice starts "After the trial,"; a free plan has none', () => {
   assert.equal(
     renewalNotice(plan(), true),
-    'After the trial, your plan renews automatically every month at $9.99 until you cancel. You can cancel any time in Settings.'
+    'After the trial, auto-renews monthly. Cancel anytime.'
   );
   assert.equal(renewalNotice(plan({ amount_minor: 0, is_free: true }), false), null);
 });
 
-test('the renewal period: every month, every 3 months, every year, every day', () => {
-  assert.equal(renewalPeriod({ interval: 'monthly', interval_count: 1 }), 'every month');
+test('the renewal period: monthly, every 3 months, yearly, daily', () => {
+  assert.equal(renewalPeriod({ interval: 'monthly', interval_count: 1 }), 'monthly');
   assert.equal(renewalPeriod({ interval: 'monthly', interval_count: 3 }), 'every 3 months');
-  assert.equal(renewalPeriod({ interval: 'annually', interval_count: 1 }), 'every year');
-  assert.equal(renewalPeriod({ interval: 'daily', interval_count: 1 }), 'every day');
+  assert.equal(renewalPeriod({ interval: 'annually', interval_count: 1 }), 'yearly');
+  assert.equal(renewalPeriod({ interval: 'daily', interval_count: 1 }), 'daily');
+  assert.equal(renewalNotice(plan({ interval_count: 3 }), false), 'Auto-renews every 3 months. Cancel anytime.');
 });
 
 test('the account’s own plan says nothing about renewing when it will not renew: one period, cancelled or expired', () => {
   const held = plan({ currency: 'NGN', amount_minor: 1500000 });
-  const RENEWS = 'Your plan renews automatically every month at ₦15,000 until you cancel. You can cancel any time in Settings.';
+  const RENEWS = 'Auto-renews monthly. Cancel anytime.';
   // Renewing by card: the notice stays, on its own card too.
   assert.equal(renewalNotice(held, false, current(held)), RENEWS);
   // One period paid by bank transfer (renews: false, ends_at set): no notice.
@@ -394,7 +395,7 @@ test('the account’s own plan says nothing about renewing when it will not rene
   const other = plan({ id: 99, currency: 'NGN', amount_minor: 490000 });
   assert.equal(
     renewalNotice(other, false, current(held, false, { renews: false, ends_at: '2026-12-01T00:00:00Z' })),
-    'Your plan renews automatically every month at ₦4,900 until you cancel. You can cancel any time in Settings.'
+    'Auto-renews monthly. Cancel anytime.'
   );
   // Signed out, or on the free plan: every paid card has it.
   assert.equal(renewalNotice(held, false, null), RENEWS);

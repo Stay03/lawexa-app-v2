@@ -70,7 +70,7 @@ export function PlanCard({
   const lines = cardLines(tier, plan);
   const leads = !isCurrent && (recommended || trialOffer);
   const badge = isCurrent ? 'Your plan' : trialOffer ? 'Free trial' : recommended ? 'Recommended' : null;
-  // Said under the button, before anyone pays: how often and how much the plan charges again.
+  // Said under the button, before anyone pays: the plan charges again on its own until cancelled.
   const notice = renewalNotice(plan, trialOffer, account);
 
   return (
@@ -126,7 +126,7 @@ export function PlanCard({
           onChoose={onChoose}
           onTrial={onTrial}
         />
-        {notice ? <p className="text-center text-[13px] leading-snug text-muted-foreground tabular-nums">{notice}</p> : null}
+        {notice ? <p className="text-center text-xs leading-snug text-muted-foreground/80">{notice}</p> : null}
       </div>
     </Card>
   );

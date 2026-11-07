@@ -202,18 +202,28 @@ export function perPeriod(plan: Pick<IPlan, 'interval' | 'interval_count'>): str
   return plan.interval_count > 1 ? `every ${plan.interval_count} ${noun}s` : `a ${noun}`;
 }
 
-/** "every month", "every 3 months", "every year": how often a plan charges again. */
+const RENEWAL_ADVERB: Record<string, string> = {
+  daily: 'daily',
+  weekly: 'weekly',
+  monthly: 'monthly',
+  quarterly: 'quarterly',
+  yearly: 'yearly',
+  annually: 'yearly',
+};
+
+/** "monthly", "yearly", "daily", "every 3 months": how often a plan charges again. */
 export function renewalPeriod(plan: Pick<IPlan, 'interval' | 'interval_count'>): string {
   const noun = oneOffPeriodNoun(plan.interval);
-  return plan.interval_count > 1 ? `every ${plan.interval_count} ${noun}s` : `every ${noun}`;
+  if (plan.interval_count > 1) return `every ${plan.interval_count} ${noun}s`;
+  return RENEWAL_ADVERB[plan.interval] ?? `every ${noun}`;
 }
 
 /**
- * The renewal notice under a paid plan's button and in the trial dialog
- * (Richard 433760d9, approved by Arthur and the techlead; the wording is
- * fixed): the plan's own currency, amount and period, said before anyone
- * pays. A trial offer says when the charging starts. A free plan renews
- * nothing, so it has no notice.
+ * The renewal notice under a paid plan's button and in the trial dialog, one
+ * short faint line (Arthur, 384c e37fc384, 7 Nov 2026: "Just a feint Auto-renews
+ * monthly. Cancel anytime"): "Auto-renews monthly. Cancel anytime." A trial
+ * offer says when the charging starts. A free plan renews nothing, so it has
+ * no notice.
  *
  * "Renews or not" is the subscription's, not the plan's: no plan carries a
  * one-off marker, and a period paid by a method Paystack cannot charge again
@@ -225,8 +235,8 @@ export function renewalPeriod(plan: Pick<IPlan, 'interval' | 'interval_count'>):
 export function renewalNotice(plan: IPlan, trial: boolean, account: ICurrentSubscriptionData | null = null): string | null {
   if (!(plan.amount_minor > 0)) return null;
   if (account && !account.is_free_tier && account.plan.id === plan.id && !accountRenews(account)) return null;
-  const rest = `renews automatically ${renewalPeriod(plan)} at ${formatPlanAmount(plan)} until you cancel. You can cancel any time in Settings.`;
-  return trial ? `After the trial, your plan ${rest}` : `Your plan ${rest}`;
+  const period = renewalPeriod(plan);
+  return trial ? `After the trial, auto-renews ${period}. Cancel anytime.` : `Auto-renews ${period}. Cancel anytime.`;
 }
 
 /** Whether the account's own subscription charges again: not one period, not cancelled, not expired. */

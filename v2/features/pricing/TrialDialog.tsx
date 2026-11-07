@@ -79,7 +79,7 @@ export function TrialDialog({
             </span>
             . You can cancel the trial in Billing before then.
           </p>
-          {notice ? <p className="text-[13px] leading-snug tabular-nums">{notice}</p> : null}
+          {notice ? <p className="text-xs leading-snug text-muted-foreground/80">{notice}</p> : null}
         </div>
       ) : null}
     </ResponsiveOverlay>
