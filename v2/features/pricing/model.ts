@@ -221,7 +221,7 @@ export function renewalPeriod(plan: Pick<IPlan, 'interval' | 'interval_count'>):
 /**
  * The renewal notice under a paid plan's button and in the trial dialog, one
  * short faint line (Arthur, 384c e37fc384, 7 Nov 2026: "Just a feint Auto-renews
- * monthly. Cancel anytime"): "Auto-renews monthly. Cancel anytime." A trial
+ * monthly. Cancel anytime"): "Renews monthly. Cancel anytime." (Arthur, 8 Nov, 10f64ed6: "remove the auto"). A trial
  * offer says when the charging starts. A free plan renews nothing, so it has
  * no notice.
  *
@@ -236,7 +236,7 @@ export function renewalNotice(plan: IPlan, trial: boolean, account: ICurrentSubs
   if (!(plan.amount_minor > 0)) return null;
   if (account && !account.is_free_tier && account.plan.id === plan.id && !accountRenews(account)) return null;
   const period = renewalPeriod(plan);
-  return trial ? `After the trial, auto-renews ${period}. Cancel anytime.` : `Auto-renews ${period}. Cancel anytime.`;
+  return trial ? `After the trial, renews ${period}. Cancel anytime.` : `Renews ${period}. Cancel anytime.`;
 }
 
 /** Whether the account's own subscription charges again: not one period, not cancelled, not expired. */
