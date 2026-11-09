@@ -177,6 +177,7 @@ export function UserMessageRow({
     const mine = !showAuthor || turnSide(message, viewerId) === 'mine';
     return (
       <CardAnswersLine
+        rowId={message.id}
         answers={message.cardAnswers}
         content={displayContent}
         who={mine ? null : (message.author?.name ?? 'Someone')}

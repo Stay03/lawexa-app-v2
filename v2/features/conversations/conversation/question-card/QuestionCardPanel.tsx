@@ -37,22 +37,30 @@ type QuestionCardProps = {
   disabled: boolean;
   /** Send the answers; resolves with the refusal's sentence, or null when they went. */
   onAnswer: (answers: QuestionCardAnswer[]) => Promise<string | null>;
+  /** A card opened to change its answers: × closes it and keeps them. */
+  onCancel?: (() => void) | null;
 };
 
 /** The open card, started afresh for each new card (its own key, so a host's box beside it keeps its node). */
 export function OpenQuestionCard(props: QuestionCardProps) {
-  return <QuestionCardPanel key={props.open.cardMessageId ?? 'unsaved'} {...props} />;
+  const key = `${props.open.cardMessageId ?? 'unsaved'}${props.open.amend ? ':change' : ''}`;
+  return <QuestionCardPanel key={key} {...props} />;
 }
 
 function QuestionCardPanel({
   open,
   disabled,
   onAnswer,
+  onCancel = null,
 }: QuestionCardProps) {
   const { questions } = open.card;
   const count = questions.length;
   const [index, setIndex] = useState(0);
-  const [drafts, setDrafts] = useState<(QuestionCardAnswer | null)[]>(() => questions.map(startingAnswer));
+  // A card opened to change its answers starts on them (Arthur, 05650d00).
+  const [drafts, setDrafts] = useState<(QuestionCardAnswer | null)[]>(
+    () => open.amend?.prefill ?? questions.map(startingAnswer),
+  );
+  const keepOnClose = open.amend !== undefined && onCancel !== null;
   const [sending, setSending] = useState(false);
   const [refused, setRefused] = useState<string | null>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -89,11 +97,13 @@ function QuestionCardPanel({
     setDraft({ option });
   };
 
+  // Skip leaves the question unanswered and moves on; on the last question it
+  // only clears the choice. Lawexa goes on only after Send (or × to skip them
+  // all), never after a single choice or skip (Arthur, 05650d00).
   const skip = () => {
     if (locked) return;
-    const next = drafts.map((entry, at) => (at === index ? null : entry));
-    setDrafts(next);
-    advance(next);
+    setDraft(null);
+    if (!isLast) setIndex(index + 1);
   };
 
   const writeOwn = () => {
@@ -141,10 +151,10 @@ function QuestionCardPanel({
           )}
           <button
             type="button"
-            aria-label={count > 1 ? 'Skip all questions' : 'Skip the question'}
-            title="Skip"
-            disabled={locked}
-            onClick={() => void send(skipAllAnswers(questions))}
+            aria-label={keepOnClose ? 'Keep my answers' : count > 1 ? 'Skip all questions' : 'Skip the question'}
+            title={keepOnClose ? 'Keep my answers' : 'Skip'}
+            disabled={keepOnClose ? sending : locked}
+            onClick={() => (keepOnClose ? onCancel?.() : void send(skipAllAnswers(questions)))}
             className={cn('v2-interactive ml-1 rounded-md p-1.5 hover:bg-muted hover:text-foreground disabled:opacity-40', FOCUS_RING)}
           >
             <X className="size-4" />
@@ -217,9 +227,10 @@ function QuestionCardPanel({
             placeholder="Type your answer"
             onChange={(event) => setDraft({ text: event.target.value })}
             onKeyDown={(event) => {
+              // Enter moves on; on the last question only Send sends.
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
-                advance(drafts);
+                if (!isLast) setIndex(index + 1);
               }
             }}
             className="field-sizing-content max-h-32 min-w-0 flex-1 resize-none bg-transparent text-[15px] text-foreground outline-none placeholder:text-muted-foreground"

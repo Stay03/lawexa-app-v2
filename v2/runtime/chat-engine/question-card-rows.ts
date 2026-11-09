@@ -62,6 +62,26 @@ export function withOpenCardClosed(
 }
 
 /**
+ * New answers to an answered card (Arthur, 05650d00): the card keeps its
+ * place and takes them, as the server stores them.
+ */
+export function withCardAmended(
+  rows: readonly EngineMessage[],
+  cardMessageId: number,
+  answers: readonly QuestionCardAnswer[],
+): EngineMessage[] {
+  let changed = false;
+  const next = rows.map((row) => {
+    const card = (row as ChatMessage).questionCard;
+    const id = row.savedId ?? (/^msg_(\d+)$/.exec(row.id) ? Number(row.id.slice(4)) : null);
+    if (row.role !== 'assistant' || !card || id !== cardMessageId) return row;
+    changed = true;
+    return { ...row, questionCard: { ...card, status: 'answered', answers: [...answers] } } as EngineMessage;
+  });
+  return changed ? next : (rows as EngineMessage[]);
+}
+
+/**
  * The card a turn ended with, from its `completed` event's `question_card`,
  * onto the answer drawn from the stream (named by its saved id). A card
  * already open on screen is closed as replaced, as the server does. No card

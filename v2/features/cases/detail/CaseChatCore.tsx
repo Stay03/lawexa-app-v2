@@ -590,6 +590,7 @@ export function CaseChatComposerDock({
             open={openCard}
             disabled={surface.sendHeldBy !== null}
             onAnswer={surface.answerCard}
+            onCancel={surface.cancelCard}
           />
         </div>
       )}

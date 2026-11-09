@@ -59,6 +59,8 @@ export interface EmbeddedComposerSurface {
   questionCard: OpenCard | null;
   /** Send answers to it: resolves with the refusal's sentence, or null when they went. */
   answerCard: (answers: QuestionCardAnswer[]) => Promise<string | null>;
+  /** Close a card opened to change its answers, keeping them; null for any other card. */
+  cancelCard: (() => void) | null;
 }
 
 let surface: EmbeddedComposerSurface | null = null;

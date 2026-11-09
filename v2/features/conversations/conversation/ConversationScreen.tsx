@@ -7,8 +7,8 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { MessageReplyTo, QuestionCardAnswer } from '@/types/chat';
-import { answersLine, answersMessage, labeledAnswers } from '@/lib/utils/question-card';
-import { openCardOf } from './question-card/open-card';
+import { answersAsDrafts, answersLine, answersMessage, labeledAnswers } from '@/lib/utils/question-card';
+import { amendTargetOf, openCardOf, type OpenCard } from './question-card/open-card';
 import { REPLY_DRAFT, quoteTone, replyDraftKey } from './reply-target';
 import { writeDraft } from './draft-store';
 import { memberColourIndex } from './member-colour';
@@ -190,19 +190,45 @@ export function ConversationScreen({
   // the message ("Firm but polite · 14-day deadline").
   // A confidential chat saves nothing: its card has no id, and its answers go
   // as the plain message the server would have written for them.
-  const questionCard = useMemo(() => openCardOf(messages, isConfidential), [messages, isConfidential]);
+  //
+  // CHANGE ANSWERS (Arthur, 05650d00): the latest answered card can be opened
+  // again from its "You chose" line, starting on its answers; Send changes them
+  // (`amend`), × keeps them. `amending` names the card being changed; it counts
+  // only while that card is still the one that can be changed.
+  const openCard = useMemo(() => openCardOf(messages, isConfidential), [messages, isConfidential]);
+  const amendTarget = useMemo(() => amendTargetOf(messages), [messages]);
+  const [amending, setAmending] = useState<number | null>(null);
+  const questionCard = useMemo<OpenCard | null>(() => {
+    if (openCard) return openCard;
+    if (!amendTarget || amending !== amendTarget.cardMessageId) return null;
+    const { card, cardMessageId } = amendTarget;
+    return { cardMessageId, card, amend: { prefill: answersAsDrafts(card.questions, card.answers ?? []) } };
+  }, [openCard, amendTarget, amending]);
   const answerCard = useCallback(
     async (answers: QuestionCardAnswer[]): Promise<string | null> => {
       if (!questionCard || !canSend) return null;
       const { questions } = questionCard.card;
       const message =
         questionCard.cardMessageId === null ? answersMessage(questions, answers) : answersLine(questions, answers);
-      // The labels are for this row's "You chose" line; the engine sends the answers without them.
-      const shown = { cardMessageId: questionCard.cardMessageId, answers: labeledAnswers(questions, answers) };
+      // The labels and questions are for this row's "You chose" line; the engine sends the answers without them.
+      const shown = {
+        cardMessageId: questionCard.cardMessageId,
+        answers: labeledAnswers(questions, answers),
+        questions,
+        ...(questionCard.amend && { amend: true }),
+      };
       const outcome = await controllerSubmit(message, [], null, shown);
+      if (!outcome && questionCard.amend) setAmending(null);
       return outcome ? outcome.refused || null : null;
     },
     [questionCard, canSend, controllerSubmit],
+  );
+  const keepCardAnswers = useCallback(() => setAmending(null), []);
+  const cancelCard = questionCard?.amend ? keepCardAnswers : null;
+  // For the rows: which "You chose" line offers Change answers, and what it does.
+  const changeCardAnswers = useMemo(
+    () => (canSend && amendTarget ? { rowId: amendTarget.answerRowId, start: () => setAmending(amendTarget.cardMessageId) } : null),
+    [canSend, amendTarget],
   );
   useEffect(() => {
     if (!externalComposer) return;
@@ -224,6 +250,7 @@ export function ConversationScreen({
       stop: controllerStop,
       questionCard,
       answerCard,
+      cancelCard,
     });
   }, [
     externalComposer,
@@ -244,6 +271,7 @@ export function ConversationScreen({
     controllerStop,
     questionCard,
     answerCard,
+    cancelCard,
   ]);
   useEffect(() => {
     if (!externalComposer) return;
@@ -350,6 +378,7 @@ export function ConversationScreen({
       stop: controllerStop,
       questionCard,
       answerCard,
+      cancelCard,
       mentionOptions,
       quoteToneOf,
       spaceUuid,
@@ -376,6 +405,7 @@ export function ConversationScreen({
     controllerStop,
     questionCard,
     answerCard,
+    cancelCard,
     mentionOptions,
     quoteToneOf,
     spaceUuid,
@@ -473,6 +503,7 @@ export function ConversationScreen({
           canSend={canSend}
           conversationId={conversationId}
           applyDraftEditLine={onDraftEditLine}
+          changeCardAnswers={changeCardAnswers}
         >
           {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
               own route, a draft or a file opens beside the transcript on a

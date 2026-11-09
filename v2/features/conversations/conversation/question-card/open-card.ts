@@ -1,4 +1,4 @@
-import type { ChatMessage, ConversationMessage, QuestionCard } from '@/types/chat';
+import type { ChatMessage, ConversationMessage, QuestionCard, QuestionCardAnswer } from '@/types/chat';
 import { isEventMessage } from '@/types/chat';
 import { savedMessageId } from '../markdown/export-target';
 
@@ -10,6 +10,47 @@ import { savedMessageId } from '../markdown/export-target';
 export interface OpenCard {
   cardMessageId: number | null;
   card: QuestionCard;
+  /**
+   * Reopened to change its answers (Arthur, 05650d00): it starts on them,
+   * sends with `amend`, and × keeps them instead of skipping.
+   */
+  amend?: { prefill: (QuestionCardAnswer | null)[] };
+}
+
+/** The chat's latest card, answered, whose answers can still be changed, and the row that answered it last. */
+export interface AmendTarget {
+  cardMessageId: number;
+  card: QuestionCard;
+  /** The row whose "You chose" line carries Change answers. */
+  answerRowId: string;
+}
+
+/**
+ * The card whose answers can be changed (Arthur, 05650d00): only the LATEST
+ * card in the chat, once answered, and only from the latest row that answered
+ * it. A newer card, an unanswered one, or one without a saved id (a
+ * confidential chat, which can name none) offers nothing.
+ */
+export function amendTargetOf(messages: readonly ConversationMessage[]): AmendTarget | null {
+  let answerRowId: string | null = null;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const row = messages[index];
+    if (isEventMessage(row)) continue;
+    const chat = row as ChatMessage;
+    if (row.role === 'user' && chat.cardAnswers && answerRowId === null) {
+      answerRowId = row.id;
+      continue;
+    }
+    const card = chat.questionCard;
+    if (row.role !== 'assistant' || !card) continue;
+    // The latest card decides: answered, with a row that answered it, or nothing.
+    if (card.status !== 'answered' || answerRowId === null) return null;
+    const cardMessageId = (row as { savedId?: number }).savedId ?? savedMessageId(row.id);
+    if (cardMessageId === null) return null;
+    const answering = messages.find((m) => m.id === answerRowId) as ChatMessage | undefined;
+    return answering?.cardAnswers?.cardMessageId === cardMessageId ? { cardMessageId, card, answerRowId } : null;
+  }
+  return null;
 }
 
 /**

@@ -101,7 +101,29 @@ export function readCardAnswers(metadata: unknown): QuestionCardAnswers | null {
   if (typeof metadata.card_message_id !== 'number') return null;
   const answers = readAnswers(metadata.answers ?? []);
   if (!answers) return null;
-  return { cardMessageId: metadata.card_message_id, answers };
+  return { cardMessageId: metadata.card_message_id, answers, ...(metadata.amend === true && { amend: true }) };
+}
+
+/**
+ * A card's stored answers as the card's starting choices, to change them
+ * (Arthur, 05650d00): each option and own answer as it was, a skip as nothing
+ * chosen.
+ */
+export function answersAsDrafts(
+  questions: readonly QuestionCardQuestion[],
+  answers: readonly QuestionCardAnswer[],
+): (QuestionCardAnswer | null)[] {
+  return questions.map((_question, index) => {
+    const answer = answers[index];
+    if (!answer || isSkipped(answer)) return null;
+    return 'text' in answer ? { text: answer.text } : { option: answer.option };
+  });
+}
+
+/** One question's answer in words for the expanded "You chose" list. */
+export function answerForList(question: QuestionCardQuestion | undefined, answer: QuestionCardAnswer): string {
+  if (isSkipped(answer)) return answer.label ? `Skipped, Lawexa went with ${answer.label}` : 'Skipped';
+  return answerWords(question, answer) ?? '';
 }
 
 export function isSkipped(answer: QuestionCardAnswer): answer is { skipped: true; label?: string } {

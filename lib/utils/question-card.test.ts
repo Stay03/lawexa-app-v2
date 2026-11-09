@@ -5,6 +5,8 @@ import type { ApiMessage, ChatMessage, QuestionCardQuestion } from '@/types/chat
 import {
   ALL_SKIPPED_LINE,
   allSkipped,
+  answerForList,
+  answersAsDrafts,
   answersLine,
   answersMessage,
   answersToSend,
@@ -147,6 +149,29 @@ test("a confidential chat's answers go as the message the server would have writ
   assert.equal(answersMessage([TONE], [{ option: 1 }]), 'My answers to your questions:\n1. TEST DATA. Which tone should the letter take? → Final demand');
 });
 
+test('changing answers starts the card on the stored ones; a skip starts empty', () => {
+  assert.deepEqual(
+    answersAsDrafts([TONE, DEADLINE], [{ option: 1, label: 'Final demand' }, { skipped: true, label: '14-day deadline' }]),
+    [{ option: 1 }, null],
+  );
+  assert.deepEqual(answersAsDrafts([TONE, DEADLINE], [{ text: 'Lagos' }]), [{ text: 'Lagos' }, null]);
+});
+
+test('the expanded list says each answer, and what Lawexa went with for a skip', () => {
+  assert.equal(answerForList(TONE, { option: 2, label: 'Friendly reminder' }), 'Friendly reminder');
+  assert.equal(answerForList(TONE, { text: 'Very firm' }), 'Very firm');
+  assert.equal(answerForList(DEADLINE, { skipped: true, label: '14-day deadline' }), 'Skipped, Lawexa went with 14-day deadline');
+  assert.equal(answerForList(DEADLINE, { skipped: true }), 'Skipped');
+});
+
+test('changed answers are read as such', () => {
+  assert.deepEqual(readCardAnswers({ type: 'question_answers', card_message_id: 41, answers: [{ option: 0 }], amend: true }), {
+    cardMessageId: 41,
+    answers: [{ option: 0 }],
+    amend: true,
+  });
+});
+
 /* ── The transform ────────────────────────────────────────────────────────── */
 
 const message = (id: number, role: ApiMessage['role'], content: string, metadata: ApiMessage['metadata'] = null): ApiMessage =>
@@ -166,7 +191,12 @@ test('a card is drawn as an answer carrying its card; its answers as a user turn
   const card = rows[1] as ChatMessage;
   assert.equal(card.content, 'TEST DATA. 1. Which tone? …');
   assert.equal(card.questionCard?.status, 'open');
-  assert.deepEqual((rows[2] as ChatMessage).cardAnswers, { cardMessageId: 2, answers: [{ option: 0 }, { option: 0 }] });
+  // The card's questions ride along for the tap-to-expand list.
+  assert.deepEqual((rows[2] as ChatMessage).cardAnswers, {
+    cardMessageId: 2,
+    answers: [{ option: 0 }, { option: 0 }],
+    questions: [TONE, DEADLINE],
+  });
   assert.equal((rows[0] as ChatMessage).cardAnswers, undefined);
 });
 

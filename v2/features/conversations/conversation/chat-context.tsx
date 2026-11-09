@@ -30,6 +30,16 @@ interface V2ChatContextValue {
    * 02:16Z, thread 1e44eb39). Stable: it only reaches the chat's engine.
    */
   applyDraftEditLine: (answer: DraftEditLineFields) => void;
+  /**
+   * Change answers (Arthur, 05650d00): the one "You chose" line that offers it
+   * (the latest answered card's), and what it does; null when none can.
+   */
+  changeCardAnswers: ChangeCardAnswers | null;
+}
+
+export interface ChangeCardAnswers {
+  rowId: string;
+  start: () => void;
 }
 
 const V2ChatContext = createContext<V2ChatContextValue | null>(null);
@@ -41,6 +51,7 @@ export function V2ChatProvider({
   canSend,
   conversationId,
   applyDraftEditLine,
+  changeCardAnswers = null,
 }: {
   children: React.ReactNode;
   sendMessage: (message: string) => void;
@@ -48,13 +59,14 @@ export function V2ChatProvider({
   canSend: boolean;
   conversationId: string;
   applyDraftEditLine: (answer: DraftEditLineFields) => void;
+  changeCardAnswers?: ChangeCardAnswers | null;
 }) {
   // Stable value — only changes when the streaming flag (or `canSend`) flips, never per token
   // (tokens flow through the per-message streaming store, not this context), so
   // the card subtree never re-renders on stream growth.
   const value = useMemo<V2ChatContextValue>(
-    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine }),
-    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine],
+    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, changeCardAnswers }),
+    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, changeCardAnswers],
   );
   return <V2ChatContext.Provider value={value}>{children}</V2ChatContext.Provider>;
 }

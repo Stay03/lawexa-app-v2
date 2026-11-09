@@ -1,9 +1,13 @@
 'use client';
 
-import { Check } from 'lucide-react';
+import { useId, useState } from 'react';
+import { Check, ChevronDown, PenLine } from 'lucide-react';
 
-import { allSkipped, chosenLine } from '@/lib/utils/question-card';
+import { cn } from '@/lib/utils';
+import { allSkipped, answerForList, chosenLine } from '@/lib/utils/question-card';
 import type { QuestionCard, QuestionCardAnswers } from '@/types/chat';
+import { FOCUS_RING } from '@/v2/shell/designs/modules/meta';
+import { useV2ChatContext } from '../chat-context';
 
 /**
  * The marks a question card leaves in the transcript (Arthur's picture,
@@ -42,33 +46,94 @@ export function CardMark({ card }: { card: QuestionCard }) {
  * labels (`chosenLine`): the server saves the turn's text as the model reads
  * it, a numbered list, not this line. Only answers without labels fall back
  * to the text. In a space chat another member's answers name them.
+ *
+ * A tap opens each question with its answer (Arthur, 05650d00), when the
+ * card's questions are known. On the latest answered card's line, "Change
+ * answers" opens the card again on these answers; changed answers read "You
+ * changed: …". Lawexa's reply to the earlier answers stays above.
  */
 export function CardAnswersLine({
+  rowId,
   answers,
   content,
   who,
 }: {
+  /** This row's id: the one line that offers Change answers is named by it. */
+  rowId: string;
   answers: QuestionCardAnswers;
   content: string;
   /** Null for the reader's own answers ("You"); else the member's name. */
   who: string | null;
 }) {
+  const [open, setOpen] = useState(false);
+  const chat = useV2ChatContext();
   const skippedAll = allSkipped(answers.answers);
   const subject = who ?? 'You';
   const line = chosenLine(answers.answers) ?? content;
+  const questions = answers.questions ?? null;
+  // Only the reader's own line, on the latest answered card, and not while a turn runs.
+  const change =
+    who === null && chat && !chat.isStreaming && chat.changeCardAnswers?.rowId === rowId ? chat.changeCardAnswers : null;
+  const listId = useId();
+  const words = skippedAll ? (
+    <span>{subject} skipped the questions</span>
+  ) : (
+    <span className="min-w-0 break-words">
+      {subject} {answers.amend ? 'changed' : 'chose'}: <span className="text-foreground">{line}</span>
+    </span>
+  );
+  const pill =
+    'inline-flex min-w-0 max-w-full items-start gap-2 rounded-2xl border border-border px-3 py-1.5 text-left text-[13px] leading-snug text-muted-foreground';
   return (
-    <div className="flex min-w-0">
+    <div className="flex min-w-0 flex-col items-start gap-1.5">
       {/* Wraps rather than cuts: the choices are the reader's record of what they told Lawexa. */}
-      <div className="inline-flex min-w-0 max-w-full items-start gap-2 rounded-2xl border border-border px-3 py-1.5 text-[13px] leading-snug text-muted-foreground">
-        <Check aria-hidden className="mt-0.5 size-3.5 shrink-0 text-primary" />
-        {skippedAll ? (
-          <span>{subject} skipped the questions</span>
-        ) : (
-          <span className="min-w-0 break-words">
-            {subject} chose: <span className="text-foreground">{line}</span>
-          </span>
-        )}
-      </div>
+      {questions ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-controls={listId}
+          onClick={() => setOpen((shown) => !shown)}
+          className={cn(pill, 'v2-interactive transition-colors hover:bg-muted/60', FOCUS_RING)}
+        >
+          <Check aria-hidden className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          {words}
+          <ChevronDown
+            aria-hidden
+            className={cn('mt-0.5 size-3.5 shrink-0 transition-transform motion-reduce:transition-none', open && 'rotate-180')}
+          />
+        </button>
+      ) : (
+        <div className={pill}>
+          <Check aria-hidden className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          {words}
+        </div>
+      )}
+      {questions && open && (
+        <ol id={listId} className="ml-1 flex max-w-full flex-col gap-1.5 border-l border-border pl-3 text-[13px] leading-snug">
+          {questions.map((question, index) => {
+            const answer = answers.answers[index];
+            return (
+              <li key={index} className="min-w-0 break-words">
+                <span className="text-muted-foreground">{question.question}</span>
+                <span className="block text-foreground">{answer ? answerForList(question, answer) : 'Skipped'}</span>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {change && (
+        <button
+          type="button"
+          onClick={change.start}
+          className={cn(
+            'v2-interactive flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+            FOCUS_RING,
+          )}
+        >
+          <PenLine aria-hidden className="size-3.5" />
+          Change answers
+        </button>
+      )}
     </div>
   );
 }

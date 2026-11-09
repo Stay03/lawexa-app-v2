@@ -232,6 +232,7 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
               open={openCard}
               disabled={surface.holdSend || surface.sendHeldBy !== null}
               onAnswer={surface.answerCard}
+              onCancel={surface.cancelCard}
             />
           </div>
         )}

@@ -152,6 +152,10 @@ export interface QuestionCard {
 export interface QuestionCardAnswers {
   cardMessageId: number | null;
   answers: QuestionCardAnswer[];
+  /** The reader changed earlier answers (Arthur, 05650d00): the row reads "You changed". */
+  amend?: boolean;
+  /** The card's questions, for the line's tap-to-expand list; absent when the card is not in the chat read. */
+  questions?: QuestionCardQuestion[];
 }
 
 /**
@@ -692,7 +696,8 @@ export interface ChatStartRequest {
   client_request_id?: string;
   // Answers to the chat's open question card, one per question in order. A
   // card that is not open, not this chat's, or a wrong count is a 422.
-  question_answers?: { card_message_id: number; answers: QuestionCardAnswer[] };
+  // `amend`: new answers to the chat's latest answered card (Arthur, 05650d00).
+  question_answers?: { card_message_id: number; answers: QuestionCardAnswer[]; amend?: true };
   // The saved message this turn replies to (space chat replies). Needs
   // conversation_id; a target outside the chat, a step, an error or a deleted
   // row is one 422 on this field.
@@ -829,8 +834,9 @@ export interface ApiMessage {
     status?: QuestionCard['status'];
     questions?: QuestionCardQuestion[];
     answers?: QuestionCardAnswer[] | null;
-    /** On a `question_answers` user turn: the card it answered. */
+    /** On a `question_answers` user turn: the card it answered, and whether it changed earlier answers. */
     card_message_id?: number;
+    amend?: boolean;
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).

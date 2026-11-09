@@ -79,7 +79,13 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
-import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
+import {
+  answersPayload,
+  cardRefusalSentence,
+  withCardAmended,
+  withCardFromCompleted,
+  withOpenCardClosed,
+} from './question-card-rows';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
@@ -2325,7 +2331,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         ...(convId &&
           questionAnswers &&
           questionAnswers.cardMessageId !== null && {
-            question_answers: { card_message_id: questionAnswers.cardMessageId, answers: answersPayload(questionAnswers.answers) },
+            question_answers: {
+              card_message_id: questionAnswers.cardMessageId,
+              answers: answersPayload(questionAnswers.answers),
+              ...(questionAnswers.amend && { amend: true as const }),
+            },
           }),
       };
       const response = await chatApi.start(applyJurisdiction(baseBody, choice));
@@ -2333,7 +2343,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (response.success) {
         // The server closed the open card with this send: answered by these
         // answers, else skipped by a typed message. The screen says so now.
-        setMessages((msgs) => withOpenCardClosed(msgs, questionAnswers?.answers ?? null));
+        // Changed answers: the answered card takes the new ones (Arthur, 05650d00).
+        setMessages((msgs) =>
+          questionAnswers?.amend && questionAnswers.cardMessageId !== null
+            ? withCardAmended(msgs, questionAnswers.cardMessageId, questionAnswers.answers)
+            : withOpenCardClosed(msgs, questionAnswers?.answers ?? null),
+        );
         // BELT-AND-BRACES RECONCILIATION (backend doc §5). The optimistic user row
         // above carries a local id; this is the server id it was saved under, known
         // BEFORE the stream even opens. Recording it here means the user's own

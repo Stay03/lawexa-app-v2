@@ -220,7 +220,12 @@ export function transformApiMessages(
         const mimeType = files.find((entry) => entry.file_id === attachment.file_id)?.file_mime_type;
         return mimeType ? { ...attachment, mime_type: mimeType } : attachment;
       });
-      const cardAnswers = readCardAnswers(apiMsg.metadata);
+      // The card's questions ride along, for the line's tap-to-expand list.
+      const answered = readCardAnswers(apiMsg.metadata);
+      const cardQuestions = answered
+        ? readQuestionCard(apiMessages.find((row) => row.id === answered.cardMessageId)?.metadata)?.questions
+        : undefined;
+      const cardAnswers = answered && cardQuestions ? { ...answered, questions: cardQuestions } : answered;
       messages.push({
         id: `msg_${apiMsg.id}`,
         role: 'user',
