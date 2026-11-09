@@ -70,6 +70,11 @@ export function openCardOf(messages: readonly ConversationMessage[], unsaved = f
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const row = messages[index];
     if (isEventMessage(row)) continue;
+    // The reader's own message, drawn before the server took it: not yet a
+    // turn after the card. A refused send takes it away again, and the card
+    // must still be there with the reader's choices and the reason (fixture
+    // run, 9 Nov). An accepted send closes the card itself (the engine).
+    if (row.role === 'user' && (row as ChatMessage).drawnHere && (row as { savedId?: number }).savedId === undefined) continue;
     const card = (row as ChatMessage).questionCard;
     if (row.role !== 'assistant' || !card || card.status !== 'open' || row.isStreaming) return null;
     const cardMessageId = (row as { savedId?: number }).savedId ?? savedMessageId(row.id);

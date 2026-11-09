@@ -60,11 +60,12 @@ test("the card sits above the chat's own box and the case page's side chat box",
   const panel = read(here, 'QuestionCardPanel.tsx');
   assert.match(panel, /const key = `\$\{props\.open\.cardMessageId \?\? 'unsaved'\}\$\{props\.open\.amend \? ':change' : ''\}`;/);
   assert.match(panel, /<QuestionCardPanel key=\{key\} \{\.\.\.props\} \/>/);
-  // Only for a reader who may answer, and not while a turn runs.
-  assert.match(
-    caseChat,
-    /surface && surface\.isOwnerResolved && surface\.canSend && !surface\.isStreaming \? surface\.questionCard : null/,
-  );
+  // Only for a reader who may answer. It stays up, disabled, while a turn runs:
+  // taken down for its own answers' send, it came back empty after a refusal.
+  for (const host of [caseChat, read(conversation, 'ChatDock.tsx')]) {
+    assert.match(host, /const openCard = surface && surface\.isOwnerResolved && surface\.canSend \? surface\.questionCard : null;/);
+    assert.match(host, /disabled=\{[^}]*surface\.isStreaming\}/);
+  }
   // The screen publishes the card to both boxes.
   const screen = read(conversation, 'ConversationScreen.tsx');
   assert.equal(screen.match(/\r?\n\s+questionCard,\r?\n\s+answerCard,\r?\n/g)?.length, 4);

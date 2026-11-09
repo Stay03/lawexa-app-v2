@@ -525,9 +525,9 @@ export function CaseChatComposerDock({
   // October 2026: "yes" for the case chat too).
   const conversationPending = conversationId !== null && surface === null;
   const viewOnly = surface !== null && surface.isOwnerResolved && !surface.canSend;
-  // The chat's open question card, for a reader who may answer, once its turn is over.
-  const openCard =
-    surface && surface.isOwnerResolved && surface.canSend && !surface.isStreaming ? surface.questionCard : null;
+  // The chat's open question card, for a reader who may answer: up, disabled,
+  // while a turn runs, so a refused answer keeps its choices (see ChatDock).
+  const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
 
   const createError = view === 'new' && start.error ? start.error : null;
 
@@ -588,7 +588,7 @@ export function CaseChatComposerDock({
         <div className="px-3">
           <OpenQuestionCard
             open={openCard}
-            disabled={surface.sendHeldBy !== null}
+            disabled={surface.sendHeldBy !== null || surface.isStreaming}
             onAnswer={surface.answerCard}
             onCancel={surface.cancelCard}
           />

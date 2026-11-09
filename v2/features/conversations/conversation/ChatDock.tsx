@@ -147,9 +147,11 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
   if (surface?.terminal) return null;
 
   // Lawexa's open questions (question cards, 9 November 2026), for a reader
-  // who may answer, once its turn is over.
-  const openCard =
-    surface && surface.isOwnerResolved && surface.canSend && !surface.isStreaming ? surface.questionCard : null;
+  // who may answer. It stays up, disabled, while a turn runs: its own answers'
+  // send is one, and a card taken down for it came back empty after a refusal,
+  // without the reader's choices or the server's reason (fixture run, 9 Nov).
+  // An accepted send closes it (the engine marks it answered at once).
+  const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
 
   let content: React.ReactNode;
   if (surface) {
@@ -230,7 +232,7 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
           <div className="pointer-events-auto mx-auto w-full max-w-2xl px-3">
             <OpenQuestionCard
               open={openCard}
-              disabled={surface.holdSend || surface.sendHeldBy !== null}
+              disabled={surface.holdSend || surface.sendHeldBy !== null || surface.isStreaming}
               onAnswer={surface.answerCard}
               onCancel={surface.cancelCard}
             />

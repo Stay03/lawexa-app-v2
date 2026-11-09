@@ -152,6 +152,11 @@ test('the card above the box: only an open card that ends the chat, with its sav
   assert.deepEqual(openCardOf([answer('local-4', { savedId: 4, questionCard: OPEN })]), { cardMessageId: 4, card: OPEN });
   // A turn after it closed it, whatever a stale copy says.
   assert.equal(openCardOf([answer('msg_2', { questionCard: OPEN }), question('msg_3')]), null);
+  // The reader's own message before the server took it is not that turn yet:
+  // a refused send takes it away, and the card must still be there.
+  const unsent = question('local-3', { drawnHere: true });
+  assert.deepEqual(openCardOf([answer('msg_2', { questionCard: OPEN }), unsent]), { cardMessageId: 2, card: OPEN });
+  assert.equal(openCardOf([answer('msg_2', { questionCard: OPEN }), question('local-3', { drawnHere: true, savedId: 3 })]), null);
   // No saved id yet: no answer can name it.
   assert.equal(openCardOf([answer('local-4', { questionCard: OPEN })]), null);
   assert.equal(openCardOf([answer('msg_2', { questionCard: { ...OPEN, status: 'skipped' } })]), null);
