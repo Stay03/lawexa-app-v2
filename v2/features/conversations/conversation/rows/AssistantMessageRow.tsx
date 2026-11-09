@@ -16,6 +16,7 @@ import { ChatContent } from '../markdown/ChatContent';
 import { MessageDocumentScope } from '../markdown/document-export';
 import { savedMessageId } from '../markdown/export-target';
 import { trimUnclosedLinkTail } from '../markdown/partial-tail';
+import { CardMark } from '../question-card/CardMarks';
 import { ReasoningTrace } from '../reasoning/ReasoningTrace';
 import { replyTargetOf, type ReplyableRow } from '../reply-target';
 import { SwipeToReply } from './SwipeToReply';
@@ -84,6 +85,18 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   const reasoningText = isStreaming ? liveReasoning : message.reasoning ?? '';
   const partial = (message as ChatMessage).partial;
   const radarReport = (message as ChatMessage).kind === 'radar_report';
+  // A question card, once its turn is over: its text is the questions in plain
+  // words (for v1 and a copy), and the card above the box asks them, so the
+  // row shows only its mark (question cards, 9 November 2026).
+  const questionCard = isStreaming ? undefined : (message as ChatMessage).questionCard;
+  if (questionCard) {
+    return (
+      <div className="w-full">
+        <ReasoningTrace text={reasoningText} isStreaming={false} reasoningMs={message.reasoningMs} />
+        <CardMark card={questionCard} />
+      </div>
+    );
+  }
   // A stopped answer can end inside a link; draw it without that unclosed tail
   // (the saved text, and what Copy copies, stay as they are).
   const shownText = partial && !isStreaming && !draining ? trimUnclosedLinkTail(text) : text;

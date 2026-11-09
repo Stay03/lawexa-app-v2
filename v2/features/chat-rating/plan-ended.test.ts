@@ -32,7 +32,7 @@ test('the slot asks the server once a session and sits in the page, above the bo
   assert.match(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /<PlanEndedSlot className="mb-2" \/>\s*\{\/\* Create \/ upload error banner/);
   assert.match(
     read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx'),
-    /<ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>/,
+    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>/,
   );
   // Only where a question is typed (Stay picked A, 28 October 2026).
   assert.doesNotMatch(read('v2', 'features', 'conversations', 'list', 'ConversationsList.tsx'), /PlanEnded/);

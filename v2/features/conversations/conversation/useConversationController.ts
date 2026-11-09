@@ -18,6 +18,7 @@ import type {
   ConversationTurnUser,
   MessageAttachment,
   MessageReplyTo,
+  QuestionCardAnswers,
   RedactionSummary,
 } from '@/types/chat';
 import { isEventMessage } from '@/types/chat';
@@ -307,6 +308,8 @@ export interface ConversationController {
     message: string,
     attachments: MessageAttachment[],
     replyTo?: MessageReplyTo | null,
+    /** Answers to the open question card, sent with `message` as their line. */
+    questionAnswers?: QuestionCardAnswers | null,
   ) => Promise<SendRefused | undefined>;
   /** Graceful cancel (cancel POST; the engine waits for the terminal SSE event). */
   stop: () => void;
@@ -1166,7 +1169,13 @@ export function useConversationController(
   );
 
   const submit = useCallback(
-    async (message: string, attachments: MessageAttachment[], replyTo: MessageReplyTo | null = null) => {
+    async (
+      message: string,
+      attachments: MessageAttachment[],
+      replyTo: MessageReplyTo | null = null,
+      /** Answers to the open question card, sent with `message` as their line. */
+      questionAnswers: QuestionCardAnswers | null = null,
+    ) => {
       // The last status read is from before this send: dropped, so a stale
       // "pending, by a colleague" can never label the reader's own turn, and
       // forgotten as seen, so the first read after this turn is not taken for
@@ -1186,6 +1195,7 @@ export function useConversationController(
         streamMode: 'v2_stream',
         jurisdiction,
         ...(fileIds.length > 0 && { fileIds, attachments }),
+        ...(questionAnswers && { questionAnswers }),
         ...(replyTo && { replyTo }),
       });
       if (refusal === null) return undefined;

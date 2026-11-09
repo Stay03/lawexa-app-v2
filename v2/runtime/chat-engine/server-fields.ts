@@ -29,15 +29,24 @@ export function adoptServerFields(
   serverRows: readonly ConversationMessage[],
 ): EngineMessage[] {
   const copies = new Map<number, ChatMessage>();
+  const cards = new Map<number, ChatMessage>();
   for (const row of serverRows) {
-    if (row.role !== 'user' || !row.id.startsWith(SERVER_ROW_PREFIX)) continue;
+    if (!row.id.startsWith(SERVER_ROW_PREFIX)) continue;
     const id = Number(row.id.slice(SERVER_ROW_PREFIX.length));
-    if (Number.isSafeInteger(id)) copies.set(id, row as ChatMessage);
+    if (!Number.isSafeInteger(id)) continue;
+    if (row.role === 'user') copies.set(id, row as ChatMessage);
+    else if (row.role === 'assistant' && (row as ChatMessage).questionCard) cards.set(id, row as ChatMessage);
   }
-  if (copies.size === 0) return rows as EngineMessage[];
+  if (copies.size === 0 && cards.size === 0) return rows as EngineMessage[];
 
   let changed = false;
   const next = rows.map((row) => {
+    if (row.role === 'assistant') {
+      const fields = cardFields(row, cards);
+      if (!fields) return row;
+      changed = true;
+      return { ...row, ...fields } as EngineMessage;
+    }
     if (row.role !== 'user' || row.savedId === undefined) return row;
     const copy = copies.get(row.savedId);
     if (!copy) return row;
@@ -52,6 +61,9 @@ export function adoptServerFields(
     // not get it from its own send: the first question of a chat, which the home
     // screen sends. A row that already has it keeps its own.
     if (copy.redaction !== undefined && local.redaction === undefined) fields.redaction = copy.redaction;
+    // The answers a question card's reply sent: a row this client drew has them
+    // from its own send; one it drew without them (the home handoff) takes them.
+    if (copy.cardAnswers !== undefined && local.cardAnswers === undefined) fields.cardAnswers = copy.cardAnswers;
     if (Object.keys(fields).length === 0) return row;
     changed = true;
     return { ...row, ...fields } as EngineMessage;
@@ -96,4 +108,25 @@ export function adoptDraftEditResults(
     return { ...row, content: copy.content, draftEditBases: copy.draftEditBases } as EngineMessage;
   });
   return changed ? next : (rows as EngineMessage[]);
+}
+
+/**
+ * A question card from the server's copy of an answer on screen, named by its
+ * saved id (a streamed answer) or its own `msg_` id (one read from history).
+ * It is how a card reaches a streamed answer when the turn's `completed` did
+ * not carry it, and how a card a colleague answered closes here (question
+ * cards, 9 November 2026). Never the other way: a read that started before
+ * the reader's own answer went could still say "open", and a card closed on
+ * this screen stays closed.
+ */
+function cardFields(row: EngineMessage, cards: ReadonlyMap<number, ChatMessage>): Partial<ChatMessage> | null {
+  const id =
+    row.savedId ??
+    (row.id.startsWith(SERVER_ROW_PREFIX) ? Number(row.id.slice(SERVER_ROW_PREFIX.length)) : Number.NaN);
+  const copy = cards.get(id)?.questionCard;
+  if (!copy) return null;
+  const local = (row as ChatMessage).questionCard;
+  if (local === undefined) return { questionCard: copy };
+  if (local.status === 'open' && copy.status !== 'open') return { questionCard: copy };
+  return null;
 }

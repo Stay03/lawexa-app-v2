@@ -97,6 +97,58 @@ export interface ChatMessage {
    * chats and on redacted turns from before the server sent it.
    */
   redaction?: RedactionSummary;
+  /**
+   * Questions Lawexa asks before it goes on (`metadata.type` "question_card",
+   * Arthur's go f6eaa156): the turn's final answer. `content` holds the same
+   * questions as plain text, which v1 and a copy show.
+   */
+  questionCard?: QuestionCard;
+  /**
+   * The user turn that answered a card (`metadata.type` "question_answers"):
+   * drawn as one "You chose" line in place of a bubble.
+   */
+  cardAnswers?: QuestionCardAnswers;
+}
+
+/** One option of a card question. */
+export interface QuestionCardOption {
+  label: string;
+  description: string;
+}
+
+/** One question of a card: 2 to 4 options, one recommended by its index. */
+export interface QuestionCardQuestion {
+  question: string;
+  why: string;
+  options: QuestionCardOption[];
+  recommended: number | null;
+}
+
+/**
+ * What the reader gave for one question, as the server stores it: an option
+ * by index, their own words, or a skip. On a stored answer `label` names the
+ * option (for a skip, the recommended one Lawexa went with).
+ */
+export type QuestionCardAnswer =
+  | { option: number; label?: string }
+  | { text: string }
+  | { skipped: true; label?: string };
+
+/**
+ * A card (Backend's shape, 9 November 2026): 1 to 4 questions; `answers` stays
+ * null until answered, then holds one answer per question in order. A typed
+ * message, or a newer card, closes an open one as "skipped".
+ */
+export interface QuestionCard {
+  status: 'open' | 'answered' | 'skipped';
+  questions: QuestionCardQuestion[];
+  answers: QuestionCardAnswer[] | null;
+}
+
+/** The answers a user turn sent, and the card's saved id. */
+export interface QuestionCardAnswers {
+  cardMessageId: number;
+  answers: QuestionCardAnswer[];
 }
 
 /**
@@ -383,6 +435,13 @@ export interface CompletedEvent {
   timestamp: string;
   /** See {@link TerminalEvent.persisted_message_ids}. */
   persisted_message_ids?: number[];
+  /** "ask_user": the answer is a question card, and Lawexa waits for the reader. */
+  ends_with?: 'ask_user';
+  /**
+   * The card's metadata, when the answer is one (techlead, 9 November 2026).
+   * Absent on servers before it: the card then comes with the next read of the chat.
+   */
+  metadata?: { type?: string; status?: unknown; questions?: unknown; answers?: unknown } | null;
 }
 
 // Terminal event emitted by backend when a streaming execution is cancelled
@@ -626,6 +685,9 @@ export interface ChatStartRequest {
   // the server already made the chat gets that chat back (backend, 17 October
   // 2026). Not a uuid: 422 on this field.
   client_request_id?: string;
+  // Answers to the chat's open question card, one per question in order. A
+  // card that is not open, not this chat's, or a wrong count is a 422.
+  question_answers?: { card_message_id: number; answers: QuestionCardAnswer[] };
   // The saved message this turn replies to (space chat replies). Needs
   // conversation_id; a target outside the chat, a step, an error or a deleted
   // row is one 422 on this field.
@@ -715,6 +777,8 @@ export interface SendMessageOptions {
   // The message this turn replies to: sent as reply_to_message_id, and drawn
   // as the quote on the row this client draws.
   replyTo?: MessageReplyTo;
+  /** Answers to an open question card: sent as question_answers, and drawn as the "You chose" line. */
+  questionAnswers?: QuestionCardAnswers;
 }
 
 // Chat state for hook
@@ -751,9 +815,17 @@ export interface ApiMessage {
       | 'background_job_result'
       | 'background_job_unanswered'
       // In an agent conversation: the calling agent's message (sub-agents contract, 1.4).
-      | 'agent_message';
+      | 'agent_message'
+      | 'question_card'
+      | 'question_answers';
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
+    /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */
+    status?: QuestionCard['status'];
+    questions?: QuestionCardQuestion[];
+    answers?: QuestionCardAnswer[] | null;
+    /** On a `question_answers` user turn: the card it answered. */
+    card_message_id?: number;
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).

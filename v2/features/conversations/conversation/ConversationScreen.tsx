@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
-import type { MessageReplyTo } from '@/types/chat';
+import type { MessageReplyTo, QuestionCardAnswer } from '@/types/chat';
+import { answersLine } from '@/lib/utils/question-card';
+import { openCardOf } from './question-card/open-card';
 import { REPLY_DRAFT, quoteTone, replyDraftKey } from './reply-target';
 import { writeDraft } from './draft-store';
 import { memberColourIndex } from './member-colour';
@@ -282,6 +284,20 @@ export function ConversationScreen({
   // The quote bar in the quoted person's colour, as the reply's quote will be.
   const quoteToneOf = useCallback((replyTo: MessageReplyTo) => quoteTone(replyTo, memberColours), [memberColours]);
 
+  // The question card the chat ends with, if it is still open (question cards,
+  // 9 November 2026): the docked box draws it above itself. Its answers go as
+  // one send, their line as the message ("Firm but polite · 14-day deadline").
+  const questionCard = useMemo(() => openCardOf(messages), [messages]);
+  const answerCard = useCallback(
+    async (answers: QuestionCardAnswer[]): Promise<string | null> => {
+      if (!questionCard || !canSend) return null;
+      const line = answersLine(questionCard.card.questions, answers);
+      const outcome = await controllerSubmit(line, [], null, { cardMessageId: questionCard.cardMessageId, answers });
+      return outcome ? outcome.refused || null : null;
+    },
+    [questionCard, canSend, controllerSubmit],
+  );
+
   // "Ask again" refused (a colleague's turn, or a demotion): the sentence in
   // the composer's banner, as for a refused send. Its question is already on
   // screen, so there is no text to give back.
@@ -322,6 +338,8 @@ export function ConversationScreen({
       canStop,
       submit: controllerSubmit,
       stop: controllerStop,
+      questionCard,
+      answerCard,
       mentionOptions,
       quoteToneOf,
       spaceUuid,
@@ -346,6 +364,8 @@ export function ConversationScreen({
     canStop,
     controllerSubmit,
     controllerStop,
+    questionCard,
+    answerCard,
     mentionOptions,
     quoteToneOf,
     spaceUuid,

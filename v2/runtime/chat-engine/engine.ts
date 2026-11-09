@@ -79,6 +79,7 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
+import { withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
@@ -1744,6 +1745,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (savedAnswerId !== null) {
         setMessages((msgs) => stampAnswerId(msgs, savedAnswerId, (id) => id.startsWith(LOCAL_ROW_PREFIX)));
       }
+      // The answer is a question card (`ends_with: "ask_user"`): drawn as one now,
+      // from the event's metadata, when the server sends it; else the read of the
+      // chat that follows every turn brings it (server-fields.ts).
+      if (event.ends_with === 'ask_user') {
+        setMessages((msgs) => withCardFromCompleted(msgs, savedAnswerId, event.metadata));
+      }
       handlers.onCompleted?.(event);
     });
 
@@ -2287,6 +2294,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // (saved-turn.ts, for a send that fails after the server may have kept it).
     const savedBefore = largestSavedId(state.messages);
     const optimisticMsg = addUserMessage(message, shownAttachments, options.replyTo);
+    // Answers to a question card: the row is drawn as the "You chose" line.
+    const questionAnswers = options.questionAnswers;
+    if (questionAnswers) {
+      setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, cardAnswers: questionAnswers } : m)));
+    }
     setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own', sending: true }));
 
     try {
@@ -2307,10 +2319,18 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         ...(isConfidentialTurnN && { messages: priorHistory }),
         // A reply names its target by its saved id (space chat replies).
         ...(convId && options.replyTo && { reply_to_message_id: options.replyTo.id }),
+        // Answers to the open question card, one per question in order.
+        ...(convId &&
+          questionAnswers && {
+            question_answers: { card_message_id: questionAnswers.cardMessageId, answers: questionAnswers.answers },
+          }),
       };
       const response = await chatApi.start(applyJurisdiction(baseBody, choice));
 
       if (response.success) {
+        // The server closed the open card with this send: answered by these
+        // answers, else skipped by a typed message. The screen says so now.
+        setMessages((msgs) => withOpenCardClosed(msgs, questionAnswers?.answers ?? null));
         // BELT-AND-BRACES RECONCILIATION (backend doc §5). The optimistic user row
         // above carries a local id; this is the server id it was saved under, known
         // BEFORE the stream even opens. Recording it here means the user's own
@@ -2475,6 +2495,22 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         removeMessage(optimisticMsg.id);
         setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
         return { kind: 'reply-gone' };
+      }
+
+      // 422 on `question_answers` — the card is no longer open (answered or
+      // skipped elsewhere, replaced by a newer one) or not this chat's. Nothing
+      // was saved; the host reads the chat again, which closes the card.
+      if (
+        questionAnswers &&
+        err instanceof AxiosError &&
+        err.response?.status === 422 &&
+        Object.keys((err.response.data as { errors?: Record<string, unknown> } | undefined)?.errors ?? {}).some(
+          (field) => field === 'question_answers' || field.startsWith('question_answers.'),
+        )
+      ) {
+        removeMessage(optimisticMsg.id);
+        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        return { kind: 'card-closed' };
       }
 
       // No answer at all (a phone that lost its signal mid-send, the network

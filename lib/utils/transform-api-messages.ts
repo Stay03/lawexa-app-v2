@@ -9,6 +9,7 @@ import type {
   TurnMessage,
 } from '@/types/chat';
 import { draftEditBases, resolveDraftEdits } from './draft-edits';
+import { readCardAnswers, readQuestionCard } from './question-card';
 import { isRedactionSummary } from './redaction-summary';
 
 /**
@@ -219,6 +220,7 @@ export function transformApiMessages(
         const mimeType = files.find((entry) => entry.file_id === attachment.file_id)?.file_mime_type;
         return mimeType ? { ...attachment, mime_type: mimeType } : attachment;
       });
+      const cardAnswers = readCardAnswers(apiMsg.metadata);
       messages.push({
         id: `msg_${apiMsg.id}`,
         role: 'user',
@@ -239,6 +241,8 @@ export function transformApiMessages(
           apiMsg.unmatched_handles.length > 0 && { unmatchedHandles: apiMsg.unmatched_handles }),
         // What redaction hid, in a redacted chat (backend, 22 October 2026).
         ...(isRedactionSummary(apiMsg.metadata?.redaction) && { redaction: apiMsg.metadata.redaction }),
+        // The turn that answered a question card: drawn as one "You chose" line.
+        ...(cardAnswers && { cardAnswers }),
       } as ChatMessage);
     }
     // Handover message - orchestrator delegating to sub-agent
@@ -380,6 +384,19 @@ export function transformApiMessages(
         ...withDraftEditBases(apiMsg),
         timestamp: new Date(apiMsg.created_at),
         kind: 'radar_report',
+      } as ChatMessage);
+    }
+    // A question card (metadata.type "question_card"): an answer whose text is
+    // its questions in words, which v1 shows. v2 draws the card from
+    // `questionCard`; a card it cannot read stays that plain answer.
+    else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'question_card') {
+      const questionCard = readQuestionCard(apiMsg.metadata);
+      messages.push({
+        id: `msg_${apiMsg.id}`,
+        role: 'assistant',
+        content: apiMsg.content,
+        timestamp: new Date(apiMsg.created_at),
+        ...(questionCard && { questionCard }),
       } as ChatMessage);
     }
     // Inter-tool narration identified by lookahead — drop, matches behavior

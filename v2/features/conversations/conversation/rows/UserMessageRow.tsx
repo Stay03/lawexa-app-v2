@@ -6,6 +6,7 @@ import { formatMessageTimestamp } from '@/lib/utils/date';
 import type { ChatMessage, MessageReplyTo } from '@/types/chat';
 import type { MessageMetadata } from '@/types/collab';
 import { PastedContentCard } from '../PastedContentCard';
+import { CardAnswersLine } from '../question-card/CardMarks';
 import { memberStyle } from '../member-colour';
 import { mentionMetadata, spaceUnmatchedSentence } from '../mention-options';
 import { replyAuthorLabel, replyTargetOf, type QuoteTone } from '../reply-target';
@@ -169,6 +170,19 @@ export function UserMessageRow({
   // (option D, 22 October 2026). A summary alone also shows it, so a question
   // whose chat flag has not resolved yet still carries its line.
   const showsRedaction = redacted || message.redaction !== undefined;
+
+  // Answers to a question card: one "You chose" line, not a bubble (question
+  // cards, 9 November 2026). Another member's answers name them.
+  if (message.cardAnswers) {
+    const mine = !showAuthor || turnSide(message, viewerId) === 'mine';
+    return (
+      <CardAnswersLine
+        answers={message.cardAnswers}
+        content={displayContent}
+        who={mine ? null : (message.author?.name ?? 'Someone')}
+      />
+    );
+  }
 
   if (showAuthor) {
     // Only a saved question can be replied to (replyTargetOf).

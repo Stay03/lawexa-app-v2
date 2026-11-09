@@ -15,6 +15,7 @@ import { earlyRuling } from './early-ruling';
 import { subscribeFollowUpRefusals } from './embedded-composer';
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { subscribeRouteReplies, useRouteComposerSurface } from './route-composer';
+import { QuestionCardPanel } from './question-card/QuestionCardPanel';
 import { ComposerSkeleton } from './skeletons';
 import type { SendRefused } from './space-turn';
 import { ViewOnlyPill } from './ViewOnlyPill';
@@ -145,6 +146,11 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
 
   if (surface?.terminal) return null;
 
+  // Lawexa's open questions (question cards, 9 November 2026), for a reader
+  // who may answer, once its turn is over.
+  const openCard =
+    surface && surface.isOwnerResolved && surface.canSend && !surface.isStreaming ? surface.questionCard : null;
+
   let content: React.ReactNode;
   if (surface) {
     content = !surface.isOwnerResolved ? (
@@ -152,8 +158,9 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
     ) : surface.canSend ? (
       <>
         {/* "How is Lawexa doing?" sits above the box, in every chat a reader
-            may send in, a Space chat's included (Arthur, 19 October 2026). */}
-        <ChatRatingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />
+            may send in, a Space chat's included (Arthur, 19 October 2026).
+            Not while Lawexa's questions are open: they take that place. */}
+        {!openCard && <ChatRatingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />}
         {/* After a paid plan runs out, once, about no chat (Arthur picked B). */}
         <PlanEndedSlot className="mb-2" />
         <ConversationComposer
@@ -216,8 +223,22 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
       data-streaming={surface ? String(surface.isStreaming) : undefined}
       className="pointer-events-none"
     >
-      <div ref={dockRef} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">
-        {content}
+      <div ref={dockRef} className="v2-safe-bottom w-full">
+        {/* The card is as wide as the transcript, wider than the compact box
+            under it, which stays usable: a typed reply puts the card aside. */}
+        {openCard && surface && (
+          <div className="pointer-events-auto mx-auto w-full max-w-2xl px-3">
+            <QuestionCardPanel
+              key={openCard.cardMessageId}
+              open={openCard}
+              disabled={surface.holdSend || surface.sendHeldBy !== null}
+              onAnswer={surface.answerCard}
+            />
+          </div>
+        )}
+        {content !== null && (
+          <div className="pointer-events-auto mx-auto w-full max-w-xs sm:max-w-md">{content}</div>
+        )}
       </div>
     </div>
   );
