@@ -15,7 +15,7 @@ import { earlyRuling } from './early-ruling';
 import { subscribeFollowUpRefusals } from './embedded-composer';
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { subscribeRouteReplies, useRouteComposerSurface } from './route-composer';
-import { QuestionCardPanel } from './question-card/QuestionCardPanel';
+import { OpenQuestionCard } from './question-card/QuestionCardPanel';
 import { ComposerSkeleton } from './skeletons';
 import type { SendRefused } from './space-turn';
 import { ViewOnlyPill } from './ViewOnlyPill';
@@ -228,8 +228,7 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
             under it, which stays usable: a typed reply puts the card aside. */}
         {openCard && surface && (
           <div className="pointer-events-auto mx-auto w-full max-w-2xl px-3">
-            <QuestionCardPanel
-              key={openCard.cardMessageId}
+            <OpenQuestionCard
               open={openCard}
               disabled={surface.holdSend || surface.sendHeldBy !== null}
               onAnswer={surface.answerCard}

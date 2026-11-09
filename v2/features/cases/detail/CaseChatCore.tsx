@@ -24,6 +24,7 @@ import {
   subscribeFollowUpRefusals,
   useEmbeddedComposerSurface,
 } from '@/v2/features/conversations/conversation/embedded-composer';
+import { OpenQuestionCard } from '@/v2/features/conversations/conversation/question-card/QuestionCardPanel';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { TranscriptSkeleton } from '@/v2/features/conversations/conversation/skeletons';
 import {
@@ -524,6 +525,9 @@ export function CaseChatComposerDock({
   // October 2026: "yes" for the case chat too).
   const conversationPending = conversationId !== null && surface === null;
   const viewOnly = surface !== null && surface.isOwnerResolved && !surface.canSend;
+  // The chat's open question card, for a reader who may answer, once its turn is over.
+  const openCard =
+    surface && surface.isOwnerResolved && surface.canSend && !surface.isStreaming ? surface.questionCard : null;
 
   const createError = view === 'new' && start.error ? start.error : null;
 
@@ -578,6 +582,17 @@ export function CaseChatComposerDock({
           <ViewOnlyPill reason={surface?.viewOnlyReason ?? 'shared'} />
         </div>
       </div>
+      {/* Lawexa's open questions, above this box as above a chat's own
+          (question cards, 9 November 2026); the box stays usable under them. */}
+      {openCard && surface && (
+        <div className="px-3">
+          <OpenQuestionCard
+            open={openCard}
+            disabled={surface.sendHeldBy !== null}
+            onAnswer={surface.answerCard}
+          />
+        </div>
+      )}
       <div
         inert={viewOnly}
         className={cn(

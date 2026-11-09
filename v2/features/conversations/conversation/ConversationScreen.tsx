@@ -184,6 +184,20 @@ export function ConversationScreen({
     submit: controllerSubmit,
     stop: controllerStop,
   } = controller;
+  // The question card the chat ends with, if it is still open (question cards,
+  // 9 November 2026): whichever box this chat has draws it above itself, the
+  // shell's dock or the case page's. Its answers go as one send, their line as
+  // the message ("Firm but polite · 14-day deadline").
+  const questionCard = useMemo(() => openCardOf(messages), [messages]);
+  const answerCard = useCallback(
+    async (answers: QuestionCardAnswer[]): Promise<string | null> => {
+      if (!questionCard || !canSend) return null;
+      const line = answersLine(questionCard.card.questions, answers);
+      const outcome = await controllerSubmit(line, [], null, { cardMessageId: questionCard.cardMessageId, answers });
+      return outcome ? outcome.refused || null : null;
+    },
+    [questionCard, canSend, controllerSubmit],
+  );
   useEffect(() => {
     if (!externalComposer) return;
     publishEmbeddedComposer({
@@ -202,6 +216,8 @@ export function ConversationScreen({
       isOwnerResolved,
       submit: controllerSubmit,
       stop: controllerStop,
+      questionCard,
+      answerCard,
     });
   }, [
     externalComposer,
@@ -220,6 +236,8 @@ export function ConversationScreen({
     isOwnerResolved,
     controllerSubmit,
     controllerStop,
+    questionCard,
+    answerCard,
   ]);
   useEffect(() => {
     if (!externalComposer) return;
@@ -283,20 +301,6 @@ export function ConversationScreen({
   );
   // The quote bar in the quoted person's colour, as the reply's quote will be.
   const quoteToneOf = useCallback((replyTo: MessageReplyTo) => quoteTone(replyTo, memberColours), [memberColours]);
-
-  // The question card the chat ends with, if it is still open (question cards,
-  // 9 November 2026): the docked box draws it above itself. Its answers go as
-  // one send, their line as the message ("Firm but polite · 14-day deadline").
-  const questionCard = useMemo(() => openCardOf(messages), [messages]);
-  const answerCard = useCallback(
-    async (answers: QuestionCardAnswer[]): Promise<string | null> => {
-      if (!questionCard || !canSend) return null;
-      const line = answersLine(questionCard.card.questions, answers);
-      const outcome = await controllerSubmit(line, [], null, { cardMessageId: questionCard.cardMessageId, answers });
-      return outcome ? outcome.refused || null : null;
-    },
-    [questionCard, canSend, controllerSubmit],
-  );
 
   // "Ask again" refused (a colleague's turn, or a demotion): the sentence in
   // the composer's banner, as for a refused send. Its question is already on

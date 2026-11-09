@@ -16,29 +16,39 @@ import type { OpenCard } from './open-card';
  *
  * One question at a time: "2 of 4" with back and next, and × to skip them all.
  * Each starts on the recommended option, so Next alone takes Lawexa's pick.
- * A tap on an option chooses it and moves on (the last waits for Send).
+ * A tap on an option selects it; Next confirms and moves on, Send on the last.
  * "Something else…" takes the reader's own words; Skip leaves a question
  * unanswered, and Lawexa goes with its recommendation. The box under the card
  * stays usable: a typed reply puts the card aside (the server marks it skipped).
+ * The same card sits above the chat's own box (`ChatDock`) and the case
+ * page's side chat box (`CaseChatCore`).
  *
  * All the answers go in one send, as the line the reader sees afterwards
  * ("Firm but polite · 14-day deadline") with the answers beside it
  * (`question_answers`). A refusal (the card was closed meanwhile, another
  * member's turn) is said in the card, and the choices stay.
  *
- * Keyed by the card's saved id where it is drawn, so a new card starts fresh.
+ * Drawn through {@link OpenQuestionCard}, keyed by the card's saved id, so a
+ * new card starts fresh.
  */
-export function QuestionCardPanel({
-  open,
-  disabled,
-  onAnswer,
-}: {
+type QuestionCardProps = {
   open: OpenCard;
   /** A turn is running or the chat is still loading: nothing can be sent yet. */
   disabled: boolean;
   /** Send the answers; resolves with the refusal's sentence, or null when they went. */
   onAnswer: (answers: QuestionCardAnswer[]) => Promise<string | null>;
-}) {
+};
+
+/** The open card, started afresh for each new card (its own key, so a host's box beside it keeps its node). */
+export function OpenQuestionCard(props: QuestionCardProps) {
+  return <QuestionCardPanel key={props.open.cardMessageId} {...props} />;
+}
+
+function QuestionCardPanel({
+  open,
+  disabled,
+  onAnswer,
+}: QuestionCardProps) {
   const { questions } = open.card;
   const count = questions.length;
   const [index, setIndex] = useState(0);
@@ -72,12 +82,11 @@ export function QuestionCardPanel({
     else setIndex(index + 1);
   };
 
+  // A tap selects (the ring and the tick); Next or Send confirms, as Arthur
+  // approved (530057fd), so a slip of the finger never answers by itself.
   const choose = (option: number) => {
     if (locked) return;
-    const next = drafts.map((entry, at) => (at === index ? { option } : entry));
-    setDrafts(next);
-    // One tap answers and moves on; on the last question Send confirms.
-    if (!isLast) setIndex(index + 1);
+    setDraft({ option });
   };
 
   const skip = () => {
