@@ -132,6 +132,63 @@ export function answersLine(questions: readonly QuestionCardQuestion[], answers:
 }
 
 /**
+ * The answers with each option's and each skip's label, as the server keeps
+ * them (Backend's `cardAnswers`: a skip names the recommended option Lawexa
+ * goes on with). The reader's own row draws its "You chose" line from these
+ * before the server's copy comes back.
+ */
+export function labeledAnswers(
+  questions: readonly QuestionCardQuestion[],
+  answers: readonly QuestionCardAnswer[],
+): QuestionCardAnswer[] {
+  return answers.map((answer, index) => {
+    const question = questions[index];
+    if ('option' in answer) {
+      const label = question?.options[answer.option]?.label;
+      return label === undefined ? answer : { option: answer.option, label };
+    }
+    if (isSkipped(answer)) {
+      const label = question && question.recommended !== null ? question.options[question.recommended]?.label : undefined;
+      return label === undefined ? { skipped: true } : { skipped: true, label };
+    }
+    return answer;
+  });
+}
+
+/**
+ * The "You chose" line from stored answers alone: each option's label and
+ * each own answer, skips left out. Null when an answer names an option
+ * without its label, so the row falls back to its own text. The server saves
+ * the answering turn's text as the model reads it ("My answers to your
+ * questions: 1. … → …"), which is not a line to show.
+ */
+export function chosenLine(answers: readonly QuestionCardAnswer[]): string | null {
+  if ((answers as QuestionCardAnswer[]).some((answer) => 'option' in answer && answer.label === undefined)) return null;
+  return answersLine([], answers);
+}
+
+/**
+ * The answers as one message, in the words the server gives the model for a
+ * saved card (Backend's `answersText`). A confidential chat saves no message,
+ * so its card has no id to answer by: this is what it sends instead.
+ */
+export function answersMessage(questions: readonly QuestionCardQuestion[], answers: readonly QuestionCardAnswer[]): string {
+  const lines = ['My answers to your questions:'];
+  questions.forEach((question, index) => {
+    const answer = answers[index] ?? { skipped: true };
+    const recommended = question.recommended === null ? null : question.options[question.recommended]?.label;
+    const words =
+      'option' in answer
+        ? (question.options[answer.option]?.label ?? '')
+        : 'text' in answer
+          ? `my own answer: ${answer.text}`
+          : `skipped: go on with your recommended option${recommended ? ` (${recommended})` : ''} and say so.`;
+    lines.push(`${index + 1}. ${question.question} → ${words}`);
+  });
+  return lines.join('\n');
+}
+
+/**
  * The answer a question starts with on an open card: the recommended option,
  * so Next alone takes Lawexa's suggestion. A question with none starts empty.
  */

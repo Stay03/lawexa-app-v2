@@ -79,7 +79,7 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
-import { withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
+import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
@@ -1746,10 +1746,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         setMessages((msgs) => stampAnswerId(msgs, savedAnswerId, (id) => id.startsWith(LOCAL_ROW_PREFIX)));
       }
       // The answer is a question card (`ends_with: "ask_user"`): drawn as one now,
-      // from the event's metadata, when the server sends it; else the read of the
-      // chat that follows every turn brings it (server-fields.ts).
+      // from the event's `question_card`, when the server sends it; else the read
+      // of the chat that follows every turn brings it (server-fields.ts). A
+      // confidential chat saves nothing, so its card goes on the answer just drawn.
       if (event.ends_with === 'ask_user') {
-        setMessages((msgs) => withCardFromCompleted(msgs, savedAnswerId, event.metadata));
+        setMessages((msgs) => withCardFromCompleted(msgs, savedAnswerId, event.question_card, confidential));
       }
       handlers.onCompleted?.(event);
     });
@@ -2319,10 +2320,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         ...(isConfidentialTurnN && { messages: priorHistory }),
         // A reply names its target by its saved id (space chat replies).
         ...(convId && options.replyTo && { reply_to_message_id: options.replyTo.id }),
-        // Answers to the open question card, one per question in order.
+        // Answers to the open question card, one per question in order. A
+        // confidential chat's card has no saved id: its answers are the message.
         ...(convId &&
-          questionAnswers && {
-            question_answers: { card_message_id: questionAnswers.cardMessageId, answers: questionAnswers.answers },
+          questionAnswers &&
+          questionAnswers.cardMessageId !== null && {
+            question_answers: { card_message_id: questionAnswers.cardMessageId, answers: answersPayload(questionAnswers.answers) },
           }),
       };
       const response = await chatApi.start(applyJurisdiction(baseBody, choice));
@@ -2497,20 +2500,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return { kind: 'reply-gone' };
       }
 
-      // 422 on `question_answers` — the card is no longer open (answered or
-      // skipped elsewhere, replaced by a newer one) or not this chat's. Nothing
-      // was saved; the host reads the chat again, which closes the card.
-      if (
-        questionAnswers &&
-        err instanceof AxiosError &&
-        err.response?.status === 422 &&
-        Object.keys((err.response.data as { errors?: Record<string, unknown> } | undefined)?.errors ?? {}).some(
-          (field) => field === 'question_answers' || field.startsWith('question_answers.'),
-        )
-      ) {
+      // 422 on a card's answers (Backend 54b85a68): the card is no longer open
+      // (answered or skipped elsewhere, replaced by a newer one) or not this
+      // chat's, or the answers do not fit it. A plain `{ message }`, not field
+      // errors. Nothing was saved; the card says why, and the host reads the
+      // chat again.
+      if (questionAnswers?.cardMessageId != null && err instanceof AxiosError && err.response?.status === 422) {
         removeMessage(optimisticMsg.id);
         setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
-        return { kind: 'card-closed' };
+        return { kind: 'card-refused', message: cardRefusalSentence(err.response.data) };
       }
 
       // No answer at all (a phone that lost its signal mid-send, the network

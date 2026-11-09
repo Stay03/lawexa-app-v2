@@ -7,7 +7,7 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { MessageReplyTo, QuestionCardAnswer } from '@/types/chat';
-import { answersLine } from '@/lib/utils/question-card';
+import { answersLine, answersMessage, labeledAnswers } from '@/lib/utils/question-card';
 import { openCardOf } from './question-card/open-card';
 import { REPLY_DRAFT, quoteTone, replyDraftKey } from './reply-target';
 import { writeDraft } from './draft-store';
@@ -188,12 +188,18 @@ export function ConversationScreen({
   // 9 November 2026): whichever box this chat has draws it above itself, the
   // shell's dock or the case page's. Its answers go as one send, their line as
   // the message ("Firm but polite · 14-day deadline").
-  const questionCard = useMemo(() => openCardOf(messages), [messages]);
+  // A confidential chat saves nothing: its card has no id, and its answers go
+  // as the plain message the server would have written for them.
+  const questionCard = useMemo(() => openCardOf(messages, isConfidential), [messages, isConfidential]);
   const answerCard = useCallback(
     async (answers: QuestionCardAnswer[]): Promise<string | null> => {
       if (!questionCard || !canSend) return null;
-      const line = answersLine(questionCard.card.questions, answers);
-      const outcome = await controllerSubmit(line, [], null, { cardMessageId: questionCard.cardMessageId, answers });
+      const { questions } = questionCard.card;
+      const message =
+        questionCard.cardMessageId === null ? answersMessage(questions, answers) : answersLine(questions, answers);
+      // The labels are for this row's "You chose" line; the engine sends the answers without them.
+      const shown = { cardMessageId: questionCard.cardMessageId, answers: labeledAnswers(questions, answers) };
+      const outcome = await controllerSubmit(message, [], null, shown);
       return outcome ? outcome.refused || null : null;
     },
     [questionCard, canSend, controllerSubmit],

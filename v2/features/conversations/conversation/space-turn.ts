@@ -185,6 +185,18 @@ export const REPLY_GONE_COPY = 'The message you replied to is no longer availabl
 export const CARD_CLOSED_COPY = 'These questions are closed now. Reply in the message box instead.';
 
 /**
+ * The card's line for refused answers: the closed line when the card is no
+ * longer open (the server's "That question card is not open in this chat…"),
+ * else the server's own sentence ("Send one answer for each of the card's 2
+ * questions."), and the closed line when it sent none.
+ */
+export function cardRefusalCopy(serverSentence: string): string {
+  const sentence = serverSentence.trim();
+  if (sentence === '' || /^That question card is not open\b/i.test(sentence)) return CARD_CLOSED_COPY;
+  return sentence;
+}
+
+/**
  * The composer's sentence for a refused send. Another member's turn: their
  * name, and that the message is kept. The reader's own earlier turn (another
  * tab or device): that it is still being answered. A refusal by role: the
@@ -197,7 +209,7 @@ export function sendRefusal(refusal: SendRefusal, viewerId: number | null): stri
   if (refusal.kind === 'reply-gone') return REPLY_GONE_COPY;
   if (refusal.kind === 'unsent') return UNSENT_COPY;
   if (refusal.kind === 'upload-limit') return refusal.message;
-  if (refusal.kind === 'card-closed') return CARD_CLOSED_COPY;
+  if (refusal.kind === 'card-refused') return cardRefusalCopy(refusal.message);
   if (refusal.by === null) return 'Someone is asking right now. Your message is kept.';
   if (refusal.by.id === viewerId) {
     return 'Your last question is still being answered. Your message is kept.';
@@ -218,7 +230,7 @@ export function askAgainRefusal(refusal: SendRefusal, viewerId: number | null): 
   if (refusal.kind === 'unsent') return "Couldn't reach Lawexa. Ask again in a moment.";
   if (refusal.kind === 'upload-limit') return refusal.message;
   // "Ask again" sends no answers; said plainly should it ever happen.
-  if (refusal.kind === 'card-closed') return CARD_CLOSED_COPY;
+  if (refusal.kind === 'card-refused') return cardRefusalCopy(refusal.message);
   if (refusal.by === null) return 'Someone is asking right now. Ask again once the answer is in.';
   if (refusal.by.id === viewerId) return 'Your last question is still being answered.';
   return `${refusal.by.name} is asking right now. Ask again once their answer is in.`;

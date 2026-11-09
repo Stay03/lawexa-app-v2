@@ -184,10 +184,11 @@ export type SendRefusal =
    *  words and the files go back to the box with the server's own sentence;
    *  `upgrade` says a bigger plan allows more. */
   | { kind: 'upload-limit'; message: string; upgrade: boolean }
-  /** Answers to a question card that is no longer open (answered or skipped
-   *  elsewhere, replaced by a newer card): the server's 422 on
-   *  `question_answers`. Nothing was saved; the chat is read again. */
-  | { kind: 'card-closed' }
+  /** Answers to a question card the server refused (422, Backend 54b85a68):
+   *  the card is no longer open (answered or skipped elsewhere, replaced by a
+   *  newer card), or the answers do not fit it. `message` is the server's
+   *  sentence. Nothing was saved; the chat is read again. */
+  | { kind: 'card-refused'; message: string }
   /** The server would not take a message from this account now: no messages
    *  left, or a flagged account. The row under the chat already says why and
    *  offers the plans, so the composer adds no line of its own; the words go

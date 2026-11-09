@@ -38,7 +38,7 @@ test("the card sits above the chat's own box and the case page's side chat box",
   assert.match(caseChat, /<OpenQuestionCard\s+open=\{openCard\}/);
   // A new card starts fresh by its own key, inside the wrapper: no key sits
   // beside a host's box, whose node must never be remounted.
-  assert.match(read(here, 'QuestionCardPanel.tsx'), /<QuestionCardPanel key=\{props\.open\.cardMessageId\} \{\.\.\.props\} \/>/);
+  assert.match(read(here, 'QuestionCardPanel.tsx'), /<QuestionCardPanel key=\{props\.open\.cardMessageId \?\? 'unsaved'\} \{\.\.\.props\} \/>/);
   // Only for a reader who may answer, and not while a turn runs.
   assert.match(
     caseChat,

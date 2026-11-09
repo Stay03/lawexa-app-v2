@@ -2,7 +2,7 @@
 
 import { Check } from 'lucide-react';
 
-import { allSkipped } from '@/lib/utils/question-card';
+import { allSkipped, chosenLine } from '@/lib/utils/question-card';
 import type { QuestionCard, QuestionCardAnswers } from '@/types/chat';
 
 /**
@@ -38,9 +38,10 @@ export function CardMark({ card }: { card: QuestionCard }) {
 
 /**
  * The reader's answers to a card, drawn in place of a bubble: "✓ You chose:
- * Firm but polite · 14-day deadline". The line is the turn's own text, which
- * the app sent as the answers' words (`answersLine`), so a reload draws the
- * same line. In a space chat another member's answers name them.
+ * Firm but polite · 14-day deadline". The line comes from the answers' own
+ * labels (`chosenLine`): the server saves the turn's text as the model reads
+ * it, a numbered list, not this line. Only answers without labels fall back
+ * to the text. In a space chat another member's answers name them.
  */
 export function CardAnswersLine({
   answers,
@@ -54,6 +55,7 @@ export function CardAnswersLine({
 }) {
   const skippedAll = allSkipped(answers.answers);
   const subject = who ?? 'You';
+  const line = chosenLine(answers.answers) ?? content;
   return (
     <div className="flex min-w-0">
       {/* Wraps rather than cuts: the choices are the reader's record of what they told Lawexa. */}
@@ -63,7 +65,7 @@ export function CardAnswersLine({
           <span>{subject} skipped the questions</span>
         ) : (
           <span className="min-w-0 break-words">
-            {subject} chose: <span className="text-foreground">{content}</span>
+            {subject} chose: <span className="text-foreground">{line}</span>
           </span>
         )}
       </div>

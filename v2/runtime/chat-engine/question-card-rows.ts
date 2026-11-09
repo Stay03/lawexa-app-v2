@@ -1,6 +1,36 @@
-import { closedCard, readQuestionCard } from '@/lib/utils/question-card';
+import { closedCard, isSkipped, readQuestionCard } from '@/lib/utils/question-card';
 import type { ChatMessage, QuestionCardAnswer } from '@/types/chat';
 import type { EngineMessage } from './types';
+
+/**
+ * The answers as the server takes them: an option, own words, or a skip, and
+ * nothing else. The labels the app keeps for its own "You chose" line stay
+ * off the wire; the server names the options itself.
+ */
+export function answersPayload(answers: readonly QuestionCardAnswer[]): QuestionCardAnswer[] {
+  return answers.map((answer) => {
+    if (isSkipped(answer)) return { skipped: true };
+    if ('text' in answer) return { text: answer.text };
+    return { option: answer.option };
+  });
+}
+
+/**
+ * The server's sentence for refused answers (Backend 54b85a68: a plain
+ * `{ message }`; a validation 422 names its field in `errors`). Empty when it
+ * sent none.
+ */
+export function cardRefusalSentence(body: unknown): string {
+  if (typeof body !== 'object' || body === null) return '';
+  const { message, errors } = body as { message?: unknown; errors?: unknown };
+  if (typeof errors === 'object' && errors !== null) {
+    for (const value of Object.values(errors)) {
+      const first: unknown = Array.isArray(value) ? value[0] : value;
+      if (typeof first === 'string' && first.trim() !== '') return first;
+    }
+  }
+  return typeof message === 'string' ? message : '';
+}
 
 /**
  * question-card-rows — what the engine does to the transcript for question
@@ -32,21 +62,29 @@ export function withOpenCardClosed(
 }
 
 /**
- * The card a turn ended with, from its `completed` event's metadata, onto the
- * answer drawn from the stream (named by its saved id). A card already open
- * on screen is closed as replaced, as the server does. No metadata (a server
- * before it), or a card this app cannot read: nothing changes, and the next
- * read of the chat brings the card (`adoptServerFields`).
+ * The card a turn ended with, from its `completed` event's `question_card`,
+ * onto the answer drawn from the stream (named by its saved id). A card
+ * already open on screen is closed as replaced, as the server does. No card
+ * on the event (a server before it), or one this app cannot read: nothing
+ * changes, and the next read of the chat brings the card (`adoptServerFields`).
+ *
+ * A confidential chat saves no message, so its answer has no saved id: with
+ * `unsaved`, the card goes on the last answer drawn instead.
  */
 export function withCardFromCompleted(
   rows: readonly EngineMessage[],
   answerSavedId: number | null,
-  metadata: unknown,
+  questionCard: unknown,
+  unsaved = false,
 ): EngineMessage[] {
-  if (answerSavedId === null) return rows as EngineMessage[];
-  const card = readQuestionCard(metadata);
+  const card = readQuestionCard(questionCard);
   if (!card) return rows as EngineMessage[];
-  const index = rows.findIndex((row) => row.role === 'assistant' && row.savedId === answerSavedId);
+  const index =
+    answerSavedId !== null
+      ? rows.findIndex((row) => row.role === 'assistant' && row.savedId === answerSavedId)
+      : unsaved
+        ? rows.findLastIndex((row) => row.role === 'assistant' && !('messageType' in row))
+        : -1;
   if (index === -1) return rows as EngineMessage[];
   const closed = withOpenCardClosed(rows, null);
   return closed.map((row, at) => (at === index ? ({ ...row, questionCard: card } as EngineMessage) : row));

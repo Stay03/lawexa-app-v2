@@ -6,8 +6,11 @@ import {
   ALL_SKIPPED_LINE,
   allSkipped,
   answersLine,
+  answersMessage,
   answersToSend,
+  chosenLine,
   closedCard,
+  labeledAnswers,
   readCardAnswers,
   readQuestionCard,
   skipAllAnswers,
@@ -112,6 +115,36 @@ test('a card closes as answered with its answers, or as skipped by a typed reply
   const open = readQuestionCard(cardMeta())!;
   assert.deepEqual(closedCard(open, [{ option: 0 }, { option: 1 }]), { ...open, status: 'answered', answers: [{ option: 0 }, { option: 1 }] });
   assert.deepEqual(closedCard(open, null), { ...open, status: 'skipped' });
+});
+
+test("the reader's row names each option and skip as the server keeps them", () => {
+  assert.deepEqual(labeledAnswers([TONE, DEADLINE], [{ option: 1 }, { skipped: true }]), [
+    { option: 1, label: 'Final demand' },
+    { skipped: true, label: '7-day deadline' },
+  ]);
+  assert.deepEqual(labeledAnswers([TONE], [{ text: 'Very firm' }]), [{ text: 'Very firm' }]);
+});
+
+test('"You chose" comes from the answers\' labels, never the turn\'s saved text', () => {
+  // As Backend keeps them (54b85a68 cardAnswers): the turn's text is "My answers to your questions: …".
+  assert.equal(
+    chosenLine([{ option: 0, label: 'Firm but polite' }, { text: 'Lagos' }, { skipped: true, label: '7-day deadline' }]),
+    'Firm but polite · Lagos',
+  );
+  // An option without its label: the row falls back to its own text.
+  assert.equal(chosenLine([{ option: 0 }]), null);
+});
+
+test("a confidential chat's answers go as the message the server would have written", () => {
+  assert.equal(
+    answersMessage([TONE, DEADLINE], [{ text: 'Very firm' }, { skipped: true }]),
+    [
+      'My answers to your questions:',
+      '1. TEST DATA. Which tone should the letter take? → my own answer: Very firm',
+      '2. TEST DATA. Which deadline? → skipped: go on with your recommended option (7-day deadline) and say so.',
+    ].join('\n'),
+  );
+  assert.equal(answersMessage([TONE], [{ option: 1 }]), 'My answers to your questions:\n1. TEST DATA. Which tone should the letter take? → Final demand');
 });
 
 /* ── The transform ────────────────────────────────────────────────────────── */

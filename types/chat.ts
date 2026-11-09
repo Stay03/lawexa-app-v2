@@ -145,9 +145,12 @@ export interface QuestionCard {
   answers: QuestionCardAnswer[] | null;
 }
 
-/** The answers a user turn sent, and the card's saved id. */
+/**
+ * The answers a user turn sent, and the card's saved id: null in a
+ * confidential chat, which saves no message, so its answers go as plain text.
+ */
 export interface QuestionCardAnswers {
-  cardMessageId: number;
+  cardMessageId: number | null;
   answers: QuestionCardAnswer[];
 }
 
@@ -438,10 +441,12 @@ export interface CompletedEvent {
   /** "ask_user": the answer is a question card, and Lawexa waits for the reader. */
   ends_with?: 'ask_user';
   /**
-   * The card's metadata, when the answer is one (techlead, 9 November 2026).
-   * Absent on servers before it: the card then comes with the next read of the chat.
+   * The card, when the answer is one (Backend 54b85a68: `{type, status,
+   * questions, answers}`, on the live event and a late connection's rebuilt
+   * one alike). Absent on servers before it: the card then comes with the
+   * next read of the chat.
    */
-  metadata?: { type?: string; status?: unknown; questions?: unknown; answers?: unknown } | null;
+  question_card?: { type?: string; status?: unknown; questions?: unknown; answers?: unknown } | null;
 }
 
 // Terminal event emitted by backend when a streaming execution is cancelled

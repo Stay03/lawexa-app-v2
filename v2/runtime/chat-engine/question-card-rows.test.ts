@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 
 import type { ChatMessage, ConversationMessage, QuestionCard } from '@/types/chat';
 import { openCardOf } from '@/v2/features/conversations/conversation/question-card/open-card';
-import { withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
+import { CARD_CLOSED_COPY, cardRefusalCopy } from '@/v2/features/conversations/conversation/space-turn';
+import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
 import { adoptServerFields } from './server-fields';
 import type { EngineMessage } from './types';
 
@@ -59,6 +60,44 @@ test('a completed event without the card changes nothing; the next read brings i
 
   const server: ConversationMessage[] = [answer('msg_4', { questionCard: OPEN })];
   assert.deepEqual(cardOf(adoptServerFields(rows, server)[0]), OPEN);
+});
+
+test("a confidential chat's card, which has no saved id, goes on the answer just drawn", () => {
+  const rows = [question('local-1'), answer('local-2')];
+  const card = { type: 'question_card', status: 'open', questions: QUESTIONS, answers: null };
+  assert.deepEqual(cardOf(withCardFromCompleted(rows, null, card, true)[1]), OPEN);
+  // Elsewhere an answer without its id takes no card: its answers could name nothing.
+  assert.equal(withCardFromCompleted(rows, null, card), rows);
+  // …and the box offers it without an id only there.
+  const drawn = withCardFromCompleted(rows, null, card, true);
+  assert.equal(openCardOf(drawn), null);
+  assert.deepEqual(openCardOf(drawn, true), { cardMessageId: null, card: OPEN });
+});
+
+test('answers go on the wire without the labels the row keeps', () => {
+  assert.deepEqual(answersPayload([{ option: 0, label: 'Firm but polite' }, { text: 'Lagos' }, { skipped: true, label: 'B' }]), [
+    { option: 0 },
+    { text: 'Lagos' },
+    { skipped: true },
+  ]);
+});
+
+test("refused answers carry the server's sentence; the card says closed only for a closed card", () => {
+  // Backend 54b85a68 refuses with a plain { message }, and a validation 422 with errors.
+  const closed = cardRefusalSentence({
+    success: false,
+    message: 'That question card is not open in this chat. It may have been answered or replaced; type your message instead.',
+    errors: null,
+  });
+  assert.equal(cardRefusalCopy(closed), CARD_CLOSED_COPY);
+  const count = cardRefusalSentence({ success: false, message: "Send one answer for each of the card's 2 questions.", errors: null });
+  assert.equal(cardRefusalCopy(count), "Send one answer for each of the card's 2 questions.");
+  const files = cardRefusalSentence({
+    message: 'Validation failed',
+    errors: { question_answers: ['Answer the question card without attaching files; attach them in your next message.'] },
+  });
+  assert.equal(cardRefusalCopy(files), 'Answer the question card without attaching files; attach them in your next message.');
+  assert.equal(cardRefusalCopy(cardRefusalSentence(null)), CARD_CLOSED_COPY);
 });
 
 test('a read can close a card a colleague answered, but never reopen one closed here', () => {

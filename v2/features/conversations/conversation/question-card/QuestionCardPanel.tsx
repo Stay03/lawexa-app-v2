@@ -41,7 +41,7 @@ type QuestionCardProps = {
 
 /** The open card, started afresh for each new card (its own key, so a host's box beside it keeps its node). */
 export function OpenQuestionCard(props: QuestionCardProps) {
-  return <QuestionCardPanel key={props.open.cardMessageId} {...props} />;
+  return <QuestionCardPanel key={props.open.cardMessageId ?? 'unsaved'} {...props} />;
 }
 
 function QuestionCardPanel({
