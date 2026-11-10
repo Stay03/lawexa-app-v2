@@ -91,6 +91,14 @@ test('back with this invite\'s code, the join finishes without a second tap, onc
   assert.match(screen, /onError: \(error\) => \{[\s\S]{0,300}forgetPendingInvite\(\);/);
 });
 
+test('the invite\'s answer is cached per viewer, so a signed-out answer is not reused after sign-in', () => {
+  // Fixture run, 10 November 2026: back from sign-in, the screen still showed the
+  // signed-out "Sign in to join" from its cache, and the join never finished.
+  const screen = read('components', 'join', 'JoinScreen.tsx');
+  assert.match(screen, /queryKey: \['invite-preview', code, viewer\],/);
+  assert.match(screen, /state\.isAuthenticated \? `\$\{state\.isGuest \? 'guest' : 'user'\}:\$\{state\.user\?\.id \?\? ''\}` : 'signed-out'/);
+});
+
 test('the sign-in and sign-up forms carry the way back to each other', () => {
   const login = read('components', 'auth', 'LoginForm.tsx');
   assert.match(login, /<AuthSwitchLink to="\/register">Sign up<\/AuthSwitchLink>/);

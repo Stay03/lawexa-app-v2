@@ -10,6 +10,7 @@ import { isAxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { inviteLinksApi } from '@/lib/api/collab';
+import { useAuthStore } from '@/lib/stores/authStore';
 import type { InvitePreview, InviteViewerAction } from '@/types/collab';
 import {
   forgetPendingInvite,
@@ -118,8 +119,15 @@ export function JoinScreen({ code }: { code: string }) {
   const router = useRouter();
   const [failed, setFailed] = useState<string | null>(null);
 
+  // The answer is about WHO is asking (`viewer_action`), so it is cached per
+  // viewer: the "sign up" answer a signed-out visitor got must not be reused
+  // once they come back signed in, or the join never finishes (fixture run,
+  // 10 November 2026: back from sign-in, the screen still said "Sign in").
+  const viewer = useAuthStore((state) =>
+    state.isAuthenticated ? `${state.isGuest ? 'guest' : 'user'}:${state.user?.id ?? ''}` : 'signed-out',
+  );
   const preview = useQuery({
-    queryKey: ['invite-preview', code],
+    queryKey: ['invite-preview', code, viewer],
     queryFn: () => inviteLinksApi.preview(code),
     retry: false, // 404/410 are answers, not blips
   });
