@@ -3,8 +3,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Hourglass, Link2, LogOut, Pencil, Trash2, Users } from 'lucide-react';
+import { Hourglass, Link2, LogOut, Pencil, Trash2, Trophy, Users } from 'lucide-react';
 
+import { GameOverlay } from '@/v2/features/channels/quiz/GameOverlay';
+import { LiveQuizBar } from '@/v2/features/channels/quiz/LiveQuizBar';
+import { QuizLibrarySheet } from '@/v2/features/channels/quiz/QuizLibrarySheet';
+import { useSpaceLiveQuiz } from '@/v2/features/channels/quiz/use-space-live-quiz';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
 import { useV2Session } from '@/v2/runtime/session-context';
@@ -23,6 +27,7 @@ import {
   defaultSpaceTab,
   parseSpaceTab,
   spaceMenuItems,
+  viewerContentRole,
   type SpaceMenuItem,
   type SpaceTab,
 } from '../model';
@@ -153,6 +158,26 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
 
   const eligible = collabAccessState(session) === 'eligible';
 
+  /* ── The Space's live quiz (Arthur's decisions 93142269) ──────────────────
+     Members hear its games and open `?game=` (a `space_quiz_live`
+     notification's link); its Owner and Contributors host, from the menu
+     below. A game started here names no chat. */
+  const liveQuiz = useSpaceLiveQuiz({
+    seat: space
+      ? {
+          uuid: space.uuid,
+          name: space.name,
+          isMember: space.my_role != null,
+          contentRole: viewerContentRole(space),
+        }
+      : undefined,
+    conversationUuid: null,
+    initialGameUuid: searchParams.get('game'),
+  });
+  const canHostQuiz = liveQuiz.mayHost;
+  const { setHostOpen } = liveQuiz;
+  const openHostQuiz = useCallback(() => setHostOpen(true), [setHostOpen]);
+
   /* The People pill's two lists for whoever manages the people (the invites
      not accepted yet, and who asked to join), asked for as the space opens, so
      the pill opens with them drawn. Asked for only when the pill mounted, they
@@ -259,7 +284,20 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
       return NO_SCREEN_ACTIONS;
     }
     const verbs: Record<SpaceMenuItem, ScreenAction> = {
-      members: { id: 'members', label: 'Members', icon: Users, onSelect: openRoster },
+      'host-quiz': {
+        id: 'host-quiz',
+        label: 'Host a live quiz',
+        icon: Trophy,
+        onSelect: openHostQuiz,
+      },
+      // The rule under Host a live quiz; as the first row it draws none.
+      members: {
+        id: 'members',
+        label: 'Members',
+        icon: Users,
+        separatorBefore: true,
+        onSelect: openRoster,
+      },
       'invite-links': {
         id: 'invite-links',
         label: 'Invite links',
@@ -294,9 +332,11 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
         onSelect: openDelete,
       },
     };
-    return spaceMenuItems({ canManage, isOwner, leaveRoute }).map((item) => verbs[item]);
+    return spaceMenuItems({ canHostQuiz, canManage, isOwner, leaveRoute }).map((item) => verbs[item]);
   }, [
     hasSpace,
+    canHostQuiz,
+    openHostQuiz,
     canManage,
     isOwner,
     leaveRoute,
@@ -356,6 +396,13 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
           invitesSent={peopleReads ? pendingInvites.data?.pagination.total : undefined}
         />
 
+        {/* The door into a running game. Nothing at all while none is live,
+            so the page keeps its shape; members only, because the probe is
+            refused to anyone else. */}
+        {liveQuiz.room && liveQuiz.isMember && (
+          <LiveQuizBar room={liveQuiz.room} viewerId={session.userId} onOpenGame={liveQuiz.openGame} />
+        )}
+
         <SpaceContentPanel
           space={space}
           tab={tab}
@@ -375,7 +422,31 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
           onEdit={canManage ? openEdit : undefined}
           {...panel.bind('about')}
         />
+        {liveQuiz.hostPlace && liveQuiz.isMember && (
+          <QuizLibrarySheet
+            place={liveQuiz.hostPlace}
+            viewerId={session.userId}
+            open={liveQuiz.hostOpen}
+            onOpenChange={liveQuiz.setHostOpen}
+            onOpenGame={liveQuiz.openGame}
+          />
+        )}
       </div>
+
+      {/* Game mode over the whole window: this page scrolls in the shell, so
+          a layer inside it would scroll away. The page stays mounted under
+          it, so leaving lands where the reader was. */}
+      {liveQuiz.room && liveQuiz.gameUuid && (
+        <GameOverlay
+          key={liveQuiz.gameUuid}
+          room={liveQuiz.room}
+          cover="viewport"
+          gameUuid={liveQuiz.gameUuid}
+          viewerId={session.userId}
+          viewerUuid={session.userUuid}
+          onClose={liveQuiz.closeGame}
+        />
+      )}
     </div>
   );
 }

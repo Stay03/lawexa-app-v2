@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ApiMessage, ChatMessage, ConversationData, DraftEditEvent } from '@/types/chat';
+import type { ApiMessage, ChatMessage, ConversationData, DraftEditEvent, QuizGameEvent } from '@/types/chat';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import { isStorableAnswer } from '@/v2/runtime/persist/policy';
 import { isTurnRow, lastTurnIndex, lastTurnRow, turnRowCount } from '@/v2/runtime/turn-rows';
@@ -67,6 +67,36 @@ test('v2 reads a draft_edit row as a line: its place is created_at, its time is 
   assert.equal(drawn.noteId, 1);
   assert.equal(drawn.timestamp.toISOString(), iso(1));
   assert.equal(drawn.editedAt.toISOString(), iso(6));
+});
+
+test('v2 reads a live quiz’s live and finished rows as lines that name their game', () => {
+  const quizLine = (id: number, type: 'quiz_game_live' | 'quiz_game_finished', game?: string): ApiMessage => ({
+    id,
+    conversation_id: 'conv-1',
+    agent_id: null,
+    role: 'event',
+    content: `Ada's quiz ${type}`,
+    metadata: { type, game_uuid: game, quiz_uuid: 'q-1', editor: { uuid: 'u-ada', name: 'Ada' } },
+    created_at: iso(id),
+  });
+  const rows = transformApiMessages(
+    [quizLine(1, 'quiz_game_live', 'g-1'), quizLine(2, 'quiz_game_finished', 'g-1'), quizLine(3, 'quiz_game_live')],
+    { events: true },
+  );
+  // A row with no game names nothing to open, so it is not drawn.
+  assert.deepEqual(ids(rows), ['msg_1', 'msg_2']);
+  const live = rows[0] as QuizGameEvent;
+  assert.equal(live.eventType, 'quiz_game_live');
+  assert.equal(live.gameUuid, 'g-1');
+  assert.equal(live.content, "Ada's quiz quiz_game_live");
+  assert.equal(live.timestamp.toISOString(), iso(1));
+  assert.equal((rows[1] as QuizGameEvent).eventType, 'quiz_game_finished');
+  // The same line again (the next poll) changes nothing.
+  const held = transformApiMessages([turn(5, 'user', 0)], { events: true }) as EngineMessage[];
+  const placed = placeEvent(held, live);
+  assert.equal(placeEvent(placed, { ...live }), placed);
+  // v1 never receives one.
+  assert.deepEqual(transformApiMessages([quizLine(1, 'quiz_game_live', 'g-1')]), []);
 });
 
 test('an event of another type is dropped, and so is a draft_edit row with no note', () => {

@@ -171,11 +171,10 @@ test('the lock shows only where it can differ: a private team space', () => {
 /* ── The approved menu (critique 2) ──────────────────────────────────────── */
 
 test('the menu: Members and Leave for everyone, Rename and the link steps for the Owner, Delete for the Owner', () => {
-  assert.deepEqual(spaceMenuItems({ canManage: false, isOwner: false, leaveRoute: 'leave' }), [
-    'members',
-    'leave',
-  ]);
-  assert.deepEqual(spaceMenuItems({ canManage: true, isOwner: true, leaveRoute: 'leave' }), [
+  const menu = (viewer: Omit<Parameters<typeof spaceMenuItems>[0], 'canHostQuiz'>) =>
+    spaceMenuItems({ canHostQuiz: false, ...viewer });
+  assert.deepEqual(menu({ canManage: false, isOwner: false, leaveRoute: 'leave' }), ['members', 'leave']);
+  assert.deepEqual(menu({ canManage: true, isOwner: true, leaveRoute: 'leave' }), [
     'members',
     'invite-links',
     'waiting',
@@ -184,7 +183,7 @@ test('the menu: Members and Leave for everyone, Rename and the link steps for th
     'delete',
   ]);
   // A team space's admin manages but does not own.
-  assert.deepEqual(spaceMenuItems({ canManage: true, isOwner: false, leaveRoute: 'leave' }), [
+  assert.deepEqual(menu({ canManage: true, isOwner: false, leaveRoute: 'leave' }), [
     'members',
     'invite-links',
     'waiting',
@@ -192,20 +191,37 @@ test('the menu: Members and Leave for everyone, Rename and the link steps for th
     'leave',
   ]);
   // The last Owner alone is never offered a Leave that can only be refused.
-  assert.deepEqual(
-    spaceMenuItems({ canManage: true, isOwner: true, leaveRoute: 'delete-instead' }),
-    ['members', 'invite-links', 'waiting', 'rename', 'delete'],
-  );
+  assert.deepEqual(menu({ canManage: true, isOwner: true, leaveRoute: 'delete-instead' }), [
+    'members',
+    'invite-links',
+    'waiting',
+    'rename',
+    'delete',
+  ]);
   // The last Owner with others keeps Leave, which asks for a new owner.
-  assert.ok(
-    spaceMenuItems({ canManage: true, isOwner: true, leaveRoute: 'choose-new-owner' }).includes('leave'),
+  assert.ok(menu({ canManage: true, isOwner: true, leaveRoute: 'choose-new-owner' }).includes('leave'));
+});
+
+test('whoever may host a live quiz gets Host a live quiz first, above the people rows', () => {
+  // A Contributor: hosts, but does not manage the people.
+  assert.deepEqual(
+    spaceMenuItems({ canHostQuiz: true, canManage: false, isOwner: false, leaveRoute: 'leave' }),
+    ['host-quiz', 'members', 'leave'],
+  );
+  assert.deepEqual(
+    spaceMenuItems({ canHostQuiz: true, canManage: true, isOwner: true, leaveRoute: 'leave' }),
+    ['host-quiz', 'members', 'invite-links', 'waiting', 'rename', 'leave', 'delete'],
   );
 });
 
 test('the page publishes the menu from the one rule and opens the frame’s dialogs', () => {
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /spaceMenuItems\(\{ canManage, isOwner, leaveRoute \}\)\.map\(\(item\) => verbs\[item\]\)/);
-  assert.match(screen, /label: 'Members', icon: Users, onSelect: openRoster/);
+  assert.match(
+    screen,
+    /spaceMenuItems\(\{ canHostQuiz, canManage, isOwner, leaveRoute \}\)\.map\(\(item\) => verbs\[item\]\)/,
+  );
+  // The rule under Host a live quiz, which as the first row draws none.
+  assert.match(screen, /label: 'Members',\s*icon: Users,\s*separatorBefore: true,\s*onSelect: openRoster,/);
   // Design round 2: the row asks for the rule above it. 16 October 2026: it
   // is "Edit space", the whole form (was 'Rename' with `openRename`).
   assert.match(screen, /label: 'Edit space',\s*icon: Pencil,\s*separatorBefore: true,\s*onSelect: openEdit/);

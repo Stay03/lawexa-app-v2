@@ -86,8 +86,12 @@ test('the conversation page stays in the router cache as long as its transcript 
   // GC_TIMES.list is 30 minutes: the two windows match.
   assert.match(read('v2', 'runtime', 'query.ts'), /list: 30 \* 60 \* 1000,/);
   // The payload carries no data: the page awaits only its params and its query
-  // (no I/O), and passes the id and the URL's `?m=` (a notification's message).
-  assert.match(page, /const \{ conversationId \} = await params;\s*\n\s*const \{ m \} = await searchParams;\s*\n\s*return <ConversationScreen conversationId=\{conversationId\} jumpTo=\{jumpTarget\(m\)\} \/>;/);
+  // (no I/O), and passes the id, the URL's `?m=` (a notification's message)
+  // and its `?game=` (a Space chat's live quiz).
+  assert.match(
+    page,
+    /const \{ conversationId \} = await params;\s*\n\s*const \{ m, game \} = await searchParams;\s*\n\s*return \(\s*<ConversationScreen\s*conversationId=\{conversationId\}\s*jumpTo=\{jumpTarget\(m\)\}\s*initialGameUuid=\{typeof game === 'string' && game !== '' \? game : null\}\s*\/>\s*\);/,
+  );
   assert.equal(page.match(/await /g)?.length, 4, 'params twice, searchParams and the metadata fetch, nothing else');
   // No layout of its own that could put data in the payload.
   assert.equal(existsSync(repo('app', 'v2', 'c', 'layout.tsx')), false);

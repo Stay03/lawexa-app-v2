@@ -1,4 +1,4 @@
-import { isEventMessage, type BackgroundJobEvent, type EventMessage } from '@/types/chat';
+import { isEventMessage, type BackgroundJobEvent, type EventMessage, type QuizGameEvent } from '@/types/chat';
 import type { EngineMessage } from './types';
 
 /**
@@ -55,6 +55,9 @@ export function removeEvent(rows: readonly EngineMessage[], serverId: number): r
 const isBackgroundJobLine = (line: EventMessage): line is BackgroundJobEvent =>
   line.eventType === 'background_job_result' || line.eventType === 'background_job_unanswered';
 
+const isQuizGameLine = (line: EventMessage): line is QuizGameEvent =>
+  line.eventType === 'quiz_game_live' || line.eventType === 'quiz_game_finished';
+
 /** Whether two lines draw the same. */
 export function sameLine(a: EventMessage, b: EventMessage): boolean {
   if (a.id !== b.id || timeOf(a) !== timeOf(b) || a.content !== b.content) return false;
@@ -72,6 +75,9 @@ export function sameLine(a: EventMessage, b: EventMessage): boolean {
       a.jobs.length === b.jobs.length &&
       a.jobs.every((job, index) => job.job_id === b.jobs[index].job_id && job.outcome === b.jobs[index].outcome)
     );
+  }
+  if (isQuizGameLine(a) && isQuizGameLine(b)) {
+    return a.eventType === b.eventType && a.gameUuid === b.gameUuid;
   }
   return false;
 }

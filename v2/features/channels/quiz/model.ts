@@ -69,6 +69,15 @@ export const HOST_POLICY_REFUSAL =
 export const HOST_POLICY_LIBRARY_NOTE =
   'You can write quizzes for your own library. Only channel admins can start a game in this channel.';
 
+/** In a Space, the Owner and Contributors host (Arthur's decision a, 93142269). */
+export const SPACE_HOST_NOTE =
+  'You can write quizzes for your own library. Only the Space’s Owner and Contributors can start a game here.';
+
+/** Whether this reader may put a quiz live in a Space: its content Owner or a Contributor. */
+export function canHostInSpace(contentRole: string | null | undefined): boolean {
+  return contentRole === 'owner' || contentRole === 'editor';
+}
+
 
 /* ── Visibility (a DISCOVERY switch, not an access one) ───────────────────── */
 

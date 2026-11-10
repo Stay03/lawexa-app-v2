@@ -271,10 +271,11 @@ export interface NarrationMessage extends ChatMessage {
  * A quiet line in the chat about something done beside it, not a turn (role
  * `event` on the server), by `eventType`:
  *  - {@link DraftEditEvent}, a draft edited from this chat;
- *  - {@link BackgroundJobEvent}, Lawexa back from background work, or unable to come back.
+ *  - {@link BackgroundJobEvent}, Lawexa back from background work, or unable to come back;
+ *  - {@link QuizGameEvent}, a live quiz put live or finished in the chat's Space.
  * Only v2 draws these: v1's transform never returns one.
  */
-export type EventMessage = DraftEditEvent | BackgroundJobEvent;
+export type EventMessage = DraftEditEvent | BackgroundJobEvent | QuizGameEvent;
 
 /** What every line has: its place and the server's own sentence. */
 interface EventMessageBase {
@@ -317,6 +318,17 @@ export interface DraftEditEvent extends EventMessageBase {
 export interface BackgroundJobEvent extends EventMessageBase {
   eventType: 'background_job_result' | 'background_job_unanswered';
   jobs: import('@/types/background-jobs').BackgroundJobOutcome[];
+}
+
+/**
+ * A live quiz in the chat's Space, hosted from this chat: put live ("Ada put
+ * 'Torts 101' live, 10 questions. Join the lobby!") or finished (live quiz in
+ * Spaces, Backend's shapes 7a007a8c). `content` is the sentence shown; the
+ * game is opened by its uuid.
+ */
+export interface QuizGameEvent extends EventMessageBase {
+  eventType: 'quiz_game_live' | 'quiz_game_finished';
+  gameUuid: string;
 }
 
 // Union type for all message types
@@ -838,7 +850,9 @@ export interface ApiMessage {
       | 'agent_message'
       | 'question_card'
       | 'question_answers'
-      | 'skill_draft';
+      | 'skill_draft'
+      | 'quiz_game_live'
+      | 'quiz_game_finished';
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
     /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */
@@ -862,6 +876,9 @@ export interface ApiMessage {
     /** On a `background_job_result` (user role) or `background_job_unanswered` (assistant role)
      *  row: the jobs it is about (Backend 063d9cc3). */
     background_jobs?: import('@/types/background-jobs').BackgroundJobOutcome[];
+    /** On a `quiz_game_live` or `quiz_game_finished` event row: the game and its quiz (`editor` is the host). */
+    game_uuid?: string;
+    quiz_uuid?: string;
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
     success?: boolean;

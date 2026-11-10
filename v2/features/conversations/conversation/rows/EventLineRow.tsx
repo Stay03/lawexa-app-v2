@@ -2,13 +2,15 @@
 
 import { memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { History, PenLine } from 'lucide-react';
+import { History, PenLine, Trophy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import type { BackgroundJobEvent, DraftEditEvent, EventMessage } from '@/types/chat';
+import type { BackgroundJobEvent, DraftEditEvent, EventMessage, QuizGameEvent } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { notesQueries } from '@/v2/features/notes/queries';
+import { useLiveQuizRoom } from '@/v2/features/channels/quiz/live-quiz-room-context';
+import { QuizGameCard } from '@/v2/features/channels/quiz/QuizGameCard';
 import { useV2ChatContext } from '../chat-context';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { clockTime } from '../day-label';
@@ -21,6 +23,9 @@ export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMe
     case 'background_job_result':
     case 'background_job_unanswered':
       return <BackgroundJobLine line={line} />;
+    case 'quiz_game_live':
+    case 'quiz_game_finished':
+      return <QuizGameLineRow line={line} />;
     default:
       return <DraftEditLine line={line} />;
   }
@@ -49,6 +54,43 @@ function BackgroundJobLine({ line }: { line: BackgroundJobEvent }) {
         {clockTime(line.timestamp)}
       </time>
     </p>
+  );
+}
+
+/**
+ * A live quiz put live or finished in the chat's Space (Backend's shapes
+ * 7a007a8c): the quiz card the channels draw, with Join, Watch or See results
+ * opening the game over the chat. A reader the screen gives no room to (not a
+ * member of the Space) gets the sentence alone, as a quiet note: the game's
+ * probe and the game are refused to them.
+ */
+function QuizGameLineRow({ line }: { line: QuizGameEvent }) {
+  const quiz = useLiveQuizRoom();
+  if (!quiz) {
+    return (
+      <p
+        role="note"
+        className="flex items-center justify-center gap-1.5 px-4 text-center text-xs text-muted-foreground"
+      >
+        <Trophy aria-hidden className="size-3.5 shrink-0" />
+        <span className="min-w-0 break-words">{line.content}</span>
+      </p>
+    );
+  }
+  return (
+    <div className="px-4">
+      <QuizGameCard
+        line={{
+          finished: line.eventType === 'quiz_game_finished',
+          gameUuid: line.gameUuid,
+          content: line.content,
+          createdAt: line.timestamp.toISOString(),
+        }}
+        room={quiz.room}
+        viewerId={quiz.viewerId}
+        onOpenGame={quiz.openGame}
+      />
+    </div>
   );
 }
 

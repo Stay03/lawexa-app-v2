@@ -29,8 +29,9 @@ import { jumpTarget } from '@/v2/features/conversations/conversation/jump-target
  */
 interface ConversationPageProps {
   params: Promise<{ conversationId: string }>;
-  /** `?m={id}`: a message to go to once the chat opens (jump-target.ts). */
-  searchParams: Promise<{ m?: string | string[] }>;
+  /** `?m={id}`: a message to go to once the chat opens (jump-target.ts).
+   *  `?game={uuid}`: a Space chat's live quiz to open over it (a notification). */
+  searchParams: Promise<{ m?: string | string[]; game?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: ConversationPageProps): Promise<Metadata> {
@@ -121,7 +122,13 @@ export const unstable_dynamicStaleTime = 1800;
 export default async function V2ConversationPage({ params, searchParams }: ConversationPageProps) {
   // The only remaining awaits: the route params and the query, which cost no I/O.
   const { conversationId } = await params;
-  const { m } = await searchParams;
+  const { m, game } = await searchParams;
 
-  return <ConversationScreen conversationId={conversationId} jumpTo={jumpTarget(m)} />;
+  return (
+    <ConversationScreen
+      conversationId={conversationId}
+      jumpTo={jumpTarget(m)}
+      initialGameUuid={typeof game === 'string' && game !== '' ? game : null}
+    />
+  );
 }

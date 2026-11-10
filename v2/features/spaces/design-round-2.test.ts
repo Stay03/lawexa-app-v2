@@ -135,17 +135,26 @@ test('a rule goes before the first destructive row and where a row asks', () => 
     items.map((item) =>
       menuRow(item, {
         destructive: item === 'leave' || item === 'delete',
-        separatorBefore: item === 'rename',
+        separatorBefore: item === 'rename' || item === 'members',
       }),
     );
   // Owner: Members, Invite links, Waiting | Rename | Leave, Delete.
+  const owner = { canManage: true, isOwner: true, leaveRoute: 'leave' } as const;
   assert.deepEqual(
-    rules(space(spaceMenuItems({ canManage: true, isOwner: true, leaveRoute: 'leave' }))),
+    rules(space(spaceMenuItems({ canHostQuiz: false, ...owner }))),
     [false, false, false, true, true, false],
+  );
+  // An Owner who hosts: Host a live quiz | Members, Invite links, Waiting |
+  // Rename | Leave, Delete.
+  assert.deepEqual(
+    rules(space(spaceMenuItems({ canHostQuiz: true, ...owner }))),
+    [false, true, false, false, true, true, false],
   );
   // Viewer: Members | Leave.
   assert.deepEqual(
-    rules(space(spaceMenuItems({ canManage: false, isOwner: false, leaveRoute: 'leave' }))),
+    rules(
+      space(spaceMenuItems({ canHostQuiz: false, canManage: false, isOwner: false, leaveRoute: 'leave' })),
+    ),
     [false, true],
   );
   // The folder screen's menu: Rename, Move to space | Delete folder.

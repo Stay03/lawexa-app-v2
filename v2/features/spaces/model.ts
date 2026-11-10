@@ -674,6 +674,7 @@ export function othersInSpace(
 
 /** One row of the space's menu in the shell bar. */
 export type SpaceMenuItem =
+  | 'host-quiz'
   | 'members'
   | 'invite-links'
   | 'waiting'
@@ -684,6 +685,9 @@ export type SpaceMenuItem =
 /**
  * The space menu, in order, for this viewer: the approved Members, Rename,
  * Leave, Delete as the role allows (design round 1, 12 October 2026).
+ *  - whoever may host a live quiz here (the content Owner and Contributors,
+ *    Arthur's decision a, 93142269) gets Host a live quiz first, the one row
+ *    that starts something, above the people rows;
  *  - every member: Members, and Leave unless it could only be refused (the
  *    last Owner of a space nobody else is in, `delete-instead`);
  *  - whoever manages membership adds Invite links, Waiting to join and
@@ -691,11 +695,12 @@ export type SpaceMenuItem =
  *  - the Owner adds Delete.
  */
 export function spaceMenuItems(viewer: {
+  canHostQuiz: boolean;
   canManage: boolean;
   isOwner: boolean;
   leaveRoute: SpaceLeaveRoute;
 }): SpaceMenuItem[] {
-  const items: SpaceMenuItem[] = ['members'];
+  const items: SpaceMenuItem[] = viewer.canHostQuiz ? ['host-quiz', 'members'] : ['members'];
   if (viewer.canManage) items.push('invite-links', 'waiting', 'rename');
   if (viewer.leaveRoute !== 'delete-instead') items.push('leave');
   if (viewer.isOwner) items.push('delete');

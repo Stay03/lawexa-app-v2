@@ -86,6 +86,7 @@ import { GameOverlay } from '../quiz/GameOverlay';
 import { LiveQuizBar } from '../quiz/LiveQuizBar';
 import { QuizLibrarySheet } from '../quiz/QuizLibrarySheet';
 import { channelRoom } from '../quiz/quiz-room';
+import { useGameMode } from '../quiz/use-game-mode';
 import { useCachedChannelIdentity } from './cached-identity';
 import { ChannelAboutSheet } from './ChannelAboutSheet';
 import { EnablePushNudge } from './EnablePushNudge';
@@ -465,72 +466,16 @@ export function ChannelScreen({
     : null;
   const aiOpen = panel.value === 'ai' || aiSessionUuid !== null;
 
-  /* ── Game mode (W6). Its OWN param, not a `?panel=` value: a game is a mode
-        that covers the screen, and a panel may be open behind it. The SSR
-        fallback is real here because `GameOverlay` renders IN TREE — an overlay
-        that only ever portals can hydrate from the URL alone. ─────────────── */
-  const game = useUrlOverlay('game', {
-    ssrValue: initialGameUuid,
-    // Values are bare uuids, so the gate is the whole param: joining a quiz is
-    // on the blocked list, so only a participant reaches the branch that
-    // renders `GameOverlay` — and therefore only a participant's screen ever
-    // asks the quiz endpoints for anything. Quizzes belong to a ROOM and not to
-    // a tangent inside one, so a thread has no game mode either.
+  /* ── Game mode (W6): `?game={uuid}` covers the channel with its live game.
+        The adoption rules live in `useGameMode`, shared with a Space's page
+        and chats. Values are bare uuids, so the gate is the whole param:
+        joining a quiz is on the blocked list, so only a participant reaches
+        the branch that renders `GameOverlay`. Quizzes belong to a ROOM and
+        not to a tangent inside one, so a thread has no game mode either. ── */
+  const { gameUuid, showGame, closeGame } = useGameMode({
+    initialGameUuid,
     canOpen: channel ? canParticipate && !isThread : undefined,
   });
-  const closeGame = game.close;
-  const gameUuid = game.value;
-  const { show: showGame } = game;
-
-  /**
-   * THE NAVIGATION'S `?game=` IS ADOPTED WHENEVER IT ARRIVES, not only when this
-   * screen is born — which is what makes the go-live notification work for its
-   * likeliest recipient.
-   *
-   * `ssrValue` alone could never do it. It is consulted only where there is no
-   * `window`, so on the client the hook reads the LIVE URL — once, in its lazy
-   * initialiser — and `popstate` is its only other adopter. Neither fires for the
-   * reader who is already sitting in `/channels/{uuid}` when a quiz starts there:
-   * the bell pushes `/channels/{uuid}?game={game}`, the route shell keys this
-   * component by `channelId` so React does NOT remount it, and a push is not a
-   * pop. The overlay stayed `null` and the address bar kept a `?game=` nothing on
-   * screen answered to — until some unrelated panel's `close()` walked back over
-   * an entry carrying it and sprang the game open minutes later. The prop is the
-   * one signal that does change, so the prop is what this reads. (`?m=` re-arms on
-   * prop change and `?tab=` falls back to its prop; `?game=` did neither.)
-   *
-   * AN EFFECT, NOT A RENDER-PHASE ADJUST, and the reason is timing. Next applies a
-   * navigation's URL in `HistoryUpdater`'s `useInsertionEffect` — after the render
-   * pass that delivered these props — so during that render `window.location`
-   * still reads the PREVIOUS address. Adopting from render would therefore be
-   * read straight back as stripped (the hook re-checks the live URL every render),
-   * and calling `show` from render would find no `?game=` yet and quietly PUSH one
-   * — a history write from a render, and a duplicate entry for Back to land on and
-   * re-open the game from. By the time an effect runs, the insertion effect has
-   * already moved the address bar, so `show` finds the live URL equal to the value
-   * and returns having touched no history at all: it only adopts into state. It
-   * cannot fight the quiet-writer rule because it never writes.
-   *
-   * IT CANNOT RE-OPEN A GAME THE READER CLOSED. Its only trigger is a CHANGE of
-   * `initialGameUuid`, and that is a navigation-time prop: closing the overlay is a
-   * quiet history write, which by construction never reaches the App Router and so
-   * never re-renders this page with new props. A dismissal is final.
-   *
-   * `canOpen` STILL RULES. `show` refuses a value this reader may not open, so a
-   * previewer's deep link degrades to the honest line in the join dock below
-   * rather than to a lobby they cannot enter.
-   *
-   * KNOWN LIMIT, stated rather than hidden: re-delivering the SAME uuid changes no
-   * prop, so clicking the same bell row twice after dismissing that same lobby
-   * will not re-open it (the URL says `?game=`, the screen does not). Covering it
-   * needs a per-navigation signal this screen does not have; the alternative —
-   * re-arming whenever the overlay goes empty — would re-open the game the instant
-   * the reader closed it, because `close()`'s `history.back()` has not landed yet.
-   */
-  useEffect(() => {
-    if (initialGameUuid === null) return;
-    showGame(initialGameUuid);
-  }, [initialGameUuid, showGame]);
 
   // `?tab=` is not an overlay — it is a persistent view selector written with
   // REPLACE — but it still has to be re-adopted here, because a Back OUT of a
@@ -1308,7 +1253,7 @@ export function ChannelScreen({
           `enabled: open`, and both audiences may open them. */}
       {canParticipate && !isThread && (
         <QuizLibrarySheet
-          channel={channel}
+          place={{ kind: 'channel', channel }}
           viewerId={viewerId}
           onOpenGame={openGame}
           {...panel.bind('quizzes')}

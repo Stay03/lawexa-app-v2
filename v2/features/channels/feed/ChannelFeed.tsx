@@ -53,7 +53,7 @@ import { MessageGroupRow } from './MessageGroupRow';
 import { MessageImageViewer } from './MessageImageViewer';
 import type { MessageRowActions } from './MessageRow';
 import { QuizCardPreview } from './QuizCardPreview';
-import { QuizGameCard } from './QuizGameCard';
+import { QuizGameCard } from '../quiz/QuizGameCard';
 import { channelRoom } from '../quiz/quiz-room';
 import { RespondingRow } from './RespondingRow';
 import { useTextSelectMode } from './use-text-select-mode';
@@ -1532,7 +1532,12 @@ export function ChannelFeed({
                     return canParticipate ? (
                       <QuizGameCard
                         key={item.key}
-                        message={item.message}
+                        line={{
+                          finished: item.message.metadata.type === 'quiz_game_finished',
+                          gameUuid: item.message.metadata.game_uuid ?? null,
+                          content: item.message.content,
+                          createdAt: item.message.created_at,
+                        }}
                         room={channelRoom(channel.uuid)}
                         viewerId={viewerId}
                         onOpenGame={onOpenGame}

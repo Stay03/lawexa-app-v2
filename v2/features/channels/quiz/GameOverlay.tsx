@@ -105,6 +105,7 @@ const LAST_ANSWER_CAPTION = 'Last answer';
 
 export function GameOverlay({
   room,
+  cover = 'room',
   gameUuid,
   viewerId,
   viewerUuid,
@@ -112,6 +113,13 @@ export function GameOverlay({
 }: {
   /** The room the overlay is over: a channel, or a Space itself (quiz-room.ts). */
   room: QuizRoom;
+  /**
+   * What the mode covers. `room`: the screen it sits in, which is a fixed-height
+   * pane (a channel, a chat). `viewport`: the whole window, for a page that
+   * scrolls in the shell (a Space's page), where an absolute layer would sit at
+   * the page's top and scroll away.
+   */
+  cover?: 'room' | 'viewport';
   gameUuid: string;
   viewerId: number | null;
   viewerUuid: string | null;
@@ -168,8 +176,10 @@ export function GameOverlay({
       className={cn(
         'outline-none',
         // Above the feed's floating composer overlay — the mode covers the
-        // whole channel screen, not just its pane region.
-        'absolute inset-0 z-20 flex min-h-0 flex-col bg-background',
+        // whole screen it is in, not just its pane region; or, on a page that
+        // scrolls in the shell, the whole window.
+        cover === 'viewport' ? 'fixed inset-0 z-50' : 'absolute inset-0 z-20',
+        'flex min-h-0 flex-col bg-background',
         'motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-200',
       )}
     >

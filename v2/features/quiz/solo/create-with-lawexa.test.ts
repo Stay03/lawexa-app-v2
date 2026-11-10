@@ -58,7 +58,11 @@ test('a new quiz opens on the choice, an edit on the form, and the choice has no
   assert.match(form, /footer=\{\s*choosing \? undefined : \(/);
   // The home's chat, or for a channel's quiz its Space's.
   assert.match(form, /chat=\{room && spaceUuid \? \{ kind: 'space', spaceUuid \} : \{ kind: 'home' \}\}/);
-  assert.match(read('v2', 'features', 'channels', 'quiz', 'QuizLibrarySheet.tsx'), /spaceUuid=\{channel\.space\.uuid\}/);
+  // A Space's own host sheet names that Space (live quiz in Spaces).
+  assert.match(
+    read('v2', 'features', 'channels', 'quiz', 'QuizLibrarySheet.tsx'),
+    /spaceUuid=\{channel \? channel\.space\.uuid : room\.uuid\}/,
+  );
   const choice = form.slice(form.indexOf('function QuizCreateChoice'), form.indexOf('function SettingRow'));
   // The tap queues the words: Next draws the chat before the address changes.
   assert.match(choice, /<Link href=\{askHref\(chat, QUIZ_ASK_PROMPT\)\} onClick=\{\(\) => queueAsk\(chat, QUIZ_ASK_PROMPT\)\}>/);

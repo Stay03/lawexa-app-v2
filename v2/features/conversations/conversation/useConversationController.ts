@@ -14,6 +14,7 @@ import { lastTurnRow, lastTurnStartIndex } from '@/v2/runtime/turn-rows';
 import type {
   ConversationReference,
   ConversationSpaceRef,
+  ConversationSpaceRole,
   ConversationStatusData,
   ConversationTurnUser,
   MessageAttachment,
@@ -228,6 +229,10 @@ export interface ConversationController {
   /** The same space with its name, from the record (null until it answers):
    *  where a draft's Save to folder files a note. */
   space: ConversationSpaceRef | null;
+  /** The chat's space and the reader's role in it (backend B4; null for a
+   *  non-member), once the record answers: who may play and host its live
+   *  quizzes. Undefined before the record, null for a chat in no space. */
+  spacePlace: { space: ConversationSpaceRef; role: ConversationSpaceRole | null } | null | undefined;
   /** Name who asked each user turn: a space chat whose record carries the B4
    *  fields. False on a personal chat, which looks exactly as before. */
   showAuthors: boolean;
@@ -887,6 +892,15 @@ export function useConversationController(
   // would be refused it once and then re-read the transcript (F4 review N8).
   const isSpaceMember = isSpaceChat && detailData?.my_space_role != null;
   const showAuthors = isSpaceChat && hasSpaceContract(detailData);
+  const spacePlace = useMemo(
+    () =>
+      detailData === null
+        ? undefined
+        : detailData.space
+          ? { space: detailData.space, role: detailData.my_space_role ?? null }
+          : null,
+    [detailData],
+  );
 
   // The space's roster, for each person's colour (member-colour.ts): the Owner
   // first, then by join time. One page of a hundred covers a space; anyone
@@ -1328,6 +1342,7 @@ export function useConversationController(
     isSpaceChat,
     spaceUuid,
     space: detailData?.space ?? null,
+    spacePlace,
     showAuthors,
     spaceRoster,
     recordRoster,

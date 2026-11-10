@@ -24,6 +24,14 @@ import { BackgroundJobsProvider } from './background-jobs/context';
 import { AgentRowsProvider } from './agents/context';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider, type CardQuestions } from './chat-context';
+import { GameOverlay } from '@/v2/features/channels/quiz/GameOverlay';
+import { LiveQuizBar } from '@/v2/features/channels/quiz/LiveQuizBar';
+import {
+  LiveQuizRoomProvider,
+  type LiveQuizRoomValue,
+} from '@/v2/features/channels/quiz/live-quiz-room-context';
+import { QuizLibrarySheet } from '@/v2/features/channels/quiz/QuizLibrarySheet';
+import { useSpaceLiveQuiz } from '@/v2/features/channels/quiz/use-space-live-quiz';
 import { DocumentExportScope } from './markdown/document-export';
 import {
   clearEmbeddedComposer,
@@ -89,6 +97,7 @@ export function ConversationScreen({
   conversationId,
   embed,
   jumpTo = null,
+  initialGameUuid = null,
 }: {
   conversationId: string;
   /** Present when this screen lives inside another route (the case page's
@@ -96,6 +105,8 @@ export function ConversationScreen({
   embed?: ConversationEmbed;
   /** A message to go to once the chat has opened (`/c/{id}?m={id}`, a notification). */
   jumpTo?: number | null;
+  /** A Space chat's live quiz to open over it once the chat has opened (`?game=`). */
+  initialGameUuid?: string | null;
 }) {
   const { userId: serverUserId } = useV2Session();
   const controller = useConversationController(conversationId, serverUserId, embed);
@@ -139,6 +150,35 @@ export function ConversationScreen({
   // then anyone else who asked, by first appearance. A row this client drew for
   // the reader carries no author yet, so it takes the reader's own uuid.
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
+
+  /* ── The chat's Space's live quiz (live quiz in Spaces, 7a007a8c) ──────────
+     In a Space chat on its own route, its members see the Space's live bar
+     and open its games over the chat; its Owner and Contributors host from
+     the chat's menu, and a game hosted here writes its live and finished
+     lines into this chat. Embedded (the case side chat) and confidential
+     chats have no Space, so no quiz. */
+  const { spacePlace } = controller;
+  const liveQuiz = useSpaceLiveQuiz({
+    seat:
+      embed || controller.isConfidential || spacePlace === null
+        ? null
+        : spacePlace === undefined
+          ? undefined
+          : {
+              uuid: spacePlace.space.uuid,
+              name: spacePlace.space.name,
+              isMember: spacePlace.role !== null,
+              contentRole: spacePlace.role,
+            },
+    conversationUuid: conversationId,
+    initialGameUuid: embed ? null : initialGameUuid,
+  });
+  const { room: quizRoom, isMember: inQuizRoom, openGame, setHostOpen } = liveQuiz;
+  const quizRoomValue = useMemo<LiveQuizRoomValue | null>(
+    () => (quizRoom && inQuizRoom ? { room: quizRoom, viewerId: serverUserId, openGame } : null),
+    [quizRoom, inQuizRoom, serverUserId, openGame],
+  );
+  const openHostQuiz = useCallback(() => setHostOpen(true), [setHostOpen]);
   // The record's own roster when it lists every asker, else the members read
   // (record-roster.ts).
   const { spaceRoster, recordRoster } = controller;
@@ -418,6 +458,11 @@ export function ConversationScreen({
         {controller.isConfidential && (
           <ConfidentialBanner onDelete={controller.deleteConfidential} />
         )}
+        {/* The door into the Space's running game. Nothing at all while none
+            is live; members only, because the probe is refused to anyone else. */}
+        {quizRoomValue && (
+          <LiveQuizBar room={quizRoomValue.room} viewerId={serverUserId} onOpenGame={openGame} />
+        )}
         {/* The header menu's rows (the chat's `can`: Rename, Move to Space or
             Move, Remove, Share, Delete) and the space line under the title.
             Not inside another route (the case side chat has its own header),
@@ -430,8 +475,32 @@ export function ConversationScreen({
             canShowPlace={controller.isOwnerResolved && !controller.isConfidential}
             currentTitle={controller.stream.conversationTitle}
             onRenamed={() => void controller.stream.fetchConversationTitle(conversationId)}
+            onHostQuiz={liveQuiz.mayHost ? openHostQuiz : null}
           />
         ) : null}
+        {quizRoomValue && liveQuiz.hostPlace && (
+          <QuizLibrarySheet
+            place={liveQuiz.hostPlace}
+            viewerId={serverUserId}
+            open={liveQuiz.hostOpen}
+            onOpenChange={setHostOpen}
+            onOpenGame={openGame}
+          />
+        )}
+        {/* Game mode over the whole window: on its own route the chat's box
+            is the shell's dock, outside this frame, and the mode covers it
+            too. The chat stays mounted under it. */}
+        {quizRoomValue && liveQuiz.gameUuid && (
+          <GameOverlay
+            key={liveQuiz.gameUuid}
+            room={quizRoomValue.room}
+            cover="viewport"
+            gameUuid={liveQuiz.gameUuid}
+            viewerId={serverUserId}
+            viewerUuid={viewerUuid}
+            onClose={liveQuiz.closeGame}
+          />
+        )}
 
         {/* Download as Word on a document block: the owner, never a confidential
             chat (the export route answers 404 for both; document-export.tsx). */}
@@ -475,50 +544,52 @@ export function ConversationScreen({
   return (
     <BackgroundJobsProvider conversationId={conversationId} jobs={controller.backgroundJobs}>
       <AgentRowsProvider conversationId={conversationId} agentConversations={controller.agentConversations}>
-        <V2ChatProvider
-          sendMessage={sendFollowUp}
-          isStreaming={isStreaming}
-          canSend={canSend}
-          conversationId={conversationId}
-          applyDraftEditLine={onDraftEditLine}
-          cardQuestions={cardQuestions}
-          settleSkillDraft={setSkillDraftStatus}
-        >
-          {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
-              own route, a draft or a file opens beside the transcript on a
-              computer and as a sheet on a phone (ChatSidePanel.tsx). Embedded, the
-              host page draws it where it keeps room for it (the case page: a card
-              over the reading, left of the docked chat), through a portal that
-              keeps this chat's context; it waits for the transcript, so a draft
-              is never reported missing from a chat still loading. With no host
-              (the statute page) a draft shows in its card instead. */}
-          {embed ? (
-            panelHost ? (
-              <SidePanelValueProvider
-                url={panelHost.url}
-                offsets={offsets}
-                versions={draftVersions}
-                titles={draftTitles}
-                space={controller.space}
-                frame="card"
-              >
-                {transcript}
-                {panelHost.element && !isLoadingHistory
-                  ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />, panelHost.element)
-                  : null}
-              </SidePanelValueProvider>
+        <LiveQuizRoomProvider value={quizRoomValue}>
+          <V2ChatProvider
+            sendMessage={sendFollowUp}
+            isStreaming={isStreaming}
+            canSend={canSend}
+            conversationId={conversationId}
+            applyDraftEditLine={onDraftEditLine}
+            cardQuestions={cardQuestions}
+            settleSkillDraft={setSkillDraftStatus}
+          >
+            {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
+                own route, a draft or a file opens beside the transcript on a
+                computer and as a sheet on a phone (ChatSidePanel.tsx). Embedded, the
+                host page draws it where it keeps room for it (the case page: a card
+                over the reading, left of the docked chat), through a portal that
+                keeps this chat's context; it waits for the transcript, so a draft
+                is never reported missing from a chat still loading. With no host
+                (the statute page) a draft shows in its card instead. */}
+            {embed ? (
+              panelHost ? (
+                <SidePanelValueProvider
+                  url={panelHost.url}
+                  offsets={offsets}
+                  versions={draftVersions}
+                  titles={draftTitles}
+                  space={controller.space}
+                  frame="card"
+                >
+                  {transcript}
+                  {panelHost.element && !isLoadingHistory
+                    ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />, panelHost.element)
+                    : null}
+                </SidePanelValueProvider>
+              ) : (
+                transcript
+              )
             ) : (
-              transcript
-            )
-          ) : (
-            <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} space={controller.space}>
-              <div className="flex h-full min-h-0">
-                {transcript}
-                <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />
-              </div>
-            </SidePanelProvider>
-          )}
-        </V2ChatProvider>
+              <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} space={controller.space}>
+                <div className="flex h-full min-h-0">
+                  {transcript}
+                  <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />
+                </div>
+              </SidePanelProvider>
+            )}
+          </V2ChatProvider>
+        </LiveQuizRoomProvider>
       </AgentRowsProvider>
     </BackgroundJobsProvider>
   );

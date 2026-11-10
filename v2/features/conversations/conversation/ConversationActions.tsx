@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Blocks, FolderOutput, Pencil, Share2, Trash2 } from 'lucide-react';
+import { Blocks, FolderOutput, Pencil, Share2, Trash2, Trophy } from 'lucide-react';
 
 import { stripPastedTags } from '@/lib/utils';
 import { RemoveFromSpaceDialog } from '@/v2/features/spaces/detail/content/RemoveFromSpaceDialog';
@@ -58,6 +58,7 @@ export function ConversationActions({
   canShowPlace,
   currentTitle,
   onRenamed,
+  onHostQuiz,
 }: {
   conversationId: string;
   viewerId: number | null;
@@ -68,6 +69,9 @@ export function ConversationActions({
   currentTitle: string | null;
   /** The server stored a new title: re-read it so the header shows it. */
   onRenamed: () => void;
+  /** Opens the host sheet for the chat's Space's live quiz, for its Owner and
+   *  Contributors; null for anyone else and outside a Space. */
+  onHostQuiz: (() => void) | null;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -109,7 +113,7 @@ export function ConversationActions({
         : [],
     [canShowPlace, detail, currentTitle],
   );
-  const actions = useMemo<readonly ScreenAction[]>(() => {
+  const chatRows = useMemo<readonly ScreenAction[]>(() => {
     if (items.length === 0) return NO_ACTIONS;
     return items.map((item): ScreenAction => {
       const label = CONVERSATION_MENU_LABELS[item];
@@ -144,6 +148,13 @@ export function ConversationActions({
       }
     });
   }, [items]);
+  const actions = useMemo<readonly ScreenAction[]>(() => {
+    if (!onHostQuiz) return chatRows;
+    // Host a live quiz first, the one row that starts something, ruled off
+    // from the chat's own rows (as on the Space's page).
+    const host: ScreenAction = { id: 'host-quiz', label: 'Host a live quiz', icon: Trophy, onSelect: onHostQuiz };
+    return [host, ...chatRows.map((row, index) => (index === 0 ? { ...row, separatorBefore: true } : row))];
+  }, [chatRows, onHostQuiz]);
 
   useEffect(() => {
     if (actions.length === 0) {

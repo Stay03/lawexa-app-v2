@@ -50,9 +50,10 @@ import {
   canHostQuiz,
   HOST_POLICY_LIBRARY_NOTE,
   HOST_POLICY_REFUSAL,
+  SPACE_HOST_NOTE,
 } from './model';
 import { channelQuizQueries } from './queries';
-import { channelRoom } from './quiz-room';
+import { channelRoom, roomNoun, spaceRoom, type QuizRoom } from './quiz-room';
 import { QuizFormDialog } from './QuizFormDialog';
 import { VisibilityChip } from './VisibilityChip';
 import { VisibilityGroup } from './VisibilityGroup';
@@ -136,21 +137,42 @@ const SOURCES = [
 
 type SourceId = (typeof SOURCES)[number]['id'];
 
+/**
+ * Where the sheet hosts (live quiz in Spaces, Arthur's decisions 93142269): a
+ * channel, or a Space itself. A Space has no "quizzes that have been here"
+ * list, so its sheet is the reader's library alone; it is hosted by the
+ * Space's Owner and Contributors (`mayHost`), and a game started from a Space
+ * chat names that chat (`conversationUuid`), where its live and finished
+ * lines go.
+ */
+export type QuizHostPlace =
+  | { kind: 'channel'; channel: Channel }
+  | {
+      kind: 'space';
+      space: { uuid: string; name: string };
+      mayHost: boolean;
+      conversationUuid: string | null;
+    };
+
 export function QuizLibrarySheet({
-  channel,
+  place,
   viewerId,
   open,
   onOpenChange,
   onOpenGame,
 }: {
-  channel: Channel;
+  place: QuizHostPlace;
   viewerId: number | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Hands a game uuid back to the channel screen, which owns the game mode. */
+  /** Hands a game uuid back to the screen, which owns the game mode. */
   onOpenGame: (gameUuid: string) => void;
 }) {
-  const [source, setSource] = useState<SourceId>('room');
+  const channel = place.kind === 'channel' ? place.channel : null;
+  const room: QuizRoom = channel ? channelRoom(channel.uuid) : spaceRoom(place.kind === 'space' ? place.space.uuid : '');
+  const placeName = channel ? channel.name : place.kind === 'space' ? place.space.name : '';
+  const conversationUuid = place.kind === 'space' ? place.conversationUuid : null;
+  const [source, setSource] = useState<SourceId>(channel ? 'room' : 'library');
   /** Whether "Everyone" is live in a row's visibility switch. */
   const canPublish = canPublishPublicly(useV2Session());
   const [formOpen, setFormOpen] = useState(false);
@@ -167,11 +189,12 @@ export function QuizLibrarySheet({
   const [deleting, setDeleting] = useState<ChannelQuiz | null>(null);
   const [liveError, setLiveError] = useState<string | null>(null);
 
-  const mayHost = canHostQuiz(channel);
+  const mayHost = channel ? canHostQuiz(channel) : place.kind === 'space' && place.mayHost;
 
   const roomQuery = useQuery({
-    ...channelQuizQueries.quizzes({ channelUuid: channel.uuid, viewerId }),
-    enabled: open,
+    ...channelQuizQueries.quizzes({ channelUuid: channel?.uuid ?? '', viewerId }),
+    // Only a channel has a list of the quizzes that have been in it.
+    enabled: open && channel !== null,
   });
   const libraryQuery = useQuery({
     ...channelQuizQueries.myQuizzes({ viewerId }),
@@ -181,7 +204,7 @@ export function QuizLibrarySheet({
     enabled: open && source === 'library',
   });
   const activeQuery = useQuery({
-    ...channelQuizQueries.activeGame({ room: channelRoom(channel.uuid), viewerId }),
+    ...channelQuizQueries.activeGame({ room, viewerId }),
     enabled: open,
   });
 
@@ -189,7 +212,8 @@ export function QuizLibrarySheet({
   const liveGame = activeQuery.data?.data?.[0] ?? null;
   const quizzes = listQuery.data?.data ?? [];
   const total = listQuery.data?.pagination.total ?? 0;
-  const governs = canManageChannel(channel);
+  // Channel governance reaches a quiz written in that channel; a Space has no such rule.
+  const governs = channel ? canManageChannel(channel) : false;
   /** Creating from the Library tab is nobody's to refuse; creating FOR this
    *  channel is the host policy's. */
   const mayCreateHere = source === 'library' || mayHost;
@@ -257,7 +281,7 @@ export function QuizLibrarySheet({
           <SheetHeader className="gap-1 border-b">
             <SheetTitle>Quizzes</SheetTitle>
             <p className="text-sm text-muted-foreground">
-              Live group quizzes for {channel.name}. Everyone plays on their own
+              Live group quizzes for {placeName}. Everyone plays on their own
               device.
             </p>
           </SheetHeader>
@@ -326,6 +350,8 @@ export function QuizLibrarySheet({
                   bracket, which reads as a rendering fault rather than focus.
                   The negative margin gives the room back, so the strip's
                   position and height are unchanged. */}
+              {/* A Space has the library alone: no strip for one tab. */}
+              {channel ? (
               <TabRow
                 tabs={SOURCES}
                 value={source}
@@ -345,6 +371,9 @@ export function QuizLibrarySheet({
               >
                 {(item) => item.label}
               </TabRow>
+              ) : (
+                <p className="text-sm font-medium text-foreground">My library</p>
+              )}
 
               {mayCreateHere && (
                 <Button size="sm" className="shrink-0" onClick={() => openForm()}>
@@ -357,9 +386,11 @@ export function QuizLibrarySheet({
             {/* The host policy, said in the words of whichever tab is open. */}
             {!mayHost && (
               <p className="text-xs text-muted-foreground">
-                {source === 'library'
-                  ? HOST_POLICY_LIBRARY_NOTE
-                  : HOST_POLICY_REFUSAL}
+                {!channel
+                  ? SPACE_HOST_NOTE
+                  : source === 'library'
+                    ? HOST_POLICY_LIBRARY_NOTE
+                    : HOST_POLICY_REFUSAL}
               </p>
             )}
 
@@ -396,7 +427,7 @@ export function QuizLibrarySheet({
                 }
                 description={
                   source === 'library'
-                    ? 'Your library holds the quizzes you write. They belong to you, not to a room, so you can run the same one in any channel you host in, as often as you like.'
+                    ? 'Your library holds the quizzes you write. They belong to you, not to a room, so you can run the same one in any channel or Space you host in, as often as you like.'
                     : 'A quiz is a few timed questions the whole channel answers at once. Good for revision, onboarding, or settling an argument.'
                 }
                 action={
@@ -415,13 +446,15 @@ export function QuizLibrarySheet({
                     <QuizRow
                       key={quiz.uuid}
                       quiz={quiz}
-                      channelUuid={channel.uuid}
+                      room={room}
+                      conversationUuid={conversationUuid}
+                      refusal403={channel ? HOST_POLICY_REFUSAL : SPACE_HOST_NOTE}
                       mayHost={mayHost}
                       // Governance reaches a quiz that was WRITTEN here and
                       // nothing else — see the module docblock.
                       mayManage={
                         quiz.is_mine ||
-                        (governs && quiz.channel_uuid === channel.uuid)
+                        (governs && channel !== null && quiz.channel_uuid === channel.uuid)
                       }
                       hasLiveGame={liveGame !== null}
                       canPublish={canPublish}
@@ -454,14 +487,16 @@ export function QuizLibrarySheet({
           quiz it was opened on — the house dialog contract, stated at
           `use-url-overlay.ts`. It fetches nothing while closed (its detail query
           is `enabled: open && isEdit`), so standing mounted costs no request. */}
+      {/* In a Space a new quiz files into the writer's library: there is no
+          room list for it to join (QuizHostPlace). */}
       <QuizFormDialog
         key={formOpenings}
         open={formOpen}
         onOpenChange={setFormOpen}
-        channelUuid={channel.uuid}
-        channelName={channel.name}
-        spaceUuid={channel.space.uuid}
-        destination={formSource === 'library' ? 'library' : 'channel'}
+        channelUuid={channel?.uuid}
+        channelName={channel?.name}
+        spaceUuid={channel ? channel.space.uuid : room.uuid}
+        destination={channel && formSource !== 'library' ? 'channel' : 'library'}
         viewerId={viewerId}
         quizUuid={editingUuid}
       />
@@ -473,7 +508,9 @@ export function QuizLibrarySheet({
 
 function QuizRow({
   quiz,
-  channelUuid,
+  room,
+  conversationUuid,
+  refusal403,
   mayHost,
   mayManage,
   hasLiveGame,
@@ -484,8 +521,13 @@ function QuizRow({
   onLiveRefused,
 }: {
   quiz: ChannelQuiz;
-  channelUuid: string;
-  /** The channel's host policy: may this viewer put a quiz live HERE? */
+  /** Where Go live runs it: the sheet's channel or Space (quiz-room.ts). */
+  room: QuizRoom;
+  /** The Space chat a game here starts from, or null. */
+  conversationUuid: string | null;
+  /** The sentence for a 403: the room's own rule about who hosts. */
+  refusal403: string;
+  /** The room's rule: may this viewer put a quiz live HERE? */
   mayHost: boolean;
   /** Authorship, or governance over a quiz written in this channel. */
   mayManage: boolean;
@@ -498,7 +540,8 @@ function QuizRow({
   /** `null` clears a previous refusal. */
   onLiveRefused: (message: string | null) => void;
 }) {
-  const goLive = useGoLive(channelRoom(channelUuid), quiz.uuid);
+  const goLive = useGoLive(room, quiz.uuid, conversationUuid);
+  const noun = roomNoun(room);
   const count = quiz.question_count ?? quiz.questions?.length ?? 0;
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
   const share = useShareAction({ path: quizFrontHref(quiz.uuid), title: quiz.title });
@@ -615,7 +658,7 @@ function QuizRow({
               disabled={goLive.isPending || hasLiveGame}
               title={
                 hasLiveGame
-                  ? 'A quiz is already running in this channel'
+                  ? `A quiz is already running in this ${noun}`
                   : undefined
               }
               onClick={() => {
@@ -629,9 +672,9 @@ function QuizRow({
                     const { status, message } = extractApiError(error);
                     onLiveRefused(
                       status === 409
-                        ? 'A quiz is already running in this channel. Open it above, or wait for it to finish.'
+                        ? `A quiz is already running in this ${noun}. Open it above, or wait for it to finish.`
                         : status === 403
-                          ? HOST_POLICY_REFUSAL
+                          ? refusal403
                           : message,
                     );
                   },

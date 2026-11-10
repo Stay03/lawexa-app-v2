@@ -6,14 +6,28 @@ import { Loader2, Radio, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
-import type { Message } from '@/types/collab';
-import { useJoinGame } from '../quiz/mutations';
-import { channelQuizQueries } from '../quiz/queries';
-import type { QuizRoom } from '../quiz/quiz-room';
+import { useJoinGame } from './mutations';
+import { channelQuizQueries } from './queries';
+import type { QuizRoom } from './quiz-room';
 
 /**
- * QuizGameCard — the designed card for the two quiz system messages
- * (`metadata.type: 'quiz_game_live' | 'quiz_game_finished'`; digest §E).
+ * One quiz line as the card draws it, from a channel's system message or a
+ * Space chat's event row: both carry the same two types and the game's uuid.
+ */
+export interface QuizGameLine {
+  finished: boolean;
+  /** The game the card opens; null draws the sentence alone. */
+  gameUuid: string | null;
+  /** The server's sentence. */
+  content: string;
+  /** ISO time the line was written. */
+  createdAt: string;
+}
+
+/**
+ * QuizGameCard — the designed card for the two quiz lines
+ * (`metadata.type: 'quiz_game_live' | 'quiz_game_finished'`; digest §E), in a
+ * channel's feed and in a Space's chat (live quiz in Spaces, 7a007a8c).
  *
  * W2 shipped it render-only because an action that could not work yet must not
  * exist. W6 gives it the actions: `metadata.game_uuid` is the handle for both
@@ -43,20 +57,19 @@ import type { QuizRoom } from '../quiz/quiz-room';
  * screen opens anyway and explains, in place, that this one is watch-only.
  */
 export function QuizGameCard({
-  message,
+  line,
   room,
   viewerId,
   onOpenGame,
 }: {
-  message: Message;
+  line: QuizGameLine;
   /** The room the card sits in, whose live-game probe it reads (quiz-room.ts). */
   room: QuizRoom;
   viewerId: number | null;
   /** Opens the room's game mode (screen-owned; `?game=`). */
   onOpenGame: (gameUuid: string) => void;
 }) {
-  const finished = message.metadata.type === 'quiz_game_finished';
-  const gameUuid = message.metadata.game_uuid ?? null;
+  const { finished, gameUuid } = line;
 
   const activeQuery = useQuery({
     ...channelQuizQueries.activeGame({ room, viewerId }),
@@ -97,7 +110,7 @@ export function QuizGameCard({
             {finished ? 'Quiz finished' : stillLive ? 'Live quiz' : 'Quiz'}
           </p>
           <p className="mt-0.5 text-sm break-words text-foreground">
-            {message.content}
+            {line.content}
           </p>
 
           {gameUuid && (
@@ -157,11 +170,11 @@ export function QuizGameCard({
           )}
         </div>
         <time
-          dateTime={message.created_at}
-          title={formatFullTimestamp(message.created_at)}
+          dateTime={line.createdAt}
+          title={formatFullTimestamp(line.createdAt)}
           className="shrink-0 pt-0.5 text-xs text-muted-foreground"
         >
-          {formatMessageTime(message.created_at)}
+          {formatMessageTime(line.createdAt)}
         </time>
       </div>
     </div>

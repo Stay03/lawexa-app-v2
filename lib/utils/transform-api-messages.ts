@@ -52,9 +52,10 @@ export function parseToolResult(result: Pick<ApiMessage, 'content' | 'metadata'>
 /**
  * A row as the line v2 draws: a `draft_edit` ("Stay edited 'Lease agreement'
  * · 17:49"; Stay, 30 October 2026, 02:16Z, thread 1e44eb39, design 9b43f942),
- * or background work's return or give-up line (Backend's shapes 063d9cc3).
- * `null` for any other row, any other event type, and a row missing what its
- * line needs: a line that cannot be drawn right is not drawn.
+ * background work's return or give-up line (Backend's shapes 063d9cc3), or a
+ * live quiz's `quiz_game_live` / `quiz_game_finished` (Backend's shapes
+ * 7a007a8c). `null` for any other row, any other event type, and a row missing
+ * what its line needs: a line that cannot be drawn right is not drawn.
  */
 export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
   const meta = apiMsg.metadata;
@@ -73,6 +74,18 @@ export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
     };
   }
   if (apiMsg.role !== 'event') return null;
+  if (meta?.type === 'quiz_game_live' || meta?.type === 'quiz_game_finished') {
+    if (typeof meta.game_uuid !== 'string' || meta.game_uuid === '') return null;
+    return {
+      id: `msg_${apiMsg.id}`,
+      role: 'event',
+      eventType: meta.type,
+      serverId: apiMsg.id,
+      content: apiMsg.content,
+      timestamp: at,
+      gameUuid: meta.game_uuid,
+    };
+  }
   if (meta?.type !== 'draft_edit' || typeof meta.note_id !== 'number') return null;
   const last = meta.last_edited_at ? new Date(meta.last_edited_at) : at;
   return {
