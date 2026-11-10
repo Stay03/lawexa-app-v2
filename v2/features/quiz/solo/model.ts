@@ -51,6 +51,28 @@ export function quizFrontHref(quizUuid: string): string {
   return `/quiz/q/${quizUuid}`;
 }
 
+/**
+ * A challenge link: the quiz's front carrying the challenger's finished
+ * attempt (`?from=`, Backend 7a007a8c). The friend sees "Tunde scored 8/10"
+ * there, and their attempt names it, so Tunde hears how they did.
+ */
+export function quizChallengeHref(quizUuid: string, attemptUuid: string): string {
+  return `${quizFrontHref(quizUuid)}?from=${encodeURIComponent(attemptUuid)}`;
+}
+
+/** The challenge banner's words: who and what to beat, by right answers. */
+export function challengeBanner(challenge: {
+  challenger: { name: string };
+  correct_count: number;
+  scored_count: number;
+}): { title: string; line: string } {
+  const who = challenge.challenger.name.trim().split(/\s+/)[0] || 'A friend';
+  return {
+    title: `${who} scored ${challenge.correct_count}/${challenge.scored_count}`,
+    line: `${who} challenged you to this quiz. Can you beat it?`,
+  };
+}
+
 export function attemptHref(attemptUuid: string): string {
   return `/quiz/attempts/${attemptUuid}`;
 }

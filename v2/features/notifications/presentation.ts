@@ -129,6 +129,13 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   // Certificates (WOZ 111315aa): sent ten minutes after a quiz ends when the
   // printed name is still unconfirmed.
   certificate_name_needed: 'Confirm the name for your certificate',
+  // Live quiz in Spaces and Challenge a Friend (Backend 7a007a8c). The server
+  // sends its own title ("Ada started a quiz in Torts Study Group", "Tunde
+  // scored 8/10 on your challenge"); these are for a row that comes without one.
+  // Their action_url is already an app address (/c/{chat}?game=,
+  // /spaces/{space}?game=, /quiz/q/{quiz}), so it is followed as it is.
+  space_quiz_live: 'A quiz is live in your Space',
+  quiz_challenge_result: 'Someone took your challenge',
   radar_report: 'A radar report is ready',
   // A space Radar's report (plan 6.3). The server sends its own title ("New
   // Radar report in {space}: {title}"); this is for a row that comes without one.

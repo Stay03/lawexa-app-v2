@@ -44,8 +44,10 @@ test('the review reads the score from the server, sends an unfinished attempt ba
   assert.match(screen, /back: quizUuid \? \{ href: quizFrontHref\(quizUuid\), label: 'Back to the quiz' \} : null,/);
   // Retake is a fresh attempt with the same reveal choice, into the player.
   assert.match(screen, /startAttempt\.mutate\(attempt\.reveal_mode, \{\s*onSuccess: \(response\) => router\.push\(attemptHref\(response\.data\.uuid\)\),/);
-  // Share only where a link can open the quiz, read from its detail.
-  assert.match(screen, /const shareable = visibility === 'link' \|\| visibility === 'public';/);
+  // Share only where a link can open the quiz, or where the author's tap opens
+  // it to the link: decided from its detail (visibility, is_mine) by challengeReach.
+  assert.match(screen, /const visibility = detailQuery\.data\?\.data\.visibility \?\? null;/);
+  assert.match(screen, /const isMine = detailQuery\.data\?\.data\.is_mine === true;/);
   assert.doesNotMatch(screen, /from 'sonner'/);
 });
 
@@ -85,7 +87,7 @@ test('the answers open from one row, on their own page, and the two buttons sit 
   const actions = read('v2', 'features', 'quiz', 'solo', 'results', 'ResultsActions.tsx');
   assert.match(actions, /sticky bottom-0 z-10 -mx-4 -mb-16 mt-auto/);
   assert.match(actions, /Take it again/);
-  assert.match(actions, /\{share\.copied \? 'Link copied' : 'Challenge a friend'\}/);
+  assert.match(actions, /\{friend\.copied \? 'Link copied' : 'Challenge a friend'\}/);
   // Other Quizzes: the third full-size button, to Explore (Arthur, 28 October 2026: "do B").
   assert.match(actions, /<RaisedButton tone="quiet" className="min-w-fit flex-1 basis-40 whitespace-nowrap" asChild>\s*<Link href=\{EXPLORE_HREF\}>\s*<Compass aria-hidden className="size-4" \/>\s*Other Quizzes\s*<\/Link>/);
   assert.equal((actions.match(/<RaisedButton/g) ?? []).length, 3);

@@ -169,4 +169,18 @@ export const soloQuizQueries = {
       gcTime: GC_TIMES.list,
       refetchOnWindowFocus: false,
     }),
+
+  /**
+   * A challenge link's banner ("Tunde scored 8/10"): the same for every
+   * reader, signed in or not, so it is not partitioned by viewer. A finished
+   * attempt does not change, so it is read once and kept.
+   */
+  challenge: (quizUuid: string, attemptUuid: string) =>
+    queryOptions({
+      queryKey: [...channelQuizQueries.all, 'challenge', quizUuid, attemptUuid] as const,
+      queryFn: () => quizAttemptsApi.challenge(quizUuid, attemptUuid),
+      staleTime: Infinity,
+      gcTime: GC_TIMES.list,
+      retry: false,
+    }),
 };

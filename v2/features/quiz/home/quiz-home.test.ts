@@ -37,11 +37,33 @@ test('Explore renders for anyone; My quizzes says the solo refusals; Create quiz
   assert.match(screen, /const canWrite = signedIn && canAccessQuizPlayer\(role\);/);
 });
 
-test('an "Only you" quiz says why there is no Challenge, with the way to change it', () => {
+/* Challenge a Friend is one tap (Arthur, 10 November 2026; decision e): on the
+ * author's own "Only you" quiz, or one shared with a Space, the tap switches it
+ * to "Anyone with the link" and opens sharing at once, with no settings screen. */
+test('Challenge a friend is one tap: who gets it, and what the tap does', async () => {
+  const { challengeReach } = await import('../solo/challenge-reach');
+  // A link opens it: the tap shares.
+  assert.equal(challengeReach('link', false), 'share');
+  assert.equal(challengeReach('public', true), 'share');
+  // The author's own quiz no link opens yet: the tap opens it to the link and shares.
+  assert.equal(challengeReach('private', true), 'open-and-share');
+  assert.equal(challengeReach('shared', true), 'open-and-share');
+  // Anyone else on such a quiz, or a quiz still loading: no Challenge.
+  assert.equal(challengeReach('private', false), null);
+  assert.equal(challengeReach('shared', false), null);
+  assert.equal(challengeReach(null, true), null);
+
+  const hook = readFileSync(join(here, '..', 'solo', 'use-challenge-friend.ts'), 'utf8');
+  // The switch and the sheet in the same tap: a phone opens the sheet only from the tap itself.
+  assert.match(hook, /if \(reach === 'open-and-share'\) openToLink\.mutate\('link'\);\s*void share\.share\(\);/);
+  assert.match(hook, /openFailed: openToLink\.isError/);
+  // No settings detour any more; a failed switch says so in place, on both screens.
   const actions = readFileSync(join(here, '..', 'solo', 'results', 'ResultsActions.tsx'), 'utf8');
-  assert.match(actions, /\{privateQuiz && !shareable \? \(/);
-  assert.match(actions, /Only you can take this quiz\.\{' '\}/);
-  assert.match(actions, /Change who can take it/);
+  assert.doesNotMatch(actions, /Change who can take it/);
+  assert.match(actions, /\{friend\.openFailed \? \(\s*<p\s+role="alert"/);
+  const front = readFileSync(join(here, '..', 'solo', 'front', 'QuizFrontScreen.tsx'), 'utf8');
+  assert.match(front, /\{challenge\.openFailed && \(\s*<p role="alert"/);
+  assert.match(front, /isMine: query\.data\?\.data\?\.is_mine === true,/);
   const results = readFileSync(join(here, '..', 'solo', 'results', 'AttemptResultsScreen.tsx'), 'utf8');
-  assert.match(results, /privateQuiz=\{visibility === 'private'\}/);
+  assert.match(results, /const isMine = detailQuery\.data\?\.data\.is_mine === true;/);
 });

@@ -30,10 +30,11 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
   assert.match(source, /const mayTake = canTakeQuiz\(session\);/);
   assert.match(source, /startAttempt\.mutate\(revealMode, \{\s*onSuccess: \(response\) => router\.push\(attemptHref\(response\.data\.uuid\)\),/);
   assert.match(source, /\{mayTake \? \(\s*<RaisedButton className=\{FRONT_BUTTON\} onClick=\{start\}/);
-  assert.match(source, /<RaisedButton asChild className=\{cn\(FRONT_BUTTON, 'max-md:basis-full'\)\}>\s*<Link href=\{signInHref\(pathname\)\}>Sign in to take this quiz<\/Link>/);
+  // Back to the same page after sign-in, a challenge link's ?from= included (returnPath).
+  assert.match(source, /<RaisedButton asChild className=\{cn\(FRONT_BUTTON, 'max-md:basis-full'\)\}>\s*<Link href=\{signInHref\(returnPath\)\}>Sign in to take this quiz<\/Link>/);
   // A stale session's 401 is not bounced by the client on this page, so the
   // screen takes the reader to sign in itself.
-  assert.match(source, /if \(status === 401\) \{\s*router\.push\(signInHref\(pathname\)\);/);
+  assert.match(source, /if \(status === 401\) \{\s*router\.push\(signInHref\(returnPath\)\);/);
   // The reveal choice opens on the default and offers both ways.
   assert.match(source, /useState<QuizRevealMode>\(DEFAULT_REVEAL_MODE\)/);
   // A small "Answer reveal" choice, not the two big cards (Arthur, 24 October 2026).
@@ -53,7 +54,8 @@ test("the owner's Edit and Delete ride the bar's menu, and Delete leaves for the
   // Share only where a link can open it; the owner of a private one is told why.
   assert.match(source, /const shareable = quiz\.visibility === 'link' \|\| quiz\.visibility === 'public';/);
   // Challenge a friend, a secondary button beside Start, the one gold action.
-  assert.match(source, /\{shareable && \(\s*<RaisedButton\s*type="button"\s*tone="quiet"/);
+  // Where a link opens it, or where the author's tap opens it to the link (use-challenge-friend).
+  assert.match(source, /\{challenge\.available && \(\s*<RaisedButton\s*type="button"\s*tone="quiet"/);
   assert.match(source, /\{challenge\.copied \? 'Link copied' : 'Challenge a friend'\}/);
   assert.match(source, /'Only you can open this quiz\.'/);
 });
@@ -111,7 +113,7 @@ test('the quiz page is drawn on B1: its tokens and the raised buttons', () => {
   // On a phone the sign-in takes the bar's whole row, the challenge under it,
   // and the page leaves room for the taller bar.
   assert.match(source, /className=\{cn\(FRONT_BUTTON, 'flex-none max-md:\[a\+&\]:flex-1'\)\}/);
-  assert.match(source, /<div className=\{cn\(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44'\)\}>/);
+  assert.match(source, /<div className=\{cn\(FRONT_COLUMN, !mayTake && challenge\.available && 'max-md:pb-44'\)\}>/);
 });
 
 /* Stay, 24 October 2026: "So many unnecessary text please remove them". */

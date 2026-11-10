@@ -26,15 +26,20 @@ test('the share behaviour is one hook, and the pill composes it unchanged', () =
 });
 
 test('every share site hands on the quiz front, and only where a link can open it', () => {
+  // Challenge a friend, on the front and the results alike, goes through one
+  // hook: the quiz's link, through the one share behaviour (Arthur, 10 November 2026).
+  const hook = read('v2', 'features', 'quiz', 'solo', 'use-challenge-friend.ts');
+  // The quiz front, or a challenge link to it from a finished attempt.
+  assert.match(hook, /const path = fromAttempt \? quizChallengeHref\(quizUuid, fromAttempt\) : quizFrontHref\(quizUuid\);/);
+  assert.match(hook, /useShareAction\(\{ path, title, text \}\)/);
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
-  assert.match(front, /const challenge = useShareAction\(\{\s*path: quizFrontHref\(quizUuid\),/);
-  assert.match(front, /\{shareable && \(\s*<RaisedButton[\s\S]*?onClick=\{\(\) => void challenge\.share\(\)\}/);
-  // The results' Challenge a friend: the quiz's link with the challenge
-  // sentence, through the same hook, and only where a link can open it.
+  assert.match(front, /const challenge = useChallengeFriend\(\{\s*quizUuid,/);
+  assert.match(front, /\{challenge\.available && \(\s*<RaisedButton[\s\S]*?onClick=\{challenge\.challenge\}/);
   const actions = read('v2', 'features', 'quiz', 'solo', 'results', 'ResultsActions.tsx');
-  assert.match(actions, /useShareAction\(\{\s*path: quizFrontHref\(quizUuid\),\s*title: quizTitle,\s*text: challenge,\s*\}\)/);
-  assert.match(actions, /\{shareable && \(\s*<RaisedButton\s*tone="quiet"/);
-  assert.match(read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx'), /shareable=\{shareable\}/);
+  assert.match(actions, /useChallengeFriend\(\{\s*quizUuid,\s*fromAttempt: attemptUuid,\s*title: quizTitle,\s*text: challenge,\s*visibility,\s*isMine,\s*\}\)/);
+  assert.match(actions, /\{friend\.available && \(\s*<RaisedButton\s*tone="quiet"/);
+  const results = read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx');
+  assert.match(results, /visibility=\{visibility\}\s*isMine=\{isMine\}/);
   const library = read('v2', 'features', 'quiz', 'solo', 'library', 'LibraryScreen.tsx');
   assert.match(library, /const shareable = quiz\.visibility === 'link' \|\| quiz\.visibility === 'public';/);
   assert.match(library, /useShareAction\(\{ path: quizFrontHref\(quiz\.uuid\), title: quiz\.title \}\)/);

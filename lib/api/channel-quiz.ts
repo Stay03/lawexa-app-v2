@@ -37,6 +37,7 @@ import type {
   QuizAnswerResponse,
   QuizAttemptAnswerResponse,
   QuizAttemptResponse,
+  QuizChallengeResponse,
   QuizGameListResponse,
   QuizGameResponse,
   QuizGameResultsResponse,
@@ -254,6 +255,16 @@ export const quizAttemptsApi = {
     const response = await apiClient.post<QuizAttemptResponse>(
       `/channel-quizzes/${quizUuid}/attempts`,
       payload,
+    );
+    return response.data;
+  },
+
+  /** A challenge link's banner: who challenged and what they scored (no
+   *  sign-in; Backend 7a007a8c). `404` when the attempt is not a finished one
+   *  at this quiz, or the quiz does not open by link. */
+  challenge: async (quizUuid: string, attemptUuid: string): Promise<QuizChallengeResponse> => {
+    const response = await apiClient.get<QuizChallengeResponse>(
+      `/channel-quizzes/${quizUuid}/challenge/${attemptUuid}`,
     );
     return response.data;
   },

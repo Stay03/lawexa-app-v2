@@ -13,6 +13,7 @@ import {
   Play,
   SearchX,
   Share2,
+  Swords,
   Trash2,
 } from 'lucide-react';
 
@@ -33,7 +34,6 @@ import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
 import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
 import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
-import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { signInHref } from '@/v2/runtime/sign-in-href';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
@@ -43,7 +43,7 @@ import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, scenarioCountLabel } from '../rows-model';
-import { frontChallengeText } from './front-model';
+import { challengeFromParam, frontChallengeText } from './front-model';
 import {
   clearScreenContext,
   setScreenContext,
@@ -54,14 +54,17 @@ import { QuizErrorState } from '../../ui/states';
 import {
   attemptHref,
   canTakeQuiz,
+  challengeBanner,
   DEFAULT_REVEAL_MODE,
   EXPLORE_HREF,
   LIBRARY_HREF,
+  quizChallengeHref,
   quizFrontHref,
   readsPreview,
   REVEAL_MODE_CHOICES,
 } from '../model';
 import { useStartAttempt } from '../mutations';
+import { useChallengeFriend } from '../use-challenge-friend';
 import { RaisedButton } from '../ui';
 import '../solo-quiz.css';
 import { soloQuizQueries } from '../queries';
@@ -145,18 +148,33 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   });
   const board = hasBoard ? (boardQuery.data?.data ?? null) : null;
 
+  // Through a friend's challenge link (`?from=`, Backend 7a007a8c): their
+  // score is shown to beat, and the attempt names theirs, so they hear how
+  // this one went. A banner that does not load leaves the quiz as it is.
+  const challengeFrom = challengeFromParam(useSearchParams().get('from'));
+  const challengeQuery = useQuery({
+    ...soloQuizQueries.challenge(quizUuid, challengeFrom ?? ''),
+    enabled: challengeFrom !== null,
+  });
+  const challenger = challengeQuery.data?.data ?? null;
+  // Signing in comes back to the challenge, not the bare quiz.
+  const returnPath = challengeFrom ? quizChallengeHref(quizUuid, challengeFrom) : pathname;
+
   const [revealMode, setRevealMode] = useState<QuizRevealMode>(DEFAULT_REVEAL_MODE);
-  const startAttempt = useStartAttempt(quizUuid, viewerId);
+  const startAttempt = useStartAttempt(quizUuid, viewerId, challengeFrom);
   /** A refusal of Start, said under the button — this surface has no toasts. */
   const [startError, setStartError] = useState<string | null>(null);
 
   // "Challenge a friend" (Arthur, 24 October 2026): the quiz's link with a
-  // line to beat. Called up here with the other hooks; it runs only on a tap,
-  // once the quiz is on screen.
-  const challenge = useShareAction({
-    path: quizFrontHref(quizUuid),
+  // line to beat. One tap, also on the author's own quiz no link opens yet,
+  // which it opens to the link (Arthur, 10 November 2026; use-challenge-friend).
+  // Called up here with the other hooks; it runs only on a tap.
+  const challenge = useChallengeFriend({
+    quizUuid,
     title: query.data?.data?.title ?? null,
     text: frontChallengeText(query.data?.data?.title ?? null, query.data?.data?.viewer_best_points ?? null),
+    visibility: query.data?.data?.visibility ?? null,
+    isMine: query.data?.data?.is_mine === true,
   });
 
   const [formOpen, setFormOpen] = useState(false);
@@ -217,7 +235,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         // The session ended under us: the client leaves this public page
         // alone on a 401, so the screen takes the reader to sign in itself.
         if (status === 401) {
-          router.push(signInHref(pathname));
+          router.push(signInHref(returnPath));
           return;
         }
         setStartError(message);
@@ -274,7 +292,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   );
 
   return (
-    <div className={cn(FRONT_COLUMN, !mayTake && shareable && 'max-md:pb-44')}>
+    <div className={cn(FRONT_COLUMN, !mayTake && challenge.available && 'max-md:pb-44')}>
       {/* One column, read top to bottom, on a phone and a computer alike
           (Stay, 28 October 2026: on a computer "the name is squezed in one
           side and the other components just look like they were spat on the
@@ -308,6 +326,20 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             {quiz.description && (
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
+            {/* Through a friend's challenge link: the score to beat. */}
+            {challenger ? (
+              <div
+                role="note"
+                className="flex items-start gap-3 rounded-2xl border-2 border-border bg-card p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+              >
+                {/* Gold stays for Start: the banner is in the plain colours. */}
+                <Swords aria-hidden className="mt-0.5 size-5 shrink-0 text-foreground/70" />
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">{challengeBanner(challenger).title}</p>
+                  <p className="text-sm text-muted-foreground">{challengeBanner(challenger).line}</p>
+                </div>
+              </div>
+            ) : null}
           </header>
         </div>
 
@@ -366,15 +398,15 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 </RaisedButton>
               ) : (
                 <RaisedButton asChild className={cn(FRONT_BUTTON, 'max-md:basis-full')}>
-                  <Link href={signInHref(pathname)}>Sign in to take this quiz</Link>
+                  <Link href={signInHref(returnPath)}>Sign in to take this quiz</Link>
                 </RaisedButton>
               )}
-              {shareable && (
+              {challenge.available && (
                 <RaisedButton
                   type="button"
                   tone="quiet"
                   className={cn(FRONT_BUTTON, 'flex-none max-md:[a+&]:flex-1')}
-                  onClick={() => void challenge.share()}
+                  onClick={challenge.challenge}
                 >
                   {challenge.copied ? <Check aria-hidden className="size-4" /> : <Share2 aria-hidden className="size-4" />}
                   <span aria-live="polite">{challenge.copied ? 'Link copied' : 'Challenge a friend'}</span>
@@ -399,6 +431,13 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 {quiz.visibility === 'private'
                   ? 'Only you can open this quiz.'
                   : 'Shared with the channels it has run in.'}
+              </p>
+            )}
+
+            {challenge.openFailed && (
+              <p role="alert" className="text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+                Your quiz couldn&rsquo;t be opened to anyone with the link, so the link won&rsquo;t open for a friend yet.
+                Tap Challenge a friend to try again.
               </p>
             )}
 

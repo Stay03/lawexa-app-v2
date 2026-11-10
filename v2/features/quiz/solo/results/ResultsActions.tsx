@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import { Check, Compass, Loader2, Lock, RotateCcw, Share2 } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
-import { useShareAction } from '@/v2/features/sharing/use-share-action';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { EXPLORE_HREF, quizFrontHref } from '../model';
+import type { ChannelQuizVisibility } from '@/types/channel-quiz';
+import { EXPLORE_HREF } from '../model';
 import { RaisedButton } from '../ui';
+import { useChallengeFriend } from '../use-challenge-friend';
 
 /**
  * ResultsActions — the two things worth doing next, at the bottom of the
@@ -25,13 +24,12 @@ import { RaisedButton } from '../ui';
  * attempt that the server does not offer yet; until it does, the sentence
  * carries the card's words.
  *
- * ── ONLY WHERE A LINK CAN OPEN THE QUIZ ────────────────────────────────────
- * The caller reads the quiz's visibility and withholds Challenge for a
- * private or channel-only quiz, rather than handing out an address that
- * answers 404. On an "Only you" quiz a quiet line takes its place and says
- * why, with the way to change it (Stay, 23 October 2026, picture 7): only
- * its author can take a private quiz, so the reader here is the author, and
- * the quiz's own page is where who can take it is set.
+ * ── ONE TAP, EVEN ON A QUIZ ONLY ITS AUTHOR CAN OPEN (Arthur, 10 November) ─
+ * `useChallengeFriend` decides and does it, for this bar and the quiz's front
+ * alike: it shares a quiz a link opens, and on the author's own quiz no link
+ * opens yet it also switches it to "Anyone with the link" in the same tap.
+ * Should that switch fail, a line here says the link will not open for a
+ * friend yet.
  *
  * ── OTHER QUIZZES, THE THIRD BUTTON (Arthur, 28 October 2026: "do B") ──────
  * "Take it again" replays this quiz, "Challenge a friend" shares it, and
@@ -46,28 +44,34 @@ import { RaisedButton } from '../ui';
  */
 export function ResultsActions({
   quizUuid,
+  attemptUuid,
   quizTitle,
   challenge,
-  shareable,
-  privateQuiz,
+  visibility,
+  isMine,
   retaking,
   onRetake,
 }: {
   quizUuid: string;
+  /** This finished attempt: the challenge link carries it, so the friend sees the score to beat. */
+  attemptUuid: string;
   quizTitle: string;
   /** The sentence the share sheet gets beside the link. */
   challenge: string;
-  /** A link or public quiz — the only ones a shared link can open. */
-  shareable: boolean;
-  /** An "Only you" quiz: say why there is no Challenge. */
-  privateQuiz: boolean;
+  /** Who can open the quiz; null while its detail loads. */
+  visibility: ChannelQuizVisibility | null;
+  /** The reader wrote it: only they may open it to the link. */
+  isMine: boolean;
   retaking: boolean;
   onRetake: () => void;
 }) {
-  const share = useShareAction({
-    path: quizFrontHref(quizUuid),
+  const friend = useChallengeFriend({
+    quizUuid,
+    fromAttempt: attemptUuid,
     title: quizTitle,
     text: challenge,
+    visibility,
+    isMine,
   });
 
   return (
@@ -84,18 +88,18 @@ export function ResultsActions({
           )}
           Take it again
         </RaisedButton>
-        {shareable && (
+        {friend.available && (
           <RaisedButton
             tone="quiet"
             className="min-w-fit flex-1 basis-40 whitespace-nowrap"
-            onClick={() => void share.share()}
+            onClick={friend.challenge}
           >
-            {share.copied ? (
+            {friend.copied ? (
               <Check aria-hidden className="size-4 text-primary" />
             ) : (
               <Share2 aria-hidden className="size-4" />
             )}
-            <span aria-live="polite">{share.copied ? 'Link copied' : 'Challenge a friend'}</span>
+            <span aria-live="polite">{friend.copied ? 'Link copied' : 'Challenge a friend'}</span>
           </RaisedButton>
         )}
         <RaisedButton tone="quiet" className="min-w-fit flex-1 basis-40 whitespace-nowrap" asChild>
@@ -105,18 +109,15 @@ export function ResultsActions({
           </Link>
         </RaisedButton>
       </div>
-      {privateQuiz && !shareable ? (
-        <p className="mt-3 flex items-start gap-2.5 rounded-2xl border border-border/60 bg-secondary/30 px-3.5 py-3 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+      {friend.openFailed ? (
+        <p
+          role="alert"
+          className="mt-3 flex items-start gap-2.5 rounded-2xl border border-border/60 bg-secondary/30 px-3.5 py-3 text-sm text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200"
+        >
           <Lock aria-hidden className="mt-0.5 size-4 shrink-0" />
           <span>
-            Only you can take this quiz.{' '}
-            <Link
-              href={quizFrontHref(quizUuid)}
-              className={cn('rounded-sm font-semibold text-primary underline-offset-2 hover:underline', FOCUS_RING)}
-            >
-              Change who can take it
-            </Link>{' '}
-            to challenge a friend.
+            Your quiz couldn&rsquo;t be opened to anyone with the link, so the link won&rsquo;t open for a friend yet.
+            Tap Challenge a friend to try again.
           </span>
         </p>
       ) : null}

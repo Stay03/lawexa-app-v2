@@ -39,12 +39,16 @@ import { soloQuizQueries } from './queries';
  * route paints from cache on arrival instead of re-fetching what it was just
  * handed. `401` is a visitor and `403` a guest pass; the quiz front never
  * offers Start to either.
+ *
+ * `from`: the challenger's attempt when the reader came through a challenge
+ * link (`?from=`, Backend 7a007a8c), so the challenger hears how they did.
+ * The server records it only when it is valid and ignores it otherwise.
  */
-export function useStartAttempt(quizUuid: string, viewerId: number | null) {
+export function useStartAttempt(quizUuid: string, viewerId: number | null, from: string | null = null) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (reveal_mode: QuizRevealMode) =>
-      quizAttemptsApi.start(quizUuid, { reveal_mode }),
+      quizAttemptsApi.start(quizUuid, from ? { reveal_mode, from } : { reveal_mode }),
     meta: { silentError: true },
     onSuccess: (response) => {
       queryClient.setQueryData<QuizAttemptResponse>(

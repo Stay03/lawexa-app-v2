@@ -104,9 +104,9 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
     enabled: quizUuid !== null,
   });
   const visibility = detailQuery.data?.data.visibility ?? null;
+  const isMine = detailQuery.data?.data.is_mine === true;
   // For the place block, a detail that fails to load reads as not public: it
   // then leaves the space as it was, never a skeleton that stays.
-  const shareable = visibility === 'link' || visibility === 'public';
   // Whether the quiz has a board at all: the server's `is_listed` (an unlisted
   // public quiz answers its board with 404).
   const publicQuiz = quizHasBoard({
@@ -273,10 +273,11 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
 
         <ResultsActions
           quizUuid={attempt.quiz.uuid}
+          attemptUuid={attempt.uuid}
           quizTitle={attempt.quiz.title}
           challenge={challengeText(viewerName, score.points, attempt.quiz.title, highlights)}
-          shareable={shareable}
-          privateQuiz={visibility === 'private'}
+          visibility={visibility}
+          isMine={isMine}
           retaking={startAttempt.isPending}
           onRetake={retake}
         />

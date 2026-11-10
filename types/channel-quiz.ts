@@ -475,6 +475,33 @@ export interface UpdateChannelQuizPayload {
 /** `POST /channel-quizzes/{quiz}/attempts`. `401` signed out, `403` a guest. */
 export interface StartQuizAttemptPayload {
   reveal_mode: QuizRevealMode;
+  /**
+   * The challenger's finished attempt, when this attempt came through their
+   * challenge link (Backend 7a007a8c). Recorded only for a finished attempt at
+   * this quiz by someone else on a quiz a link opens; otherwise ignored.
+   */
+  from?: string;
+}
+
+/**
+ * `GET /channel-quizzes/{quiz}/challenge/{attempt}` (no sign-in): the banner a
+ * friend sees on a challenge link, "Tunde scored 8/10 — can you beat it?".
+ */
+export interface QuizChallenge {
+  attempt_uuid: string;
+  quiz: { uuid: string; title: string };
+  challenger: { name: string; avatar_url: string | null };
+  points: number;
+  max_points: number;
+  correct_count: number;
+  question_count: number;
+  scored_count: number;
+}
+
+export interface QuizChallengeResponse {
+  success: boolean;
+  message: string;
+  data: QuizChallenge;
 }
 
 /**

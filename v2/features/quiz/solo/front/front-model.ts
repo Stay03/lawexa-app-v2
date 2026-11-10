@@ -6,6 +6,16 @@ import { pointsLabel } from '../model';
  * note under Start, and the line Challenge a friend sends.
  */
 
+/**
+ * The challenger's attempt from a challenge link's `?from=`: a uuid, else
+ * nothing (a mangled or hand-typed value reads no banner and sends no `from`).
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function challengeFromParam(raw: string | null): string | null {
+  return raw !== null && UUID.test(raw) ? raw : null;
+}
+
 /** "Taken 3 times", "Taken once"; nothing before the first finished attempt. */
 export function takenLabel(attempts: number | null | undefined): string | null {
   if (typeof attempts !== 'number' || attempts <= 0) return null;
