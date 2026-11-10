@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -11,7 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { inviteLinksApi } from '@/lib/api/collab';
 import type { InvitePreview, InviteViewerAction } from '@/types/collab';
-import { forgetPendingInvite, rememberPendingInvite } from './pending-invite';
+import {
+  forgetPendingInvite,
+  rememberPendingInvite,
+  signInToJoinHref,
+  signUpToJoinHref,
+  usePendingInvite,
+} from './pending-invite';
 
 /**
  * JoinScreen — what somebody sees when they open an invite link.
@@ -37,6 +43,14 @@ import { forgetPendingInvite, rememberPendingInvite } from './pending-invite';
  * is read at RENDER rather than in an effect — see its docblock for why that
  * distinction is the difference between this working and silently dropping the
  * invite of a brand new user.
+ *
+ * ── SIGN IN FIRST, AND THE JOIN FINISHES ITSELF (10 November 2026) ─────────
+ * `sign_up` is what a signed-out viewer gets, and many of them already have an
+ * account: they were sent to /register. Sign-in comes first now, with sign-up
+ * beside it, and both carry `?redirect=` back here. The held code was never
+ * read again (Backend's study), so a new person who signed up never joined:
+ * `PendingInviteReturn` brings them back once they can join, and here a held
+ * code that is this invite's finishes the join without a second tap.
  */
 
 /** One sentence per refusal. */
@@ -67,7 +81,7 @@ function refusalFor(status: number | undefined): { title: string; body: string }
 
 /** The one control, per the server's answer about this viewer. */
 const ACTION_LABEL: Record<InviteViewerAction, string> = {
-  sign_up: 'Sign up to join',
+  sign_up: 'Sign in to join',
   verify_email: 'Confirm your email to join',
   join: 'Join',
   request: 'Ask to join',
@@ -128,10 +142,27 @@ export function JoinScreen({ code }: { code: string }) {
       );
     },
     onError: (error) => {
+      // A refused join lets the held code go: it would otherwise bring the
+      // person back here on every page. The button still tries again.
+      forgetPendingInvite();
       const status = isAxiosError(error) ? error.response?.status : undefined;
       setFailed(refusalFor(status).title);
     },
   });
+
+  // Back with the code they arrived with (`PendingInviteReturn`, or the sign-in
+  // `?redirect=`): the join finishes without another tap. Only for this
+  // invite's own code, and only once; a member already in goes straight in.
+  const held = usePendingInvite() === code;
+  const heldAction = held ? preview.data?.data.viewer_action : undefined;
+  const heldSpace = preview.data?.data.space_uuid;
+  useEffect(() => {
+    if ((heldAction === 'join' || heldAction === 'request') && accept.isIdle) accept.mutate();
+    if (heldAction === 'already_member' && heldSpace) {
+      forgetPendingInvite();
+      router.replace(`/spaces/${heldSpace}`);
+    }
+  }, [heldAction, heldSpace, accept, router]);
 
   if (preview.isPending) {
     return (
@@ -197,9 +228,10 @@ export function JoinScreen({ code }: { code: string }) {
       return;
     }
     if (action === 'sign_up' || action === 'verify_email') {
-      // Hold it BEFORE leaving, so coming back finishes the join.
+      // Hold it BEFORE leaving, so coming back finishes the join. Sign-in
+      // comes back here by its `?redirect=`; its form's Sign up link too.
       rememberPendingInvite(code);
-      router.push(action === 'sign_up' ? '/register' : '/check-email');
+      router.push(action === 'sign_up' ? signInToJoinHref(code) : '/check-email');
       return;
     }
     accept.mutate();
@@ -260,6 +292,20 @@ export function JoinScreen({ code }: { code: string }) {
           ) : null}
           {ACTION_LABEL[action]}
         </Button>
+
+        {/* A new person signs up instead, and comes back here the same way. */}
+        {action === 'sign_up' ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            New to Lawexa?{' '}
+            <Link
+              href={signUpToJoinHref(code)}
+              onClick={() => rememberPendingInvite(code)}
+              className="font-medium text-primary hover:underline"
+            >
+              Create an account
+            </Link>
+          </p>
+        ) : null}
 
         {failed ? (
           <p role="alert" className="mt-3 text-sm text-destructive">

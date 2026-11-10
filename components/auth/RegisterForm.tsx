@@ -30,6 +30,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { emailOnlySchema, registerStep2Schema } from '@/lib/utils/validation';
 import { getFieldError } from '@/lib/utils/api-error';
 
+import { AuthSwitchLink } from './AuthSwitchLink';
 import { GoogleAuthButton } from './GoogleAuthButton';
 
 type Step = 'initial' | 'gmail-recommendation' | 'email-password';
@@ -149,9 +150,7 @@ function RegisterForm() {
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
-            <a href="/login" className="text-primary hover:underline">
-              Sign in
-            </a>
+            <AuthSwitchLink to="/login">Sign in</AuthSwitchLink>
           </p>
         </CardFooter>
       </Card>
@@ -202,9 +201,7 @@ function RegisterForm() {
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
             Already have an account?{' '}
-            <a href="/login" className="text-primary hover:underline">
-              Sign in
-            </a>
+            <AuthSwitchLink to="/login">Sign in</AuthSwitchLink>
           </p>
         </CardFooter>
       </Card>
@@ -307,9 +304,7 @@ function RegisterForm() {
       <CardFooter className="flex justify-center">
         <p className="text-sm text-muted-foreground">
           Already have an account?{' '}
-          <a href="/login" className="text-primary hover:underline">
-            Sign in
-          </a>
+          <AuthSwitchLink to="/login">Sign in</AuthSwitchLink>
         </p>
       </CardFooter>
     </Card>

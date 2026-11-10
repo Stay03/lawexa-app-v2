@@ -119,3 +119,67 @@ export function forgetPendingInvite(): void {
 export function usePendingInvite(): string | null {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+/** The invite's own page. */
+export function inviteJoinPath(code: string): string {
+  return `/join/${encodeURIComponent(code)}`;
+}
+
+/**
+ * Sign-in, or sign-up, that comes back to the invite (`?redirect=`, which
+ * auth-return.ts keeps across Google sign-in too). A signed-out person may
+ * already have an account, so sign-in comes first; the form's own "Sign up"
+ * link carries the same way back (the invite join fix, 10 November 2026).
+ */
+export function signInToJoinHref(code: string): string {
+  return `/login?redirect=${encodeURIComponent(inviteJoinPath(code))}`;
+}
+
+export function signUpToJoinHref(code: string): string {
+  return `/register?redirect=${encodeURIComponent(inviteJoinPath(code))}`;
+}
+
+/**
+ * The pages a held invite never pulls a person away from: the invite itself,
+ * and every step of signing in, signing up, confirming an email and
+ * onboarding. Once they are past those, the invite takes them back.
+ */
+const STEPS_BEFORE_THE_INVITE = [
+  '/join',
+  '/login',
+  '/register',
+  '/check-email',
+  '/verify-email',
+  '/email-verified',
+  '/forgot-password',
+  '/reset-password',
+  '/auth',
+  '/onboarding',
+];
+
+/**
+ * Whether a held invite should take this person back to it now: they are
+ * signed in with a confirmed account (not a guest, whose join the server
+ * refuses), and not in the middle of one of the steps above.
+ *
+ * Sign-up confirms the email on another page and onboarding comes after, and
+ * neither keeps `?redirect=`, so this is what finishes the join for a brand
+ * new person: before it, the code was held and never read again.
+ */
+export function shouldReturnToInvite({
+  code,
+  pathname,
+  signedIn,
+  isGuest,
+  verified,
+}: {
+  code: string | null;
+  pathname: string;
+  signedIn: boolean;
+  isGuest: boolean;
+  verified: boolean;
+}): boolean {
+  if (!code || !signedIn || isGuest || !verified) return false;
+  const path = pathname.startsWith('/v2/') ? pathname.slice(3) : pathname;
+  return !STEPS_BEFORE_THE_INVITE.some((step) => path === step || path.startsWith(`${step}/`));
+}

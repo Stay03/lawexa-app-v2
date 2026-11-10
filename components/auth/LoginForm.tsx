@@ -27,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 
 import { useAuth } from '@/lib/hooks/useAuth';
 import { loginSchema } from '@/lib/utils/validation';
+import { AuthSwitchLink } from './AuthSwitchLink';
 import type { LoginFormData } from '@/types/auth';
 
 import { GoogleAuthButton } from './GoogleAuthButton';
@@ -122,9 +123,7 @@ function LoginForm() {
       <CardFooter className="flex justify-center">
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{' '}
-          <a href="/register" className="text-primary hover:underline">
-            Sign up
-          </a>
+          <AuthSwitchLink to="/register">Sign up</AuthSwitchLink>
         </p>
       </CardFooter>
     </Card>
