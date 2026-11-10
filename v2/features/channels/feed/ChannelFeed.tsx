@@ -54,6 +54,7 @@ import { MessageImageViewer } from './MessageImageViewer';
 import type { MessageRowActions } from './MessageRow';
 import { QuizCardPreview } from './QuizCardPreview';
 import { QuizGameCard } from './QuizGameCard';
+import { channelRoom } from '../quiz/quiz-room';
 import { RespondingRow } from './RespondingRow';
 import { useTextSelectMode } from './use-text-select-mode';
 import {
@@ -1532,7 +1533,7 @@ export function ChannelFeed({
                       <QuizGameCard
                         key={item.key}
                         message={item.message}
-                        channelUuid={channel.uuid}
+                        room={channelRoom(channel.uuid)}
                         viewerId={viewerId}
                         onOpenGame={onOpenGame}
                       />

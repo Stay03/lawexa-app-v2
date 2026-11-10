@@ -45,6 +45,7 @@ import type {
   QuizHomeListResponse,
   QuizLeaderboardResponse,
   QuizListFilters,
+  QuizRoom,
   StartQuizAttemptPayload,
   SubmitQuizAnswerPayload,
   SubmitQuizAttemptAnswerPayload,
@@ -310,16 +311,17 @@ export const quizAttemptsApi = {
    server-side read, in `lib/api/server.ts` (`fetchPublicQuizResults`), where its
    docblock also records why it may never carry a session. */
 
-/** Games — one live game per channel; the server owns every clock. */
+/** Games — one live game per room (a channel or a Space); the server owns every clock. */
 export const quizGamesApi = {
-  /** History, newest first. `active: 1` is the "is a quiz live here?" probe
-   *  and returns 0 or 1 rows. */
+  /** A room's games, newest first. `active: 1` is the "is a quiz live here?"
+   *  probe and returns 0 or 1 rows. A Space's list is for its active members. */
   getList: async (
-    channelUuid: string,
+    room: QuizRoom,
     params: { active?: 1; per_page?: number; page?: number } = {},
   ): Promise<QuizGameListResponse> => {
+    const scope = room.kind === 'channel' ? 'channels' : 'spaces';
     const response = await apiClient.get<QuizGameListResponse>(
-      `/channels/${channelUuid}/quiz-games`,
+      `/${scope}/${encodeURIComponent(room.uuid)}/quiz-games`,
       {
         params: {
           active: params.active,

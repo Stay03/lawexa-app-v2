@@ -6,6 +6,7 @@ import { Loader2, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useJoinGame } from './mutations';
 import { channelQuizQueries } from './queries';
+import type { QuizRoom } from './quiz-room';
 
 /**
  * LiveQuizBar — the channel's standing answer to "is a quiz running right
@@ -25,19 +26,20 @@ import { channelQuizQueries } from './queries';
  * ONE QUERY, SHARED. This mounts the same `activeGame` probe every quiz card
  * reads, so the bar costs nothing extra; its docblock in `./queries.ts` covers
  * the cadence and why it currently has one.
+ *
+ * ANY ROOM: a channel's, or a Space's own (its page and its chats; live quiz
+ * in Spaces, 10 November 2026), by the room's probe.
  */
 export function LiveQuizBar({
-  channelUuid,
+  room,
   viewerId,
   onOpenGame,
 }: {
-  channelUuid: string;
+  room: QuizRoom;
   viewerId: number | null;
   onOpenGame: (gameUuid: string) => void;
 }) {
-  const query = useQuery(
-    channelQuizQueries.activeGame({ channelUuid, viewerId }),
-  );
+  const query = useQuery(channelQuizQueries.activeGame({ room, viewerId }));
   const game = query.data?.data?.[0] ?? null;
   const join = useJoinGame(game?.uuid ?? '', viewerId);
 

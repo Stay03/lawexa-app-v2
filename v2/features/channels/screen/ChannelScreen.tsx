@@ -85,6 +85,7 @@ import { ChannelEditDialog } from '../dialogs/ChannelEditDialog';
 import { GameOverlay } from '../quiz/GameOverlay';
 import { LiveQuizBar } from '../quiz/LiveQuizBar';
 import { QuizLibrarySheet } from '../quiz/QuizLibrarySheet';
+import { channelRoom } from '../quiz/quiz-room';
 import { useCachedChannelIdentity } from './cached-identity';
 import { ChannelAboutSheet } from './ChannelAboutSheet';
 import { EnablePushNudge } from './EnablePushNudge';
@@ -1073,7 +1074,7 @@ export function ChannelScreen({
             no quizzes, so the probe is not made there either. */}
         {canParticipate && !isThread && (
           <LiveQuizBar
-            channelUuid={channel.uuid}
+            room={channelRoom(channel.uuid)}
             viewerId={viewerId}
             onOpenGame={openGame}
           />
@@ -1291,7 +1292,7 @@ export function ChannelScreen({
       {gameUuid && (
         <GameOverlay
           key={gameUuid}
-          channelUuid={channel.uuid}
+          room={channelRoom(channel.uuid)}
           gameUuid={gameUuid}
           viewerId={viewerId}
           viewerUuid={viewerUuid}

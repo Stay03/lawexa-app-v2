@@ -29,6 +29,7 @@ import {
 } from './model';
 import { useCancelGame, useJoinGame, useStartGame, useSubmitAnswer } from './mutations';
 import { channelQuizQueries } from './queries';
+import type { QuizRoom } from './quiz-room';
 
 /**
  * useLiveGame — the whole live game as one hook: the authoritative state, the
@@ -470,17 +471,21 @@ export interface LiveGame {
 }
 
 export function useLiveGame({
-  channelUuid,
+  room,
   gameUuid,
   viewerId,
   viewerUuid,
 }: {
-  channelUuid: string;
+  /** Where the game runs: a channel, or a Space itself (quiz-room.ts). */
+  room: QuizRoom;
   gameUuid: string;
   viewerId: number | null;
   viewerUuid: string | null;
 }): LiveGame {
   const queryClient = useQueryClient();
+  // The effects below depend on the room's two parts, not on the object, which
+  // a caller may build afresh each render.
+  const { kind: roomKind, uuid: roomUuid } = room;
   const query = useQuery(channelQuizQueries.gameState({ gameUuid, viewerId }));
   const snapshot = query.data?.data ?? null;
 
@@ -543,13 +548,13 @@ export function useLiveGame({
   const answerMutation = useSubmitAnswer(gameUuid, viewerId);
   const joinMutation = useJoinGame(gameUuid, viewerId);
   const startMutation = useStartGame(gameUuid, viewerId);
-  const cancelMutation = useCancelGame(gameUuid, viewerId, channelUuid);
+  const cancelMutation = useCancelGame(gameUuid, viewerId, room);
 
   /* ── The event fast path ───────────────────────────────────────────────── */
   useEffect(() => {
     const key = channelQuizQueries.gameState({ gameUuid, viewerId }).queryKey;
 
-    return subscribeToQuizGameEvents(channelUuid, (event) => {
+    return subscribeToQuizGameEvents({ kind: roomKind, uuid: roomUuid }, (event) => {
       if (eventGameUuid(event) !== gameUuid) return;
 
       if (event.type === 'cancelled') {
@@ -575,7 +580,7 @@ export function useLiveGame({
         void queryClient.invalidateQueries({ queryKey: key });
       }
     });
-  }, [channelUuid, gameUuid, viewerId, queryClient]);
+  }, [roomKind, roomUuid, gameUuid, viewerId, queryClient]);
 
   /* ── Derived ───────────────────────────────────────────────────────────── */
   const phase: QuizGamePhase = shown ? gamePhase(shown) : 'lobby';
@@ -591,9 +596,9 @@ export function useLiveGame({
   useEffect(() => {
     if (!ended) return;
     void queryClient.invalidateQueries({
-      queryKey: channelQuizQueries.activeGameOf(channelUuid),
+      queryKey: channelQuizQueries.activeGameOf({ kind: roomKind, uuid: roomUuid }),
     });
-  }, [ended, channelUuid, queryClient]);
+  }, [ended, roomKind, roomUuid, queryClient]);
 
   /**
    * THE CERTIFICATE IS PER VIEWER, AND THE END OF A GAME IS A BROADCAST.

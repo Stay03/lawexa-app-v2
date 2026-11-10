@@ -25,6 +25,7 @@ import {
   QuestionStage,
 } from './GamePhases';
 import { canJoinNow } from './model';
+import { gameInRoom, roomNoun, type QuizRoom } from './quiz-room';
 import { GameStage, GameStageSkeleton } from './ui';
 import { useLiveGame } from './use-game';
 import './quiz-game.css';
@@ -103,19 +104,20 @@ const PHASE_CAPTION = {
 const LAST_ANSWER_CAPTION = 'Last answer';
 
 export function GameOverlay({
-  channelUuid,
+  room,
   gameUuid,
   viewerId,
   viewerUuid,
   onClose,
 }: {
-  channelUuid: string;
+  /** The room the overlay is over: a channel, or a Space itself (quiz-room.ts). */
+  room: QuizRoom;
   gameUuid: string;
   viewerId: number | null;
   viewerUuid: string | null;
   onClose: () => void;
 }) {
-  const game = useLiveGame({ channelUuid, gameUuid, viewerId, viewerUuid });
+  const game = useLiveGame({ room, gameUuid, viewerId, viewerUuid });
   const [cancelOpen, setCancelOpen] = useState(false);
   const frameRef = useRef<HTMLElement>(null);
 
@@ -179,8 +181,8 @@ export function GameOverlay({
             size="icon"
             className="size-8 shrink-0"
             onClick={onClose}
-            aria-label="Back to the channel"
-            title="Back to the channel"
+            aria-label={`Back to the ${roomNoun(room)}`}
+            title={`Back to the ${roomNoun(room)}`}
           >
             <ArrowLeft aria-hidden className="size-4" />
           </Button>
@@ -254,7 +256,7 @@ export function GameOverlay({
       {/* ── Body ──────────────────────────────────────────────────────── */}
       <GameBody
         game={game}
-        channelUuid={channelUuid}
+        room={room}
         viewerUuid={viewerUuid}
         viewerId={viewerId}
         onClose={onClose}
@@ -266,7 +268,7 @@ export function GameOverlay({
             <AlertDialogTitle>End this game?</AlertDialogTitle>
             <AlertDialogDescription>
               The game stops for everyone straight away. A cancelled game keeps
-              no scores and posts nothing to the channel.
+              no scores and posts nothing to the {roomNoun(room) === 'channel' ? 'channel' : 'chat'}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -298,13 +300,13 @@ export function GameOverlay({
  *  it never re-renders on a phase body's own churn. */
 function GameBody({
   game,
-  channelUuid,
+  room,
   viewerId,
   viewerUuid,
   onClose,
 }: {
   game: ReturnType<typeof useLiveGame>;
-  channelUuid: string;
+  room: QuizRoom;
   viewerId: number | null;
   viewerUuid: string | null;
   onClose: () => void;
@@ -329,10 +331,10 @@ function GameBody({
             icon={Trophy}
             tone="alert"
             title="This game isn't yours to watch"
-            description="Live quizzes are open to members of the channel they run in."
+            description={`Live quizzes are open to members of the ${roomNoun(room)} they run in.`}
             action={
               <Button variant="outline" size="sm" onClick={onClose}>
-                Back to the channel
+                Back to the {roomNoun(room)}
               </Button>
             }
           />
@@ -346,10 +348,10 @@ function GameBody({
             icon={Trophy}
             tone="neutral"
             title="This game is gone"
-            description="It may have been removed along with its quiz. Nothing else in the channel changed."
+            description={`It may have been removed along with its quiz. Nothing else in the ${roomNoun(room)} changed.`}
             action={
               <Button variant="outline" size="sm" onClick={onClose}>
-                Back to the channel
+                Back to the {roomNoun(room)}
               </Button>
             }
           />
@@ -373,21 +375,22 @@ function GameBody({
     );
   }
 
-  // A hand-edited or stale `?game=` can name a game in ANOTHER channel the
+  // A hand-edited or stale `?game=` can name a game in ANOTHER room the
   // reader also belongs to — the server would serve it happily, and this
   // screen would then run a game whose events arrive on a room it is not
-  // listening to, under the wrong channel's name. Say so instead (audit L9).
-  if (game.state.game.channel_uuid !== channelUuid) {
+  // listening to, under the wrong room's name. Say so instead (audit L9).
+  if (!gameInRoom(game.state.game, room)) {
+    const noun = roomNoun(room);
     return (
       <GameStage>
         <CollabMessage
           icon={Trophy}
           tone="neutral"
-          title="This game belongs to another channel"
-          description="Quizzes are played in the channel they were started in. Open that channel to join or see how it went."
+          title={`This game belongs to another ${noun}`}
+          description={`Quizzes are played in the ${noun} they were started in. Open that ${noun} to join or see how it went.`}
           action={
             <Button variant="outline" size="sm" onClick={onClose}>
-              Back to the channel
+              Back to the {noun}
             </Button>
           }
         />
@@ -420,7 +423,9 @@ function GameBody({
     case 'reveal':
       return <QuestionStage game={game} viewerUuid={viewerUuid} />;
     case 'cancelled':
-      return <CancelledStage cancelledBy={game.cancelledBy} onBack={onClose} />;
+      return (
+        <CancelledStage cancelledBy={game.cancelledBy} onBack={onClose} backLabel={`Back to the ${roomNoun(room)}`} />
+      );
     case 'finished':
     default:
       return (

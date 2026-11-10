@@ -48,11 +48,11 @@ import { DeleteQuizDialog } from './DeleteQuizDialog';
 import { useGoLive } from './mutations';
 import {
   canHostQuiz,
-  goLiveTarget,
   HOST_POLICY_LIBRARY_NOTE,
   HOST_POLICY_REFUSAL,
 } from './model';
 import { channelQuizQueries } from './queries';
+import { channelRoom } from './quiz-room';
 import { QuizFormDialog } from './QuizFormDialog';
 import { VisibilityChip } from './VisibilityChip';
 import { VisibilityGroup } from './VisibilityGroup';
@@ -88,7 +88,7 @@ import { VisibilityGroup } from './VisibilityGroup';
  *
  * ── RUNNING ONE RUNS IT *HERE* ─────────────────────────────────────────────
  * Pressing Go live inside a channel means "run this in this channel", so the
- * room is context and there is no picker. `goLiveTarget` builds the body; the
+ * room is context and there is no picker. `useGoLive` names it in the body; the
  * quiz's own `channel_uuid` is PROVENANCE and is never treated as a
  * destination, a link or a name. It can be null (a quiz written straight into a
  * library) and the room it names can be gone (`channel_deleted`) — so nothing
@@ -181,7 +181,7 @@ export function QuizLibrarySheet({
     enabled: open && source === 'library',
   });
   const activeQuery = useQuery({
-    ...channelQuizQueries.activeGame({ channelUuid: channel.uuid, viewerId }),
+    ...channelQuizQueries.activeGame({ room: channelRoom(channel.uuid), viewerId }),
     enabled: open,
   });
 
@@ -498,7 +498,7 @@ function QuizRow({
   /** `null` clears a previous refusal. */
   onLiveRefused: (message: string | null) => void;
 }) {
-  const goLive = useGoLive(channelUuid, quiz.uuid);
+  const goLive = useGoLive(channelRoom(channelUuid), quiz.uuid);
   const count = quiz.question_count ?? quiz.questions?.length ?? 0;
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
   const share = useShareAction({ path: quizFrontHref(quiz.uuid), title: quiz.title });
@@ -623,7 +623,7 @@ function QuizRow({
                 // reader must never read last try's sentence over this try's
                 // spinner.
                 onLiveRefused(null);
-                goLive.mutate(goLiveTarget(channelUuid), {
+                goLive.mutate(undefined, {
                   onSuccess: (response) => onLive(response.data.uuid),
                   onError: (error) => {
                     const { status, message } = extractApiError(error);

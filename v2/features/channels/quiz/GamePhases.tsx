@@ -820,9 +820,12 @@ export function PodiumStage({
 export function CancelledStage({
   cancelledBy,
   onBack,
+  backLabel,
 }: {
   cancelledBy: SlimUser | null;
   onBack: () => void;
+  /** "Back to the channel", or "Back to the Space" for a game in a Space. */
+  backLabel: string;
 }) {
   return (
     <GameStage>
@@ -837,7 +840,7 @@ export function CancelledStage({
         }
         action={
           <Button variant="outline" size="sm" onClick={onBack}>
-            Back to the channel
+            {backLabel}
           </Button>
         }
       />

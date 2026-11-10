@@ -1,9 +1,10 @@
 /**
- * channel-listeners — how many mounted task boards listen on each space
- * channel (the techlead's recheck, 29 October 2026). A board stops only its
- * own listener on unmount, and the last one to go leaves the channel, so a
- * Space visited once does not stay subscribed all session. Pure, so the count
- * is a unit test.
+ * channel-listeners — how many mounted listeners share each private channel
+ * (the techlead's recheck, 29 October 2026). A Space's channel carries both its
+ * task board (`use-task-board-live.ts`) and its live quiz games
+ * (`use-space-quiz-live.ts`), so each stops only its own listeners on unmount,
+ * and the last one to go leaves the channel: a Space visited once does not
+ * stay subscribed all session. Pure, so the count is a unit test.
  */
 
 const listeners = new Map<string, number>();

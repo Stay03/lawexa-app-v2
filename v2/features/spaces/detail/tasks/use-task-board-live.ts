@@ -8,7 +8,7 @@ import { EVT_TASK_CHANGED, spaceChannelName, type SpaceTaskChangedEvent } from '
 import { spacesQueries } from '../../queries';
 import { boardCache } from './board-cache';
 import { trailingCall } from './task-cache';
-import { releaseChannel, retainChannel } from './channel-listeners';
+import { releaseChannel, retainChannel } from '@/v2/runtime/realtime/channel-listeners';
 
 /**
  * useTaskBoardLive — the board moves while it is open (the techlead's brief,

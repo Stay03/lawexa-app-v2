@@ -653,8 +653,22 @@ export interface QuizAttemptComparison {
  * `{}` on a LIBRARY quiz is `403` ("pick a room"), and an unknown target is the
  * same `403` as a room the caller may not host in.
  */
+/**
+ * Where a live game runs: a channel, or a Space itself (live quiz in Spaces,
+ * Backend 7a007a8c). The helpers that read it are in
+ * v2/features/channels/quiz/quiz-room.ts.
+ */
+export interface QuizRoom {
+  kind: 'channel' | 'space';
+  uuid: string;
+}
+
 export interface GoLiveChannelQuizPayload {
   channel_uuid?: string;
+  /** A game in a Space itself, instead of a channel (Backend 7a007a8c). Send one of the two. */
+  space_uuid?: string;
+  /** With `space_uuid` only: the Space chat it starts from, where its cards are posted. */
+  conversation_uuid?: string;
 }
 
 export interface ChannelQuizListParams {
@@ -696,8 +710,16 @@ export interface QuizGame {
    * non-null even when {@link ChannelQuiz.channel_uuid} is null (a library quiz
    * run in a room stamps the room here). This is the field a screen may trust
    * to decide which channel a game belongs to.
+   *
+   * Null for a game played in a Space itself (live quiz in Spaces, Backend
+   * 7a007a8c): `space_uuid` is its room then. Which one a screen reads is
+   * decided once, by `gameInRoom` (v2/features/channels/quiz/quiz-room.ts).
    */
-  channel_uuid: string;
+  channel_uuid: string | null;
+  /** The Space a Space game is played in; null for a channel game. Absent on a server before Spaces. */
+  space_uuid?: string | null;
+  /** The Space chat a Space game was started from, where its live and finished lines go; else null. */
+  conversation_uuid?: string | null;
   quiz: { uuid: string; title: string };
   host: SlimUser | null;
   settings: ChannelQuizSettings;

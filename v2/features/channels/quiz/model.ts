@@ -2,7 +2,6 @@ import type { Channel } from '@/types/collab';
 import type {
   ChannelQuizSettings,
   ChannelQuizVisibility,
-  GoLiveChannelQuizPayload,
   QuizAnswerIn,
   QuizCurrentQuestion,
   QuizGamePlayer,
@@ -70,29 +69,6 @@ export const HOST_POLICY_REFUSAL =
 export const HOST_POLICY_LIBRARY_NOTE =
   'You can write quizzes for your own library. Only channel admins can start a game in this channel.';
 
-/* ── Where a quiz RUNS (2026-08-05) ───────────────────────────────────────── */
-
-/**
- * The `go-live` body for running a quiz in the channel the reader is standing
- * in. ONE shape, always: name the room.
- *
- * IT USED TO HAVE TWO BRANCHES and it no longer does. An empty body is still
- * valid on the wire — the server falls back to the quiz's own channel — and for
- * a quiz born in the room on screen the two requests are equivalent. But
- * choosing between them meant reading `quiz.channel_uuid`, which is PROVENANCE:
- * it is nullable, it may name a channel that has since been deleted, and it says
- * nothing about where this game should run. Making the request shape depend on a
- * field that cannot answer the question is how a correct call becomes an
- * accidental one. `{ channel_uuid }` is measured working for a quiz born here,
- * for one born in another room, and for one born in no room at all, so there is
- * no case left for a second way of saying the same thing.
- *
- * The room is therefore never inferred from the quiz — it is the room on screen,
- * stated outright.
- */
-export function goLiveTarget(channelUuid: string): GoLiveChannelQuizPayload {
-  return { channel_uuid: channelUuid };
-}
 
 /* ── Visibility (a DISCOVERY switch, not an access one) ───────────────────── */
 

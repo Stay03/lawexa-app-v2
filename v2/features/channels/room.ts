@@ -15,16 +15,6 @@ import type {
   ThreadStatusChangedPayload,
   ThreadUpdatedPayload,
 } from '@/types/collab';
-import type {
-  QuizAnswerProgressPayload,
-  QuizCancelledPayload,
-  QuizCountdownPayload,
-  QuizFinishedPayload,
-  QuizGameLivePayload,
-  QuizPlayerJoinedPayload,
-  QuizQuestionClosedPayload,
-  QuizQuestionOpenedPayload,
-} from '@/types/channel-quiz';
 import { getV2Echo } from '@/v2/runtime/realtime/echo';
 import { presenceChannelName } from '@/v2/runtime/realtime/protocol';
 import {
@@ -54,8 +44,9 @@ import {
 } from './lists-files-cache';
 import { channelsQueries } from './queries';
 import { noteChannelFileRemoved } from './removed-files';
-import { publishQuizGameEvent } from './quiz/game-bus';
+import { relayQuizGameEvents } from './quiz/game-bus';
 import { channelQuizQueries } from './quiz/queries';
+import { channelRoom } from './quiz/quiz-room';
 
 /**
  * useChannelRoom — the ONE presence-room subscription for an open channel
@@ -518,38 +509,13 @@ export function useChannelRoom(
 
     /** A game going live, ending or being cancelled changes the answer to
      *  "is a quiz running here?" — which every quiz card in the feed reads. */
-    const invalidateLiveProbe = () => {
+    // The eight events onto the game bus, by the one relay a Space uses too
+    // (`relayQuizGameEvents`). Leaving the room on cleanup ends them with it.
+    const quizRoom = channelRoom(channelUuid);
+    relayQuizGameEvents(room, quizRoom, () => {
       void queryClient.invalidateQueries({
-        queryKey: channelQuizQueries.activeGameOf(channelUuid),
+        queryKey: channelQuizQueries.activeGameOf(quizRoom),
       });
-    };
-
-    room.listen('.quiz.game.live', (payload: QuizGameLivePayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'live', payload });
-      invalidateLiveProbe();
-    });
-    room.listen('.quiz.game.player_joined', (payload: QuizPlayerJoinedPayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'player_joined', payload });
-    });
-    room.listen('.quiz.game.countdown', (payload: QuizCountdownPayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'countdown', payload });
-    });
-    room.listen('.quiz.game.question_opened', (payload: QuizQuestionOpenedPayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'question_opened', payload });
-    });
-    room.listen('.quiz.game.answer_progress', (payload: QuizAnswerProgressPayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'answer_progress', payload });
-    });
-    room.listen('.quiz.game.question_closed', (payload: QuizQuestionClosedPayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'question_closed', payload });
-    });
-    room.listen('.quiz.game.finished', (payload: QuizFinishedPayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'finished', payload });
-      invalidateLiveProbe();
-    });
-    room.listen('.quiz.game.cancelled', (payload: QuizCancelledPayload) => {
-      publishQuizGameEvent(channelUuid, { type: 'cancelled', payload });
-      invalidateLiveProbe();
     });
 
     room.listenForWhisper('away', (payload: AwayWhisper) => {

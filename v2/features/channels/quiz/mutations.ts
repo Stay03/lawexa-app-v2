@@ -12,7 +12,6 @@ import { extractApiError } from '@/lib/utils/api-error';
 import type {
   ChannelQuizVisibility,
   CreateChannelQuizPayload,
-  GoLiveChannelQuizPayload,
   QuizGameStateResponse,
   SubmitQuizAnswerPayload,
   UpdateChannelQuizPayload,
@@ -20,6 +19,7 @@ import type {
 import { noteThrottled } from '../engagement-throttle';
 import { isQuizListQuery, withVisibility, type QuizListCacheEntry } from './list-cache';
 import { channelQuizQueries } from './queries';
+import { goLivePayload, type QuizRoom } from './quiz-room';
 
 /**
  * channel-quiz mutations — authoring writes and the four game moves (go live,
@@ -234,28 +234,27 @@ export function useDeleteQuiz(quizUuid: string) {
 /* ── Game moves ───────────────────────────────────────────────────────────── */
 
 /**
- * Put a quiz live IN THIS CHANNEL: `201` a lobby with the host auto-joined,
- * `409` when the channel already has a live game (the library surfaces that as
- * "a quiz is already running here" with a link INTO it, not as an error), `403`
- * when the host policy refuses.
+ * Put a quiz live IN THIS ROOM (a channel, or a Space itself): `201` a lobby
+ * with the host auto-joined, `409` when the room already has a live game (the
+ * library surfaces that as "a quiz is already running here" with a link INTO
+ * it, not as an error), `403` when the reader may not host there.
  *
- * The caller passes the body, built by `goLiveTarget` in `./model.ts` — the
- * room is always `channelUuid`, and the payload only differs in shape.
+ * The body is the room's own (`goLivePayload` in `./quiz-room.ts`): the room
+ * on screen, stated outright, and for a Space the chat it was started from.
  *
- * IT ALSO SETTLES THE LISTS. A library quiz that runs here joins this channel's
+ * IT ALSO SETTLES THE LISTS. A library quiz that runs in a channel joins its
  * "quizzes that have been here" list the moment its game exists, so the sheet
  * the reader just pressed the button in is already out of date.
  */
-export function useGoLive(channelUuid: string, quizUuid: string) {
+export function useGoLive(room: QuizRoom, quizUuid: string, conversationUuid: string | null = null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: GoLiveChannelQuizPayload) =>
-      channelQuizApi.goLive(quizUuid, payload),
+    mutationFn: () => channelQuizApi.goLive(quizUuid, goLivePayload(room, conversationUuid)),
     meta: { silentError: true },
     onSuccess: () => {
-      // The probe every quiz card in the feed reads — one entry per channel.
+      // The probe every quiz card and live bar in the room reads.
       void queryClient.invalidateQueries({
-        queryKey: channelQuizQueries.activeGameOf(channelUuid),
+        queryKey: channelQuizQueries.activeGameOf(room),
       });
       invalidateQuizLists(queryClient);
     },
@@ -267,7 +266,7 @@ export function useGoLive(channelUuid: string, quizUuid: string) {
       // yet. No other status implies a game, so nothing else refetches.
       if (extractApiError(error).status === 409) {
         void queryClient.invalidateQueries({
-          queryKey: channelQuizQueries.activeGameOf(channelUuid),
+          queryKey: channelQuizQueries.activeGameOf(room),
         });
       }
     },
@@ -284,7 +283,7 @@ function useEnvelopeMove(
   gameUuid: string,
   viewerId: number | null,
   run: () => Promise<QuizGameStateResponse>,
-  channelUuid?: string,
+  room?: QuizRoom,
 ) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -295,9 +294,9 @@ function useEnvelopeMove(
         channelQuizQueries.gameState({ gameUuid, viewerId }).queryKey,
         response,
       );
-      if (channelUuid) {
+      if (room) {
         void queryClient.invalidateQueries({
-          queryKey: channelQuizQueries.activeGameOf(channelUuid),
+          queryKey: channelQuizQueries.activeGameOf(room),
         });
       }
     },
@@ -315,13 +314,9 @@ export function useStartGame(gameUuid: string, viewerId: number | null) {
   return useEnvelopeMove(gameUuid, viewerId, () => quizGamesApi.start(gameUuid));
 }
 
-/** Host or channel governance. A cancelled game leaves no results and posts no
+/** Host or room governance. A cancelled game leaves no results and posts no
  *  chat card, so the screen tears down quietly and hands the reader back. */
-export function useCancelGame(
-  gameUuid: string,
-  viewerId: number | null,
-  channelUuid: string,
-) {
+export function useCancelGame(gameUuid: string, viewerId: number | null, room: QuizRoom) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => quizGamesApi.cancel(gameUuid),
@@ -331,7 +326,7 @@ export function useCancelGame(
         queryKey: channelQuizQueries.gameStateOf(gameUuid),
       });
       void queryClient.invalidateQueries({
-        queryKey: channelQuizQueries.activeGameOf(channelUuid),
+        queryKey: channelQuizQueries.activeGameOf(room),
       });
     },
   });

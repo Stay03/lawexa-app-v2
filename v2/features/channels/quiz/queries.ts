@@ -7,6 +7,7 @@ import type { QuizGameStateResponse } from '@/types/channel-quiz';
 import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
 import type { ViewerScoped } from '../queries';
 import { isOlderSnapshot, pollDelayMs, POLL_MS, recoveryDelayMs } from './model';
+import { quizRoomKey, type QuizRoom } from './quiz-room';
 
 /**
  * channel-quiz query factory — the authoring library, the "is a game live
@@ -55,6 +56,11 @@ function httpStatus(error: unknown): number {
 
 export interface ChannelScoped extends ViewerScoped {
   channelUuid: string;
+}
+
+/** A room's reads: a channel's or a Space's (quiz-room.ts). */
+export interface RoomScoped extends ViewerScoped {
+  room: QuizRoom;
 }
 
 export interface GameScoped extends ViewerScoped {
@@ -135,9 +141,9 @@ export const channelQuizQueries = {
 
   /* ── The live probe ────────────────────────────────────────────────────── */
 
-  /** Invalidation handle for the channel's live-game probe. */
-  activeGameOf: (channelUuid: string) =>
-    [...channelQuizQueries.all, 'active-game', channelUuid] as const,
+  /** Invalidation handle for a room's live-game probe (a channel's or a Space's). */
+  activeGameOf: (room: QuizRoom) =>
+    [...channelQuizQueries.all, 'active-game', quizRoomKey(room)] as const,
 
   /**
    * "Is a quiz live in this channel right now?" — `?active=1` returns 0 or 1
@@ -161,10 +167,10 @@ export const channelQuizQueries = {
    * they pause with the tab (`refetchIntervalInBackground` stays false), and
    * the whole beat disappears with the outage that justifies it.
    */
-  activeGame: ({ channelUuid, viewerId }: ChannelScoped) =>
+  activeGame: ({ room, viewerId }: RoomScoped) =>
     queryOptions({
-      queryKey: [...channelQuizQueries.activeGameOf(channelUuid), { viewerId }] as const,
-      queryFn: () => quizGamesApi.getList(channelUuid, { active: 1, per_page: 1 }),
+      queryKey: [...channelQuizQueries.activeGameOf(room), { viewerId }] as const,
+      queryFn: () => quizGamesApi.getList(room, { active: 1, per_page: 1 }),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
       refetchInterval: (query) => (query.state.status === 'error' ? false : 30_000),

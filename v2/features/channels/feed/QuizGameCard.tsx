@@ -9,6 +9,7 @@ import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
 import type { Message } from '@/types/collab';
 import { useJoinGame } from '../quiz/mutations';
 import { channelQuizQueries } from '../quiz/queries';
+import type { QuizRoom } from '../quiz/quiz-room';
 
 /**
  * QuizGameCard — the designed card for the two quiz system messages
@@ -43,21 +44,22 @@ import { channelQuizQueries } from '../quiz/queries';
  */
 export function QuizGameCard({
   message,
-  channelUuid,
+  room,
   viewerId,
   onOpenGame,
 }: {
   message: Message;
-  channelUuid: string;
+  /** The room the card sits in, whose live-game probe it reads (quiz-room.ts). */
+  room: QuizRoom;
   viewerId: number | null;
-  /** Opens the channel's game mode (screen-owned; `?game=`). */
+  /** Opens the room's game mode (screen-owned; `?game=`). */
   onOpenGame: (gameUuid: string) => void;
 }) {
   const finished = message.metadata.type === 'quiz_game_finished';
   const gameUuid = message.metadata.game_uuid ?? null;
 
   const activeQuery = useQuery({
-    ...channelQuizQueries.activeGame({ channelUuid, viewerId }),
+    ...channelQuizQueries.activeGame({ room, viewerId }),
     // A finished card can never become live again — it needs no probe.
     enabled: !finished && gameUuid !== null,
   });
