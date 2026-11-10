@@ -43,6 +43,8 @@ test('the Space page: live bar and host sheet for members, the game over the win
   assert.match(screen, /isMember: space\.my_role != null,\s*contentRole: viewerContentRole\(space\),/);
   assert.match(screen, /conversationUuid: null,\s*initialGameUuid: searchParams\.get\('game'\),/);
   assert.match(screen, /\{liveQuiz\.room && liveQuiz\.isMember && \(\s*<LiveQuizBar/);
+  // A card in the page's column, aligned with the header (fixture pictures).
+  assert.match(screen, /<LiveQuizBar[\s\S]*?shape="card"/);
   assert.match(screen, /\{liveQuiz\.hostPlace && liveQuiz\.isMember && \(\s*<QuizLibrarySheet/);
   assert.match(screen, /<GameOverlay[\s\S]*?cover="viewport"/);
   assert.match(screen, /label: 'Host a live quiz',\s*icon: Trophy,\s*onSelect: openHostQuiz,/);

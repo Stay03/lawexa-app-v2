@@ -16,7 +16,7 @@ const quiz = (file: string) => read('v2', 'features', 'channels', 'quiz', file);
 test('the link says what it does, in the role the server names', () => {
   assert.equal(
     gameLinkNote({ content_role_label: 'Contributor' }),
-    'Whoever opens it joins the Space as a Contributor and goes straight into the game. It stops working when the game ends.',
+    'Whoever opens it joins the Space as a Contributor and goes straight into the game. It stops working when the game ends, or after 24 hours.',
   );
 });
 

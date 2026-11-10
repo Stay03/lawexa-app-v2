@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, Radio } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useJoinGame } from './mutations';
 import { channelQuizQueries } from './queries';
@@ -29,15 +30,23 @@ import type { QuizRoom } from './quiz-room';
  *
  * ANY ROOM: a channel's, or a Space's own (its page and its chats; live quiz
  * in Spaces, 10 November 2026), by the room's probe.
+ *
+ * TWO SHAPES, ONE BAR. Under a channel's or a chat's header it is a `strip`,
+ * edge to edge, its content on the transcript's centred column. On a Space's
+ * page it is a `card` in the page's own column, aligned with the header above
+ * it: a strip there centred its words away from everything else on the page
+ * (fixture pictures, 10 November 2026).
  */
 export function LiveQuizBar({
   room,
   viewerId,
   onOpenGame,
+  shape = 'strip',
 }: {
   room: QuizRoom;
   viewerId: number | null;
   onOpenGame: (gameUuid: string) => void;
+  shape?: 'strip' | 'card';
 }) {
   const query = useQuery(channelQuizQueries.activeGame({ room, viewerId }));
   const game = query.data?.data?.[0] ?? null;
@@ -50,8 +59,13 @@ export function LiveQuizBar({
   const players = game.player_count;
 
   return (
-    <div className="shrink-0 border-b bg-primary/5 px-4 py-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-      <div className="mx-auto flex w-full max-w-3xl items-center gap-3">
+    <div
+      className={cn(
+        'shrink-0 bg-primary/5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
+        shape === 'strip' ? 'border-b px-4 py-2' : 'rounded-xl border px-3 py-2.5',
+      )}
+    >
+      <div className={cn('flex w-full items-center gap-3', shape === 'strip' && 'mx-auto max-w-3xl')}>
         <span
           aria-hidden
           className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"

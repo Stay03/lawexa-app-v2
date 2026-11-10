@@ -99,9 +99,10 @@ export function quickHostSpacePayload(name: string): CreateSpacePayload {
   return { name: name.trim(), type: 'study', kind: 'shared' };
 }
 
-/** What a game's link does, said above it (Arthur's decisions c and d, 93142269). */
+/** What a game's link does, said above it (Arthur's decisions c and d, 93142269; its
+ *  24 hours, Backend a5f26f5e). */
 export function gameLinkNote(link: { content_role_label: string }): string {
-  return `Whoever opens it joins the Space as a ${link.content_role_label} and goes straight into the game. It stops working when the game ends.`;
+  return `Whoever opens it joins the Space as a ${link.content_role_label} and goes straight into the game. It stops working when the game ends, or after 24 hours.`;
 }
 
 /**

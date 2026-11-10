@@ -876,7 +876,8 @@ export interface ApiMessage {
     /** On a `background_job_result` (user role) or `background_job_unanswered` (assistant role)
      *  row: the jobs it is about (Backend 063d9cc3). */
     background_jobs?: import('@/types/background-jobs').BackgroundJobOutcome[];
-    /** On a `quiz_game_live` or `quiz_game_finished` event row: the game and its quiz (`editor` is the host). */
+    /** On a `quiz_game_live` or `quiz_game_finished` event row: the game and its quiz. These rows have no
+     *  author (`editor` null); the live one names its host in `host` (Backend a5f26f5e). */
     game_uuid?: string;
     quiz_uuid?: string;
     tool_name?: string;

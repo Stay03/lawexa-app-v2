@@ -400,7 +400,12 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
             so the page keeps its shape; members only, because the probe is
             refused to anyone else. */}
         {liveQuiz.room && liveQuiz.isMember && (
-          <LiveQuizBar room={liveQuiz.room} viewerId={session.userId} onOpenGame={liveQuiz.openGame} />
+          <LiveQuizBar
+            room={liveQuiz.room}
+            viewerId={session.userId}
+            onOpenGame={liveQuiz.openGame}
+            shape="card"
+          />
         )}
 
         <SpaceContentPanel
