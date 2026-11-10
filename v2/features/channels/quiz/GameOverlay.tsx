@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Ban, Loader2, LogIn, Trophy, WifiOff } from 'lucide-react';
+import { ArrowLeft, Ban, Loader2, LogIn, Trophy, UserPlus, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ import {
   PodiumStage,
   QuestionStage,
 } from './GamePhases';
+import { GameInviteDialog } from './GameInviteDialog';
 import { canJoinNow } from './model';
 import { gameInRoom, roomNoun, type QuizRoom } from './quiz-room';
 import { GameStage, GameStageSkeleton } from './ui';
@@ -109,6 +110,7 @@ export function GameOverlay({
   gameUuid,
   viewerId,
   viewerUuid,
+  mayInvite = false,
   onClose,
 }: {
   /** The room the overlay is over: a channel, or a Space itself (quiz-room.ts). */
@@ -123,10 +125,14 @@ export function GameOverlay({
   gameUuid: string;
   viewerId: number | null;
   viewerUuid: string | null;
+  /** Whether the reader may host in the game's Space, and so hand out its
+   *  link (`GameInviteDialog`). A channel's game has no link. */
+  mayInvite?: boolean;
   onClose: () => void;
 }) {
   const game = useLiveGame({ room, gameUuid, viewerId, viewerUuid });
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const frameRef = useRef<HTMLElement>(null);
 
   // The affordance that opened this mode (a card's Join, the live bar) is now
@@ -156,6 +162,14 @@ export function GameOverlay({
 
   const canCancel =
     game.isHost &&
+    state !== null &&
+    !ending &&
+    phase !== 'finished' &&
+    phase !== 'cancelled';
+  // While people can still come in: before the end, in a Space's game.
+  const canInvite =
+    mayInvite &&
+    room.kind === 'space' &&
     state !== null &&
     !ending &&
     phase !== 'finished' &&
@@ -214,6 +228,17 @@ export function GameOverlay({
               )}
             </p>
           </div>
+          {canInvite && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setInviteOpen(true)}
+            >
+              <UserPlus aria-hidden className="size-4" />
+              Invite
+            </Button>
+          )}
           {canCancel && (
             <Button
               variant="ghost"
@@ -271,6 +296,14 @@ export function GameOverlay({
         viewerId={viewerId}
         onClose={onClose}
       />
+
+      {inviteOpen && canInvite && (
+        <GameInviteDialog
+          gameUuid={gameUuid}
+          quizTitle={title}
+          onOpenChange={setInviteOpen}
+        />
+      )}
 
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>

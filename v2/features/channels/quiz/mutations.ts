@@ -342,6 +342,19 @@ export function useCancelGame(gameUuid: string, viewerId: number | null, room: Q
 }
 
 /**
+ * The game's link into its Space (live quiz in Spaces, 7a007a8c): made on the
+ * first ask, the same link after. Nothing is cached around it: the dialog that
+ * shows it asks each time it opens, which costs one idempotent request and
+ * never shows a link the server has since let lapse.
+ */
+export function useGameInviteLink(gameUuid: string) {
+  return useMutation({
+    mutationFn: () => quizGamesApi.inviteLink(gameUuid),
+    meta: { silentError: true },
+  });
+}
+
+/**
  * Submit the one answer this player gets for this question.
  *
  * NOT OPTIMISTIC AGAINST THE CACHE (see the module docblock) — the caller

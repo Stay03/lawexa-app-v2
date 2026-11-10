@@ -2193,6 +2193,16 @@ export interface InvitePreview {
   channel_description?: string | null;
   requires_approval: boolean;
   viewer_action: InviteViewerAction;
+  /** A live quiz's game link (Backend's shapes 7a007a8c): the game it leads
+   *  into. Null, or absent before the live quiz API, for an ordinary link. */
+  game?: InvitePreviewGame | null;
+}
+
+/** The game a game link leads into, as its preview names it. */
+export interface InvitePreviewGame {
+  uuid: string;
+  status: string;
+  quiz_title: string;
 }
 
 /** What `POST /invite-links/{code}/accept` did.
@@ -2208,6 +2218,8 @@ export interface InviteAcceptResult {
   status: InviteAcceptStatus;
   space_uuid: string;
   channel_uuid?: string | null;
+  /** A game link's game, to open next; null for an ordinary link. */
+  game_uuid?: string | null;
 }
 
 /**

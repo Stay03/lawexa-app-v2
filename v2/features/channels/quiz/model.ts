@@ -99,9 +99,21 @@ export function quickHostSpacePayload(name: string): CreateSpacePayload {
   return { name: name.trim(), type: 'study', kind: 'shared' };
 }
 
-/** Where a game hosted from outside its Space opens: the Space's page, in the game. */
-export function spaceGameHref(spaceUuid: string, gameUuid: string): string {
-  return `/spaces/${spaceUuid}?game=${encodeURIComponent(gameUuid)}`;
+/** What a game's link does, said above it (Arthur's decisions c and d, 93142269). */
+export function gameLinkNote(link: { content_role_label: string }): string {
+  return `Whoever opens it joins the Space as a ${link.content_role_label} and goes straight into the game. It stops working when the game ends.`;
+}
+
+/**
+ * Why a game's link could not be had, and whether asking again could help:
+ * `403` the reader may not host in its Space, `409` or `410` the game has
+ * ended, `422` a channel's game, which has no link (Backend's shapes 7a007a8c).
+ */
+export function gameLinkRefusal(status: number): { message: string; retry: boolean } {
+  if (status === 409 || status === 410) return { message: 'This game has ended, so it has no link any more.', retry: false };
+  if (status === 403) return { message: 'Only the Space’s Owner and Contributors can invite people to this game.', retry: false };
+  if (status === 422) return { message: 'Only a game in a Space has a link.', retry: false };
+  return { message: 'The link couldn’t be made.', retry: true };
 }
 
 /**

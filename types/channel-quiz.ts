@@ -1036,6 +1036,30 @@ export type QuizGameResponse = ItemResponse<QuizGame>;
 export type QuizGameStateResponse = ItemResponse<QuizGameState>;
 export type QuizAnswerResponse = ItemResponse<QuizAnswerReceipt>;
 export type QuizGameResultsResponse = ItemResponse<QuizGameResults>;
+export type QuizGameInviteLinkResponse = ItemResponse<QuizGameInviteLink>;
+
+/**
+ * A Space game's own link (Backend's shapes 7a007a8c; Arthur's decisions c
+ * and d, 93142269): it adds whoever opens it to the game's Space as a
+ * Contributor, with no approval, and takes them straight into the game. One
+ * link per game, made by anyone who may host there. It dies (`410`) once the
+ * game is finished or cancelled, and after 24 hours at the latest.
+ */
+export interface QuizGameInviteLink {
+  id: number;
+  code: string;
+  /** What the link and its QR code carry. */
+  url: string;
+  game_uuid: string;
+  role: string;
+  content_role: string;
+  content_role_label: string;
+  requires_approval: boolean;
+  max_uses: number | null;
+  uses: number;
+  expires_at: string | null;
+  is_usable: boolean;
+}
 
 /* THE PUBLIC CARD HAS NO ENVELOPE ALIAS, deliberately. Its `200` is the house
    envelope — measured against prod on 2026-08-05, alongside the `404

@@ -38,6 +38,7 @@ import type {
   QuizAttemptAnswerResponse,
   QuizAttemptResponse,
   QuizChallengeResponse,
+  QuizGameInviteLinkResponse,
   QuizGameListResponse,
   QuizGameResponse,
   QuizGameResultsResponse,
@@ -379,6 +380,16 @@ export const quizGamesApi = {
   cancel: async (gameUuid: string): Promise<QuizGameResponse> => {
     const response = await apiClient.post<QuizGameResponse>(
       `/quiz-games/${gameUuid}/cancel`,
+      {},
+    );
+    return response.data;
+  },
+
+  /** A Space game's link: `201` made, `200` the one it already has; `403`
+   *  for anyone who may not host in its Space, `409` once it has ended. */
+  inviteLink: async (gameUuid: string): Promise<QuizGameInviteLinkResponse> => {
+    const response = await apiClient.post<QuizGameInviteLinkResponse>(
+      `/quiz-games/${gameUuid}/invite-link`,
       {},
     );
     return response.data;

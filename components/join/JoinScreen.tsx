@@ -4,14 +4,15 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { AlertCircle, Loader2, Lock, Users } from 'lucide-react';
+import { AlertCircle, Loader2, Lock, Trophy, Users } from 'lucide-react';
 import { isAxiosError } from 'axios';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { inviteLinksApi } from '@/lib/api/collab';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { InvitePreview, InviteViewerAction } from '@/types/collab';
+import type { InvitePreview } from '@/types/collab';
+import { joinActionLabel, joinedDestination } from './join-model';
 import {
   forgetPendingInvite,
   rememberPendingInvite,
@@ -52,6 +53,14 @@ import {
  * read again (Backend's study), so a new person who signed up never joined:
  * `PendingInviteReturn` brings them back once they can join, and here a held
  * code that is this invite's finishes the join without a second tap.
+ *
+ * ── A GAME LINK LANDS IN THE GAME (live quiz in Spaces, 10 November 2026) ──
+ * A live quiz's link names its `game` in the preview and answers its
+ * `game_uuid` on accept (Backend's shapes 7a007a8c): the screen names the
+ * quiz, and every way through, joining, already a member, or back from
+ * sign-in, ends on the Space's page in the game (`joinedDestination`). A game
+ * link never waits for approval, except for someone who was removed from the
+ * Space or left it: they ask, as on any link that needs approval.
  */
 
 /** One sentence per refusal. */
@@ -59,7 +68,7 @@ function refusalFor(status: number | undefined): { title: string; body: string }
   if (status === 410) {
     return {
       title: 'This invite has expired',
-      body: 'It may have run out of uses, or been turned off. Ask whoever sent it for a new one.',
+      body: 'It may have run out of uses, been turned off, or been for a game that has ended. Ask whoever sent it for a new one.',
     };
   }
   if (status === 429) {
@@ -79,15 +88,6 @@ function refusalFor(status: number | undefined): { title: string; body: string }
     body: 'Something went wrong at our end. Try again in a moment.',
   };
 }
-
-/** The one control, per the server's answer about this viewer. */
-const ACTION_LABEL: Record<InviteViewerAction, string> = {
-  sign_up: 'Sign in to join',
-  verify_email: 'Confirm your email to join',
-  join: 'Join',
-  request: 'Ask to join',
-  already_member: 'Open the space',
-};
 
 /**
  * The line under the name. The description when there is one; otherwise a
@@ -143,11 +143,7 @@ export function JoinScreen({ code }: { code: string }) {
         setFailed(null);
         return;
       }
-      router.push(
-        data.channel_uuid
-          ? `/channels/${data.channel_uuid}`
-          : `/spaces/${data.space_uuid}`,
-      );
+      router.push(joinedDestination(data));
     },
     onError: (error) => {
       // A refused join lets the held code go: it would otherwise bring the
@@ -164,13 +160,14 @@ export function JoinScreen({ code }: { code: string }) {
   const held = usePendingInvite() === code;
   const heldAction = held ? preview.data?.data.viewer_action : undefined;
   const heldSpace = preview.data?.data.space_uuid;
+  const heldGame = preview.data?.data.game?.uuid ?? null;
   useEffect(() => {
     if ((heldAction === 'join' || heldAction === 'request') && accept.isIdle) accept.mutate();
     if (heldAction === 'already_member' && heldSpace) {
       forgetPendingInvite();
-      router.replace(`/spaces/${heldSpace}`);
+      router.replace(joinedDestination({ space_uuid: heldSpace, game_uuid: heldGame }));
     }
-  }, [heldAction, heldSpace, accept, router]);
+  }, [heldAction, heldSpace, heldGame, accept, router]);
 
   if (preview.isPending) {
     return (
@@ -204,6 +201,7 @@ export function JoinScreen({ code }: { code: string }) {
 
   const invite = preview.data.data;
   const action = invite.viewer_action;
+  const game = invite.game ?? null;
   const waiting =
     accept.isSuccess &&
     (accept.data.data.status === 'request' ||
@@ -232,7 +230,7 @@ export function JoinScreen({ code }: { code: string }) {
   const press = () => {
     setFailed(null);
     if (action === 'already_member') {
-      router.push(`/spaces/${invite.space_uuid}`);
+      router.push(joinedDestination({ space_uuid: invite.space_uuid, game_uuid: game?.uuid ?? null }));
       return;
     }
     if (action === 'sign_up' || action === 'verify_email') {
@@ -259,6 +257,7 @@ export function JoinScreen({ code }: { code: string }) {
           {invite.inviter_name
             ? `${invite.inviter_name} invited you to`
             : 'You have been invited to'}
+          {game ? ' a live quiz in' : null}
         </p>
         <h1 className="mt-1 text-2xl leading-tight font-semibold text-foreground">
           {invite.space_name}
@@ -267,6 +266,14 @@ export function JoinScreen({ code }: { code: string }) {
         {invite.channel_name ? (
           <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
             <Lock aria-hidden className="size-3.5" />#{invite.channel_name}
+          </p>
+        ) : null}
+
+        {/* The quiz a game link leads into, named before the Space's own line. */}
+        {game ? (
+          <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
+            <Trophy aria-hidden className="size-4 text-primary" />
+            {game.quiz_title}
           </p>
         ) : null}
 
@@ -298,7 +305,7 @@ export function JoinScreen({ code }: { code: string }) {
           {accept.isPending ? (
             <Loader2 aria-hidden className="size-4 animate-spin" />
           ) : null}
-          {ACTION_LABEL[action]}
+          {joinActionLabel(action, game !== null)}
         </Button>
 
         {/* A new person signs up instead, and comes back here the same way. */}

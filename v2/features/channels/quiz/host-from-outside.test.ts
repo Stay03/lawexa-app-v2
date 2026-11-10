@@ -5,7 +5,8 @@ import { join } from 'node:path';
 
 import type { Space } from '@/types/collab';
 import { offersHostLive } from '@/v2/features/quiz/solo/front/front-model';
-import { hostRefusal, hostTargets, quickHostSpacePayload, spaceGameHref } from './model';
+import { hostRefusal, hostTargets, quickHostSpacePayload } from './model';
+import { spaceGameHref } from '@/lib/utils/space-game-href';
 
 /* Live quiz in Spaces, step 3 (Arthur's spec, 9 November 2026: "Host Live
  * Quiz from a Space with a quick Space picker from outside one", and a new

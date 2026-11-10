@@ -498,6 +498,7 @@ export function ConversationScreen({
             gameUuid={liveQuiz.gameUuid}
             viewerId={serverUserId}
             viewerUuid={viewerUuid}
+            mayInvite={liveQuiz.mayHost}
             onClose={liveQuiz.closeGame}
           />
         )}

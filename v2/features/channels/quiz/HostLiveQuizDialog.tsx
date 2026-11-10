@@ -17,11 +17,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { extractApiError } from '@/lib/utils/api-error';
+import { spaceGameHref } from '@/lib/utils/space-game-href';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
 import { useCreateSpace } from '@/v2/features/spaces/mutations';
 import { SpacePickList } from '@/v2/features/spaces/move/SpacePickList';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { hostRefusal, hostTargets, quickHostSpacePayload, spaceGameHref } from './model';
+import { hostRefusal, hostTargets, quickHostSpacePayload } from './model';
 import { useGoLive } from './mutations';
 import { spaceRoom } from './quiz-room';
 

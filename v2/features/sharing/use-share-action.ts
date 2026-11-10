@@ -27,15 +27,22 @@ import { useShareUrl } from './useShareUrl';
  * `onCopied` (23 October 2026, the notes list's row menu) runs when the link
  * went to the clipboard, for a control that closes before it could say
  * "Link copied" itself.
+ *
+ * `exactUrl` (10 November 2026, a live quiz's game link) is a whole address
+ * the server made, shared exactly as given: no referral code rides it, since
+ * the link itself is the invitation and its QR code carries the same string.
  */
 export function useShareAction({
   path,
+  exactUrl,
   title,
   text,
   onCopied,
 }: {
   /** The page to share, as a path. Omitted: the address the reader is on. */
   path?: string;
+  /** A whole address to share as given, in place of `path`. */
+  exactUrl?: string;
   /** Passed to the share sheet, which shows it above the link. */
   title: string | null;
   /** Passed to the share sheet beside the link; nothing without one. */
@@ -55,7 +62,7 @@ export function useShareAction({
   );
 
   const share = async () => {
-    const url = shareUrl(path ? `${window.location.origin}${path}` : window.location.href);
+    const url = exactUrl ?? shareUrl(path ? `${window.location.origin}${path}` : window.location.href);
 
     if ('share' in navigator) {
       const data: ShareData = { url };
