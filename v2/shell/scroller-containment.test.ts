@@ -22,9 +22,10 @@ const SCROLLERS: ReadonlyArray<[string[], string]> = [
     ['v2', 'features', 'folders', 'picker', 'PickerBody.tsx'],
     'className="relative -mx-1 max-h-[min(24rem,45dvh)] min-h-0 overflow-y-auto overscroll-y-contain px-1"',
   ],
-  // "Move to space": the rows' sr-only "In it now" on a phone.
+  // The Space picker of "Move to space" and "Host a live quiz": the rows'
+  // sr-only "In it now" on a phone.
   [
-    ['v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx'],
+    ['v2', 'features', 'spaces', 'move', 'SpacePickList.tsx'],
     "'relative -mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-y-contain',",
   ],
   // A channel's feed: the empty channel's intro sr-only visibility label.

@@ -43,7 +43,7 @@ test('the list row and the move picker name a space’s kind with one rule', () 
   // an icon instead); the move picker keeps the mark.
   const row = read('v2', 'features', 'spaces', 'list', 'SpaceRow.tsx');
   assert.doesNotMatch(row, /spaceKindMark|showsTeamMark\(/);
-  const dialog = read('v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx');
+  const dialog = read('v2', 'features', 'spaces', 'move', 'SpacePickList.tsx');
   assert.match(dialog, /const kind = spaceKindMark\(space, teamChannelsOpen\);/);
 });
 

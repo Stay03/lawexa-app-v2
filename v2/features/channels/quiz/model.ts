@@ -1,4 +1,5 @@
-import type { Channel } from '@/types/collab';
+import type { Channel, CreateSpacePayload, Space } from '@/types/collab';
+import { viewerContentRole } from '@/v2/features/spaces/model';
 import type {
   ChannelQuizSettings,
   ChannelQuizVisibility,
@@ -76,6 +77,43 @@ export const SPACE_HOST_NOTE =
 /** Whether this reader may put a quiz live in a Space: its content Owner or a Contributor. */
 export function canHostInSpace(contentRole: string | null | undefined): boolean {
   return contentRole === 'owner' || contentRole === 'editor';
+}
+
+/**
+ * The Spaces a reader may put a quiz live in from outside one (Arthur's
+ * spec, 9 November 2026: "Host Live Quiz from a Space with a quick Space
+ * picker"): each Space where they host. THE ONE PLACE the picker's rule
+ * lives: if live quizzes are kept to shared Spaces (techlead's question to
+ * Arthur, 03:02Z 10 November 2026), the narrowing goes here.
+ */
+export function hostTargets(spaces: readonly Space[]): Space[] {
+  return spaces.filter((space) => canHostInSpace(viewerContentRole(space)));
+}
+
+/**
+ * A new Space made from the host picker with just a name (Arthur's spec): a
+ * shared Space, as every new Space is (`SpaceFormDialog`), and a Study one,
+ * since a quiz is study. The name is trimmed; the picker sends none empty.
+ */
+export function quickHostSpacePayload(name: string): CreateSpacePayload {
+  return { name: name.trim(), type: 'study', kind: 'shared' };
+}
+
+/** Where a game hosted from outside its Space opens: the Space's page, in the game. */
+export function spaceGameHref(spaceUuid: string, gameUuid: string): string {
+  return `/spaces/${spaceUuid}?game=${encodeURIComponent(gameUuid)}`;
+}
+
+/**
+ * Why Go live in a picked Space was refused, in words (Backend's shapes
+ * 7a007a8c): `409` a game is already live there, `403` the reader no longer
+ * hosts there, `422` the server's own reason (the quiz has no questions).
+ */
+export function hostRefusal(status: number, message: string | null, spaceName: string): string {
+  if (status === 409) return `A quiz is already running in ${spaceName}. Open the Space to join it, or wait for it to finish.`;
+  if (status === 403) return `You can’t start a game in ${spaceName}. Only its Owner and Contributors can.`;
+  if (status === 422 && message) return message;
+  return 'The game couldn’t be started. Try again.';
 }
 
 

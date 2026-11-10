@@ -286,7 +286,7 @@ test('the picker word and the list line name one person the same way', () => {
 });
 
 test('the move picker reads its role word from the spaces model', () => {
-  const dialog = read('v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx');
+  const dialog = read('v2', 'features', 'spaces', 'move', 'SpacePickList.tsx');
   assert.match(dialog, /const role = spaceRoleWord\(space\);/);
   assert.doesNotMatch(dialog, /CONTENT_ROLE_LABELS/);
   assert.doesNotMatch(dialog, /my_content_role\]/);

@@ -16,6 +16,22 @@ export function challengeFromParam(raw: string | null): string | null {
   return raw !== null && UUID.test(raw) ? raw : null;
 }
 
+/**
+ * Whether the page offers Host a live quiz (Arthur's spec, 9 November 2026:
+ * hosted in a Space, picked from outside one): to an account that may use
+ * Spaces, for a quiz with questions to play (the server answers 422 for an
+ * empty one). Which Space, and whether they host there, is the picker's.
+ */
+export function offersHostLive({
+  spacesOpen,
+  questionCount,
+}: {
+  spacesOpen: boolean;
+  questionCount: number;
+}): boolean {
+  return spacesOpen && questionCount > 0;
+}
+
 /** "Taken 3 times", "Taken once"; nothing before the first finished attempt. */
 export function takenLabel(attempts: number | null | undefined): string | null {
   if (typeof attempts !== 'number' || attempts <= 0) return null;

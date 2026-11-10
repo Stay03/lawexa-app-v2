@@ -15,6 +15,7 @@ import {
   Share2,
   Swords,
   Trash2,
+  Trophy,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -30,10 +31,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { ChannelQuiz, QuizRevealMode } from '@/types/channel-quiz';
 import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
+import { HostLiveQuizDialog } from '@/v2/features/channels/quiz/HostLiveQuizDialog';
 import { QuizFormDialog } from '@/v2/features/channels/quiz/QuizFormDialog';
 import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
 import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
+import { collabAccessState } from '@/v2/features/collab/model';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { signInHref } from '@/v2/runtime/sign-in-href';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
@@ -43,7 +46,7 @@ import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, scenarioCountLabel } from '../rows-model';
-import { challengeFromParam, frontChallengeText } from './front-model';
+import { challengeFromParam, frontChallengeText, offersHostLive } from './front-model';
 import {
   clearScreenContext,
   setScreenContext,
@@ -203,24 +206,34 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
     if (!next && wantsEdit) replaceUrlParams({ edit: null });
   };
   const openDelete = useCallback(() => setDeleting(quiz), [quiz]);
-  /** The owner's rows for the bar's overflow menu. Stable while the quiz is,
-   *  so the publish below is a no-op between loads. */
-  const actions = useMemo<readonly ScreenAction[]>(
-    () =>
-      own
-        ? [
-            { id: 'edit', label: 'Edit quiz', icon: Pencil, onSelect: openEdit },
-            {
-              id: 'delete',
-              label: 'Delete quiz',
-              icon: Trash2,
-              destructive: true,
-              onSelect: openDelete,
-            },
-          ]
-        : [],
-    [own, openEdit, openDelete],
-  );
+  // Host a live quiz in a Space picked here (Arthur's spec, 9 November 2026).
+  // The dialog mounts only while open, so each open starts clean.
+  const [hostOpen, setHostOpen] = useState(false);
+  const mayHostLive = offersHostLive({
+    spacesOpen: collabAccessState(session) === 'eligible',
+    questionCount: quiz ? (quiz.question_count ?? quiz.questions?.length ?? 0) : 0,
+  });
+  const openHost = useCallback(() => setHostOpen(true), []);
+  /** The bar's overflow menu: Host a live quiz for whoever may, then the
+   *  owner's rows. Stable while the quiz is, so the publish below is a no-op
+   *  between loads. */
+  const actions = useMemo<readonly ScreenAction[]>(() => {
+    const rows: ScreenAction[] = [];
+    if (mayHostLive) rows.push({ id: 'host-quiz', label: 'Host a live quiz', icon: Trophy, onSelect: openHost });
+    if (own) {
+      rows.push(
+        { id: 'edit', label: 'Edit quiz', icon: Pencil, separatorBefore: mayHostLive, onSelect: openEdit },
+        {
+          id: 'delete',
+          label: 'Delete quiz',
+          icon: Trash2,
+          destructive: true,
+          onSelect: openDelete,
+        },
+      );
+    }
+    return rows;
+  }, [mayHostLive, openHost, own, openEdit, openDelete]);
   useEffect(() => {
     setScreenContext({ pathname, back: null, actions });
   }, [pathname, actions]);
@@ -475,6 +488,10 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         onClose={() => setDeleting(null)}
         onDeleted={() => router.replace(LIBRARY_HREF)}
       />
+
+      {hostOpen && quiz ? (
+        <HostLiveQuizDialog quiz={{ uuid: quiz.uuid, title: quiz.title }} open onOpenChange={setHostOpen} />
+      ) : null}
 
     </div>
   );

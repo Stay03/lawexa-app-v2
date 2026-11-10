@@ -540,7 +540,7 @@ function QuizRow({
   /** `null` clears a previous refusal. */
   onLiveRefused: (message: string | null) => void;
 }) {
-  const goLive = useGoLive(room, quiz.uuid, conversationUuid);
+  const goLive = useGoLive(quiz.uuid);
   const noun = roomNoun(room);
   const count = quiz.question_count ?? quiz.questions?.length ?? 0;
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
@@ -666,7 +666,7 @@ function QuizRow({
                 // reader must never read last try's sentence over this try's
                 // spinner.
                 onLiveRefused(null);
-                goLive.mutate(undefined, {
+                goLive.mutate({ room, conversationUuid }, {
                   onSuccess: (response) => onLive(response.data.uuid),
                   onError: (error) => {
                     const { status, message } = extractApiError(error);

@@ -329,12 +329,13 @@ test('the picker says when the server holds more than the page it sent', () => {
 });
 
 test('the picker searches on the server, keeps team spaces and prints the cut line', () => {
-  const dialog = read('v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx');
+  // The Space list the move and host pickers share.
+  const dialog = read('v2', 'features', 'spaces', 'move', 'SpacePickList.tsx');
   assert.match(dialog, /\.\.\.\(search\.term \? \{ search: search\.term \} : SPACES_BASELINE_PARAMS\),/);
   assert.match(dialog, /placeholderData: keepPreviousData,/);
   assert.match(dialog, /<SearchField[\s\S]*?label="Search your spaces"/);
   assert.match(dialog, /const kind = spaceKindMark\(space, teamChannelsOpen\);/);
-  assert.match(dialog, /\{cutLine \? \(\s*<p className="-mt-3 text-xs text-muted-foreground">\{cutLine\}<\/p>/);
+  assert.match(dialog, /\{cutLine \? <p className="-mt-3 text-xs text-muted-foreground">\{cutLine\}<\/p> : null\}/);
   assert.match(dialog, /rows && pagination \? \{ rows: rows\.length, total: pagination\.total \} : null,/);
   // The list API sends the search term the picker passes.
   const api = read('lib', 'api', 'collab.ts');

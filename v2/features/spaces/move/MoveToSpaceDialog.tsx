@@ -1,9 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Check, FolderOutput, Loader2 } from 'lucide-react';
+import { FolderOutput, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
@@ -16,28 +15,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { Space } from '@/types/collab';
-import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
-import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
-import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
-import { useV2Session } from '@/v2/runtime/session-context';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { SearchField } from '@/v2/shell/SearchField';
 import { useMoveToSpace } from '../content-mutations';
 import {
-  movePickerCutLine,
   moveRefusal,
   moveTargets,
   offersRemoveFromSpace,
   SPACE_ITEM_NOUN,
   type SpaceItemTarget,
 } from '../content-model';
-import { spaceKindMark, spaceOwnerLabel, spaceRoleWord } from '../model';
-import { SPACES_BASELINE_PARAMS, spacesQueries } from '../queries';
-import { useServerSearch } from '../use-server-search';
+import { SpacePickList } from './SpacePickList';
 
 /**
  * MoveToSpaceDialog — put an item the viewer owns into one of their spaces,
@@ -103,30 +92,10 @@ export function MoveToSpaceDialog({
    */
   pick?: { count: number; onPick: (to: Space | null) => void };
 }) {
-  const session = useV2Session();
   const move = useMoveToSpace();
   const [error, setError] = useState<string | null>(null);
   // The row the reader picked, so its spinner shows on it and not on all.
   const [pickedUuid, setPickedUuid] = useState<string | null | undefined>(undefined);
-
-  const search = useServerSearch();
-  const teamChannelsOpen = canOpenTeamChannels(session);
-
-  const spacesQuery = useQuery({
-    ...spacesQueries.list({
-      viewerId: session.userId,
-      ...(search.term ? { search: search.term } : SPACES_BASELINE_PARAMS),
-    }),
-    enabled: collabAccessState(session) === 'eligible',
-    placeholderData: keepPreviousData,
-  });
-  const rows = spacesQuery.data?.data;
-  const pagination = spacesQuery.data?.pagination;
-  const targets = useMemo(() => (rows ? moveTargets(rows) : []), [rows]);
-  const cutLine = movePickerCutLine(
-    targets.length,
-    rows && pagination ? { rows: rows.length, total: pagination.total } : null,
-  );
 
   const noun = SPACE_ITEM_NOUN[item.type];
   const currentUuid = pick ? null : (item.space?.uuid ?? null);
@@ -171,40 +140,14 @@ export function MoveToSpaceDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <SearchField
-          value={search.value}
-          onChange={search.setValue}
-          onClear={search.clear}
-          placeholder="Search your spaces"
-          label="Search your spaces"
-          busy={spacesQuery.isPlaceholderData}
-        />
-
-        <div
-          className={cn(
-            'relative -mx-2 max-h-[min(22rem,55vh)] overflow-y-auto overscroll-y-contain',
-            'transition-opacity duration-150 motion-reduce:transition-none',
-            spacesQuery.isPlaceholderData && 'opacity-60',
-          )}
-        >
-          {spacesQuery.isPending ? (
-            <MoveTargetsSkeleton />
-          ) : spacesQuery.isError ? (
-            <CollabFailure
-              className="mx-2"
-              message="Couldn’t load your spaces."
-              onRetry={() => void spacesQuery.refetch()}
-            />
-          ) : targets.length === 0 && search.term ? (
-            <div className="px-2 py-6 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
-              <p className="text-sm font-medium text-foreground">
-                {`No space you can add to matches “${search.term}”`}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Try another word, or clear the search.
-              </p>
-            </div>
-          ) : targets.length === 0 && cutLine === null ? (
+        <SpacePickList
+          targets={moveTargets}
+          onPick={send}
+          busyUuid={move.isPending ? (pickedUuid ?? null) : null}
+          disabled={move.isPending}
+          currentUuid={currentUuid}
+          noMatch={(term) => `No space you can add to matches “${term}”`}
+          empty={
             <div className="px-2 py-6 text-center motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
               <p className="text-sm font-medium text-foreground">No space to move it to</p>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -214,64 +157,8 @@ export function MoveToSpaceDialog({
                 <Link href="/spaces">Go to Spaces</Link>
               </Button>
             </div>
-          ) : (
-            <ul className="flex flex-col gap-0.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
-              {targets.map((space) => {
-                const isCurrent = space.uuid === currentUuid;
-                const isSending = move.isPending && pickedUuid === space.uuid;
-                // The list's word for the same person (`spaceRoleWord`).
-                const role = spaceRoleWord(space);
-                const kind = spaceKindMark(space, teamChannelsOpen);
-                return (
-                  <li key={space.uuid}>
-                    <button
-                      type="button"
-                      disabled={isCurrent || move.isPending}
-                      onClick={() => send(space)}
-                      aria-current={isCurrent ? 'true' : undefined}
-                      className={cn(
-                        'v2-interactive flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-secondary/60 disabled:cursor-default disabled:hover:bg-transparent',
-                        move.isPending && !isSending && 'opacity-60',
-                        FOCUS_RING,
-                      )}
-                    >
-                      <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="md" />
-                      <span className="min-w-0 flex-1">
-                        <span className="flex min-w-0 items-center gap-1.5">
-                          <span className="min-w-0 truncate text-sm font-medium text-foreground">
-                            {space.name}
-                          </span>
-                          {kind ? (
-                            <span className="shrink-0 rounded-md border border-border px-1.5 text-[10px] font-medium leading-4 text-muted-foreground">
-                              {kind}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="block truncate text-xs text-muted-foreground">
-                          {[role, spaceOwnerLabel(space)].filter(Boolean).join(' · ')}
-                        </span>
-                      </span>
-                      {isSending ? (
-                        <Loader2 aria-hidden className="size-4 shrink-0 text-muted-foreground motion-safe:animate-spin" />
-                      ) : isCurrent ? (
-                        // Below sm the check stands alone, so the row the
-                        // item is in keeps its whole name on a phone.
-                        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                          <Check aria-hidden className="size-3.5" />
-                          <span className="sr-only sm:not-sr-only">In it now</span>
-                        </span>
-                      ) : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-
-        {cutLine ? (
-          <p className="-mt-3 text-xs text-muted-foreground">{cutLine}</p>
-        ) : null}
+          }
+        />
 
         {error ? (
           <p role="alert" className="text-sm text-destructive">
@@ -310,26 +197,5 @@ export function MoveToSpaceDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** Three rows at the picker's exact geometry: crest, name, meta line. */
-function MoveTargetsSkeleton() {
-  return (
-    <div aria-hidden className="flex flex-col gap-0.5">
-      {[0, 1, 2].map((index) => (
-        <div
-          key={index}
-          className="flex items-center gap-3 px-2 py-2"
-          style={{ opacity: 1 - index * 0.25 }}
-        >
-          <Skeleton className="size-9 shrink-0 rounded-lg" />
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <Skeleton className="h-4 w-2/5 rounded" />
-            <Skeleton className="h-3 w-1/4 rounded" />
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }

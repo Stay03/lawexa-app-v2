@@ -46,7 +46,8 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
 test("the owner's Edit and Delete ride the bar's menu, and Delete leaves for the library", () => {
   const source = screen();
   assert.match(source, /setScreenContext\(\{ pathname, back: null, actions \}\);/);
-  assert.match(source, /\{ id: 'edit', label: 'Edit quiz', icon: Pencil, onSelect: openEdit \}/);
+  // Ruled off from Host a live quiz when that row is above it.
+  assert.match(source, /\{ id: 'edit', label: 'Edit quiz', icon: Pencil, separatorBefore: mayHostLive, onSelect: openEdit \}/);
   assert.match(source, /id: 'delete',\s*label: 'Delete quiz',\s*icon: Trash2,\s*destructive: true,/);
   assert.match(source, /onDeleted=\{\(\) => router\.replace\(LIBRARY_HREF\)\}/);
   // No second kebab in the body.

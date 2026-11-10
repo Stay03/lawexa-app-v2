@@ -233,32 +233,41 @@ export function useDeleteQuiz(quizUuid: string) {
 
 /* ── Game moves ───────────────────────────────────────────────────────────── */
 
+/** Where one Go live runs: a room, and for a Space the chat it starts from. */
+export interface GoLiveTarget {
+  room: QuizRoom;
+  conversationUuid?: string | null;
+}
+
 /**
- * Put a quiz live IN THIS ROOM (a channel, or a Space itself): `201` a lobby
+ * Put a quiz live IN A ROOM (a channel, or a Space itself): `201` a lobby
  * with the host auto-joined, `409` when the room already has a live game (the
  * library surfaces that as "a quiz is already running here" with a link INTO
  * it, not as an error), `403` when the reader may not host there.
  *
- * The body is the room's own (`goLivePayload` in `./quiz-room.ts`): the room
- * on screen, stated outright, and for a Space the chat it was started from.
+ * The room comes with each press (`GoLiveTarget`): the sheet's own room, or
+ * the Space the reader picked from outside one (`HostLiveQuizDialog`). The body
+ * is the room's own (`goLivePayload` in `./quiz-room.ts`): the room stated
+ * outright, and for a Space the chat it was started from.
  *
  * IT ALSO SETTLES THE LISTS. A library quiz that runs in a channel joins its
  * "quizzes that have been here" list the moment its game exists, so the sheet
  * the reader just pressed the button in is already out of date.
  */
-export function useGoLive(room: QuizRoom, quizUuid: string, conversationUuid: string | null = null) {
+export function useGoLive(quizUuid: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => channelQuizApi.goLive(quizUuid, goLivePayload(room, conversationUuid)),
+    mutationFn: ({ room, conversationUuid = null }: GoLiveTarget) =>
+      channelQuizApi.goLive(quizUuid, goLivePayload(room, conversationUuid)),
     meta: { silentError: true },
-    onSuccess: () => {
+    onSuccess: (_response, { room }) => {
       // The probe every quiz card and live bar in the room reads.
       void queryClient.invalidateQueries({
         queryKey: channelQuizQueries.activeGameOf(room),
       });
       invalidateQuizLists(queryClient);
     },
-    onError: (error) => {
+    onError: (error, { room }) => {
       // A 409 IS the probe answering: someone else's game started between our
       // last beat and this press. The refusal tells the reader to open the game
       // above it, so the banner has to be there when they look — waiting out

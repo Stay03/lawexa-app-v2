@@ -54,7 +54,7 @@ test('the space precheck reads the chat composer’s rules, not a copy', () => {
 /* ── NICE 1: the move picker's current row keeps its name on a phone ─────── */
 
 test('below sm the current row shows the check alone; the words come back from sm up', () => {
-  const dialog = read('v2', 'features', 'spaces', 'move', 'MoveToSpaceDialog.tsx');
+  const dialog = read('v2', 'features', 'spaces', 'move', 'SpacePickList.tsx');
   assert.match(
     dialog,
     /<Check aria-hidden className="size-3\.5" \/>\s*<span className="sr-only sm:not-sr-only">In it now<\/span>/,
