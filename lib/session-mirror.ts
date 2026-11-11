@@ -10,9 +10,10 @@ import { SESSION_PRESENT_COOKIE, SESSION_PRESENT_VALUE } from './session-cookie'
  * it last mirrored during this page load and dedupes on it.
  *
  * TWO KINDS OF CALLER, ONE STATE (11 November 2026, the signed-out flash):
- *  - A sign-in or sign-out that is about to navigate into v2 AWAITS the
- *    mirror first (`useAuth`, the Google callback, the grant forms), so the
- *    layout's first render on the server already sees the new identity. When
+ *  - A sign-in or sign-out that is about to navigate AWAITS the mirror first
+ *    (`useAuth`'s login and register, the Google callback, `useAuth`'s
+ *    logout and v2's sign-out), so the next page's first render on the server
+ *    already sees the new identity. When
  *    the cookie was written only after arriving, the first paint was the
  *    signed-out shell, and the signed-in page replaced it a moment later.
  *  - `SessionSync` (in the v2 layout) keeps the cookie in step with every
