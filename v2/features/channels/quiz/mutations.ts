@@ -16,6 +16,8 @@ import type {
   SubmitQuizAnswerPayload,
   UpdateChannelQuizPayload,
 } from '@/types/channel-quiz';
+import { conversationsQueries } from '@/v2/features/conversations/queries';
+import { spacesQueries } from '@/v2/features/spaces/queries';
 import { noteThrottled } from '../engagement-throttle';
 import { isQuizListQuery, withVisibility, type QuizListCacheEntry } from './list-cache';
 import { channelQuizQueries } from './queries';
@@ -267,16 +269,27 @@ export function useGoLive(quizUuid: string) {
       });
       invalidateQuizLists(queryClient);
     },
-    onError: (error, { room }) => {
+    onError: (error, { room, conversationUuid = null }) => {
+      const status = extractApiError(error).status;
       // A 409 IS the probe answering: someone else's game started between our
       // last beat and this press. The refusal tells the reader to open the game
       // above it, so the banner has to be there when they look — waiting out
       // the probe's 30-second beat would point at a row that does not exist
-      // yet. No other status implies a game, so nothing else refetches.
-      if (extractApiError(error).status === 409) {
+      // yet.
+      if (status === 409) {
         void queryClient.invalidateQueries({
           queryKey: channelQuizQueries.activeGameOf(room),
         });
+      }
+      // A 403 in a Space says the reader no longer hosts there (a Contributor
+      // made a Viewer, or removed). Re-read the Space, and the chat the press
+      // came from, so the screens stop offering Host from what they knew
+      // before (live quiz review, 11 November 2026).
+      if (status === 403 && room.kind === 'space') {
+        void queryClient.invalidateQueries({ queryKey: spacesQueries.detailsOf(room.uuid) });
+        if (conversationUuid) {
+          void queryClient.invalidateQueries({ queryKey: [...conversationsQueries.details(), conversationUuid] });
+        }
       }
     },
   });

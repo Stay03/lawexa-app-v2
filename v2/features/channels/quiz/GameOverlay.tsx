@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Dialog as DialogPrimitive } from 'radix-ui';
 import { ArrowLeft, Ban, Loader2, LogIn, Trophy, UserPlus, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -111,6 +112,7 @@ export function GameOverlay({
   viewerId,
   viewerUuid,
   mayInvite = false,
+  place,
   onClose,
 }: {
   /** The room the overlay is over: a channel, or a Space itself (quiz-room.ts). */
@@ -128,9 +130,18 @@ export function GameOverlay({
   /** Whether the reader may host in the game's Space, and so hand out its
    *  link (`GameInviteDialog`). A channel's game has no link. */
   mayInvite?: boolean;
+  /**
+   * Where leaving the game returns to, as a noun: "channel", "Space" (a
+   * Space's page) or "chat" (a Space chat). "Back to the …" and the cancel
+   * dialog name it; the room alone cannot, since a Space game is played from
+   * its page and its chats (live quiz review, 11 November 2026). Defaults to
+   * the room's own noun.
+   */
+  place?: string;
   onClose: () => void;
 }) {
   const game = useLiveGame({ room, gameUuid, viewerId, viewerUuid });
+  const placeNoun = place ?? roomNoun(room);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const frameRef = useRef<HTMLElement>(null);
@@ -182,7 +193,7 @@ export function GameOverlay({
     canJoinNow(state) &&
     game.joinErrorStatus !== 403;
 
-  return (
+  const frame = (
     <section
       ref={frameRef}
       tabIndex={-1}
@@ -205,8 +216,8 @@ export function GameOverlay({
             size="icon"
             className="size-8 shrink-0"
             onClick={onClose}
-            aria-label={`Back to the ${roomNoun(room)}`}
-            title={`Back to the ${roomNoun(room)}`}
+            aria-label={`Back to the ${placeNoun}`}
+            title={`Back to the ${placeNoun}`}
           >
             <ArrowLeft aria-hidden className="size-4" />
           </Button>
@@ -292,6 +303,7 @@ export function GameOverlay({
       <GameBody
         game={game}
         room={room}
+        placeNoun={placeNoun}
         viewerUuid={viewerUuid}
         viewerId={viewerId}
         onClose={onClose}
@@ -311,7 +323,7 @@ export function GameOverlay({
             <AlertDialogTitle>End this game?</AlertDialogTitle>
             <AlertDialogDescription>
               The game stops for everyone straight away. A cancelled game keeps
-              no scores and posts nothing to the {roomNoun(room) === 'channel' ? 'channel' : 'chat'}.
+              no scores and posts nothing to the {placeNoun}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -335,7 +347,31 @@ export function GameOverlay({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {cover === 'viewport' ? <DialogPrimitive.Title className="sr-only">Live quiz</DialogPrimitive.Title> : null}
     </section>
+  );
+
+  // In a room the screen makes the rest inert itself (ChannelScreen). Over the
+  // whole window there is nothing the screen can mark, so the game is a modal
+  // dialog: focus stays in it and the page under it is hidden from assistive
+  // tech (live quiz review, 11 November 2026). Escape stays off, as above.
+  if (cover === 'room') return frame;
+  return (
+    <DialogPrimitive.Root open modal>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Content
+          asChild
+          aria-describedby={undefined}
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            frameRef.current?.focus({ preventScroll: true });
+          }}
+        >
+          {frame}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }
 
@@ -344,12 +380,15 @@ export function GameOverlay({
 function GameBody({
   game,
   room,
+  placeNoun,
   viewerId,
   viewerUuid,
   onClose,
 }: {
   game: ReturnType<typeof useLiveGame>;
   room: QuizRoom;
+  /** What leaving returns to ("channel", "Space", "chat"); see `GameOverlay`'s `place`. */
+  placeNoun: string;
   viewerId: number | null;
   viewerUuid: string | null;
   onClose: () => void;
@@ -377,7 +416,7 @@ function GameBody({
             description={`Live quizzes are open to members of the ${roomNoun(room)} they run in.`}
             action={
               <Button variant="outline" size="sm" onClick={onClose}>
-                Back to the {roomNoun(room)}
+                Back to the {placeNoun}
               </Button>
             }
           />
@@ -394,7 +433,7 @@ function GameBody({
             description={`It may have been removed along with its quiz. Nothing else in the ${roomNoun(room)} changed.`}
             action={
               <Button variant="outline" size="sm" onClick={onClose}>
-                Back to the {roomNoun(room)}
+                Back to the {placeNoun}
               </Button>
             }
           />
@@ -433,7 +472,7 @@ function GameBody({
           description={`Quizzes are played in the ${noun} they were started in. Open that ${noun} to join or see how it went.`}
           action={
             <Button variant="outline" size="sm" onClick={onClose}>
-              Back to the {noun}
+              Back to the {placeNoun}
             </Button>
           }
         />
@@ -467,7 +506,7 @@ function GameBody({
       return <QuestionStage game={game} viewerUuid={viewerUuid} />;
     case 'cancelled':
       return (
-        <CancelledStage cancelledBy={game.cancelledBy} onBack={onClose} backLabel={`Back to the ${roomNoun(room)}`} />
+        <CancelledStage cancelledBy={game.cancelledBy} onBack={onClose} backLabel={`Back to the ${placeNoun}`} />
       );
     case 'finished':
     default:

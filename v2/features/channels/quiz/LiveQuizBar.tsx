@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useJoinGame } from './mutations';
 import { channelQuizQueries } from './queries';
+import type { QuizGame } from '@/types/channel-quiz';
 import type { QuizRoom } from './quiz-room';
 
 /**
@@ -37,6 +38,23 @@ import type { QuizRoom } from './quiz-room';
  * it: a strip there centred its words away from everything else on the page
  * (fixture pictures, 10 November 2026).
  */
+/**
+ * The game live in a room, by the room's one shared probe, or null: what the
+ * bar shows, and what a screen asks when its layout depends on the bar being
+ * there (a phone chat's transcript stops passing under the header while it
+ * is, ConversationScreen).
+ */
+export function useRoomLiveGame(room: QuizRoom | null, viewerId: number | null): QuizGame | null {
+  const query = useQuery({
+    ...channelQuizQueries.activeGame({ room: room ?? NO_ROOM, viewerId }),
+    enabled: room !== null,
+  });
+  return room === null ? null : (query.data?.data?.[0] ?? null);
+}
+
+/** Stands in for a room not known yet; its probe is never enabled. */
+const NO_ROOM: QuizRoom = { kind: 'space', uuid: '' };
+
 export function LiveQuizBar({
   room,
   viewerId,
@@ -48,8 +66,7 @@ export function LiveQuizBar({
   onOpenGame: (gameUuid: string) => void;
   shape?: 'strip' | 'card';
 }) {
-  const query = useQuery(channelQuizQueries.activeGame({ room, viewerId }));
-  const game = query.data?.data?.[0] ?? null;
+  const game = useRoomLiveGame(room, viewerId);
   const join = useJoinGame(game?.uuid ?? '', viewerId);
 
   if (!game) return null;

@@ -450,6 +450,7 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
           viewerId={session.userId}
           viewerUuid={session.userUuid}
           mayInvite={liveQuiz.mayHost}
+          place="Space"
           onClose={liveQuiz.closeGame}
         />
       )}

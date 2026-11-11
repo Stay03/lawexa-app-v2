@@ -77,7 +77,8 @@ test('a chat draws no title and no space at its top, in the skeleton or the load
   const screen = read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
   assert.match(screen, /masthead=\{embed \? null : <ConversationMasthead \/>\}/);
   // Below the confidential banner, the transcript does not pull up under the bar.
-  assert.match(screen, /underBar=\{!embed && !controller\.isConfidential\}/);
+  // Not under a live quiz's bar either (live quiz in Spaces, 11 November 2026).
+  assert.match(screen, /underBar=\{!embed && !controller\.isConfidential && !quizBarShown\}/);
   // The masthead is a heading for screen readers only: no visible title, no
   // space link, no title-shaped shimmer while the title resolves.
   const masthead = read('v2', 'features', 'conversations', 'conversation', 'ConversationMasthead.tsx');

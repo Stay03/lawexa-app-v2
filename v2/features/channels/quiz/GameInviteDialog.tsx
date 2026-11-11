@@ -19,8 +19,14 @@ import { extractApiError } from '@/lib/utils/api-error';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { GameLinkQr } from './GameLinkQr';
-import { gameLinkNote, gameLinkRefusal } from './model';
+import { GAME_LINK_EXPIRED, gameLinkNote, gameLinkRefusal } from './model';
 import { useGameInviteLink } from './mutations';
+
+/** The refusal's `errors.code` (`game_ended`, `link_revoked`), when it carries one. */
+function errorCode(errors: unknown): string | null {
+  const code = (errors as { code?: unknown } | null)?.code;
+  return typeof code === 'string' ? code : null;
+}
 
 /**
  * GameInviteDialog — the game's link into its Space, for the host and
@@ -51,13 +57,18 @@ export function GameInviteDialog({
     mutate();
   }, [mutate]);
 
-  const made = link.data?.data ?? null;
+  const answered = link.data?.data ?? null;
+  // A link past its 24 hours comes back with `is_usable` false: say so, and
+  // neither show nor share an address that no longer lets anyone in.
+  const expired = answered !== null && !answered.is_usable;
+  const made = expired ? null : answered;
   const share = useShareAction({
     exactUrl: made?.url,
     title: quizTitle,
     text: `Join my live quiz “${quizTitle}” on Lawexa.`,
   });
-  const refusal = link.isError ? gameLinkRefusal(extractApiError(link.error).status) : null;
+  const failure = link.isError ? extractApiError(link.error) : null;
+  const refusal = failure ? gameLinkRefusal(failure.status, errorCode(failure.errors)) : null;
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
@@ -80,6 +91,10 @@ export function GameInviteDialog({
             />
             <GameLinkQr url={made.url} />
           </div>
+        ) : expired ? (
+          <p role="alert" className="text-sm text-muted-foreground">
+            {GAME_LINK_EXPIRED}
+          </p>
         ) : refusal ? (
           <div role="alert" className="flex flex-col items-start gap-2">
             <p className="text-sm text-muted-foreground">{refusal.message}</p>

@@ -66,6 +66,12 @@ export function HostLiveQuizDialog({
   const [refusal, setRefusal] = useState<{ message: string; running: PickedSpace | null } | null>(null);
   /** The new Space's name while its field is open; null while it is the row. */
   const [newName, setNewName] = useState<string | null>(null);
+  /**
+   * The Space this dialog made, kept so that when going live in it fails, a
+   * second press goes live in the same Space rather than making another
+   * (live quiz review, 11 November 2026). A changed name is a new Space.
+   */
+  const [made, setMade] = useState<PickedSpace | null>(null);
   const busy = goLive.isPending || createSpace.isPending;
 
   const goLiveIn = (space: PickedSpace) => {
@@ -93,9 +99,17 @@ export function HostLiveQuizDialog({
     event.preventDefault();
     const name = newName?.trim() ?? '';
     if (name === '' || busy) return;
+    if (made && made.name === name) {
+      goLiveIn(made);
+      return;
+    }
     setRefusal(null);
     createSpace.mutate(quickHostSpacePayload(name), {
-      onSuccess: (response) => goLiveIn({ uuid: response.data.uuid, name: response.data.name, isNew: true }),
+      onSuccess: (response) => {
+        const space = { uuid: response.data.uuid, name: response.data.name, isNew: true };
+        setMade(space);
+        goLiveIn(space);
+      },
       onError: (error) => setRefusal({ message: extractApiError(error).message, running: null }),
     });
   };
@@ -140,7 +154,7 @@ export function HostLiveQuizDialog({
           {createSpace.isPending || (goLive.isPending && picked?.isNew === true) ? (
             <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
           ) : null}
-          Create and go live
+          {made && made.name === newName.trim() ? 'Go live' : 'Create and go live'}
         </Button>
       </form>
     );

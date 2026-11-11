@@ -172,10 +172,20 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   // line to beat. One tap, also on the author's own quiz no link opens yet,
   // which it opens to the link (Arthur, 10 November 2026; use-challenge-friend).
   // Called up here with the other hooks; it runs only on a tap.
+  //
+  // THE LINK NAMES THE READER'S BEST ATTEMPT (live quiz review, 11 November
+  // 2026), so the friend sees "{name} scored …" and the reader hears how they
+  // did. The score goes in the share text only with that attempt: a line
+  // promising a score the link cannot show would be false.
+  const bestAttempt = query.data?.data?.viewer_best_attempt_uuid ?? null;
   const challenge = useChallengeFriend({
     quizUuid,
+    fromAttempt: bestAttempt,
     title: query.data?.data?.title ?? null,
-    text: frontChallengeText(query.data?.data?.title ?? null, query.data?.data?.viewer_best_points ?? null),
+    text: frontChallengeText(
+      query.data?.data?.title ?? null,
+      bestAttempt ? (query.data?.data?.viewer_best_points ?? null) : null,
+    ),
     visibility: query.data?.data?.visibility ?? null,
     isMine: query.data?.data?.is_mine === true,
   });

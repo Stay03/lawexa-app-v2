@@ -66,7 +66,10 @@ test('the dialog uses the Move dialog’s Space list, goes live in the picked Sp
   assert.match(dialog, /router\.push\(spaceGameHref\(space\.uuid, response\.data\.uuid\)\);/);
   // New Space: made with just a name, then live in it in the same tap.
   assert.match(dialog, /createSpace\.mutate\(quickHostSpacePayload\(name\), \{/);
-  assert.match(dialog, /goLiveIn\(\{ uuid: response\.data\.uuid, name: response\.data\.name, isNew: true \}\)/);
+  assert.match(dialog, /const space = \{ uuid: response\.data\.uuid, name: response\.data\.name, isNew: true \};\s*setMade\(space\);\s*goLiveIn\(space\);/);
+  // A Space made here and then refused going live is not made twice: the
+  // same name goes live in the same Space (live quiz review).
+  assert.match(dialog, /if \(made && made\.name === name\) \{\s*goLiveIn\(made\);\s*return;\s*\}/);
   // A Space with a game running offers the way in.
   assert.match(dialog, /running: status === 409 \? \{ uuid: space\.uuid, name: space\.name \} : null,/);
 

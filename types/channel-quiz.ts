@@ -387,6 +387,10 @@ export interface ChannelQuiz {
   /** The signed-in viewer's best points on a finished attempt; `null` before
    *  their first, or signed out (backend, 23 October 2026). */
   viewer_best_points?: number | null;
+  /** The reader's own finished attempt with their best score (ties: the most recent), null
+   *  before their first finish or signed out: what Challenge a friend names (Backend, 11
+   *  November 2026). Absent from an older server. */
+  viewer_best_attempt_uuid?: string | null;
   /** Finished attempts by the viewer; `null` signed out. */
   viewer_attempts_count?: number | null;
   /** The sum of the questions' time limits, in seconds: the "about N min". */

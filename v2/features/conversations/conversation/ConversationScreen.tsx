@@ -25,7 +25,7 @@ import { AgentRowsProvider } from './agents/context';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider, type CardQuestions } from './chat-context';
 import { GameOverlay } from '@/v2/features/channels/quiz/GameOverlay';
-import { LiveQuizBar } from '@/v2/features/channels/quiz/LiveQuizBar';
+import { LiveQuizBar, useRoomLiveGame } from '@/v2/features/channels/quiz/LiveQuizBar';
 import {
   LiveQuizRoomProvider,
   type LiveQuizRoomValue,
@@ -179,6 +179,11 @@ export function ConversationScreen({
     [quizRoom, inQuizRoom, serverUserId, openGame],
   );
   const openHostQuiz = useCallback(() => setHostOpen(true), [setHostOpen]);
+  // While the live bar shows, the transcript starts below it, as below the
+  // confidential banner: on a phone the transcript otherwise pulls up under
+  // the see-through header and its lines showed between the header and the
+  // bar (fixture pictures, 11 November 2026).
+  const quizBarShown = useRoomLiveGame(quizRoomValue?.room ?? null, serverUserId) !== null;
   // The record's own roster when it lists every asker, else the members read
   // (record-roster.ts).
   const { spaceRoster, recordRoster } = controller;
@@ -499,6 +504,7 @@ export function ConversationScreen({
             viewerId={serverUserId}
             viewerUuid={viewerUuid}
             mayInvite={liveQuiz.mayHost}
+            place="chat"
             onClose={liveQuiz.closeGame}
           />
         )}
@@ -533,7 +539,7 @@ export function ConversationScreen({
             memberColours={memberColours}
             viewerUuid={viewerUuid}
             masthead={embed ? null : <ConversationMasthead />}
-            underBar={!embed && !controller.isConfidential}
+            underBar={!embed && !controller.isConfidential && !quizBarShown}
             onReply={canReply ? stageReply : null}
             jumpTo={jumpTo}
           />

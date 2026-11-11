@@ -57,6 +57,10 @@ test('a Space chat: the quiz on its own route only, games named by the chat, Hos
   assert.match(screen, /conversationUuid: conversationId,\s*initialGameUuid: embed \? null : initialGameUuid,/);
   assert.match(screen, /quizRoom && inQuizRoom \? \{ room: quizRoom, viewerId: serverUserId, openGame \} : null/);
   assert.match(screen, /<LiveQuizRoomProvider value=\{quizRoomValue\}>/);
+  // While the bar shows, the transcript starts below it (as below the
+  // confidential banner), never pulled up under a phone's header.
+  assert.match(screen, /const quizBarShown = useRoomLiveGame\(quizRoomValue\?\.room \?\? null, serverUserId\) !== null;/);
+  assert.match(screen, /underBar=\{!embed && !controller\.isConfidential && !quizBarShown\}/);
   assert.match(screen, /onHostQuiz=\{liveQuiz\.mayHost \? openHostQuiz : null\}/);
   assert.match(screen, /<GameOverlay[\s\S]*?cover="viewport"/);
 
