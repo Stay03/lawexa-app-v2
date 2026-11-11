@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Ban,
@@ -27,6 +28,8 @@ import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
 import type { QuizShareStanding } from '@/lib/constants/quiz-share';
 import { ShareResults } from './ShareResults';
+import { ResultCardShare } from './ResultCardShare';
+import type { ResultCardInput } from './result-card';
 import {
   AnswersInRail,
   COMPACT_RAISED,
@@ -653,22 +656,46 @@ export function PodiumStage({
   viewerId,
   viewerUuid,
   certificate,
+  spaceName = null,
 }: {
   gameUuid: string;
   viewerId: number | null;
   viewerUuid: string | null;
   /** This viewer's certificate offer from the finished game's state (certificates part 2). */
   certificate?: unknown;
+  /** The Space the game was played in, for the player's result card. */
+  spaceName?: string | null;
 }) {
   const query = useQuery(channelQuizQueries.results({ gameUuid, viewerId }));
   const results = query.data?.data;
+
+  // The player's own result card (ResultCardShare): only for someone who
+  // played. One object per read of the results, so the card is drawn once.
+  const cardInput = useMemo<ResultCardInput | null>(() => {
+    const own = viewerUuid === null ? undefined : results?.ranking.find((row) => row.user.uuid === viewerUuid);
+    if (!results || !own) return null;
+    return {
+      playerName: own.user.name,
+      rank: own.rank,
+      score: own.score,
+      quizTitle: results.game.quiz.title,
+      spaceName,
+      playerCount: results.game.player_count,
+      podium: results.podium.map((row) => ({
+        rank: row.rank,
+        name: row.user.name,
+        score: row.score,
+        isViewer: row.user.uuid === viewerUuid,
+      })),
+    };
+  }, [results, viewerUuid, spaceName]);
 
   if (query.isPending) {
     return (
       <GameStage>
         <div aria-hidden className="flex items-end justify-center gap-3 pt-8">
           {PODIUM_HEIGHT.map((height, index) => (
-            <Skeleton key={index} className={cn('w-20 rounded-t-lg', height)} />
+            <Skeleton key={index} className={cn('w-20 rounded-t-2xl', height)} />
           ))}
         </div>
         <Skeleton className="mx-auto h-4 w-40 rounded" />
@@ -758,20 +785,22 @@ export function PodiumStage({
               <span className="font-comfortaa text-sm font-bold tabular-nums text-foreground">
                 {row.score.toLocaleString()}
               </span>
+              {/* The quiz's blocks: first in gold on its deep lip, second and
+                  third outlined, each with its place in Comfortaa. */}
               <div
                 className={cn(
-                  'v2-quiz-rise w-full rounded-t-lg border-t border-x',
+                  'v2-quiz-rise w-full rounded-t-2xl border-x-2 border-t-2',
                   PODIUM_HEIGHT[row.rank - 1] ?? 'h-10',
                   row.rank === 1
-                    ? 'border-primary/40 bg-primary/20'
-                    : 'border-border bg-secondary',
+                    ? 'border-[var(--solo-gold-deep)] bg-primary text-primary-foreground'
+                    : 'border-border bg-card text-muted-foreground',
                 )}
                 style={{ animationDelay: `${(row.rank - 1) * 90}ms` }}
               >
                 <span className="sr-only">Rank {row.rank}</span>
                 <span
                   aria-hidden
-                  className="flex h-full items-start justify-center pt-2 text-sm font-semibold text-muted-foreground"
+                  className="flex h-full items-start justify-center pt-2 font-comfortaa text-lg font-bold"
                 >
                   {row.rank}
                 </span>
@@ -784,7 +813,9 @@ export function PodiumStage({
       {/* SHARING SITS WHERE THE THING WORTH SHARING JUST APPEARED — directly
           under the podium, before the full ranking. Any player may hand the
           link out: everyone on this screen already sees more than the public
-          card publishes, so gating it to the host would protect nothing. */}
+          card publishes, so gating it to the host would protect nothing.
+          A player gets their own card first, made like Wrapped's. */}
+      {cardInput ? <ResultCardShare gameUuid={gameUuid} input={cardInput} /> : null}
       <ShareResults
         gameUuid={gameUuid}
         standing={standing}

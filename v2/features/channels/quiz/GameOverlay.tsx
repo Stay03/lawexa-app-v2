@@ -125,6 +125,7 @@ export function GameOverlay({
   viewerUuid,
   mayInvite = false,
   place,
+  spaceName = null,
   onClose,
 }: {
   /** The room the overlay is over: a channel, or a Space itself (quiz-room.ts). */
@@ -150,6 +151,9 @@ export function GameOverlay({
    * the room's own noun.
    */
   place?: string;
+  /** The game's Space by name, which a player's result card names
+   *  ("… came 2nd in Torts 101, LASU LSS"). The room carries only its uuid. */
+  spaceName?: string | null;
   onClose: () => void;
 }) {
   const game = useLiveGame({ room, gameUuid, viewerId, viewerUuid });
@@ -315,6 +319,7 @@ export function GameOverlay({
         game={game}
         room={room}
         placeNoun={placeNoun}
+        spaceName={spaceName}
         viewerUuid={viewerUuid}
         viewerId={viewerId}
         onClose={onClose}
@@ -393,6 +398,7 @@ function GameBody({
   game,
   room,
   placeNoun,
+  spaceName,
   viewerId,
   viewerUuid,
   onClose,
@@ -401,6 +407,7 @@ function GameBody({
   room: QuizRoom;
   /** What leaving returns to ("channel", "Space", "chat"); see `GameOverlay`'s `place`. */
   placeNoun: string;
+  spaceName: string | null;
   viewerId: number | null;
   viewerUuid: string | null;
   onClose: () => void;
@@ -528,6 +535,7 @@ function GameBody({
           viewerId={viewerId}
           viewerUuid={viewerUuid}
           certificate={game.state.certificate}
+          spaceName={spaceName}
         />
       );
   }

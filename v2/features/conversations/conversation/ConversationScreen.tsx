@@ -505,6 +505,7 @@ export function ConversationScreen({
             viewerUuid={viewerUuid}
             mayInvite={liveQuiz.mayHost}
             place="chat"
+            spaceName={spacePlace?.space.name ?? null}
             onClose={liveQuiz.closeGame}
           />
         )}

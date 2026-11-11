@@ -1241,6 +1241,7 @@ export function ChannelScreen({
           gameUuid={gameUuid}
           viewerId={viewerId}
           viewerUuid={viewerUuid}
+          spaceName={channel.space.name}
           onClose={closeGame}
         />
       )}

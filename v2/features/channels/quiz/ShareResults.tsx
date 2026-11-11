@@ -3,15 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, Share2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useShareUrl } from '@/v2/features/sharing/useShareUrl';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import {
   PUBLIC_QUIZ_RESULTS_NOTICE,
-  publicQuizResultsPath,
   quizShareInvite,
   type QuizShareStanding,
 } from '@/lib/constants/quiz-share';
+import { COMPACT_RAISED } from './ui';
+import { useResultsLink } from './use-results-link';
 
 /**
  * ShareResults — the way a finished game's podium leaves the room.
@@ -54,10 +54,12 @@ import {
  *
  * ── ONE COPY, ONE TIMER, CLEANED UP ────────────────────────────────────────
  * The confirmed state lasts two seconds and its timeout is cleared on unmount
- * (leaving a game mid-timer is ordinary here). The origin is read through a
- * lazy `useState` initialiser, never in render, so the server frame and the
- * hydration frame agree and no clock or `window` read happens during a render
- * pass.
+ * (leaving a game mid-timer is ordinary here). The link comes from
+ * `useResultsLink`, which the player's result card shares too.
+ *
+ * In the quiz's look since 11 November 2026: an outlined card, and Share link
+ * as the quiet raised button, under the player's own card (`ResultCardShare`),
+ * whose Share is the gold one.
  */
 
 const COPIED_MS = 2000;
@@ -77,12 +79,6 @@ export function ShareResults({
 }) {
   const [state, setState] = useState<CopyState>('idle');
   const timerRef = useRef<number | null>(null);
-  // Client-only, behind a lazy initialiser: this component only ever renders
-  // inside an already-mounted game overlay, so the empty server value is never
-  // painted — and reading `window` in render would be a compiler-lint error.
-  const [origin] = useState(() =>
-    typeof window === 'undefined' ? '' : window.location.origin,
-  );
 
   useEffect(
     () => () => {
@@ -91,12 +87,8 @@ export function ShareResults({
     [],
   );
 
-  /* An ambassador sharing their result carries their code, so a signup from
-     it credits them. Everybody else shares exactly what they shared before. */
-  const shareUrl = useShareUrl();
-  const url = origin
-    ? shareUrl(`${origin}${publicQuizResultsPath(gameUuid)}`)
-    : '';
+  // With an ambassador's code when the sharer has one (use-results-link.ts).
+  const url = useResultsLink(gameUuid);
   const { headline, ask } = quizShareInvite(standing);
 
   const confirmCopied = () => {
@@ -130,7 +122,7 @@ export function ShareResults({
   const copied = state === 'copied';
 
   return (
-    <div className="rounded-xl border bg-card px-4 py-3">
+    <div className="rounded-2xl border-2 border-border bg-card p-4">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
         <div className="min-w-0 flex-1 basis-48">
           <p className="text-sm font-semibold text-pretty text-foreground">
@@ -140,14 +132,14 @@ export function ShareResults({
             {ask}
           </p>
         </div>
-        <Button size="sm" onClick={() => void share()}>
+        <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={() => void share()}>
           {copied ? (
             <Check aria-hidden className="size-4" />
           ) : (
             <Share2 aria-hidden className="size-4" />
           )}
-          {copied ? 'Link copied' : 'Share'}
-        </Button>
+          {copied ? 'Link copied' : 'Share link'}
+        </RaisedButton>
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">

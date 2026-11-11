@@ -590,7 +590,13 @@ export function PlayerChip({
   );
 }
 
-/** A rank line — used live (leaderboard) and at the end (full ranking). */
+/**
+ * A rank line — used live (leaderboard) and at the end (full ranking). In the
+ * quiz's look (11 November 2026): the place and the points in Comfortaa, the
+ * top three's places in the quiz's gold text, and the reader's own row lit
+ * with a gold ring so it is found at a glance in a long room. The gold comes
+ * from the overlay's `v2-solo` tokens.
+ */
 export function RankRow({
   rank,
   user,
@@ -607,14 +613,16 @@ export function RankRow({
   return (
     <li
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2',
-        isViewer ? 'bg-primary/10' : 'odd:bg-secondary/40',
+        'flex items-center gap-3 rounded-xl px-3 py-2.5',
+        isViewer
+          ? 'bg-primary/10 ring-2 ring-primary/60 ring-inset'
+          : 'odd:bg-secondary/40',
       )}
     >
       <span
         className={cn(
-          'w-6 shrink-0 text-sm font-semibold tabular-nums',
-          rank <= 3 ? 'text-primary' : 'text-muted-foreground',
+          'w-6 shrink-0 font-comfortaa text-sm font-bold tabular-nums',
+          rank <= 3 ? 'text-[var(--solo-gold-text)]' : 'text-muted-foreground',
         )}
       >
         {rank}
@@ -631,8 +639,9 @@ export function RankRow({
           </span>
         )}
       </span>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+      <span className="shrink-0 font-comfortaa text-sm font-bold tabular-nums text-foreground">
         {score.toLocaleString()}
+        <span className="ml-1 font-sans text-xs font-medium text-muted-foreground">pts</span>
       </span>
     </li>
   );
