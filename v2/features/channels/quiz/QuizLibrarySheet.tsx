@@ -554,11 +554,17 @@ function QuizRow({
   const [refusal, setRefusal] = useState<string | null>(null);
 
   return (
-    <li className="flex items-start gap-3 rounded-2xl border-2 border-border bg-card p-3">
+    // ON A PHONE THE ACTIONS TAKE A LINE OF THEIR OWN. The raised Go live is
+    // wider than the house button it replaced, and beside the menu it left the
+    // words a stub ("10 questions ·..", the privacy chip cut in half; pictures
+    // of 6f3dd1c9). Below `sm` the text fills the first line (its basis is the
+    // row less the tile) and Go live with the menu wraps under it, at the
+    // right; from `sm` it is one line again.
+    <li className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-2xl border-2 border-border bg-card p-3">
       {/* The quiz's face, as on the Quiz home's cards: the small tile, so a
           phone's row keeps its room for the title. */}
       <QuizTile uuid={quiz.uuid} title={quiz.title} size="sm" className="mt-0.5" />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-[calc(100%-2.5rem)] sm:basis-0">
         {/* AT A NARROW WIDTH THE ROW'S HEIGHT GIVES, NOT THE TITLE. Go live and
             the overflow trigger are a fixed width whatever the row says, and a
             phone that hands the title what is left was cutting it to "Land
@@ -656,7 +662,7 @@ function QuizRow({
       </div>
 
       {(mayHost || mayManage) && (
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex w-full shrink-0 items-center justify-end gap-1 pb-1 sm:w-auto sm:pb-0">
           {/* The host policy governs starting a game… */}
           {mayHost && (
             <RaisedButton

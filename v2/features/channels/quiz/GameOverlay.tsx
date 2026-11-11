@@ -114,8 +114,11 @@ const PHASE_CAPTION = {
 const LAST_ANSWER_CAPTION = 'Last answer';
 
 /** The header's actions: the solo quiz's raised button, small enough to sit in
- *  the header's row beside the title. */
-const HEADER_RAISED = 'h-9 rounded-xl px-3 text-sm';
+ *  the header's row beside the title. On a phone they are icons with their
+ *  names kept for assistive tech (`HEADER_LABEL`): with both labels the quiz's
+ *  title was cut to "TEST…" (pictures of 6f3dd1c9). */
+const HEADER_RAISED = 'h-9 rounded-xl px-2.5 text-sm sm:px-3';
+const HEADER_LABEL = 'sr-only sm:not-sr-only';
 
 export function GameOverlay({
   room,
@@ -263,7 +266,7 @@ export function GameOverlay({
               onClick={() => setInviteOpen(true)}
             >
               <UserPlus aria-hidden className="size-4" />
-              Invite
+              <span className={HEADER_LABEL}>Invite</span>
             </RaisedButton>
           )}
           {canCancel && (
@@ -273,7 +276,7 @@ export function GameOverlay({
               onClick={() => setCancelOpen(true)}
             >
               <Ban aria-hidden className="size-4" />
-              End game
+              <span className={HEADER_LABEL}>End game</span>
             </RaisedButton>
           )}
         </div>
