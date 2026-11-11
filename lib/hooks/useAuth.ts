@@ -11,6 +11,7 @@ import { useNotificationPrefsStore } from '@/lib/stores/notificationPrefsStore';
 import { clearAllTranscripts } from '@/lib/storage/confidentialTranscriptStore';
 import { extractApiError, type ApiError } from '@/lib/utils/api-error';
 import { clearAttribution } from '@/lib/utils/attribution';
+import { mirrorSession } from '@/lib/session-mirror';
 import { keepReturnPath, returnPathFromLocation } from '@/lib/utils/auth-return';
 import type { LoginFormData, RegisterFormData } from '@/types/auth';
 
@@ -36,10 +37,14 @@ export function useAuth() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: (data: LoginFormData) => authApi.login(data),
-    onSuccess: (response, variables) => {
+    onSuccess: async (response, variables) => {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
         queryClient.invalidateQueries({ queryKey: ['auth'] });
+        // The server's session cookie BEFORE moving on, so a v2 page's first
+        // render is already signed in (lib/session-mirror.ts). The button
+        // stays pending meanwhile; a failed write falls back to SessionSync.
+        await mirrorSession(response.data.token);
 
         // For unverified email users, redirect to check-email page
         if (response.data.user.auth_provider === 'email' && !response.data.user.is_verified) {
@@ -57,10 +62,12 @@ export function useAuth() {
   // Register mutation
   const registerMutation = useMutation({
     mutationFn: (data: RegisterFormData) => authApi.register(data),
-    onSuccess: (response, variables) => {
+    onSuccess: async (response, variables) => {
       if (response.success && response.data) {
         setAuth(response.data.user, response.data.token);
         clearAttribution();
+        // As at login: signed in on the server before the next page renders.
+        await mirrorSession(response.data.token);
 
         // For email signups, redirect to check-email page to verify
         if (response.data.user.auth_provider === 'email' && !response.data.user.is_verified) {
@@ -104,6 +111,9 @@ export function useAuth() {
       useConfidentialModeStore.getState().reset();
       clearAuth();
       queryClient.clear();
+      // Signed out on the server too before moving on, so no page renders
+      // the account that just left (lib/session-mirror.ts).
+      await mirrorSession(null);
       router.push('/login');
     },
   });

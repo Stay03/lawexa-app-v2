@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 import { authApi } from '@/lib/api/auth';
+import { mirrorSession } from '@/lib/session-mirror';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { clearAllTranscripts } from '@/v2/runtime/chat-engine';
 import { clearDeviceCache } from '@/v2/runtime/persist/device-cache';
@@ -54,9 +55,8 @@ export async function signOutOfThisDevice(queryClient: QueryClient): Promise<voi
   useAuthStore.getState().clearAuth();
   queryClient.clear();
 
-  try {
-    await fetch('/api/session', { method: 'DELETE' });
-  } catch {
-    // The cookie is cleared by SessionSync on the next visit if this failed.
-  }
+  // Through the one mirror (lib/session-mirror.ts), so SessionSync, seeing
+  // the token gone, finds the cookie already cleared and sends nothing. It
+  // never throws; a failed write is retried by SessionSync on the next visit.
+  await mirrorSession(null);
 }

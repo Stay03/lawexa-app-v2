@@ -16,7 +16,8 @@ test('Log out is the app’s own log out, drawn only for a signed-in account', (
   assert.match(button, /onClick=\{\(\) => logout\(\)\}/);
   assert.match(button, /disabled=\{isLoggingOut\}/);
   // useAuth's logout ends on the sign-in page.
-  assert.match(read('lib', 'hooks', 'useAuth.ts'), /clearAuth\(\);\s*queryClient\.clear\(\);\s*router\.push\('\/login'\);/);
+  // The session cookie is cleared before the push (lib/session-mirror.ts).
+  assert.match(read('lib', 'hooks', 'useAuth.ts'), /clearAuth\(\);\s*queryClient\.clear\(\);[\s\S]*?await mirrorSession\(null\);\s*router\.push\('\/login'\);/);
 });
 
 test('every onboarding step, "Check your email" and the link’s landing page carry it', () => {

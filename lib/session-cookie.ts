@@ -4,8 +4,12 @@
  * Three consumers must agree on these names, so they live in one place to make
  * drift impossible:
  *  - `app/api/session/route.ts` (server) SETS both cookies.
- *  - `v2/runtime/session.ts` + `api-server.ts` (server) READ the httpOnly token.
- *  - `app/v2/session-sync.tsx` (client) READS the non-httpOnly presence marker.
+ *  - `v2/runtime/session-token.ts` (server) READS the httpOnly token.
+ *  - `lib/session-mirror.ts` (client) READS the non-httpOnly presence marker.
+ *
+ * In `lib/` because both sides read it: the mirror is shared by v1's sign-in
+ * and v2's SessionSync, and v1 code may not import from v2 (moved from
+ * `v2/runtime/`, 11 November 2026).
  *
  * This module is intentionally NOT `server-only`: the presence marker is read by
  * client code, so it must be safe to import into a client bundle. It contains

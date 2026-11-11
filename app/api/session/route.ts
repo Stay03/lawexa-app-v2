@@ -4,7 +4,7 @@ import {
   SESSION_COOKIE_MAX_AGE,
   SESSION_PRESENT_COOKIE,
   SESSION_PRESENT_VALUE,
-} from '@/v2/runtime/session-cookie';
+} from '@/lib/session-cookie';
 
 /**
  * The BFF token mirror (Backend-For-Frontend pattern, per the foundation

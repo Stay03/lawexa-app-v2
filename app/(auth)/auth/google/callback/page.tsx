@@ -6,6 +6,7 @@ import { Loader2 } from 'lucide-react';
 
 import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { mirrorSession } from '@/lib/session-mirror';
 import { clearAttribution } from '@/lib/utils/attribution';
 import { takeReturnPath } from '@/lib/utils/auth-return';
 
@@ -36,6 +37,8 @@ function GoogleCallbackContent() {
         if (response.success && response.data) {
           setAuth(response.data.user, response.data.token);
           clearAttribution();
+          // Signed in on the server before the next page renders (lib/session-mirror.ts).
+          await mirrorSession(response.data.token);
 
           // Check if user needs onboarding (profession is set after completing onboarding)
           const needsOnboarding = !(response.data.user.profile?.onboarding_completed_at || response.data.user.profile?.profession);

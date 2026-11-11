@@ -3,10 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/authStore';
-import {
-  SESSION_PRESENT_COOKIE,
-  SESSION_PRESENT_VALUE,
-} from '@/v2/runtime/session-cookie';
+import { mirrorSession } from '@/lib/session-mirror';
 
 /**
  * Bridges the v1 client token (localStorage zustand) into the v2 httpOnly
@@ -18,7 +15,7 @@ import {
  * the reviewer's token-swap finding — guest→login must re-mirror):
  *
  *  - Token present  → POST once per page load PER TOKEN VALUE, unconditionally
- *    overwriting whatever was mirrored before. `lastSyncedToken` (module state)
+ *    overwriting whatever was mirrored before. `lib/session-mirror.ts`
  *    dedupes within the load; the readable marker is deliberately NOT used to
  *    skip POSTs — it can't tell WHICH token is mirrored, only that one is.
  *  - Token absent   → DELETE when the marker says something is mirrored (or a
@@ -64,9 +61,9 @@ import {
  *       for correctness but NO refresh is armed and the page renders exactly
  *       once. After a refresh they agree by construction, so this effect's
  *       re-run (its `serverSignedIn` / `serverUserId` deps changed) arms nothing.
- *   (b) `doSync` reports an actual CHANGE. After a refresh `token ===
- *       lastSyncedToken`, so the second pass short-circuits to `false` before it
- *       issues any request. Module state survives a refresh — a refresh
+ *   (b) `mirrorSession` reports an actual CHANGE. After a refresh the token
+ *       is the one already mirrored, so the second pass short-circuits to
+ *       `false` before it issues any request. Module state survives a refresh — a refresh
  *       re-renders in place, it does not remount this component — and survives a
  *       remount anyway, since it is module-scoped.
  *
@@ -81,58 +78,14 @@ import {
  * the snapshot still says "signed in" → stale → DELETE → changed → refresh → the
  * layout re-renders as a guest.
  *
+ * THE WRITE ITSELF lives in `lib/session-mirror.ts` (11 November 2026), shared
+ * with the sign-in and sign-out paths, which mirror BEFORE they navigate into
+ * v2 so the layout's first render is already right. Its per-token dedupe is
+ * what makes this component send nothing after such a navigation. Failures
+ * are swallowed there and the dedupe resets, so the next run retries.
+ *
  * Pure network side-effect in an effect (no `setState` — React Compiler lint).
- * Failures are swallowed and `lastSyncedToken` resets so the next effect run /
- * mount retries; a transient error must never break the page.
  */
-
-// Serialized sync queue (StrictMode double-invoke and concurrent mounts fold
-// into no-ops via lastSyncedToken; a mid-flight token change queues behind).
-let queue: Promise<void> = Promise.resolve();
-// undefined = nothing synced this page load; null = synced signed-out state.
-let lastSyncedToken: string | null | undefined;
-
-function markerPresent(): boolean {
-  return document.cookie
-    .split('; ')
-    .some(
-      (entry) => entry === `${SESSION_PRESENT_COOKIE}=${SESSION_PRESENT_VALUE}`,
-    );
-}
-
-/**
- * Mirror one token state into the cookie. Returns whether the mirrored state was
- * actually CHANGED — i.e. whether the server would now resolve a different
- * identity than it did before this call. `false` for a deduped no-op, for the
- * "nothing was ever mirrored, nothing to clear" case, and for any failure (a
- * write that did not land changed nothing, so there is nothing to re-render for).
- */
-async function doSync(token: string | null): Promise<boolean> {
-  // Already reflected this exact state during this page load.
-  if (token === lastSyncedToken) return false;
-
-  if (!token && lastSyncedToken === undefined && !markerPresent()) {
-    // Fresh load, signed out, nothing mirrored — nothing to clear.
-    lastSyncedToken = null;
-    return false;
-  }
-
-  try {
-    const response = token
-      ? await fetch('/api/session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        })
-      : await fetch('/api/session', { method: 'DELETE' });
-    // On failure, forget — the next run retries instead of trusting a bad sync.
-    lastSyncedToken = response.ok ? token : undefined;
-    return response.ok;
-  } catch {
-    lastSyncedToken = undefined;
-    return false;
-  }
-}
 
 /**
  * Queue a sync, invoking `onMirrored` only if it genuinely changed the mirrored
@@ -146,8 +99,7 @@ async function doSync(token: string | null): Promise<boolean> {
  * refreshing the page into a signed-out render — would not be.
  */
 function syncSession(token: string | null, onMirrored?: () => void): void {
-  queue = queue.then(async () => {
-    const changed = await doSync(token);
+  void mirrorSession(token).then((changed) => {
     if (!changed || !onMirrored) return;
     if (useAuthStore.getState().token !== token) return;
     onMirrored();

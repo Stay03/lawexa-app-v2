@@ -1,6 +1,6 @@
 import 'server-only';
 import { cookies } from 'next/headers';
-import { SESSION_COOKIE } from './session-cookie';
+import { SESSION_COOKIE } from '@/lib/session-cookie';
 
 /**
  * Read the mirrored bearer token from the httpOnly session cookie, or `null`.
