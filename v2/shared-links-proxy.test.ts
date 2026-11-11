@@ -41,6 +41,7 @@ test('a visitor not served v2 is sent from a v2-only address to the nearest clas
     ['/activity/stats', '/activity'],
     ['/settings/devices', '/settings'],
     ['/settings/verification', '/settings'],
+    ['/settings/certificates', '/settings'],
     ['/quiz/library', '/quiz'],
     ['/quiz/explore', '/quiz'],
     ['/quiz/attempts/1f3a', '/quiz'],

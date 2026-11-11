@@ -6,13 +6,13 @@ import { ArrowLeft, RotateCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SuperadminGate } from '@/components/admin/certificates/SuperadminGate';
 import { ProgrammeCertificates } from '@/components/admin/certificates/ProgrammeCertificates';
 import { ProgrammeForm } from '@/components/admin/certificates/ProgrammeForm';
 import { useCertificateProgramme } from '@/lib/hooks/useAdminCertificates';
 
 /** `/admin/certificates/programmes/{uuid}`, or `/new`: details, issuing by hand, and what was issued. */
-export default function AdminCertificateProgrammePage({ params }: { params: Promise<{ uuid: string }> }) {
-  const { uuid } = use(params);
+function AdminCertificateProgrammeContent({ uuid }: { uuid: string }) {
   const isNew = uuid === 'new';
   const programme = useCertificateProgramme(isNew ? null : uuid);
 
@@ -48,5 +48,14 @@ export default function AdminCertificateProgrammePage({ params }: { params: Prom
         </div>
       )}
     </div>
+  );
+}
+
+export default function AdminCertificateProgrammePage({ params }: { params: Promise<{ uuid: string }> }) {
+  const { uuid } = use(params);
+  return (
+    <SuperadminGate>
+      <AdminCertificateProgrammeContent uuid={uuid} />
+    </SuperadminGate>
   );
 }

@@ -21,6 +21,7 @@ import {
   readCertificateVerification,
   readIssueResult,
   templateFormProblems,
+  templatePayload,
   unknownFillIns,
   verificationOutcome,
 } from './model';
@@ -39,16 +40,18 @@ const verified = {
   ],
 };
 
-test('a typed number becomes the stored one; junk never reaches the server', () => {
+test('a typed number becomes the stored one; anything else never reaches the server', () => {
   assert.equal(normalizeCertificateNumber('lx-2026-000123-k7q9m'), 'LX-2026-000123-K7Q9M');
   assert.equal(normalizeCertificateNumber(' LX-2026-000123-K7Q9M '), 'LX-2026-000123-K7Q9M');
-  assert.equal(normalizeCertificateNumber('LX 2026 000123'), 'LX2026000123');
-  assert.equal(normalizeCertificateNumber(''), null);
-  assert.equal(normalizeCertificateNumber('   '), null);
+  assert.equal(normalizeCertificateNumber('LX-2026-0001234-K7Q9M'), 'LX-2026-0001234-K7Q9M', 'the counter can grow');
+  assert.equal(normalizeCertificateNumber('LX-2026-000123'), null, 'a partial number');
+  assert.equal(normalizeCertificateNumber('LX-2026-00123-K7Q9M'), null, 'five-digit counter');
+  assert.equal(normalizeCertificateNumber('LX-2026-000123-K7Q9O'), null, 'O is not in the check alphabet');
+  assert.equal(normalizeCertificateNumber('LX-2026-000123-K7Q91'), null, '1 is not in the check alphabet');
+  assert.equal(normalizeCertificateNumber('LX-2026-000123-K7Q9'), null, 'four check characters');
+  assert.equal(normalizeCertificateNumber('AB-2026-000123-K7Q9M'), null);
   assert.equal(normalizeCertificateNumber('LX-2026-../../admin'), null);
-  assert.equal(normalizeCertificateNumber('LX--2026'), null);
-  assert.equal(normalizeCertificateNumber('-LX-2026'), null);
-  assert.equal(normalizeCertificateNumber('A'.repeat(41)), null);
+  assert.equal(normalizeCertificateNumber(''), null);
   assert.equal(normalizeCertificateNumber(null), null);
   assert.equal(normalizeCertificateNumber(undefined), null);
 });
@@ -145,6 +148,14 @@ test('the verify answer is read field by field', () => {
   });
   assert.equal(lenient?.partner_name, null);
   assert.deepEqual(lenient?.logos, [{ label: 'LSS', url: 'https://u' }]);
+  assert.deepEqual(
+    readCertificateVerification({ data: { ...verified, logos: [{ label: null, url: 'https://a' }, { label: '  ', url: 'https://b' }] } })?.logos,
+    [
+      { label: null, url: 'https://a' },
+      { label: null, url: 'https://b' },
+    ],
+    'a logo with no name still shows',
+  );
   assert.deepEqual(readCertificateVerification({ data: { ...verified, logos: undefined } })?.logos, []);
 });
 
@@ -197,6 +208,16 @@ test('a template saves only with a name, title, wording and six-digit colours', 
   const bad = templateFormProblems({ ...good, name: ' ', title: '', body: '', colors: { ...good.colors, accent: '#fff' } });
   assert.deepEqual(Object.keys(bad).sort(), ['body', 'colors.accent', 'name', 'title']);
   assert.match(templateFormProblems({ ...good, body: 'x'.repeat(5001) }).body ?? '', /5,000/);
+
+  const blankWording = { ...good, title: ' ', body: '' };
+  assert.deepEqual(templateFormProblems(blankWording, { isNew: true }), {}, 'a new design may start on the server defaults');
+  assert.deepEqual(templatePayload(blankWording, { isNew: true }), { name: 'LASU LSS 2026', colors: good.colors });
+  assert.deepEqual(templatePayload({ ...good, title: ' Certificate ' }), {
+    name: 'LASU LSS 2026',
+    title: 'Certificate',
+    body: good.body,
+    colors: good.colors,
+  });
 });
 
 test('a programme needs a name, a design and a date; a blank partner is sent as null', () => {

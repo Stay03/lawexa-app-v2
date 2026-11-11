@@ -7,11 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CertificatesTabs } from '@/components/admin/certificates/CertificatesTabs';
+import { SuperadminGate } from '@/components/admin/certificates/SuperadminGate';
 import { formatCertificateDate } from '@/lib/certificates/model';
 import { useCertificateProgrammes } from '@/lib/hooks/useAdminCertificates';
 
 /** `/admin/certificates/programmes`: the events that issue certificates. */
-export default function AdminCertificateProgrammesPage() {
+function AdminCertificateProgrammesContent() {
   const programmes = useCertificateProgrammes();
 
   return (
@@ -74,5 +75,13 @@ export default function AdminCertificateProgrammesPage() {
         </ul>
       )}
     </div>
+  );
+}
+
+export default function AdminCertificateProgrammesPage() {
+  return (
+    <SuperadminGate>
+      <AdminCertificateProgrammesContent />
+    </SuperadminGate>
   );
 }

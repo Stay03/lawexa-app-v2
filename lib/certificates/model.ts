@@ -14,20 +14,22 @@ import {
  * verify page (a server component) and the signed-in screens can both use it.
  */
 
-/** The longest number the app will ask the server about. Real ones are `LX-2026-000123-K7Q9M`. */
-const MAX_NUMBER_LENGTH = 40;
+/**
+ * The server's number pattern (Techlead 113d06a1): `LX`, the year, a running
+ * number of at least six digits, then five check characters without 0, O, 1 or I.
+ */
+const CERTIFICATE_NUMBER = /^LX-\d{4}-\d{6,}-[A-HJ-NP-Z2-9]{5}$/;
 
 /**
  * A certificate number as the server stores it: upper case, no spaces. People
- * type `lx-2026-000123-k7q9m` or paste ` LX-2026-000123-K7Q9M `, and both are the same
- * certificate. `null` for anything that cannot be a number at all, so a junk
- * link never reaches the server.
+ * type `lx-2026-000123-k7q9m` or paste ` LX-2026-000123-K7Q9M `, and both are
+ * the same certificate. `null` for anything that cannot be a number, so a
+ * malformed link shows "no certificate" without asking the server.
  */
 export function normalizeCertificateNumber(raw: string | null | undefined): string | null {
   if (typeof raw !== 'string') return null;
   const value = raw.replace(/\s+/g, '').toUpperCase();
-  if (value.length === 0 || value.length > MAX_NUMBER_LENGTH) return null;
-  return /^[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(value) ? value : null;
+  return CERTIFICATE_NUMBER.test(value) ? value : null;
 }
 
 /** The public page that confirms a certificate. */
@@ -152,8 +154,8 @@ export function certificateImageProblem(
 /**
  * The verify answer, proved field by field. The public page is a server
  * component, so a malformed body must become "unavailable", never a crash in
- * front of a stranger. `logos` is the one lenient field: entries that are not
- * `{label, url}` strings are dropped, because the certificate itself is still real.
+ * front of a stranger. `logos` is the one lenient field: an entry without a url is
+ * dropped and a blank label reads as `null`, because the certificate itself is still real.
  */
 export function readCertificateVerification(body: unknown): CertificateVerification | null {
   if (typeof body !== 'object' || body === null) return null;
@@ -178,7 +180,8 @@ export function readCertificateVerification(body: unknown): CertificateVerificat
     ? record.logos.flatMap((entry) => {
         if (typeof entry !== 'object' || entry === null) return [];
         const { label, url } = entry as Record<string, unknown>;
-        return typeof label === 'string' && typeof url === 'string' && url !== '' ? [{ label, url }] : [];
+        if (typeof url !== 'string' || url === '') return [];
+        return [{ label: typeof label === 'string' && label.trim() !== '' ? label : null, url }];
       })
     : [];
 
@@ -261,11 +264,15 @@ export interface TemplateFormValues {
 }
 
 /** What stops a template from saving, by field; an empty object when it can save. */
-export function templateFormProblems(values: TemplateFormValues): Partial<Record<keyof TemplateFormValues | 'colors.primary' | 'colors.accent' | 'colors.background', string>> {
+export function templateFormProblems(
+  values: TemplateFormValues,
+  { isNew = false }: { isNew?: boolean } = {},
+): Partial<Record<keyof TemplateFormValues | 'colors.primary' | 'colors.accent' | 'colors.background', string>> {
   const problems: Partial<Record<string, string>> = {};
   if (!values.name.trim()) problems.name = 'Give the design a name admins will recognise.';
-  if (!values.title.trim()) problems.title = 'Add the title printed at the top, such as "Certificate of Participation".';
-  if (!values.body.trim()) problems.body = 'Add the wording printed on the certificate.';
+  // A new design may leave both blank: the server starts it on Lucy's title and wording (WOZ 84c5a71c).
+  if (!isNew && !values.title.trim()) problems.title = 'Add the title printed at the top, such as "Certificate of Participation".';
+  if (!isNew && !values.body.trim()) problems.body = 'Add the wording printed under the name.';
   if (values.body.length > 5000) problems.body = 'Keep the wording under 5,000 characters.';
   for (const key of ['primary', 'accent', 'background'] as const) {
     if (!isHexColor(values.colors[key])) problems[`colors.${key}`] = 'Use a colour like #1f2a44.';
@@ -279,6 +286,18 @@ export interface ProgrammeFormValues {
   partnerName: string;
   eventDate: string;
   isActive: boolean;
+}
+
+/** The template payload. On create, a blank title or wording is left out so the server's default applies. */
+export function templatePayload(values: TemplateFormValues, { isNew = false }: { isNew?: boolean } = {}) {
+  const title = values.title.trim();
+  const body = values.body.trim();
+  return {
+    name: values.name.trim(),
+    ...(isNew && !title ? {} : { title }),
+    ...(isNew && !body ? {} : { body }),
+    colors: values.colors,
+  };
 }
 
 /** What stops a programme from saving, by field. */

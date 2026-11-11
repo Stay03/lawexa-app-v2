@@ -105,8 +105,10 @@ export function ProgrammeForm({ programme }: { programme: CertificateProgramme |
           placeholder="The Future of Legal Research Is Here"
           value={values.name}
           onChange={(event) => set('name', event.target.value)}
+          aria-invalid={visible.name ? true : undefined}
+          aria-describedby="programme-name-note"
         />
-        <p className={visible.name ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
+        <p id="programme-name-note" className={visible.name ? 'text-xs text-destructive' : 'text-xs text-muted-foreground'}>
           {visible.name ?? 'Printed as {programme} on the certificate.'}
         </p>
       </div>
@@ -114,7 +116,12 @@ export function ProgrammeForm({ programme }: { programme: CertificateProgramme |
       <div className="space-y-1.5">
         <Label htmlFor="programme-template">Design</Label>
         <Select value={values.templateUuid} onValueChange={(value) => set('templateUuid', value)}>
-          <SelectTrigger id="programme-template" className="w-full">
+          <SelectTrigger
+            id="programme-template"
+            className="w-full"
+            aria-invalid={visible.templateUuid ? true : undefined}
+            aria-describedby={visible.templateUuid ? 'programme-template-error' : undefined}
+          >
             <SelectValue placeholder={templates.isPending ? 'Loading designs…' : 'Pick a design'} />
           </SelectTrigger>
           <SelectContent>
@@ -134,7 +141,11 @@ export function ProgrammeForm({ programme }: { programme: CertificateProgramme |
             .
           </p>
         ) : (
-          visible.templateUuid && <p className="text-xs text-destructive">{visible.templateUuid}</p>
+          visible.templateUuid && (
+            <p id="programme-template-error" className="text-xs text-destructive">
+              {visible.templateUuid}
+            </p>
+          )
         )}
       </div>
 
@@ -143,11 +154,15 @@ export function ProgrammeForm({ programme }: { programme: CertificateProgramme |
           <Label htmlFor="programme-partner">Partner</Label>
           <Input
             id="programme-partner"
-            placeholder="LASU Law Students’ Society"
+            placeholder="the LASU Law Students’ Society"
             value={values.partnerName}
             onChange={(event) => set('partnerName', event.target.value)}
+            aria-describedby="programme-partner-hint"
           />
-          <p className="text-xs text-muted-foreground">Optional. Printed as {'{partner}'}.</p>
+          <p id="programme-partner-hint" className="text-xs text-muted-foreground">
+            Optional. Write it as it reads in a sentence: the Law Students’ Society. The gold line at the top prints
+            it in capitals.
+          </p>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="programme-date">Event date</Label>
@@ -156,8 +171,14 @@ export function ProgrammeForm({ programme }: { programme: CertificateProgramme |
             type="date"
             value={values.eventDate}
             onChange={(event) => set('eventDate', event.target.value)}
+            aria-invalid={visible.eventDate ? true : undefined}
+            aria-describedby={visible.eventDate ? 'programme-date-error' : undefined}
           />
-          {visible.eventDate && <p className="text-xs text-destructive">{visible.eventDate}</p>}
+          {visible.eventDate && (
+            <p id="programme-date-error" className="text-xs text-destructive">
+              {visible.eventDate}
+            </p>
+          )}
         </div>
       </div>
 

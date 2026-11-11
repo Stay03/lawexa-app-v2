@@ -76,7 +76,7 @@ export function TemplateSignatories({
         {
           uuid: signatory.uuid,
           name: changes.name ?? signatory.name,
-          title: changes.title ?? signatory.title,
+          title: changes.title ?? signatory.title ?? '',
           sort: signatory.sort,
           signature: changes.signature ?? null,
           removeSignature: changes.removeSignature,
@@ -88,7 +88,12 @@ export function TemplateSignatories({
 
   const move = (uuid: string, direction: -1 | 1) => {
     update.mutate(
-      moveBySort(signatories, uuid, direction).map((item) => ({ uuid: item.uuid, name: item.name, title: item.title, sort: item.sort })),
+      moveBySort(signatories, uuid, direction).map((item) => ({
+        uuid: item.uuid,
+        name: item.name,
+        title: item.title ?? '',
+        sort: item.sort,
+      })),
       { onError: fail },
     );
   };
@@ -119,12 +124,12 @@ export function TemplateSignatories({
                 />
                 <Input
                   aria-label="Signatory title"
-                  defaultValue={signatory.title}
+                  defaultValue={signatory.title ?? ''}
                   placeholder="Founder & CEO, Lawexa"
                   className="h-8"
                   onBlur={(event) => {
                     const next = event.target.value.trim();
-                    if (next !== signatory.title) save(signatory, { title: next });
+                    if (next !== (signatory.title ?? '')) save(signatory, { title: next });
                   }}
                 />
               </div>
