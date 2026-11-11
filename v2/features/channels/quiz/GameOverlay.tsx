@@ -17,6 +17,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import {
   CancelledStage,
   CountdownStage,
@@ -28,8 +30,9 @@ import {
 import { GameInviteDialog } from './GameInviteDialog';
 import { canJoinNow } from './model';
 import { gameInRoom, roomNoun, type QuizRoom } from './quiz-room';
-import { GameStage, GameStageSkeleton } from './ui';
+import { COMPACT_RAISED, GameStage, GameStageSkeleton } from './ui';
 import { useLiveGame } from './use-game';
+import '@/v2/features/quiz/solo/solo-quiz.css';
 import './quiz-game.css';
 
 /**
@@ -61,6 +64,11 @@ import './quiz-game.css';
  * the polite live region that announces phase changes for readers who cannot
  * see them. Every phase body lives in `./GamePhases.tsx`; all state, timing
  * and transport live in `./use-game.ts`.
+ *
+ * IN THE QUIZ'S OWN LOOK (Stay and Arthur, 11 November 2026). `v2-solo` on the
+ * frame carries the solo quiz's tokens to every phase: the header shows the
+ * quiz's letter tile, and its actions, the join bar's and the refusals' are
+ * the solo quiz's raised buttons.
  */
 
 /** One coarse sentence per phase for the polite live region. Question and
@@ -104,6 +112,10 @@ const PHASE_CAPTION = {
 /** The caption for the beat where the game is over but its last question is
  *  still being closed on screen. */
 const LAST_ANSWER_CAPTION = 'Last answer';
+
+/** The header's actions: the solo quiz's raised button, small enough to sit in
+ *  the header's row beside the title. */
+const HEADER_RAISED = 'h-9 rounded-xl px-3 text-sm';
 
 export function GameOverlay({
   room,
@@ -199,7 +211,7 @@ export function GameOverlay({
       tabIndex={-1}
       aria-label="Live quiz"
       className={cn(
-        'outline-none',
+        'v2-solo outline-none',
         // Above the feed's floating composer overlay — the mode covers the
         // whole screen it is in, not just its pane region; or, on a page that
         // scrolls in the shell, the whole window.
@@ -209,7 +221,7 @@ export function GameOverlay({
       )}
     >
       {/* ── Frame header ──────────────────────────────────────────────── */}
-      <div className="shrink-0 border-b px-4 py-2.5">
+      <div className="shrink-0 border-b px-4 pt-2.5 pb-3">
         <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
           <Button
             variant="ghost"
@@ -221,8 +233,9 @@ export function GameOverlay({
           >
             <ArrowLeft aria-hidden className="size-4" />
           </Button>
+          {state ? <QuizTile uuid={state.game.quiz.uuid} title={title} size="sm" /> : null}
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-foreground">
+            <p className="truncate text-sm font-bold text-foreground">
               {title}
             </p>
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -240,26 +253,24 @@ export function GameOverlay({
             </p>
           </div>
           {canInvite && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="shrink-0"
+            <RaisedButton
+              tone="quiet"
+              className={cn(HEADER_RAISED, 'shrink-0')}
               onClick={() => setInviteOpen(true)}
             >
               <UserPlus aria-hidden className="size-4" />
               Invite
-            </Button>
+            </RaisedButton>
           )}
           {canCancel && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="shrink-0 text-muted-foreground hover:text-destructive"
+            <RaisedButton
+              tone="quiet"
+              className={cn(HEADER_RAISED, 'shrink-0 text-muted-foreground hover:text-destructive')}
               onClick={() => setCancelOpen(true)}
             >
               <Ban aria-hidden className="size-4" />
               End game
-            </Button>
+            </RaisedButton>
           )}
         </div>
       </div>
@@ -273,20 +284,20 @@ export function GameOverlay({
 
       {/* ── Late join / watching ──────────────────────────────────────── */}
       {showJoinBar && (
-        <div className="shrink-0 border-b bg-primary/5 px-4 py-2">
+        <div className="shrink-0 border-b bg-primary/5 px-4 pt-2 pb-3">
           <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               You&rsquo;re watching. Join now and you play from the next
               question.
             </p>
-            <Button size="sm" onClick={game.join} disabled={game.joining}>
+            <RaisedButton className={COMPACT_RAISED} onClick={game.join} disabled={game.joining}>
               {game.joining ? (
                 <Loader2 aria-hidden className="size-4 animate-spin" />
               ) : (
                 <LogIn aria-hidden className="size-4" />
               )}
               Join
-            </Button>
+            </RaisedButton>
           </div>
         </div>
       )}
@@ -312,6 +323,7 @@ export function GameOverlay({
       {inviteOpen && canInvite && (
         <GameInviteDialog
           gameUuid={gameUuid}
+          quizUuid={state?.game.quiz.uuid ?? null}
           quizTitle={title}
           onOpenChange={setInviteOpen}
         />
@@ -415,9 +427,9 @@ function GameBody({
             title="This game isn't yours to watch"
             description={`Live quizzes are open to members of the ${roomNoun(room)} they run in.`}
             action={
-              <Button variant="outline" size="sm" onClick={onClose}>
+              <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
                 Back to the {placeNoun}
-              </Button>
+              </RaisedButton>
             }
           />
         </GameStage>
@@ -432,9 +444,9 @@ function GameBody({
             title="This game is gone"
             description={`It may have been removed along with its quiz. Nothing else in the ${roomNoun(room)} changed.`}
             action={
-              <Button variant="outline" size="sm" onClick={onClose}>
+              <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
                 Back to the {placeNoun}
-              </Button>
+              </RaisedButton>
             }
           />
         </GameStage>
@@ -448,9 +460,9 @@ function GameBody({
           title="Couldn't reach the game"
           description="The game keeps running on our side. This screen just lost touch with it."
           action={
-            <Button variant="outline" size="sm" onClick={game.retry}>
+            <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={game.retry}>
               Try again
-            </Button>
+            </RaisedButton>
           }
         />
       </GameStage>
@@ -471,9 +483,9 @@ function GameBody({
           title={`This game belongs to another ${noun}`}
           description={`Quizzes are played in the ${noun} they were started in. Open that ${noun} to join or see how it went.`}
           action={
-            <Button variant="outline" size="sm" onClick={onClose}>
+            <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
               Back to the {placeNoun}
-            </Button>
+            </RaisedButton>
           }
         />
       </GameStage>

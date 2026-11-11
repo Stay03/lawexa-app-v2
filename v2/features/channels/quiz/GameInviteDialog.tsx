@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { Check, Loader2, Share2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -17,10 +16,14 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { extractApiError } from '@/lib/utils/api-error';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
+import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { GameLinkQr } from './GameLinkQr';
 import { GAME_LINK_EXPIRED, gameLinkNote, gameLinkRefusal } from './model';
 import { useGameInviteLink } from './mutations';
+import { COMPACT_RAISED } from './ui';
+import '@/v2/features/quiz/solo/solo-quiz.css';
 
 /** The refusal's `errors.code` (`game_ended`, `link_revoked`), when it carries one. */
 function errorCode(errors: unknown): string | null {
@@ -40,14 +43,21 @@ function errorCode(errors: unknown): string | null {
  * can be read out or typed; Share hands it to the phone's sheet or copies it,
  * exactly as the server gave it. Its QR code sits under it (`GameLinkQr`).
  *
+ * In the quiz's own look (Stay and Arthur, 11 November 2026): the quiz's
+ * letter tile beside a bold heading, and Share as the solo quiz's gold raised
+ * button. `v2-solo` sits on the content, which portals out of the game.
+ *
  * Hosts mount this only while it is open, so every open asks again.
  */
 export function GameInviteDialog({
   gameUuid,
+  quizUuid,
   quizTitle,
   onOpenChange,
 }: {
   gameUuid: string;
+  /** The quiz's uuid, for its tile; null while the game has not been read. */
+  quizUuid: string | null;
   quizTitle: string;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -72,9 +82,12 @@ export function GameInviteDialog({
 
   return (
     <Dialog open onOpenChange={onOpenChange}>
-      <DialogContent className={cn('sm:max-w-md', COLLAB_DIALOG_SURFACE)}>
+      <DialogContent className={cn('v2-solo sm:max-w-md', COLLAB_DIALOG_SURFACE)}>
         <DialogHeader>
-          <DialogTitle>Invite people to this game</DialogTitle>
+          <div className="flex items-center gap-3">
+            {quizUuid ? <QuizTile uuid={quizUuid} title={quizTitle} size="sm" /> : null}
+            <DialogTitle className="text-lg leading-tight font-bold tracking-tight">Invite people to this game</DialogTitle>
+          </div>
           <DialogDescription>
             {made ? gameLinkNote(made) : 'Anyone with the link joins the Space and goes straight into the game.'}
           </DialogDescription>
@@ -87,7 +100,7 @@ export function GameInviteDialog({
               value={made.url}
               aria-label="Game link"
               onFocus={(event) => event.currentTarget.select()}
-              className="text-center"
+              className="h-11 rounded-xl border-2 text-center"
             />
             <GameLinkQr url={made.url} />
           </div>
@@ -99,20 +112,20 @@ export function GameInviteDialog({
           <div role="alert" className="flex flex-col items-start gap-2">
             <p className="text-sm text-muted-foreground">{refusal.message}</p>
             {refusal.retry ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => mutate()}>
+              <RaisedButton type="button" tone="quiet" className={COMPACT_RAISED} onClick={() => mutate()}>
                 Try again
-              </Button>
+              </RaisedButton>
             ) : null}
           </div>
         ) : (
-          <Skeleton aria-hidden className="h-9 w-full rounded-4xl" />
+          <Skeleton aria-hidden className="h-11 w-full rounded-xl" />
         )}
 
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="gap-3 pb-1">
+          <RaisedButton type="button" tone="quiet" className={INVITE_BUTTON} onClick={() => onOpenChange(false)}>
             Close
-          </Button>
-          <Button type="button" disabled={!made} onClick={() => void share.share()}>
+          </RaisedButton>
+          <RaisedButton type="button" className={INVITE_BUTTON} disabled={!made} onClick={() => void share.share()}>
             {link.isPending ? (
               <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
             ) : share.copied ? (
@@ -121,9 +134,12 @@ export function GameInviteDialog({
               <Share2 aria-hidden className="size-4" />
             )}
             <span aria-live="polite">{share.copied ? 'Link copied' : 'Share link'}</span>
-          </Button>
+          </RaisedButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
+
+/** The footer's pair: the quiz front's raised buttons (`FRONT_BUTTON`'s 48px). */
+const INVITE_BUTTON = 'h-12 px-5 text-[15px]';

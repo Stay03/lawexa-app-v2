@@ -37,6 +37,12 @@ import { useServerSearch } from '../use-server-search';
  * The tapped row shows the wait (`busyUuid`) and every other row is held
  * still while it runs (`disabled`). The row the item is in now
  * (`currentUuid`) stays on the list, marked, and cannot be picked again.
+ *
+ * ── TWO LOOKS ──────────────────────────────────────────────────────────────
+ * `plain` (the default, Move's) draws the rows as a flat list. `quiz` draws
+ * each row as a card in the solo quiz's design (rounded-2xl on a 2px border),
+ * for Host a live quiz, which sits among the quiz screens (Stay and Arthur,
+ * 11 November 2026). The rows say and do the same in both.
  */
 export function SpacePickList({
   targets,
@@ -47,6 +53,7 @@ export function SpacePickList({
   noMatch,
   empty,
   after,
+  look = 'plain',
 }: {
   /** Which of the reader's Spaces can be picked here. */
   targets: (spaces: readonly Space[]) => Space[];
@@ -63,7 +70,10 @@ export function SpacePickList({
   empty: ReactNode;
   /** A last row under the Spaces (Host's "New Space"), drawn whenever the list is. */
   after?: ReactNode;
+  /** How the rows are drawn: Move's flat list, or the quiz screens' cards. */
+  look?: 'plain' | 'quiz';
 }) {
+  const quizLook = look === 'quiz';
   const session = useV2Session();
   const search = useServerSearch();
   const teamChannelsOpen = canOpenTeamChannels(session);
@@ -118,7 +128,14 @@ export function SpacePickList({
         ) : picks.length === 0 && cutLine === null ? (
           empty
         ) : (
-          <ul className="flex flex-col gap-0.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
+          <ul
+            className={cn(
+              'flex flex-col motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150',
+              // The cards keep the scroller's 8px gutter, so a focus ring is
+              // never cut at the edge.
+              quizLook ? 'gap-2 px-2 py-1' : 'gap-0.5',
+            )}
+          >
             {picks.map((space) => {
               const isCurrent = space.uuid === currentUuid;
               const isSending = busyUuid === space.uuid;
@@ -133,7 +150,10 @@ export function SpacePickList({
                     onClick={() => onPick(space)}
                     aria-current={isCurrent ? 'true' : undefined}
                     className={cn(
-                      'v2-interactive flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-secondary/60 disabled:cursor-default disabled:hover:bg-transparent',
+                      'v2-interactive flex w-full items-center gap-3 text-left transition-colors disabled:cursor-default',
+                      quizLook
+                        ? 'rounded-2xl border-2 border-border bg-card px-3 py-2.5 hover:border-primary/40 disabled:hover:border-border'
+                        : 'rounded-lg px-2 py-2 hover:bg-secondary/60 disabled:hover:bg-transparent',
                       disabled && !isSending && 'opacity-60',
                       FOCUS_RING,
                     )}

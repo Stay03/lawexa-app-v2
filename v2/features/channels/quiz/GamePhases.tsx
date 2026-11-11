@@ -17,17 +17,19 @@ import {
 
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { QuizGameState, QuizRankingRow } from '@/types/channel-quiz';
 import type { SlimUser } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
 import type { QuizShareStanding } from '@/lib/constants/quiz-share';
 import { ShareResults } from './ShareResults';
 import {
   AnswersInRail,
+  COMPACT_RAISED,
   CountdownDial,
   GameStage,
   GameStageSkeleton,
@@ -84,6 +86,13 @@ import { ScoringBadge } from '@/v2/features/quiz/ScoringBadge';
  * falls under 4.5:1. Dark stays on 400. The house-wide sweep (23 emerald sites
  * across the app, 21 of them outside this wave) is a phase-6 token follow-up
  * and deliberately NOT touched here.
+ *
+ * THE SOLO QUIZ'S LOOK AROUND THE PLAY (Stay and Arthur, 11 November 2026).
+ * The overlay's `v2-solo` reaches every phase here: the lobby leads with the
+ * quiz's letter tile and its title in the quiz's bold type, its cards are
+ * rounded-2xl on a 2px border, and every button is the solo quiz's raised
+ * one (`RaisedButton`). The answer grid, the timers and the podium's columns
+ * keep the game's own look.
  */
 
 /* ── Lobby ────────────────────────────────────────────────────────────────── */
@@ -98,9 +107,10 @@ export function LobbyStage({ game }: { game: LiveGame }) {
 
   return (
     <GameStage>
-      <div className="text-center">
+      <div className="flex flex-col items-center text-center">
+        <QuizTile uuid={state.game.quiz.uuid} title={state.game.quiz.title} size="md" className="mb-3" />
         <StageKicker>Waiting to start</StageKicker>
-        <h2 className="mt-2 text-2xl font-semibold text-balance text-foreground">
+        <h2 className="mt-2 text-2xl leading-tight font-bold tracking-tight text-balance text-foreground">
           {state.game.quiz.title}
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -110,14 +120,15 @@ export function LobbyStage({ game }: { game: LiveGame }) {
         </p>
       </div>
 
-      <div className="rounded-xl border bg-card p-4">
+      <div className="rounded-2xl border-2 border-border bg-card p-4">
         {/* NOT a live region (audit L11). The overlay's status region is this
             mode's ONE announcer; a busy lobby announcing every arrival would
             talk over the count-in a screen-reader user needs to hear. */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Users aria-hidden className="size-4" />
           <span>
-            {count} {count === 1 ? 'player' : 'players'} in the lobby
+            <span className="font-comfortaa font-bold text-foreground tabular-nums">{count}</span>{' '}
+            {count === 1 ? 'player' : 'players'} in the lobby
           </span>
         </div>
         <div className="mt-4 flex flex-wrap justify-center gap-4">
@@ -136,21 +147,28 @@ export function LobbyStage({ game }: { game: LiveGame }) {
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-4">
+        {/* The front's raised pair: gold for the one move this reader has,
+            the quiet twin for a host's own join beside their Start. */}
         {joinable && (
-          <Button size="lg" onClick={game.join} disabled={game.joining}>
+          <RaisedButton
+            tone={game.isHost ? 'quiet' : 'primary'}
+            className={LOBBY_BUTTON}
+            onClick={game.join}
+            disabled={game.joining}
+          >
             {game.joining ? (
               <Loader2 aria-hidden className="size-4 animate-spin" />
             ) : (
               <LogIn aria-hidden className="size-4" />
             )}
             Join this game
-          </Button>
+          </RaisedButton>
         )}
 
         {game.isHost && (
-          <Button
-            size="lg"
+          <RaisedButton
+            className={LOBBY_BUTTON}
             onClick={game.start}
             disabled={game.starting || count === 0}
           >
@@ -160,7 +178,7 @@ export function LobbyStage({ game }: { game: LiveGame }) {
               <Play aria-hidden className="size-4" />
             )}
             Start the game
-          </Button>
+          </RaisedButton>
         )}
 
         {!game.isHost && (
@@ -183,6 +201,10 @@ export function LobbyStage({ game }: { game: LiveGame }) {
     </GameStage>
   );
 }
+
+/** The lobby's buttons: the quiz front's raised size (`FRONT_BUTTON`), one
+ *  width so Join and Start stack as a pair. */
+const LOBBY_BUTTON = 'h-12 w-full max-w-xs px-5 text-[15px]';
 
 /* ── Count-in ─────────────────────────────────────────────────────────────── */
 
@@ -558,7 +580,7 @@ export function FinalAnswerStage({
         })}
       </div>
 
-      <div className="flex min-h-10 flex-wrap items-center gap-3">
+      <div className="flex min-h-10 flex-wrap items-center gap-3 pb-1">
         {!isPlaying ? (
           <WatchingNote />
         ) : query.isPending ? (
@@ -575,9 +597,9 @@ export function FinalAnswerStage({
             next.
           </p>
         )}
-        <Button variant="outline" size="sm" onClick={onContinue}>
+        <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onContinue}>
           See final scores
-        </Button>
+        </RaisedButton>
       </div>
     </GameStage>
   );
@@ -678,13 +700,13 @@ export function PodiumStage({
           }
           action={
             refused ? undefined : (
-              <Button
-                variant="outline"
-                size="sm"
+              <RaisedButton
+                tone="quiet"
+                className={COMPACT_RAISED}
                 onClick={() => void query.refetch()}
               >
                 Try again
-              </Button>
+              </RaisedButton>
             )
           }
         />
@@ -717,7 +739,7 @@ export function PodiumStage({
     <GameStage>
       <div className="text-center">
         <StageKicker>Final scores</StageKicker>
-        <h2 className="mt-2 text-2xl font-semibold text-foreground">
+        <h2 className="mt-2 text-2xl leading-tight font-bold tracking-tight text-foreground">
           {results.game.quiz.title}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -733,7 +755,7 @@ export function PodiumStage({
           {ordered.map((row) => (
             <div key={row.user.uuid} className="flex w-24 flex-col items-center gap-2">
               <PlayerChip user={row.user} />
-              <span className="text-sm font-semibold tabular-nums text-foreground">
+              <span className="font-comfortaa text-sm font-bold tabular-nums text-foreground">
                 {row.score.toLocaleString()}
               </span>
               <div
@@ -796,7 +818,7 @@ export function PodiumStage({
             {results.questions.map((question) => (
               <li
                 key={question.uuid}
-                className="rounded-lg border bg-card px-3 py-2.5"
+                className="rounded-2xl border-2 border-border bg-card px-4 py-3"
               >
                 <p className="text-sm text-foreground">{question.question}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -839,9 +861,9 @@ export function CancelledStage({
             : 'The game ended before it finished. Cancelled games keep no scores.'
         }
         action={
-          <Button variant="outline" size="sm" onClick={onBack}>
+          <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onBack}>
             {backLabel}
-          </Button>
+          </RaisedButton>
         }
       />
     </GameStage>

@@ -1,14 +1,16 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Radio } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useJoinGame } from './mutations';
 import { channelQuizQueries } from './queries';
 import type { QuizGame } from '@/types/channel-quiz';
 import type { QuizRoom } from './quiz-room';
+import { COMPACT_RAISED, LiveQuizTile } from './ui';
+import '@/v2/features/quiz/solo/solo-quiz.css';
 
 /**
  * LiveQuizBar — the channel's standing answer to "is a quiz running right
@@ -37,6 +39,11 @@ import type { QuizRoom } from './quiz-room';
  * page it is a `card` in the page's own column, aligned with the header above
  * it: a strip there centred its words away from everything else on the page
  * (fixture pictures, 10 November 2026).
+ *
+ * IN THE QUIZ'S OWN LOOK (Stay and Arthur, 11 November 2026): the quiz's
+ * letter tile with a live dot, its title in bold, and Join or Watch as the
+ * solo quiz's raised button a size down (`COMPACT_RAISED`). `v2-solo` on the
+ * root carries the tokens the lip and the dot are drawn from.
  */
 /**
  * The game live in a room, by the room's one shared probe, or null: what the
@@ -78,19 +85,16 @@ export function LiveQuizBar({
   return (
     <div
       className={cn(
-        'shrink-0 bg-primary/5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
-        shape === 'strip' ? 'border-b px-4 py-2' : 'rounded-xl border px-3 py-2.5',
+        'v2-solo shrink-0 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200',
+        shape === 'strip'
+          ? 'border-b bg-primary/5 px-4 pt-2 pb-3'
+          : 'rounded-2xl border-2 border-border bg-card px-3 pt-3 pb-3.5',
       )}
     >
       <div className={cn('flex w-full items-center gap-3', shape === 'strip' && 'mx-auto max-w-3xl')}>
-        <span
-          aria-hidden
-          className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
-        >
-          <Radio className="size-3.5" />
-        </span>
+        <LiveQuizTile uuid={game.quiz.uuid} title={game.quiz.title} size={shape === 'strip' ? 'sm' : 'md'} />
         <p className="min-w-0 flex-1 truncate text-sm text-foreground">
-          <span className="font-medium">{game.quiz.title}</span>{' '}
+          <span className="font-bold">{game.quiz.title}</span>{' '}
           <span className="text-muted-foreground">
             {lobby ? 'is starting' : 'is live'}
             {players !== undefined &&
@@ -104,9 +108,10 @@ export function LiveQuizBar({
             reader came back, leaving a permanently dead button. `openGame` in
             `ChannelScreen` is idempotent against the LIVE URL instead, which
             cannot go stale and covers all three entry points at once. */}
-        <Button
-          size="sm"
-          className="shrink-0"
+        {/* Gold to play; watching is the quiet twin. */}
+        <RaisedButton
+          tone={canEnterAsPlayer ? 'primary' : 'quiet'}
+          className={cn(COMPACT_RAISED, 'shrink-0')}
           disabled={join.isPending}
           onClick={() => {
             if (!canEnterAsPlayer) {
@@ -122,7 +127,7 @@ export function LiveQuizBar({
             <Loader2 aria-hidden className="size-4 animate-spin" />
           )}
           {canEnterAsPlayer ? 'Join' : 'Watch'}
-        </Button>
+        </RaisedButton>
       </div>
     </div>
   );

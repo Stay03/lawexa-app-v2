@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Check, Crown, Minus, X } from 'lucide-react';
+import { Check, Crown, Minus, Radio, Trophy, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +11,7 @@ import type {
   QuizRankingRow,
 } from '@/types/channel-quiz';
 import type { SlimUser } from '@/types/collab';
+import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
 import { MemberAvatar } from '../ui/avatars';
 import { useServerCountdown } from './game-clock';
 import {
@@ -38,6 +39,58 @@ import {
  * row — so the five-times-a-second tick never re-renders an option grid, a
  * leaderboard or a question body.
  */
+
+/* ── The quiz look around the game ────────────────────────────────────────── */
+
+/*
+ * Everything a reader meets on the way into a live game (the live bar, the
+ * chat card, the host sheet, the dialogs, the lobby) wears the solo quiz's
+ * design (Stay and Arthur, 11 November 2026: "Everything around the quiz
+ * should have the quiz based designs for consistency"): the raised button,
+ * the letter tile, rounded-2xl cards on a 2px border. The tokens and the lip
+ * come from `solo-quiz.css` under a `v2-solo` ancestor, which each of those
+ * surfaces sets on its own root (a dialog or a sheet portals out of the
+ * screen's tree, so it sets it on its content).
+ */
+
+/** The solo quiz's `RaisedButton` a size down, for an action that sits in a
+ *  row beside text (Join on the live bar, Go live on a library row). */
+export const COMPACT_RAISED = 'h-10 rounded-xl px-4 text-sm';
+
+/** A quiz's letter tile with a live dot on its corner: the quiz is being
+ *  played now. Decorative, like the tile; the words beside it say "live". */
+export function LiveQuizTile({
+  uuid,
+  title,
+  size = 'md',
+}: {
+  uuid: string;
+  title: string;
+  size?: 'sm' | 'md';
+}) {
+  return (
+    <span aria-hidden className="relative shrink-0">
+      <QuizTile uuid={uuid} title={title} size={size} />
+      <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-[var(--solo-coral)] ring-2 ring-card motion-safe:animate-pulse" />
+    </span>
+  );
+}
+
+/**
+ * A game's face where its quiz's tile cannot be drawn (a chat line carries
+ * the game, not the quiz): a gold tile on the tile's lip, the live mark while
+ * it runs and the trophy once it has finished. Decorative.
+ */
+export function GameMark({ finished }: { finished: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className="flex size-11 shrink-0 items-center justify-center rounded-[14px] bg-primary text-primary-foreground shadow-[0_3px_0_rgb(0_0_0/0.45)]"
+    >
+      {finished ? <Trophy className="size-5" /> : <Radio className="size-5" />}
+    </span>
+  );
+}
 
 /* ── Layout ───────────────────────────────────────────────────────────────── */
 

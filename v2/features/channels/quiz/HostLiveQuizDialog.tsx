@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -19,12 +18,16 @@ import { Input } from '@/components/ui/input';
 import { extractApiError } from '@/lib/utils/api-error';
 import { spaceGameHref } from '@/lib/utils/space-game-href';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
+import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useCreateSpace } from '@/v2/features/spaces/mutations';
 import { SpacePickList } from '@/v2/features/spaces/move/SpacePickList';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { hostRefusal, hostTargets, quickHostSpacePayload } from './model';
 import { useGoLive } from './mutations';
 import { spaceRoom } from './quiz-room';
+import { COMPACT_RAISED } from './ui';
+import '@/v2/features/quiz/solo/solo-quiz.css';
 
 interface PickedSpace {
   uuid: string;
@@ -46,6 +49,11 @@ interface PickedSpace {
  *
  * A refusal is said under the list and the dialog stays open, so the reader
  * can pick again: a Space with a game already running offers the way into it.
+ *
+ * In the quiz's own look (Stay and Arthur, 11 November 2026): the quiz's
+ * letter tile over a bold heading, the Spaces as rounded-2xl cards
+ * (`SpacePickList`'s `quiz` look; Move keeps its flat list), and the solo
+ * quiz's raised buttons. `v2-solo` sits on the content, which portals out.
  *
  * Hosts mount this only while it is open, so every open starts clean.
  */
@@ -121,7 +129,7 @@ export function HostLiveQuizDialog({
         disabled={busy}
         onClick={() => setNewName('')}
         className={cn(
-          'v2-interactive flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-secondary/60 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent',
+          'v2-interactive flex w-full items-center gap-3 rounded-2xl border-2 border-dashed border-border px-3 py-2.5 text-left transition-colors hover:border-primary/40 disabled:cursor-default disabled:opacity-60 disabled:hover:border-border',
           FOCUS_RING,
         )}
       >
@@ -139,7 +147,7 @@ export function HostLiveQuizDialog({
     ) : (
       <form
         onSubmit={createAndGoLive}
-        className="flex items-center gap-2 px-2 py-2 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
+        className="flex items-center gap-2 py-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
       >
         <Input
           autoFocus
@@ -149,21 +157,23 @@ export function HostLiveQuizDialog({
           aria-label="New Space name"
           maxLength={100}
           disabled={busy}
+          className="h-10 rounded-xl border-2"
         />
-        <Button type="submit" size="sm" disabled={busy || newName.trim() === ''} className="shrink-0">
+        <RaisedButton type="submit" disabled={busy || newName.trim() === ''} className={cn(COMPACT_RAISED, 'shrink-0')}>
           {createSpace.isPending || (goLive.isPending && picked?.isNew === true) ? (
             <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" />
           ) : null}
           {made && made.name === newName.trim() ? 'Go live' : 'Create and go live'}
-        </Button>
+        </RaisedButton>
       </form>
     );
 
   return (
     <Dialog open={open} onOpenChange={(next) => (busy ? undefined : onOpenChange(next))}>
-      <DialogContent className={cn('sm:max-w-md', COLLAB_DIALOG_SURFACE)}>
+      <DialogContent className={cn('v2-solo sm:max-w-md', COLLAB_DIALOG_SURFACE)}>
         <DialogHeader>
-          <DialogTitle>Host a live quiz</DialogTitle>
+          <QuizTile uuid={quiz.uuid} title={quiz.title} size="md" className="mb-1" />
+          <DialogTitle className="text-xl leading-tight font-bold tracking-tight">Host a live quiz</DialogTitle>
           <DialogDescription>
             {`Pick a Space to run “${quiz.title}” in. Its members are told it’s live and join from there.`}
           </DialogDescription>
@@ -174,10 +184,11 @@ export function HostLiveQuizDialog({
           onPick={goLiveIn}
           busyUuid={goLive.isPending ? (picked?.uuid ?? null) : null}
           disabled={busy}
+          look="quiz"
           noMatch={(term) => `No Space you host in matches “${term}”`}
           empty={
-            <div className="flex flex-col gap-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
-              <p className="px-2 pt-2 text-sm text-muted-foreground">
+            <div className="flex flex-col gap-2 px-2 py-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
+              <p className="pt-1 text-sm text-muted-foreground">
                 You don’t host in a Space yet. Make one to run the quiz in.
               </p>
               {newSpace}
@@ -201,10 +212,10 @@ export function HostLiveQuizDialog({
           </p>
         ) : null}
 
-        <DialogFooter>
-          <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
+        <DialogFooter className="pb-1">
+          <RaisedButton type="button" tone="quiet" className={COMPACT_RAISED} disabled={busy} onClick={() => onOpenChange(false)}>
             Cancel
-          </Button>
+          </RaisedButton>
         </DialogFooter>
       </DialogContent>
     </Dialog>

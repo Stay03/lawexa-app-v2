@@ -1,14 +1,17 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Radio, Trophy } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useJoinGame } from './mutations';
 import { channelQuizQueries } from './queries';
 import type { QuizRoom } from './quiz-room';
+import { COMPACT_RAISED, GameMark } from './ui';
+import '@/v2/features/quiz/solo/solo-quiz.css';
 
 /**
  * One quiz line as the card draws it, from a channel's system message or a
@@ -55,6 +58,11 @@ export interface QuizGameLine {
  * player is in the lobby the moment the screen arrives rather than facing a
  * second button. A refusal (late joining off) is not an error either: the game
  * screen opens anyway and explains, in place, that this one is watch-only.
+ *
+ * IN THE QUIZ'S OWN LOOK (Stay and Arthur, 11 November 2026): a rounded-2xl
+ * card on a 2px border, the game's gold tile (`GameMark`: live, or the trophy
+ * once finished), and its actions as the solo quiz's raised button a size
+ * down: gold to play, the quiet twin for everything else.
  */
 export function QuizGameCard({
   line,
@@ -97,42 +105,43 @@ export function QuizGameCard({
   };
 
   return (
-    <div className="mx-auto w-full max-w-md">
-      <div className="flex items-start gap-3 rounded-xl border bg-card px-4 py-3">
-        <span
-          aria-hidden
-          className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"
-        >
-          {finished ? <Trophy className="size-4" /> : <Radio className="size-4" />}
-        </span>
+    <div className="v2-solo mx-auto w-full max-w-md">
+      <div className="flex items-start gap-3 rounded-2xl border-2 border-border bg-card p-4">
+        <GameMark finished={finished} />
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <p
+            className={cn(
+              'text-[11px] font-bold tracking-[0.08em] uppercase',
+              stillLive ? 'text-[var(--solo-gold-text)]' : 'text-muted-foreground',
+            )}
+          >
             {finished ? 'Quiz finished' : stillLive ? 'Live quiz' : 'Quiz'}
           </p>
-          <p className="mt-0.5 text-sm break-words text-foreground">
+          <p className="mt-0.5 text-sm font-semibold break-words text-foreground">
             {line.content}
           </p>
 
           {gameUuid && (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2 pb-1">
               {finished ? (
-                <Button size="sm" variant="outline" onClick={open}>
+                <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={open}>
                   See results
-                </Button>
+                </RaisedButton>
               ) : probePending ? (
                 // Nothing is known about this game yet. Reserve the row's
                 // shape rather than guess at its state.
-                <Skeleton aria-hidden className="h-8 w-20 rounded-md" />
+                <Skeleton aria-hidden className="h-10 w-20 rounded-xl" />
               ) : probeUnreadable ? (
                 // The probe failed, so whether this game is still running is
                 // simply unknown. Open it — the game screen reads the game
                 // itself and states the truth there.
-                <Button size="sm" variant="outline" onClick={open}>
+                <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={open}>
                   Open quiz
-                </Button>
+                </RaisedButton>
               ) : stillLive ? (
-                <Button
-                  size="sm"
+                <RaisedButton
+                  tone={lateJoinOff ? 'quiet' : 'primary'}
+                  className={COMPACT_RAISED}
                   disabled={join.isPending}
                   onClick={() => {
                     if (lateJoinOff) {
@@ -150,20 +159,19 @@ export function QuizGameCard({
                     <Loader2 aria-hidden className="size-4 animate-spin" />
                   )}
                   {lateJoinOff ? 'Watch' : 'Join'}
-                </Button>
+                </RaisedButton>
               ) : (
                 <>
                   <span className="text-xs text-muted-foreground">
                     This game has ended
                   </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 text-xs"
+                  <RaisedButton
+                    tone="quiet"
+                    className="h-8 rounded-lg px-3 text-xs"
                     onClick={open}
                   >
                     See what happened
-                  </Button>
+                  </RaisedButton>
                 </>
               )}
             </div>

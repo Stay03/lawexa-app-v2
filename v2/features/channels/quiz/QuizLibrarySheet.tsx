@@ -9,7 +9,6 @@ import {
   Pencil,
   Play,
   Plus,
-  Radio,
   Share2,
   Trash2,
   Trophy,
@@ -38,6 +37,8 @@ import type { ChannelQuiz } from '@/types/channel-quiz';
 import type { Channel } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
 import { canPublishPublicly, quizFrontHref } from '@/v2/features/quiz/solo/model';
+import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
+import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { TabRow } from '@/v2/shell/TabRow';
@@ -55,8 +56,10 @@ import {
 import { channelQuizQueries } from './queries';
 import { channelRoom, roomNoun, spaceRoom, type QuizRoom } from './quiz-room';
 import { QuizFormDialog } from './QuizFormDialog';
+import { COMPACT_RAISED, LiveQuizTile } from './ui';
 import { VisibilityChip } from './VisibilityChip';
 import { VisibilityGroup } from './VisibilityGroup';
+import '@/v2/features/quiz/solo/solo-quiz.css';
 
 /**
  * QuizLibrarySheet — the quizzes a reader can reach from this room: the ones
@@ -128,6 +131,12 @@ import { VisibilityGroup } from './VisibilityGroup';
  * which is the room's own answer and needs no label here, and a `link` or
  * `public` quiz can be shared from its menu: the link opens the quiz's front
  * (`/quiz/q/{uuid}`), where anyone signed in can take it alone.
+ *
+ * ── IN THE QUIZ'S OWN LOOK (Stay and Arthur, 11 November 2026) ─────────────
+ * The rows are the solo quiz's: a quiz's letter tile on a rounded-2xl card
+ * with a 2px border, Go live and Create quiz the solo quiz's raised button a
+ * size down (`COMPACT_RAISED`), and the live game at the top its tile with
+ * the live dot. `v2-solo` sits on the sheet's content, which portals out.
  */
 
 const SOURCES = [
@@ -276,10 +285,10 @@ export function QuizLibrarySheet({
              desktop. That missing quarter is most of why its rows were
              truncating a quiz title at seventeen characters. Same trap, same
              remedy, as `V2Drawer` and `SpaceDrawer`. */
-          className="flex flex-col data-[side=right]:w-full data-[side=right]:sm:max-w-lg"
+          className="v2-solo flex flex-col data-[side=right]:w-full data-[side=right]:sm:max-w-lg"
         >
           <SheetHeader className="gap-1 border-b">
-            <SheetTitle>Quizzes</SheetTitle>
+            <SheetTitle className="text-lg font-bold tracking-tight">Quizzes</SheetTitle>
             <p className="text-sm text-muted-foreground">
               Live group quizzes for {placeName}. Everyone plays on their own
               device.
@@ -296,16 +305,11 @@ export function QuizLibrarySheet({
                   setLiveError(null);
                   onOpenGame(liveGame.uuid);
                 }}
-                className="v2-interactive flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/5 px-4 py-3 text-left transition-colors duration-150 hover:bg-primary/10 motion-reduce:transition-none"
+                className="v2-interactive flex items-center gap-3 rounded-2xl border-2 border-primary/40 bg-primary/5 p-3 text-left transition-colors duration-150 hover:bg-primary/10 motion-reduce:transition-none"
               >
-                <span
-                  aria-hidden
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
-                >
-                  <Radio className="size-4" />
-                </span>
+                <LiveQuizTile uuid={liveGame.quiz.uuid} title={liveGame.quiz.title} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-foreground">
+                  <span className="block truncate text-sm font-bold text-foreground">
                     {liveGame.quiz.title}
                   </span>
                   <span className="block text-xs text-muted-foreground">
@@ -316,7 +320,7 @@ export function QuizLibrarySheet({
                       }`}
                   </span>
                 </span>
-                <span className="shrink-0 text-sm font-medium text-primary">
+                <span className="shrink-0 text-sm font-bold text-[var(--solo-gold-text)]">
                   Open
                 </span>
               </button>
@@ -376,10 +380,10 @@ export function QuizLibrarySheet({
               )}
 
               {mayCreateHere && (
-                <Button size="sm" className="shrink-0" onClick={() => openForm()}>
+                <RaisedButton className={cn(COMPACT_RAISED, 'shrink-0')} onClick={() => openForm()}>
                   <Plus aria-hidden className="size-4" />
                   Create quiz
-                </Button>
+                </RaisedButton>
               )}
             </div>
 
@@ -407,13 +411,13 @@ export function QuizLibrarySheet({
                 }
                 description="Something went wrong on our side. Please try again."
                 action={
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <RaisedButton
+                    tone="quiet"
+                    className={COMPACT_RAISED}
                     onClick={() => void listQuery.refetch()}
                   >
                     Try again
-                  </Button>
+                  </RaisedButton>
                 }
               />
             ) : quizzes.length === 0 ? (
@@ -432,10 +436,10 @@ export function QuizLibrarySheet({
                 }
                 action={
                   mayCreateHere ? (
-                    <Button size="sm" onClick={() => openForm()}>
+                    <RaisedButton className={COMPACT_RAISED} onClick={() => openForm()}>
                       <Plus aria-hidden className="size-4" />
                       Write the first one
-                    </Button>
+                    </RaisedButton>
                   ) : undefined
                 }
               />
@@ -550,10 +554,13 @@ function QuizRow({
   const [refusal, setRefusal] = useState<string | null>(null);
 
   return (
-    <li className="flex items-start gap-3 rounded-xl border bg-card px-3 py-3">
+    <li className="flex items-start gap-3 rounded-2xl border-2 border-border bg-card p-3">
+      {/* The quiz's face, as on the Quiz home's cards: the small tile, so a
+          phone's row keeps its room for the title. */}
+      <QuizTile uuid={quiz.uuid} title={quiz.title} size="sm" className="mt-0.5" />
       <div className="min-w-0 flex-1">
         {/* AT A NARROW WIDTH THE ROW'S HEIGHT GIVES, NOT THE TITLE. Go live and
-            the overflow trigger are a fixed 126px whatever the row says, and a
+            the overflow trigger are a fixed width whatever the row says, and a
             phone that hands the title what is left was cutting it to "Land
             registratio…" — a quiz the reader cannot identify is a row they
             cannot use. The width the sheet was actually rendering at is fixed
@@ -561,7 +568,7 @@ function QuizRow({
             rather than dropping the words off the one verb on the row. One line
             again from `sm`, where the column is wide enough that a second was
             only ever going to be a ragged half-line. */}
-        <p className="line-clamp-2 text-sm font-medium text-foreground sm:line-clamp-1">
+        <p className="line-clamp-2 text-sm font-semibold text-foreground sm:line-clamp-1">
           {quiz.title}
         </p>
         {/* ONE LINE THAT GIVES IN A DECIDED ORDER, never a wrapped one.
@@ -652,9 +659,9 @@ function QuizRow({
         <div className="flex shrink-0 items-center gap-1">
           {/* The host policy governs starting a game… */}
           {mayHost && (
-            <Button
-              size="sm"
-              variant="outline"
+            <RaisedButton
+              tone="quiet"
+              className={cn(COMPACT_RAISED, 'px-3')}
               disabled={goLive.isPending || hasLiveGame}
               title={
                 hasLiveGame
@@ -687,7 +694,7 @@ function QuizRow({
                 <Play aria-hidden className="size-4" />
               )}
               Go live
-            </Button>
+            </RaisedButton>
           )}
 
           {/* …authorship (or governance over a quiz born here) governs
@@ -746,11 +753,14 @@ function QuizListSkeleton() {
       {[0, 1, 2, 3].map((index) => (
         <div
           key={index}
-          className="rounded-xl border px-3 py-3"
+          className="flex items-start gap-3 rounded-2xl border-2 border-border/60 p-3"
           style={{ opacity: Math.max(0.3, 1 - index * 0.2) }}
         >
-          <Skeleton className="h-4 w-2/3 rounded" />
-          <Skeleton className="mt-2 h-3 w-1/2 rounded" />
+          <Skeleton className="mt-0.5 size-7 shrink-0 rounded-lg" />
+          <div className="min-w-0 flex-1">
+            <Skeleton className="h-4 w-2/3 rounded" />
+            <Skeleton className="mt-2 h-3 w-1/2 rounded" />
+          </div>
         </div>
       ))}
     </div>
