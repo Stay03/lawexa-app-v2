@@ -1,4 +1,5 @@
 import { infiniteQueryOptions, queryOptions } from '@tanstack/react-query';
+import { backgroundJobsApi } from '@/lib/api/background-jobs';
 import { chatApi } from '@/lib/api/chat';
 import type {
   ConversationData,
@@ -6,6 +7,7 @@ import type {
   ListConversationsParams,
 } from '@/types/chat';
 import { GC_TIMES, REFETCH_ON_VISIT, STALE_TIMES } from '@/v2/runtime/query';
+import { awaitsBackgroundJob } from './conversation/background-jobs/model';
 import { SPACE_CHAT_POLL_MS, stopsPolling } from './conversation/space-turn';
 
 /**
@@ -456,4 +458,38 @@ export const conversationsQueries = {
       refetchInterval: (query) => (stopsPolling(query.state.error) ? false : SPACE_CHAT_POLL_MS),
       refetchOnWindowFocus: (query) => !stopsPolling(query.state.error),
     }),
+
+  allBackgroundJobs: () => [...conversationsQueries.all, 'background-jobs'] as const,
+
+  backgroundJobsOf: (conversationId: string) =>
+    [...conversationsQueries.allBackgroundJobs(), conversationId] as const,
+
+  /**
+   * The reader's background jobs in a chat (`GET /conversations/{uuid}/
+   * background-jobs`; Backend's shapes 063d9cc3): what the label under the
+   * message that started each one shows, and whether the chat still waits on
+   * Lawexa's return.
+   *
+   * Read as the chat opens, again when a notification names the chat (the
+   * spine), and every {@link BACKGROUND_JOBS_POLL_MS} while a job runs or
+   * Lawexa has not come back to one (`awaitsBackgroundJob`), as the doc asks:
+   * a modest poll, paused in a hidden tab. Not at all otherwise. A refusal
+   * (403, 404: a chat that has no jobs to show this reader) stops it.
+   */
+  backgroundJobs: ({ conversationId, viewerId }: ConversationDetailOptions) =>
+    queryOptions({
+      queryKey: [...conversationsQueries.backgroundJobsOf(conversationId), { viewerId }] as const,
+      queryFn: () => backgroundJobsApi.list(conversationId),
+      staleTime: STALE_TIMES.live,
+      gcTime: GC_TIMES.list,
+      retry: false,
+      refetchInterval: (query) =>
+        !stopsPolling(query.state.error) && awaitsBackgroundJob(query.state.data?.data.background_jobs ?? [])
+          ? BACKGROUND_JOBS_POLL_MS
+          : false,
+      refetchOnWindowFocus: (query) => !stopsPolling(query.state.error),
+    }),
 };
+
+/** How often a chat waiting on a background job asks for its jobs again. */
+export const BACKGROUND_JOBS_POLL_MS = 10_000;

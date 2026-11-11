@@ -249,7 +249,7 @@ test('the poll waits for the mount flow, stops while streaming, and reads the tr
   const controller = readHere('useConversationController.ts');
   assert.match(
     controller,
-    /enabled:\s*isSpaceMember &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
+    /enabled:\s*\(isSpaceMember \|\| awaitingBackgroundJob\) &&\s*!isConfidential &&\s*!isGoneOnServer &&\s*recoveredFor === conversationId &&\s*!isStreaming,/,
   );
   // Recovery settles after the mount flow's own attach, or on any connect.
   // The open's recovery (retried, then followed: recover-with-retry.ts) settles
@@ -682,7 +682,7 @@ test('a colleague’s pending turn, the record still on its way: held, named, no
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /const canStop = turn\.kind === 'own' && turn\.canStop;/);
   // The only gate the record still sets is the poll's, which is off while streaming anyway.
-  assert.match(controller, /enabled:\s*isSpaceMember &&/);
+  assert.match(controller, /enabled:\s*\(isSpaceMember \|\| awaitingBackgroundJob\) &&/);
 });
 
 /* ── Whose turn: the techlead's five rules (F4 run against the real API) ──── */
@@ -773,10 +773,11 @@ test('rule 5: a personal chat’s owner keeps Stop on their own turn, with no ne
   assert.deepEqual(whoseTurn({ isStreaming: true, origin: 'followed', status: ownStatus, refusal: null, viewerId: 2 }), { kind: 'own', canStop: true });
   const before = { status: 'pending' as const, messages: [], execution_id: 'e1', stream_url: null, pending_since: null };
   assert.deepEqual(whoseTurn({ isStreaming: true, origin: 'followed', status: before, refusal: null, viewerId: 2 }), { kind: 'own', canStop: true });
-  // No new read: the status poll stays a space member's, the mount flow adds
-  // none, and the recovery read is the one it always made.
+  // No new read: the status poll stays a space member's (or a chat's while it
+  // waits on a background job, Backend 063d9cc3), the mount flow adds none,
+  // and the recovery read is the one it always made.
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /enabled:\s*isSpaceMember &&/);
+  assert.match(controller, /enabled:\s*\(isSpaceMember \|\| awaitingBackgroundJob\) &&/);
   assert.doesNotMatch(controller, /prefetchQuery/);
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   const recover = engine.slice(engine.indexOf('async function recoverPendingState'), engine.indexOf('// ─── Construction seed'));

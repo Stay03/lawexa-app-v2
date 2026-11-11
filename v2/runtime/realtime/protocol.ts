@@ -66,6 +66,9 @@ export interface CollabBroadcastNotification {
   author?: SlimUser | null;
   preview?: string;
   action_url?: string;
+  /** The chat a notification is about (`background_job_answered`, Backend
+   *  063d9cc3): read again on arrival, so an open chat shows Lawexa's return. */
+  conversation_uuid?: string;
 }
 
 /** Echo name of a space's private channel (wire: `private-spaces.{uuid}`).

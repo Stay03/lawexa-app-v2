@@ -18,6 +18,7 @@ import { channelsQueries } from '@/v2/features/channels/queries';
 import { warmChannelHistory } from '@/v2/features/channels/warm';
 import { channelDisplayName } from '@/v2/features/channels/thread-model';
 import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
+import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { invitationsQueries } from '@/v2/features/invitations/queries';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
 import {
@@ -37,6 +38,7 @@ import {
   EVT_USERBOX_CONTROL,
   userChannelName,
   type ChannelUnreadEvent,
+  type CollabBroadcastNotification,
 } from './protocol';
 
 /**
@@ -123,6 +125,16 @@ function invalidateCollabSurfaces(queryClient: QueryClient): void {
   for (const queryKey of COLLAB_GAP_KEYS) {
     void queryClient.invalidateQueries({ queryKey }, { cancelRefetch: false });
   }
+}
+
+/**
+ * A notification named a chat: read its transcript and its background jobs
+ * again. An open chat re-draws from them (the engine merges a re-read
+ * transcript); a chat not on screen only has its cache marked stale.
+ */
+function refreshNotifiedChat(queryClient: QueryClient, conversationId: string): void {
+  void queryClient.invalidateQueries({ queryKey: [...conversationsQueries.details(), conversationId] });
+  void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(conversationId) });
 }
 
 /**
@@ -296,13 +308,19 @@ export function RealtimeSpine() {
     // focus. Blanket again, for the same reason: the payload's vocabulary is
     // not ours to branch on, and re-asking three cheap inboxes on a
     // notification is far below the cost of a badge that lies.
-    channel.notification(() => {
+    channel.notification((payload: CollabBroadcastNotification) => {
       void queryClient.invalidateQueries({
         queryKey: notificationsQueries.all,
       });
       void queryClient.invalidateQueries({
         queryKey: invitationsQueries.all,
       });
+      // A notification about a chat (Lawexa back from a background job,
+      // Backend 063d9cc3) says that chat changed. Branching on the payload's
+      // FIELD, never its `type`: a named chat is re-read, and a chat that is
+      // open re-draws with Lawexa's return and its jobs' new state. A closed
+      // one only marks its cache stale.
+      if (payload?.conversation_uuid) refreshNotifiedChat(queryClient, payload.conversation_uuid);
     });
 
     channel.listen(EVT_CHANNEL_UNREAD, (payload: ChannelUnreadEvent) => {

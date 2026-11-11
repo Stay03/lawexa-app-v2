@@ -48,18 +48,30 @@ export function parseToolResult(result: Pick<ApiMessage, 'content' | 'metadata'>
 }
 
 /**
- * A `draft_edit` event row as the line v2 draws ("Stay edited 'Lease
- * agreement' · 17:49"; Stay, 30 October 2026, 02:16Z, thread 1e44eb39,
- * design 9b43f942). `null` for any other row, any other event type, and a
- * draft_edit row missing what the line needs: a line that cannot be drawn
- * right is not drawn.
+ * A row as the line v2 draws: a `draft_edit` ("Stay edited 'Lease agreement'
+ * · 17:49"; Stay, 30 October 2026, 02:16Z, thread 1e44eb39, design 9b43f942),
+ * or background work's return or give-up line (Backend's shapes 063d9cc3).
+ * `null` for any other row, any other event type, and a row missing what its
+ * line needs: a line that cannot be drawn right is not drawn.
  */
 export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
-  if (apiMsg.role !== 'event') return null;
   const meta = apiMsg.metadata;
-  if (meta?.type !== 'draft_edit' || typeof meta.note_id !== 'number') return null;
   const at = new Date(apiMsg.created_at);
   if (Number.isNaN(at.getTime())) return null;
+  if (isBackgroundJobLine(apiMsg)) {
+    const lineMeta = apiMsg.metadata;
+    return {
+      id: `msg_${apiMsg.id}`,
+      role: 'event',
+      eventType: lineMeta.type,
+      serverId: apiMsg.id,
+      content: apiMsg.content,
+      timestamp: at,
+      jobs: Array.isArray(lineMeta.background_jobs) ? lineMeta.background_jobs : [],
+    };
+  }
+  if (apiMsg.role !== 'event') return null;
+  if (meta?.type !== 'draft_edit' || typeof meta.note_id !== 'number') return null;
   const last = meta.last_edited_at ? new Date(meta.last_edited_at) : at;
   return {
     id: `msg_${apiMsg.id}`,
@@ -74,6 +86,24 @@ export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
     draftTitle: meta.draft_title?.trim() || 'Untitled draft',
     noteId: meta.note_id,
   };
+}
+
+/**
+ * Whether a turn row is background work's line (Backend's shapes 063d9cc3):
+ * Lawexa's return, which the server stores as a USER-role row, or its give-up
+ * notice, an ASSISTANT-role row. v2 draws both as lines beside the turns; v1,
+ * which does not ask for lines, keeps drawing them as it always has.
+ */
+export function isBackgroundJobLine(
+  apiMsg: Pick<ApiMessage, 'role' | 'metadata'>,
+): apiMsg is Pick<ApiMessage, 'role'> & {
+  metadata: NonNullable<ApiMessage['metadata']> & { type: 'background_job_result' | 'background_job_unanswered' };
+} {
+  const type = apiMsg.metadata?.type;
+  return (
+    (apiMsg.role === 'user' && type === 'background_job_result') ||
+    (apiMsg.role === 'assistant' && type === 'background_job_unanswered')
+  );
 }
 
 /**
@@ -145,8 +175,9 @@ export function transformApiMessages(
   const failedTurnsShown = new Set<string>();
 
   for (const apiMsg of apiMessages) {
-    // A line beside the turns: drawn by v2 when it is a kind it knows, else dropped.
-    if (apiMsg.role === 'event') {
+    // A line beside the turns: drawn by v2 when it is a kind it knows, else
+    // dropped. Background work's two rows are turns on the server and lines here.
+    if (apiMsg.role === 'event' || (keepEvents && isBackgroundJobLine(apiMsg))) {
       const line = keepEvents ? eventFromApi(apiMsg) : null;
       if (line) messages.push(line);
       continue;

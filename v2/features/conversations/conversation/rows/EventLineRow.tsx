@@ -2,10 +2,10 @@
 
 import { memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PenLine } from 'lucide-react';
+import { History, PenLine } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import type { EventMessage } from '@/types/chat';
+import type { BackgroundJobEvent, DraftEditEvent, EventMessage } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { notesQueries } from '@/v2/features/notes/queries';
@@ -13,9 +13,46 @@ import { useV2ChatContext } from '../chat-context';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { clockTime } from '../day-label';
 import { draftOrdinalForLine } from './event-line';
+import { backgroundReturnLine } from '../background-jobs/model';
+
+/** EventLineRow — a line in the chat beside the turns, drawn by its kind. */
+export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMessage }) {
+  switch (line.eventType) {
+    case 'background_job_result':
+    case 'background_job_unanswered':
+      return <BackgroundJobLine line={line} />;
+    default:
+      return <DraftEditLine line={line} />;
+  }
+});
 
 /**
- * EventLineRow — a quiet centred line in the chat where a draft was edited:
+ * Background work the reader started has ended (Backend's shapes 063d9cc3):
+ * "File reading finished. Lawexa is continuing." where Lawexa came back, its
+ * answer following under it; Lawexa's own sentence where it could not ("…
+ * Ask about it to continue."). A quiet centred note, never a bubble: the
+ * server stores these as turns, but nobody typed them. The return's words
+ * come from the jobs it names, never its content, which is written for
+ * Lawexa.
+ */
+function BackgroundJobLine({ line }: { line: BackgroundJobEvent }) {
+  const words = line.eventType === 'background_job_result' ? backgroundReturnLine(line.jobs) : line.content;
+  return (
+    // One run of text, the icon and the time inline with it: the give-up
+    // sentence is long, and as flex items its words, dot and time wrapped
+    // into separate columns (fixture pictures, 11 November 2026).
+    <p role="note" className="px-4 text-center text-xs text-balance text-muted-foreground">
+      <History aria-hidden className="mr-1.5 inline size-3.5 -translate-y-px align-middle" />
+      {words} <span aria-hidden>·</span>{' '}
+      <time dateTime={line.timestamp.toISOString()} className="whitespace-nowrap">
+        {clockTime(line.timestamp)}
+      </time>
+    </p>
+  );
+}
+
+/**
+ * A quiet centred line in the chat where a draft was edited:
  * "✎ Stay edited 'Lease agreement' · 5:49 PM", once per editing session (Stay,
  * 30 October 2026, 02:16Z, thread 1e44eb39; design 9b43f942). No bubble, no
  * avatar, no actions, no reply: it is a note about the chat, not a turn.
@@ -25,7 +62,7 @@ import { draftOrdinalForLine } from './event-line';
  * does not hold leaves the title as plain text. The list is read from the cache the draft
  * cards fill, so the line sends no request of its own.
  */
-export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMessage }) {
+function DraftEditLine({ line }: { line: DraftEditEvent }) {
   const chat = useV2ChatContext();
   const panel = useSidePanel();
   const { userId: viewerId } = useV2Session();
@@ -63,4 +100,4 @@ export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMe
       </span>
     </p>
   );
-});
+}

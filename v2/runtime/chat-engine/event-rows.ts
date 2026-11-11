@@ -1,4 +1,4 @@
-import { isEventMessage, type EventMessage } from '@/types/chat';
+import { isEventMessage, type BackgroundJobEvent, type EventMessage } from '@/types/chat';
 import type { EngineMessage } from './types';
 
 /**
@@ -52,16 +52,28 @@ export function removeEvent(rows: readonly EngineMessage[], serverId: number): r
   return rows.filter((_, i) => i !== index);
 }
 
+const isBackgroundJobLine = (line: EventMessage): line is BackgroundJobEvent =>
+  line.eventType === 'background_job_result' || line.eventType === 'background_job_unanswered';
+
 /** Whether two lines draw the same. */
 export function sameLine(a: EventMessage, b: EventMessage): boolean {
-  return (
-    a.id === b.id &&
-    timeOf(a) === timeOf(b) &&
-    a.editedAt.getTime() === b.editedAt.getTime() &&
-    a.draftTitle === b.draftTitle &&
-    a.editorName === b.editorName &&
-    a.content === b.content
-  );
+  if (a.id !== b.id || timeOf(a) !== timeOf(b) || a.content !== b.content) return false;
+  if (a.eventType === 'draft_edit' && b.eventType === 'draft_edit') {
+    return (
+      a.editedAt.getTime() === b.editedAt.getTime() &&
+      a.draftTitle === b.draftTitle &&
+      a.editorName === b.editorName
+    );
+  }
+  if (isBackgroundJobLine(a) && isBackgroundJobLine(b)) {
+    // A stored row never changes; its jobs are compared for a row read twice.
+    return (
+      a.eventType === b.eventType &&
+      a.jobs.length === b.jobs.length &&
+      a.jobs.every((job, index) => job.job_id === b.jobs[index].job_id && job.outcome === b.jobs[index].outcome)
+    );
+  }
+  return false;
 }
 
 /**

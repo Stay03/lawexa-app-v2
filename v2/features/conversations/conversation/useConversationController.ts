@@ -40,6 +40,8 @@ import type { RosterEntry } from './member-colour';
 import { flushDraftsBeforeSend, UNSAVED_DRAFT_LINE } from './draft/draft-flush';
 import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
+import { awaitsBackgroundJob } from './background-jobs/model';
+import type { BackgroundJob } from '@/types/background-jobs';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { toast } from 'sonner';
 import type { MentionOptions } from '@/v2/features/channels/model';
@@ -111,6 +113,8 @@ import {
 
 /** Stable empty references — a fresh `[]` per render would churn every consumer. */
 const NO_REFERENCES: ConversationReference[] = [];
+/** Stable empty reference for a chat with no jobs read (yet). */
+const NO_BACKGROUND_JOBS: readonly BackgroundJob[] = [];
 
 /**
  * Map a failed history load onto the sentinel strings the screen renders. Byte-identical
@@ -254,6 +258,8 @@ export interface ConversationController {
    * owner id is still null).
    */
   isOwnerResolved: boolean;
+  /** The reader's background jobs in this chat (Backend 063d9cc3), oldest first; empty until read. */
+  backgroundJobs: readonly BackgroundJob[];
   /**
    * Whether the transcript is still being loaded and there is NOTHING to show yet.
    * The union of both history paths (the device-owned IndexedDB load and the server
@@ -896,17 +902,47 @@ export function useConversationController(
     queryClient.removeQueries({ queryKey: [...conversationsQueries.details(), conversationId] });
   }, [isGoneOnServer, isGoneMarked, conversationId, queryClient]);
 
+  // ── Background jobs (Backend's shapes 063d9cc3) ──
+  // The reader's own jobs in this chat, for the label under the message that
+  // started each one. Read once the record has answered, for the chat's owner
+  // or a member of its space (the only readers the server lists jobs for);
+  // never on a confidential chat, which has none. The query polls itself while
+  // a job runs or Lawexa has not come back to one (`awaitsBackgroundJob`).
+  const readsBackgroundJobs = detailData !== null && (isOwner || isSpaceMember) && !isConfidential && !isGoneOnServer;
+  const backgroundJobsQuery = useQuery({
+    ...conversationsQueries.backgroundJobs({ conversationId, viewerId: serverUserId }),
+    enabled: readsBackgroundJobs,
+  });
+  const backgroundJobs = backgroundJobsQuery.data?.data.background_jobs ?? NO_BACKGROUND_JOBS;
+  const awaitingBackgroundJob = awaitsBackgroundJob(backgroundJobs);
+
+  // A turn on this screen just ended: it may have started a job, whose label
+  // belongs under its question now rather than at the next beat. A query call
+  // on the edge, no setState.
+  const wasStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    const ended = wasStreamingRef.current && !isStreaming;
+    wasStreamingRef.current = isStreaming;
+    if (ended && readsBackgroundJobs) {
+      void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(conversationId) });
+    }
+  }, [isStreaming, readsBackgroundJobs, queryClient, conversationId]);
+
   // ── A space chat follows its other members (Spaces F4, backend B4). ──
   // B4 has no push channel, so an open space chat reads its status every four
   // seconds (`conversationsQueries.status`: paused in a hidden tab, stopped by
   // a 403 or 404). Never while this screen streams: the engine owns liveness
   // then. Never before the mount flow settled its recovery, never for a reader
-  // who is not a member of the space, and never on a personal or confidential
-  // chat.
+  // who is not a member of the space, and never on a confidential chat.
+  //
+  // A PERSONAL CHAT WAITING ON A BACKGROUND JOB reads it too: Lawexa comes back
+  // in a turn nobody on this screen started (Backend 063d9cc3), and the same
+  // poll is what finds such a turn and follows its stream. Only while a job
+  // runs or Lawexa has yet to answer one; not otherwise.
   const statusQuery = useQuery({
     ...statusOptions,
     enabled:
-      isSpaceMember &&
+      (isSpaceMember || awaitingBackgroundJob) &&
       !isConfidential &&
       !isGoneOnServer &&
       recoveredFor === conversationId &&
@@ -1197,6 +1233,7 @@ export function useConversationController(
     turnLabel,
     canStop,
     isOwnerResolved: ownerId !== null,
+    backgroundJobs,
     isLoadingHistory,
     showHistorySkeleton,
     isGoneOnServer,

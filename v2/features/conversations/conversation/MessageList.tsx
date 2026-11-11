@@ -38,6 +38,7 @@ import { spaceMarks } from './space-marks';
 import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
 import { EventLineRow } from './rows/EventLineRow';
+import { BackgroundJobsLabel } from './background-jobs/BackgroundJobsLabel';
 import { CompactToolChain } from './tools/CompactToolChain';
 import { CreatedQuizCards } from './cards/CreatedQuizCard';
 import { isFileListStep } from './files/chat-files';
@@ -992,18 +993,22 @@ const GroupRow = memo(function GroupRow({
       );
     } else if (message.role === 'user') {
       body = (
-        <UserMessageRow
-          message={message}
-          showAuthor={showAuthor}
-          viewerId={viewerId}
-          viewerUuid={viewerUuid}
-          colourIndex={colourIndex}
-          quoteTone={quoteColour}
-          onReply={onReply}
-          onJump={onJump}
-          onHold={onHold}
-          redacted={redacted}
-        />
+        <>
+          <UserMessageRow
+            message={message}
+            showAuthor={showAuthor}
+            viewerId={viewerId}
+            viewerUuid={viewerUuid}
+            colourIndex={colourIndex}
+            quoteTone={quoteColour}
+            onReply={onReply}
+            onJump={onJump}
+            onHold={onHold}
+            redacted={redacted}
+          />
+          {/* The background work this question started, if any (Backend 063d9cc3). */}
+          <BackgroundJobsLabel messageId={savedIdOf(message)} />
+        </>
       );
     } else {
       body = (

@@ -205,29 +205,54 @@ export interface NarrationMessage extends ChatMessage {
 
 /**
  * A quiet line in the chat about something done beside it, not a turn (role
- * `event` on the server). The one kind drawn today is `draft_edit`: "Stay
- * edited 'Lease agreement' · 17:49", once per editing session of a draft made
- * from this chat (Stay, 30 October 2026, 02:16Z, thread 1e44eb39; design
- * 9b43f942). Its place is `timestamp` (the session's first save, the row's
- * `created_at`); the time it shows is `editedAt` (the session's last save).
+ * `event` on the server), by `eventType`:
+ *  - {@link DraftEditEvent}, a draft edited from this chat;
+ *  - {@link BackgroundJobEvent}, Lawexa back from background work, or unable to come back.
  * Only v2 draws these: v1's transform never returns one.
  */
-export interface EventMessage {
+export type EventMessage = DraftEditEvent | BackgroundJobEvent;
+
+/** What every line has: its place and the server's own sentence. */
+interface EventMessageBase {
   /** `msg_{serverId}`, as every row read from the server is named. */
   id: string;
   role: 'event';
-  eventType: 'draft_edit';
   /** The server's message id: a later save replaces or removes the line by it. */
   serverId: number;
-  /** The server's sentence, kept for reading aloud; the row builds its own words. */
+  /** The server's sentence. */
   content: string;
   timestamp: Date;
+}
+
+/**
+ * "Stay edited 'Lease agreement' · 17:49", once per editing session of a draft
+ * made from this chat (Stay, 30 October 2026, 02:16Z, thread 1e44eb39; design
+ * 9b43f942). Its place is `timestamp` (the session's first save, the row's
+ * `created_at`); the time it shows is `editedAt` (the session's last save).
+ * The row builds its own words; `content` is kept for reading aloud.
+ */
+export interface DraftEditEvent extends EventMessageBase {
+  eventType: 'draft_edit';
   editedAt: Date;
   editorName: string;
   editorUuid: string | null;
   draftTitle: string;
   /** The draft's note (`metadata.note_id`; notes have no uuid). */
   noteId: number;
+}
+
+/**
+ * Background work the reader started has ended (Backend's shapes 063d9cc3).
+ * The server stores these as turns, and v2 draws them as lines:
+ *  - `background_job_result`, a USER-role row the system writes when Lawexa is
+ *    woken with the result; its `content` is written for Lawexa, so the line
+ *    builds its words from `jobs` and never shows it. Lawexa's answer follows.
+ *  - `background_job_unanswered`, an ASSISTANT-role row written when Lawexa
+ *    could not come back; its `content` is for the reader and is shown as is.
+ */
+export interface BackgroundJobEvent extends EventMessageBase {
+  eventType: 'background_job_result' | 'background_job_unanswered';
+  jobs: import('@/types/background-jobs').BackgroundJobOutcome[];
 }
 
 // Union type for all message types
@@ -716,7 +741,9 @@ export interface ApiMessage {
       | 'error'
       | 'narration'
       | 'radar_report'
-      | 'draft_edit';
+      | 'draft_edit'
+      | 'background_job_result'
+      | 'background_job_unanswered';
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).
@@ -729,6 +756,9 @@ export interface ApiMessage {
     /** On a `draft_edit` event row: the editing session's first and last save. */
     first_edited_at?: string;
     last_edited_at?: string;
+    /** On a `background_job_result` (user role) or `background_job_unanswered` (assistant role)
+     *  row: the jobs it is about (Backend 063d9cc3). */
+    background_jobs?: import('@/types/background-jobs').BackgroundJobOutcome[];
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
     success?: boolean;

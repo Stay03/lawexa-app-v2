@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { ApiMessage, ChatMessage, ConversationData, EventMessage } from '@/types/chat';
+import type { ApiMessage, ChatMessage, ConversationData, DraftEditEvent } from '@/types/chat';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import { isStorableAnswer } from '@/v2/runtime/persist/policy';
 import { isTurnRow, lastTurnIndex, lastTurnRow, turnRowCount } from '@/v2/runtime/turn-rows';
@@ -57,7 +57,7 @@ const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
 test('v2 reads a draft_edit row as a line: its place is created_at, its time is last_edited_at', () => {
   const rows = transformApiMessages([turn(1, 'user', 0), line(9, 1), turn(2, 'assistant', 2)], { events: true });
   assert.deepEqual(ids(rows), ['msg_1', 'msg_9', 'msg_2']);
-  const drawn = rows[1] as EventMessage;
+  const drawn = rows[1] as DraftEditEvent;
   assert.equal(drawn.role, 'event');
   assert.equal(drawn.eventType, 'draft_edit');
   assert.equal(drawn.serverId, 9);
@@ -119,7 +119,7 @@ test('a chat whose last turn is a question is not kept on the device, though a l
 
 const engineRows = (messages: ApiMessage[]) => transformApiMessages(messages, { events: true }) as EngineMessage[];
 const lineRow = (id: number, minutes: number, extra?: Partial<NonNullable<ApiMessage['metadata']>>) =>
-  transformApiMessages([line(id, minutes, extra)], { events: true })[0] as EventMessage;
+  transformApiMessages([line(id, minutes, extra)], { events: true })[0] as DraftEditEvent;
 
 test('a new line goes in its place in time, and a held one is replaced by id', () => {
   const rows = engineRows([turn(1, 'user', 0), turn(2, 'assistant', 2), turn(3, 'user', 4)]);
@@ -128,7 +128,7 @@ test('a new line goes in its place in time, and a held one is replaced by id', (
   // A later save of the session: same place, new time and title.
   const moved = placeEvent(placed, lineRow(9, 3, { last_edited_at: iso(30), draft_title: 'Lease (final)' }));
   assert.deepEqual(ids(moved), ['msg_1', 'msg_2', 'msg_9', 'msg_3']);
-  const drawn = moved[2] as EventMessage;
+  const drawn = moved[2] as DraftEditEvent;
   assert.equal(drawn.draftTitle, 'Lease (final)');
   assert.equal(drawn.editedAt.toISOString(), iso(30));
   // The same line again changes nothing.
@@ -171,7 +171,7 @@ test('the engine draws a saved line at once, replaces it by id, and takes it awa
   assert.equal(engine.upsertEvent(line(9, 3)), true);
   assert.deepEqual(ids(engine.getSnapshot().messages), ['msg_1', 'msg_2', 'msg_9', 'msg_3']);
   assert.equal(engine.upsertEvent(line(9, 3, { last_edited_at: iso(20) })), true);
-  const held = engine.getSnapshot().messages.find((row) => row.id === 'msg_9') as EventMessage;
+  const held = engine.getSnapshot().messages.find((row) => row.id === 'msg_9') as DraftEditEvent;
   assert.equal(held.editedAt.toISOString(), iso(20));
   // Another chat's row, and an event of another type, change nothing.
   assert.equal(engine.upsertEvent({ ...line(10, 3), conversation_id: 'conv-2' }), false);
@@ -191,7 +191,7 @@ test('a merge brings a colleague’s line in its place and refreshes it by id, w
   engine.adoptConversationHistory(
     history([turn(1, 'user', 0), line(9, 1, { last_edited_at: iso(40) }), turn(2, 'assistant', 2)]),
   );
-  const held = engine.getSnapshot().messages.find((row) => row.id === 'msg_9') as EventMessage;
+  const held = engine.getSnapshot().messages.find((row) => row.id === 'msg_9') as DraftEditEvent;
   assert.equal(held.editedAt.toISOString(), iso(40));
   // The server took the line away (the draft went back to Lawexa's version): the merge does too.
   engine.adoptConversationHistory(history(base));

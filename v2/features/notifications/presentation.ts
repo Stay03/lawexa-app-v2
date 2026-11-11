@@ -143,6 +143,10 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   space_role_requested: 'Someone asked to contribute',
   space_role_approved: 'You are now a Contributor',
   space_role_declined: 'Your request to contribute was declined',
+  // Lawexa back from a background job (Backend 063d9cc3). The server sends
+  // its own title ("Lawexa has an update in {chat}"); this is for a row that
+  // comes without one.
+  background_job_answered: 'Lawexa has an update in your chat',
 };
 
 function trimmedOrNull(value: string | null | undefined): string | null {
