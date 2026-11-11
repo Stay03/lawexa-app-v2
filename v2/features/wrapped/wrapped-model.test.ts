@@ -21,7 +21,7 @@ import {
   vibeFor,
 } from '@/lib/wrapped/copy';
 import { FRAME_MS, framesToPlay, initialStory, progressOf, storyReducer, tapSide } from '@/lib/wrapped/story-model';
-import { fitText, wrapWords } from '@/lib/wrapped/text-fit';
+import { fitText, wrapWords } from '@/lib/share-card/text-fit';
 import { SHARE_LAYOUT, corsPhotoUrl, personaBanner, shownStickers } from '@/lib/wrapped/share-image';
 import { POLAROID, SHARE_HEIGHT, wrappedArt } from '@/lib/wrapped/theme';
 import { mayHaveWrapped, wrappedAskable, wrappedSignedIn } from '@/lib/wrapped/access';

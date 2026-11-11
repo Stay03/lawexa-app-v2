@@ -1,5 +1,5 @@
 import { CAMPAIGN_LINE, CAMPUS_NAMES, PERSONAS, STICKER_LABELS, WRAPPED_URL, formatCount, shareName, vibeFor } from './copy';
-import { fitText, type Measure } from './text-fit';
+import { fitText, type Measure } from '@/lib/share-card/text-fit';
 import { POLAROID, SHARE_HEIGHT, SHARE_WIDTH, STROKE_OUTLINE, VIBE_BACKGROUNDS, WRAPPED_COLOURS } from './theme';
 import type { WrappedRecord, WrappedSticker } from './types';
 
@@ -62,19 +62,6 @@ export function corsPhotoUrl(url: string | null): string | null {
   } catch {
     return null;
   }
-}
-
-/** Loads a picture for the canvas; null when it cannot (no CORS, offline): the placeholder face shows. */
-export function loadImage(url: string | null): Promise<HTMLImageElement | null> {
-  if (!url) return Promise.resolve(null);
-  return new Promise((resolve) => {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.decoding = 'async';
-    image.onload = () => resolve(image);
-    image.onerror = () => resolve(null);
-    image.src = url;
-  });
 }
 
 /**
@@ -277,11 +264,4 @@ export function drawShareCard(canvas: HTMLCanvasElement, record: WrappedRecord, 
   ctx.fillStyle = ink;
   ctx.font = body(34, 700);
   trackedText(ctx, `GET YOURS · ${WRAPPED_URL.toUpperCase()}`, L.link.x, L.link.y, 2, SHARE_WIDTH - L.link.x - PAD);
-}
-
-/** The canvas as a PNG file, for the share sheet and Save image. */
-export function canvasToFile(canvas: HTMLCanvasElement, name = 'lawexa-wrapped.png'): Promise<File | null> {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob ? new File([blob], name, { type: 'image/png' }) : null), 'image/png');
-  });
 }
