@@ -1,4 +1,5 @@
 import {
+  Award,
   Bell,
   Building2,
   ChartColumn,
@@ -33,6 +34,7 @@ import { canUseDeveloperSettings } from '@/lib/utils/v2-access';
  *   Profile         /settings/profile        → V2 (rebuilt, 16 August 2026)
  *   Activity        /activity                → V2 (rebuilt, 5 October 2026)
  *   My requests     /content-requests        → V2 (rebuilt, 24 October 2026)
+ *   Certificates    /settings/certificates   → V2 (new, 11 November 2026)
  *   Verification    /settings/verification   → V2 (rebuilt, 5 October 2026)
  *   Devices         /settings/devices        → V2 (new, 28 September 2026)
  *   Organization    /organization            → V2 (rebuilt, phase-5 W5)
@@ -194,6 +196,16 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         label: 'My requests',
         icon: ClipboardList,
         href: '/content-requests',
+        requiresAccount: true,
+      },
+      {
+        // The certificates Lawexa issued to this account, with each PDF and its
+        // public verify link (Techlead e465210e, 11 November 2026). Account-only:
+        // certificates are issued to registered accounts.
+        id: 'certificates',
+        label: 'Certificates',
+        icon: Award,
+        href: '/settings/certificates',
         requiresAccount: true,
       },
       {

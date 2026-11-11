@@ -1,0 +1,153 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { Award, Check, Download, Link2, Loader2, RotateCw, ShieldCheck, TriangleAlert } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  certificateVerifyPath,
+  formatCertificateDate,
+  formatCertificateScore,
+} from '@/lib/certificates/model';
+import type { MyCertificate } from '@/types/certificates';
+import { SETTINGS_BLOCK, SETTINGS_COLUMN } from '../SettingsList';
+import { SettingsState } from '../SettingsState';
+import { myCertificatesQueries, useDownloadCertificate } from './queries';
+
+/**
+ * v2 `/settings/certificates`: the certificates Lawexa has issued to this
+ * account, each with its PDF and its public verify link (Techlead e465210e).
+ */
+export function CertificatesScreen() {
+  const list = useQuery(myCertificatesQueries.list());
+
+  if (list.isPending) return <CertificatesFallback />;
+
+  if (list.isError) {
+    return (
+      <div className={SETTINGS_COLUMN}>
+        <SettingsState
+          icon={TriangleAlert}
+          tone="alarm"
+          title="Your certificates did not load"
+          description="Check your connection and try again."
+          action={
+            <Button size="sm" variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
+              <RotateCw aria-hidden className={cn('size-4', list.isFetching && 'animate-spin')} />
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  if (list.data.length === 0) {
+    return (
+      <div className={SETTINGS_COLUMN}>
+        <SettingsState
+          icon={Award}
+          title="No certificates yet"
+          description="When you take part in a Lawexa programme or event that awards one, your certificate appears here."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={SETTINGS_COLUMN}>
+      <h1 className="mb-5 hidden text-2xl font-semibold text-foreground md:block">Certificates</h1>
+      <ul className={SETTINGS_BLOCK} aria-label="Your certificates">
+        {list.data.map((certificate) => (
+          <CertificateRow key={certificate.number} certificate={certificate} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CertificateRow({ certificate }: { certificate: MyCertificate }) {
+  const download = useDownloadCertificate();
+  const [copied, setCopied] = useState(false);
+  const verifyPath = certificateVerifyPath(certificate.number);
+  const details = [
+    certificate.programme.partner_name,
+    formatCertificateDate(certificate.programme.event_date),
+    formatCertificateScore(certificate.score) && `Score ${formatCertificateScore(certificate.score)}`,
+  ].filter(Boolean);
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${verifyPath}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <li className="flex flex-col gap-3 px-4 py-4">
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Award className="size-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-pretty text-foreground">{certificate.programme.name}</p>
+          {details.length > 0 && <p className="mt-0.5 text-sm text-muted-foreground">{details.join(' · ')}</p>}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Issued to {certificate.printed_name} · <span className="font-mono tabular-nums">{certificate.number}</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 sm:pl-13">
+        <Button
+          size="sm"
+          disabled={download.isPending}
+          onClick={() => download.mutate(certificate.number)}
+        >
+          {download.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <Download aria-hidden className="size-4" />}
+          Download PDF
+        </Button>
+        <Button asChild size="sm" variant="outline">
+          <Link href={verifyPath} target="_blank" rel="noopener">
+            <ShieldCheck aria-hidden className="size-4" />
+            Verify page
+          </Link>
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => void copyLink()}>
+          {copied ? <Check aria-hidden className="size-4" /> : <Link2 aria-hidden className="size-4" />}
+          {copied ? 'Link copied' : 'Copy verify link'}
+        </Button>
+      </div>
+
+      {download.isError && (
+        <p role="alert" className="text-sm text-destructive sm:pl-13">
+          The PDF did not download. Try again in a moment.
+        </p>
+      )}
+    </li>
+  );
+}
+
+function CertificatesFallback() {
+  return (
+    <>
+      <span role="status" className="sr-only">
+        Loading your certificates
+      </span>
+      <div aria-hidden inert className={SETTINGS_COLUMN}>
+        <Skeleton className="mb-5 hidden h-8 w-36 rounded-lg md:block" />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-28 w-full rounded-2xl" />
+          <Skeleton className="h-28 w-full rounded-2xl" />
+        </div>
+      </div>
+    </>
+  );
+}
