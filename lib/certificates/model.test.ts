@@ -2,7 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  bracketProblem,
   bySort,
+  DEFAULT_CERTIFICATE_BODY,
   certificateFileName,
   certificateImageProblem,
   certificateVerifyPath,
@@ -77,6 +79,16 @@ test('the form flags fill-ins the server will not replace', () => {
   assert.deepEqual(unknownFillIns('{nmae} and {Name} and {nmae}'), ['{nmae}', '{Name}']);
   assert.deepEqual(unknownFillIns('{}'), ['{}']);
   assert.deepEqual(unknownFillIns('No fill-ins at all'), []);
+  assert.deepEqual(unknownFillIns(DEFAULT_CERTIFICATE_BODY), [], 'square brackets are allowed');
+});
+
+test('optional clauses in square brackets must be closed and not nested', () => {
+  assert.equal(bracketProblem(DEFAULT_CERTIFICATE_BODY), null);
+  assert.equal(bracketProblem('No clauses'), null);
+  assert.equal(bracketProblem('a [b] c [d]'), null);
+  assert.match(bracketProblem('a [b c') ?? '', /never closed/);
+  assert.match(bracketProblem('a b] c') ?? '', /without a \[/);
+  assert.match(bracketProblem('a [b [c]]') ?? '', /inside another/);
 });
 
 test('colours must be hex', () => {
