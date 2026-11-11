@@ -10,6 +10,7 @@ import { isAxiosError } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { inviteLinksApi } from '@/lib/api/collab';
+import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { InvitePreview } from '@/types/collab';
 import { joinActionLabel, joinedDestination } from './join-model';
@@ -115,6 +116,22 @@ function subtitleFor(invite: InvitePreview): string {
     : 'A work space on Lawexa';
 }
 
+/*
+ * A GAME LINK WEARS THE QUIZ'S LOOK (Stay, f730f71c, 11 November 2026:
+ * "everything around the quiz should have the quiz based designs"). The
+ * raised gold button, the outlined cards and the Comfortaa title are v2's solo
+ * quiz kit (`v2/features/quiz/solo/ui.tsx`, `solo-quiz.css`); this page is
+ * outside v2 and may not import it, so the few classes are restated here with
+ * the kit's values. An ordinary invite keeps the house look.
+ */
+const QUIZ_LIP =
+  'transition-[transform,box-shadow] duration-100 ease-out shadow-[0_4px_0_0_var(--lip)] enabled:active:translate-y-1 enabled:active:shadow-none motion-reduce:transition-none';
+const QUIZ_BUTTON = `h-14 rounded-2xl text-base font-bold hover:bg-primary [--lip:oklch(0.47_0.11_85)] dark:[--lip:oklch(0.52_0.11_82)] ${QUIZ_LIP}`;
+const QUIZ_QUIET_BUTTON = `h-14 rounded-2xl border-2 border-border bg-card text-base font-bold text-foreground hover:bg-card [--lip:oklch(0.86_0_0)] dark:[--lip:oklch(0.36_0_0)] ${QUIZ_LIP}`;
+const QUIZ_CARD = 'rounded-2xl border-2 border-border bg-card';
+const QUIZ_TILE =
+  'flex size-20 items-center justify-center rounded-3xl bg-primary text-primary-foreground shadow-[0_5px_0_0_oklch(0.47_0.11_85)] dark:shadow-[0_5px_0_0_oklch(0.52_0.11_82)]';
+
 export function JoinScreen({ code }: { code: string }) {
   const router = useRouter();
   const [failed, setFailed] = useState<string | null>(null);
@@ -212,15 +229,30 @@ export function JoinScreen({ code }: { code: string }) {
   if (waiting) {
     return (
       <div className="mx-auto w-full max-w-md px-5 py-16 text-center">
-        <Users aria-hidden className="mx-auto size-8 text-primary" />
-        <h1 className="mt-4 text-xl font-semibold text-foreground">
+        {game ? (
+          <span aria-hidden className={cn(QUIZ_TILE, 'mx-auto')}>
+            <Users className="size-9" />
+          </span>
+        ) : (
+          <Users aria-hidden className="mx-auto size-8 text-primary" />
+        )}
+        <h1
+          className={cn(
+            'text-foreground',
+            game ? 'mt-6 font-comfortaa text-2xl font-bold' : 'mt-4 text-xl font-semibold',
+          )}
+        >
           Your request has been sent
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
           An admin of {invite.space_name} will let you know. You do not need to
           do anything else.
         </p>
-        <Button asChild variant="outline" className="mt-6">
+        <Button
+          asChild
+          variant="outline"
+          className={cn('mt-6', game && cn(QUIZ_QUIET_BUTTON, 'w-full'))}
+        >
           <Link href="/">Go to Lawexa</Link>
         </Button>
       </div>
@@ -243,49 +275,80 @@ export function JoinScreen({ code }: { code: string }) {
     accept.mutate();
   };
 
+  const spaceLines = (
+    <>
+      {invite.channel_name ? (
+        <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Lock aria-hidden className="size-3.5" />#{invite.channel_name}
+        </p>
+      ) : null}
+
+      {/* Never blank: see `subtitleFor`. */}
+      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        {subtitleFor(invite)}
+      </p>
+
+      <p className="mt-3 text-sm text-muted-foreground">
+        {invite.member_count}{' '}
+        {invite.member_count === 1 ? 'person is' : 'people are'} already here
+      </p>
+    </>
+  );
+
   return (
     <div className="mx-auto w-full max-w-md px-5 py-14">
       <div className="flex flex-col items-center text-center">
-        <span
-          aria-hidden
-          className="flex size-16 items-center justify-center rounded-2xl bg-secondary text-xl font-semibold text-foreground"
-        >
-          {invite.space_name.slice(0, 2).toUpperCase()}
-        </span>
-
-        <p className="mt-5 text-sm text-muted-foreground">
-          {invite.inviter_name
-            ? `${invite.inviter_name} invited you to`
-            : 'You have been invited to'}
-          {game ? ' a live quiz in' : null}
-        </p>
-        <h1 className="mt-1 text-2xl leading-tight font-semibold text-foreground">
-          {invite.space_name}
-        </h1>
-
-        {invite.channel_name ? (
-          <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Lock aria-hidden className="size-3.5" />#{invite.channel_name}
-          </p>
-        ) : null}
-
-        {/* The quiz a game link leads into, named before the Space's own line. */}
+        {/* A game link leads with the quiz it opens, and the Space it sits in
+            is the card under it. An ordinary invite leads with the Space. */}
         {game ? (
-          <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <Trophy aria-hidden className="size-4 text-primary" />
-            {game.quiz_title}
-          </p>
-        ) : null}
+          <>
+            <span aria-hidden className={QUIZ_TILE}>
+              <Trophy className="size-9" />
+            </span>
+            <p className="mt-6 text-xs font-bold tracking-[0.14em] text-[oklch(0.47_0.11_85)] uppercase dark:text-primary">
+              Live quiz
+            </p>
+            <h1 className="mt-1 font-comfortaa text-2xl leading-tight font-bold text-balance text-foreground">
+              {game.quiz_title}
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {invite.inviter_name
+                ? `${invite.inviter_name} invited you to play in`
+                : 'You have been invited to play in'}
+            </p>
+            <div className={cn(QUIZ_CARD, 'mt-4 flex w-full flex-col items-center p-4')}>
+              <p className="flex items-center gap-2.5 text-base font-bold text-foreground">
+                <span
+                  aria-hidden
+                  className="flex size-8 items-center justify-center rounded-xl bg-secondary font-comfortaa text-xs font-bold text-foreground"
+                >
+                  {invite.space_name.slice(0, 2).toUpperCase()}
+                </span>
+                {invite.space_name}
+              </p>
+              {spaceLines}
+            </div>
+          </>
+        ) : (
+          <>
+            <span
+              aria-hidden
+              className="flex size-16 items-center justify-center rounded-2xl bg-secondary text-xl font-semibold text-foreground"
+            >
+              {invite.space_name.slice(0, 2).toUpperCase()}
+            </span>
 
-        {/* Never blank: see `subtitleFor`. */}
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          {subtitleFor(invite)}
-        </p>
-
-        <p className="mt-3 text-sm text-muted-foreground">
-          {invite.member_count}{' '}
-          {invite.member_count === 1 ? 'person is' : 'people are'} already here
-        </p>
+            <p className="mt-5 text-sm text-muted-foreground">
+              {invite.inviter_name
+                ? `${invite.inviter_name} invited you to`
+                : 'You have been invited to'}
+            </p>
+            <h1 className="mt-1 text-2xl leading-tight font-semibold text-foreground">
+              {invite.space_name}
+            </h1>
+            {spaceLines}
+          </>
+        )}
 
         {/* WHAT WILL HAPPEN, BEFORE THEY PRESS. An approval queue is not a
             refusal, but finding out about it afterwards feels like one. */}
@@ -298,7 +361,7 @@ export function JoinScreen({ code }: { code: string }) {
 
         <Button
           size="lg"
-          className="mt-7 w-full"
+          className={cn('mt-7 w-full', game && QUIZ_BUTTON)}
           onClick={press}
           disabled={accept.isPending}
         >
