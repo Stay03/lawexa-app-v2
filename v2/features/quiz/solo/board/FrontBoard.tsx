@@ -49,8 +49,25 @@ const BOARD_TOP = 10;
  * Where a player studies is sent to a signed-in reader only (Backend: their
  * Law School campus when they are at law school, else their university); a
  * visitor sees names alone.
+ *
+ * THE LIVE QUIZ'S FINAL SCORES ARE THIS BOARD TOO (Arthur, f730f71c, 11
+ * November 2026: "Did you check the current quiz leaderboard style that comes
+ * with its animation"), fed from the game's ranking (`liveGameBoard`). A game
+ * ends once, so its podium rises as it first shows (`rising`, the end-of-quiz
+ * animation the results podium plays), and its (i) says how a game ranks
+ * (`rulesNote`): one game's points, not a best of many attempts.
  */
-export function FrontBoard({ board }: { board: QuizLeaderboard }) {
+export function FrontBoard({
+  board,
+  rising = false,
+  rulesNote = BOARD_RULES_NOTE,
+}: {
+  board: QuizLeaderboard;
+  /** The podium rises in as the board first shows (the end-of-quiz animation). */
+  rising?: boolean;
+  /** What the (i) says about how the board ranks. */
+  rulesNote?: string;
+}) {
   const viewer = board.viewer;
   const isYou = (entry: QuizLeaderboardEntry) => isViewerEntry(viewer, entry);
   const podium = board.entries.slice(0, 3);
@@ -76,7 +93,7 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
             >
               <Info className="size-4" />
             </TooltipTrigger>
-            <TooltipContent className="max-w-64">{BOARD_RULES_NOTE}</TooltipContent>
+            <TooltipContent className="max-w-64">{rulesNote}</TooltipContent>
           </Tooltip>
         </h2>
         {players ? <span className="text-sm text-muted-foreground tabular-nums">{players}</span> : null}
@@ -90,7 +107,7 @@ export function FrontBoard({ board }: { board: QuizLeaderboard }) {
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">
           <div className="flex min-w-0 flex-col gap-3">
             <div className="mx-auto w-full min-w-0 md:max-w-lg">
-              <Podium entries={podium} isYou={isYou} />
+              <Podium entries={podium} isYou={isYou} rising={rising} />
             </div>
             {/* On the podium the reader's line sits under it. */}
             {standing && podium.some(isYou) ? (

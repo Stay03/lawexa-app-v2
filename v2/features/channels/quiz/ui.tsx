@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type {
   QuizAnswerIn,
   QuizGamePlayer,
-  QuizRankingRow,
 } from '@/types/channel-quiz';
 import type { SlimUser } from '@/types/collab';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
@@ -691,16 +690,6 @@ export function Leaderboard({
       )}
     </ol>
   );
-}
-
-/** Ranking detail line: "8 of 10 right" — and, for a late joiner, out of how
- *  many they could actually answer (the contract's `answerable_count`). */
-export function rankingDetail(row: QuizRankingRow): string {
-  const base = `${row.correct_count} of ${row.answerable_count} right`;
-  // `answerable_count < question_count` IS the late-join marker (contract), and
-  // `joined_at_question_index` names the moment — either one alone would leave
-  // a smaller denominator looking like a mistake.
-  return row.joined_at_question_index !== null ? `${base} · joined late` : base;
 }
 
 /* ── Loading ──────────────────────────────────────────────────────────────── */

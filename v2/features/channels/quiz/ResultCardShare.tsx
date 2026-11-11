@@ -4,16 +4,21 @@ import { useEffect, useState } from 'react';
 import { Download, Share2 } from 'lucide-react';
 
 import { canShareFile, canvasToFile, copyText, download, loadImage } from '@/lib/share-card/canvas';
+import { wrappedFontFamilies } from '@/lib/share-card/fonts';
+import { corsPhotoUrl, drawPoster } from '@/lib/wrapped/share-image';
+import { wrappedArt } from '@/lib/wrapped/theme';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
-import { drawResultCard, resultCardCopy, type ResultCardInput } from './result-card';
+import { resultCardCopy, resultFrame, resultPoster, type ResultCardInput } from './result-card';
 import { COMPACT_RAISED } from './ui';
 import { useResultsLink } from './use-results-link';
 
 /**
- * ResultCardShare — the player's own result card under the podium, with
- * Share and Download (Arthur, f730f71c, 11 November 2026). The card is drawn
- * once on the device (`result-card.ts`) and shown as that very image, so what
- * the player sees is what they post, as Wrapped's share frame does.
+ * ResultCardShare — the player's own result card under the leaderboard, with
+ * Share and Download (Arthur, f730f71c, 11 November 2026). The card is
+ * Wrapped's poster (`result-card.ts`): Arthur's frame for the place, the
+ * player's photo in the polaroid, drawn once on the device with Wrapped's
+ * type and shown as that very image, so what the player sees is what they
+ * post, as Wrapped's share frame does.
  *
  * Share hands the picture to the phone's sheet (WhatsApp Status, Instagram),
  * with the results link in its words; a browser whose sheet takes no picture
@@ -25,12 +30,6 @@ import { useResultsLink } from './use-results-link';
 interface Drawn {
   file: File;
   url: string;
-}
-
-/** The family a CSS custom property names (next/font sets `--font-comfortaa`). */
-function fontFamilyOf(variable: string, fallback: string): string {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
-  return value || fallback;
 }
 
 export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: ResultCardInput }) {
@@ -45,15 +44,20 @@ export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: 
     let made: string | null = null;
     void (async () => {
       try {
-        const fonts = {
-          display: fontFamilyOf('--font-comfortaa', 'system-ui, sans-serif'),
-          body: getComputedStyle(document.body).fontFamily || 'system-ui, sans-serif',
-        };
+        const fonts = wrappedFontFamilies;
         // Settled, not all: a fallback face that is not on the phone rejects its load (see Wrapped's ShareFrame).
-        await Promise.allSettled([document.fonts.load(`700 80px ${fonts.display}`), document.fonts.load(`500 40px ${fonts.body}`)]);
-        const logo = await loadImage('/images/logo.png');
+        await Promise.allSettled([
+          document.fonts.load(`900 80px ${fonts.display}`),
+          document.fonts.load(`700 40px ${fonts.body}`),
+          document.fonts.load(`500 30px ${fonts.body}`),
+        ]);
+        // Arthur's frame for the place, and the player's photo, at once; a photo that will not load leaves the place.
+        const [frame, photo] = await Promise.all([
+          loadImage(wrappedArt('frame', resultFrame(input.rank).vibeId)),
+          loadImage(corsPhotoUrl(input.avatarUrl)),
+        ]);
         const canvas = document.createElement('canvas');
-        drawResultCard(canvas, input, fonts, logo);
+        drawPoster(canvas, resultPoster(input), fonts, { frame, face: null, prop: null, photo });
         const file = await canvasToFile(canvas, resultCardCopy(input).fileName);
         if (cancelled) return;
         if (!file) {
@@ -98,12 +102,12 @@ export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: 
 
   return (
     <section aria-label="Your result card" className="flex flex-col items-center gap-4 rounded-2xl border-2 border-border bg-card p-4">
-      <div className="flex aspect-[9/16] w-full max-w-[15rem] items-center justify-center overflow-hidden rounded-xl bg-[#111]">
+      <div className="flex aspect-[9/16] w-full max-w-[15rem] items-center justify-center overflow-hidden rounded-xl bg-muted">
         {drawn ? (
           // eslint-disable-next-line @next/next/no-img-element -- a blob of the drawn card, not a remote image
           <img src={drawn.url} alt={`Result card: ${copy.headline}, ${input.score.toLocaleString('en-US')} points`} className="size-full object-contain" />
         ) : (
-          <p role="status" className="px-4 text-center text-sm text-neutral-400">
+          <p role="status" className="px-4 text-center text-sm text-muted-foreground">
             {failed ? 'Your card could not be drawn on this device.' : 'Drawing your card…'}
           </p>
         )}

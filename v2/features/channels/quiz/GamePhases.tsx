@@ -19,14 +19,16 @@ import {
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { QuizGameState, QuizRankingRow } from '@/types/channel-quiz';
+import type { QuizGameState } from '@/types/channel-quiz';
 import type { SlimUser } from '@/types/collab';
 import { CollabMessage } from '@/v2/features/collab/ui/CollabMessage';
+import { FrontBoard, FrontBoardSkeleton } from '@/v2/features/quiz/solo/board/FrontBoard';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
 import type { QuizShareStanding } from '@/lib/constants/quiz-share';
+import { LIVE_BOARD_RULES_NOTE, liveGameBoard } from './live-board';
 import { ShareResults } from './ShareResults';
 import { ResultCardShare } from './ResultCardShare';
 import type { ResultCardInput } from './result-card';
@@ -42,8 +44,6 @@ import {
   PhaseRow,
   PlayerChip,
   QuestionTimer,
-  RankRow,
-  rankingDetail,
   StageKicker,
   type OptionState,
 } from './ui';
@@ -648,9 +648,13 @@ function VerdictChip({
 
 /* ── Podium ───────────────────────────────────────────────────────────────── */
 
-const PODIUM_HEIGHT = ['h-24', 'h-16', 'h-12'];
-const PODIUM_ORDER = [1, 0, 2];
-
+/**
+ * The final scores: the quiz's own leaderboard (`FrontBoard`, fed by
+ * `liveGameBoard`), its podium rising in as the game ends, then the reader's
+ * card and the results link, then how the room did (Arthur, f730f71c, 11
+ * November 2026: the live results use "the current quiz leaderboard style that
+ * comes with its animation").
+ */
 export function PodiumStage({
   gameUuid,
   viewerId,
@@ -676,8 +680,11 @@ export function PodiumStage({
     if (!results || !own) return null;
     return {
       playerName: own.user.name,
+      avatarUrl: own.user.avatar_url,
       rank: own.rank,
       score: own.score,
+      correctCount: own.correct_count,
+      answerableCount: own.answerable_count,
       quizTitle: results.game.quiz.title,
       spaceName,
       playerCount: results.game.player_count,
@@ -693,12 +700,7 @@ export function PodiumStage({
   if (query.isPending) {
     return (
       <GameStage>
-        <div aria-hidden className="flex items-end justify-center gap-3 pt-8">
-          {PODIUM_HEIGHT.map((height, index) => (
-            <Skeleton key={index} className={cn('w-20 rounded-t-2xl', height)} />
-          ))}
-        </div>
-        <Skeleton className="mx-auto h-4 w-40 rounded" />
+        <FrontBoardSkeleton />
       </GameStage>
     );
   }
@@ -741,11 +743,6 @@ export function PodiumStage({
     );
   }
 
-  const podium = results.podium;
-  const ordered = PODIUM_ORDER.map((index) => podium[index]).filter(
-    (row): row is QuizRankingRow => row !== undefined,
-  );
-
   // What the share card should SAY depends on where this reader finished, and
   // both facts are already on screen. A viewer absent from the ranking watched
   // rather than played — the host who never answered, or a member who opened
@@ -777,44 +774,19 @@ export function PodiumStage({
         </p>
       </div>
 
-      {ordered.length > 0 && (
-        <div className="flex items-end justify-center gap-3 pt-4">
-          {ordered.map((row) => (
-            <div key={row.user.uuid} className="flex w-24 flex-col items-center gap-2">
-              <PlayerChip user={row.user} />
-              <span className="font-comfortaa text-sm font-bold tabular-nums text-foreground">
-                {row.score.toLocaleString()}
-              </span>
-              {/* The quiz's blocks: first in gold on its deep lip, second and
-                  third outlined, each with its place in Comfortaa. */}
-              <div
-                className={cn(
-                  'v2-quiz-rise w-full rounded-t-2xl border-x-2 border-t-2',
-                  PODIUM_HEIGHT[row.rank - 1] ?? 'h-10',
-                  row.rank === 1
-                    ? 'border-[var(--solo-gold-deep)] bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-muted-foreground',
-                )}
-                style={{ animationDelay: `${(row.rank - 1) * 90}ms` }}
-              >
-                <span className="sr-only">Rank {row.rank}</span>
-                <span
-                  aria-hidden
-                  className="flex h-full items-start justify-center pt-2 font-comfortaa text-lg font-bold"
-                >
-                  {row.rank}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* The quiz's leaderboard, its podium rising in: the same board a
+          quiz's own page shows, the reader's row marked as it marks "you". */}
+      <FrontBoard
+        board={liveGameBoard(results, viewerUuid)}
+        rising
+        rulesNote={LIVE_BOARD_RULES_NOTE}
+      />
 
-      {/* SHARING SITS WHERE THE THING WORTH SHARING JUST APPEARED — directly
-          under the podium, before the full ranking. Any player may hand the
-          link out: everyone on this screen already sees more than the public
-          card publishes, so gating it to the host would protect nothing.
-          A player gets their own card first, made like Wrapped's. */}
+      {/* SHARING SITS UNDER THE BOARD, where the result just showed. Any
+          player may hand the link out: everyone on this screen already sees
+          more than the public card publishes, so gating it to the host would
+          protect nothing. A player gets their own card first, Wrapped's
+          poster with their finish on it. */}
       {cardInput ? <ResultCardShare gameUuid={gameUuid} input={cardInput} /> : null}
       <ShareResults
         gameUuid={gameUuid}
@@ -825,22 +797,6 @@ export function PodiumStage({
       {/* A quiz that carries a certificate asks for the printed name here,
           once the scores are in: it is the moment the player is still on. */}
       {certificate ? <CertificateOffer raw={certificate} /> : null}
-
-      <div>
-        <StageKicker>Everyone</StageKicker>
-        <ol className="mt-2 flex flex-col gap-1">
-          {results.ranking.map((row) => (
-            <RankRow
-              key={row.user.uuid}
-              rank={row.rank}
-              user={row.user}
-              score={row.score}
-              detail={rankingDetail(row)}
-              isViewer={row.user.uuid === viewerUuid}
-            />
-          ))}
-        </ol>
-      </div>
 
       {results.questions.length > 0 && (
         <div>
