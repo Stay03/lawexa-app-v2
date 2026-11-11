@@ -20,18 +20,50 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// Is the page this push opens already on screen in a Lawexa window? Compared by
+// path, so `/c/{uuid}` matches the chat with any `?m=` or `?game=` on it.
+function shownOnScreen(url) {
+  let path;
+  try {
+    path = new URL(url, self.location.origin).pathname;
+  } catch {
+    return Promise.resolve(false);
+  }
+  return clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then((list) =>
+      list.some((client) => {
+        try {
+          return client.visibilityState === 'visible' && new URL(client.url).pathname === path;
+        } catch {
+          return false;
+        }
+      }),
+    )
+    .catch(() => false);
+}
+
 // Fires only when the app is closed / not focused. The backend sends the copy in
 // the `data` payload (with a `url` deep link); fall back to `notification` fields.
+//
+// A push about a page the person is already looking at is dropped (Lawexa back
+// in a chat that is open on screen in a window without focus; background jobs,
+// Backend's shapes 063d9cc3, section 6): the page itself shows it. A chat open
+// only in a hidden tab still gets its push.
 messaging.onBackgroundMessage((payload) => {
   const data = payload.data || {};
   const notification = payload.notification || {};
   const title = data.title || notification.title || 'Lawexa';
-  self.registration.showNotification(title, {
-    body: data.body || notification.body || '',
-    icon: '/android-chrome-192x192.png',
-    badge: '/android-chrome-192x192.png',
-    tag: data.tag || 'lawexa-push',
-    data: { url: data.url || '/' },
+  const url = data.url || '/';
+  return shownOnScreen(url).then((shown) => {
+    if (shown && url !== '/') return undefined;
+    return self.registration.showNotification(title, {
+      body: data.body || notification.body || '',
+      icon: '/android-chrome-192x192.png',
+      badge: '/android-chrome-192x192.png',
+      tag: data.tag || 'lawexa-push',
+      data: { url },
+    });
   });
 });
 

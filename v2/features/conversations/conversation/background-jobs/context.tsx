@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
 import type { BackgroundJob } from '@/types/background-jobs';
 import { backgroundJobsByMessage } from './model';
@@ -9,8 +9,8 @@ import { useCancelBackgroundJob } from './mutations';
 interface BackgroundJobsValue {
   byMessage: ReadonlyMap<number, readonly BackgroundJob[]>;
   cancel: (jobUuid: string) => void;
-  /** The job whose cancel is on its way, whose button shows the wait. */
-  cancellingId: string | null;
+  /** The jobs whose cancel is on its way, whose buttons show the wait. */
+  cancelling: ReadonlySet<string>;
 }
 
 const BackgroundJobsContext = createContext<BackgroundJobsValue | null>(null);
@@ -30,15 +30,28 @@ export function BackgroundJobsProvider({
   jobs: readonly BackgroundJob[];
   children: React.ReactNode;
 }) {
-  const cancelMutation = useCancelBackgroundJob(conversationId);
-  const { mutate, isPending, variables } = cancelMutation;
+  const { mutate } = useCancelBackgroundJob(conversationId);
+  // Every cancel on its way, by job: one shared mutation reports only its
+  // latest call, so a second press would have re-enabled the first button
+  // while its request was still out (review of 8d263fb2).
+  const [cancelling, setCancelling] = useState<ReadonlySet<string>>(() => new Set());
+  const cancel = useCallback(
+    (jobUuid: string) => {
+      setCancelling((held) => new Set(held).add(jobUuid));
+      mutate(jobUuid, {
+        onSettled: () =>
+          setCancelling((held) => {
+            const next = new Set(held);
+            next.delete(jobUuid);
+            return next;
+          }),
+      });
+    },
+    [mutate],
+  );
   const value = useMemo<BackgroundJobsValue>(
-    () => ({
-      byMessage: backgroundJobsByMessage(jobs),
-      cancel: (jobUuid) => mutate(jobUuid),
-      cancellingId: isPending ? (variables ?? null) : null,
-    }),
-    [jobs, mutate, isPending, variables],
+    () => ({ byMessage: backgroundJobsByMessage(jobs), cancel, cancelling }),
+    [jobs, cancel, cancelling],
   );
   return <BackgroundJobsContext.Provider value={value}>{children}</BackgroundJobsContext.Provider>;
 }
@@ -47,10 +60,10 @@ export function BackgroundJobsProvider({
 export function useBackgroundJobsOf(messageId: number | null): {
   jobs: readonly BackgroundJob[];
   cancel: (jobUuid: string) => void;
-  cancellingId: string | null;
+  cancelling: ReadonlySet<string>;
 } | null {
   const value = useContext(BackgroundJobsContext);
   if (!value || messageId === null) return null;
   const jobs = value.byMessage.get(messageId);
-  return jobs ? { jobs, cancel: value.cancel, cancellingId: value.cancellingId } : null;
+  return jobs ? { jobs, cancel: value.cancel, cancelling: value.cancelling } : null;
 }

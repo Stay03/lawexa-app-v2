@@ -10,7 +10,7 @@ import {
   recoverWithRetry,
   type SendRefusal,
 } from '@/v2/runtime/chat-engine';
-import { lastTurnRow } from '@/v2/runtime/turn-rows';
+import { lastTurnRow, lastTurnStartIndex } from '@/v2/runtime/turn-rows';
 import type {
   ConversationReference,
   ConversationSpaceRef,
@@ -20,6 +20,7 @@ import type {
   MessageReplyTo,
   RedactionSummary,
 } from '@/types/chat';
+import { isEventMessage } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
@@ -915,6 +916,10 @@ export function useConversationController(
   });
   const backgroundJobs = backgroundJobsQuery.data?.data.background_jobs ?? NO_BACKGROUND_JOBS;
   const awaitingBackgroundJob = awaitsBackgroundJob(backgroundJobs);
+  // A chat the server keeps no jobs for (a Radar or channel chat: 404) is not
+  // asked again on each turn's end (review of 8d263fb2). The record carries no
+  // flag to know that before the first read.
+  const backgroundJobsRefused = stopsPolling(backgroundJobsQuery.error);
 
   // A turn on this screen just ended: it may have started a job, whose label
   // belongs under its question now rather than at the next beat. A query call
@@ -923,10 +928,22 @@ export function useConversationController(
   useEffect(() => {
     const ended = wasStreamingRef.current && !isStreaming;
     wasStreamingRef.current = isStreaming;
-    if (ended && readsBackgroundJobs) {
+    if (ended && readsBackgroundJobs && !backgroundJobsRefused) {
       void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(conversationId) });
     }
-  }, [isStreaming, readsBackgroundJobs, queryClient, conversationId]);
+  }, [isStreaming, readsBackgroundJobs, backgroundJobsRefused, queryClient, conversationId]);
+
+  // Waiting on a job ended (Lawexa answered, or gave up) while this screen was
+  // not following the turn: a hidden tab pauses the status poll, and the
+  // broadcast that would re-read the chat may not come. Read the transcript
+  // once on that edge, so the return and its answer are drawn (review of
+  // 8d263fb2). A query call on the edge, no setState.
+  const wasAwaitingRef = useRef(awaitingBackgroundJob);
+  useEffect(() => {
+    const ended = wasAwaitingRef.current && !awaitingBackgroundJob;
+    wasAwaitingRef.current = awaitingBackgroundJob;
+    if (ended && !isStreaming) void queryClient.refetchQueries({ queryKey: detailKey, exact: true });
+  }, [awaitingBackgroundJob, isStreaming, queryClient, detailKey]);
 
   // ── A space chat follows its other members (Spaces F4, backend B4). ──
   // B4 has no push channel, so an open space chat reads its status every four
@@ -1167,14 +1184,23 @@ export function useConversationController(
   // offered the button. In a space chat the last question may be a colleague's
   // (Spaces F4): asking it again would put their words under the owner's name,
   // so it is offered only on the owner's own question.
+  //
+  // NOT AFTER BACKGROUND WORK (review of 8d263fb2). When Lawexa's return from a
+  // background job starts the latest turn, its question is the one that
+  // started the job, and asking it again would start (and charge) the work
+  // again; nor under the give-up line, where the reader is told to ask about
+  // it instead. So the question asked again is the latest turn's own, never an
+  // older one (`lastTurnStartIndex`).
   const lastUserTurn = useMemo(() => {
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const row = messages[i];
-      if (row.role === 'user') return row;
-    }
-    return null;
+    const start = lastTurnStartIndex(messages);
+    const row = start === -1 ? null : messages[start];
+    return row && row.role === 'user' ? row : null;
   }, [messages]);
   const lastUserContent = lastUserTurn?.content ?? null;
+  const endsWithGiveUp = useMemo(() => {
+    const last = messages.at(-1);
+    return !!last && isEventMessage(last) && last.eventType === 'background_job_unanswered';
+  }, [messages]);
 
   // The last TURN: a draft's "edited" line under the answer leaves "Ask again"
   // where it was (Stay, 30 October 2026, 02:16Z, thread 1e44eb39).
@@ -1192,6 +1218,7 @@ export function useConversationController(
     isOwner &&
     !isStreaming &&
     lastIsCompletedAssistant &&
+    !endsWithGiveUp &&
     lastUserTurn !== null &&
     !!lastUserTurn.content &&
     (!showAuthors || isOwnTurn(lastUserTurn, serverUserId));

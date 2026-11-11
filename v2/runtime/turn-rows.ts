@@ -42,3 +42,31 @@ export function turnRowCount(rows: readonly HasRole[]): number {
   for (const row of rows) if (isTurnRow(row)) count += 1;
   return count;
 }
+
+/** A row's role and, for a line, its kind. */
+interface HasRoleAndKind extends HasRole {
+  eventType?: unknown;
+}
+
+/**
+ * Lawexa back from background work (Backend's shapes 063d9cc3): the server
+ * stores it as the turn's USER row, and v2 draws it as a line
+ * (`BackgroundJobEvent`). For where a turn starts, it is a question.
+ */
+export function isBackgroundReturn(row: HasRoleAndKind): boolean {
+  return row.role === 'event' && row.eventType === 'background_job_result';
+}
+
+/**
+ * Where the latest turn starts: its question, or Lawexa's return from
+ * background work, whichever is later; -1 when there is neither. What the
+ * server counts as the turn's user row, so a merge of the turn's rows cuts
+ * here, and a retry never reaches past a return to re-ask an older question
+ * (which would start the background work again; live review of 8d263fb2).
+ */
+export function lastTurnStartIndex(rows: readonly HasRoleAndKind[]): number {
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (rows[i].role === 'user' || isBackgroundReturn(rows[i])) return i;
+  }
+  return -1;
+}

@@ -78,7 +78,7 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { adoptServerFields } from './server-fields';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
-import { isTurnRow, lastTurnRow } from '../turn-rows';
+import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import { largestSavedId, savedTurnId } from './saved-turn';
 import { STALL_CHECK_MS, hiddenDuring, quietCheckDue, stallVerdict, type StallVerdict } from './stall';
@@ -671,7 +671,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   }
 
   // Merge missed messages from the status endpoint: replace any SSE-originated
-  // messages after the last user message with the authoritative API messages.
+  // messages after the turn's start with the authoritative API messages. The
+  // turn starts at its question OR at Lawexa's return from background work,
+  // a line here but the turn's user row on the server, whose status rows begin
+  // after it (`lastTurnStartIndex`; review of 8d263fb2: cutting at the older
+  // question dropped Lawexa's answer until a reload).
   function mergeMissedMessages(apiMessages: ApiMessage[]) {
     if (apiMessages.length === 0) return;
     const transformed = transformApiMessages(apiMessages, { events: true });
@@ -681,8 +685,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // (`LOCAL_ROW_PREFIX`) and the server's copies of those rows are recognised
     // through `authoredMessageIds`, which the same turn's terminal event fills.
     setState((prev) => {
-      const lastUserIdx = [...prev.messages].reverse().findIndex((m) => m.role === 'user');
-      if (lastUserIdx === -1) {
+      const start = lastTurnStartIndex(prev.messages);
+      if (start === -1) {
         return {
           ...prev,
           messages: [...prev.messages, ...transformed],
@@ -691,7 +695,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           error: null,
         };
       }
-      const cutIndex = prev.messages.length - lastUserIdx;
+      const cutIndex = start + 1;
       // The kept rows include the question this client drew; the server's rows
       // may carry its copy, with who it tags (server-fields.ts). A line held
       // after the question is not the turn's: it goes back in its place unless
@@ -2494,9 +2498,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
   async function retryLastMessage() {
     if (state.isStreaming || eventSource) return;
-    const lastUserMsg = [...state.messages].reverse().find((m) => m.role === 'user');
+    const start = lastTurnStartIndex(state.messages);
+    const turnStart = start === -1 ? undefined : state.messages[start];
     const convId = state.conversationId;
-    if (!lastUserMsg || !convId) return;
+    if (!turnStart || !convId) return;
 
     setState((prev) => ({
       ...prev,
@@ -2529,14 +2534,23 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         return;
       }
 
+      // expired / idle after Lawexa's return from background work: there is
+      // no question of this turn to send again, and the one before it would
+      // start the work again (and charge it). Follow the status only; what is
+      // saved shows on the next read (review of 8d263fb2).
+      if (isBackgroundReturn(turnStart)) {
+        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+        return;
+      }
+
       // expired / idle — truly retry, preserving all file attachments.
-      const originalMsg = lastUserMsg as ChatMessage;
+      const originalMsg = turnStart as ChatMessage;
       const retryAttachments =
         originalMsg.attachments ?? (originalMsg.attachment ? [originalMsg.attachment] : []);
       const retryFileIds = retryAttachments.map((a) => a.file_id);
 
       const retryBody = {
-        message: lastUserMsg.content,
+        message: originalMsg.content,
         stream: true as const,
         conversation_id: convId,
         ...(retryFileIds.length > 0 && { file_ids: retryFileIds }),

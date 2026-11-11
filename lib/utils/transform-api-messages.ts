@@ -177,7 +177,10 @@ export function transformApiMessages(
   for (const apiMsg of apiMessages) {
     // A line beside the turns: drawn by v2 when it is a kind it knows, else
     // dropped. Background work's two rows are turns on the server and lines here.
-    if (apiMsg.role === 'event' || (keepEvents && isBackgroundJobLine(apiMsg))) {
+    // v1 draws no lines, and Lawexa's return is written FOR LAWEXA: shown as the
+    // person's bubble it would read as a message they never typed (review of
+    // 8d263fb2), so v1 leaves it out, as it already leaves out the give-up row.
+    if (apiMsg.role === 'event' || isBackgroundJobLine(apiMsg)) {
       const line = keepEvents ? eventFromApi(apiMsg) : null;
       if (line) messages.push(line);
       continue;

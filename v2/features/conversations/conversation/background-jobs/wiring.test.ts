@@ -58,14 +58,11 @@ test('Lawexa’s return and its give-up notice are lines in v2, never bubbles', 
   assert.equal((rows[3] as BackgroundJobEvent).eventType, 'background_job_unanswered');
 });
 
-test('v1, which asks for no lines, draws them as it already did', () => {
-  // v1 is frozen: the return stays a bubble there, and an assistant row of a
-  // type it does not know was already left out before this change.
+test('v1, which draws no lines, shows neither row', () => {
+  // Lawexa's return is written for Lawexa: as the person's bubble it would read
+  // as a message they never typed (review of 8d263fb2).
   const rows = transformApiMessages([wake(2), giveUp(3)]);
-  assert.deepEqual(
-    rows.map((r) => r.role),
-    ['user'],
-  );
+  assert.deepEqual(rows, []);
 });
 
 test('the same return read twice changes nothing', () => {
@@ -95,7 +92,9 @@ test('a personal chat waiting on a job follows Lawexa’s return live, and re-re
   const controller = here('useConversationController.ts');
   assert.match(controller, /const readsBackgroundJobs = detailData !== null && \(isOwner \|\| isSpaceMember\) && !isConfidential && !isGoneOnServer;/);
   assert.match(controller, /\(isSpaceMember \|\| awaitingBackgroundJob\) &&/);
-  assert.match(controller, /if \(ended && readsBackgroundJobs\) \{/);
+  assert.match(controller, /if \(ended && readsBackgroundJobs && !backgroundJobsRefused\) \{/);
+  // Waiting ended unseen (a hidden tab): the transcript is read once.
+  assert.match(controller, /if \(ended && !isStreaming\) void queryClient\.refetchQueries\(\{ queryKey: detailKey, exact: true \}\);/);
   const queries = read('v2', 'features', 'conversations', 'queries.ts');
   assert.match(queries, /awaitsBackgroundJob\(query\.state\.data\?\.data\.background_jobs \?\? \[\]\)\s*\? BACKGROUND_JOBS_POLL_MS\s*: false,/);
 });
@@ -121,4 +120,20 @@ test('the notification opens the chat, in the server’s words or ours', () => {
   assert.deepEqual(titled.destination, { kind: 'internal', href: '/c/00000000-0000-4000-8000-000000000601' });
   const bare = presentNotification({ ...base, title: null, message: null } as unknown as Notification, 'http://localhost:3472');
   assert.equal(bare.title, 'Lawexa has an update in your chat');
+});
+
+test('the label reads out its state, not its page count, and Cancel says which job', () => {
+  const label = here('background-jobs', 'BackgroundJobsLabel.tsx');
+  assert.match(label, /<span aria-live="polite" className="min-w-0">\s*\{backgroundJobLabel\(job\)\}/);
+  assert.doesNotMatch(label, /<ul aria-live/);
+  assert.match(label, /aria-label=\{`Cancel the \$\{job\.kind_name\}`\}/);
+  // Each job's cancel is held on its own.
+  const context = here('background-jobs', 'context.tsx');
+  assert.match(context, /cancelling=\{held\.cancelling\.has\(job\.id\)\}|const \[cancelling, setCancelling\] = useState<ReadonlySet<string>>/);
+});
+
+test('a push about the page already on screen is dropped; a hidden tab still gets it', () => {
+  const worker = read('public', 'firebase-messaging-sw.js');
+  assert.match(worker, /client\.visibilityState === 'visible' && new URL\(client\.url\)\.pathname === path/);
+  assert.match(worker, /if \(shown && url !== '\/'\) return undefined;/);
 });

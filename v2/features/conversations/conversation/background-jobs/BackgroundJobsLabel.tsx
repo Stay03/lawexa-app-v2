@@ -28,12 +28,12 @@ export function BackgroundJobsLabel({ messageId }: { messageId: number | null })
   const held = useBackgroundJobsOf(messageId);
   if (!held) return null;
   return (
-    <ul aria-live="polite" className="mt-1.5 flex flex-col items-end gap-1 px-4">
+    <ul className="mt-1.5 flex flex-col items-end gap-1 px-4">
       {held.jobs.map((job) => (
         <JobLine
           key={job.id}
           job={job}
-          cancelling={held.cancellingId === job.id}
+          cancelling={held.cancelling.has(job.id)}
           onCancel={() => held.cancel(job.id)}
         />
       ))}
@@ -63,13 +63,19 @@ function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling
         aria-hidden
         className={cn('size-3.5 shrink-0', spinning && 'motion-safe:animate-spin', state === 'done' && 'text-primary')}
       />
-      <span className="min-w-0">{backgroundJobLabel(job)}</span>
+      {/* The live region is the state's words alone: they change a few times
+          in a job's life. The page count changes every beat, and would be read
+          out each time (review of 8d263fb2). */}
+      <span aria-live="polite" className="min-w-0">
+        {backgroundJobLabel(job)}
+      </span>
       {progress ? <span className="shrink-0 tabular-nums">· {progress}</span> : null}
       {canCancelBackgroundJob(job) ? (
         <button
           type="button"
           onClick={onCancel}
           disabled={cancelling}
+          aria-label={`Cancel the ${job.kind_name}`}
           className={cn(
             'v2-interactive ml-1 shrink-0 rounded-sm font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60',
             FOCUS_RING,
