@@ -26,6 +26,7 @@ import {
   DEFAULT_CERTIFICATE_COLORS,
   DEFAULT_CERTIFICATE_TITLE,
   templateFormProblems,
+  templatePayload,
   unknownFillIns,
   type TemplateFormValues,
 } from '@/lib/certificates/model';
@@ -67,7 +68,7 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
   const [showProblems, setShowProblems] = useState(false);
   const [serverProblem, setServerProblem] = useState<string | null>(null);
 
-  const problems = useMemo(() => templateFormProblems(values), [values]);
+  const problems = useMemo(() => templateFormProblems(values, { isNew: !template }), [values, template]);
   const strayFillIns = useMemo(() => unknownFillIns(values.body), [values.body]);
   const brackets = useMemo(() => bracketProblem(values.body), [values.body]);
   const visible = showProblems ? problems : {};
@@ -89,12 +90,7 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
     save.mutate(
       {
         uuid: template?.uuid ?? null,
-        payload: {
-          name: values.name.trim(),
-          title: values.title.trim(),
-          body: values.body,
-          colors: values.colors,
-        },
+        payload: templatePayload(values, { isNew: !template }),
       },
       {
         onSuccess: (saved) => {
@@ -122,11 +118,21 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
       <div className="space-y-8">
         <section className="space-y-4" aria-label="Wording and colours">
           <Field id="template-name" label="Design name" hint="For admins only. Never printed." error={visible.name}>
-            <Input id="template-name" value={values.name} onChange={(event) => set('name', event.target.value)} />
+            <Input
+              id="template-name"
+              value={values.name}
+              onChange={(event) => set('name', event.target.value)}
+              {...fieldA11y('template-name', visible.name, true)}
+            />
           </Field>
 
           <Field id="template-title" label="Title" error={visible.title}>
-            <Input id="template-title" value={values.title} onChange={(event) => set('title', event.target.value)} />
+            <Input
+              id="template-title"
+              value={values.title}
+              onChange={(event) => set('title', event.target.value)}
+              {...fieldA11y('template-title', visible.title)}
+            />
           </Field>
 
           <Field
@@ -140,6 +146,7 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
               rows={5}
               value={values.body}
               onChange={(event) => set('body', event.target.value)}
+              {...fieldA11y('template-body', visible.body, true)}
             />
           </Field>
           {strayFillIns.length > 0 && (
@@ -169,9 +176,14 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
                       value={values.colors[key]}
                       onChange={(event) => setColor(key, event.target.value.trim())}
                       className="font-mono"
+                      {...fieldA11y(`color-${key}`, visible[`colors.${key}`])}
                     />
                   </div>
-                  {visible[`colors.${key}`] && <p className="text-xs text-destructive">{visible[`colors.${key}`]}</p>}
+                  {visible[`colors.${key}`] && (
+                    <p id={`color-${key}-error`} className="text-xs text-destructive">
+                      {visible[`colors.${key}`]}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -247,6 +259,12 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
   );
 }
 
+/** Ties a field to its error (or hint) for assistive technology. */
+function fieldA11y(id: string, error: string | undefined, hasHint = false) {
+  if (error) return { 'aria-invalid': true as const, 'aria-describedby': `${id}-error` };
+  return hasHint ? { 'aria-describedby': `${id}-hint` } : {};
+}
+
 function Field({
   id,
   label,
@@ -265,9 +283,13 @@ function Field({
       <Label htmlFor={id}>{label}</Label>
       {children}
       {error ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p id={`${id}-error`} className="text-xs text-destructive">
+          {error}
+        </p>
       ) : hint ? (
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+          {hint}
+        </p>
       ) : null}
     </div>
   );

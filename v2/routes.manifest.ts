@@ -251,7 +251,7 @@ export function classicFallbackFor(pathname: string): string | null {
   if (exact === 'work' || exact === 'study' || exact === 'channels') return '/';
   if (exact === 'organization') return '/settings';
   if (first === 'activity' && second === 'stats' && segments.length === 2) return '/activity';
-  if (first === 'settings' && (second === 'devices' || second === 'verification') && segments.length === 2) return '/settings';
+  if (first === 'settings' && (second === 'devices' || second === 'verification' || second === 'certificates') && segments.length === 2) return '/settings';
   if (first === 'quiz' && segments.length >= 2) {
     // The library, explore, an attempt, and a practice session's own address
     // (`/quiz/{session}`) are v2's; play, history and stats are the classic

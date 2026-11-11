@@ -28,6 +28,7 @@ export function TemplateLogos({ templateUuid, logos }: { templateUuid: string; l
   const [label, setLabel] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const ordered = bySort(logos);
+  const nameOf = (logo: CertificateLogo) => logo.label?.trim() || 'this logo';
 
   const upload = (file: File | undefined) => {
     if (!file) return;
@@ -47,14 +48,20 @@ export function TemplateLogos({ templateUuid, logos }: { templateUuid: string; l
   };
 
   const move = (uuid: string, direction: -1 | 1) => {
-    update.mutate(moveBySort(logos, uuid, direction).map(({ uuid: id, label: text, sort }) => ({ uuid: id, label: text, sort })), {
+    update.mutate(moveBySort(logos, uuid, direction).map(({ uuid: id, label: text, sort }) => ({ uuid: id, label: text ?? '', sort })), {
       onError: (cause) => setProblem(extractApiError(cause).message),
     });
   };
 
-  const rename = (logo: CertificateLogo, next: string) => {
-    const text = next.trim();
+  const rename = (logo: CertificateLogo, input: HTMLInputElement) => {
+    const text = input.value.trim();
+    if (!text) {
+      input.value = logo.label ?? '';
+      setProblem('A logo needs a name. It is read out to people who cannot see it.');
+      return;
+    }
     if (text === logo.label) return;
+    setProblem(null);
     update.mutate([{ uuid: logo.uuid, label: text, sort: logo.sort }], {
       onError: (cause) => setProblem(extractApiError(cause).message),
     });
@@ -79,8 +86,8 @@ export function TemplateLogos({ templateUuid, logos }: { templateUuid: string; l
               </span>
               <Input
                 aria-label="Logo name"
-                defaultValue={logo.label}
-                onBlur={(event) => rename(logo, event.target.value)}
+                defaultValue={logo.label ?? ''}
+                onBlur={(event) => rename(logo, event.target)}
                 className="h-8"
               />
               <div className="flex shrink-0 gap-1">
@@ -88,7 +95,7 @@ export function TemplateLogos({ templateUuid, logos }: { templateUuid: string; l
                   size="icon"
                   variant="ghost"
                   className="size-8"
-                  aria-label={`Move ${logo.label} left`}
+                  aria-label={`Move ${nameOf(logo)} left`}
                   disabled={index === 0 || update.isPending}
                   onClick={() => move(logo.uuid, -1)}
                 >
@@ -98,7 +105,7 @@ export function TemplateLogos({ templateUuid, logos }: { templateUuid: string; l
                   size="icon"
                   variant="ghost"
                   className="size-8"
-                  aria-label={`Move ${logo.label} right`}
+                  aria-label={`Move ${nameOf(logo)} right`}
                   disabled={index === ordered.length - 1 || update.isPending}
                   onClick={() => move(logo.uuid, 1)}
                 >
@@ -108,7 +115,7 @@ export function TemplateLogos({ templateUuid, logos }: { templateUuid: string; l
                   size="icon"
                   variant="ghost"
                   className="size-8 text-destructive hover:text-destructive"
-                  aria-label={`Remove ${logo.label}`}
+                  aria-label={`Remove ${nameOf(logo)}`}
                   disabled={remove.isPending}
                   onClick={() => remove.mutate(logo.uuid, { onError: (cause) => setProblem(extractApiError(cause).message) })}
                 >

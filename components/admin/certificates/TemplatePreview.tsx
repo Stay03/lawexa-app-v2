@@ -59,7 +59,13 @@ export function TemplatePreview({
       } catch (cause) {
         if (request !== latest.current) return;
         const apiError = extractApiError(cause);
-        setError(apiError.status === 422 ? apiError.message : 'The preview did not load.');
+        setError(
+          apiError.status === 429
+            ? 'Too many previews in a minute. Wait a moment, then press Try again.'
+            : apiError.status === 422
+              ? apiError.message
+              : 'The preview did not load.',
+        );
         setState('error');
       }
     }, PREVIEW_DELAY_MS);

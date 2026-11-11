@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { adminCertificatesApi } from '@/lib/api/certificates';
+import { useAuth } from '@/lib/hooks/useAuth';
 import type {
   CertificateProgrammePayload,
   CertificateTemplatePayload,
@@ -26,45 +27,57 @@ export const certificateKeys = {
                                   Queries
 ******************************************************************************/
 
+/** Every read is superadmin-only on the server, so nobody else asks. */
+function useIsSuperadmin(): boolean {
+  return useAuth().user?.role === 'superadmin';
+}
+
 export function useCertificateTemplates() {
+  const isSuperadmin = useIsSuperadmin();
   return useQuery({
     queryKey: certificateKeys.templates(),
     queryFn: () => adminCertificatesApi.templates(),
+    enabled: isSuperadmin,
     staleTime: 30 * 1000,
   });
 }
 
 export function useCertificateTemplate(uuid: string | null) {
+  const isSuperadmin = useIsSuperadmin();
   return useQuery({
     queryKey: certificateKeys.template(uuid ?? ''),
     queryFn: () => adminCertificatesApi.template(uuid as string),
-    enabled: Boolean(uuid),
+    enabled: isSuperadmin && Boolean(uuid),
     staleTime: 30 * 1000,
   });
 }
 
 export function useCertificateProgrammes() {
+  const isSuperadmin = useIsSuperadmin();
   return useQuery({
     queryKey: certificateKeys.programmes(),
     queryFn: () => adminCertificatesApi.programmes(),
+    enabled: isSuperadmin,
     staleTime: 30 * 1000,
   });
 }
 
 export function useCertificateProgramme(uuid: string | null) {
+  const isSuperadmin = useIsSuperadmin();
   return useQuery({
     queryKey: certificateKeys.programme(uuid ?? ''),
     queryFn: () => adminCertificatesApi.programme(uuid as string),
-    enabled: Boolean(uuid),
+    enabled: isSuperadmin && Boolean(uuid),
     staleTime: 30 * 1000,
   });
 }
 
 export function useIssuedCertificates(programmeUuid: string, page: number) {
+  const isSuperadmin = useIsSuperadmin();
   return useQuery({
     queryKey: certificateKeys.issued(programmeUuid, page),
     queryFn: () => adminCertificatesApi.certificates(programmeUuid, page),
-    enabled: Boolean(programmeUuid),
+    enabled: isSuperadmin && Boolean(programmeUuid),
     staleTime: 30 * 1000,
   });
 }
@@ -171,7 +184,8 @@ export function useIssueCertificates(programmeUuid: string) {
   return useMutation({
     mutationFn: (payload: IssueCertificatesPayload) => adminCertificatesApi.issue(programmeUuid, payload),
     meta: { silentError: true },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: certificateKeys.programme(programmeUuid) }),
+    // The programme, its issued list and the programmes list's issued_count.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: certificateKeys.programmes() }),
   });
 }
 

@@ -15,7 +15,8 @@ export interface CertificateColors {
 
 export interface CertificateLogo {
   uuid: string;
-  label: string;
+  /** Null for a logo saved without a name before names were required. */
+  label: string | null;
   url: string;
   sort: number;
 }
@@ -23,7 +24,7 @@ export interface CertificateLogo {
 export interface CertificateSignatory {
   uuid: string;
   name: string;
-  title: string;
+  title: string | null;
   signature_url: string | null;
   sort: number;
 }
@@ -41,10 +42,11 @@ export interface CertificateTemplate {
   updated_at?: string;
 }
 
+/** On create, `title` and `body` may be left out: the server uses the default wording. */
 export interface CertificateTemplatePayload {
   name: string;
-  title: string;
-  body: string;
+  title?: string;
+  body?: string;
   colors: CertificateColors;
 }
 
@@ -86,6 +88,8 @@ export interface CertificateProgrammeSummary {
 export interface MyCertificate {
   number: string;
   printed_name: string;
+  /** False once the certificate has been withdrawn. */
+  valid?: boolean;
   score: number | null;
   issued_at: string;
   programme: CertificateProgrammeSummary;
@@ -124,7 +128,7 @@ export interface CertificateVerification {
   event_date: string;
   issued_at: string;
   valid: boolean;
-  logos: Array<{ label: string; url: string }>;
+  logos: Array<{ label: string | null; url: string }>;
 }
 
 export interface IssueCertificatesPayload {

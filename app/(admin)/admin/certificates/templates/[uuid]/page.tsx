@@ -6,12 +6,12 @@ import { ArrowLeft, RotateCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SuperadminGate } from '@/components/admin/certificates/SuperadminGate';
 import { CertificateTemplateEditor } from '@/components/admin/certificates/CertificateTemplateEditor';
 import { useCertificateTemplate } from '@/lib/hooks/useAdminCertificates';
 
 /** `/admin/certificates/templates/{uuid}`, or `/new` for a new design. */
-export default function AdminCertificateTemplatePage({ params }: { params: Promise<{ uuid: string }> }) {
-  const { uuid } = use(params);
+function AdminCertificateTemplateContent({ uuid }: { uuid: string }) {
   const isNew = uuid === 'new';
   const template = useCertificateTemplate(isNew ? null : uuid);
 
@@ -47,5 +47,14 @@ export default function AdminCertificateTemplatePage({ params }: { params: Promi
         <CertificateTemplateEditor key={template.data.uuid} template={template.data} />
       )}
     </div>
+  );
+}
+
+export default function AdminCertificateTemplatePage({ params }: { params: Promise<{ uuid: string }> }) {
+  const { uuid } = use(params);
+  return (
+    <SuperadminGate>
+      <AdminCertificateTemplateContent uuid={uuid} />
+    </SuperadminGate>
   );
 }

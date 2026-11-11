@@ -72,7 +72,7 @@ export function CertificatesScreen() {
 
 function CertificateRow({ certificate }: { certificate: MyCertificate }) {
   const download = useDownloadCertificate();
-  const [copied, setCopied] = useState(false);
+  const [copy, setCopy] = useState<'idle' | 'copied' | 'failed'>('idle');
   const verifyPath = certificateVerifyPath(certificate.number);
   const details = [
     certificate.programme.partner_name,
@@ -80,13 +80,14 @@ function CertificateRow({ certificate }: { certificate: MyCertificate }) {
     formatCertificateScore(certificate.score) && `Score ${formatCertificateScore(certificate.score)}`,
   ].filter(Boolean);
 
+  const verifyUrl = () => `${window.location.origin}${verifyPath}`;
   const copyLink = async () => {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${verifyPath}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(verifyUrl());
+      setCopy('copied');
+      setTimeout(() => setCopy('idle'), 2000);
     } catch {
-      setCopied(false);
+      setCopy('failed');
     }
   };
 
@@ -97,7 +98,12 @@ function CertificateRow({ certificate }: { certificate: MyCertificate }) {
           <Award className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-pretty text-foreground">{certificate.programme.name}</p>
+          <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-pretty text-foreground">
+            {certificate.programme.name}
+            {certificate.valid === false && (
+              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">Withdrawn</span>
+            )}
+          </p>
           {details.length > 0 && <p className="mt-0.5 text-sm text-muted-foreground">{details.join(' · ')}</p>}
           <p className="mt-1 text-xs text-muted-foreground">
             Issued to {certificate.printed_name} · <span className="font-mono tabular-nums">{certificate.number}</span>
@@ -121,11 +127,16 @@ function CertificateRow({ certificate }: { certificate: MyCertificate }) {
           </Link>
         </Button>
         <Button size="sm" variant="ghost" onClick={() => void copyLink()}>
-          {copied ? <Check aria-hidden className="size-4" /> : <Link2 aria-hidden className="size-4" />}
-          {copied ? 'Link copied' : 'Copy verify link'}
+          {copy === 'copied' ? <Check aria-hidden className="size-4" /> : <Link2 aria-hidden className="size-4" />}
+          {copy === 'copied' ? 'Link copied' : 'Copy verify link'}
         </Button>
       </div>
 
+      {copy === 'failed' && (
+        <p role="alert" className="text-sm break-all text-destructive sm:pl-13">
+          The link could not be copied. Copy it from here: {verifyUrl()}
+        </p>
+      )}
       {download.isError && (
         <p role="alert" className="text-sm text-destructive sm:pl-13">
           The PDF did not download. Try again in a moment.

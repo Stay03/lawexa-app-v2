@@ -6,10 +6,11 @@ import { Award, Plus, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CertificatesTabs } from '@/components/admin/certificates/CertificatesTabs';
+import { SuperadminGate } from '@/components/admin/certificates/SuperadminGate';
 import { useCertificateTemplates } from '@/lib/hooks/useAdminCertificates';
 
 /** `/admin/certificates/templates`: every certificate design. */
-export default function AdminCertificateTemplatesPage() {
+function AdminCertificateTemplatesContent() {
   const templates = useCertificateTemplates();
 
   return (
@@ -74,5 +75,13 @@ export default function AdminCertificateTemplatesPage() {
         </ul>
       )}
     </div>
+  );
+}
+
+export default function AdminCertificateTemplatesPage() {
+  return (
+    <SuperadminGate>
+      <AdminCertificateTemplatesContent />
+    </SuperadminGate>
   );
 }

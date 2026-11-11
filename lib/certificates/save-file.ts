@@ -1,6 +1,9 @@
 import type { ExportedFile } from '@/lib/api/export';
 
-/** Hands a downloaded file to the browser's download, then frees the object URL. */
+/**
+ * Hands a downloaded file to the browser's download, then frees the object URL.
+ * Safari on iOS opens the file asynchronously, so the URL is kept for a minute.
+ */
 export function saveExportedFile(file: ExportedFile): void {
   const url = URL.createObjectURL(file.blob);
   const link = document.createElement('a');
@@ -9,5 +12,5 @@ export function saveExportedFile(file: ExportedFile): void {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
