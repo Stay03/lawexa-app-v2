@@ -61,9 +61,14 @@ export function ordinal(n: number): string {
   }
 }
 
+/** The points' unit: "pt" for one, "pts" otherwise (the card and the ranking both). */
+export function pointsUnit(score: number): string {
+  return score === 1 ? 'pt' : 'pts';
+}
+
 /** Points as the game shows them, with the unit. */
 export function pointsText(score: number): string {
-  return `${score.toLocaleString('en-US')} ${score === 1 ? 'pt' : 'pts'}`;
+  return `${score.toLocaleString('en-US')} ${pointsUnit(score)}`;
 }
 
 /** The card's words, and the words that go with it to the share sheet. Pure, so a test pins it. */
@@ -87,6 +92,101 @@ export function resultCardCopy(input: ResultCardInput): {
   };
 }
 
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+
+/** The top three's box ends here at the latest, clear of the footer line at `FOOTER_Y`. */
+export const CARD_BOTTOM = 1780;
+export const FOOTER_Y = 1840;
+const PAD = 84;
+const TEXT_WIDTH = RESULT_CARD.width - PAD * 2;
+const NAME_LINES = 2;
+const TITLE_LINES = 3;
+
+export interface ResultCardLayout {
+  /** 1 at full size; smaller when the words need the room. */
+  scale: number;
+  medal: { cx: number; cy: number; r: number };
+  name: { size: number; lines: string[]; baselines: number[] };
+  came: { size: number; baseline: number };
+  title: { size: number; lines: string[]; baselines: number[] };
+  pill: { top: number; h: number; size: number };
+  meta: { size: number; baseline: number };
+  box: { top: number; h: number; rowH: number } | null;
+  /** The lowest point drawn above the footer, the box's lip included. */
+  bottom: number;
+}
+
+/** At most `maxLines` lines; a longer text keeps its first lines and ends the last with "…". */
+function clampLines(lines: string[], maxLines: number, size: number, measure: Measure): string[] {
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  let last = `${kept[maxLines - 1]} ${lines.slice(maxLines).join(' ')}`;
+  while (last.length > 1 && measure(`${last}…`, size) > TEXT_WIDTH) last = last.slice(0, -1);
+  kept[maxLines - 1] = `${last.trimEnd()}…`;
+  return kept;
+}
+
+function layoutAt(input: ResultCardInput, measure: Measure, s: number): ResultCardLayout {
+  const px = (n: number) => Math.round(n * s);
+  const r = px(190);
+  const medal = { cx: RESULT_CARD.width / 2, cy: 200 + r, r };
+  let y = medal.cy + r + 16 + px(70);
+
+  const nameFit = fitText(input.playerName, { width: TEXT_WIDTH, maxLines: NAME_LINES, max: px(92), min: px(56), step: 2 }, measure);
+  const nameLines = clampLines(nameFit.lines, NAME_LINES, nameFit.size, measure);
+  const nameBaselines = nameLines.map(() => (y += nameFit.size * 1.05));
+
+  y += px(70);
+  const came = { size: px(42), baseline: y };
+
+  const titleFit = fitText(input.quizTitle, { width: TEXT_WIDTH, maxLines: TITLE_LINES, max: px(72), min: px(44), step: 2 }, measure);
+  const titleLines = clampLines(titleFit.lines, TITLE_LINES, titleFit.size, measure);
+  const titleBaselines = titleLines.map(() => (y += titleFit.size * 1.12));
+
+  const pill = { top: y + px(60), h: px(120), size: px(64) };
+  const meta = { size: px(36), baseline: pill.top + pill.h + 10 + px(64) };
+
+  const rows = Math.min(input.podium.length, 3);
+  let box: ResultCardLayout['box'] = null;
+  let bottom = meta.baseline + 10;
+  if (rows > 0) {
+    const rowH = px(112);
+    const h = rows * rowH + px(48);
+    // The box sits low on the card, above the footer; with long words it follows the meta line.
+    const top = Math.max(meta.baseline + px(64), CARD_BOTTOM - 10 - h);
+    box = { top, h, rowH };
+    bottom = top + h + 10;
+  }
+  return {
+    scale: s,
+    medal,
+    name: { size: nameFit.size, lines: nameLines, baselines: nameBaselines },
+    came,
+    title: { size: titleFit.size, lines: titleLines, baselines: titleBaselines },
+    pill,
+    meta,
+    box,
+    bottom,
+  };
+}
+
+/**
+ * Where everything sits (techlead's review of cd5f6af0). The block is measured
+ * whole first: at full size when it fits, else everything (medal, type, rows)
+ * a step smaller together until the top three end by `CARD_BOTTOM`, so a
+ * two-line name over a three-line title never reaches the footer or the
+ * canvas's edge. A name past two lines, or a title past three, ends in "…".
+ * Pure (the canvas's measure is passed in), so a test pins it.
+ */
+export function resultCardLayout(input: ResultCardInput, measure: Measure): ResultCardLayout {
+  let layout = layoutAt(input, measure, 1);
+  for (let s = 0.96; layout.bottom > CARD_BOTTOM && s >= 0.6; s -= 0.04) layout = layoutAt(input, measure, s);
+  return layout;
+}
+
+/* ── Drawing ──────────────────────────────────────────────────────────────── */
+
 const INK = '#111111';
 const CARD = '#1c1c1c';
 const CARD_BORDER = '#333333';
@@ -95,23 +195,29 @@ const GOLD = '#c99414';
 const GOLD_DEEP = '#775400';
 const WHITE = '#fafafa';
 const MUTED = '#a3a3a3';
-const PAD = 84;
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+/** A rounded rectangle's path from arcs: `ctx.roundRect` throws on Safari before 16. */
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number) {
+  const r = Math.min(radius, w / 2, h / 2);
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, r);
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 /** A card on its lip, as the quiz draws its cards and buttons. */
-function raisedCard(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, fill: string, border: string, lip: string) {
-  roundRect(ctx, x, y + 10, w, h, 40);
-  ctx.fillStyle = lip;
+function raisedCard(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius: number) {
+  roundRectPath(ctx, x, y + 10, w, h, radius);
+  ctx.fillStyle = LIP;
   ctx.fill();
-  roundRect(ctx, x, y, w, h, 40);
-  ctx.fillStyle = fill;
+  roundRectPath(ctx, x, y, w, h, radius);
+  ctx.fillStyle = CARD;
   ctx.fill();
   ctx.lineWidth = 4;
-  ctx.strokeStyle = border;
+  ctx.strokeStyle = CARD_BORDER;
   ctx.stroke();
 }
 
@@ -140,16 +246,19 @@ export function drawResultCard(
     ctx.font = display(size);
     return ctx.measureText(text).width;
   };
+  const L = resultCardLayout(input, measureDisplay);
+  const px = (n: number) => Math.round(n * L.scale);
+  const cx = L.medal.cx;
   ctx.textBaseline = 'alphabetic';
 
   // The ground, with the gold glow the medal sits in.
   ctx.fillStyle = INK;
   ctx.fillRect(0, 0, W, RESULT_CARD.height);
-  const glow = ctx.createRadialGradient(W / 2, 560, 40, W / 2, 560, 720);
+  const glow = ctx.createRadialGradient(cx, L.medal.cy, 40, cx, L.medal.cy, 720);
   glow.addColorStop(0, 'rgba(201, 148, 20, 0.28)');
   glow.addColorStop(1, 'rgba(201, 148, 20, 0)');
   ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, W, 1300);
+  ctx.fillRect(0, 0, W, L.medal.cy + 760);
 
   // The mark, and what this is.
   if (logo) {
@@ -162,9 +271,7 @@ export function drawResultCard(
   ctx.fillText('LIVE QUIZ', W - PAD, 140);
 
   // The medal: the place in gold, on its lip.
-  const cx = W / 2;
-  const cy = 520;
-  const r = 190;
+  const { cy, r } = L.medal;
   ctx.beginPath();
   ctx.arc(cx, cy + 16, r, 0, Math.PI * 2);
   ctx.fillStyle = GOLD_DEEP;
@@ -175,64 +282,49 @@ export function drawResultCard(
   ctx.fill();
   ctx.textAlign = 'center';
   ctx.fillStyle = INK;
-  let placeSize = 170;
-  while (placeSize > 90 && measureDisplay(copy.place, placeSize) > r * 1.6) placeSize -= 6;
+  let placeSize = px(170);
+  while (placeSize > px(90) && measureDisplay(copy.place, placeSize) > r * 1.6) placeSize -= 6;
   ctx.font = display(placeSize);
   ctx.fillText(copy.place, cx, cy + placeSize * 0.36);
 
   // Who, and in what.
-  let y = 820;
-  const nameFit = fitText(input.playerName, { width: W - PAD * 2, maxLines: 2, max: 92, min: 56, step: 4 }, measureDisplay);
-  ctx.font = display(nameFit.size);
+  ctx.font = display(L.name.size);
   ctx.fillStyle = WHITE;
-  for (const line of nameFit.lines) {
-    y += nameFit.size * 1.05;
-    ctx.fillText(line, cx, y);
-  }
-  y += 70;
-  ctx.font = body(42, 500);
+  L.name.lines.forEach((line, i) => ctx.fillText(line, cx, L.name.baselines[i]));
+  ctx.font = body(L.came.size, 500);
   ctx.fillStyle = MUTED;
-  ctx.fillText(`came ${copy.place} in`, cx, y);
-  const titleFit = fitText(input.quizTitle, { width: W - PAD * 2, maxLines: 3, max: 72, min: 44, step: 4 }, measureDisplay);
-  ctx.font = display(titleFit.size);
+  ctx.fillText(`came ${copy.place} in`, cx, L.came.baseline);
+  ctx.font = display(L.title.size);
   ctx.fillStyle = GOLD;
-  for (const line of titleFit.lines) {
-    y += titleFit.size * 1.12;
-    ctx.fillText(line, cx, y);
-  }
+  L.title.lines.forEach((line, i) => ctx.fillText(line, cx, L.title.baselines[i]));
 
   // The points, as a raised pill.
-  y += 60;
   const points = pointsText(input.score);
-  ctx.font = display(64);
-  const pillW = ctx.measureText(points).width + 112;
-  raisedCard(ctx, cx - pillW / 2, y, pillW, 120, CARD, CARD_BORDER, LIP);
+  ctx.font = display(L.pill.size);
+  const pillW = ctx.measureText(points).width + px(112);
+  raisedCard(ctx, cx - pillW / 2, L.pill.top, pillW, L.pill.h, px(40));
   ctx.fillStyle = WHITE;
-  ctx.fillText(points, cx, y + 84);
-  y += 120 + 64;
-  ctx.font = body(36, 500);
+  ctx.fillText(points, cx, L.pill.top + L.pill.h * 0.7);
+  ctx.font = body(L.meta.size, 500);
   ctx.fillStyle = MUTED;
-  ctx.fillText(trimToWidth(ctx, copy.meta, W - PAD * 2), cx, y);
+  ctx.fillText(trimToWidth(ctx, copy.meta, TEXT_WIDTH), cx, L.meta.baseline);
 
   // The top three, the player's own row lit.
-  const rows = input.podium.slice(0, 3);
-  if (rows.length > 0) {
-    const rowH = 112;
-    const boxH = rows.length * rowH + 48;
-    const boxY = Math.max(y + 64, 1760 - 96 - boxH);
-    raisedCard(ctx, PAD, boxY, W - PAD * 2, boxH, CARD, CARD_BORDER, LIP);
-    rows.forEach((row, i) => {
-      const ry = boxY + 24 + i * rowH;
+  if (L.box) {
+    const { top, h, rowH } = L.box;
+    raisedCard(ctx, PAD, top, W - PAD * 2, h, px(40));
+    input.podium.slice(0, 3).forEach((row, i) => {
+      const ry = top + px(24) + i * rowH;
+      const dy = ry + rowH / 2;
       if (row.isViewer) {
-        roundRect(ctx, PAD + 16, ry + 8, W - PAD * 2 - 32, rowH - 16, 28);
+        roundRectPath(ctx, PAD + 16, ry + px(8), W - PAD * 2 - 32, rowH - px(16), px(28));
         ctx.fillStyle = 'rgba(201, 148, 20, 0.18)';
         ctx.fill();
       }
       // The rank in a gold disc for first, an outlined one after.
-      const dx = PAD + 80;
-      const dy = ry + rowH / 2;
+      const dx = PAD + px(80);
       ctx.beginPath();
-      ctx.arc(dx, dy, 32, 0, Math.PI * 2);
+      ctx.arc(dx, dy, px(32), 0, Math.PI * 2);
       if (row.rank === 1) {
         ctx.fillStyle = GOLD;
         ctx.fill();
@@ -242,19 +334,20 @@ export function drawResultCard(
         ctx.stroke();
       }
       ctx.textAlign = 'center';
-      ctx.font = display(34);
+      ctx.font = display(px(34));
       ctx.fillStyle = row.rank === 1 ? INK : WHITE;
-      ctx.fillText(String(row.rank), dx, dy + 12);
+      ctx.fillText(String(row.rank), dx, dy + px(12));
       ctx.textAlign = 'right';
-      ctx.font = display(38);
+      ctx.font = display(px(38));
       ctx.fillStyle = row.isViewer ? GOLD : WHITE;
       const score = pointsText(row.score);
-      ctx.fillText(score, W - PAD - 48, dy + 13);
+      ctx.fillText(score, W - PAD - px(48), dy + px(13));
       const scoreW = ctx.measureText(score).width;
       ctx.textAlign = 'left';
-      ctx.font = body(38, row.isViewer ? 700 : 500);
+      ctx.font = body(px(38), row.isViewer ? 700 : 500);
       ctx.fillStyle = WHITE;
-      ctx.fillText(trimToWidth(ctx, row.name, W - PAD * 2 - 48 - 136 - scoreW - 32), dx + 56, dy + 13);
+      const nameX = dx + px(56);
+      ctx.fillText(trimToWidth(ctx, row.name, W - PAD - px(48) - scoreW - px(32) - nameX), nameX, dy + px(13));
     });
   }
 
@@ -262,5 +355,5 @@ export function drawResultCard(
   ctx.textAlign = 'center';
   ctx.font = body(32, 700);
   ctx.fillStyle = MUTED;
-  ctx.fillText('Play live quizzes with your class on lawexa.com', cx, 1840);
+  ctx.fillText('Play live quizzes with your class on lawexa.com', cx, FOOTER_Y);
 }

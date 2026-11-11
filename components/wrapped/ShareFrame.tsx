@@ -5,7 +5,7 @@ import { Copy, Download, Instagram, Music2, Share2, Twitter } from 'lucide-react
 import { toast } from 'sonner';
 
 import { shareUrl, vibeFor } from '@/lib/wrapped/copy';
-import { canShareFile, canvasToFile, download, loadImage } from '@/lib/share-card/canvas';
+import { canShareFile, canvasToFile, copyText, download, loadImage } from '@/lib/share-card/canvas';
 import { corsPhotoUrl, drawShareCard, type ShareFonts } from '@/lib/wrapped/share-image';
 import { wrappedArt } from '@/lib/wrapped/theme';
 import type { WrappedRecord } from '@/lib/wrapped/types';
@@ -27,15 +27,6 @@ interface Poster {
 
 function shareText(record: WrappedRecord, link: string): string {
   return `My post-Bar Finals vibe: ${vibeFor(record.vibe.id).line} Get yours: ${link}`;
-}
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function ShareFrame({ record, fonts, onShared }: { record: WrappedRecord; fonts: ShareFonts; onShared?: () => void }) {

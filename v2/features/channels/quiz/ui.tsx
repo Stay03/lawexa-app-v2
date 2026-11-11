@@ -14,6 +14,7 @@ import type { SlimUser } from '@/types/collab';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
 import { MemberAvatar } from '../ui/avatars';
 import { useServerCountdown } from './game-clock';
+import { pointsUnit } from './result-card';
 import {
   ANSWERS_RAIL_VISIBLE,
   CATCH_UP_AFTER_MS,
@@ -640,8 +641,10 @@ export function RankRow({
         )}
       </span>
       <span className="shrink-0 font-comfortaa text-sm font-bold tabular-nums text-foreground">
-        {score.toLocaleString()}
-        <span className="ml-1 font-sans text-xs font-medium text-muted-foreground">pts</span>
+        {score.toLocaleString()}{' '}
+        <span className="font-sans text-xs font-medium text-muted-foreground">
+          {pointsUnit(score)}
+        </span>
       </span>
     </li>
   );

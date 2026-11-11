@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Share2 } from 'lucide-react';
 
-import { canShareFile, canvasToFile, download, loadImage } from '@/lib/share-card/canvas';
+import { canShareFile, canvasToFile, copyText, download, loadImage } from '@/lib/share-card/canvas';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { drawResultCard, resultCardCopy, type ResultCardInput } from './result-card';
 import { COMPACT_RAISED } from './ui';
@@ -17,8 +17,9 @@ import { useResultsLink } from './use-results-link';
  *
  * Share hands the picture to the phone's sheet (WhatsApp Status, Instagram),
  * with the results link in its words; a browser whose sheet takes no picture
- * saves it instead. Download saves it. A dismissed sheet is a decision, not a
- * failure: nothing is said. Messages are inline, as on every channel surface.
+ * saves it and copies the link, as Wrapped does. Download saves it. A
+ * dismissed sheet is a decision, not a failure: nothing is said. A sheet that
+ * fails to open says so. Messages are inline, as on every channel surface.
  */
 
 interface Drawn {
@@ -77,6 +78,7 @@ export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: 
     setNote('Saved to your downloads.');
   };
 
+  /** The phone's sheet with the picture; where a sheet takes no picture, the card is saved and the link copied. */
   const share = async () => {
     if (!drawn) return;
     if (canShareFile(drawn.file)) {
@@ -85,11 +87,13 @@ export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: 
         setNote(null);
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
-        save();
+        setNote('Sharing did not open. Download the card and post it instead.');
       }
       return;
     }
-    save();
+    download(drawn.url, drawn.file.name);
+    const copied = link ? await copyText(link) : false;
+    setNote(copied ? 'Saved. Your link is copied too.' : 'Saved to your downloads.');
   };
 
   return (

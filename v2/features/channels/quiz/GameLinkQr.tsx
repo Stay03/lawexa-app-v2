@@ -1,11 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -40,7 +41,18 @@ export function GameLinkQr({ url }: { url: string }) {
       </RaisedButton>
 
       <Dialog open={large} onOpenChange={setLarge}>
-        <DialogContent className="flex h-dvh max-h-none w-screen max-w-none flex-col items-center justify-center gap-6 rounded-none bg-white p-6 text-neutral-950 ring-0 sm:max-w-none dark:bg-white [&_[data-slot=dialog-close]]:text-neutral-950">
+        <DialogContent
+          showCloseButton={false}
+          className="flex h-dvh max-h-none w-screen max-w-none flex-col items-center justify-center gap-6 rounded-none bg-white p-6 text-neutral-950 ring-0 sm:max-w-none dark:bg-white"
+        >
+          {/* The page is white in both themes, so its close is drawn for a white page: the shared
+              close's hover is a theme token, dark on this page in dark mode. */}
+          <DialogClose
+            aria-label="Close"
+            className="absolute top-4 right-4 flex size-10 items-center justify-center rounded-full text-neutral-700 transition-colors hover:bg-neutral-100 hover:text-neutral-950 focus-visible:ring-2 focus-visible:ring-neutral-950 focus-visible:outline-none"
+          >
+            <X aria-hidden className="size-5" />
+          </DialogClose>
           <DialogHeader className="items-center text-center">
             <DialogTitle className="font-comfortaa text-2xl font-bold text-neutral-950 md:text-4xl">Scan to join the game</DialogTitle>
             <DialogDescription className="text-base text-neutral-600 md:text-lg">
