@@ -147,6 +147,7 @@ export const V2_ROUTES = [
   '/settings/usage',
   '/settings/api',
   '/settings/verification',
+  '/settings/certificates',
   // The Terms of Service and the Privacy Policy, inside the v2 shell. Only a
   // reader holding the v2 cookie is rewritten here; crawlers keep the v1 page.
   '/terms',

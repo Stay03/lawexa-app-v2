@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
+  Award,
   BarChart3,
   ChevronRight,
   Compass,
@@ -27,6 +28,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '@/components/ui/sidebar';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 const quizNavItems = [
   { title: 'Questions', url: '/admin/quiz/questions', icon: ListChecks },
@@ -35,12 +37,16 @@ const quizNavItems = [
   { title: 'Analytics', url: '/admin/quiz/analytics', icon: BarChart3 },
   // The new quizzes people play in Explore and channels (option A, thread e80a3d30).
   { title: 'Explore quizzes', url: '/admin/quiz/explore', icon: Compass },
+  // Designs and programmes that issue certificates (Techlead e465210e).
+  { title: 'Certificates', url: '/admin/certificates', icon: Award, superadminOnly: true },
 ];
 
 export function AdminNavQuizSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
-  const isSectionActive = pathname.startsWith('/admin/quiz');
+  const { user } = useAuth();
+  const items = quizNavItems.filter((item) => !('superadminOnly' in item) || user?.role === 'superadmin');
+  const isSectionActive = pathname.startsWith('/admin/quiz') || pathname.startsWith('/admin/certificates');
 
   return (
     <SidebarGroup>
@@ -57,7 +63,7 @@ export function AdminNavQuizSection() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <SidebarMenuSub>
-                {quizNavItems.map((item) => {
+                {items.map((item) => {
                   const isActive =
                     pathname === item.url || pathname.startsWith(item.url + '/');
                   return (
