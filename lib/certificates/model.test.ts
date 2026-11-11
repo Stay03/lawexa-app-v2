@@ -82,11 +82,14 @@ test('the form flags fill-ins the server will not replace', () => {
   assert.deepEqual(unknownFillIns('{nmae} and {Name} and {nmae}'), ['{nmae}', '{Name}']);
   assert.deepEqual(unknownFillIns('{}'), ['{}']);
   assert.deepEqual(unknownFillIns('No fill-ins at all'), []);
-  assert.deepEqual(unknownFillIns(DEFAULT_CERTIFICATE_BODY), [], 'square brackets are allowed');
+  assert.deepEqual(unknownFillIns(DEFAULT_CERTIFICATE_BODY), []);
+  assert.equal(DEFAULT_CERTIFICATE_BODY.includes('{score}'), false, 'no score line by default');
+  assert.deepEqual(unknownFillIns('held on {date}[, and scored {score} in the closing quiz].'), [], 'square brackets are allowed');
 });
 
 test('optional clauses in square brackets must be closed and not nested', () => {
   assert.equal(bracketProblem(DEFAULT_CERTIFICATE_BODY), null);
+  assert.equal(bracketProblem('on {date}[, and scored {score}].'), null);
   assert.equal(bracketProblem('No clauses'), null);
   assert.equal(bracketProblem('a [b] c [d]'), null);
   assert.match(bracketProblem('a [b c') ?? '', /never closed/);

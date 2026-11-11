@@ -80,10 +80,13 @@ export const DEFAULT_CERTIFICATE_COLORS: CertificateColors = {
   background: '#F7F1E3',
 };
 
-/** The wording a new design starts with (WOZ 552ca1fd). The name is printed above it as the hero. */
+/**
+ * The wording a new design starts with. The name is printed above it as the
+ * hero. No score line by default (Arthur, via Techlead 60c6e758); {score} stays
+ * available for programmes that want it.
+ */
 export const DEFAULT_CERTIFICATE_TITLE = 'Certificate of Participation';
-export const DEFAULT_CERTIFICATE_BODY =
-  'took part in {programme}, held with {partner} on {date}[, and scored {score} in the closing quiz].';
+export const DEFAULT_CERTIFICATE_BODY = 'took part in {programme}, held with {partner} on {date}.';
 
 /**
  * Square brackets mark a clause the PDF leaves out when a fill-in inside it is
