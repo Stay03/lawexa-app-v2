@@ -21,7 +21,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  bracketProblem,
+  DEFAULT_CERTIFICATE_BODY,
   DEFAULT_CERTIFICATE_COLORS,
+  DEFAULT_CERTIFICATE_TITLE,
   templateFormProblems,
   unknownFillIns,
   type TemplateFormValues,
@@ -33,9 +36,6 @@ import { TemplateLogos } from './TemplateLogos';
 import { TemplatePreview } from './TemplatePreview';
 import { TemplateSignatories } from './TemplateSignatories';
 
-const DEFAULT_BODY =
-  'This certifies that {name} participated in {programme}, presented by Lawexa in partnership with {partner}, on {date}.';
-
 const COLOR_FIELDS: Array<{ key: keyof CertificateColors; label: string }> = [
   { key: 'primary', label: 'Main colour' },
   { key: 'accent', label: 'Accent' },
@@ -45,7 +45,12 @@ const COLOR_FIELDS: Array<{ key: keyof CertificateColors; label: string }> = [
 function initialValues(template: CertificateTemplate | null): TemplateFormValues {
   return template
     ? { name: template.name, title: template.title, body: template.body, colors: { ...template.colors } }
-    : { name: '', title: 'Certificate of Participation', body: DEFAULT_BODY, colors: { ...DEFAULT_CERTIFICATE_COLORS } };
+    : {
+        name: '',
+        title: DEFAULT_CERTIFICATE_TITLE,
+        body: DEFAULT_CERTIFICATE_BODY,
+        colors: { ...DEFAULT_CERTIFICATE_COLORS },
+      };
 }
 
 /**
@@ -64,6 +69,7 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
 
   const problems = useMemo(() => templateFormProblems(values), [values]);
   const strayFillIns = useMemo(() => unknownFillIns(values.body), [values.body]);
+  const brackets = useMemo(() => bracketProblem(values.body), [values.body]);
   const visible = showProblems ? problems : {};
   const dirty = JSON.stringify(values) !== JSON.stringify(initialValues(template));
   const partsVersion = useMemo(
@@ -126,7 +132,7 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
           <Field
             id="template-body"
             label="Wording"
-            hint={`Fill-ins: ${CERTIFICATE_FILL_INS.map((fill) => `{${fill}}`).join(' ')}`}
+            hint={`Printed under the name. Fill-ins: ${CERTIFICATE_FILL_INS.map((fill) => `{${fill}}`).join(' ')}. Text in [square brackets] is left out when a fill-in inside it is empty.`}
             error={visible.body}
           >
             <Textarea
@@ -142,6 +148,7 @@ export function CertificateTemplateEditor({ template }: { template: CertificateT
               typed.
             </p>
           )}
+          {brackets && <p className="text-sm text-amber-700 dark:text-amber-400">{brackets}</p>}
 
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Colours</legend>

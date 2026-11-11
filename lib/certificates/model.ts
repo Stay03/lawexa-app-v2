@@ -71,12 +71,36 @@ export function isHexColor(value: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(value);
 }
 
-/** Colours a new template starts with: Lawexa's ink on paper. */
+/** Colours a new design starts with: Lucy's layout (54b765e1), as WOZ's renderer defaults them. */
 export const DEFAULT_CERTIFICATE_COLORS: CertificateColors = {
-  primary: '#1f2a44',
-  accent: '#b08d57',
-  background: '#ffffff',
+  primary: '#171307',
+  accent: '#C9A227',
+  background: '#F7F1E3',
 };
+
+/** The wording a new design starts with (WOZ 552ca1fd). The name is printed above it as the hero. */
+export const DEFAULT_CERTIFICATE_TITLE = 'Certificate of Participation';
+export const DEFAULT_CERTIFICATE_BODY =
+  'took part in {programme}, held with {partner} on {date}[, and scored {score} in the closing quiz].';
+
+/**
+ * Square brackets mark a clause the PDF leaves out when a fill-in inside it is
+ * empty (WOZ 84c5a71c). An unclosed or nested bracket would print as typed, so
+ * the form warns about it.
+ */
+export function bracketProblem(body: string): string | null {
+  let depth = 0;
+  for (const char of body) {
+    if (char === '[') {
+      depth += 1;
+      if (depth > 1) return 'A [ … ] clause cannot sit inside another one.';
+    } else if (char === ']') {
+      depth -= 1;
+      if (depth < 0) return 'There is a ] without a [ before it.';
+    }
+  }
+  return depth === 0 ? null : 'A [ is never closed with ].';
+}
 
 /** Items in the order the server will draw them, without changing the input. */
 export function bySort<T extends { sort: number }>(items: readonly T[]): T[] {
