@@ -1,5 +1,5 @@
 import { CAMPAIGN_LINE, CAMPUS_NAMES, PERSONAS, STICKER_LABELS, WRAPPED_URL, formatCount, shareName, vibeFor } from './copy';
-import { fitText, type Measure } from '@/lib/share-card/text-fit';
+import { fitText, type Measure } from './text-fit';
 import { POLAROID, SHARE_HEIGHT, SHARE_WIDTH, STROKE_OUTLINE, VIBE_BACKGROUNDS, WRAPPED_COLOURS } from './theme';
 import type { WrappedRecord, WrappedSticker } from './types';
 
@@ -62,6 +62,19 @@ export function corsPhotoUrl(url: string | null): string | null {
   } catch {
     return null;
   }
+}
+
+/** Loads a picture for the canvas; null when it cannot (no CORS, offline): the placeholder face shows. */
+export function loadImage(url: string | null): Promise<HTMLImageElement | null> {
+  if (!url) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.decoding = 'async';
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = url;
+  });
 }
 
 /**
@@ -136,60 +149,12 @@ export interface ShareArt {
   photo: HTMLImageElement | null;
 }
 
-/**
- * What a poster says, in Arthur's Wrapped layout. Wrapped fills it from a
- * student's record (`wrappedPoster`); the live quiz fills it from a player's
- * result (`v2/features/channels/quiz/result-card.ts`, Arthur, f730f71c: "a
- * shareable card just like we did for the Wrapped"). One layout, one drawing.
- */
-export interface PosterContent {
-  /** The ground under Arthur's frame, shown alone when the frame cannot load. */
-  background: string;
-  /** The tracked kicker over the line ("MY POST-BAR FINALS VIBE:"). */
-  kicker: string;
-  /** The display line above the polaroid. */
-  line: string;
-  /** On the polaroid's white edge: who, and the line under it. */
-  caption: { name: string; sub: string | null };
-  /** In the polaroid's circle when there is neither a photo nor a face ("2nd"). */
-  mark?: string;
-  /** The turned sticker on the polaroid's corner (the persona). */
-  banner: string;
-  /** At most three stat stickers. */
-  stickers: { value: string; label: string }[];
-  /** The campaign line beside the stickers; the last part is highlighted. */
-  campaign: readonly string[];
-  /** Beside the mark at the foot ("GET YOURS · LAWEXA.COM/WRAPPED"). */
-  link: string;
-}
-
-/** A student's Wrapped poster: their vibe, face card, stickers and persona. */
-export function wrappedPoster(record: WrappedRecord): PosterContent {
-  const vibe = vibeFor(record.vibe.id);
-  return {
-    background: VIBE_BACKGROUNDS[vibe.colour],
-    kicker: 'MY POST-BAR FINALS VIBE:',
-    line: vibe.line,
-    caption: {
-      name: shareName(record.student.first_name, record.student.last_initial),
-      sub: record.student.campus ? `${CAMPUS_NAMES[record.student.campus]} Campus` : null,
-    },
-    banner: PERSONAS[record.persona.key]?.name ?? PERSONAS.steady_learned_friend.name,
-    stickers: shownStickers(record.stickers).map(stickerText),
-    campaign: CAMPAIGN_LINE,
-    link: `GET YOURS · ${WRAPPED_URL.toUpperCase()}`,
-  };
-}
-
 export function drawShareCard(canvas: HTMLCanvasElement, record: WrappedRecord, fonts: ShareFonts, art: ShareArt): void {
-  drawPoster(canvas, wrappedPoster(record), fonts, art);
-}
-
-export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fonts: ShareFonts, art: ShareArt): void {
   canvas.width = SHARE_WIDTH;
   canvas.height = SHARE_HEIGHT;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  const vibe = vibeFor(record.vibe.id);
   const ink = WRAPPED_COLOURS.ink;
   const display = (size: number) => `900 ${size}px ${fonts.display}`;
   const body = (size: number, weight = 500) => `${weight} ${size}px ${fonts.body}`;
@@ -198,13 +163,11 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
     return ctx.measureText(text).width;
   };
   const L = SHARE_LAYOUT;
-  // The sticker on the polaroid's corner, measured first: the caption's second line stops short of it.
-  const banner = personaBanner(content.banner, measureDisplay);
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
 
   // Arthur's frame; without it (offline), the card's colour, so the words still read.
-  ctx.fillStyle = content.background;
+  ctx.fillStyle = VIBE_BACKGROUNDS[vibe.colour];
   ctx.fillRect(0, 0, SHARE_WIDTH, SHARE_HEIGHT);
   if (art.frame) ctx.drawImage(art.frame, 0, 0, SHARE_WIDTH, SHARE_HEIGHT);
 
@@ -224,15 +187,6 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
     ctx.restore();
   } else if (art.face) {
     ctx.drawImage(art.face, wx, wy, ww, wh);
-  } else if (content.mark) {
-    // No picture to show: the mark in the frame's circle, in the display type.
-    ctx.fillStyle = ink;
-    ctx.textAlign = 'center';
-    let size = 200;
-    while (size > 80 && measureDisplay(content.mark, size) > POLAROID.circle.r * 1.6) size -= 8;
-    ctx.font = display(size);
-    ctx.fillText(content.mark, POLAROID.circle.cx, POLAROID.circle.cy + size * 0.36);
-    ctx.textAlign = 'left';
   }
   if (art.prop) {
     const [px, py, pw, ph] = POLAROID.prop;
@@ -242,24 +196,23 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   const [cx, cy, cw] = POLAROID.caption;
   ctx.fillStyle = ink;
   ctx.font = body(40, 700);
-  ctx.fillText(content.caption.name, cx, cy + 62, cw * 0.62);
-  if (content.caption.sub) {
-    const measureBody: Measure = (text, size) => {
-      ctx.font = body(size, 500);
-      return ctx.measureText(text).width;
-    };
-    const sub = captionSubFit(content.caption.sub, measureBody, captionSubRoom(banner));
+  ctx.fillText(shareName(record.student.first_name, record.student.last_initial), cx, cy + 62, cw * 0.62);
+  if (record.student.campus) {
     ctx.fillStyle = WRAPPED_COLOURS.inkMuted;
-    ctx.font = body(sub.size, 500);
-    ctx.fillText(sub.text, cx, cy + 106);
+    ctx.font = body(30, 500);
+    ctx.fillText(`${CAMPUS_NAMES[record.student.campus]} Campus`, cx, cy + 106, cw * 0.62);
   }
   ctx.restore();
 
   // The vibe line, above the polaroid.
   ctx.fillStyle = ink;
   ctx.font = body(28, 700);
-  trackedText(ctx, content.kicker, L.top.x, L.top.kickerY, 8, L.top.width);
-  const line = posterLine(content.line, measureDisplay);
+  trackedText(ctx, 'MY POST-BAR FINALS VIBE:', L.top.x, L.top.kickerY, 8);
+  const room = L.top.lineBottom - L.top.lineTop;
+  let line = fitText(vibe.line, { width: L.top.width, maxLines: 2, max: 96, min: 52, step: 2 }, measureDisplay);
+  if (line.lines.length * line.size * 0.95 > room || line.lines.length > 2) {
+    line = fitText(vibe.line, { width: L.top.width, maxLines: 3, max: 64, min: 46, step: 2 }, measureDisplay);
+  }
   ctx.font = display(line.size);
   let y = L.top.lineTop;
   for (const text of line.lines) {
@@ -268,7 +221,8 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   }
 
   // Three stat stickers (square, outlined, the raised surface) and the campaign line beside them.
-  content.stickers.slice(0, 3).forEach(({ value, label }, i) => {
+  shownStickers(record.stickers).forEach((sticker, i) => {
+    const { value, label } = stickerText(sticker);
     const sx = L.bottom.x;
     const sy = L.bottom.y + i * (L.bottom.stickerH + L.bottom.gap);
     ctx.fillStyle = WRAPPED_COLOURS.white;
@@ -286,12 +240,11 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   const campaignX = L.bottom.x + L.bottom.stickerW + 36;
   const campaignW = SHARE_WIDTH - PAD - campaignX;
   let campaignSize = 52;
-  const widest = Math.max(...content.campaign.map((text) => measureDisplay(text, campaignSize)));
-  while (campaignSize > 30 && widest * (campaignSize / 52) + 24 > campaignW) campaignSize -= 2;
-  content.campaign.forEach((text, i) => {
+  while (campaignSize > 30 && measureDisplay(CAMPAIGN_LINE[2], campaignSize) + 24 > campaignW) campaignSize -= 2;
+  CAMPAIGN_LINE.forEach((text, i) => {
     const ty = L.bottom.y + 62 + i * (L.bottom.stickerH + L.bottom.gap);
     ctx.font = display(campaignSize);
-    if (i === content.campaign.length - 1) {
+    if (i === CAMPAIGN_LINE.length - 1) {
       // "The Bench." is highlighted (spec): ink block, cream type, square as the system is.
       ctx.fillStyle = ink;
       ctx.fillRect(campaignX, ty - campaignSize, measureDisplay(text, campaignSize) + 24, campaignSize * 1.34);
@@ -305,6 +258,8 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   });
 
   // The persona, as a sticker on the polaroid's lower right corner.
+  const persona = PERSONAS[record.persona.key]?.name ?? PERSONAS.steady_learned_friend.name;
+  const banner = personaBanner(persona, measureDisplay);
   ctx.save();
   ctx.translate(banner.cx, banner.cy);
   ctx.rotate((L.persona.rotationDeg * Math.PI) / 180);
@@ -321,60 +276,12 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   // Where to get one, beside the mark.
   ctx.fillStyle = ink;
   ctx.font = body(34, 700);
-  trackedText(ctx, content.link, L.link.x, L.link.y, 2, SHARE_WIDTH - L.link.x - PAD);
+  trackedText(ctx, `GET YOURS · ${WRAPPED_URL.toUpperCase()}`, L.link.x, L.link.y, 2, SHARE_WIDTH - L.link.x - PAD);
 }
 
-/** The caption's lines never run wider than this on the polaroid's white edge. */
-export const CAPTION_SUB_WIDTH = POLAROID.caption[2] * 0.62;
-
-/** The gap the caption's second line keeps before the sticker on the polaroid's corner. */
-const CAPTION_STICKER_GAP = 12;
-
-/**
- * How wide the caption's second line may run: its usual width, or less when
- * the sticker on the polaroid's corner (`banner`) starts sooner, so the line
- * never runs under it (a university's name did; pictures of 4a612ab6). The
- * sticker is measured where it is drawn; its slight turn is within the gap.
- */
-export function captionSubRoom(banner: PersonaBanner): number {
-  const stickerLeft = banner.cx - banner.w / 2;
-  return Math.min(CAPTION_SUB_WIDTH, stickerLeft - POLAROID.caption[0] - CAPTION_STICKER_GAP);
-}
-
-/**
- * The caption's second line (a campus, a university): 30 px when it fits the
- * room, a size down to 22 px when it does not, and past that the line ends
- * with "…". Never squeezed by fillText's maxWidth (a long university's name
- * came out at two thirds of its width; techlead's review of 4a612ab6). Pure,
- * so a test pins it.
- */
-export function captionSubFit(text: string, measure: Measure, room: number = CAPTION_SUB_WIDTH): { size: number; text: string } {
-  for (let size = 30; size >= 22; size -= 2) {
-    if (measure(text, size) <= room) return { size, text };
-  }
-  let cut = text;
-  while (cut.length > 1 && measure(`${cut.trimEnd()}…`, 22) > room) cut = cut.slice(0, -1);
-  return { size: 22, text: `${cut.trimEnd()}…` };
-}
-
-/**
- * The display line's type and wrapping above the polaroid: two lines from 96
- * px down to 52, or three from 64 down to 46 when two will not fit the band.
- * Pure, so a test pins it with the longest quiz titles.
- */
-export function posterLine(text: string, measure: Measure): { size: number; lines: string[] } {
-  const L = SHARE_LAYOUT;
-  const room = L.top.lineBottom - L.top.lineTop;
-  let line = fitText(text, { width: L.top.width, maxLines: 2, max: 96, min: 52, step: 2 }, measure);
-  if (line.lines.length * line.size * 0.95 > room || line.lines.length > 2) {
-    line = fitText(text, { width: L.top.width, maxLines: 3, max: 64, min: 46, step: 2 }, measure);
-  }
-  if (line.lines.length <= 3) return line;
-  // Past three lines at the smallest size (a long quiz title; Wrapped's vibe
-  // lines never are): the first three, the last ending with "…".
-  const kept = line.lines.slice(0, 3);
-  let last = `${kept[2]} ${line.lines.slice(3).join(' ')}`;
-  while (last.length > 1 && measure(`${last}…`, line.size) > L.top.width) last = last.slice(0, -1);
-  kept[2] = `${last.trimEnd()}…`;
-  return { size: line.size, lines: kept };
+/** The canvas as a PNG file, for the share sheet and Save image. */
+export function canvasToFile(canvas: HTMLCanvasElement, name = 'lawexa-wrapped.png'): Promise<File | null> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob ? new File([blob], name, { type: 'image/png' }) : null), 'image/png');
+  });
 }

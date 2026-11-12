@@ -1,173 +1,279 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { CAMPUS_NAMES, PERSONAS } from '@/lib/wrapped/copy';
-import {
-  CAPTION_SUB_WIDTH,
-  SHARE_LAYOUT,
-  captionSubFit,
-  captionSubRoom,
-  personaBanner,
-  posterLine,
-  wrappedPoster,
-} from '@/lib/wrapped/share-image';
 import type { QuizGameResults, QuizRankingRow } from '@/types/channel-quiz';
-import type { WrappedRecord } from '@/lib/wrapped/types';
 import { LIVE_BOARD_RULES_NOTE, liveGameBoard, liveRowNote } from './live-board';
 import {
+  cardCta,
+  cardHeadline,
+  cardInitials,
   cardName,
+  cardStats,
+  cardSubline,
+  cardTier,
   pointsText,
-  resultBanner,
   resultCardCopy,
-  resultFrame,
-  resultPoster,
+  topPercent,
   type ResultCardInput,
 } from './result-card';
+import { drawResultCard } from './result-card-draw';
+import { CARD_FONT_FACES } from './result-card-fonts';
+import { CARD_LAYOUTS, ellipsize, headlineSetting, sublineLines, type Measure } from './result-card-layout';
 
-/* The live quiz's final scores and each player's card (Arthur, f730f71c, 11
- * November 2026: the quiz's own leaderboard "that comes with its animation",
- * and a card "just like we did for the Wrapped"). TEST DATA only. */
+/* The live quiz's final scores and each player's card: the quiz's own
+ * leaderboard (Arthur, f730f71c), and his share card for every place, as a
+ * story and a square (Arthur, f9645a22, 12 November 2026). The card's words
+ * and numbers are checked against his files. TEST DATA only. */
 
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
 const quiz = (file: string) => read('v2', 'features', 'channels', 'quiz', file);
 
-const INPUT: ResultCardInput = {
-  playerName: 'Ada Obi',
+/** Arthur's sample player: Ada H., one of 70, in Torts 101. */
+const ADA: ResultCardInput = {
+  playerName: 'Ada Hassan',
   avatarUrl: null,
-  institution: 'Nigerian Law School – Lagos Campus',
-  rank: 2,
-  score: 18400,
-  correctCount: 8,
+  rank: 1,
+  score: 19339,
+  correctCount: 10,
   answerableCount: 10,
   quizTitle: 'Torts 101',
   spaceName: 'LASU LSS',
-  playerCount: 34,
-  podium: [],
+  playerCount: 70,
 };
 
-// Unbounded 900 is wide: about 0.82 of the size per letter, a little more than the real face measures.
-const unbounded = (text: string, size: number) => text.length * size * 0.82;
+test('every place has Arthur’s headline, word for word, and every place past 10th shares his last card', () => {
+  assert.deepEqual(
+    Array.from({ length: 10 }, (_, i) => cardHeadline(i + 1).join(' / ')),
+    [
+      'Gold, / my lord.',
+      'Silver, / my lord.',
+      'Bronze, / my lord.',
+      'Just off / the podium.',
+      'Top five. / No objection.',
+      'Motion / granted.',
+      'Top 10. / Sustained.',
+      'On the / record.',
+      'Leave / granted.',
+      'Last seat / at the Bar.',
+    ],
+  );
+  for (const rank of [11, 23, 70, 1000]) assert.deepEqual(cardHeadline(rank), ['Adjourned,', 'not dismissed.']);
+  assert.equal(cardCta(10), 'Think you can beat me?');
+  assert.equal(cardCta(11), 'See you next sitting.');
+  assert.deepEqual([1, 2, 3, 4, 10, 11].map(cardTier), ['gold', 'silver', 'bronze', 'top10', 'top10', 'field']);
+});
 
-test('the card is Wrapped’s poster with the player’s finish on it', () => {
-  const poster = resultPoster(INPUT);
-  assert.equal(poster.kicker, 'LIVE QUIZ · LASU LSS');
-  assert.equal(poster.line, 'Came 2nd in Torts 101');
-  // First name and last initial, Wrapped's rule for a name on a public picture.
-  // Where they study under the name, the campus alone as the podium shortens it; the Space is in the kicker.
-  assert.deepEqual(poster.caption, { name: 'Ada O.', sub: 'Lagos Campus' });
-  assert.equal(resultPoster({ ...INPUT, institution: 'University of Lagos' }).caption.sub, 'University of Lagos');
-  assert.equal(poster.mark, '2nd');
-  assert.equal(poster.banner, 'Made the Podium');
-  // Points past Wrapped's 9,999+ cap are printed whole.
-  assert.deepEqual(poster.stickers, [
-    { value: '18,400', label: 'points' },
-    { value: '2nd', label: 'of 34 players' },
-    { value: '8/10', label: 'right answers' },
-  ]);
-  assert.deepEqual(poster.campaign, ['The Law.', 'The Bar.', 'The Bench.']);
-  assert.equal(poster.link, 'PLAY LIVE QUIZZES · LAWEXA.COM');
+test('"Top N%" is the place over the players, rounded up, as on every one of Arthur’s cards', () => {
+  // His eleven samples, all of 70 players.
+  const arthur: [number, number][] = [[1, 2], [2, 3], [3, 5], [4, 6], [5, 8], [6, 9], [7, 10], [8, 12], [9, 13], [10, 15], [23, 33]];
+  for (const [rank, percent] of arthur) assert.equal(topPercent(rank, 70), percent, `${rank} of 70`);
+  // Never the top 0%, never past 100%, and a place past the count (a stale count) reads as last.
+  assert.equal(topPercent(1, 1000), 1);
+  assert.equal(topPercent(1, 1), 100);
+  assert.equal(topPercent(5, 3), 100);
+  assert.equal(topPercent(1, 0), 100);
+});
 
-  assert.equal(resultBanner(1), 'Quiz Champion');
-  assert.equal(resultBanner(3), 'Made the Podium');
-  assert.equal(resultBanner(7), 'Took the Challenge');
-  assert.deepEqual([1, 2, 3, 9].map((rank) => resultFrame(rank).colour), ['gold', 'lilac', 'coral', 'lime']);
-  assert.equal(cardName('Oluwaseyifunmi Adebanjo-Okonkwo'), 'Oluwaseyifunmi A.');
+test('the card’s line, stats and share words name the player as Arthur’s does', () => {
+  assert.equal(cardName('Ada Hassan'), 'Ada H.');
   assert.equal(cardName('Tobi'), 'Tobi');
-
-  const bare = resultPoster({ ...INPUT, spaceName: null, institution: null, playerCount: 1, score: 1 });
-  assert.equal(bare.kicker, 'LIVE QUIZ');
-  assert.equal(bare.caption.sub, null);
-  assert.deepEqual(bare.stickers.slice(0, 2), [
-    { value: '1', label: 'point' },
-    { value: '2nd', label: 'of 1 player' },
+  assert.equal(cardName('  Oluwaseyifunmi   Adebanjo-Okonkwo '), 'Oluwaseyifunmi A.');
+  assert.equal(cardInitials('Ada Hassan'), 'AH');
+  assert.equal(cardInitials('ọlá adé'), 'ỌA');
+  assert.equal(cardInitials('Tobi'), 'T');
+  assert.deepEqual(cardSubline(ADA), { lead: 'Ada H. placed 1st of 70 in', title: 'Torts 101' });
+  assert.deepEqual(cardSubline({ ...ADA, rank: 23, playerCount: 1204, quizTitle: '  Land   Law ' }), {
+    lead: 'Ada H. placed 23rd of 1,204 in',
+    title: 'Land Law',
+  });
+  assert.deepEqual(cardStats(ADA), [
+    { value: '19,339', label: 'points' },
+    { value: '10/10', label: 'correct' },
+    { value: 'Top 2%', label: 'of players' },
   ]);
-});
-
-test('the share words name the player as the card does', () => {
-  const copy = resultCardCopy(INPUT);
-  assert.equal(copy.headline, 'Ada O. came 2nd in Torts 101');
-  assert.equal(copy.shareText, 'Ada O. came 2nd in Torts 101, 18,400 pts, LASU LSS. Live quiz on Lawexa.');
-  assert.equal(copy.fileName, 'lawexa-quiz-2nd.png');
+  // A late joiner is out of the questions they could answer; one point is a point.
+  assert.deepEqual(cardStats({ ...ADA, score: 1, correctCount: 3, answerableCount: 7 }).slice(0, 2), [
+    { value: '1', label: 'point' },
+    { value: '3/7', label: 'correct' },
+  ]);
   assert.equal(pointsText(1), '1 pt');
+
+  const story = resultCardCopy(ADA, 'story');
+  assert.equal(story.fileName, 'lawexa-quiz-1st-story.png');
+  assert.equal(resultCardCopy(ADA, 'square').fileName, 'lawexa-quiz-1st-square.png');
+  assert.equal(story.shareText, 'Ada H. placed 1st of 70 in Torts 101, LASU LSS. Think you can beat me? Play the live quiz on Lawexa.');
+  assert.equal(resultCardCopy({ ...ADA, spaceName: null, rank: 23 }, 'story').shareText, 'Ada H. placed 23rd of 70 in Torts 101. See you next sitting. Play the live quiz on Lawexa.');
+  assert.equal(story.alt, 'Gold, my lord. Ada H. placed 1st of 70 in Torts 101. 19,339 points, 10/10 correct, Top 2% of players.');
 });
 
-test('a long quiz title fits the poster’s band in three lines at most, and every banner fits its sticker', () => {
-  for (const title of [
-    'Torts 101',
-    'Constitutional Law Two: Fundamental Rights Enforcement and Judicial Review',
-    'Land Law, Equity and Trusts: Week Six Revision on Registered Titles and Charges',
-  ]) {
-    const line = posterLine(`Came 2nd in ${title}`, unbounded);
-    assert.ok(line.lines.length <= 3, title);
-    for (const text of line.lines) assert.ok(unbounded(text, line.size) <= SHARE_LAYOUT.top.width + 1, `"${text}" fits`);
-  }
-  for (const rank of [1, 2, 9]) {
-    const banner = personaBanner(resultBanner(rank), unbounded);
-    assert.ok(banner.right <= 1080 - 48, resultBanner(rank));
-  }
+// DM Sans Medium is about 0.45 of the size per character (Arthur's line, measured); 0.5 errs long.
+const fake: Measure = (text, font) => {
+  const size = Number(/(\d+(?:\.\d+)?)px/.exec(font)?.[1] ?? 0);
+  return [...text].length * size * 0.5;
+};
+
+test('the headline sits where Arthur set it for each place, in both sizes', () => {
+  assert.deepEqual(headlineSetting('story', 1), { size: 140, baselines: [472, 605], sublineTop: 685 });
+  assert.deepEqual(headlineSetting('story', 5), { size: 128, baselines: [462, 584], sublineTop: 685 });
+  assert.deepEqual(headlineSetting('story', 23), { size: 119, baselines: [456, 569], sublineTop: 685 });
+  assert.deepEqual(headlineSetting('square', 1), { size: 88, baselines: [270, 354], sublineTop: 425 });
+  assert.deepEqual(headlineSetting('square', 4), { size: 68, baselines: [254, 319], sublineTop: 387 });
+  assert.deepEqual(headlineSetting('square', 5), { size: 57, baselines: [246, 300], sublineTop: 366 });
+  assert.deepEqual(headlineSetting('square', 7), { size: 74, baselines: [259, 329], sublineTop: 399 });
+  assert.deepEqual(headlineSetting('square', 10), { size: 68, baselines: [254, 319], sublineTop: 387 });
+  assert.deepEqual(headlineSetting('square', 99), { size: 53, baselines: [242, 292], sublineTop: 359 });
+  assert.equal(CARD_LAYOUTS.story.height, 1920);
+  assert.equal(CARD_LAYOUTS.square.height, 1080);
 });
 
-// Inter 500: about 0.56 of the size per letter and 0.28 per space, a little wider than the face measures.
-const inter = (text: string, size: number) =>
-  [...text].reduce((width, ch) => width + (ch === ' ' ? 0.28 : 0.56) * size, 0);
+test('a long name or quiz title shortens the line under the headline, never running off the card', () => {
+  // Arthur's own line: one line on the story, and on the square "Torts 101" goes to a second line.
+  const { lead, title } = cardSubline(ADA);
+  assert.deepEqual(sublineLines(lead, title, 'story', 1, fake), { size: 36, lines: [{ text: 'Ada H. placed 1st of 70 in Torts 101', baseline: 685 }] });
+  assert.deepEqual(sublineLines(lead, title, 'square', 1, fake).lines, [
+    { text: 'Ada H. placed 1st of 70 in', baseline: 425 },
+    { text: 'Torts 101', baseline: 464 },
+  ]);
 
-test('the polaroid’s second line stops short of the sticker: a size down, then "…"', () => {
-  // Wrapped: the six shorter campuses keep the 30 px they always had beside every persona's sticker; Port
-  // Harcourt (320 px in Inter at 30 px, measured) may step down so it no longer runs under a sticker.
-  for (const { name } of Object.values(PERSONAS)) {
-    const room = captionSubRoom(personaBanner(name, unbounded));
-    assert.ok(room > 0 && room <= CAPTION_SUB_WIDTH, `${name}: ${room}`);
-    for (const campus of Object.values(CAMPUS_NAMES)) {
-      const line = `${campus} Campus`;
-      const fit = captionSubFit(line, inter, room);
-      if (campus !== 'Port Harcourt') assert.deepEqual(fit, { size: 30, text: line }, `${name} · ${campus}`);
-      assert.ok(inter(fit.text, fit.size) <= room, `${name} · ${campus} fits`);
-    }
+  const long = cardSubline({ ...ADA, playerName: 'Oluwaseyifunmi Adebanjo', quizTitle: 'Constitutional Law Two: Fundamental Rights Enforcement and Judicial Review' });
+  const story = sublineLines(long.lead, long.title, 'story', 1, fake);
+  assert.equal(story.size, 28);
+  assert.equal(story.lines.length, 1);
+  assert.ok(story.lines[0].text.startsWith('Oluwaseyifunmi A. placed 1st of 70 in Constitutional'), story.lines[0].text);
+  assert.ok(story.lines[0].text.endsWith('…'));
+  assert.ok(fake(story.lines[0].text, '500 28px x') <= CARD_LAYOUTS.story.subline.maxWidth);
+
+  // The square keeps every line in its column and clear of the line over the button (baseline 540).
+  for (const rank of [1, 5, 23]) {
+    const square = sublineLines(long.lead, long.title, 'square', rank, fake);
+    for (const line of square.lines) assert.ok(fake(line.text, '500 30px x') <= CARD_LAYOUTS.square.subline.maxWidth, line.text);
+    assert.ok(square.lines.at(-1)!.baseline <= CARD_LAYOUTS.square.subline.lastBaseline);
+    assert.ok(square.lines.at(-1)!.text.endsWith('…'), JSON.stringify(square.lines));
   }
-  // The live quiz's stickers: a long university steps down, and past 22 px ends with "…", clear of the sticker.
-  for (const banner of ['Quiz Champion', 'Made the Podium', 'Took the Challenge']) {
-    const room = captionSubRoom(personaBanner(banner, unbounded));
-    const long = captionSubFit('Ahmadu Bello University, Zaria', inter, room);
-    assert.ok(long.size >= 22 && inter(long.text, long.size) <= room, `${banner}: ${JSON.stringify(long)}`);
-    const longer = captionSubFit('Ladoke Akintola University of Technology, Ogbomoso', inter, room);
-    assert.ok(longer.text.endsWith('…') && inter(longer.text, 22) <= room, `${banner}: ${longer.text}`);
-  }
-  // Never squeezed by fillText's maxWidth again, and measured against the sticker where it is drawn.
-  const poster = read('lib', 'wrapped', 'share-image.ts');
-  assert.doesNotMatch(poster, /fillText\(content\.caption\.sub/);
-  assert.match(poster, /captionSubFit\(content\.caption\.sub, measureBody, captionSubRoom\(banner\)\)/);
+  // A shorter heading leaves room for more lines: two under Gold, four under Adjourned.
+  assert.equal(sublineLines(long.lead, long.title, 'square', 1, fake).lines.length, 2);
+  assert.equal(sublineLines(long.lead, long.title, 'square', 23, fake).lines.length, 4);
+  assert.equal(ellipsize('Torts 101', () => false), '…');
 });
 
-test('Wrapped draws the same poster it did, from its record', () => {
-  const record = {
-    vibe: { id: 1 },
-    student: { first_name: 'Ada', last_initial: 'O', campus: null, photo_url: null },
-    persona: { key: 'steady_learned_friend' },
-    stickers: [{ key: 'days_active', value: 12 }],
-    share_code: null,
-  } as unknown as WrappedRecord;
-  const poster = wrappedPoster(record);
-  assert.equal(poster.kicker, 'MY POST-BAR FINALS VIBE:');
-  assert.deepEqual(poster.caption, { name: 'Ada O.', sub: null });
-  assert.equal(poster.link, 'GET YOURS · LAWEXA.COM/WRAPPED');
-  const wrapped = read('lib', 'wrapped', 'share-image.ts');
-  assert.match(wrapped, /export function drawShareCard\([^)]*\): void \{\s*drawPoster\(canvas, wrappedPoster\(record\), fonts, art\);\s*\}/);
+interface Drawn {
+  text: string;
+  x: number;
+  y: number;
+  font: string;
+  fill: string;
+}
+
+/** A 2D context that records what the card draws: its texts with where and how, and how many circles. */
+function recordingCanvas() {
+  const texts: Drawn[] = [];
+  let arcs = 0;
+  let images = 0;
+  const ctx = {
+    font: '',
+    fillStyle: '' as unknown,
+    strokeStyle: '',
+    lineWidth: 1,
+    lineCap: 'butt',
+    lineJoin: 'miter',
+    textAlign: 'left',
+    textBaseline: 'alphabetic',
+    measureText: (text: string) => {
+      const size = Number(/(\d+(?:\.\d+)?)px/.exec(ctx.font)?.[1] ?? 0);
+      return { width: [...text].length * size * 0.55, actualBoundingBoxAscent: size * 0.7, actualBoundingBoxDescent: 0 };
+    },
+    fillText: (text: string, x: number, y: number) => texts.push({ text, x, y, font: ctx.font, fill: String(ctx.fillStyle) }),
+    arc: () => {
+      arcs += 1;
+    },
+    drawImage: () => {
+      images += 1;
+    },
+    createLinearGradient: () => ({ addColorStop: () => undefined }),
+  };
+  for (const name of ['fillRect', 'beginPath', 'moveTo', 'lineTo', 'bezierCurveTo', 'closePath', 'fill', 'stroke', 'clip', 'save', 'restore', 'translate', 'scale']) {
+    (ctx as Record<string, unknown>)[name] = () => undefined;
+  }
+  const canvas = { width: 0, height: 0, getContext: () => ctx } as unknown as HTMLCanvasElement;
+  return { canvas, texts, counts: () => ({ arcs, images }) };
+}
+
+/** The texts drawn whole (untracked), and the tracked ones put back together by baseline. */
+function words(texts: Drawn[]): string[] {
+  const lines = new Map<number, string>();
+  for (const drawn of texts) lines.set(drawn.y, (lines.get(drawn.y) ?? '') + (drawn.text.length === 1 ? drawn.text : `|${drawn.text}|`));
+  return [...lines.values()];
+}
+
+test('the card draws Arthur’s parts for the place: crown and medal, medal, "Top 10", or the podium alone', () => {
+  const draw = (rank: number, format: 'story' | 'square' = 'story', photo = false) => {
+    const recording = recordingCanvas();
+    const image = photo ? ({ width: 400, height: 400 } as unknown as CanvasImageSource & { width: number; height: number }) : null;
+    drawResultCard(recording.canvas, { ...ADA, rank }, format, image);
+    return { ...recording, all: words(recording.texts).join('\n') };
+  };
+
+  const first = draw(1);
+  assert.equal(first.canvas.width, 1080);
+  assert.equal(first.canvas.height, 1920);
+  for (const text of ['|Lawexa live quiz|', 'Gold,', 'my lord.', '|Ada H. placed 1st of 70 in Torts 101|', '|Think you can beat me?|', '|Play at lawexa.com|', '|19,339|', '|points|', '|10/10|', '|correct|', '|Top 2%|', '|of players|', '1st']) {
+    assert.ok(first.all.includes(text), `1st draws ${text}`);
+  }
+  // The medal's number, at the medal's own baseline; the place under it in large type.
+  const medal = first.texts.find((drawn) => drawn.text === '1' && /64px/.test(drawn.font));
+  assert.ok(medal, 'the medal carries "1"');
+  assert.ok(first.texts.some((drawn) => drawn.y === 1244 && /170px/.test(drawn.font)), 'the place on the podium');
+  assert.ok(first.texts.some((drawn) => drawn.y === 685 && drawn.text.startsWith('Ada H.')), 'the line under the headline');
+  assert.ok(first.texts.every((drawn) => !drawn.text.includes('Top 10')), 'no Top 10 pill on the podium');
+
+  // 4th to 10th: the pill instead of the medal; no medal number.
+  const fifth = draw(5);
+  assert.ok(fifth.all.includes('|Top 10|'));
+  assert.ok(!fifth.texts.some((drawn) => /64px/.test(drawn.font) && /^[0-9]$/.test(drawn.text)), 'no medal');
+  // Past 10th: neither, and Arthur's other line.
+  const late = draw(23);
+  assert.ok(!late.all.includes('|Top 10|'));
+  assert.ok(late.all.includes('|See you next sitting.|'));
+  assert.ok(late.all.includes('Adjourned,'));
+
+  // The crown is only for 1st: three balls more than 2nd (medal rims, photo circle and button corners being equal).
+  assert.equal(draw(1).counts().arcs - draw(2).counts().arcs, 3);
+  // No photo: the initials in the gold circle; a photo: drawn, and no initials.
+  assert.ok(draw(1).texts.some((drawn) => drawn.text === 'A' && drawn.fill === '#171307'));
+  const withPhoto = draw(1, 'story', true);
+  assert.equal(withPhoto.counts().images, 1);
+  assert.ok(!withPhoto.texts.some((drawn) => drawn.text === 'A' && drawn.fill === '#171307'));
+
+  // The square: its size, the headline at the column's left, the line under it wrapped as Arthur's.
+  const square = draw(1, 'square');
+  assert.equal(square.canvas.height, 1080);
+  assert.ok(square.texts.some((drawn) => drawn.text === 'G' && drawn.x === 600 && drawn.y === 270));
+  assert.ok(square.texts.some((drawn) => drawn.y === 425 && drawn.x === 600));
+  assert.ok(square.texts.some((drawn) => drawn.text === 'Think you can beat me?' && drawn.x === 600 && drawn.y === 540));
 });
 
-test('the card is drawn and shared the way Wrapped’s is', () => {
+test('the card is drawn on the device with its own fonts, in both sizes, and Wrapped is left as it is live', () => {
+  // Every face the card asks for is served, with its licence beside it.
+  for (const face of CARD_FONT_FACES) assert.ok(existsSync(join(process.cwd(), 'public', 'fonts', 'live-quiz-card', face.file)), face.file);
+  for (const licence of ['OFL-bricolage-grotesque.txt', 'OFL-dm-sans.txt']) {
+    assert.match(read('public', 'fonts', 'live-quiz-card', licence), /SIL Open Font License, Version 1\.1/);
+  }
+
   const card = quiz('ResultCardShare.tsx');
-  assert.match(card, /loadImage\(wrappedArt\('frame', resultFrame\(input\.rank\)\.vibeId\)\)/);
-  assert.match(card, /loadImage\(corsPhotoUrl\(input\.avatarUrl\)\)/);
-  assert.match(card, /drawPoster\(canvas, resultPoster\(input\), fonts, \{ frame, face: null, prop: null, photo \}\);/);
-  assert.match(card, /const fonts = wrappedFontFamilies;/);
-  assert.match(card, /await navigator\.share\(\{ files: \[drawn\.file\], text: link \? `\$\{copy\.shareText\} \$\{link\}` : copy\.shareText \}\);/);
+  assert.match(card, /loadCardFonts\(cardText\(input\)\), loadImage\(corsPhotoUrl\(input\.avatarUrl\)\)/);
+  assert.match(card, /for \(const each of CARD_FORMATS\) \{\s*const canvas = document\.createElement\('canvas'\);\s*drawResultCard\(canvas, input, each, photo\);/);
+  assert.match(card, /<TabsTrigger key=\{each\} value=\{each\}/);
+  assert.match(card, /await navigator\.share\(\{ files: \[current\.file\], text: link \? `\$\{copy\.shareText\} \$\{link\}` : copy\.shareText \}\);/);
   assert.match(card, /if \(error instanceof DOMException && error\.name === 'AbortError'\) return;\s*setNote\('Sharing did not open\. Download the card and post it instead\.'\);/);
-  assert.match(card, /download\(drawn\.url, drawn\.file\.name\);\s*const copied = link \? await copyText\(link\) : false;\s*setNote\(copied \? 'Saved\. Your link is copied too\.' : 'Saved to your downloads\.'\);/);
-  const wrapped = read('components', 'wrapped', 'ShareFrame.tsx');
-  assert.match(wrapped, /import \{ canShareFile, canvasToFile, copyText, download, loadImage \} from '@\/lib\/share-card\/canvas';/);
+  assert.match(card, /download\(current\.url, current\.file\.name\);\s*const copied = link \? await copyText\(link\) : false;\s*setNote\(copied \? 'Saved\. Your link is copied too\.' : 'Saved to your downloads\.'\);/);
   assert.match(quiz('ShareResults.tsx'), /const url = useResultsLink\(gameUuid\);/);
+
+  // Wrapped keeps its own card: the live quiz only borrows the picture helpers it already exported.
+  assert.doesNotMatch(card, /drawShareCard|wrappedFontFamilies|wrappedArt/);
+  assert.ok(!existsSync(join(process.cwd(), 'lib', 'share-card')), 'no shared card module');
+  assert.match(read('lib', 'wrapped', 'share-image.ts'), /export function drawShareCard\(canvas: HTMLCanvasElement, record: WrappedRecord, fonts: ShareFonts, art: ShareArt\): void \{/);
 });
 
 const row = (rank: number, uuid: string, score: number): QuizRankingRow => ({

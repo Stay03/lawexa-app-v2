@@ -61,9 +61,8 @@ import type { AnswerStanding, FinalAnswerClose, LiveGame } from './use-game';
 import { CertificateOffer } from '@/v2/features/settings/certificates/CertificateOffer';
 import { ScoringBadge } from '@/v2/features/quiz/ScoringBadge';
 
-// The card brings Wrapped's poster fonts (Unbounded, Inter; lib/share-card/fonts.ts), whose preloads would
-// otherwise ride on every screen that can open a game. Loaded only when a finished game shows a player's card,
-// and on the device only: it draws on a canvas (techlead's review of 4a612ab6).
+// The card draws Arthur's design on a canvas with its own typefaces (result-card-fonts.ts). Loaded only when a
+// finished game shows a player's card, and on the device only (techlead's review of 4a612ab6).
 const ResultCardShare = dynamic(() => import('./ResultCardShare').then((module) => module.ResultCardShare), {
   ssr: false,
 });
@@ -688,7 +687,6 @@ export function PodiumStage({
     return {
       playerName: own.user.name,
       avatarUrl: own.user.avatar_url,
-      institution: own.user.institution ?? null,
       rank: own.rank,
       score: own.score,
       correctCount: own.correct_count,
@@ -696,12 +694,6 @@ export function PodiumStage({
       quizTitle: results.game.quiz.title,
       spaceName,
       playerCount: results.game.player_count,
-      podium: results.podium.map((row) => ({
-        rank: row.rank,
-        name: row.user.name,
-        score: row.score,
-        isViewer: row.user.uuid === viewerUuid,
-      })),
     };
   }, [results, viewerUuid, spaceName]);
 

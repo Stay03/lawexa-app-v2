@@ -5,8 +5,7 @@ import { Copy, Download, Instagram, Music2, Share2, Twitter } from 'lucide-react
 import { toast } from 'sonner';
 
 import { shareUrl, vibeFor } from '@/lib/wrapped/copy';
-import { canShareFile, canvasToFile, copyText, download, loadImage } from '@/lib/share-card/canvas';
-import { corsPhotoUrl, drawShareCard, type ShareFonts } from '@/lib/wrapped/share-image';
+import { canvasToFile, corsPhotoUrl, drawShareCard, loadImage, type ShareFonts } from '@/lib/wrapped/share-image';
 import { wrappedArt } from '@/lib/wrapped/theme';
 import type { WrappedRecord } from '@/lib/wrapped/types';
 
@@ -27,6 +26,24 @@ interface Poster {
 
 function shareText(record: WrappedRecord, link: string): string {
   return `My post-Bar Finals vibe: ${vibeFor(record.vibe.id).line} Get yours: ${link}`;
+}
+
+function download(url: string, name: string) {
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function ShareFrame({ record, fonts, onShared }: { record: WrappedRecord; fonts: ShareFonts; onShared?: () => void }) {
@@ -53,7 +70,7 @@ export function ShareFrame({ record, fonts, onShared }: { record: WrappedRecord;
         ]);
         const canvas = document.createElement('canvas');
         drawShareCard(canvas, record, fonts, { frame, face, prop, photo });
-        const file = await canvasToFile(canvas, 'lawexa-wrapped.png');
+        const file = await canvasToFile(canvas);
         if (cancelled) return;
         if (!file) {
           setFailed(true);
@@ -70,6 +87,8 @@ export function ShareFrame({ record, fonts, onShared }: { record: WrappedRecord;
       if (made) URL.revokeObjectURL(made);
     };
   }, [record, fonts]);
+
+  const canShareFile = (file: File) => typeof navigator !== 'undefined' && !!navigator.canShare?.({ files: [file] });
 
   /** The phone's share sheet with the picture; elsewhere, the picture is saved and the link copied. */
   const shareToStory = async (afterSave: string) => {

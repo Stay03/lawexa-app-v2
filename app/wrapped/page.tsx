@@ -9,7 +9,7 @@ import { WrappedStory } from '@/components/wrapped/WrappedStory';
 import { useWrapped } from '@/lib/hooks/useWrapped';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { wrappedSignedIn } from '@/lib/wrapped/access';
-import { wrappedFontFamilies } from '@/lib/share-card/fonts';
+import { wrappedFontFamilies } from './fonts';
 
 const noSubscribe = () => () => {};
 

@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { SEO, getAppUrl } from '@/lib/constants/seo';
 import { WRAPPED_COLOURS } from '@/lib/wrapped/theme';
-import { wrappedBody, wrappedDisplay } from '@/lib/share-card/fonts';
+import { wrappedBody, wrappedDisplay } from './fonts';
 import './wrapped.css';
 
 /**
