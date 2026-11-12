@@ -370,7 +370,7 @@ test('a one-player card claims no place: no rank, ordinal or percentile; the sco
   assert.equal(cardPlace(SOLO), null);
   assert.equal(cardPlace({ ...ADA, rank: 2, playerCount: 8 }), 2);
   assert.equal(cardTier(cardPlace(SOLO)), 'field');
-  assert.deepEqual(cardHeadline(null), ['Well', 'played.']);
+  assert.deepEqual(cardHeadline(null), ['Case', 'closed.']);
   assert.equal(cardCta(null), 'Think you can beat me?');
   assert.deepEqual(cardSubline(SOLO), { lead: 'Ada H. scored 7,120 points in', title: 'Torts 101' });
   assert.deepEqual(cardStats(SOLO), [
@@ -382,7 +382,7 @@ test('a one-player card claims no place: no rank, ordinal or percentile; the sco
   const copy = resultCardCopy(SOLO, 'story');
   assert.equal(copy.fileName, 'lawexa-quiz-score-story.png');
   assert.equal(copy.shareText, 'Ada H. scored 7,120 points in Torts 101, LASU LSS. Think you can beat me? Play the live quiz on Lawexa.');
-  assert.equal(copy.alt, 'Well played. Ada H. scored 7,120 points in Torts 101. 7,120 points, 7/10 correct, 70% accuracy.');
+  assert.equal(copy.alt, 'Case closed. Ada H. scored 7,120 points in Torts 101. 7,120 points, 7/10 correct, 70% accuracy.');
   for (const text of [copy.shareText, copy.alt]) assert.doesNotMatch(text, /\b1st\b|\bTop\b|of 1\b|placed/);
   // The headline is set as the card past the top 10.
   assert.deepEqual(headlineSetting('story', null), headlineSetting('story', 23));
@@ -407,7 +407,7 @@ test('a one-player card draws no crown, medal or "Top 10", and its points on the
   const recording = recordingCanvas();
   drawResultCard(recording.canvas, SOLO, 'story', null);
   const all = words(recording.texts).join('\n');
-  for (const text of ['Well', 'played.', '|Ada H. scored 7,120 points in Torts 101|', '|70%|', '|accuracy|']) assert.ok(all.includes(text), text);
+  for (const text of ['Case', 'closed.', '|Ada H. scored 7,120 points in Torts 101|', '|70%|', '|accuracy|']) assert.ok(all.includes(text), text);
   assert.ok(!all.includes('|Top 10|'));
   assert.ok(!recording.texts.some((drawn) => /64px/.test(drawn.font) && /^[0-9]$/.test(drawn.text)), 'no medal');
   assert.ok(!/1st|Top \d+%/.test(all));

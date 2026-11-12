@@ -74,8 +74,8 @@ const HEADLINES: Readonly<Record<number, readonly [string, string]>> = {
 
 const OUTSIDE_TOP_10: readonly [string, string] = ['Adjourned,', 'not dismissed.'];
 
-/** A one-player card's headline: it claims no place (Arthur, 9a3fd436, 12 November 2026: "Well Played"), in two lines as his others. */
-const NO_PLACE: readonly [string, string] = ['Well', 'played.'];
+/** A one-player card's headline: it claims no place (Arthur, 99c1dff3, 12 November 2026: "Keep the case closed"), in two lines as his others. */
+const NO_PLACE: readonly [string, string] = ['Case', 'closed.'];
 
 /** The headline's two lines for a place; every place past 10th shares Arthur's "outside top 10" card. */
 export function cardHeadline(rank: CardPlace): readonly [string, string] {
