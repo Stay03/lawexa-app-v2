@@ -12,6 +12,7 @@ import {
   renameTranscript,
   replaceLastUserTurnContent,
 } from '@/v2/runtime/chat-engine';
+import { labelDocuments, withServerLabels } from '@/v2/runtime/chat-engine/document-labels';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { conversationsCache, makeOptimisticConversation } from './cache';
 import { renewRequestId, requestIdFor, settleRequestId, type FirstSend } from './first-send-id';
@@ -256,6 +257,9 @@ export async function startConversation(
   // The send as composed, for its `client_request_id` (first-send-id.ts): a
   // retry of it carries the same id, so it never makes a second chat.
   const firstSend: FirstSend = { message, fileIds, spaceUuid, references, confidential, redacted };
+  // A redacted chat's files are "Document 1, 2…" from its first question on
+  // (document-labels.ts): nothing came before, so they number from one.
+  const shownAttachments = redacted ? labelDocuments([], attachments) : attachments;
 
   // Confidential turn 1: persist the user turn to IDB BEFORE the POST so a crash
   // never loses it. Use a temp id until the server returns the real one.
@@ -265,7 +269,7 @@ export async function startConversation(
     try {
       await appendUserTurn(tempConvId, {
         content: message,
-        ...(attachments.length > 0 && { attachments: attachments.map(toAttachment) }),
+        ...(shownAttachments.length > 0 && { attachments: shownAttachments.map(toAttachment) }),
       });
     } catch {
       // IndexedDB unavailable — fall through; the server path surfaces any real
@@ -352,7 +356,9 @@ export async function startConversation(
 
     bridgeJurisdiction(conversationId, jurisdiction);
     const redaction = redacted && isRedactionSummary(response.data.redaction) ? response.data.redaction : undefined;
-    writeConvInit(conversationId, { msg: displayMessage, exec: executionId, attachments, redaction });
+    // The labels the server gave the files, when it sent them, over the app's own.
+    const sentAttachments = redacted ? withServerLabels(shownAttachments, response.data.user_message_attachments) : attachments;
+    writeConvInit(conversationId, { msg: displayMessage, exec: executionId, attachments: sentAttachments, redaction });
 
     // Put the new conversation at the top of every recents cache IMMEDIATELY, so the
     // sidebar/drawer/home show it without waiting on a refetch (wave-4 acceptance b).

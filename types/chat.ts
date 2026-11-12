@@ -646,6 +646,12 @@ export interface ChatStartResponse {
     // turn. Use this in place of the raw input so the local store stays in
     // sync without a refetch.
     user_message_content?: string;
+    /**
+     * The turn's files as the chat stores them: redacted chats only, labelled
+     * "Document 1, 2…" in place of their own names (backend 11fd72e0, 12 November
+     * 2026). The app draws the same labels at once and takes these when they come.
+     */
+    user_message_attachments?: { file_id: number; file_name: string; file_size: number }[];
     /** What redaction hid in that turn: redacted chats only (see {@link RedactionSummary}). */
     redaction?: RedactionSummary;
     /**

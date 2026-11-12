@@ -116,7 +116,8 @@ test('the engine sends reply_to_message_id, on a retry too, and draws the quote 
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /\.\.\.\(convId && options\.replyTo && \{ reply_to_message_id: options\.replyTo\.id \}\),\n {6}\};\n {6}const response = await chatApi\.start\(applyJurisdiction\(baseBody, choice\)\);/);
   assert.match(engine, /\.\.\.\(originalMsg\.replyTo && \{ reply_to_message_id: originalMsg\.replyTo\.id \}\),/);
-  assert.match(engine, /const optimisticMsg = addUserMessage\(message, attachmentsList, options\.replyTo\);/);
+  // The files as the chat shows them: "Document 1, 2…" in a redacted chat (document-labels.ts).
+  assert.match(engine, /const optimisticMsg = addUserMessage\(message, shownAttachments, options\.replyTo\);/);
   assert.match(engine, /drawnHere: true,\n {6}\.\.\.\(replyTo && \{ replyTo \}\),/);
   const types = read('types', 'chat.ts');
   assert.match(types, /reply_to_message_id\?: number;\n\}/);

@@ -80,6 +80,7 @@ import { adoptServerFields } from './server-fields';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
+import { labelDocuments, withServerLabels } from './document-labels';
 import { largestSavedId, savedTurnId } from './saved-turn';
 import { STALL_CHECK_MS, hiddenDuring, quietCheckDue, stallVerdict, type StallVerdict } from './stall';
 import { reportChatError } from '../chat-errors/report';
@@ -2232,6 +2233,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // Redacted flag is sticky after turn 1, so it is never re-sent — but we still
     // need to know locally to swap the optimistic user message for the redacted form.
     const isRedactedTurnN = !!convId && isRedacted(convId);
+    // A redacted chat stores and shows its files as "Document 1, 2…", never by
+    // their own names (document-labels.ts): the question is drawn with the
+    // labels the server will give, and takes the server's once the send answers.
+    const shownAttachments = isRedactedTurnN ? labelDocuments(state.messages, attachmentsList) : attachmentsList;
 
     // Read prior history from IDB BEFORE appending the new user turn.
     let priorHistory: { role: 'user' | 'assistant' | 'tool'; content: string }[] = [];
@@ -2246,8 +2251,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       try {
         await appendUserTurn(convId, {
           content: message,
-          ...(attachmentsList.length > 0 && {
-            attachments: attachmentsList.map((a) => ({
+          ...(shownAttachments.length > 0 && {
+            attachments: shownAttachments.map((a) => ({
               file_id: a.file_id,
               file_name: a.file_name,
               file_size: a.file_size,
@@ -2262,7 +2267,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // What was saved before this send: a question saved by it has a larger id
     // (saved-turn.ts, for a send that fails after the server may have kept it).
     const savedBefore = largestSavedId(state.messages);
-    const optimisticMsg = addUserMessage(message, attachmentsList, options.replyTo);
+    const optimisticMsg = addUserMessage(message, shownAttachments, options.replyTo);
     setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own', sending: true }));
 
     try {
@@ -2324,6 +2329,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         const redaction = response.data.redaction;
         if (isRedactedTurnN && isRedactionSummary(redaction)) {
           setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, redaction } : m)));
+        }
+        // The labels the server gave this question's files replace the app's,
+        // so the row never shows a different number from the saved one.
+        const labelled = response.data.user_message_attachments;
+        if (isRedactedTurnN && labelled && labelled.length > 0 && shownAttachments.length > 0) {
+          const confirmed = withServerLabels(shownAttachments, labelled);
+          setMessages((msgs) =>
+            msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, attachments: confirmed, attachment: confirmed[0] } : m)),
+          );
         }
         if (isRedactedTurnN && redactedText && redactedText !== message) {
           setMessages((msgs) =>
