@@ -8,6 +8,7 @@
  *   file:812         a file by id
  *   note:my-note     a note by slug
  *   machine:live     Lawexa's machine (Userbox v1, staff)
+ *   agent:<uuid>     an agent conversation Lawexa opened with another agent (sub-agents)
  *
  * A draft is named by its PLACE among the chat's drafts, not by its message
  * id: an answer streamed in this visit carries a local id and the same answer
@@ -18,7 +19,11 @@ export type SidePanelTarget =
   | { kind: 'draft'; ordinal: number }
   | { kind: 'file'; id: number }
   | { kind: 'note'; slug: string }
-  | { kind: 'machine' };
+  | { kind: 'machine' }
+  | { kind: 'agent'; id: string };
+
+/** An agent conversation's uuid, as the server writes one. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const SIDE_PANEL_PARAM = 'side';
 
@@ -32,6 +37,8 @@ export function sidePanelValue(target: SidePanelTarget): string {
       return `note:${encodeURIComponent(target.slug)}`;
     case 'machine':
       return 'machine:live';
+    case 'agent':
+      return `agent:${target.id}`;
   }
 }
 
@@ -58,5 +65,6 @@ export function parseSidePanelValue(value: string | null): SidePanelTarget | nul
     return slug ? { kind, slug } : null;
   }
   if (kind === 'machine') return rest === 'live' ? { kind } : null;
+  if (kind === 'agent') return UUID.test(rest) ? { kind, id: rest.toLowerCase() } : null;
   return null;
 }

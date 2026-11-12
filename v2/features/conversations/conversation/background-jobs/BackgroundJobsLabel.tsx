@@ -13,6 +13,8 @@ import {
   type BackgroundJobState,
 } from './model';
 import { useBackgroundJobsOf } from './context';
+import { jobAgentConversation } from '../agents/agent-model';
+import { useSidePanel } from '../side-panel/SidePanelContext';
 
 /**
  * BackgroundJobsLabel — under the message whose turn started background work,
@@ -50,11 +52,17 @@ const STATE_ICON: Record<BackgroundJobState, typeof Check> = {
   cancelled: Ban,
 };
 
+const LINE_BUTTON =
+  'v2-interactive ml-1 shrink-0 rounded-sm font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60';
+
 function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling: boolean; onCancel: () => void }) {
   const state = backgroundJobState(job);
   const Icon = STATE_ICON[state];
   const progress = state === 'running' ? backgroundJobProgress(job) : null;
   const spinning = state === 'running' || state === 'replying';
+  // A job that waits on another agent opens that agent's conversation beside the chat (sub-agents).
+  const agentConversation = jobAgentConversation(job);
+  const panel = useSidePanel();
   return (
     // Wraps on a narrow screen rather than cutting the words: on a phone the
     // running line read "file r…" (fixture pictures, 11 November 2026).
@@ -70,18 +78,26 @@ function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling
         {backgroundJobLabel(job)}
       </span>
       {progress ? <span className="shrink-0 tabular-nums">· {progress}</span> : null}
+      {agentConversation && panel ? (
+        <button
+          type="button"
+          onClick={() => panel.open({ kind: 'agent', id: agentConversation.id })}
+          aria-label={`Open the conversation with ${agentConversation.agent.name}`}
+          className={cn(LINE_BUTTON, FOCUS_RING)}
+        >
+          Open
+        </button>
+      ) : null}
       {canCancelBackgroundJob(job) ? (
         <button
           type="button"
           onClick={onCancel}
           disabled={cancelling}
-          aria-label={`Cancel the ${job.kind_name}`}
-          className={cn(
-            'v2-interactive ml-1 shrink-0 rounded-sm font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60',
-            FOCUS_RING,
-          )}
+          // Cancelling an agent's job stops the chat waiting; the agent's own turn goes on (contract 2.4).
+          aria-label={agentConversation ? `Stop waiting for ${agentConversation.agent.name}` : `Cancel the ${job.kind_name}`}
+          className={cn(LINE_BUTTON, FOCUS_RING)}
         >
-          {cancelling ? 'Cancelling…' : 'Cancel'}
+          {cancelling ? (agentConversation ? 'Stopping…' : 'Cancelling…') : agentConversation ? 'Stop waiting' : 'Cancel'}
         </button>
       ) : null}
     </li>

@@ -77,7 +77,7 @@ test('the line draws the return’s words from its jobs, and the give-up notice 
   assert.match(lines, /case 'background_job_result':\s*case 'background_job_unanswered':\s*return <BackgroundJobLine line=\{line\} \/>;/);
   assert.match(
     lines,
-    /const words = line\.eventType === 'background_job_result' \? backgroundReturnLine\(line\.jobs\) : line\.content;/,
+    /const returned = line\.eventType === 'background_job_result';\s*const words = returned \? backgroundReturnLine\(line\.jobs\) : line\.content;/,
   );
 });
 
@@ -126,7 +126,8 @@ test('the label reads out its state, not its page count, and Cancel says which j
   const label = here('background-jobs', 'BackgroundJobsLabel.tsx');
   assert.match(label, /<span aria-live="polite" className="min-w-0">\s*\{backgroundJobLabel\(job\)\}/);
   assert.doesNotMatch(label, /<ul aria-live/);
-  assert.match(label, /aria-label=\{`Cancel the \$\{job\.kind_name\}`\}/);
+  // A job that waits on another agent stops the waiting instead (sub-agents): its turn goes on.
+  assert.match(label, /aria-label=\{agentConversation \? `Stop waiting for \$\{agentConversation\.agent\.name\}` : `Cancel the \$\{job\.kind_name\}`\}/);
   // Each job's cancel is held on its own.
   const context = here('background-jobs', 'context.tsx');
   assert.match(context, /cancelling=\{held\.cancelling\.has\(job\.id\)\}|const \[cancelling, setCancelling\] = useState<ReadonlySet<string>>/);

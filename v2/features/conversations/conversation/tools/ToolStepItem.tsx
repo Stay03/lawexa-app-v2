@@ -30,6 +30,7 @@ import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepSt
 import { failedStepLine, stepFailed } from './step-failure';
 import { isBoxTool } from '@/v2/features/userbox/machine-model';
 import { HAND_OVER_TOOL, OpenMachineButton } from '@/v2/features/userbox/OpenMachineButton';
+import { MESSAGE_AGENT_TOOL, messageAgentStep } from '../agents/agent-model';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -226,6 +227,10 @@ export function formatToolMessage(
       const asked = typeof parameters.title === 'string' && parameters.title.trim() ? parameters.title.trim() : undefined;
       return { action, detail: title ?? asked };
     }
+    // Lawexa messaging another agent (sub-agents): "Writing to Issue Spotter",
+    // named from the call, then by the agent's own name once the tool answers.
+    case MESSAGE_AGENT_TOOL:
+      return messageAgentStep(parameters, isComplete, toolResult);
     default: {
       const readable = toolName
         .replace(/_/g, ' ')

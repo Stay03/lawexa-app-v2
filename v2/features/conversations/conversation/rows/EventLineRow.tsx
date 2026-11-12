@@ -14,6 +14,8 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
 import { clockTime } from '../day-label';
 import { draftOrdinalForLine } from './event-line';
 import { backgroundReturnLine } from '../background-jobs/model';
+import { agentReplies } from '../agents/agent-model';
+import { AgentReplyRows } from '../agents/AgentReplyRows';
 
 /** EventLineRow — a line in the chat beside the turns, drawn by its kind. */
 export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMessage }) {
@@ -36,8 +38,11 @@ export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMe
  * Lawexa.
  */
 function BackgroundJobLine({ line }: { line: BackgroundJobEvent }) {
-  const words = line.eventType === 'background_job_result' ? backgroundReturnLine(line.jobs) : line.content;
-  return (
+  const returned = line.eventType === 'background_job_result';
+  const words = returned ? backgroundReturnLine(line.jobs) : line.content;
+  // Another agent's replies: one preview row each under the line (sub-agents contract, section 4).
+  const replies = returned ? agentReplies(line.jobs) : [];
+  const note = (
     // One run of text, the icon and the time inline with it: the give-up
     // sentence is long, and as flex items its words, dot and time wrapped
     // into separate columns (fixture pictures, 11 November 2026).
@@ -48,6 +53,13 @@ function BackgroundJobLine({ line }: { line: BackgroundJobEvent }) {
         {clockTime(line.timestamp)}
       </time>
     </p>
+  );
+  if (replies.length === 0) return note;
+  return (
+    <div className="flex flex-col gap-2">
+      {note}
+      <AgentReplyRows replies={replies} />
+    </div>
   );
 }
 

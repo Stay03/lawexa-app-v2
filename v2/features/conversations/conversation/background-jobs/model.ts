@@ -1,4 +1,5 @@
 import type { BackgroundJob, BackgroundJobKind, BackgroundJobOutcome } from '@/types/background-jobs';
+import { agentJobLabel } from '../agents/agent-model';
 
 /**
  * background-jobs model — the pure rules of a chat's background jobs
@@ -12,6 +13,7 @@ const KIND_NAMES: Readonly<Record<BackgroundJobKind, string>> = {
   file_transcription: 'file reading',
   case_import: 'case import',
   radar_scan: 'Radar scan',
+  agent_reply: 'message to another agent',
 };
 
 function capitalised(words: string): string {
@@ -44,8 +46,17 @@ export function backgroundJobProgress(job: Pick<BackgroundJob, 'progress'>): str
     : `${progress.done} / ${progress.total} ${progress.unit}`;
 }
 
-/** The label's words, by state (Backend's doc, section 1). */
-export function backgroundJobLabel(job: Pick<BackgroundJob, 'status' | 'wake' | 'kind_name'>): string {
+/**
+ * The label's words, by state (Backend's doc, section 1). A job that waits on
+ * another agent names the agent: "Waiting for Issue Spotter…" (sub-agents
+ * contract, section 4).
+ */
+export function backgroundJobLabel(
+  job: Pick<BackgroundJob, 'status' | 'wake' | 'kind_name'> & Partial<Pick<BackgroundJob, 'kind' | 'agent_conversation'>>,
+): string {
+  if (job.kind === 'agent_reply' && job.agent_conversation) {
+    return agentJobLabel(job.agent_conversation.agent.name, backgroundJobState(job), job.status === 'failed');
+  }
   const kind = capitalised(job.kind_name);
   switch (backgroundJobState(job)) {
     case 'running':
@@ -96,9 +107,15 @@ export function backgroundJobsByMessage(jobs: readonly BackgroundJob[]): Readonl
  * continuing." for one job; "2 background jobs ended. Lawexa is continuing."
  * for several.
  */
-export function backgroundReturnLine(outcomes: readonly Pick<BackgroundJobOutcome, 'kind' | 'outcome'>[]): string {
+export function backgroundReturnLine(
+  outcomes: readonly (Pick<BackgroundJobOutcome, 'kind' | 'outcome'> & Partial<Pick<BackgroundJobOutcome, 'agent_reply'>>)[],
+): string {
   if (outcomes.length === 1) {
     const [only] = outcomes;
+    // One agent's reply: named, as its preview row under the line names it (sub-agents contract, section 4).
+    if (only.kind === 'agent_reply' && only.agent_reply) {
+      return `${only.agent_reply.agent.name} ${only.outcome === 'failed' ? 'could not reply' : 'replied'}. Lawexa is continuing.`;
+    }
     const kind = capitalised(KIND_NAMES[only.kind] ?? 'background job');
     return `${kind} ${only.outcome === 'failed' ? 'failed' : 'finished'}. Lawexa is continuing.`;
   }
