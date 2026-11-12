@@ -69,8 +69,17 @@ export type MachineControl =
   /** The person drives because they acted: Done gives it back. */
   | { who: 'you'; reason: 'user_acted'; message: null; action: 'done' };
 
+/*
+ * A message the person types gives the machine back to Lawexa, as Done does
+ * (Stay, 12 November 2026, card 9bab169f; the server's takeBackOnMessage), so
+ * the panel offers both ways.
+ */
+
 /** Lawexa's words when it hands the machine over without a message of its own. */
-export const HAND_OVER_FALLBACK = 'Lawexa needs you to do this part. When you have finished, press Done.';
+export const HAND_OVER_FALLBACK = 'Lawexa needs you to do this part. When you have finished, tell Lawexa or press Done.';
+
+/** The panel's words while the person has the machine because they acted on it. */
+export const YOU_HAVE_THE_MACHINE = 'You have the machine. Tell Lawexa what to do next, or press Done.';
 
 export function machineControl(box: Pick<UserBoxStatus, 'control' | 'control_reason' | 'hand_over_message'>): MachineControl {
   if (box.control !== 'user') return { who: 'lawexa', action: 'take-over' };

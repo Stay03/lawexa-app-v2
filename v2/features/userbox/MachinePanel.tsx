@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { UserBoxDoneResult } from '@/types/user-box';
 import { ChatSidePanel } from '@/v2/features/conversations/conversation/side-panel/ChatSidePanel';
+import { YOU_HAVE_THE_MACHINE } from './machine-model';
 import { MachineScreen } from './MachineScreen';
 import { useMachine } from './use-machine';
 
@@ -19,7 +20,9 @@ import { useMachine } from './use-machine';
  *                    to the person as soon as they act on the view)
  *   the person       "Done": Lawexa drives again; when Lawexa handed over,
  *                    its request shows above the button, and Done continues
- *                    the chat that was waiting ("Waiting for you, press Done")
+ *                    the chat that was waiting ("Waiting for you, press Done").
+ *                    A message the person types gives it back too, with no
+ *                    Done (card 9bab169f); the broadcast moves the panel.
  *
  * Opening the panel wakes the machine ("Starting…" until it is awake); one
  * that went to sleep offers Wake. With the machines off, or for an account
@@ -46,7 +49,7 @@ export function MachinePanel({ onResumed }: { onResumed: (result: UserBoxDoneRes
       ) : (
         <div className="flex w-full items-center justify-between gap-3">
           <p className="min-w-0 text-sm text-foreground">
-            {control.reason === 'hand_over' ? control.message : 'You have the machine. Press Done to give it back to Lawexa.'}
+            {control.reason === 'hand_over' ? control.message : YOU_HAVE_THE_MACHINE}
           </p>
           <Button type="button" size="sm" className="shrink-0" disabled={machine.busy} onClick={machine.done}>
             {machine.busy ? <Loader2 aria-hidden className="size-4 animate-spin motion-reduce:animate-none" /> : null}

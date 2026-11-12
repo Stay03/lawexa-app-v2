@@ -144,3 +144,16 @@ test('the hand-over’s full button is for the chat’s last answer: the groups 
   const step = readFileSync(new URL('../conversations/conversation/tools/ToolStepItem.tsx', import.meta.url), 'utf8');
   assert.match(step, /message\.toolName === HAND_OVER_TOOL && isComplete && inLastAnswer/);
 });
+
+// Stay, 12 November 2026 (card 9bab169f): a typed message gives the machine
+// back to Lawexa, as Done does, so the panel's words offer both ways.
+test('while the person has the machine, the panel says a message gives it back, as Done does', async () => {
+  const { YOU_HAVE_THE_MACHINE } = await import('./machine-model');
+  assert.equal(YOU_HAVE_THE_MACHINE, 'You have the machine. Tell Lawexa what to do next, or press Done.');
+  assert.equal(HAND_OVER_FALLBACK, 'Lawexa needs you to do this part. When you have finished, tell Lawexa or press Done.');
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const panel = readFileSync(join(process.cwd(), 'v2', 'features', 'userbox', 'MachinePanel.tsx'), 'utf8');
+  assert.match(panel, /\{control\.reason === 'hand_over' \? control\.message : YOU_HAVE_THE_MACHINE\}/);
+  assert.doesNotMatch(panel, /Press Done to give it back to Lawexa/);
+});
