@@ -74,7 +74,9 @@ test('a Space chat: the quiz on its own route only, games named by the chat, Hos
 
 test('a chat’s quiz line is the channels’ quiz card for a member, and the sentence alone for anyone else', () => {
   const row = read('v2', 'features', 'conversations', 'conversation', 'rows', 'EventLineRow.tsx');
-  assert.match(row, /line\.eventType === 'draft_edit' \? <DraftEditLine line=\{line\} \/> : <QuizGameLineRow line=\{line\} \/>/);
+  // One switch draws every kind of line: background work's, a live quiz's, a draft's.
+  assert.match(row, /case 'quiz_game_live':\s*case 'quiz_game_finished':\s*return <QuizGameLineRow line=\{line\} \/>;/);
+  assert.match(row, /case 'background_job_result':\s*case 'background_job_unanswered':\s*return <BackgroundJobLine line=\{line\} \/>;/);
   assert.match(row, /const quiz = useLiveQuizRoom\(\);\s*if \(!quiz\) \{/);
   assert.match(row, /finished: line\.eventType === 'quiz_game_finished',\s*gameUuid: line\.gameUuid,/);
 
