@@ -590,8 +590,9 @@ export interface QuizAttempt {
   questions: QuizAttemptQuestion[];
   /** Present once the attempt is finished, absent before — see the type. */
   comparison?: QuizAttemptComparison;
-  /** The finish response's word on a certificate, when the quiz carries one
-   *  (certificates part 2). A later read of the attempt does not carry it. */
+  /** This person's certificate for a finished attempt, when the quiz carries
+   *  one (certificates part 2): on the finish response and on the owner's read
+   *  of the finished attempt (Techlead cb17912b), so it survives a refetch. */
   certificate?: CertificateOffer | null;
 }
 

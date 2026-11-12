@@ -20,8 +20,8 @@ import type {
   IssuedCertificate,
   MyCertificate,
   PendingCertificate,
+  QuizCertificateLink,
 } from '@/types/certificates';
-import type { AdminChannelQuiz } from '@/types/admin-channel-quizzes';
 
 /**
  * Certificates (shapes agreed with WOZ in 384c, 11 November 2026; see
@@ -218,11 +218,11 @@ export const adminCertificatesApi = {
   },
 
   /** Links a channel quiz to a programme, or unlinks it with `null`. 422 for a programme that is off. */
-  setQuizCertificate: async (quizUuid: string, programmeUuid: string | null): Promise<AdminChannelQuiz> => {
-    const response = await apiClient.put<ApiResponse<AdminChannelQuiz>>(`/admin/channel-quizzes/${enc(quizUuid)}/certificate`, {
+  setQuizCertificate: async (quizUuid: string, programmeUuid: string | null): Promise<QuizCertificateLink> => {
+    const response = await apiClient.put<ApiResponse<QuizCertificateLink>>(`/admin/channel-quizzes/${enc(quizUuid)}/certificate`, {
       programme_uuid: programmeUuid,
     });
-    return response.data.data as AdminChannelQuiz;
+    return response.data.data as QuizCertificateLink;
   },
 
   certificates: async (programmeUuid: string, page = 1): Promise<PageOf<IssuedCertificate>> => {
