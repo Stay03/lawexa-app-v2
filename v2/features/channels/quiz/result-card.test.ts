@@ -331,7 +331,7 @@ test('the final scores are the quiz’s own leaderboard, its podium rising, the 
   const phases = quiz('GamePhases.tsx');
   assert.match(
     phases,
-    /<FrontBoard\s*board=\{liveGameBoard\(results, viewerUuid\)\}\s*rising\s*finished\s*everyone\s*rowNote=\{liveRowNote\(results\)\}\s*rulesNote=\{LIVE_BOARD_RULES_NOTE\}\s*\/>/,
+    /<FrontBoard\s*board=\{liveGameBoard\(results, viewerUuid\)\}\s*rising\s*finished\s*everyone\s*unranked=\{results\.game\.player_count < 2\}\s*rowNote=\{liveRowNote\(results\)\}\s*rulesNote=\{LIVE_BOARD_RULES_NOTE\}\s*\/>/,
   );
   // Every player is on the board (Arthur's A): twelve players, all twelve entries; a late joiner's row says so.
   const twelve = Array.from({ length: 12 }, (_, i) =>
@@ -434,4 +434,20 @@ test('the invite under a one-player game claims no place either', () => {
     ask: 'Share this challenge with your study group and find out.',
   });
   assert.match(quiz('GamePhases.tsx'), /: results\.game\.player_count < 2\s*\? \{ outcome: 'solo' \}\s*: viewerRow\.rank === 1/);
+});
+
+test('a one-player game ranks no one on its board: the row and its points, no podium, crown or place; other boards unchanged', () => {
+  const board = read('v2', 'features', 'quiz', 'solo', 'board', 'FrontBoard.tsx');
+  // The prop is off unless asked for, so the quiz's own page and every 2+ player game draw as before.
+  assert.match(board, /everyone = false,\s*unranked = false,/);
+  const unranked = board.slice(board.indexOf(') : unranked ? ('), board.indexOf('<div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">'));
+  assert.match(unranked, /<PlayerLine rank=\{null\} user=\{entry\.user\} points=\{entry\.points\} you=\{isYou\(entry\)\}/);
+  assert.match(unranked, /\{standing \? <p className="text-center text-sm font-medium text-foreground\/80">\{standing\}<\/p> : null\}/);
+  assert.doesNotMatch(unranked, /<Podium|Crown|Trophy/);
+  // A row without a place drops the trophy and the number; a ranked row keeps them.
+  assert.match(board, /\{rank !== null \? \(\s*<span className="flex w-9 shrink-0 items-center gap-1/);
+  assert.match(board, /<PlayerLine rank=\{entry\.rank\} user=\{entry\.user\}/);
+  assert.match(board, /<PlayerLine rank=\{viewer\.rank\} user=\{user\}/);
+  // The quiz's own page passes no such prop.
+  assert.match(read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx'), /<FrontBoard board=\{board\} \/>/);
 });

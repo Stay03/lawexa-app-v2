@@ -777,12 +777,14 @@ export function PodiumStage({
       </div>
 
       {/* The quiz's leaderboard, its podium rising in: the same board a
-          quiz's own page shows, the reader's row marked as it marks "you". */}
+          quiz's own page shows, the reader's row marked as it marks "you".
+          A one-player game ranks no one: the player's row, no podium. */}
       <FrontBoard
         board={liveGameBoard(results, viewerUuid)}
         rising
         finished
         everyone
+        unranked={results.game.player_count < 2}
         rowNote={liveRowNote(results)}
         rulesNote={LIVE_BOARD_RULES_NOTE}
       />

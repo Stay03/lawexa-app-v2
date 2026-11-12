@@ -60,7 +60,10 @@ const BOARD_TOP = 10;
  * again to climb the board." Every player in the room is listed (`everyone`,
  * Arthur's choice A, 075b09bc: "no player is missing"), and a row can carry a
  * line of its own (`rowNote`: "Joined late", so a lower score makes sense).
- * The quiz's page keeps its top ten.
+ * The quiz's page keeps its top ten. A game with one player ranks no one
+ * (`unranked`, Arthur, 0f517a68, 12 November 2026: "Don't show a percentile
+ * or ranking"): no podium, crown or place, only the player's row with their
+ * points, and the reader's line under it.
  */
 export function FrontBoard({
   board,
@@ -68,6 +71,7 @@ export function FrontBoard({
   rulesNote = BOARD_RULES_NOTE,
   finished = false,
   everyone = false,
+  unranked = false,
   rowNote,
 }: {
   board: QuizLeaderboard;
@@ -79,6 +83,8 @@ export function FrontBoard({
   finished?: boolean;
   /** Every place under the podium, not only the top ten. */
   everyone?: boolean;
+  /** Nobody is ranked (a one-player game): the rows without places, no podium. */
+  unranked?: boolean;
   /** A line under a player's name in the rows (and before the reader's own line on theirs). */
   rowNote?: (entry: QuizLeaderboardEntry) => string | null;
 }) {
@@ -122,6 +128,20 @@ export function FrontBoard({
         <p className="rounded-2xl border-2 border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
           {BOARD_EMPTY_NOTE}
         </p>
+      ) : unranked ? (
+        <div className="flex min-w-0 flex-col gap-3">
+          <ul aria-label="Scores" className="flex min-w-0 flex-col divide-y divide-border/70">
+            {board.entries.map((entry) => (
+              <li
+                key={entry.user.uuid}
+                className={cn('flex min-w-0 flex-col', isYou(entry) && 'rounded-xl bg-primary/10 ring-2 ring-primary/50')}
+              >
+                <PlayerLine rank={null} user={entry.user} points={entry.points} you={isYou(entry)} note={rowNote?.(entry) ?? null} />
+              </li>
+            ))}
+          </ul>
+          {standing ? <p className="text-center text-sm font-medium text-foreground/80">{standing}</p> : null}
+        </div>
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">
           <div className="flex min-w-0 flex-col gap-3">
@@ -297,7 +317,7 @@ function YourRow({ viewer, standing }: { viewer: NonNullable<QuizLeaderboard['vi
   );
 }
 
-/** Rank, face, name over where they study (and, for the reader, their standing), and points. */
+/** Rank (none on an unranked board), face, name over where they study (and, for the reader, their standing), and points. */
 function PlayerLine({
   rank,
   user,
@@ -305,7 +325,7 @@ function PlayerLine({
   you,
   note = null,
 }: {
-  rank: number;
+  rank: number | null;
   user: QuizLeaderboardEntry['user'];
   points: number;
   you: boolean;
@@ -313,11 +333,13 @@ function PlayerLine({
 }) {
   return (
     <div className="flex min-h-14 min-w-0 items-center gap-3 px-2 py-2">
-      <span className="flex w-9 shrink-0 items-center gap-1 text-sm font-semibold text-foreground tabular-nums">
-        <Trophy aria-hidden className={cn('size-3.5', you ? 'text-primary' : 'text-muted-foreground')} />
-        <span className="sr-only">Place </span>
-        {rank}
-      </span>
+      {rank !== null ? (
+        <span className="flex w-9 shrink-0 items-center gap-1 text-sm font-semibold text-foreground tabular-nums">
+          <Trophy aria-hidden className={cn('size-3.5', you ? 'text-primary' : 'text-muted-foreground')} />
+          <span className="sr-only">Place </span>
+          {rank}
+        </span>
+      ) : null}
       <MemberAvatar
         user={{ name: user.name, avatar_url: user.avatar_url ?? null }}
         className="size-10 rounded-xl after:rounded-xl *:rounded-xl"
