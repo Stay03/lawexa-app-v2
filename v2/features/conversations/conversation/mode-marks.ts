@@ -39,11 +39,8 @@ const redactedIds = new Set<string>();
 let seeded = false;
 const listeners = new Set<() => void>();
 
-/** Snapshot version — bumped on every mutation so useSyncExternalStore re-reads. */
-let version = 0;
-
+/** Tell every reader that a mark changed; each re-reads its own snapshot. */
 function notify(): void {
-  version += 1;
   listeners.forEach((l) => l());
 }
 
@@ -165,23 +162,50 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+/** Confidential is bit 1, redacted bit 2: a whole mark state as one number. */
+const CONFIDENTIAL_BIT = 1;
+const REDACTED_BIT = 2;
+
+/**
+ * A conversation's marks as one number (`confidential | redacted`), the
+ * external store's snapshot. A number compares by value, so React re-renders
+ * only when a mark actually flips.
+ */
+export function modeMarkBits(conversationId: string | null | undefined): number {
+  return (isConfidentialMark(conversationId) ? CONFIDENTIAL_BIT : 0) | (isRedactedMark(conversationId) ? REDACTED_BIT : 0);
+}
+
+/** The two flags back out of {@link modeMarkBits}. */
+export function modeMarksFromBits(bits: number): { isConfidential: boolean; isRedacted: boolean } {
+  return { isConfidential: (bits & CONFIDENTIAL_BIT) !== 0, isRedacted: (bits & REDACTED_BIT) !== 0 };
+}
+
+/**
+ * What the server draws: no marks. sessionStorage does not exist there, and
+ * the server snapshot must say so.
+ */
+export const SERVER_MODE_MARK_BITS = 0;
+
 /**
  * Reactively read a conversation's mode marks (for the composer's redacted pill +
  * confidential surface treatment). Re-renders only when a mark actually flips.
+ *
+ * THE FLAGS ARE THE SNAPSHOT (Techlead bef9b44b). They used to be read from
+ * sessionStorage on every render beside a version-number snapshot, so the
+ * HYDRATION render, which React runs with the server snapshot, still saw the
+ * client's marks: it drew the Confidential banner and the Redacted chip the
+ * server had not, React logged "Hydration failed" and threw the server HTML away.
+ * Now the hydration render reads {@link SERVER_MODE_MARK_BITS} (no marks, like
+ * the server), and React draws the real marks on the very next render.
  */
 export function useModeMarks(conversationId: string | null): {
   isConfidential: boolean;
   isRedacted: boolean;
 } {
-  // Version is the external-store snapshot; the booleans are derived from it. Both
-  // reads share the same seed/notify cycle, so the values stay consistent.
-  useSyncExternalStore(
+  const bits = useSyncExternalStore(
     subscribe,
-    () => version,
-    () => 0,
+    () => modeMarkBits(conversationId),
+    () => SERVER_MODE_MARK_BITS,
   );
-  return {
-    isConfidential: isConfidentialMark(conversationId),
-    isRedacted: isRedactedMark(conversationId),
-  };
+  return modeMarksFromBits(bits);
 }
