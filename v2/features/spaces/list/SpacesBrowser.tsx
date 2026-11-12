@@ -207,7 +207,7 @@ export function SpacesBrowser() {
         <PendingPill count={pendingInvitations} />
 
         {/* The way to public spaces (Arthur, 15 October 2026: a public space
-            is listed on Discover, and people ask to join it). Quiet, so New
+            is listed on Discover, and anyone can join it). Quiet, so New
             space stays the one primary action here. */}
         <Link
           href="/spaces/discover"

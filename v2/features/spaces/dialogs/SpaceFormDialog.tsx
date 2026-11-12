@@ -112,7 +112,7 @@ import { useCreateSpace, useUpdateSpace } from '../mutations';
  * the server makes the old team space, which a plain account may not), owned
  * by the person making it. Step two asks one more thing, Private or Public
  * (Private first; Arthur's answer, 15 October 2026: a public space is listed
- * on Discover, people ask to join and the Owner approves). Each step says
+ * on Discover, and anyone new joins at once; Arthur's A, 12 November 2026). Each step says
  * which it is ("Step 1 of 2").
  *
  * ── BOTH STEPS ARE ONE FRAME (Arthur, 15 October 2026) ─────────────────────
@@ -220,7 +220,7 @@ const PRIVACY_CHOICES: readonly Choice<Privacy>[] = [
     value: 'open',
     icon: Globe,
     title: 'Public',
-    description: 'Shown on Discover. People ask to join, and you approve them.',
+    description: 'Shown on Discover. Anyone can join.',
   },
 ];
 

@@ -297,7 +297,8 @@ test('the create dialog asks no kind and no owner: every new space is a shared o
   assert.match(dialog, /const privacyField = canBeOpen \? \(\s*<ChoiceCards\s+legend="Who can join"/);
   assert.equal((dialog.match(/\{privacyField\}/g) ?? []).length, 2);
   assert.match(dialog, /\{nameField\}\s*\{goalField\}\s*\{privacyField\}\s*<\/div>/);
-  assert.match(dialog, /title: 'Public',\s*description: 'Shown on Discover\. People ask to join, and you approve them\.',/);
+  // Arthur's A (12 November 2026, thread dcd06933): anyone new joins a public space at once.
+  assert.match(dialog, /title: 'Public',\s*description: 'Shown on Discover\. Anyone can join\.',/);
 });
 
 test('create is two steps: the type first, then the fields, with no preview (Stay, 15 October 2026)', () => {

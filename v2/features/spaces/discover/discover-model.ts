@@ -1,29 +1,27 @@
 import type { DiscoverableSpace } from '@/types/collab';
 
 /**
- * discover-model — what a Discover card offers the reader (public shared
- * spaces, Arthur, 15 October 2026: listed here, people ask to join and the
- * space's Owner approves in the People tab). No JSX, so the tests pin it.
+ * discover-model — what a Discover card offers the reader (public Spaces,
+ * Arthur's A, 12 November 2026, thread dcd06933: anyone new joins a public
+ * Space at once; someone the Owner removed or turned down sends a request the
+ * Owner decides on). No JSX, so the tests pin it.
  *
  *  - `open`:    the reader is a member; the card opens the space.
- *  - `ask`:     a shared space they are not in; the card asks to join.
- *  - `pending`: their ask is waiting for the Owner; the card says so and can
- *               take it back.
- *  - `join`:    an older public team space, which anyone may join at once.
+ *  - `join`:    they are not in it; the card joins, or the server makes it a
+ *               request (`joinOutcome`).
+ *  - `pending`: their request is waiting for the Owner; the card says so and
+ *               can take it back.
  *
  * The server's `my_status` decides; the older `is_member` is read only when
  * it is absent.
  */
-export type DiscoverAction = 'open' | 'ask' | 'pending' | 'join';
+export type DiscoverAction = 'open' | 'pending' | 'join';
 
-export function discoverAction(
-  space: Pick<DiscoverableSpace, 'kind' | 'my_status' | 'is_member'>,
-): DiscoverAction {
+export function discoverAction(space: Pick<DiscoverableSpace, 'my_status' | 'is_member'>): DiscoverAction {
   if (space.my_status === 'member' || (space.my_status === undefined && space.is_member === true)) {
     return 'open';
   }
-  if ((space.kind ?? 'team') === 'team') return 'join';
-  return space.my_status === 'pending' ? 'pending' : 'ask';
+  return space.my_status === 'pending' ? 'pending' : 'join';
 }
 
 /**
@@ -40,17 +38,8 @@ export interface Refusal {
   offerAccount: boolean;
 }
 
-/** Why an ask was refused. */
-export function askRefusal(status: number | undefined, hasAccount: boolean): Refusal {
-  if (status === 409) return { text: 'You are already in this space.', offerAccount: false };
-  if (status === 404) return { text: 'This space is no longer public.', offerAccount: false };
-  if (status === 403) {
-    return hasAccount
-      ? { text: "This space isn't taking requests from your account.", offerAccount: false }
-      : { text: 'You need a Lawexa account to ask to join.', offerAccount: true };
-  }
-  return { text: "That didn't work. Try again in a moment.", offerAccount: false };
-}
+/** Taking back a request failed: the card still shows it, so trying again is the way on. */
+export const CANCEL_FAILED: Refusal = { text: "Your request wasn't taken back. Try again in a moment.", offerAccount: false };
 
 /** Why a join was refused. */
 export function joinRefusal(status: number | undefined, hasAccount: boolean): Refusal {

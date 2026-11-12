@@ -156,12 +156,12 @@ export function useDiscoverSpaces(params: DiscoverSpacesParams) {
 
 /** Ask to join a public shared space, or take the ask back. The Discover
  *  rows re-ask the server, which says the reader's status (`my_status`). */
-export function useAskToJoinSpace() {
+/** Take back a request to join that is still waiting for the Owner. */
+export function useCancelJoinRequest() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ spaceUuid, ask }: { spaceUuid: string; ask: boolean }): Promise<void> => {
-      if (ask) await discoverApi.askToJoin(spaceUuid);
-      else await discoverApi.cancelAsk(spaceUuid);
+    mutationFn: async (spaceUuid: string): Promise<void> => {
+      await discoverApi.cancelRequest(spaceUuid);
     },
     meta: { silentError: true },
     onSuccess: () => client.invalidateQueries({ queryKey: ['discover-spaces'] }),

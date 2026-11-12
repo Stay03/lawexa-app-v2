@@ -9,6 +9,7 @@
 
 import { apiClient } from '@/lib/api/client';
 import type { ApiResponse } from '@/types/api';
+import { joinOutcome, type JoinOutcome } from '@/lib/utils/space-join';
 import type { UserFile } from '@/types/file';
 import type {
   AddListItemPayload,
@@ -1733,31 +1734,21 @@ export const discoverApi = {
     return response.data;
   },
 
-  /** Self-join a public space. `403` for a guest, or for a private space. */
-  join: async (spaceUuid: string): Promise<ApiResponse<null>> => {
-    const response = await apiClient.post<ApiResponse<null>>(
+  /**
+   * Join a public space (Arthur's A, 12 November 2026): `201` joined, or
+   * `202` with `{status: "pending"}` when the Owner decides (someone they
+   * removed or turned down). `403` for a guest, or for a private space.
+   */
+  join: async (spaceUuid: string): Promise<JoinOutcome> => {
+    const response = await apiClient.post<ApiResponse<unknown>>(
       `/spaces/${spaceUuid}/join`,
       {}
     );
-    return response.data;
+    return joinOutcome(response.status, response.data?.data);
   },
 
-  /**
-   * Ask to join a public SHARED space; its Owner approves in the People tab
-   * (backend, 15 October 2026). `201` with `{status: 'pending'}`, `200` for an
-   * ask already waiting, `409` for a member, `404` for a private or missing
-   * space.
-   */
-  askToJoin: async (spaceUuid: string): Promise<ApiResponse<{ status: 'pending' }>> => {
-    const response = await apiClient.post<ApiResponse<{ status: 'pending' }>>(
-      `/spaces/${spaceUuid}/join-requests`,
-      {}
-    );
-    return response.data;
-  },
-
-  /** Take back an ask that is still waiting. */
-  cancelAsk: async (spaceUuid: string): Promise<ApiResponse<null>> => {
+  /** Take back a request to join that is still waiting for the Owner. */
+  cancelRequest: async (spaceUuid: string): Promise<ApiResponse<null>> => {
     const response = await apiClient.delete<ApiResponse<null>>(
       `/spaces/${spaceUuid}/join-requests/mine`
     );

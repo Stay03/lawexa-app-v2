@@ -13,11 +13,11 @@ import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { DiscoverableSpace } from '@/types/collab';
 import {
-  useAskToJoinSpace,
+  useCancelJoinRequest,
   useDiscoverSpaces,
   useJoinPublicSpace,
 } from '@/v2/features/invites/queries';
-import { askRefusal, discoverAction, joinRefusal, type Refusal } from './discover-model';
+import { CANCEL_FAILED, discoverAction, joinRefusal, type Refusal } from './discover-model';
 
 /**
  * DiscoverScreen — the public spaces anybody can find, and the way in.
@@ -34,39 +34,37 @@ import { askRefusal, discoverAction, joinRefusal, type Refusal } from './discove
  * guest-ness here, for the same reason the invite page does not — a guest
  * carries a real sign-in.
  *
- * ── PUBLIC SHARED SPACES ASK FIRST (Arthur, 15 October 2026) ───────────────
- * A public space is listed here, and joining it is a request its Owner
- * approves in the People tab, so its card says "Ask to join", then "Request
- * sent" with a way to take it back (`discoverAction`). An older public team
- * space keeps "Join". Every signed-in account sees the list now; it was Team
- * Channels' alone while only team spaces could be public.
+ * ── ANYONE NEW JOINS AT ONCE (Arthur's A, 12 November 2026, thread dcd06933) ─
+ * Every public space's card says "Join". A new person is in at once and the
+ * card opens the space. Someone the Owner removed or turned down sends a
+ * request instead (the server's `202`), and the card shows "Request sent"
+ * with a way to take it back, as it does while that request waits
+ * (`discoverAction`). Every signed-in account sees the list.
  */
 
 function SpaceRow({ space }: { space: DiscoverableSpace }) {
   const router = useRouter();
   const join = useJoinPublicSpace();
-  const ask = useAskToJoinSpace();
+  const cancel = useCancelJoinRequest();
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const action = discoverAction(space);
   // A guest pass is signed in too; it is not an account.
   const { signedIn, role } = useV2Session();
   const hasAccount = signedIn && role !== 'guest' && role !== 'bot';
 
-  const sendAsk = (asking: boolean) => {
+  const cancelRequest = () => {
     setRefusal(null);
-    ask.mutate(
-      { spaceUuid: space.uuid, ask: asking },
-      {
-        onError: (error) =>
-          setRefusal(askRefusal(isAxiosError(error) ? error.response?.status : undefined, hasAccount)),
-      },
-    );
+    cancel.mutate(space.uuid, { onError: () => setRefusal(CANCEL_FAILED) });
   };
 
   const press = () => {
     setRefusal(null);
     join.mutate(space.uuid, {
-      onSuccess: () => router.push(`/spaces/${space.uuid}`),
+      // A request (someone the Owner removed or turned down) stays here: the
+      // list is read again and the card shows "Request sent".
+      onSuccess: (outcome) => {
+        if (outcome === 'joined') router.push(`/spaces/${space.uuid}`);
+      },
       onError: (error) =>
         setRefusal(joinRefusal(isAxiosError(error) ? error.response?.status : undefined, hasAccount)),
     });
@@ -121,23 +119,13 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
               variant="ghost"
               size="sm"
               className="v2-interactive shrink-0"
-              disabled={ask.isPending}
-              onClick={() => sendAsk(false)}
+              disabled={cancel.isPending}
+              onClick={cancelRequest}
             >
-              {ask.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+              {cancel.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
               Cancel request
             </Button>
           </div>
-        ) : action === 'ask' ? (
-          <Button
-            size="sm"
-            className="w-full md:w-auto"
-            disabled={ask.isPending}
-            onClick={() => sendAsk(true)}
-          >
-            {ask.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-            Ask to join
-          </Button>
         ) : (
           <Button
             size="sm"
@@ -203,7 +191,7 @@ function DiscoverFrame({
         Find a space
       </h1>
       <p className="text-sm text-muted-foreground md:mt-1.5">
-        Public spaces you can ask to join. Private ones never appear here.
+        Public spaces anyone can join. Private ones never appear here.
       </p>
 
       <div className="relative mt-5">
