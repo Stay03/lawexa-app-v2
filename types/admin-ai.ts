@@ -261,6 +261,8 @@ export interface AdminAiAgent {
   id: number;
   model_id: number;
   name: string;
+  /** The name readers see; `null` shows `name`. Absent from a server before sub-agents 88cef0fe. */
+  display_name?: string | null;
   slug: string;
   description: string | null;
   system_prompt?: string | null;
@@ -314,6 +316,8 @@ export interface AdminAiAgentsParams {
 export interface AdminAiCreateAgentData {
   model_id: number;
   name: string;
+  /** The name readers see; `null` or absent shows `name`. */
+  display_name?: string | null;
   slug: string;
   description?: string;
   system_prompt: string;
@@ -326,6 +330,8 @@ export interface AdminAiCreateAgentData {
 export interface AdminAiUpdateAgentData {
   model_id?: number;
   name?: string;
+  /** The name readers see; `null` clears it, absent keeps it. */
+  display_name?: string | null;
   slug?: string;
   description?: string;
   system_prompt?: string;

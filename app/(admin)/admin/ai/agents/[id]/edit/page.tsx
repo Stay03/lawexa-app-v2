@@ -30,12 +30,19 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DISPLAY_NAME_HINT,
+  DISPLAY_NAME_LABEL,
+  displayNameField,
+  displayNameForSave,
+} from '@/components/admin/ai/agent-display-name';
 
 import {
   useAdminAiAgent,
@@ -55,6 +62,7 @@ const slugRegex = /^[a-z0-9-_]+$/;
 const agentEditSchema = z.object({
   model_id: z.number({ message: 'AI model is required' }).int().positive('AI model is required'),
   name: z.string().min(1, 'Agent name is required').max(255),
+  display_name: displayNameField.optional(),
   slug: z
     .string()
     .min(1, 'Slug is required')
@@ -106,6 +114,7 @@ function AgentEditForm({ id, agent }: AgentEditFormProps) {
     defaultValues: {
       model_id: agent.model_id,
       name: agent.name,
+      display_name: agent.display_name ?? '',
       slug: agent.slug,
       description: agent.description || '',
       system_prompt: agent.system_prompt || '',
@@ -117,7 +126,8 @@ function AgentEditForm({ id, agent }: AgentEditFormProps) {
   });
 
   const onSubmit = (formData: AgentEditFormData) => {
-    const submitData: AdminAiUpdateAgentData = { ...formData };
+    // An emptied "Name people see" is sent as null, which clears it.
+    const submitData: AdminAiUpdateAgentData = { ...formData, display_name: displayNameForSave(formData.display_name) };
 
     // Strip empty system_prompt (keep current if not changed)
     if (!submitData.system_prompt) {
@@ -245,6 +255,27 @@ function AgentEditForm({ id, agent }: AgentEditFormProps) {
                 )}
               />
             </div>
+
+            {/* Name people see */}
+            <FormField
+              control={form.control}
+              name="display_name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    {DISPLAY_NAME_LABEL}
+                    <span className="ml-1 text-xs text-muted-foreground font-normal">
+                      (optional)
+                    </span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder={agent.name} maxLength={255} {...field} value={field.value ?? ''} />
+                  </FormControl>
+                  <FormDescription>{DISPLAY_NAME_HINT}</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Description */}
             <FormField

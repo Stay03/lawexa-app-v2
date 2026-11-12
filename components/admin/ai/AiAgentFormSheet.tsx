@@ -30,11 +30,14 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import type { AdminAiCreateAgentData } from '@/types/admin-ai';
+import { DISPLAY_NAME_HINT, DISPLAY_NAME_LABEL, displayNameField, displayNameForSave } from './agent-display-name';
 
 import {
   useAdminAiModels,
@@ -52,6 +55,7 @@ const slugRegex = /^[a-z0-9-_]+$/;
 const createAgentSchema = z.object({
   model_id: z.number({ message: 'AI model is required' }).int().positive('AI model is required'),
   name: z.string().min(1, 'Agent name is required').max(255),
+  display_name: displayNameField.optional(),
   slug: z
     .string()
     .min(1, 'Slug is required')
@@ -107,6 +111,7 @@ export function AiAgentFormSheet({
     defaultValues: {
       model_id: undefined,
       name: '',
+      display_name: '',
       slug: '',
       description: '',
       system_prompt: '',
@@ -124,6 +129,7 @@ export function AiAgentFormSheet({
       form.reset({
         model_id: undefined,
         name: '',
+        display_name: '',
         slug: '',
         description: '',
         system_prompt: '',
@@ -148,14 +154,17 @@ export function AiAgentFormSheet({
   };
 
   const onSubmit = (data: CreateAgentFormData) => {
-    const submitData = { ...data };
+    // "Name people see" goes only when given; the agent's Name stands in otherwise.
+    const { display_name: displayName, ...rest } = data;
+    const shown = displayNameForSave(displayName);
+    const submitData: AdminAiCreateAgentData = { ...rest, ...(shown ? { display_name: shown } : {}) };
     // Strip empty description
     if (!submitData.description) {
       delete submitData.description;
     }
 
     createMutation.mutate(
-      submitData as { model_id: number; name: string; slug: string; system_prompt: string; description?: string; temperature?: number; max_response_tokens?: number; is_active?: boolean },
+      submitData,
       {
         onSuccess: (response) => {
           toast.success(response.message);
@@ -251,6 +260,27 @@ export function AiAgentFormSheet({
                         }
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Name people see */}
+              <FormField
+                control={form.control}
+                name="display_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {DISPLAY_NAME_LABEL}
+                      <span className="ml-1 text-xs text-muted-foreground font-normal">
+                        (optional)
+                      </span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Lawexa" maxLength={255} {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <FormDescription>{DISPLAY_NAME_HINT}</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
