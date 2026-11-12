@@ -749,7 +749,11 @@ export interface ApiMessage {
       | 'radar_report'
       | 'draft_edit'
       | 'background_job_result'
-      | 'background_job_unanswered';
+      | 'background_job_unanswered'
+      // In an agent conversation: the calling agent's message (sub-agents contract, 1.4).
+      | 'agent_message';
+    /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
+    from_agent?: { id: number; slug: string; name: string };
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).
@@ -966,6 +970,15 @@ export interface ConversationData {
    *  chat list sorts by it, newest first (Stay, 13 October 2026). Absent on an older
    *  server, where the rows show updated_at (activity.ts). */
   last_message_at?: string | null;
+  /**
+   * On an agent conversation (sub-agents contract, 3.2): the conversation that
+   * called it, and the chat at the top of the chain. Null on a chat; absent on
+   * a server without sub-agents.
+   */
+  parent_conversation?: { id: string; title: string } | null;
+  root_conversation?: { id: string; title: string } | null;
+  /** 0 for a chat; 1 to 3 for an agent conversation. */
+  agent_depth?: number;
 }
 
 export interface ConversationResponse {
