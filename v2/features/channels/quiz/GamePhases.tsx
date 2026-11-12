@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import {
   Ban,
@@ -28,9 +29,8 @@ import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
 import type { QuizShareStanding } from '@/lib/constants/quiz-share';
-import { LIVE_BOARD_RULES_NOTE, liveGameBoard } from './live-board';
+import { LIVE_BOARD_RULES_NOTE, liveGameBoard, liveRowNote } from './live-board';
 import { ShareResults } from './ShareResults';
-import { ResultCardShare } from './ResultCardShare';
 import type { ResultCardInput } from './result-card';
 import {
   AnswersInRail,
@@ -60,6 +60,13 @@ import {
 import type { AnswerStanding, FinalAnswerClose, LiveGame } from './use-game';
 import { CertificateOffer } from '@/v2/features/settings/certificates/CertificateOffer';
 import { ScoringBadge } from '@/v2/features/quiz/ScoringBadge';
+
+// The card brings Wrapped's poster fonts (Unbounded, Inter; lib/share-card/fonts.ts), whose preloads would
+// otherwise ride on every screen that can open a game. Loaded only when a finished game shows a player's card,
+// and on the device only: it draws on a canvas (techlead's review of 4a612ab6).
+const ResultCardShare = dynamic(() => import('./ResultCardShare').then((module) => module.ResultCardShare), {
+  ssr: false,
+});
 
 /**
  * GamePhases — the six things a live game can look like: lobby, count-in,
@@ -780,6 +787,9 @@ export function PodiumStage({
       <FrontBoard
         board={liveGameBoard(results, viewerUuid)}
         rising
+        finished
+        everyone
+        rowNote={liveRowNote(results)}
         rulesNote={LIVE_BOARD_RULES_NOTE}
       />
 

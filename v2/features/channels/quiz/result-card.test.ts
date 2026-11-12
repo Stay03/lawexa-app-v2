@@ -3,10 +3,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { SHARE_LAYOUT, personaBanner, posterLine, wrappedPoster } from '@/lib/wrapped/share-image';
+import { CAMPUS_NAMES, PERSONAS } from '@/lib/wrapped/copy';
+import {
+  CAPTION_SUB_WIDTH,
+  SHARE_LAYOUT,
+  captionSubFit,
+  captionSubRoom,
+  personaBanner,
+  posterLine,
+  wrappedPoster,
+} from '@/lib/wrapped/share-image';
 import type { QuizGameResults, QuizRankingRow } from '@/types/channel-quiz';
 import type { WrappedRecord } from '@/lib/wrapped/types';
-import { LIVE_BOARD_RULES_NOTE, liveGameBoard } from './live-board';
+import { LIVE_BOARD_RULES_NOTE, liveGameBoard, liveRowNote } from './live-board';
 import {
   cardName,
   pointsText,
@@ -100,6 +109,37 @@ test('a long quiz title fits the poster’s band in three lines at most, and eve
   }
 });
 
+// Inter 500: about 0.56 of the size per letter and 0.28 per space, a little wider than the face measures.
+const inter = (text: string, size: number) =>
+  [...text].reduce((width, ch) => width + (ch === ' ' ? 0.28 : 0.56) * size, 0);
+
+test('the polaroid’s second line stops short of the sticker: a size down, then "…"', () => {
+  // Wrapped: the six shorter campuses keep the 30 px they always had beside every persona's sticker; Port
+  // Harcourt (320 px in Inter at 30 px, measured) may step down so it no longer runs under a sticker.
+  for (const { name } of Object.values(PERSONAS)) {
+    const room = captionSubRoom(personaBanner(name, unbounded));
+    assert.ok(room > 0 && room <= CAPTION_SUB_WIDTH, `${name}: ${room}`);
+    for (const campus of Object.values(CAMPUS_NAMES)) {
+      const line = `${campus} Campus`;
+      const fit = captionSubFit(line, inter, room);
+      if (campus !== 'Port Harcourt') assert.deepEqual(fit, { size: 30, text: line }, `${name} · ${campus}`);
+      assert.ok(inter(fit.text, fit.size) <= room, `${name} · ${campus} fits`);
+    }
+  }
+  // The live quiz's stickers: a long university steps down, and past 22 px ends with "…", clear of the sticker.
+  for (const banner of ['Quiz Champion', 'Made the Podium', 'Took the Challenge']) {
+    const room = captionSubRoom(personaBanner(banner, unbounded));
+    const long = captionSubFit('Ahmadu Bello University, Zaria', inter, room);
+    assert.ok(long.size >= 22 && inter(long.text, long.size) <= room, `${banner}: ${JSON.stringify(long)}`);
+    const longer = captionSubFit('Ladoke Akintola University of Technology, Ogbomoso', inter, room);
+    assert.ok(longer.text.endsWith('…') && inter(longer.text, 22) <= room, `${banner}: ${longer.text}`);
+  }
+  // Never squeezed by fillText's maxWidth again, and measured against the sticker where it is drawn.
+  const poster = read('lib', 'wrapped', 'share-image.ts');
+  assert.doesNotMatch(poster, /fillText\(content\.caption\.sub/);
+  assert.match(poster, /captionSubFit\(content\.caption\.sub, measureBody, captionSubRoom\(banner\)\)/);
+});
+
 test('Wrapped draws the same poster it did, from its record', () => {
   const record = {
     vibe: { id: 1 },
@@ -178,8 +218,23 @@ test('the final scores are the quiz’s own leaderboard, its podium rising, the 
   assert.deepEqual(Object.keys(withSchool.entries[1].user), ['uuid', 'name', 'avatar_url']);
 
   const phases = quiz('GamePhases.tsx');
-  assert.match(phases, /<FrontBoard\s*board=\{liveGameBoard\(results, viewerUuid\)\}\s*rising\s*rulesNote=\{LIVE_BOARD_RULES_NOTE\}\s*\/>/);
+  assert.match(
+    phases,
+    /<FrontBoard\s*board=\{liveGameBoard\(results, viewerUuid\)\}\s*rising\s*finished\s*everyone\s*rowNote=\{liveRowNote\(results\)\}\s*rulesNote=\{LIVE_BOARD_RULES_NOTE\}\s*\/>/,
+  );
+  // Every player is on the board (Arthur's A): twelve players, all twelve entries; a late joiner's row says so.
+  const twelve = Array.from({ length: 12 }, (_, i) =>
+    i === 10 ? { ...row(11, 'late', 300), joined_at_question_index: 4 } : row(i + 1, `p${i + 1}`, 1000 - i * 50),
+  );
+  const big = { ...results, game: { ...results.game, player_count: 12 }, podium: twelve.slice(0, 3), ranking: twelve } as QuizGameResults;
+  assert.equal(liveGameBoard(big, 'p12').entries.length, 12);
+  const note = liveRowNote(big);
+  assert.deepEqual(liveGameBoard(big, null).entries.map(note).filter(Boolean), ['Joined late']);
+  assert.equal(note(liveGameBoard(big, null).entries[10]), 'Joined late');
   assert.match(phases, /<FrontBoardSkeleton \/>/);
+  // The card, and the poster fonts it imports, load only when a finished game shows it.
+  assert.match(phases, /const ResultCardShare = dynamic\(\(\) => import\('\.\/ResultCardShare'\)\.then\(\(module\) => module\.ResultCardShare\), \{\s*ssr: false,\s*\}\);/);
+  assert.doesNotMatch(phases, /import \{ ResultCardShare \}/);
   assert.doesNotMatch(phases, /PODIUM_HEIGHT|<RankRow/);
   assert.match(LIVE_BOARD_RULES_NOTE, /points in this game/);
   // The quiz's own page is unchanged: no rise, its own note.

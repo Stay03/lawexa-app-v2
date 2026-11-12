@@ -47,6 +47,19 @@ export function liveGameBoard(results: QuizGameResults, viewerUuid: string | nul
   };
 }
 
+/** What a late joiner's row says, so a lower score reads right (Arthur's choice A, 075b09bc). */
+export const JOINED_LATE = 'Joined late';
+
+/**
+ * The line under a player's name on the game's board: "Joined late" for a
+ * player who joined after the first question (the server's
+ * `joined_at_question_index`), nothing for everyone else.
+ */
+export function liveRowNote(results: QuizGameResults): (entry: QuizLeaderboardEntry) => string | null {
+  const late = new Set(results.ranking.filter((row) => row.joined_at_question_index !== null).map((row) => row.user.uuid));
+  return (entry) => (late.has(entry.user.uuid) ? JOINED_LATE : null);
+}
+
 /** The board's (i) for a game: one game's points, not a best of many attempts. */
 export const LIVE_BOARD_RULES_NOTE =
   'Ranked by points in this game. Right answers score more the faster they come.';

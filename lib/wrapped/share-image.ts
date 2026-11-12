@@ -198,6 +198,8 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
     return ctx.measureText(text).width;
   };
   const L = SHARE_LAYOUT;
+  // The sticker on the polaroid's corner, measured first: the caption's second line stops short of it.
+  const banner = personaBanner(content.banner, measureDisplay);
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
 
@@ -242,9 +244,14 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   ctx.font = body(40, 700);
   ctx.fillText(content.caption.name, cx, cy + 62, cw * 0.62);
   if (content.caption.sub) {
+    const measureBody: Measure = (text, size) => {
+      ctx.font = body(size, 500);
+      return ctx.measureText(text).width;
+    };
+    const sub = captionSubFit(content.caption.sub, measureBody, captionSubRoom(banner));
     ctx.fillStyle = WRAPPED_COLOURS.inkMuted;
-    ctx.font = body(30, 500);
-    ctx.fillText(content.caption.sub, cx, cy + 106, cw * 0.62);
+    ctx.font = body(sub.size, 500);
+    ctx.fillText(sub.text, cx, cy + 106);
   }
   ctx.restore();
 
@@ -298,7 +305,6 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   });
 
   // The persona, as a sticker on the polaroid's lower right corner.
-  const banner = personaBanner(content.banner, measureDisplay);
   ctx.save();
   ctx.translate(banner.cx, banner.cy);
   ctx.rotate((L.persona.rotationDeg * Math.PI) / 180);
@@ -316,6 +322,39 @@ export function drawPoster(canvas: HTMLCanvasElement, content: PosterContent, fo
   ctx.fillStyle = ink;
   ctx.font = body(34, 700);
   trackedText(ctx, content.link, L.link.x, L.link.y, 2, SHARE_WIDTH - L.link.x - PAD);
+}
+
+/** The caption's lines never run wider than this on the polaroid's white edge. */
+export const CAPTION_SUB_WIDTH = POLAROID.caption[2] * 0.62;
+
+/** The gap the caption's second line keeps before the sticker on the polaroid's corner. */
+const CAPTION_STICKER_GAP = 12;
+
+/**
+ * How wide the caption's second line may run: its usual width, or less when
+ * the sticker on the polaroid's corner (`banner`) starts sooner, so the line
+ * never runs under it (a university's name did; pictures of 4a612ab6). The
+ * sticker is measured where it is drawn; its slight turn is within the gap.
+ */
+export function captionSubRoom(banner: PersonaBanner): number {
+  const stickerLeft = banner.cx - banner.w / 2;
+  return Math.min(CAPTION_SUB_WIDTH, stickerLeft - POLAROID.caption[0] - CAPTION_STICKER_GAP);
+}
+
+/**
+ * The caption's second line (a campus, a university): 30 px when it fits the
+ * room, a size down to 22 px when it does not, and past that the line ends
+ * with "…". Never squeezed by fillText's maxWidth (a long university's name
+ * came out at two thirds of its width; techlead's review of 4a612ab6). Pure,
+ * so a test pins it.
+ */
+export function captionSubFit(text: string, measure: Measure, room: number = CAPTION_SUB_WIDTH): { size: number; text: string } {
+  for (let size = 30; size >= 22; size -= 2) {
+    if (measure(text, size) <= room) return { size, text };
+  }
+  let cut = text;
+  while (cut.length > 1 && measure(`${cut.trimEnd()}…`, 22) > room) cut = cut.slice(0, -1);
+  return { size: 22, text: `${cut.trimEnd()}…` };
 }
 
 /**

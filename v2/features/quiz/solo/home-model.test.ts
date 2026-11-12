@@ -147,10 +147,12 @@ test('the quiz page reads the board only for a listed quiz, and draws the top te
   // row reads like the others, from the server's viewer.user, and their
   // standing sits under it.
   assert.doesNotMatch(board, /#\{viewer\.rank\}|>Your place</);
-  assert.match(board, /const standing = viewer \? standingLine\(viewer\.players_behind, board\.player_count, viewer\.rank\) : null;/);
+  assert.match(board, /const standing = viewer \? standingLine\(viewer\.players_behind, board\.player_count, viewer\.rank, finished\) : null;/);
   assert.match(board, /const user = viewer\.user \?\? \{/);
   assert.match(board, /<YourRow viewer=\{viewer\} standing=\{standing\} \/>/);
-  assert.match(board, /standing=\{isYou\(entry\) \? standing : null\}/);
+  // The reader's line on their own row (after a row's own line, which the quiz's page never sets).
+  assert.match(board, /standing=\{noteFor\(entry\)\}/);
+  assert.match(board, /\[rowNote\?\.\(entry\) \?\? null, isYou\(entry\) \? standing : null\]\.filter\(Boolean\)\.join\('\. '\) \|\| null;/);
   // The standing is the row's third line, so the face stays centred (Stay, 28 October 2026).
   assert.match(board, /\{note \? <span className="mt-1 text-xs leading-snug font-medium text-foreground\/75">\{note\}<\/span> : null\}/);
   // Where each player studies: the podium's short form, the rows' whole name.
@@ -161,7 +163,12 @@ test('the quiz page reads the board only for a listed quiz, and draws the top te
   assert.match(board, /<span className="w-full px-1 text-\[10px\] leading-tight text-balance break-words text-muted-foreground sm:text-\[11px\]">/);
   // On the page itself, no card around it, the rows split by quiet dividers (Arthur, 28 October 2026).
   assert.match(board, /aria-labelledby="quiz-front-board"\s*className="flex flex-col gap-4"\s*>/);
-  assert.match(board, /<ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col divide-y divide-border\/70">/);
+  assert.match(board, /<ol aria-label=\{restLabel\} className="flex min-w-0 flex-col divide-y divide-border\/70">/);
+  // The quiz's page keeps the top ten and its own label; only a finished live game lists everyone.
+  assert.match(board, /everyone = false,/);
+  assert.match(board, /const shownTo = everyone \? board\.entries\.length : BOARD_TOP;/);
+  assert.match(board, /const restLabel = everyone \? `Places 4 to \$\{3 \+ rest\.length\}` : 'Places 4 to 10';/);
+  assert.match(front, /<FrontBoard board=\{board\} \/>/);
   // One column on a computer: the quiz, one action bar, then the board, all
   // on the column's edges (Stay, 28 October 2026).
   assert.match(front, /<article className="grid grid-cols-\[minmax\(0,1fr\)\] gap-6 [^"]*md:gap-8">/);
@@ -183,6 +190,22 @@ test('the standing line is the share of the OTHER players behind the reader, fro
   assert.equal(standingLine(1, 3, 2), 'You’re doing better than 50% of other players.');
   assert.equal(standingLine(1, 2, 1), 'You’re top of the board.');
   assert.equal(standingLine(0, 2, 2), 'Play again to climb the board.');
+});
+
+test('a finished live game reports the finish, never "play again" (techlead review of 4a612ab6)', () => {
+  // The only player.
+  assert.equal(standingLine(0, 1, 1, true), 'You were the only player.');
+  // Last of eight, and first of eight.
+  assert.equal(standingLine(0, 8, 8, true), 'You finished 8th of 8.');
+  assert.equal(standingLine(7, 8, 1, true), 'You finished 1st of 8.');
+  // A tie: 2nd with one player level (ranks 1, 2, 2, 4…), so one ahead and five behind of eight.
+  assert.equal(standingLine(5, 8, 2, true), 'You finished joint 2nd of 8.');
+  // Level at the top, and 11th, 22nd, 23rd as people say them.
+  assert.equal(standingLine(0, 2, 1, true), 'You finished joint 1st of 2.');
+  assert.equal(standingLine(13, 24, 11, true), 'You finished 11th of 24.');
+  assert.equal(standingLine(1, 23, 22, true), 'You finished 22nd of 23.');
+  // The quiz's own page keeps its wording.
+  assert.equal(standingLine(0, 16, 16), 'Play again to climb the board.');
 });
 
 test('the standing line gives no percentage when there is no one to compare with', () => {

@@ -55,28 +55,47 @@ const BOARD_TOP = 10;
  * with its animation"), fed from the game's ranking (`liveGameBoard`). A game
  * ends once, so its podium rises as it first shows (`rising`, the end-of-quiz
  * animation the results podium plays), and its (i) says how a game ranks
- * (`rulesNote`): one game's points, not a best of many attempts.
+ * (`rulesNote`): one game's points, not a best of many attempts. The game is
+ * over, so the reader's line reports their finish (`finished`), never "Play
+ * again to climb the board." Every player in the room is listed (`everyone`,
+ * Arthur's choice A, 075b09bc: "no player is missing"), and a row can carry a
+ * line of its own (`rowNote`: "Joined late", so a lower score makes sense).
+ * The quiz's page keeps its top ten.
  */
 export function FrontBoard({
   board,
   rising = false,
   rulesNote = BOARD_RULES_NOTE,
+  finished = false,
+  everyone = false,
+  rowNote,
 }: {
   board: QuizLeaderboard;
   /** The podium rises in as the board first shows (the end-of-quiz animation). */
   rising?: boolean;
   /** What the (i) says about how the board ranks. */
   rulesNote?: string;
+  /** A finished game: the reader's line says where they finished, not how to climb. */
+  finished?: boolean;
+  /** Every place under the podium, not only the top ten. */
+  everyone?: boolean;
+  /** A line under a player's name in the rows (and before the reader's own line on theirs). */
+  rowNote?: (entry: QuizLeaderboardEntry) => string | null;
 }) {
   const viewer = board.viewer;
   const isYou = (entry: QuizLeaderboardEntry) => isViewerEntry(viewer, entry);
+  const shownTo = everyone ? board.entries.length : BOARD_TOP;
   const podium = board.entries.slice(0, 3);
-  const rest = board.entries.slice(3, BOARD_TOP);
-  const youShown = board.entries.slice(0, BOARD_TOP).some(isYou);
+  const rest = board.entries.slice(3, shownTo);
+  const youShown = board.entries.slice(0, shownTo).some(isYou);
+  const restLabel = everyone ? `Places 4 to ${3 + rest.length}` : 'Places 4 to 10';
   const players = playersLabel(board.player_count);
   // "You're doing better than 20% of other players.": under the reader's own
   // row (Stay, 28 October 2026: the #13 banner repeated the place).
-  const standing = viewer ? standingLine(viewer.players_behind, board.player_count, viewer.rank) : null;
+  const standing = viewer ? standingLine(viewer.players_behind, board.player_count, viewer.rank, finished) : null;
+  // A row's own line ("Joined late"), then the reader's line on their row.
+  const noteFor = (entry: QuizLeaderboardEntry) =>
+    [rowNote?.(entry) ?? null, isYou(entry) ? standing : null].filter(Boolean).join('. ') || null;
 
   return (
     <section
@@ -118,13 +137,13 @@ export function FrontBoard({
           {rest.length > 0 || (viewer && !youShown) ? (
             <div className="flex min-w-0 flex-col gap-1">
               {rest.length > 0 ? (
-                <ol aria-label="Places 4 to 10" className="flex min-w-0 flex-col divide-y divide-border/70">
+                <ol aria-label={restLabel} className="flex min-w-0 flex-col divide-y divide-border/70">
                   {rest.map((entry) => (
                     <BoardRow
                       key={`${entry.rank}-${entry.user.uuid}`}
                       entry={entry}
                       you={isYou(entry)}
-                      standing={isYou(entry) ? standing : null}
+                      standing={noteFor(entry)}
                     />
                   ))}
                 </ol>

@@ -1,3 +1,4 @@
+import { ordinal } from '@/lib/wrapped/copy';
 import type { ChannelQuiz, QuizLeaderboard, QuizLeaderboardEntry, QuizListFilters } from '@/types/channel-quiz';
 
 /**
@@ -160,12 +161,20 @@ export function playerDetailLabel(user: { institution?: string; level?: string }
  * it when players tie; two players level at the top are both 1 of 2 and
  * neither beats anyone). No percentage when there is no one else, when the
  * count is missing (an older server) or when no one is behind them.
+ *
+ * A FINISHED LIVE GAME (`final`) cannot be played again, so it reports the
+ * finish instead (techlead's review of 4a612ab6): "You finished 8th of 8.",
+ * "You finished joint 2nd of 8." when someone is level, and "You were the only
+ * player." A tie is anyone neither ahead (rank − 1 of them, by the server's
+ * ranking) nor behind.
  */
 export function standingLine(
   playersBehind: number | null | undefined,
   playerCount: number,
   rank?: number,
+  final = false,
 ): string | null {
+  if (final) return finishLine(playersBehind, playerCount, rank);
   if (playerCount <= 1) return 'You’re the only player so far.';
   if (typeof playersBehind !== 'number' || !Number.isFinite(playersBehind)) return null;
   const others = playerCount - 1;
@@ -174,6 +183,15 @@ export function standingLine(
   // Never "better than 100%" while someone is level with or ahead of them.
   const share = Math.min(99, Math.round((playersBehind / others) * 100));
   return share > 0 ? `You’re doing better than ${share}% of other players.` : 'Play again to climb the board.';
+}
+
+/** A finished game's line for the reader: where they finished, of how many. */
+function finishLine(playersBehind: number | null | undefined, playerCount: number, rank?: number): string | null {
+  if (playerCount <= 1) return 'You were the only player.';
+  if (typeof rank !== 'number' || !Number.isFinite(rank) || rank < 1) return null;
+  const ahead = rank - 1;
+  const level = typeof playersBehind === 'number' ? playerCount - 1 - ahead - playersBehind : 0;
+  return `You finished ${level > 0 ? 'joint ' : ''}${ordinal(rank)} of ${playerCount}.`;
 }
 
 /**
