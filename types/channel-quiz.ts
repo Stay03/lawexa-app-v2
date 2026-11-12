@@ -693,11 +693,20 @@ export interface QuizListFilters {
                               Game shapes
 ******************************************************************************/
 
+/**
+ * A live game's player as the server sends them (Backend bc5f1b55): where
+ * they study and their level, by the solo board's one rule (the Law School
+ * campus for a Law School student, else the university), sent to a signed-in
+ * reader only and left out when empty. The game's realtime broadcast has no
+ * reader, so it never carries them.
+ */
+export type QuizGamePlayerUser = SlimUser & { institution?: string; level?: string };
+
 /** A row of the live leaderboard. In lobby every score is 0 and `rank` is
  *  provisional; ties rank by who reached the score first (server rule). */
 export interface QuizGamePlayer {
   rank: number;
-  user: SlimUser;
+  user: QuizGamePlayerUser;
   score: number;
   /** Non-null marks a late joiner: they play from the NEXT question after
    *  this index, so their answerable set is smaller than the question count. */
@@ -856,7 +865,8 @@ export interface QuizAnswerReceipt {
 
 export interface QuizRankingRow {
   rank: number;
-  user: SlimUser;
+  /** With where they study and their level, as a game's players (`QuizGamePlayerUser`). */
+  user: QuizGamePlayerUser;
   score: number;
   correct_count: number;
   answered_count: number;

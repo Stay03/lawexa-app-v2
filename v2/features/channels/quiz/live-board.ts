@@ -1,4 +1,4 @@
-import type { QuizGameResults, QuizLeaderboard, QuizLeaderboardEntry } from '@/types/channel-quiz';
+import type { QuizGameResults, QuizLeaderboard, QuizLeaderboardEntry, QuizRankingRow } from '@/types/channel-quiz';
 
 /**
  * A finished game's ranking in the shape of the quiz's own leaderboard, so
@@ -11,13 +11,21 @@ import type { QuizGameResults, QuizLeaderboard, QuizLeaderboardEntry } from '@/t
  * all), so the reader's own row is always one of the entries; `viewer` is
  * what the board needs to mark it and to say how they did. Points are the
  * game's score; there is no best of many attempts, so `achieved_at` is null.
- * Where a player studies is not in a game's results yet (Backend is adding
- * it); until then the board shows names alone, as it does for a visitor.
+ * Where a player studies and their level come by the solo board's own rule
+ * (Backend bc5f1b55), for a signed-in reader and only when given, so the
+ * board shows them exactly as it does on a quiz's page.
  */
 export function liveGameBoard(results: QuizGameResults, viewerUuid: string | null): QuizLeaderboard {
+  const toUser = (user: QuizRankingRow['user']): QuizLeaderboardEntry['user'] => ({
+    uuid: user.uuid,
+    name: user.name,
+    avatar_url: user.avatar_url,
+    ...(user.institution ? { institution: user.institution } : {}),
+    ...(user.level ? { level: user.level } : {}),
+  });
   const entries: QuizLeaderboardEntry[] = results.ranking.map((row) => ({
     rank: row.rank,
-    user: { uuid: row.user.uuid, name: row.user.name, avatar_url: row.user.avatar_url },
+    user: toUser(row.user),
     points: row.score,
     correct_count: row.correct_count,
     question_count: row.answerable_count,
@@ -33,7 +41,7 @@ export function liveGameBoard(results: QuizGameResults, viewerUuid: string | nul
           points: own.score,
           players_behind: results.ranking.filter((row) => row.score < own.score).length,
           achieved_at: null,
-          user: { uuid: own.user.uuid, name: own.user.name, avatar_url: own.user.avatar_url },
+          user: toUser(own.user),
         }
       : null,
   };

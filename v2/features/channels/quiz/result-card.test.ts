@@ -159,6 +159,21 @@ test('the final scores are the quiz’s own leaderboard, its podium rising, the 
   assert.equal(liveGameBoard(results, 'watcher').viewer, null);
   assert.equal(liveGameBoard(results, null).viewer, null);
 
+  // Where they study and their level, as the quiz page's board shows them, only when the server sent them.
+  const schooled = {
+    ...results,
+    ranking: [{ ...ranking[0], user: { ...ranking[0].user, institution: 'Nigerian Law School – Lagos Campus', level: '500 Level' } }, ...ranking.slice(1)],
+  };
+  const withSchool = liveGameBoard(schooled, 'me');
+  assert.deepEqual(withSchool.entries[0].user, {
+    uuid: 'a',
+    name: 'TEST DATA a',
+    avatar_url: null,
+    institution: 'Nigerian Law School – Lagos Campus',
+    level: '500 Level',
+  });
+  assert.deepEqual(Object.keys(withSchool.entries[1].user), ['uuid', 'name', 'avatar_url']);
+
   const phases = quiz('GamePhases.tsx');
   assert.match(phases, /<FrontBoard\s*board=\{liveGameBoard\(results, viewerUuid\)\}\s*rising\s*rulesNote=\{LIVE_BOARD_RULES_NOTE\}\s*\/>/);
   assert.match(phases, /<FrontBoardSkeleton \/>/);
