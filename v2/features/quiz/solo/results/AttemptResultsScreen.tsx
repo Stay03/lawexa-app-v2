@@ -235,8 +235,10 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
           viewerName={viewerName}
         />
 
-        {/* The certificate this quiz carries, when the finish answer named one:
-            the name prompt sits right under the score, where the reader is. */}
+        {/* The certificate this quiz carries, read from the attempt itself (the
+            finish answer, then the owner's read of the finished attempt, so it
+            survives a refetch and a reload): the name prompt sits right under
+            the score, where the reader is. */}
         {attempt.certificate ? (
           <div className="mt-6">
             <CertificateOffer raw={attempt.certificate} />

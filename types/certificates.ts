@@ -159,3 +159,10 @@ export interface PendingCertificate {
   suggested_name: string;
   created_at: string;
 }
+
+/** `PUT /admin/channel-quizzes/{uuid}/certificate` answers with the quiz's link (WOZ 549e353e). */
+export interface QuizCertificateLink {
+  uuid: string;
+  title: string;
+  certificate_programme: { uuid: string; name: string } | null;
+}

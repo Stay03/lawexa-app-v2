@@ -292,6 +292,11 @@ test('a quiz offer is read field by field, and anything unusable is no offer', (
   assert.equal(readCertificateOffer({ state: 'needs_name', pending_uuid: 'p', programme: { name: 'x' } }), null);
   assert.equal(readCertificateOffer(null), null);
   assert.equal(
+    readCertificateOffer({ state: 'needs_name', pending_uuid: 'p', programme, suggested_name: null })?.suggested_name,
+    '',
+    'an account with no name leaves the field empty to fill',
+  );
+  assert.equal(
     readCertificateOffer({ state: 'needs_name', pending_uuid: 'p', programme: { ...programme, partner_name: '' } })?.programme.partner_name,
     null,
   );
