@@ -9,7 +9,15 @@ import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { EngineMessage } from '@/v2/runtime/chat-engine/types';
 import { groupMessages, turnEndPlaces } from '../message-groups';
 import { savedIdOf } from '../reply-target';
-import { AGENT_ROW_WORDS, agentInitials, agentRow, agentRowState, agentRowsByMessage, agentsWorking } from './agent-roster';
+import {
+  AGENT_ROW_WORDS,
+  agentInitials,
+  agentRow,
+  agentRowState,
+  agentRowsByMessage,
+  agentsWorking,
+  liveWindowText,
+} from './agent-roster';
 
 /* C1 (Stay, 12 November 2026, 17:47Z): each agent Lawexa messaged is a row
  * after the turn that called it, for every reader of the chat, with its
@@ -151,6 +159,16 @@ test('two agents at once are two rows after the turn that called them, in the li
       ['Expert', 'writing', 'exec-3', false],
     ],
   );
+});
+
+test('the live window shows the words, never a tool call the model writes as text', () => {
+  // The C1 stack pictures (12 November 2026): Expert's window showed "<tool" as its next step began.
+  assert.equal(liveWindowText('I will look around this Space first. <tool'), 'I will look around this Space first.');
+  assert.equal(liveWindowText('Looking now. <tool_call>{"name": "list_space"}</tool_call> and more'), 'Looking now.');
+  assert.equal(liveWindowText('**Issue 1.** The notice <'), 'Issue 1. The notice');
+  // A comparison sign in the words stays.
+  assert.equal(liveWindowText('Rent < 2 years is periodic'), 'Rent < 2 years is periodic');
+  assert.match(here('agents', 'AgentRoster.tsx'), /const text = live\.text \? liveWindowText\(live\.text\) : '';/);
 });
 
 test('the list is read again on a beat only while an agent works, for a reader who did not ask', () => {

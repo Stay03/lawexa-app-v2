@@ -115,3 +115,17 @@ export function agentRowsByMessage(entries: readonly AgentConversation[]): Reado
 export function agentsWorking(entries: readonly Pick<AgentConversation, 'latest_call'>[]): boolean {
   return entries.some((entry) => entry.latest_call?.state === 'working');
 }
+
+/**
+ * The live window's words: the streaming answer as plain text, without a
+ * tool call the model writes out as text. On the local stack Expert's window
+ * showed "<tool" as its next step began (C1 pictures, 12 November 2026); the
+ * step shows on its own line, and the server resets the text when it runs.
+ * Everything from a tool call's opening tag on goes, and so does a tag still
+ * being written at the end ("<to"), which may be one.
+ */
+export function liveWindowText(text: string): string {
+  const call = text.search(/<tool_call\b|<function_calls?\b|<invoke\b/);
+  const before = call === -1 ? text : text.slice(0, call);
+  return plainPreview(before.replace(/<[A-Za-z_]*$/, ''));
+}

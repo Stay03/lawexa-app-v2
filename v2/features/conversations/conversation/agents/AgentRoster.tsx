@@ -9,10 +9,9 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { conversationsQueries } from '../../queries';
-import { plainPreview } from '../../plain-preview';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { formatToolMessage } from '../tools/ToolStepItem';
-import { AGENT_ROW_WORDS, agentInitials, type AgentRow, type AgentRowState } from './agent-roster';
+import { AGENT_ROW_WORDS, agentInitials, liveWindowText, type AgentRow, type AgentRowState } from './agent-roster';
 import { useAgentRowsOf } from './context';
 import { agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
@@ -190,7 +189,7 @@ const LINE_EM = 1.625;
  */
 function LiveWindow({ executionId, onEnd }: { executionId: string; onEnd: () => void }) {
   const live = useAgentStream(executionId, onEnd);
-  const text = live.text ? plainPreview(live.text) : '';
+  const text = live.text ? liveWindowText(live.text) : '';
   if (!text) {
     if (!live.step) return null;
     const words = formatToolMessage(live.step.name, live.step.parameters, false);
