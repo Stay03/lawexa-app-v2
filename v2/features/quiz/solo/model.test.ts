@@ -106,7 +106,7 @@ const trueFalse = (uuid: string, position: number, firstId: number) => ({
 function inProgress(): QuizAttempt {
   return {
     uuid: 'a78ef286',
-    quiz: { uuid: 'f4a3095a', title: 'Land Law Problems', description: 'Two facts patterns', creator: { uuid: '3f468fc4', name: 'Ada Author', avatar_url: null } },
+    quiz: { uuid: 'f4a3095a', title: 'Land Law Problems', description: 'Two facts patterns', creator: { uuid: '3f468fc4', name: 'Ada Author', avatar_url: null }, is_listed: false },
     reveal_mode: 'each',
     question_count: 4,
     answered_count: 2,

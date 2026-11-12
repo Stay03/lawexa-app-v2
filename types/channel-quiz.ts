@@ -362,6 +362,10 @@ export interface ChannelQuiz {
   is_ai_generated: boolean;
   /** Who may find it — see {@link ChannelQuizVisibility}. Owner-editable. */
   visibility: ChannelQuizVisibility;
+  /** Whether the quiz has a leaderboard (Backend 8a507baa): public AND a
+   *  verified author AND at least one question. The board answers 200 exactly
+   *  when this is true and 404 when it is false. */
+  is_listed: boolean;
   /** The server's own answer to "did this viewer write it?" — the ONLY honest
    *  source for the owner-only affordances, since authorship can also be read
    *  from `creator.uuid` but governance (channel admin, space governor,
@@ -513,6 +517,8 @@ export interface QuizAttemptQuiz {
   title: string;
   description: string | null;
   creator: QuizAuthor | null;
+  /** Whether the quiz has a leaderboard; see `ChannelQuiz.is_listed`. */
+  is_listed: boolean;
 }
 
 /**

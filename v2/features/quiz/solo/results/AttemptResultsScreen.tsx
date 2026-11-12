@@ -32,7 +32,7 @@ import { FinishPosition } from './FinishPosition';
 import { ResultsActions } from './ResultsActions';
 import { AttemptResultsSkeleton, RESULTS_COLUMN } from './states';
 import { PodiumStage, podiumAlreadySeen, rememberPodiumSeen } from './PodiumStage';
-import { glideTop, opensOnPodium, SCORE_GLIDE_MS } from './position-model';
+import { glideTop, opensOnPodium, quizHasBoard, resultsWaitForBoard, SCORE_GLIDE_MS } from './position-model';
 import '../solo-quiz.css';
 
 /**
@@ -106,7 +106,12 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   // For the place block, a detail that fails to load reads as not public: it
   // then leaves the space as it was, never a skeleton that stays.
   const shareable = visibility === 'link' || visibility === 'public';
-  const publicQuiz = detailQuery.isError ? false : visibility === null ? null : visibility === 'public';
+  // Whether the quiz has a board at all: the server's `is_listed` (an unlisted
+  // public quiz answers its board with 404).
+  const publicQuiz = quizHasBoard({
+    attemptListed: attempt?.quiz.is_listed,
+    quizListed: detailQuery.data?.data.is_listed,
+  });
 
   // The board decides whether the results open on the podium; the place
   // block below reads the same entry, so this costs no second read.
@@ -192,10 +197,11 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
   }
 
   // A top-three finish opens on the podium, full screen, before the score
-  // (Arthur, 28 October 2026). Until the board says whether it is one, the
-  // results keep their skeleton, so nothing swaps under the reader. A board
-  // that fails to load goes straight to the results.
-  if (!podiumDone && (publicQuiz === null || (publicQuiz && boardQuery.isPending))) {
+  // (Arthur, 28 October 2026). Until the board's first answer says whether it
+  // is one, the results keep their skeleton, so nothing swaps under the
+  // reader. A board that fails to load goes straight to the results, and stays
+  // there through any later refetch (`resultsWaitForBoard`).
+  if (resultsWaitForBoard({ podiumDone, hasBoard: publicQuiz, boardSettled: boardQuery.isFetched })) {
     return (
       <div className={RESULTS_COLUMN}>
         <AttemptResultsSkeleton />

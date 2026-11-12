@@ -132,9 +132,11 @@ test('an Explore card is one link: the tile and title, quiet tags, the person to
   assert.doesNotMatch(card, /viewer_rank\s*\?\?|rankLabel|text-\[var\(--solo-gold-text\)\]/);
 });
 
-test('the quiz page reads the board only for a public quiz, and draws the top ten', () => {
+test('the quiz page reads the board only for a listed quiz, and draws the top ten', () => {
   const front = read('front', 'QuizFrontScreen.tsx');
-  assert.match(front, /enabled: quiz\?\.visibility === 'public',/);
+  // Listed (Backend 8a507baa), from the flag alone.
+  assert.match(front, /const hasBoard = quiz\?\.is_listed === true;/);
+  assert.match(front, /enabled: hasBoard,/);
   assert.match(front, /<FrontBoard board=\{board\} \/>/);
   // The podium and the top ten, the reader's row marked and kept when further down.
   const board = read('board', 'FrontBoard.tsx');

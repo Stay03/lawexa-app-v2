@@ -136,11 +136,14 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const query = preview ? previewQuery : detailQuery;
   const quiz = query.data?.data ?? null;
 
+  // Only a listed quiz has a board (Backend 8a507baa); an unlisted public quiz
+  // answers it with 404, so it is not asked.
+  const hasBoard = quiz?.is_listed === true;
   const boardQuery = useQuery({
     ...soloQuizQueries.leaderboard(quizUuid, { viewerId }),
-    enabled: quiz?.visibility === 'public',
+    enabled: hasBoard,
   });
-  const board = quiz?.visibility === 'public' ? (boardQuery.data?.data ?? null) : null;
+  const board = hasBoard ? (boardQuery.data?.data ?? null) : null;
 
   const [revealMode, setRevealMode] = useState<QuizRevealMode>(DEFAULT_REVEAL_MODE);
   const startAttempt = useStartAttempt(quizUuid, viewerId);

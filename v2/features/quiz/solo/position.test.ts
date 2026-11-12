@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import type { QuizLeaderboard } from '@/types/channel-quiz';
 import { isViewerEntry } from './home-model';
 import {
+  quizHasBoard,
+  resultsWaitForBoard,
   finishPosition,
   glideTop,
   opensOnPodium,
@@ -139,14 +141,17 @@ test('the results screen puts the place between the answers and the button bar, 
   assert.match(block, /<Podium entries=\{entries\} isYou=\{isYou\} rising=\{playing\} \/>/);
 });
 
-test('only a public quiz asks for its board, so a link-only or private finish sends no request', () => {
+test('only a quiz with a board asks for it, so an unlisted, link-only or private finish sends no request', () => {
   const position = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx'), 'utf8').replace(/\r\n/g, '\n');
   assert.match(position, /useQuery\(\{\s*\.\.\.soloQuizQueries\.leaderboard\(quizUuid, \{ viewerId \}\),\s*enabled: publicQuiz === true,\s*\}\);/);
   assert.match(position, /if \(publicQuiz === false\) return null;/);
-  assert.match(position, /if \(publicQuiz === null \|\| boardQuery\.isPending\) return <FinishPositionSkeleton \/>;/);
-  // A quiz detail that fails to load never leaves the skeleton up.
+  // The first answer only, so a failed board's refetch cannot bring the skeleton back.
+  assert.match(position, /if \(publicQuiz === null \|\| !boardQuery\.isFetched\) return <FinishPositionSkeleton \/>;/);
+  // Whether there is a board comes from the server's is_listed (attempt, then detail) alone.
   const screen = readFileSync(join(process.cwd(), 'v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx'), 'utf8').replace(/\r\n/g, '\n');
-  assert.match(screen, /const publicQuiz = detailQuery\.isError \? false : visibility === null \? null : visibility === 'public';/);
+  assert.match(screen, /const publicQuiz = quizHasBoard\(\{\s*attemptListed: attempt\?\.quiz\.is_listed,\s*quizListed: detailQuery\.data\?\.data\.is_listed,\s*\}\);/);
+  // No visibility rule beside the flag.
+  assert.doesNotMatch(screen, /quizHasBoard\(\{[^}]*visibility/);
   assert.match(screen, /publicQuiz=\{publicQuiz\}/);
   // The screen's own read of the board (for the podium) is public-only too.
   assert.match(screen, /useQuery\(\{\s*\.\.\.soloQuizQueries\.leaderboard\(quizUuid \?\? '', \{ viewerId \}\),\s*enabled: quizUuid !== null && publicQuiz === true,\s*\}\);/);
@@ -157,7 +162,7 @@ test('the podium plays first, full screen over the results, for a top-three fini
   // Reduced motion, or a podium already seen on this attempt: straight to the results.
   assert.match(screen, /useState\(\(\) => prefersReducedMotion\(\) \|\| podiumAlreadySeen\(attemptUuid\)\)/);
   // Until the board says, the skeleton stays, so nothing swaps under the reader.
-  assert.match(screen, /if \(!podiumDone && \(publicQuiz === null \|\| \(publicQuiz && boardQuery\.isPending\)\)\) \{\s*return \(\s*<div className=\{RESULTS_COLUMN\}>\s*<AttemptResultsSkeleton \/>/);
+  assert.match(screen, /if \(resultsWaitForBoard\(\{ podiumDone, hasBoard: publicQuiz, boardSettled: boardQuery\.isFetched \}\)\) \{\s*return \(\s*<div className=\{RESULTS_COLUMN\}>\s*<AttemptResultsSkeleton \/>/);
   assert.match(screen, /const podiumFirst = !podiumDone && board !== null && opensOnPodium\(board, score\.points\);/);
   // One layer over the results, which sit still and out of reach underneath.
   assert.match(screen, /\{podiumFirst && board \? \(\s*<PodiumStage/);
@@ -309,4 +314,26 @@ test('the landing scrolls only when the small podium is out of view: a phone yes
   assert.equal(podiumInView({ top: -250, bottom: 60, height: 310 }, 700), false);
   // Not laid out.
   assert.equal(podiumInView({ top: 0, bottom: 0, height: 0 }, 700), false);
+});
+
+test('a quiz has a board exactly when the server lists it', () => {
+  assert.equal(quizHasBoard({ attemptListed: false }), false, 'an unlisted public quiz has no board');
+  assert.equal(quizHasBoard({ attemptListed: true }), true);
+  assert.equal(quizHasBoard({ quizListed: false }), false, 'the detail flag when the attempt has not loaded');
+  assert.equal(quizHasBoard({ quizListed: true }), true);
+  assert.equal(quizHasBoard({ attemptListed: true, quizListed: false }), true, 'the attempt answers first');
+  assert.equal(quizHasBoard({}), null, 'not known until one of them loads');
+});
+
+test('the results wait only for the board\'s first answer, so a failed board cannot loop', () => {
+  // Listed: wait until the first answer, then never again, even while a
+  // refetch of a failed board puts it back to pending.
+  assert.equal(resultsWaitForBoard({ podiumDone: false, hasBoard: true, boardSettled: false }), true);
+  assert.equal(resultsWaitForBoard({ podiumDone: false, hasBoard: true, boardSettled: true }), false);
+  // Unlisted: nothing to wait for.
+  assert.equal(resultsWaitForBoard({ podiumDone: false, hasBoard: false, boardSettled: false }), false);
+  // Unknown yet: wait.
+  assert.equal(resultsWaitForBoard({ podiumDone: false, hasBoard: null, boardSettled: false }), true);
+  // The podium already played: never wait.
+  assert.equal(resultsWaitForBoard({ podiumDone: true, hasBoard: null, boardSettled: false }), false);
 });

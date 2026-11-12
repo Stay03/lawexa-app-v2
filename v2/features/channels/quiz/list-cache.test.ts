@@ -14,6 +14,7 @@ function quiz(uuid: string, visibility: ChannelQuiz['visibility'] = 'shared'): C
     uuid,
     channel_uuid: null,
     channel_deleted: false,
+    is_listed: false,
     title: `Quiz ${uuid}`,
     description: null,
     settings: { show_leaderboard: true, allow_late_join: true },

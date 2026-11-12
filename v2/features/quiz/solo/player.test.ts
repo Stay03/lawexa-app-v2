@@ -39,7 +39,7 @@ const question = (over: Partial<QuizAttemptQuestion> = {}): QuizAttemptQuestion 
 
 const attempt = (questions: QuizAttemptQuestion[]): QuizAttempt => ({
   uuid: 'a1',
-  quiz: { uuid: 'z1', title: 'Contract Drill', description: null, creator: null },
+  quiz: { uuid: 'z1', title: 'Contract Drill', description: null, creator: null, is_listed: false },
   reveal_mode: 'each',
   question_count: questions.length,
   answered_count: questions.filter((entry) => entry.answered).length,

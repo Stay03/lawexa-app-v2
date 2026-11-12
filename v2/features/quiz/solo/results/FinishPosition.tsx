@@ -49,7 +49,8 @@ export function FinishPosition({
   quizUuid: string;
   /** This run's points, to tell a new place from an older best. */
   runPoints: number;
-  /** Whether the quiz is on the public list; `null` while its detail loads. */
+  /** Whether the quiz has a board (`quizHasBoard`): its `is_listed`, or the old
+   *  public rule on a server without it; `null` while that is not known. */
   publicQuiz: boolean | null;
   viewerId: number | null;
   /** The full-screen podium has played (or is playing) for this attempt: the small one stands still. */
@@ -67,7 +68,9 @@ export function FinishPosition({
   });
 
   if (publicQuiz === false) return null;
-  if (publicQuiz === null || boardQuery.isPending) return <FinishPositionSkeleton />;
+  // The first answer only: a refetch of a board that failed has no data and
+  // TanStack puts it back to pending, which must not bring the skeleton back.
+  if (publicQuiz === null || !boardQuery.isFetched) return <FinishPositionSkeleton />;
   if (boardQuery.isError || !boardQuery.data) return null;
 
   return (

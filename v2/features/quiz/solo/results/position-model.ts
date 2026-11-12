@@ -115,3 +115,33 @@ export function podiumInView(box: { top: number; bottom: number; height: number 
   const shown = Math.min(box.bottom, barTop) - Math.max(box.top, 0);
   return shown / box.height >= 0.6;
 }
+
+/**
+ * DOES THIS QUIZ HAVE A BOARD? `true`, `false`, or `null` while it is not yet
+ * known. The server's `is_listed` (Backend 8a507baa) is the whole answer: the
+ * board read succeeds exactly when it is true, so a quiz without one is never
+ * asked for it. The attempt carries it on its quiz and answers first; the quiz
+ * detail carries it too.
+ */
+export function quizHasBoard(input: { attemptListed?: boolean; quizListed?: boolean }): boolean | null {
+  return input.attemptListed ?? input.quizListed ?? null;
+}
+
+/**
+ * WHETHER THE RESULTS STILL WAIT FOR THE BOARD, before deciding whether to
+ * open on the podium. They wait only for the board's FIRST answer, success or
+ * failure (`boardSettled`, TanStack's `isFetched`), never for `isPending`: a
+ * refetch of a board that failed has no data, and TanStack puts such a query
+ * back to `pending`, so waiting on `isPending` sent a failed board round a loop
+ * of skeleton, results, refetch, skeleton (results stuck on live, 12 November
+ * 2026).
+ */
+export function resultsWaitForBoard(input: {
+  podiumDone: boolean;
+  hasBoard: boolean | null;
+  boardSettled: boolean;
+}): boolean {
+  if (input.podiumDone) return false;
+  if (input.hasBoard === null) return true;
+  return input.hasBoard && !input.boardSettled;
+}
