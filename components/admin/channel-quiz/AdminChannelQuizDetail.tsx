@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatSessionDate } from '@/lib/utils/quiz-format';
 import { useAdminChannelQuiz } from '@/lib/hooks/useAdminChannelQuizzes';
 import type { AdminChannelQuizQuestionStat } from '@/types/admin-channel-quizzes';
+import { QuizCertificateCard } from '@/components/admin/certificates/QuizCertificateCard';
 import { AdminChannelQuizError, useBreadcrumbLabel } from './AdminChannelQuizStates';
 import { quizSetting } from './AdminChannelQuizzesTable';
 import { EXPLORE_BASE, percentLabel, playsForQuizHref } from './model';
@@ -89,6 +90,8 @@ export function AdminChannelQuizDetail({ uuid }: { uuid: string }) {
           </dl>
         </CardContent>
       </Card>
+
+      <QuizCertificateCard key={quiz.certificate_programme?.uuid ?? 'none'} quizUuid={quiz.uuid} current={quiz.certificate_programme} />
 
       <Card>
         <CardHeader>

@@ -251,3 +251,15 @@ test('joining and role bells read the server title, else their own, and open the
     assert.equal(titled.title, 'Ada joined Bar Finals', type);
   }
 });
+
+test('a certificate name reminder opens the certificates page, with or without its own link', () => {
+  const bare = presentNotification(row({ type: 'certificate_name_needed', title: '', action_url: null }), ORIGIN);
+  assert.equal(bare.title, 'Confirm the name for your certificate');
+  assert.deepEqual(bare.destination, { kind: 'internal', href: '/settings/certificates' });
+
+  const classNamed = presentNotification(row({ type: 'CertificateNameNeededNotification', action_url: null }), ORIGIN);
+  assert.deepEqual(classNamed.destination, { kind: 'internal', href: '/settings/certificates' }, 'the class-named type too');
+
+  const linked = presentNotification(row({ type: 'certificate_name_needed', action_url: '/settings/certificates' }), ORIGIN);
+  assert.deepEqual(linked.destination, { kind: 'internal', href: '/settings/certificates' });
+});

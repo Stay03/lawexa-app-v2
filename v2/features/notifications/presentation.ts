@@ -92,6 +92,10 @@ const NO_DESTINATION: NotificationDestination = { kind: 'none' };
 /** Where a radar report with no link of its own opens. */
 const RADAR_FALLBACK: NotificationDestination = { kind: 'internal', href: '/radars' };
 
+/** Where a certificate notification opens when it carries no link (certificates part 2). */
+const CERTIFICATES_FALLBACK: NotificationDestination = { kind: 'internal', href: '/settings/certificates' };
+const CERTIFICATE_TYPES = new Set(['certificate_name_needed', 'certificate_issued']);
+
 /**
  * This app's own origin, from the one place the app states its address. Null
  * only for a malformed `NEXT_PUBLIC_APP_URL`, where no absolute link can be
@@ -122,6 +126,9 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   space_invite: 'Space invitation',
   organization_invite: 'Organization invitation',
   channel_quiz_live: 'A quiz is live',
+  // Certificates (WOZ 111315aa): sent ten minutes after a quiz ends when the
+  // printed name is still unconfirmed.
+  certificate_name_needed: 'Confirm the name for your certificate',
   radar_report: 'A radar report is ready',
   // A space Radar's report (plan 6.3). The server sends its own title ("New
   // Radar report in {space}: {title}"); this is for a row that comes without one.
@@ -354,6 +361,10 @@ export function presentNotification(
       UNLABELLED_TITLE,
     preview: trimmedOrNull(notification.message),
     destination:
-      destination.kind === 'none' && mark === 'radar' ? RADAR_FALLBACK : destination,
+      destination.kind === 'none' && mark === 'radar'
+        ? RADAR_FALLBACK
+        : destination.kind === 'none' && CERTIFICATE_TYPES.has(typeToken)
+          ? CERTIFICATES_FALLBACK
+          : destination,
   };
 }

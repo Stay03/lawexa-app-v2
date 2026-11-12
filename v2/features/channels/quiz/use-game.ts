@@ -596,6 +596,21 @@ export function useLiveGame({
   }, [ended, channelUuid, queryClient]);
 
   /**
+   * THE CERTIFICATE IS PER VIEWER, AND THE END OF A GAME IS A BROADCAST.
+   * `quiz.game.finished` reaches everyone alike, so it cannot say whether THIS
+   * player now has a certificate to name. The game's own state can (WOZ
+   * 111315aa): one authoritative read once the game has finished brings its
+   * `certificate`. Once, on the way out, like the read above.
+   */
+  const finished = phase === 'finished';
+  useEffect(() => {
+    if (!finished || !gameUuid) return;
+    void queryClient.invalidateQueries({
+      queryKey: channelQuizQueries.gameState({ gameUuid, viewerId }).queryKey,
+    });
+  }, [finished, gameUuid, viewerId, queryClient]);
+
+  /**
    * WHAT THE SERVER SAYS THIS READER DID with the question on screen.
    *
    * Two sources of truth, in order of authority: a state read that stamped

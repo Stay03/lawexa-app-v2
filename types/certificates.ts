@@ -68,6 +68,8 @@ export interface CertificateProgramme {
   is_active: boolean;
   issued_count: number;
   template_name?: string | null;
+  /** Emails held for a later day by the daily certificate-email budget. */
+  emails_waiting?: number;
 }
 
 export interface CertificateProgrammePayload {
@@ -134,4 +136,26 @@ export interface CertificateVerification {
 export interface IssueCertificatesPayload {
   user_uuids: string[];
   score?: number | null;
+}
+
+/**
+ * What a finished quiz says about this person's certificate (part 2, shapes
+ * agreed 111315aa). Solo: in the finish response. Live: in `GET
+ * /quiz-games/{uuid}` once the game has finished. `null` when the quiz carries
+ * no certificate, or this person cannot have one (a guest).
+ */
+export interface CertificateOffer {
+  state: 'needs_name' | 'issued';
+  pending_uuid?: string;
+  programme: CertificateProgrammeSummary;
+  suggested_name: string;
+  number?: string;
+}
+
+/** `GET /api/certificates/pending`: a certificate waiting for its printed name. */
+export interface PendingCertificate {
+  uuid: string;
+  programme: CertificateProgrammeSummary;
+  suggested_name: string;
+  created_at: string;
 }

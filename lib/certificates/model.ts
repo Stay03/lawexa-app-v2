@@ -4,8 +4,11 @@ import {
   CERTIFICATE_FILL_INS,
   type CertificateColors,
   type CertificateVerification,
+  type CertificateOffer,
+  type CertificateProgrammeSummary,
   type IssueCertificatesResult,
   type IssuedCertificate,
+  type PendingCertificate,
 } from '@/types/certificates';
 
 /**
@@ -351,4 +354,66 @@ export function issueSummary(result: IssueCertificatesResult): string {
     parts.push(`${result.skipped.length} skipped: ${reasons.join('; ')}.`);
   }
   return parts.join(' ');
+}
+
+/** The printed name's limits (agreed 111315aa): trimmed, 2 to 120 characters. */
+export const PRINTED_NAME_MIN = 2;
+export const PRINTED_NAME_MAX = 120;
+
+/** Why a printed name cannot be saved, or `null` when it can. */
+export function printedNameProblem(raw: string): string | null {
+  const name = raw.trim().replace(/\s+/g, ' ');
+  if (name.length < PRINTED_NAME_MIN) return 'Write your full name as it should appear on the certificate.';
+  if (name.length > PRINTED_NAME_MAX) return `Keep the name to ${PRINTED_NAME_MAX} characters or fewer.`;
+  return null;
+}
+
+/** The name as it is sent: trimmed, with runs of spaces closed up. */
+export function cleanPrintedName(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ');
+}
+
+function readProgrammeSummary(raw: unknown): CertificateProgrammeSummary | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const { name, partner_name, event_date } = raw as Record<string, unknown>;
+  if (typeof name !== 'string' || typeof event_date !== 'string') return null;
+  return { name, partner_name: typeof partner_name === 'string' && partner_name !== '' ? partner_name : null, event_date };
+}
+
+/**
+ * A finished quiz's certificate offer, proved field by field: anything that is
+ * not a usable offer reads as `null`, so the end screen simply shows no card.
+ * `needs_name` needs a pending uuid to confirm against; `issued` needs a number.
+ */
+export function readCertificateOffer(raw: unknown): CertificateOffer | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const record = raw as Record<string, unknown>;
+  const programme = readProgrammeSummary(record.programme);
+  if (!programme) return null;
+  const suggested = typeof record.suggested_name === 'string' ? record.suggested_name : '';
+  if (record.state === 'needs_name' && typeof record.pending_uuid === 'string' && record.pending_uuid !== '') {
+    return { state: 'needs_name', pending_uuid: record.pending_uuid, programme, suggested_name: suggested };
+  }
+  if (record.state === 'issued' && typeof record.number === 'string' && record.number !== '') {
+    return { state: 'issued', number: record.number, programme, suggested_name: suggested };
+  }
+  return null;
+}
+
+/** The pending list, keeping only rows that can be confirmed. */
+export function readPendingCertificates(raw: unknown): PendingCertificate[] {
+  return listItems<unknown>(raw).flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null) return [];
+    const record = entry as Record<string, unknown>;
+    const programme = readProgrammeSummary(record.programme);
+    if (typeof record.uuid !== 'string' || !programme) return [];
+    return [
+      {
+        uuid: record.uuid,
+        programme,
+        suggested_name: typeof record.suggested_name === 'string' ? record.suggested_name : '',
+        created_at: typeof record.created_at === 'string' ? record.created_at : '',
+      },
+    ];
+  });
 }

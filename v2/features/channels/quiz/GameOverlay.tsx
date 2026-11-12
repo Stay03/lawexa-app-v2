@@ -428,6 +428,7 @@ function GameBody({
           gameUuid={gameUuid}
           viewerId={viewerId}
           viewerUuid={viewerUuid}
+          certificate={game.state.certificate}
         />
       );
   }

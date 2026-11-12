@@ -73,6 +73,8 @@ export interface AdminChannelQuizAttemptDetail extends AdminChannelQuizAttempt {
 /** One quiz with its play numbers. The averages count finished plays only. */
 export interface AdminChannelQuiz extends AdminChannelQuizRef {
   author: AdminChannelQuizPerson | null;
+  /** The certificate programme this quiz issues for, if any (certificates part 2). */
+  certificate_programme?: { uuid: string; name: string } | null;
   question_count: number;
   plays: number;
   finished_plays: number;
