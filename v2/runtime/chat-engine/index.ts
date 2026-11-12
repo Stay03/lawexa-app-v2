@@ -46,6 +46,7 @@ export {
   appendUserTurn,
   appendAssistantTurn,
   replaceLastUserTurnContent,
+  replaceLastUserTurnFileNames,
   upsertTranscriptTitle,
   renameTranscript,
   listConversationIds,

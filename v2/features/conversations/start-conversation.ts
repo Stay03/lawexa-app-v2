@@ -11,6 +11,7 @@ import {
   deleteTranscript,
   renameTranscript,
   replaceLastUserTurnContent,
+  replaceLastUserTurnFileNames,
 } from '@/v2/runtime/chat-engine';
 import { labelDocuments, withServerLabels } from '@/v2/runtime/chat-engine/document-labels';
 import { spacesQueries } from '@/v2/features/spaces/queries';
@@ -339,6 +340,11 @@ export async function startConversation(
           conversationId,
           response.data.user_message_content,
         ).catch(() => {});
+      }
+      // …and the files under the server's labels, not the app's guess (document-labels.ts).
+      const labelled = response.data.user_message_attachments;
+      if (redacted && labelled && labelled.length > 0) {
+        await replaceLastUserTurnFileNames(conversationId, labelled).catch(() => {});
       }
     }
 

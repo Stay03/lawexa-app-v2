@@ -75,7 +75,13 @@ test('a redacted chat’s question is drawn with its labels, the first send too,
   // The file ids sent are the real ones: only the names change.
   assert.match(engine, /file_ids: fileIdsList/);
 
+  // A confidential chat's device transcript keeps the server's labels, not the app's guess.
+  assert.match(engine, /if \(isConfidentialTurnN && convId\) \{\s*try \{\s*await replaceLastUserTurnFileNames\(convId, labelled\);/);
+  const transcript = read('v2', 'runtime', 'chat-engine', 'confidential-transcript.ts');
+  assert.match(transcript, /const name = names\.get\(file\.file_id\);\s*return name \? \{ \.\.\.file, file_name: name \} : file;/);
+
   const start = read('v2', 'features', 'conversations', 'start-conversation.ts');
+  assert.match(start, /if \(redacted && labelled && labelled\.length > 0\) \{\s*await replaceLastUserTurnFileNames\(conversationId, labelled\)/);
   assert.match(start, /const shownAttachments = redacted \? labelDocuments\(\[\], attachments\) : attachments;/);
   assert.match(start, /const sentAttachments = redacted \? withServerLabels\(shownAttachments, response\.data\.user_message_attachments\) : attachments;\s*writeConvInit\(conversationId, \{ msg: displayMessage, exec: executionId, attachments: sentAttachments, redaction \}\);/);
 });

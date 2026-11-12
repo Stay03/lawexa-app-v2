@@ -301,6 +301,38 @@ export async function replaceLastUserTurnContent(
 }
 
 /**
+ * Rename the files of the most recent user turn to the names the server gave
+ * them. A redacted chat stores its files as "Document 1, 2…"; the turn was
+ * written before the POST with the app's own labels, and the server's are the
+ * ones kept (document-labels.ts). Matched by file id; everything else on a
+ * file, its expiry too, is left. No-op if the tail isn't a user turn.
+ */
+export async function replaceLastUserTurnFileNames(
+  conversation_id: string,
+  files: readonly { file_id: number; file_name: string }[],
+): Promise<void> {
+  const transcript = await getTranscript(conversation_id);
+  if (!transcript) return;
+  const tail = transcript.messages[transcript.messages.length - 1];
+  if (!tail || tail.role !== 'user' || !tail.attachments) return;
+  const names = new Map(files.map((file) => [file.file_id, file.file_name]));
+  const merged: ConfidentialTranscriptEntry = {
+    ...tail,
+    attachments: tail.attachments.map((file) => {
+      const name = names.get(file.file_id);
+      return name ? { ...file, file_name: name } : file;
+    }),
+  };
+  const updated: ConfidentialTranscript = {
+    ...transcript,
+    updated_at: nowIso(),
+    messages: [...transcript.messages.slice(0, -1), merged],
+  };
+  const db = await getDB();
+  await db.put(STORE, updated);
+}
+
+/**
  * Append (or idempotently update) the assistant turn. If the tail is already an
  * assistant row, its content is replaced — this is what makes the `text_done` and
  * `completed` writes idempotent: the first creates the row, the second updates it

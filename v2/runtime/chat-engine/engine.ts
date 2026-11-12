@@ -61,6 +61,7 @@ import {
   historyEntriesFor,
   isConfidentialAttachmentExpired,
   replaceLastUserTurnContent,
+  replaceLastUserTurnFileNames,
 } from './confidential-transcript';
 import { createStreamSmoother } from './stream-smoother';
 import type {
@@ -2338,6 +2339,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
           setMessages((msgs) =>
             msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, attachments: confirmed, attachment: confirmed[0] } : m)),
           );
+          // A confidential chat keeps its turns on the device: they keep the server's labels too.
+          if (isConfidentialTurnN && convId) {
+            try {
+              await replaceLastUserTurnFileNames(convId, labelled);
+            } catch {
+              // Non-fatal: the next load of the chat reads the row the server stored.
+            }
+          }
         }
         if (isRedactedTurnN && redactedText && redactedText !== message) {
           setMessages((msgs) =>
