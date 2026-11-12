@@ -13,9 +13,10 @@ import {
   formatCertificateDate,
   formatCertificateScore,
 } from '@/lib/certificates/model';
-import type { MyCertificate } from '@/types/certificates';
+import type { MyCertificate, PendingCertificate } from '@/types/certificates';
 import { SETTINGS_BLOCK, SETTINGS_COLUMN } from '../SettingsList';
 import { SettingsState } from '../SettingsState';
+import { ConfirmNameCard } from './ConfirmNameCard';
 import { myCertificatesQueries, useDownloadCertificate } from './queries';
 
 /**
@@ -24,6 +25,9 @@ import { myCertificatesQueries, useDownloadCertificate } from './queries';
  */
 export function CertificatesScreen() {
   const list = useQuery(myCertificatesQueries.list());
+  // A failed pending read hides the section rather than blocking the issued list.
+  const pending = useQuery(myCertificatesQueries.pending());
+  const waiting = pending.data ?? [];
 
   if (list.isPending) return <CertificatesFallback />;
 
@@ -46,7 +50,7 @@ export function CertificatesScreen() {
     );
   }
 
-  if (list.data.length === 0) {
+  if (list.data.length === 0 && waiting.length === 0) {
     return (
       <div className={SETTINGS_COLUMN}>
         <SettingsState
@@ -61,12 +65,33 @@ export function CertificatesScreen() {
   return (
     <div className={SETTINGS_COLUMN}>
       <h1 className="mb-5 hidden text-2xl font-semibold text-foreground md:block">Certificates</h1>
-      <ul className={SETTINGS_BLOCK} aria-label="Your certificates">
-        {list.data.map((certificate) => (
-          <CertificateRow key={certificate.number} certificate={certificate} />
+      {waiting.length > 0 && <PendingNames pending={waiting} />}
+      {list.data.length > 0 && (
+        <ul className={SETTINGS_BLOCK} aria-label="Your certificates">
+          {list.data.map((certificate) => (
+            <CertificateRow key={certificate.number} certificate={certificate} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** Certificates waiting for the printed name, above the issued ones (Techlead 60c6e758). */
+function PendingNames({ pending }: { pending: PendingCertificate[] }) {
+  return (
+    <section aria-labelledby="pending-names-heading" className="mb-6">
+      <h2 id="pending-names-heading" className="mb-2 text-sm font-semibold text-foreground">
+        {pending.length === 1 ? 'One certificate needs your name' : `${pending.length} certificates need your name`}
+      </h2>
+      <ul className={SETTINGS_BLOCK}>
+        {pending.map((item) => (
+          <li key={item.uuid}>
+            <ConfirmNameCard pendingUuid={item.uuid} programme={item.programme} suggestedName={item.suggested_name} compact />
+          </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }
 

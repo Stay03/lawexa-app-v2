@@ -1,6 +1,13 @@
 import { apiClient } from './client';
 import { filenameFromDisposition, type ExportedFile } from './export';
-import { certificateFileName, listItems, pageOf, readIssueResult, type PageOf } from '@/lib/certificates/model';
+import {
+  certificateFileName,
+  listItems,
+  pageOf,
+  readIssueResult,
+  readPendingCertificates,
+  type PageOf,
+} from '@/lib/certificates/model';
 import type { ApiResponse } from '@/types/api';
 import type {
   CertificatePreviewPayload,
@@ -12,7 +19,9 @@ import type {
   IssueCertificatesResult,
   IssuedCertificate,
   MyCertificate,
+  PendingCertificate,
 } from '@/types/certificates';
+import type { AdminChannelQuiz } from '@/types/admin-channel-quizzes';
 
 /**
  * Certificates (shapes agreed with WOZ in 384c, 11 November 2026; see
@@ -40,6 +49,24 @@ export const certificatesApi = {
   /** Owner only. */
   download: (number: string): Promise<ExportedFile> =>
     pdf(`/certificates/${enc(number)}/download`, certificateFileName(number)),
+
+  /** Certificates waiting for their printed name (part 2). */
+  pending: async (): Promise<PendingCertificate[]> => {
+    const response = await apiClient.get<ApiResponse<unknown>>('/certificates/pending');
+    return readPendingCertificates(response.data.data);
+  },
+
+  /**
+   * Confirms the printed name and issues the certificate: 201 the first time,
+   * 200 with the same certificate on a repeat, so a double tap is safe. 422
+   * with `errors.printed_name` for a name outside 2 to 120 characters.
+   */
+  confirmName: async (pendingUuid: string, printedName: string): Promise<MyCertificate> => {
+    const response = await apiClient.post<ApiResponse<MyCertificate>>(`/certificates/pending/${enc(pendingUuid)}/confirm`, {
+      printed_name: printedName,
+    });
+    return response.data.data as MyCertificate;
+  },
 };
 
 const TEMPLATES = '/admin/certificate-templates';
@@ -188,6 +215,14 @@ export const adminCertificatesApi = {
   rerender: async (programmeUuid: string): Promise<number> => {
     const response = await apiClient.post<ApiResponse<{ queued?: number }>>(`${PROGRAMMES}/${enc(programmeUuid)}/rerender`);
     return response.data.data?.queued ?? 0;
+  },
+
+  /** Links a channel quiz to a programme, or unlinks it with `null`. 422 for a programme that is off. */
+  setQuizCertificate: async (quizUuid: string, programmeUuid: string | null): Promise<AdminChannelQuiz> => {
+    const response = await apiClient.put<ApiResponse<AdminChannelQuiz>>(`/admin/channel-quizzes/${enc(quizUuid)}/certificate`, {
+      programme_uuid: programmeUuid,
+    });
+    return response.data.data as AdminChannelQuiz;
   },
 
   certificates: async (programmeUuid: string, page = 1): Promise<PageOf<IssuedCertificate>> => {

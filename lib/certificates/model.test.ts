@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 
 import {
   bracketProblem,
+  cleanPrintedName,
+  printedNameProblem,
+  readCertificateOffer,
+  readPendingCertificates,
   bySort,
   DEFAULT_CERTIFICATE_BODY,
   certificateFileName,
@@ -259,4 +263,53 @@ test('the issue result keeps new, already-had and skipped apart', () => {
     issueSummary(readIssueResult({ already_had: [1], skipped: [{ uuid: 'a', reason: 'No name on account.' }, { uuid: 'b', reason: 'No name on account.' }] })),
     '0 certificates issued. 1 already had one and keeps it. 2 skipped: No name on account.',
   );
+});
+
+test('a printed name is 2 to 120 characters once trimmed', () => {
+  assert.equal(printedNameProblem('Ọ̀ṣọ́ Adébáyọ̀'), null);
+  assert.match(printedNameProblem('  A ') ?? '', /full name/);
+  assert.match(printedNameProblem('') ?? '', /full name/);
+  assert.match(printedNameProblem('x'.repeat(121)) ?? '', /120/);
+  assert.equal(printedNameProblem('x'.repeat(120)), null);
+  assert.equal(cleanPrintedName('  Ada   Lovelace \n'), 'Ada Lovelace');
+});
+
+test('a quiz offer is read field by field, and anything unusable is no offer', () => {
+  const programme = { name: 'TEST DATA Programme', partner_name: 'TEST DATA Society', event_date: '2026-11-15' };
+  assert.deepEqual(
+    readCertificateOffer({ state: 'needs_name', pending_uuid: 'p-1', programme, suggested_name: 'Test Student' }),
+    { state: 'needs_name', pending_uuid: 'p-1', programme, suggested_name: 'Test Student' },
+  );
+  assert.deepEqual(readCertificateOffer({ state: 'issued', number: 'LX-2026-000123-K7Q9M', programme, suggested_name: 'T' }), {
+    state: 'issued',
+    number: 'LX-2026-000123-K7Q9M',
+    programme,
+    suggested_name: 'T',
+  });
+  assert.equal(readCertificateOffer({ state: 'needs_name', programme, suggested_name: 'T' }), null, 'no pending uuid');
+  assert.equal(readCertificateOffer({ state: 'issued', programme }), null, 'no number');
+  assert.equal(readCertificateOffer({ state: 'other', programme }), null);
+  assert.equal(readCertificateOffer({ state: 'needs_name', pending_uuid: 'p', programme: { name: 'x' } }), null);
+  assert.equal(readCertificateOffer(null), null);
+  assert.equal(
+    readCertificateOffer({ state: 'needs_name', pending_uuid: 'p', programme: { ...programme, partner_name: '' } })?.programme.partner_name,
+    null,
+  );
+});
+
+test('pending certificates keep only rows that can be confirmed', () => {
+  const programme = { name: 'P', partner_name: null, event_date: '2026-11-15' };
+  assert.deepEqual(
+    readPendingCertificates([
+      { uuid: 'a', programme, suggested_name: 'A Name', created_at: '2026-11-15T10:00:00Z' },
+      { uuid: 'b' },
+      'x',
+      { uuid: 'c', programme },
+    ]),
+    [
+      { uuid: 'a', programme, suggested_name: 'A Name', created_at: '2026-11-15T10:00:00Z' },
+      { uuid: 'c', programme, suggested_name: '', created_at: '' },
+    ],
+  );
+  assert.deepEqual(readPendingCertificates(null), []);
 });

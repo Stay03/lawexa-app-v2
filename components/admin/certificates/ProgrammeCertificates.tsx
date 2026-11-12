@@ -32,8 +32,15 @@ const MAX_PEOPLE = 500;
  * issuing from a quiz waits for Stay's answers (pass mark, printed name, email).
  */
 export function ProgrammeCertificates({ programme }: { programme: CertificateProgramme }) {
+  const waiting = programme.emails_waiting ?? 0;
   return (
     <div className="space-y-8">
+      {waiting > 0 && (
+        <p className="max-w-2xl rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+          {waiting} certificate {waiting === 1 ? 'email is' : 'emails are'} waiting for tomorrow’s sending budget. The
+          certificates are already in people’s accounts.
+        </p>
+      )}
       <IssuePanel programme={programme} />
       <IssuedList programmeUuid={programme.uuid} />
     </div>

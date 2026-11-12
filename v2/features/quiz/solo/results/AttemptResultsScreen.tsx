@@ -30,6 +30,7 @@ import { AnswersFold } from './AnswersFold';
 import { AttemptSummary } from './AttemptSummary';
 import { FinishPosition } from './FinishPosition';
 import { ResultsActions } from './ResultsActions';
+import { CertificateOffer } from '@/v2/features/settings/certificates/CertificateOffer';
 import { AttemptResultsSkeleton, RESULTS_COLUMN } from './states';
 import { PodiumStage, podiumAlreadySeen, rememberPodiumSeen } from './PodiumStage';
 import { glideTop, opensOnPodium, SCORE_GLIDE_MS } from './position-model';
@@ -233,6 +234,14 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
           highlights={highlights}
           viewerName={viewerName}
         />
+
+        {/* The certificate this quiz carries, when the finish answer named one:
+            the name prompt sits right under the score, where the reader is. */}
+        {attempt.certificate ? (
+          <div className="mt-6">
+            <CertificateOffer raw={attempt.certificate} />
+          </div>
+        ) : null}
 
         <AnswersFold attemptUuid={attempt.uuid} questions={questions} />
 

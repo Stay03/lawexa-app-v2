@@ -1,3 +1,5 @@
+import type { CertificateOffer } from './certificates';
+
 /**
  * Channel Quiz (live) — the Kahoot-style group game that runs INSIDE a channel.
  *
@@ -582,6 +584,9 @@ export interface QuizAttempt {
   questions: QuizAttemptQuestion[];
   /** Present once the attempt is finished, absent before — see the type. */
   comparison?: QuizAttemptComparison;
+  /** The finish response's word on a certificate, when the quiz carries one
+   *  (certificates part 2). A later read of the attempt does not carry it. */
+  certificate?: CertificateOffer | null;
 }
 
 /**
@@ -768,6 +773,9 @@ export interface QuizGameState {
   game: QuizGame;
   current_question: QuizCurrentQuestion | null;
   your_answer: QuizYourAnswer | null;
+  /** Per viewer, once the game has finished and the quiz carries a
+   *  certificate (certificates part 2). */
+  certificate?: CertificateOffer | null;
 }
 
 /** `POST /quiz-games/{game}/answer` — one-shot, immutable, and deliberately

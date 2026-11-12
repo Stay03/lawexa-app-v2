@@ -53,6 +53,7 @@ import {
   totalPicks,
 } from './model';
 import type { AnswerStanding, FinalAnswerClose, LiveGame } from './use-game';
+import { CertificateOffer } from '@/v2/features/settings/certificates/CertificateOffer';
 import { ScoringBadge } from '@/v2/features/quiz/ScoringBadge';
 
 /**
@@ -629,10 +630,13 @@ export function PodiumStage({
   gameUuid,
   viewerId,
   viewerUuid,
+  certificate,
 }: {
   gameUuid: string;
   viewerId: number | null;
   viewerUuid: string | null;
+  /** This viewer's certificate offer from the finished game's state (certificates part 2). */
+  certificate?: unknown;
 }) {
   const query = useQuery(channelQuizQueries.results({ gameUuid, viewerId }));
   const results = query.data?.data;
@@ -764,6 +768,10 @@ export function PodiumStage({
         standing={standing}
         quizTitle={results.game.quiz.title}
       />
+
+      {/* A quiz that carries a certificate asks for the printed name here,
+          once the scores are in: it is the moment the player is still on. */}
+      {certificate ? <CertificateOffer raw={certificate} /> : null}
 
       <div>
         <StageKicker>Everyone</StageKicker>
