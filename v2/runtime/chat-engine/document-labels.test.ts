@@ -85,3 +85,28 @@ test('a redacted chat’s question is drawn with its labels, the first send too,
   assert.match(start, /const shownAttachments = redacted \? labelDocuments\(\[\], attachments\) : attachments;/);
   assert.match(start, /const sentAttachments = redacted \? withServerLabels\(shownAttachments, response\.data\.user_message_attachments\) : attachments;\s*writeConvInit\(conversationId, \{ msg: displayMessage, exec: executionId, attachments: sentAttachments, redaction \}\);/);
 });
+
+test('the rename always finds the question at the tail: no answer reaches the device before it', () => {
+  // The rename works on the transcript's last turn. That turn is the question because the answer is
+  // written to the device only from the stream's events (appendAssistantTurn, inside connectToStream),
+  // and the stream is opened only after the rename has been awaited.
+  const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
+  const streamStart = engine.indexOf('  function connectToStream(');
+  // The stream's function ends where the engine's next function begins (line endings may be CRLF).
+  const nextFunction = /\r?\n {2}(?:async )?function /g;
+  nextFunction.lastIndex = streamStart + 1;
+  const streamEnd = nextFunction.exec(engine)?.index ?? -1;
+  const answerWrites = [...engine.matchAll(/appendAssistantTurn\(/g)].map((match) => match.index ?? 0);
+  assert.ok(answerWrites.length > 0);
+  for (const at of answerWrites) assert.ok(at > streamStart && at < streamEnd, 'answers reach the device only from the stream');
+  const rename = engine.indexOf('await replaceLastUserTurnFileNames(convId, labelled);');
+  const send = engine.slice(rename);
+  assert.ok(rename > 0 && send.indexOf('connectToStream(response.data.execution_id);') > 0, 'the rename is awaited before the stream opens');
+  assert.ok(!engine.slice(engine.lastIndexOf('const response = await chatApi.start(', rename), rename).includes('connectToStream('), 'no stream opens between the send and the rename');
+
+  // The first question: renamed before the hand-off the chat screen opens the stream from.
+  const start = read('v2', 'features', 'conversations', 'start-conversation.ts');
+  const firstRename = start.indexOf('await replaceLastUserTurnFileNames(conversationId, labelled)');
+  assert.ok(firstRename > 0 && firstRename < start.indexOf('writeConvInit(conversationId, {'));
+  assert.doesNotMatch(start, /appendAssistantTurn/);
+});
