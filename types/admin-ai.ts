@@ -283,9 +283,23 @@ export interface AdminAiAgentSkill {
   is_active: boolean;
 }
 
+/**
+ * An agent this agent may message with `message_agent` (sub-agents contract,
+ * section 5.1). The agent's own entry is what lets it call "lawexa", a fresh
+ * copy of itself.
+ */
+export interface AdminAiAgentCallee {
+  id: number;
+  name: string;
+  slug: string;
+  is_active: boolean;
+}
+
 export type AdminAiAgentDetail = AdminAiAgent & {
   /** The skills on this agent; absent from a server without skills. */
   skills?: AdminAiAgentSkill[];
+  /** The agents it may message ("Can call"); absent from a server without sub-agents. */
+  can_call?: AdminAiAgentCallee[];
 };
 
 export interface AdminAiAgentsParams {
@@ -319,6 +333,8 @@ export interface AdminAiUpdateAgentData {
   max_response_tokens?: number;
   max_iterations?: number | null;
   is_active?: boolean;
+  /** Replaces the agent's "Can call" list; `[]` clears it, absent leaves it (sub-agents contract, 5.1). */
+  can_call_agent_ids?: number[];
 }
 
 export interface AdminAiCopyAgentData {

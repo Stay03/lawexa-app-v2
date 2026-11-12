@@ -44,6 +44,7 @@ import { useAdminAiAgent } from '@/lib/hooks/useAdminAi';
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { AiAgentDeleteDialog } from '@/components/admin/ai/AiAgentDeleteDialog';
 import { AiAgentSkillsCard } from '@/components/admin/ai/AiAgentSkillsCard';
+import { AiAgentCanCallCard } from '@/components/admin/ai/AiAgentCanCallCard';
 import type { AdminAiAgent } from '@/types/admin-ai';
 
 interface AiAgentDetailPageProps {
@@ -314,6 +315,9 @@ export default function AiAgentDetailPage({
 
       {/* Skills on this agent (read-only; attached from the skill's page) */}
       <AiAgentSkillsCard skills={agent.skills} />
+
+      {/* The agents it may message (sub-agents); edited here */}
+      <AiAgentCanCallCard agent={agent} />
 
       {/* Delete Dialog */}
       <AiAgentDeleteDialog
