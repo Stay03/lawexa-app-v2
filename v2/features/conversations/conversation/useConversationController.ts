@@ -43,6 +43,8 @@ import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
 import { awaitsBackgroundJob } from './background-jobs/model';
 import type { BackgroundJob } from '@/types/background-jobs';
+import type { AgentConversation } from '@/types/agent-conversations';
+import { agentConversationQueries } from './agents/queries';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { toast } from 'sonner';
 import type { MentionOptions } from '@/v2/features/channels/model';
@@ -116,6 +118,7 @@ import {
 const NO_REFERENCES: ConversationReference[] = [];
 /** Stable empty reference for a chat with no jobs read (yet). */
 const NO_BACKGROUND_JOBS: readonly BackgroundJob[] = [];
+const NO_AGENT_CONVERSATIONS: readonly AgentConversation[] = [];
 
 /**
  * Map a failed history load onto the sentinel strings the screen renders. Byte-identical
@@ -261,6 +264,8 @@ export interface ConversationController {
   isOwnerResolved: boolean;
   /** The reader's background jobs in this chat (Backend 063d9cc3), oldest first; empty until read. */
   backgroundJobs: readonly BackgroundJob[];
+  /** The agents Lawexa messaged in this chat (sub-agents contract 3.1), for their rows (C1); empty until read. */
+  agentConversations: readonly AgentConversation[];
   /**
    * Whether the transcript is still being loaded and there is NOTHING to show yet.
    * The union of both history paths (the device-owned IndexedDB load and the server
@@ -921,9 +926,25 @@ export function useConversationController(
   // flag to know that before the first read.
   const backgroundJobsRefused = stopsPolling(backgroundJobsQuery.error);
 
+  // ── The agents Lawexa messaged (sub-agents contract 3.1; C1) ──
+  // One row each after the turn that called them, for every reader of the
+  // chat, as Lawexa's answer is: the list carries each call's state, the turn
+  // to stream and whether this reader may stop it. Never on a confidential
+  // chat, which has none; a chat the server keeps none for (404) is not asked
+  // again. Not polled: read again when a turn here ends (below) and when an
+  // agent's streamed turn ends (AgentRoster).
+  const readsAgentConversations = detailData !== null && !isConfidential && !isGoneOnServer;
+  const agentConversationsQuery = useQuery({
+    ...agentConversationQueries.of({ parentId: conversationId, viewerId: serverUserId }),
+    enabled: readsAgentConversations,
+  });
+  const agentConversations = agentConversationsQuery.data ?? NO_AGENT_CONVERSATIONS;
+  const agentConversationsRefused = stopsPolling(agentConversationsQuery.error);
+
   // A turn on this screen just ended: it may have started a job, whose label
-  // belongs under its question now rather than at the next beat. A query call
-  // on the edge, no setState.
+  // belongs under its question now rather than at the next beat, or messaged
+  // an agent, whose row belongs after its answer. A query call on the edge,
+  // no setState.
   const wasStreamingRef = useRef(isStreaming);
   useEffect(() => {
     const ended = wasStreamingRef.current && !isStreaming;
@@ -931,7 +952,18 @@ export function useConversationController(
     if (ended && readsBackgroundJobs && !backgroundJobsRefused) {
       void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(conversationId) });
     }
-  }, [isStreaming, readsBackgroundJobs, backgroundJobsRefused, queryClient, conversationId]);
+    if (ended && readsAgentConversations && !agentConversationsRefused) {
+      void queryClient.invalidateQueries({ queryKey: [...agentConversationQueries.all(), conversationId] });
+    }
+  }, [
+    isStreaming,
+    readsBackgroundJobs,
+    backgroundJobsRefused,
+    readsAgentConversations,
+    agentConversationsRefused,
+    queryClient,
+    conversationId,
+  ]);
 
   // Waiting on a job ended (Lawexa answered, or gave up) while this screen was
   // not following the turn: a hidden tab pauses the status poll, and the
@@ -1261,6 +1293,7 @@ export function useConversationController(
     canStop,
     isOwnerResolved: ownerId !== null,
     backgroundJobs,
+    agentConversations,
     isLoadingHistory,
     showHistorySkeleton,
     isGoneOnServer,

@@ -3,43 +3,43 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { AgentConversation } from '@/types/agent-conversations';
-import type { BackgroundJob } from '@/types/background-jobs';
+import type { AgentConversation, AgentLatestCall } from '@/types/agent-conversations';
 import type { ApiMessage } from '@/types/chat';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { EngineMessage } from '@/v2/runtime/chat-engine/types';
 import { groupMessages, turnEndPlaces } from '../message-groups';
 import { savedIdOf } from '../reply-target';
-import { AGENT_ROW_WORDS, agentInitials, agentRows, agentRowState, rosterNeedsList } from './agent-roster';
+import { AGENT_ROW_WORDS, agentInitials, agentRow, agentRowState, agentRowsByMessage, agentsWorking } from './agent-roster';
 
 /* C1 (Stay, 12 November 2026, 17:47Z): each agent Lawexa messaged is a row
- * after the turn's answer, with its state, its own Stop while it works, and
- * its words streaming in. TEST DATA only. */
+ * after the turn that called it, for every reader of the chat, with its
+ * state, its own Stop while it works, and its words streaming in. The rows
+ * come from the chat's list of agent conversations and each entry's
+ * `latest_call` (Backend, 12 November 2026). TEST DATA only. */
 
-const read = (...parts: string[]) =>
-  readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', ...parts), 'utf8');
+const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+const here = (...parts: string[]) => read('v2', 'features', 'conversations', 'conversation', ...parts);
 
 const SPOTTER = { id: 231, name: 'Issue Spotter', slug: 'issue-spotter' };
 const EXPERT = { id: 229, name: 'Expert', slug: 'expert' };
 const SPOTTER_CHAT = '7e1a0000-0000-4000-8000-000000000001';
 const EXPERT_CHAT = '8f2b0000-0000-4000-8000-000000000002';
 
-const job = (patch: Partial<BackgroundJob> = {}): BackgroundJob => ({
-  id: 'job-1',
-  kind: 'agent_reply',
-  kind_name: 'message to another agent',
-  status: 'running',
-  progress: null,
-  started_at: '2026-11-12T09:12:03+00:00',
-  finished_at: null,
-  started_by_message_id: 81234,
-  wake: null,
+const PREVIEW = '**ISSUES ARISING — TENANT**\n*Assumed framework: Lagos…';
+const REPLY = { message_id: 9123, preview: PREVIEW, created_at: '2026-11-12T09:14:00+00:00' };
+
+const call = (patch: Partial<AgentLatestCall> = {}): AgentLatestCall => ({
+  state: 'working',
   failure: null,
-  agent_conversation: { id: SPOTTER_CHAT, agent: SPOTTER },
+  called_by_message_id: 81240,
+  called_at: '2026-11-12T09:12:03+00:00',
+  reply: null,
   ...patch,
 });
 
-const entry = (patch: Partial<AgentConversation> = {}): AgentConversation => ({
+type Called = AgentConversation & { latest_call: AgentLatestCall };
+
+const entry = (patch: Partial<AgentConversation> = {}, latest: Partial<AgentLatestCall> = {}): Called => ({
   id: SPOTTER_CHAT,
   parent_conversation_id: 'c0000000-0000-4000-8000-000000000001',
   agent: SPOTTER,
@@ -54,22 +54,24 @@ const entry = (patch: Partial<AgentConversation> = {}): AgentConversation => ({
   can_send: true,
   created_at: '2026-11-12T09:12:03+00:00',
   last_message_at: null,
+  latest_call: call(latest),
   ...patch,
-});
+} as Called);
 
-test('an agent row reads Writing, Replied, Stopped or Couldn’t reply from its job', () => {
-  assert.equal(agentRowState(job()), 'writing');
-  assert.equal(agentRowState(job({ status: 'succeeded', wake: 'pending' })), 'replied');
-  assert.equal(agentRowState(job({ status: 'succeeded', wake: 'woken' })), 'replied');
-  assert.equal(agentRowState(job({ status: 'failed', failure: 'stopped' })), 'stopped');
-  for (const failure of ['no_reply', 'error', 'gone', 'wake_abandoned'] as const) {
-    assert.equal(agentRowState(job({ status: 'failed', failure })), 'failed', failure);
+/** Its turn ended: the entry is idle. */
+const IDLE = { status: 'idle', execution_id: null, stream_url: null } as const;
+
+test('an agent row reads Writing, Replied, Stopped or Couldn’t reply from its newest call', () => {
+  assert.equal(agentRowState(call()), 'writing');
+  assert.equal(agentRowState(call({ state: 'replied' })), 'replied');
+  assert.equal(agentRowState(call({ state: 'failed', failure: 'stopped' })), 'stopped');
+  for (const failure of ['no_reply', 'error', 'gone', 'wake_abandoned', 'stalled'] as const) {
+    assert.equal(agentRowState(call({ state: 'failed', failure })), 'failed', failure);
   }
   // No reason sent: never guessed as Stopped (techlead, 12 November 2026).
-  assert.equal(agentRowState(job({ status: 'failed', failure: null })), 'failed');
-  assert.equal(agentRowState(job({ status: 'failed', failure: undefined })), 'failed');
+  assert.equal(agentRowState(call({ state: 'failed', failure: null })), 'failed');
   // An older "Stop waiting": the chat stopped following.
-  assert.equal(agentRowState(job({ status: 'cancelled' })), 'unfollowed');
+  assert.equal(agentRowState(call({ state: 'cancelled' })), 'unfollowed');
 
   assert.equal(AGENT_ROW_WORDS.writing, 'Writing');
   assert.equal(AGENT_ROW_WORDS.replied, 'Replied');
@@ -89,9 +91,7 @@ test('a row shows the agent’s initials', () => {
 });
 
 test('a writing agent streams its turn, and Stop shows only to a reader the server lets stop it', () => {
-  const [row] = agentRows([job()], [entry()]);
-  assert.deepEqual(row, {
-    jobId: 'job-1',
+  assert.deepEqual(agentRow(entry()), {
     conversationId: SPOTTER_CHAT,
     name: 'Issue Spotter',
     state: 'writing',
@@ -99,62 +99,69 @@ test('a writing agent streams its turn, and Stop shows only to a reader the serv
     canStop: true,
     replyStart: null,
   });
-  // `can_send` false: the words still stream, Stop does not show.
-  const [watcher] = agentRows([job()], [entry({ can_send: false })]);
+  // `can_send` false (a Space Viewer, a member the server does not let stop it): the words still stream, Stop does not show.
+  const watcher = agentRow(entry({ can_send: false }));
   assert.equal(watcher.executionId, 'exec-1');
   assert.equal(watcher.canStop, false);
-  // The list not read yet, or older than the job: the state alone, no stream, no Stop, and the list is read again.
-  for (const list of [undefined, [], [entry({ status: 'idle', execution_id: null, stream_url: null })]]) {
-    const [early] = agentRows([job()], list);
-    assert.equal(early.state, 'writing');
-    assert.equal(early.executionId, null);
-    assert.equal(early.canStop, false);
-    assert.equal(rosterNeedsList([early]), true);
-  }
-  assert.equal(rosterNeedsList([row]), false);
+  // Working, but its turn not running (between two reads): the state alone, no stream, no Stop.
+  const between = agentRow(entry(IDLE));
+  assert.equal(between.state, 'writing');
+  assert.equal(between.executionId, null);
+  assert.equal(between.canStop, false);
 });
 
-test('the stream ends with the turn: an ended job never streams or offers Stop, whatever the list still says', () => {
+test('the stream ends with the call: an ended call never streams or offers Stop, whatever the turn still says', () => {
   for (const ended of [
-    job({ status: 'succeeded', wake: 'pending' }),
-    job({ status: 'failed', failure: 'stopped' }),
-    job({ status: 'failed', failure: 'error' }),
-    job({ status: 'cancelled' }),
-  ]) {
-    const [row] = agentRows([ended], [entry()]);
-    assert.equal(row.executionId, null, ended.status);
-    assert.equal(row.canStop, false, ended.status);
+    { state: 'replied', reply: REPLY },
+    { state: 'failed', failure: 'stopped' },
+    { state: 'failed', failure: 'error' },
+    { state: 'cancelled' },
+  ] as const) {
+    const row = agentRow(entry({}, ended));
+    assert.equal(row.executionId, null, ended.state);
+    assert.equal(row.canStop, false, ended.state);
   }
-  assert.equal(rosterNeedsList(agentRows([job({ status: 'succeeded' })], undefined)), false);
 });
 
-test('a replied row keeps the start of the reply as plain words', () => {
-  const replied = job({ status: 'succeeded', wake: 'woken' });
-  const preview = '**ISSUES ARISING — TENANT**\n*Assumed framework: Lagos…';
-  const [row] = agentRows([replied], [entry({ status: 'idle', execution_id: null, last_reply: { message_id: 9123, preview, created_at: '2026-11-12T09:14:00+00:00' } })]);
+test('a replied row keeps the start of this call’s reply as plain words; a stopped one shows none', () => {
+  const row = agentRow(entry(IDLE, { state: 'replied', reply: REPLY }));
   assert.equal(row.state, 'replied');
   assert.equal(row.replyStart, 'ISSUES ARISING — TENANT Assumed framework: Lagos…');
-  // A stopped or failed row shows no reply, even when the agent wrote one earlier.
-  const [stopped] = agentRows([job({ status: 'failed', failure: 'stopped' })], [entry({ last_reply: { message_id: 1, preview, created_at: '' } })]);
+  // Never an earlier call's reply (`last_reply`): a stopped call shows none.
+  const stopped = agentRow(entry({ ...IDLE, last_reply: REPLY }, { state: 'failed', failure: 'stopped' }));
   assert.equal(stopped.replyStart, null);
+  assert.equal(agentRow(entry({ ...IDLE, last_reply: REPLY }, { state: 'replied', reply: null })).replyStart, null);
 });
 
-test('two agents at once are two rows, in the jobs’ order; other work is not a row', () => {
-  const rows = agentRows(
-    [
-      job(),
-      job({ id: 'job-2', kind: 'file_transcription', kind_name: 'file reading', agent_conversation: null }),
-      job({ id: 'job-3', agent_conversation: { id: EXPERT_CHAT, agent: EXPERT } }),
-    ],
-    [entry(), entry({ id: EXPERT_CHAT, agent: EXPERT, execution_id: 'exec-3', can_send: false })],
-  );
+test('two agents at once are two rows after the turn that called them, in the list’s order', () => {
+  const byMessage = agentRowsByMessage([
+    entry(),
+    entry({ id: EXPERT_CHAT, agent: EXPERT, execution_id: 'exec-3', can_send: false }),
+    // Called again in a later turn: the row moves to that turn, not the first call's.
+    entry({ id: 'again', ...IDLE }, { state: 'replied', reply: REPLY, called_by_message_id: 81300 }),
+    // Its calling message deleted, or never called: no turn to sit after.
+    entry({ id: 'orphan' }, { called_by_message_id: null }),
+    { ...entry({ id: 'uncalled', ...IDLE }), latest_call: null },
+  ]);
+  assert.deepEqual([...byMessage.keys()], [81240, 81300]);
   assert.deepEqual(
-    rows.map((row) => [row.name, row.state, row.executionId, row.canStop]),
+    byMessage.get(81240)?.map((row) => [row.name, row.state, row.executionId, row.canStop]),
     [
       ['Issue Spotter', 'writing', 'exec-1', true],
       ['Expert', 'writing', 'exec-3', false],
     ],
   );
+});
+
+test('the list is read again on a beat only while an agent works, for a reader who did not ask', () => {
+  assert.equal(agentsWorking([entry()]), true);
+  assert.equal(agentsWorking([entry(IDLE, { state: 'replied', reply: REPLY }), { latest_call: null }]), false);
+  assert.equal(agentsWorking([]), false);
+  const queries = here('agents', 'queries.ts');
+  assert.match(queries, /!stopsPolling\(query\.state\.error\) && agentsWorking\(query\.state\.data \?\? \[\]\) \? BACKGROUND_JOBS_POLL_MS : false,/);
+  // A notification about the chat re-reads its agents too.
+  const spine = read('v2', 'runtime', 'realtime', 'spine.tsx');
+  assert.match(spine, /queryKey: \[\.\.\.agentConversationQueries\.all\(\), conversationId\]/);
 });
 
 const iso = (minutes: number) => new Date(Date.parse('2026-11-12T09:00:00Z') + minutes * 60_000).toISOString();
@@ -190,25 +197,38 @@ test('the agents’ rows go after the answer of the turn that called them, befor
     [4, 5],
   ]);
 
-  // A question not saved yet has no place: it has no jobs.
+  // A question not saved yet has no place: no agent was called from it.
   const unsaved = groupMessages([{ ...rows[0], id: 'local-1', savedId: undefined } as EngineMessage]);
   assert.equal(turnEndPlaces(unsaved, () => null).size, 0);
 
-  const list = read('MessageList.tsx');
+  const list = here('MessageList.tsx');
   assert.match(list, /const turnEnds = useMemo\(\(\) => turnEndPlaces\(groups, savedIdOf\), \[groups\]\);/);
   assert.match(list, /\{turnEnds\.has\(gi\) \? <AgentRoster messageId=\{turnEnds\.get\(gi\) \?\? null\} \/> : null\}/);
 });
 
+test('every reader of the chat sees the rows: they come from the chat’s list, never the reader’s own jobs', () => {
+  const roster = here('agents', 'AgentRoster.tsx');
+  assert.match(roster, /const held = useAgentRowsOf\(messageId\);/);
+  assert.doesNotMatch(roster, /useBackgroundJobsOf|background_jobs/);
+  const controller = here('useConversationController.ts');
+  assert.match(controller, /const readsAgentConversations = detailData !== null && !isConfidential && !isGoneOnServer;/);
+  assert.match(
+    controller,
+    /if \(ended && readsAgentConversations && !agentConversationsRefused\) \{\s*void queryClient\.invalidateQueries\(\{ queryKey: \[\.\.\.agentConversationQueries\.all\(\), conversationId\] \}\);/,
+  );
+  assert.match(here('ConversationScreen.tsx'), /<AgentRowsProvider conversationId=\{conversationId\} agentConversations=\{controller\.agentConversations\}>/);
+});
+
 test('Stop ends the agent’s turn, never just the chat’s waiting; the row streams from the turn’s own stream', () => {
-  const roster = read('agents', 'AgentRoster.tsx');
+  const roster = here('agents', 'AgentRoster.tsx');
   assert.match(roster, /\{row\.canStop && row\.executionId \? <StopPill name=\{row\.name\} executionId=\{row\.executionId\} \/> : null\}/);
   assert.match(roster, /void chatApi\.cancelStream\(executionId, token\);/);
   assert.doesNotMatch(roster, /cancelBackgroundJob|backgroundJobsApi|\.cancel\(job/);
-  // One window per turn, from the reader the side panel uses; its end re-reads the jobs and the list.
+  // One window per turn, from the reader the side panel uses; its end re-reads the list and the jobs.
   assert.match(roster, /<LiveWindow key=\{row\.executionId\} executionId=\{row\.executionId\} onEnd=\{onTurnEnd\} \/>/);
   assert.match(roster, /const live = useAgentStream\(executionId, onEnd\);/);
+  assert.match(roster, /queryKey: \[\.\.\.agentConversationQueries\.all\(\), parentId\]/);
   assert.match(roster, /queryKey: conversationsQueries\.backgroundJobsOf\(parentId\)/);
-  assert.match(roster, /queryKey: agentConversationQueries\.all\(\)/);
   // The window is held to its foot and fades at the top once full; no dots.
   assert.match(roster, /flex flex-col justify-end overflow-hidden/);
   assert.match(roster, /maskImage: full \? `linear-gradient\(to bottom, transparent, black \$\{LINE_EM\}em\)` : undefined,/);
@@ -218,11 +238,11 @@ test('Stop ends the agent’s turn, never just the chat’s waiting; the row str
   assert.match(roster, /Open its conversation/);
 
   // The return line no longer carries preview cards: the rows show the replies.
-  assert.doesNotMatch(read('rows', 'EventLineRow.tsx'), /AgentReplyRows|agentReplies/);
+  assert.doesNotMatch(here('rows', 'EventLineRow.tsx'), /AgentReplyRows|agentReplies/);
 });
 
 test('the side panel streams the agent’s reply, with Stop in its write box', () => {
-  const panel = read('agents', 'AgentConversationPanel.tsx');
+  const panel = here('agents', 'AgentConversationPanel.tsx');
   assert.match(panel, /\{running \? <LiveTurn key=\{running\} executionId=\{running\} agentName=\{agentName\} onEnd=\{refresh\} \/> : null\}/);
   assert.match(panel, /aria-label=\{`Stop \$\{conversation\.agent\.name\}`\}/);
   assert.match(panel, /void chatApi\.cancelStream\(running, token\);/);

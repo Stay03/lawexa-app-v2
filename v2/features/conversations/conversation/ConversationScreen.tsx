@@ -19,6 +19,7 @@ import { ConversationMasthead } from './ConversationMasthead';
 import { MessageList } from './MessageList';
 import { ConfidentialBanner } from './ConfidentialBanner';
 import { BackgroundJobsProvider } from './background-jobs/context';
+import { AgentRowsProvider } from './agents/context';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider } from './chat-context';
 import { DocumentExportScope } from './markdown/document-export';
@@ -435,48 +436,50 @@ export function ConversationScreen({
 
   return (
     <BackgroundJobsProvider conversationId={conversationId} jobs={controller.backgroundJobs}>
-      <V2ChatProvider
-        sendMessage={sendFollowUp}
-        isStreaming={isStreaming}
-        canSend={canSend}
-        conversationId={conversationId}
-        applyDraftEditLine={onDraftEditLine}
-      >
-        {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
-            own route, a draft or a file opens beside the transcript on a
-            computer and as a sheet on a phone (ChatSidePanel.tsx). Embedded, the
-            host page draws it where it keeps room for it (the case page: a card
-            over the reading, left of the docked chat), through a portal that
-            keeps this chat's context; it waits for the transcript, so a draft
-            is never reported missing from a chat still loading. With no host
-            (the statute page) a draft shows in its card instead. */}
-        {embed ? (
-          panelHost ? (
-            <SidePanelValueProvider
-              url={panelHost.url}
-              offsets={offsets}
-              versions={draftVersions}
-              titles={draftTitles}
-              space={controller.space}
-              frame="card"
-            >
-              {transcript}
-              {panelHost.element && !isLoadingHistory
-                ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />, panelHost.element)
-                : null}
-            </SidePanelValueProvider>
+      <AgentRowsProvider conversationId={conversationId} agentConversations={controller.agentConversations}>
+        <V2ChatProvider
+          sendMessage={sendFollowUp}
+          isStreaming={isStreaming}
+          canSend={canSend}
+          conversationId={conversationId}
+          applyDraftEditLine={onDraftEditLine}
+        >
+          {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
+              own route, a draft or a file opens beside the transcript on a
+              computer and as a sheet on a phone (ChatSidePanel.tsx). Embedded, the
+              host page draws it where it keeps room for it (the case page: a card
+              over the reading, left of the docked chat), through a portal that
+              keeps this chat's context; it waits for the transcript, so a draft
+              is never reported missing from a chat still loading. With no host
+              (the statute page) a draft shows in its card instead. */}
+          {embed ? (
+            panelHost ? (
+              <SidePanelValueProvider
+                url={panelHost.url}
+                offsets={offsets}
+                versions={draftVersions}
+                titles={draftTitles}
+                space={controller.space}
+                frame="card"
+              >
+                {transcript}
+                {panelHost.element && !isLoadingHistory
+                  ? createPortal(<SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />, panelHost.element)
+                  : null}
+              </SidePanelValueProvider>
+            ) : (
+              transcript
+            )
           ) : (
-            transcript
-          )
-        ) : (
-          <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} space={controller.space}>
-            <div className="flex h-full min-h-0">
-              {transcript}
-              <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />
-            </div>
-          </SidePanelProvider>
-        )}
-      </V2ChatProvider>
+            <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} space={controller.space}>
+              <div className="flex h-full min-h-0">
+                {transcript}
+                <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />
+              </div>
+            </SidePanelProvider>
+          )}
+        </V2ChatProvider>
+      </AgentRowsProvider>
     </BackgroundJobsProvider>
   );
 }

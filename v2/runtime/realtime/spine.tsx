@@ -19,6 +19,7 @@ import { warmChannelHistory } from '@/v2/features/channels/warm';
 import { channelDisplayName } from '@/v2/features/channels/thread-model';
 import { canOpenTeamChannels, collabAccessState } from '@/v2/features/collab/model';
 import { conversationsQueries } from '@/v2/features/conversations/queries';
+import { agentConversationQueries } from '@/v2/features/conversations/conversation/agents/queries';
 import { invitationsQueries } from '@/v2/features/invitations/queries';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
 import {
@@ -135,6 +136,8 @@ function invalidateCollabSurfaces(queryClient: QueryClient): void {
 function refreshNotifiedChat(queryClient: QueryClient, conversationId: string): void {
   void queryClient.invalidateQueries({ queryKey: [...conversationsQueries.details(), conversationId] });
   void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(conversationId) });
+  // The agents' rows (C1): an agent's reply is what a `background_job_answered` often reports.
+  void queryClient.invalidateQueries({ queryKey: [...agentConversationQueries.all(), conversationId] });
 }
 
 /**

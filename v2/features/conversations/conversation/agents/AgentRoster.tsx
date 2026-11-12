@@ -1,20 +1,19 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Check, CircleAlert, Loader2, Square } from 'lucide-react';
 
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
-import { useV2Session } from '@/v2/runtime/session-context';
 import { conversationsQueries } from '../../queries';
 import { plainPreview } from '../../plain-preview';
-import { useBackgroundJobsOf } from '../background-jobs/context';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { formatToolMessage } from '../tools/ToolStepItem';
-import { AGENT_ROW_WORDS, agentInitials, agentRows, rosterNeedsList, type AgentRow, type AgentRowState } from './agent-roster';
+import { AGENT_ROW_WORDS, agentInitials, type AgentRow, type AgentRowState } from './agent-roster';
+import { useAgentRowsOf } from './context';
 import { agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
 
@@ -31,40 +30,30 @@ import { useAgentStream } from './use-agent-stream';
  * stopped, or unable to reply, the row says so with "Open its conversation".
  *
  * Stop ends the agent's turn (`POST /api/chat/stream/{execution_id}/cancel`,
- * contract 2.4): the job settles as stopped and Lawexa is woken. It shows
+ * contract 2.4): the call settles as stopped and Lawexa is woken. It shows
  * only while the agent works, and only to a reader the server lets stop it.
+ *
+ * The rows come from the chat's list of agent conversations, which every
+ * reader of the chat reads (agents/context.tsx), never from the reader's own
+ * jobs: a Space member who did not ask sees them too.
  */
 export function AgentRoster({ messageId }: { messageId: number | null }) {
-  const held = useBackgroundJobsOf(messageId);
+  const held = useAgentRowsOf(messageId);
   const parentId = held?.conversationId ?? null;
-  const hasAgents = held?.jobs.some((job) => job.kind === 'agent_reply') ?? false;
-  const { userId: viewerId } = useV2Session();
   const queryClient = useQueryClient();
-  const list = useQuery({
-    ...agentConversationQueries.of({ parentId: parentId ?? '', viewerId }),
-    enabled: parentId !== null && hasAgents,
-  });
-  const rows = held ? agentRows(held.jobs, list.data) : [];
 
-  // A job runs that the list does not show running yet: read the list again, once per such job.
-  const behind = rosterNeedsList(rows) && list.isSuccess && !list.isFetching;
-  const behindKey = behind ? rows.map((row) => row.jobId).join() : null;
-  const { refetch } = list;
-  useEffect(() => {
-    if (behindKey !== null) void refetch();
-  }, [behindKey, refetch]);
-
-  // A turn ended (replied, stopped, or failed): the jobs and the list move on.
+  // A streamed turn ended (replied, stopped, or failed): the list moves the row on, and the jobs move on too.
   const onTurnEnd = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: agentConversationQueries.all() });
-    if (parentId) void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(parentId) });
+    if (!parentId) return;
+    void queryClient.invalidateQueries({ queryKey: [...agentConversationQueries.all(), parentId] });
+    void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(parentId) });
   }, [queryClient, parentId]);
 
-  if (rows.length === 0) return null;
+  if (!held) return null;
   return (
     <ul aria-label="Agents Lawexa asked" className="flex flex-col gap-5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
-      {rows.map((row) => (
-        <AgentRosterRow key={row.jobId} row={row} onTurnEnd={onTurnEnd} />
+      {held.rows.map((row) => (
+        <AgentRosterRow key={row.conversationId} row={row} onTurnEnd={onTurnEnd} />
       ))}
     </ul>
   );

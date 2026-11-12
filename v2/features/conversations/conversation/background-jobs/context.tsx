@@ -7,8 +7,6 @@ import { backgroundJobsByMessage } from './model';
 import { useCancelBackgroundJob } from './mutations';
 
 interface BackgroundJobsValue {
-  /** The chat the jobs belong to: the agents' rows read its agent conversations. */
-  conversationId: string;
   byMessage: ReadonlyMap<number, readonly BackgroundJob[]>;
   cancel: (jobUuid: string) => void;
   /** The jobs whose cancel is on its way, whose buttons show the wait. */
@@ -52,15 +50,14 @@ export function BackgroundJobsProvider({
     [mutate],
   );
   const value = useMemo<BackgroundJobsValue>(
-    () => ({ conversationId, byMessage: backgroundJobsByMessage(jobs), cancel, cancelling }),
-    [conversationId, jobs, cancel, cancelling],
+    () => ({ byMessage: backgroundJobsByMessage(jobs), cancel, cancelling }),
+    [jobs, cancel, cancelling],
   );
   return <BackgroundJobsContext.Provider value={value}>{children}</BackgroundJobsContext.Provider>;
 }
 
 /** The jobs a message started, and how to cancel one; nothing outside a chat that provides them. */
 export function useBackgroundJobsOf(messageId: number | null): {
-  conversationId: string;
   jobs: readonly BackgroundJob[];
   cancel: (jobUuid: string) => void;
   cancelling: ReadonlySet<string>;
@@ -68,5 +65,5 @@ export function useBackgroundJobsOf(messageId: number | null): {
   const value = useContext(BackgroundJobsContext);
   if (!value || messageId === null) return null;
   const jobs = value.byMessage.get(messageId);
-  return jobs ? { conversationId: value.conversationId, jobs, cancel: value.cancel, cancelling: value.cancelling } : null;
+  return jobs ? { jobs, cancel: value.cancel, cancelling: value.cancelling } : null;
 }

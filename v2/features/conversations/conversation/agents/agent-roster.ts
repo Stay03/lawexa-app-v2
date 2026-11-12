@@ -1,40 +1,41 @@
-import type { AgentConversation } from '@/types/agent-conversations';
-import type { BackgroundJob } from '@/types/background-jobs';
+import type { AgentConversation, AgentLatestCall } from '@/types/agent-conversations';
 import { plainPreview } from '../../plain-preview';
 
 /**
  * agent roster — the pure rules of the agents' rows in a chat (C1, Stay, 12
- * November 2026, 17:47Z; sub-agents contract, sections 2.4, 3 and 4). Each
+ * November 2026, 17:47Z; sub-agents contract, sections 2.4 and 3). Each
  * agent Lawexa messaged in a turn is a row after that turn's answer: its
  * initials, its name, its state, and Stop on the right while it works. Its
  * words stream under its name while it writes; once it has replied, the
  * start of the reply stays with "Read the reply".
  *
- * A row joins two reads: the agent's background job (the state, the same for
- * every reader after a reload) and the chat's list of agent conversations
- * (the turn to stream, the reply's start, and whether this reader may stop
- * it, `can_send`: the server's rule, never a check here).
+ * A row is one entry of the chat's list of agent conversations, which every
+ * reader of the chat reads (the techlead, 12 November 2026: the rows show to
+ * every reader, as Lawexa's answer does). Its newest call (`latest_call`)
+ * gives the state, why it failed, the turn it sits after and the reply; the
+ * entry gives the turn to stream and whether this reader may stop it
+ * (`can_send`: the server's rule, never a check here).
  */
 
 /** Where an agent is, as its row shows it. */
 export type AgentRowState = 'writing' | 'replied' | 'stopped' | 'failed' | 'unfollowed';
 
 /**
- * The agent's state from its job. A failed job says why (`failure`, Backend
- * 12 November 2026): `stopped` is a person's Stop, every other reason is "could
- * not reply". With no reason the row never guesses Stopped. A cancelled job
- * is an older "Stop waiting": the chat stopped following, the agent went on.
+ * The row's state from the call. A failed call says why (`failure`):
+ * `stopped` is a person's Stop, every other reason is "could not reply". With
+ * no reason the row never guesses Stopped. A cancelled call is an older "Stop
+ * waiting": the chat stopped following, the agent went on.
  */
-export function agentRowState(job: Pick<BackgroundJob, 'status' | 'failure'>): AgentRowState {
-  switch (job.status) {
-    case 'running':
+export function agentRowState(call: Pick<AgentLatestCall, 'state' | 'failure'>): AgentRowState {
+  switch (call.state) {
+    case 'working':
       return 'writing';
-    case 'succeeded':
+    case 'replied':
       return 'replied';
     case 'cancelled':
       return 'unfollowed';
     default:
-      return job.failure === 'stopped' ? 'stopped' : 'failed';
+      return call.failure === 'stopped' ? 'stopped' : 'failed';
   }
 }
 
@@ -47,7 +48,7 @@ export const AGENT_ROW_WORDS: Readonly<Record<AgentRowState, string>> = {
   unfollowed: 'Lawexa stopped waiting for it',
 };
 
-/** "Issue Spotter" reads "IS", "Expert" "EX", "a fresh Lawexa" "FL". */
+/** "Issue Spotter" reads "IS", "Expert" "EX", "a fresh Lawexa" "LA". */
 export function agentInitials(name: string): string {
   const words = name
     .split(/\s+/)
@@ -63,56 +64,54 @@ export function agentInitials(name: string): string {
 
 /** One agent's row. */
 export interface AgentRow {
-  jobId: string;
-  /** The agent conversation's uuid: what "Read the reply" and "Open its conversation" open. */
+  /** The agent conversation's uuid: the row's key, and what "Read the reply" and "Open its conversation" open. */
   conversationId: string;
   name: string;
   state: AgentRowState;
-  /** The turn to stream while it writes; null until the list names it, and once it ends. */
+  /** The turn to stream while it writes; null once it ends. */
   executionId: string | null;
   /** Whether this reader may stop the turn (`can_send`, contract 2.4). */
   canStop: boolean;
-  /** The start of the reply, as plain words, once it replied; null until the list has it. */
+  /** The start of the reply, as plain words, once it replied. */
   replyStart: string | null;
 }
 
-/**
- * The rows for one question's jobs, in the jobs' order: only the jobs that
- * wait on another agent. The list of agent conversations may be unread or
- * older than the jobs; a row then shows its state alone until it is read.
- */
-export function agentRows(
-  jobs: readonly BackgroundJob[],
-  conversations: readonly AgentConversation[] | undefined,
-): AgentRow[] {
-  const byId = new Map((conversations ?? []).map((each) => [each.id, each]));
-  const rows: AgentRow[] = [];
-  for (const job of jobs) {
-    if (job.kind !== 'agent_reply' || !job.agent_conversation) continue;
-    const entry = byId.get(job.agent_conversation.id);
-    const state = agentRowState(job);
-    // A turn is streamed only while both reads say it runs: the job's word
-    // decides the state, the list's the turn.
-    const executionId = state === 'writing' && entry?.status === 'running' ? entry.execution_id : null;
-    const preview = state === 'replied' ? (entry?.last_reply?.preview ?? null) : null;
-    rows.push({
-      jobId: job.id,
-      conversationId: job.agent_conversation.id,
-      name: entry?.agent.name ?? job.agent_conversation.agent.name,
-      state,
-      executionId,
-      canStop: executionId !== null && entry?.can_send === true,
-      replyStart: preview ? plainPreview(preview) || preview : null,
-    });
-  }
-  return rows;
+/** A called entry's row. A turn is streamed only while the call is working and the turn still runs. */
+export function agentRow(entry: AgentConversation & { latest_call: AgentLatestCall }): AgentRow {
+  const state = agentRowState(entry.latest_call);
+  const executionId = state === 'writing' && entry.status === 'running' ? entry.execution_id : null;
+  const preview = state === 'replied' ? (entry.latest_call.reply?.preview ?? null) : null;
+  return {
+    conversationId: entry.id,
+    name: entry.agent.name,
+    state,
+    executionId,
+    canStop: executionId !== null && entry.can_send,
+    replyStart: preview ? plainPreview(preview) || preview : null,
+  };
 }
 
 /**
- * Whether the list of agent conversations is behind the jobs: a job runs that
- * the list does not show running yet (the list was read before its turn
- * began). The roster then reads the list again once.
+ * The rows by the message whose turn made each agent's newest call
+ * (`called_by_message_id`; an agent called again later moves to that turn),
+ * in the list's order (oldest first), so two agents called at once are two
+ * rows. An entry no agent called, or whose calling message is gone, has no
+ * turn to sit after, and no row.
  */
-export function rosterNeedsList(rows: readonly AgentRow[]): boolean {
-  return rows.some((row) => row.state === 'writing' && row.executionId === null);
+export function agentRowsByMessage(entries: readonly AgentConversation[]): ReadonlyMap<number, readonly AgentRow[]> {
+  const byMessage = new Map<number, AgentRow[]>();
+  for (const entry of entries) {
+    const call = entry.latest_call;
+    if (!call || call.called_by_message_id === null) continue;
+    const row = agentRow({ ...entry, latest_call: call });
+    const held = byMessage.get(call.called_by_message_id);
+    if (held) held.push(row);
+    else byMessage.set(call.called_by_message_id, [row]);
+  }
+  return byMessage;
+}
+
+/** Whether an agent in the list is still working: the list is read again on a beat until none is (Backend's rule). */
+export function agentsWorking(entries: readonly Pick<AgentConversation, 'latest_call'>[]): boolean {
+  return entries.some((entry) => entry.latest_call?.state === 'working');
 }

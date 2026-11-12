@@ -7,7 +7,23 @@
  * type into it.
  */
 
-import type { AgentRef } from './background-jobs';
+import type { AgentRef, BackgroundJobFailure } from './background-jobs';
+
+/**
+ * The newest call to an agent conversation (Backend, 12 November 2026, for
+ * C1): from that call's background job, whoever's it is, so every reader of
+ * the chat sees the same.
+ */
+export interface AgentLatestCall {
+  state: 'working' | 'replied' | 'failed' | 'cancelled';
+  /** Why it failed; null unless `state` is `failed`. */
+  failure: BackgroundJobFailure | null;
+  /** The parent chat's message whose turn made this call; null once that message is gone. */
+  called_by_message_id: number | null;
+  called_at: string;
+  /** This call's own reply; null until it replies, and when it failed or was cancelled. */
+  reply: { message_id: number; preview: string; created_at: string } | null;
+}
 
 /** `AgentConversationResource`: one agent conversation, as the list (3.1) and a send (3.3) return it. */
 export interface AgentConversation {
@@ -26,6 +42,8 @@ export interface AgentConversation {
   /** The parent chat's message whose turn opened it; null once that message is gone. */
   started_by_message_id: number | null;
   last_reply: { message_id: number; preview: string; created_at: string } | null;
+  /** The newest call to it; null when no agent ever called it (C1). */
+  latest_call: AgentLatestCall | null;
   messages_count: number;
   /** Whether the reader may type into it. */
   can_send: boolean;

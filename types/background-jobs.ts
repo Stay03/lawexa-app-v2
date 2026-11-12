@@ -45,9 +45,10 @@ export type BackgroundJobStatus = 'running' | 'succeeded' | 'failed' | 'cancelle
  * Why a failed job failed (Backend, 12 November 2026, for C1): `stopped` a
  * person pressed Stop on the agent's turn, `no_reply` the agent answered
  * nothing, `error` an error or a timeout, `gone` what it worked on is gone,
- * `wake_abandoned` Lawexa could not come back to it.
+ * `wake_abandoned` Lawexa could not come back to it, `stalled` it went quiet
+ * past the stall window.
  */
-export type BackgroundJobFailure = 'stopped' | 'no_reply' | 'error' | 'gone' | 'wake_abandoned';
+export type BackgroundJobFailure = 'stopped' | 'no_reply' | 'error' | 'gone' | 'wake_abandoned' | 'stalled';
 
 /**
  * Whether Lawexa has come back to an ended job: `null` while it runs or once
