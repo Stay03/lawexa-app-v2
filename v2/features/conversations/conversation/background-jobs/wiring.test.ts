@@ -126,8 +126,9 @@ test('the label reads out its state, not its page count, and Cancel says which j
   const label = here('background-jobs', 'BackgroundJobsLabel.tsx');
   assert.match(label, /<span aria-live="polite" className="min-w-0">\s*\{backgroundJobLabel\(job\)\}/);
   assert.doesNotMatch(label, /<ul aria-live/);
-  // A job that waits on another agent stops the waiting instead (sub-agents): its turn goes on.
-  assert.match(label, /aria-label=\{agentConversation \? `Stop waiting for \$\{agentConversation\.agent\.name\}` : `Cancel the \$\{job\.kind_name\}`\}/);
+  assert.match(label, /aria-label=\{`Cancel the \$\{job\.kind_name\}`\}/);
+  // A job that waits on another agent is that agent's row instead, with its own Stop (C1).
+  assert.match(label, /const jobs = held\?\.jobs\.filter\(\(job\) => job\.kind !== 'agent_reply'\) \?\? \[\];/);
   // Each job's cancel is held on its own.
   const context = here('background-jobs', 'context.tsx');
   assert.match(context, /cancelling=\{held\.cancelling\.has\(job\.id\)\}|const \[cancelling, setCancelling\] = useState<ReadonlySet<string>>/);

@@ -26,7 +26,14 @@ import {
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
 import { turnRowCount } from '@/v2/runtime/turn-rows';
 import { useScrollAnchoring } from '@/v2/runtime/scroll-anchoring';
-import { groupMessages, isLineGroup, lastQuestionGroupIndex, lastTurnGroupIndex, type MessageGroup } from './message-groups';
+import {
+  groupMessages,
+  isLineGroup,
+  lastQuestionGroupIndex,
+  lastTurnGroupIndex,
+  turnEndPlaces,
+  type MessageGroup,
+} from './message-groups';
 import { computeStreamStart } from './stream-start';
 import { splitOpenTail, type OpenTailLimit } from './open-tail';
 import { UserMessageRow } from './rows/UserMessageRow';
@@ -39,6 +46,7 @@ import { HandoverRow } from './rows/HandoverRow';
 import { ErrorRow } from './rows/ErrorRow';
 import { EventLineRow } from './rows/EventLineRow';
 import { BackgroundJobsLabel } from './background-jobs/BackgroundJobsLabel';
+import { AgentRoster } from './agents/AgentRoster';
 import { CompactToolChain } from './tools/CompactToolChain';
 import { CreatedQuizCards } from './cards/CreatedQuizCard';
 import { isFileListStep } from './files/chat-files';
@@ -434,6 +442,8 @@ export function MessageList({
   // Keyed on the (structurally stable) messages reference — stable group objects
   // across token flushes and unrelated parent re-renders, so GroupRow's memo holds.
   const groups = useMemo(() => groupMessages(messages), [messages]);
+  // Where each question's turn ends: the agents Lawexa messaged in it are drawn there (C1).
+  const turnEnds = useMemo(() => turnEndPlaces(groups, savedIdOf), [groups]);
   // A space chat's date separators and Lawexa marks (space-marks.ts); a
   // personal chat draws neither.
   const marks = useMemo(() => (showAuthors ? spaceMarks(groups) : null), [groups, showAuthors]);
@@ -794,6 +804,7 @@ export function MessageList({
                       onHold={setHeld}
                       redacted={redacted}
                     />
+                    {turnEnds.has(gi) ? <AgentRoster messageId={turnEnds.get(gi) ?? null} /> : null}
                   </Fragment>
                 ))}
                 {/* `activityIndex === groups.length` — nothing is being written yet, so

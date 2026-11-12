@@ -42,6 +42,14 @@ export interface AgentReplyOutcome {
 export type BackgroundJobStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 /**
+ * Why a failed job failed (Backend, 12 November 2026, for C1): `stopped` a
+ * person pressed Stop on the agent's turn, `no_reply` the agent answered
+ * nothing, `error` an error or a timeout, `gone` what it worked on is gone,
+ * `wake_abandoned` Lawexa could not come back to it.
+ */
+export type BackgroundJobFailure = 'stopped' | 'no_reply' | 'error' | 'gone' | 'wake_abandoned';
+
+/**
  * Whether Lawexa has come back to an ended job: `null` while it runs or once
  * cancelled, `pending` ended and not answered yet, `woken` answered,
  * `abandoned` Lawexa could not come back (the give-up line was written).
@@ -70,6 +78,8 @@ export interface BackgroundJob {
   /** The person's message whose turn started the job; null once that message is gone. */
   started_by_message_id: number | null;
   wake: BackgroundJobWake;
+  /** Why it failed; null while it runs, when it did not fail, and on a server that does not send it. */
+  failure?: BackgroundJobFailure | null;
   /** On an `agent_reply` job: the agent conversation it follows; null or absent on every other kind. */
   agent_conversation?: JobAgentConversation | null;
 }

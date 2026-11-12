@@ -1,16 +1,10 @@
-import type { BackgroundJob, BackgroundJobOutcome, AgentReplyOutcome } from '@/types/background-jobs';
-import { plainPreview } from '../../plain-preview';
-
 /**
  * agents model — the pure rules of sub-agents in a chat (contract:
  * docs/api/sub-agents-contract.md, sections 3 and 4). Lawexa messages another
  * agent with `message_agent`; the agent answers in an agent conversation of
- * its own, in the background; Lawexa is woken with its reply. The chat shows
- * three states under the person's message:
- *
- *   Writing to Issue Spotter…    the call, while Lawexa's turn streams
- *   Waiting for Issue Spotter…   the background job, until the reply lands
- *   Issue Spotter replied        a preview row in Lawexa's return, "Open full"
+ * its own, in the background; Lawexa is woken with its reply. The call shows
+ * as Lawexa's step ("Writing to Issue Spotter"); the agent itself is a row
+ * after the turn's answer (agent-roster.ts).
  *
  * An agent conversation is named by its agent and opened by its uuid; the
  * model's handle (issue-spotter-1) is never shown.
@@ -58,56 +52,4 @@ export function messageAgentStep(
   const slug = typeof parameters.agent === 'string' ? parameters.agent : '';
   const name = calledAgentName(result) ?? (slug ? agentNameFromSlug(slug) : 'another agent');
   return { action: isComplete ? `Wrote to ${name}` : `Writing to ${name}` };
-}
-
-/** The agent conversation a job follows, when it waits on another agent; null for every other job. */
-export function jobAgentConversation(job: Pick<BackgroundJob, 'kind' | 'agent_conversation'>): BackgroundJob['agent_conversation'] {
-  return job.kind === 'agent_reply' ? (job.agent_conversation ?? null) : null;
-}
-
-/**
- * The status line's words for an agent's job, by the job's state
- * (background-jobs/model.ts): waiting while it runs; replied, or could not
- * reply, once it ends, with "Lawexa will reply shortly" until Lawexa comes
- * back; and, cancelled, that the chat stopped waiting (the agent's turn goes
- * on in its own conversation, contract 2.4).
- */
-export function agentJobLabel(
-  name: string,
-  state: 'running' | 'replying' | 'done' | 'failed' | 'cancelled' | 'unanswered',
-  failed: boolean,
-): string {
-  switch (state) {
-    case 'running':
-      return `Waiting for ${name}…`;
-    case 'replying':
-      return `${name} ${failed ? 'could not reply' : 'replied'}. Lawexa will reply shortly.`;
-    case 'cancelled':
-      return `Stopped waiting for ${name}`;
-    case 'failed':
-      return `${name} could not reply`;
-    case 'unanswered':
-      return failed ? `${name} could not reply` : `${name} replied`;
-    default:
-      return `${name} replied`;
-  }
-}
-
-/** The replies a return carries, one preview row each, in the return's order. */
-export function agentReplies(outcomes: readonly Pick<BackgroundJobOutcome, 'kind' | 'outcome' | 'agent_reply'>[]): (AgentReplyOutcome & {
-  failed: boolean;
-})[] {
-  return outcomes
-    .filter((outcome) => outcome.kind === 'agent_reply' && outcome.agent_reply)
-    .map((outcome) => ({ ...(outcome.agent_reply as AgentReplyOutcome), failed: outcome.outcome === 'failed' }));
-}
-
-/**
- * A reply row's words: the preview as plain text (the server's preview is the
- * reply's markdown, whose "**" and "*" the row printed; S1 pictures, 12
- * November 2026), or that the agent could not reply.
- */
-export function agentReplyText(reply: { agent: { name: string }; preview: string | null; failed: boolean }): string {
-  if (reply.failed || !reply.preview) return `${reply.agent.name} could not reply.`;
-  return plainPreview(reply.preview) || reply.preview;
 }

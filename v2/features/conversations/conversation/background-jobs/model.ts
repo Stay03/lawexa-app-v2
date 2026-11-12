@@ -1,5 +1,4 @@
 import type { BackgroundJob, BackgroundJobKind, BackgroundJobOutcome } from '@/types/background-jobs';
-import { agentJobLabel } from '../agents/agent-model';
 
 /**
  * background-jobs model — the pure rules of a chat's background jobs
@@ -48,15 +47,9 @@ export function backgroundJobProgress(job: Pick<BackgroundJob, 'progress'>): str
 
 /**
  * The label's words, by state (Backend's doc, section 1). A job that waits on
- * another agent names the agent: "Waiting for Issue Spotter…" (sub-agents
- * contract, section 4).
+ * another agent has no label: it is that agent's row (agents/agent-roster.ts).
  */
-export function backgroundJobLabel(
-  job: Pick<BackgroundJob, 'status' | 'wake' | 'kind_name'> & Partial<Pick<BackgroundJob, 'kind' | 'agent_conversation'>>,
-): string {
-  if (job.kind === 'agent_reply' && job.agent_conversation) {
-    return agentJobLabel(job.agent_conversation.agent.name, backgroundJobState(job), job.status === 'failed');
-  }
+export function backgroundJobLabel(job: Pick<BackgroundJob, 'status' | 'wake' | 'kind_name'>): string {
   const kind = capitalised(job.kind_name);
   switch (backgroundJobState(job)) {
     case 'running':

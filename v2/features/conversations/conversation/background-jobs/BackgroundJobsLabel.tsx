@@ -13,8 +13,6 @@ import {
   type BackgroundJobState,
 } from './model';
 import { useBackgroundJobsOf } from './context';
-import { jobAgentConversation } from '../agents/agent-model';
-import { useSidePanel } from '../side-panel/SidePanelContext';
 
 /**
  * BackgroundJobsLabel — under the message whose turn started background work,
@@ -28,10 +26,12 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
  */
 export function BackgroundJobsLabel({ messageId }: { messageId: number | null }) {
   const held = useBackgroundJobsOf(messageId);
-  if (!held) return null;
+  // A job that waits on another agent is that agent's row after the turn's answer (AgentRoster, C1).
+  const jobs = held?.jobs.filter((job) => job.kind !== 'agent_reply') ?? [];
+  if (!held || jobs.length === 0) return null;
   return (
     <ul className="mt-1.5 flex flex-col items-end gap-1 px-4">
-      {held.jobs.map((job) => (
+      {jobs.map((job) => (
         <JobLine
           key={job.id}
           job={job}
@@ -60,9 +60,6 @@ function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling
   const Icon = STATE_ICON[state];
   const progress = state === 'running' ? backgroundJobProgress(job) : null;
   const spinning = state === 'running' || state === 'replying';
-  // A job that waits on another agent opens that agent's conversation beside the chat (sub-agents).
-  const agentConversation = jobAgentConversation(job);
-  const panel = useSidePanel();
   return (
     // Wraps on a narrow screen rather than cutting the words: on a phone the
     // running line read "file r…" (fixture pictures, 11 November 2026).
@@ -78,26 +75,15 @@ function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling
         {backgroundJobLabel(job)}
       </span>
       {progress ? <span className="shrink-0 tabular-nums">· {progress}</span> : null}
-      {agentConversation && panel ? (
-        <button
-          type="button"
-          onClick={() => panel.open({ kind: 'agent', id: agentConversation.id })}
-          aria-label={`Open the conversation with ${agentConversation.agent.name}`}
-          className={cn(LINE_BUTTON, FOCUS_RING)}
-        >
-          Open
-        </button>
-      ) : null}
       {canCancelBackgroundJob(job) ? (
         <button
           type="button"
           onClick={onCancel}
           disabled={cancelling}
-          // Cancelling an agent's job stops the chat waiting; the agent's own turn goes on (contract 2.4).
-          aria-label={agentConversation ? `Stop waiting for ${agentConversation.agent.name}` : `Cancel the ${job.kind_name}`}
+          aria-label={`Cancel the ${job.kind_name}`}
           className={cn(LINE_BUTTON, FOCUS_RING)}
         >
-          {cancelling ? (agentConversation ? 'Stopping…' : 'Cancelling…') : agentConversation ? 'Stop waiting' : 'Cancel'}
+          {cancelling ? 'Cancelling…' : 'Cancel'}
         </button>
       ) : null}
     </li>

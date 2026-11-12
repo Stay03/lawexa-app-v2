@@ -89,3 +89,31 @@ export function lastTurnGroupIndex(groups: readonly MessageGroup[]): number {
   }
   return -1;
 }
+
+/**
+ * Where each question's turn ends: the group index after which the agents
+ * Lawexa messaged in that turn are drawn (C1, 12 November 2026), mapped to
+ * the question's saved id. A turn runs from the question to the group before
+ * the next question or line (Lawexa's return is a line), or to the end. A
+ * question not saved yet has no jobs and no place.
+ */
+export function turnEndPlaces(
+  groups: readonly MessageGroup[],
+  savedIdOf: (message: EngineMessage) => number | null,
+): ReadonlyMap<number, number> {
+  const places = new Map<number, number>();
+  let open: number | null = null;
+  let last = -1;
+  const close = () => {
+    if (open !== null && last !== -1) places.set(last, open);
+    open = null;
+  };
+  groups.forEach((group, index) => {
+    const startsTurn = group.type === 'single' && group.message.role === 'user';
+    if (startsTurn || isLineGroup(group)) close();
+    if (startsTurn) open = savedIdOf(group.message);
+    last = index;
+  });
+  close();
+  return places;
+}

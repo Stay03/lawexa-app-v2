@@ -3,22 +3,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { BackgroundJob, BackgroundJobOutcome } from '@/types/background-jobs';
-import { backgroundJobLabel, backgroundReturnLine } from '../background-jobs/model';
+import type { BackgroundJobOutcome } from '@/types/background-jobs';
+import { backgroundReturnLine } from '../background-jobs/model';
 import { parseSidePanelValue, sidePanelValue } from '../side-panel/side-panel-value';
-import {
-  agentJobLabel,
-  agentNameFromSlug,
-  agentReplies,
-  agentReplyText,
-  calledAgentName,
-  jobAgentConversation,
-  messageAgentStep,
-} from './agent-model';
+import { agentNameFromSlug, calledAgentName, messageAgentStep } from './agent-model';
 
 /* Sub-agents in a chat (docs/api/sub-agents-contract.md, sections 3 and 4):
- * "Writing to X…", "Waiting for X…", and X's reply with "Open full". TEST DATA
- * only. */
+ * Lawexa's step "Writing to X", the return's line, and the agent's
+ * conversation beside the chat. The agents' rows are agent-roster.test.ts.
+ * TEST DATA only. */
 
 const SPOTTER = { id: 231, name: 'Issue Spotter', slug: 'issue-spotter' };
 const EXPERT = { id: 229, name: 'Expert', slug: 'expert' };
@@ -44,38 +37,7 @@ test('the call reads "Writing to Issue Spotter" from the slug, then by the name 
   assert.match(step, /case MESSAGE_AGENT_TOOL:\s*return messageAgentStep\(parameters, isComplete, toolResult\);/);
 });
 
-const job = (patch: Partial<BackgroundJob>): BackgroundJob => ({
-  id: 'job-1',
-  kind: 'agent_reply',
-  kind_name: 'message to another agent',
-  status: 'running',
-  progress: null,
-  started_at: '2026-11-12T09:12:03+00:00',
-  finished_at: null,
-  started_by_message_id: 81234,
-  wake: null,
-  agent_conversation: { id: CONVERSATION, agent: SPOTTER },
-  ...patch,
-});
-
-test('the waiting line names the agent, through every state of its job', () => {
-  assert.equal(backgroundJobLabel(job({})), 'Waiting for Issue Spotter…');
-  assert.equal(backgroundJobLabel(job({ status: 'succeeded', wake: 'pending' })), 'Issue Spotter replied. Lawexa will reply shortly.');
-  assert.equal(backgroundJobLabel(job({ status: 'failed', wake: 'pending' })), 'Issue Spotter could not reply. Lawexa will reply shortly.');
-  assert.equal(backgroundJobLabel(job({ status: 'succeeded', wake: 'woken' })), 'Issue Spotter replied');
-  assert.equal(backgroundJobLabel(job({ status: 'failed', wake: 'woken' })), 'Issue Spotter could not reply');
-  assert.equal(backgroundJobLabel(job({ status: 'cancelled' })), 'Stopped waiting for Issue Spotter');
-  assert.equal(agentJobLabel('Expert', 'unanswered', true), 'Expert could not reply');
-  // Other kinds read as before.
-  assert.equal(
-    backgroundJobLabel(job({ kind: 'file_transcription', kind_name: 'file reading', agent_conversation: null })),
-    'Running in the background: file reading',
-  );
-  assert.deepEqual(jobAgentConversation(job({})), { id: CONVERSATION, agent: SPOTTER });
-  assert.equal(jobAgentConversation(job({ kind: 'radar_scan', agent_conversation: { id: CONVERSATION, agent: SPOTTER } })), null);
-});
-
-test('the return names the agents that answered, and each gets a preview row', () => {
+test('the return names the agents that answered', () => {
   const outcomes: BackgroundJobOutcome[] = [
     {
       job_id: '4b0c',
@@ -93,14 +55,6 @@ test('the return names the agents that answered, and each gets a preview row', (
   assert.equal(backgroundReturnLine(outcomes.slice(0, 1)), 'Issue Spotter replied. Lawexa is continuing.');
   assert.equal(backgroundReturnLine(outcomes.slice(1)), 'Expert could not reply. Lawexa is continuing.');
   assert.equal(backgroundReturnLine(outcomes), '2 background jobs ended. Lawexa is continuing.');
-  const replies = agentReplies([...outcomes, { job_id: 'x', kind: 'file_transcription', outcome: 'succeeded' }]);
-  assert.deepEqual(
-    replies.map((reply) => [reply.agent.name, reply.agent_conversation_id, reply.failed, agentReplyText(reply)]),
-    [
-      ['Issue Spotter', CONVERSATION, false, 'Three issues arise from these facts.'],
-      ['Expert', OTHER, true, 'Expert could not reply.'],
-    ],
-  );
 });
 
 test('an agent conversation opens in the chat’s side panel by its uuid', () => {
@@ -110,9 +64,8 @@ test('an agent conversation opens in the chat’s side panel by its uuid', () =>
   for (const bad of ['agent:', 'agent:issue-spotter-1', 'agent:123', 'agent:../x']) assert.equal(parseSidePanelValue(bad), null, bad);
 
   const read = (...parts: string[]) => readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', ...parts), 'utf8');
-  assert.match(read('background-jobs', 'BackgroundJobsLabel.tsx'), /onClick=\{\(\) => panel\.open\(\{ kind: 'agent', id: agentConversation\.id \}\)\}/);
-  assert.match(read('agents', 'AgentReplyRows.tsx'), /onClick=\{\(\) => panel\.open\(\{ kind: 'agent', id: reply\.agent_conversation_id \}\)\}/);
-  assert.match(read('rows', 'EventLineRow.tsx'), /const replies = returned \? agentReplies\(line\.jobs\) : \[\];/);
+  // Each agent's row opens its conversation ("Read the reply", "Open its conversation").
+  assert.match(read('agents', 'AgentRoster.tsx'), /const open = panel \? \(\) => panel\.open\(\{ kind: 'agent', id: row\.conversationId \}\) : null;/);
 });
 
 // Review finding 1 (12 November 2026): in a Space, the root chat's owner and
@@ -127,11 +80,4 @@ test("the agent panel's write box and Stop follow the server's can_send, never a
   assert.match(panel, /\{running \? \(\s*<button\s+type="button"\s+onClick=\{stop\}/);
   assert.doesNotMatch(panel, /viewerId\s*[!=]==|[!=]==\s*viewerId|user_id|started_by/);
   assert.doesNotMatch(readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'background-jobs', 'model.ts'), 'utf8'), /user_id|viewerId/);
-});
-
-test("a reply row shows the start of the agent's reply as plain words, never its markdown marks", () => {
-  const reply = { agent: { name: 'Issue Spotter' }, failed: false, preview: '**ISSUES ARISING — TENANT**\n*Assumed framework: Lagos…' };
-  assert.equal(agentReplyText(reply), 'ISSUES ARISING — TENANT Assumed framework: Lagos…');
-  assert.equal(agentReplyText({ ...reply, preview: null }), 'Issue Spotter could not reply.');
-  assert.equal(agentReplyText({ ...reply, failed: true }), 'Issue Spotter could not reply.');
 });
