@@ -1,4 +1,5 @@
 import type { BackgroundJob, BackgroundJobOutcome, AgentReplyOutcome } from '@/types/background-jobs';
+import { plainPreview } from '../../plain-preview';
 
 /**
  * agents model — the pure rules of sub-agents in a chat (contract:
@@ -101,8 +102,12 @@ export function agentReplies(outcomes: readonly Pick<BackgroundJobOutcome, 'kind
     .map((outcome) => ({ ...(outcome.agent_reply as AgentReplyOutcome), failed: outcome.outcome === 'failed' }));
 }
 
-/** A reply row's words: the preview, or that the agent could not reply. */
+/**
+ * A reply row's words: the preview as plain text (the server's preview is the
+ * reply's markdown, whose "**" and "*" the row printed; S1 pictures, 12
+ * November 2026), or that the agent could not reply.
+ */
 export function agentReplyText(reply: { agent: { name: string }; preview: string | null; failed: boolean }): string {
   if (reply.failed || !reply.preview) return `${reply.agent.name} could not reply.`;
-  return reply.preview;
+  return plainPreview(reply.preview) || reply.preview;
 }

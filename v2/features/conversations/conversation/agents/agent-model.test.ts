@@ -128,3 +128,10 @@ test("the agent panel's write box and Stop follow the server's can_send, never a
   assert.doesNotMatch(panel, /viewerId\s*[!=]==|[!=]==\s*viewerId|user_id|started_by/);
   assert.doesNotMatch(readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'background-jobs', 'model.ts'), 'utf8'), /user_id|viewerId/);
 });
+
+test("a reply row shows the start of the agent's reply as plain words, never its markdown marks", () => {
+  const reply = { agent: { name: 'Issue Spotter' }, failed: false, preview: '**ISSUES ARISING — TENANT**\n*Assumed framework: Lagos…' };
+  assert.equal(agentReplyText(reply), 'ISSUES ARISING — TENANT Assumed framework: Lagos…');
+  assert.equal(agentReplyText({ ...reply, preview: null }), 'Issue Spotter could not reply.');
+  assert.equal(agentReplyText({ ...reply, failed: true }), 'Issue Spotter could not reply.');
+});
