@@ -209,10 +209,20 @@ test('the agents’ rows go after the answer of the turn that called them, befor
   ) as EngineMessage[];
   const groups = groupMessages(rows);
   const places = turnEndPlaces(groups, savedIdOf);
-  // Question 1's turn ends at its answer (group 1); question 5's at itself (nothing after it yet).
+  // Question 1's turn ends at its answer (group 1). The return (3) starts the
+  // turn it wakes, ending at that turn's answer (group 3). Question 5's ends at
+  // itself (nothing after it yet).
   assert.deepEqual([...places.entries()], [
     [1, 1],
+    [3, 3],
     [4, 5],
+  ]);
+
+  // While the woken turn has written nothing yet, its calls sit right after the return line.
+  const waking = groupMessages(rows.slice(0, 3));
+  assert.deepEqual([...turnEndPlaces(waking, savedIdOf).entries()], [
+    [1, 1],
+    [2, 3],
   ]);
 
   // A question not saved yet has no place: no agent was called from it.
@@ -222,6 +232,28 @@ test('the agents’ rows go after the answer of the turn that called them, befor
   const list = here('MessageList.tsx');
   assert.match(list, /const turnEnds = useMemo\(\(\) => turnEndPlaces\(groups, savedIdOf\), \[groups\]\);/);
   assert.match(list, /\{turnEnds\.has\(gi\) \? <AgentRoster messageId=\{turnEnds\.get\(gi\) \?\? null\} \/> : null\}/);
+});
+
+test('an agent Lawexa calls again from its return has a row after the woken turn, never none', () => {
+  // The C1 stack run (12 November 2026): after Expert was stopped, Lawexa's
+  // woken turn called Expert again, so latest_call named the return's id.
+  const rows = transformApiMessages(
+    [
+      message(1, 'user', 'TEST DATA. Ask Expert about the quit notice.'),
+      message(2, 'assistant', 'TEST DATA. I’ve asked Expert.'),
+      message(3, 'user', 'Background work you started earlier in this chat has ended: …', {
+        type: 'background_job_result',
+        background_jobs: [{ job_id: 'job-1', kind: 'agent_reply', outcome: 'failed' }],
+      }),
+      message(4, 'assistant', 'TEST DATA. Expert was stopped, so I have asked it again.'),
+    ],
+    { events: true },
+  ) as EngineMessage[];
+  const places = turnEndPlaces(groupMessages(rows), savedIdOf);
+  const again = agentRowsByMessage([entry({ id: EXPERT_CHAT, agent: EXPERT }, { called_by_message_id: 3 })]);
+  const placed = [...places.values()].filter((id) => again.has(id));
+  assert.deepEqual(placed, [3]);
+  assert.equal([...places.entries()].find(([, id]) => id === 3)?.[0], 3);
 });
 
 test('every reader of the chat sees the rows: they come from the chat’s list, never the reader’s own jobs', () => {

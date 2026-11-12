@@ -93,9 +93,13 @@ export function lastTurnGroupIndex(groups: readonly MessageGroup[]): number {
 /**
  * Where each question's turn ends: the group index after which the agents
  * Lawexa messaged in that turn are drawn (C1, 12 November 2026), mapped to
- * the question's saved id. A turn runs from the question to the group before
- * the next question or line (Lawexa's return is a line), or to the end. A
- * question not saved yet has no jobs and no place.
+ * the id of the message that began the turn. A turn runs from its start to
+ * the group before the next start or line, or to the end. A question starts
+ * one, and so does Lawexa's return (`background_job_result`): the turn it
+ * wakes can message an agent too, and the server names the return's id as
+ * that call's (the C1 stack run, 12 November 2026: Lawexa called Expert again
+ * from its return, and the row had nowhere to go). A question not saved yet
+ * has called no agent and has no place.
  */
 export function turnEndPlaces(
   groups: readonly MessageGroup[],
@@ -109,9 +113,12 @@ export function turnEndPlaces(
     open = null;
   };
   groups.forEach((group, index) => {
-    const startsTurn = group.type === 'single' && group.message.role === 'user';
-    if (startsTurn || isLineGroup(group)) close();
-    if (startsTurn) open = savedIdOf(group.message);
+    const message = group.type === 'single' ? group.message : null;
+    const isQuestion = message !== null && message.role === 'user';
+    const isReturn = message !== null && isEventMessage(message) && message.eventType === 'background_job_result';
+    if (isQuestion || isLineGroup(group)) close();
+    if (isQuestion) open = savedIdOf(message);
+    else if (isReturn) open = message.serverId;
     last = index;
   });
   close();
