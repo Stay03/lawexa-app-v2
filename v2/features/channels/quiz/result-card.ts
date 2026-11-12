@@ -1,6 +1,7 @@
 import { CAMPAIGN_LINE, formatCount, ordinal, shareName } from '@/lib/wrapped/copy';
 import type { PosterContent } from '@/lib/wrapped/share-image';
 import { VIBE_BACKGROUNDS } from '@/lib/wrapped/theme';
+import { podiumInstitution } from '@/v2/features/quiz/solo/home-model';
 
 /**
  * The live quiz's result card: one player's finish as Wrapped's poster
@@ -27,6 +28,8 @@ export interface ResultCardInput {
   playerName: string;
   /** The player's photo, when they have one; their place stands in the polaroid when not. */
   avatarUrl: string | null;
+  /** Where the player studies, when the server sent it (the polaroid's second line, as Wrapped's campus). */
+  institution: string | null;
   rank: number;
   score: number;
   correctCount: number;
@@ -101,7 +104,9 @@ export function resultPoster(input: ResultCardInput): PosterContent {
     background: VIBE_BACKGROUNDS[resultFrame(input.rank).colour],
     kicker: input.spaceName ? `LIVE QUIZ · ${input.spaceName.toUpperCase()}` : 'LIVE QUIZ',
     line: `Came ${place} in ${input.quizTitle}`,
-    caption: { name: cardName(input.playerName), sub: input.spaceName },
+    // Where they study under the name, as Wrapped prints the campus and the podium shortens it ("Lagos
+    // Campus"). Not the Space: the kicker names it, and a Space's name runs under the sticker.
+    caption: { name: cardName(input.playerName), sub: input.institution ? podiumInstitution(input.institution) : null },
     mark: place,
     banner: resultBanner(input.rank),
     stickers: [

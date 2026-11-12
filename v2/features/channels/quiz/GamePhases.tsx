@@ -681,6 +681,7 @@ export function PodiumStage({
     return {
       playerName: own.user.name,
       avatarUrl: own.user.avatar_url,
+      institution: own.user.institution ?? null,
       rank: own.rank,
       score: own.score,
       correctCount: own.correct_count,

@@ -27,6 +27,7 @@ const quiz = (file: string) => read('v2', 'features', 'channels', 'quiz', file);
 const INPUT: ResultCardInput = {
   playerName: 'Ada Obi',
   avatarUrl: null,
+  institution: 'Nigerian Law School – Lagos Campus',
   rank: 2,
   score: 18400,
   correctCount: 8,
@@ -45,7 +46,9 @@ test('the card is Wrapped’s poster with the player’s finish on it', () => {
   assert.equal(poster.kicker, 'LIVE QUIZ · LASU LSS');
   assert.equal(poster.line, 'Came 2nd in Torts 101');
   // First name and last initial, Wrapped's rule for a name on a public picture.
-  assert.deepEqual(poster.caption, { name: 'Ada O.', sub: 'LASU LSS' });
+  // Where they study under the name, the campus alone as the podium shortens it; the Space is in the kicker.
+  assert.deepEqual(poster.caption, { name: 'Ada O.', sub: 'Lagos Campus' });
+  assert.equal(resultPoster({ ...INPUT, institution: 'University of Lagos' }).caption.sub, 'University of Lagos');
   assert.equal(poster.mark, '2nd');
   assert.equal(poster.banner, 'Made the Podium');
   // Points past Wrapped's 9,999+ cap are printed whole.
@@ -64,7 +67,7 @@ test('the card is Wrapped’s poster with the player’s finish on it', () => {
   assert.equal(cardName('Oluwaseyifunmi Adebanjo-Okonkwo'), 'Oluwaseyifunmi A.');
   assert.equal(cardName('Tobi'), 'Tobi');
 
-  const bare = resultPoster({ ...INPUT, spaceName: null, playerCount: 1, score: 1 });
+  const bare = resultPoster({ ...INPUT, spaceName: null, institution: null, playerCount: 1, score: 1 });
   assert.equal(bare.kicker, 'LIVE QUIZ');
   assert.equal(bare.caption.sub, null);
   assert.deepEqual(bare.stickers.slice(0, 2), [
