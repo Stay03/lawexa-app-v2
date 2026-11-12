@@ -24,6 +24,15 @@ test("an agent's reply preview loses its emphasis and link marks, and keeps mark
   assert.equal(plainPreview('* first\n* second'), 'first second');
 });
 
+test('a preview whose line breaks the server folded loses its mid-line heading marks, and keeps a number sign', () => {
+  // The C1 stack pictures (12 November 2026): Expert's reply preview came folded onto one line.
+  assert.equal(
+    plainPreview('# The Seven-Day Quit Notice: Advice ## Preliminary: which statute governs The shop is in Ikeja.'),
+    'The Seven-Day Quit Notice: Advice Preliminary: which statute governs The shop is in Ikeja.',
+  );
+  assert.equal(plainPreview('Ground #1 and issue #2 stand'), 'Ground #1 and issue #2 stand');
+});
+
 test("a Space chat row shows the answer's words, not its marks", () => {
   const at = '2026-10-20T10:00:00Z';
   assert.equal(

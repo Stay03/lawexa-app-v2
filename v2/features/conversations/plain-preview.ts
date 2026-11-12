@@ -5,13 +5,16 @@
  * chat row printed "**" and "##" (Tester, 20 October 2026, finding 29); a
  * reply quote already cleaned it this way. Single-mark emphasis ("*Assumed
  * framework*") and a link's address go too: an agent's reply preview printed
- * them (sub-agents E2E pictures, 12 November 2026). A mark inside a word
- * (snake_case, 2*3) stays.
+ * them (sub-agents E2E pictures, 12 November 2026). A heading's marks go
+ * mid-line too: the server's reply preview has its line breaks folded, so
+ * "# Advice ## Preliminary" kept the second "##" (C1 stack pictures, 12
+ * November 2026). A mark inside a word (snake_case, 2*3, #1) stays.
  */
 export function plainPreview(text: string): string {
   return text
     .replace(/<[^>]+>/g, ' ')
     .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+/gm, '')
+    .replace(/(^|\s)#{1,6}\s+/g, '$1')
     .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
     .replace(/(\*\*|__|`)/g, '')
     .replace(/(^|[\s(])[*_](?=\S)/g, '$1')
