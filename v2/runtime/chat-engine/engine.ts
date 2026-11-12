@@ -77,6 +77,7 @@ import type {
   StreamSmoothingConfig,
 } from './types';
 import { answerMessageId, stampAnswerId } from './answer-id';
+import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
 import { adoptServerFields } from './server-fields';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
@@ -1335,6 +1336,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // Snapshot the dedup set built from history — skip SSE events already rendered.
     const dedup = dedupKeys;
+    // The rows on screen before this connection drew anything: a run whose
+    // answer is among them had already ended (`completed` below).
+    const heldAtConnect: ReadonlySet<string> = new Set(state.messages.map((m) => m.id));
     /* Seeded AT CONNECT, not left at 0 until the first data event. A stream that
        opens, heartbeats, and never carries a single data event is precisely the
        "the service died and nobody told the connection" case; leaving this unset
@@ -1622,6 +1626,20 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       settleTurn(event.persisted_message_ids);
 
+      // The run's saved answer was on screen before this connection: the
+      // server reported an ended run as still going, and this is its replay.
+      // What the replay drew goes, and the saved answer stands alone.
+      const savedAnswerId = answerMessageId(event.persisted_message_ids);
+      if (answerAlreadyShown(state.messages, savedAnswerId, heldAtConnect)) {
+        if (streamingMessageId) takeReasoning(streamingMessageId);
+        streamingMessageId = null;
+        currentIteration = null;
+        resetStreamingBuffers();
+        setMessages((msgs) => withoutReplayedRows(msgs, heldAtConnect));
+        handlers.onCompleted?.(event);
+        return;
+      }
+
       const convId = conversationId;
       const confidential = !!convId && isConfidential(convId);
       const finalText = event.content ?? event.message ?? '';
@@ -1722,7 +1740,6 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       }
       // The answer just drawn from the stream has a local row id; the event's ids
       // name its saved copy (answer-id.ts), which the Word export asks for.
-      const savedAnswerId = answerMessageId(event.persisted_message_ids);
       if (savedAnswerId !== null) {
         setMessages((msgs) => stampAnswerId(msgs, savedAnswerId, (id) => id.startsWith(LOCAL_ROW_PREFIX)));
       }
