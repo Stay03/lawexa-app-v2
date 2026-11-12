@@ -1,4 +1,4 @@
-import type { CardFormat, CardTier } from './result-card';
+import type { CardFormat, CardPlace, CardTier } from './result-card';
 
 /**
  * Where everything on the live quiz's result card sits, in the card's own
@@ -101,7 +101,8 @@ const SQUARE_HEADLINES: Readonly<Record<number, HeadlineSetting & { sublineTop: 
   11: { size: 53, baselines: [242, 292], sublineTop: 359 },
 };
 
-const settingKey = (rank: number) => (rank >= 1 && rank <= 10 ? rank : 11);
+/** A one-player card (no place) is set as the card past the top 10. */
+const settingKey = (rank: CardPlace) => (rank !== null && rank >= 1 && rank <= 10 ? rank : 11);
 
 export interface CardLayout {
   width: number;
@@ -175,7 +176,7 @@ export const CARD_LAYOUTS: Record<CardFormat, CardLayout> = {
 };
 
 /** The headline's size and baselines for a place, and on the square where the line under it starts. */
-export function headlineSetting(format: CardFormat, rank: number): HeadlineSetting & { sublineTop: number } {
+export function headlineSetting(format: CardFormat, rank: CardPlace): HeadlineSetting & { sublineTop: number } {
   if (format === 'story') {
     return { ...STORY_HEADLINES[settingKey(rank)], sublineTop: CARD_LAYOUTS.story.subline.lastBaseline };
   }
@@ -217,7 +218,7 @@ export function sublineLines(
   lead: string,
   title: string,
   format: CardFormat,
-  rank: number,
+  rank: CardPlace,
   measure: Measure,
 ): { size: number; lines: { text: string; baseline: number }[] } {
   const box = CARD_LAYOUTS[format].subline;

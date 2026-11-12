@@ -5,16 +5,21 @@ import { join } from 'node:path';
 
 import type { QuizGameResults, QuizRankingRow } from '@/types/channel-quiz';
 import { LIVE_BOARD_RULES_NOTE, liveGameBoard, liveRowNote } from './live-board';
+import { quizShareInvite } from '@/lib/constants/quiz-share';
 import {
+  accuracyPercent,
   cardCta,
   cardHeadline,
   cardInitials,
   cardName,
+  cardPlace,
   cardStats,
   cardSubline,
   cardTier,
+  podiumText,
   pointsText,
   resultCardCopy,
+  shareCaption,
   topPercent,
   type ResultCardInput,
 } from './result-card';
@@ -265,9 +270,9 @@ test('the card is drawn on the device with its own fonts, in both sizes, and Wra
   assert.match(card, /loadCardFonts\(cardText\(input\)\), loadImage\(corsPhotoUrl\(input\.avatarUrl\)\)/);
   assert.match(card, /for \(const each of CARD_FORMATS\) \{\s*const canvas = document\.createElement\('canvas'\);\s*drawResultCard\(canvas, input, each, photo\);/);
   assert.match(card, /<TabsTrigger key=\{each\} value=\{each\}/);
-  assert.match(card, /await navigator\.share\(\{ files: \[current\.file\], text: link \? `\$\{copy\.shareText\} \$\{link\}` : copy\.shareText \}\);/);
+  assert.match(card, /await navigator\.share\(\{ files: \[current\.file\], text: caption \}\);/);
   assert.match(card, /if \(error instanceof DOMException && error\.name === 'AbortError'\) return;\s*setNote\('Sharing did not open\. Download the card and post it instead\.'\);/);
-  assert.match(card, /download\(current\.url, current\.file\.name\);\s*const copied = link \? await copyText\(link\) : false;\s*setNote\(copied \? 'Saved\. Your link is copied too\.' : 'Saved to your downloads\.'\);/);
+  assert.match(card, /download\(current\.url, current\.file\.name\);\s*const copied = await copyText\(caption\);\s*setNote\(copied \? 'Saved\. Caption and link copied\.' : 'Saved to your downloads\.'\);/);
   assert.match(quiz('ShareResults.tsx'), /const url = useResultsLink\(gameUuid\);/);
 
   // Wrapped keeps its own card: the live quiz only borrows the picture helpers it already exported.
@@ -356,4 +361,77 @@ test('a player gets their own card under the board; someone who only watched doe
   assert.match(read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx'), /spaceName=\{space\?\.name \?\? null\}/);
   assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /spaceName=\{spacePlace\?\.space\.name \?\? null\}/);
   assert.match(read('v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx'), /spaceName=\{channel\.space\.name\}/);
+});
+
+// Arthur's corrections (0f517a68, e3d57458, 12 November 2026), as the techlead set them.
+const SOLO: ResultCardInput = { ...ADA, playerCount: 1, score: 7120, correctCount: 7, answerableCount: 10 };
+
+test('a one-player card claims no place: no rank, ordinal or percentile; the score and how it went instead', () => {
+  assert.equal(cardPlace(SOLO), null);
+  assert.equal(cardPlace({ ...ADA, rank: 2, playerCount: 8 }), 2);
+  assert.equal(cardTier(cardPlace(SOLO)), 'field');
+  assert.deepEqual(cardHeadline(null), ['Well', 'played.']);
+  assert.equal(cardCta(null), 'Think you can beat me?');
+  assert.deepEqual(cardSubline(SOLO), { lead: 'Ada H. scored 7,120 points in', title: 'Torts 101' });
+  assert.deepEqual(cardStats(SOLO), [
+    { value: '7,120', label: 'points' },
+    { value: '7/10', label: 'correct' },
+    { value: '70%', label: 'accuracy' },
+  ]);
+  assert.equal(podiumText(SOLO), '7,120 pts');
+  const copy = resultCardCopy(SOLO, 'story');
+  assert.equal(copy.fileName, 'lawexa-quiz-score-story.png');
+  assert.equal(copy.shareText, 'Ada H. scored 7,120 points in Torts 101, LASU LSS. Think you can beat me? Play the live quiz on Lawexa.');
+  assert.equal(copy.alt, 'Well played. Ada H. scored 7,120 points in Torts 101. 7,120 points, 7/10 correct, 70% accuracy.');
+  for (const text of [copy.shareText, copy.alt]) assert.doesNotMatch(text, /\b1st\b|\bTop\b|of 1\b|placed/);
+  // The headline is set as the card past the top 10.
+  assert.deepEqual(headlineSetting('story', null), headlineSetting('story', 23));
+  assert.deepEqual(headlineSetting('square', null), headlineSetting('square', 23));
+});
+
+test('two or more players show the place; "Top N%" only from 10 players, accuracy below', () => {
+  const second = { ...ADA, rank: 2, playerCount: 8, correctCount: 9, answerableCount: 10 };
+  assert.deepEqual(cardSubline(second).lead, 'Ada H. placed 2nd of 8 in');
+  assert.deepEqual(cardStats(second)[2], { value: '90%', label: 'accuracy' });
+  assert.equal(podiumText(second), '2nd');
+  const fifth = { ...ADA, rank: 5, playerCount: 12 };
+  assert.deepEqual(cardStats(fifth)[2], { value: 'Top 42%', label: 'of players' });
+  assert.deepEqual(cardStats({ ...ADA, rank: 2, playerCount: 9 })[2].label, 'accuracy');
+  assert.deepEqual(cardStats({ ...ADA, rank: 2, playerCount: 10 })[2], { value: 'Top 20%', label: 'of players' });
+  assert.equal(accuracyPercent(2, 3), 67);
+  assert.equal(accuracyPercent(0, 0), 0);
+  assert.equal(accuracyPercent(5, 4), 100);
+});
+
+test('a one-player card draws no crown, medal or "Top 10", and its points on the podium', () => {
+  const recording = recordingCanvas();
+  drawResultCard(recording.canvas, SOLO, 'story', null);
+  const all = words(recording.texts).join('\n');
+  for (const text of ['Well', 'played.', '|Ada H. scored 7,120 points in Torts 101|', '|70%|', '|accuracy|']) assert.ok(all.includes(text), text);
+  assert.ok(!all.includes('|Top 10|'));
+  assert.ok(!recording.texts.some((drawn) => /64px/.test(drawn.font) && /^[0-9]$/.test(drawn.text)), 'no medal');
+  assert.ok(!/1st|Top \d+%/.test(all));
+  // The crown is three balls: a one-player 1st draws as few arcs as a 2nd with a medal removed would, never the crown's.
+  const second = recordingCanvas();
+  drawResultCard(second.canvas, { ...ADA, rank: 23 }, 'story', null);
+  assert.equal(recording.counts().arcs, second.counts().arcs);
+});
+
+test('the share carries a caption, the card words and the link; where the sheet takes no picture the caption is copied; Download is the picture alone', () => {
+  assert.equal(shareCaption('Ada H. placed 2nd of 8 in Torts 101.', 'https://lawexa.com/q/r/abc'), 'Ada H. placed 2nd of 8 in Torts 101. https://lawexa.com/q/r/abc');
+  assert.equal(shareCaption('Ada H. placed 2nd of 8 in Torts 101.', null), 'Ada H. placed 2nd of 8 in Torts 101.');
+  const share = quiz('ResultCardShare.tsx');
+  assert.match(share, /const caption = shareCaption\(copy\.shareText, link\);/);
+  assert.match(share, /await navigator\.share\(\{ files: \[current\.file\], text: caption \}\);/);
+  assert.match(share, /download\(current\.url, current\.file\.name\);\s*const copied = await copyText\(caption\);/);
+  const save = share.slice(share.indexOf('const save = () => {'), share.indexOf('const share = async'));
+  assert.doesNotMatch(save, /copyText|navigator\.share/);
+});
+
+test('the invite under a one-player game claims no place either', () => {
+  assert.deepEqual(quizShareInvite({ outcome: 'solo' }), {
+    headline: 'Can anyone beat your score?',
+    ask: 'Share this challenge with your study group and find out.',
+  });
+  assert.match(quiz('GamePhases.tsx'), /: results\.game\.player_count < 2\s*\? \{ outcome: 'solo' \}\s*: viewerRow\.rank === 1/);
 });

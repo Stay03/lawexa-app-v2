@@ -52,6 +52,8 @@ export const PUBLIC_QUIZ_RESULTS_NOTICE =
  */
 export type QuizShareStanding =
   | { readonly outcome: 'won' }
+  /** The only player: there is no place to claim (Arthur, 0f517a68), only a score to beat. */
+  | { readonly outcome: 'solo' }
   | { readonly outcome: 'played'; readonly leader: string | null }
   | { readonly outcome: 'watched'; readonly leader: string | null };
 
@@ -71,6 +73,13 @@ export function quizShareInvite(standing: QuizShareStanding): {
   headline: string;
   ask: string;
 } {
+  if (standing.outcome === 'solo') {
+    return {
+      headline: 'Can anyone beat your score?',
+      ask: 'Share this challenge with your study group and find out.',
+    };
+  }
+
   if (standing.outcome === 'won') {
     return {
       headline: "You're the one to beat.",

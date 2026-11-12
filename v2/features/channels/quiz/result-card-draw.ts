@@ -1,12 +1,14 @@
-import { ordinal } from '@/lib/wrapped/copy';
 import {
   cardCta,
   cardHeadline,
   cardInitials,
+  cardPlace,
   cardStats,
   cardSubline,
   cardTier,
+  podiumText,
   type CardFormat,
+  type CardPlace,
   type ResultCardInput,
 } from './result-card';
 import {
@@ -333,8 +335,8 @@ function drawTopTenBadge(ctx: Ctx, layout: CardLayout) {
   drawTracked(ctx, label, left + iconBox + badge.gap, badge.baseline, badge.size, TRACKING.none, 'left');
 }
 
-/** The podium block in the place's colours, with the place in large type on its front. */
-function drawPodium(ctx: Ctx, layout: CardLayout, rank: number, measure: Measure) {
+/** The podium block in the place's colours, with the place (or a one-player card's points) in large type on its front. */
+function drawPodium(ctx: Ctx, layout: CardLayout, rank: CardPlace, place: string, measure: Measure) {
   const podium = layout.podium;
   const colours = PODIUM_COLOURS[cardTier(rank)];
   const right = podium.left + podium.width;
@@ -355,7 +357,6 @@ function drawPodium(ctx: Ctx, layout: CardLayout, rank: number, measure: Measure
   ctx.fillStyle = gradient;
   ctx.fillRect(podium.left, front, podium.width, podium.bottom - front);
 
-  const place = ordinal(rank);
   const size = fittedSize(place, displayFont, podium.place.size, TRACKING.place, podium.place.maxWidth, measure);
   ctx.font = displayFont(size);
   ctx.fillStyle = CARD_COLOURS.white;
@@ -390,30 +391,32 @@ export function drawResultCard(canvas: HTMLCanvasElement, input: ResultCardInput
 
   drawGround(ctx, layout);
   drawBand(ctx, layout);
-  drawPodium(ctx, layout, input.rank, measure);
+  // A one-player card has no place: no crown, medal or badge (`cardPlace`).
+  const place = cardPlace(input);
+  drawPodium(ctx, layout, place, podiumText(input), measure);
   drawPhoto(ctx, layout, photo, cardInitials(input.playerName));
-  if (input.rank === 1) drawCrown(ctx, layout);
-  if (input.rank <= 3) drawMedal(ctx, layout, input.rank as 1 | 2 | 3);
-  else if (input.rank <= 10) drawTopTenBadge(ctx, layout);
+  if (place === 1) drawCrown(ctx, layout);
+  if (place !== null && place <= 3) drawMedal(ctx, layout, place as 1 | 2 | 3);
+  else if (place !== null && place <= 10) drawTopTenBadge(ctx, layout);
 
   drawBrand(ctx, layout);
 
-  const setting = headlineSetting(format, input.rank);
+  const setting = headlineSetting(format, place);
   ctx.font = displayFont(setting.size);
   ctx.fillStyle = CARD_COLOURS.white;
-  cardHeadline(input.rank).forEach((line, index) => {
+  cardHeadline(place).forEach((line, index) => {
     drawTracked(ctx, line, layout.headline.x, setting.baselines[index], setting.size, TRACKING.headline, layout.headline.align);
   });
 
   const { lead, title } = cardSubline(input);
-  const subline = sublineLines(lead, title, format, input.rank, measure);
+  const subline = sublineLines(lead, title, format, place, measure);
   ctx.font = textFont(500, subline.size);
   ctx.fillStyle = CARD_COLOURS.subline;
   for (const line of subline.lines) drawTracked(ctx, line.text, layout.subline.x, line.baseline, subline.size, TRACKING.none, layout.subline.align);
 
   ctx.font = textFont(700, layout.cta.size);
   ctx.fillStyle = CARD_COLOURS.white;
-  drawTracked(ctx, cardCta(input.rank), layout.cta.x, layout.cta.baseline, layout.cta.size, TRACKING.none, layout.cta.align);
+  drawTracked(ctx, cardCta(place), layout.cta.x, layout.cta.baseline, layout.cta.size, TRACKING.none, layout.cta.align);
   drawButton(ctx, layout);
 
   const stats = layout.stats;

@@ -7,7 +7,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { canvasToFile, corsPhotoUrl, loadImage } from '@/lib/wrapped/share-image';
 import { cn } from '@/lib/utils';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
-import { CARD_FORMATS, cardCta, cardHeadline, cardStats, cardSubline, resultCardCopy, type CardFormat, type ResultCardInput } from './result-card';
+import {
+  CARD_FORMATS,
+  cardCta,
+  cardHeadline,
+  cardPlace,
+  cardStats,
+  cardSubline,
+  podiumText,
+  resultCardCopy,
+  shareCaption,
+  type CardFormat,
+  type ResultCardInput,
+} from './result-card';
 import { drawResultCard } from './result-card-draw';
 import { loadCardFonts } from './result-card-fonts';
 import { COMPACT_RAISED } from './ui';
@@ -21,8 +33,9 @@ import { useResultsLink } from './use-results-link';
  * for feeds. The player picks one; what they see is the very image they post.
  *
  * Share hands the picture to the phone's sheet (WhatsApp Status, Instagram),
- * with the results link in its words; a browser whose sheet takes no picture
- * saves it and copies the link. Download saves it. A dismissed sheet is a
+ * with its caption: the card's words and the results link (Arthur,
+ * e3d57458). A browser whose sheet takes no picture saves it and copies the
+ * caption. Download saves the picture alone. A dismissed sheet is a
  * decision, not a failure: nothing is said. A sheet that fails to open says
  * so. Messages are inline, as on every channel surface.
  */
@@ -59,9 +72,10 @@ const canShareFile = (file: File) => typeof navigator !== 'undefined' && !!navig
 
 /** Every character the card prints, so the fonts load only the ranges it needs. */
 function cardText(input: ResultCardInput): string {
+  const place = cardPlace(input);
   const { lead, title } = cardSubline(input);
   const stats = cardStats(input).flatMap((stat) => [stat.value, stat.label]);
-  return [...cardHeadline(input.rank), lead, title, ...stats, cardCta(input.rank), 'Lawexa live quiz', 'Play at lawexa.com', 'Top 10…'].join(' ');
+  return [...cardHeadline(place), podiumText(input), lead, title, ...stats, cardCta(place), 'Lawexa live quiz', 'Play at lawexa.com', 'Top 10…'].join(' ');
 }
 
 export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: ResultCardInput }) {
@@ -107,12 +121,13 @@ export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: 
     setNote('Saved to your downloads.');
   };
 
-  /** The phone's sheet with the picture; where a sheet takes no picture, the card is saved and the link copied. */
+  /** The phone's sheet with the picture and its caption; where a sheet takes no picture, the card is saved and the caption copied. */
   const share = async () => {
     if (!current) return;
+    const caption = shareCaption(copy.shareText, link);
     if (canShareFile(current.file)) {
       try {
-        await navigator.share({ files: [current.file], text: link ? `${copy.shareText} ${link}` : copy.shareText });
+        await navigator.share({ files: [current.file], text: caption });
         setNote(null);
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;
@@ -121,8 +136,8 @@ export function ResultCardShare({ gameUuid, input }: { gameUuid: string; input: 
       return;
     }
     download(current.url, current.file.name);
-    const copied = link ? await copyText(link) : false;
-    setNote(copied ? 'Saved. Your link is copied too.' : 'Saved to your downloads.');
+    const copied = await copyText(caption);
+    setNote(copied ? 'Saved. Caption and link copied.' : 'Saved to your downloads.');
   };
 
   return (

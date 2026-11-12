@@ -755,9 +755,11 @@ export function PodiumStage({
   const standing: QuizShareStanding =
     viewerRow === null
       ? { outcome: 'watched', leader: leader?.user.name ?? null }
-      : viewerRow.rank === 1
-        ? { outcome: 'won' }
-        : { outcome: 'played', leader: leader?.user.name ?? null };
+      : results.game.player_count < 2
+        ? { outcome: 'solo' }
+        : viewerRow.rank === 1
+          ? { outcome: 'won' }
+          : { outcome: 'played', leader: leader?.user.name ?? null };
 
   return (
     <GameStage>

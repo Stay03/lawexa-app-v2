@@ -38,7 +38,20 @@ export const CARD_FORMATS: readonly CardFormat[] = ['story', 'square'];
  */
 export type CardTier = 'gold' | 'silver' | 'bronze' | 'top10' | 'field';
 
-export function cardTier(rank: number): CardTier {
+/**
+ * The place a card shows: the player's rank, or `null` in a game with one
+ * player, whose card claims no place, no rank and no percentile and shows the
+ * score and how it went instead (Arthur, 0f517a68, 12 November 2026).
+ */
+export type CardPlace = number | null;
+
+export function cardPlace(input: Pick<ResultCardInput, 'rank' | 'playerCount'>): CardPlace {
+  return input.playerCount >= 2 ? input.rank : null;
+}
+
+/** A one-player card wears the plain card past the top 10: no medal, no badge, no podium colour. */
+export function cardTier(rank: CardPlace): CardTier {
+  if (rank === null) return 'field';
   if (rank === 1) return 'gold';
   if (rank === 2) return 'silver';
   if (rank === 3) return 'bronze';
@@ -61,9 +74,22 @@ const HEADLINES: Readonly<Record<number, readonly [string, string]>> = {
 
 const OUTSIDE_TOP_10: readonly [string, string] = ['Adjourned,', 'not dismissed.'];
 
+/** A one-player card's headline: it claims no place (Arthur, 9a3fd436, 12 November 2026: "Well Played"), in two lines as his others. */
+const NO_PLACE: readonly [string, string] = ['Well', 'played.'];
+
 /** The headline's two lines for a place; every place past 10th shares Arthur's "outside top 10" card. */
-export function cardHeadline(rank: number): readonly [string, string] {
+export function cardHeadline(rank: CardPlace): readonly [string, string] {
+  if (rank === null) return NO_PLACE;
   return HEADLINES[rank] ?? OUTSIDE_TOP_10;
+}
+
+/** Below this many players a percentile says little, so the third stat is the player's accuracy instead (techlead, 12 November 2026). */
+export const PERCENTILE_FROM_PLAYERS = 10;
+
+/** Right answers as a share of the questions the player could answer, rounded; 0 when there were none. */
+export function accuracyPercent(correctCount: number, answerableCount: number): number {
+  if (answerableCount <= 0) return 0;
+  return Math.round((Math.min(correctCount, answerableCount) / answerableCount) * 100);
 }
 
 /**
@@ -77,9 +103,9 @@ export function topPercent(rank: number, playerCount: number): number {
   return Math.min(100, Math.max(1, Math.ceil((rank / players) * 100)));
 }
 
-/** The line over the button: a dare in the top 10, a see-you-later past it. */
-export function cardCta(rank: number): string {
-  return rank <= 10 ? 'Think you can beat me?' : 'See you next sitting.';
+/** The line over the button: a dare in the top 10 and on a one-player card, a see-you-later past the top 10. */
+export function cardCta(rank: CardPlace): string {
+  return rank === null || rank <= 10 ? 'Think you can beat me?' : 'See you next sitting.';
 }
 
 /** The points' unit: "pt" for one, "pts" otherwise (the game's own score rows). */
@@ -110,7 +136,12 @@ export function cardInitials(fullName: string): string {
 
 /** The line under the headline, in two parts so a long quiz title can be shortened on its own. */
 export function cardSubline(input: ResultCardInput): { lead: string; title: string } {
-  const lead = `${cardName(input.playerName)} placed ${ordinal(input.rank)} of ${input.playerCount.toLocaleString('en-US')} in`;
+  const place = cardPlace(input);
+  const name = cardName(input.playerName);
+  const lead =
+    place === null
+      ? `${name} scored ${input.score.toLocaleString('en-US')} ${input.score === 1 ? 'point' : 'points'} in`
+      : `${name} placed ${ordinal(place)} of ${input.playerCount.toLocaleString('en-US')} in`;
   return { lead, title: input.quizTitle.trim().replace(/\s+/g, ' ') };
 }
 
@@ -119,12 +150,22 @@ export interface CardStat {
   label: string;
 }
 
-/** The three stats on the band: points, right answers out of the player's questions, and the top share. */
+/**
+ * The three stats on the band: points, right answers out of the player's
+ * questions, and the top share from 10 players up. Below that, and in a
+ * one-player game, the third is the player's accuracy: the line under the
+ * headline already says the place.
+ */
 export function cardStats(input: ResultCardInput): [CardStat, CardStat, CardStat] {
+  const place = cardPlace(input);
+  const third: CardStat =
+    place !== null && input.playerCount >= PERCENTILE_FROM_PLAYERS
+      ? { value: `Top ${topPercent(place, input.playerCount)}%`, label: 'of players' }
+      : { value: `${accuracyPercent(input.correctCount, input.answerableCount)}%`, label: 'accuracy' };
   return [
     { value: input.score.toLocaleString('en-US'), label: input.score === 1 ? 'point' : 'points' },
     { value: `${input.correctCount}/${input.answerableCount}`, label: 'correct' },
-    { value: `Top ${topPercent(input.rank, input.playerCount)}%`, label: 'of players' },
+    third,
   ];
 }
 
@@ -133,20 +174,34 @@ export function resultCardCopy(
   input: ResultCardInput,
   format: CardFormat,
 ): {
-  place: string;
   alt: string;
   shareText: string;
   fileName: string;
 } {
-  const place = ordinal(input.rank);
+  const place = cardPlace(input);
   const { lead, title } = cardSubline(input);
   const stats = cardStats(input)
     .map((stat) => `${stat.value} ${stat.label}`)
     .join(', ');
   return {
-    place,
-    alt: `${cardHeadline(input.rank).join(' ')} ${lead} ${title}. ${stats}.`,
-    shareText: `${lead} ${title}${input.spaceName ? `, ${input.spaceName}` : ''}. ${cardCta(input.rank)} Play the live quiz on Lawexa.`,
-    fileName: `lawexa-quiz-${place}-${format}.png`,
+    alt: `${cardHeadline(place).join(' ')} ${lead} ${title}. ${stats}.`,
+    shareText: `${lead} ${title}${input.spaceName ? `, ${input.spaceName}` : ''}. ${cardCta(place)} Play the live quiz on Lawexa.`,
+    fileName: `lawexa-quiz-${place === null ? 'score' : ordinal(place)}-${format}.png`,
   };
+}
+
+/** The words on the podium's front: the place, or the points on a one-player card. */
+export function podiumText(input: Pick<ResultCardInput, 'rank' | 'playerCount' | 'score'>): string {
+  const place = cardPlace(input);
+  return place === null ? pointsText(input.score) : ordinal(place);
+}
+
+/**
+ * The caption that goes with the card (Arthur, e3d57458): its words and the
+ * quiz's link, as the share sheet sends them beside the picture and as the
+ * clipboard takes them where the sheet takes no picture. The words alone
+ * when there is no link.
+ */
+export function shareCaption(shareText: string, link: string | null): string {
+  return link ? `${shareText} ${link}` : shareText;
 }
