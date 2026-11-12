@@ -114,3 +114,17 @@ test('an agent conversation opens in the chat’s side panel by its uuid', () =>
   assert.match(read('agents', 'AgentReplyRows.tsx'), /onClick=\{\(\) => panel\.open\(\{ kind: 'agent', id: reply\.agent_conversation_id \}\)\}/);
   assert.match(read('rows', 'EventLineRow.tsx'), /const replies = returned \? agentReplies\(line\.jobs\) : \[\];/);
 });
+
+// Review finding 1 (12 November 2026): in a Space, the root chat's owner and
+// editors may Stop an agent turn another member's call started. The panel
+// takes that from the server's answer alone, never from who opened it.
+test("the agent panel's write box and Stop follow the server's can_send, never a check on the viewer", () => {
+  const panel = readFileSync(
+    join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'agents', 'AgentConversationPanel.tsx'),
+    'utf8',
+  );
+  assert.match(panel, /footer=\{entry\?\.can_send \? <AgentComposer /);
+  assert.match(panel, /\{running \? \(\s*<button\s+type="button"\s+onClick=\{stop\}/);
+  assert.doesNotMatch(panel, /viewerId\s*[!=]==|[!=]==\s*viewerId|user_id|started_by/);
+  assert.doesNotMatch(readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'background-jobs', 'model.ts'), 'utf8'), /user_id|viewerId/);
+});
