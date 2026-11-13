@@ -150,11 +150,14 @@ function toAttachment(a: StartAttachment): MessageAttachment {
  * Write the BYTE-COMPATIBLE streaming handoff v1's conversation page reads on mount.
  * Shape is identical to v1's home write: `{ msg, exec, stream_mode, attachments? }`,
  * plus `redaction` in a redacted chat (what the send hid, for the "Sent as
- * redacted" line under the first message; v1 ignores it).
+ * redacted" line under the first message; v1 ignores it), and `uid`, the
+ * saved id of the first message, so the page draws it as saved: the jobs and
+ * agents its turn starts find it by that id (Lucy's check 2, 13 November
+ * 2026). v1 ignores it too.
  */
 function writeConvInit(
   conversationId: string,
-  data: { msg: string; exec: string; attachments: StartAttachment[]; redaction?: RedactionSummary },
+  data: { msg: string; exec: string; attachments: StartAttachment[]; redaction?: RedactionSummary; uid?: number },
 ): void {
   if (typeof window === 'undefined') return;
   try {
@@ -168,6 +171,7 @@ function writeConvInit(
           attachments: data.attachments.map(toAttachment),
         }),
         ...(data.redaction && { redaction: data.redaction }),
+        ...(typeof data.uid === 'number' && { uid: data.uid }),
       }),
     );
   } catch {
@@ -364,7 +368,13 @@ export async function startConversation(
     const redaction = redacted && isRedactionSummary(response.data.redaction) ? response.data.redaction : undefined;
     // The labels the server gave the files, when it sent them, over the app's own.
     const sentAttachments = redacted ? withServerLabels(shownAttachments, response.data.user_message_attachments) : attachments;
-    writeConvInit(conversationId, { msg: displayMessage, exec: executionId, attachments: sentAttachments, redaction });
+    writeConvInit(conversationId, {
+      msg: displayMessage,
+      exec: executionId,
+      attachments: sentAttachments,
+      redaction,
+      uid: response.data.user_message_id,
+    });
 
     // Put the new conversation at the top of every recents cache IMMEDIATELY, so the
     // sidebar/drawer/home show it without waiting on a refetch (wave-4 acceptance b).

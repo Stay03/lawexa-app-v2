@@ -353,6 +353,8 @@ export interface ChatEngine {
     initialAttachments?: MessageAttachment[] | MessageAttachment,
     /** What redaction hid in the handoff's message (a new redacted chat). */
     initialRedaction?: RedactionSummary,
+    /** The handoff message's saved id, from the start response: the row is drawn as saved. */
+    initialMessageId?: number | null,
   ): void;
   /**
    * Adopt SERVER history the host fetched — from its cache or over the network.

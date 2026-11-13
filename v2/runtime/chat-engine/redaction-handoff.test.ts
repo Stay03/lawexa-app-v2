@@ -49,5 +49,6 @@ test('the home send writes the summary into the handoff and the chat reads it ba
   assert.match(start, /\.\.\.\(data\.redaction && \{ redaction: data\.redaction \}\)/);
   const controller = read('conversation', 'useConversationController.ts');
   assert.match(controller, /isRedactionSummary\(parsed\.redaction\) && \{ redaction: parsed\.redaction \}/);
-  assert.match(controller, /connectToStream\(executionId, message, attachments, redaction\)/);
+  // The handoff's saved id rides along too (Lucy's check 2, handoff-saved-id.test.ts).
+  assert.match(controller, /connectToStream\(executionId, message, attachments, redaction, userMessageId\)/);
 });

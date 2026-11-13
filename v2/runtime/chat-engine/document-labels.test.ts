@@ -83,7 +83,7 @@ test('a redacted chat’s question is drawn with its labels, the first send too,
   const start = read('v2', 'features', 'conversations', 'start-conversation.ts');
   assert.match(start, /if \(redacted && labelled && labelled\.length > 0\) \{\s*await replaceLastUserTurnFileNames\(conversationId, labelled\)/);
   assert.match(start, /const shownAttachments = redacted \? labelDocuments\(\[\], attachments\) : attachments;/);
-  assert.match(start, /const sentAttachments = redacted \? withServerLabels\(shownAttachments, response\.data\.user_message_attachments\) : attachments;\s*writeConvInit\(conversationId, \{ msg: displayMessage, exec: executionId, attachments: sentAttachments, redaction \}\);/);
+  assert.match(start, /const sentAttachments = redacted \? withServerLabels\(shownAttachments, response\.data\.user_message_attachments\) : attachments;\s*writeConvInit\(conversationId, \{\s*msg: displayMessage,\s*exec: executionId,\s*attachments: sentAttachments,\s*redaction,/);
 });
 
 test('the rename always finds the question at the tail: no answer reaches the device before it', () => {

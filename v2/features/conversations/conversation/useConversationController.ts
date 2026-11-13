@@ -150,6 +150,8 @@ interface StoredInit {
   /** What redaction hid in the first message, in a redacted chat. */
   redaction?: unknown;
   attachments?: InitAttachment[];
+  /** The first message's saved id (start-conversation.ts). */
+  uid?: number;
   file_id?: number;
   file_name?: string;
   file_size?: number;
@@ -161,13 +163,15 @@ function readConvInit(conversationId: string): {
   executionId: string | null;
   attachments: MessageAttachment[] | undefined;
   redaction?: RedactionSummary;
+  /** The first message's saved id, when the home composer handed it over. */
+  userMessageId: number | null;
 } {
   if (typeof window === 'undefined') {
-    return { message: null, executionId: null, attachments: undefined };
+    return { message: null, executionId: null, attachments: undefined, userMessageId: null };
   }
   const key = `${CONV_INIT_PREFIX}${conversationId}`;
   const raw = window.sessionStorage.getItem(key);
-  if (!raw) return { message: null, executionId: null, attachments: undefined };
+  if (!raw) return { message: null, executionId: null, attachments: undefined, userMessageId: null };
   try {
     const parsed = JSON.parse(raw) as StoredInit;
     let attachments: MessageAttachment[] | undefined;
@@ -183,10 +187,11 @@ function readConvInit(conversationId: string): {
       message: parsed.msg ?? null,
       executionId: parsed.exec ?? null,
       attachments,
+      userMessageId: typeof parsed.uid === 'number' ? parsed.uid : null,
       ...(isRedactionSummary(parsed.redaction) && { redaction: parsed.redaction }),
     };
   } catch {
-    return { message: null, executionId: null, attachments: undefined };
+    return { message: null, executionId: null, attachments: undefined, userMessageId: null };
   } finally {
     // Consume once — a reload must not replay a finished handoff.
     window.sessionStorage.removeItem(key);
@@ -575,13 +580,13 @@ export function useConversationController(
     let cancelled = false;
     liveRef.current = conversationId;
 
-    const { message, executionId, attachments, redaction } = readConvInit(conversationId);
+    const { message, executionId, attachments, redaction, userMessageId } = readConvInit(conversationId);
     setConversationId(conversationId);
 
     if (executionId && message) {
       // Fresh handoff from the home composer: attach to the live execution. The
       // creator is the owner (server-verified id threaded from the page).
-      connectToStream(executionId, message, attachments, redaction);
+      connectToStream(executionId, message, attachments, redaction, userMessageId);
       if (serverUserId != null) setLocalOwnerId(serverUserId);
       // Drop the ?init=1 marker so a manual reload takes the recovery path —
       // unless embedded, where the URL is the HOST's (`/cases/…?chat=…`, no

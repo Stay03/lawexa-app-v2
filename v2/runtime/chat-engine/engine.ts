@@ -1285,6 +1285,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     initialMessage?: string,
     initialAttachments?: MessageAttachment[] | MessageAttachment,
     initialRedaction?: RedactionSummary,
+    initialMessageId?: number | null,
   ) {
     const token = getToken();
     if (!token) {
@@ -1302,7 +1303,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       return;
     }
 
-    if (initialMessage) addUserMessage(initialMessage, initialAttachments, undefined, initialRedaction);
+    if (initialMessage) {
+      const handed = addUserMessage(initialMessage, initialAttachments, undefined, initialRedaction);
+      // The home composer's message is saved already (its start response gave
+      // the id): drawn with it, as send() draws its own, so the jobs and agents
+      // this turn starts find their question at once (Lucy's check 2, 13
+      // November 2026), and the merge knows the row.
+      if (typeof initialMessageId === 'number') {
+        rememberAuthoredIds([initialMessageId]);
+        setMessages((msgs) => msgs.map((m) => (m.id === handed.id ? { ...m, savedId: initialMessageId } : m)));
+      }
+    }
 
     // A TURN BEGINS. Counted here rather than in `send()` because this is the one
     // door BOTH routes into a turn pass through — a `send()` from the composer and
