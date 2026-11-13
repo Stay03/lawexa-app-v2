@@ -4,69 +4,101 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/* Question cards on screen (Arthur's go f6eaa156; techlead's review, 9
- * November 2026): a tap selects and Next or Send confirms; the questions'
- * streamed text leaves no second copy once the card is drawn; and the card
- * sits above the box of every chat, the case page's side chat included. */
+/* Question cards on screen, design B (Arthur's pick, 13 November 2026, thread
+ * c91086ec): the questions are asked inside Lawexa's answer, where it asked,
+ * not on a card above the box. A tap selects and Next or Send confirms; the
+ * answers come back as the reader's own bubble; and they cannot be changed
+ * afterwards (Stay, 12 November). */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const conversation = join(here, '..');
 const read = (...parts: string[]) => readFileSync(join(...parts), 'utf8');
+const caseChatCore = () => read(conversation, '..', '..', 'cases', 'detail', 'CaseChatCore.tsx');
 
 test('a tap selects an option and moves nowhere; Next or Send confirms', () => {
-  const panel = read(here, 'QuestionCardPanel.tsx');
-  assert.match(panel, /const choose = \(option: number\) => \{\s*if \(locked\) return;\s*setDraft\(\{ option \}\);\s*\};/);
-  assert.match(panel, /onClick=\{\(\) => advance\(drafts\)\}/);
-  assert.match(panel, /\{isLast \? \(sending \? 'Sending…' : 'Send'\) : 'Next'\}/);
-  // Skip never sends: on the last question it only clears the choice (Arthur, 05650d00).
-  assert.match(panel, /const skip = \(\) => \{\s*if \(locked\) return;\s*setDraft\(null\);\s*if \(!isLast\) setIndex\(index \+ 1\);\s*\};/);
-  // The answers go from two places only: Send (advance on the last question) and × (skip all).
-  assert.equal(panel.match(/void send\(/g)?.length, 2);
-});
-
-test('changing answers: the card starts on them, × keeps them, and only the latest line offers it', () => {
-  const panel = read(here, 'QuestionCardPanel.tsx');
-  assert.match(panel, /\(\) => open\.amend\?\.prefill \?\? questions\.map\(startingAnswer\),/);
-  assert.match(panel, /onClick=\{\(\) => \(keepOnClose \? onCancel\?\.\(\) : void send\(skipAllAnswers\(questions\)\)\)\}/);
-  const marks = read(here, 'CardMarks.tsx');
+  const questions = read(here, 'InlineQuestions.tsx');
   assert.match(
-    marks,
-    /who === null && chat && !chat\.isStreaming && chat\.changeCardAnswers\?\.rowId === rowId \? chat\.changeCardAnswers : null/,
+    questions,
+    /const choose = \(option: number\) => \{\s*if \(locked\) return;\s*setDrafts\(\(current\) => current\.map\(\(entry, at\) => \(at === index \? \{ option \} : entry\)\)\);\s*\};/,
   );
-  assert.match(marks, /\{answers\.amend \? 'changed' : 'chose'\}/);
-  // Both boxes pass × through.
-  assert.match(read(conversation, 'ChatDock.tsx'), /onCancel=\{surface\.cancelCard\}/);
-  assert.match(read(conversation, '..', '..', 'cases', 'detail', 'CaseChatCore.tsx'), /onCancel=\{surface\.cancelCard\}/);
+  assert.match(questions, /onClick=\{next\}/);
+  assert.match(questions, /\{isLast \? \(sending \? 'Sending…' : 'Send'\) : 'Next'\}/);
+  // The answers go from two places only: Send on the last question, and the skip button.
+  assert.equal(questions.match(/void send\(/g)?.length, 2);
+  // Each question starts on Lawexa's recommendation.
+  assert.match(questions, /useState<\(QuestionCardAnswer \| null\)\[\]>\(\(\) => questions\.map\(startingAnswer\)\)/);
 });
 
-test("a card's row draws only its mark: the streamed questions leave no second copy", () => {
+test('"Skip the rest" keeps the answers given so far and skips this question and the later ones', () => {
+  const questions = read(here, 'InlineQuestions.tsx');
+  assert.match(
+    questions,
+    /const skipRest = \(\) => void send\(answersToSend\(questions, drafts\.map\(\(draft, at\) => \(at < index \? draft : null\)\)\)\);/,
+  );
+  assert.match(questions, /\{count === 1 \? 'Skip' : isLast \? 'Skip and send' : 'Skip the rest'\}/);
+});
+
+test('an answered question folds to its choice, and a tap opens it again before Send', () => {
+  const questions = read(here, 'InlineQuestions.tsx');
+  assert.match(questions, /if \(at < index\) \{[\s\S]{0,400}onClick=\{\(\) => goTo\(at\)\}/);
+  assert.match(questions, /\{words \?\? 'Skipped'\}/);
+});
+
+test('Change answers is gone: nothing reopens a card once its answers went', () => {
+  for (const file of [
+    read(here, 'CardMarks.tsx'),
+    read(here, 'InlineQuestions.tsx'),
+    read(here, 'open-card.ts'),
+    read(conversation, 'ConversationScreen.tsx'),
+    read(conversation, 'chat-context.tsx'),
+    read(conversation, 'ChatDock.tsx'),
+    caseChatCore(),
+  ]) {
+    assert.doesNotMatch(file, /amend|changeCardAnswers|cancelCard|Change answers/);
+  }
+});
+
+test("a card's row asks the questions itself: the streamed text leaves no second copy", () => {
   const row = read(conversation, 'rows', 'AssistantMessageRow.tsx');
   const early = row.indexOf('if (questionCard) {');
   assert.ok(early > 0);
   // The card's return comes before the text is drawn, and draws no text.
   assert.ok(early < row.indexOf('<ChatContent'));
-  const branch = row.slice(early, row.indexOf('}', row.indexOf('<CardMark card={questionCard} />')));
+  const branch = row.slice(early, row.indexOf('}', row.indexOf('<AskedQuestions rowId={message.id} card={questionCard} />')));
   assert.doesNotMatch(branch, /ChatContent|message\.content|shownText/);
-  // While the turn streams, the row is a plain answer; the card replaces it in place.
+  // While the turn streams, the row is a plain answer; the questions replace it in place.
   assert.match(row, /const questionCard = isStreaming \? undefined : \(message as ChatMessage\)\.questionCard;/);
+  // Only the row that asks, while open, for a reader who may answer.
+  const marks = read(here, 'CardMarks.tsx');
+  assert.match(
+    marks,
+    /const answering = card\.status === 'open' && chat\?\.cardQuestions\?\.open\.rowId === rowId \? chat\.cardQuestions : null;/,
+  );
 });
 
-test("the card sits above the chat's own box and the case page's side chat box", () => {
-  assert.match(read(conversation, 'ChatDock.tsx'), /<OpenQuestionCard\s+open=\{openCard\}/);
-  const caseChat = read(conversation, '..', '..', 'cases', 'detail', 'CaseChatCore.tsx');
-  assert.match(caseChat, /<OpenQuestionCard\s+open=\{openCard\}/);
-  // A new card starts fresh by its own key, inside the wrapper: no key sits
-  // beside a host's box, whose node must never be remounted.
-  const panel = read(here, 'QuestionCardPanel.tsx');
-  assert.match(panel, /const key = `\$\{props\.open\.cardMessageId \?\? 'unsaved'\}\$\{props\.open\.amend \? ':change' : ''\}`;/);
-  assert.match(panel, /<QuestionCardPanel key=\{key\} \{\.\.\.props\} \/>/);
-  // Only for a reader who may answer. It stays up, disabled, while a turn runs:
-  // taken down for its own answers' send, it came back empty after a refusal.
-  for (const host of [caseChat, read(conversation, 'ChatDock.tsx')]) {
+test('no card sits above either box; each box reads "Or type a different answer" while the questions wait', () => {
+  for (const host of [read(conversation, 'ChatDock.tsx'), caseChatCore()]) {
+    assert.doesNotMatch(host, /OpenQuestionCard|QuestionCardPanel/);
+    assert.match(host, /CARD_ANSWER_PLACEHOLDER/);
     assert.match(host, /const openCard = surface && surface\.isOwnerResolved && surface\.canSend \? surface\.questionCard : null;/);
-    assert.match(host, /disabled=\{[^}]*surface\.isStreaming\}/);
   }
-  // The screen publishes the card to both boxes.
+  assert.match(read(here, 'InlineQuestions.tsx'), /export const CARD_ANSWER_PLACEHOLDER = 'Or type a different answer';/);
+});
+
+test('the screen hands the open card to the rows, held while a turn runs, and the boxes only see it', () => {
   const screen = read(conversation, 'ConversationScreen.tsx');
-  assert.equal(screen.match(/\r?\n\s+questionCard,\r?\n\s+answerCard,\r?\n/g)?.length, 4);
+  assert.match(screen, /held: isLoadingHistory \|\| isStreaming \|\| sendHeldBy !== null/);
+  assert.match(screen, /cardQuestions=\{cardQuestions\}/);
+  // Both boxes get the card, for the hint and nothing else.
+  assert.equal(screen.match(/\r?\n\s+questionCard,\r?\n/g)?.length, 4);
+  assert.doesNotMatch(screen, /answerCard,\r?\n/);
+});
+
+test("the reader's answers come back as their own bubble, each question with its answer", () => {
+  const marks = read(here, 'CardMarks.tsx');
+  assert.match(marks, /\{answer \? answerForList\(question, answer\) : 'Skipped'\}/);
+  const row = read(conversation, 'rows', 'UserMessageRow.tsx');
+  assert.match(row, /<CardAnswersBubble answers=\{message\.cardAnswers\} content=\{displayContent\} ground=\{BUBBLE_GROUND\[tint\]\} \/>/);
+  // In both the personal row and a space chat's turn.
+  assert.equal(row.match(/\{cardBubble \? \(\s*cardBubble\s*\) : pastedTexts\.length > 0 \? \(/g)?.length, 2);
 });

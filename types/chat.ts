@@ -105,7 +105,7 @@ export interface ChatMessage {
   questionCard?: QuestionCard;
   /**
    * The user turn that answered a card (`metadata.type` "question_answers"):
-   * drawn as one "You chose" line in place of a bubble.
+   * drawn as a bubble of each question with its answer.
    */
   cardAnswers?: QuestionCardAnswers;
 }
@@ -152,9 +152,7 @@ export interface QuestionCard {
 export interface QuestionCardAnswers {
   cardMessageId: number | null;
   answers: QuestionCardAnswer[];
-  /** The reader changed earlier answers (Arthur, 05650d00): the row reads "You changed". */
-  amend?: boolean;
-  /** The card's questions, for the line's tap-to-expand list; absent when the card is not in the chat read. */
+  /** The card's questions, for the answers' bubble; absent when the card is not in the chat read. */
   questions?: QuestionCardQuestion[];
 }
 
@@ -696,8 +694,7 @@ export interface ChatStartRequest {
   client_request_id?: string;
   // Answers to the chat's open question card, one per question in order. A
   // card that is not open, not this chat's, or a wrong count is a 422.
-  // `amend`: new answers to the chat's latest answered card (Arthur, 05650d00).
-  question_answers?: { card_message_id: number; answers: QuestionCardAnswer[]; amend?: true };
+  question_answers?: { card_message_id: number; answers: QuestionCardAnswer[] };
   // The saved message this turn replies to (space chat replies). Needs
   // conversation_id; a target outside the chat, a step, an error or a deleted
   // row is one 422 on this field.
@@ -787,7 +784,7 @@ export interface SendMessageOptions {
   // The message this turn replies to: sent as reply_to_message_id, and drawn
   // as the quote on the row this client draws.
   replyTo?: MessageReplyTo;
-  /** Answers to an open question card: sent as question_answers, and drawn as the "You chose" line. */
+  /** Answers to an open question card: sent as question_answers, and drawn as their bubble. */
   questionAnswers?: QuestionCardAnswers;
 }
 
@@ -834,9 +831,8 @@ export interface ApiMessage {
     status?: QuestionCard['status'];
     questions?: QuestionCardQuestion[];
     answers?: QuestionCardAnswer[] | null;
-    /** On a `question_answers` user turn: the card it answered, and whether it changed earlier answers. */
+    /** On a `question_answers` user turn: the card it answered. */
     card_message_id?: number;
-    amend?: boolean;
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).

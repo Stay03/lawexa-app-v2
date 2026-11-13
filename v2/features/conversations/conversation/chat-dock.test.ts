@@ -126,8 +126,6 @@ const surfaceFor = (conversationId: string): RouteComposerSurface => ({
   submit: async () => undefined,
   stop: () => {},
   questionCard: null,
-  answerCard: async () => null,
-  cancelCard: null,
   mentionOptions: null,
   quoteToneOf: null,
   spaceUuid: null,
@@ -194,19 +192,7 @@ test('the box floats over the content row, above the tap’s frame and under the
   // flags, for the journey checks.)
   assert.match(
     readHere('ChatDock.tsx'),
-    /<div\s+data-v2-chat-dock=""[\s\S]{0,600}?className="pointer-events-none"\s*>\s*<div ref=\{dockRef\} className="v2-safe-bottom w-full">/,
-  );
-  // The pill keeps its compact width; an open question card above it is as
-  // wide as the transcript (question cards, 9 November 2026). Each takes
-  // touches, and each is drawn only when there is something in it, so an
-  // empty dock still measures as empty.
-  assert.match(
-    readHere('ChatDock.tsx'),
-    /\{content !== null && \(\s*<div className="pointer-events-auto mx-auto w-full max-w-xs sm:max-w-md">\{content\}<\/div>\s*\)\}/,
-  );
-  assert.match(
-    readHere('ChatDock.tsx'),
-    /\{openCard && surface && \(\s*<div className="pointer-events-auto mx-auto w-full max-w-2xl px-3">/,
+    /<div\s+data-v2-chat-dock=""[\s\S]{0,600}?className="pointer-events-none"\s*>\s*<div ref=\{dockRef\} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">/,
   );
   assert.match(readHere('ChatDock.tsx'), /data-source=\{surface \? 'screen' : early \? 'early' : 'cold'\}/);
 });

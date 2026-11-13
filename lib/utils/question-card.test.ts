@@ -6,7 +6,6 @@ import {
   ALL_SKIPPED_LINE,
   allSkipped,
   answerForList,
-  answersAsDrafts,
   answersLine,
   answersMessage,
   answersToSend,
@@ -22,7 +21,7 @@ import { transformApiMessages } from './transform-api-messages';
 
 /* Question cards (Arthur's go f6eaa156; Backend's shape, 9 November 2026).
  * Lawexa ends a turn with 1 to 4 questions of 2 to 4 options; the reader
- * answers them in one send, as the line they then see ("You chose: …"). */
+ * answers them in one send, and see them back as their own bubble. */
 
 const TONE: QuestionCardQuestion = {
   question: 'TEST DATA. Which tone should the letter take?',
@@ -127,7 +126,7 @@ test("the reader's row names each option and skip as the server keeps them", () 
   assert.deepEqual(labeledAnswers([TONE], [{ text: 'Very firm' }]), [{ text: 'Very firm' }]);
 });
 
-test('"You chose" comes from the answers\' labels, never the turn\'s saved text', () => {
+test('the one-line answers come from the answers\' labels, never the turn\'s saved text', () => {
   // As Backend keeps them (54b85a68 cardAnswers): the turn's text is "My answers to your questions: …".
   assert.equal(
     chosenLine([{ option: 0, label: 'Firm but polite' }, { text: 'Lagos' }, { skipped: true, label: '7-day deadline' }]),
@@ -149,26 +148,17 @@ test("a confidential chat's answers go as the message the server would have writ
   assert.equal(answersMessage([TONE], [{ option: 1 }]), 'My answers to your questions:\n1. TEST DATA. Which tone should the letter take? → Final demand');
 });
 
-test('changing answers starts the card on the stored ones; a skip starts empty', () => {
-  assert.deepEqual(
-    answersAsDrafts([TONE, DEADLINE], [{ option: 1, label: 'Final demand' }, { skipped: true, label: '14-day deadline' }]),
-    [{ option: 1 }, null],
-  );
-  assert.deepEqual(answersAsDrafts([TONE, DEADLINE], [{ text: 'Lagos' }]), [{ text: 'Lagos' }, null]);
-});
-
-test('the expanded list says each answer, and what Lawexa went with for a skip', () => {
+test("the answers' bubble says each answer, and what Lawexa went with for a skip", () => {
   assert.equal(answerForList(TONE, { option: 2, label: 'Friendly reminder' }), 'Friendly reminder');
   assert.equal(answerForList(TONE, { text: 'Very firm' }), 'Very firm');
   assert.equal(answerForList(DEADLINE, { skipped: true, label: '14-day deadline' }), 'Skipped, Lawexa went with 14-day deadline');
   assert.equal(answerForList(DEADLINE, { skipped: true }), 'Skipped');
 });
 
-test('changed answers are read as such', () => {
+test('answers cannot be changed: a stray amend flag on a stored turn is not read', () => {
   assert.deepEqual(readCardAnswers({ type: 'question_answers', card_message_id: 41, answers: [{ option: 0 }], amend: true }), {
     cardMessageId: 41,
     answers: [{ option: 0 }],
-    amend: true,
   });
 });
 

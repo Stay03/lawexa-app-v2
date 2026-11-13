@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { MessageAttachment, QuestionCardAnswer } from '@/types/chat';
+import type { MessageAttachment } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { OpenCard } from './question-card/open-card';
 import type { SendRefused, ViewOnlyReason } from './space-turn';
@@ -55,12 +55,11 @@ export interface EmbeddedComposerSurface {
   isOwnerResolved: boolean;
   submit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
   stop: () => void;
-  /** The chat's open question card, drawn above the host's box; null when there is none. */
+  /**
+   * The chat's open question card, whose questions Lawexa's answer asks; null
+   * when there is none. The host's box then reads "Or type a different answer".
+   */
   questionCard: OpenCard | null;
-  /** Send answers to it: resolves with the refusal's sentence, or null when they went. */
-  answerCard: (answers: QuestionCardAnswer[]) => Promise<string | null>;
-  /** Close a card opened to change its answers, keeping them; null for any other card. */
-  cancelCard: (() => void) | null;
 }
 
 let surface: EmbeddedComposerSurface | null = null;

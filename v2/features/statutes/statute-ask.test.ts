@@ -30,7 +30,8 @@ test('a statute chat starts with a statute reference and keeps its own draft and
   assert.equal(CHAT_SUBJECT_PROMPTS.statute.length, 3);
   const core = read('v2', 'features', 'cases', 'detail', 'CaseChatCore.tsx');
   assert.match(core, /references: \[\{ type: subject\.kind, id: subject\.slug \}\],/);
-  assert.match(core, /placeholder=\{`Ask about this \$\{CHAT_SUBJECT_NOUN\[subject\.kind\]\}`\}/);
+  // While Lawexa's questions wait, the box offers a typed answer instead (question cards, design B).
+  assert.match(core, /placeholder=\{openCard \? CARD_ANSWER_PLACEHOLDER : `Ask about this \$\{CHAT_SUBJECT_NOUN\[subject\.kind\]\}`\}/);
   assert.match(core, /Chat · this \{noun\}/);
 });
 

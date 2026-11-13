@@ -4,7 +4,7 @@ import type { EngineMessage } from './types';
 
 /**
  * The answers as the server takes them: an option, own words, or a skip, and
- * nothing else. The labels the app keeps for its own "You chose" line stay
+ * nothing else. The labels the app keeps for its own bubble stay
  * off the wire; the server names the options itself.
  */
 export function answersPayload(answers: readonly QuestionCardAnswer[]): QuestionCardAnswer[] {
@@ -57,26 +57,6 @@ export function withOpenCardClosed(
     if (row.role !== 'assistant' || !card || card.status !== 'open') return row;
     changed = true;
     return { ...row, questionCard: closedCard(card, answers) } as EngineMessage;
-  });
-  return changed ? next : (rows as EngineMessage[]);
-}
-
-/**
- * New answers to an answered card (Arthur, 05650d00): the card keeps its
- * place and takes them, as the server stores them.
- */
-export function withCardAmended(
-  rows: readonly EngineMessage[],
-  cardMessageId: number,
-  answers: readonly QuestionCardAnswer[],
-): EngineMessage[] {
-  let changed = false;
-  const next = rows.map((row) => {
-    const card = (row as ChatMessage).questionCard;
-    const id = row.savedId ?? (/^msg_(\d+)$/.exec(row.id) ? Number(row.id.slice(4)) : null);
-    if (row.role !== 'assistant' || !card || id !== cardMessageId) return row;
-    changed = true;
-    return { ...row, questionCard: { ...card, status: 'answered', answers: [...answers] } } as EngineMessage;
   });
   return changed ? next : (rows as EngineMessage[]);
 }

@@ -101,26 +101,10 @@ export function readCardAnswers(metadata: unknown): QuestionCardAnswers | null {
   if (typeof metadata.card_message_id !== 'number') return null;
   const answers = readAnswers(metadata.answers ?? []);
   if (!answers) return null;
-  return { cardMessageId: metadata.card_message_id, answers, ...(metadata.amend === true && { amend: true }) };
+  return { cardMessageId: metadata.card_message_id, answers };
 }
 
-/**
- * A card's stored answers as the card's starting choices, to change them
- * (Arthur, 05650d00): each option and own answer as it was, a skip as nothing
- * chosen.
- */
-export function answersAsDrafts(
-  questions: readonly QuestionCardQuestion[],
-  answers: readonly QuestionCardAnswer[],
-): (QuestionCardAnswer | null)[] {
-  return questions.map((_question, index) => {
-    const answer = answers[index];
-    if (!answer || isSkipped(answer)) return null;
-    return 'text' in answer ? { text: answer.text } : { option: answer.option };
-  });
-}
-
-/** One question's answer in words for the expanded "You chose" list. */
+/** One question's answer in words for the answers' bubble: a skip says what Lawexa went with. */
 export function answerForList(question: QuestionCardQuestion | undefined, answer: QuestionCardAnswer): string {
   if (isSkipped(answer)) return answer.label ? `Skipped, Lawexa went with ${answer.label}` : 'Skipped';
   return answerWords(question, answer) ?? '';
@@ -143,8 +127,9 @@ export function answerWords(question: QuestionCardQuestion | undefined, answer: 
 }
 
 /**
- * The line the reader's answers are sent as, and the "You chose" line shows:
- * each chosen label or own words, in question order, skips left out.
+ * The line the reader's answers are sent as, and the bubble shows when the
+ * questions are not at hand: each chosen label or own words, in question
+ * order, skips left out.
  */
 export function answersLine(questions: readonly QuestionCardQuestion[], answers: readonly QuestionCardAnswer[]): string {
   const words = answers
@@ -156,7 +141,7 @@ export function answersLine(questions: readonly QuestionCardQuestion[], answers:
 /**
  * The answers with each option's and each skip's label, as the server keeps
  * them (Backend's `cardAnswers`: a skip names the recommended option Lawexa
- * goes on with). The reader's own row draws its "You chose" line from these
+ * goes on with). The reader's own row draws its bubble from these
  * before the server's copy comes back.
  */
 export function labeledAnswers(
@@ -178,7 +163,7 @@ export function labeledAnswers(
 }
 
 /**
- * The "You chose" line from stored answers alone: each option's label and
+ * The answers in one line from stored answers alone: each option's label and
  * each own answer, skips left out. Null when an answer names an option
  * without its label, so the row falls back to its own text. The server saves
  * the answering turn's text as the model reads it ("My answers to your

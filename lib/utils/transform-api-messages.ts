@@ -246,7 +246,7 @@ export function transformApiMessages(
           apiMsg.unmatched_handles.length > 0 && { unmatchedHandles: apiMsg.unmatched_handles }),
         // What redaction hid, in a redacted chat (backend, 22 October 2026).
         ...(isRedactionSummary(apiMsg.metadata?.redaction) && { redaction: apiMsg.metadata.redaction }),
-        // The turn that answered a question card: drawn as one "You chose" line.
+        // The turn that answered a question card: drawn as a bubble of its questions and answers.
         ...(cardAnswers && { cardAnswers }),
       } as ChatMessage);
     }

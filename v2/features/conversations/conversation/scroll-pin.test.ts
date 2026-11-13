@@ -150,7 +150,7 @@ test('an empty dock keeps the fallback padding, whatever its safe-area padding m
   );
   assert.doesNotMatch(dockBox, /offsetHeight === 0/);
   // The dock carries that padding, which is why its height is not the test.
-  assert.match(dockBox, /ref=\{dockRef\} className="v2-safe-bottom/);
+  assert.match(dockBox, /ref=\{dockRef\} className="pointer-events-auto v2-safe-bottom/);
 });
 
 test('the dock height is written only when it changes, and a reopen renders the last one', () => {

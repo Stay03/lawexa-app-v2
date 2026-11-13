@@ -6,7 +6,7 @@ import { formatMessageTimestamp } from '@/lib/utils/date';
 import type { ChatMessage, MessageReplyTo } from '@/types/chat';
 import type { MessageMetadata } from '@/types/collab';
 import { PastedContentCard } from '../PastedContentCard';
-import { CardAnswersLine } from '../question-card/CardMarks';
+import { CardAnswersBubble } from '../question-card/CardMarks';
 import { memberStyle } from '../member-colour';
 import { mentionMetadata, spaceUnmatchedSentence } from '../mention-options';
 import { replyAuthorLabel, replyTargetOf, type QuoteTone } from '../reply-target';
@@ -171,19 +171,13 @@ export function UserMessageRow({
   // whose chat flag has not resolved yet still carries its line.
   const showsRedaction = redacted || message.redaction !== undefined;
 
-  // Answers to a question card: one "You chose" line, not a bubble (question
-  // cards, 9 November 2026). Another member's answers name them.
-  if (message.cardAnswers) {
-    const mine = !showAuthor || turnSide(message, viewerId) === 'mine';
-    return (
-      <CardAnswersLine
-        rowId={message.id}
-        answers={message.cardAnswers}
-        content={displayContent}
-        who={mine ? null : (message.author?.name ?? 'Someone')}
-      />
-    );
-  }
+  // Answers to a question card (design B, 13 November 2026): a bubble with
+  // each question and its answer, in place of the saved text, which is the
+  // list as the model reads it. In a space chat it is the member's turn as any
+  // other, with their name and colour.
+  const cardBubble = message.cardAnswers ? (
+    <CardAnswersBubble answers={message.cardAnswers} content={displayContent} ground={BUBBLE_GROUND[tint]} />
+  ) : null;
 
   if (showAuthor) {
     // Only a saved question can be replied to (replyTargetOf).
@@ -191,7 +185,9 @@ export function UserMessageRow({
     const reply = target && onReply ? () => onReply(target) : null;
     const content = (
       <>
-        {pastedTexts.length > 0 ? (
+        {cardBubble ? (
+          cardBubble
+        ) : pastedTexts.length > 0 ? (
           <>
             <div data-v2-strip="" className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
               {pastedTexts.map((text, index) => (
@@ -253,7 +249,9 @@ export function UserMessageRow({
       className="group flex flex-col items-end"
       style={colourIndex === null ? undefined : memberStyle(colourIndex)}
     >
-      {pastedTexts.length > 0 ? (
+      {cardBubble ? (
+        cardBubble
+      ) : pastedTexts.length > 0 ? (
         <>
           <div data-v2-strip="" className="flex max-w-full gap-1.5 overflow-x-auto overscroll-x-contain pb-1">
             {pastedTexts.map((text, index) => (

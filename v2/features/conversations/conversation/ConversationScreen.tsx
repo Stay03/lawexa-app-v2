@@ -7,8 +7,8 @@ import { ShieldCheck } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useV2Session } from '@/v2/runtime/session-context';
 import type { MessageReplyTo, QuestionCardAnswer } from '@/types/chat';
-import { answersAsDrafts, answersLine, answersMessage, labeledAnswers } from '@/lib/utils/question-card';
-import { amendTargetOf, openCardOf, type OpenCard } from './question-card/open-card';
+import { answersLine, answersMessage, labeledAnswers } from '@/lib/utils/question-card';
+import { openCardOf } from './question-card/open-card';
 import { REPLY_DRAFT, quoteTone, replyDraftKey } from './reply-target';
 import { writeDraft } from './draft-store';
 import { memberColourIndex } from './member-colour';
@@ -23,7 +23,7 @@ import { ConfidentialBanner } from './ConfidentialBanner';
 import { BackgroundJobsProvider } from './background-jobs/context';
 import { AgentRowsProvider } from './agents/context';
 import { ConversationActions } from './ConversationActions';
-import { V2ChatProvider } from './chat-context';
+import { V2ChatProvider, type CardQuestions } from './chat-context';
 import { DocumentExportScope } from './markdown/document-export';
 import {
   clearEmbeddedComposer,
@@ -185,50 +185,25 @@ export function ConversationScreen({
     stop: controllerStop,
   } = controller;
   // The question card the chat ends with, if it is still open (question cards,
-  // 9 November 2026): whichever box this chat has draws it above itself, the
-  // shell's dock or the case page's. Its answers go as one send, their line as
-  // the message ("Firm but polite · 14-day deadline").
-  // A confidential chat saves nothing: its card has no id, and its answers go
-  // as the plain message the server would have written for them.
-  //
-  // CHANGE ANSWERS (Arthur, 05650d00): the latest answered card can be opened
-  // again from its "You chose" line, starting on its answers; Send changes them
-  // (`amend`), × keeps them. `amending` names the card being changed; it counts
-  // only while that card is still the one that can be changed.
-  const openCard = useMemo(() => openCardOf(messages, isConfidential), [messages, isConfidential]);
-  const amendTarget = useMemo(() => amendTargetOf(messages), [messages]);
-  const [amending, setAmending] = useState<number | null>(null);
-  const questionCard = useMemo<OpenCard | null>(() => {
-    if (openCard) return openCard;
-    if (!amendTarget || amending !== amendTarget.cardMessageId) return null;
-    const { card, cardMessageId } = amendTarget;
-    return { cardMessageId, card, amend: { prefill: answersAsDrafts(card.questions, card.answers ?? []) } };
-  }, [openCard, amendTarget, amending]);
+  // design B, Arthur's pick, 13 November 2026): its questions are part of
+  // Lawexa's answer, where it asked, and that row draws them. The answers go
+  // as one send. A confidential chat saves nothing: its card has no id, and
+  // its answers go as the plain message the server would have written for
+  // them. Answers cannot be changed afterwards (Stay, 12 November): to change
+  // something, the reader tells Lawexa.
+  const questionCard = useMemo(() => openCardOf(messages, isConfidential), [messages, isConfidential]);
   const answerCard = useCallback(
     async (answers: QuestionCardAnswer[]): Promise<string | null> => {
       if (!questionCard || !canSend) return null;
       const { questions } = questionCard.card;
       const message =
         questionCard.cardMessageId === null ? answersMessage(questions, answers) : answersLine(questions, answers);
-      // The labels and questions are for this row's "You chose" line; the engine sends the answers without them.
-      const shown = {
-        cardMessageId: questionCard.cardMessageId,
-        answers: labeledAnswers(questions, answers),
-        questions,
-        ...(questionCard.amend && { amend: true }),
-      };
+      // The labels and questions are for this row's bubble; the engine sends the answers without them.
+      const shown = { cardMessageId: questionCard.cardMessageId, answers: labeledAnswers(questions, answers), questions };
       const outcome = await controllerSubmit(message, [], null, shown);
-      if (!outcome && questionCard.amend) setAmending(null);
       return outcome ? outcome.refused || null : null;
     },
     [questionCard, canSend, controllerSubmit],
-  );
-  const keepCardAnswers = useCallback(() => setAmending(null), []);
-  const cancelCard = questionCard?.amend ? keepCardAnswers : null;
-  // For the rows: which "You chose" line offers Change answers, and what it does.
-  const changeCardAnswers = useMemo(
-    () => (canSend && amendTarget ? { rowId: amendTarget.answerRowId, start: () => setAmending(amendTarget.cardMessageId) } : null),
-    [canSend, amendTarget],
   );
   useEffect(() => {
     if (!externalComposer) return;
@@ -249,8 +224,6 @@ export function ConversationScreen({
       submit: controllerSubmit,
       stop: controllerStop,
       questionCard,
-      answerCard,
-      cancelCard,
     });
   }, [
     externalComposer,
@@ -270,8 +243,6 @@ export function ConversationScreen({
     controllerSubmit,
     controllerStop,
     questionCard,
-    answerCard,
-    cancelCard,
   ]);
   useEffect(() => {
     if (!externalComposer) return;
@@ -286,6 +257,16 @@ export function ConversationScreen({
   // alike, so a copy read from the device in that time is not preceded by a
   // skeleton flash (skeleton-hold.ts).
   const holdingSkeleton = isLoadingHistory && !showHistorySkeleton;
+  // For the rows: the open card's questions, when this reader may answer them.
+  // Held while the chat loads, a turn runs or another member's turn holds the
+  // chat; they stay on screen then, so a refused answer keeps its choices.
+  const cardQuestions = useMemo<CardQuestions | null>(
+    () =>
+      questionCard && canSend && isOwnerResolved
+        ? { open: questionCard, answer: answerCard, held: isLoadingHistory || isStreaming || sendHeldBy !== null }
+        : null,
+    [questionCard, canSend, isOwnerResolved, answerCard, isLoadingHistory, isStreaming, sendHeldBy],
+  );
 
   // Whether the reader has scrolled up from the bottom; set by MessageList's
   // scroll handler, read by the composer's chip row (#16).
@@ -377,8 +358,6 @@ export function ConversationScreen({
       submit: controllerSubmit,
       stop: controllerStop,
       questionCard,
-      answerCard,
-      cancelCard,
       mentionOptions,
       quoteToneOf,
       spaceUuid,
@@ -404,8 +383,6 @@ export function ConversationScreen({
     controllerSubmit,
     controllerStop,
     questionCard,
-    answerCard,
-    cancelCard,
     mentionOptions,
     quoteToneOf,
     spaceUuid,
@@ -503,7 +480,7 @@ export function ConversationScreen({
           canSend={canSend}
           conversationId={conversationId}
           applyDraftEditLine={onDraftEditLine}
-          changeCardAnswers={changeCardAnswers}
+          cardQuestions={cardQuestions}
         >
           {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
               own route, a draft or a file opens beside the transcript on a

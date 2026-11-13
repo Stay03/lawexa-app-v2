@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 
-import type { MessageAttachment, MessageReplyTo, QuestionCardAnswer } from '@/types/chat';
+import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
 import type { OpenCard } from './question-card/open-card';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { MentionOptions } from '@/v2/features/channels/model';
@@ -69,12 +69,11 @@ export interface RouteComposerSurface {
     replyTo: MessageReplyTo | null,
   ) => Promise<SendRefused | undefined>;
   stop: () => void;
-  /** The chat's open question card, drawn above the box; null when there is none. */
+  /**
+   * The chat's open question card, whose questions Lawexa's answer asks; null
+   * when there is none. The box then reads "Or type a different answer".
+   */
   questionCard: OpenCard | null;
-  /** Send answers to it: resolves with the refusal's sentence, or null when they went. */
-  answerCard: (answers: QuestionCardAnswer[]) => Promise<string | null>;
-  /** Close a card opened to change its answers, keeping them; null for any other card. */
-  cancelCard: (() => void) | null;
   mentionOptions: MentionOptions | null;
   quoteToneOf: ((replyTo: MessageReplyTo) => QuoteTone) | null;
   spaceUuid: string | null;

@@ -2,7 +2,9 @@
 
 import { createContext, useContext, useMemo } from 'react';
 
+import type { QuestionCardAnswer } from '@/types/chat';
 import type { DraftEditLineFields } from '@/v2/features/notes/types';
+import type { OpenCard } from './question-card/open-card';
 
 /**
  * V2 conversation chat context — the v2-native replacement for v1's
@@ -31,15 +33,18 @@ interface V2ChatContextValue {
    */
   applyDraftEditLine: (answer: DraftEditLineFields) => void;
   /**
-   * Change answers (Arthur, 05650d00): the one "You chose" line that offers it
-   * (the latest answered card's), and what it does; null when none can.
+   * The chat's open question card, when this reader may answer it (question
+   * cards, design B): the row that asks draws its questions. Null otherwise.
    */
-  changeCardAnswers: ChangeCardAnswers | null;
+  cardQuestions: CardQuestions | null;
 }
 
-export interface ChangeCardAnswers {
-  rowId: string;
-  start: () => void;
+export interface CardQuestions {
+  open: OpenCard;
+  /** Send the answers: resolves with the refusal's sentence, or null when they went. */
+  answer: (answers: QuestionCardAnswer[]) => Promise<string | null>;
+  /** Nothing can be sent yet (the chat loads, a turn runs, another member's turn holds it). */
+  held: boolean;
 }
 
 const V2ChatContext = createContext<V2ChatContextValue | null>(null);
@@ -51,7 +56,7 @@ export function V2ChatProvider({
   canSend,
   conversationId,
   applyDraftEditLine,
-  changeCardAnswers = null,
+  cardQuestions = null,
 }: {
   children: React.ReactNode;
   sendMessage: (message: string) => void;
@@ -59,14 +64,14 @@ export function V2ChatProvider({
   canSend: boolean;
   conversationId: string;
   applyDraftEditLine: (answer: DraftEditLineFields) => void;
-  changeCardAnswers?: ChangeCardAnswers | null;
+  cardQuestions?: CardQuestions | null;
 }) {
   // Stable value — only changes when the streaming flag (or `canSend`) flips, never per token
   // (tokens flow through the per-message streaming store, not this context), so
   // the card subtree never re-renders on stream growth.
   const value = useMemo<V2ChatContextValue>(
-    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, changeCardAnswers }),
-    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, changeCardAnswers],
+    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions }),
+    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions],
   );
   return <V2ChatContext.Provider value={value}>{children}</V2ChatContext.Provider>;
 }

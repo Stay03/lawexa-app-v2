@@ -79,13 +79,7 @@ import type {
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
-import {
-  answersPayload,
-  cardRefusalSentence,
-  withCardAmended,
-  withCardFromCompleted,
-  withOpenCardClosed,
-} from './question-card-rows';
+import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
@@ -2301,7 +2295,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // (saved-turn.ts, for a send that fails after the server may have kept it).
     const savedBefore = largestSavedId(state.messages);
     const optimisticMsg = addUserMessage(message, shownAttachments, options.replyTo);
-    // Answers to a question card: the row is drawn as the "You chose" line.
+    // Answers to a question card: the row is drawn as a bubble of the questions and answers.
     const questionAnswers = options.questionAnswers;
     if (questionAnswers) {
       setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, cardAnswers: questionAnswers } : m)));
@@ -2334,7 +2328,6 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
             question_answers: {
               card_message_id: questionAnswers.cardMessageId,
               answers: answersPayload(questionAnswers.answers),
-              ...(questionAnswers.amend && { amend: true as const }),
             },
           }),
       };
@@ -2343,12 +2336,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (response.success) {
         // The server closed the open card with this send: answered by these
         // answers, else skipped by a typed message. The screen says so now.
-        // Changed answers: the answered card takes the new ones (Arthur, 05650d00).
-        setMessages((msgs) =>
-          questionAnswers?.amend && questionAnswers.cardMessageId !== null
-            ? withCardAmended(msgs, questionAnswers.cardMessageId, questionAnswers.answers)
-            : withOpenCardClosed(msgs, questionAnswers?.answers ?? null),
-        );
+        setMessages((msgs) => withOpenCardClosed(msgs, questionAnswers?.answers ?? null));
         // BELT-AND-BRACES RECONCILIATION (backend doc §5). The optimistic user row
         // above carries a local id; this is the server id it was saved under, known
         // BEFORE the stream even opens. Recording it here means the user's own

@@ -2,16 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { ChatMessage, ConversationMessage, QuestionCard } from '@/types/chat';
-import { amendTargetOf, openCardOf } from '@/v2/features/conversations/conversation/question-card/open-card';
+import { openCardOf } from '@/v2/features/conversations/conversation/question-card/open-card';
 import { CARD_CLOSED_COPY, cardRefusalCopy } from '@/v2/features/conversations/conversation/space-turn';
-import { answersPayload, cardRefusalSentence, withCardAmended, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
+import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
 import { adoptServerFields } from './server-fields';
 import type { EngineMessage } from './types';
 
 /* Question cards on screen (9 November 2026): the card closes the moment the
  * server takes the reader's send, reaches a streamed answer from `completed`
- * or from the next read of the chat, and is offered above the box only while
- * the chat ends with it. */
+ * or from the next read of the chat, and can be answered only while the chat
+ * ends with it. */
 
 const QUESTIONS: QuestionCard['questions'] = [
   {
@@ -71,7 +71,7 @@ test("a confidential chat's card, which has no saved id, goes on the answer just
   // …and the box offers it without an id only there.
   const drawn = withCardFromCompleted(rows, null, card, true);
   assert.equal(openCardOf(drawn), null);
-  assert.deepEqual(openCardOf(drawn, true), { cardMessageId: null, card: OPEN });
+  assert.deepEqual(openCardOf(drawn, true), { rowId: 'local-2', cardMessageId: null, card: OPEN });
 });
 
 test('answers go on the wire without the labels the row keeps', () => {
@@ -117,45 +117,23 @@ test("a reply drawn here takes its card answers from the server's copy when it l
   assert.deepEqual((adoptServerFields(rows, server)[0] as ChatMessage).cardAnswers, { cardMessageId: 2, answers: [{ option: 0 }] });
 });
 
-test('changed answers land on the answered card, which keeps its place', () => {
-  const answered: QuestionCard = { ...OPEN, status: 'answered', answers: [{ option: 0 }] };
-  const rows = [answer('msg_2', { questionCard: answered }), question('msg_3')];
-  const next = withCardAmended(rows, 2, [{ option: 1, label: 'Final demand' }]);
-  assert.deepEqual(cardOf(next[0]), { ...answered, answers: [{ option: 1, label: 'Final demand' }] });
-  assert.equal(withCardAmended(rows, 99, [{ option: 1 }]), rows);
-});
-
-test('Change answers: only the latest card, answered, from the latest row that answered it', () => {
-  const answered: QuestionCard = { ...OPEN, status: 'answered', answers: [{ option: 0 }] };
-  const answers = { cardMessageId: 2, answers: [{ option: 0 }] };
-  const chat = [
-    answer('msg_2', { questionCard: answered }),
-    question('msg_3', { cardAnswers: answers }),
-    answer('msg_4'),
-    question('msg_5'),
-    answer('msg_6'),
-  ];
-  assert.deepEqual(amendTargetOf(chat), { cardMessageId: 2, card: answered, answerRowId: 'msg_3' });
-  // Changed once already: the newer answering row carries it.
-  const changed = [...chat, question('msg_7', { cardAnswers: { ...answers, amend: true } }), answer('msg_8')];
-  assert.equal(amendTargetOf(changed)?.answerRowId, 'msg_7');
-  // A newer card, open or skipped, takes it away.
-  assert.equal(amendTargetOf([...chat, answer('msg_9', { questionCard: OPEN })]), null);
-  assert.equal(amendTargetOf([...chat, answer('msg_9', { questionCard: { ...OPEN, status: 'skipped' } })]), null);
-  // An open card, or one with no saved id (a confidential chat), offers none.
-  assert.equal(amendTargetOf([answer('msg_2', { questionCard: OPEN })]), null);
-  assert.equal(amendTargetOf([answer('local-2', { questionCard: answered }), question('local-3', { cardAnswers: { cardMessageId: null, answers: [] } })]), null);
-});
-
-test('the card above the box: only an open card that ends the chat, with its saved id', () => {
-  assert.deepEqual(openCardOf([question('msg_1'), answer('msg_2', { questionCard: OPEN })]), { cardMessageId: 2, card: OPEN });
-  assert.deepEqual(openCardOf([answer('local-4', { savedId: 4, questionCard: OPEN })]), { cardMessageId: 4, card: OPEN });
+test('the questions that can be answered: only an open card that ends the chat, with its saved id', () => {
+  assert.deepEqual(openCardOf([question('msg_1'), answer('msg_2', { questionCard: OPEN })]), {
+    rowId: 'msg_2',
+    cardMessageId: 2,
+    card: OPEN,
+  });
+  assert.deepEqual(openCardOf([answer('local-4', { savedId: 4, questionCard: OPEN })]), {
+    rowId: 'local-4',
+    cardMessageId: 4,
+    card: OPEN,
+  });
   // A turn after it closed it, whatever a stale copy says.
   assert.equal(openCardOf([answer('msg_2', { questionCard: OPEN }), question('msg_3')]), null);
   // The reader's own message before the server took it is not that turn yet:
   // a refused send takes it away, and the card must still be there.
   const unsent = question('local-3', { drawnHere: true });
-  assert.deepEqual(openCardOf([answer('msg_2', { questionCard: OPEN }), unsent]), { cardMessageId: 2, card: OPEN });
+  assert.deepEqual(openCardOf([answer('msg_2', { questionCard: OPEN }), unsent]), { rowId: 'msg_2', cardMessageId: 2, card: OPEN });
   assert.equal(openCardOf([answer('msg_2', { questionCard: OPEN }), question('local-3', { drawnHere: true, savedId: 3 })]), null);
   // No saved id yet: no answer can name it.
   assert.equal(openCardOf([answer('local-4', { questionCard: OPEN })]), null);

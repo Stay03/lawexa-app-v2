@@ -15,7 +15,7 @@ import { earlyRuling } from './early-ruling';
 import { subscribeFollowUpRefusals } from './embedded-composer';
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { subscribeRouteReplies, useRouteComposerSurface } from './route-composer';
-import { OpenQuestionCard } from './question-card/QuestionCardPanel';
+import { CARD_ANSWER_PLACEHOLDER } from './question-card/InlineQuestions';
 import { ComposerSkeleton } from './skeletons';
 import type { SendRefused } from './space-turn';
 import { ViewOnlyPill } from './ViewOnlyPill';
@@ -146,11 +146,9 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
 
   if (surface?.terminal) return null;
 
-  // Lawexa's open questions (question cards, 9 November 2026), for a reader
-  // who may answer. It stays up, disabled, while a turn runs: its own answers'
-  // send is one, and a card taken down for it came back empty after a refusal,
-  // without the reader's choices or the server's reason (fixture run, 9 Nov).
-  // An accepted send closes it (the engine marks it answered at once).
+  // Lawexa's open questions (question cards, design B): they are asked in its
+  // answer, and the box under them reads "Or type a different answer", since a
+  // typed reply goes instead of the answers (the server marks the card skipped).
   const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
 
   let content: React.ReactNode;
@@ -161,7 +159,7 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
       <>
         {/* "How is Lawexa doing?" sits above the box, in every chat a reader
             may send in, a Space chat's included (Arthur, 19 October 2026).
-            Not while Lawexa's questions are open: they take that place. */}
+            Not while Lawexa's questions wait for an answer. */}
         {!openCard && <ChatRatingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />}
         {/* After a paid plan runs out, once, about no chat (Arthur picked B). */}
         <PlanEndedSlot className="mb-2" />
@@ -184,6 +182,7 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
           mentionOptions={surface.mentionOptions}
           quoteToneOf={surface.quoteToneOf}
           spaceUuid={surface.spaceUuid}
+          {...(openCard && { placeholder: CARD_ANSWER_PLACEHOLDER })}
         />
       </>
     ) : (
@@ -225,22 +224,8 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
       data-streaming={surface ? String(surface.isStreaming) : undefined}
       className="pointer-events-none"
     >
-      <div ref={dockRef} className="v2-safe-bottom w-full">
-        {/* The card is as wide as the transcript, wider than the compact box
-            under it, which stays usable: a typed reply puts the card aside. */}
-        {openCard && surface && (
-          <div className="pointer-events-auto mx-auto w-full max-w-2xl px-3">
-            <OpenQuestionCard
-              open={openCard}
-              disabled={surface.holdSend || surface.sendHeldBy !== null || surface.isStreaming}
-              onAnswer={surface.answerCard}
-              onCancel={surface.cancelCard}
-            />
-          </div>
-        )}
-        {content !== null && (
-          <div className="pointer-events-auto mx-auto w-full max-w-xs sm:max-w-md">{content}</div>
-        )}
+      <div ref={dockRef} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">
+        {content}
       </div>
     </div>
   );

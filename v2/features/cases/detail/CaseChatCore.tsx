@@ -24,7 +24,7 @@ import {
   subscribeFollowUpRefusals,
   useEmbeddedComposerSurface,
 } from '@/v2/features/conversations/conversation/embedded-composer';
-import { OpenQuestionCard } from '@/v2/features/conversations/conversation/question-card/QuestionCardPanel';
+import { CARD_ANSWER_PLACEHOLDER } from '@/v2/features/conversations/conversation/question-card/InlineQuestions';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { TranscriptSkeleton } from '@/v2/features/conversations/conversation/skeletons';
 import {
@@ -525,8 +525,8 @@ export function CaseChatComposerDock({
   // October 2026: "yes" for the case chat too).
   const conversationPending = conversationId !== null && surface === null;
   const viewOnly = surface !== null && surface.isOwnerResolved && !surface.canSend;
-  // The chat's open question card, for a reader who may answer: up, disabled,
-  // while a turn runs, so a refused answer keeps its choices (see ChatDock).
+  // The chat's open question card, for a reader who may answer: its questions
+  // are in Lawexa's answer, and this box offers a typed answer instead (see ChatDock).
   const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
 
   const createError = view === 'new' && start.error ? start.error : null;
@@ -582,18 +582,6 @@ export function CaseChatComposerDock({
           <ViewOnlyPill reason={surface?.viewOnlyReason ?? 'shared'} />
         </div>
       </div>
-      {/* Lawexa's open questions, above this box as above a chat's own
-          (question cards, 9 November 2026); the box stays usable under them. */}
-      {openCard && surface && (
-        <div className="px-3">
-          <OpenQuestionCard
-            open={openCard}
-            disabled={surface.sendHeldBy !== null || surface.isStreaming}
-            onAnswer={surface.answerCard}
-            onCancel={surface.cancelCard}
-          />
-        </div>
-      )}
       <div
         inert={viewOnly}
         className={cn(
@@ -604,7 +592,7 @@ export function CaseChatComposerDock({
         <div className="min-h-0 overflow-hidden">
           <ConversationComposer
             draftScopeId={chatDraftScope(subject)}
-            placeholder={`Ask about this ${CHAT_SUBJECT_NOUN[subject.kind]}`}
+            placeholder={openCard ? CARD_ANSWER_PLACEHOLDER : `Ask about this ${CHAT_SUBJECT_NOUN[subject.kind]}`}
             signedIn={signedIn}
             showMeta={showMeta}
             animateMeta={animateMeta}
