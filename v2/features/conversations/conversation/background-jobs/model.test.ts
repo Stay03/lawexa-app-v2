@@ -13,6 +13,7 @@ import {
   backgroundReturnLine,
   canCancelBackgroundJob,
   toolResultNamesBackgroundJob,
+  waitingToResume,
 } from './model';
 
 /* Background jobs, app side (Backend's shapes 063d9cc3,
@@ -129,4 +130,24 @@ test('the chat reads its jobs when a tool result names one, not only when the tu
     controller,
     /onToolComplete: \(event\) => \{\n(\s+\/\/[^\n]*\n)*\s+if \(toolResultNamesBackgroundJob\(event\.tool_result\)\) \{\n\s+void queryClient\.invalidateQueries\(\{ queryKey: conversationsQueries\.backgroundJobsOf\(conversationId\) \}\);/,
   );
+});
+
+test('a reading waiting to restart says so in place of its frozen count, keeps Cancel, and an older server reads as before', () => {
+  const reading = job({ progress: { done: 50, total: 84, unit: 'scanned pages' } });
+  // Backend's stall fix (ca11f4c8): waiting_to_resume on a running job.
+  const paused = { ...reading, waiting_to_resume: true };
+  assert.equal(waitingToResume(paused), true);
+  assert.equal(backgroundJobLabel(paused), 'Reading paused · restarting automatically');
+  assert.equal(backgroundJobProgress(paused), null);
+  assert.equal(canCancelBackgroundJob(paused), true);
+  // Moving again (false), or a server that sends no field: the running line and its count, as before.
+  for (const moving of [{ ...reading, waiting_to_resume: false }, reading]) {
+    assert.equal(waitingToResume(moving), false);
+    assert.equal(backgroundJobLabel(moving), 'Running in the background: file reading');
+    assert.equal(backgroundJobProgress(moving), '50 / 84 scanned pages');
+  }
+  // Only a running job waits: an ended one reads as it did.
+  const ended = job({ status: 'succeeded', wake: 'woken', waiting_to_resume: true });
+  assert.equal(waitingToResume(ended), false);
+  assert.equal(backgroundJobLabel(ended), 'File reading done');
 });

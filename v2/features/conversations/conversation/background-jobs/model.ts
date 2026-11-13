@@ -37,10 +37,20 @@ export function backgroundJobState(job: Pick<BackgroundJob, 'status' | 'wake'>):
   return job.status === 'failed' ? 'failed' : 'done';
 }
 
-/** "3 / 10 pages", "3 pages" when the total is unknown; null with no progress to show. */
-export function backgroundJobProgress(job: Pick<BackgroundJob, 'progress'>): string | null {
+/**
+ * A running reading that stopped moving and is waiting to be picked up again
+ * (Backend's stall fix ca11f4c8: `waiting_to_resume`). The line says so in
+ * place of a count that stands still; an older server sends no field, which
+ * reads as not waiting, so the line is as before.
+ */
+export function waitingToResume(job: Pick<BackgroundJob, 'status' | 'waiting_to_resume'>): boolean {
+  return job.status === 'running' && job.waiting_to_resume === true;
+}
+
+/** "3 / 10 pages", "3 pages" when the total is unknown; null with no progress to show, or while it waits to restart. */
+export function backgroundJobProgress(job: Pick<BackgroundJob, 'progress' | 'status' | 'waiting_to_resume'>): string | null {
   const progress = job.progress;
-  if (!progress) return null;
+  if (!progress || waitingToResume(job)) return null;
   return progress.total === null
     ? `${progress.done} ${progress.unit}`
     : `${progress.done} / ${progress.total} ${progress.unit}`;
@@ -50,11 +60,11 @@ export function backgroundJobProgress(job: Pick<BackgroundJob, 'progress'>): str
  * The label's words, by state (Backend's doc, section 1). A job that waits on
  * another agent has no label: it is that agent's row (agents/agent-roster.ts).
  */
-export function backgroundJobLabel(job: Pick<BackgroundJob, 'status' | 'wake' | 'kind_name'>): string {
+export function backgroundJobLabel(job: Pick<BackgroundJob, 'status' | 'wake' | 'kind_name' | 'waiting_to_resume'>): string {
   const kind = capitalised(job.kind_name);
   switch (backgroundJobState(job)) {
     case 'running':
-      return `Running in the background: ${job.kind_name}`;
+      return waitingToResume(job) ? 'Reading paused · restarting automatically' : `Running in the background: ${job.kind_name}`;
     case 'replying':
       return `${kind} ${job.status === 'failed' ? 'failed' : 'finished'}. Lawexa will reply shortly.`;
     case 'cancelled':

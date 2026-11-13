@@ -83,6 +83,12 @@ export interface BackgroundJob {
   failure?: BackgroundJobFailure | null;
   /** On an `agent_reply` job: the agent conversation it follows; null or absent on every other kind. */
   agent_conversation?: JobAgentConversation | null;
+  /**
+   * A running job with a counted progress (a file reading) whose count has not
+   * moved for 5 minutes and is waiting to be picked up again (Backend's stall
+   * fix ca11f4c8). Absent on an older server, which means false.
+   */
+  waiting_to_resume?: boolean;
 }
 
 /** `GET /conversations/{uuid}/background-jobs`: the reader's own jobs in the chat, oldest first. */
