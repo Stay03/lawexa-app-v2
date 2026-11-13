@@ -470,7 +470,10 @@ test('the composer is never remounted: one node, at a fixed place in the card', 
   assert.doesNotMatch(dock, /opacity-0/);
   // Inside the dock the composer is rendered once, unkeyed, whatever the state.
   assert.equal(core.match(/<ConversationComposer\b/g)?.length, 1);
-  const composerProps = core.slice(core.indexOf('<ConversationComposer'), core.indexOf('onSubmit=', core.indexOf('<ConversationComposer')));
+  // The element itself (`\b`): the bare text also starts `RefObject<ConversationComposerHandle`, earlier in the file,
+  // and a slice from there ran across the question card docked above the box (design A), whose key is its own.
+  const composerAt = core.search(/<ConversationComposer\b/);
+  const composerProps = core.slice(composerAt, core.indexOf('onSubmit=', composerAt));
   assert.doesNotMatch(composerProps, /\bkey=/);
 });
 

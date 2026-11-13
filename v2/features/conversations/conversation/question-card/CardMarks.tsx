@@ -4,29 +4,26 @@ import { cn } from '@/lib/utils';
 import { allSkipped, answerForList, chosenLine } from '@/lib/utils/question-card';
 import type { QuestionCard, QuestionCardAnswers } from '@/types/chat';
 import { useV2ChatContext } from '../chat-context';
-import { InlineQuestions } from './InlineQuestions';
 
 /**
- * Lawexa's answer that asks questions (question cards, design B: Arthur's
- * pick, 13 November 2026). Its saved text is the questions in plain words
- * (for v1 and a copy); the row draws them instead. While the card is open and
- * this reader may answer, the questions are answered right here
- * ({@link InlineQuestions}); a reader who may not (a viewer, a shared link)
- * sees them as a list. Once answered, only the lead line stays: the reader's
- * answers come next, as their own bubble ({@link CardAnswersBubble}). A card
- * put aside for a typed reply says so.
+ * Lawexa's answer that asks questions (question cards, design A: Stay, 13
+ * November 2026). Its saved text is the questions in plain words (for v1 and a
+ * copy); the row draws them instead. While the card is open and this reader
+ * may answer, the row keeps only its lead line: the questions are asked on the
+ * card docked above the message box (`QuestionDock`). A reader who may not (a
+ * viewer, a shared link) sees them here as a list. Once answered, only the
+ * lead line stays: the reader's answers come next, as their own bubble
+ * ({@link CardAnswersBubble}). A card put aside for a typed reply says so.
  */
 export function AskedQuestions({ rowId, card }: { rowId: string; card: QuestionCard }) {
   const chat = useV2ChatContext();
   const count = card.questions.length;
   const lead = count === 1 ? 'I have a question before I go on.' : 'I have a few questions before I go on.';
-  const answering = card.status === 'open' && chat?.cardQuestions?.open.rowId === rowId ? chat.cardQuestions : null;
+  const answering = card.status === 'open' && chat?.cardQuestions?.open.rowId === rowId;
   return (
     <div className="text-[15px] leading-relaxed text-foreground">
       <p>{lead}</p>
-      {answering ? (
-        <InlineQuestions cardQuestions={answering} />
-      ) : card.status === 'open' ? (
+      {answering ? null : card.status === 'open' ? (
         <ol className="mt-3 flex flex-col gap-2.5">
           {card.questions.map((question, at) => (
             <li key={at} className="flex items-start gap-2.5 px-1 text-[14px] leading-snug text-muted-foreground">

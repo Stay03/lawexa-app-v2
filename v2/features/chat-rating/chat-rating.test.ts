@@ -122,10 +122,11 @@ test('the moments are hooked where they happen, and only inside an answer', () =
 
 test('the banner sits above every chat’s box, and the home box has none', () => {
   const dock = read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx');
-  // The moment banner, then the plan-ended slot (Arthur's B), then the box.
+  // The moment banner, then the plan-ended slot (Arthur's B), then the box; while Lawexa's questions wait, their
+  // card docks between the slot and the box (question cards, design A), and the banner stays away.
   assert.match(
     dock,
-    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*<ConversationComposer/,
+    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*\{openCard && \(\s*<QuestionDock[\s\S]*?\/>\s*\)\}\s*\{\/\*[^*]*\*\/\}\s*<div className=\{boxAway \? 'hidden' : undefined\}>\s*<ConversationComposer/,
   );
   // The home box carries only the plan-ended slot, never the moment banner.
   assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /ChatRatingSlot|ChatRatingBanner/);

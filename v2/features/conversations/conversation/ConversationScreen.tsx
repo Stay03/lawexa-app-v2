@@ -270,6 +270,7 @@ export function ConversationScreen({
       submit: controllerSubmit,
       stop: controllerStop,
       questionCard,
+      answerCard,
     });
   }, [
     externalComposer,
@@ -289,6 +290,7 @@ export function ConversationScreen({
     controllerSubmit,
     controllerStop,
     questionCard,
+    answerCard,
   ]);
   useEffect(() => {
     if (!externalComposer) return;
@@ -404,6 +406,7 @@ export function ConversationScreen({
       submit: controllerSubmit,
       stop: controllerStop,
       questionCard,
+      answerCard,
       mentionOptions,
       quoteToneOf,
       spaceUuid,
@@ -429,6 +432,7 @@ export function ConversationScreen({
     controllerSubmit,
     controllerStop,
     questionCard,
+    answerCard,
     mentionOptions,
     quoteToneOf,
     spaceUuid,

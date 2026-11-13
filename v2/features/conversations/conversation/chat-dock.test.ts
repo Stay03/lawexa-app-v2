@@ -126,6 +126,7 @@ const surfaceFor = (conversationId: string): RouteComposerSurface => ({
   submit: async () => undefined,
   stop: () => {},
   questionCard: null,
+  answerCard: async () => null,
   mentionOptions: null,
   quoteToneOf: null,
   spaceUuid: null,

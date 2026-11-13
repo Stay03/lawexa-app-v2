@@ -49,11 +49,23 @@ function readQuestion(value: unknown): QuestionCardQuestion | null {
     if (!option) return null;
     options.push(option);
   }
-  const recommended =
-    typeof value.recommended === 'number' && Number.isInteger(value.recommended) && value.recommended >= 0 && value.recommended < options.length
-      ? value.recommended
-      : null;
-  return { question: value.question, why: typeof value.why === 'string' ? value.why : '', options, recommended };
+  return { question: value.question, why: typeof value.why === 'string' ? value.why : '', options, recommended: readRecommended(value, options.length) };
+}
+
+/**
+ * Which option Lawexa recommends, if any (question cards B, Stay 13 November
+ * 2026; Backend's 13566521): the option marked `recommended: true` (at most
+ * one), and a question with none has no recommendation and no tag. A card
+ * from before that change carries the question's `recommended` index instead,
+ * which is still read, so either server answers the same way.
+ */
+function readRecommended(value: Record<string, unknown>, total: number): number | null {
+  const options = value.options as unknown[];
+  const marked = options.findIndex((option) => isRecord(option) && option.recommended === true);
+  if (marked >= 0) return marked;
+  if (options.some((option) => isRecord(option) && 'recommended' in option)) return null;
+  const index = value.recommended;
+  return typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < total ? index : null;
 }
 
 /** One stored or sent answer; null for a shape this app does not know. */

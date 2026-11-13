@@ -68,6 +68,39 @@ test('a shape the app does not know is no card, so the answer stays plain text',
   assert.equal(readQuestionCard(null), null);
 });
 
+test('the recommended option is the one the server marks (cards B, Backend 13566521); none marked is none', () => {
+  // Stay's tenancy questions: a state question with no recommendation, why null, descriptions null.
+  const state = {
+    question: 'TEST DATA. Which state is the property in?',
+    why: null,
+    options: [
+      { label: 'Lagos', description: null, recommended: false },
+      { label: 'Abuja (FCT)', description: null, recommended: false },
+      { label: 'Rivers', description: null, recommended: false },
+    ],
+  };
+  const notice = {
+    question: 'TEST DATA. How much notice does the tenancy give?',
+    why: 'The notice period decides the date on the letter.',
+    options: [
+      { label: 'Six months', description: 'A yearly tenancy.', recommended: true },
+      { label: 'One month', description: 'A monthly tenancy.', recommended: false },
+    ],
+  };
+  const card = readQuestionCard(cardMeta({ questions: [state, notice] }));
+  assert.equal(card?.questions[0].recommended, null);
+  assert.equal(card?.questions[0].why, '');
+  assert.equal(card?.questions[0].options[0].description, '');
+  assert.equal(card?.questions[1].recommended, 0);
+  assert.equal(startingAnswer(card!.questions[0]), null);
+  // Marked options win over a stray question-level index; a card saved before the change still reads its index.
+  assert.equal(readQuestionCard(cardMeta({ questions: [{ ...state, recommended: 2 }] }))?.questions[0].recommended, null);
+  assert.equal(readQuestionCard(cardMeta({ questions: [TONE] }))?.questions[0].recommended, 0);
+  // A skip with no recommendation sends a bare skip and reads "skipped".
+  assert.deepEqual(labeledAnswers(card!.questions, [{ skipped: true }, { option: 0 }]), [{ skipped: true }, { option: 0, label: 'Six months' }]);
+  assert.match(answersMessage(card!.questions, [{ skipped: true }, { text: 'TEST DATA. Three months' }]), /→ skipped\n2\. .* → my own answer: TEST DATA\. Three months$/);
+});
+
 test('a recommended index outside the options is no recommendation', () => {
   const card = readQuestionCard(cardMeta({ questions: [{ ...TONE, recommended: 7 }] }));
   assert.equal(card?.questions[0].recommended, null);

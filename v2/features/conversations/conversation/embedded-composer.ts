@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { MessageAttachment } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import type { QuestionCardAnswer } from '@/types/chat';
 import type { OpenCard } from './question-card/open-card';
 import type { SendRefused, ViewOnlyReason } from './space-turn';
 
@@ -60,6 +61,12 @@ export interface EmbeddedComposerSurface {
    * when there is none. The host's box then reads "Or type a different answer".
    */
   questionCard: OpenCard | null;
+  /**
+   * Answers the open card (question cards, design A: Stay, 13 November 2026):
+   * resolves with the refusal's sentence, or null when they went. The host's
+   * dock above the box asks the questions with it.
+   */
+  answerCard: (answers: QuestionCardAnswer[]) => Promise<string | null>;
 }
 
 let surface: EmbeddedComposerSurface | null = null;

@@ -4,50 +4,49 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/* Question cards on screen, design B (Arthur's pick, 13 November 2026, thread
- * c91086ec): the questions are asked inside Lawexa's answer, where it asked,
- * not on a card above the box. A tap selects and Next or Send confirms; the
- * answers come back as the reader's own bubble; and they cannot be changed
- * afterwards (Stay, 12 November). */
+/* Question cards on screen, design A (Stay, 13 November 2026, thread c91086ec:
+ * "lets just use this and use it well"): a card docked above the message box
+ * asks one question at a time, with dots for the steps, Skip, Next and ×.
+ * "Something else" turns its row into a field in place, and the box steps
+ * away while it types. The answers come back as the reader's own bubble, and
+ * they cannot be changed afterwards (Stay, 12 November). */
 
 const here = dirname(fileURLToPath(import.meta.url));
 const conversation = join(here, '..');
-const read = (...parts: string[]) => readFileSync(join(...parts), 'utf8');
+const read = (...parts: string[]) => readFileSync(join(...parts), 'utf8').replace(/\r\n/g, '\n');
 const caseChatCore = () => read(conversation, '..', '..', 'cases', 'detail', 'CaseChatCore.tsx');
+const dock = () => read(here, 'QuestionDock.tsx');
 
 test('a tap selects an option and moves nowhere; Next or Send confirms', () => {
-  const questions = read(here, 'InlineQuestions.tsx');
-  assert.match(
-    questions,
-    /const choose = \(option: number\) => \{\s*if \(locked\) return;\s*setDrafts\(\(current\) => current\.map\(\(entry, at\) => \(at === index \? \{ option \} : entry\)\)\);\s*\};/,
-  );
-  assert.match(questions, /onClick=\{next\}/);
+  const questions = dock();
+  assert.match(questions, /setDraft\(\{ option: choice \}\);/);
+  assert.match(questions, /onClick=\{\(\) => next\(\)\}/);
   assert.match(questions, /\{isLast \? \(sending \? 'Sending…' : 'Send'\) : 'Next'\}/);
-  // The answers go from two places only: Send on the last question, and the skip button.
+  // The answers go from two places only: Send on the last question (Next's), and × to skip them all.
   assert.equal(questions.match(/void send\(/g)?.length, 2);
-  // Each question starts on Lawexa's recommendation.
+  // Each question starts on Lawexa's recommendation, or on nothing when there is none.
   assert.match(questions, /useState<\(QuestionCardAnswer \| null\)\[\]>\(\(\) => questions\.map\(startingAnswer\)\)/);
 });
 
-test('"Skip the rest" keeps the answers given so far and skips this question and the later ones', () => {
-  const questions = read(here, 'InlineQuestions.tsx');
+test('Skip leaves this question unanswered and moves on; on the last it sends', () => {
+  const questions = dock();
   assert.match(
     questions,
-    /const skipRest = \(\) => void send\(answersToSend\(questions, drafts\.map\(\(draft, at\) => \(at < index \? draft : null\)\)\)\);/,
+    /const skip = \(\) => \{\s*if \(locked\) return;\s*const current = drafts\.map\(\(entry, at\) => \(at === index \? null : entry\)\);\s*setDrafts\(current\);\s*next\(current\);/,
   );
-  assert.match(questions, /\{count === 1 \? 'Skip' : isLast \? 'Skip and send' : 'Skip the rest'\}/);
+  assert.match(questions, /if \(isLast\) void send\(answersToSend\(questions, current\)\);/);
 });
 
-test('an answered question folds to its choice, and a tap opens it again before Send', () => {
-  const questions = read(here, 'InlineQuestions.tsx');
-  assert.match(questions, /if \(at < index\) \{[\s\S]{0,400}onClick=\{\(\) => goTo\(at\)\}/);
-  assert.match(questions, /\{words \?\? 'Skipped'\}/);
+test('a dot of a question already passed goes back to it before Send', () => {
+  const questions = dock();
+  assert.match(questions, /disabled=\{locked \|\| at > reached \|\| at === index\}\s*onClick=\{\(\) => goTo\(at\)\}/);
+  assert.match(questions, /setReached\(\(furthest\) => Math\.max\(furthest, at\)\);/);
 });
 
 test('Change answers is gone: nothing reopens a card once its answers went', () => {
   for (const file of [
     read(here, 'CardMarks.tsx'),
-    read(here, 'InlineQuestions.tsx'),
+    dock(),
     read(here, 'open-card.ts'),
     read(conversation, 'ConversationScreen.tsx'),
     read(conversation, 'chat-context.tsx'),
@@ -58,7 +57,7 @@ test('Change answers is gone: nothing reopens a card once its answers went', () 
   }
 });
 
-test("a card's row asks the questions itself: the streamed text leaves no second copy", () => {
+test("a card's row keeps only its lead line while the dock asks: the streamed text leaves no second copy", () => {
   const row = read(conversation, 'rows', 'AssistantMessageRow.tsx');
   const early = row.indexOf('if (questionCard) {');
   assert.ok(early > 0);
@@ -66,32 +65,33 @@ test("a card's row asks the questions itself: the streamed text leaves no second
   assert.ok(early < row.indexOf('<ChatContent'));
   const branch = row.slice(early, row.indexOf('}', row.indexOf('<AskedQuestions rowId={message.id} card={questionCard} />')));
   assert.doesNotMatch(branch, /ChatContent|message\.content|shownText/);
-  // While the turn streams, the row is a plain answer; the questions replace it in place.
+  // While the turn streams, the row is a plain answer; the lead line replaces it in place.
   assert.match(row, /const questionCard = isStreaming \? undefined : \(message as ChatMessage\)\.questionCard;/);
-  // Only the row that asks, while open, for a reader who may answer.
+  // Only the row that asks, while open, for a reader who may answer: the lead alone.
   const marks = read(here, 'CardMarks.tsx');
-  assert.match(
-    marks,
-    /const answering = card\.status === 'open' && chat\?\.cardQuestions\?\.open\.rowId === rowId \? chat\.cardQuestions : null;/,
-  );
+  assert.match(marks, /const answering = card\.status === 'open' && chat\?\.cardQuestions\?\.open\.rowId === rowId;/);
+  assert.match(marks, /\{answering \? null : card\.status === 'open' \? \(/);
 });
 
-test('no card sits above either box; each box reads "Or type a different answer" while the questions wait', () => {
+test('a card docks above either box, which reads "Or type a different answer" while the questions wait', () => {
   for (const host of [read(conversation, 'ChatDock.tsx'), caseChatCore()]) {
-    assert.doesNotMatch(host, /OpenQuestionCard|QuestionCardPanel/);
+    assert.match(host, /<QuestionDock\s+key=\{openCard\.cardMessageId \?\? openCard\.rowId\}/);
+    assert.match(host, /onAnswer=\{surface\.answerCard\}/);
     assert.match(host, /CARD_ANSWER_PLACEHOLDER/);
     assert.match(host, /const openCard = surface && surface\.isOwnerResolved && surface\.canSend \? surface\.questionCard : null;/);
   }
-  assert.match(read(here, 'InlineQuestions.tsx'), /export const CARD_ANSWER_PLACEHOLDER = 'Or type a different answer';/);
+  assert.match(dock(), /export const CARD_ANSWER_PLACEHOLDER = 'Or type a different answer';/);
+  // On a phone the card is capped and scrolls inside.
+  assert.match(dock(), /max-h-\[60dvh\]/);
 });
 
-test('the screen hands the open card to the rows, held while a turn runs, and the boxes only see it', () => {
+test('the screen hands the open card to the rows and to both boxes, held while a turn runs', () => {
   const screen = read(conversation, 'ConversationScreen.tsx');
   assert.match(screen, /held: isLoadingHistory \|\| isStreaming \|\| sendHeldBy !== null/);
   assert.match(screen, /cardQuestions=\{cardQuestions\}/);
-  // Both boxes get the card, for the hint and nothing else.
-  assert.equal(screen.match(/\r?\n\s+questionCard,\r?\n/g)?.length, 4);
-  assert.doesNotMatch(screen, /answerCard,\r?\n/);
+  // Both boxes get the card and its answer (two publishes, each with its dependency list).
+  assert.equal(screen.match(/\n\s+questionCard,\n/g)?.length, 4);
+  assert.equal(screen.match(/\n\s+answerCard,\n/g)?.length, 4);
 });
 
 test("the reader's answers come back as their own bubble, each question with its answer", () => {
@@ -103,9 +103,25 @@ test("the reader's answers come back as their own bubble, each question with its
   assert.equal(row.match(/\{cardBubble \? \(\s*cardBubble\s*\) : pastedTexts\.length > 0 \? \(/g)?.length, 2);
 });
 
-test('the options are one Tab stop, and the arrow keys move the choice with the focus', () => {
-  const questions = read(here, 'InlineQuestions.tsx');
-  assert.match(questions, /tabIndex=\{optionAt === \(chosenAt\(draft\) \?\? 0\) \? 0 : -1\}/);
-  assert.match(questions, /onKeyDown=\{\(event\) => onOptionKey\(event, question\.options\.length, chosenAt\(draft\)\)\}/);
-  assert.match(questions, /const target = optionKeyTarget\(event\.key, from, total\);[\s\S]{0,120}choose\(target\);[\s\S]{0,120}\.focus\(\);/);
+test('the choices are one Tab stop, and the arrow keys move the choice with the focus', () => {
+  const questions = dock();
+  // "Something else" is the last choice in the group: the arrows reach it, and it puts the keyboard in its field.
+  assert.match(questions, /tabIndex=\{at === \(choiceAt \?\? 0\) \? 0 : -1\}/);
+  assert.match(questions, /tabIndex=\{choiceAt === optionCount \? 0 : -1\}/);
+  assert.match(questions, /const target = optionKeyTarget\(event\.key, choiceAt, optionCount \+ 1\);[\s\S]{0,120}choose\(target\);[\s\S]{0,200}\.focus\(\);/);
+});
+
+test('"Something else" becomes a field in place, the box steps away while it types, and its words are the answer', () => {
+  const questions = dock();
+  assert.match(questions, /Something else/);
+  assert.match(questions, /\{ownChosen \? \(\s*<div className="[^"]*">\s*<PenLine[^>]*\/>\s*<input/);
+  assert.match(questions, /onFocus=\{\(\) => onTypingChange\(true\)\}\s*onBlur=\{\(\) => onTypingChange\(false\)\}/);
+  assert.match(questions, /maxLength=\{OTHER_ANSWER_MAX\}/);
+  assert.match(questions, /export const OTHER_ANSWER_MAX = 2000;/);
+  assert.match(questions, /if \(event\.key === 'Enter' && !event\.nativeEvent\.isComposing\) \{\s*event\.preventDefault\(\);\s*next\(\);/);
+  // The box hides while the field types: one place to type.
+  assert.match(read(conversation, 'ChatDock.tsx'), /const boxAway = openCard !== null && cardTyping;/);
+  assert.match(caseChatCore(), /<div className=\{openCard && cardTyping \? 'hidden' : undefined\}>/);
+  // "Recommended" only on the option the server marks, after its label (wrapping under it when it must).
+  assert.match(questions, /\{question\.recommended === at && <span className="[^"]*">Recommended<\/span>\}/);
 });
