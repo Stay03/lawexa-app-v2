@@ -170,9 +170,10 @@ export function DraftCard({
  * panel reads it (markdown-to-doc.ts) and drawn with the editor's document
  * classes, so a template's centred lines and its signature table look as they
  * do in the panel, not as a code box or as typed tags (template layout, thread
- * 2b658111).
+ * 2b658111). The draft panel draws an unfinished draft with it too, read only
+ * (DraftPanel.tsx; Arthur's A, thread 83151a13).
  */
-function DraftDocument({ draft }: { draft: DraftBlock }) {
+export function DraftDocument({ draft }: { draft: DraftBlock }) {
   const doc = useMemo(() => markdownToDoc(draft.body, { font: draft.font, size: draft.size }), [draft.body, draft.font, draft.size]);
   return <DiffDocument diff={doc} />;
 }

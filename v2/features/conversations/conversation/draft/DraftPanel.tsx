@@ -17,6 +17,7 @@ import { draftStatus, draftsIn, type DraftBlock } from './draft-blocks';
 import { locateDraft } from './draft-ordinals';
 import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
 import { DraftChangesView } from './DraftChangesView';
+import { DraftDocument } from './DraftCard';
 import { draftGroupKey, draftVersionTitle } from './draft-versions';
 import { newestFinished } from './draft-note-state';
 import { DraftVersionSwitch } from './DraftVersionSwitch';
@@ -188,7 +189,20 @@ export function DraftPanel({
           <DraftBar />
           {versionSwitch}
           <article className={DRAFT_DOCUMENT}>
-            <MarkdownText content={draft.body} animate={!draft.complete && Boolean(streamingMessage)} />
+            {/*
+              While Lawexa is still writing it, the draft streams as the chat's
+              text does: re-reading the whole document on every few words would
+              make it flicker. Once the answer has ended, a draft Lawexa never
+              closed (Arthur's adjournment letter, 13 November 2026) is drawn as
+              the document a finished one is, read only: right-aligned lines,
+              the signature table, headings and numbering as written. Editing,
+              download and compare wait for a finished version.
+            */}
+            {!draft.complete && streamingMessage ? (
+              <MarkdownText content={draft.body} animate />
+            ) : (
+              <DraftDocument draft={draft} />
+            )}
           </article>
         </div>
       )}
