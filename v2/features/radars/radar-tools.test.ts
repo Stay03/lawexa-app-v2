@@ -26,7 +26,8 @@ test('a finished Radar tool re-asks the Radar page’s lists and every space’s
   const controller = code('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
   assert.match(
     controller,
-    /onToolComplete: \(event\) => \{\s*if \(!radarToolChangesRadars\(event\.tool_call\.name\)\) return;\s*void queryClient\.invalidateQueries\(\{ queryKey: radarsQueries\.all \}\);\s*void queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.allRadars\(\) \}\);/,
+    // The handler reads a chat's background jobs first (a tool result that names one); the Radar part follows.
+    /onToolComplete: \(event\) => \{[\s\S]*?\n\s*if \(!radarToolChangesRadars\(event\.tool_call\.name\)\) return;\s*void queryClient\.invalidateQueries\(\{ queryKey: radarsQueries\.all \}\);\s*void queryClient\.invalidateQueries\(\{ queryKey: spacesQueries\.allRadars\(\) \}\);/,
   );
   const queries = code('v2', 'features', 'spaces', 'queries.ts');
   assert.match(queries, /radarsOf: \(spaceUuid: string\) => \[\.\.\.spacesQueries\.allRadars\(\), spaceUuid\] as const,/);

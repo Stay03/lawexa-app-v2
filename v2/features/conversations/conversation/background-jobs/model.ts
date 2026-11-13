@@ -1,4 +1,5 @@
 import type { BackgroundJob, BackgroundJobKind, BackgroundJobOutcome } from '@/types/background-jobs';
+import type { ToolResult } from '@/types/chat';
 
 /**
  * background-jobs model — the pure rules of a chat's background jobs
@@ -95,7 +96,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * seconds shows its line while the turn is still writing (Lucy's check 2,
  * 13 November 2026: a 17-second file reading).
  */
-export function toolResultNamesBackgroundJob(result: { data: unknown } | null | undefined): boolean {
+export function toolResultNamesBackgroundJob(result: ToolResult | null | undefined): boolean {
   const answer = result?.data;
   return isRecord(answer) && isRecord(answer.data) && isRecord(answer.data.background_job);
 }
