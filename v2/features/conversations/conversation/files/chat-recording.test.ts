@@ -48,7 +48,7 @@ test('a finished box_record_stop step gives the recording by its file id, never 
 
 test('no card for another tool, a running or failed step, an unloaded result, or no file id', () => {
   assert.equal(chatRecording(step({ toolName: 'box_record_start' })), null);
-  assert.equal(chatRecording(step({ toolStatus: 'running' } as Partial<ToolMessage>)), null);
+  assert.equal(chatRecording(step({ toolStatus: 'calling' })), null);
   assert.equal(chatRecording(step({ toolResult: { success: false, data: null, error: 'save_failed' } })), null);
   assert.equal(chatRecording(step({ toolResult: undefined })), null);
   assert.equal(chatRecording(step({ toolResult: { success: true, data: { ...STOPPED, file_id: '5501' }, error: null } })), null);
