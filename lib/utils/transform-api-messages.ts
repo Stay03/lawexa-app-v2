@@ -10,6 +10,7 @@ import type {
 } from '@/types/chat';
 import { draftEditBases, resolveDraftEdits } from './draft-edits';
 import { readCardAnswers, readQuestionCard } from './question-card';
+import { readSkillDraftCard } from './skill-draft';
 import { isRedactionSummary } from './redaction-summary';
 
 /**
@@ -402,6 +403,19 @@ export function transformApiMessages(
         content: apiMsg.content,
         timestamp: new Date(apiMsg.created_at),
         ...(questionCard && { questionCard }),
+      } as ChatMessage);
+    }
+    // A skill Lawexa drafted (metadata.type "skill_draft", the skills tool): an
+    // answer with its text, and the card under it. A card this app cannot read
+    // stays a plain answer.
+    else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'skill_draft') {
+      const skillDraft = readSkillDraftCard(apiMsg.metadata);
+      messages.push({
+        id: `msg_${apiMsg.id}`,
+        role: 'assistant',
+        content: apiMsg.content,
+        timestamp: new Date(apiMsg.created_at),
+        ...(skillDraft && { skillDraft }),
       } as ChatMessage);
     }
     // Inter-tool narration identified by lookahead — drop, matches behavior

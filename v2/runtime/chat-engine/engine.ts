@@ -80,6 +80,8 @@ import { answerMessageId, stampAnswerId } from './answer-id';
 import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
 import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
+import { withSkillDraftFromCompleted, withSkillDraftStatus } from './skill-draft-rows';
+import type { SkillDraftStatus } from '@/types/skill-draft';
 import { applySnapshotEvents, placeEvent, removeEvent as withoutEvent } from './event-rows';
 import { isBackgroundReturn, isTurnRow, lastTurnRow, lastTurnStartIndex } from '../turn-rows';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
@@ -1773,6 +1775,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (event.ends_with === 'ask_user') {
         setMessages((msgs) => withCardFromCompleted(msgs, savedAnswerId, event.question_card, confidential));
       }
+      // The turn drafted a skill (the skills tool): its card goes under the
+      // answer now; else the read of the chat that follows every turn brings it.
+      if (event.skill_draft) {
+        setMessages((msgs) => withSkillDraftFromCompleted(msgs, savedAnswerId, event.skill_draft));
+      }
       handlers.onCompleted?.(event);
     });
 
@@ -2759,6 +2766,13 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     return true;
   }
 
+  function setSkillDraftStatus(draft: string, status: SkillDraftStatus): boolean {
+    if (disposed) return false;
+    if (withSkillDraftStatus(state.messages, draft, status) === state.messages) return false;
+    setState((prev) => ({ ...prev, messages: [...withSkillDraftStatus(prev.messages, draft, status)] }));
+    return true;
+  }
+
   function followUntilAnswered(convId: string): boolean {
     if (disposed || eventSource || pollInterval || state.isStreaming) return false;
     const last = lastTurnRow(state.messages);
@@ -2839,6 +2853,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     followUntilAnswered,
     upsertEvent,
     removeEvent,
+    setSkillDraftStatus,
     updateHandlers(next) {
       handlers = next;
     },

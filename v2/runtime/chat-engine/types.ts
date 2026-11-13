@@ -31,6 +31,7 @@ import type {
   RedactionSummary,
 } from '@/types/chat';
 import type { StreamSmoothingConfig } from './stream-smoother';
+import type { SkillDraftStatus } from '@/types/skill-draft';
 
 export type { StreamSmoothingConfig, StreamStyle } from './stream-smoother';
 
@@ -402,6 +403,12 @@ export interface ChatEngine {
   upsertEvent(row: ApiMessage): boolean;
   /** Take away the line of this server id (its draft went back to Lawexa's version). */
   removeEvent(serverId: number): boolean;
+  /**
+   * A skill draft the reader saved or set aside on this screen (the skills
+   * tool): its card takes the server's status at once, on every row showing
+   * that draft. Applies while a stream is live. Returns whether rows changed.
+   */
+  setSkillDraftStatus(draft: string, status: SkillDraftStatus): boolean;
 
   /**
    * Replace the live callbacks + mode resolvers on a long-lived engine. The React

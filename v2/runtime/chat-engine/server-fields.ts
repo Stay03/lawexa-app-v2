@@ -1,5 +1,6 @@
 import type { ChatMessage, ConversationMessage } from '@/types/chat';
 import { hasUnresolvedDraftEdits } from '@/lib/utils/draft-edits';
+import { laterSkillDraftCard } from '@/lib/utils/skill-draft';
 import type { EngineMessage } from './types';
 
 /** The server's prefix on a row id read from history (`msg_{id}`). */
@@ -35,7 +36,9 @@ export function adoptServerFields(
     const id = Number(row.id.slice(SERVER_ROW_PREFIX.length));
     if (!Number.isSafeInteger(id)) continue;
     if (row.role === 'user') copies.set(id, row as ChatMessage);
-    else if (row.role === 'assistant' && (row as ChatMessage).questionCard) cards.set(id, row as ChatMessage);
+    else if (row.role === 'assistant' && ((row as ChatMessage).questionCard || (row as ChatMessage).skillDraft)) {
+      cards.set(id, row as ChatMessage);
+    }
   }
   if (copies.size === 0 && cards.size === 0) return rows as EngineMessage[];
 
@@ -123,10 +126,22 @@ function cardFields(row: EngineMessage, cards: ReadonlyMap<number, ChatMessage>)
   const id =
     row.savedId ??
     (row.id.startsWith(SERVER_ROW_PREFIX) ? Number(row.id.slice(SERVER_ROW_PREFIX.length)) : Number.NaN);
-  const copy = cards.get(id)?.questionCard;
-  if (!copy) return null;
+  const server = cards.get(id);
+  if (!server) return null;
+  const fields: Partial<ChatMessage> = {};
+  const copy = server.questionCard;
   const local = (row as ChatMessage).questionCard;
-  if (local === undefined) return { questionCard: copy };
-  if (local.status === 'open' && copy.status !== 'open') return { questionCard: copy };
-  return null;
+  if (copy && (local === undefined || (local.status === 'open' && copy.status !== 'open'))) fields.questionCard = copy;
+  // A skill draft's card (the skills tool): it reaches a streamed answer the
+  // same way, and follows the draft as an admin publishes or rejects it. Only
+  // ever forward: a read from before the reader's own Save keeps "Sent".
+  const draftCopy = server.skillDraft;
+  const draftLocal = (row as ChatMessage).skillDraft;
+  if (draftCopy) {
+    const next = draftLocal === undefined ? draftCopy : laterSkillDraftCard(draftLocal, draftCopy);
+    if (next !== draftLocal && (draftLocal === undefined || next.status !== draftLocal.status || next.displayName !== draftLocal.displayName || next.description !== draftLocal.description)) {
+      fields.skillDraft = next;
+    }
+  }
+  return Object.keys(fields).length > 0 ? fields : null;
 }

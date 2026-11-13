@@ -3,6 +3,7 @@
 import { createContext, useContext, useMemo } from 'react';
 
 import type { QuestionCardAnswer } from '@/types/chat';
+import type { SkillDraftStatus } from '@/types/skill-draft';
 import type { DraftEditLineFields } from '@/v2/features/notes/types';
 import type { OpenCard } from './question-card/open-card';
 
@@ -37,6 +38,12 @@ interface V2ChatContextValue {
    * cards, design B): the row that asks draws its questions. Null otherwise.
    */
   cardQuestions: CardQuestions | null;
+  /**
+   * A skill draft's card was saved or set aside on this screen (the skills
+   * tool): the rows show the server's new status at once. Stable: it only
+   * reaches the chat's engine. A no-op outside a chat screen.
+   */
+  settleSkillDraft: (draft: string, status: SkillDraftStatus) => void;
 }
 
 export interface CardQuestions {
@@ -46,6 +53,8 @@ export interface CardQuestions {
   /** Nothing can be sent yet (the chat loads, a turn runs, another member's turn holds it). */
   held: boolean;
 }
+
+const settleNothing = () => {};
 
 const V2ChatContext = createContext<V2ChatContextValue | null>(null);
 
@@ -57,6 +66,7 @@ export function V2ChatProvider({
   conversationId,
   applyDraftEditLine,
   cardQuestions = null,
+  settleSkillDraft = settleNothing,
 }: {
   children: React.ReactNode;
   sendMessage: (message: string) => void;
@@ -65,13 +75,14 @@ export function V2ChatProvider({
   conversationId: string;
   applyDraftEditLine: (answer: DraftEditLineFields) => void;
   cardQuestions?: CardQuestions | null;
+  settleSkillDraft?: (draft: string, status: SkillDraftStatus) => void;
 }) {
   // Stable value — only changes when the streaming flag (or `canSend`) flips, never per token
   // (tokens flow through the per-message streaming store, not this context), so
   // the card subtree never re-renders on stream growth.
   const value = useMemo<V2ChatContextValue>(
-    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions }),
-    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions],
+    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft }),
+    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft],
   );
   return <V2ChatContext.Provider value={value}>{children}</V2ChatContext.Provider>;
 }

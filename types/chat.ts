@@ -1,5 +1,6 @@
 import type { JurisdictionChoice } from './jurisdiction';
 import type { IBlockedReason } from './message-pack';
+import type { SkillDraftCard } from './skill-draft';
 
 // Message role types
 export type MessageRole = 'user' | 'assistant' | 'tool';
@@ -103,6 +104,12 @@ export interface ChatMessage {
    * questions as plain text, which v1 and a copy show.
    */
   questionCard?: QuestionCard;
+  /**
+   * A skill Lawexa drafted in this turn (`metadata.type` "skill_draft", the
+   * skills tool, thread 2b436b4f): the card under the answer that the person
+   * saves for an admin, or sets aside.
+   */
+  skillDraft?: SkillDraftCard;
   /**
    * The user turn that answered a card (`metadata.type` "question_answers"):
    * drawn as a bubble of each question with its answer.
@@ -449,6 +456,12 @@ export interface CompletedEvent {
    * next read of the chat.
    */
   question_card?: { type?: string; status?: unknown; questions?: unknown; answers?: unknown } | null;
+  /**
+   * A skill the turn drafted (the skills tool, branch skills-tool 385ececc):
+   * the same card the answer's metadata carries. Sent only for a turn that
+   * answered; read by `readSkillDraftCard`.
+   */
+  skill_draft?: Record<string, unknown> | null;
 }
 
 // Terminal event emitted by backend when a streaming execution is cancelled
@@ -824,7 +837,8 @@ export interface ApiMessage {
       // In an agent conversation: the calling agent's message (sub-agents contract, 1.4).
       | 'agent_message'
       | 'question_card'
-      | 'question_answers';
+      | 'question_answers'
+      | 'skill_draft';
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
     /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */

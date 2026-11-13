@@ -110,6 +110,7 @@ export function ConversationScreen({
     retryLastMessage,
     upsertEvent,
     removeEvent,
+    setSkillDraftStatus,
   } = stream;
   // A draft save's "edited" line, drawn at once for the reader who saved
   // (draft/draft-edit-line.ts). The engine's own functions, so this never changes.
@@ -481,6 +482,7 @@ export function ConversationScreen({
           conversationId={conversationId}
           applyDraftEditLine={onDraftEditLine}
           cardQuestions={cardQuestions}
+          settleSkillDraft={setSkillDraftStatus}
         >
           {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
               own route, a draft or a file opens beside the transcript on a

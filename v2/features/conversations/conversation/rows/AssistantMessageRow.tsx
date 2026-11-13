@@ -18,6 +18,7 @@ import { savedMessageId } from '../markdown/export-target';
 import { trimUnclosedLinkTail } from '../markdown/partial-tail';
 import { AskedQuestions } from '../question-card/CardMarks';
 import { ReasoningTrace } from '../reasoning/ReasoningTrace';
+import { SkillDraftCardView } from '../skill-draft/SkillDraftCard';
 import { replyTargetOf, type ReplyableRow } from '../reply-target';
 import { SwipeToReply } from './SwipeToReply';
 
@@ -89,6 +90,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   // words (for v1 and a copy), and the row asks them itself, where Lawexa
   // asked (question cards, design B, 13 November 2026).
   const questionCard = isStreaming ? undefined : (message as ChatMessage).questionCard;
+  const skillDraft = isStreaming || draining ? undefined : (message as ChatMessage).skillDraft;
   if (questionCard) {
     return (
       <div className="w-full">
@@ -173,6 +175,10 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
               )}
             </div>
           )}
+
+          {/* A skill Lawexa drafted in this turn (the skills tool): its card under
+              the answer, once the turn is over. */}
+          {skillDraft && <SkillDraftCardView card={skillDraft} />}
 
           {showActions && (
             <MessageActions

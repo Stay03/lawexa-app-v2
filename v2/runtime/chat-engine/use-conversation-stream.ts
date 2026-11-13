@@ -98,6 +98,7 @@ export interface UseConversationStreamResult {
   followUntilAnswered: ChatEngine['followUntilAnswered'];
   upsertEvent: ChatEngine['upsertEvent'];
   removeEvent: ChatEngine['removeEvent'];
+  setSkillDraftStatus: ChatEngine['setSkillDraftStatus'];
 }
 
 export function useConversationStream(
@@ -180,5 +181,6 @@ export function useConversationStream(
     followUntilAnswered: engine.followUntilAnswered,
     upsertEvent: engine.upsertEvent,
     removeEvent: engine.removeEvent,
+    setSkillDraftStatus: engine.setSkillDraftStatus,
   };
 }
