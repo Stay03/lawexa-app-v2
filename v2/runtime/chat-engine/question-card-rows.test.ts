@@ -117,7 +117,7 @@ test("a reply drawn here takes its card answers from the server's copy when it l
   assert.deepEqual((adoptServerFields(rows, server)[0] as ChatMessage).cardAnswers, { cardMessageId: 2, answers: [{ option: 0 }] });
 });
 
-test('the questions that can be answered: only an open card that ends the chat, with its saved id', () => {
+test('the questions that can be answered: an open card with its saved id, until a person sends something', () => {
   assert.deepEqual(openCardOf([question('msg_1'), answer('msg_2', { questionCard: OPEN })]), {
     rowId: 'msg_2',
     cardMessageId: 2,
@@ -140,4 +140,20 @@ test('the questions that can be answered: only an open card that ends the chat, 
   assert.equal(openCardOf([answer('msg_2', { questionCard: { ...OPEN, status: 'skipped' } })]), null);
   assert.equal(openCardOf([answer('msg_2', { questionCard: OPEN, isStreaming: true })]), null);
   assert.equal(openCardOf([]), null);
+});
+
+test("Lawexa's own answers after an unanswered card leave it answerable; a person's message closes it", () => {
+  // A sub-agent's reply wakes the chat (or a scheduled turn runs) after Lawexa
+  // asked (Techlead's review, 13 November 2026): the card stays where it is.
+  const step = { id: 'msg_3', role: 'tool', messageType: 'tool', toolName: 'message_agent', toolStatus: 'complete', content: '', timestamp: at } as unknown as EngineMessage;
+  const woken = [question('msg_1'), answer('msg_2', { questionCard: OPEN }), step, answer('msg_4')];
+  assert.deepEqual(openCardOf(woken), { rowId: 'msg_2', cardMessageId: 2, card: OPEN });
+  // Even while the woken answer streams; nothing can be sent until it ends (the rows hold it).
+  assert.deepEqual(openCardOf([...woken, answer('local-5', { isStreaming: true })])?.rowId, 'msg_2');
+  // The person's next message closes it, as the server marks it skipped.
+  assert.equal(openCardOf([...woken, question('msg_5')]), null);
+  // A newer card is the one that counts: open, it is offered; closed, nothing is.
+  const newer = [...woken, answer('msg_6', { questionCard: OPEN })];
+  assert.equal(openCardOf(newer)?.rowId, 'msg_6');
+  assert.equal(openCardOf([...woken, answer('msg_6', { questionCard: { ...OPEN, status: 'answered', answers: [{ option: 0 }] } })]), null);
 });

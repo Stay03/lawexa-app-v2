@@ -177,7 +177,9 @@ export function chosenLine(answers: readonly QuestionCardAnswer[]): string | nul
 /**
  * The answers as one message, in the words the server gives the model for a
  * saved card (Backend's `answersText`). A confidential chat saves no message,
- * so its card has no id to answer by: this is what it sends instead.
+ * so its card has no id to answer by: this is what it sends instead. Facts
+ * only, no instruction to the model (Techlead's review, 13 November 2026): a
+ * skip reads "skipped (recommended: X)", Backend's exact words.
  */
 export function answersMessage(questions: readonly QuestionCardQuestion[], answers: readonly QuestionCardAnswer[]): string {
   const lines = ['My answers to your questions:'];
@@ -189,7 +191,9 @@ export function answersMessage(questions: readonly QuestionCardQuestion[], answe
         ? (question.options[answer.option]?.label ?? '')
         : 'text' in answer
           ? `my own answer: ${answer.text}`
-          : `skipped: go on with your recommended option${recommended ? ` (${recommended})` : ''} and say so.`;
+          : recommended
+            ? `skipped (recommended: ${recommended})`
+            : 'skipped';
     lines.push(`${index + 1}. ${question.question} → ${words}`);
   });
   return lines.join('\n');
@@ -201,6 +205,36 @@ export function answersMessage(questions: readonly QuestionCardQuestion[], answe
  */
 export function startingAnswer(question: QuestionCardQuestion): QuestionCardAnswer | null {
   return question.recommended === null ? null : { option: question.recommended };
+}
+
+/** The option a question's choice names, or `null` for none (nothing chosen, or own words). */
+export function chosenAt(draft: QuestionCardAnswer | null): number | null {
+  return draft !== null && 'option' in draft ? draft.option : null;
+}
+
+/**
+ * Where a key moves the choice in a question's options, as a radio group
+ * does: ArrowDown and ArrowRight to the next (round to the first), ArrowUp
+ * and ArrowLeft to the one before (round to the last), Home and End to the
+ * ends. From no choice, the next is the first and the one before the last.
+ * `null` for any other key.
+ */
+export function optionKeyTarget(key: string, from: number | null, total: number): number | null {
+  if (total <= 0) return null;
+  switch (key) {
+    case 'ArrowDown':
+    case 'ArrowRight':
+      return from === null ? 0 : (from + 1) % total;
+    case 'ArrowUp':
+    case 'ArrowLeft':
+      return from === null ? total - 1 : (from - 1 + total) % total;
+    case 'Home':
+      return 0;
+    case 'End':
+      return total - 1;
+    default:
+      return null;
+  }
 }
 
 /** Every question answered as skipped: the × on the card. */

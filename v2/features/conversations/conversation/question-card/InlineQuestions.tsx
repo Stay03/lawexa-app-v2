@@ -1,10 +1,10 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type KeyboardEvent } from 'react';
 import { Check, Minus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { answersToSend, answerWords, startingAnswer } from '@/lib/utils/question-card';
+import { answersToSend, answerWords, chosenAt, optionKeyTarget, startingAnswer } from '@/lib/utils/question-card';
 import type { QuestionCardAnswer } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules/meta';
 import type { CardQuestions } from '../chat-context';
@@ -75,6 +75,18 @@ function Questions({ open, answer, held }: CardQuestions) {
   const next = () => {
     if (isLast) void send(answersToSend(questions, drafts));
     else goTo(index + 1);
+  };
+
+  // The options as a radio group for the keyboard: Tab reaches the chosen
+  // one, the arrow keys (and Home, End) move the choice and the focus with
+  // it, as a radio group does. Nothing is sent; Next or Send still confirms.
+  const onOptionKey = (event: KeyboardEvent<HTMLDivElement>, total: number, from: number | null) => {
+    if (locked) return;
+    const target = optionKeyTarget(event.key, from, total);
+    if (target === null) return;
+    event.preventDefault();
+    choose(target);
+    event.currentTarget.querySelector<HTMLButtonElement>(`[data-option="${target}"]`)?.focus();
   };
 
   const skipRest = () => void send(answersToSend(questions, drafts.map((draft, at) => (at < index ? draft : null))));
@@ -148,7 +160,12 @@ function Questions({ open, answer, held }: CardQuestions) {
               {question.why && (
                 <p className="mt-1 pl-7.5 text-[13px] leading-snug text-muted-foreground">{question.why}</p>
               )}
-              <div role="radiogroup" aria-label={question.question} className="mt-2.5 flex flex-col gap-1.5 md:pl-7.5">
+              <div
+                role="radiogroup"
+                aria-label={question.question}
+                onKeyDown={(event) => onOptionKey(event, question.options.length, chosenAt(draft))}
+                className="mt-2.5 flex flex-col gap-1.5 md:pl-7.5"
+              >
                 {question.options.map((option, optionAt) => {
                   const chosen = draft !== null && 'option' in draft && draft.option === optionAt;
                   return (
@@ -157,6 +174,9 @@ function Questions({ open, answer, held }: CardQuestions) {
                       type="button"
                       role="radio"
                       aria-checked={chosen}
+                      // One stop for Tab: the chosen option, or the first when none is.
+                      tabIndex={optionAt === (chosenAt(draft) ?? 0) ? 0 : -1}
+                      data-option={optionAt}
                       disabled={locked}
                       onClick={() => choose(optionAt)}
                       className={cn(

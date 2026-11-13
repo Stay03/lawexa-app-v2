@@ -9,9 +9,11 @@ import {
   answersLine,
   answersMessage,
   answersToSend,
+  chosenAt,
   chosenLine,
   closedCard,
   labeledAnswers,
+  optionKeyTarget,
   readCardAnswers,
   readQuestionCard,
   skipAllAnswers,
@@ -142,8 +144,13 @@ test("a confidential chat's answers go as the message the server would have writ
     [
       'My answers to your questions:',
       '1. TEST DATA. Which tone should the letter take? → my own answer: Very firm',
-      '2. TEST DATA. Which deadline? → skipped: go on with your recommended option (7-day deadline) and say so.',
+      '2. TEST DATA. Which deadline? → skipped (recommended: 7-day deadline)',
     ].join('\n'),
+  );
+  // A question with no recommendation: the bare fact.
+  assert.equal(
+    answersMessage([{ ...DEADLINE, recommended: null }], [{ skipped: true }]),
+    'My answers to your questions:\n1. TEST DATA. Which deadline? → skipped',
   );
   assert.equal(answersMessage([TONE], [{ option: 1 }]), 'My answers to your questions:\n1. TEST DATA. Which tone should the letter take? → Final demand');
 });
@@ -195,4 +202,21 @@ test('a card the app cannot read stays its plain-text answer, never dropped', ()
   assert.equal(rows.length, 1);
   assert.equal(rows[0].content, 'TEST DATA. 1. Which tone?');
   assert.equal((rows[0] as ChatMessage).questionCard, undefined);
+});
+
+test('the options move like a radio group: arrows round the ends, Home and End to them', () => {
+  assert.equal(optionKeyTarget('ArrowDown', 0, 3), 1);
+  assert.equal(optionKeyTarget('ArrowRight', 2, 3), 0);
+  assert.equal(optionKeyTarget('ArrowUp', 0, 3), 2);
+  assert.equal(optionKeyTarget('ArrowLeft', 1, 3), 0);
+  assert.equal(optionKeyTarget('Home', 2, 3), 0);
+  assert.equal(optionKeyTarget('End', 0, 3), 2);
+  // From no choice (none recommended, or own words): the first, or the last.
+  assert.equal(optionKeyTarget('ArrowDown', null, 3), 0);
+  assert.equal(optionKeyTarget('ArrowUp', null, 3), 2);
+  assert.equal(optionKeyTarget('Enter', 1, 3), null);
+  assert.equal(optionKeyTarget('ArrowDown', null, 0), null);
+  assert.equal(chosenAt({ option: 2 }), 2);
+  assert.equal(chosenAt({ text: 'Lagos' }), null);
+  assert.equal(chosenAt(null), null);
 });

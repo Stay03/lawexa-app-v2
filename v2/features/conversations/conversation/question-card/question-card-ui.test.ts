@@ -102,3 +102,10 @@ test("the reader's answers come back as their own bubble, each question with its
   // In both the personal row and a space chat's turn.
   assert.equal(row.match(/\{cardBubble \? \(\s*cardBubble\s*\) : pastedTexts\.length > 0 \? \(/g)?.length, 2);
 });
+
+test('the options are one Tab stop, and the arrow keys move the choice with the focus', () => {
+  const questions = read(here, 'InlineQuestions.tsx');
+  assert.match(questions, /tabIndex=\{optionAt === \(chosenAt\(draft\) \?\? 0\) \? 0 : -1\}/);
+  assert.match(questions, /onKeyDown=\{\(event\) => onOptionKey\(event, question\.options\.length, chosenAt\(draft\)\)\}/);
+  assert.match(questions, /const target = optionKeyTarget\(event\.key, from, total\);[\s\S]{0,120}choose\(target\);[\s\S]{0,120}\.focus\(\);/);
+});
