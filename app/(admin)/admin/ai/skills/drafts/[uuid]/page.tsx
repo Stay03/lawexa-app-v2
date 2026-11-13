@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useLayoutEffect, useState } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { AlertTriangle, ArrowLeft, Loader2, Pencil, X } from 'lucide-react';
@@ -47,8 +47,9 @@ export default function SkillDraftPage({ params }: { params: Promise<{ uuid: str
   const [rejectOpen, setRejectOpen] = useState(false);
 
   const title = data?.data?.display_name;
-  useEffect(() => {
-    if (title) setOverride(uuid, title);
+  // The crumb reads "Draft" until the name arrives, set before paint so the uuid is never drawn.
+  useLayoutEffect(() => {
+    setOverride(uuid, title || 'Draft');
     return () => clearOverride(uuid);
   }, [title, uuid, setOverride, clearOverride]);
 
