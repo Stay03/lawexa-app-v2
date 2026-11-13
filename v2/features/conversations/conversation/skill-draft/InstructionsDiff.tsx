@@ -17,7 +17,7 @@ import { ScrollKeepContext } from '../markdown/scroll-keep-context';
 function StepsBox({ children }: { children: ReactNode }) {
   return (
     <ScrollKeepContext.Provider value={null}>
-      <div className="max-h-80 overflow-y-auto overscroll-contain text-[13px] leading-relaxed text-foreground">{children}</div>
+      <div className="max-h-80 overflow-y-auto overscroll-y-contain text-[13px] leading-relaxed text-foreground">{children}</div>
     </ScrollKeepContext.Provider>
   );
 }

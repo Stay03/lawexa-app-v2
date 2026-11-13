@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,9 +33,12 @@ test('the locked body is fixed, with !important so the sheet scroll lock cannot 
 test('the root, the shell region and every vertical scroller hold only the vertical overscroll', () => {
   assert.doesNotMatch(css, /overscroll-behavior: (none|contain)/);
   assert.match(css, /\.v2-shell__content \{[\s\S]*?overscroll-behavior-y: contain;/);
-  const tsx = execSync("git ls-files 'v2/**/*.tsx' 'v2/**/*.ts'", { encoding: 'utf8' })
+  // No shell, so the patterns reach git as written: through cmd.exe on Windows the single quotes stayed in the
+  // patterns, git listed no file, and this check passed with nothing checked (13 November 2026).
+  const tsx = execFileSync('git', ['ls-files', 'v2/**/*.tsx', 'v2/**/*.ts'], { encoding: 'utf8' })
     .split('\n')
     .filter((file) => file && !file.endsWith('.test.ts'));
+  assert.ok(tsx.length > 100, `the check reads the v2 files (${tsx.length} listed)`);
   const both = tsx.filter((file) => /(?<![-\w])overscroll-(contain|none)(?![-\w])/.test(readFileSync(file, 'utf8')));
   assert.deepEqual(both, [], 'overscroll on both axes');
 });
