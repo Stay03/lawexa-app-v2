@@ -51,6 +51,8 @@ import { CompactToolChain } from './tools/CompactToolChain';
 import { CreatedQuizCards } from './cards/CreatedQuizCard';
 import { isFileListStep } from './files/chat-files';
 import { ChatFileListCard } from './files/ChatFileListCard';
+import { isRecordingStep } from './files/chat-recording';
+import { RecordingCard } from './files/RecordingCard';
 import { runningSteps } from './tools/running-steps';
 import { ActivityStatus } from './ActivityStatus';
 import { ReferenceChips } from './ReferenceChips';
@@ -985,12 +987,18 @@ const GroupRow = memo(function GroupRow({
     // The files a step listed show as one card each (the file list in chat,
     // piece a; Stay, 23 October 2026): a tap opens one in the side panel.
     const fileSteps = steps.filter(isFileListStep);
+    // A call Lawexa recorded plays in its own card, by the file's id, so it
+    // still plays after the result's 60-minute link has gone (call recordings).
+    const recordingSteps = steps.filter(isRecordingStep);
     body = (
       <>
         <CompactToolChain messages={steps} inLastAnswer={inLastAnswer} />
         <CreatedQuizCards steps={steps} />
         {fileSteps.map((step) => (
           <ChatFileListCard key={step.id} message={step} />
+        ))}
+        {recordingSteps.map((step) => (
+          <RecordingCard key={step.id} message={step} />
         ))}
       </>
     );

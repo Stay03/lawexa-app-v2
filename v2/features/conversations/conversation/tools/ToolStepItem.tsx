@@ -29,6 +29,7 @@ import type { ToolMessage } from '@/types/chat';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 import { failedStepLine, stepFailed } from './step-failure';
 import { isBoxTool } from '@/v2/features/userbox/machine-model';
+import { RECORD_START_TOOL, RECORD_STOP_TOOL, recordingStepAction } from '../files/chat-recording';
 import { HAND_OVER_TOOL, OpenMachineButton } from '@/v2/features/userbox/OpenMachineButton';
 import { MESSAGE_AGENT_TOOL, messageAgentStep } from '../agents/agent-model';
 
@@ -231,6 +232,11 @@ export function formatToolMessage(
     // named from the call, then by the agent's own name once the tool answers.
     case MESSAGE_AGENT_TOOL:
       return messageAgentStep(parameters, isComplete, toolResult);
+    // A call Lawexa records on its machine (call recordings, 13 November 2026):
+    // the saved recording plays in its card after the chain (RecordingCard).
+    case RECORD_START_TOOL:
+    case RECORD_STOP_TOOL:
+      return { action: recordingStepAction(toolName, isComplete) ?? toolName };
     default: {
       const readable = toolName
         .replace(/_/g, ' ')
