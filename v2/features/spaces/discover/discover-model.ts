@@ -17,7 +17,7 @@ import type { DiscoverableSpace } from '@/types/collab';
  */
 export type DiscoverAction = 'open' | 'pending' | 'join';
 
-export function discoverAction(space: Pick<DiscoverableSpace, 'my_status' | 'is_member'>): DiscoverAction {
+export function discoverAction(space: Pick<DiscoverableSpace, 'kind' | 'my_status' | 'is_member'>): DiscoverAction {
   if (space.my_status === 'member' || (space.my_status === undefined && space.is_member === true)) {
     return 'open';
   }
