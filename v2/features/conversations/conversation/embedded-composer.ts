@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { RedactionCategory } from '@/types/redaction';
 import type { MessageAttachment } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { QuestionCardAnswer } from '@/types/chat';
@@ -36,6 +37,12 @@ export interface EmbeddedComposerSurface {
   setJurisdiction: (next: JurisdictionChoice) => void;
   isConfidential: boolean;
   isRedacted: boolean;
+  /**
+   * What this redacted chat hides (thread cce2eafe); null when its record
+   * names none (an older redacted chat hides everything). The box's
+   * Redacted pill says it.
+   */
+  redactionCategories: RedactionCategory[] | null;
   isStreaming: boolean;
   isCancelling: boolean;
   /** Server-verified ownership. */

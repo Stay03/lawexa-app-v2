@@ -119,6 +119,7 @@ const surfaceFor = (conversationId: string): RouteComposerSurface => ({
   setJurisdiction: () => {},
   isConfidential: false,
   isRedacted: false,
+  redactionCategories: null,
   isStreaming: false,
   isCancelling: false,
   sendHeldBy: null,

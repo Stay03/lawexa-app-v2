@@ -1,6 +1,7 @@
 import type { JurisdictionChoice } from './jurisdiction';
 import type { IBlockedReason } from './message-pack';
 import type { SkillDraftCard } from './skill-draft';
+import type { RedactionCategory } from './redaction';
 
 // Message role types
 export type MessageRole = 'user' | 'assistant' | 'tool';
@@ -709,6 +710,9 @@ export interface ChatStartRequest {
   // with it. Server replaces the message text with the redacted form before
   // persistence and before the LLM call.
   is_redacted?: boolean;
+  // What a redacted chat hides (thread cce2eafe): first turn only, fixed for
+  // the chat's life. Left out, the server uses the person's saved default.
+  redaction_categories?: RedactionCategory[];
   // Prior transcript for confidential chats. Required (even as []) on every
   // confidential turn. Forbidden for non-confidential — server returns 422.
   messages?: ConfidentialHistoryEntry[];
@@ -1063,6 +1067,12 @@ export interface ConversationData {
   is_private: boolean;
   is_confidential?: boolean;
   is_redacted?: boolean;
+  /**
+   * What a redacted chat hides (Backend's 62fd6f65). Null on a redacted chat
+   * made before choices existed, which hides everything; always null when the
+   * chat is not redacted. Absent on an older server.
+   */
+  redaction_categories?: RedactionCategory[] | null;
   messages: ApiMessage[];
   messages_count: number;
   views_count?: number;

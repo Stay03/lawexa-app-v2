@@ -4,6 +4,7 @@ import { AxiosError } from 'axios';
 import { chatApi } from '@/lib/api/chat';
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import type { RedactionCategory } from '@/types/redaction';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import type { ChatReference, MessageAttachment, RedactionSummary } from '@/types/chat';
 import {
@@ -69,6 +70,12 @@ export interface StartConversationInput {
   confidential?: boolean;
   /** Redacted mode (plus-menu) — turn-1 sticky flag; 503 fails closed. */
   redacted?: boolean;
+  /**
+   * What a redacted chat hides (thread cce2eafe): sent as
+   * `redaction_categories` on its first message, fixed for the chat's life.
+   * Left out, the server uses the person's saved default.
+   */
+  redactionCategories?: RedactionCategory[];
   /**
    * Tie this new conversation to the content it is about — the case page's
    * "ask about this case" composer sends `[{ type: 'case', id: slug }]`.
@@ -293,8 +300,11 @@ export async function startConversation(
       ...(fileIds.length > 0 && { file_ids: fileIds }),
       // Confidential turn 1: the flag + an empty prior-history array.
       ...(confidential && { is_confidential: true, messages: [] }),
-      // Redacted turn 1: sticky flag; the server swaps the message text.
+      // Redacted turn 1: sticky flag; the server swaps the message text, hiding the kinds chosen.
       ...(redacted && { is_redacted: true }),
+      ...(redacted && input.redactionCategories && input.redactionCategories.length > 0 && {
+        redaction_categories: input.redactionCategories,
+      }),
       // Content this chat is about (case slug, …) — first turn only, sticky.
       ...(references && references.length > 0 && { references }),
       // The space it starts in — first turn only, never with a private mode.

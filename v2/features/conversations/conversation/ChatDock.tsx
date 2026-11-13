@@ -208,6 +208,7 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
               onJurisdictionChange={surface.setJurisdiction}
               isConfidential={surface.isConfidential}
               isRedacted={surface.isRedacted}
+              redactionCategories={surface.redactionCategories}
               showMeta={surface.showMeta}
               isStreaming={surface.isStreaming}
               isCancelling={surface.isCancelling}

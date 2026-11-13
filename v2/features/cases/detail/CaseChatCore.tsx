@@ -639,6 +639,7 @@ export function CaseChatComposerDock({
                 }
                 isConfidential={surface ? surface.isConfidential : false}
                 isRedacted={surface ? surface.isRedacted : false}
+                redactionCategories={surface ? surface.redactionCategories : null}
                 isStreaming={surface ? surface.isStreaming : false}
                 isCancelling={surface ? surface.isCancelling : false}
                 // A case chat in a space: a colleague's turn holds Send and offers

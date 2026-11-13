@@ -2,7 +2,7 @@
 
 import { useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AxiosError } from 'axios';
 import {
   AlertCircle,
@@ -58,6 +58,8 @@ import type { IBlockedReason } from '@/types/message-pack';
 import type { UserRole } from '@/types/auth';
 import type { ChatReference } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import type { RedactionCategory } from '@/types/redaction';
+import { RedactionChoice, redactionDefaultQuery } from '@/v2/features/conversations/RedactionChoice';
 import {
   RedactionUnavailableError,
   startConversation,
@@ -263,6 +265,10 @@ export function HomeComposer({
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const [removing, setRemoving] = useState<Set<string>>(new Set());
   const [redacted, setRedacted] = useState(false);
+  // What a new redacted chat hides (thread cce2eafe): the person's saved default until they change it here.
+  const [pickedCategories, setPickedCategories] = useState<RedactionCategory[] | null>(null);
+  const savedRedaction = useQuery({ ...redactionDefaultQuery(userId), enabled: redacted && signedIn && !space });
+  const redactionCategories = pickedCategories ?? savedRedaction.data?.data.categories ?? null;
   const [jurisdiction, setJurisdiction] = useState<JurisdictionChoice>({ mode: 'auto' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** When Send was pressed (epoch ms), for the redaction wait's clock. */
@@ -466,6 +472,7 @@ export function HomeComposer({
           studyMode,
           confidential,
           redacted,
+          ...(redacted && redactionCategories && { redactionCategories }),
           references,
           spaceUuid: space?.uuid,
         },
@@ -711,6 +718,16 @@ export function HomeComposer({
                 );
               })}
             </div>
+          ) : null}
+
+          {/* What a new redacted chat hides (thread cce2eafe): one quiet line, the ticks behind "Change". */}
+          {redacted && signedIn && !space ? (
+            <RedactionChoice
+              userId={userId}
+              chosen={redactionCategories}
+              onChange={setPickedCategories}
+              disabled={isSubmitting}
+            />
           ) : null}
 
           <PromptInputTextarea

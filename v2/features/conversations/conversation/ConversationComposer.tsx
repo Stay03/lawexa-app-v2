@@ -37,6 +37,8 @@ import { uploadAttachment } from '@/v2/features/conversations/attachment-upload'
 import { extractApiError, extractUploadLimit } from '@/lib/utils/api-error';
 import { PlansLink } from '@/v2/features/files/PlansLink';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
+import type { RedactionCategory } from '@/types/redaction';
+import { hiddenSummary } from '@/lib/utils/redaction-categories';
 import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
@@ -199,6 +201,11 @@ export interface ConversationComposerProps {
   onJurisdictionChange: (next: JurisdictionChoice) => void;
   isConfidential: boolean;
   isRedacted: boolean;
+  /**
+   * What a redacted chat hides (thread cce2eafe): the pill and the locked menu
+   * item say it. Null or absent: an older redacted chat, which hides everything.
+   */
+  redactionCategories?: RedactionCategory[] | null;
   isStreaming: boolean;
   isCancelling: boolean;
   /**
@@ -294,6 +301,7 @@ export function ConversationComposer({
   onJurisdictionChange,
   isConfidential,
   isRedacted,
+  redactionCategories = null,
   isStreaming,
   isCancelling,
   onSubmit,
@@ -730,12 +738,16 @@ export function ConversationComposer({
                   stop={stop}
                 />
                 {isRedacted && (
+                  // What this chat hides, from its record (thread cce2eafe); an older chat hides everything it can.
                   <div
-                    className="bg-background flex items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
-                    aria-label="Redacted mode is on for this conversation"
+                    className="bg-background flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
+                    aria-label={`Redacted mode is on for this conversation: it hides ${hiddenSummary(redactionCategories)}`}
                   >
-                    <VenetianMask className="h-3.5 w-3.5" />
-                    <span className="font-medium">Redacted</span>
+                    <VenetianMask className="h-3.5 w-3.5 shrink-0" />
+                    <span className="shrink-0 font-medium">Redacted</span>
+                    <span aria-hidden className="min-w-0 truncate opacity-80">
+                      · hides {hiddenSummary(redactionCategories)}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1071,7 +1083,7 @@ export function ConversationComposer({
                         <span className="flex flex-col">
                           <span className="font-medium leading-tight">Redacted mode</span>
                           <span className="text-muted-foreground text-xs">
-                            Names, addresses &amp; IDs hidden from the model
+                            Hides {hiddenSummary(redactionCategories)} from the model
                           </span>
                         </span>
                       </DropdownMenuCheckboxItem>

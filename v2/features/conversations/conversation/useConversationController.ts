@@ -26,6 +26,8 @@ import { isEventMessage } from '@/types/chat';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { stripPastedTags } from '@/lib/utils';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
+import { readRedactionCategories } from '@/lib/utils/redaction-categories';
+import type { RedactionCategory } from '@/types/redaction';
 import { setHeaderContext, clearHeaderContext } from '@/v2/shell/header-context';
 import { useStreamStyle } from '@/v2/stream-style';
 import { conversationsCache, listedConversation, spaceOfListedChat } from '../cache';
@@ -302,6 +304,12 @@ export interface ConversationController {
   isConfidential: boolean;
   /** Redacted mode (sticky) — drives the composer's locked redacted pill. */
   isRedacted: boolean;
+  /**
+   * What this redacted chat hides, from its record (thread cce2eafe); null
+   * when the record names none: a redacted chat made before choices, which
+   * hides everything, or the record not read yet.
+   */
+  redactionCategories: RedactionCategory[] | null;
   references: ConversationReference[];
   jurisdiction: JurisdictionChoice;
   setJurisdiction: (next: JurisdictionChoice) => void;
@@ -942,6 +950,9 @@ export function useConversationController(
   );
 
   const references = detailData?.references ?? NO_REFERENCES;
+  // What a redacted chat hides, from its record; memoised so the composers' surfaces keep one value.
+  const recordedCategories = detailData?.redaction_categories;
+  const redactionCategories = useMemo(() => readRedactionCategories(recordedCategories), [recordedCategories]);
 
   // ── The skeleton gate (standing rule: never a skeleton over cached content). ──
   // `detailQuery.isPending` means "this query has no data at all"; it is also true
@@ -1369,6 +1380,7 @@ export function useConversationController(
     isGoneOnServer,
     isConfidential,
     isRedacted,
+    redactionCategories,
     references,
     jurisdiction,
     setJurisdiction,
