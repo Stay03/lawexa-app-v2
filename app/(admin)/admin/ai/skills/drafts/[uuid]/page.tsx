@@ -26,7 +26,7 @@ import { useAdminSkillDraft, usePublishSkillDraft } from '@/lib/hooks/useAdminAi
 import { useBreadcrumbStore } from '@/lib/stores/breadcrumbStore';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { SkillDraft } from '@/types/skill-draft';
+import type { SkillDraft, SkillDraftLive } from '@/types/skill-draft';
 
 /**
  * One skill draft (the skills tool, thread 2b436b4f): the draft beside the
@@ -161,7 +161,7 @@ export default function SkillDraftPage({ params }: { params: Promise<{ uuid: str
         </Card>
       ) : null}
 
-      {draft.kind === 'change' && draft.live ? <ChangeView draft={draft} /> : <NewSkillView draft={draft} />}
+      {draft.kind === 'change' && draft.live ? <ChangeView draft={draft} live={draft.live} /> : <NewSkillView draft={draft} />}
 
       {waiting ? (
         <>
@@ -209,9 +209,8 @@ function PublishProblemNote({ problem, onPublishOver, busy }: { problem: Publish
 const FIELD_LABEL = { display_name: 'Display name', description: 'Description', load_mode: 'Load mode' } as const;
 
 /** A change: the short fields beside the live skill's, then the steps marked line by line. */
-function ChangeView({ draft }: { draft: SkillDraft & { live: NonNullable<SkillDraft['live']> } }) {
+function ChangeView({ draft, live }: { draft: SkillDraft; live: SkillDraftLive }) {
   const changed = new Set(changedFields(draft));
-  const live = draft.live;
   const value = (field: keyof typeof FIELD_LABEL, of: 'draft' | 'live') => {
     const source = of === 'draft' ? draft : live;
     return field === 'load_mode' ? LOAD_MODE_LABEL[source.load_mode] : source[field];
