@@ -447,6 +447,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    * rows are written.
    */
   let turnsAwaitingIds = 0;
+  /**
+   * A turn this engine started whose stream a full disconnect cut before its
+   * terminal: still counted in {@link turnsAwaitingIds}. Recovery attaches to
+   * it again (`recoverPendingState`), and that attach does not count it twice.
+   */
+  let interruptedExecution: string | null = null;
   let executionId: string | null = null;
   /** The execution whose `completed` came: only then does its `end` close a finished turn. */
   let completedExecution: string | null = null;
@@ -807,6 +813,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     toolCallQueue.clear();
     resetStreamingBuffers();
     turnsAwaitingIds = 0;
+    interruptedExecution = null;
   }
 
   // ─── Watchdog ─────────────────────────────────────────────────────────────
@@ -1319,7 +1326,10 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // door BOTH routes into a turn pass through — a `send()` from the composer and
     // the home handoff, which draws its user row above and never calls `send()`.
     // Settled by whichever terminal event reports what the execution persisted.
-    turnsAwaitingIds += 1;
+    // A turn a disconnect cut, attached again, is the same turn: counted once.
+    const resuming = interruptedExecution !== null && execId === interruptedExecution;
+    if (resuming) interruptedExecution = null;
+    else turnsAwaitingIds += 1;
 
     // Streaming — no assistant placeholder yet (created on the first text_delta).
     // Its origin: the handoff's message makes it this engine's own turn; a
@@ -1332,7 +1342,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       error: null,
       // The stream is open: the send is over (redaction included).
       sending: false,
-      turnOrigin: initialMessage
+      turnOrigin: initialMessage || resuming
         ? 'own'
         : prev.isStreaming && prev.turnOrigin !== null
           ? prev.turnOrigin
@@ -2185,6 +2195,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     textSmoother.abandonDrains();
     textSmoother.clear();
     reasoningSmoother.clear();
+    // A turn still unaccounted for is cut here, not ended: remembered, so
+    // recovery can attach to it again and settle it.
+    if (executionId !== null && turnsAwaitingIds > 0 && eventSource) interruptedExecution = executionId;
     executionId = null;
     reconnectCount = 0;
     lastDataEventTime = 0;
@@ -2235,6 +2248,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     authoredMessageIds.clear();
     unconfirmedEventIds.clear();
     turnsAwaitingIds = 0;
+    interruptedExecution = null;
     jurisdiction = { mode: 'auto' };
     state = INITIAL_SNAPSHOT;
     commitFn(notifyStructural);
@@ -2686,6 +2700,16 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // Already following a live turn: it is attached, and re-reading the status
     // would only mark the reader's own turn as one this screen merely followed.
     if (eventSource && executionId) return 'reconnected';
+    // A turn this engine started, whose stream a disconnect cut before its end
+    // (E2E, chat 33f09770: a remount in development, after the home handoff):
+    // attach to it again, whatever the status says. Running, it streams on;
+    // over, the server answers it from the database with its terminal and its
+    // saved ids, which settles it. Without this a finished turn's ids never
+    // came, and every later merge of the history was refused.
+    if (interruptedExecution !== null) {
+      connectToStream(interruptedExecution);
+      return 'reconnected';
+    }
     try {
       // The open-time check reads only the status and the execution id. For a
       // finished chat the full answer also carried every message (351 KB for
