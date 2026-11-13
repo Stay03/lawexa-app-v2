@@ -743,9 +743,10 @@ test('rule 2: Stop only for a turn this tab started, or one the status says the 
   // `send` also marks the turn as still on the wire (redacted-wait label, 22 October 2026).
   assert.match(engine, /isStreaming: true, isCancelling: false, error: null, turnOrigin: 'own', sending: true \}\)\);/);
   assert.match(engine, /isStreaming: true, isCancelling: false, error: null, turnOrigin: 'followed' \}\)\);/);
+  // The handoff's own turn, and that turn attached again after a cut (interrupted-turn.test.ts), are 'own'.
   assert.match(
     engine,
-    /turnOrigin: initialMessage\s*\? 'own'\s*: prev\.isStreaming && prev\.turnOrigin !== null\s*\? prev\.turnOrigin\s*: 'followed',/,
+    /turnOrigin: initialMessage \|\| resuming\s*\? 'own'\s*: prev\.isStreaming && prev\.turnOrigin !== null\s*\? prev\.turnOrigin\s*: 'followed',/,
   );
 });
 
