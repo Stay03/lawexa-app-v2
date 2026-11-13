@@ -11,6 +11,7 @@ import { AiSkillFilters } from '@/components/admin/ai/AiSkillFilters';
 import { AiSkillsTable } from '@/components/admin/ai/AiSkillsTable';
 import { AiSkillFormSheet } from '@/components/admin/ai/AiSkillFormSheet';
 import { AiSkillDeleteDialog } from '@/components/admin/ai/AiSkillDeleteDialog';
+import { SkillsTabs } from '@/components/admin/ai/SkillsTabs';
 import { useAdminAiSkills } from '@/lib/hooks/useAdminAi';
 import type { AdminAiSkill, AdminAiSkillsParams } from '@/types/admin-ai';
 
@@ -51,6 +52,7 @@ function AiSkillsPageContent() {
 
   return (
     <div className="space-y-6">
+      <SkillsTabs active="skills" />
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>

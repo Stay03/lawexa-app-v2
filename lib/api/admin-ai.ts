@@ -1,5 +1,13 @@
 import { apiClient } from './client';
 import type {
+  AdminSkillDraftEdit,
+  AdminSkillDraftImportResponse,
+  AdminSkillDraftListStatus,
+  AdminSkillDraftPublishResponse,
+  AdminSkillDraftsResponse,
+  SkillDraftResponse,
+} from '@/types/skill-draft';
+import type {
   AdminAiProvidersParams,
   AdminAiProvidersListResponse,
   AdminAiProviderDetailResponse,
@@ -527,6 +535,60 @@ export const adminAiApi = {
   getSkillUsage: async (id: number, days = 7): Promise<AdminAiSkillUsageResponse> => {
     const response = await apiClient.get<AdminAiSkillUsageResponse>(`/admin/ai-skills/${id}/usage`, {
       params: { days },
+    });
+    return response.data;
+  },
+
+  // ============================================
+  // Skill drafts (the skills tool, thread 2b436b4f; API skills-tool 385ececc)
+  // ============================================
+
+  /** Drafts saved from chats and imported zips, newest first (never a person's unsaved one). */
+  getSkillDrafts: async (status: AdminSkillDraftListStatus = 'pending', page = 1, perPage = 25): Promise<AdminSkillDraftsResponse> => {
+    const response = await apiClient.get<AdminSkillDraftsResponse>('/admin/ai-skills/drafts', {
+      params: { status, page, per_page: perPage },
+    });
+    return response.data;
+  },
+
+  /** One draft, with the live skill beside a change, and the version it was drafted against when the live one moved on. */
+  getSkillDraft: async (uuid: string): Promise<SkillDraftResponse> => {
+    const response = await apiClient.get<SkillDraftResponse>(`/admin/ai-skills/drafts/${uuid}`);
+    return response.data;
+  },
+
+  /** Edit a waiting draft before deciding on it. */
+  updateSkillDraft: async (uuid: string, data: AdminSkillDraftEdit): Promise<SkillDraftResponse> => {
+    const response = await apiClient.put<SkillDraftResponse>(`/admin/ai-skills/drafts/${uuid}`, data);
+    return response.data;
+  },
+
+  /**
+   * Publish: a new version of the live skill, or a new skill switched off. A 409
+   * means the live skill moved on since the draft; resend with `overNewer`.
+   */
+  publishSkillDraft: async (uuid: string, overNewer = false): Promise<AdminSkillDraftPublishResponse> => {
+    const response = await apiClient.post<AdminSkillDraftPublishResponse>(
+      `/admin/ai-skills/drafts/${uuid}/publish`,
+      overNewer ? { over_newer: true } : {},
+    );
+    return response.data;
+  },
+
+  /** Reject, with an optional note (at most 500 characters). */
+  rejectSkillDraft: async (uuid: string, reviewNote: string | null): Promise<SkillDraftResponse> => {
+    const response = await apiClient.post<SkillDraftResponse>(`/admin/ai-skills/drafts/${uuid}/reject`, {
+      review_note: reviewNote,
+    });
+    return response.data;
+  },
+
+  /** Import a SKILL.md zip (at most 1 MB) as a waiting draft; other files are listed as skipped. */
+  importSkillZip: async (file: File): Promise<AdminSkillDraftImportResponse> => {
+    const body = new FormData();
+    body.append('file', file);
+    const response = await apiClient.post<AdminSkillDraftImportResponse>('/admin/ai-skills/import', body, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   },

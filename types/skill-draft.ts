@@ -88,3 +88,50 @@ export interface SkillDraftResponse {
   message: string;
   data: SkillDraft;
 }
+
+// ── Admin AI Skills' drafts (superadmin) ─────────────────────────────────────
+
+/** The admin list shows waiting, published or rejected drafts; never a person's unsaved one. */
+export type AdminSkillDraftListStatus = 'pending' | 'published' | 'rejected';
+
+export interface AdminSkillDraftsResponse {
+  success: boolean;
+  message: string;
+  data: {
+    drafts: SkillDraft[];
+    pagination: { current_page: number; last_page: number; per_page: number; total: number };
+  };
+}
+
+/** An admin's edit. `name` only for a new skill; the limits are the skill form's. */
+export interface AdminSkillDraftEdit {
+  name?: string;
+  display_name?: string;
+  description?: string;
+  instructions?: string;
+  load_mode?: SkillLoadMode;
+  change_note?: string | null;
+}
+
+/** The live skill as published, as admin AI Skills reads skills elsewhere. */
+export interface AdminPublishedSkill {
+  id: number;
+  name: string;
+  display_name: string;
+  version: number;
+  is_active: boolean;
+}
+
+export interface AdminSkillDraftPublishResponse {
+  success: boolean;
+  /** "Published as version N." or "Published as a new skill, switched off. …" */
+  message: string;
+  data: { draft: SkillDraft; skill: AdminPublishedSkill };
+}
+
+export interface AdminSkillDraftImportResponse {
+  success: boolean;
+  /** Says how many other files were skipped. */
+  message: string;
+  data: { draft: SkillDraft; skipped_files: string[] };
+}

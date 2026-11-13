@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminAiApi } from '@/lib/api/admin-ai';
+import type { AdminSkillDraftEdit, AdminSkillDraftListStatus } from '@/types/skill-draft';
 import type {
   AdminAiProvidersParams,
   AdminAiCreateProviderData,
@@ -69,6 +70,11 @@ export const adminAiKeys = {
     [...adminAiKeys.skillVersions(id), version] as const,
   skillUsage: (id: number, days: number) =>
     [...adminAiKeys.skillDetail(id), 'usage', days] as const,
+  // Skill drafts (the skills tool): under skills, so a publish refreshes both.
+  skillDrafts: () => [...adminAiKeys.skills(), 'drafts'] as const,
+  skillDraftsList: (status: AdminSkillDraftListStatus, page: number) =>
+    [...adminAiKeys.skillDrafts(), 'list', status, page] as const,
+  skillDraft: (uuid: string) => [...adminAiKeys.skillDrafts(), 'detail', uuid] as const,
 
   // Tools
   tools: () => [...adminAiKeys.all, 'tools'] as const,
@@ -680,5 +686,70 @@ export function useUpdatePageReaders() {
     onSuccess: (response) => {
       queryClient.setQueryData(adminAiKeys.pageReaders(), response);
     },
+  });
+}
+
+// ============================================
+// Skill drafts (the skills tool, thread 2b436b4f)
+// ============================================
+
+/** Drafts waiting for review, published or rejected. */
+export function useAdminSkillDrafts(status: AdminSkillDraftListStatus, page = 1) {
+  return useQuery({
+    queryKey: adminAiKeys.skillDraftsList(status, page),
+    queryFn: () => adminAiApi.getSkillDrafts(status, page),
+    staleTime: 30 * 1000,
+  });
+}
+
+/** One draft, beside the live skill. */
+export function useAdminSkillDraft(uuid: string) {
+  return useQuery({
+    queryKey: adminAiKeys.skillDraft(uuid),
+    queryFn: () => adminAiApi.getSkillDraft(uuid),
+    enabled: !!uuid,
+    staleTime: 15 * 1000,
+  });
+}
+
+export function useUpdateSkillDraft(uuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AdminSkillDraftEdit) => adminAiApi.updateSkillDraft(uuid, data),
+    onSuccess: (response) => {
+      queryClient.setQueryData(adminAiKeys.skillDraft(uuid), response);
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skillDrafts() });
+    },
+  });
+}
+
+/** A publish writes a skill version (or a new skill): the skills, their drafts and the agents refresh. */
+export function usePublishSkillDraft(uuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (overNewer: boolean) => adminAiApi.publishSkillDraft(uuid, overNewer),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agents() });
+    },
+  });
+}
+
+export function useRejectSkillDraft(uuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reviewNote: string | null) => adminAiApi.rejectSkillDraft(uuid, reviewNote),
+    onSuccess: (response) => {
+      queryClient.setQueryData(adminAiKeys.skillDraft(uuid), response);
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.skillDrafts() });
+    },
+  });
+}
+
+export function useImportSkillZip() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => adminAiApi.importSkillZip(file),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminAiKeys.skillDrafts() }),
   });
 }
