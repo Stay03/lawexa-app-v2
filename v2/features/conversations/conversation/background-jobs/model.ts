@@ -81,6 +81,25 @@ export function awaitsBackgroundJob(jobs: readonly Pick<BackgroundJob, 'status' 
   return jobs.some((job) => job.status === 'running' || (job.status !== 'cancelled' && job.wake === 'pending'));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Whether a tool's answer started a background job, or handed its work to one
+ * already running. The server's answer carries the job as
+ * `data.background_job` (BackgroundJobRegistry::toolPayload: read_file's 202
+ * on a file still being read, message_agent's send), and the stream's
+ * `tool_complete` passes that whole answer on as `tool_result.data`. Read on
+ * that event, the chat asks for its jobs at once, so a job that runs only
+ * seconds shows its line while the turn is still writing (Lucy's check 2,
+ * 13 November 2026: a 17-second file reading).
+ */
+export function toolResultNamesBackgroundJob(result: { data: unknown } | null | undefined): boolean {
+  const answer = result?.data;
+  return isRecord(answer) && isRecord(answer.data) && isRecord(answer.data.background_job);
+}
+
 /** The jobs by the message whose turn started them, in the list's order. */
 export function backgroundJobsByMessage(jobs: readonly BackgroundJob[]): ReadonlyMap<number, readonly BackgroundJob[]> {
   const byMessage = new Map<number, BackgroundJob[]>();

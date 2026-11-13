@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import type { BackgroundJob } from '@/types/background-jobs';
 import {
@@ -10,6 +12,7 @@ import {
   backgroundJobsByMessage,
   backgroundReturnLine,
   canCancelBackgroundJob,
+  toolResultNamesBackgroundJob,
 } from './model';
 
 /* Background jobs, app side (Backend's shapes 063d9cc3,
@@ -91,4 +94,39 @@ test('Lawexa’s return reads from the jobs it names, never its content', () => 
     '2 background jobs ended. Lawexa is continuing.',
   );
   assert.equal(backgroundReturnLine([]), 'Background work ended. Lawexa is continuing.');
+});
+
+test('a tool answer that started a background job is recognised, so the chat asks for its jobs at once', () => {
+  // read_file's 202 on a file still being read, as the stream passes it on (the server's whole answer).
+  const reading = {
+    success: true,
+    data: {
+      success: true,
+      message: 'The scanned pages of this file are still being read.',
+      data: { background_job: { id: 'job-1', kind: 'file_transcription', status: 'running' } },
+    },
+    error: null,
+  };
+  assert.equal(toolResultNamesBackgroundJob(reading), true);
+  // message_agent's send carries one too.
+  const agent = { success: true, data: { success: true, message: 'Sent.', data: { ends_turn: true, background_job: { kind: 'agent_reply', status: 'running' } } }, error: null };
+  assert.equal(toolResultNamesBackgroundJob(agent), true);
+  // Every other answer: an ordinary read, a failed call, nothing at all.
+  assert.equal(toolResultNamesBackgroundJob({ success: true, data: { success: true, message: 'ok', data: { text: 'TEST DATA' } }, error: null }), false);
+  assert.equal(toolResultNamesBackgroundJob({ success: false, data: null, error: 'Timed out' }), false);
+  assert.equal(toolResultNamesBackgroundJob({ success: true, data: { data: { background_job: null } }, error: null }), false);
+  assert.equal(toolResultNamesBackgroundJob(null), false);
+  assert.equal(toolResultNamesBackgroundJob(undefined), false);
+});
+
+test('the chat reads its jobs when a tool result names one, not only when the turn ends', () => {
+  // The controller's onToolComplete: a short job's line shows while the turn still writes (Lucy's check 2).
+  const controller = readFileSync(
+    join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'useConversationController.ts'),
+    'utf8',
+  ).replace(/\r\n/g, '\n');
+  assert.match(
+    controller,
+    /onToolComplete: \(event\) => \{\n(\s+\/\/[^\n]*\n)*\s+if \(toolResultNamesBackgroundJob\(event\.tool_result\)\) \{\n\s+void queryClient\.invalidateQueries\(\{ queryKey: conversationsQueries\.backgroundJobsOf\(conversationId\) \}\);/,
+  );
 });

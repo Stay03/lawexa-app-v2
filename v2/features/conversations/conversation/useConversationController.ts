@@ -44,7 +44,7 @@ import { flushDraftsBeforeSend, UNSAVED_DRAFT_LINE } from './draft/draft-flush';
 import { draftEditRecheckDelay, hasUnresolvedDraftEdits } from '@/lib/utils/draft-edits';
 import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
-import { awaitsBackgroundJob } from './background-jobs/model';
+import { awaitsBackgroundJob, toolResultNamesBackgroundJob } from './background-jobs/model';
 import type { BackgroundJob } from '@/types/background-jobs';
 import type { AgentConversation } from '@/types/agent-conversations';
 import { agentConversationQueries } from './agents/queries';
@@ -523,10 +523,19 @@ export function useConversationController(
       if (isConfidentialMark(conversationId)) return;
       void queryClient.invalidateQueries({ queryKey: detailKey });
     },
-    // Lawexa made or changed a Radar in this chat (a space's Radars box,
-    // Stay 26 October 2026): the Radar lists re-ask, the Radar page's and every
-    // space's Radars pill, so going back shows it.
     onToolComplete: (event) => {
+      // A tool handed its work to a background job (a file still being read,
+      // a message to another agent): the jobs are read now, so its "Running in
+      // the background" line shows while the turn still writes, even for a job
+      // that ends seconds after the turn does (Lucy's check 2, 13 November
+      // 2026). Before the record answers the query is off, and it reads fresh
+      // when it turns on; the turn's end reads it again as before.
+      if (toolResultNamesBackgroundJob(event.tool_result)) {
+        void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(conversationId) });
+      }
+      // Lawexa made or changed a Radar in this chat (a space's Radars box,
+      // Stay 26 October 2026): the Radar lists re-ask, the Radar page's and every
+      // space's Radars pill, so going back shows it.
       if (!radarToolChangesRadars(event.tool_call.name)) return;
       void queryClient.invalidateQueries({ queryKey: radarsQueries.all });
       void queryClient.invalidateQueries({ queryKey: spacesQueries.allRadars() });
