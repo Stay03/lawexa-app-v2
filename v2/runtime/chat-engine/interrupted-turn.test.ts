@@ -89,21 +89,6 @@ function row(id: number, role: 'user' | 'assistant', content: string): ApiMessag
   return { id, conversation_id: 'conv-1', agent_id: null, role, content, metadata: null, created_at: at() } as unknown as ApiMessage;
 }
 
-function serverCopy(messages: ApiMessage[]) {
-  return async () => ({ success: true, message: '', data: { id: 'conv-1', title: 'Test chat', messages } }) as never;
-}
-
-async function openTurn(engine: ReturnType<typeof createChatEngine>, execId: string, question: string) {
-  engine.connectToStream(execId, question);
-  mock.timers.tick(0);
-  await settle();
-  const stream = streams[streams.length - 1];
-  stream.send('connected', { execution_id: execId, message: 'Connected' });
-  stream.send('iteration', { iteration: 1, status: 'processing', timestamp: at() });
-  await settle();
-  return stream;
-}
-
 const assistantText = (engine: ReturnType<typeof createChatEngine>) =>
   engine.getSnapshot().messages.filter((m) => m.role === 'assistant').map((m) => m.content);
 
