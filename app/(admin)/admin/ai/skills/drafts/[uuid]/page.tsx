@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { SkillDraftEditSheet } from '@/components/admin/ai/SkillDraftEditSheet';
 import { SkillDraftRejectDialog } from '@/components/admin/ai/SkillDraftRejectDialog';
-import { SkillInstructionsDiff } from '@/components/admin/ai/SkillInstructionsDiff';
+import { SkillInstructionsDiff, SkillInstructionsText } from '@/components/admin/ai/SkillInstructionsDiff';
 import {
   DRAFT_STATUS_LABEL,
   changedFields,
@@ -272,9 +272,7 @@ function NewSkillView({ draft }: { draft: SkillDraft }) {
         <CardTitle className="text-base">Steps</CardTitle>
       </CardHeader>
       <CardContent>
-        <pre className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words rounded-md border p-3 font-mono text-xs leading-relaxed">
-          {draft.instructions}
-        </pre>
+        <SkillInstructionsText text={draft.instructions} />
       </CardContent>
     </Card>
   );

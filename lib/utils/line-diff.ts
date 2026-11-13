@@ -18,8 +18,11 @@ function lines(value: string): string[] {
 }
 
 export function diffLines(before: string, after: string): DiffLine[] {
-  const a = lines(before);
-  const b = lines(after);
+  return diffSequence(lines(before), lines(after));
+}
+
+/** The same diff over any two lists of texts: lines here, markdown blocks in `block-diff.ts`. */
+export function diffSequence(a: readonly string[], b: readonly string[]): DiffLine[] {
   if (a.length * b.length > MAX_CELLS) {
     return [...a.map((text) => ({ kind: 'removed' as const, text })), ...b.map((text) => ({ kind: 'added' as const, text }))];
   }

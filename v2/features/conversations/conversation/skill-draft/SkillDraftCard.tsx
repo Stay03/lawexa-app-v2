@@ -8,13 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
-import { diffLines } from '@/lib/utils/line-diff';
 import { skillDraftErrorSentence, skillDraftKindLine, skillDraftStatusLine } from '@/lib/utils/skill-draft';
 import { skillDraftsApi } from '@/lib/api/skill-drafts';
 import type { SkillDraft, SkillDraftCard } from '@/types/skill-draft';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2ChatContext } from '../chat-context';
-import { InstructionsDiff } from './InstructionsDiff';
+import { InstructionsDiff, InstructionsText } from './InstructionsDiff';
 
 /**
  * SkillDraftCardView — a skill Lawexa drafted in this chat (the skills tool,
@@ -156,13 +155,9 @@ function DraftSteps({ draft }: { draft: SkillDraft }) {
             The live skill has changed since this draft was written (now version {draft.live.version}).
           </p>
         )}
-        <InstructionsDiff diff={diffLines(draft.live.instructions, draft.instructions)} />
+        <InstructionsDiff before={draft.live.instructions} after={draft.instructions} />
       </div>
     );
   }
-  return (
-    <div className="max-h-80 overflow-y-auto overscroll-contain whitespace-pre-wrap break-words text-[13px] leading-relaxed text-foreground">
-      {draft.instructions}
-    </div>
-  );
+  return <InstructionsText text={draft.instructions} />;
 }
