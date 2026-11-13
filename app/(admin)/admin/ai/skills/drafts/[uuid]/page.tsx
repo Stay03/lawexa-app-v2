@@ -153,12 +153,10 @@ export default function SkillDraftPage({ params }: { params: Promise<{ uuid: str
       ) : null}
 
       {draft.change_note ? (
-        <Card>
-          <CardContent className="py-4 text-sm">
-            <span className="font-medium">Change note: </span>
-            {draft.change_note}
-          </CardContent>
-        </Card>
+        <p className="rounded-lg border px-4 py-3 text-sm">
+          <span className="font-medium">Change note: </span>
+          {draft.change_note}
+        </p>
       ) : null}
 
       {draft.kind === 'change' && draft.live ? <ChangeView draft={draft} live={draft.live} /> : <NewSkillView draft={draft} />}
