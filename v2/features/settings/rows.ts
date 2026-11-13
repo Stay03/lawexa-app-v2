@@ -10,7 +10,6 @@ import {
   KeyRound,
   MessageSquarePlus,
   MonitorSmartphone,
-  Paintbrush,
   ShieldCheck,
   Ticket,
   User,
@@ -25,10 +24,11 @@ import { canUseDeveloperSettings } from '@/lib/utils/v2-access';
  * settings/rows — every door on the settings screen, in one table.
  *
  * ── WHERE EACH ROW ACTUALLY GOES TODAY (READ THIS BEFORE BUILDING ONE) ─────
- * This is a screen built option by option. ELEVEN rows already land in v2; the
- * rest cross into the classic app through the proxy, exactly as
- * `v2/shell/nav.config.ts` describes for an unmigrated nav row: v2 shell, v1
- * content, until the route joins `v2/routes.manifest.ts`.
+ * This is a screen built option by option. Every row listed below lands in v2.
+ * A row added before its screen is rebuilt would cross into the classic app
+ * through the proxy, exactly as `v2/shell/nav.config.ts` describes for an
+ * unmigrated nav row: v2 shell, v1 content, until the route joins
+ * `v2/routes.manifest.ts`.
  *
  *   Profile         /settings/profile        → V2 (rebuilt, 16 August 2026)
  *   Activity        /activity                → V2 (rebuilt, 5 October 2026)
@@ -40,7 +40,6 @@ import { canUseDeveloperSettings } from '@/lib/utils/v2-access';
  *   Billing         /settings/billing        → V2 (rebuilt, 28 September 2026)
  *   Message packs   /settings/message-packs  → V2 (rebuilt, 28 September 2026)
  *   Referrals       /settings/referrals      → V2 (rebuilt, 28 September 2026)
- *   Appearance      /settings/appearance     → v1
  *   Notifications   /settings/notifications  → V2 (rebuilt, 28 September 2026)
  *   Developer       /settings/developer      → V2 (rebuilt, 28 September 2026)
  *
@@ -68,8 +67,16 @@ import { canUseDeveloperSettings } from '@/lib/utils/v2-access';
  * row this screen exists to avoid; it is worse than no row, because the reader
  * pays a navigation to learn that nothing is there. They arrive here when they
  * are built, and the account/privacy work is where email, password and sessions
- * will live. (`/settings/general` is not listed either: it is a one-line
- * `redirect()` onto `/settings/appearance`.)
+ * will live.
+ *
+ * ── APPEARANCE HAS NO ROW (Stay, 13 November 2026) ─────────────────────────
+ * "Remove appearance from the new settings page" (52e78fa1, 18:26Z). v1's
+ * `/settings/appearance` held Reader Mode and the agent-activity switch, neither
+ * of which does anything in v2, and the light/dark theme lives in the account
+ * menu. So there is no row, and for a v2 reader the address is a redirect shell
+ * onto `/settings` (`app/v2/settings/appearance/page.tsx`). v1's
+ * `/settings/general`, a one-line `redirect()` onto `/settings/appearance`, ends
+ * there too.
  *
  * ── SIGNING OUT IS NOT A ROW HERE ──────────────────────────────────────────
  * It closes the screen in its own block (`sign-out/SignOutRow.tsx`, 29
@@ -98,7 +105,7 @@ export interface SettingsRow {
    * A guest is a view-only pre-registration identity: it has no profile to
    * edit, no plan, no invoices, no referral code and no organization. Showing
    * those rows to one is not a permission mistake, it is a lie about what they
-   * have. What a guest keeps is the two device preferences, which work for
+   * have. What a guest keeps is the device preferences, which work for
    * anybody holding the phone.
    *
    * NOT a security boundary — hiding a row hides an entry point, and each
@@ -284,18 +291,6 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     id: 'app',
     label: 'This app',
     rows: [
-      {
-        // NO QUIET VALUE ON THIS ROW, and it is the row that most looks like it
-        // should have one. `/settings/appearance` does NOT hold the light/dark
-        // theme — it holds Reader Mode and the agent-activity switch
-        // (`app/(main)/settings/appearance/page.tsx`, measured). The theme lives
-        // in the header's overflow menu. Printing "Dark" under this label would
-        // name a setting the page it opens cannot change.
-        id: 'appearance',
-        label: 'Appearance',
-        icon: Paintbrush,
-        href: '/settings/appearance',
-      },
       {
         id: 'notifications',
         label: 'Notifications',

@@ -165,6 +165,9 @@ export const V2_ROUTES = [
   '/space-invitations',
   '/organization-invitations',
   '/settings/organization',
+  // v1's Appearance page, a v2-only redirect shell onto `/settings`: v2 has no
+  // Appearance option (Stay, 13 November 2026; see `app/v2/settings/appearance/page.tsx`).
+  '/settings/appearance',
   // My requests, opened from Settings: the list and every request. v1's
   // addresses, kept as the v2 screens rather than redirected, because the
   // request emails link to `/content-requests/{uuid}`. A wildcard, unlike the

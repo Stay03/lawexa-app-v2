@@ -136,9 +136,6 @@ export function SettingsScreen() {
  * that needs doing.
  *
  * The rows that look like they should have a value and must not:
- *  - Appearance. `/settings/appearance` does not hold the theme (it holds
- *    Reader Mode and the agent-activity switch), so "Dark" under that label
- *    would name a setting the page cannot change. See `rows.ts`.
  *  - Organization, Usage, Billing, Message packs. Every one of those values is
  *    a request, and each belongs to the screen that is about to make it anyway.
  *

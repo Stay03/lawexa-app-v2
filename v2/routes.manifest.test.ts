@@ -44,6 +44,7 @@ test('My requests keeps v1 addresses: the list and each request are v2, and noth
   assert.equal(isMigratedToV2('/content-requests/559c838d-278d-47b4-9fcc-89d0e408d361'), true);
   assert.equal(isMigratedToV2('/content-requestsx'), false);
   assert.equal(isMigratedToV2('/admin/content-requests'), false);
-  // Appearance still falls through to v1.
-  assert.equal(isMigratedToV2('/settings/appearance'), false);
+  // Account still falls through to v1. (Appearance did until 13 November 2026;
+  // it is now a v2 redirect shell onto `/settings`, pinned in settings/rows.test.ts.)
+  assert.equal(isMigratedToV2('/settings/account'), false);
 });

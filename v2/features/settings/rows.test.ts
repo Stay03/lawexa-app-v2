@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { isMigratedToV2 } from '@/v2/routes.manifest';
+
 /* `rows.ts` imports its icons from lucide-react, which the node test loader
  * does not resolve, so the table is pinned by its source text. */
 
@@ -31,6 +33,11 @@ test("My requests is a row in Your account, right after Your stats, opening v1's
   );
 });
 
-test('Appearance keeps its row onto its own page', () => {
-  assert.match(rows, /id: 'appearance',\n\s+label: 'Appearance',\n\s+icon: Paintbrush,\n\s+href: '\/settings\/appearance',\n/);
+test('Appearance has no row, and its address opens Settings in v2 (Stay, 13 November 2026)', () => {
+  // "Remove appearance from the new settings page" (52e78fa1, 18:26Z). The theme stays in the account menu.
+  assert.doesNotMatch(rows, /id: 'appearance'/);
+  assert.doesNotMatch(rows, /href: '\/settings\/appearance'/);
+  assert.ok(isMigratedToV2('/settings/appearance'));
+  const shell = readFileSync(join(process.cwd(), 'app', 'v2', 'settings', 'appearance', 'page.tsx'), 'utf8');
+  assert.match(shell, /redirect\('\/settings'\);/);
 });
