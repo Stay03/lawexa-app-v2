@@ -83,3 +83,36 @@ test('the home handoff carries the start response’s user_message_id, and the c
   assert.match(controller, /userMessageId: typeof parsed\.uid === 'number' \? parsed\.uid : null,/);
   assert.match(controller, /connectToStream\(executionId, message, attachments, redaction, userMessageId\);/);
 });
+
+test('C1: an agent called in a new chat’s first turn has its row after that turn, from the handoff', async () => {
+  const { groupMessages, turnEndPlaces } = await import('@/v2/features/conversations/conversation/message-groups');
+  const { agentRowsByMessage } = await import('@/v2/features/conversations/conversation/agents/agent-roster');
+  const engine = createChatEngine({ getToken: () => 'test-token' });
+  engine.setConversationId('conv-new');
+  engine.connectToStream('exec-new', 'TEST DATA. Ask Issue Spotter about the lease.', undefined, undefined, QUESTION_ID);
+  const groups = groupMessages(engine.getSnapshot().messages);
+  const places = turnEndPlaces(groups, savedIdOf);
+  // The first question's turn has a place, named by its saved id.
+  assert.deepEqual([...places.values()], [QUESTION_ID]);
+  // And the agent the turn called (latest_call.called_by_message_id) is drawn there.
+  const rows = agentRowsByMessage([
+    {
+      id: '7e1a0000-0000-4000-8000-000000000001',
+      parent_conversation_id: 'conv-new',
+      agent: { id: 231, name: 'Issue Spotter', slug: 'issue-spotter' },
+      title: 'TEST DATA lease issues',
+      depth: 1,
+      status: 'running',
+      execution_id: 'exec-agent',
+      stream_url: '/api/chat/stream/exec-agent',
+      started_by_message_id: QUESTION_ID,
+      last_reply: null,
+      messages_count: 1,
+      can_send: true,
+      created_at: '2026-11-13T01:32:36Z',
+      last_message_at: null,
+      latest_call: { state: 'working', failure: null, called_by_message_id: QUESTION_ID, called_at: '2026-11-13T01:32:36Z', reply: null },
+    },
+  ]);
+  assert.equal(rows.get([...places.values()][0])?.[0]?.name, 'Issue Spotter');
+});
