@@ -5,7 +5,9 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, Loader2, ScrollText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { skillDraftErrorSentence, skillDraftKindLine, skillDraftStatusLine } from '@/lib/utils/skill-draft';
@@ -83,7 +85,8 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
         )}
       >
         <ChevronDown aria-hidden className={cn('size-4 transition-transform motion-reduce:transition-none', open && 'rotate-180')} />
-        {open ? 'Hide the steps' : card.kind === 'change' ? 'Show the changes' : 'Show the steps'}
+        {/* The steps open as the new version; "Show changes" inside marks them (Stay, 20:40Z). */}
+        {open ? 'Hide the steps' : 'Show the steps'}
       </button>
 
       {open && (
@@ -145,8 +148,15 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
   );
 }
 
-/** The steps: a new skill's in full; a change's marked against the live skill. */
+/**
+ * The steps, as formatted text. For a change, the new version alone by
+ * default; "Show changes" marks it against the live skill (Stay, 13 November
+ * 2026, 2b436b4f: "I dont know if the diff is necessary but it should be
+ * optional"). Off on each open; nothing is remembered.
+ */
 function DraftSteps({ draft }: { draft: SkillDraft }) {
+  const [showChanges, setShowChanges] = useState(false);
+  const switchId = useId();
   if (draft.kind === 'change' && draft.live) {
     return (
       <div className="space-y-2">
@@ -155,7 +165,17 @@ function DraftSteps({ draft }: { draft: SkillDraft }) {
             The live skill has changed since this draft was written (now version {draft.live.version}).
           </p>
         )}
-        <InstructionsDiff before={draft.live.instructions} after={draft.instructions} />
+        <div className="flex items-center justify-end gap-2">
+          <Label htmlFor={switchId} className="text-xs font-normal text-muted-foreground">
+            Show changes
+          </Label>
+          <Switch id={switchId} checked={showChanges} onCheckedChange={setShowChanges} />
+        </div>
+        {showChanges ? (
+          <InstructionsDiff before={draft.live.instructions} after={draft.instructions} />
+        ) : (
+          <InstructionsText text={draft.instructions} />
+        )}
       </div>
     );
   }

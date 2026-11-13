@@ -1,8 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { MessageContent } from '@/components/prompt-kit/message';
 import { cn } from '@/lib/utils';
 import { diffBlocks } from '@/lib/utils/block-diff';
@@ -31,7 +33,11 @@ export function SkillInstructionsText({ text }: { text: string }) {
  * diff, for checking a change to the markdown itself.
  */
 export function SkillInstructionsDiff({ before, after }: { before: string; after: string }) {
+  // "Show changes" is on each time the page opens: reviewing a change is the admin's job (Stay, 13 November 2026,
+  // 2b436b4f: the diff "should be optional"). Off, the new version reads alone. Nothing is remembered.
+  const [showChanges, setShowChanges] = useState(true);
   const [raw, setRaw] = useState(false);
+  const switchId = useId();
   const blocks = useMemo(() => diffBlocks(before, after), [before, after]);
   const lines = useMemo(() => (raw ? diffLines(before, after) : []), [raw, before, after]);
   const { added, removed } = diffCounts(raw ? lines : blocks);
@@ -40,15 +46,33 @@ export function SkillInstructionsDiff({ before, after }: { before: string; after
     <div>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted-foreground">
-          {added === 0 && removed === 0
-            ? 'No change to the steps.'
-            : `${added} ${added === 1 ? unit : `${unit}s`} added, ${removed} removed.`}
+          {!showChanges
+            ? 'The draft’s steps.'
+            : added === 0 && removed === 0
+              ? 'No change to the steps.'
+              : `${added} ${added === 1 ? unit : `${unit}s`} added, ${removed} removed.`}
         </p>
-        <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" aria-pressed={raw} onClick={() => setRaw((on) => !on)}>
-          {raw ? 'Show formatted text' : 'Show raw text'}
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Label htmlFor={switchId} className="text-xs font-normal text-muted-foreground">
+              Show changes
+            </Label>
+            <Switch id={switchId} checked={showChanges} onCheckedChange={setShowChanges} />
+          </div>
+          <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" aria-pressed={raw} onClick={() => setRaw((on) => !on)}>
+            {raw ? 'Show formatted text' : 'Show raw text'}
+          </Button>
+        </div>
       </div>
-      {raw ? (
+      {!showChanges ? (
+        raw ? (
+          <pre className="max-h-[32rem] overflow-y-auto whitespace-pre-wrap break-words rounded-md border p-3 font-mono text-xs leading-relaxed">
+            {after}
+          </pre>
+        ) : (
+          <SkillInstructionsText text={after} />
+        )
+      ) : raw ? (
         <ol className="max-h-[32rem] overflow-y-auto rounded-md border font-mono text-xs leading-relaxed">
           {lines.map((line, index) => (
             <li
