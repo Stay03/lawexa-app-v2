@@ -14,7 +14,7 @@ import { inviteLinksApi } from '@/lib/api/collab';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { InviteAcceptResponse, InviteAcceptResult, InvitePreview } from '@/types/collab';
-import { SPACES_QUERY_ROOT, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
+import { SPACES_QUERY_ROOT, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
 import {
   forgetPendingInvite,
   pendingInviteWatches,
@@ -177,15 +177,22 @@ export function JoinScreen({ code }: { code: string }) {
    * 14 November 2026). Accepting a game link puts the person in the Space,
    * not in the game: they stopped on the Space's page with a banner to press,
    * and once on "You're not in this space", read before the join had landed.
-   * So a game link's way in joins the game too (a refusal, late joining off or
-   * a game over, is a state the game screen shows), reads the Space again,
-   * and then opens the lobby. Every way through uses it: Join, Open the game,
-   * and the return from sign-in.
+   * So a game link's way in joins the game too, reads the Space again, and
+   * then opens the lobby. Every way through uses it: Join, Open the game, and
+   * the return from sign-in. The game's own refusals (`gameJoinLands`: late
+   * joining off, gone, over) still land, on a game screen that says why; any
+   * other failure stays here with a Try again that runs this step alone.
    */
   const enter = useMutation({
     mutationFn: async (destination: Pick<InviteAcceptResult, 'space_uuid' | 'channel_uuid' | 'game_uuid'> & { play: boolean }) => {
       // Play joins the game; Watch lands as a watcher, with the game's Join still there.
-      if (destination.game_uuid && destination.play) await quizGamesApi.join(destination.game_uuid).catch(() => undefined);
+      if (destination.game_uuid && destination.play) {
+        try {
+          await quizGamesApi.join(destination.game_uuid);
+        } catch (error) {
+          if (!gameJoinLands(isAxiosError(error) ? error.response?.status : undefined)) throw error;
+        }
+      }
       await queryClient.invalidateQueries({ queryKey: SPACES_QUERY_ROOT });
       return destination;
     },
@@ -406,7 +413,22 @@ export function JoinScreen({ code }: { code: string }) {
           </p>
         ) : null}
 
-        {choosesMode ? (
+        {enter.isError && enter.variables ? (
+          // In the Space, but the game join failed for a reason the game
+          // screen would not explain: say so, and try that step again.
+          <div role="alert" className="mt-7 flex w-full flex-col gap-3">
+            <p className="flex items-center justify-center gap-2 text-base font-semibold text-foreground">
+              <AlertCircle aria-hidden className="size-5 text-destructive" />
+              We couldn&rsquo;t put you in the game
+            </p>
+            <p className="text-sm text-muted-foreground">
+              You are in {invite.space_name}. Check your connection and try again.
+            </p>
+            <Button size="lg" className={cn('w-full', QUIZ_BUTTON)} onClick={() => enter.mutate(enter.variables)}>
+              Try again
+            </Button>
+          </div>
+        ) : choosesMode ? (
           <div className="mt-7 flex flex-col gap-3">
             <Button size="lg" className={cn('w-full', QUIZ_BUTTON)} onClick={() => press(true)} disabled={busy}>
               {busy && chosen === 'play' ? (

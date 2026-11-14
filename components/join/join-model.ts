@@ -80,3 +80,24 @@ const INVITE_CODE = new RegExp(`^[${INVITE_CODE_POOL}]{${INVITE_CODE_MIN},${INVI
 export function isInviteCode(code: string): boolean {
   return INVITE_CODE.test(code);
 }
+
+/**
+ * THE GAME'S OWN REFUSALS, WHICH THE GAME SCREEN EXPLAINS (Techlead's review,
+ * 14 November 2026). Play joins the game before the lobby opens; these answers
+ * from `POST /quiz-games/{uuid}/join` (ChannelQuizGameController::join) still
+ * land the person on the game, which says why they are watching:
+ * - 403: late joining is turned off for this quiz;
+ * - 404: the game is gone;
+ * - 409: the game is over (finished or cancelled).
+ * Anything else (no network, a 5xx, a session that ended) keeps them on the
+ * join screen with a Try again, so Play never quietly becomes Watch.
+ */
+export const GAME_JOIN_REFUSALS: Readonly<Record<number, string>> = {
+  403: 'Late joining is turned off for this quiz',
+  404: 'The game is gone',
+  409: 'The game is over',
+};
+
+export function gameJoinLands(status: number | undefined): boolean {
+  return status !== undefined && status in GAME_JOIN_REFUSALS;
+}
