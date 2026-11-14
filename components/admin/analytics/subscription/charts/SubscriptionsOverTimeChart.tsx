@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { BarChart3 } from 'lucide-react';
-import { formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import type { SubscriptionsOverTimePoint } from '@/types/admin';
 
 /******************************************************************************
@@ -46,6 +46,8 @@ export function SubscriptionsOverTimeChart({
   data,
   granularity,
 }: SubscriptionsOverTimeChartProps) {
+  // Hourly points cross midnight in "last 24 hours": the midnight tick then names its day.
+  const spansDays = granularity === 'hour' && bucketsSpanDays(data.map((point) => point.date));
   if (!data.length) {
     return (
       <Card>
@@ -76,7 +78,7 @@ export function SubscriptionsOverTimeChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) => formatDateTick(v, granularity)}
+              tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
             />
             <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
             <ChartTooltip

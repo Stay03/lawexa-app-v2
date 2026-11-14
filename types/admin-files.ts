@@ -45,15 +45,15 @@ export interface FileAnalyticsStatCards {
 // ============================================
 
 export interface FileUploadsOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   uploads: number;
   total_size: number;
 }
 
 export interface FileStorageOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   cumulative_size: number;
   added_size: number;
 }

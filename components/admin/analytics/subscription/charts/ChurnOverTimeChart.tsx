@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { UserMinus } from 'lucide-react';
-import { formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import type { ChurnOverTimePoint } from '@/types/admin';
 
 /******************************************************************************
@@ -46,6 +46,8 @@ export function ChurnOverTimeChart({
   data,
   granularity,
 }: ChurnOverTimeChartProps) {
+  // Hourly points cross midnight in "last 24 hours": the midnight tick then names its day.
+  const spansDays = granularity === 'hour' && bucketsSpanDays(data.map((point) => point.date));
   if (!data.length) {
     return (
       <Card>
@@ -76,7 +78,7 @@ export function ChurnOverTimeChart({
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) => formatDateTick(v, granularity)}
+              tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
             />
             <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
             <ChartTooltip

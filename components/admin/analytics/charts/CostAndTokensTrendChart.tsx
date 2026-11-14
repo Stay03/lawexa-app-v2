@@ -20,18 +20,11 @@ import {
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { CostAndTokensTrendPoint } from '@/types/admin';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 
 interface CostAndTokensTrendChartProps {
   data: CostAndTokensTrendPoint[];
   granularity: 'hour' | 'day';
-}
-
-function formatHourLabel(hour: string): string {
-  const h = parseInt(hour, 10);
-  if (h === 0) return '12 AM';
-  if (h < 12) return `${h} AM`;
-  if (h === 12) return '12 PM';
-  return `${h - 12} PM`;
 }
 
 export function CostAndTokensTrendChart({
@@ -43,7 +36,8 @@ export function CostAndTokensTrendChart({
   const showNGN = useCurrencyStore((s) => s.showNGN);
   const { rate: exchangeRate } = useExchangeRate();
   const isHourly = granularity === 'hour';
-  const xKey = isHourly ? 'hour' : 'date';
+  // Hourly points cross midnight in "last 24 hours": the midnight tick then names its day.
+  const spansDays = isHourly && bucketsSpanDays(data.map((point) => point.date));
 
   const chartConfig = useMemo<ChartConfig>(
     () => ({
@@ -105,15 +99,11 @@ export function CostAndTokensTrendChart({
           <AreaChart data={chartData} accessibilityLayer margin={{ top: 20 }}>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey={xKey}
+              dataKey="date"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) => {
-                if (isHourly) return formatHourLabel(v);
-                const d = new Date(v);
-                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-              }}
+              tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
             />
             <YAxis
               yAxisId="cost"
@@ -151,15 +141,9 @@ export function CostAndTokensTrendChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(_v, payload) => {
-                    const pt = payload?.[0]?.payload;
-                    if (isHourly) return formatHourLabel(String(pt?.hour ?? _v));
-                    return new Date(pt?.date ?? _v).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
-                  }}
+                  labelFormatter={(_v, payload) =>
+                    formatDateTooltipLabel(String(payload?.[0]?.payload?.date ?? _v), granularity)
+                  }
                   formatter={(value, name) => {
                     if (name === 'total_cost') {
                       if (showNGN) {

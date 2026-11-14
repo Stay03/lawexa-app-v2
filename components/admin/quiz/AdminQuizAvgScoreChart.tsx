@@ -7,7 +7,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { formatHourIndex } from '@/lib/utils/quiz-format';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import type {
   AdminQuizAvgScorePoint,
   AdminQuizGranularity,
@@ -35,7 +35,8 @@ export function AdminQuizAvgScoreChart({
     );
   }
 
-  const isHourly = granularity === 'hour';
+  // Hourly points cross midnight in "last 24 hours": the midnight tick then names its day.
+  const spansDays = granularity === 'hour' && bucketsSpanDays(data.map((point) => point.date));
 
   return (
     <ChartContainer config={chartConfig} className="h-[220px] w-full sm:h-[260px]">
@@ -47,14 +48,7 @@ export function AdminQuizAvgScoreChart({
           axisLine={false}
           tickMargin={8}
           minTickGap={24}
-          tickFormatter={(v) =>
-            isHourly
-              ? formatHourIndex(v)
-              : new Date(v).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })
-          }
+          tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
         />
         <YAxis
           domain={[0, 100]}
@@ -68,17 +62,8 @@ export function AdminQuizAvgScoreChart({
           content={
             <ChartTooltipContent
               labelFormatter={(_v, payload) => {
-                const d = (
-                  payload?.[0]?.payload as AdminQuizAvgScorePoint | undefined
-                )?.date;
-                if (d == null) return '';
-                return isHourly
-                  ? formatHourIndex(d)
-                  : new Date(d).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
+                const d = (payload?.[0]?.payload as AdminQuizAvgScorePoint | undefined)?.date;
+                return d == null ? '' : formatDateTooltipLabel(d, granularity);
               }}
               formatter={(value) => `${Math.round(Number(value))}%`}
             />

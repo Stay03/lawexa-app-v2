@@ -299,17 +299,18 @@ export interface AdminQuizStatCardData {
 }
 
 /**
- * A point on a usage time-series. `date` is a `YYYY-MM-DD` string for `day`
- * granularity, or an **integer hour index** (e.g. `1`) for `hour` granularity —
- * format it off the echoed `granularity`, never assume a timestamp.
+ * A point on a usage time-series. `date` is the bucket: `Y-m-d` for `day`
+ * granularity, `Y-m-d H:00` for `hour` (Backend's analytics-time-of-day, 14
+ * November 2026; it was an integer hour index, so two days' same hour merged).
+ * Format it with lib/utils/analytics.ts off the echoed `granularity`.
  */
 export interface AdminQuizSessionsPoint {
-  date: string | number;
+  date: string;
   count: number;
 }
 
 export interface AdminQuizAvgScorePoint {
-  date: string | number;
+  date: string;
   avg_score: number;
 }
 

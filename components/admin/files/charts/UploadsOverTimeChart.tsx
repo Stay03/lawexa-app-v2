@@ -20,6 +20,7 @@ import type {
   FileUploadsOverTimePoint,
   FileAnalyticsGranularity,
 } from '@/types/admin-files';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 
 interface UploadsOverTimeChartProps {
   data: FileUploadsOverTimePoint[];
@@ -32,13 +33,6 @@ const chartConfig = {
     color: 'var(--chart-1)',
   },
 } satisfies ChartConfig;
-
-function formatHour(hour: string): string {
-  const h = parseInt(hour, 10);
-  if (h === 0) return '12 AM';
-  if (h === 12) return '12 PM';
-  return h < 12 ? `${h} AM` : `${h - 12} PM`;
-}
 
 export function UploadsOverTimeChart({
   data,
@@ -59,7 +53,8 @@ export function UploadsOverTimeChart({
   }
 
   const isHourly = granularity === 'hour';
-  const dataKey = isHourly ? 'hour' : 'date';
+  // Hourly points cross midnight in "last 24 hours": the midnight tick then names its day.
+  const spansDays = isHourly && bucketsSpanDays(data.map((point) => point.date));
 
   return (
     <Card>
@@ -72,29 +67,19 @@ export function UploadsOverTimeChart({
           <AreaChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey={dataKey}
+              dataKey="date"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) => {
-                if (isHourly) return formatHour(v);
-                const d = new Date(v);
-                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-              }}
+              tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
             />
             <YAxis tickLine={false} axisLine={false} tickMargin={8} />
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(_v, payload) => {
-                    const pt = payload?.[0]?.payload;
-                    if (isHourly) return formatHour(String(pt?.hour ?? _v));
-                    return new Date(pt?.date ?? _v).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    });
-                  }}
+                  labelFormatter={(_v, payload) =>
+                    formatDateTooltipLabel(String(payload?.[0]?.payload?.date ?? _v), granularity)
+                  }
                 />
               }
             />

@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Receipt } from 'lucide-react';
 import { formatNaira } from '@/lib/utils/currency';
-import { formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import {
   compactMoney,
   fullMoney,
@@ -91,6 +91,8 @@ export function RevenueOverTimeChart({
       <CardContent className="space-y-6">
         {groups.map((group) => {
           const currency = group.currency;
+          // Hourly points cross midnight in "last 24 hours": the midnight tick then names its day.
+          const spansDays = granularity === 'hour' && bucketsSpanDays(group.items.map((point) => point.date));
           return (
             <div key={currency ?? 'legacy'} className="space-y-2">
               {labelled ? (
@@ -106,7 +108,7 @@ export function RevenueOverTimeChart({
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}
-                    tickFormatter={(v) => formatDateTick(v, granularity)}
+                    tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
                   />
                   <YAxis
                     tickLine={false}

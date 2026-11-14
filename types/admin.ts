@@ -555,15 +555,15 @@ export interface AnalyticsStatCards {
 }
 
 export interface ConversationsOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   conversations: number;
   unique_users: number;
 }
 
 export interface CostAndTokensTrendPoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   total_cost: number;
   total_tokens: number;
   prompt_tokens: number;
@@ -594,8 +594,8 @@ export interface ModelUsageRow {
 }
 
 export interface MessageRoleDistributionPoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   user_count: number;
   assistant_count: number;
   tool_count: number;
@@ -717,8 +717,8 @@ export interface UserAnalyticsStatCards {
 }
 
 export interface UserGrowthPoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   total: number;
   registered: number;
   guest: number;
@@ -731,8 +731,8 @@ export interface UserTypeDistributionPoint {
 }
 
 export interface ActiveUsersOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   total: number;
   registered: number;
   guest: number;
@@ -745,21 +745,21 @@ export interface AuthProviderDistributionPoint {
 }
 
 export interface UserConversationsAndMessagesPoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   conversations: number;
   messages: number;
 }
 
 export interface UserTokenUsagePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   total_tokens: number;
 }
 
 export interface UserDailyCostPoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   cost: number;
 }
 
@@ -802,8 +802,8 @@ export interface UserAnalyticsCharts {
 }
 
 export interface UserDailyBreakdownRow {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   new_users: number;
   new_guests: number;
   conversations: number;
@@ -877,16 +877,16 @@ export interface ViewAnalyticsStatCards {
 // Chart Data Interfaces
 
 export interface ViewsOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   human_views: number;
   bot_views: number;
   total_views: number;
 }
 
 export interface BotCrawlsOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   search_engine_crawls: number;
   social_media_crawls: number;
   total_crawls: number;
@@ -1427,14 +1427,14 @@ export interface MessagePackAnalyticsStatCards {
 // Analytics Chart Types
 
 export interface MessagePackRevenueOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   revenue: number;
 }
 
 export interface MessagePackPurchasesOverTimePoint {
-  date?: string;
-  hour?: string;
+  /** The bucket: "Y-m-d", or "Y-m-d H:00" for an hourly point (Backend's analytics-time-of-day). */
+  date: string;
   count: number;
 }
 

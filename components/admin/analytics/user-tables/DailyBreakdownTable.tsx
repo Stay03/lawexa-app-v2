@@ -18,18 +18,12 @@ import {
 import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import type { UserDailyBreakdownRow, ViewAnalyticsGranularity } from '@/types/admin';
 
 interface DailyBreakdownTableProps {
   data: UserDailyBreakdownRow[];
   granularity: ViewAnalyticsGranularity;
-}
-
-function formatHour(hour: string): string {
-  const h = parseInt(hour, 10);
-  if (h === 0) return '12 AM';
-  if (h === 12) return '12 PM';
-  return h < 12 ? `${h} AM` : `${h - 12} PM`;
 }
 
 export function DailyBreakdownTable({ data, granularity }: DailyBreakdownTableProps) {
@@ -38,6 +32,8 @@ export function DailyBreakdownTable({ data, granularity }: DailyBreakdownTablePr
   const showNGN = useCurrencyStore((s) => s.showNGN);
   const { rate: exchangeRate } = useExchangeRate();
   const isHourly = granularity === 'hour';
+  // Hourly rows cross midnight in "last 24 hours": the midnight row then names its day.
+  const spansDays = isHourly && bucketsSpanDays(data.map((row) => row.date));
 
   if (!data.length) {
     return (
@@ -75,15 +71,9 @@ export function DailyBreakdownTable({ data, granularity }: DailyBreakdownTablePr
           </TableHeader>
           <TableBody>
             {data.map((row) => (
-              <TableRow key={row.hour ?? row.date}>
+              <TableRow key={row.date}>
                 <TableCell className="font-medium">
-                  {isHourly
-                    ? formatHour(row.hour!)
-                    : new Date(row.date!).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                  {isHourly ? formatDateTick(row.date, 'hour', spansDays) : formatDateTooltipLabel(row.date, 'day')}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {row.new_users - row.new_guests}

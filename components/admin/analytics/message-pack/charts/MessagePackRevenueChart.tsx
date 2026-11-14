@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Receipt } from 'lucide-react';
 import { formatNaira } from '@/lib/utils/currency';
-import { formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 import type { MessagePackRevenueOverTimePoint } from '@/types/admin';
 
 /******************************************************************************
@@ -29,17 +29,6 @@ const chartConfig = {
     color: 'var(--chart-1)',
   },
 } satisfies ChartConfig;
-
-/******************************************************************************
-                                 Functions
-******************************************************************************/
-
-function formatHourTick(hour: string): string {
-  const h = parseInt(hour, 10);
-  if (h === 0) return '12 AM';
-  if (h === 12) return '12 PM';
-  return h < 12 ? `${h} AM` : `${h - 12} PM`;
-}
 
 /******************************************************************************
                                  Types
@@ -58,7 +47,8 @@ export function MessagePackRevenueChart({
   data,
   granularity,
 }: MessagePackRevenueChartProps) {
-  const dataKey = granularity === 'hour' ? 'hour' : 'date';
+  // Hourly points cross midnight in "last 24 hours": the midnight tick then names its day.
+  const spansDays = granularity === 'hour' && bucketsSpanDays(data.map((point) => point.date));
 
   if (!data.length) {
     return (
@@ -86,13 +76,11 @@ export function MessagePackRevenueChart({
           <BarChart data={data} accessibilityLayer>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey={dataKey}
+              dataKey="date"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) =>
-                granularity === 'hour' ? formatHourTick(String(v)) : formatDateTick(String(v), granularity)
-              }
+              tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
             />
             <YAxis
               tickLine={false}
@@ -103,9 +91,7 @@ export function MessagePackRevenueChart({
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(v) =>
-                    granularity === 'hour' ? formatHourTick(String(v)) : formatDateTooltipLabel(String(v), granularity)
-                  }
+                  labelFormatter={(v) => formatDateTooltipLabel(String(v), granularity)}
                   formatter={(value) => [formatNaira(Number(value)), 'Revenue']}
                 />
               }

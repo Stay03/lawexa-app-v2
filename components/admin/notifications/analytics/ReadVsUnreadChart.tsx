@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { ReadVsUnreadPoint } from '@/types/notification';
+import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
 
 interface ReadVsUnreadChartProps {
   data: ReadVsUnreadPoint[];
@@ -34,6 +35,10 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function ReadVsUnreadChart({ data }: ReadVsUnreadChartProps) {
+  // The response names no granularity: an hour in the key means hourly, and an hourly range
+  // across midnight names the midnight point's day.
+  const granularity = bucketGranularity(data.map((point) => point.date));
+  const spansDays = granularity === 'hour' && bucketsSpanDays(data.map((point) => point.date));
   if (!data.length) {
     return (
       <Card>
@@ -67,25 +72,13 @@ export function ReadVsUnreadChart({ data }: ReadVsUnreadChartProps) {
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              tickFormatter={(v) => {
-                const d = new Date(v);
-                return d.toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                });
-              }}
+              tickFormatter={(v) => formatDateTick(String(v), granularity, spansDays)}
             />
             <YAxis tickLine={false} axisLine={false} tickMargin={8} />
             <ChartTooltip
               content={
                 <ChartTooltipContent
-                  labelFormatter={(v) =>
-                    new Date(v).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })
-                  }
+                  labelFormatter={(v) => formatDateTooltipLabel(String(v), granularity)}
                 />
               }
             />
