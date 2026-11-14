@@ -89,8 +89,8 @@ test('a card docks above either box, and the box waits folded until "Type my own
   const fold = read(here, 'CardBoxFold.tsx');
   assert.match(fold, /inert=\{folded\}/);
   assert.match(fold, /folded \? 'grid-rows-\[0fr\] opacity-0' : 'grid-rows-\[1fr\] opacity-100'/);
-  // The box opens with the card's height in one flush, before the focus (question-card-steady.test.ts).
-  assert.match(dock(), /flushSync\(\(\) => \{\s*setBoxHeightLock\(lock\);\s*onBoxAnswering\(boxState\);\s*\}\);[\s\S]{0,200}?if \(at !== null && focus\) box\.current\?\.focus\(\);/);
+  // The box opens with the stack's height in one flush, before the focus (question-card-steady.test.ts).
+  assert.match(dock(), /flushSync\(\(\) => \{\s*if \(opening && height !== null\) onStackLock\(height\);\s*if \(boxState === null\) onStackLock\(null\);\s*onBoxAnswering\(boxState\);\s*\}\);[\s\S]{0,200}?if \(at !== null && focus\) box\.current\?\.focus\(\);/);
   // On a phone the card is capped and scrolls inside.
   assert.match(dock(), /max-h-\[60dvh\]/);
 });

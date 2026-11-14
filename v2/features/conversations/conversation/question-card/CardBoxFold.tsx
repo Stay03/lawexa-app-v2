@@ -18,9 +18,9 @@ export function CardBoxFold({ folded, children }: { folded: boolean; children: R
     <div
       inert={folded}
       data-card-box-folded={folded ? '' : undefined}
-      // No animation: the card gives the box its height in the same frame (QuestionDock's heightWithBox),
+      // No animation: the card gives the box its height in the same frame (the stack lock, card-height.ts),
       // so a fold that grew over 200ms would push the two apart and back (Stay: "jumpy").
-      className={cn('grid', folded ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100')}
+      className={cn('grid shrink-0', folded ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100')}
     >
       <div className="min-h-0 overflow-hidden">{children}</div>
     </div>

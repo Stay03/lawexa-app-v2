@@ -162,6 +162,8 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
   // and gives the box back as a reply box.
   const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
   const cardDock = useRef<QuestionDockHandle>(null);
+  // The card and the box as one stack (useCardBox): the card holds its height while the box answers.
+  const cardStack = useRef<HTMLDivElement>(null);
   const cardBox = useCardBox(openCard, cardDock);
 
   if (surface?.terminal) return null;
@@ -178,46 +180,53 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
         {!openCard && <ChatRatingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />}
         {/* After a paid plan runs out, once, about no chat (Arthur picked B). */}
         <PlanEndedSlot className="mb-2" />
-        {openCard && (
-          <QuestionDock
-            key={openCard.cardMessageId ?? openCard.rowId}
-            ref={cardDock}
-            open={openCard}
-            held={surface.holdSend || surface.isStreaming || surface.sendHeldBy !== null}
-            onAnswer={surface.answerCard}
-            box={composerRef}
-            onBoxAnswering={cardBox.onBoxAnswering}
-          />
-        )}
-        {/* Under an open card the box waits, folded, until the reader picks
-            "Type my own answer" (Stay, 14 November 2026). */}
-        <CardBoxFold folded={openCard !== null && cardBox.answering === null}>
-          <ConversationComposer
-            holdSend={surface.holdSend}
-            draftScopeId={conversationId}
-            stageRef={composerRef}
-            jurisdiction={surface.jurisdiction}
-            onJurisdictionChange={surface.setJurisdiction}
-            isConfidential={surface.isConfidential}
-            isRedacted={surface.isRedacted}
-            showMeta={surface.showMeta}
-            isStreaming={surface.isStreaming}
-            isCancelling={surface.isCancelling}
-            sendHeldBy={surface.sendHeldBy}
-            canStop={surface.canStop}
-            // While the card's "Type my own answer" is on, the box's send is the card's answer.
-            onSubmit={(message, attachments, replyTo) =>
-              cardBox.answering ? cardBox.answer(message, attachments) : surface.submit(message, attachments, replyTo)
-            }
-            onStop={surface.stop}
-            viewerId={userId}
-            mentionOptions={surface.mentionOptions}
-            quoteToneOf={surface.quoteToneOf}
-            spaceUuid={surface.spaceUuid}
-            {...(openCard && { joinedAbove: true })}
-            {...cardBox.answering}
-          />
-        </CardBoxFold>
+        {/* The card and the box as one stack: held at its height while the box answers, so the card's top
+            never moves (useCardBox, card-height.ts; Fable's review). */}
+        <div ref={cardStack} style={cardBox.stackStyle} className="flex flex-col">
+          {openCard && (
+            <QuestionDock
+              key={openCard.cardMessageId ?? openCard.rowId}
+              ref={cardDock}
+              open={openCard}
+              held={surface.holdSend || surface.isStreaming || surface.sendHeldBy !== null}
+              onAnswer={surface.answerCard}
+              box={composerRef}
+              onBoxAnswering={cardBox.onBoxAnswering}
+              stack={cardStack}
+              onStackLock={cardBox.onStackLock}
+              stackLocked={cardBox.stackLocked}
+            />
+          )}
+          {/* Under an open card the box waits, folded, until the reader picks
+              "Type my own answer" (Stay, 14 November 2026). */}
+          <CardBoxFold folded={openCard !== null && cardBox.answering === null}>
+            <ConversationComposer
+              holdSend={surface.holdSend}
+              draftScopeId={conversationId}
+              stageRef={composerRef}
+              jurisdiction={surface.jurisdiction}
+              onJurisdictionChange={surface.setJurisdiction}
+              isConfidential={surface.isConfidential}
+              isRedacted={surface.isRedacted}
+              showMeta={surface.showMeta}
+              isStreaming={surface.isStreaming}
+              isCancelling={surface.isCancelling}
+              sendHeldBy={surface.sendHeldBy}
+              canStop={surface.canStop}
+              // While the card's "Type my own answer" is on, the box's send is the card's answer.
+              onSubmit={(message, attachments, replyTo) =>
+                cardBox.answering ? cardBox.answer(message, attachments) : surface.submit(message, attachments, replyTo)
+              }
+              onStop={surface.stop}
+              viewerId={userId}
+              mentionOptions={surface.mentionOptions}
+              quoteToneOf={surface.quoteToneOf}
+              spaceUuid={surface.spaceUuid}
+              {...(openCard && { joinedAbove: true })}
+              {...cardBox.answering}
+            />
+          </CardBoxFold>
+        </div>
       </>
     ) : (
       <ViewOnlyPill reason={surface.viewOnlyReason} />

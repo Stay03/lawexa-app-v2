@@ -127,7 +127,7 @@ test('the banner sits above every chat’s box, and the home box has none', () =
   assert.match(
     dock,
     // (The box waits folded under an open card until "Type my own answer", 14 November 2026.)
-    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*\{openCard && \(\s*<QuestionDock[\s\S]*?\/>\s*\)\}\s*\{\/\*[^*]*\*\/\}\s*<CardBoxFold folded=\{openCard !== null && cardBox\.answering === null\}>\s*<ConversationComposer/,
+    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*\{\/\*[^*]*\*\/\}\s*<div ref=\{cardStack\}[^>]*>\s*\{openCard && \(\s*<QuestionDock[\s\S]*?\/>\s*\)\}\s*\{\/\*[^*]*\*\/\}\s*<CardBoxFold folded=\{openCard !== null && cardBox\.answering === null\}>\s*<ConversationComposer/,
   );
   // The home box carries only the plan-ended slot, never the moment banner.
   assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /ChatRatingSlot|ChatRatingBanner/);

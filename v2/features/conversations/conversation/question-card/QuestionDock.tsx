@@ -1,6 +1,6 @@
 'use client';
 
-import { useImperativeHandle, useRef, useState, type KeyboardEvent, type Ref, type RefObject } from 'react';
+import { useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { ChevronLeft, PenLine, X } from 'lucide-react';
 
@@ -18,7 +18,6 @@ import type { MessageAttachment, QuestionCardAnswer } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules/meta';
 import type { ConversationComposerHandle } from '../ConversationComposer';
 import type { SendRefused } from '../space-turn';
-import { heightWithBox } from './card-height';
 import type { OpenCard } from './open-card';
 
 /** The choice that opens the box for the reader's own words (Stay, 14 November 2026: renamed from its first wording). */
@@ -66,6 +65,12 @@ type QuestionDockProps = {
   box: RefObject<ConversationComposerHandle | null>;
   /** The box answers a question (its hint and its arrow's name), or null: it is a reply box again. */
   onBoxAnswering: (answering: BoxAnswering | null) => void;
+  /** The host's element around the card and the box (useCardBox's stackRef). */
+  stack: RefObject<HTMLDivElement | null>;
+  /** The stack's height to keep while the box answers, or null to let it go (useCardBox's onStackLock). */
+  onStackLock: (height: number | null) => void;
+  /** The stack is held at its height: the card gives the box what it takes. */
+  stackLocked: boolean;
   ref?: Ref<QuestionDockHandle>;
 };
 
@@ -95,7 +100,7 @@ type QuestionDockProps = {
  *
  * Keyed by the card by its host, so a new card starts fresh.
  */
-export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }: QuestionDockProps) {
+export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack, onStackLock, stackLocked, ref }: QuestionDockProps) {
   const { questions } = open.card;
   const count = questions.length;
   const [index, setIndex] = useState(0);
@@ -108,10 +113,8 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
   const [refused, setRefused] = useState<string | null>(null);
   // The reader's own draft from the box, set aside while the box answers a question; null when it does not.
   const replyDraft = useRef<string | null>(null);
-  // While the box is open under the card: the card's height, so the two stand where the card stood (heightWithBox).
-  const [boxHeightLock, setBoxHeightLock] = useState<number | null>(null);
-  const cardRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const questionRef = useRef<HTMLParagraphElement>(null);
 
   const question = questions[index];
   const draft = drafts[index] ?? null;
@@ -137,27 +140,28 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
     if (at === null) replyDraft.current = null;
     // The box is folded away until it answers (CardBoxFold): it opens at once,
     // so the focus below lands, inside the tap, and a phone raises its keyboard.
-    // Opening, the card gives the box its height (heightWithBox), so nothing
-    // above moves; folding again, the card takes it back.
+    // Opening, the stack keeps the height it has now (the card, the box folded),
+    // and the card gives the box whatever it takes (card-height.ts); folding
+    // again, the stack lets go. Already open, the lock stays as it is.
     const boxState = at === null ? null : boxAnsweringFor(at, count);
-    const lock = boxState === null ? null : answering ? boxHeightLock : measuredLock();
+    const opening = boxState !== null && !answering;
+    const height = opening ? (stack.current?.getBoundingClientRect().height ?? null) : null;
     flushSync(() => {
-      setBoxHeightLock(lock);
+      if (opening && height !== null) onStackLock(height);
+      if (boxState === null) onStackLock(null);
       onBoxAnswering(boxState);
     });
-    // The chosen row is the last: keep it in view in the shorter card.
-    if (lock !== null && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
     if (at !== null && focus) box.current?.focus();
     return answering ? previous : null;
   };
 
-  /** The card's height with the box open, measured on the folded box (its content keeps its height), or null. */
-  const measuredLock = (): number | null => {
-    const card = cardRef.current;
-    const fold = card?.parentElement?.querySelector<HTMLElement>(':scope > [data-card-box-folded] > div');
-    if (!card || !fold) return null;
-    return heightWithBox(card.getBoundingClientRect().height, fold.scrollHeight);
-  };
+  // Shorter for the box, the chosen row (the last) stays in view, after the
+  // question has changed too (Back to an own-answered question; Fable's review).
+  const boxRoom = ownChosen && stackLocked;
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (boxRoom && list) list.scrollTop = list.scrollHeight;
+  }, [boxRoom, index]);
 
   /** Keep the words the box held as question `at`'s own answer. */
   const keepWords = (at: number, words: string, chosen: boolean) => {
@@ -266,17 +270,17 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
 
   return (
     <section
-      ref={cardRef}
       aria-label="Lawexa's questions"
       // Flush on the box while it takes the reader's words: no gap, and no
-      // corners or border where the two meet, at the height that keeps its top
-      // still. Otherwise the box is folded away and the card stands alone, with
-      // the space under it the box has (CARD_GAP_PX).
+      // corners or border where the two meet; in the held stack it takes the
+      // room the box leaves (flex-1, min-h-0), so its top never moves.
+      // Otherwise the box is folded away and the card stands alone, with the
+      // space under it the box has (CARD_GAP_PX).
       className={cn(
         'mx-4 flex max-h-[60dvh] flex-col overflow-hidden border border-border bg-card',
         ownChosen ? 'rounded-t-3xl border-b-0' : 'mb-3 rounded-3xl',
+        boxRoom && 'min-h-0 flex-1',
       )}
-      style={ownChosen && boxHeightLock !== null ? { height: boxHeightLock } : undefined}
     >
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-3">
         {count > 1 ? (
@@ -286,7 +290,11 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
               <button
                 type="button"
                 disabled={locked}
-                onClick={() => goTo(index - 1)}
+                onClick={() => {
+                  // Back to the first question takes this button away: the question keeps the focus.
+                  goTo(index - 1);
+                  if (index - 1 === 0) window.requestAnimationFrame(() => questionRef.current?.focus({ preventScroll: true }));
+                }}
                 className={cn(
                   'v2-interactive -ml-1.5 flex items-center gap-0.5 rounded-md py-1 pr-1.5 pl-1 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40',
                   FOCUS_RING,
@@ -329,9 +337,11 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
       </div>
 
       {/* The question stays in view; only the choices scroll, when the card
-          gives the box its height (heightWithBox). */}
+          gives the box the room it takes. */}
       <div className="shrink-0 px-4 pt-2">
-        <p className="text-[15px] font-semibold leading-snug text-foreground">{question.question}</p>
+        <p ref={questionRef} tabIndex={-1} className="text-[15px] font-semibold leading-snug text-foreground outline-none">
+          {question.question}
+        </p>
         {question.why && <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{question.why}</p>}
       </div>
       <div
@@ -341,7 +351,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
           ownChosen && 'pb-3',
           // Made shorter for the box, the choices scroll: their top edge fades, so a row
           // part-way out reads as more above, never as text cut under the question.
-          ownChosen && boxHeightLock !== null && SCROLL_TOP_FADE,
+          boxRoom && SCROLL_TOP_FADE,
         )}
       >
         <div
@@ -378,7 +388,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
                   </span>
                   {/* While the box takes the reader's words, the choices give it their hints'
                       room: names only, so they fit the shorter card without a row cut at the top. */}
-                  {option.description && !(ownChosen && boxHeightLock !== null) && (
+                  {option.description && !boxRoom && (
                     <span className="block text-[12.5px] leading-snug text-muted-foreground">{option.description}</span>
                   )}
                 </span>

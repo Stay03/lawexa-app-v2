@@ -535,6 +535,8 @@ export function CaseChatComposerDock({
   // while "Type my own answer" is on (see ChatDock).
   const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
   const cardDock = useRef<QuestionDockHandle>(null);
+  // The card and the box as one stack (useCardBox): the card holds its height while the box answers.
+  const cardStack = useRef<HTMLDivElement>(null);
   const cardBox = useCardBox(openCard, cardDock);
   // The card fills and reads this box, so it needs the handle when the host passes none.
   const ownBox = useRef<ConversationComposerHandle>(null);
@@ -601,58 +603,65 @@ export function CaseChatComposerDock({
         )}
       >
         <div className="min-h-0 overflow-hidden">
-          {openCard && surface && (
-            <QuestionDock
-              key={openCard.cardMessageId ?? openCard.rowId}
-              ref={cardDock}
-              open={openCard}
-              held={conversationPending || surface.isStreaming || surface.sendHeldBy !== null}
-              onAnswer={surface.answerCard}
-              box={box}
-              onBoxAnswering={cardBox.onBoxAnswering}
-            />
-          )}
-          {/* Folded under an open card until "Type my own answer" is picked (as in ChatDock). */}
-          <CardBoxFold folded={openCard !== null && cardBox.answering === null}>
-            <ConversationComposer
-              draftScopeId={chatDraftScope(subject)}
-              placeholder={`Ask about this ${CHAT_SUBJECT_NOUN[subject.kind]}`}
-              {...cardBox.answering}
-              joinedAbove={openCard !== null}
-              signedIn={signedIn}
-              showMeta={showMeta}
-              animateMeta={animateMeta}
-              onEngage={onEngage}
-              stageRef={box}
-              holdSend={conversationPending}
-              jurisdiction={surface ? surface.jurisdiction : start.jurisdiction}
-              onJurisdictionChange={
-                surface ? surface.setJurisdiction : start.onJurisdictionChange
-              }
-              isConfidential={surface ? surface.isConfidential : false}
-              isRedacted={surface ? surface.isRedacted : false}
-              isStreaming={surface ? surface.isStreaming : false}
-              isCancelling={surface ? surface.isCancelling : false}
-              // A case chat in a space: a colleague's turn holds Send and offers
-              // no Stop, as on the chat's own screen (Spaces F4).
-              sendHeldBy={surface ? surface.sendHeldBy : null}
-              canStop={surface ? surface.canStop : true}
-              onSubmit={async (message, attachments) => {
-                // While the card's "Type my own answer" is on, the box's send is the card's answer.
-                if (cardBox.answering) return cardBox.answer(message, attachments);
-                // A refused send comes back to the composer, which gives the
-                // message back and says why.
-                if (surface) return surface.submit(message, attachments);
-                const ok = await start.start(message, attachments);
-                // The composer clears its draft optimistically; a failed create
-                // hands the text back for the retry. Attachments are the one
-                // loss (already uploaded, but their tray entries are gone) —
-                // re-attach on retry.
-                if (!ok) box.current?.stage(message);
-              }}
-              onStop={() => surface?.stop()}
-            />
-          </CardBoxFold>
+          {/* The card and the box as one stack: held at its height while the box answers, so the card's top
+              never moves (useCardBox, card-height.ts; Fable's review). */}
+          <div ref={cardStack} style={cardBox.stackStyle} className="flex flex-col">
+            {openCard && surface && (
+              <QuestionDock
+                key={openCard.cardMessageId ?? openCard.rowId}
+                ref={cardDock}
+                open={openCard}
+                held={conversationPending || surface.isStreaming || surface.sendHeldBy !== null}
+                onAnswer={surface.answerCard}
+                box={box}
+                onBoxAnswering={cardBox.onBoxAnswering}
+                stack={cardStack}
+                onStackLock={cardBox.onStackLock}
+                stackLocked={cardBox.stackLocked}
+              />
+            )}
+            {/* Folded under an open card until "Type my own answer" is picked (as in ChatDock). */}
+            <CardBoxFold folded={openCard !== null && cardBox.answering === null}>
+              <ConversationComposer
+                draftScopeId={chatDraftScope(subject)}
+                placeholder={`Ask about this ${CHAT_SUBJECT_NOUN[subject.kind]}`}
+                {...cardBox.answering}
+                joinedAbove={openCard !== null}
+                signedIn={signedIn}
+                showMeta={showMeta}
+                animateMeta={animateMeta}
+                onEngage={onEngage}
+                stageRef={box}
+                holdSend={conversationPending}
+                jurisdiction={surface ? surface.jurisdiction : start.jurisdiction}
+                onJurisdictionChange={
+                  surface ? surface.setJurisdiction : start.onJurisdictionChange
+                }
+                isConfidential={surface ? surface.isConfidential : false}
+                isRedacted={surface ? surface.isRedacted : false}
+                isStreaming={surface ? surface.isStreaming : false}
+                isCancelling={surface ? surface.isCancelling : false}
+                // A case chat in a space: a colleague's turn holds Send and offers
+                // no Stop, as on the chat's own screen (Spaces F4).
+                sendHeldBy={surface ? surface.sendHeldBy : null}
+                canStop={surface ? surface.canStop : true}
+                onSubmit={async (message, attachments) => {
+                  // While the card's "Type my own answer" is on, the box's send is the card's answer.
+                  if (cardBox.answering) return cardBox.answer(message, attachments);
+                  // A refused send comes back to the composer, which gives the
+                  // message back and says why.
+                  if (surface) return surface.submit(message, attachments);
+                  const ok = await start.start(message, attachments);
+                  // The composer clears its draft optimistically; a failed create
+                  // hands the text back for the retry. Attachments are the one
+                  // loss (already uploaded, but their tray entries are gone) —
+                  // re-attach on retry.
+                  if (!ok) box.current?.stage(message);
+                }}
+                onStop={() => surface?.stop()}
+              />
+            </CardBoxFold>
+          </div>
         </div>
       </div>
     </div>
