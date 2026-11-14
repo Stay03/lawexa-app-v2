@@ -23,12 +23,14 @@ import type { OpenCard } from './open-card';
 export const CARD_ANSWER_PLACEHOLDER = 'Or type a different answer';
 
 /**
- * The wash under the pointer on a row not chosen: a faint shade, far lighter
- * than the chosen row's, so a row the pointer rests on never reads as chosen
- * (Techlead, 14 November 2026). Tailwind's hover applies only where there is a
+ * The wash under the pointer on a row not chosen: under half the chosen row's
+ * shade, so a row the pointer rests on never reads as chosen (Techlead, 14
+ * November 2026). Measured on the light card, the chosen row's bg-muted is 10
+ * steps of 255 darker than the card and this wash 4; at 3% it was 8, close
+ * enough to read as chosen. Tailwind's hover applies only where there is a
  * pointer, so a tap leaves none.
  */
-const UNCHOSEN_HOVER = 'hover:bg-foreground/[0.03]';
+const UNCHOSEN_HOVER = 'hover:bg-foreground/[0.015]';
 
 /** The longest own answer the server takes for one question (Backend's 13566521). */
 export const OTHER_ANSWER_MAX = 2000;
