@@ -13,7 +13,7 @@ import { inviteLinksApi } from '@/lib/api/collab';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { InvitePreview } from '@/types/collab';
-import { joinActionLabel, joinedDestination } from './join-model';
+import { isInviteCode, joinActionLabel, joinedDestination } from './join-model';
 import {
   forgetPendingInvite,
   rememberPendingInvite,
@@ -90,6 +90,21 @@ function refusalFor(status: number | undefined): { title: string; body: string }
   };
 }
 
+/** A refused invite: its sentence, and the way home. */
+function Refusal({ status }: { status: number | undefined }) {
+  const { title, body } = refusalFor(status);
+  return (
+    <div className="mx-auto w-full max-w-md px-5 py-16 text-center">
+      <AlertCircle aria-hidden className="mx-auto size-8 text-muted-foreground" />
+      <h1 className="mt-4 text-xl font-semibold text-foreground">{title}</h1>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
+      <Button asChild variant="outline" className="mt-6">
+        <Link href="/">Go to Lawexa</Link>
+      </Button>
+    </div>
+  );
+}
+
 /**
  * The line under the name. The description when there is one; otherwise a
  * sentence built from what we know.
@@ -143,10 +158,13 @@ export function JoinScreen({ code }: { code: string }) {
   const viewer = useAuthStore((state) =>
     state.isAuthenticated ? `${state.isGuest ? 'guest' : 'user'}:${state.user?.id ?? ''}` : 'signed-out',
   );
+  // A value that cannot be a code is never asked about: it does not exist.
+  const wellFormed = isInviteCode(code);
   const preview = useQuery({
     queryKey: ['invite-preview', code, viewer],
     queryFn: () => inviteLinksApi.preview(code),
     retry: false, // 404/410 are answers, not blips
+    enabled: wellFormed,
   });
 
   const accept = useMutation({
@@ -186,6 +204,8 @@ export function JoinScreen({ code }: { code: string }) {
     }
   }, [heldAction, heldSpace, heldGame, accept, router]);
 
+  if (!wellFormed) return <Refusal status={404} />;
+
   if (preview.isPending) {
     return (
       <div className="mx-auto w-full max-w-md px-5 py-16">
@@ -200,20 +220,7 @@ export function JoinScreen({ code }: { code: string }) {
   }
 
   if (preview.isError) {
-    const status = isAxiosError(preview.error)
-      ? preview.error.response?.status
-      : undefined;
-    const { title, body } = refusalFor(status);
-    return (
-      <div className="mx-auto w-full max-w-md px-5 py-16 text-center">
-        <AlertCircle aria-hidden className="mx-auto size-8 text-muted-foreground" />
-        <h1 className="mt-4 text-xl font-semibold text-foreground">{title}</h1>
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
-        <Button asChild variant="outline" className="mt-6">
-          <Link href="/">Go to Lawexa</Link>
-        </Button>
-      </div>
-    );
+    return <Refusal status={isAxiosError(preview.error) ? preview.error.response?.status : undefined} />;
   }
 
   const invite = preview.data.data;

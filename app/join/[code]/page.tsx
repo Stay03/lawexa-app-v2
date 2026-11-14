@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { JoinScreen } from '@/components/join/JoinScreen';
+import { isInviteCode, readInviteCode } from '@/components/join/join-model';
 import { getApiUrl } from '@/lib/constants/seo';
 
 /**
@@ -70,16 +71,19 @@ export async function generateMetadata({
 }: {
   params: Promise<{ code: string }>;
 }): Promise<Metadata> {
-  const { code } = await params;
+  const code = readInviteCode((await params).code);
   const fallback: Metadata = {
     title: 'Join on Lawexa',
     description: 'You have been invited to a space on Lawexa.',
     robots: { index: false, follow: false },
   };
 
+  // A value that cannot be a code has nothing to preview.
+  if (!isInviteCode(code)) return fallback;
+
   try {
     const response = await fetch(
-      `${getApiUrl()}/api/invite-links/${code}`,
+      `${getApiUrl()}/api/invite-links/${encodeURIComponent(code)}`,
       { headers: { Accept: 'application/json' }, next: { revalidate: 60 } },
     );
     if (!response.ok) return fallback;
@@ -125,7 +129,7 @@ export default async function JoinPage({
 }: {
   params: Promise<{ code: string }>;
 }) {
-  const { code } = await params;
+  const code = readInviteCode((await params).code);
   return (
     <main className="min-h-dvh bg-background text-foreground">
       <JoinScreen code={code} />

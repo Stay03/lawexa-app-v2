@@ -28,6 +28,7 @@ import { SettingsFormGroup } from '../SettingsForm';
 import { SettingsState } from '../SettingsState';
 import { referralsQueries, useClaimCode } from './queries';
 import { ReferralsFallback } from './states';
+import { shareData } from '@/lib/utils/share-data';
 
 /** @arthur's wording, 2026-08-11, verbatim (as on the shared screen). */
 const SHARE_TEXT =
@@ -240,7 +241,7 @@ function LinkGroup({ code }: { code: string }) {
             type="button"
             onClick={() => {
               void navigator
-                .share({ title: 'Join me on Lawexa', text: SHARE_TEXT, url })
+                .share(shareData({ title: 'Join me on Lawexa', text: SHARE_TEXT, url }))
                 .catch(() => {
                   // A dismissed share sheet rejects; not a failure.
                 });

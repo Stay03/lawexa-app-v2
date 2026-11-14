@@ -1600,7 +1600,7 @@ export const inviteLinksApi = {
    */
   preview: async (code: string): Promise<InvitePreviewResponse> => {
     const response = await apiClient.get<InvitePreviewResponse>(
-      `/invite-links/${code}`
+      `/invite-links/${encodeURIComponent(code)}`
     );
     return response.data;
   },
@@ -1608,7 +1608,7 @@ export const inviteLinksApi = {
   /** Previewing never counts as a use — only this does. */
   accept: async (code: string): Promise<InviteAcceptResponse> => {
     const response = await apiClient.post<InviteAcceptResponse>(
-      `/invite-links/${code}/accept`,
+      `/invite-links/${encodeURIComponent(code)}/accept`,
       {}
     );
     return response.data;

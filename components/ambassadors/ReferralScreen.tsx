@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMounted } from '@/lib/hooks/useMounted';
 import { ambassadorsApi } from '@/lib/api/ambassadors';
+import { shareData } from '@/lib/utils/share-data';
 
 /**
  * ReferralScreen — an ambassador's code, the link that carries it, and every
@@ -455,7 +456,9 @@ export function ReferralScreen({
                 className="w-full"
                 onClick={() => {
                   void navigator
-                    .share({
+                    // One text, the link on its own line (shareData): given apart,
+                    // a share target glued the sentence onto the address.
+                    .share(shareData({
                       title: 'Join me on Lawexa',
                       // @arthur's words, 2026-08-11, used verbatim. It leads
                       // with what Lawexa is FOR rather than with the giveaway —
@@ -463,7 +466,7 @@ export function ReferralScreen({
                       // would want it before they are told it is free.
                       text: SHARE_TEXT,
                       url: referralUrl(current.code),
-                    })
+                    }))
                     .catch(() => {
                       // A dismissed share sheet rejects. Not a failure.
                     });

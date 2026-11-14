@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { shareData } from '@/lib/utils/share-data';
 import { useShareUrl } from './useShareUrl';
 
 /**
@@ -18,7 +19,9 @@ import { useShareUrl } from './useShareUrl';
  * the link ({@link useShareUrl}).
  *
  * `text` (22 October 2026, the quiz results' Challenge a friend) is the one
- * sentence the share sheet puts beside the link — a score and an ask. It is
+ * sentence the share sheet puts beside the link — a score and an ask. The two
+ * go as one text, the link on its own line (`shareData`): given apart, a
+ * share target glued the sentence onto the address (14 November 2026). It is
  * for the sheet only: the clipboard fallback still copies the LINK alone,
  * because "Link copied" is what the control then says, and a paragraph where
  * a reader expected an address would be the small lie that label exists to
@@ -65,11 +68,8 @@ export function useShareAction({
     const url = exactUrl ?? shareUrl(path ? `${window.location.origin}${path}` : window.location.href);
 
     if ('share' in navigator) {
-      const data: ShareData = { url };
-      if (title) data.title = title;
-      if (text) data.text = text;
       try {
-        await navigator.share(data);
+        await navigator.share(shareData({ title, text, url }));
         return;
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;

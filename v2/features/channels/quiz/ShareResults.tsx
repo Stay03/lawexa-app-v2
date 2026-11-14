@@ -10,6 +10,7 @@ import {
   quizShareInvite,
   type QuizShareStanding,
 } from '@/lib/constants/quiz-share';
+import { shareData } from '@/lib/utils/share-data';
 import { COMPACT_RAISED } from './ui';
 import { useResultsLink } from './use-results-link';
 
@@ -101,7 +102,9 @@ export function ShareResults({
     // The device's own sheet first. Read here, not in render — see the docblock.
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: quizTitle, text: headline, url });
+        // The headline and the link as one text, the link on its own line: given
+        // apart, a share target glued the headline onto the address (shareData).
+        await navigator.share(shareData({ title: quizTitle, text: headline, url }));
         return;
       } catch (error) {
         // Dismissing the sheet is a decision, not a fault. Leave the card alone.
