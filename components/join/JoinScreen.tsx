@@ -190,7 +190,8 @@ export function JoinScreen({ code }: { code: string }) {
         try {
           await quizGamesApi.join(destination.game_uuid);
         } catch (error) {
-          if (!gameJoinLands(isAxiosError(error) ? error.response?.status : undefined)) throw error;
+          const response = isAxiosError<{ message?: string }>(error) ? error.response : undefined;
+          if (!gameJoinLands(response?.status, response?.data?.message)) throw error;
         }
       }
       await queryClient.invalidateQueries({ queryKey: SPACES_QUERY_ROOT });

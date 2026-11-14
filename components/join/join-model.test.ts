@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { GAME_JOIN_REFUSALS, SPACES_QUERY_ROOT, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination, readInviteCode } from './join-model';
+import { LATE_JOIN_OFF_MESSAGE, SPACES_QUERY_ROOT, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination, readInviteCode } from './join-model';
 
 /* A live quiz's game link on the join screen (Backend's shapes 7a007a8c:
  * the preview names the `game`, accept answers its `game_uuid`). TEST DATA
@@ -84,7 +84,7 @@ test('a game link chosen to Play joins the game before it opens the lobby, on ev
   const screen = readFileSync(join(process.cwd(), 'components', 'join', 'JoinScreen.tsx'), 'utf8');
   // Watch lands as a watcher, with the game's Join still there. Play's join lets
   // through only the game's own refusals (Techlead's review, 14 November 2026).
-  assert.match(screen, /if \(destination\.game_uuid && destination\.play\) \{\s*try \{\s*await quizGamesApi\.join\(destination\.game_uuid\);\s*\} catch \(error\) \{\s*if \(!gameJoinLands\(isAxiosError\(error\) \? error\.response\?\.status : undefined\)\) throw error;/);
+  assert.match(screen, /if \(destination\.game_uuid && destination\.play\) \{\s*try \{\s*await quizGamesApi\.join\(destination\.game_uuid\);\s*\} catch \(error\) \{\s*const response = isAxiosError<\{ message\?: string \}>\(error\) \? error\.response : undefined;\s*if \(!gameJoinLands\(response\?\.status, response\?\.data\?\.message\)\) throw error;/);
   assert.doesNotMatch(screen, /\.catch\(\(\) => undefined\)/);
   assert.match(screen, /await queryClient\.invalidateQueries\(\{ queryKey: SPACES_QUERY_ROOT \}\);/);
   // Join, Open the game, and the return from sign-in all go through it; the
@@ -94,13 +94,16 @@ test('a game link chosen to Play joins the game before it opens the lobby, on ev
 });
 
 test("Play lands on the game only for the game's own refusals; any other failure is not a quiet Watch", () => {
-  // ChannelQuizGameController::join: 403 late joining off, 404 gone, 409 over (finished or cancelled).
-  assert.deepEqual(Object.keys(GAME_JOIN_REFUSALS).map(Number), [403, 404, 409]);
-  assert.equal(gameJoinLands(403), true);
-  assert.equal(gameJoinLands(404), true);
-  assert.equal(gameJoinLands(409), true);
+  // Backend's list for POST /quiz-games/{uuid}/join (14 November 2026).
+  assert.equal(LATE_JOIN_OFF_MESSAGE, 'Late joining is turned off for this quiz.');
+  assert.equal(gameJoinLands(403, LATE_JOIN_OFF_MESSAGE), true);
+  assert.equal(gameJoinLands(404, undefined), true);
+  assert.equal(gameJoinLands(409, 'This game is over.'), true);
+  // The policy's 403 (not yet in the Space): the Space join did not take, so try again.
+  assert.equal(gameJoinLands(403, 'This action is unauthorized.'), false);
+  assert.equal(gameJoinLands(403, undefined), false);
   // No network, a server error, an ended session, a throttle: stay and try again.
-  for (const status of [undefined, 500, 502, 503, 401, 422, 429, 400]) assert.equal(gameJoinLands(status), false, String(status));
+  for (const status of [undefined, 500, 502, 503, 401, 422, 429, 400]) assert.equal(gameJoinLands(status, undefined), false, String(status));
 });
 
 test('a failed game join stays on the join screen with a Try again that runs the game step alone', () => {

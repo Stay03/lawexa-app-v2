@@ -83,21 +83,21 @@ export function isInviteCode(code: string): boolean {
 
 /**
  * THE GAME'S OWN REFUSALS, WHICH THE GAME SCREEN EXPLAINS (Techlead's review,
- * 14 November 2026). Play joins the game before the lobby opens; these answers
- * from `POST /quiz-games/{uuid}/join` (ChannelQuizGameController::join) still
- * land the person on the game, which says why they are watching:
- * - 403: late joining is turned off for this quiz;
- * - 404: the game is gone;
- * - 409: the game is over (finished or cancelled).
- * Anything else (no network, a 5xx, a session that ended) keeps them on the
- * join screen with a Try again, so Play never quietly becomes Watch.
+ * 14 November 2026; Backend's list of `POST /quiz-games/{uuid}/join` answers).
+ * Play joins the game before the lobby opens; these answers still land the
+ * person on the game, which says why they are watching:
+ * - 403 with the game's own message: late joining is turned off for this quiz.
+ *   A 403 without it is the policy (not yet a member of the Space or channel):
+ *   in a game link's flow that is the Space join not having taken, so it is
+ *   tried again, never landed;
+ * - 404: the game is gone ("This game is gone" on the game screen);
+ * - 409: the game is over (finished, cancelled, or a lobby that closed).
+ * Anything else (no network, a 5xx, 401, 429) keeps them on the join screen
+ * with a Try again, so Play never quietly becomes Watch.
  */
-export const GAME_JOIN_REFUSALS: Readonly<Record<number, string>> = {
-  403: 'Late joining is turned off for this quiz',
-  404: 'The game is gone',
-  409: 'The game is over',
-};
+export const LATE_JOIN_OFF_MESSAGE = 'Late joining is turned off for this quiz.';
 
-export function gameJoinLands(status: number | undefined): boolean {
-  return status !== undefined && status in GAME_JOIN_REFUSALS;
+export function gameJoinLands(status: number | undefined, message: string | undefined): boolean {
+  if (status === 403) return message === LATE_JOIN_OFF_MESSAGE;
+  return status === 404 || status === 409;
 }
