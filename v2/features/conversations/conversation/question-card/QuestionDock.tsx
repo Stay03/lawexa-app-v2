@@ -187,6 +187,8 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack,
     if (!card || !list || !row) return;
     const style = getComputedStyle(list);
     const rowRoom = row.offsetHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    // The chosen row alone in view: no fade over its top (the fade says "more above", and here it would dim the row).
+    list.toggleAttribute('data-row-only', list.clientHeight <= rowRoom + 1);
     const short = Math.max(rowRoom - list.clientHeight, 0) + (card.scrollHeight - card.clientHeight);
     const height = stack.current?.getBoundingClientRect().height;
     if (short > 0.5 && height !== undefined) {
@@ -403,6 +405,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack,
           // Made shorter for the box, the choices scroll: their top edge fades, so a row
           // part-way out reads as more above, never as text cut under the question.
           boxRoom && SCROLL_TOP_FADE,
+          boxRoom && 'data-[row-only]:[mask-image:none]',
         )}
       >
         <div

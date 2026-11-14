@@ -43,8 +43,19 @@ export function useCardBox(open: OpenCard | null, dock: RefObject<QuestionDockHa
   const onBoxAnswering = (next: BoxAnswering | null) =>
     setState(next === null || card === null ? null : { card, answering: next });
 
-  /** The card's call, inside its flush: the stack's height to keep while the box answers, or null to let it go. */
-  const onStackLock = (height: number | null) => setLock(height === null || card === null ? null : { card, height });
+  /**
+   * The card's call, inside its flush: the stack's height to keep while the box
+   * answers, or null to let it go. For the same card the lock only grows: a
+   * growth measured while the ceiling cuts the stack (a keyboard open) is
+   * smaller than the lock, and taking it would leave the card shorter once the
+   * keyboard closes (Fable's third review). It is null between openings, so
+   * each opening starts from its own height.
+   */
+  const onStackLock = (height: number | null) =>
+    setLock((current) => {
+      if (height === null || card === null) return null;
+      return current !== null && current.card === card ? { card, height: Math.max(current.height, height) } : { card, height };
+    });
 
   // A turn of the phone drops the lock; a keyboard opening (height alone) keeps it.
   useEffect(() => {

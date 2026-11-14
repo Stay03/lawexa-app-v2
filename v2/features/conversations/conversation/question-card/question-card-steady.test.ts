@@ -35,7 +35,14 @@ test('opening the box, the stack keeps its height and the card gives the box wha
   // Held, the stack is the card's one cap; alone, the card caps itself at 60dvh.
   assert.match(card, /boxRoom \? 'min-h-0 flex-1' : 'max-h-\[60dvh\]',/);
   // Fable's second review. 1: the held stack's ceiling follows the visible screen (a keyboard shrinks it).
-  assert.equal(STACK_MAX_HEIGHT, 'calc(100dvh - 7rem)');
+  // Third review: the overlay keyboard (iOS Safari) keeps dvh full and reports --keyboard-inset, as the shell uses.
+  assert.equal(STACK_MAX_HEIGHT, 'calc(100dvh - var(--keyboard-inset, 0px) - 7rem)');
+  assert.match(read('v2', 'shell', 'shell.css'), /height: calc\(100dvh - var\(--keyboard-inset, 0px\)\);/);
+  // For the same card the lock only grows, so a growth cut by the ceiling never shortens it for later.
+  assert.match(read(...here, 'use-card-box.ts'), /current !== null && current\.card === card \? \{ card, height: Math\.max\(current\.height, height\) \} : \{ card, height \}/);
+  // The chosen row alone in view takes no fade over its top.
+  assert.match(card, /list\.toggleAttribute\('data-row-only', list\.clientHeight <= rowRoom \+ 1\);/);
+  assert.match(card, /boxRoom && 'data-\[row-only\]:\[mask-image:none\]',/);
   assert.match(read(...here, 'use-card-box.ts'), /\{ height: stackLock, maxHeight: STACK_MAX_HEIGHT \}/);
   // 2: the shortfall counts the card's own overflow, and the card is watched too.
   assert.match(card, /const short = Math\.max\(rowRoom - list\.clientHeight, 0\) \+ \(card\.scrollHeight - card\.clientHeight\);/);
