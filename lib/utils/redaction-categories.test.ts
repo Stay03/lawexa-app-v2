@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   REDACTION_CATEGORIES,
+  hiddenCount,
   hiddenList,
   hiddenSummary,
   orderedCategories,
@@ -58,6 +59,13 @@ test('the summary names what it hides by short names, and every kind or an older
   assert.equal(hiddenSummary(['names', 'phones'], {}), null);
   assert.equal(hiddenList(['names'], { addresses: 'addresses' }), null);
   assert.equal(hiddenSummary(null, {}), 'all 6 kinds');
+});
+
+test('a line too narrow for the names says how many: 4 of 6 kinds, or all 6 kinds', () => {
+  assert.equal(hiddenCount(['names', 'addresses', 'phones', 'emails']), '4 of 6 kinds');
+  assert.equal(hiddenCount(['names']), '1 of 6 kinds');
+  assert.equal(hiddenCount([...REDACTION_CATEGORIES]), 'all 6 kinds');
+  assert.equal(hiddenCount(null), 'all 6 kinds');
 });
 
 test('one kind toggles on and off in the server order, and the last one stays on', () => {

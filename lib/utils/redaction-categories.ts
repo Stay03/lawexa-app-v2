@@ -60,6 +60,13 @@ export function hiddenSummary(categories: readonly RedactionCategory[] | null, l
   return hiddenList(categories, labels);
 }
 
+/** The same as a count, for a line too narrow for the names: "4 of 6 kinds", or "all 6 kinds". */
+export function hiddenCount(categories: readonly RedactionCategory[] | null): string {
+  const total = REDACTION_CATEGORIES.length;
+  const count = categories === null ? total : orderedCategories(categories).length;
+  return count === total || count === 0 ? `all ${total} kinds` : `${count} of ${total} kinds`;
+}
+
 /** Turn one kind on or off, keeping at least one on: the last one cannot be turned off. */
 export function toggleCategory(current: readonly RedactionCategory[], key: RedactionCategory): RedactionCategory[] {
   const on = current.includes(key);
