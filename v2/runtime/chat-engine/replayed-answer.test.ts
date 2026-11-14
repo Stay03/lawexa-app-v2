@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
+import { answerAlreadyShown, textlessTerminalDraw, turnEndsWithError, withoutReplayedRows } from './replayed-answer';
 import type { EngineMessage } from './types';
 
 const at = new Date('2026-11-12T07:14:52Z');
@@ -66,4 +66,34 @@ test('completed checks for the saved answer before it draws one', () => {
     completed,
     /setMessages\(\(msgs\) => withoutReplayedRows\(msgs, heldAtConnect\)\);\s*handlers\.onCompleted\?\.\(event\);\s*return;/,
   );
+});
+
+// Fable's review of 1917ffeb (14 November 2026): a terminal without text drew
+// the transcript's answer whenever no placeholder was open, already on screen or not.
+const lost = (id: string): EngineMessage =>
+  ({ id, role: 'assistant', content: 'This confidential conversation has ended on this device.', timestamp: at, messageType: 'error', errorCode: 'TRANSCRIPT_LOST', retryable: false, retryAfterMs: null }) as unknown as EngineMessage;
+const SAVED = 'The document is still being read.';
+
+test('a terminal without text draws the saved answer only when the turn does not show it', () => {
+  // Shown already (live): nothing, whether or not the transcript can be read.
+  assert.equal(textlessTerminalDraw([user('u1'), tool('t1'), answer('a1')], SAVED), 'nothing');
+  assert.equal(textlessTerminalDraw([user('u1'), answer('a1')], null), 'nothing');
+  // Not shown yet: the saved answer.
+  assert.equal(textlessTerminalDraw([user('u1'), tool('t1')], SAVED), 'answer');
+  // A different, newer answer than the one on screen: drawn.
+  assert.equal(textlessTerminalDraw([user('u1'), { ...answer('a1'), content: 'An earlier draft.' }], SAVED), 'answer');
+  // The same words in an EARLIER turn do not count: the new question's answer is drawn.
+  assert.equal(textlessTerminalDraw([user('u0'), answer('a0'), user('u1')], SAVED), 'answer');
+  // A streaming row, a tool step or an error is not a shown answer.
+  assert.equal(textlessTerminalDraw([user('u1'), { ...answer('a1'), isStreaming: true }], null), 'lost');
+  assert.equal(textlessTerminalDraw([user('u1'), tool('t1'), lost('e1')], null), 'lost');
+});
+
+test('the same error last in the turn is drawn once; another error, or one in an earlier turn, is not the same', () => {
+  const message = 'This confidential conversation has ended on this device.';
+  assert.equal(turnEndsWithError([user('u1'), lost('e1')], message, 'TRANSCRIPT_LOST'), true);
+  assert.equal(turnEndsWithError([user('u1'), lost('e1')], message, 'UNKNOWN'), false);
+  assert.equal(turnEndsWithError([user('u1'), lost('e1')], 'Something went wrong', 'TRANSCRIPT_LOST'), false);
+  assert.equal(turnEndsWithError([user('u0'), lost('e0'), user('u1')], message, 'TRANSCRIPT_LOST'), false);
+  assert.equal(turnEndsWithError([user('u1'), lost('e1'), answer('a1')], message, 'TRANSCRIPT_LOST'), false);
 });

@@ -77,7 +77,7 @@ import type {
   StreamSmoothingConfig,
 } from './types';
 import { answerMessageId, stampAnswerId } from './answer-id';
-import { answerAlreadyShown, withoutReplayedRows } from './replayed-answer';
+import { answerAlreadyShown, textlessTerminalDraw, turnEndsWithError, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
 import { answersPayload, cardRefusalSentence, withCardFromCompleted, withOpenCardClosed } from './question-card-rows';
 import { withSkillDraftFromCompleted, withSkillDraftStatus } from './skill-draft-rows';
@@ -608,7 +608,9 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     };
     setState((prev) => ({
       ...prev,
-      messages: [...prev.messages, message],
+      // The same error delivered again (the stream reconnecting on its own
+      // between the terminal and `end`) is drawn once.
+      messages: turnEndsWithError(prev.messages, errorMsg, errorCode) ? prev.messages : [...prev.messages, message],
       error: null,
       isStreaming: false,
       isCancelling: false,
@@ -1688,45 +1690,38 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // blank bubble.
       if (event.replayable === false && confidential && convId) {
         void (async () => {
+          let savedAnswer: string | null = null;
           try {
             const transcript = await getTranscript(convId);
-            const lastAssistant = transcript?.messages
-              .filter((m) => m.role === 'assistant')
-              .slice(-1)[0];
-            if (lastAssistant && lastAssistant.content) {
-              const placeholderId = streamingMessageId;
-              if (placeholderId) {
-                const trace = takeReasoning(placeholderId);
-                setMessages((msgs) =>
-                  msgs.map((m) =>
-                    m.id === placeholderId
-                      ? { ...m, content: lastAssistant.content, isStreaming: false, ...trace }
-                      : m,
-                  ),
-                );
-                clearText(placeholderId);
-                messageIdToIteration.delete(placeholderId);
-                streamingMessageId = null;
-                currentIteration = null;
-              } else {
-                addAssistantMessage(lastAssistant.content);
-              }
-            } else {
-              addErrorMessage(
-                'This confidential conversation has ended on this device.',
-                'TRANSCRIPT_LOST',
-                false,
-                null,
-              );
-            }
+            savedAnswer =
+              transcript?.messages.filter((m) => m.role === 'assistant').slice(-1)[0]?.content || null;
           } catch {
-            addErrorMessage(
-              'This confidential conversation has ended on this device.',
-              'TRANSCRIPT_LOST',
-              false,
-              null,
-            );
+            savedAnswer = null;
           }
+          const lostLine = () =>
+            addErrorMessage('This confidential conversation has ended on this device.', 'TRANSCRIPT_LOST', false, null);
+          const placeholderId = streamingMessageId;
+          if (placeholderId) {
+            if (!savedAnswer) {
+              lostLine();
+              return;
+            }
+            const answer = savedAnswer;
+            const trace = takeReasoning(placeholderId);
+            setMessages((msgs) =>
+              msgs.map((m) => (m.id === placeholderId ? { ...m, content: answer, isStreaming: false, ...trace } : m)),
+            );
+            clearText(placeholderId);
+            messageIdToIteration.delete(placeholderId);
+            streamingMessageId = null;
+            currentIteration = null;
+            return;
+          }
+          // No answer streaming: draw it only if the turn does not show it
+          // already (a terminal delivered twice drew it twice).
+          const draw = textlessTerminalDraw(state.messages, savedAnswer);
+          if (draw === 'answer' && savedAnswer) addAssistantMessage(savedAnswer);
+          else if (draw === 'lost') lostLine();
         })();
         handlers.onCompleted?.(event);
         return;

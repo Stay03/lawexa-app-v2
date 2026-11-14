@@ -43,3 +43,65 @@ export function withoutReplayedRows(
 ): EngineMessage[] {
   return rows.filter((row) => heldAtConnect.has(row.id) || row.role === 'user' || row.role === 'event');
 }
+
+/** The rows of the turn on screen: everything after the last question. */
+function currentTurn(rows: readonly EngineMessage[]): readonly EngineMessage[] {
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (rows[i].role === 'user') return rows.slice(i + 1);
+  }
+  return rows;
+}
+
+/** The text of the turn's last finished answer row (not a tool step, a handover, a narration or an error), or null. */
+function shownAnswer(rows: readonly EngineMessage[]): string | null {
+  const turn = currentTurn(rows);
+  for (let i = turn.length - 1; i >= 0; i -= 1) {
+    const row = turn[i];
+    if (row.role !== 'assistant' || ('messageType' in row && row.messageType) || row.isStreaming) continue;
+    return row.content.trim() ? row.content : null;
+  }
+  return null;
+}
+
+/**
+ * What a terminal WITHOUT TEXT draws when no answer is streaming (Fable's
+ * review of 1917ffeb, 14 November 2026). A confidential chat's terminal
+ * rebuilt from the database carries no text (`replayable: false`), so the
+ * engine reads the answer from the device's transcript. It used to append it
+ * as a new row whenever no placeholder was open, with no look at the screen;
+ * a terminal delivered twice (a late follow, or the stream's own reconnect
+ * between `completed` and `end`) drew the answer twice. Stored chats are
+ * spared by `answerAlreadyShown`, keyed on saved ids a confidential chat
+ * never has, so this compares what the turn shows:
+ * - `answer`: the transcript's answer is not on screen yet, draw it;
+ * - `nothing`: the turn already shows it (or shows an answer and the
+ *   transcript cannot be read: the chat has not ended on this device);
+ * - `lost`: no answer anywhere, say the conversation ended on this device.
+ */
+export function textlessTerminalDraw(
+  rows: readonly EngineMessage[],
+  savedAnswer: string | null,
+): 'answer' | 'nothing' | 'lost' {
+  const shown = shownAnswer(rows);
+  if (savedAnswer && savedAnswer.trim()) {
+    return shown !== null && shown.trim() === savedAnswer.trim() ? 'nothing' : 'answer';
+  }
+  return shown !== null ? 'nothing' : 'lost';
+}
+
+/**
+ * Whether the turn already ends with this error. A terminal error delivered
+ * again (the stream reconnecting on its own after a drop) drew a second error
+ * row in any chat; the same error, last in the turn, is drawn once.
+ */
+export function turnEndsWithError(rows: readonly EngineMessage[], content: string, errorCode: string): boolean {
+  const last = currentTurn(rows).at(-1);
+  return (
+    last !== undefined &&
+    last.role === 'assistant' &&
+    'messageType' in last &&
+    last.messageType === 'error' &&
+    last.errorCode === errorCode &&
+    last.content === content
+  );
+}
