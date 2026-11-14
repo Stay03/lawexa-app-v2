@@ -6,6 +6,17 @@
 export const CARD_GAP_PX = 12;
 
 /**
+ * The held stack's ceiling: the visible screen less the chat's top bar and a
+ * strip of the chat above the card. In the held stack this is the card's only
+ * cap, so a phone's keyboard, which shrinks the visible screen on Android
+ * (`interactive-widget=resizes-content`, app/v2/layout.tsx), shrinks the
+ * stack with it: the card gives up its choices first and its question stays
+ * in reach (Fable's second review). A locked height taller than this is cut
+ * to it; on a desktop it never binds.
+ */
+export const STACK_MAX_HEIGHT = 'calc(100dvh - 7rem)';
+
+/**
  * THE CARD STAYS STILL WHEN THE BOX OPENS UNDER IT (Stay, 14 November 2026:
  * "jumpy and buggy when i go from one option to type my answer"; Fable's
  * review of abe2948c). The dock sits on the bottom of the screen, so the

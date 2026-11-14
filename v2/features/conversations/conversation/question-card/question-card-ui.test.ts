@@ -128,7 +128,7 @@ test('"Type my own answer" makes the box the field: the card sits on it, and its
   assert.doesNotMatch(questions, /Something else/);
   // While the box takes the words the card is flush on it (no gap, no bottom corners or border); otherwise it stands alone.
   // Alone, it keeps the box's 12px under it (mb-3), so it sits where the box sits.
-  assert.match(questions, /'mx-4 flex max-h-\[60dvh\] flex-col overflow-hidden border border-border bg-card',\s*ownChosen \? 'rounded-t-3xl border-b-0' : 'mb-3 rounded-3xl',/);
+  assert.match(questions, /'mx-4 flex flex-col overflow-hidden border border-border bg-card',\s*ownChosen \? 'rounded-t-3xl border-b-0' : 'mb-3 rounded-3xl',/);
   assert.match(read(conversation, 'ConversationComposer.tsx'), /joinedAbove=\{joinedAbove\}/);
   // The jurisdiction row steps away: nothing sits between the card and the box.
   assert.match(read(conversation, 'ConversationComposer.tsx'), /const showMeta = showMetaProp && !joinedAbove;/);

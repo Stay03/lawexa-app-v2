@@ -34,6 +34,19 @@ export const OWN_ANSWER_LABEL = 'Type my own answer';
 const UNCHOSEN_HOVER = 'hover:bg-foreground/[0.015]';
 
 /** The scrolling choices' top edge, faded over 20px while the card is shorter for the box. */
+/**
+ * Scroll the choices just enough to show `row`, nearest edge first: a refused
+ * answer's line under the row stays below it rather than pushing it out of view
+ * (Fable's second review).
+ */
+function showRow(list: HTMLElement, row: HTMLElement): void {
+  const room = list.getBoundingClientRect();
+  const place = row.getBoundingClientRect();
+  const padding = parseFloat(getComputedStyle(list).paddingBottom);
+  if (place.bottom + padding > room.bottom) list.scrollTop += place.bottom + padding - room.bottom;
+  else if (place.top < room.top) list.scrollTop -= room.top - place.top;
+}
+
 const SCROLL_TOP_FADE = '[mask-image:linear-gradient(to_bottom,transparent,black_20px)]';
 
 /** The longest own answer the server takes for one question (Backend's 13566521). */
@@ -113,6 +126,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack,
   const [refused, setRefused] = useState<string | null>(null);
   // The reader's own draft from the box, set aside while the box answers a question; null when it does not.
   const replyDraft = useRef<string | null>(null);
+  const cardRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const questionRef = useRef<HTMLParagraphElement>(null);
 
@@ -161,26 +175,39 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack,
   // had when the box opened, and that may be another question's (Back from a
   // shorter one) or too little for the reader's words. Whenever the choices
   // are left less room than the chosen row needs, the stack grows by exactly
-  // that much, before the frame paints: the card's top moves only when the
-  // row would otherwise be hidden.
+  // that much: the card's top moves only when the row would otherwise be
+  // hidden. The shortfall counts the card's own overflow too, so a box that
+  // grows by more than the list in one step (a paste) never clips the
+  // question (Fable's second review).
   const boxRoom = ownChosen && stackLocked;
-  const keepChosenRow = useEffectEvent(() => {
+  const keepChosenRow = useEffectEvent((fromObserver: boolean) => {
+    const card = cardRef.current;
     const list = listRef.current;
     const row = list?.querySelector<HTMLElement>(`[data-option="${optionCount}"]`);
-    if (!list || !row) return;
+    if (!card || !list || !row) return;
     const style = getComputedStyle(list);
-    const short = row.offsetHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) - list.clientHeight;
+    const rowRoom = row.offsetHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    const short = Math.max(rowRoom - list.clientHeight, 0) + (card.scrollHeight - card.clientHeight);
     const height = stack.current?.getBoundingClientRect().height;
-    if (short > 0.5 && height !== undefined) onStackLock(Math.ceil(height + short));
-    list.scrollTop = list.scrollHeight;
+    if (short > 0.5 && height !== undefined) {
+      const grow = () => onStackLock(Math.ceil(height + short));
+      // Before paint either way: a layout effect's update commits before the
+      // frame, and an observer's (it runs after layout, before paint) is
+      // committed at once with flushSync.
+      if (fromObserver) flushSync(grow);
+      else grow();
+    }
+    showRow(list, row);
   });
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!boxRoom || !list) return;
-    keepChosenRow();
-    // The reader's words grow the box, which takes room from the choices.
-    const watch = new ResizeObserver(() => keepChosenRow());
+    keepChosenRow(false);
+    // The reader's words grow the box, which takes room from the choices (and,
+    // past them, from the card itself).
+    const watch = new ResizeObserver(() => keepChosenRow(true));
     watch.observe(list);
+    if (cardRef.current) watch.observe(cardRef.current);
     return () => watch.disconnect();
   }, [boxRoom, index]);
 
@@ -291,6 +318,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack,
 
   return (
     <section
+      ref={cardRef}
       aria-label="Lawexa's questions"
       // Flush on the box while it takes the reader's words: no gap, and no
       // corners or border where the two meet; in the held stack it takes the
@@ -298,9 +326,11 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack,
       // Otherwise the box is folded away and the card stands alone, with the
       // space under it the box has (CARD_GAP_PX).
       className={cn(
-        'mx-4 flex max-h-[60dvh] flex-col overflow-hidden border border-border bg-card',
+        'mx-4 flex flex-col overflow-hidden border border-border bg-card',
         ownChosen ? 'rounded-t-3xl border-b-0' : 'mb-3 rounded-3xl',
-        boxRoom && 'min-h-0 flex-1',
+        // In the held stack the stack is the one cap (its max-height follows the
+        // visible screen, so a keyboard that shrinks it shrinks the card too).
+        boxRoom ? 'min-h-0 flex-1' : 'max-h-[60dvh]',
       )}
     >
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-3">

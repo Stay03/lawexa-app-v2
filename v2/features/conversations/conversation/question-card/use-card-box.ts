@@ -5,7 +5,7 @@ import { useEffect, useState, type CSSProperties, type RefObject } from 'react';
 import type { BoxAnswering } from '@/lib/utils/question-card';
 import type { MessageAttachment } from '@/types/chat';
 import type { SendRefused } from '../space-turn';
-import { lockSurvivesResize } from './card-height';
+import { lockSurvivesResize, STACK_MAX_HEIGHT } from './card-height';
 import type { OpenCard } from './open-card';
 import type { QuestionDockHandle } from './QuestionDock';
 
@@ -31,6 +31,12 @@ export function useCardBox(open: OpenCard | null, dock: RefObject<QuestionDockHa
   const [state, setState] = useState<{ card: string; answering: BoxAnswering } | null>(null);
   const [lock, setLock] = useState<{ card: string; height: number } | null>(null);
   const card = open ? openCardKey(open) : null;
+  // A card that closes takes its answering box and its lock with it, so the
+  // same card coming back (null, then the same key) starts folded and free.
+  if (card === null && (state !== null || lock !== null)) {
+    setState(null);
+    setLock(null);
+  }
   const answering = state !== null && state.card === card ? state.answering : null;
   const stackLock = lock !== null && lock.card === card ? lock.height : null;
 
@@ -57,7 +63,8 @@ export function useCardBox(open: OpenCard | null, dock: RefObject<QuestionDockHa
   const answer = (message: string, attachments: MessageAttachment[]): Promise<SendRefused | undefined> =>
     dock.current ? dock.current.answer(message, attachments) : Promise.resolve({ refused: '' });
 
-  const stackStyle: CSSProperties | undefined = stackLock !== null ? { height: stackLock } : undefined;
+  const stackStyle: CSSProperties | undefined =
+    stackLock !== null ? { height: stackLock, maxHeight: STACK_MAX_HEIGHT } : undefined;
 
   return { answering, onBoxAnswering, answer, stackStyle, stackLocked: stackLock !== null, onStackLock };
 }
