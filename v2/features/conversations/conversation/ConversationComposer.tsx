@@ -420,7 +420,8 @@ export function ConversationComposer({
         setInput(text);
         return input;
       },
-      focus: () => rootRef.current?.querySelector('textarea')?.focus(),
+      // The box is in the dock, always in view: focus without scrolling the page (a question card's box, Stay: "jumpy").
+      focus: () => rootRef.current?.querySelector('textarea')?.focus({ preventScroll: true }),
     }),
     [setInput, updateInput, setReply, input],
   );

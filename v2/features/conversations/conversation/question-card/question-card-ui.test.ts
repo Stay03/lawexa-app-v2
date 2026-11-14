@@ -89,7 +89,8 @@ test('a card docks above either box, and the box waits folded until "Type my own
   const fold = read(here, 'CardBoxFold.tsx');
   assert.match(fold, /inert=\{folded\}/);
   assert.match(fold, /folded \? 'grid-rows-\[0fr\] opacity-0' : 'grid-rows-\[1fr\] opacity-100'/);
-  assert.match(dock(), /if \(boxState !== null && focus\) flushSync\(\(\) => onBoxAnswering\(boxState\)\);\s*else onBoxAnswering\(boxState\);\s*if \(at !== null && focus\) box\.current\?\.focus\(\);/);
+  // The box opens with the card's height in one flush, before the focus (question-card-steady.test.ts).
+  assert.match(dock(), /flushSync\(\(\) => \{\s*setBoxHeightLock\(lock\);\s*onBoxAnswering\(boxState\);\s*\}\);[\s\S]{0,200}?if \(at !== null && focus\) box\.current\?\.focus\(\);/);
   // On a phone the card is capped and scrolls inside.
   assert.match(dock(), /max-h-\[60dvh\]/);
 });
@@ -126,7 +127,8 @@ test('"Type my own answer" makes the box the field: the card sits on it, and its
   assert.match(questions, /\{OWN_ANSWER_LABEL\}/);
   assert.doesNotMatch(questions, /Something else/);
   // While the box takes the words the card is flush on it (no gap, no bottom corners or border); otherwise it stands alone.
-  assert.match(questions, /'mx-4 flex max-h-\[60dvh\] flex-col overflow-hidden border border-border bg-card',\s*ownChosen \? 'rounded-t-3xl border-b-0' : 'rounded-3xl',/);
+  // Alone, it keeps the box's 12px under it (mb-3), so it sits where the box sits.
+  assert.match(questions, /'mx-4 flex max-h-\[60dvh\] flex-col overflow-hidden border border-border bg-card',\s*ownChosen \? 'rounded-t-3xl border-b-0' : 'mb-3 rounded-3xl',/);
   assert.match(read(conversation, 'ConversationComposer.tsx'), /joinedAbove=\{joinedAbove\}/);
   // The jurisdiction row steps away: nothing sits between the card and the box.
   assert.match(read(conversation, 'ConversationComposer.tsx'), /const showMeta = showMetaProp && !joinedAbove;/);

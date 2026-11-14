@@ -2,7 +2,7 @@
 
 import { useImperativeHandle, useRef, useState, type KeyboardEvent, type Ref, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
-import { PenLine, X } from 'lucide-react';
+import { ChevronLeft, PenLine, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -18,6 +18,7 @@ import type { MessageAttachment, QuestionCardAnswer } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules/meta';
 import type { ConversationComposerHandle } from '../ConversationComposer';
 import type { SendRefused } from '../space-turn';
+import { heightWithBox } from './card-height';
 import type { OpenCard } from './open-card';
 
 /** The choice that opens the box for the reader's own words (Stay, 14 November 2026: renamed from its first wording). */
@@ -104,6 +105,10 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
   const [refused, setRefused] = useState<string | null>(null);
   // The reader's own draft from the box, set aside while the box answers a question; null when it does not.
   const replyDraft = useRef<string | null>(null);
+  // While the box is open under the card: the card's height, so the two stand where the card stood (heightWithBox).
+  const [boxHeightLock, setBoxHeightLock] = useState<number | null>(null);
+  const cardRef = useRef<HTMLElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const question = questions[index];
   const draft = drafts[index] ?? null;
@@ -129,11 +134,26 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
     if (at === null) replyDraft.current = null;
     // The box is folded away until it answers (CardBoxFold): it opens at once,
     // so the focus below lands, inside the tap, and a phone raises its keyboard.
+    // Opening, the card gives the box its height (heightWithBox), so nothing
+    // above moves; folding again, the card takes it back.
     const boxState = at === null ? null : boxAnsweringFor(at, count);
-    if (boxState !== null && focus) flushSync(() => onBoxAnswering(boxState));
-    else onBoxAnswering(boxState);
+    const lock = boxState === null ? null : answering ? boxHeightLock : measuredLock();
+    flushSync(() => {
+      setBoxHeightLock(lock);
+      onBoxAnswering(boxState);
+    });
+    // The chosen row is the last: keep it in view in the shorter card.
+    if (lock !== null && listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
     if (at !== null && focus) box.current?.focus();
     return answering ? previous : null;
+  };
+
+  /** The card's height with the box open, measured on the folded box (its content keeps its height), or null. */
+  const measuredLock = (): number | null => {
+    const card = cardRef.current;
+    const fold = card?.parentElement?.querySelector<HTMLElement>(':scope > [data-card-box-folded] > div');
+    if (!card || !fold) return null;
+    return heightWithBox(card.getBoundingClientRect().height, fold.scrollHeight);
   };
 
   /** Keep the words the box held as question `at`'s own answer. */
@@ -243,33 +263,53 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
 
   return (
     <section
+      ref={cardRef}
       aria-label="Lawexa's questions"
       // Flush on the box while it takes the reader's words: no gap, and no
-      // corners or border where the two meet. Otherwise the box is folded away
-      // and the card stands alone.
+      // corners or border where the two meet, at the height that keeps its top
+      // still. Otherwise the box is folded away and the card stands alone, with
+      // the space under it the box has (CARD_GAP_PX).
       className={cn(
         'mx-4 flex max-h-[60dvh] flex-col overflow-hidden border border-border bg-card',
-        ownChosen ? 'rounded-t-3xl border-b-0' : 'rounded-3xl',
+        ownChosen ? 'rounded-t-3xl border-b-0' : 'mb-3 rounded-3xl',
       )}
+      style={ownChosen && boxHeightLock !== null ? { height: boxHeightLock } : undefined}
     >
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-3">
         {count > 1 ? (
-          <div className="flex items-center gap-1.5" role="group" aria-label={`Question ${index + 1} of ${count}`}>
-            {questions.map((step, at) => (
+          <div className="flex items-center gap-2">
+            {/* Back to the question before, its answer kept (Stay, 14 November 2026). */}
+            {index > 0 ? (
               <button
-                key={at}
                 type="button"
-                aria-label={`Question ${at + 1}: ${step.question}`}
-                aria-current={at === index ? 'step' : undefined}
-                disabled={locked || at > reached || at === index}
-                onClick={() => goTo(at)}
+                disabled={locked}
+                onClick={() => goTo(index - 1)}
                 className={cn(
-                  'v2-interactive h-1.5 rounded-full transition-all disabled:cursor-default',
-                  at === index ? 'w-4 bg-primary' : at <= reached ? 'w-1.5 bg-primary/50' : 'w-1.5 bg-border',
+                  'v2-interactive -ml-1.5 flex items-center gap-0.5 rounded-md py-1 pr-1.5 pl-1 text-[13px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40',
                   FOCUS_RING,
                 )}
-              />
-            ))}
+              >
+                <ChevronLeft aria-hidden className="size-4" />
+                Back
+              </button>
+            ) : null}
+            <div className="flex items-center gap-1.5" role="group" aria-label={`Question ${index + 1} of ${count}`}>
+              {questions.map((step, at) => (
+                <button
+                  key={at}
+                  type="button"
+                  aria-label={`Question ${at + 1}: ${step.question}`}
+                  aria-current={at === index ? 'step' : undefined}
+                  disabled={locked || at > reached || at === index}
+                  onClick={() => goTo(at)}
+                  className={cn(
+                    'v2-interactive h-1.5 rounded-full transition-all disabled:cursor-default',
+                    at === index ? 'w-4 bg-primary' : at <= reached ? 'w-1.5 bg-primary/50' : 'w-1.5 bg-border',
+                    FOCUS_RING,
+                  )}
+                />
+              ))}
+            </div>
           </div>
         ) : (
           <span />
@@ -285,7 +325,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
         </button>
       </div>
 
-      <div className={cn('min-h-0 overflow-y-auto overscroll-y-contain px-4 pt-2', ownChosen && 'pb-3')}>
+      <div ref={listRef} className={cn('min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-2', ownChosen && 'pb-3')}>
         <p className="text-[15px] font-semibold leading-snug text-foreground">{question.question}</p>
         {question.why && <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{question.why}</p>}
         <div
