@@ -325,14 +325,18 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
         </button>
       </div>
 
-      <div ref={listRef} className={cn('min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-2', ownChosen && 'pb-3')}>
+      {/* The question stays in view; only the choices scroll, when the card
+          gives the box its height (heightWithBox). */}
+      <div className="shrink-0 px-4 pt-2">
         <p className="text-[15px] font-semibold leading-snug text-foreground">{question.question}</p>
         {question.why && <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{question.why}</p>}
+      </div>
+      <div ref={listRef} className={cn('min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-1.5', ownChosen && 'pb-3')}>
         <div
           role="radiogroup"
           aria-label={question.question}
           onKeyDown={onChoiceKey}
-          className="mt-1.5 flex flex-col"
+          className="flex flex-col"
         >
           {question.options.map((option, at) => {
             const chosen = choiceAt === at;

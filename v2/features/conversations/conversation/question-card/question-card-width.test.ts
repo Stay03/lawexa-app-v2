@@ -24,7 +24,9 @@ test("while a card is open the dock is the chat column's width on a phone and th
 
 test('the option rows are compact: less padding, no gap between rows, the hint under its label', () => {
   const card = read('v2', 'features', 'conversations', 'conversation', 'question-card', 'QuestionDock.tsx');
-  assert.match(card, /className="mt-1\.5 flex flex-col"/);
+  // The group's top space is the scrolling list's pt-1.5 since the question stays out of the scroll (14 November 2026).
+  assert.match(card, /role="radiogroup"[\s\S]{0,120}?className="flex flex-col"/);
+  assert.match(card, /'min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-1\.5'/);
   assert.match(card, /'v2-interactive flex w-full items-start gap-2\.5 rounded-xl px-2 py-1\.5 text-left/);
   assert.match(card, /<span className="block text-\[12\.5px\] leading-snug text-muted-foreground">\{option\.description\}<\/span>/);
   assert.doesNotMatch(card, /py-2 text-left/);
