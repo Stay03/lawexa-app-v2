@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { ReadVsUnreadPoint } from '@/types/notification';
-import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface ReadVsUnreadChartProps {
   data: ReadVsUnreadPoint[];
@@ -69,6 +69,7 @@ export function ReadVsUnreadChart({ data }: ReadVsUnreadChartProps) {
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

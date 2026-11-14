@@ -18,7 +18,7 @@ import { formatCost } from '@/lib/utils/currency';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { UserDailyCostPoint, ViewAnalyticsGranularity } from '@/types/admin';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface DailyCostChartProps {
   data: UserDailyCostPoint[];
@@ -70,6 +70,7 @@ export function DailyCostChart({ data, granularity }: DailyCostChartProps) {
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

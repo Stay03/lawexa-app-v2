@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card';
 import { TrendingUp } from 'lucide-react';
 import { formatNaira } from '@/lib/utils/currency';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 import {
   compactMoney,
   fullMoney,
@@ -106,6 +106,7 @@ export function MrrTrendChart({ data, granularity }: MrrTrendChartProps) {
                   <CartesianGrid vertical={false} />
                   <XAxis
                     dataKey="date"
+                    ticks={hourlyTicks(group.items.map((point) => point.date), spansDays)}
                     tickLine={false}
                     axisLine={false}
                     tickMargin={8}

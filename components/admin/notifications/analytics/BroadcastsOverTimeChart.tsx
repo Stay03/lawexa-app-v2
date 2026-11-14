@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { BroadcastsOverTimePoint } from '@/types/notification';
-import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface BroadcastsOverTimeChartProps {
   data: BroadcastsOverTimePoint[];
@@ -71,6 +71,7 @@ export function BroadcastsOverTimeChart({
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

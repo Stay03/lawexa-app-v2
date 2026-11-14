@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Receipt } from 'lucide-react';
 import { formatNaira } from '@/lib/utils/currency';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 import type { MessagePackRevenueOverTimePoint } from '@/types/admin';
 
 /******************************************************************************
@@ -77,6 +77,7 @@ export function MessagePackRevenueChart({
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

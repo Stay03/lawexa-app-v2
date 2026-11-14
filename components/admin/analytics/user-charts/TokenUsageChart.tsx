@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { UserTokenUsagePoint, ViewAnalyticsGranularity } from '@/types/admin';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface TokenUsageChartProps {
   data: UserTokenUsagePoint[];
@@ -60,6 +60,7 @@ export function TokenUsageChart({ data, granularity }: TokenUsageChartProps) {
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

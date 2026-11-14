@@ -21,7 +21,7 @@ import type {
   FileStorageOverTimePoint,
   FileAnalyticsGranularity,
 } from '@/types/admin-files';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface StorageOverTimeChartProps {
   data: FileStorageOverTimePoint[];
@@ -73,6 +73,7 @@ export function StorageOverTimeChart({
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

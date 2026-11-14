@@ -20,7 +20,7 @@ import type {
   BotCrawlsOverTimePoint,
   ViewAnalyticsGranularity,
 } from '@/types/admin';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface BotCrawlsOverTimeChartProps {
   data: BotCrawlsOverTimePoint[];
@@ -76,6 +76,7 @@ export function BotCrawlsOverTimeChart({
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

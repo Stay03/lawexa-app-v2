@@ -52,6 +52,20 @@ export function bucketsSpanDays(values: readonly string[]): boolean {
 }
 
 /**
+ * The axis ticks for an hourly range across midnight: every third hour, so
+ * midnight is always one of them and the day change is always labelled. Left
+ * to itself the chart drops ticks that crowd the axis, and the wider "Sun 12
+ * AM" was the one it dropped. Undefined otherwise: the chart picks its own.
+ */
+export function hourlyTicks(values: readonly string[], spansDays: boolean): string[] | undefined {
+  if (!spansDays) return undefined;
+  return values.filter((value) => {
+    const hour = parseBucket(value)?.hour;
+    return hour != null && hour % 3 === 0;
+  });
+}
+
+/**
  * An axis tick. Hourly: the hour ("2 PM"); where the range crosses midnight,
  * the midnight point also names its day ("Sat 12 AM"), so the two days read
  * apart. Daily: "Nov 14".

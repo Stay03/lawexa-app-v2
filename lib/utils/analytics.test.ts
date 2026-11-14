@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel, parseBucket } from './analytics';
+import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks, parseBucket } from './analytics';
 
 /* The admin charts' time axis (Backend's analytics-time-of-day, 14 November
  * 2026): hourly points are "Y-m-d H:00", so two days' same hour stay apart.
@@ -50,4 +50,17 @@ test('a series with no granularity of its own reads it off its keys', () => {
   assert.equal(bucketGranularity(['2026-11-14 23:00', '2026-11-15 00:00']), 'hour');
   assert.equal(bucketGranularity(['2026-11-14', '2026-11-15']), 'day');
   assert.equal(bucketGranularity([]), 'day');
+});
+
+test('across midnight the axis ticks every third hour, so midnight is always labelled', () => {
+  const day = Array.from({ length: 24 }, (_, i) => {
+    const hour = (10 + i) % 24;
+    return `2026-11-${10 + i < 24 ? 14 : 15} ${String(hour).padStart(2, '0')}:00`;
+  });
+  assert.deepEqual(hourlyTicks(day, true), [
+    '2026-11-14 12:00', '2026-11-14 15:00', '2026-11-14 18:00', '2026-11-14 21:00',
+    '2026-11-15 00:00', '2026-11-15 03:00', '2026-11-15 06:00', '2026-11-15 09:00',
+  ]);
+  // Within one day, or daily, the chart picks its own.
+  assert.equal(hourlyTicks(day, false), undefined);
 });

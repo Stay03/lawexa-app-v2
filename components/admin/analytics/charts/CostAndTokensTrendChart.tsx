@@ -20,7 +20,7 @@ import {
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
 import type { CostAndTokensTrendPoint } from '@/types/admin';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface CostAndTokensTrendChartProps {
   data: CostAndTokensTrendPoint[];
@@ -100,6 +100,7 @@ export function CostAndTokensTrendChart({
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}

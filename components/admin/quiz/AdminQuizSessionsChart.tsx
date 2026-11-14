@@ -7,7 +7,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
-import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 import type {
   AdminQuizGranularity,
   AdminQuizSessionsPoint,
@@ -44,6 +44,7 @@ export function AdminQuizSessionsChart({
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="date"
+          ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
           tickLine={false}
           axisLine={false}
           tickMargin={8}

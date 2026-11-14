@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import type { LawyerConnectRequestsOverTimePoint } from '@/types/admin-lawyer-connect';
-import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel } from '@/lib/utils/analytics';
+import { bucketGranularity, bucketsSpanDays, formatDateTick, formatDateTooltipLabel, hourlyTicks } from '@/lib/utils/analytics';
 
 interface LawyerConnectRequestsChartProps {
   data: LawyerConnectRequestsOverTimePoint[];
@@ -61,6 +61,7 @@ export function LawyerConnectRequestsChart({ data }: LawyerConnectRequestsChartP
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="date"
+              ticks={hourlyTicks(data.map((point) => point.date), spansDays)}
               tickLine={false}
               axisLine={false}
               tickMargin={8}
