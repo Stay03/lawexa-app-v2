@@ -85,7 +85,7 @@ test('a terminal without text draws the saved answer only when the turn does not
   // The same words in an EARLIER turn do not count: the new question's answer is drawn.
   assert.equal(textlessTerminalDraw([user('u0'), answer('a0'), user('u1')], SAVED), 'answer');
   // A streaming row, a tool step or an error is not a shown answer.
-  assert.equal(textlessTerminalDraw([user('u1'), { ...answer('a1'), isStreaming: true }], null), 'lost');
+  assert.equal(textlessTerminalDraw([user('u1'), { ...answer('a1'), isStreaming: true } as EngineMessage], null), 'lost');
   assert.equal(textlessTerminalDraw([user('u1'), tool('t1'), lost('e1')], null), 'lost');
 });
 
