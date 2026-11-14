@@ -13,13 +13,15 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import type { RedactionCategory } from '@/types/redaction';
 import { FitText } from './FitText';
+import { redactionDefaultKey } from './redaction-default-cache';
 import { LAST_KIND_NOTE } from './what-to-hide-copy';
 
 /** The person's current choice of what a new redacted chat hides (the server's default), per signed-in person. */
 export const redactionDefaultQuery = (userId: number | null) =>
   queryOptions({
-    queryKey: ['redaction-default', userId] as const,
+    queryKey: redactionDefaultKey(userId),
     queryFn: redactionDefaultApi.get,
+    // Kept a while, and set from each redacted chat's choice when it starts (settleRedactionDefault).
     staleTime: 5 * 60_000,
   });
 
@@ -89,6 +91,8 @@ export function RedactionChoice({
       <button
         type="button"
         disabled={disabled || chosen === null}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         onClick={() => setOpen(true)}
         className="v2-interactive flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium text-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
       >

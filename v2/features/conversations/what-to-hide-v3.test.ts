@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { QueryClient } from '@tanstack/react-query';
+
+import { hiddenCount, hiddenSummary, toggleCategory } from '@/lib/utils/redaction-categories';
+import type { RedactionCategory, RedactionDefaultResponse } from '@/types/redaction';
+import { defaultAfterStart, redactionDefaultKey, settleRedactionDefault } from './redaction-default-cache';
 import { LAST_KIND_NOTE } from './what-to-hide-copy';
 
 /* "What to hide", V3 (Stay, 14 November 2026, thread cce2eafe): the six kinds
@@ -42,4 +47,59 @@ test('the sheet has no paragraph under its title, and keeps the last-kind note',
   const choice = read('v2', 'features', 'conversations', 'RedactionChoice.tsx');
   assert.doesNotMatch(choice, /description=|PERSON_1|Your next redacted chat starts with these/);
   assert.equal(LAST_KIND_NOTE, 'At least one kind stays hidden.');
+});
+
+/* Fable's review of V3 (14 November 2026): behaviour, not the source, wherever
+ * the suite can run it. TEST DATA only. */
+const ALL: RedactionCategory[] = ['names', 'addresses', 'phones', 'emails', 'identity', 'financial'];
+const OPTIONS = ALL.map((key) => ({ key, label: key, short_label: key, description: '' }));
+const answer = (categories: RedactionCategory[]): RedactionDefaultResponse => ({ success: true, data: { categories, options: OPTIONS } });
+
+test('after a redacted chat starts, the cached default is the choice it was sent with', () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(redactionDefaultKey(31), answer(ALL));
+  // Tick only names and send: the next redacted chat starts from names, not all six.
+  settleRedactionDefault(client, ['names']);
+  assert.deepEqual(client.getQueryData<RedactionDefaultResponse>(redactionDefaultKey(31))?.data.categories, ['names']);
+  // And it is read again from the server, which stays the one source.
+  assert.equal(client.getQueryState(redactionDefaultKey(31))?.isInvalidated, true);
+  client.clear();
+});
+
+test('a start that sent no choice leaves the default as the server keeps it', () => {
+  const kept = answer(['names', 'emails']);
+  assert.equal(defaultAfterStart(kept, undefined), kept);
+  assert.equal(defaultAfterStart(kept, []), kept);
+  assert.equal(defaultAfterStart(undefined, ['names']), undefined);
+  // The server's order, repeats and unknown keys dropped.
+  assert.deepEqual(defaultAfterStart(kept, ['emails', 'names', 'emails'])?.data.categories, ['names', 'emails']);
+  // The options are untouched.
+  assert.equal(defaultAfterStart(kept, ['phones'])?.data.options, kept.data.options);
+});
+
+test('the stale-default sequence: names only, then home again within five minutes, sends names only', () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  client.setQueryData(redactionDefaultKey(31), answer(ALL));
+  settleRedactionDefault(client, toggleCategory(toggleCategory(toggleCategory(toggleCategory(toggleCategory(ALL, 'addresses'), 'phones'), 'emails'), 'identity'), 'financial'));
+  // HomeComposer seeds the ticks from the cached default (pickedCategories ?? saved categories).
+  const seeded = client.getQueryData<RedactionDefaultResponse>(redactionDefaultKey(31))?.data.categories ?? null;
+  assert.deepEqual(seeded, ['names']);
+  assert.equal(hiddenSummary(seeded, { names: 'names' }), 'names');
+  assert.equal(hiddenCount(seeded), '1 of 6 kinds');
+  client.clear();
+});
+
+test('the last kind on cannot be turned off; any other toggles', () => {
+  assert.deepEqual(toggleCategory(['names'], 'names'), ['names']);
+  assert.deepEqual(toggleCategory(['names', 'emails'], 'names'), ['emails']);
+  assert.deepEqual(toggleCategory(['emails'], 'names'), ['names', 'emails']);
+  assert.equal(hiddenCount(ALL), 'all 6 kinds');
+  assert.equal(hiddenCount(['names', 'addresses', 'phones', 'emails']), '4 of 6 kinds');
+});
+
+test('startConversation settles the default for a redacted chat, and Change says it opens a dialog', () => {
+  assert.match(read('v2', 'features', 'conversations', 'start-conversation.ts'), /if \(redacted\) settleRedactionDefault\(deps\.queryClient, input\.redactionCategories\);/);
+  const choice = read('v2', 'features', 'conversations', 'RedactionChoice.tsx');
+  assert.match(choice, /aria-haspopup="dialog"\s+aria-expanded=\{open\}/);
+  assert.match(choice, /queryKey: redactionDefaultKey\(userId\),/);
 });

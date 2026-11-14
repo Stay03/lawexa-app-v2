@@ -19,6 +19,7 @@ import { spacesQueries } from '@/v2/features/spaces/queries';
 import { conversationsCache, makeOptimisticConversation } from './cache';
 import { renewRequestId, requestIdFor, settleRequestId, type FirstSend } from './first-send-id';
 import { conversationsQueries } from './queries';
+import { settleRedactionDefault } from './redaction-default-cache';
 
 /**
  * startConversation — the ONE create-a-conversation flow for v2, extracted so both
@@ -411,6 +412,8 @@ export async function startConversation(
       void deps.queryClient.invalidateQueries({ queryKey: spacesQueries.detailsOf(spaceUuid) });
       void deps.queryClient.invalidateQueries({ queryKey: spacesQueries.lists() });
     }
+    // A redacted chat's choice is now the person's default (redaction-default-cache.ts).
+    if (redacted) settleRedactionDefault(deps.queryClient, input.redactionCategories);
 
     settleRequestId(firstSend);
     return {
