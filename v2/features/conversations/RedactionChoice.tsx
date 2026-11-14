@@ -13,7 +13,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import type { RedactionCategory } from '@/types/redaction';
 import { FitText } from './FitText';
-import { LAST_KIND_NOTE, WHAT_TO_HIDE_NOTE } from './what-to-hide-copy';
+import { LAST_KIND_NOTE } from './what-to-hide-copy';
 
 /** The person's current choice of what a new redacted chat hides (the server's default), per signed-in person. */
 export const redactionDefaultQuery = (userId: number | null) =>
@@ -98,8 +98,8 @@ export function RedactionChoice({
       <ResponsiveOverlay
         open={open}
         onOpenChange={setOpen}
+        // No paragraph under the title: the tiles say it (Stay, 14 November 2026).
         title="What to hide"
-        description={WHAT_TO_HIDE_NOTE}
         size="content"
         // The page's 16px phone gutter (Techlead, 14 November 2026); the shared sheet's own is 8px.
         className="left-4 right-4"

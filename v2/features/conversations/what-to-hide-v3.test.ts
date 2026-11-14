@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { LAST_KIND_NOTE, WHAT_TO_HIDE_NOTE } from './what-to-hide-copy';
+import { LAST_KIND_NOTE } from './what-to-hide-copy';
 
 /* "What to hide", V3 (Stay, 14 November 2026, thread cce2eafe): the six kinds
  * as tiles in a sheet, and "don't ask to save default. What ever the user
@@ -24,7 +24,7 @@ test('the app never saves a default: no save call, no save control', () => {
 
 test('the sheet shows the six kinds as tiles, opens on the current default, and keeps one kind on', () => {
   const choice = read('v2', 'features', 'conversations', 'RedactionChoice.tsx');
-  assert.match(choice, /<ResponsiveOverlay\s+open=\{open\}\s+onOpenChange=\{setOpen\}\s+title="What to hide"\s+description=\{WHAT_TO_HIDE_NOTE\}/);
+  assert.match(choice, /<ResponsiveOverlay\s+open=\{open\}\s+onOpenChange=\{setOpen\}\s+\/\/[^\n]*\n\s*title="What to hide"\s+size="content"/);
   assert.match(choice, /<div role="group" aria-label="What to hide" className="grid grid-cols-2 gap-2">/);
   assert.match(choice, /role="checkbox"\s+aria-checked=\{on\}/);
   // The last kind on cannot be turned off, and says why.
@@ -37,8 +37,9 @@ test('the sheet shows the six kinds as tiles, opens on the current default, and 
   assert.match(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /redactionDefaultQuery\(/);
 });
 
-test('the sheet says what Lawexa reads and that the next redacted chat starts with these', () => {
-  assert.match(WHAT_TO_HIDE_NOTE, /\[PERSON_1\]/);
-  assert.match(WHAT_TO_HIDE_NOTE, /Your next redacted chat starts with these\.$/);
+test('the sheet has no paragraph under its title, and keeps the last-kind note', () => {
+  // Stay, 14 November 2026: "Remove the text under what to hide".
+  const choice = read('v2', 'features', 'conversations', 'RedactionChoice.tsx');
+  assert.doesNotMatch(choice, /description=|PERSON_1|Your next redacted chat starts with these/);
   assert.equal(LAST_KIND_NOTE, 'At least one kind stays hidden.');
 });
