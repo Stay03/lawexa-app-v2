@@ -22,6 +22,14 @@ import type { OpenCard } from './open-card';
 /** The message box's hint while Lawexa's questions wait: a typed reply goes instead of the answers. */
 export const CARD_ANSWER_PLACEHOLDER = 'Or type a different answer';
 
+/**
+ * The wash under the pointer on a row not chosen: a faint shade, far lighter
+ * than the chosen row's, so a row the pointer rests on never reads as chosen
+ * (Techlead, 14 November 2026). Tailwind's hover applies only where there is a
+ * pointer, so a tap leaves none.
+ */
+const UNCHOSEN_HOVER = 'hover:bg-foreground/[0.03]';
+
 /** The longest own answer the server takes for one question (Backend's 13566521). */
 export const OTHER_ANSWER_MAX = 2000;
 
@@ -290,7 +298,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
                 onClick={() => choose(at)}
                 className={cn(
                   'v2-interactive flex w-full items-start gap-3 rounded-xl px-2.5 py-2 text-left transition-colors disabled:cursor-default',
-                  chosen ? 'bg-muted' : 'hover:bg-muted/60',
+                  chosen ? 'bg-muted' : UNCHOSEN_HOVER,
                   FOCUS_RING,
                 )}
               >
@@ -318,7 +326,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
             onClick={() => choose(optionCount)}
             className={cn(
               'v2-interactive flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-[14.5px] transition-colors disabled:cursor-default',
-              ownChosen ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60 hover:text-foreground',
+              ownChosen ? 'bg-muted text-foreground' : cn('text-muted-foreground hover:text-foreground', UNCHOSEN_HOVER),
               FOCUS_RING,
             )}
           >
