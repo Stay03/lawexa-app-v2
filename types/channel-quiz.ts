@@ -750,6 +750,13 @@ export interface QuizGame {
   started_at: string | null;
   finished_at: string | null;
   cancelled_at: string | null;
+  /**
+   * When an unstarted lobby closes: ten minutes after the latest of going live
+   * and a player joining (Backend 851eb1ec, Arthur's choice B). An ISO stamp
+   * while the game is in its lobby, `null` once it has started or ended.
+   * Absent on a server before it. The join broadcast does not carry it.
+   */
+  lobby_closes_at?: string | null;
   /** Leaderboard order in the state envelope. */
   players?: QuizGamePlayer[];
   player_count?: number;

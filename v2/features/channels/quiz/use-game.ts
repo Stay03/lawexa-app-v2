@@ -25,6 +25,7 @@ import {
   isPlaying as isPlayingIn,
   isRevealedQuestion,
   isTerminalPhase,
+  pushedLobbyClose,
   type QuizGamePhase,
 } from './model';
 import { useCancelGame, useJoinGame, useStartGame, useSubmitAnswer } from './mutations';
@@ -561,9 +562,15 @@ export function useLiveGame({
         setCancelledBy(event.payload.cancelled_by);
       }
 
+      // A join moves the lobby's closing time on (`pushedLobbyClose`); taken as it arrives.
+      const receivedAt = Date.now();
       queryClient.setQueryData<QuizGameStateResponse>(key, (previous) => {
         if (!previous) return previous;
-        const next = applyQuizEvent(previous.data, event);
+        const merged = applyQuizEvent(previous.data, event);
+        const next =
+          event.type === 'player_joined' && merged.game.lobby_closes_at
+            ? { ...merged, game: { ...merged.game, lobby_closes_at: pushedLobbyClose(merged.game.lobby_closes_at, receivedAt) } }
+            : merged;
         return next === previous.data ? previous : { ...previous, data: next };
       });
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { canHostInSpace, cancelledGameCopy, LOBBY_IDLE_LIMIT_MINUTES } from './model';
+import { canHostInSpace, cancelledGameCopy, LOBBY_IDLE_LIMIT_MINUTES, lobbyCloseNote, pushedLobbyClose } from './model';
 import { spaceQuizSeat } from './space-quiz-seat';
 
 /* Live quiz in Spaces, step 2 (Arthur's decisions 93142269; Backend's shapes
@@ -111,4 +111,28 @@ test('a lobby nobody started says it closed; a game someone ended says it was ca
   assert.equal(cancelledGameCopy({ cancelledBy: { name: 'TEST DATA Ada' }, neverStarted: true }).title, 'This game was cancelled');
   assert.match(cancelledGameCopy({ cancelledBy: { name: 'TEST DATA Ada' }, neverStarted: false }).description, /^TEST DATA Ada ended the game/);
   assert.equal(cancelledGameCopy({ cancelledBy: null, neverStarted: false }).title, 'This game was cancelled');
+});
+
+test("the lobby closes 10 minutes after the last person joined (Arthur's B): it says when, and a join moves it on", () => {
+  assert.match(cancelledGameCopy({ cancelledBy: null, neverStarted: true }).description, /within 10 minutes of the last person joining/);
+  const clock = (iso: string) => `[${iso}]`;
+  assert.equal(
+    lobbyCloseNote('2026-11-14T12:10:00.000Z', clock),
+    'If nobody starts it, this lobby closes at [2026-11-14T12:10:00.000Z], 10 minutes after the last person joined',
+  );
+  assert.equal(lobbyCloseNote(null, clock), 'A lobby nobody starts closes itself 10 minutes after the last person joined');
+  // A join at 12:05 moves a 12:10 close to 12:15; an earlier one never brings it forward.
+  const joinedAt = Date.parse('2026-11-14T12:05:00.000Z');
+  assert.equal(pushedLobbyClose('2026-11-14T12:10:00.000Z', joinedAt), '2026-11-14T12:15:00.000Z');
+  assert.equal(pushedLobbyClose('2026-11-14T12:20:00.000Z', joinedAt), '2026-11-14T12:20:00.000Z');
+  // No time from the server (it started, or an older server): nothing is made up.
+  assert.equal(pushedLobbyClose(null, joinedAt), null);
+  assert.equal(pushedLobbyClose(undefined, joinedAt), undefined);
+  assert.equal(LOBBY_IDLE_LIMIT_MINUTES, 10);
+
+  const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+  assert.match(read('v2', 'features', 'channels', 'quiz', 'GamePhases.tsx'), /\{lobbyCloseNote\(state\.game\.lobby_closes_at, clockTime\)\}/);
+  const game = read('v2', 'features', 'channels', 'quiz', 'use-game.ts');
+  assert.match(game, /event\.type === 'player_joined' && merged\.game\.lobby_closes_at/);
+  assert.match(game, /lobby_closes_at: pushedLobbyClose\(merged\.game\.lobby_closes_at, receivedAt\)/);
 });

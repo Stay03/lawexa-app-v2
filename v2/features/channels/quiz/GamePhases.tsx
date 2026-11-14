@@ -19,6 +19,7 @@ import {
 
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
+import { formatMessageTime as clockTime } from '@/lib/utils/collab';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { QuizGameState } from '@/types/channel-quiz';
 import type { SlimUser } from '@/types/collab';
@@ -66,7 +67,7 @@ import {
   canJoinNow,
   cancelledGameCopy,
   isRevealedQuestion,
-  LOBBY_IDLE_LIMIT_MINUTES,
+  lobbyCloseNote,
   nextQuestionOpensAt,
   questionNumber,
   SPEED_SCORING_NOTE,
@@ -214,8 +215,8 @@ export function LobbyStage({ game }: { game: LiveGame }) {
         )}
 
         <p className="max-w-sm text-center text-xs text-muted-foreground/80">
-          Everyone answers on their own device. A lobby nobody starts closes
-          itself after {LOBBY_IDLE_LIMIT_MINUTES} minutes
+          Everyone answers on their own device.{' '}
+          {lobbyCloseNote(state.game.lobby_closes_at, clockTime)}
           {state.game.settings.allow_late_join
             ? ' · late joiners play from the next question'
             : ' · nobody can join once it starts'}

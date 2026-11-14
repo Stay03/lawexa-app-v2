@@ -717,9 +717,31 @@ export const CATCH_UP_AFTER_MS = 2500;
  */
 export const NEXT_QUESTION_CAP_MS = 15_000;
 
-/** A lobby nobody starts auto-cancels server-side after this long. Stated in
- *  the lobby so an abandoned game reads as a rule, not a failure. */
+/** A lobby nobody starts auto-cancels server-side this long after the last
+ *  person joined (Arthur's choice B, 14 November 2026; before, after the host
+ *  opened it). Stated in the lobby so an abandoned game reads as a rule, not a
+ *  failure. */
 export const LOBBY_IDLE_LIMIT_MINUTES = 10;
+
+/**
+ * THE LOBBY'S CLOSING TIME, MOVED ON BY A JOIN. The server sends
+ * `lobby_closes_at` with the game (Backend 851eb1ec), but the join broadcast
+ * does not carry it: a join pushes it to ten minutes from then, so the lobby
+ * moves it on as the join arrives, and the poll behind the screen confirms the
+ * server's own time. Never earlier than it was, and only while it has one.
+ */
+export function pushedLobbyClose(closesAt: string | null | undefined, joinedAtMs: number): string | null | undefined {
+  if (!closesAt) return closesAt;
+  const pushed = joinedAtMs + LOBBY_IDLE_LIMIT_MINUTES * 60_000;
+  return pushed > Date.parse(closesAt) ? new Date(pushed).toISOString() : closesAt;
+}
+
+/** The lobby's rule, with its closing time when the server gives one ("3:42 PM", the reader's clock). */
+export function lobbyCloseNote(closesAt: string | null | undefined, formatTime: (iso: string) => string): string {
+  return closesAt
+    ? `If nobody starts it, this lobby closes at ${formatTime(closesAt)}, ${LOBBY_IDLE_LIMIT_MINUTES} minutes after the last person joined`
+    : `A lobby nobody starts closes itself ${LOBBY_IDLE_LIMIT_MINUTES} minutes after the last person joined`;
+}
 
 /* ── The answering list ───────────────────────────────────────────────────── */
 
@@ -787,7 +809,7 @@ export function cancelledGameCopy({
   if (cancelledBy === null && neverStarted) {
     return {
       title: 'This lobby closed',
-      description: `Nobody started the game within ${LOBBY_IDLE_LIMIT_MINUTES} minutes, so its lobby closed. Ask the host to put the quiz live again.`,
+      description: `Nobody started the game within ${LOBBY_IDLE_LIMIT_MINUTES} minutes of the last person joining, so its lobby closed. Ask the host to put the quiz live again.`,
     };
   }
   return {
