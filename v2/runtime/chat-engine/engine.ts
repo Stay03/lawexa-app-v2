@@ -458,6 +458,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   let executionId: string | null = null;
   /** The execution whose `completed` came: only then does its `end` close a finished turn. */
   let completedExecution: string | null = null;
+  /**
+   * Every execution this screen has seen to its terminal event (`completed`, an
+   * error, a timeout). A connection to one of them can only bring that terminal
+   * again, rebuilt from the database. In a confidential chat that rebuild
+   * carries no text (`replayable: false`), and with no answer streaming it drew
+   * the last saved answer as a second row (Lucy's check 6, 14 November 2026:
+   * a follow-up shown twice, word for word, though the server ran it once).
+   * So no connection opens to a settled execution: a status read that still
+   * says "pending" for a turn that has just ended no longer attaches to it.
+   */
+  const settledExecutions = new Set<string>();
   let reconnectCount = 0;
   /** When the last DATA (non-heartbeat) event arrived. 0 = no stream open. */
   let lastDataEventTime = 0;
@@ -1303,6 +1314,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       handlers.onError?.(error);
       return;
     }
+    // A turn this screen has already seen end: nothing to attach to.
+    if (settledExecutions.has(execId)) return;
     // Prevent multiple simultaneous connections. Asking again for the execution
     // already followed is a no-op (a host following a turn it is already on).
     if (eventSource) {
@@ -1648,6 +1661,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       const event = parseEvent<CompletedEvent>((e as MessageEvent).data);
       if (!event) return;
       completedExecution = execId;
+      settledExecutions.add(execId);
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       settleTurn(event.persisted_message_ids);
 
@@ -1803,6 +1817,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         discard_partial?: boolean;
         charged?: boolean;
       }>(data);
+      settledExecutions.add(execId);
       settleTurn(parsed?.persisted_message_ids);
 
       // Close BEFORE branching so onerror's identity guard trips regardless of
@@ -1896,28 +1911,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         pollForCompletion(convId);
         return;
       }
-      isCancelling = false;
-      toolCallQueue.clear();
-      const placeholderId = streamingMessageId;
-      if (placeholderId) {
-        const finalText = liveText.get(placeholderId) ?? '';
-        const trace = takeReasoning(placeholderId);
-        setState((prev) => ({
-          ...prev,
-          messages: prev.messages.map((m) =>
-            m.id === placeholderId ? { ...m, content: finalText || m.content, isStreaming: false, ...trace } : m,
-          ),
-          isStreaming: false,
-          isCancelling: false,
-        }));
-        clearText(placeholderId);
-        messageIdToIteration.delete(placeholderId);
-        streamingMessageId = null;
-        currentIteration = null;
-      } else {
-        setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
-      }
-      resetStreamingBuffers();
+      closeFinishedTurn();
     });
 
     // timeout — terminal. The server's time limit ends the turn as free and
@@ -1927,6 +1921,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // way: the text stays, marked as timed out.
     es.addEventListener('timeout', (e) => {
       stopWatchdog();
+      settledExecutions.add(execId);
       isCancelling = false;
       toolCallQueue.clear();
       const errorMsg = 'Stream timed out';
@@ -2161,6 +2156,36 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     messageIdToIteration.clear();
   }
 
+  /**
+   * A finished turn's stream is over: any placeholder left open keeps its text
+   * and stops streaming. Its `end` does this, and so does a reconnect after the
+   * turn's terminal came, which has nothing left to fetch.
+   */
+  function closeFinishedTurn(): void {
+    isCancelling = false;
+    toolCallQueue.clear();
+    const placeholderId = streamingMessageId;
+    if (placeholderId) {
+      const finalText = liveText.get(placeholderId) ?? '';
+      const trace = takeReasoning(placeholderId);
+      setState((prev) => ({
+        ...prev,
+        messages: prev.messages.map((m) =>
+          m.id === placeholderId ? { ...m, content: finalText || m.content, isStreaming: false, ...trace } : m,
+        ),
+        isStreaming: false,
+        isCancelling: false,
+      }));
+      clearText(placeholderId);
+      messageIdToIteration.delete(placeholderId);
+      streamingMessageId = null;
+      currentIteration = null;
+    } else {
+      setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+    }
+    resetStreamingBuffers();
+  }
+
   // ─── SSE reconnection ───────────────────────────────────────────────────────
   // Reconnect the live stream before falling back to polling.
   function reconnectStream() {
@@ -2175,11 +2200,19 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       }
       return;
     }
-    reconnectCount += 1;
     if (eventSource) {
       eventSource.close();
       eventSource = null;
     }
+    // The drop came after the turn's terminal: the turn is over, and a new
+    // connection could only bring that terminal again. It ends here instead.
+    if (settledExecutions.has(execId)) {
+      stopWatchdog();
+      reconnectCount = 0;
+      closeFinishedTurn();
+      return;
+    }
+    reconnectCount += 1;
     // Brief delay before reconnecting to avoid hammering the server.
     setTimeout(() => {
       if (!executionId) return; // intentionally closed during the delay
@@ -2725,6 +2758,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       // The host learns whose turn this is before the engine attaches to it.
       handlers.onStatusRead?.(convId, response);
       const status = response.data;
+      // "Pending" for a turn this screen has already seen end is a read that
+      // lags the end: the turn is over, and there is nothing to attach to.
+      if (status.status === 'pending' && status.execution_id && settledExecutions.has(status.execution_id)) {
+        return 'completed';
+      }
       if (status.status === 'pending') {
         setState((prev) => ({ ...prev, isStreaming: true, isCancelling: false, error: null, turnOrigin: 'followed' }));
         if (status.execution_id) connectToStream(status.execution_id);
