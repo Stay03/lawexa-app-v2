@@ -9,12 +9,13 @@ import type { RedactionCategory } from '@/types/redaction';
  */
 export const REDACTION_CATEGORIES: readonly RedactionCategory[] = ['names', 'addresses', 'contacts', 'identity', 'financial'];
 
+// Short enough that a phone's line keeps four of them (Techlead, 14 November 2026); the menu keeps the long labels.
 const SHORT: Readonly<Record<RedactionCategory, string>> = {
   names: 'names',
   addresses: 'addresses',
-  contacts: 'phone numbers and emails',
-  identity: 'ID numbers and dates of birth',
-  financial: 'bank and card numbers',
+  contacts: 'contacts',
+  identity: 'IDs',
+  financial: 'accounts',
 };
 
 function isCategory(value: unknown): value is RedactionCategory {
@@ -37,12 +38,21 @@ export function orderedCategories(keys: readonly unknown[]): RedactionCategory[]
   return REDACTION_CATEGORIES.filter((key) => keys.some((value) => value === key && isCategory(value)));
 }
 
-/** "names, addresses and phone numbers and emails"; every kind (or an older chat's null) is "everything it can". */
+/**
+ * Every kind a chat hides, by its short name: "names, addresses, contacts".
+ * An older redacted chat's null hides all five (it was made before choices).
+ */
+export function hiddenList(categories: readonly RedactionCategory[] | null): string {
+  const keys = categories === null ? REDACTION_CATEGORIES : orderedCategories(categories);
+  return (keys.length > 0 ? keys : REDACTION_CATEGORIES).map((key) => SHORT[key]).join(', ');
+}
+
+/** What a chat hides, short enough for a phone's line: the kinds by name, or "all 5 kinds" for every kind (and an older chat). */
 export function hiddenSummary(categories: readonly RedactionCategory[] | null): string {
-  if (categories === null || categories.length === REDACTION_CATEGORIES.length) return 'everything it can';
-  const words = orderedCategories(categories).map((key) => SHORT[key]);
-  if (words.length <= 1) return words[0] ?? 'everything it can';
-  return `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`;
+  if (categories === null || orderedCategories(categories).length === REDACTION_CATEGORIES.length) {
+    return `all ${REDACTION_CATEGORIES.length} kinds`;
+  }
+  return hiddenList(categories);
 }
 
 /** Turn one kind on or off, keeping at least one on: the last one cannot be turned off. */

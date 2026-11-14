@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   REDACTION_CATEGORIES,
+  hiddenList,
   hiddenSummary,
   orderedCategories,
   readRedactionCategories,
@@ -25,12 +26,16 @@ test("a chat's record names its choice; null or nothing named reads as null (an 
   assert.equal(readRedactionCategories(['unknown']), null);
 });
 
-test('the summary names what it hides, and every kind or an older chat is everything it can', () => {
+test('the summary names what it hides by short names, and every kind or an older chat is all 5 kinds', () => {
   assert.equal(hiddenSummary(['names']), 'names');
-  assert.equal(hiddenSummary(['addresses', 'names']), 'names and addresses');
-  assert.equal(hiddenSummary(['names', 'contacts', 'financial']), 'names, phone numbers and emails and bank and card numbers');
-  assert.equal(hiddenSummary([...REDACTION_CATEGORIES]), 'everything it can');
-  assert.equal(hiddenSummary(null), 'everything it can');
+  assert.equal(hiddenSummary(['addresses', 'names']), 'names, addresses');
+  assert.equal(hiddenSummary(['names', 'contacts', 'financial']), 'names, contacts, accounts');
+  assert.equal(hiddenSummary(['names', 'addresses', 'contacts', 'identity']), 'names, addresses, contacts, IDs');
+  assert.equal(hiddenSummary([...REDACTION_CATEGORIES]), 'all 5 kinds');
+  assert.equal(hiddenSummary(null), 'all 5 kinds');
+  // For a screen reader and the locked menu row: every kind by name, all five for an older chat.
+  assert.equal(hiddenList(['names', 'contacts']), 'names, contacts');
+  assert.equal(hiddenList(null), 'names, addresses, contacts, IDs, accounts');
 });
 
 test('one kind toggles on and off in the server order, and the last one stays on', () => {

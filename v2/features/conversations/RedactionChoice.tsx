@@ -62,7 +62,7 @@ export function RedactionChoice({
     <div className="flex min-w-0 items-center gap-1.5 px-3 pt-2 text-xs text-indigo-600 dark:text-indigo-400">
       <VenetianMask aria-hidden className="size-3.5 shrink-0" />
       <span className="min-w-0 truncate">
-        {chosen === null ? 'Redacted: loading what it hides…' : `Redacted: hides ${hiddenSummary(chosen)}`}
+        {chosen === null ? 'Redacted: loading what it hides…' : `Redacted: ${hiddenSummary(chosen)}`}
       </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -75,7 +75,14 @@ export function RedactionChoice({
             <ChevronDown aria-hidden className="size-3" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="top" sideOffset={8} className="w-80 max-w-[calc(100vw-2rem)]">
+        {/* Ends on the "Change" button and keeps a 16px gutter: on a phone it never runs off the screen. */}
+        <DropdownMenuContent
+          align="end"
+          side="top"
+          sideOffset={8}
+          collisionPadding={16}
+          className="w-80 max-w-[calc(100vw-2rem)]"
+        >
           <DropdownMenuLabel>What to hide</DropdownMenuLabel>
           {options.map((option) => {
             const on = chosen?.includes(option.key) ?? false;
@@ -87,7 +94,9 @@ export function RedactionChoice({
                 disabled={last}
                 onCheckedChange={() => chosen && onChange(toggleCategory(chosen, option.key))}
                 onSelect={(event) => event.preventDefault()}
-                className="items-start"
+                // The row under the pointer or the keyboard is a faint wash, lighter than a tick, and
+                // none on a touch screen: a tap leaves no fill that reads as chosen.
+                className="items-start focus:bg-muted/50 [@media(hover:none)]:focus:bg-transparent"
               >
                 <span className="flex flex-col">
                   <span className="font-medium leading-tight">{option.label}</span>
