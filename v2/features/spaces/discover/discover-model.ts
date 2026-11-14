@@ -41,9 +41,17 @@ export interface Refusal {
 /** Taking back a request failed: the card still shows it, so trying again is the way on. */
 export const CANCEL_FAILED: Refusal = { text: "Your request wasn't taken back. Try again in a moment.", offerAccount: false };
 
-/** Why a join was refused. */
+/**
+ * The server's 409 ("already an active member") is not a refusal: the reader
+ * is in, and a list read before they joined still offered Join. The card opens
+ * the Space (Arthur, 14 November 2026; Backend's list of join answers).
+ */
+export function joinOpensSpace(status: number | undefined): boolean {
+  return status === 409;
+}
+
+/** Why a join was refused (never a 409: `joinOpensSpace`). */
 export function joinRefusal(status: number | undefined, hasAccount: boolean): Refusal {
-  if (status === 409) return { text: 'You are already in this space.', offerAccount: false };
   if (status === 404) return { text: 'This space is no longer public.', offerAccount: false };
   if (status === 403) {
     return hasAccount

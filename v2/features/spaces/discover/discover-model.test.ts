@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { joinOutcome } from '@/lib/utils/space-join';
-import { CANCEL_FAILED, discoverAction, joinRefusal } from './discover-model';
+import { CANCEL_FAILED, discoverAction, joinOpensSpace, joinRefusal } from './discover-model';
 
 /* Public Spaces (Arthur's A, 12 November 2026, thread dcd06933): anyone new
  * joins a public Space at once from Discover; someone the Owner removed or
@@ -40,9 +40,20 @@ test('a joined reader goes into the Space; a request stays on the card as Reques
   assert.match(screen, /onSuccess: \(outcome\) => \{\s*if \(outcome === 'joined'\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*\}/);
   const queries = read('v2', 'features', 'invites', 'queries.ts');
   // The list is read again either way, so a request shows "Request sent" from the server's my_status.
-  assert.match(queries, /mutationFn: \(spaceUuid: string\) => discoverApi\.join\(spaceUuid\),\s*onSuccess: \(\) => \{\s*void client\.invalidateQueries\(\{ queryKey: \['discover-spaces'\] \}\);/);
+  assert.match(queries, /mutationFn: \(spaceUuid: string\) => discoverApi\.join\(spaceUuid\),\s*\/\/.*\s*onSettled: \(\) => \{\s*void client\.invalidateQueries\(\{ queryKey: \['discover-spaces'\] \}\);/);
   const api = read('lib', 'api', 'collab.ts');
   assert.match(api, /return joinOutcome\(response\.status, response\.data\?\.data\);/);
+});
+
+/* Arthur, 14 November 2026: Discover offered Join to a member (a list read
+ * before the join), and the server's 409 "already an active member" read as a
+ * failure. A 409 means they are in: the card opens the Space. */
+test('a 409 on Join opens the Space, and every join answer reads the list again', () => {
+  assert.equal(joinOpensSpace(409), true);
+  for (const status of [403, 404, 500, undefined]) assert.equal(joinOpensSpace(status), false, String(status));
+  const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
+  assert.match(screen, /if \(joinOpensSpace\(status\)\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*else setRefusal\(joinRefusal\(status, hasAccount\)\);/);
+  assert.match(read('v2', 'features', 'invites', 'queries.ts'), /onSettled: \(\) => \{\s*void client\.invalidateQueries\(\{ queryKey: \['discover-spaces'\] \}\);/);
 });
 
 test('a request that could not be taken back says so', () => {

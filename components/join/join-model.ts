@@ -1,4 +1,4 @@
-import type { InviteAcceptResult, InviteViewerAction } from '@/types/collab';
+import type { InviteAcceptResult, InviteDestination, InvitePreview, InviteViewerAction } from '@/types/collab';
 import { spaceGameHref } from '@/lib/utils/space-game-href';
 
 /**
@@ -9,14 +9,36 @@ import { spaceGameHref } from '@/lib/utils/space-game-href';
 export const SPACES_QUERY_ROOT = ['spaces'] as const;
 
 /**
+ * The public-space list's key (v2's `inviteKeys.discover` root; a test holds
+ * the two equal). A join here reads it again too, or a list read before it
+ * still offers Join, and that Join answers 409 (Arthur, 14 November 2026).
+ */
+export const DISCOVER_QUERY_ROOT = ['discover-spaces'] as const;
+
+/**
  * join-model — the join screen's pure rules: where a join lands and what its
  * one button says, for an ordinary invite and for a live quiz's game link
  * (Backend's shapes 7a007a8c: the preview names the `game`, and accept
  * answers its `game_uuid`).
  */
 
+/**
+ * Where an accepted invite goes. The Space comes from the answer's membership
+ * (`member.space.uuid`), else from the preview the screen already holds; the
+ * channel from the preview (the answer does not name it); the game from the
+ * answer, else the preview.
+ */
+export function acceptedDestination(
+  invite: Pick<InvitePreview, 'space_uuid' | 'channel_uuid' | 'game'> | null,
+  result: InviteAcceptResult,
+): InviteDestination | null {
+  const space = result.member?.space?.uuid ?? invite?.space_uuid;
+  if (!space) return null;
+  return { space_uuid: space, channel_uuid: invite?.channel_uuid ?? null, game_uuid: result.game_uuid ?? invite?.game?.uuid ?? null };
+}
+
 /** Where an accepted invite lands: in the game for a game link, else the channel or the Space. */
-export function joinedDestination(result: Pick<InviteAcceptResult, 'space_uuid' | 'channel_uuid' | 'game_uuid'>): string {
+export function joinedDestination(result: InviteDestination): string {
   if (result.game_uuid) return spaceGameHref(result.space_uuid, result.game_uuid);
   if (result.channel_uuid) return `/channels/${result.channel_uuid}`;
   return `/spaces/${result.space_uuid}`;

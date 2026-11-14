@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { LATE_JOIN_OFF_MESSAGE, SPACES_QUERY_ROOT, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination, readInviteCode } from './join-model';
+import { DISCOVER_QUERY_ROOT, LATE_JOIN_OFF_MESSAGE, SPACES_QUERY_ROOT, acceptedDestination, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination, readInviteCode } from './join-model';
 
 /* A live quiz's game link on the join screen (Backend's shapes 7a007a8c:
  * the preview names the `game`, accept answers its `game_uuid`). TEST DATA
@@ -18,6 +18,42 @@ test('an accepted invite lands in the game for a game link, else the channel or 
   assert.equal(joinedDestination({ space_uuid: 's-1', game_uuid: 'g-1' }), '/spaces/s-1?game=g-1');
   assert.equal(joinedDestination({ space_uuid: 's-1', channel_uuid: 'c-1', game_uuid: null }), '/channels/c-1');
   assert.equal(joinedDestination({ space_uuid: 's-1' }), '/spaces/s-1');
+});
+
+/* Arthur, 14 November 2026, 18:08Z: Join on LASU Law Students Space's link opened
+ * /spaces/undefined. The accept answer has no `space_uuid`; the Space is in the
+ * membership (Backend's read of SpaceInviteLinkService on live main). TEST DATA. */
+const ACCEPTED = {
+  status: 'joined' as const,
+  member: { id: 7, role: 'member', is_active: true, space: { uuid: 'TEST-DATA-space-uuid', name: 'TEST DATA Law Students Space' } },
+  channel_member: null,
+  game_uuid: null,
+};
+const PREVIEW = { space_uuid: 'TEST-DATA-space-uuid', channel_uuid: null, game: null };
+
+test('an accepted invite opens the Space named in the answer, never /spaces/undefined', () => {
+  const opened = acceptedDestination(PREVIEW, ACCEPTED);
+  assert.ok(opened);
+  assert.equal(joinedDestination(opened), '/spaces/TEST-DATA-space-uuid');
+  // The answer alone is enough, and so is the preview alone.
+  assert.equal(joinedDestination(acceptedDestination(null, ACCEPTED)!), '/spaces/TEST-DATA-space-uuid');
+  assert.equal(joinedDestination(acceptedDestination(PREVIEW, { status: 'already_member' })!), '/spaces/TEST-DATA-space-uuid');
+  // A game link: the game from the answer; a channel link: the channel from the preview.
+  assert.equal(joinedDestination(acceptedDestination(PREVIEW, { ...ACCEPTED, game_uuid: 'g-1' })!), '/spaces/TEST-DATA-space-uuid?game=g-1');
+  assert.equal(joinedDestination(acceptedDestination({ ...PREVIEW, channel_uuid: 'c-1' }, ACCEPTED)!), '/channels/c-1');
+  // With neither, there is nowhere to go: the screen says it failed rather than open a broken link.
+  assert.equal(acceptedDestination(null, { status: 'joined', member: null }), null);
+  for (const href of [joinedDestination(opened)]) assert.doesNotMatch(href, /undefined/);
+});
+
+test('the join screen opens the answer’s Space and reads the public-space list again', () => {
+  const screen = read('components', 'join', 'JoinScreen.tsx');
+  assert.doesNotMatch(screen, /\.\.\.data, play/);
+  assert.match(screen, /const destination = acceptedDestination\(preview\.data\?\.data \?\? null, data\);\s*if \(destination\) enter\.mutate\(\{ \.\.\.destination, play \}\);/);
+  assert.match(screen, /void queryClient\.invalidateQueries\(\{ queryKey: DISCOVER_QUERY_ROOT \}\);/);
+  // The same key as v2's discover list.
+  assert.deepEqual([...DISCOVER_QUERY_ROOT], ['discover-spaces']);
+  assert.match(read('v2', 'features', 'invites', 'queries.ts'), /discover: \(params: DiscoverSpacesParams\) => \['discover-spaces', params\] as const,/);
 });
 
 test('a game link’s button says it goes into the game', () => {
@@ -34,7 +70,7 @@ test('the join screen names the quiz and every way through lands by the one rule
   const screen = read('components', 'join', 'JoinScreen.tsx');
   // Every way through (accepted, back from sign-in, already a member) goes into
   // the game first and lands by the one rule (`enter`, 14 November 2026).
-  assert.match(screen, /enter\.mutate\(\{ \.\.\.data, play \}\);/);
+  assert.match(screen, /if \(destination\) enter\.mutate\(\{ \.\.\.destination, play \}\);/);
   assert.match(screen, /enter\.mutate\(\{ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame, play \}\);/);
   assert.match(screen, /enter\.mutate\(\{ space_uuid: invite\.space_uuid, channel_uuid: null, game_uuid: game\?\.uuid \?\? null, play \}\);/);
   assert.match(screen, /onSuccess: \(destination\) => router\.replace\(joinedDestination\(destination\)\),/);

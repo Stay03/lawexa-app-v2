@@ -2187,6 +2187,8 @@ export interface InvitePreview {
   space_type: SpaceType;
   member_count: number;
   inviter_name: string | null;
+  /** The channel the link named, when it named one (Backend, 14 November 2026). */
+  channel_uuid?: string | null;
   /** The channel the link named, when it named one. */
   channel_name: string | null;
   /** Empty when the link points at a whole space rather than a channel. */
@@ -2214,11 +2216,24 @@ export type InviteAcceptStatus =
   | 'already_member'
   | 'already_waiting';
 
+/**
+ * MEASURED, NOT GUESSED (Backend, 14 November 2026, from SpaceInviteLinkService
+ * on live main). The answer carries no `space_uuid`: the Space is inside the
+ * membership, `member.space.uuid`. Reading `space_uuid` sent every accepted
+ * invite to /spaces/undefined (Arthur, LASU Law Students Space, 18:08Z).
+ * For `request`, `member` is the join request: the reader is not in yet.
+ */
 export interface InviteAcceptResult {
   status: InviteAcceptStatus;
+  member?: { space?: { uuid: string } | null } | null;
+  /** A game link's game, to open next; null for an ordinary link. */
+  game_uuid?: string | null;
+}
+
+/** Where a way through the join screen lands: the Space, and the channel or the game a link named. */
+export interface InviteDestination {
   space_uuid: string;
   channel_uuid?: string | null;
-  /** A game link's game, to open next; null for an ordinary link. */
   game_uuid?: string | null;
 }
 

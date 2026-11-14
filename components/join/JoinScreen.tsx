@@ -13,8 +13,8 @@ import { quizGamesApi } from '@/lib/api/channel-quiz';
 import { inviteLinksApi } from '@/lib/api/collab';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { InviteAcceptResponse, InviteAcceptResult, InvitePreview } from '@/types/collab';
-import { SPACES_QUERY_ROOT, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
+import type { InviteAcceptResponse, InviteDestination, InvitePreview } from '@/types/collab';
+import { DISCOVER_QUERY_ROOT, SPACES_QUERY_ROOT, acceptedDestination, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
 import {
   forgetPendingInvite,
   pendingInviteWatches,
@@ -184,7 +184,7 @@ export function JoinScreen({ code }: { code: string }) {
    * other failure stays here with a Try again that runs this step alone.
    */
   const enter = useMutation({
-    mutationFn: async (destination: Pick<InviteAcceptResult, 'space_uuid' | 'channel_uuid' | 'game_uuid'> & { play: boolean }) => {
+    mutationFn: async (destination: InviteDestination & { play: boolean }) => {
       // Play joins the game; Watch lands as a watcher, with the game's Join still there.
       if (destination.game_uuid && destination.play) {
         try {
@@ -195,6 +195,7 @@ export function JoinScreen({ code }: { code: string }) {
         }
       }
       await queryClient.invalidateQueries({ queryKey: SPACES_QUERY_ROOT });
+      void queryClient.invalidateQueries({ queryKey: DISCOVER_QUERY_ROOT });
       return destination;
     },
     onSuccess: (destination) => router.replace(joinedDestination(destination)),
@@ -212,7 +213,9 @@ export function JoinScreen({ code }: { code: string }) {
         setFailed(null);
         return;
       }
-      enter.mutate({ ...data, play });
+      const destination = acceptedDestination(preview.data?.data ?? null, data);
+      if (destination) enter.mutate({ ...destination, play });
+      else setFailed(refusalFor(undefined).title);
     },
     onError: (error) => {
       // A refused join lets the held code go: it would otherwise bring the

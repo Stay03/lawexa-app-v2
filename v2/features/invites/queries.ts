@@ -172,7 +172,8 @@ export function useJoinPublicSpace() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (spaceUuid: string) => discoverApi.join(spaceUuid),
-    onSuccess: () => {
+    // Settled, not only succeeded: a 409 says the list was out of date (`joinOpensSpace`).
+    onSettled: () => {
       void client.invalidateQueries({ queryKey: ['discover-spaces'] });
       void client.invalidateQueries({ queryKey: ['spaces'] });
     },
