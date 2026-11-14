@@ -283,7 +283,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
           role="radiogroup"
           aria-label={question.question}
           onKeyDown={onChoiceKey}
-          className="mt-2.5 flex flex-col gap-0.5"
+          className="mt-1.5 flex flex-col"
         >
           {question.options.map((option, at) => {
             const chosen = choiceAt === at;
@@ -299,7 +299,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
                 disabled={locked}
                 onClick={() => choose(at)}
                 className={cn(
-                  'v2-interactive flex w-full items-start gap-3 rounded-xl px-2.5 py-2 text-left transition-colors disabled:cursor-default',
+                  'v2-interactive flex w-full items-start gap-2.5 rounded-xl px-2 py-1.5 text-left transition-colors disabled:cursor-default',
                   chosen ? 'bg-muted' : UNCHOSEN_HOVER,
                   FOCUS_RING,
                 )}
@@ -308,11 +308,11 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
                 <span className="min-w-0 flex-1">
                   {/* The tag rides after the label, and wraps under it where the label would not keep its line. */}
                   <span className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="text-[14.5px] font-medium leading-snug text-foreground">{option.label}</span>
+                    <span className="text-[14px] font-medium leading-tight text-foreground">{option.label}</span>
                     {question.recommended === at && <span className="text-[12px] font-medium text-primary">Recommended</span>}
                   </span>
                   {option.description && (
-                    <span className="mt-0.5 block text-[13px] leading-snug text-muted-foreground">{option.description}</span>
+                    <span className="block text-[12.5px] leading-snug text-muted-foreground">{option.description}</span>
                   )}
                 </span>
               </button>
@@ -327,7 +327,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
             disabled={locked}
             onClick={() => choose(optionCount)}
             className={cn(
-              'v2-interactive flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-[14.5px] transition-colors disabled:cursor-default',
+              'v2-interactive flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[14px] transition-colors disabled:cursor-default',
               ownChosen ? 'bg-muted text-foreground' : cn('text-muted-foreground hover:text-foreground', UNCHOSEN_HOVER),
               FOCUS_RING,
             )}
@@ -346,7 +346,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
 
       {/* While the box takes the answer, its arrow is the one way on. */}
       {!ownChosen && (
-        <div className="flex shrink-0 items-center justify-end gap-1.5 px-4 pt-2 pb-3">
+        <div className="flex shrink-0 items-center justify-end gap-1.5 px-4 pt-1 pb-2.5">
           <button
             type="button"
             disabled={locked}
@@ -375,7 +375,7 @@ function Radio({ on }: { on: boolean }) {
     <span
       aria-hidden
       className={cn(
-        'mt-[3px] flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px]',
+        'mt-px flex size-[18px] shrink-0 items-center justify-center rounded-full border-[1.5px]',
         on ? 'border-primary' : 'border-muted-foreground/40',
       )}
     >

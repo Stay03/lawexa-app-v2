@@ -4,6 +4,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { cn } from '@/lib/utils';
+
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { ChatRatingSlot } from '@/v2/features/chat-rating/ChatRatingBanner';
 import { PlanEndedSlot } from '@/v2/features/chat-rating/PlanEndedRating';
@@ -79,6 +81,11 @@ function withoutV2Prefix(pathname: string): string {
 
 /** The composer's height on the root element (see the docblock). */
 const DOCK_HEIGHT_VAR = '--v2-conv-dock-h';
+
+/** The message box's own width: compact, centred under the chat. */
+const DOCK_COMPACT = 'max-w-xs sm:max-w-md';
+/** While a question card is open: the chat column's width (MessageList's `max-w-2xl`), so the card lines up with the messages. */
+const DOCK_WITH_CARD = 'max-w-2xl';
 
 /** `useLayoutEffect` in the browser, `useEffect` on the server. */
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -244,7 +251,15 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
       data-streaming={surface ? String(surface.isStreaming) : undefined}
       className="pointer-events-none"
     >
-      <div ref={dockRef} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">
+      {/* The compact box's cap, and the chat column's width while Lawexa's
+          questions are open (Stay, 14 November 2026: the card at the box's
+          width was "too narrow, looks weirdly long"): the card lines up with
+          the messages above it, and the box under it widens with it so the
+          two still read as one. */}
+      <div
+        ref={dockRef}
+        className={cn('pointer-events-auto v2-safe-bottom mx-auto w-full', openCard ? DOCK_WITH_CARD : DOCK_COMPACT)}
+      >
         {content}
       </div>
     </div>

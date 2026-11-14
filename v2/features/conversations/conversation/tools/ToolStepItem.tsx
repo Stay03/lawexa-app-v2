@@ -217,6 +217,11 @@ export function formatToolMessage(
       return {
         action: isComplete ? "Listed the Space's contents" : "Listing the Space's contents",
       };
+    // A question card (Stay, 14 November 2026: the step read "Ask User").
+    case 'ask_user':
+      return {
+        action: isComplete ? 'Asked you a question' : 'Asking you a question',
+      };
     // Quiz from a source (Stay, 23 October 2026), and Lawexa building and
     // editing a quiz itself (24 October 2026): the quiz shows as a card after
     // the chain (`CreatedQuizCard`); the step names it.
