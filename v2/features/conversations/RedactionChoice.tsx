@@ -14,7 +14,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { redactionDefaultApi } from '@/lib/api/redaction-default';
 import { cn } from '@/lib/utils';
-import { hiddenSummary, sameCategories, toggleCategory } from '@/lib/utils/redaction-categories';
+import { hiddenSummary, sameCategories, shortLabelsOf, toggleCategory, type ShortLabels } from '@/lib/utils/redaction-categories';
+import { useV2Session } from '@/v2/runtime/session-context';
 import type { RedactionCategory, RedactionDefaultResponse } from '@/types/redaction';
 
 /** The person's saved choice of what a new redacted chat hides, per signed-in person. */
@@ -24,6 +25,17 @@ export const redactionDefaultQuery = (userId: number | null) =>
     queryFn: redactionDefaultApi.get,
     staleTime: 5 * 60_000,
   });
+
+/**
+ * The server's short name for each kind ("phone numbers", "IDs"), for a line
+ * or a pill that says what a chat hides. From the same cached answer as the
+ * new-chat choice, so an open chat asks at most once. Empty until it answers.
+ */
+export function useRedactionShortLabels(enabled: boolean): ShortLabels {
+  const { userId } = useV2Session();
+  const saved = useQuery({ ...redactionDefaultQuery(userId), enabled: enabled && userId !== null });
+  return saved.data ? shortLabelsOf(saved.data.data.options) : {};
+}
 
 /**
  * RedactionChoice — "What to hide", under the home box while redacted mode is
@@ -55,6 +67,7 @@ export function RedactionChoice({
     onSuccess: (response: RedactionDefaultResponse) => queryClient.setQueryData(redactionDefaultQuery(userId).queryKey, response),
   });
   const options = saved.data?.data.options ?? [];
+  const summary = chosen === null ? null : hiddenSummary(chosen, shortLabelsOf(options));
   const savedCategories = saved.data?.data.categories ?? null;
   const isSaved = chosen !== null && savedCategories !== null && sameCategories(chosen, savedCategories);
 
@@ -62,7 +75,7 @@ export function RedactionChoice({
     <div className="flex min-w-0 items-center gap-1.5 px-3 pt-2 text-xs text-indigo-600 dark:text-indigo-400">
       <VenetianMask aria-hidden className="size-3.5 shrink-0" />
       <span className="min-w-0 truncate">
-        {chosen === null ? 'Redacted: loading what it hides…' : `Redacted: ${hiddenSummary(chosen)}`}
+        {summary === null ? 'Redacted: loading what it hides…' : `Redacted: ${summary}`}
       </span>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

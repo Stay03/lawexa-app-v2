@@ -39,6 +39,7 @@ import { PlansLink } from '@/v2/features/files/PlansLink';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { RedactionCategory } from '@/types/redaction';
 import { hiddenList, hiddenSummary } from '@/lib/utils/redaction-categories';
+import { useRedactionShortLabels } from '@/v2/features/conversations/RedactionChoice';
 import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
@@ -326,6 +327,10 @@ export function ConversationComposer({
   // A card joined on top takes the jurisdiction row's place: nothing sits between the two.
   const showMeta = showMetaProp && !joinedAbove;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // What a redacted chat hides, in the server's short names; empty until they arrive.
+  const redactionLabels = useRedactionShortLabels(isRedacted);
+  const hiddenNames = isRedacted ? hiddenList(redactionCategories, redactionLabels) : null;
+  const hiddenShort = isRedacted ? hiddenSummary(redactionCategories, redactionLabels) : null;
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Draft per scope, read through `draft-store` so the server render and the
@@ -739,16 +744,18 @@ export function ConversationComposer({
                 />
                 {isRedacted && (
                   // What this chat hides, from its record (thread cce2eafe), by short names that fit a phone;
-                  // an older chat hides all five kinds.
+                  // an older chat hides all six kinds. The names join once the server's short names are in.
                   <div
                     className="bg-background flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-indigo-500/40 px-2.5 py-1 text-xs text-indigo-600 dark:text-indigo-400"
-                    aria-label={`Redacted mode is on for this conversation: it hides ${hiddenList(redactionCategories)}`}
+                    aria-label={`Redacted mode is on for this conversation${hiddenNames ? `: it hides ${hiddenNames}` : ''}`}
                   >
                     <VenetianMask className="h-3.5 w-3.5 shrink-0" />
                     <span className="shrink-0 font-medium">Redacted</span>
-                    <span aria-hidden className="min-w-0 truncate opacity-80">
-                      · {hiddenSummary(redactionCategories)}
-                    </span>
+                    {hiddenShort && (
+                      <span aria-hidden className="min-w-0 truncate opacity-80">
+                        · {hiddenShort}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -1084,7 +1091,7 @@ export function ConversationComposer({
                         <span className="flex flex-col">
                           <span className="font-medium leading-tight">Redacted mode</span>
                           <span className="text-muted-foreground text-xs">
-                            Hides {hiddenList(redactionCategories)} from the model
+                            {hiddenNames ? `Hides ${hiddenNames} from the model` : 'Hides personal details from the model'}
                           </span>
                         </span>
                       </DropdownMenuCheckboxItem>
