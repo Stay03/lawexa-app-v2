@@ -55,6 +55,8 @@ export type PromptInputProps = {
   // "confidential" replaces the animated gold-shimmer with a flat red outline
   // so the UI plainly signals that the chat won't be retained.
   variant?: PromptInputVariant
+  // A card sits flush on the box: the ring and the box drop their top corners.
+  joinedAbove?: boolean
 } & React.ComponentProps<"div">
 
 function PromptInput({
@@ -67,6 +69,7 @@ function PromptInput({
   children,
   disabled = false,
   variant = "default",
+  joinedAbove = false,
   onClick,
   ...props
 }: PromptInputProps) {
@@ -104,13 +107,15 @@ function PromptInput({
             isConfidential
               ? "border border-emerald-600/70 dark:border-emerald-500/70"
               : "gold-shimmer p-[1px]",
-            disabled && "cursor-not-allowed opacity-60"
+            disabled && "cursor-not-allowed opacity-60",
+            joinedAbove && "rounded-t-none"
           )}
         >
           <div
             onClick={handleClick}
             className={cn(
               "bg-background cursor-text rounded-3xl p-2 shadow-xs",
+              joinedAbove && "rounded-t-none",
               className
             )}
             {...props}

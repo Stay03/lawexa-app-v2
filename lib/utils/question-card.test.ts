@@ -9,6 +9,7 @@ import {
   answersLine,
   answersMessage,
   answersToSend,
+  boxAnsweringFor,
   chosenAt,
   chosenLine,
   closedCard,
@@ -252,4 +253,12 @@ test('the options move like a radio group: arrows round the ends, Home and End t
   assert.equal(chosenAt({ option: 2 }), 2);
   assert.equal(chosenAt({ text: 'Lagos' }), null);
   assert.equal(chosenAt(null), null);
+});
+
+test('the box answering a question names it, and its arrow is Next until the last, then Send', () => {
+  assert.deepEqual(boxAnsweringFor(0, 3), { placeholder: 'Type your answer to question 1', submitLabel: 'Next' });
+  assert.deepEqual(boxAnsweringFor(1, 3), { placeholder: 'Type your answer to question 2', submitLabel: 'Next' });
+  assert.deepEqual(boxAnsweringFor(2, 3), { placeholder: 'Type your answer to question 3', submitLabel: 'Send' });
+  // One question: no number, and the arrow sends.
+  assert.deepEqual(boxAnsweringFor(0, 1), { placeholder: 'Type your answer', submitLabel: 'Send' });
 });

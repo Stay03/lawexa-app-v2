@@ -126,7 +126,7 @@ test('the banner sits above every chat’s box, and the home box has none', () =
   // card docks between the slot and the box (question cards, design A), and the banner stays away.
   assert.match(
     dock,
-    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*\{openCard && \(\s*<QuestionDock[\s\S]*?\/>\s*\)\}\s*\{\/\*[^*]*\*\/\}\s*<div className=\{boxAway \? 'hidden' : undefined\}>\s*<ConversationComposer/,
+    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*\{openCard && \(\s*<QuestionDock[\s\S]*?\/>\s*\)\}\s*<ConversationComposer/,
   );
   // The home box carries only the plan-ended slot, never the moment banner.
   assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /ChatRatingSlot|ChatRatingBanner/);

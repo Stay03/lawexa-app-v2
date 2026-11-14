@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -24,7 +24,12 @@ import {
   subscribeFollowUpRefusals,
   useEmbeddedComposerSurface,
 } from '@/v2/features/conversations/conversation/embedded-composer';
-import { CARD_ANSWER_PLACEHOLDER, QuestionDock } from '@/v2/features/conversations/conversation/question-card/QuestionDock';
+import {
+  CARD_ANSWER_PLACEHOLDER,
+  QuestionDock,
+  type QuestionDockHandle,
+} from '@/v2/features/conversations/conversation/question-card/QuestionDock';
+import { useCardBox } from '@/v2/features/conversations/conversation/question-card/use-card-box';
 import { RouteSkeletonMark } from '@/v2/features/conversations/conversation/route-skeleton-mark';
 import { TranscriptSkeleton } from '@/v2/features/conversations/conversation/skeletons';
 import {
@@ -525,10 +530,15 @@ export function CaseChatComposerDock({
   // October 2026: "yes" for the case chat too).
   const conversationPending = conversationId !== null && surface === null;
   const viewOnly = surface !== null && surface.isOwnerResolved && !surface.canSend;
-  // The chat's open question card, for a reader who may answer: its questions
-  // are in Lawexa's answer, and this box offers a typed answer instead (see ChatDock).
+  // The chat's open question card, for a reader who may answer: it sits flush
+  // on this box, which offers a typed answer instead, and is the card's field
+  // while "Something else" is on (see ChatDock).
   const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
-  const [cardTyping, setCardTyping] = useState(false);
+  const cardDock = useRef<QuestionDockHandle>(null);
+  const cardBox = useCardBox(openCard, cardDock);
+  // The card fills and reads this box, so it needs the handle when the host passes none.
+  const ownBox = useRef<ConversationComposerHandle>(null);
+  const box = stageRef ?? ownBox;
 
   const createError = view === 'new' && start.error ? start.error : null;
 
@@ -594,49 +604,52 @@ export function CaseChatComposerDock({
           {openCard && surface && (
             <QuestionDock
               key={openCard.cardMessageId ?? openCard.rowId}
+              ref={cardDock}
               open={openCard}
               held={conversationPending || surface.isStreaming || surface.sendHeldBy !== null}
               onAnswer={surface.answerCard}
-              onTypingChange={setCardTyping}
+              box={box}
+              onBoxAnswering={cardBox.onBoxAnswering}
             />
           )}
-          {/* While the card's "Something else" field types, the box steps away: one place to type. */}
-          <div className={openCard && cardTyping ? 'hidden' : undefined}>
-            <ConversationComposer
-              draftScopeId={chatDraftScope(subject)}
-              placeholder={openCard ? CARD_ANSWER_PLACEHOLDER : `Ask about this ${CHAT_SUBJECT_NOUN[subject.kind]}`}
-              signedIn={signedIn}
-              showMeta={showMeta}
-              animateMeta={animateMeta}
-              onEngage={onEngage}
-              stageRef={stageRef}
-              holdSend={conversationPending}
-              jurisdiction={surface ? surface.jurisdiction : start.jurisdiction}
-              onJurisdictionChange={
-                surface ? surface.setJurisdiction : start.onJurisdictionChange
-              }
-              isConfidential={surface ? surface.isConfidential : false}
-              isRedacted={surface ? surface.isRedacted : false}
-              isStreaming={surface ? surface.isStreaming : false}
-              isCancelling={surface ? surface.isCancelling : false}
-              // A case chat in a space: a colleague's turn holds Send and offers
-              // no Stop, as on the chat's own screen (Spaces F4).
-              sendHeldBy={surface ? surface.sendHeldBy : null}
-              canStop={surface ? surface.canStop : true}
-              onSubmit={async (message, attachments) => {
-                // A refused send comes back to the composer, which gives the
-                // message back and says why.
-                if (surface) return surface.submit(message, attachments);
-                const ok = await start.start(message, attachments);
-                // The composer clears its draft optimistically; a failed create
-                // hands the text back for the retry. Attachments are the one
-                // loss (already uploaded, but their tray entries are gone) —
-                // re-attach on retry.
-                if (!ok) stageRef?.current?.stage(message);
-              }}
-              onStop={() => surface?.stop()}
-            />
-          </div>
+          <ConversationComposer
+            draftScopeId={chatDraftScope(subject)}
+            placeholder={openCard ? CARD_ANSWER_PLACEHOLDER : `Ask about this ${CHAT_SUBJECT_NOUN[subject.kind]}`}
+            {...cardBox.answering}
+            joinedAbove={openCard !== null}
+            signedIn={signedIn}
+            showMeta={showMeta}
+            animateMeta={animateMeta}
+            onEngage={onEngage}
+            stageRef={box}
+            holdSend={conversationPending}
+            jurisdiction={surface ? surface.jurisdiction : start.jurisdiction}
+            onJurisdictionChange={
+              surface ? surface.setJurisdiction : start.onJurisdictionChange
+            }
+            isConfidential={surface ? surface.isConfidential : false}
+            isRedacted={surface ? surface.isRedacted : false}
+            isStreaming={surface ? surface.isStreaming : false}
+            isCancelling={surface ? surface.isCancelling : false}
+            // A case chat in a space: a colleague's turn holds Send and offers
+            // no Stop, as on the chat's own screen (Spaces F4).
+            sendHeldBy={surface ? surface.sendHeldBy : null}
+            canStop={surface ? surface.canStop : true}
+            onSubmit={async (message, attachments) => {
+              // While the card's "Something else" is on, the box's send is the card's answer.
+              if (cardBox.answering) return cardBox.answer(message, attachments);
+              // A refused send comes back to the composer, which gives the
+              // message back and says why.
+              if (surface) return surface.submit(message, attachments);
+              const ok = await start.start(message, attachments);
+              // The composer clears its draft optimistically; a failed create
+              // hands the text back for the retry. Attachments are the one
+              // loss (already uploaded, but their tray entries are gone) —
+              // re-attach on retry.
+              if (!ok) box.current?.stage(message);
+            }}
+            onStop={() => surface?.stop()}
+          />
         </div>
       </div>
     </div>

@@ -249,6 +249,24 @@ export function optionKeyTarget(key: string, from: number | null, total: number)
   }
 }
 
+/**
+ * How the message box reads while it takes the answer to question `at` of
+ * `count` (question cards, design A V3: the box is the field for "Something
+ * else"): its hint names the question, and its arrow is "Next", or "Send" on
+ * the last question.
+ */
+export interface BoxAnswering {
+  placeholder: string;
+  submitLabel: 'Next' | 'Send';
+}
+
+export function boxAnsweringFor(at: number, count: number): BoxAnswering {
+  return {
+    placeholder: count > 1 ? `Type your answer to question ${at + 1}` : 'Type your answer',
+    submitLabel: at >= count - 1 ? 'Send' : 'Next',
+  };
+}
+
 /** Every question answered as skipped: the × on the card. */
 export function skipAllAnswers(questions: readonly QuestionCardQuestion[]): QuestionCardAnswer[] {
   return questions.map(() => ({ skipped: true }) as const);

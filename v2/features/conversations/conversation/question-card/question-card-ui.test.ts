@@ -22,8 +22,10 @@ test('a tap selects an option and moves nowhere; Next or Send confirms', () => {
   assert.match(questions, /setDraft\(\{ option: choice \}\);/);
   assert.match(questions, /onClick=\{\(\) => next\(\)\}/);
   assert.match(questions, /\{isLast \? \(sending \? 'Sending…' : 'Send'\) : 'Next'\}/);
-  // The answers go from two places only: Send on the last question (Next's), and × to skip them all.
-  assert.equal(questions.match(/void send\(/g)?.length, 2);
+  // The answers go from three places only: Send on the last question (Next's), × to skip them all, and the
+  // box's arrow on the last question while "Something else" is on (design A V3).
+  assert.equal(questions.match(/void send\(/g)?.length, 1);
+  assert.equal(questions.match(/await send\(/g)?.length, 2);
   // Each question starts on Lawexa's recommendation, or on nothing when there is none.
   assert.match(questions, /useState<\(QuestionCardAnswer \| null\)\[\]>\(\(\) => questions\.map\(startingAnswer\)\)/);
 });
@@ -105,23 +107,36 @@ test("the reader's answers come back as their own bubble, each question with its
 
 test('the choices are one Tab stop, and the arrow keys move the choice with the focus', () => {
   const questions = dock();
-  // "Something else" is the last choice in the group: the arrows reach it, and it puts the keyboard in its field.
+  // "Something else" is the last choice in the group: the arrows reach it, and the keyboard stays on the choices.
   assert.match(questions, /tabIndex=\{at === \(choiceAt \?\? 0\) \? 0 : -1\}/);
   assert.match(questions, /tabIndex=\{choiceAt === optionCount \? 0 : -1\}/);
-  assert.match(questions, /const target = optionKeyTarget\(event\.key, choiceAt, optionCount \+ 1\);[\s\S]{0,120}choose\(target\);[\s\S]{0,200}\.focus\(\);/);
+  assert.match(questions, /const target = optionKeyTarget\(event\.key, choiceAt, optionCount \+ 1\);[\s\S]{0,260}choose\(target, true\);[\s\S]{0,200}\.focus\(\);/);
+  assert.match(questions, /pointBox\(index, ownWords, !byKey\);/);
 });
 
-test('"Something else" becomes a field in place, the box steps away while it types, and its words are the answer', () => {
+test('"Something else" makes the box the field: the card sits on it, and its arrow is the one way on', () => {
   const questions = dock();
   assert.match(questions, /Something else/);
-  assert.match(questions, /\{ownChosen \? \(\s*<div className="[^"]*">\s*<PenLine[^>]*\/>\s*<input/);
-  assert.match(questions, /onFocus=\{\(\) => onTypingChange\(true\)\}\s*onBlur=\{\(\) => onTypingChange\(false\)\}/);
-  assert.match(questions, /maxLength=\{OTHER_ANSWER_MAX\}/);
+  // The card is flush on the box: no gap, no bottom corners or border; the box drops its top corners and gap.
+  assert.match(questions, /className="mx-4 flex max-h-\[60dvh\] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-border bg-card"/);
+  assert.match(read(conversation, 'ConversationComposer.tsx'), /joinedAbove=\{joinedAbove\}/);
+  // The jurisdiction row steps away: nothing sits between the card and the box.
+  assert.match(read(conversation, 'ConversationComposer.tsx'), /const showMeta = showMetaProp && !joinedAbove;/);
+  // The box holds the words for the question, and the reader's own draft waits aside.
+  assert.match(questions, /box\.current\?\.swap\(at === null \? \(replyDraft\.current \?\? ''\) : words\[at\]\)/);
+  // While it answers, the card's Next and Skip step away.
+  assert.match(questions, /\{!ownChosen && \(\s*<div className="[^"]*">\s*<button[\s\S]*?onClick=\{skip\}/);
+  // Its send is the answer: files and words over the limit come back with a reason.
   assert.match(questions, /export const OTHER_ANSWER_MAX = 2000;/);
-  assert.match(questions, /if \(event\.key === 'Enter' && !event\.nativeEvent\.isComposing\) \{\s*event\.preventDefault\(\);\s*next\(\);/);
-  // The box hides while the field types: one place to type.
-  assert.match(read(conversation, 'ChatDock.tsx'), /const boxAway = openCard !== null && cardTyping;/);
-  assert.match(caseChatCore(), /<div className=\{openCard && cardTyping \? 'hidden' : undefined\}>/);
+  assert.match(questions, /if \(attachments\.length > 0\) return \{ refused: ANSWER_FILES_COPY \};/);
+  assert.match(questions, /if \(text\.length > OTHER_ANSWER_MAX\) return \{ refused: ANSWER_TOO_LONG_COPY \};/);
+  // Both hosts route the box's send through the card, and take its hint and its arrow's name.
+  for (const host of [read(conversation, 'ChatDock.tsx'), caseChatCore()]) {
+    assert.match(host, /const cardBox = useCardBox\(openCard, cardDock\);/);
+    assert.match(host, /cardBox\.answering \? cardBox\.answer\(message, attachments\)|if \(cardBox\.answering\) return cardBox\.answer\(message, attachments\);/);
+    assert.match(host, /\{\.\.\.cardBox\.answering\}/);
+    assert.match(host, /joinedAbove/);
+  }
   // "Recommended" only on the option the server marks, after its label (wrapping under it when it must).
   assert.match(questions, /\{question\.recommended === at && <span className="[^"]*">Recommended<\/span>\}/);
 });

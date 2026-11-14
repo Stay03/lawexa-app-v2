@@ -15,7 +15,8 @@ import { earlyRuling } from './early-ruling';
 import { subscribeFollowUpRefusals } from './embedded-composer';
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { subscribeRouteReplies, useRouteComposerSurface } from './route-composer';
-import { CARD_ANSWER_PLACEHOLDER, QuestionDock } from './question-card/QuestionDock';
+import { CARD_ANSWER_PLACEHOLDER, QuestionDock, type QuestionDockHandle } from './question-card/QuestionDock';
+import { useCardBox } from './question-card/use-card-box';
 import { ComposerSkeleton } from './skeletons';
 import type { SendRefused } from './space-turn';
 import { ViewOnlyPill } from './ViewOnlyPill';
@@ -144,17 +145,16 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
   // not twice (the chat reopen fix, 16 October 2026). Pages that are not a
   // chat do not read the variable.
 
-  // The card's "Something else" field has the keyboard: the box steps away, so there is one place to type.
-  const [cardTyping, setCardTyping] = useState(false);
+  // Lawexa's open questions (question cards, design A: Stay, 13 November 2026):
+  // a card sits flush on the box and asks them, one at a time (V3: Stay, 14
+  // November 2026). The box reads "Or type a different answer", since a typed
+  // reply goes instead of the answers (the server marks the card skipped),
+  // and while "Something else" is on it is the card's field.
+  const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
+  const cardDock = useRef<QuestionDockHandle>(null);
+  const cardBox = useCardBox(openCard, cardDock);
 
   if (surface?.terminal) return null;
-
-  // Lawexa's open questions (question cards, design A: Stay, 13 November 2026):
-  // a card docked above the box asks them, one at a time, and the box reads
-  // "Or type a different answer", since a typed reply goes instead of the
-  // answers (the server marks the card skipped).
-  const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
-  const boxAway = openCard !== null && cardTyping;
 
   let content: React.ReactNode;
   if (surface) {
@@ -171,36 +171,39 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
         {openCard && (
           <QuestionDock
             key={openCard.cardMessageId ?? openCard.rowId}
+            ref={cardDock}
             open={openCard}
             held={surface.holdSend || surface.isStreaming || surface.sendHeldBy !== null}
             onAnswer={surface.answerCard}
-            onTypingChange={setCardTyping}
+            box={composerRef}
+            onBoxAnswering={cardBox.onBoxAnswering}
           />
         )}
-        {/* Kept mounted while the card's field types, so its own draft stays. */}
-        <div className={boxAway ? 'hidden' : undefined}>
-          <ConversationComposer
-            holdSend={surface.holdSend}
-            draftScopeId={conversationId}
-            stageRef={composerRef}
-            jurisdiction={surface.jurisdiction}
-            onJurisdictionChange={surface.setJurisdiction}
-            isConfidential={surface.isConfidential}
-            isRedacted={surface.isRedacted}
-            showMeta={surface.showMeta}
-            isStreaming={surface.isStreaming}
-            isCancelling={surface.isCancelling}
-            sendHeldBy={surface.sendHeldBy}
-            canStop={surface.canStop}
-            onSubmit={surface.submit}
-            onStop={surface.stop}
-            viewerId={userId}
-            mentionOptions={surface.mentionOptions}
-            quoteToneOf={surface.quoteToneOf}
-            spaceUuid={surface.spaceUuid}
-            {...(openCard && { placeholder: CARD_ANSWER_PLACEHOLDER })}
-          />
-        </div>
+        <ConversationComposer
+          holdSend={surface.holdSend}
+          draftScopeId={conversationId}
+          stageRef={composerRef}
+          jurisdiction={surface.jurisdiction}
+          onJurisdictionChange={surface.setJurisdiction}
+          isConfidential={surface.isConfidential}
+          isRedacted={surface.isRedacted}
+          showMeta={surface.showMeta}
+          isStreaming={surface.isStreaming}
+          isCancelling={surface.isCancelling}
+          sendHeldBy={surface.sendHeldBy}
+          canStop={surface.canStop}
+          // While the card's "Something else" is on, the box's send is the card's answer.
+          onSubmit={(message, attachments, replyTo) =>
+            cardBox.answering ? cardBox.answer(message, attachments) : surface.submit(message, attachments, replyTo)
+          }
+          onStop={surface.stop}
+          viewerId={userId}
+          mentionOptions={surface.mentionOptions}
+          quoteToneOf={surface.quoteToneOf}
+          spaceUuid={surface.spaceUuid}
+          {...(openCard && { placeholder: CARD_ANSWER_PLACEHOLDER, joinedAbove: true })}
+          {...cardBox.answering}
+        />
       </>
     ) : (
       <ViewOnlyPill reason={surface.viewOnlyReason} />

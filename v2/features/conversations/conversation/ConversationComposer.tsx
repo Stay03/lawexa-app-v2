@@ -177,6 +177,14 @@ export interface ConversationComposerHandle {
    * with the draft. Focuses the box, as WhatsApp does.
    */
   reply: (target: MessageReplyTo) => void;
+  /**
+   * Put this text in the box and give back what was there (question cards:
+   * while the box takes an answer to Lawexa's question, the reader's own draft
+   * waits aside and comes back after). Does not steal focus.
+   */
+  swap: (text: string) => string;
+  /** Give the box the keyboard. */
+  focus: () => void;
 }
 
 export interface ConversationComposerProps {
@@ -206,6 +214,18 @@ export interface ConversationComposerProps {
   onStop: () => void;
   /** Textarea placeholder — embedding surfaces brand it ("Ask about this case"). */
   placeholder?: string;
+  /**
+   * What Send says to a screen reader and in its tooltip when it is not held:
+   * "Next" or "Send" while the box takes an answer to Lawexa's question.
+   * Unset, it is "Send message".
+   */
+  submitLabel?: string;
+  /**
+   * A card sits flush on the box (Lawexa's questions, design A V3: Stay, 14
+   * November 2026): the box drops its top gap, its top corners and the
+   * jurisdiction row between them, so the two read as one. Default false.
+   */
+  joinedAbove?: boolean;
   /** False hides the jurisdiction meta row and disables its jurisdictions query
    *  (guests). Default true — the `/c/{id}` composer only renders for owners. */
   signedIn?: boolean;
@@ -279,8 +299,10 @@ export function ConversationComposer({
   onSubmit,
   onStop,
   placeholder = 'Ask a follow-up',
+  submitLabel,
+  joinedAbove = false,
   signedIn = true,
-  showMeta = true,
+  showMeta: showMetaProp = true,
   animateMeta = true,
   disabled = false,
   holdSend = false,
@@ -293,6 +315,8 @@ export function ConversationComposer({
   quoteToneOf = null,
   spaceUuid = null,
 }: ConversationComposerProps) {
+  // A card joined on top takes the jurisdiction row's place: nothing sits between the two.
+  const showMeta = showMetaProp && !joinedAbove;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -392,8 +416,13 @@ export function ConversationComposer({
         setReply(target);
         rootRef.current?.querySelector('textarea')?.focus();
       },
+      swap: (text) => {
+        setInput(text);
+        return input;
+      },
+      focus: () => rootRef.current?.querySelector('textarea')?.focus(),
     }),
-    [setInput, updateInput, setReply],
+    [setInput, updateInput, setReply, input],
   );
   const [uploads, setUploads] = useState<FileUploadEntry[]>([]);
   const [removing, setRemoving] = useState<Set<string>>(new Set());
@@ -625,6 +654,8 @@ export function ConversationComposer({
 
   const sendLabel =
     isStreaming && !canStop ? heldSendLabel(sendHeldBy ?? UNNAMED_ASKER) : 'Send message';
+  // The host's name for the arrow (a question card's "Next" or "Send"), unless a colleague's turn holds it.
+  const arrowLabel = submitLabel !== undefined && !(isStreaming && !canStop) ? submitLabel : sendLabel;
 
   return (
     // Width comes from the CONTAINER (the /c/{id} overlay carries the compact
@@ -632,7 +663,7 @@ export function ConversationComposer({
     // fills the same gutters and no two states can disagree about size.
     <div
       ref={rootRef}
-      className="relative w-full px-4 pb-3 pt-2"
+      className={cn('relative w-full px-4 pb-3', joinedAbove ? 'pt-0' : 'pt-2')}
       onKeyDown={(event) => {
         // Escape takes the reply off, as the bar's ✕ does, unless it was
         // closing something else first (the country popover, a pasted card's
@@ -993,6 +1024,7 @@ export function ConversationComposer({
           // Downward-biased soft drop (not shadow-lg) so the floating pill casts NO
           // visible shade band UP into the transcript / jurisdiction chip (owner).
           className="shadow-[0_6px_16px_-8px_rgba(0,0,0,0.28)]"
+          joinedAbove={joinedAbove}
         >
           {/* ── The single input row: + menu | textarea | Send/Stop. ── */}
           <div className="flex items-end gap-1.5">
@@ -1118,14 +1150,14 @@ export function ConversationComposer({
               // While a turn runs that this reader may not stop (a colleague's,
               // Spaces F4), Send stays in place, held, and says whose answer it
               // waits for.
-              <PromptInputAction tooltip={sendLabel}>
+              <PromptInputAction tooltip={arrowLabel}>
                 <Button
                   type="button"
                   size="icon"
                   className="v2-interactive bg-primary hover:bg-primary/90 size-8 shrink-0 rounded-full"
                   onClick={handleSubmit}
                   disabled={!canSend || isStreaming}
-                  aria-label={sendLabel}
+                  aria-label={arrowLabel}
                 >
                   {isSubmitting ? (
                     <Loader2 className="size-4 animate-spin" />
