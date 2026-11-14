@@ -8,6 +8,7 @@ import { Hourglass, Link2, LogOut, Pencil, Trash2, Trophy, Users } from 'lucide-
 import { GameOverlay } from '@/v2/features/channels/quiz/GameOverlay';
 import { LiveQuizBar } from '@/v2/features/channels/quiz/LiveQuizBar';
 import { QuizLibrarySheet } from '@/v2/features/channels/quiz/QuizLibrarySheet';
+import { spaceQuizSeat } from '@/v2/features/channels/quiz/space-quiz-seat';
 import { useSpaceLiveQuiz } from '@/v2/features/channels/quiz/use-space-live-quiz';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
@@ -27,7 +28,7 @@ import {
   defaultSpaceTab,
   parseSpaceTab,
   spaceMenuItems,
-  viewerContentRole,
+  type MembershipSubject,
   type SpaceMenuItem,
   type SpaceTab,
 } from '../model';
@@ -77,6 +78,8 @@ import {
  */
 /** Stable empty reference — a fresh `[]` per render would churn the publish. */
 const NO_SCREEN_ACTIONS: readonly ScreenAction[] = [];
+/** No membership known, before the Space frame has one. */
+const NO_MEMBERSHIP: MembershipSubject = { my_role: null };
 
 export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   // `useSearchParams` (the tab) needs a boundary; its fallback is the route's
@@ -161,16 +164,14 @@ function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {
   /* ── The Space's live quiz (Arthur's decisions 93142269) ──────────────────
      Members hear its games and open `?game=` (a `space_quiz_live`
      notification's link); its Owner and Contributors host, from the menu
-     below. A game started here names no chat. */
+     below. A game started here names no chat. Membership is the frame's
+     settled answer, not the detail's `my_role` alone (`spaceQuizSeat`). */
   const liveQuiz = useSpaceLiveQuiz({
-    seat: space
-      ? {
-          uuid: space.uuid,
-          name: space.name,
-          isMember: space.my_role != null,
-          contentRole: viewerContentRole(space),
-        }
-      : undefined,
+    seat: spaceQuizSeat({
+      space,
+      membership: scope?.membership ?? NO_MEMBERSHIP,
+      rosterPending: scope?.isMembersPending ?? true,
+    }),
     conversationUuid: null,
     initialGameUuid: searchParams.get('game'),
   });

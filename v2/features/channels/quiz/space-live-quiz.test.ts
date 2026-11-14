@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { canHostInSpace } from './model';
+import { spaceQuizSeat } from './space-quiz-seat';
 
 /* Live quiz in Spaces, step 2 (Arthur's decisions 93142269; Backend's shapes
  * 7a007a8c): the Space's page and its chats show the Space's live bar, open
@@ -40,7 +41,8 @@ test('a game over a page that scrolls in the shell covers the window', () => {
 
 test('the Space page: live bar and host sheet for members, the game over the window, Host in the menu', () => {
   const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
-  assert.match(screen, /isMember: space\.my_role != null,\s*contentRole: viewerContentRole\(space\),/);
+  // Membership is the frame's settled answer, not the detail's `my_role` alone.
+  assert.match(screen, /seat: spaceQuizSeat\(\{\s*space,\s*membership: scope\?\.membership \?\? NO_MEMBERSHIP,\s*rosterPending: scope\?\.isMembersPending \?\? true,\s*\}\),/);
   assert.match(screen, /conversationUuid: null,\s*initialGameUuid: searchParams\.get\('game'\),/);
   assert.match(screen, /\{liveQuiz\.room && liveQuiz\.isMember && \(\s*<LiveQuizBar/);
   // A card in the page's column, aligned with the header (fixture pictures).
@@ -84,4 +86,20 @@ test('a chat’s quiz line is the channels’ quiz card for a member, and the se
   const feed = read('v2', 'features', 'channels', 'feed', 'ChannelFeed.tsx');
   assert.match(feed, /import \{ QuizGameCard \} from '\.\.\/quiz\/QuizGameCard';/);
   assert.match(feed, /finished: item\.message\.metadata\.type === 'quiz_game_finished',/);
+});
+
+test("a Space's owner is a member even when the Space's detail leaves out my_role", () => {
+  const space = { uuid: 'space-1', name: 'TEST DATA Space' };
+  // The frame's answer from the member list: the owner.
+  assert.deepEqual(spaceQuizSeat({ space, membership: { kind: 'team', my_role: 'owner' }, rosterPending: false }), {
+    uuid: 'space-1',
+    name: 'TEST DATA Space',
+    isMember: true,
+    contentRole: 'owner',
+  });
+  // Not known yet: the detail has no role and the member list is still on its way. `?game=` waits.
+  assert.equal(spaceQuizSeat({ space, membership: { my_role: null }, rosterPending: true }), undefined);
+  assert.equal(spaceQuizSeat({ space: null, membership: { my_role: 'owner' }, rosterPending: false }), undefined);
+  // Known, and not a member: the link is refused.
+  assert.equal(spaceQuizSeat({ space, membership: { my_role: null }, rosterPending: false })?.isMember, false);
 });
