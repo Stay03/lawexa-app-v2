@@ -42,16 +42,26 @@ export interface Refusal {
 export const CANCEL_FAILED: Refusal = { text: "Your request wasn't taken back. Try again in a moment.", offerAccount: false };
 
 /**
- * The server's 409 ("already an active member") is not a refusal: the reader
- * is in, and a list read before they joined still offered Join. The card opens
- * the Space (Arthur, 14 November 2026; Backend's list of join answers).
+ * "Already an active member" is not a refusal: the reader is in, and a list
+ * read before they joined still offered Join, so the card opens the Space
+ * (Arthur, 14 November 2026). Only the server's code says so
+ * (`errors.code: "already_member"`, Backend): any other 409, a Space that is
+ * full one day, shows its own message and opens nothing (Fable's review).
  */
-export function joinOpensSpace(status: number | undefined): boolean {
-  return status === 409;
+export function joinOpensSpace(status: number | undefined, code: unknown): boolean {
+  return status === 409 && code === 'already_member';
 }
 
-/** Why a join was refused (never a 409: `joinOpensSpace`). */
-export function joinRefusal(status: number | undefined, hasAccount: boolean): Refusal {
+/** The `errors.code` of a refused join, when the server sent one. */
+export function joinErrorCode(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || !('errors' in body)) return undefined;
+  const errors = (body as { errors: unknown }).errors;
+  return errors && typeof errors === 'object' && 'code' in errors ? (errors as { code: unknown }).code : undefined;
+}
+
+/** Why a join was refused. A 409 that is not `already_member` says the server's own words. */
+export function joinRefusal(status: number | undefined, hasAccount: boolean, message?: string): Refusal {
+  if (status === 409) return { text: message?.trim() || "That didn't work. Try again in a moment.", offerAccount: false };
   if (status === 404) return { text: 'This space is no longer public.', offerAccount: false };
   if (status === 403) {
     return hasAccount

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { joinOutcome } from '@/lib/utils/space-join';
-import { CANCEL_FAILED, discoverAction, joinOpensSpace, joinRefusal } from './discover-model';
+import { CANCEL_FAILED, discoverAction, joinErrorCode, joinOpensSpace, joinRefusal } from './discover-model';
 
 /* Public Spaces (Arthur's A, 12 November 2026, thread dcd06933): anyone new
  * joins a public Space at once from Discover; someone the Owner removed or
@@ -49,8 +49,10 @@ test('a joined reader goes into the Space; a request stays on the card as Reques
  * before the join), and the server's 409 "already an active member" read as a
  * failure. A 409 means they are in: the card opens the Space. */
 test('a 409 on Join opens the Space, and every join answer reads the list again', () => {
-  assert.equal(joinOpensSpace(409), true);
-  for (const status of [403, 404, 500, undefined]) assert.equal(joinOpensSpace(status), false, String(status));
+  // Backend's answer: { success: false, message, errors: { code: 'already_member' } }.
+  const already = { success: false, message: 'You are already an active member of this space.', errors: { code: 'already_member' } };
+  assert.equal(joinOpensSpace(409, joinErrorCode(already)), true);
+  for (const status of [403, 404, 500, undefined]) assert.equal(joinOpensSpace(status, 'already_member'), false, String(status));
   // Backend's membership answer: pending is `is_pending`; the Space is `space.uuid`.
   assert.equal(joinOutcome(201, { id: 7, is_active: true, is_pending: false, space: { uuid: 'TEST DATA' } }), 'joined');
   assert.equal(joinOutcome(201, { id: 7, is_active: false, is_pending: true, space: { uuid: 'TEST DATA' } }), 'pending');
@@ -58,8 +60,21 @@ test('a 409 on Join opens the Space, and every join answer reads the list again'
   // The list is read on every visit, so a member sees Open, not a Join that answers 409.
   assert.match(read('v2', 'features', 'invites', 'queries.ts'), /queryFn: \(\) => discoverApi\.spaces\(params\),[\s\S]{0,400}?staleTime: STALE_TIMES\.live,/);
   const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
-  assert.match(screen, /if \(joinOpensSpace\(status\)\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*else setRefusal\(joinRefusal\(status, hasAccount\)\);/);
+  assert.match(screen, /if \(joinOpensSpace\(response\?\.status, joinErrorCode\(response\?\.data\)\)\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*else setRefusal\(joinRefusal\(response\?\.status, hasAccount, response\?\.data\?\.message\)\);/);
   assert.match(read('v2', 'features', 'invites', 'queries.ts'), /onSettled: \(\) => \{\s*void client\.invalidateQueries\(\{ queryKey: \['discover-spaces'\] \}\);/);
+});
+
+/* Fable's review of 10b9bb67: only the code means "already a member". A 409
+ * without it (before Backend's branch is live, or a future refusal such as a
+ * full Space) shows the server's message and opens nothing. TEST DATA. */
+test('a 409 without the already_member code shows its message and does not open the Space', () => {
+  const full = { success: false, message: 'TEST DATA. This space is full.', errors: null };
+  assert.equal(joinErrorCode(full), undefined);
+  assert.equal(joinOpensSpace(409, joinErrorCode(full)), false);
+  assert.equal(joinOpensSpace(409, 'space_full'), false);
+  assert.equal(joinRefusal(409, true, full.message).text, 'TEST DATA. This space is full.');
+  assert.equal(joinRefusal(409, true, '').text, "That didn't work. Try again in a moment.");
+  assert.equal(joinRefusal(409, false, full.message).offerAccount, false);
 });
 
 test('a request that could not be taken back says so', () => {

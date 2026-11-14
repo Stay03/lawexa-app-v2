@@ -24,17 +24,24 @@ export const DISCOVER_QUERY_ROOT = ['discover-spaces'] as const;
 
 /**
  * Where an accepted invite goes. The Space comes from the answer's membership
- * (`member.space.uuid`), else from the preview the screen already holds; the
- * channel from the preview (the answer does not name it); the game from the
- * answer, else the preview.
+ * (`member.space.uuid`), else from the preview the screen already holds. The
+ * channel comes from the answer alone (`channel_member.channel.uuid`): the
+ * preview names the link's channel for everyone, but the server adds only
+ * some people to it, so a Student who accepts a channel link lands in the
+ * Space, never in a channel they cannot open (Fable's review, 14 November
+ * 2026). The game comes from the answer, else the preview.
  */
 export function acceptedDestination(
-  invite: Pick<InvitePreview, 'space_uuid' | 'channel_uuid' | 'game'> | null,
+  invite: Pick<InvitePreview, 'space_uuid' | 'game'> | null,
   result: InviteAcceptResult,
 ): InviteDestination | null {
   const space = result.member?.space?.uuid ?? invite?.space_uuid;
   if (!space) return null;
-  return { space_uuid: space, channel_uuid: invite?.channel_uuid ?? null, game_uuid: result.game_uuid ?? invite?.game?.uuid ?? null };
+  return {
+    space_uuid: space,
+    channel_uuid: result.channel_member?.channel?.uuid ?? null,
+    game_uuid: result.game_uuid ?? invite?.game?.uuid ?? null,
+  };
 }
 
 /** Where an accepted invite lands: in the game for a game link, else the channel or the Space. */

@@ -17,7 +17,7 @@ import {
   useDiscoverSpaces,
   useJoinPublicSpace,
 } from '@/v2/features/invites/queries';
-import { CANCEL_FAILED, discoverAction, joinOpensSpace, joinRefusal, type Refusal } from './discover-model';
+import { CANCEL_FAILED, discoverAction, joinErrorCode, joinOpensSpace, joinRefusal, type Refusal } from './discover-model';
 
 /**
  * DiscoverScreen — the public spaces anybody can find, and the way in.
@@ -66,9 +66,9 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
         if (outcome === 'joined') router.push(`/spaces/${space.uuid}`);
       },
       onError: (error) => {
-        const status = isAxiosError(error) ? error.response?.status : undefined;
-        if (joinOpensSpace(status)) router.push(`/spaces/${space.uuid}`);
-        else setRefusal(joinRefusal(status, hasAccount));
+        const response = isAxiosError<{ message?: string }>(error) ? error.response : undefined;
+        if (joinOpensSpace(response?.status, joinErrorCode(response?.data))) router.push(`/spaces/${space.uuid}`);
+        else setRefusal(joinRefusal(response?.status, hasAccount, response?.data?.message));
       },
     });
   };

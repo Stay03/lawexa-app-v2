@@ -2187,7 +2187,8 @@ export interface InvitePreview {
   space_type: SpaceType;
   member_count: number;
   inviter_name: string | null;
-  /** The channel the link named, when it named one (Backend, 14 November 2026). */
+  /** The channel the link names, for every viewer. NOT where the reader lands:
+   *  accept adds only some people to it (see `InviteAcceptResult.channel_member`). */
   channel_uuid?: string | null;
   /** The channel the link named, when it named one. */
   channel_name: string | null;
@@ -2226,6 +2227,13 @@ export type InviteAcceptStatus =
 export interface InviteAcceptResult {
   status: InviteAcceptStatus;
   member?: { space?: { uuid: string } | null } | null;
+  /**
+   * The reader's place in the link's channel (a ChannelMemberResource, with
+   * its channel loaded), or null: not a channel link, or a reader the server
+   * did not add to it (accept adds Researchers and above only; Fable's review,
+   * 14 November 2026). Only this says the reader is in the channel.
+   */
+  channel_member?: { channel?: { uuid: string } | null; is_active?: boolean } | null;
   /** A game link's game, to open next; null for an ordinary link. */
   game_uuid?: string | null;
 }

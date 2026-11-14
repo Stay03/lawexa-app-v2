@@ -29,7 +29,7 @@ const ACCEPTED = {
   channel_member: null,
   game_uuid: null,
 };
-const PREVIEW = { space_uuid: 'TEST-DATA-space-uuid', channel_uuid: null, game: null };
+const PREVIEW = { space_uuid: 'TEST-DATA-space-uuid', game: null };
 
 test('an accepted invite opens the Space named in the answer, never /spaces/undefined', () => {
   const opened = acceptedDestination(PREVIEW, ACCEPTED);
@@ -38,12 +38,26 @@ test('an accepted invite opens the Space named in the answer, never /spaces/unde
   // The answer alone is enough, and so is the preview alone.
   assert.equal(joinedDestination(acceptedDestination(null, ACCEPTED)!), '/spaces/TEST-DATA-space-uuid');
   assert.equal(joinedDestination(acceptedDestination(PREVIEW, { status: 'already_member' })!), '/spaces/TEST-DATA-space-uuid');
-  // A game link: the game from the answer; a channel link: the channel from the preview.
+  // A game link: the game from the answer; a channel link: the channel from the answer.
   assert.equal(joinedDestination(acceptedDestination(PREVIEW, { ...ACCEPTED, game_uuid: 'g-1' })!), '/spaces/TEST-DATA-space-uuid?game=g-1');
-  assert.equal(joinedDestination(acceptedDestination({ ...PREVIEW, channel_uuid: 'c-1' }, ACCEPTED)!), '/channels/c-1');
+  assert.equal(joinedDestination(acceptedDestination(PREVIEW, { ...ACCEPTED, channel_member: { channel: { uuid: 'c-1' }, is_active: true } })!), '/channels/c-1');
   // With neither, there is nowhere to go: the screen says it failed rather than open a broken link.
   assert.equal(acceptedDestination(null, { status: 'joined', member: null }), null);
   for (const href of [joinedDestination(opened)]) assert.doesNotMatch(href, /undefined/);
+});
+
+/* Fable's review of 10b9bb67: the preview names a channel link's channel for
+ * everyone, but accept adds only Researchers and above to it. A Student who
+ * accepts gets channel_member: null and must land in the Space. TEST DATA. */
+test('a Student who accepts a channel link opens the Space, never the channel they were not added to', () => {
+  const linkToChannel = { space_uuid: 'TEST-DATA-space-uuid', channel_uuid: 'TEST-DATA-channel-uuid', game: null };
+  const student = { ...ACCEPTED, channel_member: null };
+  assert.equal(joinedDestination(acceptedDestination(linkToChannel, student)!), '/spaces/TEST-DATA-space-uuid');
+  // A Researcher on the same link is in the channel, and lands there.
+  const researcher = { ...ACCEPTED, channel_member: { channel: { uuid: 'TEST-DATA-channel-uuid' }, is_active: true } };
+  assert.equal(joinedDestination(acceptedDestination(linkToChannel, researcher)!), '/channels/TEST-DATA-channel-uuid');
+  // The rule reads no channel from the preview at all.
+  assert.doesNotMatch(read('components', 'join', 'join-model.ts'), /invite\?\.channel_uuid/);
 });
 
 test('the join screen opens the answer’s Space and reads the public-space list again', () => {
