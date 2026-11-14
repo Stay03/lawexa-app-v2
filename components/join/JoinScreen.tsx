@@ -13,10 +13,11 @@ import { quizGamesApi } from '@/lib/api/channel-quiz';
 import { inviteLinksApi } from '@/lib/api/collab';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { InviteAcceptResult, InvitePreview } from '@/types/collab';
+import type { InviteAcceptResponse, InviteAcceptResult, InvitePreview } from '@/types/collab';
 import { SPACES_QUERY_ROOT, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
 import {
   forgetPendingInvite,
+  pendingInviteWatches,
   rememberPendingInvite,
   signInToJoinHref,
   signUpToJoinHref,
@@ -151,6 +152,8 @@ const QUIZ_TILE =
 export function JoinScreen({ code }: { code: string }) {
   const router = useRouter();
   const [failed, setFailed] = useState<string | null>(null);
+  /** A game link's pressed choice, for its button's spinner. */
+  const [chosen, setChosen] = useState<'play' | 'watch' | null>(null);
 
   // The answer is about WHO is asking (`viewer_action`), so it is cached per
   // viewer: the "sign up" answer a signed-out visitor got must not be reused
@@ -180,17 +183,19 @@ export function JoinScreen({ code }: { code: string }) {
    * and the return from sign-in.
    */
   const enter = useMutation({
-    mutationFn: async (destination: Pick<InviteAcceptResult, 'space_uuid' | 'channel_uuid' | 'game_uuid'>) => {
-      if (destination.game_uuid) await quizGamesApi.join(destination.game_uuid).catch(() => undefined);
+    mutationFn: async (destination: Pick<InviteAcceptResult, 'space_uuid' | 'channel_uuid' | 'game_uuid'> & { play: boolean }) => {
+      // Play joins the game; Watch lands as a watcher, with the game's Join still there.
+      if (destination.game_uuid && destination.play) await quizGamesApi.join(destination.game_uuid).catch(() => undefined);
       await queryClient.invalidateQueries({ queryKey: SPACES_QUERY_ROOT });
       return destination;
     },
     onSuccess: (destination) => router.replace(joinedDestination(destination)),
   });
 
-  const accept = useMutation({
+  // Its variable, `play`, is a game link's choice (Play or Watch); true for any other link.
+  const accept = useMutation<InviteAcceptResponse, Error, boolean>({
     mutationFn: () => inviteLinksApi.accept(code),
-    onSuccess: (response) => {
+    onSuccess: (response, play) => {
       // `already_member` and `already_waiting` are SUCCESSES. Pressing twice —
       // or coming back to a link you already used — must never draw an error.
       forgetPendingInvite();
@@ -199,7 +204,7 @@ export function JoinScreen({ code }: { code: string }) {
         setFailed(null);
         return;
       }
-      enter.mutate(data);
+      enter.mutate({ ...data, play });
     },
     onError: (error) => {
       // A refused join lets the held code go: it would otherwise bring the
@@ -218,10 +223,12 @@ export function JoinScreen({ code }: { code: string }) {
   const heldSpace = preview.data?.data.space_uuid;
   const heldGame = preview.data?.data.game?.uuid ?? null;
   useEffect(() => {
-    if ((heldAction === 'join' || heldAction === 'request') && accept.isIdle) accept.mutate();
+    // The choice made before sign-in (Play unless Watch was picked) is the one carried out.
+    if ((heldAction === 'join' || heldAction === 'request') && accept.isIdle) accept.mutate(!pendingInviteWatches());
     if (heldAction === 'already_member' && heldSpace && enter.isIdle) {
+      const play = !pendingInviteWatches();
       forgetPendingInvite();
-      enter.mutate({ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame });
+      enter.mutate({ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame, play });
     }
   }, [heldAction, heldSpace, heldGame, accept, enter]);
 
@@ -290,21 +297,30 @@ export function JoinScreen({ code }: { code: string }) {
   // Joining, or on the way into the Space and the game.
   const busy = accept.isPending || enter.isPending || enter.isSuccess;
 
-  const press = () => {
+  /** `play`: a game link's Play (true) or Watch (false); true for any other link. */
+  const press = (play = true) => {
     setFailed(null);
+    setChosen(play ? 'play' : 'watch');
     if (action === 'already_member') {
-      enter.mutate({ space_uuid: invite.space_uuid, channel_uuid: null, game_uuid: game?.uuid ?? null });
+      enter.mutate({ space_uuid: invite.space_uuid, channel_uuid: null, game_uuid: game?.uuid ?? null, play });
       return;
     }
     if (action === 'sign_up' || action === 'verify_email') {
-      // Hold it BEFORE leaving, so coming back finishes the join. Sign-in
-      // comes back here by its `?redirect=`; its form's Sign up link too.
-      rememberPendingInvite(code);
+      // Hold it BEFORE leaving, with the choice, so coming back finishes the
+      // join as chosen. Sign-in comes back here by its `?redirect=`; its
+      // form's Sign up link too.
+      rememberPendingInvite(code, !play);
       router.push(action === 'sign_up' ? signInToJoinHref(code) : '/check-email');
       return;
     }
-    accept.mutate();
+    accept.mutate(play);
   };
+  /**
+   * PLAY OR WATCH, UP FRONT (Arthur, 14 November 2026): a game link asks
+   * which before anything else, so the next screen is the one they picked.
+   * Not for a link that waits on approval: that one only asks to join.
+   */
+  const choosesMode = game !== null && action !== 'request';
 
   const spaceLines = (
     <>
@@ -390,17 +406,37 @@ export function JoinScreen({ code }: { code: string }) {
           </p>
         ) : null}
 
-        <Button
-          size="lg"
-          className={cn('mt-7 w-full', game && QUIZ_BUTTON)}
-          onClick={press}
-          disabled={busy}
-        >
-          {busy ? (
-            <Loader2 aria-hidden className="size-4 animate-spin" />
-          ) : null}
-          {joinActionLabel(action, game !== null)}
-        </Button>
+        {choosesMode ? (
+          <div className="mt-7 flex flex-col gap-3">
+            <Button size="lg" className={cn('w-full', QUIZ_BUTTON)} onClick={() => press(true)} disabled={busy}>
+              {busy && chosen === 'play' ? (
+                <Loader2 aria-hidden className="size-4 animate-spin" />
+              ) : null}
+              Play
+            </Button>
+            <Button size="lg" className={cn('w-full', QUIZ_QUIET_BUTTON)} onClick={() => press(false)} disabled={busy}>
+              {busy && chosen === 'watch' ? (
+                <Loader2 aria-hidden className="size-4 animate-spin" />
+              ) : null}
+              Watch
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              {action === 'sign_up' ? 'You will sign in first. ' : ''}Watching, you can join the game at any time.
+            </p>
+          </div>
+        ) : (
+          <Button
+            size="lg"
+            className={cn('mt-7 w-full', game && QUIZ_BUTTON)}
+            onClick={() => press()}
+            disabled={busy}
+          >
+            {busy ? (
+              <Loader2 aria-hidden className="size-4 animate-spin" />
+            ) : null}
+            {joinActionLabel(action, game !== null)}
+          </Button>
+        )}
 
         {/* A new person signs up instead, and comes back here the same way. */}
         {action === 'sign_up' ? (

@@ -76,7 +76,8 @@ test('the join screen sends a signed-out viewer to sign in first, with sign-up b
   const screen = read('components', 'join', 'JoinScreen.tsx');
   // The button's words live in join-model.ts since the game link.
   assert.match(read('components', 'join', 'join-model.ts'), /sign_up: 'Sign in to join',/);
-  assert.match(screen, /rememberPendingInvite\(code\);\s*router\.push\(action === 'sign_up' \? signInToJoinHref\(code\) : '\/check-email'\);/);
+  // Held with a game link's choice (Watch), so coming back carries it out.
+  assert.match(screen, /rememberPendingInvite\(code, !play\);\s*router\.push\(action === 'sign_up' \? signInToJoinHref\(code\) : '\/check-email'\);/);
   assert.match(screen, /href=\{signUpToJoinHref\(code\)\}\s*onClick=\{\(\) => rememberPendingInvite\(code\)\}/);
   assert.doesNotMatch(screen, /router\.push\([^)]*'\/register'/);
 });
@@ -84,14 +85,15 @@ test('the join screen sends a signed-out viewer to sign in first, with sign-up b
 test('back with this invite\'s code, the join finishes without a second tap, once', () => {
   const screen = read('components', 'join', 'JoinScreen.tsx');
   assert.match(screen, /const held = usePendingInvite\(\) === code;/);
-  assert.match(screen, /if \(\(heldAction === 'join' \|\| heldAction === 'request'\) && accept\.isIdle\) accept\.mutate\(\);/);
+  // The choice made before sign-in (Play unless Watch) is the one carried out.
+  assert.match(screen, /if \(\(heldAction === 'join' \|\| heldAction === 'request'\) && accept\.isIdle\) accept\.mutate\(!pendingInviteWatches\(\)\);/);
   // Already a member: straight into the Space, or into its game for a game link (`enter`).
   assert.match(
     screen,
-    /if \(heldAction === 'already_member' && heldSpace && enter\.isIdle\) \{\s*forgetPendingInvite\(\);\s*enter\.mutate\(\{ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame \}\);/,
+    /if \(heldAction === 'already_member' && heldSpace && enter\.isIdle\) \{\s*const play = !pendingInviteWatches\(\);\s*forgetPendingInvite\(\);\s*enter\.mutate\(\{ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame, play \}\);/,
   );
   // Success and refusal both let the code go, so it never pulls the person back again.
-  assert.match(screen, /onSuccess: \(response\) => \{[\s\S]{0,300}forgetPendingInvite\(\);/);
+  assert.match(screen, /onSuccess: \(response, play\) => \{[\s\S]{0,300}forgetPendingInvite\(\);/);
   assert.match(screen, /onError: \(error\) => \{[\s\S]{0,300}forgetPendingInvite\(\);/);
 });
 

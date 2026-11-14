@@ -34,11 +34,16 @@ test('the join screen names the quiz and every way through lands by the one rule
   const screen = read('components', 'join', 'JoinScreen.tsx');
   // Every way through (accepted, back from sign-in, already a member) goes into
   // the game first and lands by the one rule (`enter`, 14 November 2026).
-  assert.match(screen, /enter\.mutate\(data\);/);
-  assert.match(screen, /enter\.mutate\(\{ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame \}\);/);
-  assert.match(screen, /enter\.mutate\(\{ space_uuid: invite\.space_uuid, channel_uuid: null, game_uuid: game\?\.uuid \?\? null \}\);/);
+  assert.match(screen, /enter\.mutate\(\{ \.\.\.data, play \}\);/);
+  assert.match(screen, /enter\.mutate\(\{ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame, play \}\);/);
+  assert.match(screen, /enter\.mutate\(\{ space_uuid: invite\.space_uuid, channel_uuid: null, game_uuid: game\?\.uuid \?\? null, play \}\);/);
   assert.match(screen, /onSuccess: \(destination\) => router\.replace\(joinedDestination\(destination\)\),/);
   assert.match(screen, /\{game\.quiz_title\}/);
+  // A game link asks Play or Watch up front (Arthur, 14 November 2026); a link
+  // waiting on approval, and any other invite, keeps its one button.
+  assert.match(screen, /const choosesMode = game !== null && action !== 'request';/);
+  assert.match(screen, /onClick=\{\(\) => press\(true\)\}[\s\S]{0,300}Play/);
+  assert.match(screen, /onClick=\{\(\) => press\(false\)\}[\s\S]{0,300}Watch/);
   assert.match(screen, /\{joinActionLabel\(action, game !== null\)\}/);
 });
 
@@ -75,9 +80,10 @@ test("the join reads every Space query again: its key root is v2's spacesQueries
   assert.match(queries, /all: \['spaces'\] as const,/);
 });
 
-test('a game link joins the game before it opens the lobby, on every way in', () => {
+test('a game link chosen to Play joins the game before it opens the lobby, on every way in', () => {
   const screen = readFileSync(join(process.cwd(), 'components', 'join', 'JoinScreen.tsx'), 'utf8');
-  assert.match(screen, /if \(destination\.game_uuid\) await quizGamesApi\.join\(destination\.game_uuid\)\.catch\(\(\) => undefined\);/);
+  // Watch lands as a watcher, with the game's Join still there.
+  assert.match(screen, /if \(destination\.game_uuid && destination\.play\) await quizGamesApi\.join\(destination\.game_uuid\)\.catch\(\(\) => undefined\);/);
   assert.match(screen, /await queryClient\.invalidateQueries\(\{ queryKey: SPACES_QUERY_ROOT \}\);/);
   // Join, Open the game, and the return from sign-in all go through it.
   assert.equal(screen.match(/enter\.mutate\(/g)?.length, 3);
