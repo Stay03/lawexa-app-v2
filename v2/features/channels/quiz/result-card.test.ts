@@ -331,8 +331,10 @@ test('the final scores are the quiz’s own leaderboard, its podium rising, the 
   const phases = quiz('GamePhases.tsx');
   assert.match(
     phases,
-    /<FrontBoard\s*board=\{liveGameBoard\(results, viewerUuid\)\}\s*rising\s*finished\s*everyone\s*unranked=\{results\.game\.player_count < 2\}\s*rowNote=\{liveRowNote\(results\)\}\s*rulesNote=\{LIVE_BOARD_RULES_NOTE\}\s*\/>/,
+    // The board's podium rises only when no full-screen podium plays first (14 November 2026, live-podium.test.ts).
+    /<FrontBoard\s*board=\{board\}\s*rising=\{!reveal\}\s*podiumLanding=\{[^}]*\}\s*finished\s*everyone\s*unranked=\{results\.game\.player_count < 2\}\s*rowNote=\{liveRowNote\(results\)\}\s*rulesNote=\{LIVE_BOARD_RULES_NOTE\}\s*\/>/,
   );
+  assert.match(phases, /const board = useMemo\(\(\) => \(results \? liveGameBoard\(results, viewerUuid\) : null\), \[results, viewerUuid\]\);/);
   // Every player is on the board (Arthur's A): twelve players, all twelve entries; a late joiner's row says so.
   const twelve = Array.from({ length: 12 }, (_, i) =>
     i === 10 ? { ...row(11, 'late', 300), joined_at_question_index: 4 } : row(i + 1, `p${i + 1}`, 1000 - i * 50),

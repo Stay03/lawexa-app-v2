@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -29,7 +29,21 @@ import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
 import type { QuizShareStanding } from '@/lib/constants/quiz-share';
-import { LIVE_BOARD_RULES_NOTE, liveGameBoard, liveRowNote } from './live-board';
+import { isViewerEntry } from '@/v2/features/quiz/solo/home-model';
+import { prefersReducedMotion } from '@/v2/features/quiz/solo/ui';
+import {
+  PODIUM_HEADING,
+  PodiumStage as PodiumReveal,
+  podiumAlreadySeen,
+  rememberPodiumSeen,
+} from '@/v2/features/quiz/solo/results/PodiumStage';
+import {
+  LIVE_BOARD_RULES_NOTE,
+  liveGameBoard,
+  livePodiumHeading,
+  liveRowNote,
+  revealsLivePodium,
+} from './live-board';
 import { ShareResults } from './ShareResults';
 import type { ResultCardInput } from './result-card';
 import {
@@ -698,6 +712,16 @@ export function PodiumStage({
     };
   }, [results, viewerUuid, spaceName]);
 
+  const board = useMemo(() => (results ? liveGameBoard(results, viewerUuid) : null), [results, viewerUuid]);
+  /** The full-screen podium has played (or never will: reduced motion, or seen in this tab). */
+  const [revealDone, setRevealDone] = useState(() => prefersReducedMotion() || podiumAlreadySeen(gameUuid));
+  const finishReveal = useCallback(() => {
+    rememberPodiumSeen(gameUuid);
+    setRevealDone(true);
+    // Back to the scores it covered, from their heading.
+    window.requestAnimationFrame(() => document.getElementById('live-final-scores')?.focus({ preventScroll: true }));
+  }, [gameUuid]);
+
   if (query.isPending) {
     return (
       <GameStage>
@@ -706,7 +730,7 @@ export function PodiumStage({
     );
   }
 
-  if (query.isError || !results) {
+  if (query.isError || !results || !board) {
     // TWO DIFFERENT TRUTHS, AND THEY MUST NOT SHARE A SENTENCE. A `409` is the
     // server's answer — this game was cancelled or is somehow still running, so
     // there are no scores and there never will be. Anything else is a failed
@@ -762,11 +786,33 @@ export function PodiumStage({
           ? { outcome: 'won' }
           : { outcome: 'played', leader: leader?.user.name ?? null };
 
+  // The full-screen podium first, 3rd then 2nd then 1st with the confetti, the
+  // public quiz's own (`PodiumReveal`); it moves down into the board's podium,
+  // which stays still under it (no second rise).
+  const reveal = revealsLivePodium(board);
+  const revealing = reveal && !revealDone;
+  const isYou = (entry: (typeof board.entries)[number]) => isViewerEntry(board.viewer, entry);
+  const podium = board.entries.slice(0, 3);
+
   return (
-    <GameStage>
+    <>
+    {revealing ? (
+      <PodiumReveal
+        entries={podium}
+        isYou={isYou}
+        heading={livePodiumHeading(podium.some(isYou), PODIUM_HEADING)}
+        tapToSkip
+        onDone={finishReveal}
+      />
+    ) : null}
+    <GameStage inert={revealing}>
       <div className="text-center">
         <StageKicker>Final scores</StageKicker>
-        <h2 className="mt-2 text-2xl leading-tight font-bold tracking-tight text-foreground">
+        <h2
+          id="live-final-scores"
+          tabIndex={-1}
+          className="mt-2 text-2xl leading-tight font-bold tracking-tight text-foreground outline-none"
+        >
           {results.game.quiz.title}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -781,8 +827,9 @@ export function PodiumStage({
           quiz's own page shows, the reader's row marked as it marks "you".
           A one-player game ranks no one: the player's row, no podium. */}
       <FrontBoard
-        board={liveGameBoard(results, viewerUuid)}
-        rising
+        board={board}
+        rising={!reveal}
+        podiumLanding={reveal ? (revealing ? 'covered' : 'landed') : undefined}
         finished
         everyone
         unranked={results.game.player_count < 2}
@@ -829,6 +876,7 @@ export function PodiumStage({
         </div>
       )}
     </GameStage>
+    </>
   );
 }
 

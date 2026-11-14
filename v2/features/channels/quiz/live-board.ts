@@ -63,3 +63,21 @@ export function liveRowNote(results: QuizGameResults): (entry: QuizLeaderboardEn
 /** The board's (i) for a game: one game's points, not a best of many attempts. */
 export const LIVE_BOARD_RULES_NOTE =
   'Ranked by points in this game. Right answers score more the faster they come.';
+
+/**
+ * Whether a finished game opens on the full-screen podium (Arthur, f730f71c,
+ * 14 November 2026: "announcing the 3rd then 2nd and then 1st with confetti
+ * burst ... which then places nicely with the rest of the screen"). For
+ * everyone in the room, player or watcher, whenever the board has a podium:
+ * a one-player game ranks no one, so it has none.
+ */
+export function revealsLivePodium(board: QuizLeaderboard): boolean {
+  return board.player_count >= 2 && board.entries.length > 0;
+}
+
+/** The podium's headline: the solo one for a reader on it, the room's for everyone else. */
+export const LIVE_PODIUM_HEADING = 'The top three';
+
+export function livePodiumHeading(onPodium: boolean, ownHeading: string): string {
+  return onPodium ? ownHeading : LIVE_PODIUM_HEADING;
+}

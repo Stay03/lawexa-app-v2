@@ -73,7 +73,10 @@ test('a burst is never on screen for longer than 3.2s', () => {
 test('the podium moment says "You made the Podium!", bursts as the steps land, and moves on after it falls', () => {
   const stage = read('v2', 'features', 'quiz', 'solo', 'results', 'PodiumStage.tsx');
   assert.match(stage, /playing && 'v2-solo-podium-headline',\s*\/\/ Nowhere to land: it fades with the ground instead\.\s*leaving && !headingFlight && 'opacity-0 transition-opacity duration-300',/);
-  assert.match(stage, />\s*You made the Podium!\s*<\/h1>/);
+  // The headline is a prop since the live game's podium (14 November 2026); the public quiz keeps this one.
+  assert.match(stage, /export const PODIUM_HEADING = 'You made the Podium!';/);
+  assert.match(stage, /heading = PODIUM_HEADING,/);
+  assert.match(stage, />\s*\{heading\}\s*<\/h1>/);
   // The headline lands on the small one's, which stays hidden until then: the words are never doubled.
   assert.match(stage, /setHeadingFlight\(heading \? podiumFlight\(heading, smallHeading\) : null\);/);
   const block = read('v2', 'features', 'quiz', 'solo', 'results', 'FinishPosition.tsx');

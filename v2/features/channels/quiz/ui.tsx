@@ -99,12 +99,15 @@ export function GameMark({ finished }: { finished: boolean }) {
 export function GameStage({
   children,
   className,
+  inert = false,
 }: {
   children: ReactNode;
   className?: string;
+  /** Out of reach under a full-screen layer (the podium reveal). */
+  inert?: boolean;
 }) {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain" inert={inert}>
       <div
         className={cn(
           'mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6',

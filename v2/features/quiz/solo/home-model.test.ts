@@ -176,7 +176,8 @@ test('the quiz page reads the board only for a listed quiz, and draws the top te
   // In a narrow window the buttons wrap to their own line, never squeezed (Arthur, 28 October 2026).
   assert.match(front, /md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:rounded-2xl md:border-2/);
   assert.match(front, /<div className="flex flex-col gap-3 md:ml-auto md:shrink-0">/);
-  assert.match(board, /<div className="mx-auto w-full min-w-0 md:max-w-lg">\s*<Podium/);
+  // The same box; it is also where a live game's full-screen podium lands (14 November 2026).
+  assert.match(board, /className=\{cn\('mx-auto w-full min-w-0 md:max-w-lg', podiumLanding === 'covered' && 'opacity-0'\)\}\s*>\s*<Podium/);
 });
 
 test('the standing line is the share of the OTHER players behind the reader, from the server’s players_behind', () => {

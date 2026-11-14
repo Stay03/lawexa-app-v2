@@ -40,6 +40,8 @@ export const PODIUM_HOLD_MS = 3000;
 /** The podium moves down into the small one's place this long (Arthur: "the same podium to move down into its place"). */
 export const PODIUM_SLIDE_MS = 550;
 
+/** The headline for a reader on the podium. */
+export const PODIUM_HEADING = 'You made the Podium!';
 
 /**
  * PodiumStage — the podium first, full screen, over the results (Arthur, 28
@@ -67,10 +69,16 @@ export function PodiumStage({
   entries,
   isYou,
   onDone,
+  heading = PODIUM_HEADING,
+  tapToSkip = false,
 }: {
   entries: readonly QuizLeaderboardEntry[];
   isYou: (entry: QuizLeaderboardEntry) => boolean;
   onDone: () => void;
+  /** The headline over the podium. A live game's watcher, or a player off the podium, did not make it. */
+  heading?: string;
+  /** A tap anywhere skips too (a live game's room, Techlead 14 November 2026: "A tap skips the reveal"). */
+  tapToSkip?: boolean;
 }) {
   const [playing, setPlaying] = useState(true);
   /** Moving into the small podium's place: however it ends (by itself, Skip, Escape), the same way. */
@@ -153,6 +161,7 @@ export function PodiumStage({
         'transition-colors duration-[550ms] ease-out',
         leaving && 'pointer-events-none bg-transparent',
       )}
+      onClick={tapToSkip ? leave : undefined}
     >
       <button
         ref={skipRef}
@@ -183,7 +192,7 @@ export function PodiumStage({
               : undefined
           }
         >
-          You made the Podium!
+          {heading}
         </h1>
         <div
           ref={podiumRef}

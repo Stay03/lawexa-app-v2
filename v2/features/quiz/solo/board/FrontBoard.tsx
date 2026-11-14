@@ -73,8 +73,15 @@ export function FrontBoard({
   everyone = false,
   unranked = false,
   rowNote,
+  podiumLanding,
 }: {
   board: QuizLeaderboard;
+  /**
+   * The full-screen podium (`PodiumStage`) lands on this board's podium: it is
+   * marked as the place to land, and stays hidden while the stage covers it,
+   * so only one podium is ever seen. Unset: no full-screen podium.
+   */
+  podiumLanding?: 'covered' | 'landed';
   /** The podium rises in as the board first shows (the end-of-quiz animation). */
   rising?: boolean;
   /** What the (i) says about how the board ranks. */
@@ -145,7 +152,10 @@ export function FrontBoard({
       ) : (
         <div className="grid grid-cols-[minmax(0,1fr)] gap-5 md:gap-6">
           <div className="flex min-w-0 flex-col gap-3">
-            <div className="mx-auto w-full min-w-0 md:max-w-lg">
+            <div
+              data-small-podium={podiumLanding ? '' : undefined}
+              className={cn('mx-auto w-full min-w-0 md:max-w-lg', podiumLanding === 'covered' && 'opacity-0')}
+            >
               <Podium entries={podium} isYou={isYou} rising={rising} />
             </div>
             {/* On the podium the reader's line sits under it. */}
