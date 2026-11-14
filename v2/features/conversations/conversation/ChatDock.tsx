@@ -17,7 +17,8 @@ import { earlyRuling } from './early-ruling';
 import { subscribeFollowUpRefusals } from './embedded-composer';
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
 import { subscribeRouteReplies, useRouteComposerSurface } from './route-composer';
-import { CARD_ANSWER_PLACEHOLDER, QuestionDock, type QuestionDockHandle } from './question-card/QuestionDock';
+import { CardBoxFold } from './question-card/CardBoxFold';
+import { QuestionDock, type QuestionDockHandle } from './question-card/QuestionDock';
 import { useCardBox } from './question-card/use-card-box';
 import { ComposerSkeleton } from './skeletons';
 import type { SendRefused } from './space-turn';
@@ -84,8 +85,10 @@ const DOCK_HEIGHT_VAR = '--v2-conv-dock-h';
 
 /** The message box's own width: compact, centred under the chat. */
 const DOCK_COMPACT = 'max-w-xs sm:max-w-md';
-/** While a question card is open: the chat column's width (MessageList's `max-w-2xl`), so the card lines up with the messages. */
-const DOCK_WITH_CARD = 'max-w-2xl';
+/** While a question card is open: on a phone the chat column's width (MessageList's `max-w-2xl`), so the card
+ *  lines up with the messages; from `sm` up the compact box's, as before (Stay, 14 November 2026: "Make wider for
+ *  only mobile I think web is ok as is"). */
+const DOCK_WITH_CARD = 'max-w-2xl sm:max-w-md';
 
 /** `useLayoutEffect` in the browser, `useEffect` on the server. */
 const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -153,10 +156,10 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
   // chat do not read the variable.
 
   // Lawexa's open questions (question cards, design A: Stay, 13 November 2026):
-  // a card sits flush on the box and asks them, one at a time (V3: Stay, 14
-  // November 2026). The box reads "Or type a different answer", since a typed
-  // reply goes instead of the answers (the server marks the card skipped),
-  // and while "Something else" is on it is the card's field.
+  // a card asks them, one at a time (V3: Stay, 14 November 2026). The box
+  // waits folded under it until "Type my own answer" is picked, and is then
+  // the card's field (Stay, 14 November 2026). The card's × skips them all
+  // and gives the box back as a reply box.
   const openCard = surface && surface.isOwnerResolved && surface.canSend ? surface.questionCard : null;
   const cardDock = useRef<QuestionDockHandle>(null);
   const cardBox = useCardBox(openCard, cardDock);
@@ -186,31 +189,35 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
             onBoxAnswering={cardBox.onBoxAnswering}
           />
         )}
-        <ConversationComposer
-          holdSend={surface.holdSend}
-          draftScopeId={conversationId}
-          stageRef={composerRef}
-          jurisdiction={surface.jurisdiction}
-          onJurisdictionChange={surface.setJurisdiction}
-          isConfidential={surface.isConfidential}
-          isRedacted={surface.isRedacted}
-          showMeta={surface.showMeta}
-          isStreaming={surface.isStreaming}
-          isCancelling={surface.isCancelling}
-          sendHeldBy={surface.sendHeldBy}
-          canStop={surface.canStop}
-          // While the card's "Something else" is on, the box's send is the card's answer.
-          onSubmit={(message, attachments, replyTo) =>
-            cardBox.answering ? cardBox.answer(message, attachments) : surface.submit(message, attachments, replyTo)
-          }
-          onStop={surface.stop}
-          viewerId={userId}
-          mentionOptions={surface.mentionOptions}
-          quoteToneOf={surface.quoteToneOf}
-          spaceUuid={surface.spaceUuid}
-          {...(openCard && { placeholder: CARD_ANSWER_PLACEHOLDER, joinedAbove: true })}
-          {...cardBox.answering}
-        />
+        {/* Under an open card the box waits, folded, until the reader picks
+            "Type my own answer" (Stay, 14 November 2026). */}
+        <CardBoxFold folded={openCard !== null && cardBox.answering === null}>
+          <ConversationComposer
+            holdSend={surface.holdSend}
+            draftScopeId={conversationId}
+            stageRef={composerRef}
+            jurisdiction={surface.jurisdiction}
+            onJurisdictionChange={surface.setJurisdiction}
+            isConfidential={surface.isConfidential}
+            isRedacted={surface.isRedacted}
+            showMeta={surface.showMeta}
+            isStreaming={surface.isStreaming}
+            isCancelling={surface.isCancelling}
+            sendHeldBy={surface.sendHeldBy}
+            canStop={surface.canStop}
+            // While the card's "Type my own answer" is on, the box's send is the card's answer.
+            onSubmit={(message, attachments, replyTo) =>
+              cardBox.answering ? cardBox.answer(message, attachments) : surface.submit(message, attachments, replyTo)
+            }
+            onStop={surface.stop}
+            viewerId={userId}
+            mentionOptions={surface.mentionOptions}
+            quoteToneOf={surface.quoteToneOf}
+            spaceUuid={surface.spaceUuid}
+            {...(openCard && { joinedAbove: true })}
+            {...cardBox.answering}
+          />
+        </CardBoxFold>
       </>
     ) : (
       <ViewOnlyPill reason={surface.viewOnlyReason} />

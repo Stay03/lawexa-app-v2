@@ -1,6 +1,7 @@
 'use client';
 
 import { useImperativeHandle, useRef, useState, type KeyboardEvent, type Ref, type RefObject } from 'react';
+import { flushSync } from 'react-dom';
 import { PenLine, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -19,8 +20,8 @@ import type { ConversationComposerHandle } from '../ConversationComposer';
 import type { SendRefused } from '../space-turn';
 import type { OpenCard } from './open-card';
 
-/** The message box's hint while Lawexa's questions wait: a typed reply goes instead of the answers. */
-export const CARD_ANSWER_PLACEHOLDER = 'Or type a different answer';
+/** The choice that opens the box for the reader's own words (Stay, 14 November 2026: renamed from its first wording). */
+export const OWN_ANSWER_LABEL = 'Type my own answer';
 
 /**
  * The wash under the pointer on a row not chosen: under half the chosen row's
@@ -41,7 +42,7 @@ export const ANSWER_FILES_COPY = 'An answer to a question goes without files. Re
 /** The box's line when an answer is longer than the server takes. */
 export const ANSWER_TOO_LONG_COPY = `An answer can be up to ${OTHER_ANSWER_MAX.toLocaleString('en')} characters.`;
 
-/** What the host's box sends to the card while it is the field for "Something else". */
+/** What the host's box sends to the card while it is the field for "Type my own answer". */
 export interface QuestionDockHandle {
   /**
    * The box's send, while it answers a question: the words are that question's
@@ -57,7 +58,7 @@ type QuestionDockProps = {
   held: boolean;
   /** Send the answers; resolves with the refusal's sentence, or null when they went. */
   onAnswer: (answers: QuestionCardAnswer[]) => Promise<string | null>;
-  /** The message box under the card: it is the field for "Something else". */
+  /** The message box under the card: it is the field for "Type my own answer". */
   box: RefObject<ConversationComposerHandle | null>;
   /** The box answers a question (its hint and its arrow's name), or null: it is a reply box again. */
   onBoxAnswering: (answering: BoxAnswering | null) => void;
@@ -77,7 +78,7 @@ type QuestionDockProps = {
  * and moves on (on the last, it sends). × skips them all.
  *
  * The card sits flush on the box, so the two read as one (V3: Stay, 14
- * November 2026, "5v3"). "Something else" makes the box the field: the
+ * November 2026, "5v3"). "Type my own answer" makes the box the field: the
  * reader types where they always type, and the options stay in view. While it
  * is on, the card's Next and Skip step away and the box's arrow is the one way
  * on: it records the words and moves to the next question, or sends on the
@@ -108,7 +109,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
   const draft = drafts[index] ?? null;
   const optionCount = question.options.length;
   const ownChosen = draft !== null && 'text' in draft;
-  // A choice by its place in the radio group: an option's index, or the place after them for "Something else".
+  // A choice by its place in the radio group: an option's index, or the place after them for "Type my own answer".
   const choiceAt = ownChosen ? optionCount : chosenAt(draft);
   const isLast = index === count - 1;
   const locked = held || sending;
@@ -126,8 +127,11 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
     const previous = box.current?.swap(at === null ? (replyDraft.current ?? '') : words[at]) ?? '';
     if (!answering) replyDraft.current = previous;
     if (at === null) replyDraft.current = null;
-    onBoxAnswering(at === null ? null : boxAnsweringFor(at, count));
-    // Inside the tap, so a phone raises its keyboard.
+    // The box is folded away until it answers (CardBoxFold): it opens at once,
+    // so the focus below lands, inside the tap, and a phone raises its keyboard.
+    const boxState = at === null ? null : boxAnsweringFor(at, count);
+    if (boxState !== null && focus) flushSync(() => onBoxAnswering(boxState));
+    else onBoxAnswering(boxState);
     if (at !== null && focus) box.current?.focus();
     return answering ? previous : null;
   };
@@ -183,7 +187,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
     if (locked) return;
     if (choice === optionCount) {
       if (ownChosen) {
-        // "Something else" again: the box is a reply box, the words wait for the question.
+        // "Type my own answer" again: the box is a reply box, the words wait for the question.
         const left = pointBox(null);
         if (left !== null) keepWords(index, left, false);
         setDraft(null);
@@ -231,7 +235,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
     const target = optionKeyTarget(event.key, choiceAt, optionCount + 1);
     if (target === null) return;
     event.preventDefault();
-    // Home or End on the choice already made changes nothing ("Something else" would turn off).
+    // Home or End on the choice already made changes nothing ("Type my own answer" would turn off).
     if (target === choiceAt) return;
     choose(target, true);
     if (target < optionCount) event.currentTarget.querySelector<HTMLButtonElement>(`[data-option="${target}"]`)?.focus();
@@ -240,8 +244,13 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
   return (
     <section
       aria-label="Lawexa's questions"
-      // Flush on the box: no gap, and no corners or border where the two meet.
-      className="mx-4 flex max-h-[60dvh] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-border bg-card"
+      // Flush on the box while it takes the reader's words: no gap, and no
+      // corners or border where the two meet. Otherwise the box is folded away
+      // and the card stands alone.
+      className={cn(
+        'mx-4 flex max-h-[60dvh] flex-col overflow-hidden border border-border bg-card',
+        ownChosen ? 'rounded-t-3xl border-b-0' : 'rounded-3xl',
+      )}
     >
       <div className="flex shrink-0 items-center justify-between gap-3 px-4 pt-3">
         {count > 1 ? (
@@ -333,8 +342,7 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
             )}
           >
             <PenLine aria-hidden className={cn('size-[18px] shrink-0', ownChosen && 'text-primary')} />
-            <span className={cn(ownChosen && 'font-medium')}>Something else</span>
-            {ownChosen && <span className="text-muted-foreground">· type it below</span>}
+            <span className={cn(ownChosen && 'font-medium')}>{OWN_ANSWER_LABEL}</span>
           </button>
         </div>
         {refused && (

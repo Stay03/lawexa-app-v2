@@ -11,10 +11,11 @@ import { join } from 'node:path';
 
 const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8').replace(/\r\n/g, '\n');
 
-test("while a card is open the dock is the chat column's width; without one, the compact box's", () => {
+test("while a card is open the dock is the chat column's width on a phone and the compact box's from sm up", () => {
   const dock = read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx');
   assert.match(dock, /const DOCK_COMPACT = 'max-w-xs sm:max-w-md';/);
-  assert.match(dock, /const DOCK_WITH_CARD = 'max-w-2xl';/);
+  // Wide on phones only; a computer keeps the compact width (Stay, 14 November 2026: "web is ok as is").
+  assert.match(dock, /const DOCK_WITH_CARD = 'max-w-2xl sm:max-w-md';/);
   assert.match(dock, /className=\{cn\('pointer-events-auto v2-safe-bottom mx-auto w-full', openCard \? DOCK_WITH_CARD : DOCK_COMPACT\)\}/);
   // The chat column it lines up with.
   const list = read('v2', 'features', 'conversations', 'conversation', 'MessageList.tsx');

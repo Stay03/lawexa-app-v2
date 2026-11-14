@@ -256,9 +256,10 @@ test('the options move like a radio group: arrows round the ends, Home and End t
 });
 
 test('the box answering a question names it, and its arrow is Next until the last, then Send', () => {
-  assert.deepEqual(boxAnsweringFor(0, 3), { placeholder: 'Type your answer to question 1', submitLabel: 'Next' });
-  assert.deepEqual(boxAnsweringFor(1, 3), { placeholder: 'Type your answer to question 2', submitLabel: 'Next' });
-  assert.deepEqual(boxAnsweringFor(2, 3), { placeholder: 'Type your answer to question 3', submitLabel: 'Send' });
+  // Short, so it keeps one line in a phone's box (14 November 2026).
+  assert.deepEqual(boxAnsweringFor(0, 3), { placeholder: 'Your answer to question 1', submitLabel: 'Next' });
+  assert.deepEqual(boxAnsweringFor(1, 3), { placeholder: 'Your answer to question 2', submitLabel: 'Next' });
+  assert.deepEqual(boxAnsweringFor(2, 3), { placeholder: 'Your answer to question 3', submitLabel: 'Send' });
   // One question: no number, and the arrow sends.
-  assert.deepEqual(boxAnsweringFor(0, 1), { placeholder: 'Type your answer', submitLabel: 'Send' });
+  assert.deepEqual(boxAnsweringFor(0, 1), { placeholder: 'Your answer', submitLabel: 'Send' });
 });

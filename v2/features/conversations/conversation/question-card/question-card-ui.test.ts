@@ -75,14 +75,21 @@ test("a card's row keeps only its lead line while the dock asks: the streamed te
   assert.match(marks, /\{answering \? null : card\.status === 'open' \? \(/);
 });
 
-test('a card docks above either box, which reads "Or type a different answer" while the questions wait', () => {
+test('a card docks above either box, and the box waits folded until "Type my own answer" is picked', () => {
   for (const host of [read(conversation, 'ChatDock.tsx'), caseChatCore()]) {
     assert.match(host, /<QuestionDock\s+key=\{openCard\.cardMessageId \?\? openCard\.rowId\}/);
     assert.match(host, /onAnswer=\{surface\.answerCard\}/);
-    assert.match(host, /CARD_ANSWER_PLACEHOLDER/);
+    // Stay, 14 November 2026: no text box until the reader picks their own answer.
+    assert.match(host, /<CardBoxFold folded=\{openCard !== null && cardBox\.answering === null\}>/);
+    assert.doesNotMatch(host, /CARD_ANSWER_PLACEHOLDER/);
     assert.match(host, /const openCard = surface && surface\.isOwnerResolved && surface\.canSend \? surface\.questionCard : null;/);
   }
-  assert.match(dock(), /export const CARD_ANSWER_PLACEHOLDER = 'Or type a different answer';/);
+  assert.match(dock(), /export const OWN_ANSWER_LABEL = 'Type my own answer';/);
+  // Folded, the box is out of reach; the card opens it before it focuses it, inside the tap.
+  const fold = read(here, 'CardBoxFold.tsx');
+  assert.match(fold, /inert=\{folded\}/);
+  assert.match(fold, /folded \? 'grid-rows-\[0fr\] opacity-0' : 'grid-rows-\[1fr\] opacity-100'/);
+  assert.match(dock(), /if \(boxState !== null && focus\) flushSync\(\(\) => onBoxAnswering\(boxState\)\);\s*else onBoxAnswering\(boxState\);\s*if \(at !== null && focus\) box\.current\?\.focus\(\);/);
   // On a phone the card is capped and scrolls inside.
   assert.match(dock(), /max-h-\[60dvh\]/);
 });
@@ -114,11 +121,12 @@ test('the choices are one Tab stop, and the arrow keys move the choice with the 
   assert.match(questions, /pointBox\(index, ownWords, !byKey\);/);
 });
 
-test('"Something else" makes the box the field: the card sits on it, and its arrow is the one way on', () => {
+test('"Type my own answer" makes the box the field: the card sits on it, and its arrow is the one way on', () => {
   const questions = dock();
-  assert.match(questions, /Something else/);
-  // The card is flush on the box: no gap, no bottom corners or border; the box drops its top corners and gap.
-  assert.match(questions, /className="mx-4 flex max-h-\[60dvh\] flex-col overflow-hidden rounded-t-3xl border border-b-0 border-border bg-card"/);
+  assert.match(questions, /\{OWN_ANSWER_LABEL\}/);
+  assert.doesNotMatch(questions, /Something else/);
+  // While the box takes the words the card is flush on it (no gap, no bottom corners or border); otherwise it stands alone.
+  assert.match(questions, /'mx-4 flex max-h-\[60dvh\] flex-col overflow-hidden border border-border bg-card',\s*ownChosen \? 'rounded-t-3xl border-b-0' : 'rounded-3xl',/);
   assert.match(read(conversation, 'ConversationComposer.tsx'), /joinedAbove=\{joinedAbove\}/);
   // The jurisdiction row steps away: nothing sits between the card and the box.
   assert.match(read(conversation, 'ConversationComposer.tsx'), /const showMeta = showMetaProp && !joinedAbove;/);

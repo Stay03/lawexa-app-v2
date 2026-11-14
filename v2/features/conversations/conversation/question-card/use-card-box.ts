@@ -15,7 +15,7 @@ function openCardKey(open: OpenCard): string {
 
 /**
  * The message box and the open question card as one (question cards, design A
- * V3): while "Something else" is on, the box is the card's field, so its hint
+ * V3): while "Type my own answer" is on, the box is the card's field, so its hint
  * and its arrow's name come from the card, and its send is the card's answer.
  * A card that closes, or a new one, gives the box back as a reply box.
  *

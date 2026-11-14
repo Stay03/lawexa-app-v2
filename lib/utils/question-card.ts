@@ -262,7 +262,8 @@ export interface BoxAnswering {
 
 export function boxAnsweringFor(at: number, count: number): BoxAnswering {
   return {
-    placeholder: count > 1 ? `Type your answer to question ${at + 1}` : 'Type your answer',
+    // Short, so it keeps one line in a phone's box (Techlead, 14 November 2026).
+    placeholder: count > 1 ? `Your answer to question ${at + 1}` : 'Your answer',
     submitLabel: at >= count - 1 ? 'Send' : 'Next',
   };
 }
