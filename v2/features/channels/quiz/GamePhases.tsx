@@ -50,6 +50,7 @@ import {
 import {
   answersIn,
   canJoinNow,
+  cancelledGameCopy,
   isRevealedQuestion,
   LOBBY_IDLE_LIMIT_MINUTES,
   nextQuestionOpensAt,
@@ -835,25 +836,25 @@ export function PodiumStage({
 
 export function CancelledStage({
   cancelledBy,
+  neverStarted,
   onBack,
   backLabel,
 }: {
   cancelledBy: SlimUser | null;
+  /** The game never left its lobby: a lobby that closed with nobody named is the unstarted-lobby cancel. */
+  neverStarted: boolean;
   onBack: () => void;
   /** "Back to the channel", or "Back to the Space" for a game in a Space. */
   backLabel: string;
 }) {
+  const { title, description } = cancelledGameCopy({ cancelledBy, neverStarted });
   return (
     <GameStage>
       <CollabMessage
         icon={Ban}
         tone="neutral"
-        title="This game was cancelled"
-        description={
-          cancelledBy
-            ? `${cancelledBy.name} ended the game before it finished. Cancelled games keep no scores.`
-            : 'The game ended before it finished. Cancelled games keep no scores.'
-        }
+        title={title}
+        description={description}
         action={
           <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onBack}>
             {backLabel}

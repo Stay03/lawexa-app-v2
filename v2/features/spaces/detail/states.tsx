@@ -175,11 +175,18 @@ export function SpaceAccessDeniedState() {
       icon={Lock}
       tone="neutral"
       title="You're not in this space"
-      description="Spaces are private to their members. Ask an owner or admin to invite you, then it appears in your list."
+      // Not "private": a public Space refuses a non-member here too, and anyone
+      // may join one from Find a space (Arthur, 14 November 2026).
+      description="Only its members can open it. Ask an owner or admin to invite you, or join it from Find a space if it is public."
       action={
-        <Button asChild variant="outline" size="sm">
-          <Link href="/spaces">Back to your spaces</Link>
-        </Button>
+        <div className="flex flex-wrap justify-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/spaces/discover">Find a space</Link>
+          </Button>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/spaces">Back to your spaces</Link>
+          </Button>
+        </div>
       }
     />
   );

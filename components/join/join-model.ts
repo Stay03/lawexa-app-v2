@@ -2,6 +2,13 @@ import type { InviteAcceptResult, InviteViewerAction } from '@/types/collab';
 import { spaceGameHref } from '@/lib/utils/space-game-href';
 
 /**
+ * Every Space query's key starts here (v2's `spacesQueries.all`; this screen
+ * is outside v2 and may not import it, so a test holds the two equal). The
+ * join reads them all again, so the Space opens as a member's.
+ */
+export const SPACES_QUERY_ROOT = ['spaces'] as const;
+
+/**
  * join-model — the join screen's pure rules: where a join lands and what its
  * one button says, for an ordinary invite and for a live quiz's game link
  * (Backend's shapes 7a007a8c: the preview names the `game`, and accept
@@ -53,10 +60,16 @@ export function readInviteCode(routeValue: string): string {
 }
 
 /**
- * Every invite code is 16 characters from the server's pool, which leaves out
- * 0, 1, l and O (Backend's InviteLinkCodeGenerator::POOL, 14 November 2026).
+ * An invite code's alphabet: the server's pool, which leaves out 0, 1, l and O
+ * (Backend's InviteLinkCodeGenerator::POOL, 14 November 2026). Today every
+ * code is 16 of them; the range below leaves room for the generator to grow
+ * its codes, so a longer code still reaches the server rather than reading as
+ * a link that does not exist.
  */
-const INVITE_CODE = /^[2-9a-km-zA-NP-Z]{16}$/;
+const INVITE_CODE_POOL = '2-9a-km-zA-NP-Z';
+const INVITE_CODE_MIN = 8;
+const INVITE_CODE_MAX = 64;
+const INVITE_CODE = new RegExp(`^[${INVITE_CODE_POOL}]{${INVITE_CODE_MIN},${INVITE_CODE_MAX}}$`);
 
 /**
  * Whether the route's value can be an invite code at all. One that cannot, a

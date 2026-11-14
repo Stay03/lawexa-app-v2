@@ -528,7 +528,12 @@ function GameBody({
       return <QuestionStage game={game} viewerUuid={viewerUuid} />;
     case 'cancelled':
       return (
-        <CancelledStage cancelledBy={game.cancelledBy} onBack={onClose} backLabel={`Back to the ${placeNoun}`} />
+        <CancelledStage
+          cancelledBy={game.cancelledBy}
+          neverStarted={game.state?.game.started_at == null}
+          onBack={onClose}
+          backLabel={`Back to the ${placeNoun}`}
+        />
       );
     case 'finished':
     default:

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isInviteCode, joinActionLabel, joinedDestination, readInviteCode } from './join-model';
+import { SPACES_QUERY_ROOT, isInviteCode, joinActionLabel, joinedDestination, readInviteCode } from './join-model';
 
 /* A live quiz's game link on the join screen (Backend's shapes 7a007a8c:
  * the preview names the `game`, accept answers its `game_uuid`). TEST DATA
@@ -32,9 +32,12 @@ test('a game link’s button says it goes into the game', () => {
 
 test('the join screen names the quiz and every way through lands by the one rule', () => {
   const screen = read('components', 'join', 'JoinScreen.tsx');
-  assert.match(screen, /router\.push\(joinedDestination\(data\)\);/);
-  assert.match(screen, /router\.replace\(joinedDestination\(\{ space_uuid: heldSpace, game_uuid: heldGame \}\)\);/);
-  assert.match(screen, /router\.push\(joinedDestination\(\{ space_uuid: invite\.space_uuid, game_uuid: game\?\.uuid \?\? null \}\)\);/);
+  // Every way through (accepted, back from sign-in, already a member) goes into
+  // the game first and lands by the one rule (`enter`, 14 November 2026).
+  assert.match(screen, /enter\.mutate\(data\);/);
+  assert.match(screen, /enter\.mutate\(\{ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame \}\);/);
+  assert.match(screen, /enter\.mutate\(\{ space_uuid: invite\.space_uuid, channel_uuid: null, game_uuid: game\?\.uuid \?\? null \}\);/);
+  assert.match(screen, /onSuccess: \(destination\) => router\.replace\(joinedDestination\(destination\)\),/);
   assert.match(screen, /\{game\.quiz_title\}/);
   assert.match(screen, /\{joinActionLabel\(action, game !== null\)\}/);
 });
@@ -54,11 +57,29 @@ test('the invite API is asked for the code as one path segment', () => {
   assert.match(api, /`\/invite-links\/\$\{encodeURIComponent\(code\)\}\/accept`/);
 });
 
-test('only a 16-character code from the server pool can be an invite; a glued link cannot', () => {
+test('a code from the server pool, of a sane length, can be an invite; a glued link cannot', () => {
   assert.equal(isInviteCode('HLUEoNpFPPtpXzcP'), true);
   assert.equal(isInviteCode('HLUEoNpFPPtpXzcP Join my live quiz on Lawexa.'), false);
-  assert.equal(isInviteCode('HLUEoNpFPPtpXzc'), false);
+  // A well-formed code of another length still goes to the server (the generator may grow its codes).
+  assert.equal(isInviteCode('HLUEoNpFPPtpXzc'), true);
+  assert.equal(isInviteCode('HLUEoNpFPPtpXzcPq9rS'), true);
+  assert.equal(isInviteCode('HLUE'), false);
   // The pool leaves out 0, 1, l and O.
   assert.equal(isInviteCode('HLUEoNpFPPtpXzc0'), false);
   assert.equal(isInviteCode('HLUEoNpFPPtpXzcl'), false);
+});
+
+test("the join reads every Space query again: its key root is v2's spacesQueries.all", () => {
+  assert.deepEqual(SPACES_QUERY_ROOT, ['spaces']);
+  const queries = readFileSync(join(process.cwd(), 'v2', 'features', 'spaces', 'queries.ts'), 'utf8');
+  assert.match(queries, /all: \['spaces'\] as const,/);
+});
+
+test('a game link joins the game before it opens the lobby, on every way in', () => {
+  const screen = readFileSync(join(process.cwd(), 'components', 'join', 'JoinScreen.tsx'), 'utf8');
+  assert.match(screen, /if \(destination\.game_uuid\) await quizGamesApi\.join\(destination\.game_uuid\)\.catch\(\(\) => undefined\);/);
+  assert.match(screen, /await queryClient\.invalidateQueries\(\{ queryKey: SPACES_QUERY_ROOT \}\);/);
+  // Join, Open the game, and the return from sign-in all go through it.
+  assert.equal(screen.match(/enter\.mutate\(/g)?.length, 3);
+  assert.doesNotMatch(screen, /router\.push\(joinedDestination/);
 });

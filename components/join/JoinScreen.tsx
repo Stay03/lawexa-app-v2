@@ -3,17 +3,18 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2, Lock, Trophy, Users } from 'lucide-react';
 import { isAxiosError } from 'axios';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { quizGamesApi } from '@/lib/api/channel-quiz';
 import { inviteLinksApi } from '@/lib/api/collab';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { InvitePreview } from '@/types/collab';
-import { isInviteCode, joinActionLabel, joinedDestination } from './join-model';
+import type { InviteAcceptResult, InvitePreview } from '@/types/collab';
+import { SPACES_QUERY_ROOT, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
 import {
   forgetPendingInvite,
   rememberPendingInvite,
@@ -167,6 +168,26 @@ export function JoinScreen({ code }: { code: string }) {
     enabled: wellFormed,
   });
 
+  const queryClient = useQueryClient();
+  /**
+   * INTO THE SPACE, AND INTO THE GAME, IN ONE STEP (Arthur's live quiz test,
+   * 14 November 2026). Accepting a game link puts the person in the Space,
+   * not in the game: they stopped on the Space's page with a banner to press,
+   * and once on "You're not in this space", read before the join had landed.
+   * So a game link's way in joins the game too (a refusal, late joining off or
+   * a game over, is a state the game screen shows), reads the Space again,
+   * and then opens the lobby. Every way through uses it: Join, Open the game,
+   * and the return from sign-in.
+   */
+  const enter = useMutation({
+    mutationFn: async (destination: Pick<InviteAcceptResult, 'space_uuid' | 'channel_uuid' | 'game_uuid'>) => {
+      if (destination.game_uuid) await quizGamesApi.join(destination.game_uuid).catch(() => undefined);
+      await queryClient.invalidateQueries({ queryKey: SPACES_QUERY_ROOT });
+      return destination;
+    },
+    onSuccess: (destination) => router.replace(joinedDestination(destination)),
+  });
+
   const accept = useMutation({
     mutationFn: () => inviteLinksApi.accept(code),
     onSuccess: (response) => {
@@ -178,7 +199,7 @@ export function JoinScreen({ code }: { code: string }) {
         setFailed(null);
         return;
       }
-      router.push(joinedDestination(data));
+      enter.mutate(data);
     },
     onError: (error) => {
       // A refused join lets the held code go: it would otherwise bring the
@@ -198,11 +219,11 @@ export function JoinScreen({ code }: { code: string }) {
   const heldGame = preview.data?.data.game?.uuid ?? null;
   useEffect(() => {
     if ((heldAction === 'join' || heldAction === 'request') && accept.isIdle) accept.mutate();
-    if (heldAction === 'already_member' && heldSpace) {
+    if (heldAction === 'already_member' && heldSpace && enter.isIdle) {
       forgetPendingInvite();
-      router.replace(joinedDestination({ space_uuid: heldSpace, game_uuid: heldGame }));
+      enter.mutate({ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame });
     }
-  }, [heldAction, heldSpace, heldGame, accept, router]);
+  }, [heldAction, heldSpace, heldGame, accept, enter]);
 
   if (!wellFormed) return <Refusal status={404} />;
 
@@ -266,10 +287,13 @@ export function JoinScreen({ code }: { code: string }) {
     );
   }
 
+  // Joining, or on the way into the Space and the game.
+  const busy = accept.isPending || enter.isPending || enter.isSuccess;
+
   const press = () => {
     setFailed(null);
     if (action === 'already_member') {
-      router.push(joinedDestination({ space_uuid: invite.space_uuid, game_uuid: game?.uuid ?? null }));
+      enter.mutate({ space_uuid: invite.space_uuid, channel_uuid: null, game_uuid: game?.uuid ?? null });
       return;
     }
     if (action === 'sign_up' || action === 'verify_email') {
@@ -370,9 +394,9 @@ export function JoinScreen({ code }: { code: string }) {
           size="lg"
           className={cn('mt-7 w-full', game && QUIZ_BUTTON)}
           onClick={press}
-          disabled={accept.isPending}
+          disabled={busy}
         >
-          {accept.isPending ? (
+          {busy ? (
             <Loader2 aria-hidden className="size-4 animate-spin" />
           ) : null}
           {joinActionLabel(action, game !== null)}

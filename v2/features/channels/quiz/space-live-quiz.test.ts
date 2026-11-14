@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { canHostInSpace } from './model';
+import { canHostInSpace, cancelledGameCopy, LOBBY_IDLE_LIMIT_MINUTES } from './model';
 import { spaceQuizSeat } from './space-quiz-seat';
 
 /* Live quiz in Spaces, step 2 (Arthur's decisions 93142269; Backend's shapes
@@ -102,4 +102,13 @@ test("a Space's owner is a member even when the Space's detail leaves out my_rol
   assert.equal(spaceQuizSeat({ space: null, membership: { my_role: 'owner' }, rosterPending: false }), undefined);
   // Known, and not a member: the link is refused.
   assert.equal(spaceQuizSeat({ space, membership: { my_role: null }, rosterPending: false })?.isMember, false);
+});
+
+test('a lobby nobody started says it closed; a game someone ended says it was cancelled', () => {
+  const closed = cancelledGameCopy({ cancelledBy: null, neverStarted: true });
+  assert.equal(closed.title, 'This lobby closed');
+  assert.match(closed.description, new RegExp(`within ${LOBBY_IDLE_LIMIT_MINUTES} minutes`));
+  assert.equal(cancelledGameCopy({ cancelledBy: { name: 'TEST DATA Ada' }, neverStarted: true }).title, 'This game was cancelled');
+  assert.match(cancelledGameCopy({ cancelledBy: { name: 'TEST DATA Ada' }, neverStarted: false }).description, /^TEST DATA Ada ended the game/);
+  assert.equal(cancelledGameCopy({ cancelledBy: null, neverStarted: false }).title, 'This game was cancelled');
 });

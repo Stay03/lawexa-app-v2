@@ -85,10 +85,10 @@ test('back with this invite\'s code, the join finishes without a second tap, onc
   const screen = read('components', 'join', 'JoinScreen.tsx');
   assert.match(screen, /const held = usePendingInvite\(\) === code;/);
   assert.match(screen, /if \(\(heldAction === 'join' \|\| heldAction === 'request'\) && accept\.isIdle\) accept\.mutate\(\);/);
-  // Already a member: straight into the Space, or its game for a game link.
+  // Already a member: straight into the Space, or into its game for a game link (`enter`).
   assert.match(
     screen,
-    /if \(heldAction === 'already_member' && heldSpace\) \{\s*forgetPendingInvite\(\);\s*router\.replace\(joinedDestination\(\{ space_uuid: heldSpace, game_uuid: heldGame \}\)\);/,
+    /if \(heldAction === 'already_member' && heldSpace && enter\.isIdle\) \{\s*forgetPendingInvite\(\);\s*enter\.mutate\(\{ space_uuid: heldSpace, channel_uuid: null, game_uuid: heldGame \}\);/,
   );
   // Success and refusal both let the code go, so it never pulls the person back again.
   assert.match(screen, /onSuccess: \(response\) => \{[\s\S]{0,300}forgetPendingInvite\(\);/);

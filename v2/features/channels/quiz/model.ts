@@ -769,3 +769,31 @@ export function totalPicks(
   const answered = (counts ?? []).reduce((sum, entry) => sum + entry.count, 0);
   return answered + (noAnswerCount ?? 0);
 }
+
+/**
+ * What a cancelled game says. A lobby nobody started closes on its own (the
+ * server's unstarted-lobby cancel, with no one named): it says the lobby
+ * closed, so a player waiting in it is told rather than left with a wait that
+ * just ends (Arthur's live quiz test, 14 November 2026). A game someone
+ * ended, or one that had started, says it was cancelled.
+ */
+export function cancelledGameCopy({
+  cancelledBy,
+  neverStarted,
+}: {
+  cancelledBy: { name: string } | null;
+  neverStarted: boolean;
+}): { title: string; description: string } {
+  if (cancelledBy === null && neverStarted) {
+    return {
+      title: 'This lobby closed',
+      description: `Nobody started the game within ${LOBBY_IDLE_LIMIT_MINUTES} minutes, so its lobby closed. Ask the host to put the quiz live again.`,
+    };
+  }
+  return {
+    title: 'This game was cancelled',
+    description: cancelledBy
+      ? `${cancelledBy.name} ended the game before it finished. Cancelled games keep no scores.`
+      : 'The game ended before it finished. Cancelled games keep no scores.',
+  };
+}
