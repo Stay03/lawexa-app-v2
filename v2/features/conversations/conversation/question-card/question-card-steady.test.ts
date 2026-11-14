@@ -31,7 +31,8 @@ test('the card measures the folded box, locks its height while the box is open, 
   assert.match(card, /flushSync\(\(\) => \{\s*setBoxHeightLock\(lock\);\s*onBoxAnswering\(boxState\);\s*\}\);/);
   assert.match(card, /style=\{ownChosen && boxHeightLock !== null \? \{ height: boxHeightLock \} : undefined\}/);
   assert.match(card, /if \(lock !== null && listRef\.current\) listRef\.current\.scrollTop = listRef\.current\.scrollHeight;/);
-  // The scrolled choices fade at the top, so a row part-way out never reads as cut text.
+  // The choices drop their hints while the box is open, so they fit; any that still scroll fade at the top.
+  assert.match(card, /\{option\.description && !\(ownChosen && boxHeightLock !== null\) && \(/);
   assert.match(card, /ownChosen && boxHeightLock !== null && SCROLL_TOP_FADE,/);
   assert.match(card, /const SCROLL_TOP_FADE = '\[mask-image:linear-gradient\(to_bottom,transparent,black_20px\)\]';/);
   // The box opens in the same frame (no 200ms fold to push the two apart), and focusing it scrolls nothing.

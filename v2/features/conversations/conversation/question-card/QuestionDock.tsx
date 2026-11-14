@@ -376,7 +376,9 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
                     <span className="text-[14px] font-medium leading-tight text-foreground">{option.label}</span>
                     {question.recommended === at && <span className="text-[12px] font-medium text-primary">Recommended</span>}
                   </span>
-                  {option.description && (
+                  {/* While the box takes the reader's words, the choices give it their hints'
+                      room: names only, so they fit the shorter card without a row cut at the top. */}
+                  {option.description && !(ownChosen && boxHeightLock !== null) && (
                     <span className="block text-[12.5px] leading-snug text-muted-foreground">{option.description}</span>
                   )}
                 </span>
