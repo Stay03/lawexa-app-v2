@@ -7,6 +7,7 @@
 export type JoinOutcome = 'joined' | 'pending';
 
 export function joinOutcome(httpStatus: number, data: unknown): JoinOutcome {
-  const status = data && typeof data === 'object' && 'status' in data ? (data as { status: unknown }).status : null;
-  return httpStatus === 202 || status === 'pending' ? 'pending' : 'joined';
+  const answer = data && typeof data === 'object' ? (data as { status?: unknown; is_pending?: unknown }) : null;
+  // The membership says `is_pending` (Backend, 14 November 2026); `status` is the older word.
+  return httpStatus === 202 || answer?.is_pending === true || answer?.status === 'pending' ? 'pending' : 'joined';
 }

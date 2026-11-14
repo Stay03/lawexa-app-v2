@@ -13,6 +13,7 @@ import { joinOutcome, type JoinOutcome } from '@/lib/utils/space-join';
 import type { UserFile } from '@/types/file';
 import type {
   AddListItemPayload,
+  SpaceJoinAnswer,
   AiSessionListResponse,
   AiSessionTranscriptResponse,
   BookmarkToggleResponse,
@@ -1740,7 +1741,7 @@ export const discoverApi = {
    * removed or turned down). `403` for a guest, or for a private space.
    */
   join: async (spaceUuid: string): Promise<JoinOutcome> => {
-    const response = await apiClient.post<ApiResponse<unknown>>(
+    const response = await apiClient.post<ApiResponse<SpaceJoinAnswer>>(
       `/spaces/${spaceUuid}/join`,
       {}
     );

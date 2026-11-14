@@ -2230,6 +2230,18 @@ export interface InviteAcceptResult {
   game_uuid?: string | null;
 }
 
+/**
+ * `POST /spaces/{space}/join` (Backend, 14 November 2026): a MEMBERSHIP, with
+ * its Space inside. `201` joined; `202` with `is_pending` a request the Owner
+ * decides on. There is no `uuid` of the Space at the top: it is `space.uuid`.
+ */
+export interface SpaceJoinAnswer {
+  id: number;
+  is_active: boolean;
+  is_pending: boolean;
+  space: { uuid: string; name: string };
+}
+
 /** Where a way through the join screen lands: the Space, and the channel or the game a link named. */
 export interface InviteDestination {
   space_uuid: string;

@@ -51,6 +51,12 @@ test('a joined reader goes into the Space; a request stays on the card as Reques
 test('a 409 on Join opens the Space, and every join answer reads the list again', () => {
   assert.equal(joinOpensSpace(409), true);
   for (const status of [403, 404, 500, undefined]) assert.equal(joinOpensSpace(status), false, String(status));
+  // Backend's membership answer: pending is `is_pending`; the Space is `space.uuid`.
+  assert.equal(joinOutcome(201, { id: 7, is_active: true, is_pending: false, space: { uuid: 'TEST DATA' } }), 'joined');
+  assert.equal(joinOutcome(201, { id: 7, is_active: false, is_pending: true, space: { uuid: 'TEST DATA' } }), 'pending');
+  assert.match(read('lib', 'api', 'collab.ts'), /apiClient\.post<ApiResponse<SpaceJoinAnswer>>\(\s*`\/spaces\/\$\{spaceUuid\}\/join`/);
+  // The list is read on every visit, so a member sees Open, not a Join that answers 409.
+  assert.match(read('v2', 'features', 'invites', 'queries.ts'), /queryFn: \(\) => discoverApi\.spaces\(params\),[\s\S]{0,400}?staleTime: STALE_TIMES\.live,/);
   const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
   assert.match(screen, /if \(joinOpensSpace\(status\)\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*else setRefusal\(joinRefusal\(status, hasAccount\)\);/);
   assert.match(read('v2', 'features', 'invites', 'queries.ts'), /onSettled: \(\) => \{\s*void client\.invalidateQueries\(\{ queryKey: \['discover-spaces'\] \}\);/);

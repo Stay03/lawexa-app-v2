@@ -14,6 +14,7 @@ import type {
 } from '@/types/collab';
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { spacesQueries } from '@/v2/features/spaces/queries';
+import { STALE_TIMES } from '@/v2/runtime/query';
 
 /**
  * Queries and mutations for invite links, the two waiting lists, and browsing
@@ -151,6 +152,10 @@ export function useDiscoverSpaces(params: DiscoverSpacesParams) {
   return useQuery({
     queryKey: inviteKeys.discover(params),
     queryFn: () => discoverApi.spaces(params),
+    // Read on every visit: the card's Join or Open is the reader's membership, which a
+    // join anywhere else changes (an invite link, a Space's own page). A list kept for a
+    // minute offered Join to a member, and that Join answered 409 (Arthur, 14 November 2026).
+    staleTime: STALE_TIMES.live,
   });
 }
 
