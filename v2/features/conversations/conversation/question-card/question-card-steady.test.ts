@@ -33,8 +33,12 @@ test('opening the box, the stack keeps its height and the card gives the box wha
   // The card is flex-1 and min-h-0 inside the locked stack, so the box's growth comes out of the card.
   assert.match(card, /const boxRoom = ownChosen && stackLocked;/);
   assert.match(card, /boxRoom && 'min-h-0 flex-1',/);
-  // The chosen row stays in view, after the question changes too (Back to an own-answered question).
-  assert.match(card, /if \(boxRoom && list\) list\.scrollTop = list\.scrollHeight;\s*\}, \[boxRoom, index\]\);/);
+  // The chosen row stays in view, after the question changes too (Back to an own-answered question),
+  // and the card never gives it up: when the choices have less room than that row needs, the stack
+  // grows by exactly the shortfall (Back from a shorter question; the fixture's case 3).
+  assert.match(card, /const short = row\.offsetHeight \+ parseFloat\(style\.paddingTop\) \+ parseFloat\(style\.paddingBottom\) - list\.clientHeight;/);
+  assert.match(card, /if \(short > 0\.5 && height !== undefined\) onStackLock\(Math\.ceil\(height \+ short\)\);\s*list\.scrollTop = list\.scrollHeight;/);
+  assert.match(card, /const watch = new ResizeObserver\(\(\) => keepChosenRow\(\)\);\s*watch\.observe\(list\);/);
   // The choices drop their hints while the box is open, so they fit; any that still scroll fade at the top.
   assert.match(card, /\{option\.description && !boxRoom && \(/);
   assert.match(card, /boxRoom && SCROLL_TOP_FADE,/);

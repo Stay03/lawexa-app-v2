@@ -1,6 +1,6 @@
 'use client';
 
-import { useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref, type RefObject } from 'react';
+import { useEffectEvent, useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent, type Ref, type RefObject } from 'react';
 import { flushSync } from 'react-dom';
 import { ChevronLeft, PenLine, X } from 'lucide-react';
 
@@ -157,10 +157,31 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, stack,
 
   // Shorter for the box, the chosen row (the last) stays in view, after the
   // question has changed too (Back to an own-answered question; Fable's review).
+  // THE CARD NEVER GIVES UP ITS CHOSEN ROW. The stack's height is the one it
+  // had when the box opened, and that may be another question's (Back from a
+  // shorter one) or too little for the reader's words. Whenever the choices
+  // are left less room than the chosen row needs, the stack grows by exactly
+  // that much, before the frame paints: the card's top moves only when the
+  // row would otherwise be hidden.
   const boxRoom = ownChosen && stackLocked;
+  const keepChosenRow = useEffectEvent(() => {
+    const list = listRef.current;
+    const row = list?.querySelector<HTMLElement>(`[data-option="${optionCount}"]`);
+    if (!list || !row) return;
+    const style = getComputedStyle(list);
+    const short = row.offsetHeight + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) - list.clientHeight;
+    const height = stack.current?.getBoundingClientRect().height;
+    if (short > 0.5 && height !== undefined) onStackLock(Math.ceil(height + short));
+    list.scrollTop = list.scrollHeight;
+  });
   useLayoutEffect(() => {
     const list = listRef.current;
-    if (boxRoom && list) list.scrollTop = list.scrollHeight;
+    if (!boxRoom || !list) return;
+    keepChosenRow();
+    // The reader's words grow the box, which takes room from the choices.
+    const watch = new ResizeObserver(() => keepChosenRow());
+    watch.observe(list);
+    return () => watch.disconnect();
   }, [boxRoom, index]);
 
   /** Keep the words the box held as question `at`'s own answer. */
