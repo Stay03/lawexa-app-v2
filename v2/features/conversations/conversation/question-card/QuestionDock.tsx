@@ -34,6 +34,9 @@ export const OWN_ANSWER_LABEL = 'Type my own answer';
  */
 const UNCHOSEN_HOVER = 'hover:bg-foreground/[0.015]';
 
+/** The scrolling choices' top edge, faded over 20px while the card is shorter for the box. */
+const SCROLL_TOP_FADE = '[mask-image:linear-gradient(to_bottom,transparent,black_20px)]';
+
 /** The longest own answer the server takes for one question (Backend's 13566521). */
 export const OTHER_ANSWER_MAX = 2000;
 
@@ -331,7 +334,16 @@ export function QuestionDock({ open, held, onAnswer, box, onBoxAnswering, ref }:
         <p className="text-[15px] font-semibold leading-snug text-foreground">{question.question}</p>
         {question.why && <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{question.why}</p>}
       </div>
-      <div ref={listRef} className={cn('min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-1.5', ownChosen && 'pb-3')}>
+      <div
+        ref={listRef}
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pt-1.5',
+          ownChosen && 'pb-3',
+          // Made shorter for the box, the choices scroll: their top edge fades, so a row
+          // part-way out reads as more above, never as text cut under the question.
+          ownChosen && boxHeightLock !== null && SCROLL_TOP_FADE,
+        )}
+      >
         <div
           role="radiogroup"
           aria-label={question.question}
