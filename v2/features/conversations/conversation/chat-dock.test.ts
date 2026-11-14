@@ -193,7 +193,8 @@ test('the box floats over the content row, above the tap’s frame and under the
   // flags, for the journey checks.)
   assert.match(
     readHere('ChatDock.tsx'),
-    /<div\s+data-v2-chat-dock=""[\s\S]{0,600}?className="pointer-events-none"\s*>\s*<div ref=\{dockRef\} className="pointer-events-auto v2-safe-bottom mx-auto w-full max-w-xs sm:max-w-md">/,
+    // The compact box's width, or the chat column's while a question card is open (14 November 2026).
+    /<div\s+data-v2-chat-dock=""[\s\S]{0,600}?className="pointer-events-none"\s*>[\s\S]{0,600}?<div\s+ref=\{dockRef\}\s+className=\{cn\('pointer-events-auto v2-safe-bottom mx-auto w-full', openCard \? DOCK_WITH_CARD : DOCK_COMPACT\)\}\s*>/,
   );
   assert.match(readHere('ChatDock.tsx'), /data-source=\{surface \? 'screen' : early \? 'early' : 'cold'\}/);
 });
