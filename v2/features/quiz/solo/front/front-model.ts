@@ -22,6 +22,10 @@ export function challengeFromParam(raw: string | null): string | null {
  * Spaces, for a quiz with questions to play (the server answers 422 for an
  * empty one). Which Space, and whether they host there, is the picker's.
  */
+/** Start's two ways to play (Arthur's A, f730f71c, 14 November 2026), for whoever may host. */
+export const START_SOLO = { label: 'Play solo', hint: 'On your own, for your best score' } as const;
+export const START_LIVE = { label: 'Host live in a Space', hint: 'Everyone plays at once, on their own phone' } as const;
+
 export function offersHostLive({
   spacesOpen,
   questionCount,

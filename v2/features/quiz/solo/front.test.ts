@@ -29,7 +29,8 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
   const source = screen();
   assert.match(source, /const mayTake = canTakeQuiz\(session\);/);
   assert.match(source, /startAttempt\.mutate\(revealMode, \{\s*onSuccess: \(response\) => router\.push\(attemptHref\(response\.data\.uuid\)\),/);
-  assert.match(source, /\{mayTake \? \(\s*<RaisedButton className=\{FRONT_BUTTON\} onClick=\{start\}/);
+  // Start alone for whoever cannot host; a host's Start opens the choice first (host-choice.test.ts).
+  assert.match(source, /\) : mayTake \? \(\s*<RaisedButton className=\{FRONT_BUTTON\} onClick=\{start\}/);
   // Back to the same page after sign-in, a challenge link's ?from= included (returnPath).
   assert.match(source, /<RaisedButton asChild className=\{cn\(FRONT_BUTTON, 'max-md:basis-full'\)\}>\s*<Link href=\{signInHref\(returnPath\)\}>Sign in to take this quiz<\/Link>/);
   // A stale session's 401 is not bounced by the client on this page, so the
@@ -46,12 +47,12 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
 test("the owner's Edit and Delete ride the bar's menu, and Delete leaves for the library", () => {
   const source = screen();
   assert.match(source, /setScreenContext\(\{ pathname, back: null, actions \}\);/);
-  // Ruled off from Host a live quiz when that row is above it.
-  assert.match(source, /\{ id: 'edit', label: 'Edit quiz', icon: Pencil, separatorBefore: mayHostLive, onSelect: openEdit \}/);
+  // The first row: hosting moved to Start's choice (Arthur's A, 14 November 2026).
+  assert.match(source, /\{ id: 'edit', label: 'Edit quiz', icon: Pencil, onSelect: openEdit \}/);
   assert.match(source, /id: 'delete',\s*label: 'Delete quiz',\s*icon: Trash2,\s*destructive: true,/);
   assert.match(source, /onDeleted=\{\(\) => router\.replace\(LIBRARY_HREF\)\}/);
-  // No second kebab in the body.
-  assert.doesNotMatch(source, /DropdownMenu/);
+  // No second kebab in the body (Start's choice is a menu, but not a kebab).
+  assert.doesNotMatch(source, /MoreHorizontal|MoreVertical|EllipsisVertical|Ellipsis/);
   // Share only where a link can open it; the owner of a private one is told why.
   assert.match(source, /const shareable = quiz\.visibility === 'link' \|\| quiz\.visibility === 'public';/);
   // Challenge a friend, a secondary button beside Start, the one gold action.
@@ -110,7 +111,8 @@ test('the quiz page is drawn on B1: its tokens and the raised buttons', () => {
   // Start, Sign in and Challenge a friend: no flat house button among them.
   const bar = source.slice(source.indexOf('START STAYS IN REACH'), source.indexOf('{!mayTake && ('));
   assert.doesNotMatch(bar, /<Button\b/);
-  assert.equal(bar.match(/<RaisedButton\b/g)?.length, 3);
+  // Start (as the choice's trigger, or alone), Sign in, Challenge a friend.
+  assert.equal(bar.match(/<RaisedButton\b/g)?.length, 4);
   // On a phone the sign-in takes the bar's whole row, the challenge under it,
   // and the page leaves room for the taller bar.
   assert.match(source, /className=\{cn\(FRONT_BUTTON, 'flex-none max-md:\[a\+&\]:flex-1'\)\}/);

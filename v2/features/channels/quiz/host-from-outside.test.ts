@@ -55,7 +55,10 @@ test('the quiz page offers Host to an account that may use Spaces, for a quiz wi
 
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
   assert.match(front, /spacesOpen: collabAccessState\(session\) === 'eligible',/);
-  assert.match(front, /if \(mayHostLive\) rows\.push\(\{ id: 'host-quiz', label: 'Host a live quiz', icon: Trophy, onSelect: openHost \}\);/);
+  // Hosting is Start's choice now (Arthur's A, 14 November 2026), no longer a row in the bar's menu.
+  assert.match(front, /\{mayTake && mayHostLive \? \(/);
+  assert.match(front, /<DropdownMenuItem onSelect=\{openHost\}/);
+  assert.doesNotMatch(front, /id: 'host-quiz'/);
   assert.match(front, /\{hostOpen && quiz \? \(\s*<HostLiveQuizDialog/);
 });
 

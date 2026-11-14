@@ -15,7 +15,8 @@ import {
   Share2,
   Swords,
   Trash2,
-  Trophy,
+  User,
+  Users,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -28,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { ChannelQuiz, QuizRevealMode } from '@/types/channel-quiz';
 import { DeleteQuizDialog } from '@/v2/features/channels/quiz/DeleteQuizDialog';
@@ -46,7 +48,7 @@ import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, scenarioCountLabel } from '../rows-model';
-import { challengeFromParam, frontChallengeText, offersHostLive } from './front-model';
+import { START_LIVE, START_SOLO, challengeFromParam, frontChallengeText, offersHostLive } from './front-model';
 import {
   clearScreenContext,
   setScreenContext,
@@ -216,23 +218,22 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
     if (!next && wantsEdit) replaceUrlParams({ edit: null });
   };
   const openDelete = useCallback(() => setDeleting(quiz), [quiz]);
-  // Host a live quiz in a Space picked here (Arthur's spec, 9 November 2026).
-  // The dialog mounts only while open, so each open starts clean.
+  // Host a live quiz in a Space picked here (Arthur's spec, 9 November 2026),
+  // from Start's choice (Arthur's A, f730f71c, 14 November 2026: the menu row
+  // was hidden). The dialog mounts only while open, so each open starts clean.
   const [hostOpen, setHostOpen] = useState(false);
   const mayHostLive = offersHostLive({
     spacesOpen: collabAccessState(session) === 'eligible',
     questionCount: quiz ? (quiz.question_count ?? quiz.questions?.length ?? 0) : 0,
   });
   const openHost = useCallback(() => setHostOpen(true), []);
-  /** The bar's overflow menu: Host a live quiz for whoever may, then the
-   *  owner's rows. Stable while the quiz is, so the publish below is a no-op
-   *  between loads. */
+  /** The bar's overflow menu: the owner's rows (hosting moved to Start). Stable
+   *  while the quiz is, so the publish below is a no-op between loads. */
   const actions = useMemo<readonly ScreenAction[]>(() => {
     const rows: ScreenAction[] = [];
-    if (mayHostLive) rows.push({ id: 'host-quiz', label: 'Host a live quiz', icon: Trophy, onSelect: openHost });
     if (own) {
       rows.push(
-        { id: 'edit', label: 'Edit quiz', icon: Pencil, separatorBefore: mayHostLive, onSelect: openEdit },
+        { id: 'edit', label: 'Edit quiz', icon: Pencil, onSelect: openEdit },
         {
           id: 'delete',
           label: 'Delete quiz',
@@ -243,7 +244,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
       );
     }
     return rows;
-  }, [mayHostLive, openHost, own, openEdit, openDelete]);
+  }, [own, openEdit, openDelete]);
   useEffect(() => {
     setScreenContext({ pathname, back: null, actions });
   }, [pathname, actions]);
@@ -410,7 +411,39 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                   "Challenge a friend" in a phone's bar: the sign-in takes the
                   whole row and the challenge, after it, fills the next
                   (Backend's picture, 24 October 2026). */}
-              {mayTake ? (
+              {mayTake && mayHostLive ? (
+                // START OFFERS BOTH WAYS TO PLAY (Arthur's A, 14 November 2026):
+                // on your own, or live with a Space. Whoever cannot host gets
+                // Start alone, which starts at once.
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <RaisedButton className={FRONT_BUTTON} disabled={startAttempt.isPending}>
+                      {startAttempt.isPending ? (
+                        <Loader2 aria-hidden className="size-4 animate-spin" />
+                      ) : (
+                        <Play aria-hidden className="size-4" />
+                      )}
+                      Start quiz
+                    </RaisedButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-72 p-1.5">
+                    <DropdownMenuItem onSelect={start} className="flex items-start gap-3 rounded-lg p-3">
+                      <User aria-hidden className="mt-0.5 size-5 shrink-0" />
+                      <span className="flex flex-col">
+                        <span className="font-semibold text-foreground">{START_SOLO.label}</span>
+                        <span className="text-xs text-muted-foreground">{START_SOLO.hint}</span>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={openHost} className="flex items-start gap-3 rounded-lg p-3">
+                      <Users aria-hidden className="mt-0.5 size-5 shrink-0" />
+                      <span className="flex flex-col">
+                        <span className="font-semibold text-foreground">{START_LIVE.label}</span>
+                        <span className="text-xs text-muted-foreground">{START_LIVE.hint}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : mayTake ? (
                 <RaisedButton className={FRONT_BUTTON} onClick={start} disabled={startAttempt.isPending}>
                   {startAttempt.isPending ? (
                     <Loader2 aria-hidden className="size-4 animate-spin" />
