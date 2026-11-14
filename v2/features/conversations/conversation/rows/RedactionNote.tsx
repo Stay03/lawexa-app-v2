@@ -20,8 +20,17 @@ import { redactionNote } from './redaction-note-model';
  * reduced motion. The press never reaches the row underneath (which shows the
  * time on a tap).
  */
-export function RedactionNote({ summary, align }: { summary: RedactionSummary | undefined; align: 'start' | 'end' }) {
-  const note = redactionNote(summary);
+export function RedactionNote({
+  summary,
+  align,
+  hasFiles,
+}: {
+  summary: RedactionSummary | undefined;
+  align: 'start' | 'end';
+  /** The question carries files: the count is its message's, and the files are read redacted. */
+  hasFiles: boolean;
+}) {
+  const note = redactionNote(summary, hasFiles);
   const [open, setOpen] = useState(false);
   const panelId = useId();
 
@@ -67,6 +76,7 @@ export function RedactionNote({ summary, align }: { summary: RedactionSummary | 
           <div className="border-border/60 bg-secondary/40 text-muted-foreground mt-1 rounded-xl border px-3 py-2 text-xs leading-relaxed">
             <p className="text-foreground font-medium">Hidden before the AI read it: {note.breakdown}.</p>
             <p className="mt-1">The stand-ins in your message above are what the AI saw in their place.</p>
+            {note.filesNote ? <p className="mt-1">{note.filesNote}</p> : null}
           </div>
         </div>
       </div>

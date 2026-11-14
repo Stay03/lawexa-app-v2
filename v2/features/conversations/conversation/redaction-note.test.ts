@@ -18,25 +18,49 @@ const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts),
 
 test('the line says what redaction did, in every case the contract allows', () => {
   // A question from before the server sent a summary: no count, nothing to open.
-  assert.deepEqual(redactionNote(undefined), { line: 'Sent as redacted', breakdown: null });
+  assert.deepEqual(redactionNote(undefined), { line: 'Sent as redacted', breakdown: null, filesNote: null });
   assert.deepEqual(redactionNote({ details_hidden: 0, places_replaced: 0, by_type: {} }), {
     line: 'Sent as redacted · nothing personal found',
     breakdown: null,
+    filesNote: null,
   });
   assert.deepEqual(redactionNote({ details_hidden: 1, places_replaced: 2, by_type: { PERSON: 1 } }), {
     line: 'Sent as redacted · 1 detail hidden',
     breakdown: '1 person',
+    filesNote: null,
   });
   // People first, then the backend's order; plurals per kind.
   assert.deepEqual(
     redactionNote({ details_hidden: 7, places_replaced: 11, by_type: { ADDRESS: 2, PERSON: 4, PHONE: 1 } }),
-    { line: 'Sent as redacted · 7 details hidden', breakdown: '4 people, 2 addresses, 1 phone number' },
+    { line: 'Sent as redacted · 7 details hidden', breakdown: '4 people, 2 addresses, 1 phone number', filesNote: null },
   );
   // A kind the app does not know is counted as other details, so the sum still holds.
   assert.equal(
     redactionNote({ details_hidden: 3, places_replaced: 3, by_type: { NIN: 1, VEHICLE_PLATE: 2 } }).breakdown,
     '1 NIN, 2 other details',
   );
+});
+
+test("with files, the count is the message's and the line never says nothing personal was found (Lucy's live check)", () => {
+  // The server counts the typed message only; a file is redacted as Lawexa reads it, with no count kept.
+  assert.deepEqual(redactionNote({ details_hidden: 0, places_replaced: 0, by_type: {} }, true), {
+    line: 'Sent as redacted · files read with personal details hidden',
+    breakdown: null,
+    filesNote: null,
+  });
+  assert.deepEqual(redactionNote({ details_hidden: 2, places_replaced: 3, by_type: { PERSON: 2 } }, true), {
+    line: 'Sent as redacted · 2 details hidden in your message',
+    breakdown: '2 people',
+    filesNote: 'Files are read the same way: their personal details are hidden before the AI reads them.',
+  });
+  // A question from before the summary keeps its plain line, files or not.
+  assert.deepEqual(redactionNote(undefined, true), { line: 'Sent as redacted', breakdown: null, filesNote: null });
+  // Both rows pass whether the question has files, and the opened panel says so.
+  const row = read('v2', 'features', 'conversations', 'conversation', 'rows', 'UserMessageRow.tsx');
+  assert.equal((row.match(/<RedactionNote summary=\{message\.redaction\}[^>]*hasFiles=\{hasFiles\} \/>/g) ?? []).length, 2);
+  const note = read('v2', 'features', 'conversations', 'conversation', 'rows', 'RedactionNote.tsx');
+  assert.match(note, /const note = redactionNote\(summary, hasFiles\);/);
+  assert.match(note, /\{note\.filesNote \? <p className="mt-1">\{note\.filesNote\}<\/p> : null\}/);
 });
 
 test('only a well-formed summary is read; anything else is treated as absent', () => {

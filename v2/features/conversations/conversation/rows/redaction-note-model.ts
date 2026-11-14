@@ -34,7 +34,12 @@ export interface RedactionNote {
   line: string;
   /** What opening the line shows, or null when there is nothing to open. */
   breakdown: string | null;
+  /** The opened panel's word on the question's files, or null without files. */
+  filesNote: string | null;
 }
+
+/** How a file in a redacted chat is read: its personal details hidden as Lawexa reads it. */
+export const FILES_READ_REDACTED = 'files read with personal details hidden';
 
 /**
  * The line and its breakdown for one question in a redacted chat.
@@ -43,17 +48,32 @@ export interface RedactionNote {
  *   nothing found                                             "Sent as redacted · nothing personal found"
  *   N found                                                   "Sent as redacted · N details hidden"
  *
+ * THE COUNT IS THE TYPED MESSAGE'S (Lucy's live check, 14 November 2026). The
+ * server counts what it hid in the message when it is sent; a file is redacted
+ * part by part as Lawexa reads it, and no count is kept. A question with files
+ * therefore never says "nothing personal found", which read as if it covered
+ * the file: it says the files are read with personal details hidden, and a
+ * count names the message ("N details hidden in your message").
+ *
  * The breakdown names each kind with its count, people first ("4 people,
  * 2 addresses, 1 phone number"). A kind the app does not know is counted as
  * other details, so a new kind from the server still adds up.
  */
-export function redactionNote(summary: RedactionSummary | undefined): RedactionNote {
-  if (!summary) return { line: 'Sent as redacted', breakdown: null };
+export function redactionNote(summary: RedactionSummary | undefined, hasFiles = false): RedactionNote {
+  const filesNote = hasFiles ? 'Files are read the same way: their personal details are hidden before the AI reads them.' : null;
+  if (!summary) return { line: 'Sent as redacted', breakdown: null, filesNote: null };
   const count = summary.details_hidden;
-  if (count === 0) return { line: 'Sent as redacted · nothing personal found', breakdown: null };
+  if (count === 0) {
+    return {
+      line: hasFiles ? `Sent as redacted · ${FILES_READ_REDACTED}` : 'Sent as redacted · nothing personal found',
+      breakdown: null,
+      filesNote: null,
+    };
+  }
   return {
-    line: `Sent as redacted · ${count} ${count === 1 ? 'detail' : 'details'} hidden`,
+    line: `Sent as redacted · ${count} ${count === 1 ? 'detail' : 'details'} hidden${hasFiles ? ' in your message' : ''}`,
     breakdown: kindsSentence(summary.by_type),
+    filesNote,
   };
 }
 
