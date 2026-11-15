@@ -16,7 +16,10 @@ export interface RedactionCategoryOption {
   description: string;
 }
 
-/** `GET` / `PUT /users/redaction-default`: the person's saved choice (all six for a new user) and the six options. */
+/**
+ * `GET` / `PUT /users/redaction-default`: the person's saved choice (for a
+ * person who has not chosen, the server's starting kinds) and the six options.
+ */
 export interface RedactionDefault {
   categories: RedactionCategory[];
   options: RedactionCategoryOption[];
