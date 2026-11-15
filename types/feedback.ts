@@ -65,6 +65,18 @@ export interface QuizQuestionFeedbackBody {
   };
 }
 
+/**
+ * POST /api/feedback for a live quiz game (Backend live-quiz-open e9c7ac18):
+ * a player's report of an open game, named by its uuid, in their own words
+ * (required; no reasons or context). It lands in the feedback list, where an
+ * admin may end the game.
+ */
+export interface QuizGameReportBody {
+  content_type: 'channel_quiz_game';
+  content_uuid: string;
+  feedback_text: string;
+}
+
 // POST /api/feedback response
 export interface FeedbackResponse {
   success: boolean;

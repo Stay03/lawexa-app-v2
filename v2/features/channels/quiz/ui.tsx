@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type {
   QuizAnswerIn,
   QuizGamePlayer,
+  QuizYourRank,
 } from '@/types/channel-quiz';
 import type { SlimUser } from '@/types/collab';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
@@ -568,14 +569,36 @@ function AnswerChip({ entry }: { entry: QuizAnswerIn }) {
 export function PlayerChip({
   user,
   host,
+  onRemove,
+  removing = false,
 }: {
   user: SlimUser;
   host?: boolean;
+  /** An open game's host may remove a player from the lobby (Stay, thread 12341975); absent elsewhere. */
+  onRemove?: () => void;
+  removing?: boolean;
 }) {
   return (
-    <div className="flex w-20 flex-col items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-200">
+    <div
+      className={cn(
+        'flex w-20 flex-col items-center gap-1.5 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-200',
+        removing && 'opacity-50',
+      )}
+    >
       <div className="relative">
         <MemberAvatar user={user} />
+        {onRemove && (
+          // A small mark on the avatar, its tap area 44px around it (the app's touch floor).
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={removing}
+            aria-label={`Remove ${user.name} from the game`}
+            className="absolute -top-1.5 -right-1.5 flex size-5 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors after:absolute after:-inset-3 after:content-[''] hover:text-destructive focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:opacity-50"
+          >
+            <X aria-hidden className="size-3" />
+          </button>
+        )}
         {host && (
           <span
             aria-hidden
@@ -657,15 +680,20 @@ export function Leaderboard({
   players,
   viewerUuid,
   limit,
+  yourRank = null,
 }: {
   players: readonly QuizGamePlayer[];
   viewerUuid: string | null;
   limit?: number;
+  /** The viewer's own place from the game's state (an open game's lists carry the top 10 only). */
+  yourRank?: QuizYourRank | null;
 }) {
   const top = limit ? players.slice(0, limit) : players;
   const viewerRow = players.find((player) => player.user.uuid === viewerUuid);
   const viewerOutside =
     viewerRow && !top.some((player) => player.user.uuid === viewerUuid);
+  // A player below an open game's top 10 is in no list at all: their place comes from `your_rank`.
+  const rankOnly = !viewerRow && yourRank !== null;
 
   return (
     <ol className="flex flex-col gap-1">
@@ -691,7 +719,29 @@ export function Leaderboard({
           />
         </>
       )}
+      {rankOnly && yourRank && (
+        <>
+          <li aria-hidden className="flex justify-center py-0.5 text-muted-foreground">
+            <Minus className="size-3" />
+          </li>
+          <YourRankRow rank={yourRank.rank} score={yourRank.score} />
+        </>
+      )}
     </ol>
+  );
+}
+
+/** The viewer's own place where no list holds them (an open game's rank below its top 10): RankRow's look, named "You". */
+export function YourRankRow({ rank, score }: { rank: number; score: number }) {
+  return (
+    <li className="flex items-center gap-3 rounded-xl bg-primary/10 px-3 py-2.5 ring-2 ring-primary/60 ring-inset">
+      <span className="w-6 shrink-0 font-comfortaa text-sm font-bold tabular-nums text-muted-foreground">{rank}</span>
+      <span className="min-w-0 flex-1 text-sm font-medium text-foreground">You</span>
+      <span className="shrink-0 font-comfortaa text-sm font-bold tabular-nums text-foreground">
+        {score.toLocaleString()}{' '}
+        <span className="font-sans text-xs font-medium text-muted-foreground">{pointsUnit(score)}</span>
+      </span>
+    </li>
   );
 }
 

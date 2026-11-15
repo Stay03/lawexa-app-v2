@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
-import { ArrowLeft, Ban, Loader2, LogIn, Trophy, UserPlus, WifiOff } from 'lucide-react';
+import { ArrowLeft, Ban, Flag, Loader2, LogIn, Trophy, UserPlus, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,8 @@ import {
   QuestionStage,
 } from './GamePhases';
 import { GameInviteDialog } from './GameInviteDialog';
+import { OpenGameInviteDialog } from './OpenGameInviteDialog';
+import { ReportGameDialog } from './ReportGameDialog';
 import { canJoinNow } from './model';
 import { gameInRoom, isRoomPlace, roomNoun, type QuizRoom } from './quiz-room';
 import { openJoinRefusal, REMOVED_CODE, REMOVED_NOTE } from './open-game';
@@ -164,6 +166,7 @@ export function GameOverlay({
   const placeNoun = place ?? (isRoomPlace(room) ? roomNoun(room) : 'Quiz page');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const frameRef = useRef<HTMLElement>(null);
 
   // The affordance that opened this mode (a card's Join, the live bar) is now
@@ -198,15 +201,18 @@ export function GameOverlay({
     phase !== 'finished' &&
     phase !== 'cancelled';
   // While people can still come in: before the end, in a Space's game.
+  // An open game's host hands out its own page and code (no Space to join).
+  const openVisibility = room.kind === 'game' ? (state?.game.visibility ?? null) : null;
   const canInvite =
-    mayInvite &&
-    room.kind === 'space' &&
+    (room.kind === 'space' ? mayInvite : openVisibility !== null && game.isHost) &&
     state !== null &&
     !ending &&
     phase !== 'finished' &&
     phase !== 'cancelled';
   // An open game's own refusals: full (409 game_full) or removed by its host (403 removed).
   const joinRefusal = openJoinRefusal(game.joinErrorStatus, game.joinErrorCode, state?.game.max_players);
+  // Anyone but its host may report an open game; an admin reads it and may end it (Stay, thread 12341975).
+  const canReport = openVisibility !== null && state !== null && !game.isHost;
   const showJoinBar =
     state !== null &&
     !game.isPlaying &&
@@ -271,6 +277,16 @@ export function GameOverlay({
             >
               <UserPlus aria-hidden className="size-4" />
               <span className={HEADER_LABEL}>Invite</span>
+            </RaisedButton>
+          )}
+          {canReport && (
+            <RaisedButton
+              tone="quiet"
+              className={cn(HEADER_RAISED, 'shrink-0 text-muted-foreground')}
+              onClick={() => setReportOpen(true)}
+            >
+              <Flag aria-hidden className="size-4" />
+              <span className={HEADER_LABEL}>Report</span>
             </RaisedButton>
           )}
           {canCancel && (
@@ -338,7 +354,18 @@ export function GameOverlay({
         onClose={onClose}
       />
 
-      {inviteOpen && canInvite && (
+      {reportOpen && canReport && <ReportGameDialog gameUuid={gameUuid} onOpenChange={setReportOpen} />}
+      {inviteOpen && canInvite && openVisibility !== null && state !== null && (
+        <OpenGameInviteDialog
+          gameUuid={gameUuid}
+          quizUuid={state.game.quiz.uuid}
+          quizTitle={title}
+          joinCode={state.game.join_code ?? null}
+          visibility={openVisibility}
+          onOpenChange={setInviteOpen}
+        />
+      )}
+      {inviteOpen && canInvite && openVisibility === null && (
         <GameInviteDialog
           gameUuid={gameUuid}
           quizUuid={state?.game.quiz.uuid ?? null}
@@ -353,7 +380,7 @@ export function GameOverlay({
             <AlertDialogTitle>End this game?</AlertDialogTitle>
             <AlertDialogDescription>
               The game stops for everyone straight away. A cancelled game keeps
-              no scores and posts nothing to the {placeNoun}.
+              no scores{room.kind === 'game' ? '.' : ` and posts nothing to the ${placeNoun}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

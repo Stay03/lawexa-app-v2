@@ -2,6 +2,7 @@ import { apiClient } from './client';
 import type {
   ChatPromptEligibility,
   FeedbackResponse,
+  QuizGameReportBody,
   QuizQuestionFeedbackBody,
   SubmitChatRatingData,
   SubmitFeedbackData,
@@ -42,6 +43,12 @@ export const feedbackApi = {
    * what the reader saw in `context`.
    */
   submitQuizQuestion: async (body: QuizQuestionFeedbackBody): Promise<FeedbackResponse> => {
+    const response = await apiClient.post<FeedbackResponse>('/feedback', body);
+    return response.data;
+  },
+
+  /** A player's report of a live quiz game (an open one): JSON, the game by `content_uuid`, their words required. */
+  submitQuizGameReport: async (body: QuizGameReportBody): Promise<FeedbackResponse> => {
     const response = await apiClient.post<FeedbackResponse>('/feedback', body);
     return response.data;
   },

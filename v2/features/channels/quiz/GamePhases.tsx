@@ -19,6 +19,16 @@ import {
 
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { formatMessageTime as clockTime } from '@/lib/utils/collab';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { QuizGameState } from '@/types/channel-quiz';
@@ -62,6 +72,7 @@ import {
   StageKicker,
   type OptionState,
 } from './ui';
+import { isOpenGame, spacedJoinCode } from './open-game';
 import {
   answersIn,
   canJoinNow,
@@ -123,12 +134,17 @@ const ResultCardShare = dynamic(() => import('./ResultCardShare').then((module) 
 /* ── Lobby ────────────────────────────────────────────────────────────────── */
 
 export function LobbyStage({ game }: { game: LiveGame }) {
+  const [removing, setRemoving] = useState<{ uuid: string; name: string } | null>(null);
   const state = game.state;
   if (!state) return null;
   const players = state.game.players ?? [];
   const count = state.game.player_count ?? players.length;
   const hostUuid = state.game.host?.uuid ?? null;
   const joinable = canJoinNow(state) && !game.isPlaying;
+  // An open game (no Space or channel): its code to read out, its cap, and the host's remove.
+  const open = isOpenGame(state.game);
+  const joinCode = open ? (state.game.join_code ?? null) : null;
+  const mayRemove = open && game.isHost;
 
   return (
     <GameStage>
@@ -138,6 +154,14 @@ export function LobbyStage({ game }: { game: LiveGame }) {
         <h2 className="mt-2 text-2xl leading-tight font-bold tracking-tight text-balance text-foreground">
           {state.game.quiz.title}
         </h2>
+        {joinCode ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Join code{' '}
+            <span className="font-comfortaa text-lg font-bold tracking-[0.15em] text-foreground tabular-nums">
+              {spacedJoinCode(joinCode)}
+            </span>
+          </p>
+        ) : null}
         <p className="mt-2 text-sm text-muted-foreground">
           {state.game.question_count}{' '}
           {state.game.question_count === 1 ? 'question' : 'questions'} ·{' '}
@@ -152,8 +176,17 @@ export function LobbyStage({ game }: { game: LiveGame }) {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Users aria-hidden className="size-4" />
           <span>
-            <span className="font-comfortaa font-bold text-foreground tabular-nums">{count}</span>{' '}
-            {count === 1 ? 'player' : 'players'} in the lobby
+            {open && state.game.max_players ? (
+              <>
+                <span className="font-comfortaa font-bold text-foreground tabular-nums">{count}</span> of{' '}
+                {state.game.max_players} {count === 1 ? 'player' : 'players'} in the lobby
+              </>
+            ) : (
+              <>
+                <span className="font-comfortaa font-bold text-foreground tabular-nums">{count}</span>{' '}
+                {count === 1 ? 'player' : 'players'} in the lobby
+              </>
+            )}
           </span>
         </div>
         <div className="mt-4 flex flex-wrap justify-center gap-4">
@@ -162,6 +195,10 @@ export function LobbyStage({ game }: { game: LiveGame }) {
               key={player.user.uuid}
               user={player.user}
               host={player.user.uuid === hostUuid}
+              removing={game.removingUuid === player.user.uuid}
+              {...(mayRemove && player.user.uuid !== hostUuid
+                ? { onRemove: () => setRemoving({ uuid: player.user.uuid, name: player.user.name }) }
+                : {})}
             />
           ))}
           {players.length === 0 && (
@@ -222,7 +259,37 @@ export function LobbyStage({ game }: { game: LiveGame }) {
             : ' · nobody can join once it starts'}
           .
         </p>
+        {mayRemove && game.removeErrorStatus !== 0 ? (
+          <p role="status" className="max-w-sm text-center text-xs text-muted-foreground">
+            {game.removeErrorStatus === 409
+              ? 'The game has started, so nobody can be removed now.'
+              : game.removeErrorStatus === 404
+                ? 'That player has already left the game.'
+                : 'Couldn’t remove that player. Try again.'}
+          </p>
+        ) : null}
       </div>
+
+      <AlertDialog open={removing !== null} onOpenChange={(next) => (next ? null : setRemoving(null))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {removing?.name ?? 'this player'}?</AlertDialogTitle>
+            <AlertDialogDescription>They leave the lobby and can&rsquo;t join this game again.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep them</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removing) game.removePlayer(removing.uuid);
+                setRemoving(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </GameStage>
   );
 }
@@ -422,6 +489,7 @@ export function QuestionStage({
                 players={state.game.players ?? []}
                 viewerUuid={viewerUuid}
                 limit={5}
+                yourRank={state.your_rank ?? null}
               />
             </div>
           </div>

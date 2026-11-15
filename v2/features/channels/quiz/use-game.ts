@@ -28,7 +28,7 @@ import {
   pushedLobbyClose,
   type QuizGamePhase,
 } from './model';
-import { useCancelGame, useJoinGame, useStartGame, useSubmitAnswer } from './mutations';
+import { useCancelGame, useJoinGame, useRemovePlayer, useStartGame, useSubmitAnswer } from './mutations';
 import { channelQuizQueries } from './queries';
 import type { QuizRoom } from './quiz-room';
 import { apiErrorCode } from './open-game';
@@ -484,6 +484,12 @@ export interface LiveGame {
   starting: boolean;
   cancel: () => void;
   cancelling: boolean;
+  /** An open game's host removes a player from the lobby (they cannot rejoin). */
+  removePlayer: (userUuid: string) => void;
+  /** The player being removed now, or null. */
+  removingUuid: string | null;
+  /** The last removal's refusal (409 once started, 404 not in the game), or 0. */
+  removeErrorStatus: number;
 }
 
 export function useLiveGame({
@@ -565,6 +571,7 @@ export function useLiveGame({
   const joinMutation = useJoinGame(gameUuid, viewerId);
   const startMutation = useStartGame(gameUuid, viewerId);
   const cancelMutation = useCancelGame(gameUuid, viewerId, room);
+  const removeMutation = useRemovePlayer(gameUuid, viewerId);
 
   /* ── The event fast path ───────────────────────────────────────────────── */
   useEffect(() => {
@@ -702,6 +709,7 @@ export function useLiveGame({
   const join = useCallback(() => joinMutation.mutate(), [joinMutation]);
   const start = useCallback(() => startMutation.mutate(), [startMutation]);
   const cancel = useCallback(() => cancelMutation.mutate(), [cancelMutation]);
+  const removePlayer = useCallback((userUuid: string) => removeMutation.mutate(userUuid), [removeMutation]);
 
   return {
     isPending: query.isPending,
@@ -748,5 +756,8 @@ export function useLiveGame({
     starting: startMutation.isPending,
     cancel,
     cancelling: cancelMutation.isPending,
+    removePlayer,
+    removingUuid: removeMutation.isPending ? (removeMutation.variables ?? null) : null,
+    removeErrorStatus: removeMutation.isError ? extractApiError(removeMutation.error).status : 0,
   };
 }
