@@ -104,7 +104,19 @@ export function readQuestionCard(metadata: unknown): QuestionCard | null {
     questions.push(question);
   }
   const answers = metadata.answers == null ? null : readAnswers(metadata.answers);
-  return { status: metadata.status as QuestionCard['status'], questions, answers };
+  const card: QuestionCard = { status: metadata.status as QuestionCard['status'], questions, answers };
+  const intro = readIntro(metadata.intro);
+  if (intro !== null) card.intro = intro;
+  return card;
+}
+
+/**
+ * What Lawexa wrote with a card (`intro`, thread 1f3c0a05): its markdown, or
+ * null when there is none, it is blank, or it is not text. A card without one
+ * draws exactly as before.
+ */
+function readIntro(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
 }
 
 /** The answers a user turn sent, from its metadata; null on every other turn. */

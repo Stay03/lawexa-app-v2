@@ -62,6 +62,41 @@ test('a completed event without the card changes nothing; the next read brings i
   assert.deepEqual(cardOf(adoptServerFields(rows, server)[0]), OPEN);
 });
 
+/* What Lawexa wrote with the card (`intro`, thread 1f3c0a05, 15 November
+ * 2026): the text streamed before the card must not vanish when the row
+ * turns into the card. */
+
+const INTRO = 'TEST DATA. **Question 1.** A landlord must give written notice before eviction.';
+
+test("the completed event's intro stays on the streamed answer when it turns into the card", () => {
+  const rows = [question('local-3', { savedId: 3 }), answer('local-4', { savedId: 4, content: INTRO })];
+  const next = withCardFromCompleted(rows, 4, { type: 'question_card', status: 'open', questions: QUESTIONS, answers: null, intro: INTRO });
+  assert.deepEqual(cardOf(next[1]), { ...OPEN, intro: INTRO });
+  // A completed event with no intro: the card alone, as before.
+  const plain = withCardFromCompleted(rows, 4, { type: 'question_card', status: 'open', questions: QUESTIONS, answers: null, intro: null });
+  assert.deepEqual(cardOf(plain[1]), OPEN);
+});
+
+test('closing the card keeps its intro', () => {
+  const rows = [answer('msg_2', { questionCard: { ...OPEN, intro: INTRO } })];
+  assert.equal(cardOf(withOpenCardClosed(rows, [{ option: 0 }])[0])?.intro, INTRO);
+  assert.equal(cardOf(withOpenCardClosed(rows, null)[0])?.intro, INTRO);
+});
+
+test("the next read brings the intro when completed did not, and the card on screen keeps its state", () => {
+  const closedHere: QuestionCard = { ...OPEN, status: 'answered', answers: [{ option: 1 }] };
+  const rows = [answer('local-4', { savedId: 4, questionCard: closedHere })];
+  // The server's read started before the answer went: it still says open, and carries the intro.
+  const server: ConversationMessage[] = [answer('msg_4', { questionCard: { ...OPEN, intro: INTRO } })];
+  assert.deepEqual(cardOf(adoptServerFields(rows, server)[0]), { ...closedHere, intro: INTRO });
+  // An intro already on screen is not taken again: the same array, nothing renders.
+  const settled = [answer('local-4', { savedId: 4, questionCard: { ...closedHere, intro: INTRO } })];
+  assert.equal(adoptServerFields(settled, server), settled);
+  // A server card with no intro adds nothing to a card on screen.
+  const bare = [answer('local-4', { savedId: 4, questionCard: OPEN })];
+  assert.equal(adoptServerFields(bare, [answer('msg_4', { questionCard: OPEN })]), bare);
+});
+
 test("a confidential chat's card, which has no saved id, goes on the answer just drawn", () => {
   const rows = [question('local-1'), answer('local-2')];
   const card = { type: 'question_card', status: 'open', questions: QUESTIONS, answers: null };

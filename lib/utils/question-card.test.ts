@@ -59,6 +59,39 @@ test('a card is read from its metadata', () => {
   assert.deepEqual(card, { status: 'open', questions: [TONE, DEADLINE], answers: null });
 });
 
+/* What Lawexa wrote with the card (`intro`, thread 1f3c0a05, 15 November
+ * 2026): the AI service used to drop it, so the reader saw only the card. */
+
+const INTRO = 'TEST DATA. You asked three things:\n\n1. Can a landlord evict without notice?\n2. Can a minor sign a lease?\n3. Who pays for repairs?';
+
+test("a card keeps what Lawexa wrote with it, as written", () => {
+  assert.deepEqual(readQuestionCard(cardMeta({ intro: INTRO })), {
+    status: 'open',
+    questions: [TONE, DEADLINE],
+    answers: null,
+    intro: INTRO,
+  });
+});
+
+test('a card with no intro, a blank one or one that is not text has none, and reads as before', () => {
+  for (const intro of [undefined, null, '', '   \n ', 42, { text: 'x' }]) {
+    const card = readQuestionCard(cardMeta({ intro }));
+    assert.deepEqual(card, { status: 'open', questions: [TONE, DEADLINE], answers: null });
+    assert.equal(card !== null && 'intro' in card, false);
+  }
+});
+
+test('a bad intro never costs the card', () => {
+  assert.equal(readQuestionCard(cardMeta({ intro: ['not', 'text'] }))?.status, 'open');
+});
+
+test('a closed card keeps its intro, answered or skipped', () => {
+  const card = readQuestionCard(cardMeta({ intro: INTRO }));
+  assert.ok(card);
+  assert.equal(closedCard(card, [{ option: 0 }, { option: 1 }]).intro, INTRO);
+  assert.equal(closedCard(card, null).intro, INTRO);
+});
+
 test('a shape the app does not know is no card, so the answer stays plain text', () => {
   assert.equal(readQuestionCard(cardMeta({ type: 'radar_report' })), null);
   assert.equal(readQuestionCard(cardMeta({ status: 'closed' })), null);
@@ -229,6 +262,19 @@ test('a card is drawn as an answer carrying its card; its answers as a user turn
     questions: [TONE, DEADLINE],
   });
   assert.equal((rows[0] as ChatMessage).cardAnswers, undefined);
+});
+
+test("a card read from history carries Lawexa's intro, and the answer's own text stays as saved", () => {
+  const rows = transformApiMessages([
+    message(1, 'user', 'TEST DATA. Three questions about my lease.'),
+    message(2, 'assistant', 'TEST DATA. Shall I answer them one at a time?', cardMeta({ intro: INTRO }) as ApiMessage['metadata']),
+  ]);
+  const card = rows[1] as ChatMessage;
+  assert.equal(card.questionCard?.intro, INTRO);
+  assert.equal(card.content, 'TEST DATA. Shall I answer them one at a time?');
+  // A card saved before the intro: none, so it draws as before.
+  const old = transformApiMessages([message(2, 'assistant', 'TEST DATA. 1. Which tone?', cardMeta() as ApiMessage['metadata'])]);
+  assert.equal((old[0] as ChatMessage).questionCard?.intro, undefined);
 });
 
 test('a card the app cannot read stays its plain-text answer, never dropped', () => {

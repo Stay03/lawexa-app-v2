@@ -88,13 +88,26 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   const radarReport = (message as ChatMessage).kind === 'radar_report';
   // A question card, once its turn is over: its text is the questions in plain
   // words (for v1 and a copy), and the row asks them itself, where Lawexa
-  // asked (question cards, design B, 13 November 2026).
+  // asked (question cards, design B, 13 November 2026). What Lawexa wrote with
+  // the card (`intro`, thread 1f3c0a05) comes first as a normal answer, so the
+  // text streamed before the card stays when the row turns into the card.
   const questionCard = isStreaming ? undefined : (message as ChatMessage).questionCard;
   const skillDraft = isStreaming || draining ? undefined : (message as ChatMessage).skillDraft;
   if (questionCard) {
     return (
       <div className="w-full">
         <ReasoningTrace text={reasoningText} isStreaming={false} reasoningMs={message.reasoningMs} />
+        {questionCard.intro && (
+          <div className="mb-3">
+            <ChatContent
+              content={questionCard.intro}
+              messageId={message.id}
+              isStreaming={false}
+              isDraining={false}
+              isInteracted={isInteracted}
+            />
+          </div>
+        )}
         <AskedQuestions rowId={message.id} card={questionCard} />
       </div>
     );

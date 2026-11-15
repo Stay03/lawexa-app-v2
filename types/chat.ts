@@ -150,6 +150,12 @@ export interface QuestionCard {
   status: 'open' | 'answered' | 'skipped';
   questions: QuestionCardQuestion[];
   answers: QuestionCardAnswer[] | null;
+  /**
+   * What Lawexa wrote with the card, in markdown (the card's `intro`, thread
+   * 1f3c0a05, 15 November 2026): a list of the questions it found, or a full
+   * answer before "Continue to question 2". Absent when it wrote nothing.
+   */
+  intro?: string;
 }
 
 /**
@@ -467,7 +473,7 @@ export interface CompletedEvent {
    * one alike). Absent on servers before it: the card then comes with the
    * next read of the chat.
    */
-  question_card?: { type?: string; status?: unknown; questions?: unknown; answers?: unknown } | null;
+  question_card?: { type?: string; status?: unknown; questions?: unknown; answers?: unknown; intro?: unknown } | null;
   /**
    * A skill the turn drafted (the skills tool, branch skills-tool 385ececc):
    * the same card the answer's metadata carries. Sent only for a turn that

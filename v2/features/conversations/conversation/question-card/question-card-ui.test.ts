@@ -63,10 +63,14 @@ test("a card's row keeps only its lead line while the dock asks: the streamed te
   const row = read(conversation, 'rows', 'AssistantMessageRow.tsx');
   const early = row.indexOf('if (questionCard) {');
   assert.ok(early > 0);
-  // The card's return comes before the text is drawn, and draws no text.
-  assert.ok(early < row.indexOf('<ChatContent'));
+  // The card's return comes before the answer's text is drawn, and never draws that text: only what
+  // Lawexa wrote with the card (`intro`, thread 1f3c0a05, 15 November 2026), above the lead line.
+  assert.ok(early < row.indexOf('content={shownText}'));
   const branch = row.slice(early, row.indexOf('}', row.indexOf('<AskedQuestions rowId={message.id} card={questionCard} />')));
-  assert.doesNotMatch(branch, /ChatContent|message\.content|shownText/);
+  assert.doesNotMatch(branch, /message\.content|shownText/);
+  assert.equal(branch.match(/<ChatContent/g)?.length, 1);
+  assert.match(branch, /\{questionCard\.intro && \(\s*<div className="mb-3">\s*<ChatContent\s*content=\{questionCard\.intro\}/);
+  assert.ok(branch.indexOf('content={questionCard.intro}') < branch.indexOf('<AskedQuestions'));
   // While the turn streams, the row is a plain answer; the lead line replaces it in place.
   assert.match(row, /const questionCard = isStreaming \? undefined : \(message as ChatMessage\)\.questionCard;/);
   // Only the row that asks, while open, for a reader who may answer: the lead alone.

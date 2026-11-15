@@ -132,6 +132,11 @@ function cardFields(row: EngineMessage, cards: ReadonlyMap<number, ChatMessage>)
   const copy = server.questionCard;
   const local = (row as ChatMessage).questionCard;
   if (copy && (local === undefined || (local.status === 'open' && copy.status !== 'open'))) fields.questionCard = copy;
+  // What Lawexa wrote with the card, when the turn's `completed` did not carry
+  // it: taken from the server's copy, and the card on screen keeps its state.
+  else if (copy?.intro !== undefined && local !== undefined && local.intro === undefined) {
+    fields.questionCard = { ...local, intro: copy.intro };
+  }
   // A skill draft's card (the skills tool): it reaches a streamed answer the
   // same way, and follows the draft as an admin publishes or rejects it. Only
   // ever forward: a read from before the reader's own Save keeps "Sent".
