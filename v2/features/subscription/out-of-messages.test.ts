@@ -276,3 +276,22 @@ test("a Space's monthly messages used up: the date shows once (in the server's s
 test('a block with no payer reads exactly as before', () => {
   assert.equal(outOfMessagesView({ blocked: block() }).heading, 'You’ve used your messages for now');
 });
+
+test("a member who doesn't pay gets no payer billing details, and the notice needs none", () => {
+  // Backend (parts 1-8 review): code, a Space reason, the message and paid_by only, for a member who does not pay.
+  const bare = {
+    code: 'space_payer_exhausted',
+    reason: 'space_payer_limit',
+    message: "This Space's messages are paid by TEST DATA Ada Owner, whose plan has reached its limit.",
+    paid_by: payer(false),
+  } as IBlockedReason;
+  const view = outOfMessagesView({ blocked: bare, timeZone: 'UTC' });
+  assert.equal(view.heading, 'This Space’s messages are used up');
+  assert.equal(view.body, bare.message);
+  assert.equal(view.reset, null);
+  assert.deepEqual(view.actions, []);
+  // The Space branch reads no billing field.
+  const source = read('v2', 'features', 'subscription', 'out-of-messages.ts');
+  const branch = source.slice(source.indexOf('function spaceBlockView'));
+  assert.doesNotMatch(branch, /plan_remaining|payg_remaining|subscription_ends_at/);
+});

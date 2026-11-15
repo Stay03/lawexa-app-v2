@@ -88,7 +88,9 @@ export type TBlockedReasonCode =
   | 'hard_limit'
   | 'cancelled_grace_exhausted'
   /** A Space's own monthly Lawexa messages, from its payer's plan, are used up (organisation plans part 6). */
-  | 'space_monthly_limit';
+  | 'space_monthly_limit'
+  /** A Space member who does not pay, blocked because the payer's plan is used up: no payer billing details are sent. */
+  | 'space_payer_limit';
 
 /** Who pays for a Space's Lawexa turns (organisation plans part 6): its payer, or the reader themselves. */
 export interface IBlockedPaidBy {
@@ -101,10 +103,11 @@ export interface IBlockedReason {
   code: string;
   reason: TBlockedReasonCode;
   message: string;
-  plan_remaining: number;
-  payg_remaining: number;
-  resets_at: string | null;
-  subscription_ends_at: string | null;
+  /** The reader's own billing state. Absent on a Space block for a member who does not pay (the payer's is not theirs to see). */
+  plan_remaining?: number;
+  payg_remaining?: number;
+  resets_at?: string | null;
+  subscription_ends_at?: string | null;
   /** The user's most recent paid-for message came from a message pack (bought
    *  or granted). With `free_no_subscription`, the messages used up were not
    *  only the free ones (backend 6d218a29). Absent from an older API. */

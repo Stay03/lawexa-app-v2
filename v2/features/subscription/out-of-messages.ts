@@ -85,6 +85,7 @@ const BODY: Record<TBlockedReasonCode, string> = {
     'Your plan has ended, so it no longer includes messages. Reactivate it, or buy a message pack.',
   hard_limit: 'You have reached the most messages this account can send for now.',
   space_monthly_limit: 'This Space has used its Lawexa messages for the month.',
+  space_payer_limit: 'This Space’s messages are used up.',
 };
 
 /** The free reason's sentence once a message pack has been used up too. */
