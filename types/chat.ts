@@ -742,8 +742,18 @@ export interface ChatStartResponse {
   data: {
     conversation_id: string;
     workflow_id: number;
-    execution_id: string;
-    stream_url: string;
+    /** `null` when no AI reply is coming (`ai_reply: false`). */
+    execution_id: string | null;
+    /** `null` when no AI reply is coming (`ai_reply: false`). */
+    stream_url: string | null;
+    /**
+     * Whether Lawexa answers this message (Backend space-chat-tag-only,
+     * 7932d22b). `false` in a Space where Lawexa answers only when tagged and
+     * the message does not tag it: the message is saved, nothing is streamed.
+     * Absent on a server before the switch, which answers every message: read
+     * it through `expectsAiReply`, which takes absent as true.
+     */
+    ai_reply?: boolean;
     // Echoed back by backend to confirm what's active
     stream_mode?: 'v2_stream' | null;
     // For redacted conversations, the canonical (redacted) form of the user's
@@ -1226,10 +1236,6 @@ export interface SpaceRosterEntry {
 export interface ConversationSpaceRef {
   uuid: string;
   name: string;
-  /** Lawexa answers only messages that tag it (Stay, 15 November 2026,
-   *  thread 39c968a5): on for the university Spaces. Absent on a server
-   *  before the switch. Read through `lawexaTagOnly` (space-turn.ts). */
-  lawexa_tag_only?: boolean;
 }
 
 /** A reader's role in a chat's space, the stored value (backend B4): the

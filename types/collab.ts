@@ -267,7 +267,8 @@ export interface Space {
   type_label: string;
   is_private: boolean;
   /** Lawexa answers only messages that tag it in this Space's chats; the
-   *  owner sets it (thread 39c968a5). Absent on a server before the switch. */
+   *  owner (or a platform admin) sets it with PUT /spaces/{uuid} (Backend
+   *  space-chat-tag-only, thread 39c968a5). Absent on a server before it. */
   lawexa_tag_only?: boolean;
   settings: Record<string, unknown> | null;
   /** Null for a personal space; trimmed ref for an org-owned space. */

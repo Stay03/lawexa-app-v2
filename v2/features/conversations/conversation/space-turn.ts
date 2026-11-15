@@ -302,8 +302,8 @@ export function whoseTurn(input: {
 
 /**
  * Lawexa answers only messages that tag it in this chat's space (Stay, 15
- * November 2026, thread 39c968a5). One accessor, so the server's field name is
- * one line to change.
+ * November 2026, thread 39c968a5): the Space's own `lawexa_tag_only`. A server
+ * before the switch sends nothing, which reads as off.
  */
 export function lawexaTagOnly(space: { lawexa_tag_only?: boolean } | null | undefined): boolean {
   return space?.lawexa_tag_only === true;

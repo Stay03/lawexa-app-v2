@@ -76,6 +76,7 @@ import type {
   StreamingSource,
   StreamSmoothingConfig,
 } from './types';
+import { expectsAiReply } from './ai-reply';
 import { answerMessageId, stampAnswerId } from './answer-id';
 import { answerAlreadyShown, textlessTerminalDraw, turnEndsWithError, withoutReplayedRows } from './replayed-answer';
 import { adoptDraftEditResults, adoptServerFields } from './server-fields';
@@ -2464,7 +2465,21 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
             }
           }
         }
-        connectToStream(response.data.execution_id);
+        // No AI reply is coming (a Space where Lawexa answers only when tagged,
+        // and this message does not tag it): the message is saved and the turn
+        // ends here, with no thinking and nothing to wait for. A server before
+        // the switch sends no `ai_reply`, which reads as a reply coming.
+        if (!expectsAiReply(response.data)) {
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+          return null;
+        }
+        const executionId = response.data.execution_id;
+        if (executionId === null) {
+          // A reply promised with nothing to stream: the server's fault, said as a failed send.
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false, error: 'Lawexa could not start its answer. Try again.' }));
+          return null;
+        }
+        connectToStream(executionId);
       } else {
         removeMessage(optimisticMsg.id);
         setState((prev) => ({

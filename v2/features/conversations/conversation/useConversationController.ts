@@ -948,8 +948,14 @@ export function useConversationController(
   // mention-options.ts).
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
   // Lawexa answers only when tagged in this space (thread 39c968a5): the
-  // picker offers it first and the composer says how to ask it.
-  const tagOnly = lawexaTagOnly(detailData?.space);
+  // picker offers it first and the composer says how to ask it. The switch is
+  // the Space's own field; the Space's record is usually cached already (the
+  // reader came through it), else read once here.
+  const spaceQuery = useQuery({
+    ...spacesQueries.detail(spaceUuid ?? '', { viewerId: serverUserId }),
+    enabled: spaceUuid !== null && showAuthors,
+  });
+  const tagOnly = lawexaTagOnly(spaceQuery.data?.data);
   const mentionOptions = useMemo(
     () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows, viewerUuid, { offerLawexa: tagOnly }) : null),
     [showAuthors, rosterRows, viewerUuid, tagOnly],
