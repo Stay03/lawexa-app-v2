@@ -291,7 +291,7 @@ export function LobbyStage({ game }: { game: LiveGame }) {
                 if (removing) game.removePlayer(removing.uuid);
                 setRemoving(null);
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               Remove
             </AlertDialogAction>

@@ -191,11 +191,15 @@ export function GameOverlay({
   // says "Final scores" over a question, and no affordance offers a move
   // (cancel, join) into a game that is already over.
   const ending = game.holdingFinalReveal || game.closingAnswer !== null;
-  const caption = game.closingAnswer
-    ? LAST_ANSWER_CAPTION
-    : game.holdingFinalReveal
-      ? PHASE_CAPTION.reveal
-      : PHASE_CAPTION[phase];
+  // Removed from an open game by its host: the game is closed to this reader (Backend 16b4161e).
+  const removed = game.errorStatus === 403 && game.errorCode === REMOVED_CODE;
+  const caption = removed
+    ? ''
+    : game.closingAnswer
+      ? LAST_ANSWER_CAPTION
+      : game.holdingFinalReveal
+        ? PHASE_CAPTION.reveal
+        : PHASE_CAPTION[phase];
 
   const canCancel =
     game.isHost &&
@@ -221,8 +225,6 @@ export function GameOverlay({
   // game) and blocks their next one (409 open_game_live), so Back asks first and says how to come back.
   const confirmLeave =
     room.kind === 'game' && game.isHost && state !== null && !ending && phase !== 'finished' && phase !== 'cancelled';
-  // Removed from an open game by its host: the game is closed to this reader (Backend 16b4161e).
-  const removed = game.errorStatus === 403 && game.errorCode === REMOVED_CODE;
   // Anyone but its host may report an open game; an admin reads it and may end it (Stay, thread 12341975).
   const canReport = openVisibility !== null && state !== null && !game.isHost && !removed;
   const showJoinBar =
@@ -429,7 +431,7 @@ export function GameOverlay({
                 setCancelOpen(false);
               }}
               disabled={game.cancelling}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {game.cancelling && (
                 <Loader2 aria-hidden className="mr-1 size-4 animate-spin" />
