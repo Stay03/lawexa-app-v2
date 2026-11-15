@@ -56,7 +56,7 @@ test('the quiz page offers Host to any signed-in account (guests not), for a qui
 
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
   // A Space is among the dialog's places only for an account that may use Spaces: the dialog reads that itself.
-  assert.match(front, /mayHost: canTakeQuiz(session),/);
+  assert.match(front, /mayHost: canTakeQuiz\(session\),/);
   const dialog = read('v2', 'features', 'channels', 'quiz', 'HostLiveQuizDialog.tsx');
   assert.match(dialog, /const spacesOpen = collabAccessState\(useV2Session\(\)\) === 'eligible';/);
   // Hosting is Start's choice now (Arthur's A, 14 November 2026), no longer a row in the bar's menu.
