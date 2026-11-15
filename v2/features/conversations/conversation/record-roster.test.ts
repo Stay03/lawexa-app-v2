@@ -74,7 +74,7 @@ test('a personal chat is unchanged: no roster from either side, so no colours', 
 
 test('tagging people stays on the members read', () => {
   const controller = read('useConversationController.ts');
-  assert.match(controller, /showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid\) : null/);
+  assert.match(controller, /showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid, \{ offerLawexa: tagOnly \}\) : null/);
 });
 
 test('the same people get the same colours from the members read and from the record, a null join time included', () => {

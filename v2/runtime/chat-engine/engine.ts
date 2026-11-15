@@ -2713,7 +2713,13 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       };
       const response = await chatApi.start(applyJurisdiction(retryBody, jurisdiction));
       if (response.success) {
-        connectToStream(response.data.execution_id);
+        // As a send: no answer coming (a tag-only Space, untagged) ends the retry here.
+        const retryExecution = response.data.execution_id;
+        if (!expectsAiReply(response.data) || retryExecution === null) {
+          setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
+          return;
+        }
+        connectToStream(retryExecution);
       } else {
         setState((prev) => ({
           ...prev,

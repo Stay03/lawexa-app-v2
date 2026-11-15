@@ -20,6 +20,7 @@ import { conversationsCache, makeOptimisticConversation } from './cache';
 import { renewRequestId, requestIdFor, settleRequestId, type FirstSend } from './first-send-id';
 import { conversationsQueries } from './queries';
 import { settleRedactionDefault } from './redaction-default-cache';
+import { expectsAiReply } from '@/v2/runtime/chat-engine/ai-reply';
 
 /**
  * startConversation — the ONE create-a-conversation flow for v2, extracted so both
@@ -376,10 +377,12 @@ export async function startConversation(
     }
 
     bridgeJurisdiction(conversationId, jurisdiction);
+    // No answer coming (a tag-only Space, an untagged first message): nothing to
+    // stream, so no handoff; the chat page reads the saved message itself.
     const redaction = redacted && isRedactionSummary(response.data.redaction) ? response.data.redaction : undefined;
     // The labels the server gave the files, when it sent them, over the app's own.
     const sentAttachments = redacted ? withServerLabels(shownAttachments, response.data.user_message_attachments) : attachments;
-    writeConvInit(conversationId, {
+    if (expectsAiReply(response.data) && executionId !== null) writeConvInit(conversationId, {
       msg: displayMessage,
       exec: executionId,
       attachments: sentAttachments,

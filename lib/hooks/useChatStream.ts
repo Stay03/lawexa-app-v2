@@ -1495,7 +1495,9 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
           }
         }
 
-        connectToStream(response.data.execution_id);
+        // No stream when the server starts none (a tag-only Space, v2's switch).
+        if (response.data.execution_id) connectToStream(response.data.execution_id);
+        else setState((prev) => ({ ...prev, isStreaming: false }));
       } else {
         // Backend returned success: false — reset state
         removeMessage(optimisticMsg.id);
@@ -1651,7 +1653,8 @@ export function useChatStream(options: UseChatStreamOptions = {}) {
       );
 
       if (response.success) {
-        connectToStream(response.data.execution_id);
+        if (response.data.execution_id) connectToStream(response.data.execution_id);
+        else setState((prev) => ({ ...prev, isStreaming: false }));
       } else {
         setState((prev) => ({
           ...prev,
