@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2, Lock, Trophy, Users } from 'lucide-react';
 import { isAxiosError } from 'axios';
+import { spaceLimitFromError } from '@/lib/utils/space-limit';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -152,6 +153,8 @@ const QUIZ_TILE =
 export function JoinScreen({ code }: { code: string }) {
   const router = useRouter();
   const [failed, setFailed] = useState<string | null>(null);
+  /** The refusal was a Space limit (organisation plans): the way to the plans goes beside its sentence. */
+  const [failedAtLimit, setFailedAtLimit] = useState(false);
   /** A game link's pressed choice, for its button's spinner. */
   const [chosen, setChosen] = useState<'play' | 'watch' | null>(null);
 
@@ -215,14 +218,21 @@ export function JoinScreen({ code }: { code: string }) {
       }
       const destination = acceptedDestination(preview.data?.data ?? null, data);
       if (destination) enter.mutate({ ...destination, play });
-      else setFailed(refusalFor(undefined).title);
+      else {
+        setFailedAtLimit(false);
+        setFailed(refusalFor(undefined).title);
+      }
     },
     onError: (error) => {
       // A refused join lets the held code go: it would otherwise bring the
       // person back here on every page. The button still tries again.
       forgetPendingInvite();
+      // A Space limit (the reader in as many Spaces as their plan allows, or the Space full) says the server's
+      // sentence, which names the plan and the limit, never "we couldn't open this invite".
+      const limit = spaceLimitFromError(error);
+      setFailedAtLimit(limit !== null);
       const status = isAxiosError(error) ? error.response?.status : undefined;
-      setFailed(refusalFor(status).title);
+      setFailed(limit ? limit.message : refusalFor(status).title);
     },
   });
 
@@ -481,6 +491,14 @@ export function JoinScreen({ code }: { code: string }) {
         {failed ? (
           <p role="alert" className="mt-3 text-sm text-destructive">
             {failed}
+            {failedAtLimit ? (
+              <>
+                {' '}
+                <Link href="/pricing" className="font-medium underline underline-offset-2 hover:no-underline">
+                  See plans
+                </Link>
+              </>
+            ) : null}
           </p>
         ) : null}
       </div>

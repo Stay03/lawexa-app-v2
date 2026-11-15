@@ -17,6 +17,8 @@ import {
   useDiscoverSpaces,
   useJoinPublicSpace,
 } from '@/v2/features/invites/queries';
+import { spaceLimitOf } from '@/lib/utils/space-limit';
+import { PlansLink } from '@/v2/features/files/PlansLink';
 import { CANCEL_FAILED, discoverAction, joinErrorCode, joinOpensSpace, joinRefusal, type Refusal } from './discover-model';
 
 /**
@@ -68,7 +70,7 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
       onError: (error) => {
         const response = isAxiosError<{ message?: string }>(error) ? error.response : undefined;
         if (joinOpensSpace(response?.status, joinErrorCode(response?.data))) router.push(`/spaces/${space.uuid}`);
-        else setRefusal(joinRefusal(response?.status, hasAccount, response?.data?.message));
+        else setRefusal(joinRefusal(response?.status, hasAccount, response?.data?.message, spaceLimitOf(response?.status, response?.data)));
       },
     });
   };
@@ -151,6 +153,12 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
                 <Link href="/register" className="font-medium text-primary underline">
                   Create an account
                 </Link>
+              </>
+            ) : null}
+            {refusal.offerPlans ? (
+              <>
+                {' '}
+                <PlansLink className="text-primary" />
               </>
             ) : null}
           </p>

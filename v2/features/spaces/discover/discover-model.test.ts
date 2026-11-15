@@ -60,7 +60,7 @@ test('a 409 on Join opens the Space, and every join answer reads the list again'
   // The list is read on every visit, so a member sees Open, not a Join that answers 409.
   assert.match(read('v2', 'features', 'invites', 'queries.ts'), /queryFn: \(\) => discoverApi\.spaces\(params\),[\s\S]{0,400}?staleTime: STALE_TIMES\.live,/);
   const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
-  assert.match(screen, /if \(joinOpensSpace\(response\?\.status, joinErrorCode\(response\?\.data\)\)\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*else setRefusal\(joinRefusal\(response\?\.status, hasAccount, response\?\.data\?\.message\)\);/);
+  assert.match(screen, /if \(joinOpensSpace\(response\?\.status, joinErrorCode\(response\?\.data\)\)\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*else setRefusal\(joinRefusal\(response\?\.status, hasAccount, response\?\.data\?\.message, spaceLimitOf\(response\?\.status, response\?\.data\)\)\);/);
   assert.match(read('v2', 'features', 'invites', 'queries.ts'), /onSettled: \(\) => \{\s*void client\.invalidateQueries\(\{ queryKey: \['discover-spaces'\] \}\);/);
 });
 

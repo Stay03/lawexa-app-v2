@@ -14,6 +14,7 @@ import { SHARED_INVITE_ROLES } from '@/v2/features/collab/membership/invite-role
 import { RoleSelect } from '@/v2/features/collab/membership/RoleSelect';
 import { inviteLinkPayload } from '@/v2/features/spaces/model';
 import { InviteLinkField } from './link';
+import { LinkRefusal } from './LinkRefusal';
 import {
   useCreateInviteLink,
   useInviteLinks,
@@ -198,11 +199,7 @@ export function InviteLinksPanel({
           Make a link
         </Button>
 
-        {create.isError ? (
-          <p role="alert" className="mt-2 text-sm text-destructive">
-            That didn&rsquo;t work. Try again.
-          </p>
-        ) : null}
+        {create.isError ? <LinkRefusal error={create.error} className="mt-2 text-sm" /> : null}
       </div>
 
       {links.isPending ? (

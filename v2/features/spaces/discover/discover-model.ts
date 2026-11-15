@@ -1,3 +1,4 @@
+import type { SpaceLimit } from '@/lib/utils/space-limit';
 import type { DiscoverableSpace } from '@/types/collab';
 
 /**
@@ -36,6 +37,8 @@ export function discoverAction(space: Pick<DiscoverableSpace, 'kind' | 'my_statu
 export interface Refusal {
   text: string;
   offerAccount: boolean;
+  /** A Space limit (organisation plans): the way to the plans goes beside the server's sentence. */
+  offerPlans?: boolean;
 }
 
 /** Taking back a request failed: the card still shows it, so trying again is the way on. */
@@ -59,8 +62,13 @@ export function joinErrorCode(body: unknown): unknown {
   return errors && typeof errors === 'object' && 'code' in errors ? (errors as { code: unknown }).code : undefined;
 }
 
-/** Why a join was refused. A 409 that is not `already_member` says the server's own words. */
-export function joinRefusal(status: number | undefined, hasAccount: boolean, message?: string): Refusal {
+/**
+ * Why a join was refused. A 409 that is not `already_member` says the server's own words, and so does a
+ * Space limit (organisation plans: the reader in as many Spaces as their plan allows, or the Space full for
+ * its owner's plan), with the way to the plans beside it.
+ */
+export function joinRefusal(status: number | undefined, hasAccount: boolean, message?: string, limit: SpaceLimit | null = null): Refusal {
+  if (limit) return { text: limit.message, offerAccount: false, offerPlans: true };
   if (status === 409) return { text: message?.trim() || "That didn't work. Try again in a moment.", offerAccount: false };
   if (status === 404) return { text: 'This space is no longer public.', offerAccount: false };
   if (status === 403) {

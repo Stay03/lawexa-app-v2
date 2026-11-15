@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
+import { spaceLimitFromError } from '@/lib/utils/space-limit';
+import { PlansLink } from '@/v2/features/files/PlansLink';
 import type { Space, SpaceKind, SpaceType } from '@/types/collab';
 import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
 import { readHistoryStamp } from '@/v2/runtime/url-params';
@@ -284,6 +286,8 @@ export function SpaceFormDialog({
     (space?.is_private ?? true) ? 'private' : 'open',
   );
   const [error, setError] = useState<string | null>(null);
+  /** Creating was refused at a Space limit (organisation plans): the way to the plans goes beside the sentence. */
+  const [atLimit, setAtLimit] = useState(false);
 
   // The kind this form is about: the space's own in edit; a new space is
   // always a shared one (see the docblock).
@@ -379,7 +383,10 @@ export function SpaceFormDialog({
         },
         {
           onSuccess: () => onOpenChange(false),
-          onError: (failure) => setError(extractApiError(failure).message),
+          onError: (failure) => {
+            setAtLimit(false);
+            setError(extractApiError(failure).message);
+          },
         },
       );
       return;
@@ -406,7 +413,11 @@ export function SpaceFormDialog({
           // gone, so Back from the new space goes to the list.
           else leaveFromStepTwo(finish);
         },
-        onError: (failure) => setError(extractApiError(failure).message),
+        onError: (failure) => {
+          // The server's sentence either way; at a Space limit it names the plan, and the plans are a press away.
+          setAtLimit(spaceLimitFromError(failure) !== null);
+          setError(extractApiError(failure).message);
+        },
       },
     );
   };
@@ -586,6 +597,12 @@ export function SpaceFormDialog({
           className="mt-4 text-sm text-destructive motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150"
         >
           {error}
+          {atLimit ? (
+            <>
+              {' '}
+              <PlansLink />
+            </>
+          ) : null}
         </p>
       )}
     </ResponsiveOverlay>

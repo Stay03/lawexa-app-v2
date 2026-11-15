@@ -8,6 +8,7 @@ import type { InviteLink } from '@/types/collab';
 import type { InvitableContentRole } from '@/v2/features/collab/membership/content-role';
 import { inviteLinkPayload } from '@/v2/features/spaces/model';
 import { InviteLinkField } from './link';
+import { LinkRefusal } from './LinkRefusal';
 import { approvalLabel } from './link-model';
 import { useCreateInviteLink, useInviteLinks } from './queries';
 
@@ -159,11 +160,7 @@ export function InviteLinkSection({
           <p className="text-xs text-muted-foreground">
             People who use it join after you approve them.
           </p>
-          {create.isError && (
-            <p role="alert" className="text-xs font-medium text-destructive">
-              That didn&rsquo;t work. Try again.
-            </p>
-          )}
+          {create.isError && <LinkRefusal error={create.error} className="text-xs font-medium" />}
         </>
       )}
     </div>

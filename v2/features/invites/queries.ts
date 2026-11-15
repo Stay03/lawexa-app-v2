@@ -48,6 +48,8 @@ export function useCreateInviteLink(spaceUuid: string) {
   return useMutation({
     mutationFn: (payload: CreateInviteLinkPayload) =>
       inviteLinksApi.create(spaceUuid, payload),
+    // Said where the link is made (a Space limit in the server's words, else "try again"), not in a toast too.
+    meta: { silentError: true },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: inviteKeys.links(spaceUuid) });
     },
@@ -182,5 +184,7 @@ export function useJoinPublicSpace() {
       void client.invalidateQueries({ queryKey: ['discover-spaces'] });
       void client.invalidateQueries({ queryKey: ['spaces'] });
     },
+    // Every refusal is said on the card (`joinRefusal`), so no toast says it a second time.
+    meta: { silentError: true },
   });
 }
