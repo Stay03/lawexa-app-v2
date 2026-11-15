@@ -4,9 +4,15 @@ import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Hash, Loader2 } from 'lucide-react';
+import { Hash, Loader2, Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { LiveQuizGame } from '@/types/channel-quiz';
@@ -28,21 +34,23 @@ import { QuizTile } from '../solo/QuizTile';
 import { RaisedButton } from '../solo/ui';
 
 /**
- * LiveNowRow — the Quiz page's row of circles under the title (concept C,
- * Stay's pick, 15 November 2026: "Go with C"): "Enter code" first, then each
- * public game in its lobby or running, as its quiz tile in a red Live ring
- * with its title and how many play. The row scrolls sideways when it fills.
- * With no game live, one quiet line sits beside the code circle.
+ * LiveNowRow — the Quiz page's row of live games under the title (Stay, 15
+ * November 2026, 18:19Z: option 1a): each public game in its lobby or running,
+ * as its quiz tile in a red Live ring with its title and how many play. The
+ * row scrolls sideways when it fills, and is not there at all when nothing is
+ * live. Joining with a code and creating a quiz are both on the title line's +
+ * (`JoinOrCreateMenu`).
  *
  * A game by link is never listed (the server's list holds public games only),
  * and a finished game leaves the row on the next read: the list is read every
  * 20 seconds while the row is on screen, and again when a game it shows ends
- * (`liveGamesPage`, `useOpenQuizLive`). The code circle is there from the
- * first frame; the games fade in when the list answers.
+ * (`liveGamesPage`, `useOpenQuizLive`). The games fade in when the list answers.
  */
-export function LiveNowRow({ viewerId, onCode }: { viewerId: number | null; onCode: () => void }) {
+export function LiveNowRow({ viewerId }: { viewerId: number | null }) {
   const live = useQuery(channelQuizQueries.liveGamesPage({ viewerId }));
   const games = live.data?.data.games ?? [];
+  // Nothing live, or not read yet: no row, so nothing says "none" and nothing jumps.
+  if (games.length === 0) return null;
 
   return (
     <section aria-labelledby="live-now" className="mb-4">
@@ -50,32 +58,9 @@ export function LiveNowRow({ viewerId, onCode }: { viewerId: number | null; onCo
         Live now
       </h2>
       <ul className="-mx-4 flex items-start gap-3 overflow-x-auto px-4 pt-1 pb-1">
-        <li className={STORY}>
-          <button
-            type="button"
-            onClick={onCode}
-            aria-label="Enter a game code"
-            className={cn(
-              'v2-interactive flex size-16 items-center justify-center rounded-full border-2 border-dashed border-primary/70 text-primary transition-colors hover:bg-primary/10',
-              FOCUS_RING,
-            )}
-          >
-            <Hash aria-hidden className="size-6" />
-          </button>
-          <span aria-hidden className={STORY_LABEL}>
-            Enter code
-          </span>
-        </li>
         {games.map((game) => (
           <LiveGameCircle key={game.uuid} game={game} />
         ))}
-        {live.isSuccess && games.length === 0 ? (
-          <li className="flex min-h-16 items-center pl-1 text-sm leading-snug text-muted-foreground">
-            No live games right now.
-            <br />
-            Host one from any quiz.
-          </li>
-        ) : null}
       </ul>
     </section>
   );
@@ -107,6 +92,43 @@ function LiveGameCircle({ game }: { game: LiveQuizGame }) {
         {game.player_count} playing
       </span>
     </li>
+  );
+}
+
+/**
+ * The title line's +: one button for Join and Create (Stay, 15 November 2026,
+ * 17:52Z "can't they be the same button", and 18:19Z option 1a). It opens a
+ * small menu: "Join with a code" opens the code sheet, "Create a quiz" the
+ * quiz form.
+ */
+export function JoinOrCreateMenu({ onJoin, onCreate }: { onJoin: () => void; onCreate: () => void }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="Join or create a quiz"
+          title="Join or create"
+          className={cn(
+            'v2-interactive inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground transition-colors hover:bg-secondary/70',
+            FOCUS_RING,
+          )}
+        >
+          <Plus aria-hidden className="size-5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-56 p-1.5">
+        <DropdownMenuItem onSelect={onJoin} className="gap-3 rounded-lg px-3 py-2.5 text-sm">
+          <Hash aria-hidden className="size-4 text-primary" />
+          Join with a code
+        </DropdownMenuItem>
+        {/* "Create", not "New" (Arthur, 28 October 2026: "New quiz presupposes to play a new quiz"). */}
+        <DropdownMenuItem onSelect={onCreate} className="gap-3 rounded-lg px-3 py-2.5 text-sm">
+          <Plus aria-hidden className="size-4" />
+          Create a quiz
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

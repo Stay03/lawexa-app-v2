@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { Plus } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { canAccessQuizPlayer } from '@/lib/utils/quiz-access';
@@ -10,7 +9,6 @@ import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { signInHref } from '@/v2/runtime/sign-in-href';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { SearchFieldShape } from '@/v2/shell/SearchField';
@@ -20,7 +18,7 @@ import { LibraryList, LibraryListSkeleton, useQuizForm } from '../solo/library/L
 import { SoloCreateAccountState, SoloSignedOutState } from '../solo/states';
 import { parseQuizHomeTab, type QuizHomeTab } from './quiz-home-tab';
 import { QuizHomeTabs } from './QuizHomeTabs';
-import { CodeSheet, LiveNowRow } from './LiveNowRow';
+import { CodeSheet, JoinOrCreateMenu, LiveNowRow } from './LiveNowRow';
 
 /**
  * QuizHomeScreen — `/quiz`, two tabs: Explore (`/quiz`) and My quizzes
@@ -37,13 +35,14 @@ import { CodeSheet, LiveNowRow } from './LiveNowRow';
  * being minted it draws the list's skeleton, so the panel does not flash.
  *
  * ── THE TOP AREA IS CONCEPT C (Stay, 15 November 2026: "Go with C") ──────
- * A quiet header: the title, and a round + for Create quiz. Under it, for an
- * account that may play, the row of circles (`LiveNowRow`): "Enter code"
- * first, which opens the code sheet, then each live public game. Then the tabs
- * as text on a hairline. Gold is kept for the way into a game.
+ * A quiet header: the title, and one round + for Join and Create (Stay's
+ * option 1a, 15 November 2026): its menu has "Join with a code" (the code
+ * sheet) and "Create a quiz". Under it, for an account that may play, the row
+ * of live games (`LiveNowRow`), gone when none are live. Then the tabs as text
+ * on a hairline. Gold is kept for the way into a game.
  *
- * The form belongs to the home (`useQuizForm`), so the + and a card's Edit
- * open the same dialog. It shows on Explore and on My quizzes alike (Stay, 23
+ * The form belongs to the home (`useQuizForm`), so the menu's Create and a
+ * card's Edit open the same dialog. It shows on Explore and on My quizzes alike (Stay, 23
  * October 2026: "Both"), and only to an account that may write one: a guest
  * and a visitor never see it.
  *
@@ -78,25 +77,12 @@ export function QuizHomeScreen() {
       <div className="mb-2 flex items-center justify-between gap-3">
         <ScreenTitle className="mb-0 min-w-0 truncate" />
         {canWrite ? (
-          <button
-            type="button"
-            onClick={() => openForm()}
-            aria-label="Create quiz"
-            title="Create quiz"
-            className={cn(
-              'v2-interactive inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground transition-colors hover:bg-secondary/70',
-              FOCUS_RING,
-            )}
-          >
-            {/* "Create", not "New" (Arthur, 28 October 2026: "New quiz
-                presupposes to play a new quiz"). */}
-            <Plus aria-hidden className="size-5" />
-          </button>
+          <JoinOrCreateMenu onJoin={() => setCodeOpen(true)} onCreate={() => openForm()} />
         ) : null}
       </div>
 
-      {/* The live games and the join code, on both tabs, for an account that may play (live quiz without a Space). */}
-      {canWrite ? <LiveNowRow viewerId={viewerId} onCode={() => setCodeOpen(true)} /> : null}
+      {/* The live games, on both tabs, for an account that may play (live quiz without a Space). */}
+      {canWrite ? <LiveNowRow viewerId={viewerId} /> : null}
 
       <div className="mb-4">
         <QuizHomeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />

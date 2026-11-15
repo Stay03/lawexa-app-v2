@@ -32,7 +32,7 @@ test('Explore renders for anyone; My quizzes says the solo refusals; Create quiz
   assert.match(screen, /<SoloSignedOutState signInHref=\{signInHref\(`\$\{pathname\}\?tab=mine`\)\} \/>/);
   assert.match(screen, /<SoloCreateAccountState signInHref=\{signInHref\(`\$\{pathname\}\?tab=mine`\)\} \/>/);
   // Stay, 23 October 2026: "Both". Not gated on the tab, only on who may write.
-  assert.match(screen, /\{canWrite \? \(\s*<button/);
+  assert.match(screen, /\{canWrite \? \(\s*<JoinOrCreateMenu onJoin=\{\(\) => setCodeOpen\(true\)\} onCreate=\{\(\) => openForm\(\)\} \/>/);
   assert.doesNotMatch(screen, /tab === 'mine' && canWrite/);
   assert.match(screen, /const canWrite = signedIn && canAccessQuizPlayer\(role\);/);
 });
@@ -68,13 +68,14 @@ test('Challenge a friend is one tap: who gets it, and what the tap does', async 
   assert.match(results, /const isMine = detailQuery\.data\?\.data\.is_mine === true;/);
 });
 
-/* Concept C (Stay, 15 November 2026: "Go with C and push"): a row of circles
- * under the title, "Enter code" first, then each live public game. */
+/* Option 1a (Stay, 15 November 2026, 18:19Z): one + for Join and Create on
+ * the title line; under it a row of the live public games, gone when none. */
 const row = readFileSync(join(here, 'LiveNowRow.tsx'), 'utf8').replace(/\r\n/g, '\n');
 
 test('Enter code opens the code sheet, and a code that finds a game opens that game', () => {
-  // The first circle opens the sheet the home holds.
-  assert.match(row, /<button\s+type="button"\s+onClick=\{onCode\}\s+aria-label="Enter a game code"/);
+  // The + menu's "Join with a code" opens the sheet the home holds.
+  assert.match(row, /<DropdownMenuItem onSelect=\{onJoin\}[^>]*>\s*<Hash aria-hidden[^>]*\/>\s*Join with a code/);
+  assert.match(row, /aria-label="Join or create a quiz"/);
   assert.match(screen, /\{canWrite \? <CodeSheet open=\{codeOpen\} onOpenChange=\{setCodeOpen\} \/> : null\}/);
   // A sheet on a phone, a centred dialog on a computer (the app's overlay), with one field and Join game.
   assert.match(row, /<ResponsiveOverlay\s+open=\{open\}\s+onOpenChange=\{onOpenChange\}\s+size="content"\s+title="Join a game"/);
@@ -87,12 +88,11 @@ test('Enter code opens the code sheet, and a code that finds a game opens that g
   assert.match(row, /href=\{openGameHref\(game\.uuid\)\}\s*aria-label=\{`\$\{liveGameAction\(game\)\} \$\{game\.quiz\.title\}, \$\{liveGameState\(game\)\}, \$\{game\.player_count\} playing`\}/);
 });
 
-test('with no live game, one quiet line sits beside the code circle; the + is the only Create', () => {
-  assert.match(row, /\{live\.isSuccess && games\.length === 0 \? \(/);
-  assert.match(row, /No live games right now\.\s*<br \/>\s*Host one from any quiz\./);
-  // Before the list answers, no line: the code circle alone, so nothing says "none" too early.
-  assert.doesNotMatch(row, /live\.isPending[^\n]*No live games/);
-  // Create quiz is the round + on the title line, named for screen readers.
-  assert.match(screen, /aria-label="Create quiz"/);
-  assert.doesNotMatch(screen, /CREATE_PILL/);
+test('with no live game there is no row at all; the + menu is the only Join and the only Create', () => {
+  // Nothing live, or not read yet: no row, and no line saying "none".
+  assert.match(row, /if \(games\.length === 0\) return null;/);
+  assert.doesNotMatch(row, /No live games right now|Enter a game code/);
+  // Create is the + menu's second item, and the screen has no other create button.
+  assert.match(row, /<DropdownMenuItem onSelect=\{onCreate\}[^>]*>\s*<Plus aria-hidden[^>]*\/>\s*Create a quiz/);
+  assert.doesNotMatch(screen, /CREATE_PILL|aria-label="Create quiz"/);
 });
