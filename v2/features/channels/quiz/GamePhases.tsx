@@ -39,7 +39,6 @@ import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useEngagementThrottled } from '../engagement-throttle';
 import { channelQuizQueries } from './queries';
-import type { QuizShareStanding } from '@/lib/constants/quiz-share';
 import { isViewerEntry } from '@/v2/features/quiz/solo/home-model';
 import { prefersReducedMotion } from '@/v2/features/quiz/solo/ui';
 import {
@@ -55,7 +54,6 @@ import {
   liveRowNote,
   revealsLivePodium,
 } from './live-board';
-import { ShareResults } from './ShareResults';
 import type { ResultCardInput } from './result-card';
 import {
   AnswersInRail,
@@ -845,24 +843,6 @@ export function PodiumStage({
     );
   }
 
-  // What the share card should SAY depends on where this reader finished, and
-  // both facts are already on screen. A viewer absent from the ranking watched
-  // rather than played — the host who never answered, or a member who opened
-  // the results afterwards — and is asked for the share on different grounds.
-  const leader = results.ranking.find((row) => row.rank === 1) ?? null;
-  const viewerRow =
-    viewerUuid === null
-      ? null
-      : (results.ranking.find((row) => row.user.uuid === viewerUuid) ?? null);
-  const standing: QuizShareStanding =
-    viewerRow === null
-      ? { outcome: 'watched', leader: leader?.user.name ?? null }
-      : results.game.player_count < 2
-        ? { outcome: 'solo' }
-        : viewerRow.rank === 1
-          ? { outcome: 'won' }
-          : { outcome: 'played', leader: leader?.user.name ?? null };
-
   // The full-screen podium first, 3rd then 2nd then 1st with the confetti, the
   // public quiz's own (`PodiumReveal`); it moves down into the board's podium,
   // which stays still under it (no second rise).
@@ -914,17 +894,12 @@ export function PodiumStage({
         rulesNote={LIVE_BOARD_RULES_NOTE}
       />
 
-      {/* SHARING SITS UNDER THE BOARD, where the result just showed. Any
-          player may hand the link out: everyone on this screen already sees
-          more than the public card publishes, so gating it to the host would
-          protect nothing. A player gets their own card first, Wrapped's
-          poster with their finish on it. */}
+      {/* SHARING SITS UNDER THE BOARD, where the result just showed: a
+          player's own card, Wrapped's poster with their finish on it. Its
+          Share carries the public results link in the caption. The second
+          box ("… is the one to beat" and its own link button) is gone
+          (Arthur, 15 November 2026: "The card share already does the work"). */}
       {cardInput ? <ResultCardShare gameUuid={gameUuid} input={cardInput} /> : null}
-      <ShareResults
-        gameUuid={gameUuid}
-        standing={standing}
-        quizTitle={results.game.quiz.title}
-      />
 
       {/* A quiz that carries a certificate asks for the printed name here,
           once the scores are in: it is the moment the player is still on. */}

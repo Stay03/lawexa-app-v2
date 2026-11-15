@@ -3,8 +3,8 @@
  * has to travel with it.
  *
  * IT LIVES HERE BECAUSE IT IS WRITTEN AND READ ON OPPOSITE SIDES OF A WALL.
- * The affordance that hands the link out is a v2 surface
- * (`v2/features/channels/quiz/ShareResults.tsx`); the page that serves it is a
+ * The affordance that hands the link out is a v2 surface (the result card's
+ * Share, `v2/features/channels/quiz/ResultCardShare.tsx`); the page that serves it is a
  * plain public route (`app/quiz-results/[gameUuid]`), deliberately OUTSIDE the
  * v2 tree so a stranger with no opt-in cookie can open it. Those two may not
  * import each other, so a second copy of the path would be a shared link that
@@ -24,23 +24,6 @@
 export function publicQuizResultsPath(gameUuid: string): string {
   return `/quiz-results/${encodeURIComponent(gameUuid)}`;
 }
-
-/**
- * Said ONCE, quietly, wherever the link is handed out.
- *
- * The game uuid is the only key — there is no second check, no sign-in, no
- * membership test — so possessing the link IS the permission, and anyone who
- * shares one deserves to know that before they paste it rather than after.
- * The second half is the reassurance that makes the first half bearable: the
- * public page publishes a podium and nothing that was asked or answered.
- *
- * IT IS A FOOTNOTE, NOT THE PITCH (owner review, 2026-08-07). It used to be the
- * only prose on the card, which left the card explaining a link instead of
- * asking for a share. {@link quizShareInvite} now carries the ask; this stays
- * underneath it, small, because the warning is still true.
- */
-export const PUBLIC_QUIZ_RESULTS_NOTICE =
-  'Anyone with the link can open it — no sign-in. It shows the top three and their scores, and nothing that was asked or answered.';
 
 /**
  * Where the reader finished, which is the only thing that decides what the card
