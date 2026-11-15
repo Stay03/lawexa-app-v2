@@ -65,15 +65,13 @@ import {
   startConversation,
 } from '@/v2/features/conversations/start-conversation';
 import {
-  ALLOWED_FILE_TYPES,
-  ATTACHMENT_TYPE_ERROR,
-  acceptedTypesFor,
-  allowedInMode,
-  allowedTypesFor,
+  chatModeOf,
   isImageAttachment,
-  privateModeFileError,
   privateModeOf,
+  takesChosenFile,
+  takesFile,
 } from '@/v2/features/conversations/attachment-rules';
+import { useChatFileRule } from '@/v2/features/conversations/use-chat-file-rule';
 import { JurisdictionField } from './composer/JurisdictionField';
 import { WorkflowField } from './composer/WorkflowField';
 import { useWorkflowSelection } from './composer/useWorkflowSelection';
@@ -296,14 +294,15 @@ export function HomeComposer({
      alone would let a PDF through to a redacted chat. The refusal is derived,
      not stored: switching the mode off, or removing the file, clears it. */
   const privateMode = privateModeOf(redacted, confidential);
+  /** The files the new chat takes: the server's rule for its mode (Fable's V3 review). */
+  const fileRule = useChatFileRule(chatModeOf(redacted, confidential));
   // The plan's own upload limits; a new chat in a Space sends its files to the
   // Space, so their sizes are the Space's (its owner's plan).
   const uploadLimits = useUploadLimits({ spaceUuid: space?.uuid ?? null });
-  const refusedByMode = uploads.filter(
-    (u) => u.status !== 'failed' && !allowedInMode(u, privateMode),
-  );
-  const modeError =
-    privateMode && refusedByMode.length > 0 ? privateModeFileError(privateMode) : null;
+  const refusedByMode = privateMode
+    ? uploads.filter((u) => u.status !== 'failed' && !takesChosenFile(fileRule, u))
+    : [];
+  const modeError = refusedByMode.length > 0 ? fileRule.refused : null;
   const shownError = error ?? modeError;
   /** A refused file holds Send, as in the conversation composer: it used to
    *  be dropped from the message in silence. */
@@ -320,15 +319,13 @@ export function HomeComposer({
     const remainingSlots = uploadLimits.filesPerMessage - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
-    let rejectedByMode = false;
     let rejectedSize = false;
     let rejectedDuplicate = false;
     let rejectedCap = false;
 
     for (const file of newFiles) {
-      if (!allowedTypesFor(privateMode).includes(file.type)) {
-        if (privateMode && ALLOWED_FILE_TYPES.includes(file.type)) rejectedByMode = true;
-        else rejectedType = true;
+      if (!takesFile(fileRule, file)) {
+        rejectedType = true;
         continue;
       }
       if (file.size > attachmentSizeLimit(file, uploadLimits)) {
@@ -361,10 +358,8 @@ export function HomeComposer({
       });
     }
 
-    if (rejectedByMode && privateMode) {
-      setError(privateModeFileError(privateMode));
-    } else if (rejectedType) {
-      setError(ATTACHMENT_TYPE_ERROR);
+    if (rejectedType) {
+      setError(fileRule.refused);
     } else if (rejectedSize) {
       setError(attachmentSizeError(uploadLimits));
     } else if (rejectedCap) {
@@ -558,7 +553,7 @@ export function HomeComposer({
   return (
     <FileUpload
       onFilesAdded={signedIn ? handleFilesAdded : () => {}}
-      accept={acceptedTypesFor(privateMode)}
+      accept={fileRule.accept}
       multiple
       disabled={!signedIn}
     >
@@ -568,7 +563,7 @@ export function HomeComposer({
         <input
           ref={fileInputRef}
           type="file"
-          accept={acceptedTypesFor(privateMode)}
+          accept={fileRule.accept}
           multiple
           hidden
           onChange={(event) => {
@@ -778,7 +773,7 @@ export function HomeComposer({
                       <Paperclip className="text-muted-foreground" />
                       <span className="flex-1">Attach files</span>
                       <span className="text-xs text-muted-foreground">
-                        {attachmentHintIn(privateMode, uploadLimits)}
+                        {attachmentHintIn(privateMode, uploadLimits, fileRule)}
                       </span>
                     </DropdownMenuItem>
 

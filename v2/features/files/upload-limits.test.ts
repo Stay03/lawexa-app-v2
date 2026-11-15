@@ -19,6 +19,7 @@ import {
   uploadLimitsFrom,
 } from './upload-limits';
 import { uploadPrecheck } from '@/v2/features/spaces/content-model';
+import { fileRuleFor } from '@/v2/features/conversations/attachment-rules';
 
 /* The app checks a file against the person's own plan limits before it
  * uploads (techlead's go, thread 1c93152c; Backend f2eb6ff9: GET /users/limits
@@ -55,7 +56,17 @@ test('the chat composers’ words carry the plan’s numbers', () => {
   assert.equal(megabytes(2.5 * MB), '2.5');
   assert.equal(attachmentSizeError(basic), 'Documents must be 25MB or less, and pictures 5MB or less.');
   assert.equal(attachmentHint(basic), 'PDF, DOC, RTF 25MB · JPG, PNG, WEBP 5MB');
-  assert.equal(attachmentHintIn('redacted', basic), 'DOC, DOCX, RTF 25MB · no PDFs or pictures while redacted');
+  // A private mode names what the server's rule takes there (Backend's ChatAttachmentRules: ".docx" form, its order).
+  const wordOnly = fileRuleFor('redacted', {
+    mime_types: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/rtf', 'text/rtf'],
+    extensions: ['.docx', '.doc', '.rtf'],
+    max_bytes: 25 * MB,
+    images: false,
+    refused: 'TEST DATA. A redacted chat takes Word and RTF only.',
+  });
+  assert.equal(attachmentHintIn('redacted', basic, wordOnly), 'DOCX, DOC, RTF 25MB · no PDFs or pictures while redacted');
+  // Before the server's rule is in, the line says the files are being checked.
+  assert.equal(attachmentHintIn('redacted', basic, fileRuleFor('redacted', null)), 'Checking which files a redacted chat takes');
   assert.equal(attachmentCapError(basic), 'You can attach at most 5 files per message.');
   // Today's values read as they always have.
   assert.equal(attachmentSizeError(TODAY_UPLOAD_LIMITS), 'Documents must be 10MB or less, and pictures 5MB or less.');
@@ -121,7 +132,7 @@ test('every upload path reads the plan’s limits, and a space’s uploads the s
     assert.match(composer, /if \(file\.size > attachmentSizeLimit\(file, uploadLimits\)\) \{/);
     assert.match(composer, /attachmentSizeError\(uploadLimits\)/);
     assert.match(composer, /attachmentCapError\(uploadLimits\)/);
-    assert.match(composer, /\{attachmentHintIn\(privateMode, uploadLimits\)\}/);
+    assert.match(composer, /\{attachmentHintIn\(privateMode, uploadLimits, fileRule\)\}/);
     // No fixed number is left to disagree with the plan.
     assert.doesNotMatch(composer, /MAX_FILES_PER_TURN|maxSizeFor\(|ATTACHMENT_SIZE_ERROR/);
   }

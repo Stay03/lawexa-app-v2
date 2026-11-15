@@ -1056,6 +1056,22 @@ export type ConversationReference =
   | { type: 'radar'; content: RadarReferenceContent | null }
   | { type: 'radar_scan'; content: RadarScanReferenceContent | null };
 
+/**
+ * The files a chat takes in one mode, as the server sends them (Backend's
+ * ChatAttachmentRules, 76df483f; Fable's V3 review): its content types, its
+ * extensions in ".docx" form, the reader's own document limit, whether
+ * pictures go, and the sentence the server refuses others with. A redacted or
+ * confidential chat takes Word and RTF only; a send that breaks it gets a 422
+ * with code `file_type_not_accepted`.
+ */
+export interface ChatAttachmentRule {
+  mime_types: string[];
+  extensions: string[];
+  max_bytes: number;
+  images: boolean;
+  refused: string;
+}
+
 export interface ConversationData {
   id: string;
   user_id: number;
@@ -1073,6 +1089,13 @@ export interface ConversationData {
    * chat is not redacted. Absent on an older server.
    */
   redaction_categories?: RedactionCategory[] | null;
+  /**
+   * The files this chat takes, for its mode and this reader (Backend's
+   * ChatAttachmentRules, 76df483f). Null for a reader not signed in; absent
+   * on an older server. The same rule as `GET /chat/attachment-rules` gives
+   * for this mode.
+   */
+  attachment_rules?: ChatAttachmentRule | null;
   messages: ApiMessage[];
   messages_count: number;
   views_count?: number;

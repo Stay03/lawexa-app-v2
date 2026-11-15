@@ -44,15 +44,8 @@ import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
 import { useHeldValue } from '@/v2/features/channels/use-held-value';
 import { JurisdictionField } from '@/v2/shell/designs/composer/JurisdictionField';
 import { PastedContentCard } from './PastedContentCard';
-import {
-  ALLOWED_FILE_TYPES,
-  ATTACHMENT_TYPE_ERROR,
-  acceptedTypesFor,
-  allowedTypesFor,
-  isImageAttachment,
-  privateModeFileError,
-  privateModeOf,
-} from '../attachment-rules';
+import { chatModeOf, isImageAttachment, privateModeOf, takesFile } from '../attachment-rules';
+import { useChatFileRule } from '../use-chat-file-rule';
 import {
   attachmentCapError,
   attachmentHintIn,
@@ -473,6 +466,8 @@ export function ConversationComposer({
 
   /** The private mode that limits files here, fixed for the conversation. */
   const privateMode = privateModeOf(isRedacted, isConfidential);
+  /** The files this chat takes: the server's rule for its mode (Fable's V3 review). */
+  const fileRule = useChatFileRule(chatModeOf(isRedacted, isConfidential));
   // The plan's own upload limits; a Space chat's files go to the Space, so
   // their sizes are the Space's (its owner's plan).
   const uploadLimits = useUploadLimits({ spaceUuid });
@@ -499,19 +494,17 @@ export function ConversationComposer({
     const remainingSlots = uploadLimits.filesPerMessage - uploads.length;
     const accepted: { file: File; entry: FileUploadEntry }[] = [];
     let rejectedType = false;
-    let rejectedByMode = false;
     let rejectedSize = false;
     let rejectedDuplicate = false;
     let rejectedCap = false;
 
-    /* A redacted or confidential conversation takes no PDF and no picture
-       (`attachment-rules.ts`). The server refuses too; this is so the person
-       hears it at the composer rather than after the upload. */
-    const allowedHere = allowedTypesFor(privateMode);
+    /* The server's rule for this chat's mode: a redacted or confidential chat
+       takes Word and RTF only (`attachment-rules.ts`). The server refuses too;
+       this is so the person hears its sentence at the composer rather than
+       after the upload. */
     for (const file of newFiles) {
-      if (!allowedHere.includes(file.type)) {
-        if (privateMode && ALLOWED_FILE_TYPES.includes(file.type)) rejectedByMode = true;
-        else rejectedType = true;
+      if (!takesFile(fileRule, file)) {
+        rejectedType = true;
         continue;
       }
       if (file.size > attachmentSizeLimit(file, uploadLimits)) {
@@ -544,8 +537,7 @@ export function ConversationComposer({
       });
     }
 
-    if (rejectedByMode && privateMode) showError(privateModeFileError(privateMode));
-    else if (rejectedType) showError(ATTACHMENT_TYPE_ERROR);
+    if (rejectedType) showError(fileRule.refused);
     else if (rejectedSize) showError(attachmentSizeError(uploadLimits));
     else if (rejectedCap) showError(attachmentCapError(uploadLimits));
     else if (rejectedDuplicate && accepted.length === 0) showError('That file is already attached.');
@@ -690,13 +682,13 @@ export function ConversationComposer({
     >
       <FileUpload
         onFilesAdded={handleFilesAdded}
-        accept={acceptedTypesFor(privateMode)}
+        accept={fileRule.accept}
         multiple
       >
         <input
           ref={fileInputRef}
           type="file"
-          accept={acceptedTypesFor(privateMode)}
+          accept={fileRule.accept}
           multiple
           hidden
           onChange={(event) => {
@@ -1073,7 +1065,7 @@ export function ConversationComposer({
                       after watching it upload. Two numbers because the caps
                       genuinely differ, and one of them would be a lie. */}
                   <span className="text-muted-foreground text-xs">
-                    {attachmentHintIn(privateMode, uploadLimits)}
+                    {attachmentHintIn(privateMode, uploadLimits, fileRule)}
                   </span>
                 </DropdownMenuItem>
 

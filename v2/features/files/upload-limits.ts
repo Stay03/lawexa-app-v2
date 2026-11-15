@@ -5,6 +5,7 @@ import {
   MAX_DOCUMENT_SIZE,
   MAX_FILES_PER_TURN,
   MAX_IMAGE_SIZE,
+  type FileRule,
   type PrivateMode,
 } from '@/v2/features/conversations/attachment-rules';
 import { MEDIA_MAX_SIZE_BYTES } from '@/v2/features/channels/model';
@@ -145,10 +146,16 @@ export function attachmentCapError(limits: UploadLimits): string {
 }
 
 /**
- * The line under a chat box, in the plan's numbers. A private mode takes Word
- * and RTF only (`attachmentHintFor`'s rule), so its line names that.
+ * The line under a chat box, in the plan's numbers. In a private mode it names
+ * the file types the server's rule takes there (`FileRule`, Backend's
+ * ChatAttachmentRules) and what it leaves out; until that rule is in, it says
+ * the files are being checked.
  */
-export function attachmentHintIn(mode: PrivateMode | null, limits: UploadLimits): string {
+export function attachmentHintIn(mode: PrivateMode | null, limits: UploadLimits, rule: FileRule): string {
   if (mode === null) return attachmentHint(limits);
-  return `DOC, DOCX, RTF ${megabytes(limits.documentBytes)}MB · no PDFs or pictures while ${mode}`;
+  if (!rule.known || rule.extensions.length === 0) return `Checking which files a ${mode} chat takes`;
+  const names = rule.extensions.map((extension) => extension.replace(/^\./, '').toUpperCase()).join(', ');
+  const left = [!rule.extensions.includes('.pdf') && 'PDFs', !rule.images && 'pictures'].filter(Boolean);
+  const without = left.length > 0 ? ` · no ${left.join(' or ')} while ${mode}` : '';
+  return `${names} ${megabytes(limits.documentBytes)}MB${without}`;
 }

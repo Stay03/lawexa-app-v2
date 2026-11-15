@@ -1,4 +1,4 @@
-import type { MessageAttachment } from '@/types/chat';
+import type { ChatAttachmentRule, MessageAttachment } from '@/types/chat';
 
 /**
  * attachment-rules — what the chat will accept on a message, in ONE place.
@@ -123,70 +123,132 @@ export const ATTACHMENT_HINT = 'PDF, DOC, RTF 10MB · JPG, PNG, WEBP 5MB';
  * makes them choose a file and watch it upload before it fails. The two are
  * not alternatives: the server refuses, the composer explains.
  *
- * "SETTABLE" IS THE SERVER'S HALF. The owner wants this rule changeable, so
- * it cannot stay hard-coded in the app. Backend is building the setting; when
- * it sends the allowed types per mode, this module reads them from there and
- * the lists below go. Until then this is the one place the rule lives.
+ * "SETTABLE" IS THE SERVER'S HALF, AND IT HAS LANDED (Backend's
+ * ChatAttachmentRules, redaction-choices 76df483f; Fable's V3 review, 15
+ * November 2026). The server holds the one list of files per chat mode and
+ * sends it as `GET /chat/attachment-rules`, with its own sentence for a
+ * refusal. The app keeps no list of its own for a private mode: until the
+ * server's answer is in, a private chat takes no file and says why.
  */
 export type PrivateMode = 'redacted' | 'confidential';
 
-/** The mode that limits files here, or `null`. Redacted is named first when
- *  both are on: its reason (names reach the model) is the one a person
- *  chose the mode for. */
-export function privateModeOf(redacted: boolean, confidential: boolean): PrivateMode | null {
-  if (redacted) return 'redacted';
+/** A chat's mode as the server keys its file rules. */
+export type ChatMode = 'normal' | PrivateMode;
+
+/**
+ * The mode whose files apply here, read as the server reads it: a chat that
+ * is both confidential and redacted reads as confidential (the two lists are
+ * the same, so neither is looser).
+ */
+export function chatModeOf(redacted: boolean, confidential: boolean): ChatMode {
   if (confidential) return 'confidential';
-  return null;
+  if (redacted) return 'redacted';
+  return 'normal';
 }
 
-const PRIVATE_MODE_TYPES: readonly string[] = [
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/rtf',
-  'text/rtf',
-];
-
-export function acceptedTypesFor(mode: PrivateMode | null): string {
-  return mode ? '.doc,.docx,.rtf' : ACCEPTED_FILE_TYPES;
+/** The private mode that limits files here, or `null` in a normal chat. */
+export function privateModeOf(redacted: boolean, confidential: boolean): PrivateMode | null {
+  const mode = chatModeOf(redacted, confidential);
+  return mode === 'normal' ? null : mode;
 }
 
-export function allowedTypesFor(mode: PrivateMode | null): readonly string[] {
-  return mode ? PRIVATE_MODE_TYPES : ALLOWED_FILE_TYPES;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** True when a file already chosen may go in this mode. Reads the type the
- *  upload answered with; an entry without one is judged by its name. */
-export function allowedInMode(
-  file: { mime_type?: string; file_name: string },
-  mode: PrivateMode | null,
-): boolean {
-  if (mode === null) return true;
-  if (file.mime_type) return PRIVATE_MODE_TYPES.includes(file.mime_type.toLowerCase());
-  const extension = file.file_name.split('.').pop()?.toLowerCase();
-  return extension === 'doc' || extension === 'docx' || extension === 'rtf';
-}
-
-const MODE_NAME: Record<PrivateMode, string> = {
-  redacted: 'redaction',
-  confidential: 'confidential mode',
-};
-
-export function attachmentHintFor(mode: PrivateMode | null): string {
-  if (mode === null) return ATTACHMENT_HINT;
-  return `DOC, DOCX, RTF 10MB · no PDFs or pictures while ${mode}`;
+function stringList(value: unknown): string[] | null {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string') ? (value as string[]) : null;
 }
 
 /**
- * Said when a PDF or a picture is refused. It names the reason rather than the
- * rule, and the remedy matters as much as the reason.
- *
- * IT DOES NOT SAY "TURN THE MODE OFF". The mode belongs to the whole
- * conversation, so switching it off to send one file strips protection from
- * every message already in it, and a person who wants that file in will do
- * exactly what the error tells them. The remedy has to be the one that keeps
- * the mode where it is.
+ * One mode's rule as the server sends it; null for a shape this app does not
+ * know, so a broken answer never widens what a chat takes. Extensions are
+ * kept in the server's ".docx" form, lower case.
  */
-export function privateModeFileError(mode: PrivateMode): string {
-  return `PDFs and pictures cannot be attached while ${MODE_NAME[mode]} is on. Attach the text as a Word or RTF document, or start a new conversation for this file.`;
+export function readAttachmentRule(value: unknown): ChatAttachmentRule | null {
+  if (!isRecord(value)) return null;
+  const mimeTypes = stringList(value.mime_types);
+  const extensions = stringList(value.extensions);
+  if (!mimeTypes || !extensions || typeof value.refused !== 'string' || value.refused.trim() === '') return null;
+  return {
+    mime_types: mimeTypes.map((type) => type.toLowerCase()),
+    extensions: extensions.map((extension) => `.${extension.replace(/^\./, '').toLowerCase()}`),
+    max_bytes: typeof value.max_bytes === 'number' && value.max_bytes > 0 ? value.max_bytes : 0,
+    images: value.images === true,
+    refused: value.refused,
+  };
+}
+
+/** `GET /chat/attachment-rules`'s `data`: each mode it sends and this app can read. */
+export function readAttachmentRules(value: unknown): Partial<Record<ChatMode, ChatAttachmentRule>> {
+  if (!isRecord(value)) return {};
+  const rules: Partial<Record<ChatMode, ChatAttachmentRule>> = {};
+  for (const mode of ['normal', 'redacted', 'confidential'] as const) {
+    const rule = readAttachmentRule(value[mode]);
+    if (rule) rules[mode] = rule;
+  }
+  return rules;
+}
+
+/** What a chat box checks a file against in one mode. */
+export interface FileRule {
+  /** For the file input's `accept`. Empty takes any file to the check, which then refuses it. */
+  accept: string;
+  mimeTypes: readonly string[];
+  /** In the server's ".docx" form. */
+  extensions: readonly string[];
+  images: boolean;
+  /** Said when a file of another type is refused here. */
+  refused: string;
+  /** False until the server's rule for this mode is in. */
+  known: boolean;
+}
+
+/** Said while a private chat's rule is not in yet: it takes no file until then. */
+export const FILE_RULE_PENDING = 'Checking which files this chat takes. Try again in a moment.';
+
+/**
+ * The rule a chat box uses: the server's for this mode when it has answered.
+ * Before that, a normal chat uses the upload's own rule above, and a private
+ * chat takes nothing: the app holds no private list to fall back on.
+ */
+export function fileRuleFor(mode: ChatMode, server: ChatAttachmentRule | null): FileRule {
+  if (server) {
+    return {
+      accept: server.extensions.join(','),
+      mimeTypes: server.mime_types,
+      extensions: server.extensions,
+      images: server.images,
+      refused: server.refused,
+      known: true,
+    };
+  }
+  if (mode === 'normal') {
+    return {
+      accept: ACCEPTED_FILE_TYPES,
+      mimeTypes: ALLOWED_FILE_TYPES,
+      extensions: ACCEPTED_FILE_TYPES.split(','),
+      images: true,
+      refused: ATTACHMENT_TYPE_ERROR,
+      known: false,
+    };
+  }
+  return { accept: '', mimeTypes: [], extensions: [], images: false, refused: FILE_RULE_PENDING, known: false };
+}
+
+/** True when a file being picked may be attached under this rule. */
+export function takesFile(rule: FileRule, file: Pick<File, 'type'>): boolean {
+  return rule.mimeTypes.includes(file.type.toLowerCase());
+}
+
+/**
+ * True when a file already chosen may stay (the home box: a mode can be
+ * switched on after files were attached). Reads the type the upload answered
+ * with; an entry without one is judged by its name.
+ */
+export function takesChosenFile(rule: FileRule, file: { mime_type?: string; file_name: string }): boolean {
+  if (file.mime_type) return rule.mimeTypes.includes(file.mime_type.toLowerCase());
+  const extension = file.file_name.split('.').pop()?.toLowerCase();
+  return extension !== undefined && rule.extensions.includes(`.${extension}`);
 }
 
