@@ -238,10 +238,19 @@ test("an open game's top-10 reveal is laid over the full list: nobody below it d
   assert.match(source, /isOpenGame\(state\.game\)\s*\? mergeTopLeaderboard\(state\.game\.players \?\? \[\], event\.payload\.leaderboard\)/);
 });
 
-test('an account that may not use Spaces is offered Public and Private link only', () => {
+test("the dialog's places: a Space for an account with Spaces, Public and Private link for the quiz's author", () => {
   const dialog = read('v2', 'features', 'channels', 'quiz', 'HostLiveQuizDialog.tsx');
-  assert.match(dialog, /useState<'space' \| QuizGameVisibility>\(spacesOpen \? 'space' : 'public'\)/);
-  assert.match(dialog, /const places = spacesOpen \? PLACES : PLACES\.filter\(\(option\) => option\.id !== 'space'\);/);
+  assert.match(dialog, /const places = PLACES\.filter\(\(option\) => \(option\.id === 'space' \? spacesOpen : own\)\);/);
+  assert.match(dialog, /useState<'space' \| QuizGameVisibility>\(places\[0\]\?\.id \?\? 'space'\)/);
+  // One place left (someone else's quiz): no switch to show.
+  assert.match(dialog, /\{places\.length > 1 \? \(/);
+});
+
+test("a non-author refused for an open game is told why, in the server's words", () => {
+  assert.equal(openGoLiveRefusal(403, 'open_game_author_only', 'TEST DATA. Only the author may.'), 'TEST DATA. Only the author may.');
+  assert.match(openGoLiveRefusal(403, 'open_game_author_only', null), /Only the quiz’s author can host it/);
+  // A bare 403 is not read as this refusal.
+  assert.match(openGoLiveRefusal(403, null, 'This action is unauthorized.'), /Couldn’t start the game/);
 });
 
 test("a host refused for an open game already running gets a link to it", async () => {

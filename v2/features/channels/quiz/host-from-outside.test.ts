@@ -50,13 +50,21 @@ test('a refused Go live says why, naming the Space', () => {
 
 test('the quiz page offers Host to any signed-in account (guests not), for a quiz with questions', () => {
   // Stay's decision 1 (thread 12341975, 14 November 2026): any signed-in person can host a public game.
-  assert.equal(offersHostLive({ mayHost: true, questionCount: 10 }), true);
-  assert.equal(offersHostLive({ mayHost: true, questionCount: 0 }), false);
-  assert.equal(offersHostLive({ mayHost: false, questionCount: 10 }), false);
+  // Arthur's pick 3 (15 November 2026): only the quiz's author hosts it for anyone or by link, so someone else's quiz
+  // needs a Space to go live in.
+  const host = (own: boolean, spacesOpen: boolean, questionCount = 10, mayHost = true) =>
+    offersHostLive({ mayHost, questionCount, own, spacesOpen });
+  assert.equal(host(true, true), true);
+  assert.equal(host(true, false), true);
+  assert.equal(host(false, true), true);
+  assert.equal(host(false, false), false);
+  assert.equal(host(true, true, 0), false);
+  assert.equal(host(true, true, 10, false), false);
 
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
   // A Space is among the dialog's places only for an account that may use Spaces: the dialog reads that itself.
-  assert.match(front, /mayHost: canTakeQuiz\(session\),/);
+  assert.match(front, /mayHost: canTakeQuiz\(session\),\s*own,\s*spacesOpen: collabAccessState\(session\) === 'eligible',/);
+  assert.match(front, /<HostLiveQuizDialog quiz=\{\{ uuid: quiz\.uuid, title: quiz\.title \}\} own=\{own\} open/);
   const dialog = read('v2', 'features', 'channels', 'quiz', 'HostLiveQuizDialog.tsx');
   assert.match(dialog, /const spacesOpen = collabAccessState\(useV2Session\(\)\) === 'eligible';/);
   // Hosting is Start's choice now (Arthur's A, 14 November 2026), no longer a row in the bar's menu.

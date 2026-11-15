@@ -47,6 +47,7 @@ import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, scenarioCountLabel } from '../rows-model';
+import { collabAccessState } from '@/v2/features/collab/model';
 import { START_LIVE, START_SOLO, challengeFromParam, frontChallengeText, offersHostLive } from './front-model';
 import {
   clearScreenContext,
@@ -223,6 +224,8 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const [hostOpen, setHostOpen] = useState(false);
   const mayHostLive = offersHostLive({
     mayHost: canTakeQuiz(session),
+    own,
+    spacesOpen: collabAccessState(session) === 'eligible',
     questionCount: quiz ? (quiz.question_count ?? quiz.questions?.length ?? 0) : 0,
   });
   const openHost = useCallback(() => setHostOpen(true), []);
@@ -532,7 +535,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
       />
 
       {hostOpen && quiz ? (
-        <HostLiveQuizDialog quiz={{ uuid: quiz.uuid, title: quiz.title }} open onOpenChange={setHostOpen} />
+        <HostLiveQuizDialog quiz={{ uuid: quiz.uuid, title: quiz.title }} own={own} open onOpenChange={setHostOpen} />
       ) : null}
 
     </div>

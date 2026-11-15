@@ -102,6 +102,9 @@ export function openGoLiveRefusal(status: number, code: string | null, message: 
   if (status === 409 && code === 'open_game_live') {
     return 'You already have an open game running. End it before you start another.';
   }
+  if (status === 403 && code === 'open_game_author_only') {
+    return message ?? 'Only the quiz’s author can host it for anyone or by link.';
+  }
   if (status === 429 && code === 'too_many_games') {
     return 'You’ve started a lot of games this hour. Try again later.';
   }

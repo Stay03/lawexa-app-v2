@@ -23,13 +23,24 @@ export const START_LIVE = { label: 'Host live', hint: 'Everyone plays at once, o
 
 /**
  * Whether the page offers Host a live quiz: to any signed-in account, guests
- * not (Stay's decision 1, thread 12341975, 14 November 2026: "any signed-in
- * person can host a public game"), for a quiz with questions to play (the
- * server answers 422 for an empty one). Whether a Space is among the places
- * is the dialog's (`spacesOpen`).
+ * not (Stay's decision 1, thread 12341975, 14 November 2026), for a quiz with
+ * questions to play (the server answers 422 for an empty one), where there is
+ * somewhere to run it: a public or link game for the quiz's own author only
+ * (Arthur's pick 3, 15 November 2026), a Space for an account that may use
+ * Spaces. Someone else's quiz, with no Spaces, has nowhere to go live.
  */
-export function offersHostLive({ mayHost, questionCount }: { mayHost: boolean; questionCount: number }): boolean {
-  return mayHost && questionCount > 0;
+export function offersHostLive({
+  mayHost,
+  questionCount,
+  own,
+  spacesOpen,
+}: {
+  mayHost: boolean;
+  questionCount: number;
+  own: boolean;
+  spacesOpen: boolean;
+}): boolean {
+  return mayHost && questionCount > 0 && (own || spacesOpen);
 }
 
 /** "Taken 3 times", "Taken once"; nothing before the first finished attempt. */

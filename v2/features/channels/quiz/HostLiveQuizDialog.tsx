@@ -70,14 +70,17 @@ interface PickedSpace {
  */
 export function HostLiveQuizDialog({
   quiz,
+  own = false,
   open,
   onOpenChange,
 }: {
   quiz: { uuid: string; title: string };
+  /** Whether the reader wrote the quiz: only its author hosts it for anyone or by link (Arthur's pick 3). */
+  own?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  // A Space is one of the places only for an account that may use Spaces; anyone signed in may host open.
+  // A Space is one of the places for an account that may use Spaces; Public and Private link for the quiz's author.
   const spacesOpen = collabAccessState(useV2Session()) === 'eligible';
   const router = useRouter();
   const goLive = useGoLive(quiz.uuid);
@@ -94,8 +97,8 @@ export function HostLiveQuizDialog({
    */
   const [made, setMade] = useState<PickedSpace | null>(null);
   /** Where it runs (live quiz without a Space, Stay, thread 12341975): a Space, or open to anyone signed in, or by link. */
-  const [place, setPlace] = useState<'space' | QuizGameVisibility>(spacesOpen ? 'space' : 'public');
-  const places = spacesOpen ? PLACES : PLACES.filter((option) => option.id !== 'space');
+  const places = PLACES.filter((option) => (option.id === 'space' ? spacesOpen : own));
+  const [place, setPlace] = useState<'space' | QuizGameVisibility>(places[0]?.id ?? 'space');
   const busy = goLive.isPending || createSpace.isPending;
 
   const choosePlace = (next: 'space' | QuizGameVisibility) => {
@@ -226,42 +229,45 @@ export function HostLiveQuizDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {/* A radio group: one tab stop (the chosen place), and the arrow keys move the choice, round the ends. */}
-        <div
-          role="radiogroup"
-          aria-label="Where it runs"
-          className={cn('grid gap-1 rounded-2xl bg-muted p-1', places.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}
-          onKeyDown={(event) => {
-            const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
-            if (step === 0 || busy) return;
-            event.preventDefault();
-            const at = places.findIndex((option) => option.id === place);
-            const next = places[(at + step + places.length) % places.length];
-            choosePlace(next.id);
-            event.currentTarget.querySelector<HTMLButtonElement>(`[data-place="${next.id}"]`)?.focus();
-          }}
-        >
-          {places.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              data-place={id}
-              aria-checked={place === id}
-              tabIndex={place === id ? 0 : -1}
-              disabled={busy}
-              onClick={() => choosePlace(id)}
-              className={cn(
-                'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
-                place === id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
-                FOCUS_RING,
-              )}
-            >
-              <Icon aria-hidden className="size-4" />
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* A radio group: one tab stop (the chosen place), and the arrow keys move the choice, round the ends.
+            With one place left (someone else's quiz: a Space only) there is nothing to choose, so no switch. */}
+        {places.length > 1 ? (
+          <div
+            role="radiogroup"
+            aria-label="Where it runs"
+            className={cn('grid gap-1 rounded-2xl bg-muted p-1', places.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}
+            onKeyDown={(event) => {
+              const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+              if (step === 0 || busy) return;
+              event.preventDefault();
+              const at = places.findIndex((option) => option.id === place);
+              const next = places[(at + step + places.length) % places.length];
+              choosePlace(next.id);
+              event.currentTarget.querySelector<HTMLButtonElement>(`[data-place="${next.id}"]`)?.focus();
+            }}
+          >
+            {places.map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                data-place={id}
+                aria-checked={place === id}
+                tabIndex={place === id ? 0 : -1}
+                disabled={busy}
+                onClick={() => choosePlace(id)}
+                className={cn(
+                  'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
+                  place === id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                  FOCUS_RING,
+                )}
+              >
+                <Icon aria-hidden className="size-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
 
         {place !== 'space' ? (
           <div className="flex flex-col gap-3 rounded-2xl border-2 border-border p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
