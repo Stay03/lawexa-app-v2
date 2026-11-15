@@ -109,6 +109,12 @@ export function openGoLiveRefusal(status: number, code: string | null, message: 
   return 'Couldn’t start the game. Try again.';
 }
 
+/** The host's running open game, from a 409 `open_game_live` (Backend: errors.game_uuid); null when not named. */
+export function runningOpenGame(errors: unknown): string | null {
+  const uuid = (errors as { game_uuid?: unknown } | null)?.game_uuid;
+  return typeof uuid === 'string' && uuid !== '' ? uuid : null;
+}
+
 /** How an open game is reached, for the lobby and the host dialog. */
 export const VISIBILITY_WORDS: Record<QuizGameVisibility, { label: string; who: string }> = {
   public: { label: 'Public', who: 'Anyone on Lawexa can join. It shows under Live now on the Quiz page.' },

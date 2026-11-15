@@ -26,7 +26,7 @@ import { SpacePickList } from '@/v2/features/spaces/move/SpacePickList';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { hostRefusal, hostTargets, quickHostSpacePayload } from './model';
 import { useGoLive } from './mutations';
-import { apiErrorCode, openGameHref, openGoLiveRefusal, VISIBILITY_WORDS } from './open-game';
+import { apiErrorCode, openGameHref, openGoLiveRefusal, runningOpenGame, VISIBILITY_WORDS } from './open-game';
 import { spaceRoom } from './quiz-room';
 import { COMPACT_RAISED } from './ui';
 import '@/v2/features/quiz/solo/solo-quiz.css';
@@ -68,10 +68,13 @@ interface PickedSpace {
  */
 export function HostLiveQuizDialog({
   quiz,
+  spacesOpen = true,
   open,
   onOpenChange,
 }: {
   quiz: { uuid: string; title: string };
+  /** Whether the reader may use Spaces: without them, the places are Public and Private link only. */
+  spacesOpen?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -80,7 +83,7 @@ export function HostLiveQuizDialog({
   const createSpace = useCreateSpace();
   /** The Space a press is putting the quiz live in, for its row's wait. */
   const [picked, setPicked] = useState<PickedSpace | null>(null);
-  const [refusal, setRefusal] = useState<{ message: string; running: PickedSpace | null } | null>(null);
+  const [refusal, setRefusal] = useState<{ message: string; running: PickedSpace | null; openGame?: string | null } | null>(null);
   /** The new Space's name while its field is open; null while it is the row. */
   const [newName, setNewName] = useState<string | null>(null);
   /**
@@ -90,7 +93,8 @@ export function HostLiveQuizDialog({
    */
   const [made, setMade] = useState<PickedSpace | null>(null);
   /** Where it runs (live quiz without a Space, Stay, thread 12341975): a Space, or open to anyone signed in, or by link. */
-  const [place, setPlace] = useState<'space' | QuizGameVisibility>('space');
+  const [place, setPlace] = useState<'space' | QuizGameVisibility>(spacesOpen ? 'space' : 'public');
+  const places = spacesOpen ? PLACES : PLACES.filter((option) => option.id !== 'space');
   const busy = goLive.isPending || createSpace.isPending;
 
   const choosePlace = (next: 'space' | QuizGameVisibility) => {
@@ -110,7 +114,13 @@ export function HostLiveQuizDialog({
         },
         onError: (error) => {
           const { status, message, errors } = extractApiError(error);
-          setRefusal({ message: openGoLiveRefusal(status, apiErrorCode(errors), message), running: null });
+          const code = apiErrorCode(errors);
+          setRefusal({
+            message: openGoLiveRefusal(status, code, message),
+            running: null,
+            // The game in the way, so the host can open it (and end it) from here.
+            openGame: code === 'open_game_live' ? runningOpenGame(errors) : null,
+          });
         },
       },
     );
@@ -219,18 +229,18 @@ export function HostLiveQuizDialog({
         <div
           role="radiogroup"
           aria-label="Where it runs"
-          className="grid grid-cols-3 gap-1 rounded-2xl bg-muted p-1"
+          className={cn('grid gap-1 rounded-2xl bg-muted p-1', places.length === 3 ? 'grid-cols-3' : 'grid-cols-2')}
           onKeyDown={(event) => {
             const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
             if (step === 0 || busy) return;
             event.preventDefault();
-            const at = PLACES.findIndex((option) => option.id === place);
-            const next = PLACES[(at + step + PLACES.length) % PLACES.length];
+            const at = places.findIndex((option) => option.id === place);
+            const next = places[(at + step + places.length) % places.length];
             choosePlace(next.id);
             event.currentTarget.querySelector<HTMLButtonElement>(`[data-place="${next.id}"]`)?.focus();
           }}
         >
-          {PLACES.map(({ id, label, Icon }) => (
+          {places.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"
@@ -291,6 +301,14 @@ export function HostLiveQuizDialog({
                 className={cn('rounded font-medium text-foreground underline underline-offset-4', FOCUS_RING)}
               >
                 Open {refusal.running.name}
+              </Link>
+            ) : refusal.openGame ? (
+              <Link
+                href={openGameHref(refusal.openGame)}
+                onClick={() => onOpenChange(false)}
+                className={cn('rounded font-medium text-foreground underline underline-offset-4', FOCUS_RING)}
+              >
+                Open your game
               </Link>
             ) : null}
           </p>

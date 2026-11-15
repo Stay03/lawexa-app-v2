@@ -16,24 +16,20 @@ export function challengeFromParam(raw: string | null): string | null {
   return raw !== null && UUID.test(raw) ? raw : null;
 }
 
-/**
- * Whether the page offers Host a live quiz (Arthur's spec, 9 November 2026:
- * hosted in a Space, picked from outside one): to an account that may use
- * Spaces, for a quiz with questions to play (the server answers 422 for an
- * empty one). Which Space, and whether they host there, is the picker's.
- */
 /** Start's two ways to play (Arthur's A, f730f71c, 14 November 2026), for whoever may host. */
 export const START_SOLO = { label: 'Play solo', hint: 'On your own, for your best score' } as const;
-export const START_LIVE = { label: 'Host live in a Space', hint: 'Everyone plays at once, on their own phone' } as const;
+/** Hosted in a Space, for anyone, or by link (live quiz without a Space): the place is the dialog's choice. */
+export const START_LIVE = { label: 'Host live', hint: 'Everyone plays at once, on their own phone' } as const;
 
-export function offersHostLive({
-  spacesOpen,
-  questionCount,
-}: {
-  spacesOpen: boolean;
-  questionCount: number;
-}): boolean {
-  return spacesOpen && questionCount > 0;
+/**
+ * Whether the page offers Host a live quiz: to any signed-in account, guests
+ * not (Stay's decision 1, thread 12341975, 14 November 2026: "any signed-in
+ * person can host a public game"), for a quiz with questions to play (the
+ * server answers 422 for an empty one). Whether a Space is among the places
+ * is the dialog's (`spacesOpen`).
+ */
+export function offersHostLive({ mayHost, questionCount }: { mayHost: boolean; questionCount: number }): boolean {
+  return mayHost && questionCount > 0;
 }
 
 /** "Taken 3 times", "Taken once"; nothing before the first finished attempt. */

@@ -222,8 +222,10 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   // from Start's choice (Arthur's A, f730f71c, 14 November 2026: the menu row
   // was hidden). The dialog mounts only while open, so each open starts clean.
   const [hostOpen, setHostOpen] = useState(false);
+  // A Space is one of the dialog's places only for an account that may use Spaces.
+  const spacesOpen = collabAccessState(session) === 'eligible';
   const mayHostLive = offersHostLive({
-    spacesOpen: collabAccessState(session) === 'eligible',
+    mayHost: mayTake,
     questionCount: quiz ? (quiz.question_count ?? quiz.questions?.length ?? 0) : 0,
   });
   const openHost = useCallback(() => setHostOpen(true), []);
@@ -533,7 +535,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
       />
 
       {hostOpen && quiz ? (
-        <HostLiveQuizDialog quiz={{ uuid: quiz.uuid, title: quiz.title }} open onOpenChange={setHostOpen} />
+        <HostLiveQuizDialog quiz={{ uuid: quiz.uuid, title: quiz.title }} spacesOpen={spacesOpen} open onOpenChange={setHostOpen} />
       ) : null}
 
     </div>

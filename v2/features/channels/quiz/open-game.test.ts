@@ -237,3 +237,19 @@ test("an open game's top-10 reveal is laid over the full list: nobody below it d
   const source = read('v2', 'features', 'channels', 'quiz', 'use-game.ts');
   assert.match(source, /isOpenGame\(state\.game\)\s*\? mergeTopLeaderboard\(state\.game\.players \?\? \[\], event\.payload\.leaderboard\)/);
 });
+
+test('an account that may not use Spaces is offered Public and Private link only', () => {
+  const dialog = read('v2', 'features', 'channels', 'quiz', 'HostLiveQuizDialog.tsx');
+  assert.match(dialog, /useState<'space' \| QuizGameVisibility>\(spacesOpen \? 'space' : 'public'\)/);
+  assert.match(dialog, /const places = spacesOpen \? PLACES : PLACES\.filter\(\(option\) => option\.id !== 'space'\);/);
+});
+
+test("a host refused for an open game already running gets a link to it", async () => {
+  const { runningOpenGame } = await import('./open-game');
+  assert.equal(runningOpenGame({ code: 'open_game_live', game_uuid: 'g-run', join_code: 'ABC234' }), 'g-run');
+  assert.equal(runningOpenGame({ code: 'open_game_live' }), null);
+  assert.equal(runningOpenGame(null), null);
+  const dialog = read('v2', 'features', 'channels', 'quiz', 'HostLiveQuizDialog.tsx');
+  assert.match(dialog, /openGame: code === 'open_game_live' \? runningOpenGame\(errors\) : null,/);
+  assert.match(dialog, /href=\{openGameHref\(refusal\.openGame\)\}/);
+});

@@ -48,13 +48,16 @@ test('a refused Go live says why, naming the Space', () => {
   assert.equal(hostRefusal(500, 'Server Error', 'Torts'), 'The game couldn’t be started. Try again.');
 });
 
-test('the quiz page offers Host to an account that may use Spaces, for a quiz with questions', () => {
-  assert.equal(offersHostLive({ spacesOpen: true, questionCount: 10 }), true);
-  assert.equal(offersHostLive({ spacesOpen: true, questionCount: 0 }), false);
-  assert.equal(offersHostLive({ spacesOpen: false, questionCount: 10 }), false);
+test('the quiz page offers Host to any signed-in account (guests not), for a quiz with questions', () => {
+  // Stay's decision 1 (thread 12341975, 14 November 2026): any signed-in person can host a public game.
+  assert.equal(offersHostLive({ mayHost: true, questionCount: 10 }), true);
+  assert.equal(offersHostLive({ mayHost: true, questionCount: 0 }), false);
+  assert.equal(offersHostLive({ mayHost: false, questionCount: 10 }), false);
 
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
-  assert.match(front, /spacesOpen: collabAccessState\(session\) === 'eligible',/);
+  // A Space is among the dialog's places only for an account that may use Spaces.
+  assert.match(front, /const spacesOpen = collabAccessState\(session\) === 'eligible';/);
+  assert.match(front, /<HostLiveQuizDialog quiz=\{\{ uuid: quiz\.uuid, title: quiz\.title \}\} spacesOpen=\{spacesOpen\}/);
   // Hosting is Start's choice now (Arthur's A, 14 November 2026), no longer a row in the bar's menu.
   assert.match(front, /\{mayTake && mayHostLive \? \(/);
   assert.match(front, /<DropdownMenuItem onSelect=\{openHost\}/);

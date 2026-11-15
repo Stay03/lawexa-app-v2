@@ -14,7 +14,8 @@ const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts),
 
 test("Start's two choices say what each one is", () => {
   assert.deepEqual(START_SOLO, { label: 'Play solo', hint: 'On your own, for your best score' });
-  assert.deepEqual(START_LIVE, { label: 'Host live in a Space', hint: 'Everyone plays at once, on their own phone' });
+  // "in a Space" went when a game could run for anyone or by link (live quiz without a Space, 15 November 2026).
+  assert.deepEqual(START_LIVE, { label: 'Host live', hint: 'Everyone plays at once, on their own phone' });
 });
 
 test('for a host, Start opens the choice; Play solo starts the attempt, Host live opens the Space picker', () => {
