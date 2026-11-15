@@ -55,9 +55,10 @@ test('the quiz page offers Host to any signed-in account (guests not), for a qui
   assert.equal(offersHostLive({ mayHost: false, questionCount: 10 }), false);
 
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
-  // A Space is among the dialog's places only for an account that may use Spaces.
-  assert.match(front, /const spacesOpen = collabAccessState\(session\) === 'eligible';/);
-  assert.match(front, /<HostLiveQuizDialog quiz=\{\{ uuid: quiz\.uuid, title: quiz\.title \}\} spacesOpen=\{spacesOpen\}/);
+  // A Space is among the dialog's places only for an account that may use Spaces: the dialog reads that itself.
+  assert.match(front, /mayHost: canTakeQuiz(session),/);
+  const dialog = read('v2', 'features', 'channels', 'quiz', 'HostLiveQuizDialog.tsx');
+  assert.match(dialog, /const spacesOpen = collabAccessState\(useV2Session\(\)\) === 'eligible';/);
   // Hosting is Start's choice now (Arthur's A, 14 November 2026), no longer a row in the bar's menu.
   assert.match(front, /\{mayTake && mayHostLive \? \(/);
   assert.match(front, /<DropdownMenuItem onSelect=\{openHost\}/);

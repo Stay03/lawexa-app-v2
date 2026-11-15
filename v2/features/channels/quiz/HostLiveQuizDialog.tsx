@@ -21,7 +21,9 @@ import { spaceGameHref } from '@/lib/utils/space-game-href';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
+import { collabAccessState } from '@/v2/features/collab/model';
 import { useCreateSpace } from '@/v2/features/spaces/mutations';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { SpacePickList } from '@/v2/features/spaces/move/SpacePickList';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { hostRefusal, hostTargets, quickHostSpacePayload } from './model';
@@ -68,16 +70,15 @@ interface PickedSpace {
  */
 export function HostLiveQuizDialog({
   quiz,
-  spacesOpen = true,
   open,
   onOpenChange,
 }: {
   quiz: { uuid: string; title: string };
-  /** Whether the reader may use Spaces: without them, the places are Public and Private link only. */
-  spacesOpen?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  // A Space is one of the places only for an account that may use Spaces; anyone signed in may host open.
+  const spacesOpen = collabAccessState(useV2Session()) === 'eligible';
   const router = useRouter();
   const goLive = useGoLive(quiz.uuid);
   const createSpace = useCreateSpace();
