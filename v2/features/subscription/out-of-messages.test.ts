@@ -222,3 +222,57 @@ test('without the flag, or on a paid plan, the wording is as before', () => {
   assert.equal(outOfMessagesView({ blocked: block({ reason: 'free_no_subscription', resets_at: null, last_message_from_pack: false }) }).short, 'Free messages used');
   assert.equal(outOfMessagesView({ blocked: block({ reason: 'plan_exhausted', last_message_from_pack: true }) }).short, 'Messages used for now');
 });
+
+/* Organisation plans part 6 (Backend's org-plans-part9): a Lawexa turn in a
+ * Space counts against the Space's payer. When it is used up, the block names
+ * who pays, and the notice says the server's sentence, not a personal plan's.
+ * TEST DATA only. */
+
+const payer = (isYou: boolean) => ({ uuid: 'u-pay', name: 'TEST DATA Ada Owner', is_you: isYou });
+
+test("a Space whose payer's plan is used up: the server's sentence names the payer, and someone else has nothing to buy", () => {
+  const view = outOfMessagesView({
+    blocked: block({
+      message: "This Space's messages are paid by TEST DATA Ada Owner, whose plan has reached its limit.",
+      paid_by: payer(false),
+    }),
+    timeZone: 'UTC',
+  });
+  assert.equal(view.heading, 'This Space’s messages are used up');
+  assert.equal(view.short, 'Space messages used up');
+  assert.equal(view.body, "This Space's messages are paid by TEST DATA Ada Owner, whose plan has reached its limit.");
+  assert.deepEqual(view.actions, []);
+  assert.equal(view.reset, `They come back on ${formatResetMoment('2026-11-01T00:00:00+00:00', 'UTC')}.`);
+});
+
+test("the payer in their own Space: the server's sentence, and their plan's doors", () => {
+  const view = outOfMessagesView({
+    blocked: block({ message: "Your plan's messages for TEST DATA Chambers are used up.", paid_by: payer(true) }),
+    timeZone: 'UTC',
+  });
+  assert.equal(view.heading, 'Your messages for this Space are used up');
+  assert.equal(view.body, "Your plan's messages for TEST DATA Chambers are used up.");
+  assert.deepEqual(doors(view), ['Upgrade plan /pricing (primary)', 'Buy message pack /settings/message-packs']);
+});
+
+test("a Space's monthly messages used up: the date shows once (in the server's sentence), the payer may upgrade", () => {
+  const monthly = (isYou: boolean) =>
+    block({
+      code: 'space_messages_exhausted',
+      reason: 'space_monthly_limit',
+      message: "This Space has used the 200 Lawexa messages a month that TEST DATA Ada Owner's plan gives it. They come back on 1 December.",
+      resets_at: '2026-12-01T00:00:00+00:00',
+      space_messages: { used: 200, limit: 200 },
+      paid_by: payer(isYou),
+    });
+  const member = outOfMessagesView({ blocked: monthly(false), timeZone: 'UTC' });
+  assert.equal(member.heading, 'This Space’s messages are used up');
+  assert.match(member.body, /They come back on 1 December\.$/);
+  assert.equal(member.reset, null);
+  assert.deepEqual(member.actions, []);
+  assert.deepEqual(doors(outOfMessagesView({ blocked: monthly(true), timeZone: 'UTC' })), ['Upgrade plan /pricing (primary)']);
+});
+
+test('a block with no payer reads exactly as before', () => {
+  assert.equal(outOfMessagesView({ blocked: block() }).heading, 'You’ve used your messages for now');
+});

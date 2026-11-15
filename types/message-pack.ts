@@ -86,7 +86,16 @@ export type TBlockedReasonCode =
   | 'plan_exhausted'
   | 'account_flagged'
   | 'hard_limit'
-  | 'cancelled_grace_exhausted';
+  | 'cancelled_grace_exhausted'
+  /** A Space's own monthly Lawexa messages, from its payer's plan, are used up (organisation plans part 6). */
+  | 'space_monthly_limit';
+
+/** Who pays for a Space's Lawexa turns (organisation plans part 6): its payer, or the reader themselves. */
+export interface IBlockedPaidBy {
+  uuid: string;
+  name: string;
+  is_you: boolean;
+}
 
 export interface IBlockedReason {
   code: string;
@@ -100,6 +109,10 @@ export interface IBlockedReason {
    *  or granted). With `free_no_subscription`, the messages used up were not
    *  only the free ones (backend 6d218a29). Absent from an older API. */
   last_message_from_pack?: boolean;
+  /** A turn in a Space: who pays for it. The block is then the payer's, and `message` names them. */
+  paid_by?: IBlockedPaidBy;
+  /** With `space_monthly_limit`: the Space's month so far. */
+  space_messages?: { used: number; limit: number };
 }
 
 // AI messages limit from GET /users/limits

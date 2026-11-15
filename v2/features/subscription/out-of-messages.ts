@@ -1,4 +1,4 @@
-import type { IBlockedReason, TBlockedReasonCode } from '@/types/message-pack';
+import type { IBlockedPaidBy, IBlockedReason, TBlockedReasonCode } from '@/types/message-pack';
 
 /**
  * out-of-messages — what the ONE out-of-messages notice says and offers (v2
@@ -84,6 +84,7 @@ const BODY: Record<TBlockedReasonCode, string> = {
   cancelled_grace_exhausted:
     'Your plan has ended, so it no longer includes messages. Reactivate it, or buy a message pack.',
   hard_limit: 'You have reached the most messages this account can send for now.',
+  space_monthly_limit: 'This Space has used its Lawexa messages for the month.',
 };
 
 /** The free reason's sentence once a message pack has been used up too. */
@@ -123,6 +124,7 @@ export function outOfMessagesView({
   /** For tests; the reader's own zone otherwise. */
   timeZone?: string;
 }): OutOfMessagesView {
+  if (blocked?.paid_by) return spaceBlockView(blocked, blocked.paid_by, timeZone);
   const reason = reasonOf(blocked);
   // A user without a plan who bought (or was given) a message pack has used
   // more than free messages: the notice no longer calls them free (Tester, 20
@@ -179,6 +181,38 @@ export function outOfMessagesView({
     resetShort,
     body,
     reset,
+    actions: doors.map((door, index) => ({ ...door, primary: index === 0 })),
+  };
+}
+
+/**
+ * A turn in a Space, blocked on the Space's payer (organisation plans part 6,
+ * Backend's org-plans-part9): the payer's own plan is used up, or the Space's
+ * monthly messages from that plan are. The server's sentence names who pays,
+ * and it is the one shown, never this app's words for a personal plan.
+ * Only the payer has something to do (a bigger plan, or a pack for their own
+ * plan); anyone else in the Space is told who pays and when the messages come
+ * back, with no button that would not help.
+ */
+function spaceBlockView(blocked: IBlockedReason, paidBy: IBlockedPaidBy, timeZone?: string): OutOfMessagesView {
+  const spaceCap = blocked.reason === 'space_monthly_limit';
+  const heading = spaceCap || !paidBy.is_you ? 'This Space’s messages are used up' : 'Your messages for this Space are used up';
+  const short = spaceCap || !paidBy.is_you ? 'Space messages used up' : 'Messages used for this Space';
+  // The Space's own month: the server's sentence already says when they come back, so the date shows once.
+  const moment = spaceCap ? null : formatResetMoment(blocked.resets_at, timeZone);
+  const doors = !paidBy.is_you
+    ? []
+    : spaceCap
+      ? [UPGRADE]
+      : blocked.reason === 'cancelled_grace_exhausted'
+        ? [REACTIVATE, BUY_PACK]
+        : [UPGRADE, BUY_PACK];
+  return {
+    heading,
+    short,
+    resetShort: moment ? `Back on ${moment}` : null,
+    body: blocked.message.trim(),
+    reset: moment ? `They come back on ${moment}.` : null,
     actions: doors.map((door, index) => ({ ...door, primary: index === 0 })),
   };
 }
