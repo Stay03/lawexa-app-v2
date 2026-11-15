@@ -26,7 +26,6 @@ import { apiErrorCode } from './open-game';
 import { COMPACT_RAISED } from './ui';
 import '@/v2/features/quiz/solo/solo-quiz.css';
 
-
 /**
  * GameInviteDialog — the game's link into its Space, for the host and
  * whoever else may host there (Arthur's decisions c and d, 93142269; Backend's

@@ -70,7 +70,8 @@ test('a link past its 24 hours says it has expired and cannot be shared', () => 
   assert.match(dialog, /const expired = answered !== null && !answered\.is_usable;\s*const made = expired \? null : answered;/);
   assert.match(dialog, /\) : expired \? \(\s*<p role="alert"[^>]*>\s*\{GAME_LINK_EXPIRED\}/);
   assert.match(dialog, /disabled=\{!made\}/);
-  assert.match(dialog, /gameLinkRefusal\(failure\.status, errorCode\(failure\.errors\)\)/);
+  // The refusal's code is read by the shared reader (open-game.ts) since open games (15 November 2026).
+  assert.match(dialog, /gameLinkRefusal\(failure\.status, apiErrorCode\(failure\.errors\)\)/);
 });
 
 test('over the whole window the game is a modal: focus stays in it, Escape does nothing', () => {
@@ -78,8 +79,9 @@ test('over the whole window the game is a modal: focus stays in it, Escape does 
   assert.match(overlay, /if \(cover === 'room'\) return frame;\s*return \(\s*<DialogPrimitive\.Root open modal>/);
   assert.match(overlay, /onEscapeKeyDown=\{\(event\) => event\.preventDefault\(\)\}/);
   // It names where leaving goes: the Space's page or the chat.
-  assert.match(overlay, /const placeNoun = place \?\? roomNoun\(room\);/);
-  assert.match(overlay, /posts nothing to the \{placeNoun\}\./);
+  // An open game (live quiz without a Space) has no room noun: it returns to the Quiz page and posts nowhere.
+  assert.match(overlay, /const placeNoun = place \?\? \(isRoomPlace\(room\) \? roomNoun\(room\) : 'Quiz page'\);/);
+  assert.match(overlay, /posts nothing to the \$\{placeNoun\}\.`\}/);
   assert.match(read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx'), /place="Space"/);
   assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /place="chat"/);
 });

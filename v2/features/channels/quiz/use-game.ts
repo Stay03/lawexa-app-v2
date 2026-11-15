@@ -31,7 +31,7 @@ import {
 import { useCancelGame, useJoinGame, useRemovePlayer, useStartGame, useSubmitAnswer } from './mutations';
 import { channelQuizQueries } from './queries';
 import type { QuizRoom } from './quiz-room';
-import { apiErrorCode } from './open-game';
+import { apiErrorCode, isOpenGame, mergeTopLeaderboard } from './open-game';
 
 /**
  * useLiveGame — the whole live game as one hook: the authoritative state, the
@@ -242,7 +242,12 @@ function mergeQuizEvent(
         game: {
           ...state.game,
           status: 'reveal',
-          players: event.payload.leaderboard ?? state.game.players,
+          // An open game's reveal names the top 10 only: laid over the full list, never in its place.
+          players: event.payload.leaderboard
+            ? isOpenGame(state.game)
+              ? mergeTopLeaderboard(state.game.players ?? [], event.payload.leaderboard)
+              : event.payload.leaderboard
+            : state.game.players,
         },
         current_question: {
           ...current,
@@ -490,6 +495,8 @@ export interface LiveGame {
   removingUuid: string | null;
   /** The last removal's refusal (409 once started, 404 not in the game), or 0. */
   removeErrorStatus: number;
+  /** The last removal's `errors.code` (`busy_try_again`), or null. */
+  removeErrorCode: string | null;
 }
 
 export function useLiveGame({
@@ -759,5 +766,6 @@ export function useLiveGame({
     removePlayer,
     removingUuid: removeMutation.isPending ? (removeMutation.variables ?? null) : null,
     removeErrorStatus: removeMutation.isError ? extractApiError(removeMutation.error).status : 0,
+    removeErrorCode: removeMutation.isError ? apiErrorCode(extractApiError(removeMutation.error).errors) : null,
   };
 }

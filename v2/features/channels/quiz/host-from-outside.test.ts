@@ -83,7 +83,9 @@ test('the dialog uses the Move dialog’s Space list, goes live in the picked Sp
 test('Go live takes its room with each press: the sheet’s own, or the picked Space', () => {
   const mutations = read('v2', 'features', 'channels', 'quiz', 'mutations.ts');
   assert.match(mutations, /export function useGoLive\(quizUuid: string\) \{/);
-  assert.match(mutations, /mutationFn: \(\{ room, conversationUuid = null \}: GoLiveTarget\) =>/);
+  // A room, or (live quiz without a Space, 15 November 2026) a visibility with no room.
+  assert.match(mutations, /mutationFn: \(target: GoLiveTarget\) =>/);
+  assert.match(mutations, /'visibility' in target \? \{ visibility: target\.visibility \} : goLivePayload\(target\.room, target\.conversationUuid \?\? null\)/);
   const sheet = read('v2', 'features', 'channels', 'quiz', 'QuizLibrarySheet.tsx');
   assert.match(sheet, /const goLive = useGoLive\(quiz\.uuid\);/);
   assert.match(sheet, /goLive\.mutate\(\{ room, conversationUuid \}, \{/);

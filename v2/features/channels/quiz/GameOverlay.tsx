@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 import { ArrowLeft, Ban, Flag, Loader2, LogIn, Trophy, UserPlus, WifiOff } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { spaceGameHref } from '@/lib/utils/space-game-href';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -167,6 +169,7 @@ export function GameOverlay({
   const [cancelOpen, setCancelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
   const frameRef = useRef<HTMLElement>(null);
 
   // The affordance that opened this mode (a card's Join, the live bar) is now
@@ -201,18 +204,27 @@ export function GameOverlay({
     phase !== 'finished' &&
     phase !== 'cancelled';
   // While people can still come in: before the end, in a Space's game.
-  // An open game's host hands out its own page and code (no Space to join).
-  const openVisibility = room.kind === 'game' ? (state?.game.visibility ?? null) : null;
   const canInvite =
-    (room.kind === 'space' ? mayInvite : openVisibility !== null && game.isHost) &&
+    mayInvite &&
+    room.kind === 'space' &&
     state !== null &&
     !ending &&
     phase !== 'finished' &&
     phase !== 'cancelled';
+  // An open game's host hands out its own page and code (no Space to join).
+  const openVisibility = room.kind === 'game' ? (state?.game.visibility ?? null) : null;
+  const canInviteOpen =
+    openVisibility !== null && game.isHost && state !== null && !ending && phase !== 'finished' && phase !== 'cancelled';
   // An open game's own refusals: full (409 game_full) or removed by its host (403 removed).
   const joinRefusal = openJoinRefusal(game.joinErrorStatus, game.joinErrorCode, state?.game.max_players);
+  // An open game's host leaving a game still running: it is listed nowhere they can find it from (a link
+  // game) and blocks their next one (409 open_game_live), so Back asks first and says how to come back.
+  const confirmLeave =
+    room.kind === 'game' && game.isHost && state !== null && !ending && phase !== 'finished' && phase !== 'cancelled';
+  // Removed from an open game by its host: the game is closed to this reader (Backend 16b4161e).
+  const removed = game.errorStatus === 403 && game.errorCode === REMOVED_CODE;
   // Anyone but its host may report an open game; an admin reads it and may end it (Stay, thread 12341975).
-  const canReport = openVisibility !== null && state !== null && !game.isHost;
+  const canReport = openVisibility !== null && state !== null && !game.isHost && !removed;
   const showJoinBar =
     state !== null &&
     !game.isPlaying &&
@@ -220,7 +232,8 @@ export function GameOverlay({
     phase !== 'lobby' &&
     canJoinNow(state) &&
     game.joinErrorStatus !== 403 &&
-    joinRefusal === null;
+    joinRefusal === null &&
+    !removed;
 
   const frame = (
     <section
@@ -244,7 +257,7 @@ export function GameOverlay({
             variant="ghost"
             size="icon"
             className="size-8 shrink-0"
-            onClick={onClose}
+            onClick={confirmLeave ? () => setLeaveOpen(true) : onClose}
             aria-label={`Back to the ${placeNoun}`}
             title={`Back to the ${placeNoun}`}
           >
@@ -269,7 +282,7 @@ export function GameOverlay({
               )}
             </p>
           </div>
-          {canInvite && (
+          {(canInvite || canInviteOpen) && (
             <RaisedButton
               tone="quiet"
               className={cn(HEADER_RAISED, 'shrink-0')}
@@ -328,7 +341,7 @@ export function GameOverlay({
           </div>
         </div>
       )}
-      {joinRefusal !== null ? (
+      {joinRefusal !== null && phase !== 'lobby' && !removed ? (
         <div className="shrink-0 border-b px-4 py-2">
           <p role="status" className="mx-auto w-full max-w-2xl text-xs text-muted-foreground">
             {joinRefusal}
@@ -355,7 +368,7 @@ export function GameOverlay({
       />
 
       {reportOpen && canReport && <ReportGameDialog gameUuid={gameUuid} onOpenChange={setReportOpen} />}
-      {inviteOpen && canInvite && openVisibility !== null && state !== null && (
+      {inviteOpen && canInviteOpen && openVisibility !== null && state !== null && (
         <OpenGameInviteDialog
           gameUuid={gameUuid}
           quizUuid={state.game.quiz.uuid}
@@ -365,7 +378,7 @@ export function GameOverlay({
           onOpenChange={setInviteOpen}
         />
       )}
-      {inviteOpen && canInvite && openVisibility === null && (
+      {inviteOpen && canInvite && (
         <GameInviteDialog
           gameUuid={gameUuid}
           quizUuid={state?.game.quiz.uuid ?? null}
@@ -374,6 +387,28 @@ export function GameOverlay({
         />
       )}
 
+      <AlertDialog open={leaveOpen && confirmLeave} onOpenChange={setLeaveOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave your game?</AlertDialogTitle>
+            <AlertDialogDescription>
+              It keeps running for your players, and you can&rsquo;t start another until it ends. Come back with its link
+              {state?.game.join_code ? ` or the code ${state.game.join_code}` : ''}, or end it before you go.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setLeaveOpen(false);
+                onClose();
+              }}
+            >
+              Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -560,6 +595,37 @@ function GameBody({
             <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
               Back to the {placeNoun}
             </RaisedButton>
+          }
+        />
+      </GameStage>
+    );
+  }
+
+  // The open-game page given a Space's or a channel's game (a pasted uuid): it is played there, with its members.
+  if (!gameInRoom(game.state.game, room)) {
+    const played = game.state.game;
+    const href = played.space_uuid
+      ? spaceGameHref(played.space_uuid, played.uuid)
+      : played.channel_uuid
+        ? `/channels/${played.channel_uuid}?game=${played.uuid}`
+        : null;
+    return (
+      <GameStage>
+        <CollabMessage
+          icon={Trophy}
+          tone="neutral"
+          title={played.space_uuid ? 'This game is played in a Space' : 'This game is played in a channel'}
+          description="Open it there to join or see how it went."
+          action={
+            href ? (
+              <RaisedButton asChild tone="quiet" className={COMPACT_RAISED}>
+                <Link href={href}>Open it there</Link>
+              </RaisedButton>
+            ) : (
+              <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
+                Back to the {placeNoun}
+              </RaisedButton>
+            )
           }
         />
       </GameStage>

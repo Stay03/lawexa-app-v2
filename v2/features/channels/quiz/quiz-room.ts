@@ -72,11 +72,11 @@ export function goLivePayload(room: RoomPlace, conversationUuid: string | null =
   return conversationUuid ? { space_uuid: room.uuid, conversation_uuid: conversationUuid } : { space_uuid: room.uuid };
 }
 
-/** Whether a game runs in this room: a link to another room's game opens nothing here. An open game is its own room. */
+/** Whether a game runs in this room: a link to another room's game opens nothing here. An open game is its own room, and a channel or Space game is never played as one. */
 export function gameInRoom(
   game: { uuid?: string; channel_uuid: string | null; space_uuid?: string | null },
   room: QuizRoom,
 ): boolean {
-  if (room.kind === 'game') return game.uuid !== undefined && game.uuid === room.uuid;
+  if (room.kind === 'game') return game.uuid !== undefined && game.uuid === room.uuid && game.channel_uuid === null && !game.space_uuid;
   return room.kind === 'channel' ? game.channel_uuid === room.uuid : game.space_uuid === room.uuid;
 }

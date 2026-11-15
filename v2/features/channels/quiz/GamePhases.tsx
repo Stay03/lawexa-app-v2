@@ -72,7 +72,7 @@ import {
   StageKicker,
   type OptionState,
 } from './ui';
-import { isOpenGame, spacedJoinCode } from './open-game';
+import { isOpenGame, openJoinRefusal, removeRefusal, spacedJoinCode } from './open-game';
 import {
   answersIn,
   canJoinNow,
@@ -140,7 +140,9 @@ export function LobbyStage({ game }: { game: LiveGame }) {
   const players = state.game.players ?? [];
   const count = state.game.player_count ?? players.length;
   const hostUuid = state.game.host?.uuid ?? null;
-  const joinable = canJoinNow(state) && !game.isPlaying;
+  // An open game's refusal (full, removed, busy) is said under the button, and a full game's Join goes.
+  const joinRefusal = openJoinRefusal(game.joinErrorStatus, game.joinErrorCode, state.game.max_players);
+  const joinable = canJoinNow(state) && !game.isPlaying && (joinRefusal === null || game.joinErrorCode === 'busy_try_again');
   // An open game (no Space or channel): its code to read out, its cap, and the host's remove.
   const open = isOpenGame(state.game);
   const joinCode = open ? (state.game.join_code ?? null) : null;
@@ -227,6 +229,11 @@ export function LobbyStage({ game }: { game: LiveGame }) {
             Join this game
           </RaisedButton>
         )}
+        {joinRefusal !== null && !game.isPlaying ? (
+          <p role="status" className="max-w-sm text-center text-sm text-muted-foreground">
+            {joinRefusal}
+          </p>
+        ) : null}
 
         {game.isHost && (
           <RaisedButton
@@ -261,16 +268,17 @@ export function LobbyStage({ game }: { game: LiveGame }) {
         </p>
         {mayRemove && game.removeErrorStatus !== 0 ? (
           <p role="status" className="max-w-sm text-center text-xs text-muted-foreground">
-            {game.removeErrorStatus === 409
-              ? 'The game has started, so nobody can be removed now.'
-              : game.removeErrorStatus === 404
-                ? 'That player has already left the game.'
-                : 'Couldn’t remove that player. Try again.'}
+            {removeRefusal(game.removeErrorStatus, game.removeErrorCode)}
           </p>
         ) : null}
       </div>
 
-      <AlertDialog open={removing !== null} onOpenChange={(next) => (next ? null : setRemoving(null))}>
+      <AlertDialog
+        open={removing !== null}
+        onOpenChange={(next) => {
+          if (!next) setRemoving(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {removing?.name ?? 'this player'}?</AlertDialogTitle>

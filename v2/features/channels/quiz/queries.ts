@@ -195,7 +195,8 @@ export const channelQuizQueries = {
       queryFn: () => quizGamesApi.live(1),
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
-      refetchInterval: (query) => (query.state.status === 'error' ? false : 20_000),
+      // A failed read is tried again more slowly, never given up for the visit.
+      refetchInterval: (query) => (query.state.status === 'error' ? 60_000 : 20_000),
     }),
 
   /* ── The game itself ───────────────────────────────────────────────────── */

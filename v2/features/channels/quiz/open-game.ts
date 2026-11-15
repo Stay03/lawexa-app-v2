@@ -82,7 +82,19 @@ export function openJoinRefusal(status: number, code: string | null, maxPlayers:
     return maxPlayers ? `This game is full. It takes ${maxPlayers} players.` : 'This game is full.';
   }
   if (status === 403 && code === REMOVED_CODE) return REMOVED_NOTE;
+  if (isBusyRefusal(status, code)) return BUSY_NOTE;
   return null;
+}
+
+/** Said when the busy retries ran out: the crowd is still coming in. */
+export const BUSY_NOTE = 'Lots of people are joining right now. Try again in a moment.';
+
+/** Why a removal was refused, in words. */
+export function removeRefusal(status: number, code: string | null): string {
+  if (isBusyRefusal(status, code)) return BUSY_NOTE;
+  if (status === 409) return 'The game has started, so nobody can be removed now.';
+  if (status === 404) return 'That player has already left the game.';
+  return 'Couldn’t remove that player. Try again.';
 }
 
 /** Why an open game could not go live, in words. */
@@ -121,4 +133,16 @@ export function liveGameState(game: Pick<QuizGame, 'status' | 'current_question_
 export function liveGameAction(game: Pick<QuizGame, 'status' | 'settings'>): 'Join' | 'Join late' | 'Watch' {
   if (game.status === 'lobby') return 'Join';
   return game.settings.allow_late_join ? 'Join late' : 'Watch';
+}
+
+/**
+ * An open game's reveal carries only the top 10 (Backend e9c7ac18), while
+ * the game's own list holds everyone. The top 10's new ranks and scores go
+ * first, and every other player stays as they were until the authoritative
+ * read that follows the reveal: nobody below the top 10 drops out of the game
+ * for that moment (they would read as not playing, and be offered Join).
+ */
+export function mergeTopLeaderboard<P extends { user: { uuid: string } }>(players: readonly P[], top: readonly P[]): P[] {
+  const inTop = new Set(top.map((player) => player.user.uuid));
+  return [...top, ...players.filter((player) => !inTop.has(player.user.uuid))];
 }

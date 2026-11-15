@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -14,9 +13,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { feedbackApi } from '@/lib/api/feedback';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
+import { useReportGame } from './mutations';
 import '@/v2/features/quiz/solo/solo-quiz.css';
 
 /** How long a report may be: the feedback list's own limit. */
@@ -31,11 +30,7 @@ export const REPORT_MAX = 2000;
  */
 export function ReportGameDialog({ gameUuid, onOpenChange }: { gameUuid: string; onOpenChange: (open: boolean) => void }) {
   const [text, setText] = useState('');
-  const report = useMutation({
-    mutationFn: (feedbackText: string) =>
-      feedbackApi.submitQuizGameReport({ content_type: 'channel_quiz_game', content_uuid: gameUuid, feedback_text: feedbackText }),
-    meta: { silentError: true },
-  });
+  const report = useReportGame(gameUuid);
   const trimmed = text.trim();
 
   const submit = (event: FormEvent) => {

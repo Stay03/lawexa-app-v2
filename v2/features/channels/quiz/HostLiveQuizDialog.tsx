@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { extractApiError } from '@/lib/utils/api-error';
+import type { QuizGameVisibility } from '@/types/channel-quiz';
 import { spaceGameHref } from '@/lib/utils/space-game-href';
 import { COLLAB_DIALOG_SURFACE } from '@/v2/features/collab/kit/dialog-surface';
 import { QuizTile } from '@/v2/features/quiz/solo/QuizTile';
@@ -27,7 +28,6 @@ import { hostRefusal, hostTargets, quickHostSpacePayload } from './model';
 import { useGoLive } from './mutations';
 import { apiErrorCode, openGameHref, openGoLiveRefusal, VISIBILITY_WORDS } from './open-game';
 import { spaceRoom } from './quiz-room';
-import type { QuizGameVisibility } from '@/types/channel-quiz';
 import { COMPACT_RAISED } from './ui';
 import '@/v2/features/quiz/solo/solo-quiz.css';
 
@@ -92,6 +92,11 @@ export function HostLiveQuizDialog({
   /** Where it runs (live quiz without a Space, Stay, thread 12341975): a Space, or open to anyone signed in, or by link. */
   const [place, setPlace] = useState<'space' | QuizGameVisibility>('space');
   const busy = goLive.isPending || createSpace.isPending;
+
+  const choosePlace = (next: 'space' | QuizGameVisibility) => {
+    setPlace(next);
+    setRefusal(null);
+  };
 
   /** An open game: no Space, live at once, then its own page. */
   const goLiveOpen = (visibility: QuizGameVisibility) => {
@@ -210,18 +215,31 @@ export function HostLiveQuizDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div role="radiogroup" aria-label="Where it runs" className="grid grid-cols-3 gap-1 rounded-2xl bg-muted p-1">
+        {/* A radio group: one tab stop (the chosen place), and the arrow keys move the choice, round the ends. */}
+        <div
+          role="radiogroup"
+          aria-label="Where it runs"
+          className="grid grid-cols-3 gap-1 rounded-2xl bg-muted p-1"
+          onKeyDown={(event) => {
+            const step = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 0;
+            if (step === 0 || busy) return;
+            event.preventDefault();
+            const at = PLACES.findIndex((option) => option.id === place);
+            const next = PLACES[(at + step + PLACES.length) % PLACES.length];
+            choosePlace(next.id);
+            event.currentTarget.querySelector<HTMLButtonElement>(`[data-place="${next.id}"]`)?.focus();
+          }}
+        >
           {PLACES.map(({ id, label, Icon }) => (
             <button
               key={id}
               type="button"
               role="radio"
+              data-place={id}
               aria-checked={place === id}
+              tabIndex={place === id ? 0 : -1}
               disabled={busy}
-              onClick={() => {
-                setPlace(id);
-                setRefusal(null);
-              }}
+              onClick={() => choosePlace(id)}
               className={cn(
                 'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
                 place === id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',

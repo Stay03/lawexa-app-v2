@@ -189,15 +189,19 @@ test("the lobby reuses the Space game's lobby: the code, the cap, and the host's
 test("the host's invite uses the Space game's invite dialog layout; anyone else may report the game", () => {
   const overlay = read('v2', 'features', 'channels', 'quiz', 'GameOverlay.tsx');
   assert.match(overlay, /<OpenGameInviteDialog/);
-  assert.match(overlay, /const canReport = openVisibility !== null && state !== null && !game\.isHost;/);
+  assert.match(overlay, /const canReport = openVisibility !== null && state !== null && !game\.isHost && !removed;/);
+  // A host leaving a game still running is asked first, and told how to come back.
+  assert.match(overlay, /onClick=\{confirmLeave \? \(\) => setLeaveOpen\(true\) : onClose\}/);
   assert.match(overlay, /if \(game\.errorStatus === 403 && game\.errorCode === REMOVED_CODE\) \{/);
-  const report = read('v2', 'features', 'channels', 'quiz', 'ReportGameDialog.tsx');
-  assert.match(report, /content_type: 'channel_quiz_game', content_uuid: gameUuid, feedback_text: feedbackText/);
+  assert.match(read('v2', 'features', 'channels', 'quiz', 'ReportGameDialog.tsx'), /const report = useReportGame\(gameUuid\);/);
+  const mutations = read('v2', 'features', 'channels', 'quiz', 'mutations.ts');
+  assert.match(mutations, /content_type: 'channel_quiz_game', content_uuid: gameUuid, feedback_text: feedbackText/);
 });
 
 test('the host dialog offers a Space, Public and Private link, and an open game opens its own page', () => {
   const dialog = read('v2', 'features', 'channels', 'quiz', 'HostLiveQuizDialog.tsx');
-  assert.match(dialog, /role="radiogroup" aria-label="Where it runs"/);
+  assert.match(dialog, /role="radiogroup"\s+aria-label="Where it runs"/);
+  assert.match(dialog, /tabIndex=\{place === id \? 0 : -1\}/);
   assert.match(dialog, /\{ visibility \},/);
   assert.match(dialog, /router\.push\(openGameHref\(response\.data\.uuid\)\);/);
 });
@@ -221,4 +225,15 @@ test("an open game's relay also carries player_removed; a channel's and a Space'
   assert.ok(names(gameRoom('g1')).includes('.quiz.game.player_removed'));
   assert.equal(names(spaceRoom('s1')).length, 8);
   assert.ok(!names(channelRoom('c1')).includes('.quiz.game.player_removed'));
+});
+
+test("an open game's top-10 reveal is laid over the full list: nobody below it drops out", async () => {
+  const { mergeTopLeaderboard } = await import('./open-game');
+  const row = (uuid: string, rank: number, score: number) => ({ rank, score, user: { uuid } });
+  const everyone = [row('a', 1, 0), row('b', 2, 0), row('c', 3, 0)];
+  const top = [row('b', 1, 900), row('a', 2, 500)];
+  assert.deepEqual(mergeTopLeaderboard(everyone, top).map((player) => player.user.uuid), ['b', 'a', 'c']);
+  assert.equal(mergeTopLeaderboard(everyone, top)[0].score, 900);
+  const source = read('v2', 'features', 'channels', 'quiz', 'use-game.ts');
+  assert.match(source, /isOpenGame\(state\.game\)\s*\? mergeTopLeaderboard\(state\.game\.players \?\? \[\], event\.payload\.leaderboard\)/);
 });

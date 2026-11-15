@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 
 import { channelQuizApi, quizGamesApi } from '@/lib/api/channel-quiz';
+import { feedbackApi } from '@/lib/api/feedback';
 import { extractApiError } from '@/lib/utils/api-error';
 import type {
   ChannelQuizVisibility,
@@ -402,6 +403,23 @@ export function useRemovePlayer(gameUuid: string, viewerId: number | null) {
     onSuccess: (response) => {
       queryClient.setQueryData<QuizGameStateResponse>(channelQuizQueries.gameState({ gameUuid, viewerId }).queryKey, response);
     },
+  });
+}
+
+/** An open game by its join code (Live now's code field); its refusals are said where it was typed. */
+export function useFindGameByCode() {
+  return useMutation({
+    mutationFn: (code: string) => quizGamesApi.byCode(code),
+    meta: { silentError: true },
+  });
+}
+
+/** A player's report of an open game (feedback `channel_quiz_game`), said in its dialog. */
+export function useReportGame(gameUuid: string) {
+  return useMutation({
+    mutationFn: (feedbackText: string) =>
+      feedbackApi.submitQuizGameReport({ content_type: 'channel_quiz_game', content_uuid: gameUuid, feedback_text: feedbackText }),
+    meta: { silentError: true },
   });
 }
 

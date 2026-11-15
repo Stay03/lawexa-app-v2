@@ -3,14 +3,14 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Loader2, Radio, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { quizGamesApi } from '@/lib/api/channel-quiz';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { LiveQuizGame } from '@/types/channel-quiz';
+import { useFindGameByCode } from '@/v2/features/channels/quiz/mutations';
 import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
 import {
   codeRefusal,
@@ -35,8 +35,9 @@ import { RaisedButton } from '../solo/ui';
  * A game by link is never listed (the server's list holds public games only),
  * and a finished game leaves the row on the next read: the list is read
  * every 20 seconds while the row is on screen, and again when a game it
- * shows ends (`liveGamesPage`, `useOpenQuizLive`). With no public game live,
- * only the code field shows, so the page does not open on an empty row.
+ * shows ends (`liveGamesPage`, `useOpenQuizLive`). The heading and the code
+ * field are there from the first frame; the cards fade in when the list
+ * answers, and an empty list says so in one quiet line.
  *
  * The cards are the prototype Stay and Arthur saw (proto-live-no-space,
  * 31fba56a): one row that scrolls sideways on a phone, three across on a
@@ -45,15 +46,6 @@ import { RaisedButton } from '../solo/ui';
 export function LiveNowRow({ viewerId }: { viewerId: number | null }) {
   const live = useQuery(channelQuizQueries.liveGamesPage({ viewerId }));
   const games = live.data?.data.games ?? [];
-
-  if (games.length === 0) {
-    return (
-      <section aria-label="Join a live quiz" className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Have a join code for a live quiz?</p>
-        <JoinByCode />
-      </section>
-    );
-  }
 
   return (
     <section aria-labelledby="live-now" className="mb-6">
@@ -70,11 +62,15 @@ export function LiveNowRow({ viewerId }: { viewerId: number | null }) {
         </div>
         <JoinByCode />
       </div>
-      <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
-        {games.map((game) => (
-          <LiveGameCard key={game.uuid} game={game} />
-        ))}
-      </ul>
+      {games.length > 0 ? (
+        <ul className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0">
+          {games.map((game) => (
+            <LiveGameCard key={game.uuid} game={game} />
+          ))}
+        </ul>
+      ) : live.isSuccess ? (
+        <p className="text-sm text-muted-foreground">No public games right now. Host one from any quiz, or join with a code.</p>
+      ) : null}
     </section>
   );
 }
@@ -102,7 +98,7 @@ function LiveGameCard({ game }: { game: LiveQuizGame }) {
           {game.player_count} playing
         </span>
       </div>
-      <RaisedButton asChild className={cn('h-10 w-full text-sm', FOCUS_RING)}>
+      <RaisedButton asChild className={cn('h-11 w-full text-sm', FOCUS_RING)}>
         <Link href={openGameHref(game.uuid)}>{liveGameAction(game)}</Link>
       </RaisedButton>
     </li>
@@ -118,12 +114,7 @@ function JoinByCode() {
   const router = useRouter();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const lookup = useMutation({
-    mutationFn: (normalized: string) => quizGamesApi.byCode(normalized),
-    meta: { silentError: true },
-    onSuccess: (response) => router.push(openGameHref(response.data.uuid)),
-    onError: (failure) => setError(codeRefusal(extractApiError(failure).status)),
-  });
+  const lookup = useFindGameByCode();
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -134,7 +125,10 @@ function JoinByCode() {
       return;
     }
     setError(null);
-    lookup.mutate(normalized);
+    lookup.mutate(normalized, {
+      onSuccess: (response) => router.push(openGameHref(response.data.uuid)),
+      onError: (failure) => setError(codeRefusal(extractApiError(failure).status)),
+    });
   };
 
   return (
@@ -154,9 +148,9 @@ function JoinByCode() {
           autoCapitalize="characters"
           spellCheck={false}
           maxLength={JOIN_CODE_LENGTH + 2}
-          className="h-10 w-32 rounded-xl border-2 text-center font-comfortaa font-bold tracking-[0.15em] placeholder:font-sans placeholder:font-normal placeholder:tracking-normal"
+          className="h-11 w-32 rounded-xl border-2 text-center font-comfortaa font-bold tracking-[0.15em] placeholder:font-sans placeholder:font-normal placeholder:tracking-normal"
         />
-        <RaisedButton type="submit" className="h-10 px-4 text-sm" disabled={code.trim() === '' || lookup.isPending}>
+        <RaisedButton type="submit" className="h-11 px-4 text-sm" disabled={code.trim() === '' || lookup.isPending}>
           {lookup.isPending ? <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" /> : null}
           Join
         </RaisedButton>
