@@ -47,6 +47,7 @@ import type {
   QuizLeaderboardResponse,
   QuizListFilters,
   QuizRoom,
+  LiveQuizGamesResponse,
   StartQuizAttemptPayload,
   SubmitQuizAnswerPayload,
   SubmitQuizAttemptAnswerPayload,
@@ -317,7 +318,7 @@ export const quizGamesApi = {
   /** A room's games, newest first. `active: 1` is the "is a quiz live here?"
    *  probe and returns 0 or 1 rows. A Space's list is for its active members. */
   getList: async (
-    room: QuizRoom,
+    room: QuizRoom & { kind: 'channel' | 'space' },
     params: { active?: 1; per_page?: number; page?: number } = {},
   ): Promise<QuizGameListResponse> => {
     const scope = room.kind === 'channel' ? 'channels' : 'spaces';
@@ -399,6 +400,33 @@ export const quizGamesApi = {
   results: async (gameUuid: string): Promise<QuizGameResultsResponse> => {
     const response = await apiClient.get<QuizGameResultsResponse>(
       `/quiz-games/${gameUuid}/results`,
+    );
+    return response.data;
+  },
+
+  /* ── Open games (live quiz without a Space, Backend live-quiz-open e9c7ac18) ── */
+
+  /** Live now: public games in their lobby or running, 20 per page. A game
+   *  by link is never listed, and a finished game leaves at once. */
+  live: async (page = 1): Promise<LiveQuizGamesResponse> => {
+    const response = await apiClient.get<LiveQuizGamesResponse>('/quiz-games/live', { params: { page } });
+    return response.data;
+  },
+
+  /** An open game by its 6-character code, in any case. 404 for a code that is
+   *  unknown, malformed or of a finished game (the app does not tell them
+   *  apart); 429 past 20 tries a minute. */
+  byCode: async (code: string): Promise<QuizGameResponse> => {
+    const response = await apiClient.get<QuizGameResponse>(`/quiz-games/by-code/${encodeURIComponent(code)}`);
+    return response.data;
+  },
+
+  /** An open game's host (or an admin) removes a player from the lobby; they
+   *  cannot join it again. 409 once the game has started; 422 for the host
+   *  themselves or a Space game. Returns the state envelope. */
+  removePlayer: async (gameUuid: string, userUuid: string): Promise<QuizGameStateResponse> => {
+    const response = await apiClient.delete<QuizGameStateResponse>(
+      `/quiz-games/${gameUuid}/players/${encodeURIComponent(userUuid)}`,
     );
     return response.data;
   },

@@ -7,7 +7,7 @@ import type { QuizGameStateResponse } from '@/types/channel-quiz';
 import { GC_TIMES, STALE_TIMES } from '@/v2/runtime/query';
 import type { ViewerScoped } from '../queries';
 import { isOlderSnapshot, pollDelayMs, POLL_MS, recoveryDelayMs } from './model';
-import { quizRoomKey, type QuizRoom } from './quiz-room';
+import { quizRoomKey, type QuizRoom, type RoomPlace } from './quiz-room';
 
 /**
  * channel-quiz query factory — the authoring library, the "is a game live
@@ -58,9 +58,9 @@ export interface ChannelScoped extends ViewerScoped {
   channelUuid: string;
 }
 
-/** A room's reads: a channel's or a Space's (quiz-room.ts). */
+/** A room's reads: a channel's or a Space's (quiz-room.ts). An open game has no room list. */
 export interface RoomScoped extends ViewerScoped {
-  room: QuizRoom;
+  room: RoomPlace;
 }
 
 export interface GameScoped extends ViewerScoped {
@@ -174,6 +174,28 @@ export const channelQuizQueries = {
       staleTime: STALE_TIMES.standard,
       gcTime: GC_TIMES.list,
       refetchInterval: (query) => (query.state.status === 'error' ? false : 30_000),
+    }),
+
+  /* ── Live now: open public games (Backend live-quiz-open e9c7ac18) ──────── */
+
+  /** Invalidation handle for the Live now list (every viewer variant). */
+  liveGames: () => [...channelQuizQueries.all, 'live-games'] as const,
+
+  /**
+   * The Live now row: the first page of public games in their lobby or
+   * running (20, by the server's page). A game by link is never in it. Read
+   * again every 20 seconds while the row is on screen, and on a game it shows
+   * finishing or being cancelled (`use-open-quiz-live.ts`): the list has no
+   * push of its own (Backend's design), and a finished game leaves the row at
+   * once (Stay). Paused with the tab, like every interval here.
+   */
+  liveGamesPage: ({ viewerId }: ViewerScoped) =>
+    queryOptions({
+      queryKey: [...channelQuizQueries.liveGames(), { viewerId }] as const,
+      queryFn: () => quizGamesApi.live(1),
+      staleTime: STALE_TIMES.standard,
+      gcTime: GC_TIMES.list,
+      refetchInterval: (query) => (query.state.status === 'error' ? false : 20_000),
     }),
 
   /* ── The game itself ───────────────────────────────────────────────────── */

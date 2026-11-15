@@ -9,7 +9,7 @@ import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
 import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useJoinGame } from './mutations';
 import { channelQuizQueries } from './queries';
-import type { QuizRoom } from './quiz-room';
+import type { RoomPlace } from './quiz-room';
 import { COMPACT_RAISED, GameMark } from './ui';
 import '@/v2/features/quiz/solo/solo-quiz.css';
 
@@ -72,7 +72,7 @@ export function QuizGameCard({
 }: {
   line: QuizGameLine;
   /** The room the card sits in, whose live-game probe it reads (quiz-room.ts). */
-  room: QuizRoom;
+  room: RoomPlace;
   viewerId: number | null;
   /** Opens the room's game mode (screen-owned; `?game=`). */
   onOpenGame: (gameUuid: string) => void;

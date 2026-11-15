@@ -658,14 +658,19 @@ export interface QuizAttemptComparison {
  * same `403` as a room the caller may not host in.
  */
 /**
- * Where a live game runs: a channel, or a Space itself (live quiz in Spaces,
- * Backend 7a007a8c). The helpers that read it are in
+ * Where a live game runs: a channel, a Space itself (live quiz in Spaces,
+ * Backend 7a007a8c), or nowhere but itself: an open game, public or by link,
+ * whose room is the game (live quiz without a Space, Backend live-quiz-open
+ * e9c7ac18; `uuid` is the game's then). The helpers that read it are in
  * v2/features/channels/quiz/quiz-room.ts.
  */
 export interface QuizRoom {
-  kind: 'channel' | 'space';
+  kind: 'channel' | 'space' | 'game';
   uuid: string;
 }
+
+/** Who may join an open game (Stay, thread 12341975): anyone signed in (`public`, listed under Live now) or anyone with its link (`link`, never listed). */
+export type QuizGameVisibility = 'public' | 'link';
 
 export interface GoLiveChannelQuizPayload {
   channel_uuid?: string;
@@ -673,6 +678,8 @@ export interface GoLiveChannelQuizPayload {
   space_uuid?: string;
   /** With `space_uuid` only: the Space chat it starts from, where its cards are posted. */
   conversation_uuid?: string;
+  /** An open game with no room (Backend e9c7ac18): never sent with a channel, Space or chat (422). */
+  visibility?: QuizGameVisibility;
 }
 
 export interface ChannelQuizListParams {
@@ -760,7 +767,31 @@ export interface QuizGame {
   /** Leaderboard order in the state envelope. */
   players?: QuizGamePlayer[];
   player_count?: number;
+  /** An open game's reach (Backend e9c7ac18); null for a channel or Space game. Absent on a server before it. */
+  visibility?: QuizGameVisibility | null;
+  /** An open game's 6-character join code (letters and digits that cannot be misread); null for a channel or Space game. */
+  join_code?: string | null;
+  /** How many may play an open game (100); null for a channel or Space game. */
+  max_players?: number | null;
+  /** Until when the results are kept: always null, kept for good (Arthur). The app keeps no number of its own. */
+  results_until?: string | null;
   created_at: string;
+}
+
+/** One row of `GET /quiz-games/live`: a public game in its lobby or running, with its quiz and host. */
+export type LiveQuizGame = QuizGame & { player_count: number };
+
+/** `GET /quiz-games/live`: 20 public games per page. */
+export interface LiveQuizGamesResponse {
+  success: boolean;
+  message?: string;
+  data: { games: LiveQuizGame[]; meta: { current_page: number; last_page: number; total: number } };
+}
+
+/** The viewer's own place in a game (Backend e9c7ac18): an open game's broadcasts carry the top 10 only. */
+export interface QuizYourRank {
+  rank: number;
+  score: number;
 }
 
 /** How many players picked each option — reveal only. `content` is present in
@@ -852,6 +883,8 @@ export interface QuizGameState {
   /** Per viewer, once the game has finished and the quiz carries a
    *  certificate (certificates part 2). */
   certificate?: CertificateOffer | null;
+  /** The viewer's rank and score; null when not playing. Absent on a server before open games. */
+  your_rank?: QuizYourRank | null;
 }
 
 /** `POST /quiz-games/{game}/answer` — one-shot, immutable, and deliberately
@@ -971,6 +1004,13 @@ export interface QuizGameLivePayload {
 }
 
 export interface QuizPlayerJoinedPayload {
+  game_uuid: string;
+  user: SlimUser;
+  player_count: number;
+}
+
+/** An open game's host (or an admin) removed a player from the lobby (Backend e9c7ac18); they cannot join it again. */
+export interface QuizPlayerRemovedPayload {
   game_uuid: string;
   user: SlimUser;
   player_count: number;

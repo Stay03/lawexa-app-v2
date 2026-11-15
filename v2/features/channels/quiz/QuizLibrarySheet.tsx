@@ -54,7 +54,7 @@ import {
   SPACE_HOST_NOTE,
 } from './model';
 import { channelQuizQueries } from './queries';
-import { channelRoom, roomNoun, spaceRoom, type QuizRoom } from './quiz-room';
+import { channelRoom, roomNoun, spaceRoom, type RoomPlace } from './quiz-room';
 import { QuizFormDialog } from './QuizFormDialog';
 import { COMPACT_RAISED, LiveQuizTile } from './ui';
 import { VisibilityChip } from './VisibilityChip';
@@ -178,7 +178,7 @@ export function QuizLibrarySheet({
   onOpenGame: (gameUuid: string) => void;
 }) {
   const channel = place.kind === 'channel' ? place.channel : null;
-  const room: QuizRoom = channel ? channelRoom(channel.uuid) : spaceRoom(place.kind === 'space' ? place.space.uuid : '');
+  const room: RoomPlace = channel ? channelRoom(channel.uuid) : spaceRoom(place.kind === 'space' ? place.space.uuid : '');
   const placeName = channel ? channel.name : place.kind === 'space' ? place.space.name : '';
   const conversationUuid = place.kind === 'space' ? place.conversationUuid : null;
   const [source, setSource] = useState<SourceId>(channel ? 'room' : 'library');
@@ -526,7 +526,7 @@ function QuizRow({
 }: {
   quiz: ChannelQuiz;
   /** Where Go live runs it: the sheet's channel or Space (quiz-room.ts). */
-  room: QuizRoom;
+  room: RoomPlace;
   /** The Space chat a game here starts from, or null. */
   conversationUuid: string | null;
   /** The sentence for a 403: the room's own rule about who hosts. */

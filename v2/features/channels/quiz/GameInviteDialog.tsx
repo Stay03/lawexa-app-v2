@@ -22,14 +22,10 @@ import { useShareAction } from '@/v2/features/sharing/use-share-action';
 import { GameLinkQr } from './GameLinkQr';
 import { GAME_LINK_EXPIRED, gameLinkNote, gameLinkRefusal } from './model';
 import { useGameInviteLink } from './mutations';
+import { apiErrorCode } from './open-game';
 import { COMPACT_RAISED } from './ui';
 import '@/v2/features/quiz/solo/solo-quiz.css';
 
-/** The refusal's `errors.code` (`game_ended`, `link_revoked`), when it carries one. */
-function errorCode(errors: unknown): string | null {
-  const code = (errors as { code?: unknown } | null)?.code;
-  return typeof code === 'string' ? code : null;
-}
 
 /**
  * GameInviteDialog — the game's link into its Space, for the host and
@@ -78,7 +74,7 @@ export function GameInviteDialog({
     text: `Join my live quiz “${quizTitle}” on Lawexa.`,
   });
   const failure = link.isError ? extractApiError(link.error) : null;
-  const refusal = failure ? gameLinkRefusal(failure.status, errorCode(failure.errors)) : null;
+  const refusal = failure ? gameLinkRefusal(failure.status, apiErrorCode(failure.errors)) : null;
 
   return (
     <Dialog open onOpenChange={onOpenChange}>

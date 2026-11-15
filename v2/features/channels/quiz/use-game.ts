@@ -31,6 +31,7 @@ import {
 import { useCancelGame, useJoinGame, useStartGame, useSubmitAnswer } from './mutations';
 import { channelQuizQueries } from './queries';
 import type { QuizRoom } from './quiz-room';
+import { apiErrorCode } from './open-game';
 
 /**
  * useLiveGame — the whole live game as one hook: the authoritative state, the
@@ -259,6 +260,16 @@ function mergeQuizEvent(
       };
     }
 
+    case 'player_removed': {
+      // An open game's host removed a player from the lobby (Backend e9c7ac18).
+      const { user, player_count } = event.payload;
+      const players = state.game.players ?? [];
+      return {
+        ...state,
+        game: { ...state.game, player_count, players: players.filter((player) => player.user.uuid !== user.uuid) },
+      };
+    }
+
     case 'finished':
       return { ...state, game: { ...state.game, status: 'finished' } };
 
@@ -425,6 +436,8 @@ export interface LiveGame {
   isError: boolean;
   /** HTTP status of the load failure (`403` = not a member of the channel). */
   errorStatus: number;
+  /** The read's refusal `errors.code` (a removed player's `removed`), or null. */
+  errorCode: string | null;
   /**
    * A BACKGROUND read failed while a game is still on screen. Not an error
    * state: the game keeps playing, the frame says so quietly, and the recovery
@@ -465,6 +478,8 @@ export interface LiveGame {
   join: () => void;
   joining: boolean;
   joinErrorStatus: number;
+  /** The join refusal's `errors.code` (an open game's `game_full`, `removed`), or null. */
+  joinErrorCode: string | null;
   start: () => void;
   starting: boolean;
   cancel: () => void;
@@ -586,8 +601,12 @@ export function useLiveGame({
       if (event.type === 'question_closed') {
         void queryClient.invalidateQueries({ queryKey: key });
       }
+      // This reader removed from an open game: the read now answers 403 `removed`, which the screen says at once.
+      if (event.type === 'player_removed' && viewerUuid !== null && event.payload.user.uuid === viewerUuid) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
     });
-  }, [roomKind, roomUuid, gameUuid, viewerId, queryClient]);
+  }, [roomKind, roomUuid, gameUuid, viewerId, viewerUuid, queryClient]);
 
   /* ── Derived ───────────────────────────────────────────────────────────── */
   const phase: QuizGamePhase = shown ? gamePhase(shown) : 'lobby';
@@ -688,6 +707,7 @@ export function useLiveGame({
     isPending: query.isPending,
     isError: query.isError,
     errorStatus: query.isError ? extractApiError(query.error).status : 0,
+    errorCode: query.isError ? apiErrorCode(extractApiError(query.error).errors) : null,
     // A failed REFETCH keeps `data` (React Query v5 sets `status: 'error'`
     // beside it), so this is the difference between "we cannot show you the
     // game" and "the game is right here and one read of it failed".
@@ -723,6 +743,7 @@ export function useLiveGame({
     joinErrorStatus: joinMutation.isError
       ? extractApiError(joinMutation.error).status
       : 0,
+    joinErrorCode: joinMutation.isError ? apiErrorCode(extractApiError(joinMutation.error).errors) : null,
     start,
     starting: startMutation.isPending,
     cancel,

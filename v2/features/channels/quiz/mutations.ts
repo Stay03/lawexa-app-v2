@@ -13,6 +13,7 @@ import type {
   ChannelQuizVisibility,
   CreateChannelQuizPayload,
   QuizGameStateResponse,
+  QuizGameVisibility,
   SubmitQuizAnswerPayload,
   UpdateChannelQuizPayload,
 } from '@/types/channel-quiz';
@@ -21,7 +22,8 @@ import { spacesQueries } from '@/v2/features/spaces/queries';
 import { noteThrottled } from '../engagement-throttle';
 import { isQuizListQuery, withVisibility, type QuizListCacheEntry } from './list-cache';
 import { channelQuizQueries } from './queries';
-import { goLivePayload, type QuizRoom } from './quiz-room';
+import { goLivePayload, type QuizRoom, type RoomPlace } from './quiz-room';
+import { apiErrorCode, isBusyRefusal } from './open-game';
 
 /**
  * channel-quiz mutations — authoring writes and the four game moves (go live,
@@ -235,11 +237,14 @@ export function useDeleteQuiz(quizUuid: string) {
 
 /* ── Game moves ───────────────────────────────────────────────────────────── */
 
-/** Where one Go live runs: a room, and for a Space the chat it starts from. */
-export interface GoLiveTarget {
-  room: QuizRoom;
-  conversationUuid?: string | null;
-}
+/**
+ * Where one Go live runs: a room, and for a Space the chat it starts from; or
+ * no room at all, an open game for anyone signed in (`public`) or anyone with
+ * its link (`link`) (live quiz without a Space, Backend e9c7ac18).
+ */
+export type GoLiveTarget =
+  | { room: RoomPlace; conversationUuid?: string | null }
+  | { visibility: QuizGameVisibility };
 
 /**
  * Put a quiz live IN A ROOM (a channel, or a Space itself): `201` a lobby
@@ -259,17 +264,28 @@ export interface GoLiveTarget {
 export function useGoLive(quizUuid: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ room, conversationUuid = null }: GoLiveTarget) =>
-      channelQuizApi.goLive(quizUuid, goLivePayload(room, conversationUuid)),
+    mutationFn: (target: GoLiveTarget) =>
+      channelQuizApi.goLive(
+        quizUuid,
+        'visibility' in target ? { visibility: target.visibility } : goLivePayload(target.room, target.conversationUuid ?? null),
+      ),
     meta: { silentError: true },
-    onSuccess: (_response, { room }) => {
-      // The probe every quiz card and live bar in the room reads.
-      void queryClient.invalidateQueries({
-        queryKey: channelQuizQueries.activeGameOf(room),
-      });
+    onSuccess: (_response, target) => {
+      if ('visibility' in target) {
+        // A public game joins the Live now row at once.
+        void queryClient.invalidateQueries({ queryKey: channelQuizQueries.liveGames() });
+      } else {
+        // The probe every quiz card and live bar in the room reads.
+        void queryClient.invalidateQueries({
+          queryKey: channelQuizQueries.activeGameOf(target.room),
+        });
+      }
       invalidateQuizLists(queryClient);
     },
-    onError: (error, { room, conversationUuid = null }) => {
+    onError: (error, target) => {
+      // An open game's refusals (open_game_live, too_many_games) are told by the dialog; there is no room to re-read.
+      if ('visibility' in target) return;
+      const { room, conversationUuid = null } = target;
       const status = extractApiError(error).status;
       // A 409 IS the probe answering: someone else's game started between our
       // last beat and this press. The refusal tells the reader to open the game
@@ -296,6 +312,21 @@ export function useGoLive(quizUuid: string) {
 }
 
 /**
+ * A crowded open game's 409 `busy_try_again` (Backend 16b4161e: many people
+ * joining at once) is retried, up to three times, never shown; every other
+ * refusal goes straight to the screen, as before.
+ */
+function retryWhileBusy(failureCount: number, error: unknown): boolean {
+  const { status, errors } = extractApiError(error);
+  return failureCount < 3 && isBusyRefusal(status, apiErrorCode(errors));
+}
+
+/** Spread out so a crowd's retries do not land together: about 0.4, 0.8 and 1.2 seconds, with jitter. */
+function busyRetryDelay(attempt: number): number {
+  return 400 * (attempt + 1) + Math.floor(Math.random() * 250);
+}
+
+/**
  * The three moves that return the FULL state envelope (`join`, `start`) get
  * their answer written straight onto the game's key: the response IS the
  * authoritative snapshot, so waiting for the next poll to show a lobby the
@@ -311,6 +342,8 @@ function useEnvelopeMove(
   return useMutation({
     mutationFn: run,
     meta: { silentError: true },
+    retry: retryWhileBusy,
+    retryDelay: busyRetryDelay,
     onSuccess: (response) => {
       queryClient.setQueryData<QuizGameStateResponse>(
         channelQuizQueries.gameState({ gameUuid, viewerId }).queryKey,
@@ -350,6 +383,24 @@ export function useCancelGame(gameUuid: string, viewerId: number | null, room: Q
       void queryClient.invalidateQueries({
         queryKey: channelQuizQueries.activeGameOf(room),
       });
+    },
+  });
+}
+
+/**
+ * An open game's host removes a player from the lobby (Backend e9c7ac18); the
+ * player cannot join that game again. The answer is the full state envelope,
+ * written onto the game's key like `join`'s. `409` once the game has started.
+ */
+export function useRemovePlayer(gameUuid: string, viewerId: number | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userUuid: string) => quizGamesApi.removePlayer(gameUuid, userUuid),
+    meta: { silentError: true },
+    retry: retryWhileBusy,
+    retryDelay: busyRetryDelay,
+    onSuccess: (response) => {
+      queryClient.setQueryData<QuizGameStateResponse>(channelQuizQueries.gameState({ gameUuid, viewerId }).queryKey, response);
     },
   });
 }

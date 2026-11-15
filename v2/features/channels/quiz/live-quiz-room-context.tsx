@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react';
 
-import type { QuizRoom } from './quiz-room';
+import type { RoomPlace } from './quiz-room';
 
 /**
  * The live quiz room a transcript sits in, for the rows deep inside it that
@@ -12,7 +12,7 @@ import type { QuizRoom } from './quiz-room';
  * a line draws its sentence alone.
  */
 export interface LiveQuizRoomValue {
-  room: QuizRoom;
+  room: RoomPlace;
   viewerId: number | null;
   /** Opens the room's game mode (screen-owned; `?game=`). */
   openGame: (gameUuid: string) => void;

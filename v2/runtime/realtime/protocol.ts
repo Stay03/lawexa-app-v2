@@ -78,6 +78,12 @@ export function spaceChannelName(spaceUuid: string): string {
   return `spaces.${spaceUuid}`;
 }
 
+/** Echo name of an open live quiz game's private channel (wire: `private-quiz-games.{uuid}`): a game with no Space
+ *  or channel (Backend live-quiz-open e9c7ac18), joinable by anyone who may view the game. */
+export function openQuizGameChannelName(gameUuid: string): string {
+  return `quiz-games.${gameUuid}`;
+}
+
 /** `.task.changed` — a task was created, changed or deleted, on `spaces.{uuid}`. */
 export const EVT_TASK_CHANGED = '.task.changed';
 

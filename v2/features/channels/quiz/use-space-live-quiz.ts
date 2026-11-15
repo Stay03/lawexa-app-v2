@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { canHostInSpace } from './model';
-import { spaceRoom, type QuizRoom } from './quiz-room';
+import { spaceRoom, type RoomPlace } from './quiz-room';
 import type { QuizHostPlace } from './QuizLibrarySheet';
 import { useGameMode } from './use-game-mode';
 import { useSpaceQuizLive } from './use-space-quiz-live';
@@ -50,7 +50,7 @@ export function useSpaceLiveQuiz({
   /** The navigation's `?game=`. */
   initialGameUuid: string | null;
 }): {
-  room: QuizRoom | null;
+  room: RoomPlace | null;
   isMember: boolean;
   /** Whether this reader may host here: the Space's Owner or a Contributor. */
   mayHost: boolean;

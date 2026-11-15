@@ -2,6 +2,9 @@ import type { GoLiveChannelQuizPayload, QuizRoom } from '@/types/channel-quiz';
 
 export type { QuizRoom } from '@/types/channel-quiz';
 
+/** A room that is a place: a channel or a Space. An open game's room is the game itself and has no list, no go-live body and no members. */
+export type RoomPlace = QuizRoom & { kind: 'channel' | 'space' };
+
 /**
  * quiz-room — where a live quiz game runs: a channel, or a Space itself (live
  * quiz in Spaces, Arthur's decisions 93142269; Backend's shapes 7a007a8c).
@@ -16,17 +19,32 @@ export type { QuizRoom } from '@/types/channel-quiz';
  *   - what go-live sends (`channel_uuid`, or `space_uuid` with the Space chat
  *     it was started from);
  *   - whether a game belongs to this room (`channel_uuid` or `space_uuid`).
+ *
+ * An open game (live quiz without a Space, Backend e9c7ac18) has no room: it
+ * is its own (`gameRoom`), with its events on `quiz-games.{uuid}`
+ * (`use-open-quiz-live.ts`), no live list and no members. It goes live with
+ * a `visibility` instead of a room (`useGoLive`).
  */
-export function channelRoom(uuid: string): QuizRoom {
+export function channelRoom(uuid: string): RoomPlace {
   return { kind: 'channel', uuid };
 }
 
-export function spaceRoom(uuid: string): QuizRoom {
+export function spaceRoom(uuid: string): RoomPlace {
   return { kind: 'space', uuid };
 }
 
+/** An open game's room: the game itself. */
+export function gameRoom(gameUuid: string): QuizRoom {
+  return { kind: 'game', uuid: gameUuid };
+}
+
+/** Whether a room is a place (a channel or a Space) rather than an open game. */
+export function isRoomPlace(room: QuizRoom): room is RoomPlace {
+  return room.kind !== 'game';
+}
+
 /** The room's name in a sentence: "channel" or "Space" (a Space is a proper noun in the app). */
-export function roomNoun(room: QuizRoom): 'channel' | 'Space' {
+export function roomNoun(room: RoomPlace): 'channel' | 'Space' {
   return room.kind === 'channel' ? 'channel' : 'Space';
 }
 
@@ -49,15 +67,16 @@ export function quizRoomKey(room: QuizRoom): string {
  * (`conversation_uuid`), where its live and finished lines are posted; a
  * channel game never does.
  */
-export function goLivePayload(room: QuizRoom, conversationUuid: string | null = null): GoLiveChannelQuizPayload {
+export function goLivePayload(room: RoomPlace, conversationUuid: string | null = null): GoLiveChannelQuizPayload {
   if (room.kind === 'channel') return { channel_uuid: room.uuid };
   return conversationUuid ? { space_uuid: room.uuid, conversation_uuid: conversationUuid } : { space_uuid: room.uuid };
 }
 
-/** Whether a game runs in this room: a link to another room's game opens nothing here. */
+/** Whether a game runs in this room: a link to another room's game opens nothing here. An open game is its own room. */
 export function gameInRoom(
-  game: { channel_uuid: string | null; space_uuid?: string | null },
+  game: { uuid?: string; channel_uuid: string | null; space_uuid?: string | null },
   room: QuizRoom,
 ): boolean {
+  if (room.kind === 'game') return game.uuid !== undefined && game.uuid === room.uuid;
   return room.kind === 'channel' ? game.channel_uuid === room.uuid : game.space_uuid === room.uuid;
 }

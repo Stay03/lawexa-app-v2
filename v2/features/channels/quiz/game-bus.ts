@@ -5,6 +5,7 @@ import type {
   QuizFinishedPayload,
   QuizGameLivePayload,
   QuizPlayerJoinedPayload,
+  QuizPlayerRemovedPayload,
   QuizQuestionClosedPayload,
   QuizQuestionOpenedPayload,
 } from '@/types/channel-quiz';
@@ -34,10 +35,11 @@ import { quizRoomKey, type QuizRoom } from './quiz-room';
  * November 2026).
  */
 
-/** The eight events, tagged for exhaustive handling. */
+/** The events, tagged for exhaustive handling: the eight every room sends, and an open game's ninth (`player_removed`). */
 export type QuizGameEvent =
   | { type: 'live'; payload: QuizGameLivePayload }
   | { type: 'player_joined'; payload: QuizPlayerJoinedPayload }
+  | { type: 'player_removed'; payload: QuizPlayerRemovedPayload }
   | { type: 'countdown'; payload: QuizCountdownPayload }
   | { type: 'question_opened'; payload: QuizQuestionOpenedPayload }
   | { type: 'answer_progress'; payload: QuizAnswerProgressPayload }
@@ -81,10 +83,11 @@ export function publishQuizGameEvent(room: QuizRoom, event: QuizGameEvent): void
   for (const listener of [...set]) listener(event);
 }
 
-/** The eight wire names, one per event type (the same on a channel and a Space). */
+/** The wire names, one per event type (the same in every room; only an open game sends `player_removed`). */
 const QUIZ_GAME_EVENT_NAMES = {
   live: '.quiz.game.live',
   player_joined: '.quiz.game.player_joined',
+  player_removed: '.quiz.game.player_removed',
   countdown: '.quiz.game.countdown',
   question_opened: '.quiz.game.question_opened',
   answer_progress: '.quiz.game.answer_progress',

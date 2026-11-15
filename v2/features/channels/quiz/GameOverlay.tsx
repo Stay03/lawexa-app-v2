@@ -29,7 +29,8 @@ import {
 } from './GamePhases';
 import { GameInviteDialog } from './GameInviteDialog';
 import { canJoinNow } from './model';
-import { gameInRoom, roomNoun, type QuizRoom } from './quiz-room';
+import { gameInRoom, isRoomPlace, roomNoun, type QuizRoom } from './quiz-room';
+import { openJoinRefusal, REMOVED_CODE, REMOVED_NOTE } from './open-game';
 import { COMPACT_RAISED, GameStage, GameStageSkeleton } from './ui';
 import { useLiveGame } from './use-game';
 import '@/v2/features/quiz/solo/solo-quiz.css';
@@ -131,7 +132,7 @@ export function GameOverlay({
   spaceName = null,
   onClose,
 }: {
-  /** The room the overlay is over: a channel, or a Space itself (quiz-room.ts). */
+  /** The room the overlay is over: a channel, a Space itself, or an open game's own (quiz-room.ts). */
   room: QuizRoom;
   /**
    * What the mode covers. `room`: the screen it sits in, which is a fixed-height
@@ -160,7 +161,7 @@ export function GameOverlay({
   onClose: () => void;
 }) {
   const game = useLiveGame({ room, gameUuid, viewerId, viewerUuid });
-  const placeNoun = place ?? roomNoun(room);
+  const placeNoun = place ?? (isRoomPlace(room) ? roomNoun(room) : 'Quiz page');
   const [cancelOpen, setCancelOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const frameRef = useRef<HTMLElement>(null);
@@ -204,13 +205,16 @@ export function GameOverlay({
     !ending &&
     phase !== 'finished' &&
     phase !== 'cancelled';
+  // An open game's own refusals: full (409 game_full) or removed by its host (403 removed).
+  const joinRefusal = openJoinRefusal(game.joinErrorStatus, game.joinErrorCode, state?.game.max_players);
   const showJoinBar =
     state !== null &&
     !game.isPlaying &&
     !ending &&
     phase !== 'lobby' &&
     canJoinNow(state) &&
-    game.joinErrorStatus !== 403;
+    game.joinErrorStatus !== 403 &&
+    joinRefusal === null;
 
   const frame = (
     <section
@@ -308,14 +312,20 @@ export function GameOverlay({
           </div>
         </div>
       )}
-      {game.joinErrorStatus === 403 && (
+      {joinRefusal !== null ? (
+        <div className="shrink-0 border-b px-4 py-2">
+          <p role="status" className="mx-auto w-full max-w-2xl text-xs text-muted-foreground">
+            {joinRefusal}
+          </p>
+        </div>
+      ) : game.joinErrorStatus === 403 ? (
         <div className="shrink-0 border-b px-4 py-2">
           <p className="mx-auto w-full max-w-2xl text-xs text-muted-foreground">
             This quiz doesn&rsquo;t allow joining once it has started. You can
             watch this one through.
           </p>
         </div>
-      )}
+      ) : null}
 
       {/* ── Body ──────────────────────────────────────────────────────── */}
       <GameBody
@@ -427,6 +437,25 @@ function GameBody({
   // must never be the thing that blanks it: the designed refusals below are for
   // a game we have NOTHING to show for; while a snapshot is in hand the game
   // plays on and the frame header carries a quiet "reconnecting" mark.
+  // An open game's host removed this reader: the game is closed to them, socket and all (Backend 16b4161e).
+  // Checked before the snapshot: a reader removed mid-lobby still holds the last state, and must not keep seeing it.
+  if (game.errorStatus === 403 && game.errorCode === REMOVED_CODE) {
+    return (
+      <GameStage>
+        <CollabMessage
+          icon={Trophy}
+          tone="neutral"
+          title={REMOVED_NOTE}
+          description="You can't play or watch this game."
+          action={
+            <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
+              Back to the {placeNoun}
+            </RaisedButton>
+          }
+        />
+      </GameStage>
+    );
+  }
   if (!game.state) {
     if (game.errorStatus === 403) {
       return (
@@ -435,7 +464,11 @@ function GameBody({
             icon={Trophy}
             tone="alert"
             title="This game isn't yours to watch"
-            description={`Live quizzes are open to members of the ${roomNoun(room)} they run in.`}
+            description={
+              isRoomPlace(room)
+                ? `Live quizzes are open to members of the ${roomNoun(room)} they run in.`
+                : 'This game is open only to the people its host shared it with.'
+            }
             action={
               <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
                 Back to the {placeNoun}
@@ -452,7 +485,11 @@ function GameBody({
             icon={Trophy}
             tone="neutral"
             title="This game is gone"
-            description={`It may have been removed along with its quiz. Nothing else in the ${roomNoun(room)} changed.`}
+            description={
+              isRoomPlace(room)
+                ? `It may have been removed along with its quiz. Nothing else in the ${roomNoun(room)} changed.`
+                : 'It may have been removed along with its quiz.'
+            }
             action={
               <RaisedButton tone="quiet" className={COMPACT_RAISED} onClick={onClose}>
                 Back to the {placeNoun}
@@ -483,7 +520,7 @@ function GameBody({
   // reader also belongs to — the server would serve it happily, and this
   // screen would then run a game whose events arrive on a room it is not
   // listening to, under the wrong room's name. Say so instead (audit L9).
-  if (!gameInRoom(game.state.game, room)) {
+  if (!gameInRoom(game.state.game, room) && isRoomPlace(room)) {
     const noun = roomNoun(room);
     return (
       <GameStage>

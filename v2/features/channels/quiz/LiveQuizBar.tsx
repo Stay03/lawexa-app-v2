@@ -8,7 +8,7 @@ import { RaisedButton } from '@/v2/features/quiz/solo/ui';
 import { useJoinGame } from './mutations';
 import { channelQuizQueries } from './queries';
 import type { QuizGame } from '@/types/channel-quiz';
-import type { QuizRoom } from './quiz-room';
+import type { RoomPlace } from './quiz-room';
 import { COMPACT_RAISED, LiveQuizTile } from './ui';
 import '@/v2/features/quiz/solo/solo-quiz.css';
 
@@ -51,7 +51,7 @@ import '@/v2/features/quiz/solo/solo-quiz.css';
  * there (a phone chat's transcript stops passing under the header while it
  * is, ConversationScreen).
  */
-export function useRoomLiveGame(room: QuizRoom | null, viewerId: number | null): QuizGame | null {
+export function useRoomLiveGame(room: RoomPlace | null, viewerId: number | null): QuizGame | null {
   const query = useQuery({
     ...channelQuizQueries.activeGame({ room: room ?? NO_ROOM, viewerId }),
     enabled: room !== null,
@@ -60,7 +60,7 @@ export function useRoomLiveGame(room: QuizRoom | null, viewerId: number | null):
 }
 
 /** Stands in for a room not known yet; its probe is never enabled. */
-const NO_ROOM: QuizRoom = { kind: 'space', uuid: '' };
+const NO_ROOM: RoomPlace = { kind: 'space', uuid: '' };
 
 export function LiveQuizBar({
   room,
@@ -68,7 +68,7 @@ export function LiveQuizBar({
   onOpenGame,
   shape = 'strip',
 }: {
-  room: QuizRoom;
+  room: RoomPlace;
   viewerId: number | null;
   onOpenGame: (gameUuid: string) => void;
   shape?: 'strip' | 'card';
