@@ -120,6 +120,8 @@ export function relayQuizGameEvents(
 ): () => void {
   const stops: (() => void)[] = [];
   for (const type of Object.keys(QUIZ_GAME_EVENT_NAMES) as QuizGameEvent['type'][]) {
+    // Only an open game sends `player_removed`; a channel or a Space listens for the eight it always had.
+    if (type === 'player_removed' && room.kind !== 'game') continue;
     const name = QUIZ_GAME_EVENT_NAMES[type];
     const callback = (payload: never) => {
       publishQuizGameEvent(room, { type, payload } as QuizGameEvent);

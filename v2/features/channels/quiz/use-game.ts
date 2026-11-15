@@ -115,7 +115,7 @@ import { apiErrorCode } from './open-game';
  * because a reveal for a question this client never saw open needs the
  * authoritative read for the question body, not a partial merge.
  */
-function applyQuizEvent(
+export function applyQuizEvent(
   state: QuizGameState,
   event: QuizGameEvent,
 ): QuizGameState {
