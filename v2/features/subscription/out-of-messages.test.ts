@@ -278,9 +278,9 @@ test('a block with no payer reads exactly as before', () => {
 });
 
 test("a member who doesn't pay gets no payer billing details, and the notice needs none", () => {
-  // Backend (parts 1-8 review): code, a Space reason, the message and paid_by only, for a member who does not pay.
+  // Backend's org-plans-part9 6d95d71a: exactly these four keys for a member who does not pay.
   const bare = {
-    code: 'space_payer_exhausted',
+    code: 'ai_messages_exhausted',
     reason: 'space_payer_limit',
     message: "This Space's messages are paid by TEST DATA Ada Owner, whose plan has reached its limit.",
     paid_by: payer(false),
