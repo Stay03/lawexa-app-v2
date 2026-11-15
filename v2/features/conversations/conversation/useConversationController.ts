@@ -68,6 +68,7 @@ import {
   whoseTurn,
   type SendRefused,
   type ViewOnlyReason,
+  lawexaTagOnly,
 } from './space-turn';
 import {
   isConfidentialMark,
@@ -248,6 +249,8 @@ export interface ConversationController {
   /** Who the composer's `@` picker offers (mention-options.ts), or null: a
    *  personal chat, or the roster not read yet. */
   mentionOptions: MentionOptions | null;
+  /** Lawexa answers only messages that tag it in this chat's space. */
+  lawexaTagOnly: boolean;
   /**
    * The colleague whose turn is streaming in this space chat, or null when
    * nothing streams or the turn is the reader's own. Drives "{name} is
@@ -944,9 +947,12 @@ export function useConversationController(
   // The same roster, for tagging people (Viewers included, the reader left out;
   // mention-options.ts).
   const viewerUuid = useAuthStore((state) => state.user?.uuid ?? null);
+  // Lawexa answers only when tagged in this space (thread 39c968a5): the
+  // picker offers it first and the composer says how to ask it.
+  const tagOnly = lawexaTagOnly(detailData?.space);
   const mentionOptions = useMemo(
-    () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows, viewerUuid) : null),
-    [showAuthors, rosterRows, viewerUuid],
+    () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows, viewerUuid, { offerLawexa: tagOnly }) : null),
+    [showAuthors, rosterRows, viewerUuid, tagOnly],
   );
 
   const references = detailData?.references ?? NO_REFERENCES;
@@ -1367,6 +1373,7 @@ export function useConversationController(
     spaceRoster,
     recordRoster,
     mentionOptions,
+    lawexaTagOnly: tagOnly,
     sendHeldBy: heldBy,
     heldSince,
     sentAt,

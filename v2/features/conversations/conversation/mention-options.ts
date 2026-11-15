@@ -15,6 +15,8 @@ import {
  *  - The people offered are the space's active members, Viewers included (a
  *    Viewer reads the chat, so a question can be for them).
  *  - Lawexa is not offered: in a space chat every question already goes to it.
+ *    In a space where Lawexa answers only when tagged it is offered first,
+ *    since the tag is the only way to ask it (thread 39c968a5).
  *  - A member with no username cannot be tagged (the channel rule); the picker
  *    names them in one line instead of leaving them out without a word.
  *
@@ -30,10 +32,16 @@ export const MAX_MENTION_SUGGESTIONS = 6;
  * reader is left out of both: tagging yourself tells nobody anything
  * (techlead, 15 October 2026).
  */
-export function spaceMentionOptions(members: readonly Member[], viewerUuid: string | null = null): MentionOptions {
+export function spaceMentionOptions(
+  members: readonly Member[],
+  viewerUuid: string | null = null,
+  { offerLawexa = false }: { offerLawexa?: boolean } = {},
+): MentionOptions {
   const others = viewerUuid ? members.filter((member) => member.user.uuid !== viewerUuid) : members;
   const options = buildMentionOptions(others);
-  return { candidates: options.candidates.filter((candidate) => candidate.user !== null), untaggable: options.untaggable };
+  const people = options.candidates.filter((candidate) => candidate.user !== null);
+  const lawexa = options.candidates.filter((candidate) => candidate.user === null);
+  return { candidates: offerLawexa ? [...lawexa, ...people] : people, untaggable: options.untaggable };
 }
 
 /** An `@` being typed: the text after it, and where the `@` is. */

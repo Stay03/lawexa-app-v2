@@ -784,3 +784,24 @@ test('rule 5: a personal chat’s owner keeps Stop on their own turn, with no ne
   const recover = engine.slice(engine.indexOf('async function recoverPendingState'), engine.indexOf('// ─── Construction seed'));
   assert.equal((recover.match(/chatApi\.getStatus\(/g) ?? []).length, 1);
 });
+
+test('Lawexa answers only when tagged: the flag, the composer words, the owner switch', async () => {
+  const { lawexaTagOnly, TAG_ONLY_PLACEHOLDER } = await import('./space-turn');
+  assert.equal(lawexaTagOnly({ lawexa_tag_only: true }), true);
+  assert.equal(lawexaTagOnly({ lawexa_tag_only: false }), false);
+  assert.equal(lawexaTagOnly({}), false, 'a server before the switch: as today');
+  assert.equal(lawexaTagOnly(null), false);
+  assert.equal(TAG_ONLY_PLACEHOLDER, 'Tag @Lawexa to ask Lawexa');
+  const { readFileSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8');
+  const dock = read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx');
+  assert.match(dock, /\{\.\.\.\(surface\.lawexaTagOnly && \{ placeholder: TAG_ONLY_PLACEHOLDER \}\)\}/);
+  const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
+  assert.match(controller, /spaceMentionOptions\(rosterRows, viewerUuid, \{ offerLawexa: tagOnly \}\)/);
+  // The switch is the owner's, in the edit form, sent only when it changed.
+  const form = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
+  assert.match(form, /const ownsSpace = isEdit && space\?\.my_role === 'owner';/);
+  assert.match(form, /\.\.\.\(ownsSpace && tagOnly !== \(space\.lawexa_tag_only === true\) && \{ lawexa_tag_only: tagOnly \}\),/);
+  assert.match(form, /Lawexa answers only when tagged/);
+});

@@ -266,6 +266,9 @@ export interface Space {
   type: SpaceType;
   type_label: string;
   is_private: boolean;
+  /** Lawexa answers only messages that tag it in this Space's chats; the
+   *  owner sets it (thread 39c968a5). Absent on a server before the switch. */
+  lawexa_tag_only?: boolean;
   settings: Record<string, unknown> | null;
   /** Null for a personal space; trimmed ref for an org-owned space. */
   organization: OrganizationRef | null;
@@ -1446,6 +1449,8 @@ export interface CreateSpacePayload {
   description?: string;
   organization_uuid?: string;
   is_private?: boolean;
+  /** The owner's switch: Lawexa answers only messages that tag it (thread 39c968a5). */
+  lawexa_tag_only?: boolean;
   settings?: Record<string, unknown>;
 }
 

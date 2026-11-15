@@ -89,6 +89,8 @@ export interface RouteComposerSurface {
    */
   answerCard: (answers: QuestionCardAnswer[]) => Promise<string | null>;
   mentionOptions: MentionOptions | null;
+  /** Lawexa answers only messages that tag it in this chat's space (thread 39c968a5). */
+  lawexaTagOnly: boolean;
   quoteToneOf: ((replyTo: MessageReplyTo) => QuoteTone) | null;
   spaceUuid: string | null;
 }

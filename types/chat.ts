@@ -1226,6 +1226,10 @@ export interface SpaceRosterEntry {
 export interface ConversationSpaceRef {
   uuid: string;
   name: string;
+  /** Lawexa answers only messages that tag it (Stay, 15 November 2026,
+   *  thread 39c968a5): on for the university Spaces. Absent on a server
+   *  before the switch. Read through `lawexaTagOnly` (space-turn.ts). */
+  lawexa_tag_only?: boolean;
 }
 
 /** A reader's role in a chat's space, the stored value (backend B4): the

@@ -49,6 +49,16 @@ test('the picker offers active members with a handle, Viewers included, and not 
   assert.equal(options.candidates.some((c) => c.handle === 'lawexa'), false);
 });
 
+test('in a space where Lawexa answers only when tagged, the picker offers Lawexa first', () => {
+  // Stay, 15 November 2026 (thread 39c968a5): the tag is the only way to ask it there.
+  const options = spaceMentionOptions(ROSTER, null, { offerLawexa: true });
+  assert.deepEqual(options.candidates.map((c) => c.handle), ['lawexa', 'adaobi', 'chidi', 'bolaade']);
+  assert.equal(options.candidates[0].name, 'Lawexa');
+  assert.deepEqual(mentionSuggestions(options, 'law').map((c) => c.handle), ['lawexa']);
+  // First, so six people never push it out of the list.
+  assert.equal(mentionSuggestions(options, '')[0].handle, 'lawexa');
+});
+
 test('an @ after a space or at the start opens the picker; an e-mail address does not', () => {
   assert.deepEqual(mentionQueryAt('@ch', 3), { query: 'ch', start: 0 });
   assert.deepEqual(mentionQueryAt('ask @Chi', 8), { query: 'chi', start: 4 });
@@ -131,7 +141,7 @@ test('the wiring: the picker in a space chat, chips in the bubble, the writer’
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /const unmatched = response\.data\.unmatched_handles;\s*if \(unmatched && unmatched\.length > 0\) \{\s*setMessages\(\(msgs\) =>\s*msgs\.map\(\(m\) => \(m\.id === optimisticMsg\.id \? \{ \.\.\.m, unmatchedHandles: unmatched \} : m\)\),/);
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid\) : null\),/);
+  assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid, \{ offerLawexa: tagOnly \}\) : null\),/);
   // The screen publishes the options; the shell's docked box hands them on.
   assert.match(readHere('ConversationScreen.tsx'), /publishRouteComposer\(\{[\s\S]*?mentionOptions,/);
   assert.match(readHere('ChatDock.tsx'), /mentionOptions=\{surface\.mentionOptions\}/);
