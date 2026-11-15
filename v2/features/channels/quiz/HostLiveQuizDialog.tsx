@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Loader2, Plus } from 'lucide-react';
+import { Globe, Link2, Loader2, Plus, Users } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import {
@@ -25,9 +25,18 @@ import { SpacePickList } from '@/v2/features/spaces/move/SpacePickList';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { hostRefusal, hostTargets, quickHostSpacePayload } from './model';
 import { useGoLive } from './mutations';
+import { apiErrorCode, openGameHref, openGoLiveRefusal, VISIBILITY_WORDS } from './open-game';
 import { spaceRoom } from './quiz-room';
+import type { QuizGameVisibility } from '@/types/channel-quiz';
 import { COMPACT_RAISED } from './ui';
 import '@/v2/features/quiz/solo/solo-quiz.css';
+
+/** The three places a live quiz can run, in the dialog's switch. */
+const PLACES = [
+  { id: 'space', label: 'A Space', Icon: Users },
+  { id: 'public', label: VISIBILITY_WORDS.public.label, Icon: Globe },
+  { id: 'link', label: VISIBILITY_WORDS.link.label, Icon: Link2 },
+] as const;
 
 interface PickedSpace {
   uuid: string;
@@ -80,7 +89,27 @@ export function HostLiveQuizDialog({
    * (live quiz review, 11 November 2026). A changed name is a new Space.
    */
   const [made, setMade] = useState<PickedSpace | null>(null);
+  /** Where it runs (live quiz without a Space, Stay, thread 12341975): a Space, or open to anyone signed in, or by link. */
+  const [place, setPlace] = useState<'space' | QuizGameVisibility>('space');
   const busy = goLive.isPending || createSpace.isPending;
+
+  /** An open game: no Space, live at once, then its own page. */
+  const goLiveOpen = (visibility: QuizGameVisibility) => {
+    setRefusal(null);
+    goLive.mutate(
+      { visibility },
+      {
+        onSuccess: (response) => {
+          onOpenChange(false);
+          router.push(openGameHref(response.data.uuid));
+        },
+        onError: (error) => {
+          const { status, message, errors } = extractApiError(error);
+          setRefusal({ message: openGoLiveRefusal(status, apiErrorCode(errors), message), running: null });
+        },
+      },
+    );
+  };
 
   const goLiveIn = (space: PickedSpace) => {
     setRefusal(null);
@@ -175,10 +204,46 @@ export function HostLiveQuizDialog({
           <QuizTile uuid={quiz.uuid} title={quiz.title} size="md" className="mb-1" />
           <DialogTitle className="text-xl leading-tight font-bold tracking-tight">Host a live quiz</DialogTitle>
           <DialogDescription>
-            {`Pick a Space to run “${quiz.title}” in. Its members are told it’s live and join from there.`}
+            {place === 'space'
+              ? `Pick a Space to run “${quiz.title}” in. Its members are told it’s live and join from there.`
+              : `Run “${quiz.title}” for anyone who joins. You get a link, a QR code and a join code to share.`}
           </DialogDescription>
         </DialogHeader>
 
+        <div role="radiogroup" aria-label="Where it runs" className="grid grid-cols-3 gap-1 rounded-2xl bg-muted p-1">
+          {PLACES.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              role="radio"
+              aria-checked={place === id}
+              disabled={busy}
+              onClick={() => {
+                setPlace(id);
+                setRefusal(null);
+              }}
+              className={cn(
+                'flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-semibold transition-colors disabled:opacity-60',
+                place === id ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                FOCUS_RING,
+              )}
+            >
+              <Icon aria-hidden className="size-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {place !== 'space' ? (
+          <div className="flex flex-col gap-3 rounded-2xl border-2 border-border p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-150">
+            <p className="text-sm text-foreground">{VISIBILITY_WORDS[place].who}</p>
+            <p className="text-xs text-muted-foreground">Up to 100 players. Scores are kept after the game.</p>
+            <RaisedButton type="button" className={cn(COMPACT_RAISED, 'self-start')} disabled={busy} onClick={() => goLiveOpen(place)}>
+              {goLive.isPending ? <Loader2 aria-hidden className="size-4 motion-safe:animate-spin" /> : null}
+              Go live
+            </RaisedButton>
+          </div>
+        ) : (
         <SpacePickList
           targets={hostTargets}
           onPick={goLiveIn}
@@ -196,6 +261,7 @@ export function HostLiveQuizDialog({
           }
           after={newSpace}
         />
+        )}
 
         {refusal ? (
           <p role="alert" className="text-sm text-destructive">

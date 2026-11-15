@@ -19,6 +19,7 @@ import { LibraryList, LibraryListSkeleton, useQuizForm } from '../solo/library/L
 import { SoloCreateAccountState, SoloSignedOutState } from '../solo/states';
 import { parseQuizHomeTab, type QuizHomeTab } from './quiz-home-tab';
 import { QuizHomeTabs } from './QuizHomeTabs';
+import { LiveNowRow } from './LiveNowRow';
 
 /**
  * QuizHomeScreen — `/quiz`, two tabs: Explore (`/quiz`) and My quizzes
@@ -90,6 +91,8 @@ export function QuizHomeScreen() {
       </div>
 
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${tab}`}>
+        {/* Live now and the join code, above Explore, for an account that may play (live quiz without a Space). */}
+        {tab === 'explore' && canWrite ? <LiveNowRow viewerId={viewerId} /> : null}
         {tab === 'explore' ? (
           <ExploreList />
         ) : canWrite ? (

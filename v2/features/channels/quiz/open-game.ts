@@ -108,3 +108,17 @@ export function playersAgainstCap(count: number, max: number | null | undefined)
   const noun = count === 1 ? 'player' : 'players';
   return max ? `${count} of ${max} ${noun}` : `${count} ${noun}`;
 }
+
+/** Where a Live now game is, in a few words: waiting, starting, or which question. */
+export function liveGameState(game: Pick<QuizGame, 'status' | 'current_question_index' | 'question_count'>): string {
+  if (game.status === 'lobby') return 'Waiting to start';
+  if (game.status === 'countdown') return 'Starting';
+  if (game.current_question_index !== null) return `Question ${game.current_question_index + 1} of ${game.question_count}`;
+  return 'Playing';
+}
+
+/** What a Live now card's button says: Join before it starts, Join late when late joiners may play, else Watch. */
+export function liveGameAction(game: Pick<QuizGame, 'status' | 'settings'>): 'Join' | 'Join late' | 'Watch' {
+  if (game.status === 'lobby') return 'Join';
+  return game.settings.allow_late_join ? 'Join late' : 'Watch';
+}
