@@ -152,6 +152,16 @@ test('both chat boxes read the server rule, and the app keeps no private file li
   assert.match(home, /uploads\.filter\(\(u\) => u\.status !== 'failed' && !takesChosenFile\(fileRule, u\)\)/);
 });
 
+/* ── The open chat's Redacted pill (Techlead's review, 15 November 2026) ── */
+
+test("the open chat's Redacted pill says the count, never a cut list; the names stay in its label", () => {
+  const chat = read('v2', 'features', 'conversations', 'conversation', 'ConversationComposer.tsx');
+  assert.match(chat, /const hiddenShort = isRedacted \? hiddenCount\(redactionCategories\) : null;/);
+  assert.match(chat, /<span aria-hidden className="shrink-0 opacity-80">\s*· \{hiddenShort\}/);
+  assert.doesNotMatch(chat, /truncate opacity-80/);
+  assert.match(chat, /aria-label=\{`Redacted mode is on for this conversation\$\{hiddenNames \? `: it hides \$\{hiddenNames\}` : ''\}`\}/);
+});
+
 /* ── 4. No paragraph under "What to hide" (Stay, 14 November 2026) ─────── */
 
 test('"What to hide" still has no paragraph under its title', () => {
