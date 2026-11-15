@@ -209,7 +209,8 @@ test('the host dialog offers a Space, Public and Private link, and an open game 
 test('Live now reads the public list only, and sits above Explore for an account that may play', () => {
   assert.match(read('lib', 'api', 'channel-quiz.ts'), /apiClient\.get<LiveQuizGamesResponse>\('\/quiz-games\/live'/);
   const home = read('v2', 'features', 'quiz', 'home', 'QuizHomeScreen.tsx');
-  assert.match(home, /\{tab === 'explore' && canWrite \? <LiveNowRow viewerId=\{viewerId\} \/> : null\}/);
+  // Concept C (Stay, 15 November 2026): the row of circles sits under the title, above the tabs, on both tabs.
+  assert.match(home, /\{canWrite \? <LiveNowRow viewerId=\{viewerId\} onCode=\{\(\) => setCodeOpen\(true\)\} \/> : null\}\s*<div className="mb-4">\s*<QuizHomeTabs/);
   const row = read('v2', 'features', 'quiz', 'home', 'LiveNowRow.tsx');
   assert.match(row, /if \(!isJoinCode\(normalized\)\) \{\s*setError\(NO_GAME_FOR_CODE\);/);
 });

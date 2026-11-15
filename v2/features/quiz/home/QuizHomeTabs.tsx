@@ -32,13 +32,11 @@ export function QuizHomeTabs({
       onChange={onChange}
       ariaLabel="Choose which quizzes to show"
       panelId={panelId}
-      className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5"
+      className="flex w-full items-end gap-6 overflow-x-auto overscroll-x-contain border-b border-border"
       tabClassName={(selected) =>
         cn(
-          'v2-interactive min-h-8 shrink-0 rounded-full px-3.5 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
-          selected
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground',
+          'v2-interactive relative -mb-px min-h-11 shrink-0 border-b-2 text-[15px] font-semibold transition-colors duration-150 motion-reduce:transition-none',
+          selected ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
         )
       }
     >

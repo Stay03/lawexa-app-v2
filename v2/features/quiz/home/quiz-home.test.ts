@@ -67,3 +67,32 @@ test('Challenge a friend is one tap: who gets it, and what the tap does', async 
   const results = readFileSync(join(here, '..', 'solo', 'results', 'AttemptResultsScreen.tsx'), 'utf8');
   assert.match(results, /const isMine = detailQuery\.data\?\.data\.is_mine === true;/);
 });
+
+/* Concept C (Stay, 15 November 2026: "Go with C and push"): a row of circles
+ * under the title, "Enter code" first, then each live public game. */
+const row = readFileSync(join(here, 'LiveNowRow.tsx'), 'utf8').replace(/\r\n/g, '\n');
+
+test('Enter code opens the code sheet, and a code that finds a game opens that game', () => {
+  // The first circle opens the sheet the home holds.
+  assert.match(row, /<button\s+type="button"\s+onClick=\{onCode\}\s+aria-label="Enter a game code"/);
+  assert.match(screen, /\{canWrite \? <CodeSheet open=\{codeOpen\} onOpenChange=\{setCodeOpen\} \/> : null\}/);
+  // A sheet on a phone, a centred dialog on a computer (the app's overlay), with one field and Join game.
+  assert.match(row, /<ResponsiveOverlay\s+open=\{open\}\s+onOpenChange=\{onOpenChange\}\s+size="content"\s+title="Join a game"/);
+  assert.match(row, /aria-label="Join code"/);
+  assert.match(row, /Join game\s*<\/RaisedButton>/);
+  // A code the server finds opens its game; one it does not, or that is not a code, says so in one sentence.
+  assert.match(row, /lookup\.mutate\(normalized, \{\s*onSuccess: \(response\) => router\.push\(openGameHref\(response\.data\.uuid\)\),\s*onError: \(failure\) => setError\(codeRefusal\(extractApiError\(failure\)\.status\)\),/);
+  assert.match(row, /if \(!isJoinCode\(normalized\)\) \{\s*setError\(NO_GAME_FOR_CODE\);/);
+  // Each live game is one link into it, its title and players read out.
+  assert.match(row, /href=\{openGameHref\(game\.uuid\)\}\s*aria-label=\{`\$\{liveGameAction\(game\)\} \$\{game\.quiz\.title\}, \$\{liveGameState\(game\)\}, \$\{game\.player_count\} playing`\}/);
+});
+
+test('with no live game, one quiet line sits beside the code circle; the + is the only Create', () => {
+  assert.match(row, /\{live\.isSuccess && games\.length === 0 \? \(/);
+  assert.match(row, /No live games right now\.\s*<br \/>\s*Host one from any quiz\./);
+  // Before the list answers, no line: the code circle alone, so nothing says "none" too early.
+  assert.doesNotMatch(row, /live\.isPending[^\n]*No live games/);
+  // Create quiz is the round + on the title line, named for screen readers.
+  assert.match(screen, /aria-label="Create quiz"/);
+  assert.doesNotMatch(screen, /CREATE_PILL/);
+});

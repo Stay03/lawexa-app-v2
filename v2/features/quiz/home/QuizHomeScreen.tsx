@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Plus } from 'lucide-react';
 
@@ -9,7 +10,7 @@ import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { signInHref } from '@/v2/runtime/sign-in-href';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
-import { CREATE_PILL, FOCUS_RING } from '@/v2/shell/designs/modules';
+import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { ScreenTitle } from '@/v2/shell/ScreenTitle';
 import { SearchFieldShape } from '@/v2/shell/SearchField';
@@ -19,7 +20,7 @@ import { LibraryList, LibraryListSkeleton, useQuizForm } from '../solo/library/L
 import { SoloCreateAccountState, SoloSignedOutState } from '../solo/states';
 import { parseQuizHomeTab, type QuizHomeTab } from './quiz-home-tab';
 import { QuizHomeTabs } from './QuizHomeTabs';
-import { LiveNowRow } from './LiveNowRow';
+import { CodeSheet, LiveNowRow } from './LiveNowRow';
 
 /**
  * QuizHomeScreen — `/quiz`, two tabs: Explore (`/quiz`) and My quizzes
@@ -35,11 +36,16 @@ import { LiveNowRow } from './LiveNowRow';
  * create an account on a guest pass. While a visitor's guest pass is still
  * being minted it draws the list's skeleton, so the panel does not flash.
  *
- * ── NEW QUIZ IS ON THE TABS LINE, ON BOTH TABS ─────────────────────────────
- * The form belongs to the home (`useQuizForm`), so the pill on the tabs line
- * and a card's Edit open the same dialog. It shows on Explore and on My
- * quizzes alike (Stay, 23 October 2026: "Both"), and only to an account that
- * may write one: a guest and a visitor never see it.
+ * ── THE TOP AREA IS CONCEPT C (Stay, 15 November 2026: "Go with C") ──────
+ * A quiet header: the title, and a round + for Create quiz. Under it, for an
+ * account that may play, the row of circles (`LiveNowRow`): "Enter code"
+ * first, which opens the code sheet, then each live public game. Then the tabs
+ * as text on a hairline. Gold is kept for the way into a game.
+ *
+ * The form belongs to the home (`useQuizForm`), so the + and a card's Edit
+ * open the same dialog. It shows on Explore and on My quizzes alike (Stay, 23
+ * October 2026: "Both"), and only to an account that may write one: a guest
+ * and a visitor never see it.
  *
  * The tab is the query string, read on every render, so the strip is static
  * chrome and a tab is a shareable link.
@@ -60,6 +66,7 @@ export function QuizHomeScreen() {
   const tab = parseQuizHomeTab(searchParams.get('tab'));
   const canWrite = signedIn && canAccessQuizPlayer(role);
   const { openForm, dialog } = useQuizForm(viewerId);
+  const [codeOpen, setCodeOpen] = useState(false);
 
   // Each tab has its own choices, so a tab starts with none set.
   const setTab = (next: QuizHomeTab) => {
@@ -68,31 +75,34 @@ export function QuizHomeScreen() {
 
   return (
     <div className={HOME_COLUMN}>
-      <ScreenTitle />
-
-      <div className="mb-3 flex items-center justify-between gap-3">
-        {/* The tabs scroll within what is left, so a narrow phone keeps
-            Create quiz whole beside them. */}
-        <div className="min-w-0">
-          <QuizHomeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
-        </div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <ScreenTitle className="mb-0 min-w-0 truncate" />
         {canWrite ? (
           <button
             type="button"
             onClick={() => openForm()}
-            className={cn(CREATE_PILL, 'shrink-0', FOCUS_RING)}
+            aria-label="Create quiz"
+            title="Create quiz"
+            className={cn(
+              'v2-interactive inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-secondary text-foreground transition-colors hover:bg-secondary/70',
+              FOCUS_RING,
+            )}
           >
             {/* "Create", not "New" (Arthur, 28 October 2026: "New quiz
                 presupposes to play a new quiz"). */}
-            <Plus aria-hidden className="size-4" />
-            Create quiz
+            <Plus aria-hidden className="size-5" />
           </button>
         ) : null}
       </div>
 
+      {/* The live games and the join code, on both tabs, for an account that may play (live quiz without a Space). */}
+      {canWrite ? <LiveNowRow viewerId={viewerId} onCode={() => setCodeOpen(true)} /> : null}
+
+      <div className="mb-4">
+        <QuizHomeTabs value={tab} onChange={setTab} panelId={PANEL_ID} />
+      </div>
+
       <div id={PANEL_ID} role="tabpanel" aria-labelledby={`${PANEL_ID}-tab-${tab}`}>
-        {/* Live now and the join code, above Explore, for an account that may play (live quiz without a Space). */}
-        {tab === 'explore' && canWrite ? <LiveNowRow viewerId={viewerId} /> : null}
         {tab === 'explore' ? (
           <ExploreList />
         ) : canWrite ? (
@@ -107,6 +117,7 @@ export function QuizHomeScreen() {
       </div>
 
       {canWrite ? dialog : null}
+      {canWrite ? <CodeSheet open={codeOpen} onOpenChange={setCodeOpen} /> : null}
     </div>
   );
 }
@@ -126,8 +137,10 @@ export function QuizHomeFallback() {
       {/* `aria-hidden` + `inert` (standards §8ii): a Suspense fallback is
           DELETED when content arrives, so nothing in it may hold focus. */}
       <div aria-hidden inert className={HOME_COLUMN}>
-        <ScreenTitle />
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-2 flex min-h-11 items-center">
+          <ScreenTitle className="mb-0" />
+        </div>
+        <div className="mb-4">
           <QuizHomeTabs value="explore" onChange={() => undefined} panelId={PANEL_ID} />
         </div>
         <div className="mb-3 h-5 w-3/5 max-w-full" />
