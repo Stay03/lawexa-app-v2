@@ -44,6 +44,8 @@ export interface SlimUser {
 
 export type OrganizationType = 'law_firm' | 'university' | 'company' | 'bank' | 'other';
 export type SpaceType = 'work' | 'study';
+/** Who pays for Lawexa in a Space (Backend space-who-pays). */
+export type SpaceWhoPays = 'owner' | 'each_member';
 /** `space_public` = open, `private` = listed by name but shut, `hidden` = no door
  *  at all. THREE STATES SINCE 2026-08-10 (api commit 36a2c54): `private` used to
  *  mean invisible, and every private channel that predates that deploy was
@@ -269,6 +271,12 @@ export interface Space {
   /** A university Space (a Lawexa admin sets it). In its chats Lawexa answers
    *  only messages that tag it or reply to it (Stay, 16 November 2026). */
   is_university?: boolean;
+  /** Who pays for Lawexa here: one plan ('owner': the owner's, or the member's who
+   *  agreed to pay) or each sender's own ('each_member'). The owner sets it with
+   *  PUT /spaces/{uuid} (Backend space-who-pays). Absent on a server before it. */
+  who_pays?: SpaceWhoPays;
+  /** Whose plan pays for Lawexa here, to a member; null when each sender pays (or a staff, system or sponsor plan does). */
+  payer?: { uuid: string; name: string; is_owner: boolean } | null;
   settings: Record<string, unknown> | null;
   /** Null for a personal space; trimmed ref for an org-owned space. */
   organization: OrganizationRef | null;
@@ -1458,6 +1466,8 @@ export interface UpdateSpacePayload {
   /** `null` clears it; an absent key leaves the old one (backend, 16 October 2026). */
   description?: string | null;
   is_private?: boolean;
+  /** The owner's alone to change; sent only when it changed. */
+  who_pays?: SpaceWhoPays;
   settings?: Record<string, unknown>;
 }
 
