@@ -39,12 +39,14 @@ export function ShareResultsButton({ gameUuid, quizTitle }: { gameUuid: string; 
   };
 
   return (
-    <section aria-label="Share the results" className="flex flex-col items-center gap-2 rounded-2xl border-2 border-border bg-card p-4">
-      <RaisedButton className={`${COMPACT_RAISED} w-full max-w-xs`} disabled={!link} onClick={() => void share()}>
+    // No box around it (an empty card reads as missing content): the button alone, full width, in the
+    // column's own gap. The note sits in that gap under the button, so it never moves what follows.
+    <section aria-label="Share the results" className="relative">
+      <RaisedButton className={`${COMPACT_RAISED} w-full`} disabled={!link} onClick={() => void share()}>
         <Share2 aria-hidden className="size-4" />
         Share results
       </RaisedButton>
-      <p role="status" aria-live="polite" className="min-h-5 text-xs text-muted-foreground">
+      <p role="status" aria-live="polite" className="absolute inset-x-0 top-full mt-1 text-center text-xs text-muted-foreground">
         {note ?? ''}
       </p>
     </section>

@@ -393,8 +393,10 @@ test('a host who did not play gets one Share results button with the public link
   assert.match(button, /const data = shareData\(\{ title: quizTitle, text: caption, url: link \}\);/);
   assert.match(button, /const copied = await copyText\(shareCaption\(caption, link\)\);/);
   assert.match(button, /<Share2 aria-hidden className="size-4" \/>\s*Share results/);
-  // The card's own Share button style.
-  assert.match(button, /<RaisedButton className=\{`\$\{COMPACT_RAISED\} w-full max-w-xs`\}/);
+  // The card's own Share button style, full width, with no box around it; the note never moves what follows.
+  assert.match(button, /<RaisedButton className=\{`\$\{COMPACT_RAISED\} w-full`\}/);
+  assert.doesNotMatch(button, /border-2|bg-card|rounded-2xl/);
+  assert.match(button, /<p role="status" aria-live="polite" className="absolute inset-x-0 top-full/);
   // It loads without the card's canvas and fonts.
   assert.doesNotMatch(button, /result-card-draw|result-card-fonts|canvas/);
 });
