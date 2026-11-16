@@ -73,3 +73,18 @@ test('"check your email" says the account is signed in, and another address sign
   assert.match(auth, /useMutation<Awaited<ReturnType<typeof authApi\.logout>>, Error, '\/login' \| '\/register' \| void>\(/);
   assert.match(auth, /router\.push\(next \|\| '\/login'\);/);
 });
+
+test('every way back after sign-in is a path on this site, else the default landing', async () => {
+  const { safeReturnPath } = await import('@/lib/utils/auth-return');
+  assert.equal(safeReturnPath('/quiz/q/abc?ref=magician'), '/quiz/q/abc?ref=magician');
+  assert.equal(safeReturnPath('/'), '/');
+  for (const bad of ['//evil.com', 'https://evil.com', '/\\evil.com', 'javascript:alert(1)', '\\\\evil.com', '/\t/evil.com', '/\n/evil.com', ' /x', '', null, undefined]) {
+    assert.equal(safeReturnPath(bad), null, JSON.stringify(bad));
+  }
+  // Each landing reads its way back through the check: the address's ?redirect=, and the Google round trip's kept path.
+  const back = read('lib', 'utils', 'auth-return.ts');
+  assert.match(back, /return safeReturnPath\(new URLSearchParams\(window\.location\.search\)\.get\('redirect'\)\);/);
+  assert.match(back, /const path = safeReturnPath\(window\.sessionStorage\.getItem\(RETURN_KEY\)\);/);
+  const auth = read('lib', 'hooks', 'useAuth.ts');
+  assert.match(auth, /function getSafeRedirect\(\): string \{\s*return returnPathFromLocation\(\) \?\? '\/';/);
+});

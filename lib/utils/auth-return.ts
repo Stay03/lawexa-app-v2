@@ -13,10 +13,13 @@ const RETURN_KEY = 'lawexa-auth-return';
 
 /**
  * A path on this site, or null. Only "/x" paths count: never "//host",
- * "/\host" (which browsers read as another site), or a full URL.
+ * "/\host" (which browsers read as another site), or a full URL. No control
+ * character or space either: browsers drop tabs and newlines from an address,
+ * so "/<tab>/host" would open as "//host" (techlead's check, 16 November 2026).
  */
 export function safeReturnPath(raw: string | null | undefined): string | null {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return null;
+  if (/[\u0000- \u007f]/.test(raw)) return null;
   return raw;
 }
 
