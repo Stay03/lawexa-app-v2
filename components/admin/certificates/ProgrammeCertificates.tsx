@@ -259,7 +259,7 @@ function IssuedList({ programmeUuid }: { programmeUuid: string }) {
                           size="sm"
                           variant="ghost"
                           onClick={() => setCorrecting({ ...certificate, uuid: certificate.uuid as string })}
-                          aria-label={`Correct the name on certificate ${certificate.number}`}
+                          aria-label={`Correct name on certificate ${certificate.number}`}
                         >
                           <PenLine aria-hidden className="size-4" />
                           Correct name

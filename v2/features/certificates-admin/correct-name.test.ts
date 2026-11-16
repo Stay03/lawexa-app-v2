@@ -52,8 +52,12 @@ test('the wiring: one PUT, a button on each row with a uuid, the dialog says wha
   assert.match(api, /apiClient\.put<ApiResponse<IssuedCertificate>>\(\s*`\/admin\/certificates\/\$\{enc\(certificateUuid\)\}\/printed-name`,\s*\{ printed_name: printedName\.trim\(\) \},/);
   const hook = read('lib', 'hooks', 'useAdminCertificates.ts');
   assert.match(hook, /queryKey: \[\.\.\.certificateKeys\.programme\(programmeUuid\), 'certificates'\][\s\S]{0,120}withCorrectedCertificate\(page, certificate\)/);
+  // Any failure but a 422 may have saved part of the change: the list is fetched again.
+  assert.match(hook, /onError: \(failure\) => \{\s*if \(extractApiError\(failure\)\.status === 422\) return;\s*return queryClient\.invalidateQueries\(\{ queryKey: \[\.\.\.certificateKeys\.programme\(programmeUuid\), 'certificates'\] \}\);/);
   const list = read('components', 'admin', 'certificates', 'ProgrammeCertificates.tsx');
   assert.match(list, /\{certificate\.uuid \? \(\s*<Button[\s\S]{0,600}?Correct name\s*<\/Button>/);
+  // The spoken name starts with the visible text, so voice control finds it (WCAG 2.5.3).
+  assert.match(list, /aria-label=\{`Correct name on certificate \$\{certificate\.number\}`\}/);
   const dialog = read('components', 'admin', 'certificates', 'CorrectCertificateNameDialog.tsx');
   assert.match(dialog, /The PDF is drawn again\s+with the new name\. The number and verify link stay the same, and no email goes out\./);
   assert.match(dialog, /setError\(printedNameErrorOf\(apiError\.errors\) \?\? apiError\.message\);/);
