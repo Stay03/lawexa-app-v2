@@ -20,6 +20,9 @@ test('an ended game whose quiz can be taken alone opens the quiz', () => {
 test('every other answer keeps the expired screen', () => {
   assert.equal(endedGameQuiz(410, ended({ uuid: QUIZ, title: 'x', solo_playable: false })), null, 'not playable alone');
   assert.equal(endedGameQuiz(410, { success: false, message: 'This invite has expired.' }), null, 'an expired invite');
+  // Backend 7f772d5a: quiz is null when the game or its quiz is gone; other 410s send errors: null.
+  assert.equal(endedGameQuiz(410, { success: false, message: 'The game behind this link has ended.', errors: { code: 'game_ended', quiz: null } }), null, 'game or quiz gone');
+  assert.equal(endedGameQuiz(410, { success: false, message: 'x', errors: null }), null, 'another 410');
   assert.equal(endedGameQuiz(410, { errors: { code: 'expired' } }), null);
   assert.equal(endedGameQuiz(404, ended({ uuid: QUIZ, solo_playable: true })), null);
   assert.equal(endedGameQuiz(410, ended({ uuid: '../../admin', solo_playable: true })), null, 'only a quiz uuid becomes a path');
