@@ -21,7 +21,7 @@ import { CardBoxFold } from './question-card/CardBoxFold';
 import { QuestionDock, type QuestionDockHandle } from './question-card/QuestionDock';
 import { useCardBox } from './question-card/use-card-box';
 import { ComposerSkeleton } from './skeletons';
-import type { SendRefused } from './space-turn';
+import { TAG_ONLY_PLACEHOLDER, type SendRefused } from './space-turn';
 import { ViewOnlyPill } from './ViewOnlyPill';
 
 /**
@@ -221,6 +221,8 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
               onStop={surface.stop}
               viewerId={userId}
               mentionOptions={surface.mentionOptions}
+              // A space where Lawexa answers only when tagged says how to ask it (thread 39c968a5).
+              {...(surface.lawexaTagOnly && { placeholder: TAG_ONLY_PLACEHOLDER })}
               quoteToneOf={surface.quoteToneOf}
               spaceUuid={surface.spaceUuid}
               {...(openCard && { joinedAbove: true })}

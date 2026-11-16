@@ -386,7 +386,7 @@ export function ConversationScreen({
   // composer the host's box reads the embedded surface above instead.
   const terminal =
     error === 'confidential_transcript_lost' || error === 'not_found' || controller.isGoneOnServer;
-  const { mentionOptions, spaceUuid } = controller;
+  const { mentionOptions, lawexaTagOnly, spaceUuid } = controller;
   useEffect(() => {
     if (externalComposer) return;
     publishRouteComposer({
@@ -412,6 +412,7 @@ export function ConversationScreen({
       questionCard,
       answerCard,
       mentionOptions,
+      lawexaTagOnly,
       quoteToneOf,
       spaceUuid,
     });
@@ -439,6 +440,7 @@ export function ConversationScreen({
     questionCard,
     answerCard,
     mentionOptions,
+    lawexaTagOnly,
     quoteToneOf,
     spaceUuid,
   ]);

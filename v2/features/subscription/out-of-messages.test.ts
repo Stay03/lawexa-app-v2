@@ -250,7 +250,8 @@ test("the payer in their own Space: the server's sentence, and their plan's door
     blocked: block({ message: "Your plan's messages for TEST DATA Chambers are used up.", paid_by: payer(true) }),
     timeZone: 'UTC',
   });
-  assert.equal(view.heading, 'Your messages for this Space are used up');
+  assert.equal(view.heading, 'Your Lawexa messages are used up');
+  assert.equal(view.short, 'Lawexa messages used up');
   assert.equal(view.body, "Your plan's messages for TEST DATA Chambers are used up.");
   assert.deepEqual(doors(view), ['Upgrade plan /pricing (primary)', 'Buy message pack /settings/message-packs']);
 });
