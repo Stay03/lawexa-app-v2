@@ -202,6 +202,11 @@ export function podiumText(input: Pick<ResultCardInput, 'rank' | 'playerCount' |
  * clipboard takes them where the sheet takes no picture. The words alone
  * when there is no link.
  */
+/** The plain caption a host who did not play shares the results with (no standing: they have none). */
+export function hostShareText(quizTitle: string): string {
+  return `Final scores: ${quizTitle}`;
+}
+
 export function shareCaption(shareText: string, link: string | null): string {
   return link ? `${shareText} ${link}` : shareText;
 }

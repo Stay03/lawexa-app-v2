@@ -273,7 +273,7 @@ test('the card is drawn on the device with its own fonts, in both sizes, and Wra
   assert.match(card, /await navigator\.share\(\{ files: \[current\.file\], text: caption \}\);/);
   assert.match(card, /if \(error instanceof DOMException && error\.name === 'AbortError'\) return;\s*setNote\('Sharing did not open\. Download the card and post it instead\.'\);/);
   assert.match(card, /download\(current\.url, current\.file\.name\);\s*const copied = await copyText\(caption\);\s*setNote\(copied \? 'Saved\. Caption and link copied\.' : 'Saved to your downloads\.'\);/);
-  assert.match(quiz('ShareResults.tsx'), /const url = useResultsLink\(gameUuid\);/);
+  assert.match(card, /const link = useResultsLink\(gameUuid\);/);
 
   // Wrapped keeps its own card: the live quiz only borrows the picture helpers it already exported.
   assert.doesNotMatch(card, /drawShareCard|wrappedFontFamilies|wrappedArt/);
@@ -359,10 +359,46 @@ test('the final scores are the quiz’s own leaderboard, its podium rising, the 
 test('a player gets their own card under the board; someone who only watched does not', () => {
   const phases = quiz('GamePhases.tsx');
   assert.match(phases, /const own = viewerUuid === null \? undefined : results\?\.ranking\.find\(\(row\) => row\.user\.uuid === viewerUuid\);\s*if \(!results \|\| !own\) return null;/);
-  assert.match(phases, /\{cardInput \? <ResultCardShare gameUuid=\{gameUuid\} input=\{cardInput\} \/> : null\}\s*<ShareResults/);
+  assert.match(phases, /\{cardInput \? \(\s*<ResultCardShare gameUuid=\{gameUuid\} input=\{cardInput\} \/>\s*\) : hostWatched \? \(\s*<ShareResultsButton gameUuid=\{gameUuid\} quizTitle=\{results\.game\.quiz\.title\} \/>\s*\) : null\}/);
   assert.match(read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx'), /spaceName=\{space\?\.name \?\? null\}/);
   assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /spaceName=\{spacePlace\?\.space\.name \?\? null\}/);
   assert.match(read('v2', 'features', 'channels', 'screen', 'ChannelScreen.tsx'), /spaceName=\{channel\.space\.name\}/);
+});
+
+// Arthur, 15 November 2026: "Remove the second share. The card share already does the work."
+test('the final scores keep one share, the card: the "one to beat" box and its Share link are gone', () => {
+  const phases = quiz('GamePhases.tsx');
+  assert.ok(!existsSync(join(process.cwd(), 'v2', 'features', 'channels', 'quiz', 'ShareResults.tsx')), 'no ShareResults component');
+  assert.doesNotMatch(phases, /ShareResults(?!Button)|quizShareInvite|QuizShareStanding|Share link/);
+  // The card keeps Share and Download, its caption carries the public results link, and the certificate stays.
+  assert.match(phases, /\{cardInput \? \(\s*<ResultCardShare gameUuid=\{gameUuid\} input=\{cardInput\} \/>\s*\) : hostWatched \? \(\s*<ShareResultsButton gameUuid=\{gameUuid\} quizTitle=\{results\.game\.quiz\.title\} \/>\s*\) : null\}\s*\{\/\*[^]*?\*\/\}\s*\{certificate \? <CertificateOffer raw=\{certificate\} \/> : null\}/);
+  const card = quiz('ResultCardShare.tsx');
+  assert.match(card, /const caption = shareCaption\(copy\.shareText, link\);/);
+  // The public results page stays, still reached through the card's link.
+  assert.ok(existsSync(join(process.cwd(), 'app', 'quiz-results', '[gameUuid]', 'page.tsx')));
+});
+
+// Arthur, 16 November 2026 (option 1, thread 5ffd636a): a host who ran the game without playing shares the results.
+test('a host who did not play gets one Share results button with the public link; a player keeps only their card', async () => {
+  const { hostShareText } = await import('./result-card');
+  assert.equal(hostShareText('TEST DATA Torts 101'), 'Final scores: TEST DATA Torts 101');
+  const phases = quiz('GamePhases.tsx');
+  // The host: not in the ranking (no card), and the results name them as the host.
+  assert.match(phases, /const hostWatched = cardInput === null && viewerUuid !== null && results\?\.game\.host\?\.uuid === viewerUuid;/);
+  // A player sees the card and never the button; the host sees the button and no card; anyone else sees neither.
+  assert.match(phases, /\{cardInput \? \(\s*<ResultCardShare gameUuid=\{gameUuid\} input=\{cardInput\} \/>\s*\) : hostWatched \? \(\s*<ShareResultsButton gameUuid=\{gameUuid\} quizTitle=\{results\.game\.quiz\.title\} \/>\s*\) : null\}/);
+  const button = quiz('ShareResultsButton.tsx');
+  // The same public results link the card's caption carries, in a plain caption.
+  assert.match(button, /const link = useResultsLink\(gameUuid\);/);
+  assert.match(button, /const data = shareData\(\{ title: quizTitle, text: caption, url: link \}\);/);
+  assert.match(button, /const copied = await copyText\(shareCaption\(caption, link\)\);/);
+  assert.match(button, /<Share2 aria-hidden className="size-4" \/>\s*Share results/);
+  // The card's own Share button style, full width, with no box around it; the note never moves what follows.
+  assert.match(button, /<RaisedButton className=\{`\$\{COMPACT_RAISED\} w-full`\}/);
+  assert.doesNotMatch(button, /border-2|bg-card|rounded-2xl/);
+  assert.match(button, /<p role="status" aria-live="polite" className="absolute inset-x-0 top-full/);
+  // It loads without the card's canvas and fonts.
+  assert.doesNotMatch(button, /result-card-draw|result-card-fonts|canvas/);
 });
 
 // Arthur's corrections (0f517a68, e3d57458, 12 November 2026), as the techlead set them.
@@ -435,7 +471,8 @@ test('the invite under a one-player game claims no place either', () => {
     headline: 'Can anyone beat your score?',
     ask: 'Share this challenge with your study group and find out.',
   });
-  assert.match(quiz('GamePhases.tsx'), /: results\.game\.player_count < 2\s*\? \{ outcome: 'solo' \}\s*: viewerRow\.rank === 1/);
+  // The invite box under the board is gone (Arthur, 15 November 2026), so the final scores draw no invite at all.
+  assert.doesNotMatch(quiz('GamePhases.tsx'), /outcome: 'solo'/);
 });
 
 test('a one-player game ranks no one on its board: the row and its points, no podium, crown or place; other boards unchanged', () => {
