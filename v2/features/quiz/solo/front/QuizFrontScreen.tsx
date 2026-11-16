@@ -14,6 +14,7 @@ import {
   SearchX,
   Share2,
   Swords,
+  TimerOff,
   Trash2,
   User,
   Users,
@@ -121,6 +122,9 @@ import { soloQuizQueries } from '../queries';
  * side by side and the panel stays in view while the board scrolls; on a
  * phone Start stays at the foot of the screen.
  */
+/** Said on a quiz's page reached through a live game's link after the game ended (Arthur, 16 November 2026). */
+export const GAME_ENDED_NOTE = 'This live game has ended. Take the quiz yourself.';
+
 export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const router = useRouter();
   const pathname = usePathname() ?? quizFrontHref(quizUuid);
@@ -157,6 +161,8 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   // score is shown to beat, and the attempt names theirs, so they hear how
   // this one went. A banner that does not load leaves the quiz as it is.
   const challengeFrom = challengeFromParam(useSearchParams().get('from'));
+  // Through a live game's link after the game ended (`?ended=1`, the join screen).
+  const gameEnded = useSearchParams().get('ended') === '1';
   const challengeQuery = useQuery({
     ...soloQuizQueries.challenge(quizUuid, challengeFrom ?? ''),
     enabled: challengeFrom !== null,
@@ -352,6 +358,15 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             {quiz.description && (
               <p className="max-w-prose text-sm leading-relaxed text-muted-foreground">{quiz.description}</p>
             )}
+            {gameEnded ? (
+              <p
+                role="note"
+                className="flex items-center gap-2.5 rounded-2xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300"
+              >
+                <TimerOff aria-hidden className="size-4 shrink-0 text-foreground/70" />
+                {GAME_ENDED_NOTE}
+              </p>
+            ) : null}
             {/* Through a friend's challenge link: the score to beat. */}
             {challenger ? (
               <div
