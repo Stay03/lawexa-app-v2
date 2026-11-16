@@ -33,7 +33,7 @@ test('a reopened chat draws it where it happened, among the steps', () => {
     row(1, 'user', null, 'TEST DATA. A long question.'),
     row(2, 'assistant', { type: 'tool_call', tool_name: 'read_statute', tool_parameters: { section: '1' }, iteration: 1 }),
     row(3, 'tool', { type: 'tool_result', iteration: 1, success: true }, JSON.stringify({ success: true, data: {} })),
-    row(4, 'assistant', { type: 'context_compacted', iteration: 2, agent_slug: null }),
+    row(4, 'assistant', { type: 'context_compacted', iteration: 2 }),
     row(5, 'assistant', { type: 'tool_call', tool_name: 'read_statute', tool_parameters: { section: '1' }, iteration: 2 }),
     row(6, 'tool', { type: 'tool_result', iteration: 2, success: true }, JSON.stringify({ success: true, data: {} })),
     row(7, 'assistant', null, 'TEST DATA. The answer.'),
