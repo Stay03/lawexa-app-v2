@@ -8,7 +8,7 @@ import { authApi } from '@/lib/api/auth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { mirrorSession } from '@/lib/session-mirror';
 import { clearAttribution } from '@/lib/utils/attribution';
-import { takeReturnPath } from '@/lib/utils/auth-return';
+import { landAfterSignIn, takeReturnPath } from '@/lib/utils/auth-return';
 
 function GoogleCallbackContent() {
   const router = useRouter();
@@ -44,7 +44,8 @@ function GoogleCallbackContent() {
           const needsOnboarding = !(response.data.user.profile?.onboarding_completed_at || response.data.user.profile?.profession);
           // Back where sign-in started (a ?redirect= kept before leaving for Google), else the home.
           const back = takeReturnPath();
-          router.push(needsOnboarding ? '/onboarding' : (back ?? '/'));
+          // A full load, so the page renders signed in (lib/utils/auth-return.ts, landAfterSignIn).
+          landAfterSignIn(needsOnboarding ? '/onboarding' : (back ?? '/'));
         }
       } catch {
         router.push('/login?error=google_auth_failed');

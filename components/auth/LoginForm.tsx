@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
@@ -28,6 +29,8 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { loginSchema } from '@/lib/utils/validation';
 import { AuthSwitchLink } from './AuthSwitchLink';
+import { AuthRefusalNote } from './AuthRefusalNote';
+import { authRefusalOf, emailFromSearch } from '@/lib/utils/auth-refusal';
 import type { LoginFormData } from '@/types/auth';
 
 import { GoogleAuthButton } from './GoogleAuthButton';
@@ -42,6 +45,15 @@ function LoginForm() {
       password: '',
     },
   });
+
+  // Sent here from sign-up with the email already taken: it is in the box.
+  useEffect(() => {
+    const email = emailFromSearch(window.location.search);
+    if (email) form.setValue('email', email);
+  }, [form]);
+
+  // An account made with Google has no password: say so, with its button (lib/utils/auth-refusal.ts).
+  const refusal = authRefusalOf(loginError);
 
   const onSubmit = (data: LoginFormData) => {
     login(data);
@@ -99,9 +111,11 @@ function LoginForm() {
               )}
             />
 
-            {loginError && (
+            {refusal ? (
+              <AuthRefusalNote refusal={refusal} email={form.getValues('email')} />
+            ) : loginError ? (
               <p className="text-sm text-destructive">{loginError.message}</p>
-            )}
+            ) : null}
 
             <Button type="submit" className="w-full" disabled={isLoggingIn}>
               {isLoggingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

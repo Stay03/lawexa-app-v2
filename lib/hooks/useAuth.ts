@@ -12,7 +12,7 @@ import { clearAllTranscripts } from '@/lib/storage/confidentialTranscriptStore';
 import { extractApiError, type ApiError } from '@/lib/utils/api-error';
 import { clearAttribution } from '@/lib/utils/attribution';
 import { mirrorSession } from '@/lib/session-mirror';
-import { keepReturnPath, returnPathFromLocation } from '@/lib/utils/auth-return';
+import { keepReturnPath, landAfterSignIn, returnPathFromLocation } from '@/lib/utils/auth-return';
 import type { LoginFormData, RegisterFormData } from '@/types/auth';
 
 // Honor a ?redirect= return URL (safe internal paths only) set by pages that
@@ -48,13 +48,14 @@ export function useAuth() {
 
         // For unverified email users, redirect to check-email page
         if (response.data.user.auth_provider === 'email' && !response.data.user.is_verified) {
-          router.push(`/check-email?email=${encodeURIComponent(variables.email)}`);
+          landAfterSignIn(`/check-email?email=${encodeURIComponent(variables.email)}`);
           return;
         }
 
-        // Check if user needs onboarding (profession is set after completing onboarding)
+        // Check if user needs onboarding (profession is set after completing onboarding).
+        // A full load, so the page renders signed in (landAfterSignIn).
         const needsOnboarding = !(response.data.user.profile?.onboarding_completed_at || response.data.user.profile?.profession);
-        router.push(needsOnboarding ? '/onboarding' : getSafeRedirect());
+        landAfterSignIn(needsOnboarding ? '/onboarding' : getSafeRedirect());
       }
     },
   });
@@ -71,19 +72,20 @@ export function useAuth() {
 
         // For email signups, redirect to check-email page to verify
         if (response.data.user.auth_provider === 'email' && !response.data.user.is_verified) {
-          router.push(`/check-email?email=${encodeURIComponent(variables.email)}`);
+          landAfterSignIn(`/check-email?email=${encodeURIComponent(variables.email)}`);
           return;
         }
 
-        // For OAuth users or verified users, continue to onboarding
+        // For OAuth users or verified users, continue to onboarding (a full load, as at sign-in).
         const needsOnboarding = !(response.data.user.profile?.onboarding_completed_at || response.data.user.profile?.profession);
-        router.push(needsOnboarding ? '/onboarding' : getSafeRedirect());
+        landAfterSignIn(needsOnboarding ? '/onboarding' : getSafeRedirect());
       }
     },
   });
 
   // Logout mutation
-  const logoutMutation = useMutation({
+  // Where signing out lands: sign-in, or sign-up for "Use a different email" (check-email).
+  const logoutMutation = useMutation<Awaited<ReturnType<typeof authApi.logout>>, Error, '/login' | '/register' | void>({
     mutationFn: async () => {
       // Deactivate this device's push token while the session bearer is still
       // valid, so a shared device stops receiving this user's notifications.
@@ -100,7 +102,7 @@ export function useAuth() {
       }
       return authApi.logout();
     },
-    onSuccess: async () => {
+    onSuccess: async (_, next) => {
       // Wipe confidential transcripts and reset session state — confidential
       // chats are device-only and must not survive a logout.
       try {
@@ -114,7 +116,7 @@ export function useAuth() {
       // Signed out on the server too before moving on, so no page renders
       // the account that just left (lib/session-mirror.ts).
       await mirrorSession(null);
-      router.push('/login');
+      router.push(next || '/login');
     },
   });
 

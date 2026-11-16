@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { LogOutButton } from '@/components/auth/LogOutButton';
 import { authApi } from '@/lib/api/auth';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { useAuthStore } from '@/lib/stores/authStore';
 import {
   RESEND_WAIT_SECONDS,
@@ -33,6 +34,7 @@ function CheckEmailContent() {
   // 2026: it had no cooldown); a 429 waits the server's own retry time.
   const [secondsLeft, setSecondsLeft] = useState(0);
   const router = useRouter();
+  const { logout, isLoggingOut } = useAuth();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isGuest = useAuthStore((state) => state.isGuest);
   const checking = useRef(false);
@@ -109,11 +111,13 @@ function CheckEmailContent() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <Mail className="h-8 w-8 text-primary" />
           </div>
+          {/* Signed in already: this is the one step left (Arthur's students,
+              16 November 2026, read "check your email" as a failed sign-in). */}
           <CardTitle className="text-center text-2xl font-bold">
-            Check your email
+            Confirm your email to continue
           </CardTitle>
           <CardDescription className="text-center">
-            We&apos;ve sent a verification link to{' '}
+            You&apos;re signed in. To finish, open the link we sent to{' '}
             {email ? (
               <span className="font-medium text-foreground">{email}</span>
             ) : (
@@ -158,12 +162,15 @@ function CheckEmailContent() {
         </CardContent>
 
         <CardFooter className="flex flex-col items-center gap-2">
-          <p className="text-sm text-muted-foreground">
-            Wrong email?{' '}
-            <a href="/register" className="text-primary hover:underline">
-              Sign up again
-            </a>
-          </p>
+          {/* Another address signs this account out first: never a second account beside a held one. */}
+          <button
+            type="button"
+            onClick={() => logout('/register')}
+            disabled={isLoggingOut}
+            className="text-sm text-primary hover:underline disabled:opacity-50"
+          >
+            Use a different email
+          </button>
           <LogOutButton />
         </CardFooter>
       </Card>

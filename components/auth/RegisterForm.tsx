@@ -31,6 +31,8 @@ import { emailOnlySchema, registerStep2Schema } from '@/lib/utils/validation';
 import { getFieldError } from '@/lib/utils/api-error';
 
 import { AuthSwitchLink } from './AuthSwitchLink';
+import { AuthRefusalNote } from './AuthRefusalNote';
+import { authRefusalOf } from '@/lib/utils/auth-refusal';
 import { GoogleAuthButton } from './GoogleAuthButton';
 
 type Step = 'initial' | 'gmail-recommendation' | 'email-password';
@@ -283,14 +285,22 @@ function RegisterForm() {
               )}
             />
 
-            {registerError && !registerError.errors && (
-              <p className="text-sm text-destructive">{registerError.message}</p>
-            )}
+            {/* The email already has an account: Sign in (a password account) or
+                Google's button (a Google account), never a second account. */}
+            {authRefusalOf(registerError) ? (
+              <AuthRefusalNote refusal={authRefusalOf(registerError)!} email={email} />
+            ) : (
+              <>
+                {registerError && !registerError.errors && (
+                  <p className="text-sm text-destructive">{registerError.message}</p>
+                )}
 
-            {registerError?.errors?.email && (
-              <p className="text-sm text-destructive">
-                {getFieldError(registerError.errors, 'email')}
-              </p>
+                {registerError?.errors?.email && (
+                  <p className="text-sm text-destructive">
+                    {getFieldError(registerError.errors, 'email')}
+                  </p>
+                )}
+              </>
             )}
 
             <Button type="submit" className="w-full" disabled={isRegistering}>
