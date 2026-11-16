@@ -85,6 +85,7 @@ import {
 import type { AnswerStanding, FinalAnswerClose, LiveGame } from './use-game';
 import { CertificateOffer } from '@/v2/features/settings/certificates/CertificateOffer';
 import { ScoringBadge } from '@/v2/features/quiz/ScoringBadge';
+import { ShareResultsButton } from './ShareResultsButton';
 
 // The card draws Arthur's design on a canvas with its own typefaces (result-card-fonts.ts). Loaded only when a
 // finished game shows a player's card, and on the device only (techlead's review of 4a612ab6).
@@ -788,6 +789,8 @@ export function PodiumStage({
   }, [results, viewerUuid, spaceName]);
 
   const board = useMemo(() => (results ? liveGameBoard(results, viewerUuid) : null), [results, viewerUuid]);
+  // The host who ran it without playing: no card, one Share results (Arthur, 16 November 2026, option 1).
+  const hostWatched = cardInput === null && viewerUuid !== null && results?.game.host?.uuid === viewerUuid;
   /** The full-screen podium has played (or never will: reduced motion, or seen in this tab). */
   const [revealDone, setRevealDone] = useState(() => prefersReducedMotion() || podiumAlreadySeen(gameUuid));
   const finishReveal = useCallback(() => {
@@ -899,7 +902,11 @@ export function PodiumStage({
           Share carries the public results link in the caption. The second
           box ("… is the one to beat" and its own link button) is gone
           (Arthur, 15 November 2026: "The card share already does the work"). */}
-      {cardInput ? <ResultCardShare gameUuid={gameUuid} input={cardInput} /> : null}
+      {cardInput ? (
+        <ResultCardShare gameUuid={gameUuid} input={cardInput} />
+      ) : hostWatched ? (
+        <ShareResultsButton gameUuid={gameUuid} quizTitle={results.game.quiz.title} />
+      ) : null}
 
       {/* A quiz that carries a certificate asks for the printed name here,
           once the scores are in: it is the moment the player is still on. */}
