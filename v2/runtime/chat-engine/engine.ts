@@ -47,6 +47,7 @@ import {
   type IterationEvent,
   type HandoverStartedEvent,
   type HandoverCompleteEvent,
+  type ContextCompactedEvent,
   type TextDeltaEvent,
   type TextDoneEvent,
   type TextResetEvent,
@@ -54,6 +55,7 @@ import {
   type PendingResponseData,
   type RedactionSummary,
 } from '@/types/chat';
+import { compactedStep } from '@/lib/utils/context-compacted';
 import {
   appendAssistantTurn,
   appendUserTurn,
@@ -90,6 +92,7 @@ import { largestSavedId, savedTurnId } from './saved-turn';
 import { STALL_CHECK_MS, hiddenDuring, quietCheckDue, stallVerdict, type StallVerdict } from './stall';
 import { reportChatError } from '../chat-errors/report';
 import type { IBlockedReason } from '@/types/message-pack';
+import { createCallMatcher } from '@/lib/utils/tool-call-match';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -504,9 +507,11 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // Stream mode + jurisdiction persisted so retry replays the same selection.
   let streamMode: 'v2_stream' | undefined;
   let jurisdiction: JurisdictionChoice = { mode: 'auto' };
-  // Tool-call queue: tool name → ordered pending message ids (FIFO match so
-  // tool_complete updates the right row when a tool is called repeatedly).
-  const toolCallQueue = new Map<string, string[]>();
+  // Open tool and handover rows waiting for their result: matched by the
+  // result's tool_call_id when the stream sends one, else by tool name (or
+  // agent) in the order the calls came.
+  const toolCalls = createCallMatcher();
+  const handovers = createCallMatcher();
   // Ref-based cancel guard — immune to React batching / stale closures.
   let isCancelling = false;
   let disposed = false;
@@ -635,6 +640,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
   function addHandoverMessage(event: HandoverStartedEvent): string {
     const id = generateId();
+    handovers.open(event.agent_slug, id, event.tool_call_id);
     const handoverMsg: HandoverMessage = {
       id,
       role: 'assistant',
@@ -654,16 +660,21 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   }
 
   function updateHandoverMessage(event: HandoverCompleteEvent) {
-    const id = agentSlugToMessageId.get(event.agent_slug);
-    agentSlugToMessageId.delete(event.agent_slug);
-    if (id) clearText(id); // stop the specialist's live streaming box
+    // The row this result closes. Unknown (its start was missed) → every open
+    // row for the agent, as before.
+    const rowId = handovers.close(event.agent_slug, event.tool_call_id);
+    const streamingId = agentSlugToMessageId.get(event.agent_slug);
+    if (rowId === undefined || streamingId === rowId) agentSlugToMessageId.delete(event.agent_slug);
+    const stopped = rowId ?? streamingId;
+    if (stopped) clearText(stopped); // stop the specialist's live streaming box
     setMessages((msgs) =>
       msgs.map((msg) => {
         const ho = msg as HandoverMessage;
         if (
           ho.messageType === 'handover' &&
           ho.agentSlug === event.agent_slug &&
-          ho.handoverStatus === 'active'
+          ho.handoverStatus === 'active' &&
+          (rowId === undefined || ho.id === rowId)
         ) {
           return {
             ...msg,
@@ -825,7 +836,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     currentIteration = null;
     executionId = null;
     isCancelling = false;
-    toolCallQueue.clear();
+    toolCalls.clear();
+    handovers.clear();
     resetStreamingBuffers();
     turnsAwaitingIds = 0;
     interruptedExecution = null;
@@ -1450,9 +1462,21 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       updateHandoverMessage(event);
     });
 
-    // tool_calling — add a tool row and queue its id by tool name so tool_complete
-    // matches correctly even with duplicate tool names. Internal `_handover` tool
-    // calls are skipped (not user-visible).
+    // context_compacted — a long reply's earlier reading was summarised: one
+    // quiet step where it happened (context-compacted.ts).
+    es.addEventListener('context_compacted', (e) => {
+      lastEventTime = Date.now();
+      markDataEvent();
+      const event = parseEvent<ContextCompactedEvent>((e as MessageEvent).data);
+      if (!event) return;
+      if (event.seq !== undefined && dedup.has(event.seq)) return;
+      const step = compactedStep(generateId(), new Date(), event.agent_slug);
+      setMessages((msgs) => [...msgs, step]);
+    });
+
+    // tool_calling — add a tool row and open it in `toolCalls`, so tool_complete
+    // closes the right row when several calls are out at once. Internal
+    // `_handover` tool calls are skipped (not user-visible).
     es.addEventListener('tool_calling', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
@@ -1460,15 +1484,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       if (event.tool_call.name === '_handover') return;
-      const msgId = addToolMessage(event);
-      const name = event.tool_call.name;
-      const queue = toolCallQueue.get(name) || [];
-      queue.push(msgId);
-      toolCallQueue.set(name, queue);
+      toolCalls.open(event.tool_call.name, addToolMessage(event), event.tool_call_id);
       handlers.onToolCalling?.(event);
     });
 
-    // tool_complete — consume the first pending id for this tool name (FIFO).
+    // tool_complete — close the row with this tool_call_id, else the oldest open
+    // row for this tool name.
     es.addEventListener('tool_complete', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
@@ -1476,13 +1497,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       if (event.tool_call.name === '_handover') return;
-      const name = event.tool_call.name;
-      const queue = toolCallQueue.get(name) || [];
-      const msgId = queue.shift();
-      if (msgId) {
-        toolCallQueue.set(name, queue);
-        updateToolMessage(msgId, event);
-      }
+      const msgId = toolCalls.close(event.tool_call.name, event.tool_call_id);
+      if (msgId) updateToolMessage(msgId, event);
       handlers.onToolComplete?.(event);
     });
 
@@ -1821,7 +1837,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       eventSource = null;
       executionId = null;
       isCancelling = false;
-      toolCallQueue.clear();
+      toolCalls.clear();
+      handovers.clear();
 
       // CANCELLED: user-initiated stop — NOT an error. The placeholder's
       // partial text stays, marked "Stopped" (matches ChatGPT/Claude cancel behavior).
@@ -1876,7 +1893,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       eventSource = null;
       executionId = null;
       isCancelling = false;
-      toolCallQueue.clear();
+      toolCalls.clear();
+      handovers.clear();
       stopOpenPlaceholder();
       resetStreamingBuffers();
       handlers.onCancelled?.();
@@ -1918,7 +1936,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       stopWatchdog();
       settledExecutions.add(execId);
       isCancelling = false;
-      toolCallQueue.clear();
+      toolCalls.clear();
+      handovers.clear();
       const errorMsg = 'Stream timed out';
       const failedTurn = parseEvent<{ discard_partial?: boolean }>((e as MessageEvent).data)?.discard_partial === true;
       const placeholderId = streamingMessageId;
@@ -1984,7 +2003,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         finalizeOpenPlaceholder('error');
         executionId = null;
         isCancelling = false;
-        toolCallQueue.clear();
+        toolCalls.clear();
+        handovers.clear();
         resetStreamingBuffers();
         const error = 'Authentication required';
         setState((prev) => ({ ...prev, error, isStreaming: false, isCancelling: false }));
@@ -2158,7 +2178,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
    */
   function closeFinishedTurn(): void {
     isCancelling = false;
-    toolCallQueue.clear();
+    toolCalls.clear();
+    handovers.clear();
     const placeholderId = streamingMessageId;
     if (placeholderId) {
       const finalText = liveText.get(placeholderId) ?? '';
@@ -2248,7 +2269,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     messageIdToIteration.clear();
     streamingMessageId = null;
     currentIteration = null;
-    toolCallQueue.clear();
+    toolCalls.clear();
+    handovers.clear();
     isCancelling = false;
     if (eventSource) {
       eventSource.close();
