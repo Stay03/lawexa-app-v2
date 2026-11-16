@@ -78,6 +78,8 @@ import { useWorkflowSelection } from './composer/useWorkflowSelection';
 import { OutOfMessagesStrip } from '@/v2/features/subscription/OutOfMessagesStrip';
 import { homeSendFailure } from './home-send-failure';
 import { PlanEndedSlot } from '@/v2/features/chat-rating/PlanEndedRating';
+import type { MentionOptions } from '@/v2/features/channels/model';
+import { MentionList, useMentionPicker } from '@/v2/features/conversations/conversation/mention-picker';
 
 /**
  * HomeComposer — the ONE v2-native composer both home designs share, now WIRED to
@@ -178,6 +180,10 @@ export interface HomeComposerHandle {
 interface HomeComposerBaseProps {
   value: string;
   onValueChange: (value: string) => void;
+  /** Who `@` offers: a Space's page passes its members and Lawexa (Arthur, 16
+   *  November 2026); the server reads the tags in a new chat's first message as
+   *  in any other. Absent: no picker. */
+  mentionOptions?: MentionOptions | null;
   /** Signed-in users get the full furniture; guests get a bare composer. */
   signedIn: boolean;
   /** Drives the role-aware workflow selector (users vs admin/superadmin). */
@@ -253,8 +259,16 @@ export function HomeComposer({
   sendButtonClassName,
   handle,
   onRedactingChange,
+  mentionOptions = null,
 }: HomeComposerProps) {
   const router = useRouter();
+  const boxRef = useRef<HTMLDivElement>(null);
+  const mentionPicker = useMentionPicker({
+    options: mentionOptions,
+    value,
+    setValue: onValueChange,
+    textarea: () => boxRef.current?.querySelector('textarea') ?? null,
+  });
   const queryClient = useQueryClient();
   const { userId } = useV2Session();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -477,6 +491,7 @@ export function HomeComposer({
       // The turn is committed — clear the draft (removes it from storage) and the
       // attachment chips. We are navigating away, so no further local reset needed.
       onValueChange('');
+      mentionPicker.close();
       // Every thumbnail made for this turn is released as the tray empties.
       for (const u of uploads) if (u.preview) URL.revokeObjectURL(u.preview);
       setUploads([]);
@@ -618,15 +633,19 @@ export function HomeComposer({
           mode (the primitive swaps its own outline; this animates the whole surface
           so the change never just snaps). */}
       <div
+        ref={boxRef}
         className={cn(
-          'rounded-3xl transition-shadow duration-300 ease-out motion-reduce:transition-none',
+          'relative rounded-3xl transition-shadow duration-300 ease-out motion-reduce:transition-none',
           confidential && 'ring-4 ring-emerald-500/15',
         )}
       >
+        {/* The `@` picker of a Space's page, the open chat's own (mention-picker.tsx). */}
+        <MentionList picker={mentionPicker} />
         <PromptInput
           value={value}
           onValueChange={(next) => {
             onValueChange(next);
+            mentionPicker.typed(next);
             if (error) setError(null);
             if (blocked) setBlocked(null);
           }}
@@ -733,6 +752,7 @@ export function HomeComposer({
                landing in one box and vanishing in the other is the kind of
                difference somebody finds by accident. */
             onPasteFiles={(files) => void handleFilesAdded(files)}
+            {...mentionPicker.textareaProps}
           />
 
           <PromptInputActions className="flex items-center gap-2 px-2 pb-1">
