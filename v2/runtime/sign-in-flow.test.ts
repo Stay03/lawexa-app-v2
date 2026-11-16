@@ -88,3 +88,18 @@ test('every way back after sign-in is a path on this site, else the default land
   const auth = read('lib', 'hooks', 'useAuth.ts');
   assert.match(auth, /function getSafeRedirect\(\): string \{\s*return returnPathFromLocation\(\) \?\? '\/';/);
 });
+
+test('sign-up’s first step stops an email that already has an account, and carries on when the check fails', async () => {
+  const { refusalForEmailStatus } = await import('@/lib/utils/auth-refusal');
+  assert.equal(refusalForEmailStatus({ exists: true, provider: 'google' }), 'use_google');
+  assert.equal(refusalForEmailStatus({ exists: true, provider: 'email' }), 'email_taken');
+  assert.equal(refusalForEmailStatus({ exists: true, provider: null }), 'email_taken');
+  assert.equal(refusalForEmailStatus({ exists: false, provider: null }), null);
+  assert.equal(refusalForEmailStatus(null), null);
+  const api = read('lib', 'api', 'auth.ts');
+  assert.match(api, /'\/auth\/email-status',\s*\{ email \}/);
+  const register = read('components', 'auth', 'RegisterForm.tsx');
+  assert.match(register, /const refusal = refusalForEmailStatus\(\(await authApi\.emailStatus\(data\.email\)\)\.data\);\s*if \(refusal\) \{\s*setTaken\(refusal\);\s*return;\s*\}/);
+  assert.match(register, /\} catch \{\s*\/\/ Carry on without the check\.\s*\}/);
+  assert.match(register, /\{taken \? <AuthRefusalNote refusal=\{taken\} email=\{email\} \/> : null\}/);
+});

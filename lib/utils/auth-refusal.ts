@@ -24,6 +24,17 @@ export function authRefusalOf(error: { errors?: unknown } | null | undefined): A
   return code === 'use_google' || code === 'email_taken' ? code : null;
 }
 
+/**
+ * Sign-up's first step asks whether the email already has an account (POST
+ * /auth/email-status), so a student is told at once rather than after filling
+ * in a name and a password: a Google account gets Google's button, any other
+ * Sign in. Null: a new email, carry on.
+ */
+export function refusalForEmailStatus(status: { exists?: unknown; provider?: unknown } | null | undefined): AuthRefusal | null {
+  if (status?.exists !== true) return null;
+  return status.provider === 'google' ? 'use_google' : 'email_taken';
+}
+
 /** Sign in with this email already in the box, coming back where sign-up would have. */
 export function signInWithEmailHref(email: string, returnPath: string | null): string {
   const params = new URLSearchParams({ email });

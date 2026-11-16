@@ -27,6 +27,15 @@ export const authApi = {
     return response.data;
   },
 
+  /** Whether an email already has an account, and how it signs in (Backend 16e0e75d; 5 a minute per IP). */
+  emailStatus: async (email: string) => {
+    const response = await apiClient.post<ApiResponse<{ exists: boolean; provider: 'email' | 'google' | null }>>(
+      '/auth/email-status',
+      { email }
+    );
+    return response.data;
+  },
+
   googleAuthUrl: async () => {
     const response = await apiClient.get<ApiResponse<{ url: string }>>(
       '/auth/google'

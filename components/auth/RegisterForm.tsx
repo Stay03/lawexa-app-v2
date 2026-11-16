@@ -32,7 +32,8 @@ import { getFieldError } from '@/lib/utils/api-error';
 
 import { AuthSwitchLink } from './AuthSwitchLink';
 import { AuthRefusalNote } from './AuthRefusalNote';
-import { authRefusalOf } from '@/lib/utils/auth-refusal';
+import { authRefusalOf, refusalForEmailStatus, type AuthRefusal } from '@/lib/utils/auth-refusal';
+import { authApi } from '@/lib/api/auth';
 import { GoogleAuthButton } from './GoogleAuthButton';
 
 type Step = 'initial' | 'gmail-recommendation' | 'email-password';
@@ -51,6 +52,9 @@ function RegisterForm() {
   const { register, registerError, isRegistering } = useAuth();
   const [step, setStep] = useState<Step>('initial');
   const [email, setEmail] = useState('');
+  // The email already has an account (step one's check), and the check in flight.
+  const [taken, setTaken] = useState<AuthRefusal | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
 
   const emailForm = useForm<EmailFormData>({
     resolver: zodResolver(emailOnlySchema),
@@ -72,8 +76,24 @@ function RegisterForm() {
     return email.toLowerCase().endsWith('@gmail.com');
   };
 
-  const onEmailSubmit = (data: EmailFormData) => {
+  const onEmailSubmit = async (data: EmailFormData) => {
     setEmail(data.email);
+    setTaken(null);
+    // An email that already has an account stops here, with the way to sign in.
+    // A failed check (the throttle, an older server) carries on as before: the
+    // server still refuses a duplicate at the last step, and says why.
+    setCheckingEmail(true);
+    try {
+      const refusal = refusalForEmailStatus((await authApi.emailStatus(data.email)).data);
+      if (refusal) {
+        setTaken(refusal);
+        return;
+      }
+    } catch {
+      // Carry on without the check.
+    } finally {
+      setCheckingEmail(false);
+    }
     if (isGmailEmail(data.email)) {
       setStep('gmail-recommendation');
     } else {
@@ -141,8 +161,10 @@ function RegisterForm() {
                 )}
               />
 
-              <Button type="submit" variant="outline" className="w-full">
-                <Mail className="mr-2 h-4 w-4" />
+              {taken ? <AuthRefusalNote refusal={taken} email={email} /> : null}
+
+              <Button type="submit" variant="outline" className="w-full" disabled={checkingEmail}>
+                {checkingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
                 Continue with Email
               </Button>
             </form>
