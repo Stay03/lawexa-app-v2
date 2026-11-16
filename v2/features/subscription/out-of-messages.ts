@@ -197,8 +197,11 @@ export function outOfMessagesView({
  */
 function spaceBlockView(blocked: IBlockedReason, paidBy: IBlockedPaidBy, timeZone?: string): OutOfMessagesView {
   const spaceCap = blocked.reason === 'space_monthly_limit';
-  const heading = spaceCap || !paidBy.is_you ? 'This Space’s messages are used up' : 'Your messages for this Space are used up';
-  const short = spaceCap || !paidBy.is_you ? 'Space messages used up' : 'Messages used for this Space';
+  // The sender pays from their own plan (a university Space, or the Space's payer themselves): their messages
+  // are used up, not the Space's (Arthur, 16 November 2026). "This Space" only where the Space's own cap or
+  // someone else's plan is what ran out.
+  const heading = spaceCap || !paidBy.is_you ? 'This Space’s messages are used up' : 'Your Lawexa messages are used up';
+  const short = spaceCap || !paidBy.is_you ? 'Space messages used up' : 'Lawexa messages used up';
   // The Space's own month: the server's sentence already says when they come back, so the date shows once.
   const moment = spaceCap ? null : formatResetMoment(blocked.resets_at, timeZone);
   const doors = !paidBy.is_you
