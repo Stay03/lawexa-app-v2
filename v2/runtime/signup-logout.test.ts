@@ -15,16 +15,16 @@ test('Log out is the app’s own log out, drawn only for a signed-in account', (
   assert.match(button, /if \(!isAuthenticated \|\| isGuest\) return null;/);
   assert.match(button, /onClick=\{\(\) => logout\(\)\}/);
   assert.match(button, /disabled=\{isLoggingOut\}/);
-  // useAuth's logout ends on the sign-in page.
+  // useAuth's logout ends on the sign-in page (or sign-up, for check-email's "Use a different email").
   // The session cookie is cleared before the push (lib/session-mirror.ts).
-  assert.match(read('lib', 'hooks', 'useAuth.ts'), /clearAuth\(\);\s*queryClient\.clear\(\);[\s\S]*?await mirrorSession\(null\);\s*router\.push\('\/login'\);/);
+  assert.match(read('lib', 'hooks', 'useAuth.ts'), /clearAuth\(\);\s*queryClient\.clear\(\);[\s\S]*?await mirrorSession\(null\);\s*router\.push\(next \|\| '\/login'\);/);
 });
 
 test('every onboarding step, "Check your email" and the link’s landing page carry it', () => {
   const layout = read('app', '(onboarding)', 'layout.tsx');
   assert.match(layout, /<div className="absolute right-3 top-3 z-10">\s*<LogOutButton \/>\s*<\/div>\s*<main>\{children\}<\/main>/);
   const checkEmail = read('app', '(auth)', 'check-email', 'page.tsx');
-  assert.match(checkEmail, /Sign up again\s*<\/a>\s*<\/p>\s*<LogOutButton \/>\s*<\/CardFooter>/);
+  assert.match(checkEmail, /Use a different email\s*<\/button>\s*<LogOutButton \/>\s*<\/CardFooter>/);
   const verified = read('app', '(auth)', 'email-verified', 'page.tsx');
   assert.match(verified, /<\/Button>\s*<\/div>\s*<LogOutButton \/>\s*<\/CardFooter>/);
 });

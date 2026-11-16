@@ -32,10 +32,12 @@ test('Start needs an account and sends the reveal choice; everyone else gets the
   // Start alone for whoever cannot host; a host's Start opens the choice first (host-choice.test.ts).
   assert.match(source, /\) : mayTake \? \(\s*<RaisedButton className=\{FRONT_BUTTON\} onClick=\{start\}/);
   // Back to the same page after sign-in, a challenge link's ?from= included (returnPath).
-  assert.match(source, /<RaisedButton asChild className=\{cn\(FRONT_BUTTON, 'max-md:basis-full'\)\}>\s*<Link href=\{signInHref\(returnPath\)\}>Sign in to take this quiz<\/Link>/);
+  assert.match(source, /<RaisedButton asChild className=\{cn\(FRONT_BUTTON, 'max-md:basis-full'\)\}>\s*<Link href=\{signInPath\}>Sign in to take this quiz<\/Link>/);
+  // The sign-in path is the return path with the visit's referral code (sign-in-flow.test.ts).
+  assert.match(source, /const signInPath = signInHref\(keepRef\(returnPath, refParam\)\);/);
   // A stale session's 401 is not bounced by the client on this page, so the
   // screen takes the reader to sign in itself.
-  assert.match(source, /if \(status === 401\) \{\s*router\.push\(signInHref\(returnPath\)\);/);
+  assert.match(source, /if \(status === 401\) \{\s*router\.push\(signInPath\);/);
   // The reveal choice opens on the default and offers both ways.
   assert.match(source, /useState<QuizRevealMode>\(DEFAULT_REVEAL_MODE\)/);
   // A small "Answer reveal" choice, not the two big cards (Arthur, 24 October 2026).

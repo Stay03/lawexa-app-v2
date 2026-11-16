@@ -13,10 +13,13 @@ const RETURN_KEY = 'lawexa-auth-return';
 
 /**
  * A path on this site, or null. Only "/x" paths count: never "//host",
- * "/\host" (which browsers read as another site), or a full URL.
+ * "/\host" (which browsers read as another site), or a full URL. No control
+ * character or space either: browsers drop tabs and newlines from an address,
+ * so "/<tab>/host" would open as "//host" (techlead's check, 16 November 2026).
  */
 export function safeReturnPath(raw: string | null | undefined): string | null {
   if (!raw || !raw.startsWith('/') || raw.startsWith('//') || raw.includes('\\')) return null;
+  if (/[\u0000- \u007f]/.test(raw)) return null;
   return raw;
 }
 
@@ -46,4 +49,16 @@ export function takeReturnPath(): string | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * After signing in, signing up or Google: open the next page with a full load,
+ * never a client move (Lucy's live walk, 16 November 2026). Sign-in is an old
+ * page; a client move into a new-design page kept that page's signed-out
+ * session, so the quiz still said "Sign in to take this quiz" until a reload.
+ * A full load renders every page from the signed-in session the server now
+ * holds (`mirrorSession` wrote it first), every guest panel included.
+ */
+export function landAfterSignIn(path: string): void {
+  window.location.assign(path);
 }

@@ -52,7 +52,7 @@ test('the results share a challenge link; the front reads it, shows the banner a
   assert.match(read('v2', 'features', 'quiz', 'solo', 'results', 'AttemptResultsScreen.tsx'), /attemptUuid=\{attempt\.uuid\}/);
 
   const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
-  assert.match(front, /const challengeFrom = challengeFromParam\(useSearchParams\(\)\.get\('from'\)\);/);
+  assert.match(front, /const searchParams = useSearchParams\(\);\s*const challengeFrom = challengeFromParam\(searchParams\.get\('from'\)\);/);
   assert.match(front, /\.\.\.soloQuizQueries\.challenge\(quizUuid, challengeFrom \?\? ''\),\s*enabled: challengeFrom !== null,/);
   assert.match(front, /const startAttempt = useStartAttempt\(quizUuid, viewerId, challengeFrom\);/);
   assert.match(front, /\{challenger \? \(\s*<div\s+role="note"/);
