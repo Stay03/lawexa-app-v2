@@ -301,12 +301,12 @@ export function whoseTurn(input: {
 }
 
 /**
- * Lawexa answers only messages that tag it in this chat's space (Stay, 15
- * November 2026, thread 39c968a5): the Space's own `lawexa_tag_only`. A server
- * before the switch sends nothing, which reads as off.
+ * Lawexa answers only messages that tag it (or reply to it) in this chat's
+ * space. That is every university Space and no other (Stay, 16 November 2026,
+ * thread 39c968a5: no owner switch; every other Space answers as before).
  */
-export function lawexaTagOnly(space: { lawexa_tag_only?: boolean } | null | undefined): boolean {
-  return space?.lawexa_tag_only === true;
+export function lawexaTagOnly(space: { is_university?: boolean } | null | undefined): boolean {
+  return space?.is_university === true;
 }
 
 /** The composer's words in a space where Lawexa answers only when tagged. */

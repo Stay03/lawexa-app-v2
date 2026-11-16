@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
@@ -289,10 +288,6 @@ export function SpaceFormDialog({
   const [error, setError] = useState<string | null>(null);
   /** Creating was refused at a Space limit (organisation plans): the way to the plans goes beside the sentence. */
   const [atLimit, setAtLimit] = useState(false);
-  // Lawexa answers only when tagged in this Space's chats (thread 39c968a5):
-  // the owner's to set, so only the owner's edit form shows it.
-  const ownsSpace = isEdit && space?.my_role === 'owner';
-  const [tagOnly, setTagOnly] = useState(space?.lawexa_tag_only === true);
 
   // The kind this form is about: the space's own in edit; a new space is
   // always a shared one (see the docblock).
@@ -308,8 +303,7 @@ export function SpaceFormDialog({
     name.trim() !== (space?.name ?? '') ||
     type !== space?.type ||
     description.trim() !== (space?.description ?? '') ||
-    isPrivate !== (space?.is_private ?? true) ||
-    (ownsSpace && tagOnly !== (space?.lawexa_tag_only === true));
+    isPrivate !== (space?.is_private ?? true);
 
   const canSubmit = type !== null && name.trim().length > 0 && changed && !submitting;
   const showsTypeStep = !isEdit && urlType === null;
@@ -386,8 +380,6 @@ export function SpaceFormDialog({
           // 16 October 2026: PUT /spaces reads `null` as "clear").
           description: trimmedDescription || null,
           is_private: isPrivate,
-          // Sent only by the owner, and only when it changed.
-          ...(ownsSpace && tagOnly !== (space.lawexa_tag_only === true) && { lawexa_tag_only: tagOnly }),
         },
         {
           onSuccess: () => onOpenChange(false),
@@ -486,26 +478,6 @@ export function SpaceFormDialog({
     />
   ) : null;
 
-  const tagOnlyField = ownsSpace ? (
-    <div className="flex items-start justify-between gap-4 rounded-2xl border border-border p-4">
-      <div className="min-w-0 space-y-1">
-        <Label htmlFor={`${uid}-tag-only`} className="text-sm font-medium">
-          Lawexa answers only when tagged
-        </Label>
-        <p id={`${uid}-tag-only-hint`} className="text-sm text-muted-foreground">
-          In this Space&rsquo;s chats, Lawexa replies only to messages that tag @Lawexa. Other messages stay between people.
-        </p>
-      </div>
-      <Switch
-        id={`${uid}-tag-only`}
-        checked={tagOnly}
-        onCheckedChange={setTagOnly}
-        aria-describedby={`${uid}-tag-only-hint`}
-        className="mt-0.5 shrink-0"
-      />
-    </div>
-  ) : null;
-
   const chosen = TYPE_CHOICES.find((choice) => choice.value === type) ?? null;
 
   return (
@@ -583,7 +555,6 @@ export function SpaceFormDialog({
             onChange={setEditType}
           />
           {privacyField}
-          {tagOnlyField}
         </div>
       ) : showsTypeStep ? (
         <div key="type" className={cn('space-y-4', stepMotion(entered))}>
