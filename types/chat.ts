@@ -408,6 +408,8 @@ export interface ToolCallingEvent {
   iteration: number;
   status: 'tool_calling';
   tool_call: ToolCall;
+  /** Same value on a call and its result (Backend tool-call-ids); absent on older streams. */
+  tool_call_id?: string;
   timestamp: string;
   context?: 'handover';
   agent_slug?: string;
@@ -418,6 +420,8 @@ export interface ToolCompleteEvent {
   iteration: number;
   status: 'tool_complete';
   tool_call: ToolCall;
+  /** Same value on a call and its result (Backend tool-call-ids); absent on older streams. */
+  tool_call_id?: string;
   tool_result: ToolResult;
   latency_ms: number;
   timestamp: string;
@@ -526,8 +530,22 @@ export interface HandoverStartedEvent {
   iteration: number;
   status: 'handover_started';
   agent_slug: string;
+  /** Same value on a call and its result (Backend tool-call-ids); absent on older streams. */
+  tool_call_id?: string;
   query: string;
   handover_type?: 'consult' | 'transfer';
+  timestamp: string;
+}
+
+/** A long reply's earlier reading was summarised to keep going (Backend, 16 November 2026). */
+export interface ContextCompactedEvent {
+  seq?: number;
+  iteration: number;
+  tokens_before?: number;
+  tokens_after?: number;
+  context?: 'handover' | null;
+  /** The specialist whose loop compacted; null for Lawexa itself. */
+  agent_slug?: string | null;
   timestamp: string;
 }
 
@@ -536,6 +554,8 @@ export interface HandoverCompleteEvent {
   iteration: number;
   status: 'handover_complete';
   agent_slug: string;
+  /** Same value on a call and its result (Backend tool-call-ids); absent on older streams. */
+  tool_call_id?: string;
   success: boolean;
   response_preview?: string;
   content?: string;
@@ -872,7 +892,9 @@ export interface ApiMessage {
       | 'question_answers'
       | 'skill_draft'
       | 'quiz_game_live'
-      | 'quiz_game_finished';
+      | 'quiz_game_finished'
+      // A long reply's earlier reading was summarised (context-compacted.ts).
+      | 'context_compacted';
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
     /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */
@@ -902,6 +924,9 @@ export interface ApiMessage {
     quiz_uuid?: string;
     tool_name?: string;
     tool_parameters?: Record<string, unknown>;
+    /** On tool_call, tool_result, handover and handover_result rows: the same value on a call and its
+     *  result (Backend tool-call-ids). Absent on older rows. */
+    tool_call_id?: string;
     success?: boolean;
     latency_ms?: number;
     iteration?: number;

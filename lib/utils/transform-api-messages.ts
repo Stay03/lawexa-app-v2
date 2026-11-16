@@ -12,6 +12,8 @@ import { draftEditBases, resolveDraftEdits } from './draft-edits';
 import { readCardAnswers, readQuestionCard } from './question-card';
 import { readSkillDraftCard } from './skill-draft';
 import { isRedactionSummary } from './redaction-summary';
+import { createResultPool } from './tool-call-match';
+import { compactedStep } from './context-compacted';
 
 /**
  * Transform the server's persisted message shape (`ApiMessage[]`) into the
@@ -162,25 +164,31 @@ export function transformApiMessages(
     }
   }
 
-  // Build lists of tool results by iteration for matching (lists handle iteration resets across executions)
-  const toolResultsByIteration = new Map<number, ApiMessage[]>();
-  apiMessages.forEach(msg => {
-    if (msg.role === 'tool' && msg.metadata?.type === 'tool_result' && msg.metadata.iteration !== undefined) {
-      const list = toolResultsByIteration.get(msg.metadata.iteration) || [];
-      list.push(msg);
-      toolResultsByIteration.set(msg.metadata.iteration, list);
-    }
+  // Each call's result: by tool_call_id when both rows carry it, else the next
+  // result saved at the call's iteration (lists handle iteration resets across
+  // executions).
+  const readMatch = (row: ApiMessage) => ({
+    iteration: row.metadata?.iteration,
+    callId: row.metadata?.tool_call_id,
   });
-
-  // Build lists of handover results by iteration for matching
-  const handoverResultsByIteration = new Map<number, ApiMessage[]>();
-  apiMessages.forEach(msg => {
-    if (msg.role === 'assistant' && msg.metadata?.type === 'handover_result' && msg.metadata.iteration !== undefined) {
-      const list = handoverResultsByIteration.get(msg.metadata.iteration) || [];
-      list.push(msg);
-      handoverResultsByIteration.set(msg.metadata.iteration, list);
-    }
-  });
+  const callIdsOf = (type: 'tool_call' | 'handover') =>
+    new Set(
+      apiMessages.flatMap((row) =>
+        row.role === 'assistant' && row.metadata?.type === type && row.metadata.tool_call_id
+          ? [row.metadata.tool_call_id]
+          : [],
+      ),
+    );
+  const toolResults = createResultPool(
+    apiMessages.filter((row) => row.role === 'tool' && row.metadata?.type === 'tool_result'),
+    readMatch,
+    callIdsOf('tool_call'),
+  );
+  const handoverResults = createResultPool(
+    apiMessages.filter((row) => row.role === 'assistant' && row.metadata?.type === 'handover_result'),
+    readMatch,
+    callIdsOf('handover'),
+  );
 
   // A FAILED TURN (Backend, failed-turns-free): its text rows come back with
   // `status: 'failed'` and no content, and the turn was not charged. One
@@ -266,10 +274,7 @@ export function transformApiMessages(
     }
     // Handover message - orchestrator delegating to sub-agent
     else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'handover') {
-      const iteration = apiMsg.metadata.iteration;
-      const handoverResult = iteration !== undefined
-        ? handoverResultsByIteration.get(iteration)?.shift()
-        : undefined;
+      const handoverResult = handoverResults.take(apiMsg.metadata.iteration, apiMsg.metadata.tool_call_id);
 
       // Extract handover result content if available
       let handoverResultContent: string | undefined;
@@ -313,11 +318,13 @@ export function transformApiMessages(
     else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'narration') {
       continue;
     }
+    // A long reply's earlier reading was summarised: the same quiet step as live.
+    else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'context_compacted') {
+      messages.push(compactedStep(`msg_${apiMsg.id}`, new Date(apiMsg.created_at), apiMsg.metadata.agent_slug));
+    }
     // Assistant tool call - transform to ToolMessage with result
     else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'tool_call') {
-      const toolResult = apiMsg.metadata.iteration !== undefined
-        ? toolResultsByIteration.get(apiMsg.metadata.iteration)?.shift()
-        : undefined;
+      const toolResult = toolResults.take(apiMsg.metadata.iteration, apiMsg.metadata.tool_call_id);
 
       // Parse tool result if available. A result left out of a lazy download
       // (v2's `?results=lazy`) keeps its state and label from its metadata,
