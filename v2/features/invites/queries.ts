@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
@@ -15,6 +16,7 @@ import type {
 import { channelsQueries } from '@/v2/features/channels/queries';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { STALE_TIMES } from '@/v2/runtime/query';
+import { DISCOVER_PER_PAGE, nextDiscoverPage } from '@/v2/features/spaces/discover/discover-model';
 
 /**
  * Queries and mutations for invite links, the two waiting lists, and browsing
@@ -150,10 +152,13 @@ export function useRequestChannelAccess(channelUuid: string) {
   });
 }
 
-export function useDiscoverSpaces(params: DiscoverSpacesParams) {
-  return useQuery({
+/** Public Spaces, a page of 20 at a time; the list asks for the next as it scrolls. */
+export function useDiscoverSpaces(params: Pick<DiscoverSpacesParams, 'search'>) {
+  return useInfiniteQuery({
     queryKey: inviteKeys.discover(params),
-    queryFn: () => discoverApi.spaces(params),
+    queryFn: ({ pageParam }) => discoverApi.spaces({ ...params, per_page: DISCOVER_PER_PAGE, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: nextDiscoverPage,
     // Read on every visit: the card's Join or Open is the reader's membership, which a
     // join anywhere else changes (an invite link, a Space's own page). A list kept for a
     // minute offered Join to a member, and that Join answered 409 (Arthur, 14 November 2026).

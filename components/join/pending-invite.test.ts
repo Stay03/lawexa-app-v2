@@ -65,7 +65,7 @@ test('…but never from the steps before it, nor for a guest, an unconfirmed acc
 
 test('the return is mounted once for the whole app, and moves only when it should', () => {
   const layout = read('app', 'layout.tsx');
-  assert.match(layout, /<PwaInstallProvider \/>[\s\S]{0,200}<PendingInviteReturn \/>\s*\{children\}/);
+  assert.match(layout, /<PwaInstallProvider \/>[\s\S]{0,200}<PendingInviteReturn \/>[\s\S]{0,200}<PendingSpaceReturn \/>\s*\{children\}/);
   const finisher = read('components', 'join', 'PendingInviteReturn.tsx');
   assert.match(finisher, /const go = shouldReturnToInvite\(\{ code, pathname, signedIn, isGuest, verified \}\);/);
   assert.match(finisher, /if \(go && code\) router\.replace\(inviteJoinPath\(code\)\);/);

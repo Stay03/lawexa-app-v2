@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from 'react';
 
+import { isASignInStep } from '@/lib/utils/sign-in-steps';
+
 /**
  * The invite code somebody arrived with, held across sign-up and email
  * confirmation so we can finish the join when they come back.
@@ -141,28 +143,12 @@ export function signUpToJoinHref(code: string): string {
   return `/register?redirect=${encodeURIComponent(inviteJoinPath(code))}`;
 }
 
-/**
- * The pages a held invite never pulls a person away from: the invite itself,
- * and every step of signing in, signing up, confirming an email and
- * onboarding. Once they are past those, the invite takes them back.
- */
-const STEPS_BEFORE_THE_INVITE = [
-  '/join',
-  '/login',
-  '/register',
-  '/check-email',
-  '/verify-email',
-  '/email-verified',
-  '/forgot-password',
-  '/reset-password',
-  '/auth',
-  '/onboarding',
-];
 
 /**
  * Whether a held invite should take this person back to it now: they are
  * signed in with a confirmed account (not a guest, whose join the server
- * refuses), and not in the middle of one of the steps above.
+ * refuses), and not in the middle of signing in or onboarding
+ * (`isASignInStep`, lib/utils/sign-in-steps.ts).
  *
  * Sign-up confirms the email on another page and onboarding comes after, and
  * neither keeps `?redirect=`, so this is what finishes the join for a brand
@@ -182,8 +168,7 @@ export function shouldReturnToInvite({
   verified: boolean;
 }): boolean {
   if (!code || !signedIn || isGuest || !verified) return false;
-  const path = pathname.startsWith('/v2/') ? pathname.slice(3) : pathname;
-  return !STEPS_BEFORE_THE_INVITE.some((step) => path === step || path.startsWith(`${step}/`));
+  return !isASignInStep(pathname);
 }
 
 /**

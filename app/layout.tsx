@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { AttributionBootstrap } from "@/components/AttributionBootstrap";
 import { PwaInstallProvider } from "@/components/pwa/PwaInstallProvider";
 import { PendingInviteReturn } from "@/components/join/PendingInviteReturn";
+import { PendingSpaceReturn } from "@/components/join/PendingSpaceReturn";
 
 const comfortaa = Comfortaa({ subsets: ["latin"], variable: "--font-comfortaa" });
 const fraunces = Fraunces({
@@ -91,6 +92,8 @@ export default function RootLayout({
             <PwaInstallProvider />
             {/* A held Space invite takes its person back once they can join. */}
             <PendingInviteReturn />
+            {/* So does a Space opened before signing in or signing up. */}
+            <PendingSpaceReturn />
             {children}
             <Toaster position="top-right" />
           </QueryProvider>

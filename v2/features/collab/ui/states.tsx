@@ -3,6 +3,7 @@ import { MessagesSquare } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { CollabMessage } from './CollabMessage';
+import { AuthLink } from './AuthLink';
 
 /**
  * states — the two audience refusals the `CollabAccessGate` renders. Both are
@@ -19,8 +20,11 @@ import { CollabMessage } from './CollabMessage';
  * promises nothing about security.
  */
 
-/** Signed out — the queries are gated off, so this replaces a 401 screen. */
-export function CollabSignedOutState() {
+/**
+ * Signed out — the queries are gated off, so this replaces a 401 screen. At a
+ * Space's address (`returnTo`), signing in comes back to that Space.
+ */
+export function CollabSignedOutState({ returnTo = null }: { returnTo?: string | null }) {
   return (
     <CollabMessage
       icon={MessagesSquare}
@@ -29,7 +33,9 @@ export function CollabSignedOutState() {
       description="Shared spaces for your team or study group: conversations, folders and files. Sign in to pick up where your group left off."
       action={
         <Button asChild size="sm">
-          <Link href="/login">Sign in</Link>
+          <AuthLink to="login" returnTo={returnTo}>
+            Sign in
+          </AuthLink>
         </Button>
       }
     />
@@ -41,7 +47,7 @@ export function CollabSignedOutState() {
  * URL. A guest is a view-only pre-registration identity, so the honest answer
  * is a registration nudge: registering IS the door (D1).
  */
-export function CollabCreateAccountState() {
+export function CollabCreateAccountState({ returnTo = null }: { returnTo?: string | null }) {
   return (
     <CollabMessage
       icon={MessagesSquare}
@@ -51,10 +57,14 @@ export function CollabCreateAccountState() {
       action={
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button asChild size="sm">
-            <Link href="/register">Create free account</Link>
+            <AuthLink to="register" returnTo={returnTo}>
+              Create free account
+            </AuthLink>
           </Button>
           <Button asChild variant="outline" size="sm">
-            <Link href="/login">Sign in</Link>
+            <AuthLink to="login" returnTo={returnTo}>
+              Sign in
+            </AuthLink>
           </Button>
         </div>
       }
