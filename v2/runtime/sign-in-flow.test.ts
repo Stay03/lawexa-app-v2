@@ -103,3 +103,24 @@ test('sign-up’s first step stops an email that already has an account, and car
   assert.match(register, /\} catch \{\s*\/\/ Carry on without the check\.\s*\}/);
   assert.match(register, /\{taken \? <AuthRefusalNote refusal=\{taken\} email=\{email\} \/> : null\}/);
 });
+
+test('sign-in spots a Google account as the email box is left, and says nothing about any other email', async () => {
+  const { signsInWithGoogle, looksLikeEmail } = await import('@/lib/utils/auth-refusal');
+  assert.equal(signsInWithGoogle({ exists: true, provider: 'google' }), true);
+  assert.equal(signsInWithGoogle({ exists: true, provider: 'email' }), false);
+  assert.equal(signsInWithGoogle({ exists: false, provider: null }), false, 'unknown reads as an email account: nothing revealed');
+  assert.equal(signsInWithGoogle(null), false);
+  assert.equal(looksLikeEmail('ada@example.test'), true);
+  assert.equal(looksLikeEmail('ada@example'), false);
+  assert.equal(looksLikeEmail('ada'), false);
+  const login = read('components', 'auth', 'LoginForm.tsx');
+  // Asked on leaving the email box, once per email; a failed check says nothing.
+  assert.match(login, /onBlur=\{\(\) => \{\s*field\.onBlur\(\);\s*void askHowItSignsIn\(field\.value\);\s*\}\}/);
+  assert.match(login, /if \(!looksLikeEmail\(email\) \|\| lastAsked\.current === email\) return;/);
+  assert.match(login, /if \(signsInWithGoogle\(status\)\) setGoogleEmail\(email\);\s*\} catch \{\s*\/\/ The throttle or a fault: the form stays as it is\.\s*\}/);
+  // A Google account swaps the password and Sign in for Google's line and button, while the box holds that email.
+  assert.match(login, /const googleOnly = googleEmail !== null && googleEmail === typedEmail\.trim\(\)\.toLowerCase\(\);/);
+  assert.match(login, /\{googleOnly \? \(\s*<AuthRefusalNote refusal="use_google" email=\{typedEmail\} \/>\s*\) : \(/);
+  // The 401 use_google stays as the backstop.
+  assert.match(login, /\{refusal \? \(\s*<AuthRefusalNote refusal=\{refusal\}/);
+});

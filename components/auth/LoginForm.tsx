@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useRef, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 
@@ -30,7 +30,8 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { loginSchema } from '@/lib/utils/validation';
 import { AuthSwitchLink } from './AuthSwitchLink';
 import { AuthRefusalNote } from './AuthRefusalNote';
-import { authRefusalOf, emailFromSearch } from '@/lib/utils/auth-refusal';
+import { authRefusalOf, emailFromSearch, looksLikeEmail, signsInWithGoogle } from '@/lib/utils/auth-refusal';
+import { authApi } from '@/lib/api/auth';
 import type { LoginFormData } from '@/types/auth';
 
 import { GoogleAuthButton } from './GoogleAuthButton';
@@ -54,6 +55,27 @@ function LoginForm() {
 
   // An account made with Google has no password: say so, with its button (lib/utils/auth-refusal.ts).
   const refusal = authRefusalOf(loginError);
+
+  /* SPOTTED BEFORE THE PASSWORD (Stay, 16 November 2026). Leaving the email box
+     asks how that email signs in; a Google account swaps the password for
+     Google's button. The swap holds only while the box still holds that email,
+     so changing it brings the password back. Anything else, a failed check
+     included, leaves the form as it is and says nothing. */
+  const typedEmail = useWatch({ control: form.control, name: 'email' });
+  const [googleEmail, setGoogleEmail] = useState<string | null>(null);
+  const lastAsked = useRef<string | null>(null);
+  const googleOnly = googleEmail !== null && googleEmail === typedEmail.trim().toLowerCase();
+  const askHowItSignsIn = async (value: string) => {
+    const email = value.trim().toLowerCase();
+    if (!looksLikeEmail(email) || lastAsked.current === email) return;
+    lastAsked.current = email;
+    try {
+      const status = (await authApi.emailStatus(email)).data;
+      if (signsInWithGoogle(status)) setGoogleEmail(email);
+    } catch {
+      // The throttle or a fault: the form stays as it is.
+    }
+  };
 
   const onSubmit = (data: LoginFormData) => {
     login(data);
@@ -82,6 +104,10 @@ function LoginForm() {
                       type="email"
                       placeholder="you@example.com"
                       {...field}
+                      onBlur={() => {
+                        field.onBlur();
+                        void askHowItSignsIn(field.value);
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
@@ -89,49 +115,60 @@ function LoginForm() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center justify-between">
-                    <FormLabel>Password</FormLabel>
-                    <a
-                      href="/forgot-password"
-                      className="text-sm text-muted-foreground hover:text-primary"
-                    >
-                      Forgot password?
-                    </a>
-                  </div>
-                  <FormControl>
-                    <PasswordInput placeholder="••••••••" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {googleOnly ? (
+              <AuthRefusalNote refusal="use_google" email={typedEmail} />
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center justify-between">
+                        <FormLabel>Password</FormLabel>
+                        <a
+                          href="/forgot-password"
+                          className="text-sm text-muted-foreground hover:text-primary"
+                        >
+                          Forgot password?
+                        </a>
+                      </div>
+                      <FormControl>
+                        <PasswordInput placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {refusal ? (
-              <AuthRefusalNote refusal={refusal} email={form.getValues('email')} />
-            ) : loginError ? (
-              <p className="text-sm text-destructive">{loginError.message}</p>
-            ) : null}
+                {refusal ? (
+                  <AuthRefusalNote refusal={refusal} email={form.getValues('email')} />
+                ) : loginError ? (
+                  <p className="text-sm text-destructive">{loginError.message}</p>
+                ) : null}
 
-            <Button type="submit" className="w-full" disabled={isLoggingIn}>
-              {isLoggingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign in
-            </Button>
+                <Button type="submit" className="w-full" disabled={isLoggingIn}>
+                  {isLoggingIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Sign in
+                </Button>
+              </>
+            )}
           </form>
         </Form>
 
-        <div className="relative my-6">
-          <Separator />
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
-            OR
-          </span>
-        </div>
+        {/* The swapped form already holds Google's button: no second one below it. */}
+        {googleOnly ? null : (
+          <>
+            <div className="relative my-6">
+              <Separator />
+              <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                OR
+              </span>
+            </div>
 
-        <GoogleAuthButton />
+            <GoogleAuthButton />
+          </>
+        )}
       </CardContent>
 
       <CardFooter className="flex justify-center">

@@ -35,6 +35,22 @@ export function refusalForEmailStatus(status: { exists?: unknown; provider?: unk
   return status.provider === 'google' ? 'use_google' : 'email_taken';
 }
 
+/**
+ * Sign-in asks how an email signs in when the reader leaves the email box
+ * (Stay, 16 November 2026: Google accounts typed with a password). Only a
+ * Google account changes the form; an email account and an unknown email read
+ * the same, so the check never says whether an address has an account.
+ */
+export function signsInWithGoogle(status: { exists?: unknown; provider?: unknown } | null | undefined): boolean {
+  return status?.exists === true && status.provider === 'google';
+}
+
+/** Worth asking about: something that looks like an email address. */
+export function looksLikeEmail(value: string): boolean {
+  const email = value.trim();
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
 /** Sign in with this email already in the box, coming back where sign-up would have. */
 export function signInWithEmailHref(email: string, returnPath: string | null): string {
   const params = new URLSearchParams({ email });
