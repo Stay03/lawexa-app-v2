@@ -1,0 +1,126 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+import { EMAIL_TAKEN_LINE, USE_GOOGLE_LINE, authRefusalOf, emailFromSearch, signInWithEmailHref } from '@/lib/utils/auth-refusal';
+import { keepRef } from './sign-in-href';
+
+/* Students given registration links couldn't sign in (Arthur, 16 November 2026). Google-made accounts were tried
+ * with a password, a taken email gave no way to sign in, and a page opened after sign-in still showed its
+ * signed-out state until a reload (Lucy's live walk). TEST DATA. */
+
+const read = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), 'utf8').replace(/\r\n/g, '\n');
+
+test('the server’s codes are read; every other answer reads as before', () => {
+  assert.equal(authRefusalOf({ errors: { code: 'use_google', provider: 'google' } }), 'use_google');
+  assert.equal(authRefusalOf({ errors: { code: 'email_taken', email: ['The email has already been taken.'] } }), 'email_taken');
+  assert.equal(authRefusalOf({ errors: null }), null, 'a wrong password: "Invalid credentials." as before');
+  assert.equal(authRefusalOf({ errors: { email: ['The email has already been taken.'] } }), null, 'an older server');
+  assert.equal(authRefusalOf({ errors: { code: 'something_else' } }), null);
+  assert.equal(authRefusalOf(null), null);
+  assert.equal(USE_GOOGLE_LINE, 'This account signs in with Google.');
+  assert.equal(EMAIL_TAKEN_LINE, 'You already have an account. Sign in instead.');
+});
+
+test('Sign in from a taken email carries the email and the way back; only an email is read back', () => {
+  assert.equal(signInWithEmailHref('ada@example.test', null), '/login?email=ada%40example.test');
+  assert.equal(signInWithEmailHref('ada@example.test', '/quiz/q/abc?ref=magician'), '/login?email=ada%40example.test&redirect=%2Fquiz%2Fq%2Fabc%3Fref%3Dmagician');
+  assert.equal(emailFromSearch('?email=ada%40example.test&redirect=%2F'), 'ada@example.test');
+  assert.equal(emailFromSearch('?email=not-an-email'), '');
+  assert.equal(emailFromSearch(''), '');
+});
+
+test('the way back after sign-in keeps the referral code, and only a plain one', () => {
+  assert.equal(keepRef('/quiz/q/abc', 'magician'), '/quiz/q/abc?ref=magician');
+  assert.equal(keepRef('/quiz/q/abc?from=x', 'magician'), '/quiz/q/abc?from=x&ref=magician');
+  assert.equal(keepRef('/quiz/q/abc', null), '/quiz/q/abc');
+  assert.equal(keepRef('/quiz/q/abc', '"><script>'), '/quiz/q/abc');
+  const front = read('v2', 'features', 'quiz', 'solo', 'front', 'QuizFrontScreen.tsx');
+  assert.match(front, /const signInPath = signInHref\(keepRef\(returnPath, refParam\)\);/);
+  assert.match(front, /router\.push\(signInPath\);/);
+  assert.match(front, /<Link href=\{signInPath\}>Sign in to take this quiz<\/Link>/);
+});
+
+test('after sign-in, sign-up and Google the next page opens with a full load, so it is signed in', () => {
+  const auth = read('lib', 'hooks', 'useAuth.ts');
+  assert.equal((auth.match(/landAfterSignIn\(/g) ?? []).length, 4, 'login and register, each to check-email or onward');
+  assert.doesNotMatch(auth, /router\.push\(needsOnboarding/);
+  assert.doesNotMatch(auth, /router\.push\(`\/check-email/);
+  const google = read('app', '(auth)', 'auth', 'google', 'callback', 'page.tsx');
+  assert.match(google, /landAfterSignIn\(needsOnboarding \? '\/onboarding' : \(back \?\? '\/'\)\);/);
+  assert.match(read('lib', 'utils', 'auth-return.ts'), /export function landAfterSignIn\(path: string\): void \{\s*window\.location\.assign\(path\);/);
+});
+
+test('the forms say what to do instead: Google’s button, or Sign in', () => {
+  const login = read('components', 'auth', 'LoginForm.tsx');
+  assert.match(login, /\{refusal \? \(\s*<AuthRefusalNote refusal=\{refusal\} email=\{form\.getValues\('email'\)\} \/>/);
+  assert.match(login, /const email = emailFromSearch\(window\.location\.search\);\s*if \(email\) form\.setValue\('email', email\);/);
+  const register = read('components', 'auth', 'RegisterForm.tsx');
+  assert.match(register, /\{authRefusalOf\(registerError\) \? \(\s*<AuthRefusalNote refusal=\{authRefusalOf\(registerError\)!\} email=\{email\} \/>/);
+  const note = read('components', 'auth', 'AuthRefusalNote.tsx');
+  assert.match(note, /if \(refusal === 'use_google'\) \{[\s\S]{0,300}<GoogleAuthButton \/>/);
+  assert.match(note, /href=\{signInWithEmailHref\(email, returnPath\)\}/);
+});
+
+test('"check your email" says the account is signed in, and another address signs out first', () => {
+  const page = read('app', '(auth)', 'check-email', 'page.tsx');
+  assert.match(page, /Confirm your email to continue/);
+  assert.match(page, /You&apos;re signed in\. To finish, open the link we sent to/);
+  assert.match(page, /onClick=\{\(\) => logout\('\/register'\)\}/);
+  assert.doesNotMatch(page, /Sign up again/);
+  const auth = read('lib', 'hooks', 'useAuth.ts');
+  assert.match(auth, /useMutation<Awaited<ReturnType<typeof authApi\.logout>>, Error, '\/login' \| '\/register' \| void>\(/);
+  assert.match(auth, /router\.push\(next \|\| '\/login'\);/);
+});
+
+test('every way back after sign-in is a path on this site, else the default landing', async () => {
+  const { safeReturnPath } = await import('@/lib/utils/auth-return');
+  assert.equal(safeReturnPath('/quiz/q/abc?ref=magician'), '/quiz/q/abc?ref=magician');
+  assert.equal(safeReturnPath('/'), '/');
+  for (const bad of ['//evil.com', 'https://evil.com', '/\\evil.com', 'javascript:alert(1)', '\\\\evil.com', '/\t/evil.com', '/\n/evil.com', ' /x', '', null, undefined]) {
+    assert.equal(safeReturnPath(bad), null, JSON.stringify(bad));
+  }
+  // Each landing reads its way back through the check: the address's ?redirect=, and the Google round trip's kept path.
+  const back = read('lib', 'utils', 'auth-return.ts');
+  assert.match(back, /return safeReturnPath\(new URLSearchParams\(window\.location\.search\)\.get\('redirect'\)\);/);
+  assert.match(back, /const path = safeReturnPath\(window\.sessionStorage\.getItem\(RETURN_KEY\)\);/);
+  const auth = read('lib', 'hooks', 'useAuth.ts');
+  assert.match(auth, /function getSafeRedirect\(\): string \{\s*return returnPathFromLocation\(\) \?\? '\/';/);
+});
+
+test('sign-up’s first step stops an email that already has an account, and carries on when the check fails', async () => {
+  const { refusalForEmailStatus } = await import('@/lib/utils/auth-refusal');
+  assert.equal(refusalForEmailStatus({ exists: true, provider: 'google' }), 'use_google');
+  assert.equal(refusalForEmailStatus({ exists: true, provider: 'email' }), 'email_taken');
+  assert.equal(refusalForEmailStatus({ exists: true, provider: null }), 'email_taken');
+  assert.equal(refusalForEmailStatus({ exists: false, provider: null }), null);
+  assert.equal(refusalForEmailStatus(null), null);
+  const api = read('lib', 'api', 'auth.ts');
+  assert.match(api, /'\/auth\/email-status',\s*\{ email \}/);
+  const register = read('components', 'auth', 'RegisterForm.tsx');
+  assert.match(register, /const refusal = refusalForEmailStatus\(\(await authApi\.emailStatus\(data\.email\)\)\.data\);\s*if \(refusal\) \{\s*setTaken\(refusal\);\s*return;\s*\}/);
+  assert.match(register, /\} catch \{\s*\/\/ Carry on without the check\.\s*\}/);
+  assert.match(register, /\{taken \? <AuthRefusalNote refusal=\{taken\} email=\{email\} \/> : null\}/);
+});
+
+test('sign-in spots a Google account as the email box is left, and says nothing about any other email', async () => {
+  const { signsInWithGoogle, looksLikeEmail } = await import('@/lib/utils/auth-refusal');
+  assert.equal(signsInWithGoogle({ exists: true, provider: 'google' }), true);
+  assert.equal(signsInWithGoogle({ exists: true, provider: 'email' }), false);
+  assert.equal(signsInWithGoogle({ exists: false, provider: null }), false, 'unknown reads as an email account: nothing revealed');
+  assert.equal(signsInWithGoogle(null), false);
+  assert.equal(looksLikeEmail('ada@example.test'), true);
+  assert.equal(looksLikeEmail('ada@example'), false);
+  assert.equal(looksLikeEmail('ada'), false);
+  const login = read('components', 'auth', 'LoginForm.tsx');
+  // Asked on leaving the email box, once per email; a failed check says nothing.
+  assert.match(login, /onBlur=\{\(\) => \{\s*field\.onBlur\(\);\s*void askHowItSignsIn\(field\.value\);\s*\}\}/);
+  assert.match(login, /if \(!looksLikeEmail\(email\) \|\| lastAsked\.current === email\) return;/);
+  assert.match(login, /if \(signsInWithGoogle\(status\)\) setGoogleEmail\(email\);\s*\} catch \{\s*\/\/ The throttle or a fault: the form stays as it is\.\s*\}/);
+  // A Google account swaps the password and Sign in for Google's line and button, while the box holds that email.
+  assert.match(login, /const googleOnly = googleEmail !== null && googleEmail === typedEmail\.trim\(\)\.toLowerCase\(\);/);
+  assert.match(login, /\{googleOnly \? \(\s*<AuthRefusalNote refusal="use_google" email=\{typedEmail\} \/>\s*\) : \(/);
+  // The 401 use_google stays as the backstop.
+  assert.match(login, /\{refusal \? \(\s*<AuthRefusalNote refusal=\{refusal\}/);
+});

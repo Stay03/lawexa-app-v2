@@ -39,7 +39,7 @@ import { channelQuizQueries } from '@/v2/features/channels/quiz/queries';
 import { visibilityFace } from '@/v2/features/channels/quiz/model';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { signInHref } from '@/v2/runtime/sign-in-href';
+import { keepRef, signInHref } from '@/v2/runtime/sign-in-href';
 import { replaceUrlParams } from '@/v2/runtime/url-params';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
@@ -156,7 +156,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   // Through a friend's challenge link (`?from=`, Backend 7a007a8c): their
   // score is shown to beat, and the attempt names theirs, so they hear how
   // this one went. A banner that does not load leaves the quiz as it is.
-  const challengeFrom = challengeFromParam(useSearchParams().get('from'));
+  const searchParams = useSearchParams();
+  const challengeFrom = challengeFromParam(searchParams.get('from'));
+  const refParam = searchParams.get('ref');
   const challengeQuery = useQuery({
     ...soloQuizQueries.challenge(quizUuid, challengeFrom ?? ''),
     enabled: challengeFrom !== null,
@@ -164,6 +166,8 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const challenger = challengeQuery.data?.data ?? null;
   // Signing in comes back to the challenge, not the bare quiz.
   const returnPath = challengeFrom ? quizChallengeHref(quizUuid, challengeFrom) : pathname;
+  // Sign-in comes back to the link as given, its referral code included (`keepRef`).
+  const signInPath = signInHref(keepRef(returnPath, refParam));
 
   const [revealMode, setRevealMode] = useState<QuizRevealMode>(DEFAULT_REVEAL_MODE);
   const startAttempt = useStartAttempt(quizUuid, viewerId, challengeFrom);
@@ -261,7 +265,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
         // The session ended under us: the client leaves this public page
         // alone on a 401, so the screen takes the reader to sign in itself.
         if (status === 401) {
-          router.push(signInHref(returnPath));
+          router.push(signInPath);
           return;
         }
         setStartError(message);
@@ -456,7 +460,7 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                 </RaisedButton>
               ) : (
                 <RaisedButton asChild className={cn(FRONT_BUTTON, 'max-md:basis-full')}>
-                  <Link href={signInHref(returnPath)}>Sign in to take this quiz</Link>
+                  <Link href={signInPath}>Sign in to take this quiz</Link>
                 </RaisedButton>
               )}
               {challenge.available && (
