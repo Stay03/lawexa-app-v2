@@ -12,6 +12,7 @@ import { draftEditBases, resolveDraftEdits } from './draft-edits';
 import { readCardAnswers, readQuestionCard } from './question-card';
 import { readSkillDraftCard } from './skill-draft';
 import { isRedactionSummary } from './redaction-summary';
+import { compactedStep } from './context-compacted';
 
 /**
  * Transform the server's persisted message shape (`ApiMessage[]`) into the
@@ -312,6 +313,10 @@ export function transformApiMessages(
     // Skip narration messages — shown transiently during streaming via onNarration callback
     else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'narration') {
       continue;
+    }
+    // A long reply's earlier reading was summarised: the same quiet step as live.
+    else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'context_compacted') {
+      messages.push(compactedStep(`msg_${apiMsg.id}`, new Date(apiMsg.created_at), apiMsg.metadata.agent_slug));
     }
     // Assistant tool call - transform to ToolMessage with result
     else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'tool_call') {

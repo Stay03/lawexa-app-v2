@@ -47,6 +47,7 @@ import {
   type IterationEvent,
   type HandoverStartedEvent,
   type HandoverCompleteEvent,
+  type ContextCompactedEvent,
   type TextDeltaEvent,
   type TextDoneEvent,
   type TextResetEvent,
@@ -54,6 +55,7 @@ import {
   type PendingResponseData,
   type RedactionSummary,
 } from '@/types/chat';
+import { compactedStep } from '@/lib/utils/context-compacted';
 import {
   appendAssistantTurn,
   appendUserTurn,
@@ -1448,6 +1450,18 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       updateHandoverMessage(event);
+    });
+
+    // context_compacted — a long reply's earlier reading was summarised: one
+    // quiet step where it happened (context-compacted.ts).
+    es.addEventListener('context_compacted', (e) => {
+      lastEventTime = Date.now();
+      markDataEvent();
+      const event = parseEvent<ContextCompactedEvent>((e as MessageEvent).data);
+      if (!event) return;
+      if (event.seq !== undefined && dedup.has(event.seq)) return;
+      const step = compactedStep(generateId(), new Date(), event.agent_slug);
+      setMessages((msgs) => [...msgs, step]);
     });
 
     // tool_calling — add a tool row and queue its id by tool name so tool_complete

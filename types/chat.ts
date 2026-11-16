@@ -531,6 +531,18 @@ export interface HandoverStartedEvent {
   timestamp: string;
 }
 
+/** A long reply's earlier reading was summarised to keep going (Backend, 16 November 2026). */
+export interface ContextCompactedEvent {
+  seq?: number;
+  iteration: number;
+  tokens_before?: number;
+  tokens_after?: number;
+  context?: 'handover' | null;
+  /** The specialist whose loop compacted; null for Lawexa itself. */
+  agent_slug?: string | null;
+  timestamp: string;
+}
+
 export interface HandoverCompleteEvent {
   seq?: number;
   iteration: number;
@@ -862,7 +874,9 @@ export interface ApiMessage {
       | 'question_answers'
       | 'skill_draft'
       | 'quiz_game_live'
-      | 'quiz_game_finished';
+      | 'quiz_game_finished'
+      // A long reply's earlier reading was summarised (context-compacted.ts).
+      | 'context_compacted';
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
     /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */
