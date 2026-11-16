@@ -129,6 +129,7 @@ const surfaceFor = (conversationId: string): RouteComposerSurface => ({
   questionCard: null,
   answerCard: async () => null,
   mentionOptions: null,
+  lawexaTagOnly: false,
   quoteToneOf: null,
   spaceUuid: null,
 });

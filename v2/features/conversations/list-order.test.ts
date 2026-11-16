@@ -187,7 +187,7 @@ test('a send moves its chat only once the server took it', () => {
   // Called once, in the 2xx branch, before the stream opens.
   assert.equal(sendFn.match(/handlers\.onAccepted\?\.\(\)/g)?.length, 1);
   const accepted = block(sendFn, 'if (response.success) {', '} else {');
-  assert.match(accepted, /handlers\.onAccepted\?\.\(\);[\s\S]*connectToStream\(response\.data\.execution_id\);/);
+  assert.match(accepted, /handlers\.onAccepted\?\.\(\);[\s\S]*connectToStream\(executionId\);/);
   // The engine's other turns (an attach, a recovery) never call it.
   assert.equal(engine.match(/onAccepted/g)?.length, 1);
 

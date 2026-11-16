@@ -447,7 +447,9 @@ export function FloatingPromptInput({ className, contextId, contextType, context
         if (!conversationId) {
           setConversationId(response.data.conversation_id);
         }
-        connectToStream(response.data.execution_id);
+        // No stream when the server starts none (a tag-only Space, v2's switch).
+        if (response.data.execution_id) connectToStream(response.data.execution_id);
+        else setIsStreaming(false);
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
         setError(response.message || 'Failed to send message');

@@ -42,11 +42,20 @@ const ROSTER = [
   member('gone', 'Left Person', 'leftp', 'editor', false),
 ];
 
-test('the picker offers active members with a handle, Viewers included, and not Lawexa', () => {
+test('the picker offers active members with a handle, Viewers included', () => {
   const options = spaceMentionOptions(ROSTER);
-  assert.deepEqual(options.candidates.map((c) => c.handle), ['adaobi', 'chidi', 'bolaade']);
+  assert.deepEqual(options.candidates.filter((c) => c.user !== null).map((c) => c.handle), ['adaobi', 'chidi', 'bolaade']);
   assert.deepEqual(options.untaggable, ['Nkem Eze']);
-  assert.equal(options.candidates.some((c) => c.handle === 'lawexa'), false);
+});
+
+test('in every Space the picker offers Lawexa first', () => {
+  // Arthur, 16 November 2026: "still can't see lawexa in the names". The server reads @lawexa in every Space.
+  const options = spaceMentionOptions(ROSTER);
+  assert.deepEqual(options.candidates.map((c) => c.handle), ['lawexa', 'adaobi', 'chidi', 'bolaade']);
+  assert.equal(options.candidates[0].name, 'Lawexa');
+  assert.deepEqual(mentionSuggestions(options, 'law').map((c) => c.handle), ['lawexa']);
+  // First, so six people never push it out of the list.
+  assert.equal(mentionSuggestions(options, '')[0].handle, 'lawexa');
 });
 
 test('an @ after a space or at the start opens the picker; an e-mail address does not', () => {
@@ -63,7 +72,7 @@ test('the picker matches handle or name, and names the untaggable it matches', (
   const options = spaceMentionOptions(ROSTER);
   assert.deepEqual(mentionSuggestions(options, 'ok').map((c) => c.handle), ['chidi'], 'Okonkwo, by name');
   assert.deepEqual(mentionSuggestions(options, 'bola').map((c) => c.handle), ['bolaade']);
-  assert.equal(mentionSuggestions(options, '').length, 3);
+  assert.equal(mentionSuggestions(options, '').length, 4, 'Lawexa and the three people');
   assert.equal(untaggableFor(options, 'nk'), "Nkem Eze can't be tagged yet — no handle.");
   assert.equal(untaggableFor(options, 'chi'), '');
   const many = spaceMentionOptions(Array.from({ length: 10 }, (_, i) => member(`u${i}`, `Person ${i}`, `p${i}`)));
@@ -135,11 +144,16 @@ test('the wiring: the picker in a space chat, chips in the bubble, the writer’
   // The screen publishes the options; the shell's docked box hands them on.
   assert.match(readHere('ConversationScreen.tsx'), /publishRouteComposer\(\{[\s\S]*?mentionOptions,/);
   assert.match(readHere('ChatDock.tsx'), /mentionOptions=\{surface\.mentionOptions\}/);
+  // One picker for both boxes (mention-picker.tsx): the open chat's and the Space page's.
+  const picker = readHere('mention-picker.tsx');
+  assert.match(picker, /if \(!options\) return;\s*detect\(next, textarea\(\)\?\.selectionStart \?\? next\.length\);/);
+  assert.match(picker, /if \(!open \|\| event\.nativeEvent\.isComposing\) return;/);
+  assert.match(picker, /<ul id=\{picker\.listId\} role="listbox" aria-label="Mention someone">/);
   const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /if \(mentionOptions\) \{\s*detectMention\(next, textarea\(\)\?\.selectionStart \?\? next\.length\);/);
-  assert.match(composer, /onKeyDown=\{handleMentionKeys\}/);
-  assert.match(composer, /if \(!pickerOpen \|\| event\.nativeEvent\.isComposing\) return;/);
-  assert.match(composer, /<ul id=\{listId\} role="listbox" aria-label="Mention someone">/);
+  assert.match(composer, /const mentionPicker = useMentionPicker\(\{ options: mentionOptions, value: input, setValue: setInput, textarea \}\);/);
+  assert.match(composer, /mentionPicker\.typed\(next\);/);
+  assert.match(composer, /\{\.\.\.mentionPicker\.textareaProps\}/);
+  assert.match(composer, /<MentionList picker=\{mentionPicker\} \/>/);
   const row = readHere('rows', 'UserMessageRow.tsx');
   assert.match(row, /const mentions = useMemo\(\(\) => mentionMetadata\(message\.mentions\), \[message\.mentions\]\);/);
   assert.match(row, /\{unmatched && <p className="text-muted-foreground mt-1 text-xs">\{unmatched\}<\/p>\}/);
@@ -147,28 +161,31 @@ test('the wiring: the picker in a space chat, chips in the bubble, the writer’
 });
 
 test('the pill’s key order changed in one shared component: every caller still sends on Enter', () => {
-  // Every PromptInputTextarea in the app, v1 and v2. Only the conversation
-  // composer (the /c screen and the case dock) passes onKeyDown; the rest leave
-  // the pill's own Enter-to-send exactly as it was.
+  // Every PromptInputTextarea in the app, v1 and v2. Only the two Space boxes
+  // (the open chat's and the Space page's) hand it a key handler, the shared
+  // picker's; the rest leave the pill's own Enter-to-send exactly as it was.
   const callers: Record<string, string[]> = {
-    'v2/shell/designs/HomeComposer.tsx': [],
+    'v2/shell/designs/HomeComposer.tsx': ['mentionPicker.textareaProps'],
     'components/ui/floating-prompt-input.tsx': [],
     'app/(main)/c/[conversationId]/conversation-client.tsx': [],
     'app/(main)/page.tsx': [],
-    'v2/features/conversations/conversation/ConversationComposer.tsx': ['handleMentionKeys'],
+    'v2/features/conversations/conversation/ConversationComposer.tsx': ['mentionPicker.textareaProps'],
   };
   for (const [file, handlers] of Object.entries(callers)) {
     const source = read(...file.split('/'));
     const uses = [...source.matchAll(/<PromptInputTextarea\b([\s\S]*?)\/>/g)].map((m) => m[1]);
     assert.ok(uses.length > 0, `${file} renders the pill's textarea`);
-    const passed = uses.flatMap((props) => [...props.matchAll(/onKeyDown=\{(\w+)\}/g)].map((m) => m[1]));
+    const passed = uses.flatMap((props) => [
+      ...[...props.matchAll(/onKeyDown=\{(\w+)\}/g)].map((m) => m[1]),
+      ...[...props.matchAll(/\{\.\.\.([\w.]+)\}/g)].map((m) => m[1]),
+    ]);
     assert.deepEqual(passed, handlers, file);
   }
   // The one handler leaves every key alone unless the picker is on screen, and
   // only prevents Enter or Tab when it has a person to pick.
-  const composer = readHere('ConversationComposer.tsx');
-  const handler = composer.match(/const handleMentionKeys = [\s\S]*?\n {2}\};/)?.[0] ?? '';
-  assert.match(handler, /^const handleMentionKeys = \(event: React\.KeyboardEvent<HTMLTextAreaElement>\) => \{\s*\/\/[^\n]*\n\s*if \(!pickerOpen \|\| event\.nativeEvent\.isComposing\) return;/);
+  const picker = readHere('mention-picker.tsx');
+  const handler = picker.match(/const onKeyDown = [\s\S]*?\n {2}\};/)?.[0] ?? '';
+  assert.match(handler, /^const onKeyDown = \(event: React\.KeyboardEvent<HTMLTextAreaElement>\) => \{\s*\/\/[^\n]*\n\s*if \(!open \|\| event\.nativeEvent\.isComposing\) return;/);
   assert.match(handler, /if \(suggestions\.length > 0\) \{[\s\S]*?if \(event\.key === 'Enter' \|\| event\.key === 'Tab'\) \{\s*event\.preventDefault\(\);/);
   // And the list above is every caller: a new one has to be added and looked at.
   const found = (dir: string): string[] =>
@@ -216,13 +233,13 @@ test('the review of ecaf2d5 and the rendered check: what each finding changed', 
   // 2. A question with a pasted card still draws its tags.
   const row = readHere('rows', 'UserMessageRow.tsx');
   assert.match(row, /\{mentions \? \(\s*<MentionText content=\{remainingText\} metadata=\{mentions\} viewerUuid=\{viewerUuid\} \/>\s*\) : \(\s*remainingText\s*\)\}/);
-  // 3. A caret moved without typing reads the @ there again.
-  const composer = readHere('ConversationComposer.tsx');
-  assert.match(composer, /onSelect=\{\(event\) => detectMention\(event\.currentTarget\.value, event\.currentTarget\.selectionStart\)\}/);
+  // 3. A caret moved without typing reads the @ there again (the shared picker, mention-picker.tsx).
+  const picker = readHere('mention-picker.tsx');
+  assert.match(picker, /onSelect: \(event: React\.SyntheticEvent<HTMLTextAreaElement>\) =>\s*detect\(event\.currentTarget\.value, event\.currentTarget\.selectionStart\),/);
   // 4. A combobox: the list is owned and the highlight announced; no button in an option.
-  assert.match(composer, /role: 'combobox',[\s\S]{0,200}?'aria-controls': listId,[\s\S]{0,120}?'aria-activedescendant':/);
-  assert.match(composer, /<ul id=\{listId\} role="listbox" aria-label="Mention someone">/);
-  assert.match(composer, /<li\s+key=\{candidate\.key\}\s+id=\{optionId\(index\)\}\s+role="option"/);
+  assert.match(picker, /role: 'combobox',[\s\S]{0,200}?'aria-controls': listId,[\s\S]{0,120}?'aria-activedescendant':/);
+  assert.match(picker, /<ul id=\{picker\.listId\} role="listbox" aria-label="Mention someone">/);
+  assert.match(picker, /<li\s+key=\{candidate\.key\}\s+id=\{picker\.optionId\(index\)\}\s+role="option"/);
   // The rendered check: a jump leaves the bottom before it scrolls, so a row
   // that grows meanwhile cannot snap the view back down (?m= in Chromium).
   const list = readHere('MessageList.tsx');
@@ -231,11 +248,11 @@ test('the review of ecaf2d5 and the rendered check: what each finding changed', 
 
 test('the picker leaves the reader out (techlead, 15 October 2026)', () => {
   const options = spaceMentionOptions(ROSTER, 'o');
-  assert.deepEqual(options.candidates.map((c) => c.handle), ['chidi', 'bolaade']);
+  assert.deepEqual(options.candidates.map((c) => c.handle), ['lawexa', 'chidi', 'bolaade']);
   // Nor is a reader without a handle named in the can't-be-tagged line.
   assert.deepEqual(spaceMentionOptions(ROSTER, 'n').untaggable, []);
   // Without a known reader, everyone is offered.
-  assert.equal(spaceMentionOptions(ROSTER).candidates.length, 3);
+  assert.equal(spaceMentionOptions(ROSTER).candidates.length, 4, 'Lawexa and the three people');
 });
 
 test('a quote of a question that tags someone reads their name, as the bubble does', async () => {
@@ -257,4 +274,17 @@ test('a quote of a question that tags someone reads their name, as the bubble do
   assert.equal(target?.preview, '@User Tester can you confirm the notice dates?');
   const controller = readHere('useConversationController.ts');
   assert.match(controller, /const viewerUuid = useAuthStore\(\(state\) => state\.user\?\.uuid \?\? null\);/);
+});
+
+test('the Space page box has the same @ picker, with the members and Lawexa (Arthur, 16 November 2026)', () => {
+  const home = read('v2', 'shell', 'designs', 'HomeComposer.tsx');
+  assert.match(home, /const mentionPicker = useMentionPicker\(\{\s*options: mentionOptions,\s*value,\s*setValue: onValueChange,/);
+  assert.match(home, /onValueChange\(next\);\s*mentionPicker\.typed\(next\);/);
+  assert.match(home, /\{\.\.\.mentionPicker\.textareaProps\}/);
+  assert.match(home, /<MentionList picker=\{mentionPicker\} \/>/);
+  assert.match(home, /'relative rounded-3xl transition-shadow/);
+  const dock = read('v2', 'features', 'spaces', 'detail', 'content', 'SpaceChatDock.tsx');
+  assert.match(dock, /const members = useCollabSpaceScope\(\)\?\.members;/);
+  assert.match(dock, /members \? spaceMentionOptions\(members, session\.userUuid\) : null/);
+  assert.match(dock, /mentionOptions=\{mentionOptions\}/);
 });

@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { spaceLimitFromError } from '@/lib/utils/space-limit';
 import { PlansLink } from '@/v2/features/files/PlansLink';
-import type { Space, SpaceKind, SpaceType } from '@/types/collab';
+import type { Space, SpaceKind, SpaceType, SpaceWhoPays } from '@/types/collab';
 import { ChoiceCards, type Choice } from '@/v2/features/collab/kit/ChoiceCards';
 import { readHistoryStamp } from '@/v2/runtime/url-params';
 import { OVERLAY_STAMP_KEY, useUrlOverlay } from '@/v2/runtime/use-url-overlay';
@@ -31,6 +31,15 @@ import {
   spaceKind,
 } from '../model';
 import { useCreateSpace, useUpdateSpace } from '../mutations';
+import {
+  UNIVERSITY_PAYS_LINE,
+  WHO_PAYS_LEGEND,
+  payerStopsLine,
+  savedWhoPays,
+  whoPaysChoices,
+  whoPaysField,
+  whoPaysPatch,
+} from './space-who-pays';
 
 /**
  * SpaceFormDialog — create or edit a space.
@@ -288,6 +297,12 @@ export function SpaceFormDialog({
   const [error, setError] = useState<string | null>(null);
   /** Creating was refused at a Space limit (organisation plans): the way to the plans goes beside the sentence. */
   const [atLimit, setAtLimit] = useState(false);
+  // Who pays for Lawexa here (thread 39c968a5): the owner's choice in the edit
+  // form, a fixed line in a university Space, nothing for anyone else.
+  const ownsSpace = isEdit && space?.my_role === 'owner';
+  const whoPaysShown = whoPaysField(space, ownsSpace);
+  const [whoPays, setWhoPays] = useState<SpaceWhoPays>(savedWhoPays(space));
+  const whoPaysChange = whoPaysPatch(space, ownsSpace, whoPays);
 
   // The kind this form is about: the space's own in edit; a new space is
   // always a shared one (see the docblock).
@@ -303,7 +318,8 @@ export function SpaceFormDialog({
     name.trim() !== (space?.name ?? '') ||
     type !== space?.type ||
     description.trim() !== (space?.description ?? '') ||
-    isPrivate !== (space?.is_private ?? true);
+    isPrivate !== (space?.is_private ?? true) ||
+    whoPaysChange.who_pays !== undefined;
 
   const canSubmit = type !== null && name.trim().length > 0 && changed && !submitting;
   const showsTypeStep = !isEdit && urlType === null;
@@ -380,6 +396,8 @@ export function SpaceFormDialog({
           // 16 October 2026: PUT /spaces reads `null` as "clear").
           description: trimmedDescription || null,
           is_private: isPrivate,
+          // Sent only by the owner, and only when it changed.
+          ...whoPaysChange,
         },
         {
           onSuccess: () => onOpenChange(false),
@@ -478,6 +496,29 @@ export function SpaceFormDialog({
     />
   ) : null;
 
+  const payerStops = payerStopsLine(space, whoPays);
+  const whoPaysBlock =
+    whoPaysShown === 'university' ? (
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-foreground">{WHO_PAYS_LEGEND}</p>
+        <p className="text-sm text-muted-foreground">{UNIVERSITY_PAYS_LINE}</p>
+      </div>
+    ) : whoPaysShown === 'choice' ? (
+      <div className="space-y-2">
+        <ChoiceCards
+          legend={WHO_PAYS_LEGEND}
+          choices={whoPaysChoices(space?.payer)}
+          value={whoPays}
+          onChange={setWhoPays}
+        />
+        {payerStops ? (
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {payerStops}
+          </p>
+        ) : null}
+      </div>
+    ) : null;
+
   const chosen = TYPE_CHOICES.find((choice) => choice.value === type) ?? null;
 
   return (
@@ -555,6 +596,7 @@ export function SpaceFormDialog({
             onChange={setEditType}
           />
           {privacyField}
+          {whoPaysBlock}
         </div>
       ) : showsTypeStep ? (
         <div key="type" className={cn('space-y-4', stepMotion(entered))}>

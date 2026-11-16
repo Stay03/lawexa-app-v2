@@ -45,6 +45,6 @@ test('both composers upload through it, with their space', () => {
   assert.doesNotMatch(home, /chatApi\.uploadDocument/);
   // A chat's box is the shell's dock (message box B): the screen publishes the
   // chat's space, and the dock hands it to the composer.
-  assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /const \{ mentionOptions, spaceUuid \} = controller;[\s\S]*?publishRouteComposer\(\{[\s\S]*?spaceUuid,\s*\}\);/);
+  assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /const \{ mentionOptions, lawexaTagOnly, spaceUuid \} = controller;[\s\S]*?publishRouteComposer\(\{[\s\S]*?spaceUuid,\s*\}\);/);
   assert.match(read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx'), /spaceUuid=\{surface\.spaceUuid\}/);
 });

@@ -1,8 +1,10 @@
 'use client';
 
-import { useRef, useState, type Ref } from 'react';
+import { useMemo, useRef, useState, type Ref } from 'react';
 
 import { useV2Session } from '@/v2/runtime/session-context';
+import { useCollabSpaceScope } from '@/v2/features/collab/shell/space-scope';
+import { spaceMentionOptions } from '@/v2/features/conversations/conversation/mention-options';
 import {
   HomeComposer,
   type HomeComposerHandle,
@@ -66,6 +68,13 @@ export function SpaceChatDock({
   placeholder?: string;
 }) {
   const session = useV2Session();
+  // `@` offers the Space's members and Lawexa, as in its chats (Arthur, 16
+  // November 2026). The frame already holds the roster on this page: no request.
+  const members = useCollabSpaceScope()?.members;
+  const mentionOptions = useMemo(
+    () => (members ? spaceMentionOptions(members, session.userUuid) : null),
+    [members, session.userUuid],
+  );
   const [value, setValue] = useState(() => readAsk({ kind: 'space', spaceUuid: space.uuid }) ?? '');
   const box = useRef<HTMLDivElement>(null);
   useAskArrival(box, { kind: 'space', spaceUuid: space.uuid });
@@ -83,6 +92,7 @@ export function SpaceChatDock({
           signedIn={session.signedIn}
           role={session.role ?? undefined}
           space={space}
+          mentionOptions={mentionOptions}
           handle={handle}
           placeholder={placeholder}
           className="p-2.5 shadow-lg"

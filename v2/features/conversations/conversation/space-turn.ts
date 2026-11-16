@@ -299,3 +299,15 @@ export function whoseTurn(input: {
   }
   return { kind: 'unknown', since: turnStart(refusal?.since) };
 }
+
+/**
+ * Lawexa answers only messages that tag it (or reply to it) in this chat's
+ * space. That is every university Space and no other (Stay, 16 November 2026,
+ * thread 39c968a5: no owner switch; every other Space answers as before).
+ */
+export function lawexaTagOnly(space: { is_university?: boolean } | null | undefined): boolean {
+  return space?.is_university === true;
+}
+
+/** The composer's words in a space where Lawexa answers only when tagged. */
+export const TAG_ONLY_PLACEHOLDER = 'Tag @Lawexa to ask Lawexa';
