@@ -65,6 +65,7 @@ import {
 } from './mention-options';
 import type { MentionCandidate, MentionOptions } from '@/v2/features/channels/model';
 import { MemberAvatar } from '@/v2/features/collab/membership/MemberAvatar';
+import { LawexaAvatar } from '@/v2/features/channels/ui/avatars';
 import { draftWithRefused, heldSendLabel, UNNAMED_ASKER, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
 
@@ -953,7 +954,12 @@ export function ConversationComposer({
                       index === activeIndex && 'bg-accent',
                     )}
                   >
-                    <MemberAvatar user={candidate.user} className="size-6 shrink-0" />
+                    {/* Lawexa (offered in a tag-only Space) wears its own mark, as in a channel's picker. */}
+                    {candidate.user === null ? (
+                      <LawexaAvatar size="sm" className="size-6 shrink-0" />
+                    ) : (
+                      <MemberAvatar user={candidate.user} className="size-6 shrink-0" />
+                    )}
                     <span className="min-w-0 flex-1 truncate">{candidate.name}</span>
                     <span className="text-muted-foreground shrink-0 text-xs">@{candidate.handle}</span>
                   </li>
