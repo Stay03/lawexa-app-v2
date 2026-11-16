@@ -182,8 +182,13 @@ export function shouldReturnToInvite({
   verified: boolean;
 }): boolean {
   if (!code || !signedIn || isGuest || !verified) return false;
+  return !isASignInStep(pathname);
+}
+
+/** Whether this page is the invite or a step of signing in, signing up, confirming an email or onboarding. */
+export function isASignInStep(pathname: string): boolean {
   const path = pathname.startsWith('/v2/') ? pathname.slice(3) : pathname;
-  return !STEPS_BEFORE_THE_INVITE.some((step) => path === step || path.startsWith(`${step}/`));
+  return STEPS_BEFORE_THE_INVITE.some((step) => path === step || path.startsWith(`${step}/`));
 }
 
 /**
