@@ -77,6 +77,9 @@ test('opening the box, the stack keeps its height and the card gives the box wha
   const fold = read(...here, 'CardBoxFold.tsx');
   assert.doesNotMatch(fold, /transition-\[grid-template-rows/);
   assert.match(fold, /'grid shrink-0'/);
+  // Open, nothing clips the box: its `@` picker floats above it (it was cut off in every Space chat).
+  assert.match(fold, /<div className=\{cn\('min-h-0', folded && 'overflow-hidden'\)\}>\{children\}<\/div>/);
+  assert.doesNotMatch(fold, /"min-h-0 overflow-hidden"/);
   assert.match(read('v2', 'features', 'conversations', 'conversation', 'ConversationComposer.tsx'), /focus: \(\) => rootRef\.current\?\.querySelector\('textarea'\)\?\.focus\(\{ preventScroll: true \}\),/);
 });
 
