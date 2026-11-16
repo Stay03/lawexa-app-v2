@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 
 import type { Channel } from '@/types/collab';
-import { spaceReturnPath } from '@/components/join/pending-space';
+import { spaceReturnPath } from '@/lib/utils/pending-space';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { canOpenTeamChannels, collabAccessState, isTeamChannelsPath } from './model';

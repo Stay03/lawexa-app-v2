@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { pendingSpaceStep, signInToSpaceHref, signUpToSpaceHref, spaceReturnPath } from '@/components/join/pending-space';
-import { isASignInStep, shouldReturnToInvite } from '@/components/join/pending-invite';
+import { pendingSpaceStep, signInToSpaceHref, signUpToSpaceHref, spaceReturnPath } from '@/lib/utils/pending-space';
+import { isASignInStep } from '@/lib/utils/sign-in-steps';
 
 /* A Space link opened by someone signed out (Lucy's walk, 16 November 2026): the Space is kept through
  * sign-in, sign-up, email confirmation and onboarding, and they land on it afterwards. Only a Space's own
@@ -58,12 +58,13 @@ test('the held Space takes them back once signed in and confirmed, past every si
   assert.equal(at('/', { space: null }), null);
 });
 
-test('the invite’s own return is unchanged by the shared step check', () => {
+test('the shared step check: the invite and every sign-in and onboarding step, with or without /v2', () => {
   assert.equal(isASignInStep('/join/abc'), true);
   assert.equal(isASignInStep('/v2/onboarding'), true);
+  assert.equal(isASignInStep('/check-email'), true);
   assert.equal(isASignInStep('/spaces'), false);
-  assert.equal(shouldReturnToInvite({ code: 'abc', pathname: '/', signedIn: true, isGuest: false, verified: true }), true);
-  assert.equal(shouldReturnToInvite({ code: 'abc', pathname: '/check-email', signedIn: true, isGuest: false, verified: true }), false);
+  // The invite's own return reads the same check (components/join/pending-invite.test.ts holds its rules).
+  assert.match(read('components', 'join', 'pending-invite.ts'), /return !isASignInStep\(pathname\);/);
 });
 
 test('the panels at a Space’s address link back to it; the return is mounted for the whole app', () => {

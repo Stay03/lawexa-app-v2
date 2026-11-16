@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 
-import { isASignInStep } from './pending-invite';
+import { isASignInStep } from './sign-in-steps';
 
 /**
  * The Space somebody opened before they had an account, held across sign-in,

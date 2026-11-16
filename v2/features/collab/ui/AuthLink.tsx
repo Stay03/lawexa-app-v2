@@ -3,7 +3,7 @@
 import type { ComponentProps } from 'react';
 import Link from 'next/link';
 
-import { rememberPendingSpace, signInToSpaceHref, signUpToSpaceHref } from '@/components/join/pending-space';
+import { rememberPendingSpace, signInToSpaceHref, signUpToSpaceHref } from '@/lib/utils/pending-space';
 
 /**
  * Sign in, or create an account, from a collab panel. At a Space's address

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 
 import { useAuthStore } from '@/lib/stores/authStore';
 import { usePendingInvite } from './pending-invite';
-import { forgetPendingSpace, pendingSpaceStep, usePendingSpace } from './pending-space';
+import { forgetPendingSpace, pendingSpaceStep, usePendingSpace } from '@/lib/utils/pending-space';
 
 /**
  * PendingSpaceReturn — takes a person back to the Space they opened before
