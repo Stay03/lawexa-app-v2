@@ -4,10 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { adminCertificatesApi } from '@/lib/api/certificates';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { withCorrectedCertificate, type PageOf } from '@/lib/certificates/model';
 import type {
   CertificateProgrammePayload,
   CertificateTemplatePayload,
   IssueCertificatesPayload,
+  IssuedCertificate,
 } from '@/types/certificates';
 
 /******************************************************************************
@@ -85,6 +87,26 @@ export function useIssuedCertificates(programmeUuid: string, page: number) {
 /******************************************************************************
                                  Mutations
 ******************************************************************************/
+
+/**
+ * Correct one certificate's printed name. The corrected row replaces the old
+ * one in every loaded page of its programme's list, so it shows at once
+ * without a reload; the number and dates are unchanged.
+ */
+export function useCorrectCertificateName(programmeUuid: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ certificateUuid, printedName }: { certificateUuid: string; printedName: string }) =>
+      adminCertificatesApi.correctPrintedName(certificateUuid, printedName),
+    meta: { silentError: true },
+    onSuccess: ({ certificate }) => {
+      queryClient.setQueriesData<PageOf<IssuedCertificate>>(
+        { queryKey: [...certificateKeys.programme(programmeUuid), 'certificates'] },
+        (page) => withCorrectedCertificate(page, certificate),
+      );
+    },
+  });
+}
 
 /** Creates a draft or saves an existing template. */
 export function useSaveCertificateTemplate() {

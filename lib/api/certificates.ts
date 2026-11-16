@@ -225,6 +225,21 @@ export const adminCertificatesApi = {
     return response.data.data as QuizCertificateLink;
   },
 
+  /**
+   * Correct the name printed on one issued certificate (Backend b6a83af4): its
+   * PDF is drawn again at once; the number, verify link and issued date stay,
+   * and no email goes out. 422 with `errors.printed_name` for an empty or
+   * too-long name. Answers the certificate as the list shows it, and the
+   * server's sentence ("Name corrected..." or "...already shows that name.").
+   */
+  correctPrintedName: async (certificateUuid: string, printedName: string): Promise<{ certificate: IssuedCertificate; message: string }> => {
+    const response = await apiClient.put<ApiResponse<IssuedCertificate>>(
+      `/admin/certificates/${enc(certificateUuid)}/printed-name`,
+      { printed_name: printedName.trim() },
+    );
+    return { certificate: response.data.data as IssuedCertificate, message: response.data.message };
+  },
+
   certificates: async (programmeUuid: string, page = 1): Promise<PageOf<IssuedCertificate>> => {
     const response = await apiClient.get<ApiResponse<unknown>>(`${PROGRAMMES}/${enc(programmeUuid)}/certificates`, {
       params: { page, per_page: 25 },

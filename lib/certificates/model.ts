@@ -417,3 +417,33 @@ export function readPendingCertificates(raw: unknown): PendingCertificate[] {
     ];
   });
 }
+
+/* "Correct name" on an issued certificate (Stay, 16 November 2026, thread cc930a51; Backend b6a83af4):
+ * PUT /api/admin/certificates/{uuid}/printed-name redraws that certificate's PDF with the new name. The
+ * number, verify link and issued date stay the same, and no email goes out. */
+
+/**
+ * What stops an admin's corrected name from being sent, in the admin
+ * endpoint's own words (its rules differ from a student's own name: no
+ * two-character minimum), or null when it can go.
+ */
+export function correctedNameProblem(raw: string): string | null {
+  const name = raw.trim();
+  if (name === '') return 'Type the name as it should appear on the certificate.';
+  if (name.length > PRINTED_NAME_MAX) return `The name can be at most ${PRINTED_NAME_MAX} characters.`;
+  return null;
+}
+
+/** The server's sentence for the name field on a 422, or null. */
+export function printedNameErrorOf(errors: unknown): string | null {
+  if (typeof errors !== 'object' || errors === null) return null;
+  const field = (errors as { printed_name?: unknown }).printed_name;
+  return Array.isArray(field) && typeof field[0] === 'string' ? field[0] : null;
+}
+
+/** A page of the list with the corrected certificate in its place (matched by uuid); other pages as they were. */
+export function withCorrectedCertificate<T extends { uuid?: string }>(page: PageOf<T> | undefined, corrected: T): PageOf<T> | undefined {
+  if (!page || !corrected.uuid) return page;
+  if (!page.items.some((item) => item.uuid === corrected.uuid)) return page;
+  return { ...page, items: page.items.map((item) => (item.uuid === corrected.uuid ? corrected : item)) };
+}
