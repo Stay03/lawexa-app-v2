@@ -170,3 +170,18 @@ export function shouldReturnToInvite({
   if (!code || !signedIn || isGuest || !verified) return false;
   return !isASignInStep(pathname);
 }
+
+/**
+ * Whether the held game link was chosen to Watch rather than Play. Read when
+ * the person comes back from sign-in, so the choice they made before leaving
+ * is the one the join carries out, with no second question.
+ */
+export function pendingInviteWatches(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as StoredInvite).watch === true : false;
+  } catch {
+    return false;
+  }
+}
