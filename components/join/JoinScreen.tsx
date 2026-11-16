@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2, Lock, Trophy, Users } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { spaceLimitFromError } from '@/lib/utils/space-limit';
+import { endedGameQuiz, endedGameQuizPath } from '@/lib/utils/ended-game';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,7 +16,7 @@ import { inviteLinksApi } from '@/lib/api/collab';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { InviteAcceptResponse, InviteDestination, InvitePreview } from '@/types/collab';
-import { DISCOVER_QUERY_ROOT, SPACES_QUERY_ROOT, acceptedDestination, endedGameQuiz, endedGameQuizPath, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
+import { DISCOVER_QUERY_ROOT, SPACES_QUERY_ROOT, acceptedDestination, gameJoinLands, isInviteCode, joinActionLabel, joinedDestination } from './join-model';
 import {
   forgetPendingInvite,
   pendingInviteWatches,

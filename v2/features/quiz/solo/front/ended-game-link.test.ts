@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { endedGameQuiz, endedGameQuizPath } from '@/components/join/join-model';
+import { endedGameQuiz, endedGameQuizPath } from '@/lib/utils/ended-game';
 
 /* A live game's link after the game ended (Arthur, 16 November 2026; Backend's 410 shape): when its quiz can be
  * taken alone, the link opens the quiz with a note instead of "This invite has expired". TEST DATA. */
