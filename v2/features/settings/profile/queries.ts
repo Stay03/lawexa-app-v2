@@ -124,10 +124,10 @@ export const universityQueries = {
   byCountry: (countryCode: string | undefined) =>
     queryOptions({
       queryKey: ['v2', 'universities', 'country', countryCode ?? null],
+      // Every page: one page of 100 stopped Nigeria's list at the letter T.
       queryFn: () =>
-        universityApi.getAll({
+        universityApi.getEveryPage({
           country_code: countryCode,
-          per_page: 100,
           sort: 'name',
           order: 'asc',
         }),
