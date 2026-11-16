@@ -22,7 +22,9 @@ export function CardBoxFold({ folded, children }: { folded: boolean; children: R
       // so a fold that grew over 200ms would push the two apart and back (Stay: "jumpy").
       className={cn('grid shrink-0', folded ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100')}
     >
-      <div className="min-h-0 overflow-hidden">{children}</div>
+      {/* Clipped only while folded: open, the box's `@` picker floats above it and must not be cut off
+          (it was, in every Space chat, from 14 November until this fix). */}
+      <div className={cn('min-h-0', folded && 'overflow-hidden')}>{children}</div>
     </div>
   );
 }

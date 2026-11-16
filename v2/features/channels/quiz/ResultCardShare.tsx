@@ -23,6 +23,7 @@ import {
 import { drawResultCard } from './result-card-draw';
 import { loadCardFonts } from './result-card-fonts';
 import { COMPACT_RAISED } from './ui';
+import { copyText } from './copy-text';
 import { useResultsLink } from './use-results-link';
 
 /**
@@ -55,16 +56,6 @@ function download(url: string, name: string) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-}
-
-/** Copies text to the clipboard; false when the browser refuses (no permission, an insecure page). */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /** Whether this browser's share sheet takes a picture. Read at tap time, never in render. */

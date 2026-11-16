@@ -32,6 +32,7 @@ import { isBoxTool } from '@/v2/features/userbox/machine-model';
 import { RECORD_START_TOOL, RECORD_STOP_TOOL, recordingStepAction } from '../files/chat-recording';
 import { HAND_OVER_TOOL, OpenMachineButton } from '@/v2/features/userbox/OpenMachineButton';
 import { MESSAGE_AGENT_TOOL, messageAgentStep } from '../agents/agent-model';
+import { COMPACTED_DETAIL, COMPACTED_LABEL, CONTEXT_COMPACTED_STEP } from '@/lib/utils/context-compacted';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -242,6 +243,9 @@ export function formatToolMessage(
     case RECORD_START_TOOL:
     case RECORD_STOP_TOOL:
       return { action: recordingStepAction(toolName, isComplete) ?? toolName };
+    // A long reply's earlier reading was summarised (context-compacted.ts).
+    case CONTEXT_COMPACTED_STEP:
+      return { action: COMPACTED_LABEL };
     default: {
       const readable = toolName
         .replace(/_/g, ' ')
@@ -311,6 +315,11 @@ function ToolStepBody({
 }) {
   const createdNote = extractCreatedNote(message);
   if (createdNote) return <NoteLinkCard note={createdNote} />;
+
+  // Opened, the summarised-reading line says what happened, in a sentence.
+  if (message.toolName === CONTEXT_COMPACTED_STEP) {
+    return <p className="text-muted-foreground text-sm leading-relaxed">{COMPACTED_DETAIL}</p>;
+  }
 
 
   if (extractStatuteData(message)) {
