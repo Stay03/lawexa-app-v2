@@ -798,7 +798,8 @@ test('Lawexa answers only when tagged in a university Space, and the settings ha
   const dock = read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx');
   assert.match(dock, /\{\.\.\.\(surface\.lawexaTagOnly && \{ placeholder: TAG_ONLY_PLACEHOLDER \}\)\}/);
   const controller = read('v2', 'features', 'conversations', 'conversation', 'useConversationController.ts');
-  assert.match(controller, /spaceMentionOptions\(rosterRows, viewerUuid, \{ offerLawexa: tagOnly \}\)/);
+  // Lawexa is in every Space's @ list now (spaceMentionOptions); the flag sets the composer's words only.
+  assert.match(controller, /spaceMentionOptions\(rosterRows, viewerUuid\)/);
   // No owner switch (Stay, 16 November 2026): the settings neither show nor send one.
   const form = read('v2', 'features', 'spaces', 'dialogs', 'SpaceFormDialog.tsx');
   assert.doesNotMatch(form, /lawexa_tag_only|Lawexa answers only when tagged/);

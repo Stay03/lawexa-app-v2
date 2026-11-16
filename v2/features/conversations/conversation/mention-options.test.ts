@@ -42,16 +42,15 @@ const ROSTER = [
   member('gone', 'Left Person', 'leftp', 'editor', false),
 ];
 
-test('the picker offers active members with a handle, Viewers included, and not Lawexa', () => {
+test('the picker offers active members with a handle, Viewers included', () => {
   const options = spaceMentionOptions(ROSTER);
-  assert.deepEqual(options.candidates.map((c) => c.handle), ['adaobi', 'chidi', 'bolaade']);
+  assert.deepEqual(options.candidates.filter((c) => c.user !== null).map((c) => c.handle), ['adaobi', 'chidi', 'bolaade']);
   assert.deepEqual(options.untaggable, ['Nkem Eze']);
-  assert.equal(options.candidates.some((c) => c.handle === 'lawexa'), false);
 });
 
-test('in a space where Lawexa answers only when tagged, the picker offers Lawexa first', () => {
-  // Stay, 15 November 2026 (thread 39c968a5): the tag is the only way to ask it there.
-  const options = spaceMentionOptions(ROSTER, null, { offerLawexa: true });
+test('in every Space the picker offers Lawexa first', () => {
+  // Arthur, 16 November 2026: "still can't see lawexa in the names". The server reads @lawexa in every Space.
+  const options = spaceMentionOptions(ROSTER);
   assert.deepEqual(options.candidates.map((c) => c.handle), ['lawexa', 'adaobi', 'chidi', 'bolaade']);
   assert.equal(options.candidates[0].name, 'Lawexa');
   assert.deepEqual(mentionSuggestions(options, 'law').map((c) => c.handle), ['lawexa']);
@@ -73,7 +72,7 @@ test('the picker matches handle or name, and names the untaggable it matches', (
   const options = spaceMentionOptions(ROSTER);
   assert.deepEqual(mentionSuggestions(options, 'ok').map((c) => c.handle), ['chidi'], 'Okonkwo, by name');
   assert.deepEqual(mentionSuggestions(options, 'bola').map((c) => c.handle), ['bolaade']);
-  assert.equal(mentionSuggestions(options, '').length, 3);
+  assert.equal(mentionSuggestions(options, '').length, 4, 'Lawexa and the three people');
   assert.equal(untaggableFor(options, 'nk'), "Nkem Eze can't be tagged yet — no handle.");
   assert.equal(untaggableFor(options, 'chi'), '');
   const many = spaceMentionOptions(Array.from({ length: 10 }, (_, i) => member(`u${i}`, `Person ${i}`, `p${i}`)));
@@ -141,7 +140,7 @@ test('the wiring: the picker in a space chat, chips in the bubble, the writer’
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /const unmatched = response\.data\.unmatched_handles;\s*if \(unmatched && unmatched\.length > 0\) \{\s*setMessages\(\(msgs\) =>\s*msgs\.map\(\(m\) => \(m\.id === optimisticMsg\.id \? \{ \.\.\.m, unmatchedHandles: unmatched \} : m\)\),/);
   const controller = readHere('useConversationController.ts');
-  assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid, \{ offerLawexa: tagOnly \}\) : null\),/);
+  assert.match(controller, /\(\) => \(showAuthors && rosterRows \? spaceMentionOptions\(rosterRows, viewerUuid\) : null\),/);
   // The screen publishes the options; the shell's docked box hands them on.
   assert.match(readHere('ConversationScreen.tsx'), /publishRouteComposer\(\{[\s\S]*?mentionOptions,/);
   assert.match(readHere('ChatDock.tsx'), /mentionOptions=\{surface\.mentionOptions\}/);
@@ -241,11 +240,11 @@ test('the review of ecaf2d5 and the rendered check: what each finding changed', 
 
 test('the picker leaves the reader out (techlead, 15 October 2026)', () => {
   const options = spaceMentionOptions(ROSTER, 'o');
-  assert.deepEqual(options.candidates.map((c) => c.handle), ['chidi', 'bolaade']);
+  assert.deepEqual(options.candidates.map((c) => c.handle), ['lawexa', 'chidi', 'bolaade']);
   // Nor is a reader without a handle named in the can't-be-tagged line.
   assert.deepEqual(spaceMentionOptions(ROSTER, 'n').untaggable, []);
   // Without a known reader, everyone is offered.
-  assert.equal(spaceMentionOptions(ROSTER).candidates.length, 3);
+  assert.equal(spaceMentionOptions(ROSTER).candidates.length, 4, 'Lawexa and the three people');
 });
 
 test('a quote of a question that tags someone reads their name, as the bubble does', async () => {

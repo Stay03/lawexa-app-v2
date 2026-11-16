@@ -957,8 +957,8 @@ export function useConversationController(
   });
   const tagOnly = lawexaTagOnly(spaceQuery.data?.data);
   const mentionOptions = useMemo(
-    () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows, viewerUuid, { offerLawexa: tagOnly }) : null),
-    [showAuthors, rosterRows, viewerUuid, tagOnly],
+    () => (showAuthors && rosterRows ? spaceMentionOptions(rosterRows, viewerUuid) : null),
+    [showAuthors, rosterRows, viewerUuid],
   );
 
   const references = detailData?.references ?? NO_REFERENCES;

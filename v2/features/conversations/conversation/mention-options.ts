@@ -14,7 +14,7 @@ import {
  *
  *  - The people offered are the space's active members, Viewers included (a
  *    Viewer reads the chat, so a question can be for them).
- *  - Lawexa is not offered: in a space chat every question already goes to it.
+ *  - Lawexa is offered first (see `spaceMentionOptions`).
  *    In a space where Lawexa answers only when tagged it is offered first,
  *    since the tag is the only way to ask it (thread 39c968a5).
  *  - A member with no username cannot be tagged (the channel rule); the picker
@@ -30,18 +30,17 @@ export const MAX_MENTION_SUGGESTIONS = 6;
 /**
  * Who the `@` picker offers in a space chat, and who it explains instead. The
  * reader is left out of both: tagging yourself tells nobody anything
- * (techlead, 15 October 2026).
+ * (techlead, 15 October 2026). Lawexa comes first in every Space (Arthur, 16
+ * November 2026: "still can't see lawexa in the names"): the tag is how to ask
+ * it in a university Space, and harmless where it answers anyway, since the
+ * server reads `@lawexa` as Lawexa in every Space and never as a tag for nobody.
  */
-export function spaceMentionOptions(
-  members: readonly Member[],
-  viewerUuid: string | null = null,
-  { offerLawexa = false }: { offerLawexa?: boolean } = {},
-): MentionOptions {
+export function spaceMentionOptions(members: readonly Member[], viewerUuid: string | null = null): MentionOptions {
   const others = viewerUuid ? members.filter((member) => member.user.uuid !== viewerUuid) : members;
   const options = buildMentionOptions(others);
   const people = options.candidates.filter((candidate) => candidate.user !== null);
   const lawexa = options.candidates.filter((candidate) => candidate.user === null);
-  return { candidates: offerLawexa ? [...lawexa, ...people] : people, untaggable: options.untaggable };
+  return { candidates: [...lawexa, ...people], untaggable: options.untaggable };
 }
 
 /** An `@` being typed: the text after it, and where the `@` is. */
