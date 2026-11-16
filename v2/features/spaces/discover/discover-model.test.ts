@@ -45,7 +45,7 @@ test('a join comes to joined (201) or a request for the Owner (202, status pendi
 });
 
 test('a joined reader goes into the Space; a request stays on the card as Request sent', () => {
-  const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
+  const screen = read('v2', 'features', 'spaces', 'discover', 'SpaceJoinAction.tsx');
   assert.match(screen, /onSuccess: \(outcome\) => \{\s*if \(outcome === 'joined'\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*\}/);
   const queries = read('v2', 'features', 'invites', 'queries.ts');
   // The list is read again either way, so a request shows "Request sent" from the server's my_status.
@@ -68,7 +68,7 @@ test('a 409 on Join opens the Space, and every join answer reads the list again'
   assert.match(read('lib', 'api', 'collab.ts'), /apiClient\.post<ApiResponse<SpaceJoinAnswer>>\(\s*`\/spaces\/\$\{spaceUuid\}\/join`/);
   // The list is read on every visit, so a member sees Open, not a Join that answers 409.
   assert.match(read('v2', 'features', 'invites', 'queries.ts'), /queryFn: \(\{ pageParam \}\) => discoverApi\.spaces\(\{ \.\.\.params, per_page: DISCOVER_PER_PAGE, page: pageParam \}\),[\s\S]{0,600}?staleTime: STALE_TIMES\.live,/);
-  const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
+  const screen = read('v2', 'features', 'spaces', 'discover', 'SpaceJoinAction.tsx');
   assert.match(screen, /if \(joinOpensSpace\(response\?\.status, joinErrorCode\(response\?\.data\)\)\) router\.push\(`\/spaces\/\$\{space\.uuid\}`\);\s*else setRefusal\(joinRefusal\(response\?\.status, hasAccount, response\?\.data\?\.message, spaceLimitOf\(response\?\.status, response\?\.data\)\)\);/);
   assert.match(read('v2', 'features', 'invites', 'queries.ts'), /onSettled: \(\) => \{\s*void client\.invalidateQueries\(\{ queryKey: \['discover-spaces'\] \}\);/);
 });
@@ -101,7 +101,7 @@ test('only a visitor without an account, refused with a 403, is offered one', ()
     assert.equal(joinRefusal(status, false).offerAccount, false, String(status));
     assert.equal(joinRefusal(status, true).offerAccount, false, String(status));
   }
-  const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
+  const screen = read('v2', 'features', 'spaces', 'discover', 'SpaceJoinAction.tsx');
   assert.match(screen, /const hasAccount = signedIn && role !== 'guest' && role !== 'bot';/);
   assert.match(screen, /\{refusal\.offerAccount \? \(/);
 });
@@ -113,7 +113,7 @@ test('the join and the cancel go to the documented routes', () => {
 });
 
 test('every signed-in account reaches Discover, from the spaces list, and the words match A', () => {
-  const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
+  const screen = read('v2', 'features', 'spaces', 'discover', 'SpaceJoinAction.tsx');
   assert.doesNotMatch(screen, /canAccessTeamChannels|TeamChannelsClosedState/);
   assert.doesNotMatch(screen, /Ask to join|ask to join/);
   assert.match(screen, /Request sent/);
@@ -149,6 +149,30 @@ test('the list pages 20 at a time, the search waits for typing to stop, and the 
   const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
   assert.match(screen, /const search = useServerSearch\(\);/);
   assert.match(screen, /useInfiniteScrollSentinel<HTMLDivElement>/);
-  assert.equal((screen.match(/<Link href=\{`\/spaces\/\$\{space\.uuid\}`\}/g) ?? []).length, 2, 'the crest and the Open button');
+  assert.match(screen, /<Link href=\{`\/spaces\/\$\{space\.uuid\}`\} tabIndex=\{-1\} aria-hidden/, 'the crest');
+  assert.match(screen, /<SpaceJoinAction space=\{space\}/);
   assert.match(screen, /<Link\s+href=\{`\/spaces\/\$\{space\.uuid\}`\}\s+className="block truncate/);
+});
+
+/* A public Space's page for a reader not in it (Lucy's walk, 16 November 2026; Backend's card shape). */
+
+test('only the card for a reader not in a public Space is the preview', async () => {
+  const { isSpacePreview } = await import('./discover-model');
+  assert.equal(isSpacePreview({ my_role: null, my_status: null }), true);
+  assert.equal(isSpacePreview({ my_role: null, my_status: 'pending' }), true);
+  assert.equal(isSpacePreview({ my_role: 'member' }), false);
+  assert.equal(isSpacePreview({ my_role: 'owner', my_status: null }), false);
+  // A platform admin's view of a Space they are not in carries no my_status: the full Space, never the card.
+  assert.equal(isSpacePreview({ my_role: null }), false);
+  assert.equal(isSpacePreview({}), false);
+});
+
+test('the preview is decided before the lobby mounts, and the frame asks no member-only reads for it', () => {
+  const screen = read('v2', 'features', 'spaces', 'detail', 'SpaceScreen.tsx');
+  assert.match(screen, /if \(space !== null && isSpacePreview\(space\)\) return <SpacePreview space=\{space\} \/>;\s*return <SpaceScreenBody spaceUuid=\{spaceUuid\} \/>;/);
+  const frame = read('v2', 'features', 'collab', 'shell', 'CollabFrame.tsx');
+  assert.match(frame, /const spacePreview = space !== null && isSpacePreview\(space\);/);
+  assert.equal((frame.match(/!spacePreview/g) ?? []).length, 2, 'the channels and the roster');
+  const preview = read('v2', 'features', 'spaces', 'detail', 'SpacePreview.tsx');
+  assert.match(preview, /<SpaceJoinAction[\s\S]{0,120}my_status: space\.my_status \?\? null/);
 });

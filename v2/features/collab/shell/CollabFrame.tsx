@@ -46,6 +46,7 @@ import { clearCollabHeader, setCollabHeader } from './collab-header';
 import { RailFrameSkeleton } from './rail-states';
 import { SPACE_RAIL_WIDTH, SpaceRail } from './SpaceRail';
 import { SpaceDrawer } from './SpaceDrawer';
+import { isSpacePreview } from '@/v2/features/spaces/discover/discover-model';
 import {
   CollabSpaceScopeProvider,
   type CollabSpaceIdentity,
@@ -220,6 +221,9 @@ function CollabPlaceFrame({
     enabled: eligible && spaceUuid !== null,
   });
   const space = spaceQuery.data?.data ?? null;
+  // A public Space's card for a reader not in it (`isSpacePreview`): its
+  // channels and roster are members' reads, so neither is asked for.
+  const spacePreview = space !== null && isSpacePreview(space);
   // A member opening a space from the list: its home's All list
   // goes out beside the details above, not a second later with the page's code
   // (`early-feed.ts`, speed step 5).
@@ -266,6 +270,7 @@ function CollabPlaceFrame({
       eligible &&
       showsChannels &&
       spaceUuid !== null &&
+      !spacePreview &&
       (!isSpaceRoute || spaceQuery.isSuccess),
   });
 
@@ -278,7 +283,7 @@ function CollabPlaceFrame({
    */
   const membersQuery = useQuery({
     ...spacesQueries.members(spaceUuid ?? '', { viewerId }),
-    enabled: eligible && spaceUuid !== null && isSpaceRoute && spaceQuery.isSuccess,
+    enabled: eligible && spaceUuid !== null && isSpaceRoute && spaceQuery.isSuccess && !spacePreview,
   });
 
   /**

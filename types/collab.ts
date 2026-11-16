@@ -297,6 +297,16 @@ export interface Space {
   /** The viewer's content role (chats, folders, files); `null` for a non-member.
    *  Distinct from {@link Space.my_role}, which governs channels and settings. */
   my_content_role?: ContentRole | null;
+  /**
+   * Sent ONLY on a public Space's card for a signed-in reader not in it (GET
+   * /spaces/{uuid}, Backend, 16 November 2026): their ask waiting for the
+   * Owner, or null. That card carries Discover's fields (uuid, name,
+   * description, type, type_label, kind, active_members_count, owner,
+   * is_university) and no content; `isSpacePreview` reads it. Never on a member's Space.
+   */
+  my_status?: 'pending' | null;
+  /** Who made it, on that card (Discover's shape): no creator rides with it. */
+  owner?: { name: string; avatar_url?: string | null } | null;
   /** How many chats, folders and files the space holds (backend B1). Absent on
    *  an API that predates it; never read as zero when absent. */
   conversations_count?: number;

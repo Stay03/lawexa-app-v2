@@ -107,3 +107,14 @@ export function joinRefusal(status: number | undefined, hasAccount: boolean, mes
   }
   return { text: "That didn't work. Try again in a moment.", offerAccount: false };
 }
+
+/**
+ * Whether the Space detail is a public Space's card for a reader not in it
+ * (Lucy's walk, 16 November 2026; Backend's shape): no role, and the reader's
+ * `my_status` key, which only that card carries. A member's Space, and a
+ * platform admin's view of one they are not in, never carry `my_status`, so
+ * neither is ever mistaken for the card.
+ */
+export function isSpacePreview(space: { my_role?: unknown; my_status?: unknown }): boolean {
+  return space.my_role == null && space.my_status !== undefined;
+}
