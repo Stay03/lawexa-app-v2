@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Award, Loader2, RefreshCw, RotateCw, X } from 'lucide-react';
+import { Award, Loader2, PenLine, RefreshCw, RotateCw, X } from 'lucide-react';
 
 import { AdminUserSinglePicker, type AdminUserSinglePickerValue } from '@/components/admin/AdminUserSinglePicker';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +22,8 @@ import {
   useRerenderCertificateProgramme,
 } from '@/lib/hooks/useAdminCertificates';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { CertificateProgramme } from '@/types/certificates';
+import type { CertificateProgramme, IssuedCertificate } from '@/types/certificates';
+import { CorrectCertificateNameDialog } from './CorrectCertificateNameDialog';
 
 /** The most people the server issues to in one go (WOZ's IssueCertificatesRequest). */
 const MAX_PEOPLE = 500;
@@ -158,6 +159,8 @@ function IssuePanel({ programme }: { programme: CertificateProgramme }) {
 function IssuedList({ programmeUuid }: { programmeUuid: string }) {
   const [page, setPage] = useState(1);
   const list = useIssuedCertificates(programmeUuid, page);
+  // The certificate whose printed name is being corrected (Stay, 16 November 2026).
+  const [correcting, setCorrecting] = useState<(IssuedCertificate & { uuid: string }) | null>(null);
   const rerender = useRerenderCertificateProgramme(programmeUuid);
   const [rerenderNote, setRerenderNote] = useState<string | null>(null);
 
@@ -214,6 +217,9 @@ function IssuedList({ programmeUuid }: { programmeUuid: string }) {
                   <TableHead>Score</TableHead>
                   <TableHead>Issued</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -247,6 +253,19 @@ function IssuedList({ programmeUuid }: { programmeUuid: string }) {
                         <Badge variant="secondary">Valid</Badge>
                       )}
                     </TableCell>
+                    <TableCell className="text-right">
+                      {certificate.uuid ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setCorrecting({ ...certificate, uuid: certificate.uuid as string })}
+                          aria-label={`Correct name on certificate ${certificate.number}`}
+                        >
+                          <PenLine aria-hidden className="size-4" />
+                          Correct name
+                        </Button>
+                      ) : null}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -272,6 +291,15 @@ function IssuedList({ programmeUuid }: { programmeUuid: string }) {
           )}
         </>
       )}
+      {correcting ? (
+        <CorrectCertificateNameDialog
+          programmeUuid={programmeUuid}
+          certificate={correcting}
+          onOpenChange={(open) => {
+            if (!open) setCorrecting(null);
+          }}
+        />
+      ) : null}
     </section>
   );
 }
