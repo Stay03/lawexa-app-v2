@@ -42,6 +42,8 @@ import type {
   AdminAiSkillsListResponse,
   AdminAiSkillDetailResponse,
   AdminAiCreateSkillData,
+  AdminAiCreatedSkill,
+  AdminAiSkillDefaultAgentsResponse,
   AdminAiUpdateSkillData,
   AdminAiSkill,
   AdminAiSkillDetail,
@@ -477,9 +479,18 @@ export const adminAiApi = {
     return response.data;
   },
 
-  /** Create a skill; the server writes version 1. */
-  createSkill: async (data: AdminAiCreateSkillData): Promise<AdminAiMutationResponse<AdminAiSkill>> => {
-    const response = await apiClient.post<AdminAiMutationResponse<AdminAiSkill>>('/admin/ai-skills', data);
+  /**
+   * Create a skill; the server writes version 1 and puts it on `agent_ids`, or
+   * on its default agents when the field is left out. The answer lists them.
+   */
+  createSkill: async (data: AdminAiCreateSkillData): Promise<AdminAiMutationResponse<AdminAiCreatedSkill>> => {
+    const response = await apiClient.post<AdminAiMutationResponse<AdminAiCreatedSkill>>('/admin/ai-skills', data);
+    return response.data;
+  },
+
+  /** The agents a new skill goes on unless the form says otherwise (an admin setting; active agents only). */
+  getSkillDefaultAgents: async (): Promise<AdminAiSkillDefaultAgentsResponse> => {
+    const response = await apiClient.get<AdminAiSkillDefaultAgentsResponse>('/admin/ai-skills/default-agents');
     return response.data;
   },
 
