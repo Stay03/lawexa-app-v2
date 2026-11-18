@@ -65,10 +65,9 @@ export function costAlertParams(filters: CostAlertFilters): CostAlertsParams {
   };
 }
 
-/** "$31.20"; under a dollar keeps three places, since most chats cost cents ("$0.023"). */
+/** "$31.20", "$0.40": the server rounds every cost to cents (PlanCostAlertResource), so two places always. */
 export function formatUsd(value: number): string {
-  const places = Math.abs(value) < 1 && value !== 0 ? 3 : 2;
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: places, maximumFractionDigits: places })}`;
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /** "105%", one decimal under ten ("8.5%"). */

@@ -38,7 +38,7 @@ test('the address leaves the defaults out, and the request sends what the server
 
 test('costs, shares and periods are said plainly', () => {
   assert.equal(formatUsd(31.2), '$31.20');
-  assert.equal(formatUsd(0.0234), '$0.023', 'cents keep three places');
+  assert.equal(formatUsd(0.4), '$0.40', 'the server sends cents, so two places');
   assert.equal(formatUsd(0), '$0.00');
   assert.equal(formatShare(105.3), '105%');
   assert.equal(formatShare(8.46), '8.5%');
