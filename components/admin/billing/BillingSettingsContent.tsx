@@ -41,6 +41,7 @@ const GROUP_LABELS: Record<string, string> = {
   subscription: 'Subscription Settings',
   trial: 'Trial Settings',
   pricing: 'Message Pack Pricing',
+  billing: 'Cost alerts',
 };
 
 const GROUP_DESCRIPTIONS: Record<string, string> = {
@@ -55,6 +56,8 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
      point at that rather than generalising over it. */
   pricing:
     'Pack prices, trial charges and the display rate. Read the note under each field before changing it — some are in kobo or cents rather than naira or dollars.',
+  billing:
+    'When a paying user is flagged on the Cost alerts list: the share of their plan price their AI cost must reach, the naira rate used only for this, and whether web search counts. Checked daily at 06:00 UTC.',
 };
 
 /** Maps a boolean toggle key to the fields it controls. */
@@ -261,9 +264,13 @@ export function BillingSettingsContent() {
      owner came to be told "there is no way to change the usd value of packs in
      the admin". He was right. */
   const pricingQuery = useAdminSettings({ group: 'pricing' });
+  /* Cost alerts (Arthur, 18 November 2026). Left out of the page's error state
+     on purpose: a server from before the alert has no such group, and that
+     must not take the other three cards down with it. */
+  const costAlertQuery = useAdminSettings({ group: 'billing' });
 
   const isLoading =
-    subscriptionQuery.isLoading || trialQuery.isLoading || pricingQuery.isLoading;
+    subscriptionQuery.isLoading || trialQuery.isLoading || pricingQuery.isLoading || costAlertQuery.isLoading;
   const isError = subscriptionQuery.isError || trialQuery.isError || pricingQuery.isError;
 
   const allSettings = useMemo(
@@ -271,8 +278,9 @@ export function BillingSettingsContent() {
       ...(subscriptionQuery.data?.data || []),
       ...(trialQuery.data?.data || []),
       ...(pricingQuery.data?.data || []),
+      ...(costAlertQuery.data?.data || []),
     ],
-    [subscriptionQuery.data, trialQuery.data, pricingQuery.data]
+    [subscriptionQuery.data, trialQuery.data, pricingQuery.data, costAlertQuery.data]
   );
 
   const settingsByGroup = useMemo(() => {
