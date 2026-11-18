@@ -154,6 +154,8 @@ export interface OnboardingStepPayload {
   call_number?: string;
   bio?: string;
   areas_of_expertise?: number[];
+  /** Optional (Arthur, 18 November 2026); left out, it is unchanged. */
+  phone?: string;
 }
 
 /** PUT /api/onboarding/step response data */
@@ -183,6 +185,8 @@ export interface OnboardingCompletePayload {
   call_number?: string;
   bio?: string;
   areas_of_expertise?: number[];
+  /** Optional (Arthur, 18 November 2026); left out, it is unchanged. */
+  phone?: string;
 }
 
 /** POST /api/onboarding/complete response data */

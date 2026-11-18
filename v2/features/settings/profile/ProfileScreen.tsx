@@ -1116,6 +1116,11 @@ function ProfileForm({ user }: { user: User }) {
           {textRow('address')}
         </SettingsFormGroup>
 
+        {/* Optional (Arthur, 18 November 2026). Only Lawexa's team sees it. */}
+        <SettingsFormGroup id="contact" label="Contact">
+          {textRow('phone')}
+        </SettingsFormGroup>
+
 
         <SettingsFormGroup id="links" label="Links">
           {textRow('linkedin_url')}

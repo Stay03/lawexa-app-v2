@@ -24,6 +24,8 @@ export interface ProfileUpdatePayload {
   level?: string;
   call_to_bar_year?: number;
   call_number?: string;
+  /** Optional; "" clears it; left out, it is unchanged (Backend, 18 November 2026). */
+  phone?: string;
   other_certifications?: string;
   work_experience?: string;
   linkedin_url?: string;

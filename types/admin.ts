@@ -193,6 +193,8 @@ export interface AdminUserProfile {
   website_url: string | null;
   twitter_url: string | null;
   facebook_url: string | null;
+  /** Optional, "+" and digits (Arthur, 18 November 2026). Absent from older servers. */
+  phone?: string | null;
 }
 
 export interface AdminAreaOfExpertise {
@@ -366,6 +368,8 @@ export interface IAdminUserListItem {
   free_messages_blocked: boolean;
   source: string;
   attribution: IAdminUserListAttribution | null;
+  /** Optional, "+" and digits (Arthur, 18 November 2026). Absent from older servers. */
+  phone?: string | null;
   created_at: string;
 }
 

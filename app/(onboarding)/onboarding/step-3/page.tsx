@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, Search, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { PHONE_HINT, phoneProblem, storedPhone } from '@/lib/utils/phone-number';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
@@ -42,6 +44,13 @@ export default function OnboardingStep3Page() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCountry, setSelectedCountry] = useState(locationData.country || '');
   const [selectedCountryCode, setSelectedCountryCode] = useState(locationData.countryCode || '');
+  // Optional phone number (Arthur, 18 November 2026). The step saves without
+  // waiting for the answer, so the server's rule is checked here before Next.
+  const savedPhone = (userData?.data as { user?: { profile?: { phone?: string | null } } } | undefined)?.user?.profile?.phone;
+  const [phone, setPhone] = useState<string | null>(null);
+  const phoneValue = phone ?? savedPhone ?? '';
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const phoneError = phoneProblem(phoneValue);
 
   // Initialize with detected country if not already set
   useEffect(() => {
@@ -100,6 +109,10 @@ export default function OnboardingStep3Page() {
   };
 
   const handleNext = () => {
+    if (phoneError) {
+      setPhoneTouched(true);
+      return;
+    }
     const matchesDetected = selectedCountry === detectedCountry;
 
     // Save location data to store
@@ -119,6 +132,8 @@ export default function OnboardingStep3Page() {
     };
     if (matchesDetected && detectedRegion) stepFields.region = detectedRegion;
     if (matchesDetected && detectedCity) stepFields.city = detectedCity;
+    // Sent only when typed or changed: left out, the server keeps what it has.
+    if (phone !== null) stepFields.phone = storedPhone(phone);
     saveStep({ step: 3, ...stepFields });
 
     // For lawyer/law_student who selected detected country, skip profile step
@@ -250,6 +265,30 @@ export default function OnboardingStep3Page() {
                 )}
               </>
             )}
+          </div>
+
+          {/* Optional phone number (Arthur, 18 November 2026). */}
+          <div className="space-y-2">
+            <Label htmlFor="onboarding-phone">Phone number</Label>
+            <Input
+              id="onboarding-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="+234 803 123 4567"
+              value={phoneValue}
+              onChange={(event) => setPhone(event.target.value)}
+              onBlur={() => setPhoneTouched(true)}
+              aria-invalid={phoneTouched && phoneError !== null}
+              aria-describedby="onboarding-phone-note"
+            />
+            <p
+              id="onboarding-phone-note"
+              role={phoneTouched && phoneError ? 'alert' : undefined}
+              className={cn('text-sm', phoneTouched && phoneError ? 'text-destructive' : 'text-muted-foreground')}
+            >
+              {phoneTouched && phoneError ? phoneError : PHONE_HINT}
+            </p>
           </div>
 
           {/* Navigation buttons */}

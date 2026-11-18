@@ -42,6 +42,8 @@ export interface UserProfile {
   website_url?: string;
   twitter_url?: string;
   facebook_url?: string;
+  /** Optional, always "+" and digits (Arthur, 18 November 2026; Backend's contract). Absent from older servers. */
+  phone?: string | null;
 }
 
 export interface AreaOfExpertise {
