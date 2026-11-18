@@ -27,6 +27,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { extractApiError } from '@/lib/utils/api-error';
+import { sendsOnEnter } from '@/lib/utils/enter-key';
 import { formatBytes } from '@/lib/utils/format-bytes';
 import type {
   Channel,
@@ -1431,13 +1432,9 @@ function ChannelComposerBody({
       return;
     }
 
-    // Touch keyboards: Enter breaks; the send button posts (capability read
-    // at event time — no subscription, no render-phase media query).
-    const coarse = window.matchMedia('(hover: none)').matches;
-    if (event.key === 'Enter' && !event.shiftKey && !coarse) {
-      event.preventDefault();
-      handleSend();
-    }
+    // The app's one Enter rule (lib/utils/enter-key.ts): a keyboard sends,
+    // a touch-only device adds a line and the send button posts.
+    if (sendsOnEnter(event)) handleSend();
   };
 
   const remaining = MESSAGE_MAX_LENGTH - value.length;
