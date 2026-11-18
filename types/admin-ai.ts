@@ -505,6 +505,18 @@ export interface AdminAiCreateSkillData {
   instructions: string;
   load_mode: AdminAiSkillLoadMode;
   is_active?: boolean;
+  /** The agents the new skill goes on; left out, the server uses its default agents; [] puts it on none. */
+  agent_ids?: number[];
+}
+
+/** A new skill as the server returns it: the agents it was put on come with it. */
+export type AdminAiCreatedSkill = AdminAiSkill & { agents?: AdminAiSkillAgent[] };
+
+/** `GET /admin/ai-skills/default-agents`: the agents a new skill goes on unless told otherwise (active ones only). */
+export interface AdminAiSkillDefaultAgentsResponse {
+  success: boolean;
+  message: string;
+  data: { setting: string; agents: AdminAiSkillAgent[] };
 }
 
 /** `name` is refused if it differs from the skill's (it is fixed after create). */
