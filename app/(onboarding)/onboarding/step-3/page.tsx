@@ -42,8 +42,14 @@ export default function OnboardingStep3Page() {
 
   // Form state
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState(locationData.country || '');
-  const [selectedCountryCode, setSelectedCountryCode] = useState(locationData.countryCode || '');
+  // The person's pick, else the detected country. Read, not copied into state
+  // by an effect: a setState in an effect re-renders for nothing (React
+  // Compiler lint), and the pick wins over the detection either way.
+  const [picked, setPicked] = useState<{ name: string; code: string } | null>(
+    locationData.country ? { name: locationData.country, code: locationData.countryCode || '' } : null,
+  );
+  const selectedCountry = picked ? picked.name : detectedCountry;
+  const selectedCountryCode = picked ? picked.code : detectedCountryCode;
   // Optional phone number (Arthur, 18 November 2026). The step saves without
   // waiting for the answer, so the server's rule is checked here before Next.
   const savedPhone = (userData?.data as { user?: { profile?: { phone?: string | null } } } | undefined)?.user?.profile?.phone;
@@ -51,14 +57,6 @@ export default function OnboardingStep3Page() {
   const phoneValue = phone ?? savedPhone ?? '';
   const [phoneTouched, setPhoneTouched] = useState(false);
   const phoneError = phoneProblem(phoneValue);
-
-  // Initialize with detected country if not already set
-  useEffect(() => {
-    if (detectedCountry && !selectedCountry) {
-      setSelectedCountry(detectedCountry);
-      setSelectedCountryCode(detectedCountryCode);
-    }
-  }, [detectedCountry, detectedCountryCode, selectedCountry]);
 
   // Fetch all countries
   const { data: allCountries, isLoading: loadingCountries } = useCountries('');
@@ -98,8 +96,7 @@ export default function OnboardingStep3Page() {
   }, [userType, communicationStyle, router]);
 
   const handleCountrySelect = (countryName: string, countryCode: string) => {
-    setSelectedCountry(countryName);
-    setSelectedCountryCode(countryCode);
+    setPicked({ name: countryName, code: countryCode });
   };
 
   const handleBack = () => {
@@ -260,7 +257,7 @@ export default function OnboardingStep3Page() {
                 {/* No results */}
                 {filteredCountries.length === 0 && (
                   <p className="text-center text-muted-foreground py-8">
-                    No countries found for "{searchQuery}"
+                    No countries found for &ldquo;{searchQuery}&rdquo;
                   </p>
                 )}
               </>
