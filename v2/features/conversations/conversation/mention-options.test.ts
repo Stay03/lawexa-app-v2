@@ -135,7 +135,8 @@ test('a question keeps its tags and the writer’s unmatched handles from the se
 test('the wiring: the picker in a space chat, chips in the bubble, the writer’s line under it', () => {
   // The pill lets the host take Enter first: a picked person, not a send.
   const pill = read('components', 'ui', 'prompt-input.tsx');
-  assert.match(pill, /const handleKeyDown = \(e: React\.KeyboardEvent<HTMLTextAreaElement>\) => \{\s*onKeyDown\?\.\(e\)\s*if \(e\.defaultPrevented\) return\s*if \(e\.key === "Enter" && !e\.shiftKey && !isMobile\) \{/);
+  // Then the app's one Enter rule decides whether it sends (lib/utils/enter-key.ts, Arthur 18 November 2026).
+  assert.match(pill, /const handleKeyDown = \(e: React\.KeyboardEvent<HTMLTextAreaElement>\) => \{\s*onKeyDown\?\.\(e\)\s*if \(e\.defaultPrevented\) return\s*if \(sendsOnEnter\(e\)\) onSubmit\?\.\(\)/);
   // The writer's line shows at once, from the send's answer.
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
   assert.match(engine, /const unmatched = response\.data\.unmatched_handles;\s*if \(unmatched && unmatched\.length > 0\) \{\s*setMessages\(\(msgs\) =>\s*msgs\.map\(\(m\) => \(m\.id === optimisticMsg\.id \? \{ \.\.\.m, unmatchedHandles: unmatched \} : m\)\),/);
