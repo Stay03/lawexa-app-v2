@@ -105,3 +105,19 @@ test('the wiring: no line under the phone field, the question on step 3, and adm
   assert.match(read('components', 'admin', 'UserDetailHeader.tsx'), /Heard about Lawexa: \{heardAboutLabel\(user\.profile\?\.heard_about, user\.profile\?\.heard_about_other\)\}/);
   assert.match(read('components', 'admin', 'AdminUsersTable.tsx'), /Heard via \{heardAboutLabel\(user\.heard_about\)\}/);
 });
+
+test('the privacy policy says what the phone number is for, where it belongs (Arthur, 18 November 2026)', () => {
+  const policy = read('app', '(legal)', 'privacy', 'page.tsx')
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&mdash;/g, '—')
+    .replace(/\s+/g, ' ');
+  const sentence =
+    'If you choose to give us your phone number, we use it to contact you about your account and to help you get the most from Lawexa. You can change or remove it in your profile at any time.';
+  assert.ok(policy.includes(sentence));
+  const section = policy.indexOf('Information We Collect and How We Collect It');
+  const additional = policy.indexOf('to use Lawexa to its fullest extent.');
+  const next = policy.indexOf('Use For Other Services');
+  assert.ok(section < additional && additional < policy.indexOf(sentence) && policy.indexOf(sentence) < next, 'after the additional-information paragraph');
+  assert.match(read('app', '(legal)', 'privacy', 'page.tsx'), /Last modified on November 18, 2026/);
+});

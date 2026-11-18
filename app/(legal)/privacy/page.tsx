@@ -61,7 +61,7 @@ export default function PrivacyPolicyPage() {
 
       <h2>Privacy Policy</h2>
       <p className="text-sm text-muted-foreground">
-        Last modified on August 29, 2024
+        Last modified on November 18, 2026
       </p>
       <p>
         Lawexa services are owned and operated by Law Guide Technology Limited,
@@ -152,6 +152,12 @@ export default function PrivacyPolicyPage() {
         prompts. You do not have to provide such information; however, if you
         do not, it may limit our ability to personalize Lawexa and your ability
         to use Lawexa to its fullest extent.
+      </p>
+      {/* The optional phone number (Arthur, 18 November 2026, thread bbdef040). */}
+      <p>
+        If you choose to give us your phone number, we use it to contact you
+        about your account and to help you get the most from Lawexa. You can
+        change or remove it in your profile at any time.
       </p>
       <p>
         <strong>Use For Other Services</strong> &mdash; We may combine the
