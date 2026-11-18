@@ -90,3 +90,18 @@ test('a template draft read part way through its stream never shows a tag as tex
   const notice = nodes.find((node) => JSON.stringify(node).includes('TAKE NOTICE'));
   assert.equal(notice?.attrs?.textAlign, 'justify');
 });
+
+test('the Word and PDF download sends real HTML: the editor is built by the same reader, and the download sends what the editor holds', () => {
+  // Backend, 18 November 2026: the server draws Arthur's run-together line right
+  // when it gets real HTML, and prints the tags when it gets them escaped as
+  // text, which is what the reader before this fix put in the editor.
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  assert.match(editor, /initial=\{markdownToDoc\(props\.markdown, props\.font\)\}/);
+  const download = readFileSync(new URL('./use-draft-download.ts', import.meta.url), 'utf8');
+  assert.match(download, /fetchDraftFile\(exportApi\.document, \{ title, html: editor\.getHTML\(\), format \}\)/);
+  // And what the reader gives the editor for that line is three aligned paragraphs, with no tag as words.
+  const line = '<p style="text-align: center"><strong>IN THE HIGH COURT OF LAGOS STATE</strong></p><p style="text-align: center"><strong>HOLDEN AT [JUDICIAL DIVISION]</strong></p><p style="text-align: right">SUIT NO: [SUIT NUMBER]</p>';
+  const nodes = markdownToDoc(line).content ?? [];
+  assert.deepEqual(nodes.map((node) => node.attrs?.textAlign), ['center', 'center', 'right']);
+  assert.ok(!/<\/?p\b/.test(JSON.stringify(nodes)));
+});
