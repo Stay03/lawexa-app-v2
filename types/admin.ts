@@ -195,6 +195,9 @@ export interface AdminUserProfile {
   facebook_url: string | null;
   /** Optional, "+" and digits (Arthur, 18 November 2026). Absent from older servers. */
   phone?: string | null;
+  /** "How did you hear about us?" (Arthur, 18 November 2026). Absent from older servers. */
+  heard_about?: string | null;
+  heard_about_other?: string | null;
 }
 
 export interface AdminAreaOfExpertise {
@@ -370,6 +373,8 @@ export interface IAdminUserListItem {
   attribution: IAdminUserListAttribution | null;
   /** Optional, "+" and digits (Arthur, 18 November 2026). Absent from older servers. */
   phone?: string | null;
+  /** "How did you hear about us?": the key only (Backend, 18 November 2026). */
+  heard_about?: string | null;
   created_at: string;
 }
 

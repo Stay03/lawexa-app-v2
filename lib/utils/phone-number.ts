@@ -9,7 +9,6 @@
  *  - empty is fine: the number is optional.
  */
 
-export const PHONE_HINT = 'Optional. So our team can reach you, e.g. +234 803 123 4567';
 export const PHONE_PROBLEM = 'Enter a phone number with its country code, for example +2348031234567.';
 
 /** The number with the ignored characters taken out. */

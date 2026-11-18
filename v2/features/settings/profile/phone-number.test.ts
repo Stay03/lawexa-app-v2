@@ -62,7 +62,7 @@ test('Settings > Profile: the number is read, checked, settled and sent only whe
 
 test('the wiring: onboarding step 3, the Profile row, and the admin user views', () => {
   const step = read('app', '(onboarding)', 'onboarding', 'step-3', 'page.tsx');
-  assert.match(step, /if \(phoneError\) \{\s*setPhoneTouched\(true\);\s*return;\s*\}/, 'a refused number holds Next');
+  assert.match(step, /if \(phoneError \|\| heardError\) \{\s*setPhoneTouched\(true\);\s*setHeardTouched\(true\);\s*return;\s*\}/, 'a refused number holds Next');
   assert.match(step, /if \(phone !== null\) stepFields\.phone = storedPhone\(phone\);/, 'sent only when typed');
   assert.match(step, /<Label htmlFor="onboarding-phone">Phone number<\/Label>/);
   const fields = read('v2', 'features', 'settings', 'profile', 'text-fields.ts');
@@ -70,4 +70,38 @@ test('the wiring: onboarding step 3, the Profile row, and the admin user views',
   assert.match(read('v2', 'features', 'settings', 'profile', 'ProfileScreen.tsx'), /<SettingsFormGroup id="contact" label="Contact">\s*\{textRow\('phone'\)\}/);
   assert.match(read('components', 'admin', 'UserDetailHeader.tsx'), /\{user\.profile\?\.phone \? \(/);
   assert.match(read('components', 'admin', 'AdminUsersTable.tsx'), /\{user\.phone && \(/);
+});
+
+/* "How did you hear about us?" (Arthur, 18 November 2026, thread bbdef040;
+ * Backend's contract), on the same onboarding step. */
+test('the heard-about answer: optional, one of the listed choices, and "Other" needs a few words', async () => {
+  const { HEARD_ABOUT_OPTIONS, heardAboutLabel, heardAboutPayload, heardAboutProblem } = await import('@/lib/utils/heard-about');
+  assert.deepEqual(
+    HEARD_ABOUT_OPTIONS.map((option) => option.value),
+    ['friend_or_colleague', 'instagram', 'x', 'linkedin', 'tiktok', 'whatsapp', 'university_or_law_school', 'event', 'search_engine', 'other'],
+    'Backend’s keys, in Backend’s order',
+  );
+  assert.equal(heardAboutProblem(null, ''), null, 'optional');
+  assert.equal(heardAboutProblem('instagram', ''), null);
+  assert.equal(heardAboutProblem('radio', ''), 'Choose one of the listed options.');
+  assert.equal(heardAboutProblem('other', '  '), 'Tell us where you heard about Lawexa.');
+  assert.equal(heardAboutProblem('other', 'x'.repeat(101)), 'Keep this to 100 characters or fewer.');
+  assert.equal(heardAboutProblem('other', 'A TEST DATA conference'), null);
+  assert.deepEqual(heardAboutPayload(null, ''), {}, 'unanswered: nothing sent');
+  assert.deepEqual(heardAboutPayload('linkedin', 'stale words'), { heard_about: 'linkedin' }, 'the words go only with Other');
+  assert.deepEqual(heardAboutPayload('other', ' A TEST DATA conference '), { heard_about: 'other', heard_about_other: 'A TEST DATA conference' });
+  assert.equal(heardAboutLabel('university_or_law_school'), 'University or law school');
+  assert.equal(heardAboutLabel('other', 'A TEST DATA conference'), 'Other: A TEST DATA conference');
+  assert.equal(heardAboutLabel(null), null);
+});
+
+test('the wiring: no line under the phone field, the question on step 3, and admins see the answer', () => {
+  const step = read('app', '(onboarding)', 'onboarding', 'step-3', 'page.tsx');
+  assert.doesNotMatch(step, /PHONE_HINT/, 'no line under the phone field (Arthur: "use none")');
+  assert.doesNotMatch(read('v2', 'features', 'settings', 'profile', 'text-fields.ts'), /PHONE_HINT|hint: .*phone/i);
+  assert.match(step, /<Label htmlFor="onboarding-heard-about">How did you hear about us\?<\/Label>/);
+  assert.match(step, /if \(phoneError \|\| heardError\) \{/, 'a refused answer holds Next');
+  assert.match(step, /saveStep\(\{ step: 3, \.\.\.stepFields, \.\.\.heardAboutPayload\(heardAbout, heardAboutOther\) \}\);/);
+  assert.match(read('components', 'admin', 'UserDetailHeader.tsx'), /Heard about Lawexa: \{heardAboutLabel\(user\.profile\?\.heard_about, user\.profile\?\.heard_about_other\)\}/);
+  assert.match(read('components', 'admin', 'AdminUsersTable.tsx'), /Heard via \{heardAboutLabel\(user\.heard_about\)\}/);
 });
