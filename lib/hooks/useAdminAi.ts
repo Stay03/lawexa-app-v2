@@ -64,6 +64,7 @@ export const adminAiKeys = {
     [...adminAiKeys.skills(), 'list', params] as const,
   skillDetail: (id: number) =>
     [...adminAiKeys.skills(), 'detail', id] as const,
+  skillDefaultAgents: () => [...adminAiKeys.skills(), 'default-agents'] as const,
   skillVersions: (id: number) =>
     [...adminAiKeys.skillDetail(id), 'versions'] as const,
   skillVersion: (id: number, version: number) =>
@@ -261,11 +262,12 @@ export function useDeleteAiModel() {
 /**
  * Hook for fetching AI agents list with pagination, filtering, sorting
  */
-export function useAdminAiAgents(params: AdminAiAgentsParams = {}) {
+export function useAdminAiAgents(params: AdminAiAgentsParams = {}, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: adminAiKeys.agentsList(params),
     queryFn: () => adminAiApi.getAgents(params),
     staleTime: 30 * 1000,
+    enabled,
   });
 }
 
@@ -509,7 +511,19 @@ export function useCreateAiSkill() {
     mutationFn: (data: AdminAiCreateSkillData) => adminAiApi.createSkill(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: adminAiKeys.skills() });
+      // The new skill sits on agents now, whose pages list their skills.
+      queryClient.invalidateQueries({ queryKey: adminAiKeys.agents() });
     },
+  });
+}
+
+/** The agents a new skill goes on by default (the create form's starting ticks); only asked for while the form is open. */
+export function useSkillDefaultAgents(enabled: boolean) {
+  return useQuery({
+    queryKey: adminAiKeys.skillDefaultAgents(),
+    queryFn: adminAiApi.getSkillDefaultAgents,
+    enabled,
+    staleTime: 60 * 1000,
   });
 }
 
