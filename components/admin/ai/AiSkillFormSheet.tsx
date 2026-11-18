@@ -8,6 +8,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
@@ -35,9 +36,10 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { useCreateAiSkill, useUpdateAiSkill } from '@/lib/hooks/useAdminAi';
+import { useAdminAiAgents, useCreateAiSkill, useSkillDefaultAgents, useUpdateAiSkill } from '@/lib/hooks/useAdminAi';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { AdminAiSkill } from '@/types/admin-ai';
+import { agentIdsPayload, agentRows, chosenAgentIds, createdOnAgents, toggleAgentId } from '@/lib/utils/skill-agents';
+import type { AdminAiCreatedSkill, AdminAiSkill } from '@/types/admin-ai';
 import {
   changesVersion,
   counterLabel,
@@ -86,6 +88,8 @@ const skillFormSchema = (isEditMode: boolean) =>
     load_mode: z.enum(['on_demand', 'always_on']),
     is_active: z.boolean(),
     change_note: z.string().max(SKILL_CHANGE_NOTE_MAX, `At most ${SKILL_CHANGE_NOTE_MAX} characters`).optional(),
+    // A new skill's agents once the admin touches a box; null keeps the server's defaults.
+    agent_ids: z.array(z.number()).nullable(),
   });
 
 type SkillFormData = z.infer<ReturnType<typeof skillFormSchema>>;
@@ -98,6 +102,7 @@ const EMPTY: SkillFormData = {
   load_mode: 'on_demand',
   is_active: true,
   change_note: '',
+  agent_ids: null,
 };
 
 /**
@@ -105,6 +110,12 @@ const EMPTY: SkillFormData = {
  * `name` is chosen once: Lawexa's `load_skill` calls and the transcripts use
  * it, so it is fixed after create (woz) and shown read-only on edit. Every
  * save is a new version on the server, and the toast says which.
+ *
+ * A NEW skill picks its agents here (Arthur, 18 November 2026; server
+ * d8fda929): the default agents start ticked, any box can be unticked, and
+ * the ticks go with the create as `agent_ids`. Until the defaults answer, or
+ * if they fail, nothing is sent and the server uses its defaults. Editing a
+ * skill's agents stays on the skill's page (AiSkillAgentManager).
  */
 export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheetProps) {
   const isEditMode = !!skill;
@@ -119,6 +130,14 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
   const description = useWatch({ control: form.control, name: 'description' }) ?? '';
   const instructions = useWatch({ control: form.control, name: 'instructions' }) ?? '';
   const loadMode = useWatch({ control: form.control, name: 'load_mode' }) ?? 'on_demand';
+  const pickedAgents = useWatch({ control: form.control, name: 'agent_ids' }) ?? null;
+  const choosingAgents = open && !isEditMode;
+  const defaultAgents = useSkillDefaultAgents(choosingAgents);
+  const activeAgents = useAdminAiAgents({ per_page: 100, active_only: true }, { enabled: choosingAgents });
+  const defaultList = defaultAgents.data?.data.agents ?? null;
+  const rows = defaultList ? agentRows(activeAgents.data?.data ?? [], defaultList) : [];
+  const rowOrder = rows.map((agent) => agent.id);
+  const chosenAgents = chosenAgentIds(pickedAgents, defaultList ? defaultList.map((agent) => agent.id) : null);
   const tokens = estimateTokens(instructions);
   const makesVersion =
     !skill ||
@@ -137,6 +156,7 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
             load_mode: skill.load_mode,
             is_active: skill.is_active,
             change_note: '',
+            agent_ids: null,
           }
         : EMPTY,
     );
@@ -185,8 +205,15 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
           instructions: data.instructions,
           load_mode: data.load_mode,
           is_active: data.is_active,
+          ...agentIdsPayload(chosenAgents),
         },
-        { onSuccess, onError },
+        {
+          onSuccess: (response: { message: string; data: AdminAiCreatedSkill | null }) => {
+            toast.success(response.data ? createdOnAgents(response.data.version, response.data.agents) : response.message);
+            onOpenChange(false);
+          },
+          onError,
+        },
       );
     }
   };
@@ -366,7 +393,49 @@ export function AiSkillFormSheet({ open, onOpenChange, skill }: AiSkillFormSheet
                     </FormItem>
                   )}
                 />
-              ) : null}
+              ) : (
+                <fieldset className="space-y-2" aria-describedby="skill-agents-hint">
+                  <legend className="text-sm font-medium leading-none">Agents</legend>
+                  {defaultAgents.isPending ? (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+                      Loading the default agents…
+                    </p>
+                  ) : defaultAgents.isError || chosenAgents === null ? (
+                    <p className="text-sm text-muted-foreground">
+                      The default agents could not load. The skill still goes on them when you create it.
+                    </p>
+                  ) : (
+                    <ul className="grid gap-2 sm:grid-cols-2">
+                      {rows.map((agent) => {
+                        const id = `skill-agent-${agent.id}`;
+                        return (
+                          <li key={agent.id} className="flex items-center gap-2.5">
+                            <Checkbox
+                              id={id}
+                              checked={chosenAgents.includes(agent.id)}
+                              disabled={isPending}
+                              onCheckedChange={() =>
+                                form.setValue('agent_ids', toggleAgentId(chosenAgents, agent.id, rowOrder), {
+                                  shouldDirty: true,
+                                })
+                              }
+                            />
+                            <label htmlFor={id} className="text-sm leading-none">
+                              {agent.name}
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  <p id="skill-agents-hint" className="text-sm text-muted-foreground">
+                    {chosenAgents !== null && chosenAgents.length === 0
+                      ? 'On no agent, Lawexa never uses it. You can add agents later on the skill’s page.'
+                      : 'Lawexa uses the skill only on the agents ticked. The default agents start ticked.'}
+                  </p>
+                </fieldset>
+              )}
             </div>
 
             <SheetFooter className="px-6 pb-6">
