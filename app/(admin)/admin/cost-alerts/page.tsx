@@ -37,6 +37,7 @@ function CostAlertsContent() {
   const filters = useMemo(() => costAlertFiltersFrom(new URLSearchParams(searchParams.toString())), [searchParams]);
   const alerts = useAdminCostAlerts(costAlertParams(filters));
   const meta = alerts.data?.meta;
+  const pages = alerts.data?.pagination;
 
   const go = (next: CostAlertFilters) => {
     const search = costAlertSearch(next);
@@ -100,7 +101,7 @@ function CostAlertsContent() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            {meta ? `${meta.total.toLocaleString('en-US')} ${meta.total === 1 ? 'alert' : 'alerts'}` : 'Alerts'}
+            {pages ? `${pages.total.toLocaleString('en-US')} ${pages.total === 1 ? 'alert' : 'alerts'}` : 'Alerts'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -111,17 +112,17 @@ function CostAlertsContent() {
             error={alerts.error as Error | null}
             filteredToUser={!!filters.user}
           />
-          {meta && meta.last_page > 1 ? (
+          {pages && pages.last_page > 1 ? (
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
-                Page {meta.current_page} of {meta.last_page}
+                Page {pages.current_page} of {pages.last_page}
               </span>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={meta.current_page <= 1}
-                  onClick={() => go({ ...filters, page: meta.current_page - 1 })}
+                  disabled={pages.current_page <= 1}
+                  onClick={() => go({ ...filters, page: pages.current_page - 1 })}
                 >
                   <ChevronLeft aria-hidden className="h-4 w-4" />
                   Previous
@@ -129,8 +130,8 @@ function CostAlertsContent() {
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={meta.current_page >= meta.last_page}
-                  onClick={() => go({ ...filters, page: meta.current_page + 1 })}
+                  disabled={pages.current_page >= pages.last_page}
+                  onClick={() => go({ ...filters, page: pages.current_page + 1 })}
                 >
                   Next
                   <ChevronRight aria-hidden className="h-4 w-4" />

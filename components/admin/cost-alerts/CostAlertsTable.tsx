@@ -75,16 +75,28 @@ export function CostAlertsTable({
             return (
               <TableRow key={alert.uuid}>
                 <TableCell className="max-w-[240px]">
-                  <Link href={`/admin/users/${alert.user.uuid}`} className="block truncate font-medium text-sm hover:underline">
-                    {alert.user.name}
-                  </Link>
-                  <span className="block truncate text-xs text-muted-foreground">{alert.user.email || 'No email'}</span>
+                  {alert.user ? (
+                    <>
+                      <Link href={`/admin/users/${alert.user.uuid}`} className="block truncate font-medium text-sm hover:underline">
+                        {alert.user.name}
+                      </Link>
+                      <span className="block truncate text-xs text-muted-foreground">{alert.user.email || 'No email'}</span>
+                    </>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Deleted user</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-sm">
-                  {alert.plan.name}
-                  <span className="block text-xs text-muted-foreground">
-                    {alert.plan.currency} {Number(alert.plan.amount).toLocaleString('en-US')} · {alert.plan.interval}
-                  </span>
+                  {alert.plan ? (
+                    <>
+                      {alert.plan.name}
+                      <span className="block text-xs text-muted-foreground">
+                        {alert.plan.currency} {Number(alert.plan.amount).toLocaleString('en-US')} · {alert.plan.interval}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Plan removed</span>
+                  )}
                 </TableCell>
                 <TableCell className="text-sm whitespace-nowrap">
                   {periodLabel(alert.period.start, alert.period.end)}

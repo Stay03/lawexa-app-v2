@@ -11,8 +11,10 @@ export type CostAlertSort = 'percent' | 'cost' | 'first_flagged_at';
 
 export interface CostAlert {
   uuid: string;
-  user: { uuid: string; name: string; email: string | null };
-  plan: { id: number; name: string; currency: 'NGN' | 'USD'; amount: string; interval: string };
+  /** Null once the user is gone (PlanCostAlertResource, 2b0825e0). */
+  user: { uuid: string; name: string; email: string | null } | null;
+  /** Null once the plan is gone. */
+  plan: { id: number; name: string; currency: 'NGN' | 'USD'; amount: string; interval: string } | null;
   period: { start: string; end: string | null; is_current: boolean };
   /** The plan price in USD for the window (annual plans: a twelfth). */
   price_usd: number;
@@ -28,22 +30,30 @@ export interface CostAlert {
   notified_at: string | null;
 }
 
+/** The rule in force, which the screen states (PlanCostAlertController's own meta). */
 export interface CostAlertsMeta {
-  current_page: number;
-  last_page: number;
-  per_page: number;
-  total: number;
   threshold_percent: number;
   usd_to_ngn_rate: number;
   includes_web_search: boolean;
-  /** Present when the list is filtered to one user (`user=<uuid>`). */
-  user?: { uuid: string; name: string };
+  /** The user the list is filtered to (`user=<uuid>`), else null. */
+  user: { uuid: string; name: string } | null;
 }
 
+export interface CostAlertsPagination {
+  current_page: number;
+  per_page: number;
+  total: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+}
+
+/** The API trait's paginated shape: page numbers in `pagination`, the rule in `meta`. */
 export interface CostAlertsResponse {
   success: boolean;
   message: string;
   data: CostAlert[];
+  pagination: CostAlertsPagination;
   meta: CostAlertsMeta;
 }
 

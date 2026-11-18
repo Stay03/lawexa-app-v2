@@ -72,5 +72,13 @@ test('the wiring: the list route, the nav, the settings card, the user badge and
   assert.doesNotMatch(settings, /isError = [^;]*costAlertQuery/, 'an older server without the group does not take the page down');
   assert.match(read('components', 'admin', 'AdminUsersTable.tsx'), /\{user\.cost_alert && \(/);
   assert.match(read('app', '(admin)', 'admin', 'users', '[uuid]', 'page.tsx'), /href=\{`\/admin\/cost-alerts\?user=\$\{encodeURIComponent\(user\.uuid\)\}`\}/);
-  assert.match(read('app', '(admin)', 'admin', 'cost-alerts', 'page.tsx'), /\{COST_ALERT_NOTE\}/);
+  const page = read('app', '(admin)', 'admin', 'cost-alerts', 'page.tsx');
+  assert.match(page, /\{COST_ALERT_NOTE\}/);
+  // The API trait puts page numbers in `pagination`; the controller's `meta` holds only the rule (2b0825e0).
+  assert.match(page, /const pages = alerts\.data\?\.pagination;/);
+  assert.doesNotMatch(page, /meta\.(current_page|last_page|total)/);
+  // A deleted user or plan comes back null and must not break the row.
+  const table = read('components', 'admin', 'cost-alerts', 'CostAlertsTable.tsx');
+  assert.match(table, /\{alert\.user \? \(/);
+  assert.match(table, /\{alert\.plan \? \(/);
 });
