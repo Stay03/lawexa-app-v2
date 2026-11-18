@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { FileText, Loader2, PanelRight } from 'lucide-react';
 
@@ -171,9 +171,13 @@ export function DraftCard({
  * classes, so a template's centred lines and its signature table look as they
  * do in the panel, not as a code box or as typed tags (template layout, thread
  * 2b658111). The draft panel draws an unfinished draft with it too, read only
- * (DraftPanel.tsx; Arthur's A, thread 83151a13).
+ * (DraftPanel.tsx; Arthur's A, thread 83151a13), while Lawexa is still
+ * writing it as well as after (18 November 2026). While it streams, each
+ * re-read is deferred: a burst of words is read once, after the screen has
+ * caught up, so a long draft never makes typing stutter.
  */
 export function DraftDocument({ draft }: { draft: DraftBlock }) {
-  const doc = useMemo(() => markdownToDoc(draft.body, { font: draft.font, size: draft.size }), [draft.body, draft.font, draft.size]);
+  const body = useDeferredValue(draft.body);
+  const doc = useMemo(() => markdownToDoc(body, { font: draft.font, size: draft.size }), [body, draft.font, draft.size]);
   return <DiffDocument diff={doc} />;
 }
