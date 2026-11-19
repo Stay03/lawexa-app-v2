@@ -79,10 +79,13 @@ export function summarisePlan(
     case 'past_due':
       return {
         detail: `${price} · payment overdue`,
-        // No route lets a user update a card (backend, 77e42c2e), so the note
-        // points only at what they can do: choose a plan again, or ask support.
+        // A card-paid plan can take a new card (Update card, Arthur 18 November
+        // 2026); any other plan can only be chosen again, or support asked.
         note: {
-          text: 'Your last payment did not go through. Choose a plan again, or contact support.',
+          text:
+            subscription.provider === 'paystack'
+              ? 'Your last payment did not go through. Update your card to keep your plan.'
+              : 'Your last payment did not go through. Choose a plan again, or contact support.',
           tone: 'alarm',
         },
         cancel: 'subscription',
@@ -108,6 +111,34 @@ export function summarisePlan(
         isFree: false,
       };
   }
+}
+
+/* ── Update card ─────────────────────────────────────────────────────────── */
+
+/**
+ * Whether the plan row offers "Update card", and how loudly (Arthur, 18
+ * November 2026; Backend's manage-link). Only a card-paid (Paystack) plan that
+ * renews has a card to change: an active one shows it quietly, an overdue one
+ * shows it first, since the failed-payment email sends people here for it. A
+ * single paid period never charges again, so it has no card to change.
+ */
+export type UpdateCardEmphasis = 'prominent' | 'quiet' | null;
+
+export function updateCardEmphasis(data: ICurrentSubscriptionData): UpdateCardEmphasis {
+  const { subscription, is_free_tier } = data;
+  if (is_free_tier || !subscription || subscription.provider !== 'paystack') return null;
+  if (subscription.status === 'past_due') return 'prominent';
+  if (subscription.status !== 'active') return null;
+  if (isOnePeriodSubscription(subscription) && subscription.ends_at) return null;
+  return 'quiet';
+}
+
+/** What a failed "Update card" says, by HTTP status, preferring the server's own sentence. */
+export function updateCardFailure(status: number | undefined, serverMessage: string | undefined): string {
+  if (status === 404) return serverMessage || 'You have no card-paid subscription to update.';
+  if (status === 502) return serverMessage || 'The card page could not be opened just now. Try again in a moment.';
+  if (status === 429) return 'Too many tries. Try again in a minute.';
+  return 'The card page could not be opened. Try again.';
 }
 
 /* ── "Why are you cancelling?" ───────────────────────────────────────────── */
