@@ -85,9 +85,11 @@ export type BlankEdit =
   /** Every occurrence of `passage` becomes [blank]. */
   | { op: 'add'; passage: string; blank: string };
 
-/** A row of GET .../versions, newest first. */
+/** A row of GET .../versions, newest first, the one in use included. */
 export interface ItemVersionRow {
   version: number;
+  /** The version in use (Backend, 19 November 2026): it cannot be restored (404). */
+  current?: boolean;
   created_at: string;
   by: { uuid: string; name: string } | null;
   /** Templates only. */

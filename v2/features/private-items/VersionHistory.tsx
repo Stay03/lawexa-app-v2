@@ -37,7 +37,8 @@ export function VersionHistory({
   const versions = useQuery({ ...privateItemsQueries.versions(kind, uuid), enabled: open });
   const rows = versions.data ?? [];
   const [picked, setPicked] = useState<number | null>(null);
-  const current = rows[0]?.version ?? null;
+  // The server marks the version in use; newest first otherwise.
+  const current = rows.find((row) => row.current)?.version ?? rows[0]?.version ?? null;
   const shown = picked ?? current;
   const templates = useTemplateMutations();
   const skills = useSkillMutations();
@@ -79,6 +80,12 @@ export function VersionHistory({
     >
       {versions.isPending ? (
         <Skeleton aria-hidden className="h-80 rounded-xl" />
+      ) : versions.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {extractApiError(versions.error).message || 'The history did not load.'}
+        </p>
+      ) : rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">No earlier versions yet. Each change you save makes one.</p>
       ) : (
         <div className="grid gap-4 md:grid-cols-[15rem_1fr] md:items-start">
           <ol className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible">
