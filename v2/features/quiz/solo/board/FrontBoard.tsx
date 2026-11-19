@@ -1,7 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { Crown, Info, Trophy } from 'lucide-react';
+import { Crown, Info, Star, Trophy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -280,7 +280,11 @@ export function Podium({
                   block.front,
                 )}
               >
-                {/* No stars over the rank (Arthur, 19 November 2026: no star icons anywhere). */}
+                <span aria-hidden className="mb-1 flex gap-0.5">
+                  {[0, 1, 2].map((star) => (
+                    <Star key={star} className="size-2 fill-white text-white" />
+                  ))}
+                </span>
                 {entry.rank}
               </span>
             </span>
