@@ -161,7 +161,8 @@ test('Show changes and the chat card draw a template draft as the panel does: al
   const card = read('conversations', 'conversation', 'draft', 'DraftCard.tsx');
   // Without a side panel the card reads the draft as the panel reads it, not as chat Markdown.
   assert.match(card, /<DraftDocument draft=\{draft\} \/>/);
-  assert.match(card, /markdownToDoc\(draft\.body, \{ font: draft\.font, size: draft\.size \}\)/);
+  // The body is read through a deferred copy, so a draft still streaming re-reads once per burst (18 November 2026).
+  assert.match(card, /const body = useDeferredValue\(draft\.body\);\s*const doc = useMemo\(\(\) => markdownToDoc\(body, \{ font: draft\.font, size: draft\.size \}\)/);
   assert.doesNotMatch(card, /MarkdownText/);
   // And the centred line it reads is a centred paragraph, not typed tags.
   assert.deepEqual(markdownToDoc('<p style="text-align: center">**TEST DATA TENANCY AGREEMENT**</p>').content?.[0].attrs, { textAlign: 'center' });
@@ -185,7 +186,7 @@ test('a line of underscores alone is a line to sign on, not a rule; --- and *** 
 
 test('the chat card without a panel and Show changes read a draft with the same parse, so the signing line shows there too', () => {
   const card = read('conversations', 'conversation', 'draft', 'DraftCard.tsx');
-  assert.match(card, /markdownToDoc\(draft\.body/);
+  assert.match(card, /const body = useDeferredValue\(draft\.body\);[\s\S]{0,80}markdownToDoc\(body/);
   const view = read('conversations', 'conversation', 'draft', 'DraftChangesView.tsx');
   assert.match(view, /diffDocs\(markdownToDoc\(before, font\), markdownToDoc\(after, font\)\)/);
 });
