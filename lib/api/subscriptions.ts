@@ -149,6 +149,24 @@ async function sendCancellationFeedback(body: CancellationFeedbackBody): Promise
   return response.data;
 }
 
+/** What `GET /subscriptions/manage-link` answers with on 200. */
+export interface ManageLinkData {
+  /** Paystack's card page for the person's own subscription; made fresh on each request, never cached. */
+  link: string;
+  subscription_status: 'active' | 'past_due';
+}
+
+/**
+ * A link to Paystack's page where the person changes the card their plan
+ * renews on (Arthur, 18 November 2026; Backend, renewal-email-card-export).
+ * 404: no card-paid subscription to update. 502: Paystack could not make the
+ * link. Throttled to 10 a minute.
+ */
+async function getManageLink(): Promise<ApiResponse<ManageLinkData>> {
+  const response = await apiClient.get<ApiResponse<ManageLinkData>>('/subscriptions/manage-link');
+  return response.data;
+}
+
 /**
  * Get paginated invoice history.
  */
@@ -179,5 +197,6 @@ export const subscriptionsApi = {
   verifyUpgrade,
   cancel,
   sendCancellationFeedback,
+  getManageLink,
   getInvoices,
 } as const;
