@@ -1,6 +1,6 @@
 'use client';
 
-import { Briefcase, BookOpen, HandHelping, Loader2, Sparkles } from 'lucide-react';
+import { Briefcase, BookOpen, HandHelping, Loader2 } from 'lucide-react';
 import { OnboardingCard } from './OnboardingCard';
 import { Badge } from '@/components/ui/badge';
 import type { UserType, CommunicationStyle } from '@/types/auth';
@@ -81,7 +81,6 @@ export function CommunicationStyleStep({
                   variant="default"
                   className="absolute -top-2 left-4 z-10 gap-1 bg-primary text-primary-foreground"
                 >
-                  <Sparkles className="h-3 w-3" />
                   Suggested for you
                 </Badge>
               )}

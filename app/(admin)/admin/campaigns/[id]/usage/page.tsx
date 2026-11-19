@@ -14,7 +14,7 @@ import {
   Package,
   PackageCheck,
   PackageMinus,
-  Sparkles,
+  Cpu,
   Users,
   Wallet,
   XCircle,
@@ -310,7 +310,7 @@ function planStats(
     {
       label: 'AI requests',
       value: totals.ai_requests.toLocaleString(),
-      icon: Sparkles,
+      icon: Cpu,
       subtext: 'Billed LLM calls, errors excluded',
     },
     {
@@ -357,7 +357,7 @@ function packStats(
     {
       label: 'AI requests',
       value: totals.ai_requests.toLocaleString(),
-      icon: Sparkles,
+      icon: Cpu,
       subtext: 'Billed LLM calls, errors excluded',
     },
     {

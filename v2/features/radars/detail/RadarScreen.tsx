@@ -9,7 +9,6 @@ import {
   Pause,
   Play,
   Settings,
-  Sparkles,
   Zap,
 } from 'lucide-react';
 
@@ -399,7 +398,7 @@ function RadarBody({ radarUuid }: { radarUuid: string }) {
           </h1>
           {namePending ? (
             <p className="flex items-center gap-1.5 text-xs text-primary motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
-              <Sparkles aria-hidden className="size-3.5" />
+              <Loader2 aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
               Naming this radar…
             </p>
           ) : null}

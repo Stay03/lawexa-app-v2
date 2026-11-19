@@ -11,7 +11,7 @@ import {
   MessageSquare,
   Package,
   PackageCheck,
-  Sparkles,
+  Cpu,
   Users,
 } from 'lucide-react';
 
@@ -149,7 +149,7 @@ export default function SponsorUsagePage({
           {
             label: 'AI requests',
             value: totals.ai_requests.toLocaleString(),
-            icon: Sparkles,
+            icon: Cpu,
             subtext: 'Billed LLM calls, errors excluded',
           },
           {

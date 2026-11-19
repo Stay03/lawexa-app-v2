@@ -9,7 +9,7 @@ import {
   Handshake,
   ListChecks,
   Scale,
-  Sparkles,
+  CircleHelp,
   UserRound,
   type LucideIcon,
 } from 'lucide-react';
@@ -79,7 +79,7 @@ const PROMPTS_BY_TAB: Record<HomeTab, readonly HomePrompt[]> = {
     { label: 'Explain in simple terms', icon: GraduationCap },
     { label: 'Summarise the leading case on', icon: BookText },
     { label: 'Compare these two doctrines', icon: Scale },
-    { label: 'Quiz me on', icon: Sparkles },
+    { label: 'Quiz me on', icon: CircleHelp },
   ],
 };
 
