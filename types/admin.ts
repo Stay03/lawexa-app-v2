@@ -1,4 +1,5 @@
 import type { TCurrency, TPaymentProvider } from '@/types/payment';
+import type { UserCostAlert } from '@/types/admin-cost-alerts';
 
 // Admin Conversation Management Types
 // Based on API documentation: /docs/apiDocs/admin-conversation-api-documentation.md
@@ -256,6 +257,8 @@ export interface AdminUserDetail {
   conversations_count: number;
   usage_summary: AdminUserUsageSummary;
   attribution: AdminUserAttributionDetail | null;
+  /** The current period's cost alert, when at or over the threshold (Backend, 18 November 2026). Absent from older servers. */
+  cost_alert?: UserCostAlert | null;
   created_at: string;
   updated_at: string;
 }
@@ -375,6 +378,8 @@ export interface IAdminUserListItem {
   phone?: string | null;
   /** "How did you hear about us?": the key only (Backend, 18 November 2026). */
   heard_about?: string | null;
+  /** The current period's cost alert, when at or over the threshold. Absent from older servers. */
+  cost_alert?: UserCostAlert | null;
   created_at: string;
 }
 

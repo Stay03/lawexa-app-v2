@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Settings2 } from 'lucide-react';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import { ExchangeRateField } from '@/components/admin/ExchangeRateField';
+import { ExchangeRateNote } from '@/components/admin/ExchangeRateNote';
 
 export function AdminUserConversationFilters() {
   const showNGN = useCurrencyStore((s) => s.showNGN);
@@ -45,7 +45,7 @@ export function AdminUserConversationFilters() {
               />
             </div>
 
-            <ExchangeRateField id="conversation-filters-rate" />
+            <ExchangeRateNote />
           </div>
         </PopoverContent>
       </Popover>
