@@ -60,11 +60,14 @@ test('Settings > Profile: the number is read, checked, settled and sent only whe
   assert.equal(validateProfileForm(wrong, visibilityFor(wrong)).fields.phone, PHONE_PROBLEM);
 });
 
-test('the wiring: onboarding step 3, the Profile row, and the admin user views', () => {
-  const step = read('app', '(onboarding)', 'onboarding', 'step-3', 'page.tsx');
-  assert.match(step, /if \(phoneError \|\| heardError\) \{\s*setPhoneTouched\(true\);\s*setHeardTouched\(true\);\s*return;\s*\}/, 'a refused number holds Next');
-  assert.match(step, /if \(phone !== null\) stepFields\.phone = storedPhone\(phone\);/, 'sent only when typed');
-  assert.match(step, /<Label htmlFor="onboarding-phone">Phone number<\/Label>/);
+test('the wiring: onboarding step 4 (Arthur’s pick B), the Profile row, and the admin user views', () => {
+  const step = read('app', '(onboarding)', 'onboarding', 'step-4', 'page.tsx');
+  const contact = read('components', 'onboarding', 'OnboardingContactFields.tsx');
+  assert.match(step, /if \(!contact\.check\(\)\) return;/, 'a refused number holds Next');
+  assert.match(step, /saveStep\(\{ step: 4, \.\.\.stepFields, \.\.\.contact\.payload\(\) \}\);/);
+  assert.match(contact, /\.\.\.\(phone !== null \? \{ phone: storedPhone\(phone\) \} : \{\}\),/, 'sent only when typed');
+  assert.match(contact, /<Label htmlFor="onboarding-phone">\s*Phone number <span/);
+  assert.doesNotMatch(read('app', '(onboarding)', 'onboarding', 'step-3', 'page.tsx'), /onboarding-phone|heard/i, 'step 3 asks only where you are');
   const fields = read('v2', 'features', 'settings', 'profile', 'text-fields.ts');
   assert.match(fields, /phone: \{\s*icon: Phone,\s*label: 'Phone number',/);
   assert.match(read('v2', 'features', 'settings', 'profile', 'ProfileScreen.tsx'), /<SettingsFormGroup id="contact" label="Contact">\s*\{textRow\('phone'\)\}/);
@@ -95,13 +98,13 @@ test('the heard-about answer: optional, one of the listed choices, and "Other" n
   assert.equal(heardAboutLabel(null), null);
 });
 
-test('the wiring: no line under the phone field, the question on step 3, and admins see the answer', () => {
-  const step = read('app', '(onboarding)', 'onboarding', 'step-3', 'page.tsx');
+test('the wiring: no line under the phone field, the question on step 4, and admins see the answer', () => {
+  const step = read('components', 'onboarding', 'OnboardingContactFields.tsx');
   assert.doesNotMatch(step, /PHONE_HINT/, 'no line under the phone field (Arthur: "use none")');
   assert.doesNotMatch(read('v2', 'features', 'settings', 'profile', 'text-fields.ts'), /PHONE_HINT|hint: .*phone/i);
-  assert.match(step, /<Label htmlFor="onboarding-heard-about">How did you hear about us\?<\/Label>/);
-  assert.match(step, /if \(phoneError \|\| heardError\) \{/, 'a refused answer holds Next');
-  assert.match(step, /saveStep\(\{ step: 3, \.\.\.stepFields, \.\.\.heardAboutPayload\(heardAbout, heardAboutOther\) \}\);/);
+  assert.match(step, /<Label htmlFor="onboarding-heard-about">\s*How did you hear about us\? <span/);
+  assert.match(step, /if \(!phoneError && !heardError\) return true;/, 'a refused answer holds Next');
+  assert.match(step, /\.\.\.heardAboutPayload\(heardAbout, heardAboutOther\),/);
   assert.match(read('components', 'admin', 'UserDetailHeader.tsx'), /Heard about Lawexa: \{heardAboutLabel\(user\.profile\?\.heard_about, user\.profile\?\.heard_about_other\)\}/);
   assert.match(read('components', 'admin', 'AdminUsersTable.tsx'), /Heard via \{heardAboutLabel\(user\.heard_about\)\}/);
 });

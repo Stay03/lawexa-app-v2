@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
+import { useOnboardingContact } from '@/components/onboarding/OnboardingContactFields';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
@@ -38,6 +39,8 @@ export default function OnboardingStep4Page() {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [region, setRegion] = useState(locationData.region || '');
   const [city, setCity] = useState(locationData.city || '');
+  // Optional phone and "How did you hear about us?" (Arthur's pick B, 19 November 2026).
+  const contact = useOnboardingContact(user?.profile?.phone);
 
   // Redirect if previous steps not completed
   useEffect(() => {
@@ -94,6 +97,8 @@ export default function OnboardingStep4Page() {
   };
 
   const handleNext = () => {
+    // A refused phone or heard-about answer holds Next and says why.
+    if (!contact.check()) return;
     // Determine the actual profession value
     const finalProfession = isLawyer ? 'lawyer' : isLawStudent ? 'student' : profession;
 
@@ -114,7 +119,7 @@ export default function OnboardingStep4Page() {
     if (finalProfession) stepFields.profession = finalProfession;
     if (region) stepFields.region = region;
     if (city) stepFields.city = city;
-    saveStep({ step: 4, ...stepFields });
+    saveStep({ step: 4, ...stepFields, ...contact.payload() });
 
     // Determine next step based on user type and profession
     if (userType === 'lawyer') {
@@ -276,6 +281,8 @@ export default function OnboardingStep4Page() {
                 )}
               </div>
             )}
+
+            {contact.fields}
           </div>
 
           {/* Navigation buttons */}

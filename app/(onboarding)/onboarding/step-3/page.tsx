@@ -5,15 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, Search, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { phoneProblem, storedPhone } from '@/lib/utils/phone-number';
-import {
-  HEARD_ABOUT_OPTIONS,
-  HEARD_ABOUT_OTHER_MAX,
-  heardAboutPayload,
-  heardAboutProblem,
-} from '@/lib/utils/heard-about';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
@@ -49,26 +40,16 @@ export default function OnboardingStep3Page() {
 
   // Form state
   const [searchQuery, setSearchQuery] = useState('');
-  // The person's pick, else the detected country. Read, not copied into state
-  // by an effect: a setState in an effect re-renders for nothing (React
-  // Compiler lint), and the pick wins over the detection either way.
-  const [picked, setPicked] = useState<{ name: string; code: string } | null>(
-    locationData.country ? { name: locationData.country, code: locationData.countryCode || '' } : null,
-  );
-  const selectedCountry = picked ? picked.name : detectedCountry;
-  const selectedCountryCode = picked ? picked.code : detectedCountryCode;
-  // Optional phone number (Arthur, 18 November 2026). The step saves without
-  // waiting for the answer, so the server's rule is checked here before Next.
-  const savedPhone = (userData?.data as { user?: { profile?: { phone?: string | null } } } | undefined)?.user?.profile?.phone;
-  const [phone, setPhone] = useState<string | null>(null);
-  const phoneValue = phone ?? savedPhone ?? '';
-  const [phoneTouched, setPhoneTouched] = useState(false);
-  const phoneError = phoneProblem(phoneValue);
-  // "How did you hear about us?" (Arthur, 18 November 2026): optional; "Other" needs a few words.
-  const [heardAbout, setHeardAbout] = useState<string | null>(null);
-  const [heardAboutOther, setHeardAboutOther] = useState('');
-  const [heardTouched, setHeardTouched] = useState(false);
-  const heardError = heardAboutProblem(heardAbout, heardAboutOther);
+  const [selectedCountry, setSelectedCountry] = useState(locationData.country || '');
+  const [selectedCountryCode, setSelectedCountryCode] = useState(locationData.countryCode || '');
+
+  // Initialize with detected country if not already set
+  useEffect(() => {
+    if (detectedCountry && !selectedCountry) {
+      setSelectedCountry(detectedCountry);
+      setSelectedCountryCode(detectedCountryCode);
+    }
+  }, [detectedCountry, detectedCountryCode, selectedCountry]);
 
   // Fetch all countries
   const { data: allCountries, isLoading: loadingCountries } = useCountries('');
@@ -108,7 +89,8 @@ export default function OnboardingStep3Page() {
   }, [userType, communicationStyle, router]);
 
   const handleCountrySelect = (countryName: string, countryCode: string) => {
-    setPicked({ name: countryName, code: countryCode });
+    setSelectedCountry(countryName);
+    setSelectedCountryCode(countryCode);
   };
 
   const handleBack = () => {
@@ -118,11 +100,6 @@ export default function OnboardingStep3Page() {
   };
 
   const handleNext = () => {
-    if (phoneError || heardError) {
-      setPhoneTouched(true);
-      setHeardTouched(true);
-      return;
-    }
     const matchesDetected = selectedCountry === detectedCountry;
 
     // Save location data to store
@@ -142,9 +119,7 @@ export default function OnboardingStep3Page() {
     };
     if (matchesDetected && detectedRegion) stepFields.region = detectedRegion;
     if (matchesDetected && detectedCity) stepFields.city = detectedCity;
-    // Sent only when typed or changed: left out, the server keeps what it has.
-    if (phone !== null) stepFields.phone = storedPhone(phone);
-    saveStep({ step: 3, ...stepFields, ...heardAboutPayload(heardAbout, heardAboutOther) });
+    saveStep({ step: 3, ...stepFields });
 
     // For lawyer/law_student who selected detected country, skip profile step
     const isLawyerOrLawStudent = userType === 'lawyer' || userType === 'law_student';
@@ -270,74 +245,11 @@ export default function OnboardingStep3Page() {
                 {/* No results */}
                 {filteredCountries.length === 0 && (
                   <p className="text-center text-muted-foreground py-8">
-                    No countries found for &ldquo;{searchQuery}&rdquo;
+                    No countries found for "{searchQuery}"
                   </p>
                 )}
               </>
             )}
-          </div>
-
-          {/* Optional phone number (Arthur, 18 November 2026). */}
-          <div className="space-y-2">
-            <Label htmlFor="onboarding-phone">Phone number</Label>
-            <Input
-              id="onboarding-phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              placeholder="+234 803 123 4567"
-              value={phoneValue}
-              onChange={(event) => setPhone(event.target.value)}
-              onBlur={() => setPhoneTouched(true)}
-              aria-invalid={phoneTouched && phoneError !== null}
-              aria-describedby={phoneTouched && phoneError ? 'onboarding-phone-error' : undefined}
-            />
-            {/* No line under it (Arthur: "use none"); only a refusal shows. */}
-            {phoneTouched && phoneError ? (
-              <p id="onboarding-phone-error" role="alert" className="text-sm text-destructive">
-                {phoneError}
-              </p>
-            ) : null}
-          </div>
-
-          {/* "How did you hear about us?" (Arthur, 18 November 2026). Optional. */}
-          <div className="space-y-2">
-            <Label htmlFor="onboarding-heard-about">How did you hear about us?</Label>
-            <Select
-              value={heardAbout ?? undefined}
-              onValueChange={(value) => {
-                setHeardAbout(value);
-                setHeardTouched(false);
-              }}
-            >
-              <SelectTrigger id="onboarding-heard-about" className="w-full">
-                <SelectValue placeholder="Choose one" />
-              </SelectTrigger>
-              <SelectContent>
-                {HEARD_ABOUT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {heardAbout === 'other' ? (
-              <Input
-                aria-label="Where did you hear about Lawexa?"
-                placeholder="Where did you hear about Lawexa?"
-                maxLength={HEARD_ABOUT_OTHER_MAX}
-                value={heardAboutOther}
-                onChange={(event) => setHeardAboutOther(event.target.value)}
-                onBlur={() => setHeardTouched(true)}
-                aria-invalid={heardTouched && heardError !== null}
-                aria-describedby={heardTouched && heardError ? 'onboarding-heard-error' : undefined}
-              />
-            ) : null}
-            {heardTouched && heardError ? (
-              <p id="onboarding-heard-error" role="alert" className="text-sm text-destructive">
-                {heardError}
-              </p>
-            ) : null}
           </div>
 
           {/* Navigation buttons */}
