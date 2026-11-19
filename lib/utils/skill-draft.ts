@@ -48,6 +48,8 @@ const STAGE: Readonly<Record<SkillDraftStatus, number>> = {
   dismissed: 1,
   published: 2,
   rejected: 2,
+  // Kept as the person's own skill: as final as an admin's answer.
+  saved_private: 2,
 };
 
 export function laterSkillDraftCard(local: SkillDraftCard, server: SkillDraftCard): SkillDraftCard {
