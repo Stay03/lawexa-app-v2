@@ -57,14 +57,9 @@ export default function OnboardingStep4Page() {
   // Check if user has a custom profession (not in predefined options)
   const hasCustomProfession = profession && !PROFESSION_OPTIONS.find(o => o.value === profession);
 
-  // Auto-set profession for lawyer and law_student
-  useEffect(() => {
-    if (isLawyer && !profession) {
-      setProfession('lawyer');
-    } else if (isLawStudent && !profession) {
-      setProfession('student');
-    }
-  }, [isLawyer, isLawStudent, profession]);
+  // A lawyer's or law student's profession is not chosen here: handleNext
+  // derives it (finalProfession), and the step count ignores it for both. No
+  // effect copies it into state (React Compiler lint: no setState in an effect).
 
   const handleBack = () => {
     router.push('/onboarding/step-3');
