@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
-import { ExchangeRateField } from '@/components/admin/ExchangeRateField';
+import { ExchangeRateNote } from '@/components/admin/ExchangeRateNote';
 
 export function CurrencySettings() {
   const showNGN = useCurrencyStore((s) => s.showNGN);
@@ -45,7 +45,7 @@ export function CurrencySettings() {
         </button>
       </div>
 
-      {/* Exchange Rate Settings */}
+      {/* The rate in force, read only: one rate, set in Billing settings. */}
       <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" size="icon" className="shrink-0 h-8 w-8">
@@ -54,10 +54,10 @@ export function CurrencySettings() {
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64">
           <PopoverHeader>
-            <PopoverTitle>Exchange Rate</PopoverTitle>
+            <PopoverTitle>Exchange rate</PopoverTitle>
           </PopoverHeader>
 
-          <ExchangeRateField id="currency-settings-rate" />
+          <ExchangeRateNote />
         </PopoverContent>
       </Popover>
     </div>

@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminUser } from '@/lib/hooks/useAdmin';
 import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { useExchangeRate } from '@/lib/hooks/useExchangeRate';
-import { ArrowLeft, CalendarClock, Webhook } from 'lucide-react';
+import { ArrowLeft, CalendarClock, ChevronRight, TriangleAlert, Webhook } from 'lucide-react';
+import { userCostAlertLine } from '@/lib/utils/cost-alerts';
 import {
   UserDetailHeader,
   UserFreeMessagesBlockDialog,
@@ -132,6 +133,22 @@ export default function AdminUserDetailPage({
         showNGN={showNGN}
         exchangeRate={exchangeRate}
       />
+
+      {/* Cost alert (Arthur, 18 November 2026): this period's AI cost is at or
+          over the threshold. Opens the Cost alerts list for this user. */}
+      {user.cost_alert ? (
+        <Link
+          href={`/admin/cost-alerts?user=${encodeURIComponent(user.uuid)}`}
+          className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 transition-colors hover:bg-amber-500/15 dark:text-amber-300"
+        >
+          <TriangleAlert aria-hidden className="h-4 w-4 shrink-0" />
+          <span className="flex-1">{userCostAlertLine(user.cost_alert)}</span>
+          <span className="flex shrink-0 items-center gap-0.5 font-medium">
+            Cost alerts
+            <ChevronRight aria-hidden className="h-4 w-4" />
+          </span>
+        </Link>
+      ) : null}
 
       {/* Tabs: views of the user (left) · actions on the user (right) */}
       <Tabs

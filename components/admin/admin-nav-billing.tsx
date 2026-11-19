@@ -13,6 +13,7 @@ import {
   Building2,
   Webhook,
   MessageSquare,
+  TriangleAlert,
   UserMinus,
 } from 'lucide-react';
 import {
@@ -42,6 +43,7 @@ const billingNavItems = [
   { title: 'Sponsors', url: '/admin/sponsors', icon: Building2, exact: true },
   { title: 'Messages', url: '/admin/messages', icon: MessageSquare, exact: true },
   { title: 'Paystack Webhooks', url: '/admin/paystack-webhooks', icon: Webhook, exact: true },
+  { title: 'Cost alerts', url: '/admin/cost-alerts', icon: TriangleAlert, exact: true },
   { title: 'Settings', url: '/admin/billing/settings', icon: Settings },
 ];
 
@@ -49,7 +51,7 @@ export function AdminNavBillingSection() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const isSectionActive = pathname.startsWith('/admin/plans') || pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/message-packs') || pathname.startsWith('/admin/sponsors') || pathname.startsWith('/admin/campaigns') || pathname.startsWith('/admin/billing') || pathname.startsWith('/admin/paystack-webhooks') || pathname.startsWith('/admin/messages') || pathname.startsWith('/admin/feedback/cancellations');
+  const isSectionActive = pathname.startsWith('/admin/plans') || pathname.startsWith('/admin/subscriptions') || pathname.startsWith('/admin/message-packs') || pathname.startsWith('/admin/sponsors') || pathname.startsWith('/admin/campaigns') || pathname.startsWith('/admin/billing') || pathname.startsWith('/admin/paystack-webhooks') || pathname.startsWith('/admin/cost-alerts') ||pathname.startsWith('/admin/messages') || pathname.startsWith('/admin/feedback/cancellations');
 
   return (
     <SidebarGroup>
