@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import {
   Copy,
+  CreditCard,
   Crown,
   Loader2,
   ReceiptText,
@@ -22,8 +23,14 @@ import { SETTINGS_COLUMN } from '../SettingsList';
 import { SettingsFormGroup } from '../SettingsForm';
 import { SettingsState } from '../SettingsState';
 import { CancelPlanDialog } from './CancelPlanDialog';
-import { formatBillingDate, summarisePlan, type CancelKind } from './model';
-import { billingQueries } from './queries';
+import {
+  formatBillingDate,
+  summarisePlan,
+  updateCardEmphasis,
+  updateCardFailure,
+  type CancelKind,
+} from './model';
+import { billingQueries, useUpdateCard } from './queries';
 import { BillingFallback } from './states';
 
 /**
@@ -42,6 +49,7 @@ export function BillingScreen() {
   const trial = useQuery(billingQueries.trial(trialing));
   const invoices = useInfiniteQuery(billingQueries.invoices());
   const [cancelKind, setCancelKind] = useState<CancelKind>(null);
+  const updateCard = useUpdateCard((status, message) => toast.error(updateCardFailure(status, message)));
 
   if (current.isPending || invoices.isPending) return <BillingFallback />;
 
@@ -76,6 +84,7 @@ export function BillingScreen() {
 
   const data = current.data;
   const summary = summarisePlan(data, trial.data ?? null);
+  const cardEmphasis = updateCardEmphasis(data);
   const rows = invoices.data.pages.flatMap((page) => page.data);
   const lastDay =
     cancelKind === 'trial'
@@ -106,6 +115,39 @@ export function BillingScreen() {
                 <Link href="/pricing">{summary.isFree ? 'Upgrade' : 'Change plan'}</Link>
               </Button>
             </li>
+            {/* Update card (Arthur, 18 November 2026): a card-paid plan that renews.
+                The failed-payment email's button lands here, so an overdue plan
+                shows it in the brand colour; Paystack's page opens in a new tab. */}
+            {cardEmphasis ? (
+              <li>
+                <button
+                  type="button"
+                  onClick={updateCard.open}
+                  disabled={updateCard.opening}
+                  aria-busy={updateCard.opening || undefined}
+                  className={cn(
+                    'v2-interactive flex min-h-14 w-full items-center gap-3.5 px-4 py-2.5 text-left disabled:opacity-60',
+                    'transition-colors duration-150 hover:bg-foreground/[0.04] motion-reduce:transition-none',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                    cardEmphasis === 'prominent' ? 'text-primary' : 'text-foreground',
+                  )}
+                >
+                  {updateCard.opening ? (
+                    <Loader2 aria-hidden className="size-5 shrink-0 animate-spin" />
+                  ) : (
+                    <CreditCard aria-hidden className="size-5 shrink-0" />
+                  )}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-[15px] leading-snug font-medium">Update card</span>
+                    <span className="text-[13px] leading-snug text-muted-foreground">
+                      {cardEmphasis === 'prominent'
+                        ? 'Add a card that works so your plan renews. Paystack opens in a new tab.'
+                        : 'Change the card your plan renews on. Paystack opens in a new tab.'}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            ) : null}
             {/* Cancelling sits with the plan it ends, above the invoices, so it is
                 found without scrolling past a long invoice list (Richard 433760d9). */}
             {summary.cancel ? (
