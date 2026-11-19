@@ -276,12 +276,21 @@ const ALIGNED_LINE = /^<(p|h[1-3]|div)\s+style\s*=\s*(["'])\s*text-align\s*:\s*(
 const OPENING_TAG = /^<(?:p|h[1-3]|div)(?:\s[^>]*)?$/i;
 
 /**
+ * Where one aligned block ends and the next begins on the same line:
+ * `…</p><p style="text-align: right">…`. A template's layout rule writes its
+ * centred and right-aligned lines run together like this (Arthur's garnishee
+ * draft, 18 November 2026), and read as one line the joins showed as typed tags.
+ */
+const RUN_TOGETHER = /(?<=<\/(?:p|h[1-3]|div)\s*>)\s*(?=<(?:p|h[1-3]|div)\b)/i;
+
+/**
  * An HTML block's lines, each an aligned paragraph or heading where it is one;
  * `null` when no line is, so the block stays text as before. `streaming`: the
  * block is the draft's last, so its last line may lack its closing tag.
+ * Aligned blocks written run together on one line are read one per line.
  */
 function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONContent[] | null {
-  const lines = value.split('\n');
+  const lines = value.split('\n').flatMap((line) => line.split(RUN_TOGETHER));
   const content: JSONContent[] = [];
   // The lines between aligned ones, read as Markdown together (a paragraph may run over several).
   let others: string[] = [];
@@ -305,13 +314,15 @@ function alignedLines(value: string, font: DraftFont, streaming: boolean): JSONC
       flush();
       const tag = match[1].toLowerCase();
       const align = match[3].toLowerCase() as Align;
+      // Still being written: a tag half typed at the end (`</p`, `<stro`) is not words yet.
+      const words = open && !match[5] ? match[4].replace(/<[^>]*$/, '') : match[4];
       content.push(
         tag === 'p' || tag === 'div'
-          ? withContent({ type: 'paragraph', attrs: { textAlign: align } }, inlineMarkdown(match[4], font))
+          ? withContent({ type: 'paragraph', attrs: { textAlign: align } }, inlineMarkdown(words, font))
           : // A heading keeps its own size, as a `#` heading does.
             withContent(
               { type: 'heading', attrs: { level: Number(tag[1]), textAlign: align } },
-              inlineMarkdown(match[4], { font: font.font, size: null }),
+              inlineMarkdown(words, { font: font.font, size: null }),
             ),
       );
       return;

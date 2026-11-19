@@ -45,12 +45,63 @@ test('a draft never closed reads as unfinished, with the right-aligned date and 
   assert.ok(nodes.filter((node) => node.attrs?.hang === 1).length === 2, 'the numbered paragraphs hang');
 });
 
-test('the panel draws an unfinished draft as the read-only document once the answer has ended, and streams it as text while it is written', () => {
+test('the panel draws an unfinished draft as the read-only document, while it is written and after (Arthur, 18 November 2026)', () => {
   const panel = readFileSync(new URL('./DraftPanel.tsx', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
-  assert.match(
-    panel,
-    /\{!draft\.complete && streamingMessage \? \(\s*<MarkdownText content=\{draft\.body\} animate \/>\s*\) : \(\s*<DraftDocument draft=\{draft\} \/>\s*\)\}/,
-  );
+  // One reader for a draft still being written and one that ended unfinished: the
+  // chat's Markdown text showed a template's <p style="text-align: …"> lines as tags.
+  assert.match(panel, /<article className=\{DRAFT_DOCUMENT\}>[\s\S]{0,900}?<DraftDocument draft=\{draft\} \/>\s*<\/article>/);
+  assert.doesNotMatch(panel, /MarkdownText/);
   // The editor (edit, save, download, compare) stays for a finished draft only.
   assert.match(panel, /\{draft\.complete && conversationId \? \(\s*<DraftEditor/);
+});
+
+/* Arthur's garnishee draft (18 November 2026, thread 83151a13): a template's
+ * aligned lines, written run together as the server's layout rule writes them,
+ * showed as typed tags while the draft was still streaming. The document reader
+ * now draws it at every point of the stream. TEST DATA in the shape of that answer. */
+const GARNISHEE = [
+  'TEST DATA. Here is the bundle.',
+  '',
+  '<draft title="Garnishee Order Nisi" id="gar001" version="1">',
+  '<p style="text-align: center"><strong>IN THE HIGH COURT OF LAGOS STATE</strong></p><p style="text-align: center"><strong>HOLDEN AT [JUDICIAL DIVISION]</strong></p><p style="text-align: right">SUIT NO: [SUIT NUMBER]</p>',
+  '**BETWEEN:**',
+  '',
+  '[PARTY A] ............ CLAIMANT/JUDGMENT CREDITOR',
+  '',
+  '<p style="text-align: center">AND</p>',
+  '',
+  '[PARTY B] ............ DEFENDANT/JUDGMENT DEBTOR',
+  '',
+  '<p style="text-align: center"><strong>MOTION EX PARTE</strong></p><p style="text-align: justify">TAKE NOTICE that this Honourable Court will be moved on the [DAY] day of [MONTH].</p>',
+].join('\n');
+
+test('a template draft read part way through its stream never shows a tag as text', () => {
+  // Every cut a stream can make: mid-tag, mid-word, mid-line.
+  for (let cut = GARNISHEE.indexOf('<p style'); cut <= GARNISHEE.length; cut += 7) {
+    const [draft] = draftsIn(GARNISHEE.slice(0, cut), true);
+    if (!draft) continue;
+    const text = JSON.stringify(markdownToDoc(draft.body).content ?? []);
+    assert.ok(!/<\/?(p|strong)\b/.test(text), `no tag as text at ${cut}: ${text.slice(0, 160)}`);
+  }
+  const [whole] = draftsIn(GARNISHEE, true);
+  const nodes = markdownToDoc(whole.body).content ?? [];
+  const court = nodes.find((node) => JSON.stringify(node).includes('IN THE HIGH COURT OF LAGOS STATE'));
+  assert.equal(court?.attrs?.textAlign, 'center', 'the court line is centred');
+  const notice = nodes.find((node) => JSON.stringify(node).includes('TAKE NOTICE'));
+  assert.equal(notice?.attrs?.textAlign, 'justify');
+});
+
+test('the Word and PDF download sends real HTML: the editor is built by the same reader, and the download sends what the editor holds', () => {
+  // Backend, 18 November 2026: the server draws Arthur's run-together line right
+  // when it gets real HTML, and prints the tags when it gets them escaped as
+  // text, which is what the reader before this fix put in the editor.
+  const editor = readFileSync(new URL('./DraftEditor.tsx', import.meta.url), 'utf8');
+  assert.match(editor, /initial=\{markdownToDoc\(props\.markdown, props\.font\)\}/);
+  const download = readFileSync(new URL('./use-draft-download.ts', import.meta.url), 'utf8');
+  assert.match(download, /fetchDraftFile\(exportApi\.document, \{ title, html: editor\.getHTML\(\), format \}\)/);
+  // And what the reader gives the editor for that line is three aligned paragraphs, with no tag as words.
+  const line = '<p style="text-align: center"><strong>IN THE HIGH COURT OF LAGOS STATE</strong></p><p style="text-align: center"><strong>HOLDEN AT [JUDICIAL DIVISION]</strong></p><p style="text-align: right">SUIT NO: [SUIT NUMBER]</p>';
+  const nodes = markdownToDoc(line).content ?? [];
+  assert.deepEqual(nodes.map((node) => node.attrs?.textAlign), ['center', 'center', 'right']);
+  assert.ok(!/<\/?p\b/.test(JSON.stringify(nodes)));
 });
