@@ -40,7 +40,7 @@ export function MyTemplatesScreen() {
 
   const download = async (row: MyTemplate) => {
     try {
-      saveExportedFile({ blob: await myTemplatesApi.download(row.uuid), filename: row.file.original_name });
+      saveExportedFile({ blob: await myTemplatesApi.download(row.uuid), filename: row.file?.original_name ?? row.name });
     } catch (error) {
       toast.error(extractApiError(error).message || 'The file did not download.');
     }

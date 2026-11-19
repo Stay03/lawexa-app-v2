@@ -33,7 +33,8 @@ export interface MyTemplate {
   status: TemplateStatus;
   /** Why reading failed; null otherwise. */
   error: string | null;
-  file: TemplateFile;
+  /** Null for a template with no stored file (Backend's seeded rows): it shows no file line and no Download. */
+  file: TemplateFile | null;
   /** How many blanks Lawexa marked (names, dates, amounts). */
   blanks_count: number | null;
   allowed_in: AllowedIn[];

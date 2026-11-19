@@ -37,7 +37,7 @@ export function FirmTemplates({ organizationUuid, canManage }: { organizationUui
 
   const download = async (row: FirmTemplate) => {
     try {
-      saveExportedFile({ blob: await firmTemplatesApi.download(organizationUuid, row.uuid), filename: row.file.original_name });
+      saveExportedFile({ blob: await firmTemplatesApi.download(organizationUuid, row.uuid), filename: row.file?.original_name ?? row.name });
     } catch (error) {
       toast.error(extractApiError(error).message || 'The file did not download.');
     }

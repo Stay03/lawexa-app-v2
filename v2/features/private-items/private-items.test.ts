@@ -21,6 +21,8 @@ test('a template says how far Lawexa got reading it, and what file is behind it'
   assert.equal(templateDetail({ original_name: 'TEST DATA notice.docx', size: 49_152 }, 6), 'TEST DATA notice.docx · 48 KB · 6 blanks');
   assert.equal(templateDetail({ original_name: 'a.pdf', size: 2048 }, 1), 'a.pdf · 2 KB · 1 blank');
   assert.equal(templateDetail({ original_name: 'a.pdf', size: 2048 }, null), 'a.pdf · 2 KB');
+  assert.equal(templateDetail(null, 7), '7 blanks', 'a template with no stored file still says its blanks');
+  assert.equal(templateDetail(null, null), '');
 });
 
 test('the picker refuses what the server would, and names each refused file', () => {

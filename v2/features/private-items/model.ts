@@ -14,9 +14,9 @@ export function templateStatusLine(status: TemplateStatus, error: string | null)
   return error ? `Couldn’t read it: ${error}` : 'Couldn’t read it';
 }
 
-/** "report.docx · 48 KB · 6 blanks". */
-export function templateDetail(file: { original_name: string; size: number }, blanks: number | null): string {
-  const parts = [file.original_name, formatFileSize(file.size)];
+/** "report.docx · 48 KB · 6 blanks"; without a stored file, the blanks alone. */
+export function templateDetail(file: { original_name: string; size: number } | null, blanks: number | null): string {
+  const parts = file ? [file.original_name, formatFileSize(file.size)] : [];
   if (blanks !== null && blanks > 0) parts.push(`${blanks} ${blanks === 1 ? 'blank' : 'blanks'}`);
   return parts.join(' · ');
 }

@@ -20,7 +20,7 @@ export interface TemplateRowData {
   name: string;
   status: TemplateStatus;
   error: string | null;
-  file: { original_name: string; size: number };
+  file: { original_name: string; size: number } | null;
   blanks_count: number | null;
 }
 
@@ -64,11 +64,13 @@ export function TemplateRow({
           {reading ? <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" /> : null}
           <span className="min-w-0 truncate">
             {templateStatusLine(row.status, row.error)}
-            {failed ? null : ` · ${templateDetail(row.file, row.blanks_count)}`}
+            {failed || !templateDetail(row.file, row.blanks_count) ? null : ` · ${templateDetail(row.file, row.blanks_count)}`}
           </span>
         </span>
         {below}
       </span>
+      {/* No file and no right to manage: nothing to offer, so no menu. */}
+      {row.file || manage ? (
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label={`Actions for ${row.name}`}
@@ -80,10 +82,12 @@ export function TemplateRow({
           <MoreHorizontal aria-hidden className="size-4" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={onDownload}>
-            <Download />
-            Download
-          </DropdownMenuItem>
+          {row.file ? (
+            <DropdownMenuItem onSelect={onDownload}>
+              <Download />
+              Download
+            </DropdownMenuItem>
+          ) : null}
           {manage ? (
             <>
               <DropdownMenuItem onSelect={onRename}>
@@ -105,6 +109,7 @@ export function TemplateRow({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
+      ) : null}
     </li>
   );
 }
