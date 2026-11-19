@@ -9,7 +9,7 @@ import {
   MessageSquarePlus,
   NotebookPen,
   RotateCw,
-  Sparkles,
+  Package,
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
@@ -147,7 +147,7 @@ function PlanRow({ plan }: { plan: IUserLimitsPlan }) {
   ]
     .filter(Boolean)
     .join(' · ');
-  const Icon = plan.is_free ? Sparkles : Crown;
+  const Icon = plan.is_free ? Package : Crown;
   return (
     <li className="flex min-h-14 items-center gap-3.5 px-4 py-2.5">
       <Icon aria-hidden className={cn('size-5 shrink-0', plan.is_free ? 'text-muted-foreground' : 'text-primary')} />

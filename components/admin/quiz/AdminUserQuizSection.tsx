@@ -9,7 +9,7 @@ import {
   Coins,
   GraduationCap,
   Layers,
-  Sparkles,
+  ListChecks,
   Target,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -150,7 +150,7 @@ function QuizProfile({ profile }: { profile: AdminUserQuizProfile }) {
         <div className="space-y-3 px-4 pb-4 sm:px-5 sm:pb-5">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <QuizStatCard
-              icon={<Sparkles className="h-4 w-4" />}
+              icon={<ListChecks className="h-4 w-4" />}
               label="Questions"
               value={generation.questions.toLocaleString()}
             />

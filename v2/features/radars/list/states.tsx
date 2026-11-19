@@ -5,7 +5,7 @@ import {
   CalendarClock,
   FileSearch,
   Inbox,
-  Sparkles,
+  BellOff,
   WifiOff,
   type LucideIcon,
 } from 'lucide-react';
@@ -142,7 +142,7 @@ export function RadarsFirstRunState() {
           Every report cites its sources, ready to share
         </li>
         <li className="flex items-center gap-2.5">
-          <Sparkles aria-hidden className="size-4 shrink-0 text-primary" />
+          <BellOff aria-hidden className="size-4 shrink-0 text-primary" />
           Quiet weeks stay quiet — no findings, no noise
         </li>
       </ul>

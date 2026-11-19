@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CheckCircle2, Gamepad2, PencilRuler, Percent, Play, Sparkles, TriangleAlert, Users } from 'lucide-react';
+import { CheckCircle2, Gamepad2, PencilRuler, Percent, Play, ListChecks, TriangleAlert, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -87,7 +87,7 @@ function AdminExploreTotalsContent() {
               <AdminQuizStatCard label="Average score" value={percentLabel(totals.average_score_percent)} icon={Percent} changePercent={null} />
               <AdminQuizStatCard label="Quizzes made" value={String(totals.quizzes_created)} icon={PencilRuler} changePercent={null} />
               <AdminQuizStatCard label="Live games finished" value={String(totals.live_games_finished)} icon={Gamepad2} changePercent={null} />
-              <AdminQuizStatCard label="Create with Lawexa: done" value={String(runs?.done ?? 0)} icon={Sparkles} changePercent={null} />
+              <AdminQuizStatCard label="Create with Lawexa: done" value={String(runs?.done ?? 0)} icon={ListChecks} changePercent={null} />
               <AdminQuizStatCard
                 label="Create with Lawexa: failed"
                 value={String(runs?.failed ?? 0)}
