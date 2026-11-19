@@ -424,14 +424,19 @@ function TemplateItem({
               <Pencil />
               Rename
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onDuplicate}>
-              <Copy />
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={onReplace}>
-              <FileUp />
-              Replace file
-            </DropdownMenuItem>
+            {/* While Lawexa is reading it, the server refuses both (422), so neither is offered. */}
+            {reading ? null : (
+              <>
+                <DropdownMenuItem onSelect={onDuplicate}>
+                  <Copy />
+                  Duplicate
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={onReplace}>
+                  <FileUp />
+                  Replace file
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuItem onSelect={() => onOpen('versions')}>
               <History />
               Version history
