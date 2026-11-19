@@ -1,24 +1,24 @@
 'use client';
 
-import { useCurrencyStore } from '@/lib/stores/currencyStore';
 import { useAdminSettings } from '@/lib/hooks/useAdmin';
 
 /**
  * The rate used to show dollar AI costs in naira, and where it came from.
  *
+ * ── ONE RATE, FROM SETTINGS ───────────────────────────────────────────────
+ * Stay, 19 November 2026: one naira-to-dollar rate, set in admin settings
+ * (`usd_to_ngn_display_rate`), used everywhere. The per-admin override this
+ * hook once preferred is gone, so every admin screen shows the same figure.
+ *
  * ── WHY THE SOURCE IS RETURNED AND NOT JUST THE NUMBER ────────────────────
- * Three things can supply this number and they carry different authority. The
- * server setting is the real answer. A manual override is one person exploring
- * a what-if in one browser. The fallback is us guessing because the setting has
- * not arrived yet. A screen showing ₦780,000 of spend should be able to say
- * which of those three produced it, because the difference between "the rate
- * finance set" and "a number I typed on Tuesday" is the difference between a
- * figure you can forward and one you cannot.
+ * The setting is the answer; the fallback is a guess made only while the
+ * setting has not arrived or cannot be read. A screen showing ₦780,000 of
+ * spend should be able to say which one produced it.
  */
 export interface ExchangeRateInfo {
   /** The rate to multiply dollars by. Always a usable positive number. */
   rate: number;
-  source: 'server' | 'manual' | 'fallback';
+  source: 'server' | 'fallback';
   /** What the server says, when it has said anything. */
   serverRate: number | null;
   /** True while the setting is still being fetched. */
@@ -36,23 +36,10 @@ const FALLBACK_RATE = 1500;
 const RATE_SETTING_KEY = 'usd_to_ngn_display_rate';
 
 export function useExchangeRate(): ExchangeRateInfo {
-  /* Primitive selector on purpose: returning a fresh object from a zustand
-     selector re-renders forever through useSyncExternalStore. */
-  const manualRate = useCurrencyStore((s) => s.manualRate);
-
   const query = useAdminSettings({ group: 'pricing' });
 
   const found = query.data?.data?.find((s) => s.key === RATE_SETTING_KEY);
   const parsed = toPositiveNumber(found?.value);
-
-  if (manualRate !== null && manualRate > 0) {
-    return {
-      rate: manualRate,
-      source: 'manual',
-      serverRate: parsed,
-      isLoading: query.isPending,
-    };
-  }
 
   if (parsed !== null) {
     return {

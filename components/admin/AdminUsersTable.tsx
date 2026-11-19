@@ -30,9 +30,11 @@ import {
   Monitor,
   Tablet,
   Bot,
+  TriangleAlert,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatSourceLabel } from '@/lib/utils/attributionSource';
+import { userCostAlertLine } from '@/lib/utils/cost-alerts';
 import type {
   IAdminUserListItem,
   IAdminUserListParams,
@@ -217,6 +219,20 @@ function AdminUsersTable({
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p>Free messages blocked</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          {/* Cost alert (Arthur, 18 November 2026): this period's AI cost at or over the threshold. */}
+                          {user.cost_alert && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <TriangleAlert
+                                  aria-label={userCostAlertLine(user.cost_alert)}
+                                  className="h-3.5 w-3.5 text-amber-500 shrink-0"
+                                />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{userCostAlertLine(user.cost_alert)}</p>
                               </TooltipContent>
                             </Tooltip>
                           )}
