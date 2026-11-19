@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { myTemplatesApi } from '@/lib/api/private-items';
 import { filesApi } from '@/lib/api/files';
 import { cn } from '@/lib/utils';
-import { isNotFoundError } from '@/lib/utils/api-error';
+import { extractApiError, isNotFoundError } from '@/lib/utils/api-error';
 import { formatFileSize } from '@/lib/utils/format-bytes';
 import type { MessageAttachment } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
