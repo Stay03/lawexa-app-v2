@@ -214,7 +214,7 @@ export function UserMessageRow({
             viewerUuid={viewerUuid}
           />
         )}
-        {attachments.length > 0 && <SentAttachments attachments={attachments} />}
+        {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
         {unmatched && <p className="text-muted-foreground mt-1 text-xs">{unmatched}</p>}
         {showsRedaction && (
           <RedactionNote summary={message.redaction} align={turnSide(message, viewerId) === 'mine' ? 'end' : 'start'} hasFiles={hasFiles} />
@@ -269,7 +269,7 @@ export function UserMessageRow({
         <UserMessageBubble content={displayContent} tint={tint} quote={quote} />
       )}
 
-      {attachments.length > 0 && <SentAttachments attachments={attachments} />}
+      {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
       {showsRedaction && <RedactionNote summary={message.redaction} align="end" hasFiles={hasFiles} />}
 
       <div

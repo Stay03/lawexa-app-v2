@@ -6,7 +6,7 @@ import type { SkillDraftCard, SkillDraftStatus } from '@/types/skill-draft';
  * tested on their own.
  */
 
-const STATUSES: readonly SkillDraftStatus[] = ['proposed', 'pending', 'dismissed', 'published', 'rejected'];
+const STATUSES: readonly SkillDraftStatus[] = ['proposed', 'pending', 'dismissed', 'published', 'rejected', 'saved_private'];
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -73,6 +73,8 @@ export function skillDraftStatusLine(status: SkillDraftStatus): string | null {
       return 'Approved and published';
     case 'rejected':
       return 'Not approved';
+    case 'saved_private':
+      return 'Saved to My skills';
   }
 }
 

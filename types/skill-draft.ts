@@ -8,7 +8,8 @@
  * skills-tool 385ececc).
  */
 
-export type SkillDraftStatus = 'proposed' | 'pending' | 'dismissed' | 'published' | 'rejected';
+/** `saved_private`: the person kept it as one of their own skills (thread 9ae498ae). */
+export type SkillDraftStatus = 'proposed' | 'pending' | 'dismissed' | 'published' | 'rejected' | 'saved_private';
 export type SkillDraftKind = 'new' | 'change';
 export type SkillLoadMode = 'on_demand' | 'always_on';
 

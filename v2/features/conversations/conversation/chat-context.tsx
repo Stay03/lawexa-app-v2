@@ -44,6 +44,12 @@ interface V2ChatContextValue {
    * reaches the chat's engine. A no-op outside a chat screen.
    */
   settleSkillDraft: (draft: string, status: SkillDraftStatus) => void;
+  /**
+   * The server started a turn from this screen without a send (an owner's
+   * yes to using their own template in a Space, thread 9ae498ae): the chat
+   * follows its stream. A no-op outside a chat screen.
+   */
+  followResumedTurn: (executionId: string) => void;
 }
 
 export interface CardQuestions {
@@ -67,6 +73,7 @@ export function V2ChatProvider({
   applyDraftEditLine,
   cardQuestions = null,
   settleSkillDraft = settleNothing,
+  followResumedTurn = settleNothing,
 }: {
   children: React.ReactNode;
   sendMessage: (message: string) => void;
@@ -76,13 +83,14 @@ export function V2ChatProvider({
   applyDraftEditLine: (answer: DraftEditLineFields) => void;
   cardQuestions?: CardQuestions | null;
   settleSkillDraft?: (draft: string, status: SkillDraftStatus) => void;
+  followResumedTurn?: (executionId: string) => void;
 }) {
   // Stable value — only changes when the streaming flag (or `canSend`) flips, never per token
   // (tokens flow through the per-message streaming store, not this context), so
   // the card subtree never re-renders on stream growth.
   const value = useMemo<V2ChatContextValue>(
-    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft }),
-    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft],
+    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft, followResumedTurn }),
+    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft, followResumedTurn],
   );
   return <V2ChatContext.Provider value={value}>{children}</V2ChatContext.Provider>;
 }

@@ -11,6 +11,7 @@ import type {
 import { draftEditBases, resolveDraftEdits } from './draft-edits';
 import { readCardAnswers, readQuestionCard } from './question-card';
 import { readSkillDraftCard } from './skill-draft';
+import type { UsedPrivateItem } from '@/types/private-items';
 import { isRedactionSummary } from './redaction-summary';
 import { createResultPool } from './tool-call-match';
 import { compactedStep } from './context-compacted';
@@ -455,5 +456,30 @@ export function transformApiMessages(
     }
   }
 
-  return messages;
+  return withPrivateItems(messages, apiMessages);
+}
+
+/**
+ * Own templates and skills in Space chats (thread 9ae498ae), on whichever kind
+ * of answer carries them: the ask-first requests its turn raised, and whose
+ * own item it used. Answers without either come back as they were.
+ */
+function withPrivateItems<Row extends { id: string }>(messages: Row[], apiMessages: ApiMessage[]): Row[] {
+  const byId = new Map<string, { requests?: string[]; used?: UsedPrivateItem[] }>();
+  for (const apiMsg of apiMessages) {
+    if (apiMsg.role !== 'assistant') continue;
+    const requests = apiMsg.metadata?.private_item_requests?.filter((uuid) => typeof uuid === 'string' && uuid !== '');
+    const used = apiMsg.used_private_items?.filter((item) => item && typeof item.owner?.name === 'string');
+    if (requests?.length || used?.length) byId.set(`msg_${apiMsg.id}`, { requests, used });
+  }
+  if (byId.size === 0) return messages;
+  return messages.map((message) => {
+    const found = byId.get(message.id);
+    if (!found) return message;
+    return {
+      ...message,
+      ...(found.requests?.length ? { privateItemRequests: found.requests } : {}),
+      ...(found.used?.length ? { usedPrivateItems: found.used } : {}),
+    };
+  });
 }

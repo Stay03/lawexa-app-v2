@@ -2,9 +2,18 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, ImageOff, Loader2 } from 'lucide-react';
+import { BookmarkPlus, FileText, ImageOff, Loader2, MoreHorizontal } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { myTemplatesApi } from '@/lib/api/private-items';
 import { filesApi } from '@/lib/api/files';
 import { cn } from '@/lib/utils';
 import { isNotFoundError } from '@/lib/utils/api-error';
@@ -124,7 +133,14 @@ function useSeenOnce(): [(node: HTMLElement | null) => (() => void) | undefined,
   return [ref, seen];
 }
 
-export function SentAttachments({ attachments }: { attachments: readonly MessageAttachment[] }) {
+export function SentAttachments({
+  attachments,
+  keepable = false,
+}: {
+  attachments: readonly MessageAttachment[];
+  /** The reader sent these: a Word, RTF or PDF file can be saved as one of their templates. */
+  keepable?: boolean;
+}) {
   const pictures = attachments.filter(isPictureAttachment);
   const documents = attachments.filter((attachment) => !isPictureAttachment(attachment));
 
@@ -186,6 +202,8 @@ export function SentAttachments({ attachments }: { attachments: readonly Message
         <div className="flex max-w-full flex-wrap justify-end gap-1.5">
           {documents.map((document) => (
             <div key={document.file_id} className="flex max-w-full flex-col items-end gap-0.5">
+              <span className="flex max-w-full items-center gap-1">
+              {keepable && isTemplateFile(document) ? <KeepAsTemplate document={document} /> : null}
               <DocumentChip
                 document={document}
                 onRead={
@@ -200,6 +218,7 @@ export function SentAttachments({ attachments }: { attachments: readonly Message
                     : null
                 }
               />
+              </span>
               <DocumentReadingLine fileId={document.file_id} enabled={near} />
             </div>
           ))}
@@ -368,6 +387,59 @@ function PictureTile({
         />
       )}
     </button>
+  );
+}
+
+/** Word, RTF or PDF: the files a template can be made from (Backend's rule). */
+function isTemplateFile(document: MessageAttachment): boolean {
+  return /\.(docx?|rtf|pdf)$/i.test(document.file_name);
+}
+
+/**
+ * "Save as my template" (Stay, thread 9ae498ae): a document the reader sent
+ * becomes one of their own templates. The server refuses a confidential
+ * chat's file (deleted after 24 hours), a redacted chat's (only the redacted
+ * copy is kept), a wrong type, one too big, or one they already keep, and
+ * its sentence is shown as it is.
+ */
+function KeepAsTemplate({ document }: { document: MessageAttachment }) {
+  const chat = useV2ChatContext();
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  if (!chat?.conversationId) return null;
+  const conversationId = chat.conversationId;
+  const keep = async () => {
+    setSaving(true);
+    try {
+      await myTemplatesApi.fromFile(document.file_id, conversationId);
+      toast.success('Saved to My templates. Lawexa is reading it.', {
+        action: { label: 'Open', onClick: () => router.push('/settings/templates') },
+      });
+    } catch (error) {
+      toast.error(extractApiError(error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={`More for ${document.file_name}`}
+        disabled={saving}
+        className={cn(
+          'v2-interactive flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+          FOCUS_RING,
+        )}
+      >
+        {saving ? <Loader2 aria-hidden className="size-3.5 animate-spin" /> : <MoreHorizontal aria-hidden className="size-3.5" />}
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => void keep()}>
+          <BookmarkPlus />
+          Save as my template
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

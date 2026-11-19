@@ -19,6 +19,7 @@ import { trimUnclosedLinkTail } from '../markdown/partial-tail';
 import { AskedQuestions } from '../question-card/CardMarks';
 import { ReasoningTrace } from '../reasoning/ReasoningTrace';
 import { SkillDraftCardView } from '../skill-draft/SkillDraftCard';
+import { PrivateItemAsk, UsedItemsLine } from '@/v2/features/private-items/PrivateItemAsk';
 import { replyTargetOf, type ReplyableRow } from '../reply-target';
 import { SwipeToReply } from './SwipeToReply';
 
@@ -93,6 +94,9 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   // text streamed before the card stays when the row turns into the card.
   const questionCard = isStreaming ? undefined : (message as ChatMessage).questionCard;
   const skillDraft = isStreaming || draining ? undefined : (message as ChatMessage).skillDraft;
+  // Own templates and skills in a Space (thread 9ae498ae), once the turn is over.
+  const askIds = isStreaming || draining ? undefined : (message as ChatMessage).privateItemRequests;
+  const usedItems = isStreaming || draining ? undefined : (message as ChatMessage).usedPrivateItems;
   if (questionCard) {
     return (
       <div className="w-full">
@@ -192,6 +196,9 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
           {/* A skill Lawexa drafted in this turn (the skills tool): its card under
               the answer, once the turn is over. */}
           {skillDraft && <SkillDraftCardView card={skillDraft} />}
+
+          {usedItems && <UsedItemsLine items={usedItems} />}
+          {askIds && <PrivateItemAsk requestIds={askIds} />}
 
           {showActions && (
             <MessageActions

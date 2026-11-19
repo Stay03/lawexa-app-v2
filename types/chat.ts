@@ -1,3 +1,4 @@
+import type { UsedPrivateItem } from './private-items';
 import type { JurisdictionChoice } from './jurisdiction';
 import type { IBlockedReason } from './message-pack';
 import type { SkillDraftCard } from './skill-draft';
@@ -111,6 +112,14 @@ export interface ChatMessage {
    * saves for an admin, or sets aside.
    */
   skillDraft?: SkillDraftCard;
+  /**
+   * The ask-first requests this answer's turn raised in a Space chat (thread
+   * 9ae498ae): only their owner's read of the requests returns them, so only
+   * the owner's screen draws a card under this answer.
+   */
+  privateItemRequests?: string[];
+  /** Whose own template or skill Lawexa used for this answer; the name is the owner's to see only. */
+  usedPrivateItems?: UsedPrivateItem[];
   /**
    * The user turn that answered a card (`metadata.type` "question_answers"):
    * drawn as a bubble of each question with its answer.
@@ -903,6 +912,8 @@ export interface ApiMessage {
     answers?: QuestionCardAnswer[] | null;
     /** On a `question_answers` user turn: the card it answered. */
     card_message_id?: number;
+    /** On an answer in a Space chat: the ask-first requests its turn raised (thread 9ae498ae). No names. */
+    private_item_requests?: string[];
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).
@@ -988,6 +999,8 @@ export interface ApiMessage {
   author?: ConversationAuthor | null;
   /** The message this row replies to; `null` when it replies to nothing. Absent on a server before replies. */
   reply_to?: MessageReplyTo | null;
+  /** On an assistant message: whose own template or skill it used (thread 9ae498ae). */
+  used_private_items?: UsedPrivateItem[];
   /** The people tagged in this row (`[]` when none, and in personal chats). */
   mentions?: MessageMention[];
   /**

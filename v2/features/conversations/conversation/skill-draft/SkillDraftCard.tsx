@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronDown, Loader2, ScrollText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,9 @@ import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import { skillDraftErrorSentence, skillDraftKindLine, skillDraftStatusLine } from '@/lib/utils/skill-draft';
 import { skillDraftsApi } from '@/lib/api/skill-drafts';
-import type { SkillDraft, SkillDraftCard } from '@/types/skill-draft';
+import { mySkillsApi } from '@/lib/api/private-items';
+import type { SkillDraft, SkillDraftCard, SkillDraftStatus } from '@/types/skill-draft';
+import { privateItemsQueries } from '@/v2/features/private-items/queries';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2ChatContext } from '../chat-context';
 import { InstructionsDiff, InstructionsText } from './InstructionsDiff';
@@ -48,11 +50,25 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
     staleTime: 30_000,
   });
 
+  const queryClient = useQueryClient();
   const settle = useMutation({
-    mutationFn: (action: 'save' | 'dismiss') =>
-      action === 'save' ? skillDraftsApi.save(card.draft) : skillDraftsApi.dismiss(card.draft),
-    onSuccess: (response) => chat?.settleSkillDraft(card.draft, response.data.status),
+    mutationFn: async (action: 'mine' | 'save' | 'dismiss'): Promise<SkillDraftStatus> => {
+      // "Save to my skills" (thread 9ae498ae): it works at once in the
+      // person's own chats, with no admin review.
+      if (action === 'mine') {
+        await mySkillsApi.fromDraft(card.draft);
+        return 'saved_private';
+      }
+      const response = action === 'save' ? await skillDraftsApi.save(card.draft) : await skillDraftsApi.dismiss(card.draft);
+      return response.data.status;
+    },
+    onSuccess: (status) => {
+      chat?.settleSkillDraft(card.draft, status);
+      if (status === 'saved_private') void queryClient.invalidateQueries({ queryKey: privateItemsQueries.skills });
+    },
   });
+  // Only a new skill can be one of the person's own; a change to Lawexa's goes to an admin.
+  const canKeep = card.kind === 'new';
 
   const statusLine = skillDraftStatusLine(card.status);
   const waiting = card.status === 'proposed';
@@ -110,14 +126,26 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
       <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-3.5 py-2.5">
         {waiting ? (
           <>
+            {canKeep ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={settle.isPending || chat?.canSend === false}
+                onClick={() => settle.mutate('mine')}
+              >
+                {settle.isPending && settle.variables === 'mine' ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+                Save to my skills
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
+              variant={canKeep ? 'secondary' : 'default'}
               disabled={settle.isPending || chat?.canSend === false}
               onClick={() => settle.mutate('save')}
             >
               {settle.isPending && settle.variables === 'save' ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-              Save
+              Send to admin
             </Button>
             <Button
               type="button"
@@ -128,11 +156,15 @@ export function SkillDraftCardView({ card }: { card: SkillDraftCard }) {
             >
               Not now
             </Button>
-            <p className="min-w-0 flex-1 text-xs text-muted-foreground">Save sends it to an admin to approve.</p>
+            <p className="min-w-0 basis-full text-xs text-muted-foreground">
+              {canKeep
+                ? 'My skills: works at once, in your chats only. Send to admin: an admin approves it for everyone.'
+                : 'Send to admin: an admin approves the change for everyone.'}
+            </p>
           </>
         ) : (
           <p className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-            {card.status === 'pending' || card.status === 'published' ? (
+            {card.status === 'pending' || card.status === 'published' || card.status === 'saved_private' ? (
               <Check aria-hidden className="size-3.5 text-primary" />
             ) : null}
             {statusLine}
