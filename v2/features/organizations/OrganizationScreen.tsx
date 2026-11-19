@@ -52,6 +52,7 @@ import {
   OrganizationErrorState,
   OrganizationScreenFrame,
 } from './states';
+import { FirmTemplates } from '@/v2/features/private-items/FirmTemplates';
 
 /**
  * OrganizationScreen — the `/organization` client root (owner decision D7:
@@ -319,6 +320,8 @@ export function OrganizationScreen() {
           onRequest={() => panel.show('verify')}
         />
       </div>
+
+      <FirmTemplates organizationUuid={organization.uuid} canManage={canManage} />
 
       <OrganizationMembersSheet
         organization={organization}
