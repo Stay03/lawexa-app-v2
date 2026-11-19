@@ -118,6 +118,12 @@ export interface ChatMessage {
    * the answer whose turn asked (thread 9ae498ae).
    */
   turnId?: string;
+  /**
+   * The owner's yes to using one of their own items in a Space chat
+   * (`metadata.type` "private_item_answer"): drawn as a quiet line, not a
+   * bubble; its content is Lawexa's instruction and is never shown.
+   */
+  privateItemAnswer?: { choice: 'once' | 'always'; kind: 'template' | 'skill' };
   /** Whose own template or skill Lawexa used for this answer; the name is the owner's to see only. */
   usedPrivateItems?: UsedPrivateItem[];
   /**
@@ -903,7 +909,9 @@ export interface ApiMessage {
       | 'quiz_game_live'
       | 'quiz_game_finished'
       // A long reply's earlier reading was summarised (context-compacted.ts).
-      | 'context_compacted';
+      | 'context_compacted'
+      // The owner's answer to an ask-first card, which resumed the turn (thread 9ae498ae).
+      | 'private_item_answer';
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
     /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */
@@ -912,6 +920,9 @@ export interface ApiMessage {
     answers?: QuestionCardAnswer[] | null;
     /** On a `question_answers` user turn: the card it answered. */
     card_message_id?: number;
+    /** On a `private_item_answer` user row: what the owner chose, and for what. */
+    choice?: 'once' | 'always';
+    item_kind?: 'template' | 'skill';
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).

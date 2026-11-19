@@ -271,6 +271,13 @@ export function transformApiMessages(
         ...(isRedactionSummary(apiMsg.metadata?.redaction) && { redaction: apiMsg.metadata.redaction }),
         // The turn that answered a question card: drawn as a bubble of its questions and answers.
         ...(cardAnswers && { cardAnswers }),
+        // The owner's yes to an ask-first card (thread 9ae498ae): a quiet line, not a bubble.
+        ...(apiMsg.metadata?.type === 'private_item_answer' && {
+          privateItemAnswer: {
+            choice: apiMsg.metadata.choice === 'always' ? ('always' as const) : ('once' as const),
+            kind: apiMsg.metadata.item_kind === 'skill' ? ('skill' as const) : ('template' as const),
+          },
+        }),
       } as ChatMessage);
     }
     // Handover message - orchestrator delegating to sub-agent

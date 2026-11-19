@@ -72,6 +72,20 @@ export function skillProblems(input: MySkillInput): Partial<Record<keyof MySkill
 }
 
 /**
+ * The quiet line where the owner's yes to an ask-first card sits in the chat.
+ * The owner reads "You"; everyone else reads their name, never the item's.
+ */
+export function privateItemAnswerLine(
+  answer: { choice: 'once' | 'always'; kind: 'template' | 'skill' },
+  owner: { name: string; mine: boolean },
+): string {
+  const when = answer.choice === 'always' ? 'in this Space from now on' : 'just this time';
+  return owner.mine
+    ? `You let Lawexa use your ${answer.kind} ${when}`
+    : `${owner.name} let Lawexa use one of their ${answer.kind}s ${when}`;
+}
+
+/**
  * The line under a Lawexa answer that used someone's own template or skill.
  * The owner sees the item's name; everyone else sees only whose it was.
  */

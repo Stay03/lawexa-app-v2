@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ShieldCheck } from 'lucide-react';
 import { cn, stripContextTags, parsePastedContent } from '@/lib/utils';
 import { formatMessageTimestamp } from '@/lib/utils/date';
 import type { ChatMessage, MessageReplyTo } from '@/types/chat';
@@ -11,6 +12,7 @@ import { memberStyle } from '../member-colour';
 import { mentionMetadata, spaceUnmatchedSentence } from '../mention-options';
 import { replyAuthorLabel, replyTargetOf, type QuoteTone } from '../reply-target';
 import { turnSide } from '../space-turn';
+import { privateItemAnswerLine } from '@/v2/features/private-items/model';
 import { HoverReply } from './HoverReply';
 import { MentionText } from './MentionText';
 import { ReplyQuote } from './ReplyQuote';
@@ -178,6 +180,23 @@ export function UserMessageRow({
   const cardBubble = message.cardAnswers ? (
     <CardAnswersBubble answers={message.cardAnswers} content={displayContent} ground={BUBBLE_GROUND[tint]} />
   ) : null;
+
+  // The owner's yes to an ask-first card (thread 9ae498ae): a quiet line in
+  // the middle, not their bubble; the row's text is Lawexa's instruction.
+  if (message.privateItemAnswer) {
+    const line = privateItemAnswerLine(message.privateItemAnswer, {
+      name: message.author?.name ?? 'A member',
+      mine: turnSide(message, viewerId) === 'mine',
+    });
+    return (
+      <div className="flex justify-center py-1">
+        <p className="flex items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground">
+          <ShieldCheck aria-hidden className="size-3.5 shrink-0" />
+          {line}
+        </p>
+      </div>
+    );
+  }
 
   if (showAuthor) {
     // Only a saved question can be replied to (replyTargetOf).

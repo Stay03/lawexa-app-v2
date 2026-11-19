@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { refusalLine, skillProblems, splitUpload, templateDetail, templateStatusLine, usedItemLine } from './model';
+import { privateItemAnswerLine, refusalLine, skillProblems, splitUpload, templateDetail, templateStatusLine, usedItemLine } from './model';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { ApiMessage, ChatMessage } from '@/types/chat';
 
@@ -137,4 +137,18 @@ test('the wiring: Settings rows, routes, the chat card, the skill card, the file
   const spine = read('v2', 'runtime', 'realtime', 'spine.tsx');
   assert.match(spine, /channel\.listen\(EVT_PRIVATE_ITEM_REQUESTED, readRequests\);/);
   assert.match(spine, /channel\.listen\(EVT_MY_TEMPLATE_UPDATED,/);
+});
+
+test('the owner’s yes is a quiet line: "You" for the owner, the name for everyone else, never the item', () => {
+  assert.equal(privateItemAnswerLine({ choice: 'once', kind: 'template' }, { name: 'TEST DATA Ada', mine: true }), 'You let Lawexa use your template just this time');
+  assert.equal(
+    privateItemAnswerLine({ choice: 'always', kind: 'skill' }, { name: 'TEST DATA Ada', mine: false }),
+    'TEST DATA Ada let Lawexa use one of their skills in this Space from now on',
+  );
+  const at = '2026-11-19T07:46:00Z';
+  const out = transformApiMessages([
+    { id: 11, conversation_id: 'c', agent_id: null, role: 'user', content: '[Lawexa instruction]', metadata: { type: 'private_item_answer', choice: 'always', item_kind: 'template', execution_id: 'x' }, created_at: at },
+  ] as unknown as ApiMessage[]) as ChatMessage[];
+  assert.deepEqual(out[0]?.privateItemAnswer, { choice: 'always', kind: 'template' });
+  assert.match(read('v2', 'features', 'conversations', 'conversation', 'rows', 'UserMessageRow.tsx'), /if \(message\.privateItemAnswer\) \{/, 'drawn as a line, its text never shown');
 });
