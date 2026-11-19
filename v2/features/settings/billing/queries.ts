@@ -6,6 +6,7 @@ import {
 } from '@tanstack/react-query';
 
 import { subscriptionsApi } from '@/lib/api/subscriptions';
+import { extractApiError } from '@/lib/utils/api-error';
 import type { CancellationFeedbackBody } from '@/types/feedback';
 import { trialApi } from '@/lib/api/trial';
 import { STALE_TIMES } from '@/v2/runtime/query';
@@ -64,6 +65,49 @@ export function useCancelPlan() {
       void queryClient.invalidateQueries({ queryKey: billingQueries.all });
     },
   });
+}
+
+/**
+ * "Update card": asks for a fresh Paystack card link each time and opens it in
+ * a new tab. The tab is opened AT THE TAP, before the request, because a
+ * browser may block a tab opened after an await (iOS Safari gives no grace);
+ * it is pointed at the link when it arrives, or closed with the reason when it
+ * does not. A 404 means the plan no longer has a card to change, so the plan
+ * is read again and the button goes.
+ */
+export function useUpdateCard(onFailure: (status: number | undefined, message: string | undefined) => void) {
+  const queryClient = useQueryClient();
+  const fetchLink = useMutation({
+    mutationFn: async () => (await subscriptionsApi.getManageLink()).data?.link ?? null,
+    meta: { silentError: true },
+  });
+  const open = () => {
+    if (fetchLink.isPending) return;
+    const tab = window.open('', '_blank');
+    fetchLink.mutate(undefined, {
+      onSuccess: (link) => {
+        if (!link) {
+          tab?.close();
+          onFailure(undefined, undefined);
+          return;
+        }
+        if (tab) {
+          tab.opener = null;
+          tab.location.href = link;
+        } else {
+          // The browser refused a new tab: go there in this one.
+          window.location.assign(link);
+        }
+      },
+      onError: (error) => {
+        tab?.close();
+        const { status, message } = extractApiError(error);
+        if (status === 404) void queryClient.invalidateQueries({ queryKey: billingQueries.all });
+        onFailure(status, message);
+      },
+    });
+  };
+  return { open, opening: fetchLink.isPending };
 }
 
 /** "Why are you cancelling?": one send; the plan is already cancelled. */
