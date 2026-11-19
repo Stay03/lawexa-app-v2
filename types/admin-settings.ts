@@ -9,7 +9,8 @@ export type AdminSettingGroup =
   | 'feedback'
   | 'trending'
   | 'rate_limits'
-  | 'pricing';
+  | 'pricing'
+  | 'billing';
 
 /* Drives the render order on the billing settings screen. A group missing from
    here is fetched and then silently not shown, which is how five live pricing
@@ -18,6 +19,9 @@ export const BILLING_SETTING_GROUPS: AdminSettingGroup[] = [
   'subscription',
   'trial',
   'pricing',
+  // Cost alerts (Arthur, 18 November 2026): the share that flags a user, the
+  // alert's own naira rate, and whether web search counts.
+  'billing',
 ];
 
 export interface AdminSetting {
