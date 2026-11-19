@@ -109,10 +109,17 @@ export interface SkillVersion extends ItemVersionRow {
   example_output: string | null;
 }
 
-/** POST my/skills/{uuid}/test: Lawexa's answer to the sample request; one message is charged. */
-export interface SkillTestResult {
-  answer: string;
-  charged: boolean;
+/**
+ * A skill test run (Backend, 19 November 2026): started by POST .../test
+ * (202), then read until it is done or failed. An answer costs one message;
+ * a failed run costs nothing.
+ */
+export interface SkillTestRun {
+  uuid: string;
+  status: 'running' | 'done' | 'failed';
+  answer: string | null;
+  error: { message: string } | null;
+  created_at: string;
 }
 
 /** An item the person picked with "Use in chat" (POST /chat `use_items`). */

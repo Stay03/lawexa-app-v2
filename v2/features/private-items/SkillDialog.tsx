@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { FlaskConical, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import type { MySkill, MySkillInput } from '@/types/private-items';
 import { MarkdownText } from '@/v2/features/conversations/conversation/markdown/MarkdownText';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { SKILL_LIMITS, skillProblems } from './model';
-import { useSkillMutations } from './queries';
+import { privateItemsQueries, useSkillMutations } from './queries';
 
 type Field = 'display_name' | 'description' | 'instructions' | 'example_output';
 
@@ -185,11 +186,25 @@ export function SkillDialog({
   );
 }
 
-/** Test: a sample request, run with what is on the screen, and the answer. */
+/**
+ * Test: a sample request, run with what is on the screen, and the answer. The
+ * run is a job (Backend, 19 November 2026): Run test starts it, and its answer
+ * is read every few seconds until it is done or failed.
+ */
 function SkillTest({ uuid, input, ready }: { uuid: string | null; input: MySkillInput; ready: boolean }) {
   const { test } = useSkillMutations();
   const [request, setRequest] = useState('');
-  const failure = test.error ? extractApiError(test.error) : null;
+  const [runUuid, setRunUuid] = useState<string | null>(null);
+  const run = useQuery(privateItemsQueries.skillTestRun(runUuid)).data ?? null;
+  const running = test.isPending || (runUuid !== null && (run === null || run.status === 'running'));
+  const failure = test.error
+    ? extractApiError(test.error).message || 'The test did not start.'
+    : run?.status === 'failed'
+      ? run.error?.message || 'The test did not finish. Nothing was charged.'
+      : null;
+  const answer = run?.status === 'done' ? run.answer : null;
+  const start = () =>
+    test.mutate({ uuid, request: request.trim(), input }, { onSuccess: (started) => setRunUuid(started.uuid) });
   return (
     <section aria-labelledby="skill-test" className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/40 p-4 md:sticky md:top-0">
       <h3 id="skill-test" className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
@@ -205,27 +220,23 @@ function SkillTest({ uuid, input, ready }: { uuid: string | null; input: MySkill
         className="bg-background text-[14px]"
       />
       <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          disabled={!ready || !request.trim() || test.isPending}
-          onClick={() => test.mutate({ uuid, request: request.trim(), input })}
-        >
-          {test.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-          {test.isPending ? 'Running…' : 'Run test'}
+        <Button size="sm" disabled={!ready || !request.trim() || running} onClick={start}>
+          {running ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+          {running ? 'Running…' : 'Run test'}
         </Button>
         <span className="text-xs text-muted-foreground">Uses one message</span>
       </div>
-      {test.isPending ? (
+      {running ? (
         <p role="status" className="text-xs text-muted-foreground">
           Lawexa is following your steps. This usually takes 10 to 30 seconds.
         </p>
       ) : failure ? (
         <p role="alert" className="text-sm text-destructive">
-          {failure.message || 'The test did not run.'}
+          {failure}
         </p>
-      ) : test.data ? (
+      ) : answer ? (
         <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-background p-3 text-[14px]">
-          <MarkdownText content={test.data.answer} />
+          <MarkdownText content={answer} />
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">The answer shows here. Nothing is saved, and no chat is made.</p>

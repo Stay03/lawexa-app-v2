@@ -18,7 +18,7 @@ import type {
   BlankEdit,
   ItemVersionRow,
   MyTemplateDetail,
-  SkillTestResult,
+  SkillTestRun,
   SkillVersion,
   TemplateFacets,
   TemplateSort,
@@ -47,8 +47,6 @@ function filesForm(files: readonly File[]): FormData {
 
 const MULTIPART = { headers: { 'Content-Type': 'multipart/form-data' } };
 
-/** The server gives a test run up to 120 seconds; the app waits a little longer. */
-export const SKILL_TEST_TIMEOUT_MS = 125_000;
 
 /** Download a file the API streams, keeping its own name. */
 async function download(path: string): Promise<Blob> {
@@ -116,17 +114,21 @@ export const mySkillsApi = {
   restore: async (uuid: string, version: number) =>
     (await apiClient.post<ItemEnvelope<MySkill>>(`/my/skills/${uuid}/versions/${version}/restore`)).data.data,
   /**
-   * Runs the steps on a sample request and returns the answer (one message,
-   * charged only when an answer comes back). `instructions` and
-   * `example_output` test an edit before it is saved. The server stops at 120
-   * seconds (504, nothing charged), so this waits a little longer than that.
+   * Starts a test run of the steps on a sample request (202); read it with
+   * `testRun` until it is done or failed. A test can take two minutes and the
+   * live server ends any request at 30 seconds, so it runs as a job (Backend,
+   * 19 November 2026). `instructions` and `example_output` test an edit before
+   * it is saved. 403 with the chat's block reason when out of messages; 429
+   * while another of the person's tests is running.
    */
   test: async (uuid: string, body: { request: string; instructions?: string; example_output?: string | null }) =>
-    (await apiClient.post<ItemEnvelope<SkillTestResult>>(`/my/skills/${uuid}/test`, body, { timeout: SKILL_TEST_TIMEOUT_MS }))
-      .data.data,
-  /** The same test for a skill not saved yet (Backend, 19 November 2026): a 422 names the field. */
+    (await apiClient.post<ItemEnvelope<{ test_run: SkillTestRun }>>(`/my/skills/${uuid}/test`, body)).data.data.test_run,
+  /** The same for a skill not saved yet: a 422 names the field. */
   testNew: async (body: { request: string; display_name: string; description: string; instructions: string; example_output?: string | null }) =>
-    (await apiClient.post<ItemEnvelope<SkillTestResult>>('/my/skills/test', body, { timeout: SKILL_TEST_TIMEOUT_MS })).data.data,
+    (await apiClient.post<ItemEnvelope<{ test_run: SkillTestRun }>>('/my/skills/test', body)).data.data.test_run,
+  /** One test run, the owner's only (anyone else gets 404). */
+  testRun: async (runUuid: string) =>
+    (await apiClient.get<ItemEnvelope<{ test_run: SkillTestRun }>>(`/my/skills/test-runs/${runUuid}`)).data.data.test_run,
   remove: async (uuid: string) => {
     await apiClient.delete(`/my/skills/${uuid}`);
   },

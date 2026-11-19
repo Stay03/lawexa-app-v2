@@ -21,6 +21,7 @@ import { STALE_TIMES } from '@/v2/runtime/query';
  */
 const PER_PAGE = 50;
 const RECENT_COUNT = 5;
+const TEST_POLL_MS = 2500;
 
 /** What My templates is showing: the search and the two filters, and the order. */
 export interface TemplateFilters {
@@ -96,6 +97,18 @@ export const privateItemsQueries = {
       queryKey: [...privateItemsQueries.templates, 'version', uuid, version],
       queryFn: () => myTemplatesApi.version(uuid, version),
       staleTime: Infinity,
+    }),
+
+  /** A started test run, read every 2.5 s until it is done or failed (Backend: poll every 2-3 s). */
+  skillTestRun: (runUuid: string | null) =>
+    queryOptions({
+      queryKey: [...privateItemsQueries.skills, 'test-run', runUuid],
+      queryFn: () => mySkillsApi.testRun(runUuid!),
+      enabled: runUuid !== null,
+      refetchInterval: (query) => (query.state.data?.status === 'running' || !query.state.data ? TEST_POLL_MS : false),
+      staleTime: 0,
+      gcTime: 60_000,
+      meta: { silentError: true },
     }),
 
   skillVersion: (uuid: string, version: number) =>
@@ -200,7 +213,7 @@ export function useSkillMutations() {
       onSettled: refresh,
       meta: { silentError: true },
     }),
-    /** A saved skill runs by its uuid (with any unsaved edit); a new one sends all its fields. */
+    /** Starts a test run: a saved skill by its uuid (with any unsaved edit); a new one sends all its fields. */
     test: useMutation({
       mutationFn: ({ uuid, request, input }: { uuid: string | null; request: string; input: MySkillInput }) =>
         uuid
