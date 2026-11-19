@@ -461,16 +461,23 @@ export function transformApiMessages(
 
 /**
  * Own templates and skills in Space chats (thread 9ae498ae), on whichever kind
- * of answer carries them: the ask-first requests its turn raised, and whose
- * own item it used. Answers without either come back as they were.
+ * of answer carries them: the turn the last answer of each turn ended (the
+ * owner's ask-first card sits under it), and whose own item an answer used.
+ * Answers without either come back as they were.
  */
 function withPrivateItems<Row extends { id: string }>(messages: Row[], apiMessages: ApiMessage[]): Row[] {
-  const byId = new Map<string, { requests?: string[]; used?: UsedPrivateItem[] }>();
+  const byId = new Map<string, { turnId?: string; used?: UsedPrivateItem[] }>();
+  const lastOfTurn = new Map<string, number>();
   for (const apiMsg of apiMessages) {
     if (apiMsg.role !== 'assistant') continue;
-    const requests = apiMsg.metadata?.private_item_requests?.filter((uuid) => typeof uuid === 'string' && uuid !== '');
+    const turn = apiMsg.metadata?.execution_id;
+    if (turn) lastOfTurn.set(turn, apiMsg.id);
     const used = apiMsg.used_private_items?.filter((item) => item && typeof item.owner?.name === 'string');
-    if (requests?.length || used?.length) byId.set(`msg_${apiMsg.id}`, { requests, used });
+    if (used?.length) byId.set(`msg_${apiMsg.id}`, { used });
+  }
+  for (const [turnId, apiId] of lastOfTurn) {
+    const key = `msg_${apiId}`;
+    byId.set(key, { ...byId.get(key), turnId });
   }
   if (byId.size === 0) return messages;
   return messages.map((message) => {
@@ -478,7 +485,7 @@ function withPrivateItems<Row extends { id: string }>(messages: Row[], apiMessag
     if (!found) return message;
     return {
       ...message,
-      ...(found.requests?.length ? { privateItemRequests: found.requests } : {}),
+      ...(found.turnId ? { turnId: found.turnId } : {}),
       ...(found.used?.length ? { usedPrivateItems: found.used } : {}),
     };
   });

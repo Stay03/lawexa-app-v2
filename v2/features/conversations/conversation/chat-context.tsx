@@ -50,6 +50,8 @@ interface V2ChatContextValue {
    * follows its stream. A no-op outside a chat screen.
    */
   followResumedTurn: (executionId: string) => void;
+  /** A Space chat: Lawexa may ask the reader before using their own template or skill. */
+  inSpace: boolean;
 }
 
 export interface CardQuestions {
@@ -74,6 +76,7 @@ export function V2ChatProvider({
   cardQuestions = null,
   settleSkillDraft = settleNothing,
   followResumedTurn = settleNothing,
+  inSpace = false,
 }: {
   children: React.ReactNode;
   sendMessage: (message: string) => void;
@@ -84,13 +87,14 @@ export function V2ChatProvider({
   cardQuestions?: CardQuestions | null;
   settleSkillDraft?: (draft: string, status: SkillDraftStatus) => void;
   followResumedTurn?: (executionId: string) => void;
+  inSpace?: boolean;
 }) {
   // Stable value — only changes when the streaming flag (or `canSend`) flips, never per token
   // (tokens flow through the per-message streaming store, not this context), so
   // the card subtree never re-renders on stream growth.
   const value = useMemo<V2ChatContextValue>(
-    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft, followResumedTurn }),
-    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft, followResumedTurn],
+    () => ({ sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft, followResumedTurn, inSpace }),
+    [sendMessage, isStreaming, canSend, conversationId, applyDraftEditLine, cardQuestions, settleSkillDraft, followResumedTurn, inSpace],
   );
   return <V2ChatContext.Provider value={value}>{children}</V2ChatContext.Provider>;
 }

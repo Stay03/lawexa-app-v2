@@ -113,11 +113,11 @@ export interface ChatMessage {
    */
   skillDraft?: SkillDraftCard;
   /**
-   * The ask-first requests this answer's turn raised in a Space chat (thread
-   * 9ae498ae): only their owner's read of the requests returns them, so only
-   * the owner's screen draws a card under this answer.
+   * The turn this answer ended (`metadata.execution_id`), on the last answer
+   * of each turn only: in a Space chat the owner's ask-first card sits under
+   * the answer whose turn asked (thread 9ae498ae).
    */
-  privateItemRequests?: string[];
+  turnId?: string;
   /** Whose own template or skill Lawexa used for this answer; the name is the owner's to see only. */
   usedPrivateItems?: UsedPrivateItem[];
   /**
@@ -912,8 +912,6 @@ export interface ApiMessage {
     answers?: QuestionCardAnswer[] | null;
     /** On a `question_answers` user turn: the card it answered. */
     card_message_id?: number;
-    /** On an answer in a Space chat: the ask-first requests its turn raised (thread 9ae498ae). No names. */
-    private_item_requests?: string[];
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).

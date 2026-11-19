@@ -95,7 +95,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   const questionCard = isStreaming ? undefined : (message as ChatMessage).questionCard;
   const skillDraft = isStreaming || draining ? undefined : (message as ChatMessage).skillDraft;
   // Own templates and skills in a Space (thread 9ae498ae), once the turn is over.
-  const askIds = isStreaming || draining ? undefined : (message as ChatMessage).privateItemRequests;
+  const turnId = isStreaming || draining ? undefined : (message as ChatMessage).turnId;
   const usedItems = isStreaming || draining ? undefined : (message as ChatMessage).usedPrivateItems;
   if (questionCard) {
     return (
@@ -198,7 +198,7 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
           {skillDraft && <SkillDraftCardView card={skillDraft} />}
 
           {usedItems && <UsedItemsLine items={usedItems} />}
-          {askIds && <PrivateItemAsk requestIds={askIds} />}
+          {turnId && <PrivateItemAsk turnId={turnId} />}
 
           {showActions && (
             <MessageActions

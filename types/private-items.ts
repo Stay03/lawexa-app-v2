@@ -11,10 +11,12 @@
 /** processing = Lawexa is reading it, live = ready to use, failed = `error` says why. */
 export type TemplateStatus = 'processing' | 'live' | 'failed';
 
-/** One Space where the owner said "always in this Space". */
+/** One Space where the owner said "always in this Space" (a grant). */
 export interface AllowedIn {
-  grant_uuid: string;
+  uuid: string;
   space: { uuid: string; name: string };
+  item: { kind: PrivateItemKind; uuid: string; name: string };
+  scope: 'always';
   created_at: string;
 }
 
@@ -81,17 +83,24 @@ export interface PrivateItemRequest {
   uuid: string;
   conversation_uuid: string;
   space_uuid: string | null;
+  /** The turn that asked: the card sits under that turn's reply. */
+  execution_id: string;
   item: { kind: PrivateItemKind; uuid: string; name: string };
   status: 'pending' | 'once' | 'always' | 'declined' | 'expired';
   expires_at: string;
+  answered_at: string | null;
   created_at: string;
 }
 
 export type PrivateItemChoice = 'once' | 'always' | 'no';
 
-/** POST /private-item-requests/{uuid}/answer. `resumed` comes with once or always. */
+/**
+ * POST /private-item-requests/{uuid}/answer. `resumed` names the turn a yes
+ * started; null when Lawexa is still answering in that chat or the person has
+ * no messages left, and then their next message picks up the yes.
+ */
 export interface PrivateItemAnswer extends PrivateItemRequest {
-  resumed?: { execution_id: string; conversation_uuid: string } | null;
+  resumed: { execution_id: string; conversation_uuid: string } | null;
 }
 
 /** On an assistant message: whose own item Lawexa used. `name` is the owner's to see only. */

@@ -21,10 +21,10 @@ export function AllowedInChips({ allowedIn, itemName }: { allowedIn: readonly Al
     <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px] leading-snug text-muted-foreground">
       <span>Always used in:</span>
       {allowedIn.map((grant) => {
-        const going = revoke.isPending && revoke.variables === grant.grant_uuid;
+        const going = revoke.isPending && revoke.variables === grant.uuid;
         return (
           <span
-            key={grant.grant_uuid}
+            key={grant.uuid}
             className={cn(
               'inline-flex items-center gap-1 rounded-full bg-secondary py-0.5 pr-0.5 pl-2.5 text-foreground transition-opacity duration-150',
               going && 'opacity-50',
@@ -36,7 +36,7 @@ export function AllowedInChips({ allowedIn, itemName }: { allowedIn: readonly Al
               disabled={going}
               aria-label={`Stop always using ${itemName} in ${grant.space.name}`}
               onClick={() =>
-                revoke.mutate(grant.grant_uuid, {
+                revoke.mutate(grant.uuid, {
                   onSuccess: () => toast.success(`Lawexa will ask again before using ${itemName} in ${grant.space.name}.`),
                   onError: (error) => toast.error(extractApiError(error).message),
                 })

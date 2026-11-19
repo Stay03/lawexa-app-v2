@@ -61,34 +61,37 @@ test('the line under an answer: the owner sees the name, everyone else only whos
   assert.equal(usedItemLine({ ...item, kind: 'skill', name: null }, null), 'Used a skill from TEST DATA Ada');
 });
 
-test('an answer carries its ask-first requests and the items it used, whatever kind of answer it is', () => {
+test('the last answer of each turn carries its turn, and an answer carries the items it used', () => {
   const at = '2026-11-19T10:00:00Z';
   const rows = [
     { id: 1, conversation_id: 'c', agent_id: null, role: 'user', content: 'TEST DATA draft the notice', metadata: {}, created_at: at },
-    {
-      id: 2,
-      conversation_id: 'c',
-      agent_id: null,
-      role: 'assistant',
-      content: 'A choice is waiting for TEST DATA Ada.',
-      metadata: { private_item_requests: ['req-1'] },
-      created_at: at,
-    },
+    { id: 2, conversation_id: 'c', agent_id: null, role: 'assistant', content: 'TEST DATA. Reading the file.', metadata: { execution_id: 'turn-1' }, created_at: at },
     {
       id: 3,
       conversation_id: 'c',
       agent_id: null,
       role: 'assistant',
+      content: 'A choice is waiting for TEST DATA Ada.',
+      metadata: { execution_id: 'turn-1' },
+      created_at: at,
+    },
+    {
+      id: 4,
+      conversation_id: 'c',
+      agent_id: null,
+      role: 'assistant',
       content: 'TEST DATA. Here is the notice.',
-      metadata: {},
+      metadata: { execution_id: 'turn-2' },
       used_private_items: [{ kind: 'template', owner: { uuid: 'ada', name: 'TEST DATA Ada' }, name: null }],
       created_at: at,
     },
   ] as unknown as ApiMessage[];
   const out = transformApiMessages(rows) as ChatMessage[];
-  assert.deepEqual(out.find((m) => m.id === 'msg_2')?.privateItemRequests, ['req-1']);
-  assert.equal(out.find((m) => m.id === 'msg_3')?.usedPrivateItems?.[0]?.owner.name, 'TEST DATA Ada');
-  assert.equal(out.find((m) => m.id === 'msg_1')?.privateItemRequests, undefined);
+  const row = (id: string) => out.find((m) => m.id === id);
+  assert.equal(row('msg_3')?.turnId, 'turn-1', 'the card sits under the last answer of the turn that asked');
+  assert.equal(row('msg_2')?.turnId, undefined, 'never twice for one turn');
+  assert.equal(row('msg_4')?.usedPrivateItems?.[0]?.owner.name, 'TEST DATA Ada');
+  assert.equal(row('msg_1')?.turnId, undefined);
 });
 
 test('the wiring: Settings rows, routes, the chat card, the skill card, the file chip and the firm list', () => {
@@ -103,6 +106,8 @@ test('the wiring: Settings rows, routes, the chat card, the skill card, the file
   assert.match(ask, /\{ choice: 'once', label: 'Just this time' \},\s*\{ choice: 'always', label: 'Always in this Space' \},\s*\{ choice: 'no', label: 'No' \},/);
   assert.match(ask, /Only you see this\. Others see Lawexa&rsquo;s answer, not your/);
   assert.match(ask, /if \(result\.resumed\?\.execution_id\) chat\?\.followResumedTurn\(result\.resumed\.execution_id\);/, 'a yes follows the new turn');
+  assert.match(ask, /request\.status === 'pending' && request\.execution_id === turnId/, 'under the reply whose turn asked');
+  assert.match(ask, /chatRequests\(conversationId, conversationId !== '' && chat\?\.inSpace === true\)/, 'asked in Space chats only');
 
   const card = read('v2', 'features', 'conversations', 'conversation', 'skill-draft', 'SkillDraftCard.tsx');
   assert.match(card, /const canKeep = card\.kind === 'new';/, 'a change to a Lawexa skill can only go to an admin');

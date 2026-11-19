@@ -21,22 +21,25 @@ const CHOICES: readonly { choice: PrivateItemChoice; label: string }[] = [
 /**
  * Lawexa asks before it uses one of the owner's own templates or skills in a
  * Space chat (Stay, thread 9ae498ae, 19 November 2026). The turn has ended
- * with a short reply that names nothing; this card sits under it on the
- * owner's screen only, because only the owner's read of the requests returns
- * them. "Always in this Space" covers the owner's own messages in that Space,
+ * with a short reply that names nothing; this card sits under the reply whose
+ * turn asked (`execution_id`), on the owner's screen only, because only the
+ * owner's read of the requests returns them. Group channels never ask. "Always in this Space" covers the owner's own messages in that Space,
  * and only the owner can take it back (My templates and My skills).
  *
  * A yes starts a new turn on the server, and the chat follows its stream, as
- * after the machine's Done. A request left for 24 hours expires.
+ * after the machine's Done. When Lawexa is still answering, or the person has
+ * no messages left, the server starts nothing and their next message picks up
+ * the yes; the toast says so. A request left for 24 hours expires.
+ *
+ * Every answer row of a Space chat mounts this, and they share one read (one
+ * query key per chat), so a chat asks the server once.
  */
-export function PrivateItemAsk({ requestIds }: { requestIds: readonly string[] }) {
+export function PrivateItemAsk({ turnId }: { turnId: string }) {
   const chat = useV2ChatContext();
   const conversationId = chat?.conversationId ?? '';
-  const read = useQuery(privateItemsQueries.chatRequests(conversationId, conversationId !== '' && requestIds.length > 0));
+  const read = useQuery(privateItemsQueries.chatRequests(conversationId, conversationId !== '' && chat?.inSpace === true));
   const answer = useAnswerRequest(conversationId);
-  const pending = (read.data ?? []).filter(
-    (request) => request.status === 'pending' && requestIds.includes(request.uuid),
-  );
+  const pending = (read.data ?? []).filter((request) => request.status === 'pending' && request.execution_id === turnId);
   if (pending.length === 0) return null;
 
   const choose = (request: PrivateItemRequest, choice: PrivateItemChoice) =>
@@ -45,6 +48,7 @@ export function PrivateItemAsk({ requestIds }: { requestIds: readonly string[] }
       {
         onSuccess: (result) => {
           if (result.resumed?.execution_id) chat?.followResumedTurn(result.resumed.execution_id);
+          else if (choice !== 'no') toast.success(`Lawexa will use your ${request.item.name} ${request.item.kind} with your next message.`);
         },
         onError: (error) => toast.error(extractApiError(error).message),
       },
