@@ -757,6 +757,9 @@ export interface ChatStartRequest {
   // Start the conversation in a space (backend B4): first turn only, never with
   // conversation_id, is_confidential or is_redacted (the server answers 422).
   space_uuid?: string;
+  // The sender's own template or skill for this message ("Use in chat"):
+  // Lawexa uses it with no ask card. 422 for an item not theirs, or off.
+  use_items?: { kind: 'template' | 'skill'; uuid: string }[];
   // A new chat's first send only, never with conversation_id (422): a uuid made
   // once per composed send and sent again on every retry of it, so a retry after
   // the server already made the chat gets that chat back (backend, 17 October

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import type { TemplateSegment } from '@/types/private-items';
-import { applyBlankEdits, blankName, blanksOf, sharedAnswerLine, shortDate, usedLine } from './pages-model';
+import { applyBlankEdits, blankName, blanksOf, parseUse, sharedAnswerLine, shortDate, usedLine } from './pages-model';
 
 /* My templates and My skills (Arthur agreed the pages, 19 November 2026,
  * thread 9ae498ae; Backend's shapes the same day). TEST DATA only. */
@@ -74,6 +74,15 @@ test('the used line', () => {
 test('a Space chat says the answer is shared, in the words agreed', () => {
   assert.equal(sharedAnswerLine('template'), "Everyone in this chat sees Lawexa's answer, which can include this template's wording.");
   assert.equal(sharedAnswerLine('skill'), "Everyone in this chat sees Lawexa's answer, which can follow this skill's steps.");
+});
+
+test('"Use in chat" reads only a template or skill uuid from the address', () => {
+  const uuid = '00000000-0000-4000-8000-000000000901';
+  assert.deepEqual(parseUse(`template:${uuid}`), { kind: 'template', uuid });
+  assert.deepEqual(parseUse(`skill:${uuid.toUpperCase()}`), { kind: 'skill', uuid });
+  assert.equal(parseUse(`folder:${uuid}`), null);
+  assert.equal(parseUse('template:not-a-uuid'), null);
+  assert.equal(parseUse(null), null);
 });
 
 test('a short date', () => {

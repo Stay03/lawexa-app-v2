@@ -11,7 +11,7 @@ import type { PrivateItemKind } from '@/types/private-items';
 import { spacesQueries } from '@/v2/features/spaces/queries';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
-import { sharedAnswerLine } from './pages-model';
+import { sharedAnswerLine, USE_PARAM } from './pages-model';
 
 /**
  * Use in chat (Arthur's pages, 19 November 2026): where to use one of your
@@ -43,7 +43,8 @@ export function UseInChat({
 
   const start = () => {
     onClose();
-    router.push(inSpace ? `/spaces/${target}?use=${encodeURIComponent(use)}` : `/?use=${encodeURIComponent(use)}`);
+    const query = `${USE_PARAM}=${encodeURIComponent(use)}`;
+    router.push(inSpace ? `/spaces/${target}?${query}` : `/?${query}`);
   };
 
   const option = (value: string, title: string, sub: string, icon: React.ReactNode) => (

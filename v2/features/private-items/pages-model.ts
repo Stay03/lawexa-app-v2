@@ -1,4 +1,4 @@
-import type { BlankEdit, PrivateItemKind, TemplateBlank, TemplateSegment } from '@/types/private-items';
+import type { BlankEdit, PrivateItemKind, TemplateBlank, TemplateSegment, UseItem } from '@/types/private-items';
 
 /**
  * The pure parts of My templates and My skills (Arthur agreed the pages, 19
@@ -102,4 +102,13 @@ export function sharedAnswerLine(kind: PrivateItemKind): string {
   return kind === 'template'
     ? "Everyone in this chat sees Lawexa's answer, which can include this template's wording."
     : "Everyone in this chat sees Lawexa's answer, which can follow this skill's steps.";
+}
+
+/** The address param "Use in chat" opens a box with: `?use=template:{uuid}` or `?use=skill:{uuid}`. */
+export const USE_PARAM = 'use';
+
+/** `template:{uuid}` or `skill:{uuid}`, else null. */
+export function parseUse(raw: string | null): UseItem | null {
+  const match = /^(template|skill):([0-9a-f-]{36})$/i.exec(raw ?? '');
+  return match ? { kind: match[1].toLowerCase() as UseItem['kind'], uuid: match[2].toLowerCase() } : null;
 }

@@ -78,6 +78,7 @@ import { useWorkflowSelection } from './composer/useWorkflowSelection';
 import { OutOfMessagesStrip } from '@/v2/features/subscription/OutOfMessagesStrip';
 import { homeSendFailure } from './home-send-failure';
 import { PlanEndedSlot } from '@/v2/features/chat-rating/PlanEndedRating';
+import { UsingItemChip, useUsingItem } from '@/v2/features/private-items/UsingItem';
 import type { MentionOptions } from '@/v2/features/channels/model';
 import { MentionList, useMentionPicker } from '@/v2/features/conversations/conversation/mention-picker';
 
@@ -271,6 +272,8 @@ export function HomeComposer({
   });
   const queryClient = useQueryClient();
   const { userId } = useV2Session();
+  // A template or skill brought here by "Use in chat" (?use=), sent with the first message.
+  const using = useUsingItem();
   const fileInputRef = useRef<HTMLInputElement>(null);
   useImperativeHandle(handle, () => ({ attach: () => fileInputRef.current?.click() }), []);
 
@@ -484,9 +487,11 @@ export function HomeComposer({
           ...(redacted && redactionCategories && { redactionCategories }),
           references,
           spaceUuid: space?.uuid,
+          ...(using.item && { useItems: [using.item] }),
         },
         { queryClient },
       );
+      using.clear();
 
       // The turn is committed — clear the draft (removes it from storage) and the
       // attachment chips. We are navigating away, so no further local reset needed.
@@ -672,6 +677,11 @@ export function HomeComposer({
             <div className="-mx-2.5 -mt-2.5 mb-2 rounded-t-3xl border-b border-border bg-secondary/50 px-4 py-2.5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
               <ActivityStatus startTime={submittedAt} narration={REDACTING_LABEL} />
             </div>
+          ) : null}
+
+          {/* The template or skill "Use in chat" brought: this message uses it. */}
+          {signedIn && using.item && using.name ? (
+            <UsingItemChip item={using.item} name={using.name} inSpace={Boolean(space)} onClear={using.clear} />
           ) : null}
 
           {/* Attachment chips — one per selected file, with live upload status. */}
