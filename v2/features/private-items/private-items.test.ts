@@ -96,6 +96,18 @@ test('the last answer of each turn carries its turn, and an answer carries the i
   assert.equal(row('msg_1')?.turnId, undefined);
 });
 
+test('a final reply with no execution_id of its own takes the turn of the steps before it', () => {
+  const at = '2026-11-19T06:29:47Z';
+  const rows = [
+    { id: 5, conversation_id: 'c', agent_id: null, role: 'user', content: 'TEST DATA Draft a notice to quit', metadata: {}, created_at: at },
+    { id: 6, conversation_id: 'c', agent_id: null, role: 'assistant', content: '{"tool_call":"search_templates","parameters":{}}', metadata: { type: 'tool_call', execution_id: 'turn-7' }, created_at: at },
+    { id: 7, conversation_id: 'c', agent_id: null, role: 'tool', content: '{"success":true}', metadata: { type: 'tool_result', execution_id: 'turn-7' }, created_at: at },
+    { id: 10, conversation_id: 'c', agent_id: null, role: 'assistant', content: 'TEST DATA. A choice is waiting for you.', metadata: null, created_at: at },
+  ] as unknown as ApiMessage[];
+  const out = transformApiMessages(rows) as ChatMessage[];
+  assert.equal(out.find((m) => m.id === 'msg_10')?.turnId, 'turn-7', 'the card sits under the reply, not under a step');
+});
+
 test('the wiring: Settings rows, routes, the chat card, the skill card, the file chip and the firm list', () => {
   const rows = read('v2', 'features', 'settings', 'rows.ts');
   assert.match(rows, /id: 'templates-skills',\s*label: 'Templates and skills',/);

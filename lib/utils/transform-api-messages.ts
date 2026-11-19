@@ -468,10 +468,22 @@ export function transformApiMessages(
 function withPrivateItems<Row extends { id: string }>(messages: Row[], apiMessages: ApiMessage[]): Row[] {
   const byId = new Map<string, { turnId?: string; used?: UsedPrivateItem[] }>();
   const lastOfTurn = new Map<string, number>();
+  // A turn's final reply may carry no execution_id of its own while its steps
+  // do (Backend's e2e, 19 November 2026): it takes the turn of the steps before
+  // it, back to the question that started them.
+  let currentTurn: string | null = null;
   for (const apiMsg of apiMessages) {
+    if (apiMsg.role === 'user') {
+      currentTurn = null;
+      continue;
+    }
+    const own = apiMsg.metadata?.execution_id ?? null;
+    if (own) currentTurn = own;
     if (apiMsg.role !== 'assistant') continue;
-    const turn = apiMsg.metadata?.execution_id;
-    if (turn) lastOfTurn.set(turn, apiMsg.id);
+    const type = apiMsg.metadata?.type;
+    const isReply = !type || type === 'skill_draft' || type === 'question_card' || type === 'draft_edit';
+    const turn = own ?? currentTurn;
+    if (turn && isReply) lastOfTurn.set(turn, apiMsg.id);
     const used = apiMsg.used_private_items?.filter((item) => item && typeof item.owner?.name === 'string');
     if (used?.length) byId.set(`msg_${apiMsg.id}`, { used });
   }
