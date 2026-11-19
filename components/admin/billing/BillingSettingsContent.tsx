@@ -55,9 +55,9 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
      setting — "200 = $2 per pack of 10 messages" — and the field renders it, so
      point at that rather than generalising over it. */
   pricing:
-    'Pack prices, trial charges and the display rate. Read the note under each field before changing it — some are in kobo or cents rather than naira or dollars.',
+    'Pack prices, trial charges and the display rate, the one naira-to-dollar rate used everywhere. Read the note under each field before changing it — some are in kobo or cents rather than naira or dollars.',
   billing:
-    'When a paying user is flagged on the Cost alerts list: the share of their plan price their AI cost must reach, the naira rate used only for this, and whether web search counts. Checked daily at 06:00 UTC.',
+    'When a paying user is flagged on the Cost alerts list: the share of their plan price their AI cost must reach, and whether web search counts. Naira prices use the display rate under Message Pack Pricing. Checked daily at 06:00 UTC.',
 };
 
 /** Maps a boolean toggle key to the fields it controls. */

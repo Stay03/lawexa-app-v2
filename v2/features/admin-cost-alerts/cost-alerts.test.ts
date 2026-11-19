@@ -82,3 +82,28 @@ test('the wiring: the list route, the nav, the settings card, the user badge and
   assert.match(table, /\{alert\.user \? \(/);
   assert.match(table, /\{alert\.plan \? \(/);
 });
+
+/* One naira-to-dollar rate, set in admin settings, used everywhere (Stay, 19
+ * November 2026): no admin keeps a rate of their own in the browser. */
+test('one rate: every admin screen reads the setting, with no per-admin rate', async () => {
+  const { existsSync } = await import('node:fs');
+  assert.equal(existsSync(join(process.cwd(), 'components', 'admin', 'ExchangeRateField.tsx')), false, 'the what-if field is gone');
+
+  const hook = read('lib', 'hooks', 'useExchangeRate.ts');
+  assert.match(hook, /source: 'server' \| 'fallback';/, 'no manual source');
+  assert.match(hook, /const RATE_SETTING_KEY = 'usd_to_ngn_display_rate';/);
+  assert.match(hook, /const FALLBACK_RATE = 1500;/, 'kept for a missing setting');
+  assert.doesNotMatch(hook, /useCurrencyStore|manualRate/);
+
+  const store = read('lib', 'stores', 'currencyStore.ts');
+  assert.doesNotMatch(store, /setManualRate|clearManualRate|manualRate: null,/);
+  assert.match(store, /version: 2,/);
+  assert.match(store, /if \(version < 2\) \{\s*delete state\.exchangeRate;\s*delete state\.manualRate;\s*\}/, 'a saved rate never survives a reload');
+
+  for (const host of [['components', 'admin', 'CurrencySettings.tsx'], ['components', 'admin', 'AdminUserConversationFilters.tsx']]) {
+    assert.match(read(...host), /<ExchangeRateNote \/>/, `${host.at(-1)} shows the rate read only`);
+  }
+  const note = read('components', 'admin', 'ExchangeRateNote.tsx');
+  assert.match(note, /\$1 = ₦\{rate\.toLocaleString\(\)\}, set in\{' '\}/);
+  assert.match(note, /href="\/admin\/billing\/settings"/);
+});
