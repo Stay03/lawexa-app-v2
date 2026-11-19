@@ -108,6 +108,7 @@ test('the wiring: Settings rows, routes, the chat card, the skill card, the file
   assert.match(ask, /if \(result\.resumed\?\.execution_id\) chat\?\.followResumedTurn\(result\.resumed\.execution_id\);/, 'a yes follows the new turn');
   assert.match(ask, /request\.status === 'pending' && request\.execution_id === turnId/, 'under the reply whose turn asked');
   assert.match(ask, /chatRequests\(conversationId, conversationId !== '' && chat\?\.inSpace === true\)/, 'asked in Space chats only');
+  assert.match(read('v2', 'features', 'private-items', 'queries.ts'), /refetchOnMount: 'always',/, 'a new reply reads the requests again, push or no push');
 
   const card = read('v2', 'features', 'conversations', 'conversation', 'skill-draft', 'SkillDraftCard.tsx');
   assert.match(card, /const canKeep = card\.kind === 'new';/, 'a change to a Lawexa skill can only go to an admin');

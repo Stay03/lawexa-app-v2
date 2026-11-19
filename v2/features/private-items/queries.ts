@@ -62,6 +62,11 @@ export const privateItemsQueries = {
       queryFn: () => privateItemRequestsApi.list(conversationUuid),
       enabled,
       staleTime: STALE_TIMES.standard,
+      // A reply that asked mounts its row after the chat was read: read again
+      // then, so the owner's card shows even when no push arrives (a dropped
+      // socket, or a server with broadcasting off). The rows that mount
+      // together share one read.
+      refetchOnMount: 'always',
       meta: { silentError: true },
     }),
 };
