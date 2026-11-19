@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { privateItemAnswerLine, refusalLine, skillProblems, splitUpload, templateDetail, templateStatusLine, usedItemLine } from './model';
+import { askWarning, privateItemAnswerLine, refusalLine, skillProblems, splitUpload, templateDetail, templateStatusLine, usedItemLine } from './model';
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { ApiMessage, ChatMessage } from '@/types/chat';
 
@@ -118,7 +118,7 @@ test('the wiring: Settings rows, routes, the chat card, the skill card, the file
 
   const ask = read('v2', 'features', 'private-items', 'PrivateItemAsk.tsx');
   assert.match(ask, /\{ choice: 'once', label: 'Just this time' \},\s*\{ choice: 'always', label: 'Always in this Space' \},\s*\{ choice: 'no', label: 'No' \},/);
-  assert.match(ask, /Only you see this\. Others see Lawexa&rsquo;s answer, not your/);
+  assert.match(ask, /\{askWarning\(pending\.map\(\(request\) => request\.item\.kind\)\)\}/);
   assert.match(ask, /if \(result\.resumed\?\.execution_id\) chat\?\.followResumedTurn\(result\.resumed\.execution_id\);/, 'a yes follows the new turn');
   assert.match(ask, /request\.status === 'pending' && request\.execution_id === turnId/, 'under the reply whose turn asked');
   assert.match(ask, /chatRequests\(conversationId, conversationId !== '' && chat\?\.inSpace === true\)/, 'asked in Space chats only');
@@ -151,4 +151,10 @@ test('the owner’s yes is a quiet line: "You" for the owner, the name for every
   ] as unknown as ApiMessage[]) as ChatMessage[];
   assert.deepEqual(out[0]?.privateItemAnswer, { choice: 'always', kind: 'template' });
   assert.match(read('v2', 'features', 'conversations', 'conversation', 'rows', 'UserMessageRow.tsx'), /if \(message\.privateItemAnswer\) \{/, 'drawn as a line, its text never shown');
+});
+
+test('the ask card warns that the answer is shared (Arthur’s a)', () => {
+  assert.equal(askWarning(['template']), "Only you see this question. Everyone in this chat sees Lawexa's answer, which can include this template's wording.");
+  assert.equal(askWarning(['skill']), "Only you see this question. Everyone in this chat sees Lawexa's answer, written with this skill.");
+  assert.equal(askWarning(['template', 'skill']), "Only you see this question. Everyone in this chat sees Lawexa's answer, which can include your templates' wording.");
 });

@@ -72,6 +72,20 @@ export function skillProblems(input: MySkillInput): Partial<Record<keyof MySkill
 }
 
 /**
+ * The ask card's warning (Arthur's a, 19 November 2026): after a yes,
+ * everyone in the Space chat reads Lawexa's answer. Lawexa writes the finished
+ * document and never prints the blank template or a skill's steps, but the
+ * answer can carry a template's wording.
+ */
+export function askWarning(kinds: readonly ('template' | 'skill')[]): string {
+  const only = 'Only you see this question.';
+  if (kinds.length > 1) return `${only} Everyone in this chat sees Lawexa's answer, which can include your templates' wording.`;
+  return kinds[0] === 'skill'
+    ? `${only} Everyone in this chat sees Lawexa's answer, written with this skill.`
+    : `${only} Everyone in this chat sees Lawexa's answer, which can include this template's wording.`;
+}
+
+/**
  * The quiet line where the owner's yes to an ask-first card sits in the chat.
  * The owner reads "You"; everyone else reads their name, never the item's.
  */

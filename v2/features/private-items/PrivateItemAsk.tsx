@@ -9,7 +9,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import type { PrivateItemChoice, PrivateItemRequest, UsedPrivateItem } from '@/types/private-items';
 import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { usedItemLine } from './model';
+import { askWarning, usedItemLine } from './model';
 import { privateItemsQueries, useAnswerRequest } from './queries';
 
 const CHOICES: readonly { choice: PrivateItemChoice; label: string }[] = [
@@ -90,7 +90,7 @@ export function PrivateItemAsk({ turnId }: { turnId: string }) {
       </ul>
       <p className="flex items-center gap-1.5 border-t border-border/70 bg-muted/40 px-3.5 py-2 text-xs text-muted-foreground">
         <Lock aria-hidden className="size-3 shrink-0" />
-        Only you see this. Others see Lawexa&rsquo;s answer, not your {pending.length === 1 ? pending[0].item.kind : 'items'}.
+        {askWarning(pending.map((request) => request.item.kind))}
       </p>
     </section>
   );
