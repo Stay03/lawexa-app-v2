@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { FileText, Loader2, Lock, Sparkles } from 'lucide-react';
+import { FileText, Loader2, Lock, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -61,7 +61,7 @@ export function PrivateItemAsk({ turnId }: { turnId: string }) {
     >
       <ul className="divide-y divide-border/70">
         {pending.map((request) => {
-          const Icon = request.item.kind === 'template' ? FileText : Sparkles;
+          const Icon = request.item.kind === 'template' ? FileText : ScrollText;
           const busy = answer.isPending && answer.variables?.uuid === request.uuid;
           return (
             <li key={request.uuid} className="flex flex-col gap-2.5 p-3.5">
@@ -103,7 +103,7 @@ export function UsedItemsLine({ items }: { items: readonly UsedPrivateItem[] }) 
   return (
     <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
       {items.map((item, index) => {
-        const Icon = item.kind === 'template' ? FileText : Sparkles;
+        const Icon = item.kind === 'template' ? FileText : ScrollText;
         return (
           <span key={`${item.owner.uuid}-${item.kind}-${index}`} className="inline-flex items-center gap-1.5">
             <Icon aria-hidden className="size-3" />

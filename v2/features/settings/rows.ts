@@ -13,7 +13,7 @@ import {
   MessageSquarePlus,
   MonitorSmartphone,
   ShieldCheck,
-  Sparkles,
+  ScrollText,
   Ticket,
   User,
   type LucideIcon,
@@ -271,7 +271,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
       {
         id: 'skills',
         label: 'My skills',
-        icon: Sparkles,
+        icon: ScrollText,
         href: '/settings/skills',
         requiresAccount: true,
       },

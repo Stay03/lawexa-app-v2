@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { Loader2, MoreHorizontal, Pencil, Plus, RotateCw, Sparkles, Trash2, TriangleAlert } from 'lucide-react';
+import { Loader2, MoreHorizontal, Pencil, Plus, RotateCw, ScrollText, Trash2, TriangleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -72,7 +72,7 @@ export function MySkillsScreen() {
         />
       ) : rows.length === 0 ? (
         <SettingsState
-          icon={Sparkles}
+          icon={ScrollText}
           title="No skills yet"
           description="Write the steps you want Lawexa to follow for a kind of task, or save one Lawexa drafts for you in a chat."
           action={newButton}
@@ -85,7 +85,7 @@ export function MySkillsScreen() {
         >
           {rows.map((skill) => (
             <li key={skill.uuid} className="flex min-h-16 items-start gap-3.5 px-4 py-3">
-              <Sparkles aria-hidden className="mt-0.5 size-5 shrink-0 text-primary" />
+              <ScrollText aria-hidden className="mt-0.5 size-5 shrink-0 text-primary" />
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-[15px] leading-snug font-medium text-foreground">{skill.display_name}</span>
                 <span className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">{skill.description}</span>
