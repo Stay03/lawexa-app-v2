@@ -1,7 +1,16 @@
 import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 
 import { firmTemplatesApi, myTemplatesApi, mySkillsApi, privateItemGrantsApi, privateItemRequestsApi } from '@/lib/api/private-items';
-import type { ItemsPage, MySkill, MySkillInput, MyTemplate, PrivateItemChoice } from '@/types/private-items';
+import type {
+  BlankEdit,
+  ItemsPage,
+  MySkill,
+  MySkillInput,
+  MyTemplate,
+  PrivateItemChoice,
+  PrivateItemKind,
+  TemplateSort,
+} from '@/types/private-items';
 import { STALE_TIMES } from '@/v2/runtime/query';
 
 /**
@@ -11,6 +20,15 @@ import { STALE_TIMES } from '@/v2/runtime/query';
  * reads the next.
  */
 const PER_PAGE = 50;
+const RECENT_COUNT = 5;
+
+/** What My templates is showing: the search and the two filters, and the order. */
+export interface TemplateFilters {
+  search?: string;
+  documentType?: string;
+  practiceArea?: string;
+  sort?: TemplateSort;
+}
 
 const nextPage = <Row,>(last: ItemsPage<Row>) =>
   last.pagination.current_page < last.pagination.last_page ? last.pagination.current_page + 1 : undefined;
@@ -26,19 +44,70 @@ export const privateItemsQueries = {
   firm: (orgUuid: string) => ['private-items', 'firm', orgUuid] as const,
   requests: (conversationUuid: string) => ['private-items', 'requests', conversationUuid] as const,
 
-  myTemplates: (search = '') =>
+  myTemplates: (filters: TemplateFilters = {}) =>
     infiniteQueryOptions({
-      queryKey: [...privateItemsQueries.templates, search],
-      queryFn: ({ pageParam }) => myTemplatesApi.list({ search: search || undefined, page: pageParam, per_page: PER_PAGE }),
+      queryKey: [...privateItemsQueries.templates, 'list', filters],
+      queryFn: ({ pageParam }) =>
+        myTemplatesApi.list({
+          search: filters.search || undefined,
+          document_type: filters.documentType || undefined,
+          practice_area: filters.practiceArea || undefined,
+          sort: filters.sort,
+          page: pageParam,
+          per_page: PER_PAGE,
+        }),
       initialPageParam: 1,
       getNextPageParam: nextPage,
       staleTime: STALE_TIMES.standard,
       refetchInterval: (query) => (anyReading(query.state.data) ? READING_POLL_MS : false),
     }),
 
+  /** The five used last, for the row at the top. */
+  recentTemplates: () =>
+    queryOptions({
+      queryKey: [...privateItemsQueries.templates, 'recent'],
+      queryFn: async () => (await myTemplatesApi.list({ sort: 'last_used', per_page: RECENT_COUNT })).data,
+      staleTime: STALE_TIMES.standard,
+    }),
+
+  templateFacets: () =>
+    queryOptions({
+      queryKey: [...privateItemsQueries.templates, 'facets'],
+      queryFn: myTemplatesApi.facets,
+      staleTime: STALE_TIMES.standard,
+    }),
+
+  template: (uuid: string) =>
+    queryOptions({
+      queryKey: [...privateItemsQueries.templates, 'one', uuid],
+      queryFn: () => myTemplatesApi.get(uuid),
+      staleTime: STALE_TIMES.standard,
+    }),
+
+  versions: (kind: PrivateItemKind, uuid: string) =>
+    queryOptions({
+      queryKey: [...(kind === 'template' ? privateItemsQueries.templates : privateItemsQueries.skills), 'versions', uuid],
+      queryFn: () => (kind === 'template' ? myTemplatesApi.versions(uuid) : mySkillsApi.versions(uuid)),
+      staleTime: STALE_TIMES.standard,
+    }),
+
+  templateVersion: (uuid: string, version: number) =>
+    queryOptions({
+      queryKey: [...privateItemsQueries.templates, 'version', uuid, version],
+      queryFn: () => myTemplatesApi.version(uuid, version),
+      staleTime: Infinity,
+    }),
+
+  skillVersion: (uuid: string, version: number) =>
+    queryOptions({
+      queryKey: [...privateItemsQueries.skills, 'version', uuid, version],
+      queryFn: () => mySkillsApi.version(uuid, version),
+      staleTime: Infinity,
+    }),
+
   mySkills: (search = '') =>
     infiniteQueryOptions({
-      queryKey: [...privateItemsQueries.skills, search],
+      queryKey: [...privateItemsQueries.skills, 'list', search],
       queryFn: ({ pageParam }) => mySkillsApi.list({ search: search || undefined, page: pageParam, per_page: PER_PAGE }),
       initialPageParam: 1,
       getNextPageParam: nextPage,
@@ -81,7 +150,8 @@ export function useTemplateMutations() {
   const client = useQueryClient();
   const refresh = () => void client.invalidateQueries({ queryKey: privateItemsQueries.templates });
   const land = (row: MyTemplate) =>
-    client.setQueriesData<InfiniteData<ItemsPage<MyTemplate>>>({ queryKey: privateItemsQueries.templates }, (rows) =>
+    // Only the paged lists: the same key also holds one template, the facets and the versions.
+    client.setQueriesData<InfiniteData<ItemsPage<MyTemplate>>>({ queryKey: [...privateItemsQueries.templates, 'list'] }, (rows) =>
       patchTemplate(rows, row),
     );
   return {
@@ -93,6 +163,22 @@ export function useTemplateMutations() {
     }),
     retry: useMutation({ mutationFn: myTemplatesApi.retry, onSuccess: land, meta: { silentError: true } }),
     remove: useMutation({ mutationFn: myTemplatesApi.remove, onSettled: refresh, meta: { silentError: true } }),
+    duplicate: useMutation({ mutationFn: myTemplatesApi.duplicate, onSettled: refresh, meta: { silentError: true } }),
+    replace: useMutation({
+      mutationFn: ({ uuid, file }: { uuid: string; file: File }) => myTemplatesApi.replace(uuid, file),
+      onSettled: refresh,
+      meta: { silentError: true },
+    }),
+    saveBlanks: useMutation({
+      mutationFn: ({ uuid, edits }: { uuid: string; edits: BlankEdit[] }) => myTemplatesApi.saveBlanks(uuid, edits),
+      onSettled: refresh,
+      meta: { silentError: true },
+    }),
+    restore: useMutation({
+      mutationFn: ({ uuid, version }: { uuid: string; version: number }) => myTemplatesApi.restore(uuid, version),
+      onSettled: refresh,
+      meta: { silentError: true },
+    }),
   };
 }
 
@@ -102,11 +188,26 @@ export function useSkillMutations() {
   return {
     create: useMutation({ mutationFn: (input: MySkillInput) => mySkillsApi.create(input), onSuccess: refresh, meta: { silentError: true } }),
     update: useMutation({
-      mutationFn: ({ uuid, input }: { uuid: string; input: MySkillInput }): Promise<MySkill> => mySkillsApi.update(uuid, input),
+      mutationFn: ({ uuid, input }: { uuid: string; input: Partial<MySkillInput> }): Promise<MySkill> =>
+        mySkillsApi.update(uuid, input),
       onSuccess: refresh,
       meta: { silentError: true },
     }),
     remove: useMutation({ mutationFn: mySkillsApi.remove, onSettled: refresh, meta: { silentError: true } }),
+    duplicate: useMutation({ mutationFn: mySkillsApi.duplicate, onSettled: refresh, meta: { silentError: true } }),
+    restore: useMutation({
+      mutationFn: ({ uuid, version }: { uuid: string; version: number }) => mySkillsApi.restore(uuid, version),
+      onSettled: refresh,
+      meta: { silentError: true },
+    }),
+    /** A saved skill runs by its uuid (with any unsaved edit); a new one sends all its fields. */
+    test: useMutation({
+      mutationFn: ({ uuid, request, input }: { uuid: string | null; request: string; input: MySkillInput }) =>
+        uuid
+          ? mySkillsApi.test(uuid, { request, instructions: input.instructions, example_output: input.example_output })
+          : mySkillsApi.testNew({ request, ...input }),
+      meta: { silentError: true },
+    }),
   };
 }
 

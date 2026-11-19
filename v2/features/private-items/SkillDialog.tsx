@@ -1,28 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { FlaskConical, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { MySkill, MySkillInput } from '@/types/private-items';
+import { MarkdownText } from '@/v2/features/conversations/conversation/markdown/MarkdownText';
+import { ResponsiveOverlay } from '@/v2/shell/overlay/ResponsiveOverlay';
 import { SKILL_LIMITS, skillProblems } from './model';
+import { useSkillMutations } from './queries';
 
-type Field = keyof MySkillInput;
+type Field = 'display_name' | 'description' | 'instructions' | 'example_output';
 
 /**
- * Write or edit one of your own skills: a name, one line saying what it is
- * for, and the steps Lawexa follows. It works at once in your own chats, with
- * no admin review (Stay, 18 November 2026). Lawexa reads only the one line
- * until a task needs the steps, so a long skill costs little.
+ * "Write it myself" and Edit (Arthur's pages, 19 November 2026): a name, the
+ * "When Lawexa uses it" line (Lawexa picks skills from this line, so it
+ * matters), the steps, and an example of a good answer. Beside them, Test runs
+ * a sample request with what is on the screen, saved or not, and shows the
+ * answer; it costs one message, charged only when an answer comes back.
  *
- * Mounted per open (the host keys it), so the fields start from the skill
- * being edited. The server's sentences (a name already taken, by you or by
- * one of Lawexa's skills) show under their field.
+ * It works at once in the person's own chats, with no admin review. Mounted
+ * per open (the host keys it). The server's sentences show under their field.
  */
 export function SkillDialog({
   skill,
@@ -38,40 +40,47 @@ export function SkillDialog({
     display_name: skill?.display_name ?? '',
     description: skill?.description ?? '',
     instructions: skill?.instructions ?? '',
+    example_output: skill?.example_output ?? '',
   });
   const [tried, setTried] = useState(false);
   const [serverProblems, setServerProblems] = useState<Partial<Record<Field, string>>>({});
   const [saving, setSaving] = useState(false);
   const local = skillProblems(input);
-  const problemOf = (field: Field) => serverProblems[field] ?? (tried ? local[field] : undefined);
+  const problemOf = (field: Field) => serverProblems[field] ?? (tried ? local[field as keyof typeof local] : undefined);
+  const changed =
+    input.display_name !== (skill?.display_name ?? '') ||
+    input.description !== (skill?.description ?? '') ||
+    input.instructions !== (skill?.instructions ?? '') ||
+    (input.example_output ?? '') !== (skill?.example_output ?? '');
 
   const set = (field: Field, value: string) => {
     setInput((current) => ({ ...current, [field]: value }));
     setServerProblems((current) => ({ ...current, [field]: undefined }));
   };
 
+  const trimmed = (): MySkillInput => ({
+    display_name: input.display_name.trim(),
+    description: input.description.trim(),
+    instructions: input.instructions.trim(),
+    example_output: input.example_output?.trim() || null,
+  });
+
   const save = async () => {
     setTried(true);
     if (Object.keys(local).length > 0) return;
     setSaving(true);
     try {
-      await onSave({
-        display_name: input.display_name.trim(),
-        description: input.description.trim(),
-        instructions: input.instructions.trim(),
-      });
+      await onSave(trimmed());
     } catch (error) {
       const apiError = extractApiError(error);
       const fields = apiError.errors ?? {};
-      setServerProblems({
-        // A name clash comes back on `name`, the snake_case key made from the display name.
+      const found = {
         display_name: fields.name?.[0] ?? fields.display_name?.[0],
         description: fields.description?.[0],
         instructions: fields.instructions?.[0],
-      });
-      if (!fields.name && !fields.display_name && !fields.description && !fields.instructions) {
-        setServerProblems({ display_name: apiError.message });
-      }
+        example_output: fields.example_output?.[0],
+      };
+      setServerProblems(Object.values(found).some(Boolean) ? found : { display_name: apiError.message });
     } finally {
       setSaving(false);
     }
@@ -95,19 +104,27 @@ export function SkillDialog({
   };
 
   return (
-    <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void save();
-          }}
-          className="flex flex-col gap-4"
-        >
-          <DialogHeader>
-            <DialogTitle>{skill ? 'Edit skill' : 'New skill'}</DialogTitle>
-            <DialogDescription>It works at once, in your own chats only.</DialogDescription>
-          </DialogHeader>
+    <ResponsiveOverlay
+      open
+      onOpenChange={(next) => (next ? undefined : onClose())}
+      guardUnsaved={changed}
+      className="md:max-w-5xl"
+      title={skill ? 'Edit skill' : 'New skill'}
+      description="It works at once, in your own chats only."
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="button" onClick={() => void save()} disabled={saving}>
+            {saving ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+            {skill ? 'Save changes' : 'Save skill'}
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-6 md:grid-cols-[1fr_22rem] md:items-start">
+        <div className="flex flex-col gap-4">
           {field(
             'display_name',
             'Name',
@@ -119,22 +136,20 @@ export function SkillDialog({
               placeholder="Tenancy notice review"
               onChange={(event) => set('display_name', event.target.value)}
               aria-invalid={problemOf('display_name') !== undefined}
-              aria-describedby={problemOf('display_name') ? 'skill-display_name-error' : undefined}
             />,
           )}
           {field(
             'description',
-            'What it is for',
+            'When Lawexa uses it',
             <Input
               id="skill-description"
               value={input.description}
               maxLength={SKILL_LIMITS.description}
-              placeholder="Checks a quit notice against the Lagos Tenancy Law"
+              placeholder="When I ask it to check a quit notice served on a tenant in Lagos"
               onChange={(event) => set('description', event.target.value)}
               aria-invalid={problemOf('description') !== undefined}
-              aria-describedby={problemOf('description') ? 'skill-description-error' : undefined}
             />,
-            'One line. Lawexa reads this to decide when to use the skill.',
+            'Lawexa picks a skill from this line alone, so say what kind of request it is for.',
           )}
           {field(
             'instructions',
@@ -143,26 +158,78 @@ export function SkillDialog({
               id="skill-instructions"
               value={input.instructions}
               maxLength={SKILL_LIMITS.instructions}
-              rows={12}
+              rows={10}
               placeholder={'1. Ask for the notice and the tenancy agreement.\n2. Check how the notice was served.\n3. …'}
               onChange={(event) => set('instructions', event.target.value)}
-              className="min-h-56 font-mono text-[13px] leading-relaxed"
+              className="min-h-48 text-[14px] leading-relaxed"
               aria-invalid={problemOf('instructions') !== undefined}
-              aria-describedby={problemOf('instructions') ? 'skill-instructions-error' : undefined}
             />,
-            'What Lawexa should do, step by step, when the skill fits.',
+            'What Lawexa does, step by step, when the skill fits.',
           )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-              {skill ? 'Save changes' : 'Save skill'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          {field(
+            'example_output',
+            'Example of a good answer (optional)',
+            <Textarea
+              id="skill-example_output"
+              value={input.example_output ?? ''}
+              rows={5}
+              placeholder="Paste an answer you were happy with. Lawexa matches its shape and tone."
+              onChange={(event) => set('example_output', event.target.value)}
+              className="min-h-28 text-[14px] leading-relaxed"
+            />,
+          )}
+        </div>
+        <SkillTest uuid={skill?.uuid ?? null} input={trimmed()} ready={Object.keys(local).length === 0} />
+      </div>
+    </ResponsiveOverlay>
+  );
+}
+
+/** Test: a sample request, run with what is on the screen, and the answer. */
+function SkillTest({ uuid, input, ready }: { uuid: string | null; input: MySkillInput; ready: boolean }) {
+  const { test } = useSkillMutations();
+  const [request, setRequest] = useState('');
+  const failure = test.error ? extractApiError(test.error) : null;
+  return (
+    <section aria-labelledby="skill-test" className="flex flex-col gap-3 rounded-2xl border border-border bg-muted/40 p-4 md:sticky md:top-0">
+      <h3 id="skill-test" className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
+        <FlaskConical aria-hidden className="size-4 text-muted-foreground" />
+        Test it
+      </h3>
+      <Textarea
+        value={request}
+        onChange={(event) => setRequest(event.target.value)}
+        rows={3}
+        aria-label="A sample request"
+        placeholder="A request it should handle, e.g. My client got a 7-day quit notice for a yearly tenancy in Ikeja. Is it valid?"
+        className="bg-background text-[14px]"
+      />
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          disabled={!ready || !request.trim() || test.isPending}
+          onClick={() => test.mutate({ uuid, request: request.trim(), input })}
+        >
+          {test.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+          {test.isPending ? 'Running…' : 'Run test'}
+        </Button>
+        <span className="text-xs text-muted-foreground">Uses one message</span>
+      </div>
+      {test.isPending ? (
+        <p role="status" className="text-xs text-muted-foreground">
+          Lawexa is following your steps. This usually takes 10 to 30 seconds.
+        </p>
+      ) : failure ? (
+        <p role="alert" className="text-sm text-destructive">
+          {failure.message || 'The test did not run.'}
+        </p>
+      ) : test.data ? (
+        <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-background p-3 text-[14px]">
+          <MarkdownText content={test.data.answer} />
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">The answer shows here. Nothing is saved, and no chat is made.</p>
+      )}
+    </section>
   );
 }

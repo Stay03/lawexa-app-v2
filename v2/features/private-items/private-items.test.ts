@@ -49,7 +49,7 @@ test('the picker refuses what the server would, and names each refused file', ()
 test('a skill needs a name, one line and steps, within the server’s limits', () => {
   assert.deepEqual(skillProblems({ display_name: '', description: ' ', instructions: '' }), {
     display_name: 'Give the skill a name.',
-    description: 'Say in one line what the skill is for.',
+    description: 'Say when Lawexa should use it.',
     instructions: 'Write the steps Lawexa should follow.',
   });
   assert.deepEqual(skillProblems({ display_name: 'TEST DATA review', description: 'Checks a notice', instructions: '1. Read it.' }), {});

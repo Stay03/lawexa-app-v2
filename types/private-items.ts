@@ -38,8 +38,87 @@ export interface MyTemplate {
   /** How many blanks Lawexa marked (names, dates, amounts). */
   blanks_count: number | null;
   allowed_in: AllowedIn[];
+  /** Tags for the filters (Backend, 19 November 2026); null until set or read. */
+  document_type?: string | null;
+  practice_area?: string | null;
+  /** When Lawexa last drafted from it; null if never. */
+  last_used_at?: string | null;
+  /** Null until the person checks the blanks (any PUT .../blanks); a replaced file sets it back to null. */
+  blanks_checked_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** One stretch of a template's text: plain words, or a blank by name ("TENANT NAME"). */
+export type TemplateSegment = { type: 'text'; text: string } | { type: 'blank'; name: string };
+
+/** A blank, how often it appears, and up to three short snippets around it. */
+export interface TemplateBlank {
+  name: string;
+  count: number;
+  examples: string[];
+}
+
+/** GET /my/templates/{uuid}: the row, plus its text in segments and its blanks. */
+export interface MyTemplateDetail extends MyTemplate {
+  /** The text with blanks as [NAME], for copying. */
+  text: string;
+  segments: TemplateSegment[];
+  blanks: TemplateBlank[];
+  version: number;
+}
+
+/** GET my/templates/facets: the person's own types and areas, with how many templates have each. */
+export interface TemplateFacets {
+  document_types: { value: string; count: number }[];
+  practice_areas: { value: string; count: number }[];
+}
+
+export type TemplateSort = 'last_used' | 'name' | 'created';
+
+/** One change to a template's blanks, applied in order by PUT .../blanks. */
+export type BlankEdit =
+  | { op: 'rename'; from: string; to: string }
+  | { op: 'merge'; blanks: string[]; to: string }
+  /** `text` is what the blank becomes in the document; "" takes it out. */
+  | { op: 'remove'; blank: string; text: string }
+  /** Every occurrence of `passage` becomes [blank]. */
+  | { op: 'add'; passage: string; blank: string };
+
+/** A row of GET .../versions, newest first. */
+export interface ItemVersionRow {
+  version: number;
+  created_at: string;
+  by: { uuid: string; name: string } | null;
+  /** Templates only. */
+  blanks_count?: number | null;
+  file?: { original_name: string } | null;
+}
+
+/** GET my/templates/{uuid}/versions/{v}. */
+export interface TemplateVersion extends ItemVersionRow {
+  segments: TemplateSegment[];
+  blanks: TemplateBlank[];
+}
+
+/** GET my/skills/{uuid}/versions/{v}. */
+export interface SkillVersion extends ItemVersionRow {
+  display_name: string;
+  description: string;
+  instructions: string;
+  example_output: string | null;
+}
+
+/** POST my/skills/{uuid}/test: Lawexa's answer to the sample request; one message is charged. */
+export interface SkillTestResult {
+  answer: string;
+  charged: boolean;
+}
+
+/** An item the person picked with "Use in chat" (POST /chat `use_items`). */
+export interface UseItem {
+  kind: PrivateItemKind;
+  uuid: string;
 }
 
 /** A row of GET /organizations/{uuid}/templates: shared with every member, no grants. */
@@ -64,8 +143,14 @@ export interface MySkill {
   display_name: string;
   description: string;
   instructions: string;
+  /** An example of a good answer, which Lawexa matches; optional. */
+  example_output?: string | null;
+  /** Off: Lawexa never picks it. */
+  is_active?: boolean;
   version: number;
   allowed_in: AllowedIn[];
+  /** When Lawexa last loaded it; null if never. */
+  last_used_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -73,8 +158,11 @@ export interface MySkill {
 /** Create and edit body for a skill. */
 export interface MySkillInput {
   display_name: string;
+  /** The "When Lawexa uses it" line: Lawexa picks skills from this. */
   description: string;
   instructions: string;
+  example_output?: string | null;
+  is_active?: boolean;
 }
 
 export type PrivateItemKind = 'template' | 'skill';

@@ -64,7 +64,7 @@ export function skillProblems(input: MySkillInput): Partial<Record<keyof MySkill
   const instructions = input.instructions.trim();
   if (!name) problems.display_name = 'Give the skill a name.';
   else if (name.length > SKILL_LIMITS.display_name) problems.display_name = 'Keep the name to 255 characters or fewer.';
-  if (!description) problems.description = 'Say in one line what the skill is for.';
+  if (!description) problems.description = 'Say when Lawexa should use it.';
   else if (description.length > SKILL_LIMITS.description) problems.description = 'Keep this to 300 characters or fewer.';
   if (!instructions) problems.instructions = 'Write the steps Lawexa should follow.';
   else if (instructions.length > SKILL_LIMITS.instructions) problems.instructions = 'Keep the steps to 20,000 characters or fewer.';
