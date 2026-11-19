@@ -77,7 +77,7 @@ test('the card sits under the answer once its turn is over, and the engine can s
   const engine = readFileSync(join(here, 'engine.ts'), 'utf8');
   assert.match(engine, /if \(event\.skill_draft\) \{\s*setMessages\(\(msgs\) => withSkillDraftFromCompleted\(msgs, savedAnswerId, event\.skill_draft\)\);/);
   const card = readFileSync(join(here, '..', '..', 'features', 'conversations', 'conversation', 'skill-draft', 'SkillDraftCard.tsx'), 'utf8');
-  assert.match(card, /onSuccess: \(response\) => chat\?\.settleSkillDraft\(card\.draft, response\.data\.status\)/);
+  assert.match(card, /onSuccess: \(status\) => \{\s*chat\?\.settleSkillDraft\(card\.draft, status\);/);
   // The steps are asked for only when the card is opened.
   assert.match(card, /queryFn: \(\) => skillDraftsApi\.get\(card\.draft\),\s*enabled: open,/);
 });
