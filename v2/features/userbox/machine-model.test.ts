@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 
 import type { UserBoxStatus } from '@/types/user-box';
 import {
+  CARRIED_ON_LINE,
   clockAt,
+  FREED_CARD_LINE,
+  inUseCardState,
+  MACHINE_FREE_LINE,
+  machineFree,
+  noLongerInUseLine,
+  splitRelease,
   cursorPosition,
   handOverState,
   inUseLine,
@@ -213,3 +220,41 @@ test('the hand-over step offers "press Done" only while Lawexa waits for Done in
 test('until the status arrives the step offers only the plain way in', () => {
   assert.equal(handOverState(null, 'c-1'), 'unread');
 });
+
+/* Lucy's live test (20 November 2026) and Arthur's a: the machine with no chat
+ * using it reads "Not in use", a card whose chat no longer holds the machine
+ * loses its buttons, and freeing from a chat carries it on. */
+
+test('Lawexa has the machine but no chat uses it: the panel says it is free', () => {
+  assert.equal(machineFree({ control: 'lawexa', held_by: null }), true);
+  assert.equal(machineFree({ control: 'lawexa', held_by: { conversation_uuid: 'c-1', title: 'TEST DATA CAC' } }), false, 'a chat is using it');
+  assert.equal(machineFree({ control: 'user', held_by: null }), false, 'the person drives');
+  assert.equal(machineFree({ control: 'lawexa' }), false, 'a server before held_by keeps the old words');
+  assert.equal(machineFree(null), false);
+  assert.equal(MACHINE_FREE_LINE, 'The machine is free. Take over to use it yourself.');
+});
+
+test('the in-use card keeps its buttons only while the chat it names holds the machine', () => {
+  const holder = { conversation_uuid: 'c-1', title: 'TEST DATA CAC' };
+  assert.equal(inUseCardState({ held_by: holder }, 'c-1'), 'held');
+  assert.equal(inUseCardState({ held_by: null }, 'c-1'), 'freed', 'freed, Done or the 30-minute stop');
+  assert.equal(inUseCardState({ held_by: { conversation_uuid: 'c-2', title: 'TEST DATA other' } }, 'c-1'), 'freed', 'another chat has it now');
+  assert.equal(inUseCardState({}, 'c-1'), 'held', 'a server before held_by');
+  assert.equal(inUseCardState(null, 'c-1'), 'unread');
+});
+
+test('the card lines after freeing', () => {
+  assert.equal(CARRIED_ON_LINE, 'You freed the machine. Lawexa is carrying on.');
+  assert.equal(FREED_CARD_LINE, 'The machine is free. Send a message to carry on.');
+  assert.equal(noLongerInUseLine('TEST DATA CAC'), 'Lawexa’s machine is no longer in use in “TEST DATA CAC”.');
+});
+
+test("a release's answer splits into the machine for the read and the turn to follow", () => {
+  const box = { enabled: true, state: 'awake', control: 'lawexa', control_reason: null, hand_over_message: null, view: null, held_by: null } as const;
+  const carried = splitRelease({ ...box, resumed: true, execution_id: 'exec-1', conversation_uuid: 'c-2' });
+  assert.deepEqual(carried.resumedTurn, { executionId: 'exec-1', conversationUuid: 'c-2' });
+  assert.equal('resumed' in carried.status || 'execution_id' in carried.status, false, 'the read keeps only the machine');
+  assert.equal(splitRelease({ ...box, resumed: false }).resumedTurn, null, 'nothing to carry on');
+  assert.equal(splitRelease({ ...box, resumed: undefined }).resumedTurn, null, 'a release without a chat (a server before the option)');
+});
+

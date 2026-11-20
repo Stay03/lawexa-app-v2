@@ -61,6 +61,17 @@ export interface UserBoxDoneResult {
   conversation_uuid?: string;
 }
 
+/**
+ * `POST /api/user-box/release`: the machine, freed (Arthur's a, thread
+ * 38ad195b). Sent with the chat it was freed from, the server also continues
+ * that chat's turn the way Done continues a waiting chat (`resumed`).
+ */
+export type UserBoxReleaseResult = UserBoxStatus & {
+  resumed?: boolean;
+  execution_id?: string;
+  conversation_uuid?: string;
+};
+
 /** `users.{uuid}` → `.userbox.control`, when control moves. */
 export interface UserBoxControlEvent {
   control: UserBoxControl;

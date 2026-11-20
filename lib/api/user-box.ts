@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
-import type { UserBoxDoneResult, UserBoxStatus } from '@/types/user-box';
+import type { UserBoxDoneResult, UserBoxReleaseResult, UserBoxStatus } from '@/types/user-box';
 
 /**
  * Lawexa's machine (Userbox v1): the person's side, Researcher and above
@@ -38,10 +38,14 @@ export const userBoxApi = {
 
   /**
    * Free the machine from the chat that holds it (Arthur's 5, thread
-   * 38ad195b): 409 while that chat is mid-answer.
+   * 38ad195b): 409 while that chat is mid-answer. With the chat it was freed
+   * from, that chat carries on (Arthur's a, 20 November 2026).
    */
-  release: async (): Promise<ApiResponse<UserBoxStatus>> => {
-    const response = await apiClient.post<ApiResponse<UserBoxStatus>>('/user-box/release');
+  release: async (conversationUuid?: string): Promise<ApiResponse<UserBoxReleaseResult>> => {
+    const response = await apiClient.post<ApiResponse<UserBoxReleaseResult>>(
+      '/user-box/release',
+      conversationUuid ? { conversation_uuid: conversationUuid } : undefined,
+    );
     return response.data;
   },
 };

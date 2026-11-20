@@ -1,31 +1,57 @@
 'use client';
 
 import Link from 'next/link';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, Loader2, MessagesSquare, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { userBoxApi } from '@/lib/api/user-box';
 import { extractApiError } from '@/lib/utils/api-error';
+import { useV2ChatContext } from '@/v2/features/conversations/conversation/chat-context';
 import { useSidePanel } from '@/v2/features/conversations/conversation/side-panel/SidePanelContext';
-import { inUseLine } from './machine-model';
-import { landUserBox } from './queries';
+import { useV2Session } from '@/v2/runtime/session-context';
+import {
+  CARRIED_ON_LINE,
+  FREED_CARD_LINE,
+  inUseCardState,
+  inUseLine,
+  noLongerInUseLine,
+  splitRelease,
+} from './machine-model';
+import { landUserBox, userBoxQueries } from './queries';
 
 /**
  * Under an answer that met Lawexa's machine held by another chat (Arthur's 5,
  * thread 38ad195b; `metadata.machine_in_use`): which chat has it, a way there,
- * and "Free it and use it here". Freeing resumes nothing: the person then
- * sends a message here (Backend, 20 November 2026). A 409 means that chat is
- * still answering, and says so.
+ * and "Free it and use it here". Freeing carries this chat on (Arthur's a,
+ * 20 November 2026): the release names this chat, the server continues its
+ * turn the way Done continues a waiting chat, and the screen follows it. A 409
+ * means that chat is still answering, and says so.
+ *
+ * Once that chat no longer holds the machine (freed here or elsewhere, Done,
+ * the 30-minute stop) the card is a plain line with no buttons, after a
+ * reload too (Lucy's live test, 20 November 2026).
  */
 export function MachineInUseCard({ holder }: { holder: { conversation_uuid: string; title: string } }) {
   const queryClient = useQueryClient();
+  const session = useV2Session();
+  const chat = useV2ChatContext();
+  const box = useQuery(userBoxQueries.status({ viewerId: session.userId })).data ?? null;
+  const [carriedOn, setCarriedOn] = useState(false);
   const release = useMutation({
-    mutationFn: userBoxApi.release,
+    mutationFn: () => userBoxApi.release(chat?.conversationId),
     onSuccess: (answer) => {
-      if (answer.data) landUserBox(queryClient, answer.data);
-      toast.success('The machine is free. Send a message here to carry on.');
+      if (!answer.data) return;
+      const { status, resumedTurn } = splitRelease(answer.data);
+      landUserBox(queryClient, status);
+      if (resumedTurn && chat && (resumedTurn.conversationUuid ?? chat.conversationId) === chat.conversationId) {
+        setCarriedOn(true);
+        chat.followResumedTurn(resumedTurn.executionId);
+      } else {
+        toast.success(FREED_CARD_LINE);
+      }
     },
     onError: (error) =>
       toast.error(
@@ -35,6 +61,14 @@ export function MachineInUseCard({ holder }: { holder: { conversation_uuid: stri
       ),
     meta: { silentError: true },
   });
+  if (carriedOn || inUseCardState(box, holder.conversation_uuid) === 'freed') {
+    return (
+      <p className="mt-3 flex max-w-xl items-start gap-2 text-sm text-muted-foreground">
+        <Monitor aria-hidden className="mt-0.5 size-4 shrink-0" />
+        {carriedOn ? CARRIED_ON_LINE : noLongerInUseLine(holder.title)}
+      </p>
+    );
+  }
   return (
     <section
       aria-label="Lawexa’s machine is in use"

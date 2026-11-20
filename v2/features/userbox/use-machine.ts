@@ -8,7 +8,7 @@ import { userBoxApi } from '@/lib/api/user-box';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { UserBoxDoneResult } from '@/types/user-box';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { machineControl, machinePhase, viewRefreshIn, type MachineInputs } from './machine-model';
+import { machineControl, machinePhase, splitRelease, viewRefreshIn, type MachineInputs } from './machine-model';
 import { landUserBox, landUserBoxMode, userBoxQueries } from './queries';
 
 /**
@@ -56,9 +56,20 @@ export function useMachine({ onResumed }: { onResumed: (result: UserBoxDoneResul
     meta: { silentError: true },
   });
   const release = useMutation({
-    mutationFn: userBoxApi.release,
+    mutationFn: (conversationUuid: string | undefined) => userBoxApi.release(conversationUuid),
     onSuccess: (answer) => {
-      if (answer.data) landUserBox(queryClient, answer.data);
+      if (!answer.data) return;
+      // The chat it was freed from carries on (Arthur's a): follow that turn as after Done.
+      const { status, resumedTurn } = splitRelease(answer.data);
+      landUserBox(queryClient, status);
+      if (resumedTurn) {
+        onResumed({
+          control: 'lawexa',
+          resumed: true,
+          execution_id: resumedTurn.executionId,
+          conversation_uuid: resumedTurn.conversationUuid ?? undefined,
+        });
+      }
     },
     onError: (error) =>
       toast.error(
@@ -127,7 +138,8 @@ export function useMachine({ onResumed }: { onResumed: (result: UserBoxDoneResul
     wake: () => wake.mutate(),
     takeOver: () => takeOver.mutate(),
     done: () => done.mutate(),
-    release: () => release.mutate(),
+    /** Free the machine; with the chat it is freed from, that chat carries on. */
+    release: (conversationUuid?: string) => release.mutate(conversationUuid),
     busy: takeOver.isPending || done.isPending || release.isPending,
   };
 }

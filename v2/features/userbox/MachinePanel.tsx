@@ -10,6 +10,7 @@ import { ChatSidePanel } from '@/v2/features/conversations/conversation/side-pan
 import { HeldByNote, MachineControls } from './MachineControls';
 import { MachineFullScreen } from './MachineFullScreen';
 import { MachineScreen } from './MachineScreen';
+import { machineFree } from './machine-model';
 import { useMachine } from './use-machine';
 
 /**
@@ -36,9 +37,17 @@ export function MachinePanel({ onResumed }: { onResumed: (result: UserBoxDoneRes
   const { phase, control } = machine;
   const [full, setFull] = useState(false);
   const viewOnly = control?.who === 'lawexa';
+  // Lawexa has it, but no chat is using it (a reply ended, or a chat freed it).
+  const free = machineFree(machine.box);
 
   const subtitle =
-    phase.kind !== 'live' || !control ? null : control.who === 'lawexa' ? 'Lawexa is using it' : 'You are using it';
+    phase.kind !== 'live' || !control
+      ? null
+      : control.who === 'lawexa'
+        ? free
+          ? 'Not in use'
+          : 'Lawexa is using it'
+        : 'You are using it';
 
   const footer = phase.kind === 'live' && control ? <MachineControls machine={machine} /> : undefined;
 
@@ -58,7 +67,7 @@ export function MachinePanel({ onResumed }: { onResumed: (result: UserBoxDoneRes
       footer={footer}
     >
       {full && machine.viewUrl ? (
-        <MachineFullScreen machine={machine} url={machine.viewUrl} viewOnly={viewOnly} onClose={() => setFull(false)} />
+        <MachineFullScreen machine={machine} url={machine.viewUrl} viewOnly={viewOnly} free={free} onClose={() => setFull(false)} />
       ) : null}
       <div className="p-4 xl:p-5">
         {phase.kind === 'loading' ? (
@@ -98,7 +107,7 @@ export function MachinePanel({ onResumed }: { onResumed: (result: UserBoxDoneRes
                 Showing full screen
               </p>
             ) : (
-              <MachineScreen url={machine.viewUrl} onLost={machine.reread} onMode={machine.noteMode} viewOnly={viewOnly} />
+              <MachineScreen url={machine.viewUrl} onLost={machine.reread} onMode={machine.noteMode} viewOnly={viewOnly} free={free} />
             )}
           </>
         ) : (

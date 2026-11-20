@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { UserBoxHolder } from '@/types/user-box';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
-import { inUseLine, waitingLine, YOU_HAVE_THE_MACHINE } from './machine-model';
+import { inUseLine, MACHINE_FREE_LINE, machineFree, waitingLine, YOU_HAVE_THE_MACHINE } from './machine-model';
 import type { useMachine } from './use-machine';
 
 type Machine = ReturnType<typeof useMachine>;
@@ -29,7 +29,9 @@ export function MachineControls({ machine, compact = false }: { machine: Machine
     return (
       <div className="flex w-full items-center justify-between gap-3">
         <p className={cn('min-w-0 text-xs text-muted-foreground', compact && 'max-sm:sr-only')}>
-          Lawexa is using the machine. The screen is view-only until you take over.
+          {machineFree(machine.box)
+            ? MACHINE_FREE_LINE
+            : 'Lawexa is using the machine. The screen is view-only until you take over.'}
         </p>
         <Button type="button" size="sm" className="shrink-0 gap-1.5" disabled={machine.busy} onClick={machine.takeOver}>
           <Hand aria-hidden className="size-4" />
@@ -69,9 +71,18 @@ export function MachineControls({ machine, compact = false }: { machine: Machine
 
 /**
  * Over the screen, when another chat holds the machine (Arthur's 5: one chat
- * at a time): which chat, a way there, and "Free it" to use it here.
+ * at a time): which chat, a way there, and "Free it" to use it here. Freeing
+ * from a chat carries that chat on (Arthur's a, 20 November 2026).
  */
-export function HeldByNote({ holder, onRelease, busy }: { holder: UserBoxHolder | null; onRelease: () => void; busy: boolean }) {
+export function HeldByNote({
+  holder,
+  onRelease,
+  busy,
+}: {
+  holder: UserBoxHolder | null;
+  onRelease: (conversationUuid?: string) => void;
+  busy: boolean;
+}) {
   const params = useParams<{ conversationId?: string }>();
   // The chat that holds the machine sees no note about itself.
   if (!holder || holder.conversation_uuid === params?.conversationId) return null;
@@ -85,7 +96,7 @@ export function HeldByNote({ holder, onRelease, busy }: { holder: UserBoxHolder 
             Open that chat
           </Link>
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={onRelease}>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => onRelease(params?.conversationId)}>
           Free it and use it here
         </Button>
       </div>

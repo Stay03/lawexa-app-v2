@@ -20,14 +20,17 @@ export function MachineFullScreen({
   machine,
   url,
   viewOnly,
+  free,
   onClose,
 }: {
   machine: ReturnType<typeof useMachine>;
   url: string;
   viewOnly: boolean;
+  /** Lawexa has it and no chat is using it. */
+  free: boolean;
   onClose: () => void;
 }) {
-  const who = machine.control?.who === 'you' ? 'You are using it' : 'Lawexa is using it';
+  const who = machine.control?.who === 'you' ? 'You are using it' : free ? 'Not in use' : 'Lawexa is using it';
   return (
     <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
       <DialogContent
@@ -57,6 +60,7 @@ export function MachineFullScreen({
             onLost={machine.reread}
             onMode={machine.noteMode}
             viewOnly={viewOnly}
+            free={free}
             className="w-full max-w-[calc((100dvh-9rem)*1.6)]"
           />
         </div>

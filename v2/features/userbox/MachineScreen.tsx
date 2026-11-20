@@ -33,6 +33,7 @@ export function MachineScreen({
   onLost,
   onMode,
   viewOnly = false,
+  free = false,
   className,
 }: {
   url: string;
@@ -46,6 +47,8 @@ export function MachineScreen({
    * never takes it from Lawexa; "Take over" is the one way to use it.
    */
   viewOnly?: boolean;
+  /** Lawexa has the machine but no chat is using it: the badge says so, not "while Lawexa works". */
+  free?: boolean;
   /** The frame's box (full screen sizes it to the window). */
   className?: string;
 }) {
@@ -161,7 +164,9 @@ export function MachineScreen({
           tabIndex={0}
           aria-label={
             viewOnly
-              ? 'Lawexa’s machine, view only while Lawexa works. Press Take over to use it.'
+              ? free
+                ? 'Lawexa’s machine, not in use and view only. Press Take over to use it.'
+                : 'Lawexa’s machine, view only while Lawexa works. Press Take over to use it.'
               : 'Lawexa’s machine. Click to use it; while it has focus your keys go to it.'
           }
           className={cn('block aspect-[16/10] h-auto w-full touch-none outline-none', viewOnly ? 'cursor-not-allowed' : 'cursor-default', FOCUS_RING)}
@@ -208,7 +213,7 @@ export function MachineScreen({
         {viewOnly && hasPicture && status === 'open' ? (
           <span className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-md bg-foreground/70 px-2 py-1 text-[11px] font-medium text-background">
             <Eye aria-hidden className="size-3" />
-            View only while Lawexa works
+            {free ? 'View only until you take over' : 'View only while Lawexa works'}
           </span>
         ) : null}
 

@@ -243,3 +243,59 @@ export function handOverState(
   if (box.held_by && conversationUuid && box.held_by.conversation_uuid !== conversationUuid) return 'over';
   return 'waiting';
 }
+
+/** The footer's line when no chat holds the machine (Lucy's live test, 20 November 2026). */
+export const MACHINE_FREE_LINE = 'The machine is free. Take over to use it yourself.';
+
+/** Freed, with nothing to carry on (the person already wrote again there). */
+export const FREED_CARD_LINE = 'The machine is free. Send a message to carry on.';
+
+/** The in-use card once its button freed the machine and Lawexa carries on (Arthur's a). */
+export const CARRIED_ON_LINE = 'You freed the machine. Lawexa is carrying on.';
+
+/** The in-use card once the chat it named no longer holds the machine, after a reload too. */
+export function noLongerInUseLine(title: string): string {
+  return `Lawexa’s machine is no longer in use in “${title}”.`;
+}
+
+/**
+ * A release's answer, split: the machine for the read, and whether a chat
+ * carries on (and which turn to follow).
+ */
+export function splitRelease<T extends { resumed?: boolean; execution_id?: string; conversation_uuid?: string }>(
+  answer: T,
+): { status: Omit<T, 'resumed' | 'execution_id' | 'conversation_uuid'>; resumedTurn: { executionId: string; conversationUuid: string | null } | null } {
+  const { resumed, execution_id: executionId, conversation_uuid: conversationUuid, ...status } = answer;
+  return {
+    status,
+    resumedTurn: resumed && executionId ? { executionId, conversationUuid: conversationUuid ?? null } : null,
+  };
+}
+
+/**
+ * Lawexa has the machine but no chat is using it: a reply ended, or a chat
+ * freed it. The panel then says "Not in use" instead of "Lawexa is using it".
+ * A server before `held_by` (absent) keeps the old words.
+ */
+export function machineFree(box: Pick<UserBoxStatus, 'control' | 'held_by'> | null): boolean {
+  return box !== null && box.control !== 'user' && box.held_by === null;
+}
+
+/**
+ * What the in-use card under an answer offers (thread 38ad195b):
+ * - `held`: the chat it names still holds the machine, so "Open that chat" and
+ *   "Free it and use it here";
+ * - `freed`: that chat no longer holds it (freed here or elsewhere, Done, the
+ *   30-minute stop), so a plain line and no buttons, after a reload too;
+ * - `unread`: the status has not arrived; the card shows as the answer saved it.
+ * A server before `held_by` (absent) is trusted to still hold it.
+ */
+export function inUseCardState(
+  box: Pick<UserBoxStatus, 'held_by'> | null,
+  holderUuid: string,
+): 'held' | 'freed' | 'unread' {
+  if (!box) return 'unread';
+  if (box.held_by === undefined) return 'held';
+  return box.held_by?.conversation_uuid === holderUuid ? 'held' : 'freed';
+}
+
