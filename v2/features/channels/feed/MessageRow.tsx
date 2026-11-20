@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatFullTimestamp, formatMessageTime } from '@/lib/utils/collab';
+import { sendsOnEnter } from '@/lib/utils/enter-key';
 import type {
   Message,
   MessageAttachment,
@@ -813,16 +814,10 @@ function MessageEditBox({
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
-          // Enter during IME composition confirms the composition, never the
-          // save (audit M5 — CJK input).
-          if (
-            event.key === 'Enter' &&
-            !event.shiftKey &&
-            !event.nativeEvent.isComposing
-          ) {
-            event.preventDefault();
-            saveEdit();
-          }
+          // The app's one Enter rule (lib/utils/enter-key.ts): a keyboard's
+          // Enter saves; a phone's return adds a line and Save saves. Enter
+          // during IME composition confirms the word, never the save (audit M5).
+          if (sendsOnEnter(event)) saveEdit();
           if (event.key === 'Escape') {
             event.preventDefault();
             actions.onCloseEdit();
