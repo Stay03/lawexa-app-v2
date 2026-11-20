@@ -30,9 +30,9 @@ export function useUniversitySearch(search: string, countryCode?: string) {
 export function useUniversitiesByCountry(countryCode?: string) {
   return useQuery({
     queryKey: ['universities', 'byCountry', countryCode],
-    queryFn: () => universityApi.getAll({
+    // Every page: one page of 100 stopped Nigeria's list at the letter T.
+    queryFn: () => universityApi.getEveryPage({
       country_code: countryCode,
-      per_page: 100,
       sort: 'name',
       order: 'asc',
     }),

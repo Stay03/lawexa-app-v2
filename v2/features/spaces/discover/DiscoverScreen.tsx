@@ -1,25 +1,19 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Check, Compass, Loader2, Search, Users } from 'lucide-react';
-import { isAxiosError } from 'axios';
+import { Compass, Search, Users } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SpaceCrest } from '@/v2/features/collab/kit/Crest';
-import { useV2Session } from '@/v2/runtime/session-context';
+import { CollabFailure } from '@/v2/features/collab/kit/CollabFailure';
+import { useServerSearch } from '@/v2/features/spaces/use-server-search';
+import { useInfiniteScrollSentinel } from '@/v2/shell/use-infinite-scroll';
 import type { DiscoverableSpace } from '@/types/collab';
-import {
-  useCancelJoinRequest,
-  useDiscoverSpaces,
-  useJoinPublicSpace,
-} from '@/v2/features/invites/queries';
-import { spaceLimitOf } from '@/lib/utils/space-limit';
-import { PlansLink } from '@/v2/features/files/PlansLink';
-import { CANCEL_FAILED, discoverAction, joinErrorCode, joinOpensSpace, joinRefusal, type Refusal } from './discover-model';
+import { useDiscoverSpaces } from '@/v2/features/invites/queries';
+import { discoverRows } from './discover-model';
+import { SpaceJoinAction } from './SpaceJoinAction';
 
 /**
  * DiscoverScreen — the public spaces anybody can find, and the way in.
@@ -45,47 +39,26 @@ import { CANCEL_FAILED, discoverAction, joinErrorCode, joinOpensSpace, joinRefus
  */
 
 function SpaceRow({ space }: { space: DiscoverableSpace }) {
-  const router = useRouter();
-  const join = useJoinPublicSpace();
-  const cancel = useCancelJoinRequest();
-  const [refusal, setRefusal] = useState<Refusal | null>(null);
-  const action = discoverAction(space);
-  // A guest pass is signed in too; it is not an account.
-  const { signedIn, role } = useV2Session();
-  const hasAccount = signedIn && role !== 'guest' && role !== 'bot';
-
-  const cancelRequest = () => {
-    setRefusal(null);
-    cancel.mutate(space.uuid, { onError: () => setRefusal(CANCEL_FAILED) });
-  };
-
-  const press = () => {
-    setRefusal(null);
-    join.mutate(space.uuid, {
-      // A request (someone the Owner removed or turned down) stays here: the
-      // list is read again and the card shows "Request sent".
-      onSuccess: (outcome) => {
-        if (outcome === 'joined') router.push(`/spaces/${space.uuid}`);
-      },
-      onError: (error) => {
-        const response = isAxiosError<{ message?: string }>(error) ? error.response : undefined;
-        if (joinOpensSpace(response?.status, joinErrorCode(response?.data))) router.push(`/spaces/${space.uuid}`);
-        else setRefusal(joinRefusal(response?.status, hasAccount, response?.data?.message, spaceLimitOf(response?.status, response?.data)));
-      },
-    });
-  };
-
   return (
     // ONE GRID, TWO SHAPES (techlead, 15 October 2026): on a phone the action
     // runs full width under the text, where a thumb is; from `md:` it sits at
     // its own size on the right of the title row, so a 640px card does not
     // carry a bar across its whole width.
     <li className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-xl border border-border/60 p-4 md:grid-cols-[auto_minmax(0,1fr)_auto]">
-      <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="md" />
+      {/* The crest and the name open the Space (Lucy's walk, 16 November 2026):
+          a member lands in it, anyone else on its page with the way in. The
+          crest is the same link for a pointer only; the name is the one a
+          keyboard and a screen reader meet. */}
+      <Link href={`/spaces/${space.uuid}`} tabIndex={-1} aria-hidden className="self-start">
+        <SpaceCrest uuid={space.uuid} name={space.name} type={space.type} size="md" />
+      </Link>
       <div className="min-w-0">
-        <p className="truncate text-[15px] font-semibold text-foreground">
+        <Link
+          href={`/spaces/${space.uuid}`}
+          className="block truncate rounded-sm text-[15px] font-semibold text-foreground underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
           {space.name}
-        </p>
+        </Link>
         <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           <Users aria-hidden className="size-3.5 shrink-0" />
           <span className="truncate">
@@ -101,69 +74,7 @@ function SpaceRow({ space }: { space: DiscoverableSpace }) {
         ) : null}
       </div>
 
-      <div className="col-span-2 mt-3 md:col-span-1 md:mt-0 md:self-start">
-        {action === 'open' ? (
-          <Button asChild variant="outline" size="sm" className="w-full md:w-auto">
-            <Link href={`/spaces/${space.uuid}`}>Open</Link>
-          </Button>
-        ) : action === 'pending' ? (
-          // One row: what happened on the left, the way to take it back on the
-          // right. The helper line is the phone's; on desktop the row is short.
-          <div className="flex items-center justify-between gap-3 rounded-lg bg-secondary/60 py-1.5 pr-1 pl-3 md:gap-2 md:bg-transparent md:p-0">
-            <span className="flex min-w-0 flex-col">
-              <span className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                <Check aria-hidden className="size-4 shrink-0 text-primary" />
-                Request sent
-              </span>
-              <span className="truncate text-xs text-muted-foreground md:hidden">
-                The owner will let you in.
-              </span>
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="v2-interactive shrink-0"
-              disabled={cancel.isPending}
-              onClick={cancelRequest}
-            >
-              {cancel.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
-              Cancel request
-            </Button>
-          </div>
-        ) : (
-          <Button
-            size="sm"
-            className="w-full md:w-auto"
-            disabled={join.isPending}
-            onClick={press}
-          >
-            {join.isPending ? (
-              <Loader2 aria-hidden className="size-4 animate-spin" />
-            ) : null}
-            Join
-          </Button>
-        )}
-        {refusal ? (
-          <p role="alert" className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            {refusal.text}
-            {refusal.offerAccount ? (
-              <>
-                {' '}
-                <Link href="/register" className="font-medium text-primary underline">
-                  Create an account
-                </Link>
-              </>
-            ) : null}
-            {refusal.offerPlans ? (
-              <>
-                {' '}
-                <PlansLink className="text-primary" />
-              </>
-            ) : null}
-          </p>
-        ) : null}
-      </div>
+      <SpaceJoinAction space={space} className="col-span-2 mt-3 md:col-span-1 md:mt-0 md:self-start" />
     </li>
   );
 }
@@ -261,7 +172,7 @@ export function DiscoverFallback() {
           <Input
             readOnly
             value=""
-            placeholder="Search by name"
+            placeholder="Search by name or description"
             className="pl-9"
             aria-label="Search public spaces"
           />
@@ -284,43 +195,78 @@ export function DiscoverScreen() {
 }
 
 function DiscoverBody() {
-  const [term, setTerm] = useState('');
-  const query = useDiscoverSpaces({ search: term.trim() || undefined });
-  const rows = query.data?.data ?? [];
+  // The server searches (names and descriptions), 300ms after the last keystroke.
+  const search = useServerSearch();
+  const term = search.term;
+  const query = useDiscoverSpaces({ search: term || undefined });
+  const rows = discoverRows(query.data?.pages);
+
+  // Past the first 20 the next page loads as the list's end scrolls near
+  // (Lucy's walk, 16 November 2026). Measured against the pane the page
+  // scrolls in, found from the list's own element; the viewport when none.
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const paneRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    paneRef.current = anchorRef.current?.closest<HTMLElement>('[data-v2-scroller]') ?? null;
+    return () => {
+      paneRef.current = null;
+    };
+  }, []);
+  const { fetchNextPage, refetch } = query;
+  const sentinelRef = useInfiniteScrollSentinel<HTMLDivElement>({
+    // A failed page is not retried by scrolling; its strip carries the retry.
+    hasNextPage: query.hasNextPage && !query.isFetchNextPageError,
+    isFetchingNextPage: query.isFetchingNextPage,
+    fetchNextPage,
+    rootRef: paneRef,
+    rootMargin: '320px',
+  });
 
   return (
     <DiscoverFrame
       search={
         <Input
-          value={term}
-          onChange={(event) => setTerm(event.target.value)}
-          placeholder="Search by name"
+          value={search.value}
+          onChange={(event) => search.setValue(event.target.value)}
+          placeholder="Search by name or description"
           className="pl-9"
           aria-label="Search public spaces"
         />
       }
     >
-      <>
+      <div ref={anchorRef}>
         {query.isPending ? (
           <DiscoverRowsFallback />
-        ) : query.isError ? (
+        ) : query.isError && rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
             Couldn&rsquo;t load spaces. Check your connection and try again.
           </p>
         ) : rows.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted-foreground">
-            {term.trim()
-              ? `Nothing matches “${term.trim()}”.`
-              : 'There are no public spaces yet.'}
+            {term ? `Nothing matches “${term}”.` : 'There are no public spaces yet.'}
           </p>
         ) : (
-          <ul className="space-y-3">
-            {rows.map((space) => (
-              <SpaceRow key={space.uuid} space={space} />
-            ))}
-          </ul>
+          <>
+            <ul className="space-y-3">
+              {rows.map((space) => (
+                <SpaceRow key={space.uuid} space={space} />
+              ))}
+            </ul>
+            <div ref={sentinelRef} className="pt-3">
+              {query.isFetchingNextPage ? (
+                <Skeleton aria-hidden className="h-28 w-full rounded-xl motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200" />
+              ) : null}
+            </div>
+            {query.isError ? (
+              <CollabFailure
+                className="mt-2"
+                message="Couldn’t load more spaces."
+                onRetry={() => void (query.isFetchNextPageError ? fetchNextPage() : refetch())}
+              />
+            ) : null}
+          </>
         )}
-      </>
+      </div>
     </DiscoverFrame>
   );
 }

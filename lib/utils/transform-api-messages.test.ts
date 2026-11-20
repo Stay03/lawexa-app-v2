@@ -44,3 +44,30 @@ test('the answer row labels a Radar report in grey, above the text', () => {
   assert.match(row, /const radarReport = \(message as ChatMessage\)\.kind === 'radar_report';/);
   assert.match(row, /\{radarReport && \(\s*<div className="mb-1\.5 flex items-center gap-1\.5 text-xs font-medium text-muted-foreground">\s*<Radar aria-hidden className="h-3\.5 w-3\.5" \/>\s*<span>Radar report<\/span>/);
 });
+
+/* Lawexa's machine (thread 38ad195b): an answer that met the machine held by
+ * another chat, and Lawexa's message when it stopped waiting. */
+
+test('an answer that met the machine in use carries the chat that holds it', () => {
+  const holder = { conversation_uuid: 'c-9', title: 'TEST DATA CAC annual return' };
+  const rows = transformApiMessages([
+    message(1, 'user', 'TEST DATA. Check Palmline Foods on CAC.'),
+    message(2, 'assistant', 'TEST DATA. Another chat is using my machine.', { machine_in_use: { held_by: holder } }),
+  ]);
+  assert.deepEqual((rows[1] as ChatMessage).machineInUse, holder);
+  assert.equal((rows[0] as ChatMessage).machineInUse, undefined);
+});
+
+test('Lawexa’s stopped-waiting message is drawn as its own marked row', () => {
+  const text = 'Lawexa stopped waiting for you on its machine. Send a message to carry on.';
+  const rows = transformApiMessages([
+    message(1, 'user', 'TEST DATA. File the annual return.'),
+    message(2, 'assistant', 'TEST DATA. Sign in, then press Done.'),
+    message(3, 'assistant', text, { type: 'machine_wait_ended' }),
+  ]);
+  const last = rows[rows.length - 1] as ChatMessage;
+  assert.equal(last.id, 'msg_3');
+  assert.equal(last.content, text);
+  assert.equal(last.machineWaitEnded, true);
+  assert.equal((rows[1] as ChatMessage).machineWaitEnded, undefined);
+});

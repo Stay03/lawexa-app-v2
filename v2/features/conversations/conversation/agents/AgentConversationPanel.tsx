@@ -22,6 +22,7 @@ import { formatToolMessage } from '../tools/ToolStepItem';
 import { agentConversationTopic, agentTranscriptRows, type AgentStepCall, type AgentTranscriptRow } from './agent-transcript';
 import { agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
+import { sendsOnEnter } from '@/lib/utils/enter-key';
 
 /**
  * AgentConversationPanel — an agent conversation beside the chat (sub-agents
@@ -231,11 +232,9 @@ function AgentComposer({ conversation, running, onSent }: { conversation: AgentC
     send.mutate(message);
   };
 
+  // The app's one Enter rule (lib/utils/enter-key.ts): on a phone, return adds a line and the send button sends.
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      submit();
-    }
+    if (sendsOnEnter(event)) submit();
   };
 
   const stop = () => {

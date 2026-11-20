@@ -37,7 +37,7 @@ test("Discover's Join at a Space limit says the server's sentence, with the plan
   assert.deepEqual(joinRefusal(403, true, SPACES, limit), { text: SPACES, offerAccount: false, offerPlans: true });
   // Any other 403 reads as before.
   assert.equal(joinRefusal(403, true, 'x', null).text, "This space doesn't let your account join.");
-  const screen = read('v2', 'features', 'spaces', 'discover', 'DiscoverScreen.tsx');
+  const screen = read('v2', 'features', 'spaces', 'discover', 'SpaceJoinAction.tsx');
   assert.match(screen, /joinRefusal\(response\?\.status, hasAccount, response\?\.data\?\.message, spaceLimitOf\(response\?\.status, response\?\.data\)\)/);
   assert.match(screen, /\{refusal\.offerPlans \? \(/);
 });

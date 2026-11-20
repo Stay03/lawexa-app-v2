@@ -1,5 +1,6 @@
 import type { SpaceLimit } from '@/lib/utils/space-limit';
 import type { DiscoverableSpace } from '@/types/collab';
+import type { PaginationMeta } from '@/types/case';
 
 /**
  * discover-model — what a Discover card offers the reader (public Spaces,
@@ -17,6 +18,34 @@ import type { DiscoverableSpace } from '@/types/collab';
  * it is absent.
  */
 export type DiscoverAction = 'open' | 'pending' | 'join';
+
+/** Rows per page of Discover (the server's default, asked for by name). */
+export const DISCOVER_PER_PAGE = 20;
+
+/** The page after `last`, or undefined at the end (or when the server sends no pagination). */
+export function nextDiscoverPage(last: { pagination?: Pick<PaginationMeta, 'current_page' | 'last_page'> | null }): number | undefined {
+  const page = last.pagination;
+  if (!page) return undefined;
+  return page.current_page < page.last_page ? page.current_page + 1 : undefined;
+}
+
+/**
+ * Every loaded page's rows, once each. A join or a new Space between two page
+ * reads shifts the server's order, so a row can arrive on two pages; it is
+ * kept where it first appeared.
+ */
+export function discoverRows(pages: readonly { data: readonly DiscoverableSpace[] }[] | undefined): DiscoverableSpace[] {
+  const seen = new Set<string>();
+  const rows: DiscoverableSpace[] = [];
+  for (const page of pages ?? []) {
+    for (const space of page.data) {
+      if (seen.has(space.uuid)) continue;
+      seen.add(space.uuid);
+      rows.push(space);
+    }
+  }
+  return rows;
+}
 
 export function discoverAction(space: Pick<DiscoverableSpace, 'kind' | 'my_status' | 'is_member'>): DiscoverAction {
   if (space.my_status === 'member' || (space.my_status === undefined && space.is_member === true)) {
@@ -77,4 +106,15 @@ export function joinRefusal(status: number | undefined, hasAccount: boolean, mes
       : { text: 'You need a Lawexa account to join. You can keep reading without one.', offerAccount: true };
   }
   return { text: "That didn't work. Try again in a moment.", offerAccount: false };
+}
+
+/**
+ * Whether the Space detail is a public Space's card for a reader not in it
+ * (Lucy's walk, 16 November 2026; Backend's shape): no role, and the reader's
+ * `my_status` key, which only that card carries. A member's Space, and a
+ * platform admin's view of one they are not in, never carry `my_status`, so
+ * neither is ever mistaken for the card.
+ */
+export function isSpacePreview(space: { my_role?: unknown; my_status?: unknown }): boolean {
+  return space.my_role == null && space.my_status !== undefined;
 }

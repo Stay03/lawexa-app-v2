@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 
 import type { UserBoxStatus } from '@/types/user-box';
 import {
+  clockAt,
   cursorPosition,
+  handOverState,
+  inUseLine,
+  waitingLine,
   HAND_OVER_FALLBACK,
   isBoxTool,
   machineControl,
@@ -153,7 +157,59 @@ test('while the person has the machine, the panel says a message gives it back, 
   assert.equal(HAND_OVER_FALLBACK, 'Lawexa needs you to do this part. When you have finished, tell Lawexa or press Done.');
   const { readFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const panel = readFileSync(join(process.cwd(), 'v2', 'features', 'userbox', 'MachinePanel.tsx'), 'utf8');
+  // The panel's footer and the full-screen bar share these words (MachineControls, thread 38ad195b).
+  const panel = readFileSync(join(process.cwd(), 'v2', 'features', 'userbox', 'MachineControls.tsx'), 'utf8');
   assert.match(panel, /\{control\.reason === 'hand_over' \? control\.message : YOU_HAVE_THE_MACHINE\}/);
   assert.doesNotMatch(panel, /Press Done to give it back to Lawexa/);
+});
+
+/* The hand-over wait (Arthur's 3, thread 38ad195b): calm until the 10-minute
+ * reminder, stronger after it, nothing once Lawexa stops waiting. */
+
+const WAIT = { since: '2026-11-20T10:00:00Z', remind_at: '2026-11-20T10:10:00Z', stops_at: '2026-11-20T10:30:00Z' };
+const local = (iso: string) =>
+  new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).format(Date.parse(iso));
+
+test('clockAt writes a time as "10:30 am", and an unreadable time as nothing', () => {
+  assert.equal(clockAt(WAIT.stops_at), local(WAIT.stops_at));
+  assert.match(clockAt(WAIT.stops_at), /^\d{1,2}:\d{2}\s?(am|pm)$/);
+  assert.equal(clockAt('not a time'), '');
+});
+
+test('before the reminder the wait line is calm and names when Lawexa stops', () => {
+  const line = waitingLine(WAIT, Date.parse('2026-11-20T10:04:00Z'));
+  assert.deepEqual(line, { tone: 'calm', text: `Lawexa waits for you until ${local(WAIT.stops_at)}.` });
+});
+
+test('from the reminder on, the line says Lawexa has waited 10 minutes', () => {
+  for (const at of ['2026-11-20T10:10:00Z', '2026-11-20T10:25:00Z']) {
+    assert.deepEqual(waitingLine(WAIT, Date.parse(at)), {
+      tone: 'reminded',
+      text: `Lawexa has waited 10 minutes. It stops waiting at ${local(WAIT.stops_at)}.`,
+    });
+  }
+});
+
+test('no wait, or a wait with an unreadable stop time, shows no line', () => {
+  assert.equal(waitingLine(null, Date.now()), null);
+  assert.equal(waitingLine(undefined, Date.now()), null);
+  assert.equal(waitingLine({ ...WAIT, stops_at: '' }, Date.now()), null);
+});
+
+test('the in-use line names the chat that holds the machine (Arthur’s 5)', () => {
+  assert.equal(inUseLine('TEST DATA CAC annual return'), 'Lawexa’s machine is in use in “TEST DATA CAC annual return”. Finish there, or free it here.');
+});
+
+test('the hand-over step offers "press Done" only while Lawexa waits for Done in this chat', () => {
+  const waiting = { control: 'user', control_reason: 'hand_over', held_by: { conversation_uuid: 'c-1', title: 'TEST DATA CAC' } } as const;
+  assert.equal(handOverState(waiting, 'c-1'), 'waiting');
+  assert.equal(handOverState({ ...waiting, held_by: undefined }, 'c-1'), 'waiting', 'a server before held_by');
+  assert.equal(handOverState(waiting, null), 'waiting', 'a route without the chat id');
+  assert.equal(handOverState(waiting, 'c-2'), 'over', 'another chat waits for Done');
+  assert.equal(handOverState({ control: 'lawexa', control_reason: null, held_by: null }, 'c-1'), 'over', 'Done, a message or the 30-minute stop');
+  assert.equal(handOverState({ control: 'user', control_reason: 'user_acted', held_by: null }, 'c-1'), 'over', 'the person took over themselves');
+});
+
+test('until the status arrives the step offers only the plain way in', () => {
+  assert.equal(handOverState(null, 'c-1'), 'unread');
 });

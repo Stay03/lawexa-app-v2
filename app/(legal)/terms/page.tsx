@@ -13,7 +13,7 @@ export default function TermsOfServicePage() {
     <article className="prose prose-neutral dark:prose-invert max-w-none prose-headings:scroll-mt-20 prose-h1:tracking-tight prose-h2:tracking-tight prose-a:text-primary hover:prose-a:underline">
       <h1>Lawexa Terms of Service</h1>
       <p className="text-sm text-muted-foreground">
-        Last modified: August 29, 2024
+        Last modified: November 18, 2026
       </p>
 
       <h2>Acceptance of Terms of Service</h2>
@@ -309,6 +309,15 @@ export default function TermsOfServicePage() {
           maintain current billing information with Lawexa.
         </li>
       </ul>
+      {/* Fair use on unlimited plans (Arthur's wording B, 18 November 2026,
+          thread dfa0d9b8). */}
+      <p>
+        Plans with unlimited messages are for normal personal or professional
+        use. If an account&rsquo;s use is far above what is usual for its
+        plan, we may slow its responses so Lawexa stays fast for everyone. We
+        will tell the account holder before we do, we will not charge extra
+        for it, and the plan keeps its unlimited messages.
+      </p>
 
       <h2>Payment Obligations:</h2>
       <ul>

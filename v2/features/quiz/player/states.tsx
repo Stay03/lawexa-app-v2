@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Flag, Sparkles } from 'lucide-react';
+import { Flag, Hourglass } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -82,7 +82,7 @@ export function PlayerSkeleton() {
 export function ColdStartState() {
   return (
     <QuizMessage
-      icon={Sparkles}
+      icon={Hourglass}
       tone="accent"
       title="Your question bank is warming up"
       description="We turn study conversations into practice questions overnight. There is nothing to answer just yet. Check back soon."

@@ -10,7 +10,7 @@ import {
   Loader2,
   ReceiptText,
   RotateCw,
-  Sparkles,
+  Package,
   TriangleAlert,
   XCircle,
 } from 'lucide-react';
@@ -90,7 +90,7 @@ export function BillingScreen() {
     cancelKind === 'trial'
       ? formatBillingDate(trial.data?.trial_ends_at)
       : formatBillingDate(data.subscription?.ends_at ?? data.subscription?.next_payment_date);
-  const PlanIcon = summary.isFree ? Sparkles : Crown;
+  const PlanIcon = summary.isFree ? Package : Crown;
 
   return (
     <div className={SETTINGS_COLUMN}>

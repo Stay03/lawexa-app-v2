@@ -187,7 +187,59 @@ export function viewRefreshIn(expiresAt: string | null | undefined, now: number)
   return Math.max(0, at - VIEW_REFRESH_LEAD_MS - now);
 }
 
+const CLOCK = new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+/** "11:12 am" for an ISO time, or '' when it cannot be read. */
+export function clockAt(iso: string): string {
+  const time = Date.parse(iso);
+  return Number.isNaN(time) ? '' : CLOCK.format(time);
+}
+
+/**
+ * What the panel says while Lawexa waits for the person after a hand-over
+ * (Arthur's 3, thread 38ad195b): calm before the 10-minute reminder, a
+ * stronger line after it. Null when Lawexa is not waiting.
+ */
+export function waitingLine(
+  waiting: { remind_at: string; stops_at: string } | null | undefined,
+  now: number,
+): { tone: 'calm' | 'reminded'; text: string } | null {
+  if (!waiting) return null;
+  const stops = clockAt(waiting.stops_at);
+  if (!stops) return null;
+  if (now >= Date.parse(waiting.remind_at)) {
+    return { tone: 'reminded', text: `Lawexa has waited 10 minutes. It stops waiting at ${stops}.` };
+  }
+  return { tone: 'calm', text: `Lawexa waits for you until ${stops}.` };
+}
+
+/** The line on a chat whose answer needs the machine while another chat holds it (Arthur's 5). */
+export function inUseLine(title: string): string {
+  return `Lawexa’s machine is in use in “${title}”. Finish there, or free it here.`;
+}
+
 /** A tool step Lawexa ran on the machine. */
 export function isBoxTool(toolName: string | null | undefined): boolean {
   return typeof toolName === 'string' && toolName.startsWith('box_');
+}
+
+/**
+ * What the chat's hand-over step offers (thread 38ad195b):
+ * - `waiting`: Lawexa handed the machine over in THIS chat and waits for
+ *   Done, so the step offers "Open the machine and press Done";
+ * - `over`: Done, a message, the 30-minute stop or another chat's hand-over
+ *   has moved it on, and Done here would do nothing, so the step offers
+ *   nothing more;
+ * - `unread`: the status has not arrived, so the step offers only the plain
+ *   way in, which is right in both cases (the e2e stack took 6 s to answer).
+ * A server before `held_by` (absent) is trusted on control alone.
+ */
+export function handOverState(
+  box: Pick<UserBoxStatus, 'control' | 'control_reason' | 'held_by'> | null,
+  conversationUuid: string | null,
+): 'waiting' | 'over' | 'unread' {
+  if (!box) return 'unread';
+  if (box.control !== 'user' || box.control_reason !== 'hand_over') return 'over';
+  if (box.held_by && conversationUuid && box.held_by.conversation_uuid !== conversationUuid) return 'over';
+  return 'waiting';
 }

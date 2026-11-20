@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { useIsMobile } from "@/hooks/use-mobile"
+import { sendsOnEnter } from "@/lib/utils/enter-key"
 import React, {
   createContext,
   useContext,
@@ -205,17 +205,15 @@ function PromptInputTextarea({
     setValue(e.target.value)
   }
 
-  const isMobile = useIsMobile()
-
   // The host's handler runs first, so it can take a key for itself (a mention
   // picker's Enter or Tab) by preventing it; only an Enter left alone sends.
+  // Whether it sends is the app's one Enter rule (lib/utils/enter-key.ts):
+  // a keyboard sends, a touch-only device adds a line, the window's width
+  // plays no part, and a word still being composed is never sent.
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     onKeyDown?.(e)
     if (e.defaultPrevented) return
-    if (e.key === "Enter" && !e.shiftKey && !isMobile) {
-      e.preventDefault()
-      onSubmit?.()
-    }
+    if (sendsOnEnter(e)) onSubmit?.()
   }
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {

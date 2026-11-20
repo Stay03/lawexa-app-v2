@@ -24,7 +24,7 @@ import {
   Users,
   Infinity,
   BadgeCheck,
-  Sparkles,
+  PenLine,
   Ban,
   Smartphone,
   Monitor,
@@ -212,7 +212,7 @@ function AdminUsersTable({
                             <BadgeCheck className="h-3.5 w-3.5 text-primary shrink-0" />
                           )}
                           {user.is_creator && (
-                            <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                            <PenLine className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                           )}
                           {user.free_messages_blocked && (
                             <Tooltip>

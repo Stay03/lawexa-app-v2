@@ -2,7 +2,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Award, X } from 'lucide-react';
 
 import { WRAPPED_COLOURS as C } from '@/lib/wrapped/theme';
 import { useHasWrapped } from './queries';
@@ -52,7 +52,7 @@ export function WrappedHomeBanner() {
         style={{ borderColor: C.ink, background: C.cream, color: C.ink, boxShadow: `4px 5px 0 ${C.ink}` }}
       >
         <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-xl" style={{ background: C.gold }}>
-          <Sparkles className="size-5" />
+          <Award className="size-5" />
         </span>
         <Link href="/wrapped" className="min-w-0 flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-current">
           <span className="block text-sm font-bold">Your Bar Finals Wrapped is here</span>

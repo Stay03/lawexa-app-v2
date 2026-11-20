@@ -13,6 +13,8 @@ export const DRAFT_STATUS_LABEL: Readonly<Record<SkillDraftStatus, string>> = {
   dismissed: 'Set aside',
   published: 'Published',
   rejected: 'Rejected',
+  // The person kept it as their own skill (thread 9ae498ae); it never reaches review.
+  saved_private: 'Kept as their own skill',
 };
 
 /** Where the draft came from: a person's chat, or a zip an admin imported. */

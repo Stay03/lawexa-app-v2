@@ -263,3 +263,11 @@ test('a certificate name reminder opens the certificates page, with or without i
   const linked = presentNotification(row({ type: 'certificate_name_needed', action_url: '/settings/certificates' }), ORIGIN);
   assert.deepEqual(linked.destination, { kind: 'internal', href: '/settings/certificates' });
 });
+
+test('the machine reminder without words of its own still says what it is, and opens the waiting chat', () => {
+  for (const type of ['machine_waiting', 'MachineWaitingNotification']) {
+    const presented = presentNotification(row({ type, action_url: '/c/conv-1' }), ORIGIN);
+    assert.equal(presented.title, 'Lawexa is waiting for you on its machine', type);
+    assert.deepEqual(presented.destination, { kind: 'internal', href: '/c/conv-1' });
+  }
+});

@@ -10,7 +10,7 @@ import {
   PenSquare,
   Scale,
   BookText,
-  Sparkles,
+  Award,
   Tag,
   type LucideIcon,
 } from 'lucide-react';
@@ -212,7 +212,7 @@ export const v2NavItems: V2NavItem[] = [
   // LAWEXA WRAPPED, Bar Finals edition (thread f833c285, live 8 November
   // 2026): in the menu until 31 December, so a finalist can come back and share
   // again. Only for a student who has one; it opens the full-screen story.
-  { label: 'Your Wrapped', href: '/wrapped', icon: Sparkles, wrapped: true },
+  { label: 'Your Wrapped', href: '/wrapped', icon: Award, wrapped: true },
 ];
 
 /** No account yet: signed out, or browsing on a guest pass. */

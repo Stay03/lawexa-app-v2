@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 
 import type { Channel } from '@/types/collab';
+import { spaceReturnPath } from '@/lib/utils/pending-space';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { canOpenTeamChannels, collabAccessState, isTeamChannelsPath } from './model';
@@ -48,18 +49,20 @@ import { CollabVerifyEmailState } from './ui/VerifyEmailState';
 export function CollabAccessGate({ children }: { children: React.ReactNode }) {
   const session = useV2Session();
   const pathname = usePathname();
+  // At a Space's address, signing in or up comes back to that Space.
+  const returnTo = spaceReturnPath(pathname);
 
   switch (collabAccessState(session)) {
     case 'signed-out':
       return (
         <div className={LIST_COLUMN}>
-          <CollabSignedOutState />
+          <CollabSignedOutState returnTo={returnTo} />
         </div>
       );
     case 'create-account':
       return (
         <div className={LIST_COLUMN}>
-          <CollabCreateAccountState />
+          <CollabCreateAccountState returnTo={returnTo} />
         </div>
       );
     case 'verify-email':

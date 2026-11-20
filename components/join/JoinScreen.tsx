@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, Loader2, Lock, Trophy, Users } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { spaceLimitFromError } from '@/lib/utils/space-limit';
+import { endedGameQuiz, endedGameQuizPath } from '@/lib/utils/ended-game';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -232,6 +233,12 @@ export function JoinScreen({ code }: { code: string }) {
       const limit = spaceLimitFromError(error);
       setFailedAtLimit(limit !== null);
       const status = isAxiosError(error) ? error.response?.status : undefined;
+      // The live game ended between the preview and the press: its quiz, to take alone.
+      const ended = endedGameQuiz(status, isAxiosError(error) ? error.response?.data : undefined);
+      if (ended) {
+        router.replace(endedGameQuizPath(ended.uuid));
+        return;
+      }
       setFailed(limit ? limit.message : refusalFor(status).title);
     },
   });
@@ -239,6 +246,21 @@ export function JoinScreen({ code }: { code: string }) {
   // Back with the code they arrived with (`PendingInviteReturn`, or the sign-in
   // `?redirect=`): the join finishes without another tap. Only for this
   // invite's own code, and only once; a member already in goes straight in.
+  // A live game's link after the game ended: its quiz, to take alone, when it can be.
+  const endedQuiz = preview.isError
+    ? endedGameQuiz(
+        isAxiosError(preview.error) ? preview.error.response?.status : undefined,
+        isAxiosError(preview.error) ? preview.error.response?.data : undefined,
+      )
+    : null;
+  const endedQuizUuid = endedQuiz?.uuid ?? null;
+  useEffect(() => {
+    if (endedQuizUuid) {
+      forgetPendingInvite();
+      router.replace(endedGameQuizPath(endedQuizUuid));
+    }
+  }, [endedQuizUuid, router]);
+
   const held = usePendingInvite() === code;
   const heldAction = held ? preview.data?.data.viewer_action : undefined;
   const heldSpace = preview.data?.data.space_uuid;
@@ -264,6 +286,15 @@ export function JoinScreen({ code }: { code: string }) {
           <Skeleton className="h-4 w-32 rounded" />
           <Skeleton className="mt-4 h-11 w-full rounded-full" />
         </div>
+      </div>
+    );
+  }
+
+  // On its way to the quiz: the waiting card, never a refusal flashed first.
+  if (endedQuizUuid) {
+    return (
+      <div className="mx-auto w-full max-w-md px-5 py-16">
+        <Skeleton className="h-40 w-full rounded-2xl" />
       </div>
     );
   }

@@ -572,6 +572,8 @@ export function ConversationScreen({
             applyDraftEditLine={onDraftEditLine}
             cardQuestions={cardQuestions}
             settleSkillDraft={setSkillDraftStatus}
+            followResumedTurn={followResumedTurn}
+            inSpace={controller.space !== null}
           >
             {/* THE SIDE PANEL (the draft editor; the file list in chat): on a chat's
                 own route, a draft or a file opens beside the transcript on a

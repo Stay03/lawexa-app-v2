@@ -37,6 +37,8 @@ import { parseLinkedFile, type LinkedFile } from './content/linked-file';
 import { SpaceContentPanel } from './content/SpaceContentPanel';
 import { SPACE_PAGE_COLUMN, SPACE_PANE } from './lobby-parts';
 import { SpaceAboutSheet } from './SpaceAboutSheet';
+import { SpacePreview } from './SpacePreview';
+import { isSpacePreview } from '../discover/discover-model';
 import { SpacePlaceHeader } from './SpacePlaceHeader';
 import { useCachedSpaceIdentity } from './cached-identity';
 import { useTabTitle } from '@/v2/shell/use-tab-title';
@@ -86,9 +88,20 @@ export function SpaceScreen({ spaceUuid }: { spaceUuid: string }) {
   // own silhouette, so the boundary cannot show a second shape.
   return (
     <Suspense fallback={<CachedSpaceFrame />}>
-      <SpaceScreenBody spaceUuid={spaceUuid} />
+      <SpaceScreenRoute spaceUuid={spaceUuid} />
     </Suspense>
   );
+}
+
+/**
+ * A public Space's card for a reader not in it is its own page (`SpacePreview`),
+ * decided before the lobby mounts, so none of the lobby's member-only reads
+ * (live quiz, waiting list, contents) is ever asked for.
+ */
+function SpaceScreenRoute({ spaceUuid }: { spaceUuid: string }) {
+  const space = useCollabSpaceScope()?.space ?? null;
+  if (space !== null && isSpacePreview(space)) return <SpacePreview space={space} />;
+  return <SpaceScreenBody spaceUuid={spaceUuid} />;
 }
 
 function SpaceScreenBody({ spaceUuid }: { spaceUuid: string }) {

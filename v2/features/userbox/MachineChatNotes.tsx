@@ -1,0 +1,88 @@
+'use client';
+
+import Link from 'next/link';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Clock, Loader2, MessagesSquare, Monitor } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { userBoxApi } from '@/lib/api/user-box';
+import { extractApiError } from '@/lib/utils/api-error';
+import { useSidePanel } from '@/v2/features/conversations/conversation/side-panel/SidePanelContext';
+import { inUseLine } from './machine-model';
+import { landUserBox } from './queries';
+
+/**
+ * Under an answer that met Lawexa's machine held by another chat (Arthur's 5,
+ * thread 38ad195b; `metadata.machine_in_use`): which chat has it, a way there,
+ * and "Free it and use it here". Freeing resumes nothing: the person then
+ * sends a message here (Backend, 20 November 2026). A 409 means that chat is
+ * still answering, and says so.
+ */
+export function MachineInUseCard({ holder }: { holder: { conversation_uuid: string; title: string } }) {
+  const queryClient = useQueryClient();
+  const release = useMutation({
+    mutationFn: userBoxApi.release,
+    onSuccess: (answer) => {
+      if (answer.data) landUserBox(queryClient, answer.data);
+      toast.success('The machine is free. Send a message here to carry on.');
+    },
+    onError: (error) =>
+      toast.error(
+        extractApiError(error).status === 409
+          ? `Lawexa is still answering in “${holder.title}”. Free the machine when it has finished.`
+          : extractApiError(error).message || 'The machine was not freed. Try again.',
+      ),
+    meta: { silentError: true },
+  });
+  return (
+    <section
+      aria-label="Lawexa’s machine is in use"
+      className="mt-3 flex max-w-xl flex-col gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-950 dark:border-amber-400/40 dark:bg-amber-400/10 dark:text-amber-100"
+    >
+      <p className="flex items-start gap-2">
+        <Monitor aria-hidden className="mt-0.5 size-4 shrink-0" />
+        {inUseLine(holder.title)}
+      </p>
+      <div className="flex flex-wrap gap-2 pl-6">
+        <Button asChild size="sm" variant="outline" className="gap-1.5 bg-background">
+          <Link href={`/c/${holder.conversation_uuid}`}>
+            <MessagesSquare aria-hidden className="size-4" />
+            Open that chat
+          </Link>
+        </Button>
+        <Button size="sm" variant="ghost" disabled={release.isPending} onClick={() => release.mutate()}>
+          {release.isPending ? <Loader2 aria-hidden className="size-4 animate-spin" /> : null}
+          Free it and use it here
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Under Lawexa's "I stopped waiting" message (Arthur's 3: 30 minutes after a
+ * hand-over; `metadata.type` "machine_wait_ended"): a quiet mark that the
+ * wait ended, and the machine one tap away. A message carries on as usual.
+ */
+export function MachineWaitEndedNote() {
+  const panel = useSidePanel();
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      <span className="flex items-center gap-1.5">
+        <Clock aria-hidden className="size-3.5" />
+        Waited 30 minutes
+      </span>
+      {panel ? (
+        <button
+          type="button"
+          onClick={() => panel.open({ kind: 'machine' })}
+          className="v2-interactive inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium hover:bg-secondary/60 hover:text-foreground"
+        >
+          <Monitor aria-hidden className="size-3.5" />
+          Open the machine
+        </button>
+      ) : null}
+    </div>
+  );
+}

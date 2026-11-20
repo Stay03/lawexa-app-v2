@@ -8,7 +8,7 @@ import {
   Hourglass,
   ListChecks,
   Loader2,
-  Sparkles,
+  FilePlus2,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -167,7 +167,7 @@ export function EnrichmentSummaryCards({ summary, isLoading }: EnrichmentSummary
           hint="Awaiting structures"
         />
         <StatCard
-          icon={Sparkles}
+          icon={FilePlus2}
           label="Enriched"
           value={enriched_cases}
           hint="≥1 completed run"

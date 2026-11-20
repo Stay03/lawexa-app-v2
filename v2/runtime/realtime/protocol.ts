@@ -32,6 +32,16 @@ export const EVT_CHANNEL_UNREAD = '.channel.unread';
 export const EVT_USERBOX_CONTROL = '.userbox.control';
 
 /**
+ * Own templates and skills (thread 9ae498ae; Backend's contract, 19 November
+ * 2026), on `users.{uuid}`: Lawexa asks the owner before using one in a Space
+ * chat, the owner answered on another tab, and one of their templates finished
+ * reading. Each payload is the row itself; the spine only reads again.
+ */
+export const EVT_PRIVATE_ITEM_REQUESTED = '.private_item.requested';
+export const EVT_PRIVATE_ITEM_ANSWERED = '.private_item.answered';
+export const EVT_MY_TEMPLATE_UPDATED = '.my_template.updated';
+
+/**
  * Payload of {@link EVT_CHANNEL_UNREAD}. Counts are ABSOLUTE, recomputed
  * server-side — assign, never increment (digest §D). No message content ever
  * rides it. Fires on: message posted (others), own read-pointer advance

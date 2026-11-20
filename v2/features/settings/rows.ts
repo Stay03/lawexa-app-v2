@@ -5,6 +5,7 @@ import {
   ChartColumn,
   ClipboardList,
   CreditCard,
+  FileText,
   FlaskConical,
   Gauge,
   History,
@@ -12,6 +13,7 @@ import {
   MessageSquarePlus,
   MonitorSmartphone,
   ShieldCheck,
+  ScrollText,
   Ticket,
   User,
   type LucideIcon,
@@ -250,6 +252,28 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
         // The same audience as the Spaces and Channels rows, from the same
         // shared helper, because it is the same feature's door.
         canAccess: canAccessCollab,
+      },
+    ],
+  },
+  {
+    // A person's own templates and skills (Stay, thread 9ae498ae, 18 and 19
+    // November 2026). Account-only: the server keeps them per account.
+    id: 'templates-skills',
+    label: 'Templates and skills',
+    rows: [
+      {
+        id: 'templates',
+        label: 'My templates',
+        icon: FileText,
+        href: '/settings/templates',
+        requiresAccount: true,
+      },
+      {
+        id: 'skills',
+        label: 'My skills',
+        icon: ScrollText,
+        href: '/settings/skills',
+        requiresAccount: true,
       },
     ],
   },
