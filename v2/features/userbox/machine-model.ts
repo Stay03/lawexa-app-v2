@@ -224,13 +224,22 @@ export function isBoxTool(toolName: string | null | undefined): boolean {
 }
 
 /**
- * Whether the chat's hand-over step still offers "Open the machine and press
- * Done": Lawexa handed the machine over and is still waiting. Once Done, a
- * message or the 30-minute stop has given it back, Done would do nothing.
- * An unread status (null) keeps the button, as before the status arrives.
+ * What the chat's hand-over step offers (thread 38ad195b):
+ * - `waiting`: Lawexa handed the machine over in THIS chat and waits for
+ *   Done, so the step offers "Open the machine and press Done";
+ * - `over`: Done, a message, the 30-minute stop or another chat's hand-over
+ *   has moved it on, and Done here would do nothing, so the step offers
+ *   nothing more;
+ * - `unread`: the status has not arrived, so the step offers only the plain
+ *   way in, which is right in both cases (the e2e stack took 6 s to answer).
+ * A server before `held_by` (absent) is trusted on control alone.
  */
-export function handOverStillWaiting(
-  box: Pick<UserBoxStatus, 'control' | 'control_reason'> | null,
-): boolean {
-  return !box || (box.control === 'user' && box.control_reason === 'hand_over');
+export function handOverState(
+  box: Pick<UserBoxStatus, 'control' | 'control_reason' | 'held_by'> | null,
+  conversationUuid: string | null,
+): 'waiting' | 'over' | 'unread' {
+  if (!box) return 'unread';
+  if (box.control !== 'user' || box.control_reason !== 'hand_over') return 'over';
+  if (box.held_by && conversationUuid && box.held_by.conversation_uuid !== conversationUuid) return 'over';
+  return 'waiting';
 }

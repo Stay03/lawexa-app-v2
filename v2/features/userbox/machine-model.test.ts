@@ -5,7 +5,7 @@ import type { UserBoxStatus } from '@/types/user-box';
 import {
   clockAt,
   cursorPosition,
-  handOverStillWaiting,
+  handOverState,
   inUseLine,
   waitingLine,
   HAND_OVER_FALLBACK,
@@ -200,9 +200,16 @@ test('the in-use line names the chat that holds the machine (Arthur’s 5)', () 
   assert.equal(inUseLine('TEST DATA CAC annual return'), 'Lawexa’s machine is in use in “TEST DATA CAC annual return”. Finish there, or free it here.');
 });
 
-test('the hand-over button stays only while Lawexa waits for Done', () => {
-  assert.equal(handOverStillWaiting(null), true, 'status not read yet');
-  assert.equal(handOverStillWaiting({ control: 'user', control_reason: 'hand_over' }), true);
-  assert.equal(handOverStillWaiting({ control: 'lawexa', control_reason: null }), false, 'Done, a message or the 30-minute stop');
-  assert.equal(handOverStillWaiting({ control: 'user', control_reason: 'user_acted' }), false, 'the person took over themselves');
+test('the hand-over step offers "press Done" only while Lawexa waits for Done in this chat', () => {
+  const waiting = { control: 'user', control_reason: 'hand_over', held_by: { conversation_uuid: 'c-1', title: 'TEST DATA CAC' } } as const;
+  assert.equal(handOverState(waiting, 'c-1'), 'waiting');
+  assert.equal(handOverState({ ...waiting, held_by: undefined }, 'c-1'), 'waiting', 'a server before held_by');
+  assert.equal(handOverState(waiting, null), 'waiting', 'a route without the chat id');
+  assert.equal(handOverState(waiting, 'c-2'), 'over', 'another chat waits for Done');
+  assert.equal(handOverState({ control: 'lawexa', control_reason: null, held_by: null }, 'c-1'), 'over', 'Done, a message or the 30-minute stop');
+  assert.equal(handOverState({ control: 'user', control_reason: 'user_acted', held_by: null }, 'c-1'), 'over', 'the person took over themselves');
+});
+
+test('until the status arrives the step offers only the plain way in', () => {
+  assert.equal(handOverState(null, 'c-1'), 'unread');
 });

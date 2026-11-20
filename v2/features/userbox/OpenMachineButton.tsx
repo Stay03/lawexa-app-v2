@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
 import { Clock, Monitor } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -8,7 +9,7 @@ import { useSidePanel } from '@/v2/features/conversations/conversation/side-pane
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { handOverStillWaiting, waitingLine } from './machine-model';
+import { handOverState, waitingLine } from './machine-model';
 import { userBoxQueries } from './queries';
 
 /** The step that hands the machine to the person (Userbox v1). */
@@ -25,14 +26,17 @@ export const HAND_OVER_TOOL = 'box_hand_to_user';
 export function OpenMachineButton({ handOver = false }: { handOver?: boolean }) {
   const panel = useSidePanel();
   const session = useV2Session();
+  const params = useParams<{ conversationId?: string }>();
   const box = useQuery({ ...userBoxQueries.status({ viewerId: session.userId }), enabled: handOver }).data ?? null;
   if (!panel || (panel.target?.kind === 'machine' && !panel.closing)) return null;
   const open = () => panel.open({ kind: 'machine' });
-  // The hand-over is over (Done, a message, or Lawexa stopped waiting): Done would do nothing,
-  // and the step header and the wait-ended note already open the machine.
-  if (handOver && !handOverStillWaiting(box)) return null;
+  // "Press Done" only while Lawexa waits for Done in this chat; once the hand-over has moved on,
+  // the step header and the wait-ended note already open the machine. Until the status arrives,
+  // the plain way in below.
+  const state = handOver ? handOverState(box, params?.conversationId ?? null) : null;
+  if (state === 'over') return null;
 
-  if (handOver) {
+  if (state === 'waiting') {
     return (
       <div className="ml-7">
       <button
