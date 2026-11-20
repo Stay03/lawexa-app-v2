@@ -36,7 +36,10 @@ export function adoptServerFields(
     const id = Number(row.id.slice(SERVER_ROW_PREFIX.length));
     if (!Number.isSafeInteger(id)) continue;
     if (row.role === 'user') copies.set(id, row as ChatMessage);
-    else if (row.role === 'assistant' && ((row as ChatMessage).questionCard || (row as ChatMessage).skillDraft)) {
+    else if (
+      row.role === 'assistant' &&
+      ((row as ChatMessage).questionCard || (row as ChatMessage).skillDraft || (row as ChatMessage).machineInUse)
+    ) {
       cards.set(id, row as ChatMessage);
     }
   }
@@ -148,5 +151,8 @@ function cardFields(row: EngineMessage, cards: ReadonlyMap<number, ChatMessage>)
       fields.skillDraft = next;
     }
   }
+  // Lawexa's machine held by another chat (thread 38ad195b): the turn's answer
+  // carries the holder only in the saved copy, so a streamed answer takes it.
+  if (server.machineInUse && (row as ChatMessage).machineInUse === undefined) fields.machineInUse = server.machineInUse;
   return Object.keys(fields).length > 0 ? fields : null;
 }
