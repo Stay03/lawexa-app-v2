@@ -55,6 +55,19 @@ export function useMachine({ onResumed }: { onResumed: (result: UserBoxDoneResul
     onError: (error) => toast.error(extractApiError(error).message || 'You could not take the machine. Try again.'),
     meta: { silentError: true },
   });
+  const release = useMutation({
+    mutationFn: userBoxApi.release,
+    onSuccess: (answer) => {
+      if (answer.data) landUserBox(queryClient, answer.data);
+    },
+    onError: (error) =>
+      toast.error(
+        extractApiError(error).status === 409
+          ? 'Lawexa is still answering in that chat. Free the machine when it has finished.'
+          : extractApiError(error).message || 'The machine was not freed. Try again.',
+      ),
+    meta: { silentError: true },
+  });
   const done = useMutation({
     mutationFn: userBoxApi.done,
     onSuccess: (answer) => {
@@ -114,6 +127,7 @@ export function useMachine({ onResumed }: { onResumed: (result: UserBoxDoneResul
     wake: () => wake.mutate(),
     takeOver: () => takeOver.mutate(),
     done: () => done.mutate(),
-    busy: takeOver.isPending || done.isPending,
+    release: () => release.mutate(),
+    busy: takeOver.isPending || done.isPending || release.isPending,
   };
 }

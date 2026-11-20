@@ -35,4 +35,13 @@ export const userBoxApi = {
     const response = await apiClient.post<ApiResponse<UserBoxDoneResult>>('/user-box/done');
     return response.data;
   },
+
+  /**
+   * Free the machine from the chat that holds it (Arthur's 5, thread
+   * 38ad195b): 409 while that chat is mid-answer.
+   */
+  release: async (): Promise<ApiResponse<UserBoxStatus>> => {
+    const response = await apiClient.post<ApiResponse<UserBoxStatus>>('/user-box/release');
+    return response.data;
+  },
 };

@@ -45,6 +45,9 @@ export function landUserBoxControl(queryClient: QueryClient, event: UserBoxContr
     control: event.control,
     control_reason: event.reason,
     hand_over_message: event.control === 'user' ? event.message : null,
+    // Lawexa driving again ends any wait; otherwise the event's own fields, when it has them.
+    ...(event.control === 'lawexa' ? { waiting: null } : 'waiting' in event ? { waiting: event.waiting ?? null } : {}),
+    ...('held_by' in event ? { held_by: event.held_by ?? null } : {}),
   });
 }
 
@@ -57,7 +60,7 @@ export function landUserBoxMode(queryClient: QueryClient, mode: 'lawexa' | 'user
   queryClient.setQueriesData<UserBoxStatus>({ queryKey: userBoxQueries.all }, (current) => {
     if (!current || current.control === mode) return current;
     return mode === 'lawexa'
-      ? { ...current, control: 'lawexa', control_reason: null, hand_over_message: null }
+      ? { ...current, control: 'lawexa', control_reason: null, hand_over_message: null, waiting: null }
       : { ...current, control: 'user', control_reason: current.control_reason ?? 'user_acted' };
   });
 }

@@ -137,6 +137,9 @@ const KIND_TITLES: Readonly<Record<string, string>> = {
   space_quiz_live: 'A quiz is live in your Space',
   quiz_challenge_result: 'Someone took your challenge',
   radar_report: 'A radar report is ready',
+  // Lawexa's machine, ten minutes into a hand-over (thread 38ad195b). Its
+  // action_url is the waiting chat (/c/{chat}), followed as it is.
+  machine_waiting: 'Lawexa is waiting for you on its machine',
   // A space Radar's report (plan 6.3). The server sends its own title ("New
   // Radar report in {space}: {title}"); this is for a row that comes without one.
   space_radar_report: 'A Radar report is ready in your Space',

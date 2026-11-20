@@ -459,6 +459,18 @@ export function transformApiMessages(
         content: resolveDraftEdits(apiMsg.content, apiMsg.metadata?.draft_edits),
         ...withDraftEditBases(apiMsg),
         timestamp: new Date(apiMsg.created_at),
+        // The answer met Lawexa's machine held by another chat (thread 38ad195b, Arthur's 5).
+        ...(apiMsg.metadata?.machine_in_use?.held_by && { machineInUse: apiMsg.metadata.machine_in_use.held_by }),
+      } as ChatMessage);
+    }
+    // Lawexa stopped waiting for the person on its machine (Arthur's 3: 30 minutes after a hand-over).
+    else if (apiMsg.role === 'assistant' && apiMsg.metadata?.type === 'machine_wait_ended') {
+      messages.push({
+        id: `msg_${apiMsg.id}`,
+        role: 'assistant',
+        content: apiMsg.content,
+        timestamp: new Date(apiMsg.created_at),
+        machineWaitEnded: true,
       } as ChatMessage);
     }
   }

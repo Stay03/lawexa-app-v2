@@ -32,6 +32,25 @@ export interface UserBoxStatus {
   hand_over_message: string | null;
   /** Only on the read; wake, sleep and take-over leave it out. */
   view: UserBoxView | null;
+  /**
+   * While Lawexa waits for the person after a hand-over (Arthur's 3, thread
+   * 38ad195b): one reminder at `remind_at` (10 minutes), and at `stops_at`
+   * (30 minutes) Lawexa stops waiting. Null otherwise.
+   */
+  waiting?: UserBoxWaiting | null;
+  /** The chat whose turn holds the machine (Arthur's 5: one chat at a time). Null when free. */
+  held_by?: UserBoxHolder | null;
+}
+
+export interface UserBoxWaiting {
+  since: string;
+  remind_at: string;
+  stops_at: string;
+}
+
+export interface UserBoxHolder {
+  conversation_uuid: string;
+  title: string;
 }
 
 /** `POST /api/user-box/done`: Lawexa drives again, and a chat that was waiting continues. */
@@ -47,4 +66,7 @@ export interface UserBoxControlEvent {
   control: UserBoxControl;
   reason: UserBoxControlReason | null;
   message: string | null;
+  /** As on the read (thread 38ad195b); absent from a server before it. */
+  waiting?: UserBoxWaiting | null;
+  held_by?: UserBoxHolder | null;
 }

@@ -57,3 +57,34 @@ test('nothing is written when no panel has read the machine', () => {
   landUserBoxControl(queryClient, { control: 'user', reason: 'hand_over', message: 'x' });
   assert.equal(queryClient.getQueryData(KEY), undefined);
 });
+
+/* The wait and the holder (thread 38ad195b) ride on the control broadcast. */
+
+const WAIT = { since: '2026-11-20T10:00:00Z', remind_at: '2026-11-20T10:10:00Z', stops_at: '2026-11-20T10:30:00Z' };
+const HOLDER = { conversation_uuid: 'c-1', title: 'TEST DATA CAC annual return' };
+
+test('a hand-over broadcast brings the wait and the holder', () => {
+  const { queryClient, now } = client(read());
+  landUserBoxControl(queryClient, { control: 'user', reason: 'hand_over', message: 'Sign in.', waiting: WAIT, held_by: HOLDER });
+  assert.deepEqual(now()?.waiting, WAIT);
+  assert.deepEqual(now()?.held_by, HOLDER);
+});
+
+test('control back to Lawexa ends the wait, even when the event leaves it out', () => {
+  const { queryClient, now } = client(read({ control: 'user', control_reason: 'hand_over', waiting: WAIT, held_by: HOLDER }));
+  landUserBoxControl(queryClient, { control: 'lawexa', reason: null, message: null });
+  assert.equal(now()?.waiting, null);
+  assert.deepEqual(now()?.held_by, HOLDER, 'a server before the field: the holder the read had stays');
+});
+
+test('a broadcast with held_by null frees the machine in the read', () => {
+  const { queryClient, now } = client(read({ held_by: HOLDER }));
+  landUserBoxControl(queryClient, { control: 'lawexa', reason: null, message: null, waiting: null, held_by: null });
+  assert.equal(now()?.held_by, null);
+});
+
+test('the live view saying Lawexa drives again ends the wait too', () => {
+  const { queryClient, now } = client(read({ control: 'user', control_reason: 'hand_over', waiting: WAIT }));
+  landUserBoxMode(queryClient, 'lawexa');
+  assert.equal(now()?.waiting, null);
+});

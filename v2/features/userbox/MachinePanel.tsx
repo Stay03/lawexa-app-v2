@@ -1,12 +1,14 @@
 'use client';
 
-import { Hand, Loader2, Monitor, Power, RotateCw } from 'lucide-react';
+import { useState } from 'react';
+import { Loader2, Maximize2, Monitor, Power, RotateCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { UserBoxDoneResult } from '@/types/user-box';
 import { ChatSidePanel } from '@/v2/features/conversations/conversation/side-panel/ChatSidePanel';
-import { YOU_HAVE_THE_MACHINE } from './machine-model';
+import { HeldByNote, MachineControls } from './MachineControls';
+import { MachineFullScreen } from './MachineFullScreen';
 import { MachineScreen } from './MachineScreen';
 import { useMachine } from './use-machine';
 
@@ -32,32 +34,13 @@ import { useMachine } from './use-machine';
 export function MachinePanel({ onResumed }: { onResumed: (result: UserBoxDoneResult) => void }) {
   const machine = useMachine({ onResumed });
   const { phase, control } = machine;
+  const [full, setFull] = useState(false);
+  const viewOnly = control?.who === 'lawexa';
 
   const subtitle =
     phase.kind !== 'live' || !control ? null : control.who === 'lawexa' ? 'Lawexa is using it' : 'You are using it';
 
-  const footer =
-    phase.kind === 'live' && control ? (
-      control.who === 'lawexa' ? (
-        <div className="flex w-full items-center justify-between gap-3">
-          <p className="text-xs text-muted-foreground">Lawexa is using the machine. You can take over at any time.</p>
-          <Button type="button" variant="outline" size="sm" className="shrink-0 gap-1.5" disabled={machine.busy} onClick={machine.takeOver}>
-            <Hand aria-hidden className="size-4" />
-            Take over
-          </Button>
-        </div>
-      ) : (
-        <div className="flex w-full items-center justify-between gap-3">
-          <p className="min-w-0 text-sm text-foreground">
-            {control.reason === 'hand_over' ? control.message : YOU_HAVE_THE_MACHINE}
-          </p>
-          <Button type="button" size="sm" className="shrink-0" disabled={machine.busy} onClick={machine.done}>
-            {machine.busy ? <Loader2 aria-hidden className="size-4 animate-spin motion-reduce:animate-none" /> : null}
-            Done
-          </Button>
-        </div>
-      )
-    ) : undefined;
+  const footer = phase.kind === 'live' && control ? <MachineControls machine={machine} /> : undefined;
 
   return (
     <ChatSidePanel
@@ -65,8 +48,18 @@ export function MachinePanel({ onResumed }: { onResumed: (result: UserBoxDoneRes
       title="Lawexa’s machine"
       subtitle={subtitle}
       icon={<Monitor aria-hidden className="size-4 text-muted-foreground" />}
+      actions={
+        phase.kind === 'live' && machine.viewUrl ? (
+          <Button type="button" variant="ghost" size="icon" className="size-8" aria-label="Full screen" title="Full screen" onClick={() => setFull(true)}>
+            <Maximize2 aria-hidden className="size-4" />
+          </Button>
+        ) : null
+      }
       footer={footer}
     >
+      {full && machine.viewUrl ? (
+        <MachineFullScreen machine={machine} url={machine.viewUrl} viewOnly={viewOnly} onClose={() => setFull(false)} />
+      ) : null}
       <div className="p-4 xl:p-5">
         {phase.kind === 'loading' ? (
           <Skeleton className="aspect-[16/10] w-full rounded-xl" />
@@ -97,7 +90,17 @@ export function MachinePanel({ onResumed }: { onResumed: (result: UserBoxDoneRes
         ) : phase.kind === 'hidden' ? (
           <p className="py-8 text-center text-sm text-muted-foreground">Lawexa’s machine is not available.</p>
         ) : machine.viewUrl ? (
-          <MachineScreen url={machine.viewUrl} onLost={machine.reread} onMode={machine.noteMode} />
+          <>
+            <HeldByNote holder={machine.box?.held_by ?? null} onRelease={machine.release} busy={machine.busy} />
+            {/* One live view at a time: while full screen is open, the panel only says so. */}
+            {full ? (
+              <p className="flex aspect-[16/10] w-full items-center justify-center rounded-xl border border-dashed border-border text-sm text-muted-foreground">
+                Showing full screen
+              </p>
+            ) : (
+              <MachineScreen url={machine.viewUrl} onLost={machine.reread} onMode={machine.noteMode} viewOnly={viewOnly} />
+            )}
+          </>
         ) : (
           <p className="py-8 text-center text-sm text-muted-foreground">Lawexa’s machine is not available.</p>
         )}

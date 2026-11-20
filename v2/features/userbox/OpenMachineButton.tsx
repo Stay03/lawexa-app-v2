@@ -1,10 +1,15 @@
 'use client';
 
-import { Monitor } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Clock, Monitor } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useSidePanel } from '@/v2/features/conversations/conversation/side-panel/SidePanelContext';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { useMinuteNow } from '@/v2/features/channels/use-minute-now';
+import { useV2Session } from '@/v2/runtime/session-context';
+import { handOverStillWaiting, waitingLine } from './machine-model';
+import { userBoxQueries } from './queries';
 
 /** The step that hands the machine to the person (Userbox v1). */
 export const HAND_OVER_TOOL = 'box_hand_to_user';
@@ -19,22 +24,30 @@ export const HAND_OVER_TOOL = 'box_hand_to_user';
  */
 export function OpenMachineButton({ handOver = false }: { handOver?: boolean }) {
   const panel = useSidePanel();
+  const session = useV2Session();
+  const box = useQuery({ ...userBoxQueries.status({ viewerId: session.userId }), enabled: handOver }).data ?? null;
   if (!panel || (panel.target?.kind === 'machine' && !panel.closing)) return null;
   const open = () => panel.open({ kind: 'machine' });
+  // The hand-over is over (Done, a message, or Lawexa stopped waiting): Done would do nothing,
+  // and the step header and the wait-ended note already open the machine.
+  if (handOver && !handOverStillWaiting(box)) return null;
 
   if (handOver) {
     return (
+      <div className="ml-7">
       <button
         type="button"
         onClick={open}
         className={cn(
-          'v2-interactive mt-2 ml-7 inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
+          'v2-interactive mt-2 inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90',
           FOCUS_RING,
         )}
       >
         <Monitor aria-hidden className="size-4" />
         Open the machine and press Done
       </button>
+      <HandOverWait />
+      </div>
     );
   }
 
@@ -52,5 +65,28 @@ export function OpenMachineButton({ handOver = false }: { handOver?: boolean }) 
       <Monitor aria-hidden className="size-3.5" />
       <span>Open machine</span>
     </button>
+  );
+}
+
+/**
+ * Under the hand-over button: how long Lawexa waits (Arthur's 3, thread
+ * 38ad195b), from the machine's own state. Nothing once the wait is over.
+ */
+function HandOverWait() {
+  const session = useV2Session();
+  const now = useMinuteNow();
+  const box = useQuery(userBoxQueries.status({ viewerId: session.userId })).data ?? null;
+  const wait = box && box.control === 'user' && now > 0 ? waitingLine(box.waiting, now) : null;
+  if (!wait) return null;
+  return (
+    <p
+      className={cn(
+        'mt-1.5 flex items-center gap-1.5 text-xs',
+        wait.tone === 'reminded' ? 'text-amber-700 dark:text-amber-300' : 'text-muted-foreground',
+      )}
+    >
+      <Clock aria-hidden className="size-3.5" />
+      {wait.text}
+    </p>
   );
 }

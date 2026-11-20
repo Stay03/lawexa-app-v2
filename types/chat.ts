@@ -131,6 +131,10 @@ export interface ChatMessage {
    * drawn as a bubble of each question with its answer.
    */
   cardAnswers?: QuestionCardAnswers;
+  /** The answer met Lawexa's machine held by another chat (`metadata.machine_in_use`, thread 38ad195b). */
+  machineInUse?: { conversation_uuid: string; title: string };
+  /** Lawexa stopped waiting for the person on its machine (`metadata.type` "machine_wait_ended"). */
+  machineWaitEnded?: boolean;
 }
 
 /** One option of a card question. */
@@ -914,7 +918,11 @@ export interface ApiMessage {
       // A long reply's earlier reading was summarised (context-compacted.ts).
       | 'context_compacted'
       // The owner's answer to an ask-first card, which resumed the turn (thread 9ae498ae).
-      | 'private_item_answer';
+      | 'private_item_answer'
+      // Lawexa stopped waiting on its machine after a hand-over (thread 38ad195b).
+      | 'machine_wait_ended';
+    /** On an answer that met Lawexa's machine held by another chat (thread 38ad195b). */
+    machine_in_use?: { held_by: { conversation_uuid: string; title: string } };
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
     /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */

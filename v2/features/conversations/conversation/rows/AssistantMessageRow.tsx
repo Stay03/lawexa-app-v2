@@ -20,6 +20,7 @@ import { AskedQuestions } from '../question-card/CardMarks';
 import { ReasoningTrace } from '../reasoning/ReasoningTrace';
 import { SkillDraftCardView } from '../skill-draft/SkillDraftCard';
 import { PrivateItemAsk, UsedItemsLine } from '@/v2/features/private-items/PrivateItemAsk';
+import { MachineInUseCard, MachineWaitEndedNote } from '@/v2/features/userbox/MachineChatNotes';
 import { replyTargetOf, type ReplyableRow } from '../reply-target';
 import { SwipeToReply } from './SwipeToReply';
 
@@ -97,6 +98,8 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
   // Own templates and skills in a Space (thread 9ae498ae), once the turn is over.
   const turnId = isStreaming || draining ? undefined : (message as ChatMessage).turnId;
   const usedItems = isStreaming || draining ? undefined : (message as ChatMessage).usedPrivateItems;
+  const machineInUse = isStreaming || draining ? undefined : (message as ChatMessage).machineInUse;
+  const machineWaitEnded = !isStreaming && !draining && (message as ChatMessage).machineWaitEnded === true;
   if (questionCard) {
     return (
       <div className="w-full">
@@ -196,6 +199,9 @@ export const AssistantMessageRow = memo(function AssistantMessageRow({
           {/* A skill Lawexa drafted in this turn (the skills tool): its card under
               the answer, once the turn is over. */}
           {skillDraft && <SkillDraftCardView card={skillDraft} />}
+          {/* Lawexa's machine (thread 38ad195b): held by another chat, or the wait ended. */}
+          {machineInUse && <MachineInUseCard holder={machineInUse} />}
+          {machineWaitEnded && <MachineWaitEndedNote />}
 
           {usedItems && <UsedItemsLine items={usedItems} />}
           {turnId && <PrivateItemAsk turnId={turnId} />}

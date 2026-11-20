@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, MousePointer2, RotateCw } from 'lucide-react';
+import { Eye, Loader2, MousePointer2, RotateCw } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -32,12 +32,22 @@ export function MachineScreen({
   url,
   onLost,
   onMode,
+  viewOnly = false,
+  className,
 }: {
   url: string;
   /** The view dropped: read a fresh address. */
   onLost: () => void;
   /** The view says who drives now. */
   onMode: (mode: 'lawexa' | 'user') => void;
+  /**
+   * Lawexa drives (Arthur's 1a, thread 38ad195b): the screen only shows. No
+   * move, click or key goes to the machine, so a hand resting on the screen
+   * never takes it from Lawexa; "Take over" is the one way to use it.
+   */
+  viewOnly?: boolean;
+  /** The frame's box (full screen sizes it to the window). */
+  className?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewRef = useRef<MachineView | null>(null);
@@ -47,9 +57,11 @@ export function MachineScreen({
   const triesRef = useRef(0);
   const onLostRef = useRef(onLost);
   const onModeRef = useRef(onMode);
+  const viewOnlyRef = useRef(viewOnly);
   useEffect(() => {
     onLostRef.current = onLost;
     onModeRef.current = onMode;
+    viewOnlyRef.current = viewOnly;
   });
 
   // One view per address: a fresh address (a new token) is a new connection.
@@ -108,7 +120,7 @@ export function MachineScreen({
     const onWheel = (event: WheelEvent) => {
       const at = toDisplayPoint(event.clientX, event.clientY, canvas.getBoundingClientRect());
       const dy = scrollDelta(event.deltaY, event.deltaMode);
-      if (!at || dy === null) return;
+      if (!at || dy === null || viewOnlyRef.current) return;
       event.preventDefault();
       viewRef.current?.send({ type: 'scroll', ...at, dy });
     };
@@ -131,7 +143,7 @@ export function MachineScreen({
     return canvas ? toDisplayPoint(event.clientX, event.clientY, canvas.getBoundingClientRect()) : null;
   };
   const buttonOf = (button: number): 'left' | 'middle' | 'right' => (button === 2 ? 'right' : button === 1 ? 'middle' : 'left');
-  const send = (event: ViewerEvent) => viewRef.current?.send(event);
+  const send = (event: ViewerEvent) => (viewOnly ? false : viewRef.current?.send(event));
 
   const reconnect = () => {
     triesRef.current = 0;
@@ -140,17 +152,22 @@ export function MachineScreen({
   };
 
   return (
-    <div className="space-y-2">
+    <div className={cn('space-y-2', className)}>
       <div className="relative overflow-hidden rounded-xl border border-border bg-muted">
         <canvas
           ref={canvasRef}
           width={DISPLAY.width}
           height={DISPLAY.height}
           tabIndex={0}
-          aria-label="Lawexa’s machine. Click to use it; while it has focus your keys go to it."
-          className={cn('block aspect-[16/10] h-auto w-full cursor-default touch-none outline-none', FOCUS_RING)}
+          aria-label={
+            viewOnly
+              ? 'Lawexa’s machine, view only while Lawexa works. Press Take over to use it.'
+              : 'Lawexa’s machine. Click to use it; while it has focus your keys go to it.'
+          }
+          className={cn('block aspect-[16/10] h-auto w-full touch-none outline-none', viewOnly ? 'cursor-not-allowed' : 'cursor-default', FOCUS_RING)}
           onContextMenu={(event) => event.preventDefault()}
           onPointerDown={(event) => {
+            if (viewOnly) return;
             event.currentTarget.focus();
             const at = pointAt(event);
             if (!at) return;
@@ -173,6 +190,7 @@ export function MachineScreen({
             });
           }}
           onKeyDown={(event) => {
+            if (viewOnly) return;
             const key = toBoxKey(event);
             // Ctrl+V or Cmd+V pastes the person's own clipboard (onPaste), not the machine's.
             if (!key || (key.type === 'key' && key.key === 'ctrl+v')) return;
@@ -186,6 +204,13 @@ export function MachineScreen({
             send({ type: 'type', text: text.slice(0, 5000) });
           }}
         />
+
+        {viewOnly && hasPicture && status === 'open' ? (
+          <span className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-md bg-foreground/70 px-2 py-1 text-[11px] font-medium text-background">
+            <Eye aria-hidden className="size-3" />
+            View only while Lawexa works
+          </span>
+        ) : null}
 
         {/* Lawexa's cursor, where its last action landed. */}
         {lawexa && lawexa.x !== null && lawexa.y !== null ? (

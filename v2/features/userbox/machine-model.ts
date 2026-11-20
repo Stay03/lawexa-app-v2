@@ -187,7 +187,50 @@ export function viewRefreshIn(expiresAt: string | null | undefined, now: number)
   return Math.max(0, at - VIEW_REFRESH_LEAD_MS - now);
 }
 
+const CLOCK = new Intl.DateTimeFormat('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+/** "11:12 am" for an ISO time, or '' when it cannot be read. */
+export function clockAt(iso: string): string {
+  const time = Date.parse(iso);
+  return Number.isNaN(time) ? '' : CLOCK.format(time);
+}
+
+/**
+ * What the panel says while Lawexa waits for the person after a hand-over
+ * (Arthur's 3, thread 38ad195b): calm before the 10-minute reminder, a
+ * stronger line after it. Null when Lawexa is not waiting.
+ */
+export function waitingLine(
+  waiting: { remind_at: string; stops_at: string } | null | undefined,
+  now: number,
+): { tone: 'calm' | 'reminded'; text: string } | null {
+  if (!waiting) return null;
+  const stops = clockAt(waiting.stops_at);
+  if (!stops) return null;
+  if (now >= Date.parse(waiting.remind_at)) {
+    return { tone: 'reminded', text: `Lawexa has waited 10 minutes. It stops waiting at ${stops}.` };
+  }
+  return { tone: 'calm', text: `Lawexa waits for you until ${stops}.` };
+}
+
+/** The line on a chat whose answer needs the machine while another chat holds it (Arthur's 5). */
+export function inUseLine(title: string): string {
+  return `Lawexa’s machine is in use in “${title}”. Finish there, or free it here.`;
+}
+
 /** A tool step Lawexa ran on the machine. */
 export function isBoxTool(toolName: string | null | undefined): boolean {
   return typeof toolName === 'string' && toolName.startsWith('box_');
+}
+
+/**
+ * Whether the chat's hand-over step still offers "Open the machine and press
+ * Done": Lawexa handed the machine over and is still waiting. Once Done, a
+ * message or the 30-minute stop has given it back, Done would do nothing.
+ * An unread status (null) keeps the button, as before the status arrives.
+ */
+export function handOverStillWaiting(
+  box: Pick<UserBoxStatus, 'control' | 'control_reason'> | null,
+): boolean {
+  return !box || (box.control === 'user' && box.control_reason === 'hand_over');
 }
