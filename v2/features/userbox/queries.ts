@@ -2,6 +2,7 @@ import { queryOptions, type QueryClient } from '@tanstack/react-query';
 
 import { userBoxApi } from '@/lib/api/user-box';
 import type { UserBoxControlEvent, UserBoxStatus } from '@/types/user-box';
+import { conversationsQueries } from '@/v2/features/conversations/queries';
 
 /**
  * Lawexa's machine, read (Userbox v1). The read issues a fresh view token,
@@ -41,6 +42,16 @@ export function landUserBox(queryClient: QueryClient, next: Partial<UserBoxStatu
 
 /** The `users.{uuid}` → `.userbox.control` broadcast, into the read. */
 export function landUserBoxControl(queryClient: QueryClient, event: UserBoxControlEvent) {
+  // A wait that ends here (Done elsewhere, a message, or the 30-minute stop) may have
+  // written a message into the chat that waited ("Lawexa stopped waiting…"). No turn
+  // brings it, so that chat's transcript is read again (thread 38ad195b).
+  const waitedIn = queryClient
+    .getQueriesData<UserBoxStatus>({ queryKey: userBoxQueries.all })
+    .map(([, read]) => read)
+    .find((read) => read?.control === 'user' && read.control_reason === 'hand_over')?.held_by?.conversation_uuid;
+  if (waitedIn && event.control === 'lawexa') {
+    void queryClient.invalidateQueries({ queryKey: [...conversationsQueries.details(), waitedIn] });
+  }
   landUserBox(queryClient, {
     control: event.control,
     control_reason: event.reason,

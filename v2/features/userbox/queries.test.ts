@@ -88,3 +88,22 @@ test('the live view saying Lawexa drives again ends the wait too', () => {
   landUserBoxMode(queryClient, 'lawexa');
   assert.equal(now()?.waiting, null);
 });
+
+test('a wait that ends reads the waiting chat again, for the note no turn brings', async () => {
+  const { queryClient } = client(read({ control: 'user', control_reason: 'hand_over', waiting: WAIT, held_by: HOLDER }));
+  const chat = ['conversations', 'detail', HOLDER.conversation_uuid, { viewerId: 1 }];
+  const other = ['conversations', 'detail', 'c-2', { viewerId: 1 }];
+  queryClient.setQueryData(chat, { id: HOLDER.conversation_uuid, messages: [] });
+  queryClient.setQueryData(other, { id: 'c-2', messages: [] });
+  landUserBoxControl(queryClient, { control: 'lawexa', reason: null, message: null, waiting: null, held_by: null });
+  assert.equal(queryClient.getQueryState(chat)?.isInvalidated, true);
+  assert.equal(queryClient.getQueryState(other)?.isInvalidated, false);
+});
+
+test('a hand-over that starts reads no chat again', () => {
+  const { queryClient } = client(read());
+  const chat = ['conversations', 'detail', HOLDER.conversation_uuid, { viewerId: 1 }];
+  queryClient.setQueryData(chat, { id: HOLDER.conversation_uuid, messages: [] });
+  landUserBoxControl(queryClient, { control: 'user', reason: 'hand_over', message: 'Sign in.', waiting: WAIT, held_by: HOLDER });
+  assert.equal(queryClient.getQueryState(chat)?.isInvalidated, false);
+});
