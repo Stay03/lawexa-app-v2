@@ -67,16 +67,22 @@ test('row 20: a lawyer has no education step, and the steps around it agree', ()
   assert.equal(shouldShowEducationStep('lawyer'), false);
   assert.equal(shouldShowEducationStep('law_student'), true);
   assert.equal(shouldShowEducationStep('other', 'student'), true);
-  // type, communication, location, [profile], expertise, verification
-  assert.equal(getTotalSteps('lawyer', undefined, false), 6);
-  assert.equal(getTotalSteps('lawyer', undefined, true), 5);
-  assert.equal(getTotalSteps('law_student', undefined, false), 7);
+  // type, communication, location, profile, expertise, verification: step 4 for
+  // every user type since option b (Stay, 20 November 2026), so no shorter count.
+  assert.equal(getTotalSteps('lawyer', undefined), 6);
+  assert.equal(getTotalSteps('law_student', undefined), 7);
+  assert.equal(getTotalSteps('other', 'student'), 6);
+  assert.equal(getTotalSteps('other', 'journalist'), 4);
   const step4 = read('app', '(onboarding)', 'onboarding', 'step-4', 'page.tsx');
   assert.match(step4, /if \(userType === 'lawyer'\) \{\s*\/\/[^\n]*\n\s*router\.push\('\/onboarding\/step-7'\);/);
   const step6 = read('app', '(onboarding)', 'onboarding', 'step-6', 'page.tsx');
   assert.match(step6, /router\.replace\(userType === 'lawyer' \? '\/onboarding\/step-7' : '\/onboarding\/step-4'\);/);
   const step7 = read('app', '(onboarding)', 'onboarding', 'step-7', 'page.tsx');
-  assert.match(step7, /router\.push\(skipProfile \? '\/onboarding\/step-3' : '\/onboarding\/step-4'\);/);
-  assert.match(step7, /currentStep=\{userType === 'lawyer' \? \(skipProfile \? 4 : 5\)/);
-  assert.match(read('app', '(onboarding)', 'onboarding', 'step-8', 'page.tsx'), /currentStep=\{skipProfile \? 5 : 6\}/);
+  assert.match(step7, /if \(userType === 'lawyer'\) \{\s*router\.push\('\/onboarding\/step-4'\);/);
+  assert.match(step7, /currentStep=\{userType === 'lawyer' \? 5 : 6 \+ \(isLawStudent \? 1 : 0\)\}/);
+  assert.match(read('app', '(onboarding)', 'onboarding', 'step-8', 'page.tsx'), /currentStep=\{6\}/);
+  // Option b: step 3 sends every user type on to step 4.
+  const step3 = read('app', '(onboarding)', 'onboarding', 'step-3', 'page.tsx');
+  assert.match(step3, /startTransition\(\(\) => \{\s*router\.push\('\/onboarding\/step-4'\);\s*\}\);/);
+  assert.doesNotMatch(step3, /step-7|step-5/);
 });

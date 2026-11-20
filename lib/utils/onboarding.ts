@@ -1,47 +1,26 @@
 import type { UserType } from '@/types/auth';
 
 /**
- * Calculate total onboarding steps based on user type, profession, and whether profile is skipped
- *
- * When lawyer/law_student selects detected country, profile step is skipped:
- * - Lawyer (skip profile): 5 steps (type, communication, location, expertise, verification)
- * - Law Student (skip profile): 6 steps (type, communication, location, education-level, education, expertise)
- *
- * When profile is shown:
- * - Lawyer: 6 steps (type, communication, location, profile, expertise, verification)
- * - Law Student: 7 steps (type, communication, location, profile, education-level, education, expertise)
- * - Other + Student profession: 5 steps (type, communication, location, profile, education)
- * - Other + Non-student profession: 4 steps (type, communication, location, profile)
+ * How many onboarding steps a person sees. Every user type sees step 4 ("Tell
+ * us about yourself", with the required phone number and "How did you hear
+ * about us?"): Stay chose option b on 20 November 2026 (thread bbdef040), so
+ * Lawyers and Law Students who keep the detected country no longer skip it.
+ * - Lawyer: 6 (type, communication, location, profile, expertise, verification)
+ * - Law Student: 7 (type, communication, location, profile, education level, education, expertise)
+ * - Other, profession Student: 6 (type, communication, location, profile, university, level and area)
+ * - Other: 4 (type, communication, location, profile)
  */
-export function getTotalSteps(
-  userType: UserType | null,
-  profession?: string,
-  skipProfile?: boolean
-): number {
+export function getTotalSteps(userType: UserType | null, profession?: string): number {
   // A lawyer has no education step (Stay, 19 October 2026: the step had no
   // fields for a lawyer; "for 20 skip the step for lawyer").
-  if (userType === 'lawyer') return skipProfile ? 5 : 6;
-  if (userType === 'law_student') return skipProfile ? 6 : 7;
+  if (userType === 'lawyer') return 6;
+  if (userType === 'law_student') return 7;
   if (userType === 'other') {
     // "Other" users with "student" profession get 2 education steps (university, then level+area)
     if (profession === 'student') return 6;
     return 4;
   }
   return 4; // Default
-}
-
-/**
- * Check if profile step should be skipped
- * Lawyers and law students skip profile when they select the detected country
- */
-export function shouldSkipProfileStep(
-  userType: UserType | null,
-  selectedCountryMatchesDetected: boolean
-): boolean {
-  if (userType === 'lawyer' || userType === 'law_student') {
-    return selectedCountryMatchesDetected;
-  }
-  return false;
 }
 
 /**

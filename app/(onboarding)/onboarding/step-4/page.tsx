@@ -39,8 +39,8 @@ export default function OnboardingStep4Page() {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [region, setRegion] = useState(locationData.region || '');
   const [city, setCity] = useState(locationData.city || '');
-  // Optional phone and "How did you hear about us?" (Arthur's pick B, 19 November 2026).
-  const contact = useOnboardingContact(user?.profile?.phone);
+  // Phone and "How did you hear about us?", both required (Stay's option b, 20 November 2026).
+  const contact = useOnboardingContact(user?.profile);
 
   // Redirect if previous steps not completed
   useEffect(() => {

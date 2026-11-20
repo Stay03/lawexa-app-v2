@@ -5,29 +5,35 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { HEARD_ABOUT_OPTIONS, HEARD_ABOUT_OTHER_MAX, heardAboutPayload, heardAboutProblem } from '@/lib/utils/heard-about';
-import { phoneProblem, storedPhone } from '@/lib/utils/phone-number';
+import { HEARD_ABOUT_OPTIONS, HEARD_ABOUT_OTHER_MAX, heardAboutPayload, requiredHeardAboutProblem } from '@/lib/utils/heard-about';
+import { requiredPhoneProblem, storedPhone } from '@/lib/utils/phone-number';
 
 /**
- * The optional phone number and "How did you hear about us?" (Arthur, 18
- * November 2026; on the "Tell us about yourself" step since his pick B, 19
- * November 2026, thread bbdef040).
+ * The phone number and "How did you hear about us?" on the "Tell us about
+ * yourself" step (Arthur, 18-19 November 2026, thread bbdef040). Both are
+ * required since Stay's option b (20 November 2026): every user type sees the
+ * step, and Next holds until both are answered.
  *
  * The step saves without waiting for the answer, so the server's rules are
- * checked here first: `check()` holds Next on a refused answer and shows why.
+ * checked here first: `check()` holds Next on a missing or refused answer and
+ * shows why. An answer already saved (Back, then Next again) fills the fields.
  * `payload()` carries only what the person typed or chose: a phone left
  * untouched is not sent, so the server keeps what it has.
  */
-export function useOnboardingContact(savedPhone: string | null | undefined) {
+export function useOnboardingContact(saved: {
+  phone?: string | null;
+  heard_about?: string | null;
+  heard_about_other?: string | null;
+} | null | undefined) {
   const [phone, setPhone] = useState<string | null>(null);
   const [phoneTouched, setPhoneTouched] = useState(false);
-  const [heardAbout, setHeardAbout] = useState<string | null>(null);
-  const [heardAboutOther, setHeardAboutOther] = useState('');
+  const [heardAbout, setHeardAbout] = useState<string | null>(saved?.heard_about ?? null);
+  const [heardAboutOther, setHeardAboutOther] = useState(saved?.heard_about_other ?? '');
   const [heardTouched, setHeardTouched] = useState(false);
 
-  const phoneValue = phone ?? savedPhone ?? '';
-  const phoneError = phoneProblem(phoneValue);
-  const heardError = heardAboutProblem(heardAbout, heardAboutOther);
+  const phoneValue = phone ?? saved?.phone ?? '';
+  const phoneError = requiredPhoneProblem(phoneValue);
+  const heardError = requiredHeardAboutProblem(heardAbout, heardAboutOther);
 
   /** True when both answers may be sent; otherwise shows why and returns false. */
   const check = () => {
@@ -46,7 +52,7 @@ export function useOnboardingContact(savedPhone: string | null | undefined) {
     <>
       <div className="space-y-2">
         <Label htmlFor="onboarding-phone">
-          Phone number <span className="font-normal text-muted-foreground">(optional)</span>
+          Phone number
         </Label>
         <Input
           id="onboarding-phone"
@@ -70,7 +76,7 @@ export function useOnboardingContact(savedPhone: string | null | undefined) {
 
       <div className="space-y-2">
         <Label htmlFor="onboarding-heard-about">
-          How did you hear about us? <span className="font-normal text-muted-foreground">(optional)</span>
+          How did you hear about us?
         </Label>
         <Select
           value={heardAbout ?? undefined}
@@ -79,7 +85,12 @@ export function useOnboardingContact(savedPhone: string | null | undefined) {
             setHeardTouched(false);
           }}
         >
-          <SelectTrigger id="onboarding-heard-about" className="w-full">
+          <SelectTrigger
+            id="onboarding-heard-about"
+            className="w-full"
+            aria-invalid={heardTouched && heardError !== null}
+            aria-describedby={heardTouched && heardError ? 'onboarding-heard-error' : undefined}
+          >
             <SelectValue placeholder="Choose one" />
           </SelectTrigger>
           <SelectContent>

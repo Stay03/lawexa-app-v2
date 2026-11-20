@@ -49,3 +49,11 @@ export function heardAboutLabel(choice: string | null | undefined, other?: strin
   if (choice === 'other') return other?.trim() ? `Other: ${other.trim()}` : 'Other';
   return HEARD_ABOUT_OPTIONS.find((option) => option.value === choice)?.label ?? choice;
 }
+
+/** Onboarding asks how they heard about Lawexa (Stay's option b, 20 November 2026). */
+export const HEARD_ABOUT_REQUIRED = 'Choose how you heard about Lawexa.';
+
+/** At onboarding an answer is required; then the same rule as anywhere else. */
+export function requiredHeardAboutProblem(choice: string | null, other: string): string | null {
+  return choice === null || choice === '' ? HEARD_ABOUT_REQUIRED : heardAboutProblem(choice, other);
+}

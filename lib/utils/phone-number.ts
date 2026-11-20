@@ -43,3 +43,11 @@ export function formatPhone(stored: string | null | undefined): string {
   const nigerian = /^\+234(\d{3})(\d{3})(\d{4})$/.exec(stored);
   return nigerian ? `+234 ${nigerian[1]} ${nigerian[2]} ${nigerian[3]}` : stored;
 }
+
+/** Onboarding asks for a number (Stay's option b, 20 November 2026). */
+export const PHONE_REQUIRED = 'Enter your phone number.';
+
+/** At onboarding the number is required; then the same rule as anywhere else. */
+export function requiredPhoneProblem(raw: string): string | null {
+  return phoneDigits(raw) === '' ? PHONE_REQUIRED : phoneProblem(raw);
+}

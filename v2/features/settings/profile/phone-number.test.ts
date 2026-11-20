@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { PHONE_PROBLEM, formatPhone, phoneDigits, phoneProblem, storedPhone } from '@/lib/utils/phone-number';
+import { PHONE_REQUIRED, requiredPhoneProblem } from '@/lib/utils/phone-number';
+import { HEARD_ABOUT_REQUIRED, requiredHeardAboutProblem } from '@/lib/utils/heard-about';
 import { buildProfilePayload, profileFormValuesFromUser, settleProfileValues, validateProfileForm, visibilityFor } from './form-model';
 import type { User } from '@/types/auth';
 
@@ -66,7 +68,8 @@ test('the wiring: onboarding step 4 (Arthur’s pick B), the Profile row, and th
   assert.match(step, /if \(!contact\.check\(\)\) return;/, 'a refused number holds Next');
   assert.match(step, /saveStep\(\{ step: 4, \.\.\.stepFields, \.\.\.contact\.payload\(\) \}\);/);
   assert.match(contact, /\.\.\.\(phone !== null \? \{ phone: storedPhone\(phone\) \} : \{\}\),/, 'sent only when typed');
-  assert.match(contact, /<Label htmlFor="onboarding-phone">\s*Phone number <span/);
+  // Required since option b (Stay, 20 November 2026): the label has no "(optional)".
+  assert.match(contact, /<Label htmlFor="onboarding-phone">\s*Phone number\s*<\/Label>/);
   assert.doesNotMatch(read('app', '(onboarding)', 'onboarding', 'step-3', 'page.tsx'), /onboarding-phone|heard/i, 'step 3 asks only where you are');
   const fields = read('v2', 'features', 'settings', 'profile', 'text-fields.ts');
   assert.match(fields, /phone: \{\s*icon: Phone,\s*label: 'Phone number',/);
@@ -102,7 +105,7 @@ test('the wiring: no line under the phone field, the question on step 4, and adm
   const step = read('components', 'onboarding', 'OnboardingContactFields.tsx');
   assert.doesNotMatch(step, /PHONE_HINT/, 'no line under the phone field (Arthur: "use none")');
   assert.doesNotMatch(read('v2', 'features', 'settings', 'profile', 'text-fields.ts'), /PHONE_HINT|hint: .*phone/i);
-  assert.match(step, /<Label htmlFor="onboarding-heard-about">\s*How did you hear about us\? <span/);
+  assert.match(step, /<Label htmlFor="onboarding-heard-about">\s*How did you hear about us\?\s*<\/Label>/);
   assert.match(step, /if \(!phoneError && !heardError\) return true;/, 'a refused answer holds Next');
   assert.match(step, /\.\.\.heardAboutPayload\(heardAbout, heardAboutOther\),/);
   assert.match(read('components', 'admin', 'UserDetailHeader.tsx'), /Heard about Lawexa: \{heardAboutLabel\(user\.profile\?\.heard_about, user\.profile\?\.heard_about_other\)\}/);
@@ -124,3 +127,35 @@ test('the privacy policy says what the phone number is for, where it belongs (Ar
   assert.ok(section < additional && additional < policy.indexOf(sentence) && policy.indexOf(sentence) < next, 'after the additional-information paragraph');
   assert.match(read('app', '(legal)', 'privacy', 'page.tsx'), /Last modified on November 18, 2026/);
 });
+
+/* Stay's option b (20 November 2026, thread bbdef040): onboarding step 4
+ * requires both answers, for every user type. Settings keeps the number
+ * optional (phoneProblem above). TEST DATA. */
+
+test('at onboarding a phone number is required, then checked as anywhere else', () => {
+  assert.equal(PHONE_REQUIRED, 'Enter your phone number.');
+  assert.equal(requiredPhoneProblem(''), PHONE_REQUIRED);
+  assert.equal(requiredPhoneProblem('  -  '), PHONE_REQUIRED, 'only spaces and dashes');
+  assert.equal(requiredPhoneProblem('12345'), PHONE_PROBLEM);
+  assert.equal(requiredPhoneProblem('0803 123 4567'), null);
+  assert.equal(requiredPhoneProblem('+2348031234567'), null);
+});
+
+test('at onboarding "How did you hear about us?" is required, then checked as anywhere else', () => {
+  assert.equal(HEARD_ABOUT_REQUIRED, 'Choose how you heard about Lawexa.');
+  assert.equal(requiredHeardAboutProblem(null, ''), HEARD_ABOUT_REQUIRED);
+  assert.equal(requiredHeardAboutProblem('', ''), HEARD_ABOUT_REQUIRED);
+  assert.equal(requiredHeardAboutProblem('other', ''), 'Tell us where you heard about Lawexa.');
+  assert.equal(requiredHeardAboutProblem('other', 'TEST DATA bar association talk'), null);
+});
+
+test('step 4 asks for both without "(optional)", and fills an answer already saved', () => {
+  const fields = readFileSync(join(process.cwd(), 'components', 'onboarding', 'OnboardingContactFields.tsx'), 'utf8');
+  assert.doesNotMatch(fields, /\(optional\)/);
+  assert.match(fields, /const phoneError = requiredPhoneProblem\(phoneValue\);/);
+  assert.match(fields, /const heardError = requiredHeardAboutProblem\(heardAbout, heardAboutOther\);/);
+  assert.match(fields, /useState<string \| null>\(saved\?\.heard_about \?\? null\)/);
+  const step4 = readFileSync(join(process.cwd(), 'app', '(onboarding)', 'onboarding', 'step-4', 'page.tsx'), 'utf8');
+  assert.match(step4, /useOnboardingContact\(user\?\.profile\)/);
+});
+

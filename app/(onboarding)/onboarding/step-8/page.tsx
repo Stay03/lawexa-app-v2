@@ -20,7 +20,7 @@ import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
-import { getTotalSteps, shouldSkipProfileStep } from '@/lib/utils/onboarding';
+import { getTotalSteps } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
 import { lawyerVerificationApi, type LawyerProfileDocument } from '@/lib/api/lawyerVerification';
 import { toast } from 'sonner';
@@ -162,11 +162,6 @@ export default function OnboardingStep8Page() {
   const [profileCreated, setProfileCreated] = useState(!!verificationData.lawyerProfileId);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Check if profile step was skipped
-  const skipProfile = shouldSkipProfileStep(
-    userType,
-    locationData.selectedCountryMatchesDetected || false
-  );
 
   // Create lawyer profile on mount
   useEffect(() => {
@@ -349,8 +344,8 @@ export default function OnboardingStep8Page() {
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress
-          currentStep={skipProfile ? 5 : 6}
-          totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
+          currentStep={6}
+          totalSteps={getTotalSteps(userType, profileData.profession)}
         />
 
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">

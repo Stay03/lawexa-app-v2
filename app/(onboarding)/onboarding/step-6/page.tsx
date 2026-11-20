@@ -27,7 +27,6 @@ import {
   getTotalSteps,
   shouldShowEducationStep,
   shouldShowExpertiseStep,
-  shouldSkipProfileStep,
 } from '@/lib/utils/onboarding';
 import { getLevelOptions, getLawSchoolOptions } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
@@ -77,11 +76,6 @@ export default function OnboardingStep6Page() {
     return countryUniversities || [];
   }, [searchQuery, searchResults, countryUniversities]);
 
-  // Check if profile step was skipped
-  const skipProfile = shouldSkipProfileStep(
-    userType,
-    locationData.selectedCountryMatchesDetected || false
-  );
 
   // Redirect if previous steps not completed or education step not needed
   useEffect(() => {
@@ -141,8 +135,6 @@ export default function OnboardingStep6Page() {
     if (isLawStudent) {
       // Law students go back to education level selection (step-5)
       router.push('/onboarding/step-5');
-    } else if (skipProfile) {
-      router.push('/onboarding/step-3');
     } else {
       router.push('/onboarding/step-4');
     }
@@ -217,14 +209,14 @@ export default function OnboardingStep6Page() {
   const isLoading = loadingCountryUniversities || loadingSearch;
 
   // Calculate current step number: law students have an extra step (education level selection)
-  const currentStep = (skipProfile ? 4 : 5) + (isLawStudent ? 1 : 0);
+  const currentStep = 5 + (isLawStudent ? 1 : 0);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress
           currentStep={currentStep}
-          totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
+          totalSteps={getTotalSteps(userType, profileData.profession)}
         />
 
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
