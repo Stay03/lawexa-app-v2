@@ -8,7 +8,7 @@ import { userBoxApi } from '@/lib/api/user-box';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { UserBoxDoneResult } from '@/types/user-box';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { machineControl, machinePhase, splitRelease, viewRefreshIn, type MachineInputs } from './machine-model';
+import { machineControl, machinePhase, releaseRefusal, splitRelease, viewRefreshIn, type MachineInputs } from './machine-model';
 import { landUserBox, landUserBoxMode, userBoxQueries } from './queries';
 
 /**
@@ -27,7 +27,7 @@ import { landUserBox, landUserBoxMode, userBoxQueries } from './queries';
  */
 
 /** The server's reason for a refusal (`{errors: {reason}}`), when it sent one. */
-function reasonOf(error: unknown): string | null {
+export function reasonOf(error: unknown): string | null {
   const errors = extractApiError(error).errors as unknown;
   if (errors && typeof errors === 'object' && typeof (errors as { reason?: unknown }).reason === 'string') {
     return (errors as { reason: string }).reason;
@@ -71,12 +71,13 @@ export function useMachine({ onResumed }: { onResumed: (result: UserBoxDoneResul
         });
       }
     },
-    onError: (error) =>
-      toast.error(
-        extractApiError(error).status === 409
-          ? 'Lawexa is still answering in that chat. Free the machine when it has finished.'
-          : extractApiError(error).message || 'The machine was not freed. Try again.',
-      ),
+    onError: (error) => {
+      const { status, message } = extractApiError(error);
+      const refusal = releaseRefusal(status, reasonOf(error), message, read.data?.held_by?.title ?? null);
+      // Freed, but this chat did not carry on (no balance, a confidential chat, its own send): read the machine again.
+      if (refusal.machineFreed) void queryClient.invalidateQueries({ queryKey: userBoxQueries.all });
+      toast.error(refusal.text);
+    },
     meta: { silentError: true },
   });
   const done = useMutation({

@@ -10,6 +10,7 @@ import {
   MACHINE_FREE_LINE,
   machineFree,
   noLongerInUseLine,
+  releaseRefusal,
   splitRelease,
   cursorPosition,
   handOverState,
@@ -256,5 +257,16 @@ test("a release's answer splits into the machine for the read and the turn to fo
   assert.equal('resumed' in carried.status || 'execution_id' in carried.status, false, 'the read keeps only the machine');
   assert.equal(splitRelease({ ...box, resumed: false }).resumedTurn, null, 'nothing to carry on');
   assert.equal(splitRelease({ ...box, resumed: undefined }).resumedTurn, null, 'a release without a chat (a server before the option)');
+});
+
+test('a refused Free it says why, and knows when the machine was freed anyway (Backend, 20 November 2026)', () => {
+  const busy = releaseRefusal(409, 'machine_busy', 'Lawexa is still working…', 'TEST DATA CAC');
+  assert.deepEqual(busy, { text: 'Lawexa is still answering in “TEST DATA CAC”. Free the machine when it has finished.', machineFreed: false });
+  assert.equal(releaseRefusal(409, 'machine_busy', null, null).text, 'Lawexa is still answering in that chat. Free the machine when it has finished.');
+  const broke = releaseRefusal(422, 'no_balance', 'TEST DATA. Top up, then press Free it and use it here again.', 'TEST DATA CAC');
+  assert.deepEqual(broke, { text: 'TEST DATA. Top up, then press Free it and use it here again.', machineFreed: true });
+  assert.equal(releaseRefusal(422, 'not_resumable', null, null).machineFreed, true, 'a confidential chat');
+  assert.equal(releaseRefusal(409, 'busy', null, null).machineFreed, true, "this chat's own send holds it");
+  assert.deepEqual(releaseRefusal(404, null, null, null), { text: 'The machine was not freed. Try again.', machineFreed: false });
 });
 

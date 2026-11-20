@@ -18,9 +18,11 @@ import {
   inUseCardState,
   inUseLine,
   noLongerInUseLine,
+  releaseRefusal,
   splitRelease,
 } from './machine-model';
 import { landUserBox, userBoxQueries } from './queries';
+import { reasonOf } from './use-machine';
 
 /**
  * Under an answer that met Lawexa's machine held by another chat (Arthur's 5,
@@ -53,12 +55,14 @@ export function MachineInUseCard({ holder }: { holder: { conversation_uuid: stri
         toast.success(FREED_CARD_LINE);
       }
     },
-    onError: (error) =>
-      toast.error(
-        extractApiError(error).status === 409
-          ? `Lawexa is still answering in “${holder.title}”. Free the machine when it has finished.`
-          : extractApiError(error).message || 'The machine was not freed. Try again.',
-      ),
+    onError: (error) => {
+      const { status, message } = extractApiError(error);
+      const refusal = releaseRefusal(status, reasonOf(error), message, holder.title);
+      // Freed, but this chat did not carry on (no balance, a confidential chat, its own send):
+      // read the machine again, and the card turns into its plain line.
+      if (refusal.machineFreed) void queryClient.invalidateQueries({ queryKey: userBoxQueries.all });
+      toast.error(refusal.text);
+    },
     meta: { silentError: true },
   });
   if (carriedOn || inUseCardState(box, holder.conversation_uuid) === 'freed') {

@@ -299,3 +299,32 @@ export function inUseCardState(
   return box.held_by?.conversation_uuid === holderUuid ? 'held' : 'freed';
 }
 
+/**
+ * What a refused "Free it" says, and whether the machine was freed anyway
+ * (Backend, 20 November 2026):
+ * - 409 `machine_busy`: the chat holding it is still answering; nothing freed;
+ * - 422 (`no_balance`, `not_resumable`) or another 409 (`busy`: this chat's
+ *   own send holds it): the machine IS freed, but this chat does not carry on;
+ * - anything else (404: not a chat the person can send in): nothing freed.
+ * The server's own sentence is shown when it sends one.
+ */
+export function releaseRefusal(
+  status: number,
+  reason: string | null,
+  message: string | null,
+  holderTitle: string | null,
+): { text: string; machineFreed: boolean } {
+  if (status === 409 && reason === 'machine_busy') {
+    return {
+      text: holderTitle
+        ? `Lawexa is still answering in “${holderTitle}”. Free the machine when it has finished.`
+        : 'Lawexa is still answering in that chat. Free the machine when it has finished.',
+      machineFreed: false,
+    };
+  }
+  if (status === 422 || status === 409) {
+    return { text: message || 'The machine is free, but Lawexa could not carry on here. Send a message to carry on.', machineFreed: true };
+  }
+  return { text: message || 'The machine was not freed. Try again.', machineFreed: false };
+}
+
