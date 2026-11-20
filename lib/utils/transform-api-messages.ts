@@ -11,6 +11,7 @@ import type {
 import { draftEditBases, resolveDraftEdits } from './draft-edits';
 import { readCardAnswers, readQuestionCard } from './question-card';
 import { readSkillDraftCard } from './skill-draft';
+import type { UsedPrivateItem } from '@/types/private-items';
 import { isRedactionSummary } from './redaction-summary';
 import { createResultPool } from './tool-call-match';
 import { compactedStep } from './context-compacted';
@@ -270,6 +271,13 @@ export function transformApiMessages(
         ...(isRedactionSummary(apiMsg.metadata?.redaction) && { redaction: apiMsg.metadata.redaction }),
         // The turn that answered a question card: drawn as a bubble of its questions and answers.
         ...(cardAnswers && { cardAnswers }),
+        // The owner's yes to an ask-first card (thread 9ae498ae): a quiet line, not a bubble.
+        ...(apiMsg.metadata?.type === 'private_item_answer' && {
+          privateItemAnswer: {
+            choice: apiMsg.metadata.choice === 'always' ? ('always' as const) : ('once' as const),
+            kind: apiMsg.metadata.item_kind === 'skill' ? ('skill' as const) : ('template' as const),
+          },
+        }),
       } as ChatMessage);
     }
     // Handover message - orchestrator delegating to sub-agent
@@ -455,5 +463,49 @@ export function transformApiMessages(
     }
   }
 
-  return messages;
+  return withPrivateItems(messages, apiMessages);
+}
+
+/**
+ * Own templates and skills in Space chats (thread 9ae498ae), on whichever kind
+ * of answer carries them: the turn the last answer of each turn ended (the
+ * owner's ask-first card sits under it), and whose own item an answer used.
+ * Answers without either come back as they were.
+ */
+function withPrivateItems<Row extends { id: string }>(messages: Row[], apiMessages: ApiMessage[]): Row[] {
+  const byId = new Map<string, { turnId?: string; used?: UsedPrivateItem[] }>();
+  const lastOfTurn = new Map<string, number>();
+  // A turn's final reply may carry no execution_id of its own while its steps
+  // do (Backend's e2e, 19 November 2026): it takes the turn of the steps before
+  // it, back to the question that started them.
+  let currentTurn: string | null = null;
+  for (const apiMsg of apiMessages) {
+    if (apiMsg.role === 'user') {
+      currentTurn = null;
+      continue;
+    }
+    const own = apiMsg.metadata?.execution_id ?? null;
+    if (own) currentTurn = own;
+    if (apiMsg.role !== 'assistant') continue;
+    const type = apiMsg.metadata?.type;
+    const isReply = !type || type === 'skill_draft' || type === 'question_card' || type === 'draft_edit';
+    const turn = own ?? currentTurn;
+    if (turn && isReply) lastOfTurn.set(turn, apiMsg.id);
+    const used = apiMsg.used_private_items?.filter((item) => item && typeof item.owner?.name === 'string');
+    if (used?.length) byId.set(`msg_${apiMsg.id}`, { used });
+  }
+  for (const [turnId, apiId] of lastOfTurn) {
+    const key = `msg_${apiId}`;
+    byId.set(key, { ...byId.get(key), turnId });
+  }
+  if (byId.size === 0) return messages;
+  return messages.map((message) => {
+    const found = byId.get(message.id);
+    if (!found) return message;
+    return {
+      ...message,
+      ...(found.turnId ? { turnId: found.turnId } : {}),
+      ...(found.used?.length ? { usedPrivateItems: found.used } : {}),
+    };
+  });
 }

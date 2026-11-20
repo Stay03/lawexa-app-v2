@@ -33,9 +33,13 @@ import type { UserBoxControlEvent } from '@/types/user-box';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { resetAppBadge, setAppMentionBadge } from './app-badge';
 import { dispatchChannelUnread, type ResolvedChannelContext } from './dispatcher';
+import { privateItemsQueries } from '@/v2/features/private-items/queries';
 import { disconnectV2Echo, getV2Echo } from './echo';
 import {
   EVT_CHANNEL_UNREAD,
+  EVT_MY_TEMPLATE_UPDATED,
+  EVT_PRIVATE_ITEM_ANSWERED,
+  EVT_PRIVATE_ITEM_REQUESTED,
   EVT_USERBOX_CONTROL,
   userChannelName,
   type ChannelUnreadEvent,
@@ -337,6 +341,18 @@ export function RealtimeSpine() {
     // read the panel holds; nothing is read when no panel is open.
     channel.listen(EVT_USERBOX_CONTROL, (payload: UserBoxControlEvent) => {
       landUserBoxControl(queryClient, payload);
+    });
+
+    // Own templates and skills (thread 9ae498ae): a request to use one in a
+    // Space chat, its answer from another tab, and a template that finished
+    // reading. Read again; the open chat or list shows it at once.
+    const readRequests = (payload: { conversation_uuid?: string }) => {
+      if (payload.conversation_uuid) void queryClient.invalidateQueries({ queryKey: privateItemsQueries.requests(payload.conversation_uuid) });
+    };
+    channel.listen(EVT_PRIVATE_ITEM_REQUESTED, readRequests);
+    channel.listen(EVT_PRIVATE_ITEM_ANSWERED, readRequests);
+    channel.listen(EVT_MY_TEMPLATE_UPDATED, () => {
+      void queryClient.invalidateQueries({ queryKey: privateItemsQueries.templates });
     });
 
     // Reconnect gap recovery: between drop and re-establish, every event was

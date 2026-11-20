@@ -6,7 +6,7 @@ import type { SkillDraftCard, SkillDraftStatus } from '@/types/skill-draft';
  * tested on their own.
  */
 
-const STATUSES: readonly SkillDraftStatus[] = ['proposed', 'pending', 'dismissed', 'published', 'rejected'];
+const STATUSES: readonly SkillDraftStatus[] = ['proposed', 'pending', 'dismissed', 'published', 'rejected', 'saved_private'];
 
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -48,6 +48,8 @@ const STAGE: Readonly<Record<SkillDraftStatus, number>> = {
   dismissed: 1,
   published: 2,
   rejected: 2,
+  // Kept as the person's own skill: as final as an admin's answer.
+  saved_private: 2,
 };
 
 export function laterSkillDraftCard(local: SkillDraftCard, server: SkillDraftCard): SkillDraftCard {
@@ -73,6 +75,8 @@ export function skillDraftStatusLine(status: SkillDraftStatus): string | null {
       return 'Approved and published';
     case 'rejected':
       return 'Not approved';
+    case 'saved_private':
+      return 'Saved to My skills';
   }
 }
 

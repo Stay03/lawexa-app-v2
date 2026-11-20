@@ -1,3 +1,4 @@
+import type { UsedPrivateItem } from './private-items';
 import type { JurisdictionChoice } from './jurisdiction';
 import type { IBlockedReason } from './message-pack';
 import type { SkillDraftCard } from './skill-draft';
@@ -111,6 +112,20 @@ export interface ChatMessage {
    * saves for an admin, or sets aside.
    */
   skillDraft?: SkillDraftCard;
+  /**
+   * The turn this answer ended (`metadata.execution_id`), on the last answer
+   * of each turn only: in a Space chat the owner's ask-first card sits under
+   * the answer whose turn asked (thread 9ae498ae).
+   */
+  turnId?: string;
+  /**
+   * The owner's yes to using one of their own items in a Space chat
+   * (`metadata.type` "private_item_answer"): drawn as a quiet line, not a
+   * bubble; its content is Lawexa's instruction and is never shown.
+   */
+  privateItemAnswer?: { choice: 'once' | 'always'; kind: 'template' | 'skill' };
+  /** Whose own template or skill Lawexa used for this answer; the name is the owner's to see only. */
+  usedPrivateItems?: UsedPrivateItem[];
   /**
    * The user turn that answered a card (`metadata.type` "question_answers"):
    * drawn as a bubble of each question with its answer.
@@ -742,6 +757,9 @@ export interface ChatStartRequest {
   // Start the conversation in a space (backend B4): first turn only, never with
   // conversation_id, is_confidential or is_redacted (the server answers 422).
   space_uuid?: string;
+  // The sender's own template or skill for this message ("Use in chat"):
+  // Lawexa uses it with no ask card. 422 for an item not theirs, or off.
+  use_items?: { kind: 'template' | 'skill'; uuid: string }[];
   // A new chat's first send only, never with conversation_id (422): a uuid made
   // once per composed send and sent again on every retry of it, so a retry after
   // the server already made the chat gets that chat back (backend, 17 October
@@ -894,7 +912,9 @@ export interface ApiMessage {
       | 'quiz_game_live'
       | 'quiz_game_finished'
       // A long reply's earlier reading was summarised (context-compacted.ts).
-      | 'context_compacted';
+      | 'context_compacted'
+      // The owner's answer to an ask-first card, which resumed the turn (thread 9ae498ae).
+      | 'private_item_answer';
     /** On an `agent_message` row: the agent that wrote it, drawn as "From Expert". */
     from_agent?: { id: number; slug: string; name: string };
     /** On a `question_card` answer: the card's state, its questions and, once answered, the answers. */
@@ -903,6 +923,9 @@ export interface ApiMessage {
     answers?: QuestionCardAnswer[] | null;
     /** On a `question_answers` user turn: the card it answered. */
     card_message_id?: number;
+    /** On a `private_item_answer` user row: what the owner chose, and for what. */
+    choice?: 'once' | 'always';
+    item_kind?: 'template' | 'skill';
     /**
      * On an answer: each `<draft-edit>` it holds, applied by the server once
      * the answer was saved, by "id:version" (lib/utils/draft-edits.ts).
@@ -988,6 +1011,8 @@ export interface ApiMessage {
   author?: ConversationAuthor | null;
   /** The message this row replies to; `null` when it replies to nothing. Absent on a server before replies. */
   reply_to?: MessageReplyTo | null;
+  /** On an assistant message: whose own template or skill it used (thread 9ae498ae). */
+  used_private_items?: UsedPrivateItem[];
   /** The people tagged in this row (`[]` when none, and in personal chats). */
   mentions?: MessageMention[];
   /**

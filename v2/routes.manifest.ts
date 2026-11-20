@@ -141,6 +141,8 @@ export const V2_ROUTES = [
   '/settings/developer',
   '/settings/notifications',
   '/settings/devices',
+  '/settings/templates',
+  '/settings/skills',
   '/settings/message-packs',
   '/settings/billing',
   '/settings/referrals',

@@ -7,6 +7,7 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { RedactionCategory } from '@/types/redaction';
 import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import type { ChatReference, MessageAttachment, RedactionSummary } from '@/types/chat';
+import type { UseItem } from '@/types/private-items';
 import {
   appendUserTurn,
   deleteTranscript,
@@ -97,6 +98,13 @@ export interface StartConversationInput {
    * neither and this flow sends neither with it.
    */
   spaceUuid?: string;
+  /**
+   * The person's own template or skill picked with "Use in chat" (Arthur's
+   * pages, 19 November 2026): sent as `use_items`, and Lawexa uses it for this
+   * message with no ask card. The server refuses (422) an item that is not the
+   * sender's, or is off.
+   */
+  useItems?: UseItem[];
 }
 
 export interface StartConversationDeps {
@@ -311,6 +319,8 @@ export async function startConversation(
       ...(references && references.length > 0 && { references }),
       // The space it starts in — first turn only, never with a private mode.
       ...(spaceUuid !== undefined && { space_uuid: spaceUuid }),
+      // The person's own item for this message ("Use in chat").
+      ...(input.useItems && input.useItems.length > 0 && { use_items: input.useItems }),
     };
     const post = (clientRequestId: string) =>
       chatApi.start(applyJurisdiction({ ...baseBody, client_request_id: clientRequestId }, jurisdiction));

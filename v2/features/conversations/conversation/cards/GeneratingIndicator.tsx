@@ -6,7 +6,7 @@ import {
   Telescope,
   ListChecks,
   FileText,
-  Sparkles,
+  Loader2,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,7 @@ const ELEMENT_META: Record<GeneratingElement, { icon: LucideIcon; label: string 
   note_link: { icon: FileText, label: 'Preparing note' },
 };
 
-const FALLBACK = { icon: Sparkles, label: 'Generating' };
+const FALLBACK = { icon: Loader2, label: 'Generating' };
 
 /**
  * Minimal streaming placeholder shown while a special element (quiz, lawyer card,

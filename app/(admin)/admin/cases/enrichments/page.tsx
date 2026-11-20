@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Sparkles } from 'lucide-react';
+import { FilePlus2 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -126,7 +126,7 @@ function EnrichmentsPageContent() {
     <div className="space-y-6">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Sparkles className="h-6 w-6 text-primary" />
+          <FilePlus2 className="h-6 w-6 text-primary" />
           Case Enrichment
         </h1>
         <p className="text-sm text-muted-foreground">

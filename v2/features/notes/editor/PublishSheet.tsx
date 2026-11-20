@@ -2,7 +2,7 @@
 
 import { useState, type KeyboardEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Globe, Lock, Sparkles, X } from 'lucide-react';
+import { Globe, Lock, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -310,7 +310,6 @@ export function PublishSheet({
                         : 'bg-primary/10 pl-3',
                     )}
                   >
-                    {suggested ? <Sparkles aria-hidden className="size-3 shrink-0" /> : null}
                     {tag}
                     <button
                       type="button"
