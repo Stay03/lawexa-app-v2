@@ -194,6 +194,11 @@ export interface AdminUserProfile {
   website_url: string | null;
   twitter_url: string | null;
   facebook_url: string | null;
+  /** Optional, "+" and digits (Arthur, 18 November 2026). Absent from older servers. */
+  phone?: string | null;
+  /** "How did you hear about us?" (Arthur, 18 November 2026). Absent from older servers. */
+  heard_about?: string | null;
+  heard_about_other?: string | null;
 }
 
 export interface AdminAreaOfExpertise {
@@ -369,6 +374,10 @@ export interface IAdminUserListItem {
   free_messages_blocked: boolean;
   source: string;
   attribution: IAdminUserListAttribution | null;
+  /** Optional, "+" and digits (Arthur, 18 November 2026). Absent from older servers. */
+  phone?: string | null;
+  /** "How did you hear about us?": the key only (Backend, 18 November 2026). */
+  heard_about?: string | null;
   /** The current period's cost alert, when at or over the threshold. Absent from older servers. */
   cost_alert?: UserCostAlert | null;
   created_at: string;

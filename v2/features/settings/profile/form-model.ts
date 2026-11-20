@@ -3,6 +3,7 @@ import {
   inferStudentEducationLevel,
   type ProfileFieldVisibility,
 } from '@/lib/utils/profile-field-config';
+import { phoneProblem, storedPhone } from '@/lib/utils/phone-number';
 import type { User, UserType } from '@/types/auth';
 import type { StudentEducationLevel } from '@/types/onboarding';
 import type { ProfileUpdatePayload } from '@/types/profile';
@@ -120,6 +121,8 @@ export interface ProfileFormValues {
   website_url: string;
   twitter_url: string;
   facebook_url: string;
+  /** Optional; held as the server stores it, "+" and digits (Arthur, 18 November 2026). */
+  phone: string;
 }
 
 /**
@@ -166,6 +169,7 @@ export type ProfileFieldName =
   | 'website_url'
   | 'twitter_url'
   | 'facebook_url'
+  | 'phone'
   | 'form';
 
 export type ProfileFieldErrors = Partial<Record<ProfileFieldName, string>>;
@@ -209,6 +213,7 @@ export function profileFormValuesFromUser(user: User): ProfileFormValues {
     website_url: profile?.website_url ?? '',
     twitter_url: profile?.twitter_url ?? '',
     facebook_url: profile?.facebook_url ?? '',
+    phone: profile?.phone ?? '',
   };
 }
 
@@ -285,6 +290,9 @@ export function settleProfileValues(
     website_url: next.website_url.trim(),
     twitter_url: next.twitter_url.trim(),
     facebook_url: next.facebook_url.trim(),
+    // As the server stores it, so the saved baseline matches what comes back
+    // (0803… is saved as +234803…).
+    phone: storedPhone(next.phone),
   };
 
   /* Only the NEW visibility is consulted now. What a field used to be visible
@@ -440,6 +448,8 @@ export function buildProfilePayload(
   if (values.facebook_url !== original.facebook_url) {
     payload.facebook_url = values.facebook_url;
   }
+  // "" clears it, which is how somebody removes their number.
+  if (values.phone !== original.phone) payload.phone = values.phone;
 
   // The backend replaces this list wholesale, so it travels in full or not at
   // all. An empty list is a real answer and does travel, which is how somebody
@@ -532,6 +542,9 @@ export function validateProfileForm(
   if (values.address.trim().length > PROFILE_LIMITS.address) {
     fields.address = `Keep this to ${PROFILE_LIMITS.address} characters or fewer.`;
   }
+
+  const phone = phoneProblem(values.phone);
+  if (phone) fields.phone = phone;
 
   if (visibility.showCallToBarYear && values.call_to_bar_year.trim()) {
     const year = Number(values.call_to_bar_year.trim());

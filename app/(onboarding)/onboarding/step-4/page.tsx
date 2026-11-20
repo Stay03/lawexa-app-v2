@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { OnboardingProgress } from '@/components/onboarding/OnboardingProgress';
 import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
+import { useOnboardingContact } from '@/components/onboarding/OnboardingContactFields';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
@@ -38,6 +39,8 @@ export default function OnboardingStep4Page() {
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [region, setRegion] = useState(locationData.region || '');
   const [city, setCity] = useState(locationData.city || '');
+  // Phone and "How did you hear about us?", both required (Stay's option b, 20 November 2026).
+  const contact = useOnboardingContact(user?.profile);
 
   // Redirect if previous steps not completed
   useEffect(() => {
@@ -54,14 +57,9 @@ export default function OnboardingStep4Page() {
   // Check if user has a custom profession (not in predefined options)
   const hasCustomProfession = profession && !PROFESSION_OPTIONS.find(o => o.value === profession);
 
-  // Auto-set profession for lawyer and law_student
-  useEffect(() => {
-    if (isLawyer && !profession) {
-      setProfession('lawyer');
-    } else if (isLawStudent && !profession) {
-      setProfession('student');
-    }
-  }, [isLawyer, isLawStudent, profession]);
+  // A lawyer's or law student's profession is not chosen here: handleNext
+  // derives it (finalProfession), and the step count ignores it for both. No
+  // effect copies it into state (React Compiler lint: no setState in an effect).
 
   const handleBack = () => {
     router.push('/onboarding/step-3');
@@ -94,6 +92,8 @@ export default function OnboardingStep4Page() {
   };
 
   const handleNext = () => {
+    // A refused phone or heard-about answer holds Next and says why.
+    if (!contact.check()) return;
     // Determine the actual profession value
     const finalProfession = isLawyer ? 'lawyer' : isLawStudent ? 'student' : profession;
 
@@ -114,7 +114,7 @@ export default function OnboardingStep4Page() {
     if (finalProfession) stepFields.profession = finalProfession;
     if (region) stepFields.region = region;
     if (city) stepFields.city = city;
-    saveStep({ step: 4, ...stepFields });
+    saveStep({ step: 4, ...stepFields, ...contact.payload() });
 
     // Determine next step based on user type and profession
     if (userType === 'lawyer') {
@@ -276,6 +276,8 @@ export default function OnboardingStep4Page() {
                 )}
               </div>
             )}
+
+            {contact.fields}
           </div>
 
           {/* Navigation buttons */}

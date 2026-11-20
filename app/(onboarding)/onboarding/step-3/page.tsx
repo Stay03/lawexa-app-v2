@@ -109,7 +109,6 @@ export default function OnboardingStep3Page() {
       // Pre-fill region and city only if user selected the detected country
       region: matchesDetected ? detectedRegion : undefined,
       city: matchesDetected ? detectedCity : undefined,
-      selectedCountryMatchesDetected: matchesDetected,
     });
 
     // Fire-and-forget save to server
@@ -121,21 +120,10 @@ export default function OnboardingStep3Page() {
     if (matchesDetected && detectedCity) stepFields.city = detectedCity;
     saveStep({ step: 3, ...stepFields });
 
-    // For lawyer/law_student who selected detected country, skip profile step
-    const isLawyerOrLawStudent = userType === 'lawyer' || userType === 'law_student';
+    // Every user type goes on to step 4, with the required phone number and
+    // "How did you hear about us?" (Stay's option b, 20 November 2026).
     startTransition(() => {
-      if (isLawyerOrLawStudent && matchesDetected) {
-        // Skip step 4 (profile)
-        if (userType === 'law_student') {
-          // Law students go to education level selection (step-5)
-          router.push('/onboarding/step-5');
-        } else {
-          // Lawyers skip education and go to expertise (step-7)
-          router.push('/onboarding/step-7');
-        }
-      } else {
-        router.push('/onboarding/step-4');
-      }
+      router.push('/onboarding/step-4');
     });
   };
 

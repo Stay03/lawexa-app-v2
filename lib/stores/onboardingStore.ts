@@ -8,7 +8,6 @@ export interface OnboardingLocationData {
   countryCode?: string;
   region?: string;
   city?: string;
-  selectedCountryMatchesDetected?: boolean;
 }
 
 export interface OnboardingProfileData {

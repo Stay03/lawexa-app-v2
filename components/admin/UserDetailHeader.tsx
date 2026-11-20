@@ -18,12 +18,16 @@ import {
   GraduationCap,
   Mail,
   MapPin,
+  Megaphone,
+  Phone,
   ShieldCheck,
   UserCog,
   XCircle,
 } from 'lucide-react';
 import type { AdminUserDetail } from '@/types/admin';
 import { cn } from '@/lib/utils';
+import { formatPhone } from '@/lib/utils/phone-number';
+import { heardAboutLabel } from '@/lib/utils/heard-about';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { ChangeRoleDialog } from './ChangeRoleDialog';
 import { asRole, canChangeRole } from './change-role-model';
@@ -199,6 +203,24 @@ export function UserDetailHeader({ user, onToggleBlock }: UserDetailHeaderProps)
           <Mail className="h-4 w-4 shrink-0" />
           <span className="truncate">{user.email}</span>
         </div>
+        {/* Optional phone number (Arthur, 18 November 2026): only when the user gave one. */}
+        {user.profile?.phone ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Phone className="h-4 w-4 shrink-0" />
+            <a href={`tel:${user.profile.phone}`} className="truncate hover:text-foreground hover:underline">
+              {formatPhone(user.profile.phone)}
+            </a>
+          </div>
+        ) : null}
+        {/* "How did you hear about us?" (Arthur, 18 November 2026): only when answered. */}
+        {heardAboutLabel(user.profile?.heard_about, user.profile?.heard_about_other) ? (
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Megaphone className="h-4 w-4 shrink-0" />
+            <span className="truncate">
+              Heard about Lawexa: {heardAboutLabel(user.profile?.heard_about, user.profile?.heard_about_other)}
+            </span>
+          </div>
+        ) : null}
 
         <Tooltip>
           <TooltipTrigger asChild>

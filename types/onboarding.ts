@@ -154,6 +154,12 @@ export interface OnboardingStepPayload {
   call_number?: string;
   bio?: string;
   areas_of_expertise?: number[];
+  /** Optional (Arthur, 18 November 2026); left out, it is unchanged. */
+  phone?: string;
+  /** "How did you hear about us?" (Arthur, 18 November 2026): one of HEARD_ABOUT_OPTIONS. */
+  heard_about?: string;
+  /** The person's own words, only with heard_about "other"; at most 100. */
+  heard_about_other?: string;
 }
 
 /** PUT /api/onboarding/step response data */
@@ -183,6 +189,12 @@ export interface OnboardingCompletePayload {
   call_number?: string;
   bio?: string;
   areas_of_expertise?: number[];
+  /** Optional (Arthur, 18 November 2026); left out, it is unchanged. */
+  phone?: string;
+  /** "How did you hear about us?" (Arthur, 18 November 2026): one of HEARD_ABOUT_OPTIONS. */
+  heard_about?: string;
+  /** The person's own words, only with heard_about "other"; at most 100. */
+  heard_about_other?: string;
 }
 
 /** POST /api/onboarding/complete response data */

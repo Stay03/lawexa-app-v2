@@ -9,7 +9,6 @@ import { OnboardingFooter } from '@/components/onboarding/OnboardingFooter';
 import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import {
   getTotalSteps,
-  shouldSkipProfileStep,
   shouldShowEducationLevelStep,
 } from '@/lib/utils/onboarding';
 import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
@@ -42,10 +41,6 @@ export default function OnboardingStep5Page() {
   } = useOnboardingStore();
   const { saveStep } = useOnboardingStepSave();
 
-  const skipProfile = shouldSkipProfileStep(
-    userType,
-    locationData.selectedCountryMatchesDetected || false
-  );
 
   // Redirect if previous steps not completed or not a law student
   useEffect(() => {
@@ -62,11 +57,7 @@ export default function OnboardingStep5Page() {
 
   const handleBack = () => {
     startTransition(() => {
-      if (skipProfile) {
-        router.push('/onboarding/step-3');
-      } else {
-        router.push('/onboarding/step-4');
-      }
+      router.push('/onboarding/step-4');
     });
   };
 
@@ -87,8 +78,8 @@ export default function OnboardingStep5Page() {
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress
-          currentStep={skipProfile ? 4 : 5}
-          totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
+          currentStep={5}
+          totalSteps={getTotalSteps(userType, profileData.profession)}
         />
 
         <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">

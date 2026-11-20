@@ -42,6 +42,11 @@ export interface UserProfile {
   website_url?: string;
   twitter_url?: string;
   facebook_url?: string;
+  /** Optional, always "+" and digits (Arthur, 18 November 2026; Backend's contract). Absent from older servers. */
+  phone?: string | null;
+  /** "How did you hear about us?" (Arthur, 18 November 2026). Absent from older servers. */
+  heard_about?: string | null;
+  heard_about_other?: string | null;
 }
 
 export interface AreaOfExpertise {

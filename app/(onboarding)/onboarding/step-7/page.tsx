@@ -10,7 +10,7 @@ import { useOnboardingStore } from '@/lib/stores/onboardingStore';
 import { useAllExpertise } from '@/lib/hooks/useExpertise';
 import { useOnboarding } from '@/lib/hooks/useOnboarding';
 import { useOnboardingStepSave } from '@/lib/hooks/useOnboardingStepSave';
-import { getTotalSteps, shouldShowVerificationStep, shouldSkipProfileStep } from '@/lib/utils/onboarding';
+import { getTotalSteps, shouldShowVerificationStep } from '@/lib/utils/onboarding';
 import { cn } from '@/lib/utils';
 
 export default function OnboardingStep7Page() {
@@ -38,11 +38,6 @@ export default function OnboardingStep7Page() {
   // Local state for selected expertise
   const [selectedIds, setSelectedIds] = useState<number[]>(areasOfExpertise || []);
 
-  // Check if profile step was skipped
-  const skipProfile = shouldSkipProfileStep(
-    userType,
-    locationData.selectedCountryMatchesDetected || false
-  );
 
   // Debug logging for expertise data loading
   useEffect(() => {
@@ -86,10 +81,9 @@ export default function OnboardingStep7Page() {
   const isLawStudent = userType === 'law_student';
 
   const handleBack = () => {
-    // A lawyer has no education step: back is the profile, or the location
-    // when the profile was skipped.
+    // A lawyer has no education step: back is the profile.
     if (userType === 'lawyer') {
-      router.push(skipProfile ? '/onboarding/step-3' : '/onboarding/step-4');
+      router.push('/onboarding/step-4');
       return;
     }
     router.push('/onboarding/step-6');
@@ -124,8 +118,8 @@ export default function OnboardingStep7Page() {
     <div className="flex min-h-screen flex-col items-center justify-start p-4 pt-8 pb-24 md:justify-center md:pb-4">
       <div className="w-full max-w-lg space-y-8">
         <OnboardingProgress
-          currentStep={userType === 'lawyer' ? (skipProfile ? 4 : 5) : (skipProfile ? 5 : 6) + (isLawStudent ? 1 : 0)}
-          totalSteps={getTotalSteps(userType, profileData.profession, skipProfile)}
+          currentStep={userType === 'lawyer' ? 5 : 6 + (isLawStudent ? 1 : 0)}
+          totalSteps={getTotalSteps(userType, profileData.profession)}
         />
 
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">

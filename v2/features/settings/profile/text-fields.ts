@@ -10,6 +10,7 @@ import {
   Linkedin,
   MapPin,
   NotebookPen,
+  Phone,
   School,
   Twitter,
   UserPen,
@@ -72,6 +73,7 @@ export type ProfileTextFieldName = Extract<
   | 'website_url'
   | 'twitter_url'
   | 'facebook_url'
+  | 'phone'
 >;
 
 export interface ProfileTextFieldSpec {
@@ -91,8 +93,8 @@ export interface ProfileTextFieldSpec {
   maxLength?: number;
   /** A fixed glyph before the value, in both places (the handle's `@`). */
   prefix?: string;
-  type?: 'text' | 'url' | 'date';
-  inputMode?: 'text' | 'url' | 'numeric';
+  type?: 'text' | 'url' | 'date' | 'tel';
+  inputMode?: 'text' | 'url' | 'numeric' | 'tel';
   autoComplete?: string;
   spellCheck?: boolean;
   /**
@@ -223,6 +225,18 @@ export const PROFILE_TEXT_FIELDS: Record<
     type: 'url',
     inputMode: 'url',
     autoComplete: 'off',
+    spellCheck: false,
+  },
+  /* Optional (Arthur, 18 November 2026). Never shown on a public profile, the
+     lawyer directory or a Space's members; only Lawexa's team sees it. No
+     line under it (Arthur: "use none"). */
+  phone: {
+    icon: Phone,
+    label: 'Phone number',
+    placeholder: '+234 803 123 4567',
+    type: 'tel',
+    inputMode: 'tel',
+    autoComplete: 'tel',
     spellCheck: false,
   },
 };

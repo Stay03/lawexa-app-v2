@@ -34,6 +34,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatSourceLabel } from '@/lib/utils/attributionSource';
+import { formatPhone } from '@/lib/utils/phone-number';
+import { heardAboutLabel } from '@/lib/utils/heard-about';
 import { userCostAlertLine } from '@/lib/utils/cost-alerts';
 import type {
   IAdminUserListItem,
@@ -240,6 +242,18 @@ function AdminUsersTable({
                         <span className="block truncate text-xs text-muted-foreground">
                           {user.email || 'No email'}
                         </span>
+                        {/* Optional phone number (Arthur, 18 November 2026). */}
+                        {user.phone && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {formatPhone(user.phone)}
+                          </span>
+                        )}
+                        {/* "How did you hear about us?" (the list sends the key only). */}
+                        {user.heard_about && (
+                          <span className="block truncate text-[11px] text-muted-foreground/80">
+                            Heard via {heardAboutLabel(user.heard_about)}
+                          </span>
+                        )}
                         {user.ip_address && (
                           <span className="block truncate text-[11px] text-muted-foreground/70 font-mono">
                             {user.ip_address}
