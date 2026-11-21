@@ -32,13 +32,6 @@ function whereLine(recording: Recording): string | null {
   return `${recording.target.type === 'space' ? 'Space' : 'Chat'}: ${recording.target.name}`;
 }
 
-/** The length, unless the title already ends with it ("Recording 21 Nov 2026, 04:46 UTC (0:46)"). */
-function lengthWord(recording: Recording): string | null {
-  if (recording.duration_seconds === null) return null;
-  const length = clock(recording.duration_seconds);
-  return recording.title.endsWith(`(${length})`) ? null : length;
-}
-
 /** Still being finished, or failed: said on the row instead of the transcript. */
 function stageWord(recording: Recording): string | null {
   if (recording.stage === 'done') return null;
@@ -120,7 +113,7 @@ export function RecordingsList({ now }: { now: number }) {
         {rows.map((recording) => {
           const where = whereLine(recording);
           const stage = stageWord(recording);
-          const details = [lengthWord(recording), where, stage].filter(Boolean).join(' · ');
+          const details = [recording.duration_seconds !== null ? clock(recording.duration_seconds) : null, where, stage].filter(Boolean).join(' · ');
           const title = (
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-[15px] leading-snug font-medium text-foreground">{recording.title}</span>

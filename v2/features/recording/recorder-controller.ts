@@ -1,5 +1,3 @@
-import { isAxiosError } from 'axios';
-
 import { recordingsApi } from '@/lib/api/recordings';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { RecordingLiveConfig, RecordingStage, RecordingTargetInput } from '@/types/recording';
@@ -80,9 +78,8 @@ const IDLE: RecorderState = {
 
 /** 409 recording_stopped: the server closed the recording itself. */
 function isRecordingStopped(error: unknown): boolean {
-  if (!isAxiosError(error) || error.response?.status !== 409) return false;
-  const body = error.response.data as { reason?: unknown; errors?: { reason?: unknown } | null } | undefined;
-  return (body?.errors?.reason ?? body?.reason) === 'recording_stopped';
+  const { status, errors } = extractApiError(error);
+  return status === 409 && (errors as { reason?: unknown } | null)?.reason === 'recording_stopped';
 }
 
 const POLL_MS = 4_000;
