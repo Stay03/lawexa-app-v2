@@ -22,6 +22,8 @@ import { conversationsQueries } from '@/v2/features/conversations/queries';
 import { agentConversationQueries } from '@/v2/features/conversations/conversation/agents/queries';
 import { invitationsQueries } from '@/v2/features/invitations/queries';
 import { notificationsQueries } from '@/v2/features/notifications/queries';
+import type { VoiceResearchReadyEvent } from '@/types/voice-test';
+import { emitVoiceResearchReady } from '@/v2/features/voice-test/voice-events';
 import {
   applySpaceRollupDeltas,
   invalidateSpaceRollups,
@@ -38,6 +40,7 @@ import { disconnectV2Echo, getV2Echo } from './echo';
 import {
   EVT_CHANNEL_UNREAD,
   EVT_MY_TEMPLATE_UPDATED,
+  EVT_VOICE_RESEARCH_READY,
   EVT_PRIVATE_ITEM_ANSWERED,
   EVT_PRIVATE_ITEM_REQUESTED,
   EVT_USERBOX_CONTROL,
@@ -353,6 +356,12 @@ export function RealtimeSpine() {
     channel.listen(EVT_PRIVATE_ITEM_ANSWERED, readRequests);
     channel.listen(EVT_MY_TEMPLATE_UPDATED, () => {
       void queryClient.invalidateQueries({ queryKey: privateItemsQueries.templates });
+    });
+
+    // The staff voice test page (thread ac47b1df): a `c` call's research is
+    // done, so the open call sends its marker and Lawexa speaks the answer.
+    channel.listen(EVT_VOICE_RESEARCH_READY, (payload: VoiceResearchReadyEvent) => {
+      emitVoiceResearchReady(payload);
     });
 
     // Reconnect gap recovery: between drop and re-establish, every event was

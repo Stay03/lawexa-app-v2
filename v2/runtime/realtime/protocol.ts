@@ -118,3 +118,6 @@ export interface SpaceTaskRefreshEvent {
 }
 
 export type SpaceTaskChangedEvent = SpaceTaskSnapshotEvent | SpaceTaskRefreshEvent;
+
+/** A staff voice test call's research is done (voice test page, thread ac47b1df), on `users.{uuid}`. */
+export const EVT_VOICE_RESEARCH_READY = '.voice.research_ready';

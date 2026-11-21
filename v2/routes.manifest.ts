@@ -187,6 +187,9 @@ export const V2_ROUTES = [
   // The ambassador approval email's address, a v2-only redirect shell onto
   // `/settings/referrals` (see `app/v2/ambassadors/referrals/page.tsx`).
   '/ambassadors/referrals',
+  // The staff live-voice test page (thread ac47b1df). EXACT; linked from no
+  // menu, and v1 has no page here (see `classicFallbackFor`).
+  '/labs/voice',
 ] as const;
 
 /**
@@ -255,6 +258,7 @@ export function classicFallbackFor(pathname: string): string | null {
   const exact = segments.length === 1 ? first : null;
   if (exact === 'work' || exact === 'study' || exact === 'channels') return '/';
   if (exact === 'organization') return '/settings';
+  if (first === 'labs' && second === 'voice' && segments.length === 2) return '/';
   if (first === 'activity' && second === 'stats' && segments.length === 2) return '/activity';
   if (first === 'settings' && (second === 'devices' || second === 'verification' || second === 'certificates') && segments.length === 2) return '/settings';
   if (first === 'quiz' && segments.length >= 2) {
