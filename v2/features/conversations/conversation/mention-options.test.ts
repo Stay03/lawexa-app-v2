@@ -9,6 +9,7 @@ import { adoptServerFields } from '@/v2/runtime/chat-engine/server-fields';
 import type { EngineMessage } from '@/v2/runtime/chat-engine';
 import type { ApiMessage } from '@/types/chat';
 import type { Member } from '@/types/collab';
+import { buildMentionOptions } from '@/v2/features/channels/model';
 import {
   MAX_MENTION_SUGGESTIONS,
   applyMention,
@@ -41,6 +42,17 @@ const ROSTER = [
   member('n', 'Nkem Eze', null),
   member('gone', 'Left Person', 'leftp', 'editor', false),
 ];
+
+test('a team channel’s picker: Lawexa first, and the reader left out of their own list', () => {
+  // Lucy's live check, 21 November 2026 (thread 87928438): #firm listed her first and Lawexa after her.
+  const options = buildMentionOptions(ROSTER, 'o');
+  assert.deepEqual(options.candidates.map((c) => c.handle), ['lawexa', 'chidi', 'bolaade']);
+  assert.deepEqual(options.untaggable, ['Nkem Eze']);
+  assert.deepEqual(buildMentionOptions(ROSTER).candidates.map((c) => c.handle), ['lawexa', 'adaobi', 'chidi', 'bolaade'], 'no reader known: everyone active');
+  assert.deepEqual(buildMentionOptions(ROSTER, 'n').untaggable, [], 'a reader with no handle is not named in the line either');
+  assert.deepEqual(spaceMentionOptions(ROSTER, 'o'), buildMentionOptions(ROSTER, 'o'), 'a Space chat and a team channel offer the same list');
+  assert.match(read('v2', 'features', 'channels', 'composer', 'ChannelComposer.tsx'), /buildMentionOptions\(membersQuery\.data\?\.data \?\? \[\], userUuid\)/);
+});
 
 test('the picker offers active members with a handle, Viewers included', () => {
   const options = spaceMentionOptions(ROSTER);

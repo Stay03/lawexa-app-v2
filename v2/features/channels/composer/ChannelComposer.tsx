@@ -59,6 +59,7 @@ import { channelDisplayName } from '../thread-model';
 import { MemberAvatar, LawexaAvatar } from '../ui/avatars';
 import type { TypingUser } from '../room';
 import { useHeldValue } from '../use-held-value';
+import { useV2Session } from '@/v2/runtime/session-context';
 import {
   ChatComposerShell,
   ComposerAction,
@@ -939,9 +940,11 @@ function ChannelComposerBody({
     };
   }, [viewerId, channel.uuid]);
 
+  // Lawexa first, and the reader left out of their own list (thread 87928438).
+  const { userUuid } = useV2Session();
   const options = useMemo(
-    () => buildMentionOptions(membersQuery.data?.data ?? []),
-    [membersQuery.data],
+    () => buildMentionOptions(membersQuery.data?.data ?? [], userUuid),
+    [membersQuery.data, userUuid],
   );
 
   const suggestions = useMemo(() => {
