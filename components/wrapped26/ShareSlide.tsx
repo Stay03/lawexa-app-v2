@@ -160,7 +160,7 @@ export function ShareSlide({
         <div className="w26-eyebrow" style={{ color: 'var(--muted)' }}>
           2027 forecast
         </div>
-        <p data-a="forecast" className="w26-d" style={{ fontSize: 88, lineHeight: 1.02, letterSpacing: -2 }}>
+        <p data-a="forecast" className="w26-d" style={{ fontSize: 76, lineHeight: 1.02, letterSpacing: -2 }}>
           {record.forecast}
         </p>
         <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 0 }}>
@@ -168,8 +168,8 @@ export function ShareSlide({
             data-a="card"
             aria-hidden
             style={{
-              width: 520,
-              height: 640,
+              width: 480,
+              height: 580,
               background: 'var(--w26-ink)',
               color: 'var(--w26-cream)',
               border: '4px solid var(--w26-ink)',
@@ -192,6 +192,9 @@ export function ShareSlide({
               <div className="w26-d" style={{ fontSize: 30, color: accent, marginTop: 14, letterSpacing: -1 }}>
                 as {record.character.name}
               </div>
+              <div className="w26-billing" style={{ fontSize: 16, marginTop: 14, color: 'var(--w26-ink300)' }}>
+                {record.character.archetype}
+              </div>
             </div>
             <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: 2 }}>LAWEXA.COM/WRAPPED</div>
           </div>
@@ -205,7 +208,7 @@ export function ShareSlide({
                   type="button"
                   className="w26-btn w26-pill"
                   disabled={busy}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, fontSize: 32, padding: 26, color: 'inherit', background: 'transparent', gridColumn: platform === 'save' ? 'span 2' : undefined }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, fontSize: 32, padding: 26, color: 'inherit', background: 'transparent', borderColor: 'var(--line)', gridColumn: platform === 'save' ? 'span 2' : undefined }}
                   onClick={() => void share(platform)}
                 >
                   <Icon aria-hidden size={36} />
@@ -219,7 +222,7 @@ export function ShareSlide({
               {record.cta.share}
             </button>
           )}
-          <button data-a="btn" type="button" className="w26-btn w26-pill" style={{ color: 'inherit', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18 }} onClick={() => void invite()}>
+          <button data-a="btn" type="button" className="w26-btn w26-pill" style={{ color: 'inherit', background: 'transparent', borderColor: 'var(--line)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 18 }} onClick={() => void invite()}>
             <UserPlus aria-hidden size={40} />
             {record.cta.invite}
           </button>

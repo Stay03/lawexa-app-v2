@@ -61,6 +61,8 @@ const subscribeSize = (onChange: () => void) => {
 };
 const readScale = () => stageScale(window.innerWidth, window.innerHeight);
 
+const onControl = (target: EventTarget | null) => target instanceof Element && target.closest('button, a') !== null;
+
 export function Wrapped26Story({ record, fonts, onClose }: { record: Wrapped26Record; fonts: CardFonts; onClose: () => void }) {
   const slides = useMemo(() => slidesToPlay(record.slides), [record.slides]);
   const character = useMemo(() => characterFor(record.track, record.character.name), [record.track, record.character.name]);
@@ -171,10 +173,10 @@ export function Wrapped26Story({ record, fonts, onClose }: { record: Wrapped26Re
     };
   }, [state.moving, state.index, state.direction, current, reduced]);
 
-  // Into the dialog on open, so the keyboard starts inside the story.
-  const pauseButton = useRef<HTMLButtonElement>(null);
+  // Into the dialog on open, so the keyboard starts inside the story (Tab then reaches its buttons).
+  const dialog = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    pauseButton.current?.focus({ preventScroll: true });
+    dialog.current?.focus({ preventScroll: true });
   }, []);
 
   useEffect(() => {
@@ -198,7 +200,8 @@ export function Wrapped26Story({ record, fonts, onClose }: { record: Wrapped26Re
   // A press: held past HOLD_MS it pauses until let go; shorter, it is a tap.
   const press = useRef<{ timer: ReturnType<typeof setTimeout>; held: boolean } | null>(null);
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
+    // A press on a control (Start, a guess, Share, Pause, Close) is that control's, never a tap or a hold.
+    if (event.button !== 0 || onControl(event.target)) return;
     const timer = setTimeout(() => {
       if (press.current) press.current.held = true;
       dispatch({ type: 'pause' });
@@ -280,7 +283,7 @@ export function Wrapped26Story({ record, fonts, onClose }: { record: Wrapped26Re
   const student = record.track === 'undergraduates';
 
   return (
-    <div className="w26" role="dialog" aria-modal="true" aria-label="Your Lawexa Wrapped 2026">
+    <div ref={dialog} tabIndex={-1} className="w26" role="dialog" aria-modal="true" aria-label="Your Lawexa Wrapped 2026">
       <div
         ref={stage}
         className="w26-stage"
@@ -297,11 +300,11 @@ export function Wrapped26Story({ record, fonts, onClose }: { record: Wrapped26Re
           </div>
         ) : null}
         {current ? (
-          <div ref={incomingRef} key={`in-${current}`} className={`w26-slide w26-${ground}`} style={{ zIndex: 1 }}>
+          <div ref={incomingRef} key={`in-${current}`} className={`w26-slide w26-${ground}`} style={{ zIndex: 1 }} data-slide={current} data-settled={state.moving ? undefined : 'true'}>
             {renderSlide(current, !state.moving)}
           </div>
         ) : null}
-        <div className="w26-chrome" data-ground={ground} style={{ opacity: chromeShown ? 1 : 0 }}>
+        <div className="w26-chrome" data-ground={ground} data-intro={chromeShown ? undefined : 'true'}>
           <div className="w26-bars" aria-hidden>
             {fill.map((share, i) => (
               <i key={i}>
@@ -316,7 +319,6 @@ export function Wrapped26Story({ record, fonts, onClose }: { record: Wrapped26Re
                 {student ? 'Student' : 'Counsel'}
               </span>
               <button
-                ref={pauseButton}
                 type="button"
                 onPointerDown={(event) => event.stopPropagation()}
                 onPointerUp={(event) => event.stopPropagation()}
@@ -329,6 +331,10 @@ export function Wrapped26Story({ record, fonts, onClose }: { record: Wrapped26Re
                 <X aria-hidden size={48} />
               </button>
             </span>
+          </div>
+          <div className="w26-foot">
+            <span className="w26-url">lawexa.com/wrapped</span>
+            {current !== '00' ? <span className="w26-label">Tap to continue</span> : null}
           </div>
           <div className="w26-paused" data-on={state.paused ? 'true' : 'false'} aria-live="polite">
             {state.paused ? 'PAUSED' : ''}

@@ -235,6 +235,44 @@
   gap: 24px;
 }
 
+.w26-top .w26-eyebrow {
+  white-space: nowrap;
+  font-size: 24px;
+  letter-spacing: 10px;
+}
+
+/* The intro shows only the footer link: no bars, no title row (the kit's 00-intro.png). */
+.w26-chrome[data-intro='true'] .w26-bars,
+.w26-chrome[data-intro='true'] .w26-top > span:last-child .w26-tag {
+  opacity: 0;
+}
+
+.w26-foot {
+  position: absolute;
+  left: 64px;
+  right: 64px;
+  top: 1806px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.w26-foot .w26-label {
+  color: inherit;
+  opacity: 0.6;
+}
+
+.w26:focus {
+  outline: none;
+}
+
+.w26-url {
+  font-weight: 700;
+  font-size: 36px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
 .w26-tag {
   padding: 10px 22px;
   border-radius: 9999px;

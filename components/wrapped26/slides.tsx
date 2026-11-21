@@ -295,12 +295,12 @@ export function PhysicalSlide(props: SlideProps) {
             {physical.line}
           </p>
         </div>
-        <div style={{ width: 300, display: 'flex', flexDirection: 'column-reverse', gap: 6 }} aria-hidden>
+        <div style={{ width: 110, flex: 'none', display: 'flex', flexDirection: 'column-reverse', gap: 6 }} aria-hidden>
           {Array.from({ length: count }, (_, i) => (
             <div
               key={i}
               data-a="book"
-              style={{ height: Math.max(14, Math.floor(520 / count)), marginLeft: (i % 3) * 18, background: `var(--w26-${BOOK_ACCENTS[i % 4]})`, border: '4px solid var(--w26-ink)' }}
+              style={{ height: Math.max(14, Math.floor(520 / count)), marginLeft: (i % 3) * 8, marginRight: ((i + 1) % 3) * 8, background: `var(--w26-${BOOK_ACCENTS[i % 4]})`, border: '4px solid var(--w26-ink)' }}
             />
           ))}
         </div>
@@ -471,6 +471,12 @@ const enterGlowUp: Enter = (root, m, record) => {
   m.animate(one(root, 'end'), RISE, { duration: 600, delay: 2500 });
 };
 
+/** The polyline's first point, where the start dot sits. */
+function firstPoint(points: string): [number, number] {
+  const [x, y] = (points.trim().split(/\s+/)[0] ?? '20,520').split(',').map(Number);
+  return [Number.isFinite(x) ? x : 20, Number.isFinite(y) ? y : 520];
+}
+
 /** The polyline's last point, where the end dot sits. */
 function lastPoint(points: string): [number, number] {
   const pairs = points.trim().split(/\s+/);
@@ -483,6 +489,7 @@ export function GlowUpSlide(props: SlideProps) {
   const glow = props.record.glowUp;
   if (!glow) return null;
   const [dotX, dotY] = lastPoint(glow.points);
+  const [startX, startY] = firstPoint(glow.points);
   const short = (label: string) => label.slice(0, 3).toUpperCase();
   return (
     <div ref={ref} style={{ position: 'absolute', inset: 0 }}>
@@ -508,6 +515,7 @@ export function GlowUpSlide(props: SlideProps) {
             strokeDasharray={1}
             strokeDashoffset={1}
           />
+          <circle cx={startX} cy={startY} r={18} fill="var(--fg)" stroke="var(--bg)" strokeWidth={6} />
           <circle data-a="dot" cx={dotX} cy={dotY} r={30} fill="var(--w26-lime)" stroke="var(--w26-ink)" strokeWidth={6} opacity={0} style={{ transformBox: 'fill-box', transformOrigin: 'center' }} />
           <text x={20} y={595} fontFamily="var(--w26-body)" fontWeight={700} fontSize={28} fill="currentColor">
             {short(glow.fromLabel)}
@@ -599,7 +607,7 @@ export function CastingSlide(props: SlideProps) {
         <div data-a="eyebrow" className="w26-eyebrow" style={{ color: 'var(--w26-gold)' }}>
           Casting call
         </div>
-        <h2 data-a="q" className="w26-d" style={{ fontSize: 112, lineHeight: 1, letterSpacing: -2 }}>
+        <h2 data-a="q" className="w26-d" style={{ fontSize: 96, lineHeight: 1, letterSpacing: -2 }}>
           {casting.question}
         </h2>
         <p data-a="tape" className="w26-body" style={{ fontSize: 44 }}>
@@ -655,14 +663,14 @@ export function StarSlide(props: SlideProps) {
         <div data-a="avatar" style={{ marginTop: 36 }}>
           <Avatar record={record} character={character} size={520} />
         </div>
-        <div data-a="name" className="w26-d" style={{ fontSize: fitSize(record.user.firstName, 888, 230, 0.72), marginTop: 64, whiteSpace: 'nowrap' }}>
+        <div data-a="name" className="w26-d" style={{ fontSize: fitSize(record.user.firstName, 888, 230, 0.84), marginTop: 64, whiteSpace: 'nowrap' }}>
           {record.user.firstName}
         </div>
         <div data-a="as" style={{ display: 'flex', alignItems: 'baseline', gap: 22, marginTop: 28 }}>
           <span className="w26-d7" style={{ fontSize: 52, color: accent }}>
             as
           </span>
-          <span className="w26-d" style={{ fontSize: fitSize(name, 760, 96, 0.66), letterSpacing: -2, color: accent, whiteSpace: 'nowrap' }}>
+          <span className="w26-d" style={{ fontSize: fitSize(name, 760, 96, 0.78), letterSpacing: -2, color: accent, whiteSpace: 'nowrap' }}>
             {name}
           </span>
         </div>
