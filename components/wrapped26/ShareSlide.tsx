@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Download, Instagram, Linkedin, MessageCircle, Share2, Twitter, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { shareUrl } from '@/lib/wrapped/copy';
 import { canvasToFile, corsPhotoUrl, loadImage } from '@/lib/wrapped/share-image';
 import { EASE_BACK, EASE_IN_OUT, RISE, SlideMotion } from '@/lib/wrapped26/motion';
 import type { Wrapped26CardFormat, Wrapped26Platform } from '@/lib/wrapped26/progress';
 import { FORMAT_FOR, cardContent, drawWrapped26Card, type CardFonts } from '@/lib/wrapped26/share-card';
+import { wrapped26Link } from '@/lib/wrapped26/share-link';
 import { Avatar, accentVar, type SlideProps } from './slides';
 
 /**
@@ -18,15 +18,6 @@ import { Avatar, accentVar, type SlideProps } from './slides';
  * carries utm_source={platform}, utm_campaign=wrapped2026 and
  * utm_content={track}. Nothing posts by itself: every share is a tap.
  */
-
-/** The share link for one platform, with the kit's utm tags. */
-export function wrapped26Link(code: string, platform: Wrapped26Platform | 'invite', track: string): string {
-  const url = new URL(shareUrl(code));
-  url.searchParams.set('utm_source', platform);
-  url.searchParams.set('utm_campaign', 'wrapped2026');
-  url.searchParams.set('utm_content', track);
-  return url.toString();
-}
 
 function download(url: string, name: string) {
   const anchor = document.createElement('a');

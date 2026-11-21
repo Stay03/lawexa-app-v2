@@ -13,7 +13,10 @@ import {
   tapSide,
   type Wrapped26StoryState,
 } from '@/lib/wrapped26/story';
-import type { Wrapped26SlideId } from '@/lib/wrapped26/types';
+import { createWrapped26Tracker, type Wrapped26Progress } from '@/lib/wrapped26/progress';
+import { cardContent, FORMAT_FOR } from '@/lib/wrapped26/share-card';
+import { wrapped26Link } from '@/lib/wrapped26/share-link';
+import type { Wrapped26Record, Wrapped26SlideId } from '@/lib/wrapped26/types';
 
 /* Wrapped 2026 (thread f833c285; Arthur's build kit, BUILD_SPEC §3–5). */
 
@@ -115,4 +118,80 @@ test('taps on the left 30% go back, and the stage fits the 1080×1920 canvas ins
   assert.equal(tapSide(300, 1000), 'next');
   assert.equal(stageScale(390, 844), 390 / 1080);
   assert.equal(stageScale(1440, 900), 900 / 1920);
+});
+
+// ── Share cards, links and view counts ────────────────────────────────────
+
+
+const RECORD = {
+  track: 'undergraduates',
+  user: { firstName: 'Adaeze', avatarUrl: null },
+  character: { name: 'Mike Ross', archetype: 'Research Rabbit', rising: 'Paper Trail Detective', evidence: '' },
+  shareStats: [
+    { value: '214', label: 'cases read' },
+    { value: 'Top 7%', label: '300L at UNILAG' },
+  ],
+} as unknown as Wrapped26Record;
+
+test('a student card says Student and carries the student line; a lawyer card says Counsel and the practitioner line', () => {
+  const student = cardContent(RECORD, characterFor('undergraduates', 'Mike Ross'));
+  assert.equal(student.label, 'Student');
+  assert.match(student.line ?? '', /wasn’t technically a lawyer/);
+  assert.equal(student.show, 'Suits (2011)');
+  assert.equal(student.accent, '#bee860');
+  assert.deepEqual(student.stats.map((s) => s.value), ['214', 'Top 7%']);
+  const lawyer = cardContent({ ...RECORD, track: 'lawyers' }, characterFor('lawyers', 'Mike Ross'));
+  assert.equal(lawyer.label, 'Counsel');
+  assert.equal(lawyer.line, 'The Natural. Reads everything, remembers everything.');
+});
+
+test('a character the app does not know still draws a card: no line, no show, the gold accent', () => {
+  const card = cardContent({ ...RECORD, character: { ...RECORD.character, name: 'New Face' } }, null);
+  assert.equal(card.character, 'New Face');
+  assert.equal(card.line, null);
+  assert.equal(card.show, null);
+  assert.equal(card.accent, '#d3af37');
+});
+
+test('each platform gets its card size, and each link carries the utm tags', () => {
+  assert.equal(FORMAT_FOR.instagram, 'story');
+  assert.equal(FORMAT_FOR.x, 'square');
+  assert.equal(FORMAT_FOR.linkedin, 'landscape');
+  const link = new URL(wrapped26Link('wr-TEST1234', 'whatsapp', 'undergraduates'));
+  assert.equal(link.pathname, '/wrapped');
+  assert.equal(link.searchParams.get('r'), 'wr-TEST1234');
+  assert.equal(link.searchParams.get('utm_source'), 'whatsapp');
+  assert.equal(link.searchParams.get('utm_campaign'), 'wrapped2026');
+  assert.equal(link.searchParams.get('utm_content'), 'undergraduates');
+});
+
+test('view counts: open, each card and finish once, the first guess once on card 3, every share', () => {
+  const sent: Wrapped26Progress[] = [];
+  const tracker = createWrapped26Tracker((p) => sent.push(p));
+  tracker.open();
+  tracker.open();
+  tracker.card(1);
+  tracker.card(1);
+  tracker.guess(2);
+  tracker.guess(0);
+  tracker.finish();
+  tracker.share('x', 'square');
+  tracker.share('x', 'square');
+  assert.deepEqual(sent, [
+    { event: 'open' },
+    { event: 'card', card: 1 },
+    { event: 'card', card: 3, guess: 2 },
+    { event: 'finish' },
+    { event: 'share', platform: 'x', format: 'square' },
+    { event: 'share', platform: 'x', format: 'square' },
+  ]);
+});
+
+test('a failed send never stops the story', () => {
+  const tracker = createWrapped26Tracker(() => {
+    throw new Error('offline');
+  });
+  assert.doesNotThrow(() => tracker.open());
+  const rejecting = createWrapped26Tracker(() => Promise.reject(new Error('500')));
+  assert.doesNotThrow(() => rejecting.card(2));
 });
