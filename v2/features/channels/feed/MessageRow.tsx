@@ -34,6 +34,8 @@ import type {
   MessageThreadStub,
 } from '@/types/collab';
 import { FOCUS_RING, UnreadDot } from '@/v2/shell/designs/modules';
+import { readRecordingMeta } from '@/lib/utils/recording-meta';
+import { RecordingCard } from '@/v2/features/recording/RecordingCard';
 import { useEngagementThrottled } from '../engagement-throttle';
 import {
   MESSAGE_MAX_LENGTH,
@@ -239,6 +241,9 @@ export const MessageRow = memo(function MessageRow({
 
   const hasText = message.content !== '';
   const attachments = message.attachments ?? EMPTY_ATTACHMENTS;
+  // A recorded meeting posted here (thread ac47b1df): the recording's card, the
+  // same as in a chat, in place of its two attached files.
+  const recording = readRecordingMeta(message.metadata);
   const mentioned = mentionsViewer(message.metadata.mentions, viewerUuid);
   const failed = sendState?.status === 'failed';
   const sending = sendState?.status === 'sending';
@@ -463,7 +468,11 @@ export const MessageRow = memo(function MessageRow({
           </span>
         )}
 
-        {attachments.length > 0 && (
+        {recording ? (
+          <div className={cn('max-w-md', hasText && 'mt-1.5')}>
+            <RecordingCard recording={recording} />
+          </div>
+        ) : attachments.length > 0 ? (
           <MessageAttachments
             attachments={attachments}
             onOpenImage={(attachmentId) =>
@@ -471,7 +480,7 @@ export const MessageRow = memo(function MessageRow({
             }
             className={hasText ? 'mt-1.5' : undefined}
           />
-        )}
+        ) : null}
 
         <ReactionChips
           reactions={message.reactions}

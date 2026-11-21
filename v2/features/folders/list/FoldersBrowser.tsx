@@ -38,6 +38,23 @@ import {
 } from './states';
 import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 import { FoldersFallback } from './FoldersFallback';
+import { useAuthStore } from '@/lib/stores/authStore';
+import { TabRow } from '@/v2/shell/TabRow';
+import { RecordingsList } from '@/v2/features/recording/RecordingsList';
+
+/** All files, or the recorded meetings (thread ac47b1df; shown to accounts that may record). */
+const LENSES = [
+  { id: 'all', label: 'All' },
+  { id: 'recordings', label: 'Recordings' },
+] as const;
+type Lens = (typeof LENSES)[number]['id'];
+const LENS_ROW_CLASS =
+  'mb-3 inline-flex max-w-full min-w-0 items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full bg-secondary/60 p-0.5';
+const lensClass = (selected: boolean): string =>
+  cn(
+    'v2-interactive min-h-8 shrink-0 rounded-full px-3.5 text-xs font-medium transition-colors duration-150 motion-reduce:transition-none',
+    selected ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+  );
 
 /**
  * FoldersBrowser — the `/folders` body, and the `useSearchParams` consumer (so
@@ -114,6 +131,9 @@ export function FoldersBrowser() {
   const [now] = useState(() => Date.now());
 
   const [creating, setCreating] = useState(false);
+  const canRecord = useAuthStore((state) => state.user?.can_record === true);
+  const [chosenLens, setLens] = useState<Lens>('all');
+  const lens: Lens = canRecord ? chosenLens : 'all';
   const [renameTarget, setRenameTarget] = useState<FolderRowModel | null>(null);
   // MOVE TO SPACE (Spaces F3): every folder here is the reader's own. Held
   // after closing so the dialog's exit plays; each open bumps the key.
@@ -299,6 +319,16 @@ export function FoldersBrowser() {
   return (
     <PageShell actions={actions}>
       {searchAtTop ? <div className="mb-3">{searchField}</div> : null}
+      {canRecord ? (
+        <TabRow tabs={LENSES} value={lens} onChange={setLens} ariaLabel="Show" className={LENS_ROW_CLASS} tabClassName={lensClass}>
+          {(tab) => tab.label}
+        </TabRow>
+      ) : null}
+
+      {lens === 'recordings' ? (
+        <RecordingsList now={now} />
+      ) : (
+      <>
 
       {/* The ONE live region for this surface. The route fallback's
           announcement is gone by the time an in-page fetch happens and the
@@ -384,6 +414,8 @@ export function FoldersBrowser() {
         selection={looseSelection}
         onStartSelect={startWithFile}
       />
+      </>
+      )}
       {/* Room under the last row for the bar while it is up. */}
       {selecting ? <div aria-hidden className="h-36 md:h-24" /> : null}
       {bulk.bar}
