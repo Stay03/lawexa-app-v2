@@ -30,6 +30,8 @@ import {
 import { SPACES_BASELINE_PARAMS, spacesQueries } from '@/v2/features/spaces/queries';
 import { landUserBoxControl } from '@/v2/features/userbox/queries';
 import type { UserBoxControlEvent } from '@/types/user-box';
+import type { RecordingUpdatedEvent } from '@/types/recording';
+import { emitRecordingUpdated } from '@/v2/features/recording/recording-events';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { resetAppBadge, setAppMentionBadge } from './app-badge';
 import { dispatchChannelUnread, type ResolvedChannelContext } from './dispatcher';
@@ -41,6 +43,7 @@ import {
   EVT_PRIVATE_ITEM_ANSWERED,
   EVT_PRIVATE_ITEM_REQUESTED,
   EVT_USERBOX_CONTROL,
+  EVT_RECORDING_UPDATED,
   userChannelName,
   type ChannelUnreadEvent,
   type CollabBroadcastNotification,
@@ -341,6 +344,13 @@ export function RealtimeSpine() {
     // read the panel holds; nothing is read when no panel is open.
     channel.listen(EVT_USERBOX_CONTROL, (payload: UserBoxControlEvent) => {
       landUserBoxControl(queryClient, payload);
+    });
+
+    // A recorded meeting moved a stage after Stop: an open recorder's steps move
+    // at once, and the Files list reads its rows again.
+    channel.listen(EVT_RECORDING_UPDATED, (payload: RecordingUpdatedEvent) => {
+      emitRecordingUpdated(payload);
+      void queryClient.invalidateQueries({ queryKey: ['recordings'] });
     });
 
     // Own templates and skills (thread 9ae498ae): a request to use one in a

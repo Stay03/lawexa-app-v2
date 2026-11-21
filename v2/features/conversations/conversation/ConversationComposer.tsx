@@ -9,6 +9,7 @@ import {
   FileText,
   FileUp,
   Loader2,
+  Mic,
   Paperclip,
   Plus,
   ShieldCheck,
@@ -60,6 +61,9 @@ import type { MentionOptions } from '@/v2/features/channels/model';
 import { MentionList, useMentionPicker } from './mention-picker';
 import { draftWithRefused, heldSendLabel, UNNAMED_ASKER, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
+import { useAuthStore } from '@/lib/stores/authStore';
+import { RecordingConsent, RecordingPanel } from '@/v2/features/recording/RecorderPanel';
+import { useRecorder } from '@/v2/features/recording/use-recorder';
 
 /**
  * ConversationComposer — the FLOATING PILL for the conversation screen. It is rendered
@@ -280,6 +284,15 @@ export interface ConversationComposerProps {
   /** The chat's space, or null: a space chat's attachments are uploaded to the
    *  space (POST /spaces/{space}/files), so they are the space's files. */
   spaceUuid?: string | null;
+  /**
+   * The chat a meeting recording belongs to (thread ac47b1df): the microphone
+   * beside Send records into it. Only the chat screen passes it; staff only
+   * (`user.can_record`), and never in a confidential chat, whose words the
+   * server does not keep.
+   */
+  recordInto?: string | null;
+  /** The chat's title, at the top of the phone's recording screen. */
+  recordingTitle?: string | null;
 }
 
 export function ConversationComposer({
@@ -309,6 +322,8 @@ export function ConversationComposer({
   mentionOptions = null,
   quoteToneOf = null,
   spaceUuid = null,
+  recordInto = null,
+  recordingTitle = null,
 }: ConversationComposerProps) {
   // A card joined on top takes the jurisdiction row's place: nothing sits between the two.
   const showMeta = showMetaProp && !joinedAbove;
@@ -397,6 +412,11 @@ export function ConversationComposer({
   // A send refused at a plan's files limit a bigger plan allows: the line links to the plans.
   const [errorPlans, setErrorPlans] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Recording a meeting (thread ac47b1df): the recorder takes the box's place while it runs.
+  const canRecord = useAuthStore((state) => state.user?.can_record === true);
+  const recordable = recordInto !== null && canRecord && !isConfidential;
+  const { state: recording, recorder } = useRecorder({ conversation_uuid: recordInto ?? '' });
+  const recorderOpen = recording.phase === 'live' || recording.phase === 'stopping' || recording.phase === 'finalising';
 
   // The reader's own turn locks the pill; any other (a colleague's, or one
   // whose sender is not known yet) leaves it open to type the next question,
@@ -920,7 +940,15 @@ export function ConversationComposer({
           </div>
         </div>
 
+        {recordable ? (
+          <>
+            <RecordingConsent state={recording} recorder={recorder} inSpace={spaceUuid !== null} />
+            <RecordingPanel state={recording} recorder={recorder} title={recordingTitle ?? 'Recording'} />
+          </>
+        ) : null}
+
         {/* ── The pill: the PromptInput card holds ONLY the single input row. ── */}
+        {recordable && recorderOpen ? null : (
         <PromptInput
           value={input}
           onValueChange={(next) => {
@@ -1028,6 +1056,20 @@ export function ConversationComposer({
               onPasteFiles={(files) => void handleFilesAdded(files)}
             />
 
+            {recordable ? (
+              <PromptInputAction tooltip="Record a meeting">
+                <button
+                  type="button"
+                  aria-label="Record a meeting"
+                  onClick={recorder.ask}
+                  disabled={ownTurnRunning || isSubmitting || disabled}
+                  className="v2-interactive text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Mic className="size-4" />
+                </button>
+              </PromptInputAction>
+            ) : null}
+
             {isStreaming && canStop ? (
               <PromptInputAction tooltip={isCancelling ? 'Cancelling' : 'Stop generating'}>
                 <Button
@@ -1069,6 +1111,7 @@ export function ConversationComposer({
             )}
           </div>
         </PromptInput>
+        )}
 
         <FileUploadContent>
           <div className="flex min-h-[200px] w-full items-center justify-center">

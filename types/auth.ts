@@ -83,6 +83,8 @@ export interface User {
    * do not carry it, and absent reads as `false`.
    */
   is_verified_author?: boolean;
+  /** May record meetings (staff first; recorder, thread ac47b1df). Absent from older servers: no. */
+  can_record?: boolean;
   auth_provider: AuthProvider;
   avatar_url: string | null;
   profile: UserProfile | null;

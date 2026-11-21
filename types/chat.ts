@@ -1,3 +1,4 @@
+import type { RecordingMessageMeta } from './recording';
 import type { UsedPrivateItem } from './private-items';
 import type { JurisdictionChoice } from './jurisdiction';
 import type { IBlockedReason } from './message-pack';
@@ -135,6 +136,8 @@ export interface ChatMessage {
   machineInUse?: { conversation_uuid: string; title: string };
   /** Lawexa stopped waiting for the person on its machine (`metadata.type` "machine_wait_ended"). */
   machineWaitEnded?: boolean;
+  /** A recorded meeting's card: the player and the transcript (`metadata.type` "recording", thread ac47b1df). */
+  recording?: RecordingMessageMeta;
 }
 
 /** One option of a card question. */
