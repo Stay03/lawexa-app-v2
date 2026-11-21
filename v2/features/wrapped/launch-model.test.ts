@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { wrappedLaunchSeenKey, wrappedLaunchShouldOpen, type WrappedLaunchInputs } from './launch-model';
+import { WRAPPED_2026_LAUNCH, WRAPPED_BAR_FINALS_LAUNCH, launchFor, wrappedLaunchSeenKey, wrappedLaunchShouldOpen, type WrappedLaunchInputs } from './launch-model';
 
 const ready: WrappedLaunchInputs = {
   hasWrapped: true,
@@ -36,4 +36,13 @@ test('the Wrapped launch pop-up waits for an answer being written, but stays up 
 test('the launch pop-up keeps its mark per account', () => {
   assert.equal(wrappedLaunchSeenKey(7), 'lawexa-wrapped-launch-seen:7');
   assert.notEqual(wrappedLaunchSeenKey(7), wrappedLaunchSeenKey(8));
+});
+
+test('the 2026 launch wins for someone with a 2026 record, with its own picture and its own mark', () => {
+  assert.equal(launchFor(true, true), WRAPPED_2026_LAUNCH);
+  assert.equal(launchFor(false, true), WRAPPED_BAR_FINALS_LAUNCH);
+  assert.equal(launchFor(false, false), null);
+  assert.equal(WRAPPED_2026_LAUNCH.image.src, '/wrapped/og-2026.png');
+  assert.equal(WRAPPED_2026_LAUNCH.text, 'See the character your year earned you.');
+  assert.notEqual(WRAPPED_2026_LAUNCH.seenKey(7), wrappedLaunchSeenKey(7));
 });

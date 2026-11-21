@@ -13,13 +13,10 @@ import { useScreenHeld } from '@/v2/runtime/screen-hold';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
-  WRAPPED_LAUNCH_IMAGE,
-  WRAPPED_LAUNCH_TEXT,
-  WRAPPED_LAUNCH_TITLE,
-  wrappedLaunchSeenKey,
+  launchFor,
   wrappedLaunchShouldOpen,
 } from './launch-model';
-import { useHasWrapped } from './queries';
+import { useHasWrapped, useHasWrapped2026 } from './queries';
 
 /** A beat after the first paint before the card may open, as RedesignIntro waits. */
 const SETTLE_MS = 1500;
@@ -33,16 +30,18 @@ const SETTLE_MS = 1500;
 export function WrappedLaunchPopup({ introSeenOnServer }: { introSeenOnServer: boolean }) {
   const pathname = usePathname();
   const { userId } = useV2Session();
-  const hasWrapped = useHasWrapped();
+  const launch = launchFor(useHasWrapped2026(), useHasWrapped());
+  const hasWrapped = launch !== null;
+  const seenKey = launch?.seenKey ?? null;
   const settled = useSettled();
-  const seenHere = useSeen(userId, wrappedLaunchSeenKey);
+  const seenHere = useSeen(userId, seenKey);
   const introSeenHere = useSeen(userId, introSeenKey);
   const screenHeld = useScreenHeld();
   const [showing, setShowing] = useState(false);
   const onHome = pathname === '/' || pathname === '/v2';
-  const image = useImage(WRAPPED_LAUNCH_IMAGE.src, onHome && hasWrapped && !seenHere);
+  const image = useImage(launch?.image.src ?? '', onHome && hasWrapped && !seenHere);
 
-  if (!onHome || userId === null || !hasWrapped || seenHere) return null;
+  if (!onHome || userId === null || !launch || seenHere) return null;
 
   const open = wrappedLaunchShouldOpen({
     hasWrapped,
@@ -54,7 +53,7 @@ export function WrappedLaunchPopup({ introSeenOnServer }: { introSeenOnServer: b
     showing,
     image,
   });
-  const close = () => markSeen(userId);
+  const close = () => markSeen(userId, launch.seenKey);
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
@@ -70,7 +69,7 @@ export function WrappedLaunchPopup({ introSeenOnServer }: { introSeenOnServer: b
       >
         <div className="relative shrink-0">
           {/* eslint-disable-next-line @next/next/no-img-element -- a fixed 1200x630 picture in public/, loaded before the card opens. */}
-          <img src={WRAPPED_LAUNCH_IMAGE.src} alt={WRAPPED_LAUNCH_IMAGE.alt} width={1200} height={630} className="aspect-[1200/630] w-full object-cover" />
+          <img src={launch.image.src} alt={launch.image.alt} width={1200} height={630} className="aspect-[1200/630] w-full object-cover" />
           <button
             type="button"
             onClick={close}
@@ -86,8 +85,8 @@ export function WrappedLaunchPopup({ introSeenOnServer }: { introSeenOnServer: b
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-6">
           <div className="flex flex-col gap-2">
-            <DialogTitle className="text-xl leading-snug font-semibold text-balance">{WRAPPED_LAUNCH_TITLE}</DialogTitle>
-            <DialogDescription className="text-sm leading-6 text-muted-foreground">{WRAPPED_LAUNCH_TEXT}</DialogDescription>
+            <DialogTitle className="text-xl leading-snug font-semibold text-balance">{launch.title}</DialogTitle>
+            <DialogDescription className="text-sm leading-6 text-muted-foreground">{launch.text}</DialogDescription>
           </div>
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -141,8 +140,8 @@ function useImage(src: string, wanted: boolean): 'loading' | 'ready' | 'failed' 
 // ── This browser's marks ─────────────────────────────────────────────────────
 
 const listeners = new Set<() => void>();
-/** Closed in this page load, whether or not storage took the mark. */
-const closedThisLoad = new Set<number>();
+/** Closed in this page load, whether or not storage took the mark: the mark's own key. */
+const closedThisLoad = new Set<string>();
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
@@ -153,9 +152,9 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-function readSeen(userId: number | null, key: (id: number) => string): boolean {
-  if (userId === null) return true;
-  if (key === wrappedLaunchSeenKey && closedThisLoad.has(userId)) return true;
+function readSeen(userId: number | null, key: ((id: number) => string) | null): boolean {
+  if (userId === null || key === null) return true;
+  if (closedThisLoad.has(key(userId))) return true;
   try {
     return window.localStorage.getItem(key(userId)) !== null;
   } catch {
@@ -164,17 +163,17 @@ function readSeen(userId: number | null, key: (id: number) => string): boolean {
   }
 }
 
-function markSeen(userId: number): void {
-  closedThisLoad.add(userId);
+function markSeen(userId: number, key: (id: number) => string): void {
+  closedThisLoad.add(key(userId));
   try {
-    window.localStorage.setItem(wrappedLaunchSeenKey(userId), new Date().toISOString());
+    window.localStorage.setItem(key(userId), new Date().toISOString());
   } catch {
     // Storage refused: `closedThisLoad` keeps it shut for this page load.
   }
   for (const listener of listeners) listener();
 }
 
-function useSeen(userId: number | null, key: (id: number) => string): boolean {
+function useSeen(userId: number | null, key: ((id: number) => string) | null): boolean {
   // The server snapshot is "seen": nothing is drawn before the client knows.
   return useSyncExternalStore(subscribe, () => readSeen(userId, key), () => true);
 }

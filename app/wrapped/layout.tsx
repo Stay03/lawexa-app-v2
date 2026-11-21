@@ -39,15 +39,19 @@ const image = { url: '/wrapped/og.png', width: 1200, height: 630, alt: 'Your Bar
  * Bar Finals words until it opens, Arthur's 2026 words from then. Read on the
  * server, cached five minutes, so moving the launch needs no push.
  */
+/** Arthur's pick for the 2026 preview (21 November 2026): the kit's wheel on lilac with the casting question. */
+const image2026 = { url: '/wrapped/og-2026.png', width: 1200, height: 630, alt: 'If your year on Lawexa were a legal drama, who would you play? Lawexa Wrapped 2026.' };
+
 export async function generateMetadata(): Promise<Metadata> {
   const window = await fetchWrapped26Window();
   const { title, description } = window?.open ? edition2026 : barFinals;
+  const picture = window?.open ? image2026 : image;
   return {
     title,
     description,
     alternates: { canonical: '/wrapped' },
-    openGraph: { title, description, url: `${getAppUrl()}/wrapped`, siteName: SEO.siteName, type: 'website', images: [image] },
-    twitter: { card: 'summary_large_image', title, description, images: [image] },
+    openGraph: { title, description, url: `${getAppUrl()}/wrapped`, siteName: SEO.siteName, type: 'website', images: [picture] },
+    twitter: { card: 'summary_large_image', title, description, images: [picture] },
   };
 }
 

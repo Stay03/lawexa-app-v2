@@ -31,6 +31,34 @@ export function wrappedLaunchSeenKey(userId: number): string {
   return `lawexa-wrapped-launch-seen:${userId}`;
 }
 
+/**
+ * The Wrapped 2026 launch (thread f833c285): Arthur's words and the picture he
+ * picked on 21 November 2026 (the kit's wheel, lilac, the casting question).
+ * Its own mark, so someone who closed the Bar Finals pop-up still meets this
+ * one once.
+ */
+export const WRAPPED_2026_LAUNCH = {
+  title: 'Your 2026 on Lawexa',
+  text: 'See the character your year earned you.',
+  image: { src: '/wrapped/og-2026.png', alt: 'If your year on Lawexa were a legal drama, who would you play? The Wrapped 2026 wheel of characters.' },
+  seenKey: (userId: number) => `lawexa-wrapped-2026-launch-seen:${userId}`,
+} as const;
+
+export const WRAPPED_BAR_FINALS_LAUNCH = {
+  title: WRAPPED_LAUNCH_TITLE,
+  text: WRAPPED_LAUNCH_TEXT,
+  image: WRAPPED_LAUNCH_IMAGE,
+  seenKey: wrappedLaunchSeenKey,
+} as const;
+
+export type WrappedLaunch = typeof WRAPPED_2026_LAUNCH | typeof WRAPPED_BAR_FINALS_LAUNCH;
+
+/** Which launch the home shows: 2026 for someone with a 2026 record, else Bar Finals, else none. */
+export function launchFor(has2026: boolean, hasBarFinals: boolean): WrappedLaunch | null {
+  if (has2026) return WRAPPED_2026_LAUNCH;
+  return hasBarFinals ? WRAPPED_BAR_FINALS_LAUNCH : null;
+}
+
 export interface WrappedLaunchInputs {
   /** A Law School student whose Wrapped exists (the banner's rule). */
   hasWrapped: boolean;
