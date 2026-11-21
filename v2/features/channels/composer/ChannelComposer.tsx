@@ -13,11 +13,16 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AtSign,
   CornerUpLeft,
+  Mic,
   Paperclip,
   SendHorizontal,
   Smile,
   X,
 } from 'lucide-react';
+import { useAuthStore } from '@/lib/stores/authStore';
+import { RecordingConsent, RecordingPanel } from '@/v2/features/recording/RecorderPanel';
+import { useRecorder } from '@/v2/features/recording/use-recorder';
+import { channelRecordingTarget } from '@/v2/features/recording/recording-model';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -647,6 +652,14 @@ function ChannelComposerBody({
    * below has to be a LAYOUT effect.
    */
   const [saved] = useState(() => readChannelDraft(viewerId, channel.uuid));
+  // Recording a meeting into this channel or thread (thread ac47b1df): staff
+  // first (`user.can_record`), and only where the reader may post. A thread is
+  // a channel with a parent; the recording names the Space, the channel and
+  // the thread, and its card and Lawexa's summary are posted there.
+  const canRecord = useAuthStore((state) => state.user?.can_record === true);
+  const recordable = canRecord && channel.can_post !== false;
+  const { state: recording, recorder } = useRecorder(channelRecordingTarget(channel));
+  const recorderOpen = recording.phase === 'live' || recording.phase === 'stopping' || recording.phase === 'finalising';
   const [value, setValue] = useState(() => saved?.text ?? '');
   /** The reply a draft brought back. Shadowed the moment the feed sets a live
    *  one, and cleared by the same {@link cancelReply} that clears the parent's,
@@ -1460,6 +1473,19 @@ function ChannelComposerBody({
     : '';
 
   return (
+    <>
+      {recordable ? (
+        <>
+          <RecordingConsent state={recording} recorder={recorder} inSpace />
+          {/* The composer's own column (ChatComposerShell), so the recorder sits where the message box was. */}
+          {recorderOpen ? (
+            <div className="mx-auto w-full max-w-3xl md:px-4 md:pb-3">
+              <RecordingPanel state={recording} recorder={recorder} title={channel.title ?? channel.name} inSpace />
+            </div>
+          ) : null}
+        </>
+      ) : null}
+      {recordable && recorderOpen ? null : (
     <ChatComposerShell
       typing={{ label: typingShown ?? '', visible: typing }}
       tray={
@@ -1800,6 +1826,12 @@ function ChannelComposerBody({
             <AtSign aria-hidden className="size-4" />
           </ComposerAction>
 
+          {recordable ? (
+            <ComposerAction label="Record a meeting" onClick={recorder.ask}>
+              <Mic aria-hidden className="size-4" />
+            </ComposerAction>
+          ) : null}
+
           <EmojiInsert onPick={(emoji) => insertAtCaret(emoji)} />
         </>
       }
@@ -1891,6 +1923,8 @@ function ChannelComposerBody({
         className="block max-h-[200px] min-h-8 w-full resize-none bg-transparent px-2 py-1.5 text-base outline-none placeholder:text-muted-foreground sm:text-sm"
       />
     </ChatComposerShell>
+      )}
+    </>
   );
 }
 

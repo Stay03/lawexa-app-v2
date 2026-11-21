@@ -1,3 +1,4 @@
+import { readRecordingMeta } from './recording-meta';
 import type {
   ApiMessage,
   ConversationMessage,
@@ -249,11 +250,14 @@ export function transformApiMessages(
         ? readQuestionCard(apiMessages.find((row) => row.id === answered.cardMessageId)?.metadata)?.questions
         : undefined;
       const cardAnswers = answered && cardQuestions ? { ...answered, questions: cardQuestions } : answered;
+      // A recorded meeting: the person's own message, drawn as the recording's card (thread ac47b1df).
+      const recording = readRecordingMeta(apiMsg.metadata);
       messages.push({
         id: `msg_${apiMsg.id}`,
         role: 'user',
         content: apiMsg.content,
         timestamp: new Date(apiMsg.created_at),
+        ...(recording && { recording }),
         ...(list && {
           attachments: list,
           attachment: list[0],

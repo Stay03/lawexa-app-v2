@@ -18,6 +18,7 @@ import { MentionText } from './MentionText';
 import { ReplyQuote } from './ReplyQuote';
 import { withoutAttachmentMarks } from './attachment-markers';
 import { SentAttachments } from './SentAttachments';
+import { RecordingCard } from '@/v2/features/recording/RecordingCard';
 import { RedactionNote } from './RedactionNote';
 import { SpaceTurn } from './SpaceTurn';
 import { SwipeToReply } from './SwipeToReply';
@@ -234,6 +235,7 @@ export function UserMessageRow({
           />
         )}
         {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
+        {message.recording && <RecordingCard recording={message.recording} />}
         {unmatched && <p className="text-muted-foreground mt-1 text-xs">{unmatched}</p>}
         {showsRedaction && (
           <RedactionNote summary={message.redaction} align={turnSide(message, viewerId) === 'mine' ? 'end' : 'start'} hasFiles={hasFiles} />
@@ -289,6 +291,7 @@ export function UserMessageRow({
       )}
 
       {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
+      {message.recording && <RecordingCard recording={message.recording} />}
       {showsRedaction && <RedactionNote summary={message.redaction} align="end" hasFiles={hasFiles} />}
 
       <div

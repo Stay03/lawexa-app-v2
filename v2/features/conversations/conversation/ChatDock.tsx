@@ -13,6 +13,7 @@ import { useV2Session } from '@/v2/runtime/session-context';
 import { useMoveFirstPending } from '@/v2/shell/move-first';
 import { conversationIdOf } from '../warm';
 import { ConversationComposer, type ConversationComposerHandle } from './ConversationComposer';
+import { useHeaderContextFor } from '@/v2/shell/header-context';
 import { earlyRuling } from './early-ruling';
 import { subscribeFollowUpRefusals } from './embedded-composer';
 import { readJurisdictionSlot, writeJurisdictionSlot } from './jurisdiction-slot';
@@ -97,6 +98,8 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
   const queryClient = useQueryClient();
   const { userId } = useV2Session();
   const surface = useRouteComposerSurface(conversationId);
+  // The chat's title, for the phone's recording screen (the breadcrumb's own source).
+  const chatTitle = useHeaderContextFor(conversationId).title;
   // Read once for this chat: the dock is keyed by it, and the screen's own
   // answer replaces it as soon as the screen publishes.
   const [early] = useState(() => earlyRuling(queryClient, conversationId, userId));
@@ -225,6 +228,8 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
               {...(surface.lawexaTagOnly && { placeholder: TAG_ONLY_PLACEHOLDER })}
               quoteToneOf={surface.quoteToneOf}
               spaceUuid={surface.spaceUuid}
+              recordInto={conversationId}
+              recordingTitle={chatTitle}
               {...(openCard && { joinedAbove: true })}
               {...cardBox.answering}
             />

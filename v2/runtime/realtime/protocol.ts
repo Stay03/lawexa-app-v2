@@ -30,6 +30,8 @@ export const EVT_CHANNEL_UNREAD = '.channel.unread';
 
 /** `.userbox.control` — control of Lawexa's machine moved (Userbox v1), on `users.{uuid}`. */
 export const EVT_USERBOX_CONTROL = '.userbox.control';
+/** A recorded meeting moved a stage after Stop (recorder, thread ac47b1df). */
+export const EVT_RECORDING_UPDATED = '.recording.updated';
 
 /**
  * Own templates and skills (thread 9ae498ae; Backend's contract, 19 November
