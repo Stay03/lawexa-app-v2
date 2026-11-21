@@ -27,9 +27,8 @@ export function Wrapped26Landing({ signedIn, reason }: { signedIn: boolean; reas
         <section style={{ display: 'grid', gap: 40, alignItems: 'center', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 320px), 1fr))' }}>
           <div style={{ display: 'grid', gap: 20 }}>
             <p style={{ font: '700 0.95rem/1 var(--wr-body)', color: 'var(--wr-ink)' }}>Lawexa Wrapped 2026</p>
-            <h1>
-              Your 2026 on Lawexa. <span className="wr-mark">See the character your year earned you.</span>
-            </h1>
+            <h1>Your 2026 on Lawexa.</h1>
+            <p style={{ font: '700 clamp(1.25rem, 2.4vw, 1.6rem)/1.3 var(--wr-body)', color: 'var(--wr-ink)' }}>See the character your year earned you.</p>
             {reason === 'hidden' ? (
               <p>
                 You&rsquo;ve hidden your Wrapped. Turn it back on in <Link href="/settings/profile">Profile</Link>.
