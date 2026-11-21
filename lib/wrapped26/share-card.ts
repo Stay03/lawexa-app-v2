@@ -192,9 +192,17 @@ function rule(ctx: Ctx, x0: number, x1: number, y: number) {
   ctx.fillRect(x0, y, x1 - x0, 4);
 }
 
-function stat(ctx: Ctx, value: string, label: string, x: number, valueBaseline: number, valueSize: number, labelSize: number, labelGap: number, fonts: CardFonts, width: number) {
-  displayLine(ctx, value, x, valueBaseline, width, valueSize, fonts.display, C.cream, -2);
+/** A headline stat in Inter (the kit's .stat), its label under it; returns the wider of the two. */
+function stat(ctx: Ctx, value: string, label: string, x: number, valueBaseline: number, valueSize: number, labelSize: number, labelGap: number, fonts: CardFonts, width: number): number {
+  const measure = measureWith(ctx, 500, fonts.body, -2);
+  let size = valueSize;
+  while (size > 12 && measure(value, size) > width) size -= 2;
+  font(ctx, 500, size, fonts.body, -2);
+  ctx.fillStyle = C.cream;
+  ctx.fillText(value, x, valueBaseline);
+  const valueW = ctx.measureText(value).width;
   tracked(ctx, label, x, valueBaseline + labelGap + labelSize, 700, labelSize, fonts.body, 0, C.ink300);
+  return Math.max(valueW, ctx.measureText(label).width);
 }
 
 function drawStory(ctx: Ctx, c: CardContent, photo: HTMLImageElement | null, fonts: CardFonts) {
@@ -258,8 +266,9 @@ function drawSquare(ctx: Ctx, c: CardContent, photo: HTMLImageElement | null, fo
   const statsTop = statsBottom - 26 - 8 - 120 - 24;
   rule(ctx, left, right, statsTop);
   const half = (right - left) / 2;
-  stat(ctx, c.stats[0].value, c.stats[0].label, left, statsTop + 24 + 108, 120, 26, 8, fonts, half - 24);
-  stat(ctx, c.stats[1].value, c.stats[1].label, left + half + 24, statsTop + 24 + 108, 120, 26, 8, fonts, half - 24);
+  const firstW = stat(ctx, c.stats[0].value, c.stats[0].label, left, statsTop + 24 + 108, 120, 26, 8, fonts, half - 24);
+  const secondX = left + Math.min(firstW, half) + 48;
+  stat(ctx, c.stats[1].value, c.stats[1].label, secondX, statsTop + 24 + 108, 120, 26, 8, fonts, right - secondX);
   tracked(ctx, 'LAWEXA.COM/WRAPPED', left, urlBase, 700, 20, fonts.body, 2, C.cream);
 }
 
@@ -289,9 +298,7 @@ function drawLandscape(ctx: Ctx, c: CardContent, photo: HTMLImageElement | null,
   const labelBase = bottom - 2;
   const valueBase = labelBase - 15 - 8;
   rule(ctx, textLeft, right, valueBase - 38 - 12);
-  stat(ctx, c.stats[0].value, c.stats[0].label, textLeft, valueBase, 38, 15, 4, fonts, 240);
-  font(ctx, 900, 38, fonts.display, -1);
-  const firstW = Math.max(ctx.measureText(c.stats[0].value).width, measureWith(ctx, 700, fonts.body)(c.stats[0].label, 15));
+  const firstW = stat(ctx, c.stats[0].value, c.stats[0].label, textLeft, valueBase, 38, 15, 4, fonts, 240);
   stat(ctx, c.stats[1].value, c.stats[1].label, textLeft + Math.min(260, firstW) + 28, valueBase, 38, 15, 4, fonts, 240);
   tracked(ctx, 'LAWEXA.COM/WRAPPED', right, labelBase, 700, 15, fonts.body, 2, C.cream, 'right');
 }
