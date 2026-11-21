@@ -34,13 +34,11 @@ export const MAX_MENTION_SUGGESTIONS = 6;
  * November 2026: "still can't see lawexa in the names"): the tag is how to ask
  * it in a university Space, and harmless where it answers anyway, since the
  * server reads `@lawexa` as Lawexa in every Space and never as a tag for nobody.
+ * Both rules now live in `buildMentionOptions`, so a team channel's picker
+ * follows them too (thread 87928438).
  */
 export function spaceMentionOptions(members: readonly Member[], viewerUuid: string | null = null): MentionOptions {
-  const others = viewerUuid ? members.filter((member) => member.user.uuid !== viewerUuid) : members;
-  const options = buildMentionOptions(others);
-  const people = options.candidates.filter((candidate) => candidate.user !== null);
-  const lawexa = options.candidates.filter((candidate) => candidate.user === null);
-  return { candidates: [...lawexa, ...people], untaggable: options.untaggable };
+  return buildMentionOptions(members, viewerUuid);
 }
 
 /** An `@` being typed: the text after it, and where the `@` is. */

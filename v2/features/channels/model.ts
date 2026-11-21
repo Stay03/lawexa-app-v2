@@ -265,13 +265,18 @@ export interface MentionOptions {
  * a row would be a promise the send cannot keep. They are returned separately
  * instead: the picker names them in one quiet line, because a reader who can
  * see someone in the member list and not in the picker is owed the reason.
+ *
+ * LAWEXA FIRST, AND NOT THE READER. Lawexa heads the list and the reader is
+ * left out of it (tagging yourself tells nobody anything), the same in a team
+ * channel as in a Space chat (Arthur, thread 87928438; Lucy's live check of
+ * 21 November 2026 found #firm listing her first and Lawexa after her).
  */
-export function buildMentionOptions(members: readonly Member[]): MentionOptions {
-  const candidates: MentionCandidate[] = [];
+export function buildMentionOptions(members: readonly Member[], viewerUuid: string | null = null): MentionOptions {
+  const candidates: MentionCandidate[] = [{ key: LAWEXA_HANDLE, name: 'Lawexa', handle: LAWEXA_HANDLE, user: null }];
   const untaggable: string[] = [];
 
   for (const member of members) {
-    if (!member.is_active) continue;
+    if (!member.is_active || (viewerUuid !== null && member.user.uuid === viewerUuid)) continue;
     const handle = member.user.username;
     if (!handle) {
       untaggable.push(member.user.name);
@@ -285,7 +290,6 @@ export function buildMentionOptions(members: readonly Member[]): MentionOptions 
     });
   }
 
-  candidates.push({ key: LAWEXA_HANDLE, name: 'Lawexa', handle: LAWEXA_HANDLE, user: null });
   return { candidates, untaggable };
 }
 
