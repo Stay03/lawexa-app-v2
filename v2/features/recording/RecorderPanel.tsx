@@ -69,7 +69,7 @@ export function RecordingConsent({
           <p className="flex items-start gap-2 rounded-xl bg-muted/60 px-3 py-2.5 text-[13px] leading-snug text-muted-foreground">
             <ShieldCheck aria-hidden className="mt-px size-4 shrink-0 text-emerald-600 dark:text-emerald-500" />
             {inSpace
-              ? 'The audio and transcript are saved to this thread and your Files. Members of this Space can see them.'
+              ? 'The audio and transcript are saved here and in your Files. Members of this Space can see them.'
               : 'The audio and transcript are saved to this chat and your Files. Only people in this chat can see them.'}
           </p>
         )}

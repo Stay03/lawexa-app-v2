@@ -1,4 +1,5 @@
-import type { RecordingStage } from '@/types/recording';
+import type { Channel } from '@/types/collab';
+import type { RecordingStage, RecordingTargetInput } from '@/types/recording';
 
 /**
  * The recorder's rules, React-free so they can be read and tested on their own
@@ -153,3 +154,18 @@ export function savedUpToLine(savedPieces: number): string | null {
   if (savedPieces <= 0) return null;
   return `Saved up to ${clock((savedPieces * PIECE_MS) / 1000)}`;
 }
+
+/**
+ * Where a recording made in a Space channel or thread belongs. A thread is a
+ * channel with a parent: the recording names the Space, the parent channel and
+ * the thread, so its card and Lawexa's summary are posted in the thread.
+ */
+export function channelRecordingTarget(
+  channel: Pick<Channel, 'uuid' | 'is_thread' | 'parent_channel_uuid' | 'space'>,
+): RecordingTargetInput {
+  if (channel.is_thread && channel.parent_channel_uuid) {
+    return { space_uuid: channel.space.uuid, channel_uuid: channel.parent_channel_uuid, thread_uuid: channel.uuid };
+  }
+  return { space_uuid: channel.space.uuid, channel_uuid: channel.uuid };
+}
+

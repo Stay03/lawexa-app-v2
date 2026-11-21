@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   applyLiveEvent,
+  channelRecordingTarget,
   clock,
   EMPTY_TRANSCRIPT,
   finalSteps,
@@ -107,3 +108,14 @@ test('pieces go up in order, a failure is tried again, and Stop waits for all of
   await queue.drain();
   assert.deepEqual(sent, [0, 1, 2, 1], 'a piece the server lacks goes again');
 });
+
+test('a recording in a Space thread names the Space, the parent channel and the thread; in a channel, the channel', () => {
+  const space = { uuid: 'space-1', name: 'TEST DATA Chambers', type: 'private' } as never;
+  assert.deepEqual(channelRecordingTarget({ uuid: 'ch-1', is_thread: false, parent_channel_uuid: null, space }), { space_uuid: 'space-1', channel_uuid: 'ch-1' });
+  assert.deepEqual(
+    channelRecordingTarget({ uuid: 'th-1', is_thread: true, parent_channel_uuid: 'ch-1', space }),
+    { space_uuid: 'space-1', channel_uuid: 'ch-1', thread_uuid: 'th-1' },
+  );
+  assert.deepEqual(channelRecordingTarget({ uuid: 'th-2', is_thread: true, parent_channel_uuid: null, space }), { space_uuid: 'space-1', channel_uuid: 'th-2' }, 'a thread payload without its parent records into itself');
+});
+
