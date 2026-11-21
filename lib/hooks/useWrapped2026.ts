@@ -5,12 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { wrappedApi } from '@/lib/api/wrapped';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { WRAPPED_STALE_MS, wrappedSignedIn } from '@/lib/wrapped/access';
+import { WRAPPED26_WINDOW_STALE_MS, wrapped2026Keys } from '@/lib/wrapped26/window';
 
-/** The 2026 record's cache key, apart from the Bar Finals one so the two never mix. */
-export const wrapped2026Keys = {
-  all: ['wrapped', '2026', 'me'] as const,
-  me: (userId: string | number | null) => ['wrapped', '2026', 'me', { userId }] as const,
-};
 
 /**
  * The signed-in person's Wrapped 2026, for the /wrapped route. `null` is "no
@@ -18,6 +14,16 @@ export const wrapped2026Keys = {
  * falls back to the Bar Finals record. Every signed-in account asks: the
  * general edition covers everyone with activity this year.
  */
+/** Whether Wrapped 2026 is open to everyone (the server's public window, cached five minutes). */
+export function useWrapped2026Window() {
+  return useQuery({
+    queryKey: wrapped2026Keys.window,
+    queryFn: wrappedApi.window2026,
+    staleTime: WRAPPED26_WINDOW_STALE_MS,
+    retry: 1,
+  });
+}
+
 export function useWrapped2026(options: { enabled?: boolean } = {}) {
   const user = useAuthStore((state) => state.user);
   const token = useAuthStore((state) => state.token);

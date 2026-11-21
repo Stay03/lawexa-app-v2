@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 
 import { SEO, getAppUrl } from '@/lib/constants/seo';
 import { WRAPPED_COLOURS } from '@/lib/wrapped/theme';
+import { fetchWrapped26Window } from '@/lib/wrapped26/window';
 import { wrappedBody, wrappedDisplay } from './fonts';
 import './wrapped.css';
 import './wrapped26.css';
@@ -15,8 +16,16 @@ import './wrapped26.css';
  * only the shared layers (components, lib, types), never v2/.
  */
 
-const title = 'Lawexa Wrapped: Bar Finals 2026';
-const description = 'Your Bar Finals year on Lawexa, in eight cards. The Law. The Bar. The Bench. Get yours.';
+const barFinals = {
+  title: 'Lawexa Wrapped: Bar Finals 2026',
+  description: 'Your Bar Finals year on Lawexa, in eight cards. The Law. The Bar. The Bench. Get yours.',
+};
+
+/** Arthur's words for the 2026 edition (thread f833c285, 21 November 2026). */
+const edition2026 = {
+  title: 'My 2026 on Lawexa Wrapped',
+  description: 'Your 2026 on Lawexa. See the character your year earned you.',
+};
 
 /**
  * The link-preview picture, 1200×630, from Arthur's art for vibe 14 and the
@@ -25,13 +34,22 @@ const description = 'Your Bar Finals year on Lawexa, in eight cards. The Law. Th
  */
 const image = { url: '/wrapped/og.png', width: 1200, height: 630, alt: 'Your Bar Finals Report is out. The Law. The Bar. The Bench. Lawexa Wrapped.' };
 
-export const metadata: Metadata = {
-  title,
-  description,
-  alternates: { canonical: '/wrapped' },
-  openGraph: { title, description, url: `${getAppUrl()}/wrapped`, siteName: SEO.siteName, type: 'website', images: [image] },
-  twitter: { card: 'summary_large_image', title, description, images: [image] },
-};
+/**
+ * The preview follows the server's Wrapped 2026 window (Backend e5d5c35e): the
+ * Bar Finals words until it opens, Arthur's 2026 words from then. Read on the
+ * server, cached five minutes, so moving the launch needs no push.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const window = await fetchWrapped26Window();
+  const { title, description } = window?.open ? edition2026 : barFinals;
+  return {
+    title,
+    description,
+    alternates: { canonical: '/wrapped' },
+    openGraph: { title, description, url: `${getAppUrl()}/wrapped`, siteName: SEO.siteName, type: 'website', images: [image] },
+    twitter: { card: 'summary_large_image', title, description, images: [image] },
+  };
+}
 
 /** The palette as CSS variables (`--wr-cream`, `--wr-ink-soft`, …), so CSS and the canvas share one source. */
 const palette = Object.fromEntries(

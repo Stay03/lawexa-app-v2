@@ -6,6 +6,7 @@ import type { WrappedRecord } from '@/lib/wrapped/types';
 import type { WrappedProgress } from '@/lib/wrapped/progress';
 import type { Wrapped26Record } from '@/lib/wrapped26/types';
 import type { Wrapped26Progress } from '@/lib/wrapped26/progress';
+import { fetchWrapped26Window, type Wrapped26Window } from '@/lib/wrapped26/window';
 
 /**
  * Lawexa Wrapped's two calls (Backend, thread f833c285, 4 November 2026):
@@ -52,6 +53,9 @@ export const wrappedApi = {
   progress2026: async (step: Wrapped26Progress): Promise<void> => {
     await apiClient.post('/wrapped/2026/me/progress', step, { headers: { 'X-Silent-Auth': 'true' } });
   },
+
+  /** Whether Wrapped 2026 is open to everyone, from the server's settings (public). */
+  window2026: (): Promise<Wrapped26Window | null> => fetchWrapped26Window(),
 
   /** Hides every edition (the 2026 one too). */
   setHidden: async (hidden: boolean): Promise<void> => {

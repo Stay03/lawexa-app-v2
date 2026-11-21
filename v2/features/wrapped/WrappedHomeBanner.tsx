@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Award, X } from 'lucide-react';
 
 import { WRAPPED_COLOURS as C } from '@/lib/wrapped/theme';
-import { useHasWrapped } from './queries';
+import { useHasWrapped, useHasWrapped2026 } from './queries';
 
 /**
  * The home's Lawexa Wrapped banner (thread f833c285, live 8 November 2026):
@@ -15,15 +15,20 @@ import { useHasWrapped } from './queries';
  * file Arthur's design system values replace).
  */
 const DISMISSED_KEY = 'lawexa-wrapped-banner-closed';
+/** The 2026 banner's own mark: closing the Bar Finals banner never hides the 2026 one. */
+const DISMISSED_2026_KEY = 'lawexa-wrapped-2026-banner-closed';
 const listeners = new Set<() => void>();
 
-function readDismissed(): boolean {
+function readFlag(key: string): boolean {
   try {
-    return localStorage.getItem(DISMISSED_KEY) === '1';
+    return localStorage.getItem(key) === '1';
   } catch {
     return false;
   }
 }
+
+const readDismissed = () => readFlag(DISMISSED_KEY);
+const readDismissed2026 = () => readFlag(DISMISSED_2026_KEY);
 
 function subscribe(listener: () => void) {
   listeners.add(listener);
@@ -31,17 +36,21 @@ function subscribe(listener: () => void) {
 }
 
 export function WrappedHomeBanner() {
-  const hasWrapped = useHasWrapped();
+  const hasBarFinals = useHasWrapped();
+  const has2026 = useHasWrapped2026();
+  const hasWrapped = has2026 || hasBarFinals;
   // Closed on the server's first paint is unknown: it shows after the device answers.
-  const dismissed = useSyncExternalStore(subscribe, readDismissed, () => true);
+  const dismissedBarFinals = useSyncExternalStore(subscribe, readDismissed, () => true);
+  const dismissed2026 = useSyncExternalStore(subscribe, readDismissed2026, () => true);
+  const dismissed = has2026 ? dismissed2026 : dismissedBarFinals;
   const close = useCallback(() => {
     try {
-      localStorage.setItem(DISMISSED_KEY, '1');
+      localStorage.setItem(has2026 ? DISMISSED_2026_KEY : DISMISSED_KEY, '1');
     } catch {
       // Storage refused: it closes for this visit only.
     }
     listeners.forEach((listener) => listener());
-  }, []);
+  }, [has2026]);
 
   if (!hasWrapped || dismissed) return null;
 
@@ -55,8 +64,17 @@ export function WrappedHomeBanner() {
           <Award className="size-5" />
         </span>
         <Link href="/wrapped" className="min-w-0 flex-1 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-current">
-          <span className="block text-sm font-bold">Your Bar Finals Wrapped is here</span>
-          <span className="block text-xs" style={{ color: C.inkSoft }}>Eight cards of your year on Lawexa, and one to post.</span>
+          {has2026 ? (
+            <>
+              <span className="block text-sm font-bold">Your 2026 Wrapped is here</span>
+              <span className="block text-xs" style={{ color: C.inkSoft }}>See the character your year earned you.</span>
+            </>
+          ) : (
+            <>
+              <span className="block text-sm font-bold">Your Bar Finals Wrapped is here</span>
+              <span className="block text-xs" style={{ color: C.inkSoft }}>Eight cards of your year on Lawexa, and one to post.</span>
+            </>
+          )}
         </Link>
         <Link
           href="/wrapped"

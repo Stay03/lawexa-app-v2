@@ -7,7 +7,8 @@ import { BarFinalsWrapped } from '@/components/wrapped/BarFinalsWrapped';
 import { WrappedError } from '@/components/wrapped/WrappedError';
 import { WrappedLanding } from '@/components/wrapped/WrappedLanding';
 import { Wrapped26Story } from '@/components/wrapped26/Wrapped26Story';
-import { useWrapped2026 } from '@/lib/hooks/useWrapped2026';
+import { Wrapped26Landing } from '@/components/wrapped26/Wrapped26Landing';
+import { useWrapped2026, useWrapped2026Window } from '@/lib/hooks/useWrapped2026';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { wrappedSignedIn } from '@/lib/wrapped/access';
 import { wrappedFontFamilies } from './fonts';
@@ -33,8 +34,11 @@ export default function WrappedPage() {
   const hidden = signedIn && Boolean(user?.wrapped_hidden);
   const wrapped2026 = useWrapped2026({ enabled: signedIn && !hidden });
   const close = useCallback(() => router.push('/'), [router]);
+  // Once the 2026 window is open, the landing page is the 2026 one (Arthur's words).
+  const open = useWrapped2026Window().data?.open === true;
+  const Landing = open ? Wrapped26Landing : WrappedLanding;
 
-  if (hidden) return <WrappedLanding signedIn reason="hidden" />;
+  if (hidden) return <Landing signedIn reason="hidden" />;
 
   if (signedIn && wrapped2026.isPending) {
     return (
@@ -52,6 +56,6 @@ export default function WrappedPage() {
     return <WrappedError retrying={wrapped2026.isFetching} onRetry={() => void wrapped2026.refetch()} />;
   }
 
-  // No 2026 record, or signed out: the Bar Finals edition and its landing page, as before.
-  return <BarFinalsWrapped fonts={wrappedFontFamilies} />;
+  // No 2026 record, or signed out: the Bar Finals story if there is one, else the landing page.
+  return <BarFinalsWrapped fonts={wrappedFontFamilies} Landing={Landing} />;
 }

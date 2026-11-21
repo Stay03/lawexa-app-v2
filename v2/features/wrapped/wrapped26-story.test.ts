@@ -17,6 +17,9 @@ import { createWrapped26Tracker, type Wrapped26Progress } from '@/lib/wrapped26/
 import { cardContent, FORMAT_FOR } from '@/lib/wrapped26/share-card';
 import { wrapped26Link } from '@/lib/wrapped26/share-link';
 import type { Wrapped26Record, Wrapped26SlideId } from '@/lib/wrapped26/types';
+import { seesWrapped26Early, wrapped26Askable } from '@/lib/wrapped26/window';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 /* Wrapped 2026 (thread f833c285; Arthur's build kit, BUILD_SPEC §3–5). */
 
@@ -194,4 +197,25 @@ test('a failed send never stops the story', () => {
   assert.doesNotThrow(() => tracker.open());
   const rejecting = createWrapped26Tracker(() => Promise.reject(new Error('500')));
   assert.doesNotThrow(() => rejecting.card(2));
+});
+
+// ── The launch window ────────────────────────────────────────────────────
+
+test('before the window opens only staff ask for a 2026 record; once open, every signed-in account that has not hidden it', () => {
+  assert.equal(wrapped26Askable({ signedIn: true, hidden: false, open: false, role: 'user' }), false);
+  assert.equal(wrapped26Askable({ signedIn: true, hidden: false, open: false, role: 'researcher' }), true);
+  assert.equal(wrapped26Askable({ signedIn: true, hidden: false, open: true, role: 'user' }), true);
+  assert.equal(wrapped26Askable({ signedIn: true, hidden: true, open: true, role: 'admin' }), false);
+  assert.equal(wrapped26Askable({ signedIn: false, hidden: false, open: true, role: null }), false);
+  assert.ok(seesWrapped26Early('superadmin') && !seesWrapped26Early('lawyer' as never));
+});
+
+test('the app holds no launch date: the preview and the landing page follow the server window', () => {
+  const layout = readFileSync(join(process.cwd(), 'app', 'wrapped', 'layout.tsx'), 'utf8');
+  assert.match(layout, /const window = await fetchWrapped26Window\(\);/);
+  assert.match(layout, /window\?\.open \? edition2026 : barFinals/);
+  assert.match(layout, /title: 'My 2026 on Lawexa Wrapped'/);
+  const page = readFileSync(join(process.cwd(), 'app', 'wrapped', 'page.tsx'), 'utf8');
+  assert.match(page, /const Landing = open \? Wrapped26Landing : WrappedLanding;/);
+  for (const file of ['window.ts', 'story.ts']) assert.doesNotMatch(readFileSync(join(process.cwd(), 'lib', 'wrapped26', file), 'utf8'), /2026-12-0/);
 });

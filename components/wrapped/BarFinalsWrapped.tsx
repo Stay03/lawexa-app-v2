@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore, type ComponentType } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { WrappedError } from '@/components/wrapped/WrappedError';
@@ -13,6 +13,12 @@ import type { ShareFonts } from '@/lib/wrapped/share-image';
 
 const noSubscribe = () => () => {};
 
+/** The landing page's props: the Bar Finals one by default, the 2026 one at /wrapped once that window is open. */
+export interface LandingProps {
+  signedIn: boolean;
+  reason?: 'not-ready' | 'hidden';
+}
+
 /**
  * The Bar Finals edition (live 8 November 2026): a signed-in student with a
  * record gets the story; a failed read gets Try again; anyone else stays on
@@ -20,7 +26,7 @@ const noSubscribe = () => () => {};
  * yet). Shown at /wrapped/bar-finals, and at /wrapped for someone with no
  * 2026 record (app/wrapped/page.tsx).
  */
-export function BarFinalsWrapped({ fonts }: { fonts: ShareFonts }) {
+export function BarFinalsWrapped({ fonts, Landing = WrappedLanding }: { fonts: ShareFonts; Landing?: ComponentType<LandingProps> }) {
   const router = useRouter();
   // The sign-in lives in the device's storage: until the page runs there, it is the landing page.
   const onDevice = useSyncExternalStore(noSubscribe, () => true, () => false);
@@ -32,7 +38,7 @@ export function BarFinalsWrapped({ fonts }: { fonts: ShareFonts }) {
   const wrapped = useWrapped({ enabled: signedIn && !hidden });
   const close = useCallback(() => router.push('/'), [router]);
 
-  if (hidden) return <WrappedLanding signedIn reason="hidden" />;
+  if (hidden) return <Landing signedIn reason="hidden" />;
 
   if (signedIn && wrapped.isPending) {
     return (
@@ -50,5 +56,5 @@ export function BarFinalsWrapped({ fonts }: { fonts: ShareFonts }) {
     return <WrappedError retrying={wrapped.isFetching} onRetry={() => void wrapped.refetch()} />;
   }
 
-  return <WrappedLanding signedIn={signedIn} reason={signedIn ? 'not-ready' : undefined} />;
+  return <Landing signedIn={signedIn} reason={signedIn ? 'not-ready' : undefined} />;
 }
