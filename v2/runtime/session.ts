@@ -87,6 +87,15 @@ export interface SessionUser {
    */
   can_access_team_channels: boolean;
   /**
+   * May this account record meetings (the recorder, its Recordings lens and
+   * the staff voice test page)? `user.can_record` from THIS page load's
+   * `/auth/me`. The user saved at sign-in did not carry it (the sign-in
+   * answers left it out, 21 November 2026), and a flag switched on later
+   * would never reach a saved copy, so the recorder's doors read this.
+   * `false` when the server does not send it.
+   */
+  can_record: boolean;
+  /**
    * Has the account finished onboarding? A completion date, or, for an
    * account that never started the current onboarding, a profession
    * (`onboarding-finished.ts`). The layout sends an unfinished account to
@@ -149,6 +158,7 @@ function toSessionDTO(
       // Beside the user, like `is_ambassador`, never inside it: the user
       // resource also describes other people (backend, 11 October 2026).
       can_access_team_channels: data?.can_access_team_channels === true,
+      can_record: user.can_record === true,
       onboarding_complete: onboardingFinished(user.profile),
       is_verified_author: user.is_verified_author === true,
       v2_intro_seen: typeof user.v2_intro_seen_at === 'string' && user.v2_intro_seen_at !== '',

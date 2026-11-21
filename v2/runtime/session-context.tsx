@@ -151,6 +151,14 @@ export interface V2SessionSnapshot {
    */
   readonly canAccessTeamChannels: boolean;
   /**
+   * May this account record meetings? The server's `user.can_record` from
+   * this page load's `/auth/me` (staff today). Every recorder door reads
+   * this, never the copy of the user saved at sign-in, which goes stale.
+   * Presentation only: the recordings API answers 403 without the flag.
+   * `false` when signed out or not sent.
+   */
+  readonly canRecord: boolean;
+  /**
    * May this account publish a quiz to everyone (`visibility: public`)? The
    * server's `user.is_verified_author` from `/auth/me` (21 October 2026).
    * Presentation only: it decides whether the quiz form and the visibility
@@ -203,6 +211,7 @@ export function V2SessionProvider({
   profileCountryCode,
   isLawyer,
   canAccessTeamChannels,
+  canRecord,
   isVerifiedAuthor,
   mayHaveWrapped,
   wrappedHidden,
@@ -226,6 +235,7 @@ export function V2SessionProvider({
       profileCountryCode,
       isLawyer,
       canAccessTeamChannels,
+      canRecord,
       isVerifiedAuthor,
       mayHaveWrapped,
       wrappedHidden,
@@ -247,6 +257,7 @@ export function V2SessionProvider({
       profileCountryCode,
       isLawyer,
       canAccessTeamChannels,
+      canRecord,
       isVerifiedAuthor,
       mayHaveWrapped,
       wrappedHidden,

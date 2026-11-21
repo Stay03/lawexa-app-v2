@@ -19,7 +19,6 @@ import {
   Smile,
   X,
 } from 'lucide-react';
-import { useAuthStore } from '@/lib/stores/authStore';
 import { RecordingConsent, RecordingPanel } from '@/v2/features/recording/RecorderPanel';
 import { useRecorder } from '@/v2/features/recording/use-recorder';
 import { channelRecordingTarget } from '@/v2/features/recording/recording-model';
@@ -657,7 +656,7 @@ function ChannelComposerBody({
   // first (`user.can_record`), and only where the reader may post. A thread is
   // a channel with a parent; the recording names the Space, the channel and
   // the thread, and its card and Lawexa's summary are posted there.
-  const canRecord = useAuthStore((state) => state.user?.can_record === true);
+  const { canRecord } = useV2Session();
   const recordable = canRecord && channel.can_post !== false;
   const { state: recording, recorder } = useRecorder(channelRecordingTarget(channel));
   const recorderOpen = recording.phase === 'live' || recording.phase === 'stopping' || recording.phase === 'finalising';

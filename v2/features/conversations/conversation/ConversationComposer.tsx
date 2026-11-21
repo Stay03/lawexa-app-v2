@@ -61,7 +61,7 @@ import type { MentionOptions } from '@/v2/features/channels/model';
 import { MentionList, useMentionPicker } from './mention-picker';
 import { draftWithRefused, heldSendLabel, UNNAMED_ASKER, type SendRefused } from './space-turn';
 import { usePastedContent } from './usePastedContent';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { RecordingConsent, RecordingPanel } from '@/v2/features/recording/RecorderPanel';
 import { useRecorder } from '@/v2/features/recording/use-recorder';
 
@@ -413,7 +413,7 @@ export function ConversationComposer({
   const [errorPlans, setErrorPlans] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Recording a meeting (thread ac47b1df): the recorder takes the box's place while it runs.
-  const canRecord = useAuthStore((state) => state.user?.can_record === true);
+  const { canRecord } = useV2Session();
   // Never in a confidential or redacted chat: the server refuses both (422 not_recordable, Backend 21 November 2026).
   const recordable = recordInto !== null && canRecord && !isConfidential && !isRedacted;
   const { state: recording, recorder } = useRecorder({ conversation_uuid: recordInto ?? '' });

@@ -38,7 +38,6 @@ import {
 } from './states';
 import { useGuestPassFailed } from '@/v2/runtime/guest-pass';
 import { FoldersFallback } from './FoldersFallback';
-import { useAuthStore } from '@/lib/stores/authStore';
 import { TabRow } from '@/v2/shell/TabRow';
 import { RecordingsList } from '@/v2/features/recording/RecordingsList';
 
@@ -116,7 +115,7 @@ function PageShell({ actions, children }: { actions?: React.ReactNode; children:
 }
 
 export function FoldersBrowser() {
-  const { signedIn, userId: viewerId } = useV2Session();
+  const { signedIn, userId: viewerId, canRecord } = useV2Session();
   // A visitor who is not signed in gets a guest pass in a moment
   // (guest-pass.tsx); until then this is a load, not a sign-in wall.
   const guestPassFailed = useGuestPassFailed();
@@ -131,7 +130,6 @@ export function FoldersBrowser() {
   const [now] = useState(() => Date.now());
 
   const [creating, setCreating] = useState(false);
-  const canRecord = useAuthStore((state) => state.user?.can_record === true);
   const [chosenLens, setLens] = useState<Lens>('all');
   const lens: Lens = canRecord ? chosenLens : 'all';
   const [renameTarget, setRenameTarget] = useState<FolderRowModel | null>(null);

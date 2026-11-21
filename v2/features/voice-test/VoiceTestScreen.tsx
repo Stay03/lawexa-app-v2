@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Check, Copy, Loader2, Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 
-import { useAuthStore } from '@/lib/stores/authStore';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { cn } from '@/lib/utils';
 import type { VoiceTestMode } from '@/types/voice-test';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -256,7 +256,7 @@ function DelayTable({ state }: { state: VoiceTestState }) {
 }
 
 export function VoiceTestScreen() {
-  const canRecord = useAuthStore((store) => store.user?.can_record === true);
+  const { canRecord } = useV2Session();
   const [controller] = useState(() => new VoiceTestController());
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot, controller.getSnapshot);
 

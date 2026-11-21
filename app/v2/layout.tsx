@@ -289,6 +289,8 @@ export default async function V2Layout({
           isLawyer={user?.is_lawyer ?? false}
           // Whether Team Channels open (the server's flag, researchers and up).
           canAccessTeamChannels={user?.can_access_team_channels ?? false}
+          // Whether the recorder shows (the server's flag, fresh each load, not the sign-in copy).
+          canRecord={user?.can_record ?? false}
           // Whether the quiz form offers "Public" (a verified author only).
           isVerifiedAuthor={user?.is_verified_author ?? false}
           // Whether the Wrapped entry points ask for one (fresh each load, not the sign-in copy).
