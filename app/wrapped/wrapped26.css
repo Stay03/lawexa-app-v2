@@ -1,0 +1,323 @@
+/*
+ * Lawexa Wrapped 2026, general edition (thread f833c285), from Arthur's build
+ * kit (design/tokens.css, prototype/prototype.html). Every size is the kit's
+ * px on its 1080×1920 canvas: the stage is drawn at that size and scaled to
+ * fit the screen (BUILD_SPEC §2), so a slide matches its PNG on any device.
+ * Everything sits under .w26, apart from the Bar Finals styles in wrapped.css.
+ */
+
+.w26 {
+  --w26-cream: #f3ecd9;
+  --w26-cream50: #f8f2e2;
+  --w26-white: #ffffff;
+  --w26-ink: #171307;
+  --w26-ink700: #3c3627;
+  --w26-ink500: #615b4d;
+  --w26-ink300: #9b9485;
+  --w26-gold: #d3af37;
+  --w26-lilac: #9591f8;
+  --w26-coral: #e55541;
+  --w26-lime: #bee860;
+  --w26-display: var(--font-wrapped-display), 'Arial Black', system-ui, sans-serif;
+  --w26-body: var(--font-wrapped-body), system-ui, -apple-system, 'Segoe UI', sans-serif;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #0c0a04;
+  font-family: var(--w26-body);
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+
+/* The 1080×1920 canvas, scaled by the player to fit inside the safe area. */
+.w26-stage {
+  position: relative;
+  flex: none;
+  width: 1080px;
+  height: 1920px;
+  overflow: hidden;
+  background: var(--w26-ink);
+  transform-origin: center;
+}
+
+.w26-slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  will-change: transform, opacity, clip-path;
+}
+
+.w26-paper {
+  background: var(--w26-cream);
+  color: var(--w26-ink);
+  --fg: var(--w26-ink);
+  --bg: var(--w26-cream);
+  --muted: var(--w26-ink500);
+  --line: var(--w26-ink);
+}
+
+.w26-ink {
+  background: var(--w26-ink);
+  color: var(--w26-cream);
+  --fg: var(--w26-cream);
+  --bg: var(--w26-ink);
+  --muted: var(--w26-ink300);
+  --line: var(--w26-cream);
+}
+
+.w26-d {
+  font-family: var(--w26-display);
+  font-weight: 900;
+  line-height: 0.9;
+  letter-spacing: -3px;
+}
+
+.w26-d7 {
+  font-family: var(--w26-display);
+  font-weight: 700;
+}
+
+.w26-eyebrow {
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 12px;
+  text-transform: uppercase;
+}
+
+.w26-body {
+  font-size: 52px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -1.5px;
+}
+
+.w26-label {
+  font-size: 30px;
+  color: var(--muted);
+}
+
+.w26-billing {
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--muted);
+  font-size: 24px;
+}
+
+.w26-billing b {
+  color: var(--fg);
+}
+
+.w26-content {
+  position: absolute;
+  left: 96px;
+  right: 96px;
+  top: 240px;
+  bottom: 200px;
+  display: flex;
+  flex-direction: column;
+}
+
+.w26-pill {
+  border: 4px solid var(--line);
+  border-radius: 9999px;
+}
+
+/* Buttons are at least 88 px tall on the canvas (BUILD_SPEC §10). */
+.w26-btn {
+  display: block;
+  width: 100%;
+  min-height: 88px;
+  border-radius: 9999px;
+  padding: 34px;
+  text-align: center;
+  font: 700 40px/1.1 var(--w26-body);
+  cursor: pointer;
+  border: 4px solid transparent;
+}
+
+.w26-btn:focus-visible,
+.w26-chrome button:focus-visible,
+.w26-option:focus-visible {
+  outline: 6px solid var(--w26-gold);
+  outline-offset: 6px;
+}
+
+.w26-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 36px 48px;
+  font: 700 64px/1 var(--w26-display);
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.w26-avatar {
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--w26-display);
+  font-weight: 900;
+  color: var(--w26-ink);
+  background: var(--w26-cream);
+  flex: none;
+  overflow: hidden;
+}
+
+.w26-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ── Chrome: progress bars, the title row, PAUSED ───────────────────────── */
+
+.w26-chrome {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 20;
+  color: var(--w26-cream);
+  transition: color 0.5s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s;
+  pointer-events: none;
+}
+
+.w26-chrome[data-ground='paper'] {
+  color: var(--w26-ink);
+}
+
+.w26-bars {
+  position: absolute;
+  top: 56px;
+  left: 64px;
+  right: 64px;
+  display: flex;
+  gap: 10px;
+}
+
+.w26-bars i {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: color-mix(in srgb, currentColor 22%, transparent);
+}
+
+.w26-bars b {
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  border-radius: inherit;
+  transform-origin: left;
+}
+
+.w26-top {
+  position: absolute;
+  top: 104px;
+  left: 64px;
+  right: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.w26-tag {
+  padding: 10px 22px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  color: var(--w26-ink);
+}
+
+.w26-chrome button {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border: 0;
+  border-radius: 9999px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.w26-paused {
+  position: absolute;
+  top: 200px;
+  right: 64px;
+  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.w26-paused[data-on='true'] {
+  opacity: 0.7;
+}
+
+@keyframes w26-marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes w26-marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w26-marquee {
+    animation: none !important;
+  }
+}
+
+/* 06: the busiest day turns gold (set by its entrance at 1.1 s). */
+.w26-cell[data-lit='true'] {
+  background: var(--w26-gold);
+  border-color: var(--w26-ink) !important;
+  border-width: 5px !important;
+  font-size: 40px !important;
+  color: var(--w26-ink);
+  box-shadow: 8px 8px 0 var(--w26-ink);
+}
+
+/* 08: one dot per percent; the top N fill gold one by one. */
+.w26-dot {
+  border-radius: 50%;
+  aspect-ratio: 1;
+  border: 3px solid var(--line);
+  opacity: 0.3;
+}
+
+.w26-dot[data-lit='true'] {
+  background: var(--w26-gold);
+  border-color: var(--w26-ink);
+  opacity: 1;
+}

@@ -4,6 +4,8 @@ import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
 import type { WrappedRecord } from '@/lib/wrapped/types';
 import type { WrappedProgress } from '@/lib/wrapped/progress';
+import type { Wrapped26Record } from '@/lib/wrapped26/types';
+import type { Wrapped26Progress } from '@/lib/wrapped26/progress';
 
 /**
  * Lawexa Wrapped's two calls (Backend, thread f833c285, 4 November 2026):
@@ -31,6 +33,27 @@ export const wrappedApi = {
     await apiClient.post('/wrapped/me/progress', step, { headers: { 'X-Silent-Auth': 'true' } });
   },
 
+  /**
+   * Wrapped 2026's record (Backend, 21 November 2026), or null on a 404: no
+   * record, hidden, or outside the window (one message for all three, so
+   * the dates never leak). Staff get theirs as soon as the batch has run.
+   */
+  me2026: async (): Promise<Wrapped26Record | null> => {
+    try {
+      const response = await apiClient.get<ApiResponse<Wrapped26Record>>('/wrapped/2026/me');
+      return response.data.data ?? null;
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 404) return null;
+      throw error;
+    }
+  },
+
+  /** One step of the 2026 story, for the view counts. Silent on a 401, like `progress`. */
+  progress2026: async (step: Wrapped26Progress): Promise<void> => {
+    await apiClient.post('/wrapped/2026/me/progress', step, { headers: { 'X-Silent-Auth': 'true' } });
+  },
+
+  /** Hides every edition (the 2026 one too). */
   setHidden: async (hidden: boolean): Promise<void> => {
     await apiClient.put('/wrapped/me/visibility', { hidden });
   },

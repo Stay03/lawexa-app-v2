@@ -94,6 +94,8 @@ export interface Wrapped26StoryState {
   queued: 'next' | 'back' | null;
   /** Which way the current slide came in, for the transition. */
   direction: 1 | -1;
+  /** The slide going out while `moving`, drawn under the one coming in. */
+  from: number | null;
 }
 
 export type Wrapped26StoryAction =
@@ -109,7 +111,7 @@ export type Wrapped26StoryAction =
   | { type: 'toggle' };
 
 export function initialStory(index = 0): Wrapped26StoryState {
-  return { index, elapsed: 0, paused: false, moving: false, queued: null, direction: 1 };
+  return { index, elapsed: 0, paused: false, moving: false, queued: null, direction: 1, from: null };
 }
 
 /** A slide that waits for its own control ignores a tap on the right (BUILD_SPEC §4). */
@@ -120,7 +122,7 @@ export function waitsForControl(id: Wrapped26SlideId | undefined): boolean {
 function move(state: Wrapped26StoryState, last: number, direction: 1 | -1): Wrapped26StoryState {
   const index = state.index + direction;
   if (index < 0 || index > last) return { ...state, queued: null };
-  return { ...state, index, elapsed: 0, moving: true, queued: null, direction };
+  return { ...state, index, elapsed: 0, moving: true, queued: null, direction, from: state.index };
 }
 
 export function storyReducer(slides: readonly Wrapped26SlideId[], state: Wrapped26StoryState, action: Wrapped26StoryAction): Wrapped26StoryState {
@@ -145,7 +147,7 @@ export function storyReducer(slides: readonly Wrapped26SlideId[], state: Wrapped
       if (state.moving) return { ...state, queued: 'back' };
       return state.index > 0 ? move(state, last, -1) : { ...state, elapsed: 0 };
     case 'settled': {
-      const settled = { ...state, moving: false, queued: null };
+      const settled = { ...state, moving: false, queued: null, from: null };
       if (state.queued === 'next' && !waitsForControl(slides[state.index])) return move(settled, last, 1);
       if (state.queued === 'back') return state.index > 0 ? move(settled, last, -1) : settled;
       return settled;

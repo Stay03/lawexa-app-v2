@@ -120,4 +120,9 @@ export interface Wrapped26Record {
   /** The `wr-XXXXXXXX` code for lawexa.com/wrapped?r=. */
   shareCode: string;
   shareSignups: number;
+  /**
+   * The person also has a visible Bar Finals Wrapped: the share slide links
+   * to /wrapped/bar-finals (Backend 935535a1, checked on each request).
+   */
+  hasBarFinals: boolean;
 }

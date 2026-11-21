@@ -3,10 +3,11 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 
+import { BarFinalsWrapped } from '@/components/wrapped/BarFinalsWrapped';
 import { WrappedError } from '@/components/wrapped/WrappedError';
 import { WrappedLanding } from '@/components/wrapped/WrappedLanding';
-import { WrappedStory } from '@/components/wrapped/WrappedStory';
-import { useWrapped } from '@/lib/hooks/useWrapped';
+import { Wrapped26Story } from '@/components/wrapped26/Wrapped26Story';
+import { useWrapped2026 } from '@/lib/hooks/useWrapped2026';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { wrappedSignedIn } from '@/lib/wrapped/access';
 import { wrappedFontFamilies } from './fonts';
@@ -14,11 +15,12 @@ import { wrappedFontFamilies } from './fonts';
 const noSubscribe = () => () => {};
 
 /**
- * One page for everybody (see ./layout.tsx). The server's HTML is the landing
- * page, which is also what a link preview reads. On the device, a signed-in
- * student with a Wrapped gets the story; a failed read gets Try again; anyone
- * else stays on the landing page, which says why when they are signed in
- * (hidden, or none yet).
+ * One page for everybody (see ./layout.tsx; Techlead, 21 November 2026). The
+ * server's HTML is the landing page, which is also what a link preview reads.
+ * On the device, a signed-in person with a Wrapped 2026 record gets the 2026
+ * story. Without one (the server's 404: none, hidden, or outside the window)
+ * the Bar Finals edition answers as it did before, and its own address is
+ * /wrapped/bar-finals. A failed 2026 read gets Try again.
  */
 export default function WrappedPage() {
   const router = useRouter();
@@ -29,12 +31,12 @@ export default function WrappedPage() {
   const isGuest = useAuthStore((state) => state.isGuest);
   const signedIn = onDevice && wrappedSignedIn({ token, user, isGuest });
   const hidden = signedIn && Boolean(user?.wrapped_hidden);
-  const wrapped = useWrapped({ enabled: signedIn && !hidden });
+  const wrapped2026 = useWrapped2026({ enabled: signedIn && !hidden });
   const close = useCallback(() => router.push('/'), [router]);
 
   if (hidden) return <WrappedLanding signedIn reason="hidden" />;
 
-  if (signedIn && wrapped.isPending) {
+  if (signedIn && wrapped2026.isPending) {
     return (
       <div className="wr-stage" role="status" aria-label="Opening your Wrapped">
         <p style={{ color: 'var(--wr-cream)', font: '800 1.4rem/1.2 var(--wr-display)' }}>Opening your Wrapped…</p>
@@ -42,13 +44,14 @@ export default function WrappedPage() {
     );
   }
 
-  if (signedIn && wrapped.data) {
-    return <WrappedStory record={wrapped.data} fonts={wrappedFontFamilies} onClose={close} />;
+  if (signedIn && wrapped2026.data) {
+    return <Wrapped26Story record={wrapped2026.data} fonts={wrappedFontFamilies} onClose={close} />;
   }
 
-  if (signedIn && wrapped.isError) {
-    return <WrappedError retrying={wrapped.isFetching} onRetry={() => void wrapped.refetch()} />;
+  if (signedIn && wrapped2026.isError) {
+    return <WrappedError retrying={wrapped2026.isFetching} onRetry={() => void wrapped2026.refetch()} />;
   }
 
-  return <WrappedLanding signedIn={signedIn} reason={signedIn ? 'not-ready' : undefined} />;
+  // No 2026 record, or signed out: the Bar Finals edition and its landing page, as before.
+  return <BarFinalsWrapped fonts={wrappedFontFamilies} />;
 }

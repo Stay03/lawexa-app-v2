@@ -5,6 +5,7 @@ import { SEO, getAppUrl } from '@/lib/constants/seo';
 import { WRAPPED_COLOURS } from '@/lib/wrapped/theme';
 import { wrappedBody, wrappedDisplay } from './fonts';
 import './wrapped.css';
+import './wrapped26.css';
 
 /**
  * lawexa.com/wrapped: Lawexa Wrapped, Bar Finals edition (thread f833c285,
