@@ -289,11 +289,6 @@ export function VoiceTestScreen() {
         <p className="text-[14px] text-muted-foreground">Staff only. Talk to Lawexa and see how long each answer takes to start.</p>
       </header>
 
-      {state.practice ? (
-        <p className="rounded-xl bg-amber-500/10 px-4 py-3 text-[13px] leading-relaxed text-amber-900 dark:text-amber-200">
-          Practice call: no microphone and no sound. A short scripted conversation runs until the ElevenLabs client is added to the app.
-        </p>
-      ) : null}
 
       <section aria-label="Call" className="flex flex-col gap-5 rounded-3xl border border-border/80 bg-background p-5 shadow-[0_12px_32px_-18px_rgba(0,0,0,0.25)]">
         <div className="flex flex-col gap-2">

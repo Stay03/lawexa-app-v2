@@ -1,8 +1,7 @@
 /**
  * A voice call, whichever client carries it (thread ac47b1df). The page talks
- * only to this, so the ElevenLabs client (`@elevenlabs/client`, WebRTC) slots
- * in behind it once Stay OKs the package (the Techlead, 21 November 2026);
- * until then the practice call in `practice-voice-session.ts` stands in.
+ * only to this; `elevenlabs-voice-session.ts` carries it over ElevenLabs'
+ * web client (WebRTC).
  *
  * The shape follows the ElevenLabs client's own: a status, the agent speaking
  * or listening, a message per finished line from either side, mute, a user
@@ -46,6 +45,4 @@ export interface VoiceSession {
   sendUserMessage: (text: string) => void;
   /** The provider's id for this call, once connected. */
   conversationId: () => string | null;
-  /** True for the stand-in call, so the page can say the call is not real. */
-  readonly practice: boolean;
 }

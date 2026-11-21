@@ -1,7 +1,7 @@
 import { voiceTestApi } from '@/lib/api/voice-test';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { VoiceOption, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
-import { PracticeVoiceSession } from './practice-voice-session';
+import { ElevenLabsVoiceSession } from './elevenlabs-voice-session';
 import { onVoiceResearchReady } from './voice-events';
 import { applyCallEvent, EMPTY_CALL_LOG, type CallEvent, type CallLog } from './voice-model';
 import type { VoiceSession } from './voice-session';
@@ -28,8 +28,6 @@ export interface VoiceTestState {
   sessionUuid: string | null;
   /** A sentence when the call could not start or failed. */
   problem: string | null;
-  /** The stand-in call is running, not ElevenLabs. */
-  practice: boolean;
 }
 
 /**
@@ -53,12 +51,11 @@ const INITIAL: VoiceTestState = {
   serverTurns: [],
   sessionUuid: null,
   problem: null,
-  practice: false,
 };
 
-/** The call itself. The ElevenLabs client replaces the practice call here once its package is added. */
-export function createVoiceSession(mode: VoiceTestMode): VoiceSession {
-  return new PracticeVoiceSession(mode);
+/** The call itself: ElevenLabs' web client, behind the VoiceSession shape. */
+export function createVoiceSession(): VoiceSession {
+  return new ElevenLabsVoiceSession();
 }
 
 function startProblem(error: unknown): string {
@@ -118,9 +115,8 @@ export class VoiceTestController {
     const voices = started.voices.length > 0 ? started.voices : this.state.voices;
     this.set({ sessionUuid: started.session_uuid, voices, voiceId: started.voice_id || voiceId });
 
-    const session = createVoiceSession(mode);
+    const session = createVoiceSession();
     this.session = session;
-    this.set({ practice: session.practice });
     this.stopListening = onVoiceResearchReady((event) => {
       if (event.session_uuid !== this.state.sessionUuid || this.session !== session) return;
       session.sendUserMessage(event.marker);
