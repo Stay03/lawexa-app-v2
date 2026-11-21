@@ -145,7 +145,7 @@ function Transcript({ state, className }: { state: RecorderState; className?: st
     <ol
       ref={list}
       aria-live="polite"
-      className={cn('flex flex-col gap-4 overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,transparent,black_28px)]', className)}
+      className={cn('flex flex-col gap-4 overflow-y-auto overscroll-y-contain [mask-image:linear-gradient(to_bottom,transparent,black_28px)]', className)}
     >
       <li aria-hidden className="h-3 shrink-0" />
       {empty ? (
