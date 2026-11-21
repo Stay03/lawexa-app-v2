@@ -1,3 +1,5 @@
+import { isAxiosError } from 'axios';
+
 import { recordingsApi } from '@/lib/api/recordings';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { RecordingLiveConfig, RecordingStage, RecordingTargetInput } from '@/types/recording';
@@ -52,6 +54,11 @@ export interface RecorderState {
   /** After Stop: the server's stage, and its sentence if a step failed. */
   stage: RecordingStage | null;
   stageError: string | null;
+  /**
+   * The server closed the recording before Stop: nothing reached it for 10
+   * minutes (a tab or phone asleep), so it finished what it had.
+   */
+  closedByServer: boolean;
 }
 
 const IDLE: RecorderState = {
@@ -68,9 +75,24 @@ const IDLE: RecorderState = {
   recordingUuid: null,
   stage: null,
   stageError: null,
+  closedByServer: false,
 };
 
+/** 409 recording_stopped: the server closed the recording itself. */
+function isRecordingStopped(error: unknown): boolean {
+  if (!isAxiosError(error) || error.response?.status !== 409) return false;
+  const body = error.response.data as { reason?: unknown; errors?: { reason?: unknown } | null } | undefined;
+  return (body?.errors?.reason ?? body?.reason) === 'recording_stopped';
+}
+
 const POLL_MS = 4_000;
+/**
+ * How often an open recording tells the server it is still there, paused or
+ * not (Backend, 21 November 2026). A pause sends no pieces, and the server
+ * closes a recording that hears nothing for 10 minutes: a court recess would
+ * otherwise lose its second half.
+ */
+const KEEPALIVE_MS = 60_000;
 /** How many loudness readings the sound bar draws (its widest, on a phone). */
 const LEVEL_HISTORY = 36;
 const RECONNECT_GAP_MS = 5_000;
@@ -88,6 +110,7 @@ export class RecorderController {
   private queue: PieceQueue | null = null;
   private wakeLock: { release: () => Promise<void> } | null = null;
   private ticker: ReturnType<typeof setInterval> | null = null;
+  private keepalive: ReturnType<typeof setInterval> | null = null;
   private poller: ReturnType<typeof setInterval> | null = null;
   private stopListening: (() => void) | null = null;
 
@@ -155,7 +178,12 @@ export class RecorderController {
     const uuid = this.state.recordingUuid as string;
     this.queue = new PieceQueue(
       async (seq, piece) => {
-        await recordingsApi.uploadChunk(uuid, seq, piece);
+        try {
+          await recordingsApi.uploadChunk(uuid, seq, piece);
+        } catch (error) {
+          if (isRecordingStopped(error)) void this.closedByServer();
+          throw error;
+        }
       },
       (savedPieces) => this.set({ savedPieces }),
     );
@@ -167,6 +195,7 @@ export class RecorderController {
 
     await this.startLiveAudio(live);
     this.ticker = setInterval(() => this.set({ elapsed: this.recordedSeconds() }), 500);
+    this.keepalive = setInterval(() => void this.sendKeepalive(), KEEPALIVE_MS);
     void this.holdScreen();
     window.addEventListener('beforeunload', this.warnBeforeLeaving);
     this.set({ phase: 'live', elapsed: 0 });
@@ -332,9 +361,40 @@ export class RecorderController {
     });
   }
 
+  /** "Still here", paused or not. A missed one is harmless: the next comes in a minute. */
+  private async sendKeepalive() {
+    const uuid = this.state.recordingUuid;
+    if (!uuid || this.state.phase !== 'live') return;
+    try {
+      await recordingsApi.keepalive(uuid, this.state.paused);
+    } catch (error) {
+      if (isRecordingStopped(error)) await this.closedByServer();
+    }
+  }
+
+  /**
+   * The server already closed this recording (409 recording_stopped on a
+   * keepalive or a piece): stop recording here and follow the server as it
+   * finishes what it has.
+   */
+  private async closedByServer() {
+    if (this.state.phase !== 'live') return;
+    const uuid = this.state.recordingUuid;
+    this.set({ phase: 'stopping', elapsed: this.recordedSeconds(), level: 0 });
+    this.live?.close();
+    this.queue?.abandon();
+    await this.stopRecorder();
+    this.releaseMedia();
+    window.removeEventListener('beforeunload', this.warnBeforeLeaving);
+    this.set({ phase: 'finalising', stage: 'transcribing', closedByServer: true });
+    if (uuid) this.pollStage(uuid);
+  }
+
   private releaseMedia() {
     if (this.ticker) clearInterval(this.ticker);
     this.ticker = null;
+    if (this.keepalive) clearInterval(this.keepalive);
+    this.keepalive = null;
     this.worklet?.disconnect();
     this.worklet = null;
     void this.audio?.close().catch(() => {});

@@ -1,6 +1,12 @@
 import { apiClient } from './client';
-import type { ApiResponse, PaginatedResponse } from '@/types/api';
-import type { Recording, RecordingLiveConfig, RecordingStart, RecordingTargetInput } from '@/types/recording';
+import type { ApiResponse } from '@/types/api';
+import type {
+  Recording,
+  RecordingListPage,
+  RecordingLiveConfig,
+  RecordingStart,
+  RecordingTargetInput,
+} from '@/types/recording';
 
 /**
  * Recording a meeting (thread ac47b1df; Backend's server half, section 3).
@@ -35,6 +41,16 @@ export const recordingsApi = {
     return response.data;
   },
 
+  /**
+   * "Still here", about once a minute while a recording is open, paused or not.
+   * The server closes a recording that hears nothing (no piece, no keepalive)
+   * for 10 minutes; 409 recording_stopped says it already did.
+   */
+  keepalive: async (uuid: string, paused: boolean): Promise<ApiResponse<{ received: boolean }>> => {
+    const response = await apiClient.post<ApiResponse<{ received: boolean }>>(`/recordings/${uuid}/keepalive`, { paused });
+    return response.data;
+  },
+
   /** Stop: the server joins the pieces, saves the audio and writes the final transcript. 409 names missing pieces. */
   stop: async (
     uuid: string,
@@ -50,8 +66,8 @@ export const recordingsApi = {
   },
 
   /** The person's own recordings, newest first (Files, Recordings tab). */
-  list: async (params: { page?: number; per_page?: number } = {}): Promise<PaginatedResponse<Recording>> => {
-    const response = await apiClient.get<PaginatedResponse<Recording>>('/recordings', { params });
+  list: async (params: { page?: number; per_page?: number } = {}): Promise<RecordingListPage> => {
+    const response = await apiClient.get<RecordingListPage>('/recordings', { params });
     return response.data;
   },
 

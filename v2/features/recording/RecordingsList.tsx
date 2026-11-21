@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { recordingsApi } from '@/lib/api/recordings';
 import { cn } from '@/lib/utils';
-import type { Recording } from '@/types/recording';
+import type { Recording, RecordingListPage } from '@/types/recording';
 import { useOpenFileInNewTab } from '@/v2/features/channels/feed/use-file-url';
 import { formatEntryDate } from '@/v2/features/folders/file-list/entry-look';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -19,19 +19,24 @@ const PAGE_SIZE = 20;
 /** The person's recordings, newest first (GET /recordings). */
 export const recordingsListQuery = {
   queryKey: ['recordings', 'list'] as const,
-  queryFn: async ({ pageParam }: { pageParam: number }) => {
-    const answer = await recordingsApi.list({ page: pageParam, per_page: PAGE_SIZE });
-    return answer.data;
-  },
+  queryFn: ({ pageParam }: { pageParam: number }): Promise<RecordingListPage> =>
+    recordingsApi.list({ page: pageParam, per_page: PAGE_SIZE }),
   initialPageParam: 1,
-  getNextPageParam: (last: Awaited<ReturnType<typeof recordingsApi.list>>['data'] | undefined) =>
-    last && last.meta.current_page < last.meta.last_page ? last.meta.current_page + 1 : undefined,
+  getNextPageParam: (last: RecordingListPage | undefined) =>
+    last && last.pagination.current_page < last.pagination.last_page ? last.pagination.current_page + 1 : undefined,
 };
 
 /** Where a recording was made, as its row says it. */
 function whereLine(recording: Recording): string | null {
   if (!recording.target) return null;
   return `${recording.target.type === 'space' ? 'Space' : 'Chat'}: ${recording.target.name}`;
+}
+
+/** The length, unless the title already ends with it ("Recording 21 Nov 2026, 04:46 UTC (0:46)"). */
+function lengthWord(recording: Recording): string | null {
+  if (recording.duration_seconds === null) return null;
+  const length = clock(recording.duration_seconds);
+  return recording.title.endsWith(`(${length})`) ? null : length;
 }
 
 /** Still being finished, or failed: said on the row instead of the transcript. */
@@ -70,7 +75,7 @@ function TranscriptButton({ recording }: { recording: Recording }) {
  */
 export function RecordingsList({ now }: { now: number }) {
   const list = useInfiniteQuery(recordingsListQuery);
-  const rows = list.data?.pages.flatMap((page) => page?.items ?? []) ?? [];
+  const rows = list.data?.pages.flatMap((page) => page?.data ?? []) ?? [];
 
   if (list.isPending) {
     return (
@@ -115,7 +120,7 @@ export function RecordingsList({ now }: { now: number }) {
         {rows.map((recording) => {
           const where = whereLine(recording);
           const stage = stageWord(recording);
-          const details = [recording.duration_seconds !== null ? clock(recording.duration_seconds) : null, where, stage].filter(Boolean).join(' · ');
+          const details = [lengthWord(recording), where, stage].filter(Boolean).join(' · ');
           const title = (
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="truncate text-[15px] leading-snug font-medium text-foreground">{recording.title}</span>

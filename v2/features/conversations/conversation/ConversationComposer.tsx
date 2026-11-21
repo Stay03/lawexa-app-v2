@@ -288,7 +288,7 @@ export interface ConversationComposerProps {
    * The chat a meeting recording belongs to (thread ac47b1df): the microphone
    * beside Send records into it. Only the chat screen passes it; staff only
    * (`user.can_record`), and never in a confidential chat, whose words the
-   * server does not keep.
+   * server does not keep, nor in a redacted one.
    */
   recordInto?: string | null;
   /** The chat's title, at the top of the phone's recording screen. */
@@ -414,7 +414,8 @@ export function ConversationComposer({
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Recording a meeting (thread ac47b1df): the recorder takes the box's place while it runs.
   const canRecord = useAuthStore((state) => state.user?.can_record === true);
-  const recordable = recordInto !== null && canRecord && !isConfidential;
+  // Never in a confidential or redacted chat: the server refuses both (422 not_recordable, Backend 21 November 2026).
+  const recordable = recordInto !== null && canRecord && !isConfidential && !isRedacted;
   const { state: recording, recorder } = useRecorder({ conversation_uuid: recordInto ?? '' });
   const recorderOpen = recording.phase === 'live' || recording.phase === 'stopping' || recording.phase === 'finalising';
 

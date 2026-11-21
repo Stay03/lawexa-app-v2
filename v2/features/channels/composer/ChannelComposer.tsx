@@ -1477,7 +1477,12 @@ function ChannelComposerBody({
       {recordable ? (
         <>
           <RecordingConsent state={recording} recorder={recorder} inSpace />
-          <RecordingPanel state={recording} recorder={recorder} title={channel.title ?? channel.name} />
+          {/* The composer's own column (ChatComposerShell), so the recorder sits where the message box was. */}
+          {recorderOpen ? (
+            <div className="mx-auto w-full max-w-3xl md:px-4 md:pb-3">
+              <RecordingPanel state={recording} recorder={recorder} title={channel.title ?? channel.name} inSpace />
+            </div>
+          ) : null}
         </>
       ) : null}
       {recordable && recorderOpen ? null : (

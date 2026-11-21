@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { audioMessage, liveSocketUrl, parseLiveMessage } from './elevenlabs-live';
+import { audioMessage, liveSocketUrl, parseLiveMessage, speakerTurns } from './elevenlabs-live';
 
 /* ElevenLabs Scribe Live (thread ac47b1df). The messages below are the shapes
  * Backend's test session returned on 21 November 2026, with TEST DATA text. */
@@ -41,9 +41,27 @@ test('the service messages become partial and settled lines', () => {
   assert.deepEqual(parseLiveMessage('not json', 1, 0), { kind: 'ignore' });
 });
 
-test("a speaker label fills the line it belongs to; refusals and the time limit are told apart", () => {
-  const diarized = { message_type: 'diarized_transcript', segment_index: 0, text: 'x', words: [{ text: ' ', type: 'spacing', speaker_id: null }, { text: 'Good', type: 'word', speaker_id: 'speaker_1' }] };
-  assert.deepEqual(parseLiveMessage(JSON.stringify(diarized), 6, 2), { kind: 'event', event: { kind: 'speaker', lineIndex: 1, speaker: 'Speaker 2' } });
+test("speaker labels split the line they belong to by who spoke; refusals and the time limit are told apart", () => {
+  // The e2e of 21 November 2026: one settled segment held both speakers.
+  const word = (text: string, speaker: string | null, type = 'word') => ({ text, type, speaker_id: speaker });
+  const diarized = {
+    message_type: 'diarized_transcript', segment_index: 1, text: 'x',
+    words: [
+      word('When', 'speaker_0'), word(' ', null, 'spacing'), word('was', 'speaker_0'), word(' ', 'speaker_0', 'spacing'), word('it?', 'speaker_0'),
+      word(' ', null, 'spacing'), word('On', 'speaker_1'), word(' ', null, 'spacing'), word('Monday.', 'speaker_1'),
+      word(' ', null, 'spacing'), word('Thanks.', 'speaker_0'),
+    ],
+  };
+  assert.deepEqual(parseLiveMessage(JSON.stringify(diarized), 6, 2), {
+    kind: 'event',
+    event: { kind: 'speakers', lineIndex: 1, turns: [
+      { speaker: 'Speaker 1', text: 'When was it?' },
+      { speaker: 'Speaker 2', text: 'On Monday.' },
+      { speaker: 'Speaker 1', text: 'Thanks.' },
+    ] },
+  });
+  assert.deepEqual(speakerTurns([word(' ', null, 'spacing'), word('Good', 'speaker_1')]), [{ speaker: 'Speaker 2', text: 'Good' }], 'a leading space belongs to no one');
+  assert.deepEqual(parseLiveMessage(JSON.stringify({ message_type: 'diarized_transcript', words: [word(' ', null, 'spacing')] }), 6, 2), { kind: 'ignore' });
   assert.deepEqual(parseLiveMessage(JSON.stringify({ message_type: 'session_time_limit_exceeded', error: 'limit' }), 9, 0), { kind: 'expired' });
   assert.deepEqual(parseLiveMessage(JSON.stringify({ message_type: 'auth_error', error: 'TEST DATA bad token' }), 9, 0), { kind: 'error', message: 'TEST DATA bad token' });
 });

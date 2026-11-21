@@ -64,11 +64,14 @@ test('the live transcript: a partial is the faint line, a committed segment sett
   t = applyLiveEvent(t, { kind: 'committed', text: 'Nobody handed it to you?', at: 9 });
   assert.deepEqual(t.lines.map((l) => l.id), ['line-0', 'line-1']);
   assert.equal(applyLiveEvent(t, { kind: 'committed', text: '  ', at: 12 }).lines.length, 2, 'an empty commit adds nothing');
-  // Option b's labels arrive after a segment settles, and fill that line.
-  const labelled = applyLiveEvent(t, { kind: 'speaker', lineIndex: 1, speaker: 'Speaker 2' });
-  assert.equal(labelled.lines[1].speaker, 'Speaker 2');
-  assert.equal(labelled.lines[0].speaker, undefined);
-  assert.equal(applyLiveEvent(t, { kind: 'speaker', lineIndex: 9, speaker: 'Speaker 2' }), t, 'a label for no line changes nothing');
+  // Option b's labels arrive after a segment settles, and split that line by who spoke.
+  const turns = [{ speaker: 'Speaker 2', text: 'Nobody handed' }, { speaker: 'Speaker 1', text: 'it to you?' }];
+  const labelled = applyLiveEvent(t, { kind: 'speakers', lineIndex: 1, turns });
+  assert.deepEqual(labelled.lines[1].turns, turns);
+  assert.equal(labelled.lines[1].text, 'Nobody handed it to you?', 'the line keeps its text');
+  assert.equal(labelled.lines[0].turns, undefined);
+  assert.equal(applyLiveEvent(t, { kind: 'speakers', lineIndex: 9, turns }), t, 'labels for no line change nothing');
+  assert.equal(applyLiveEvent(t, { kind: 'speakers', lineIndex: 1, turns: [] }), t, 'no turns change nothing');
   assert.equal(liveTranscriptNote(false), 'Live transcript. Speakers are named in the final transcript.');
   assert.equal(liveTranscriptNote(true), 'Live transcript. Speakers are checked again in the final transcript.');
 });

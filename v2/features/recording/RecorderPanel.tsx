@@ -118,12 +118,27 @@ function LevelMeter({ levels: history, bars, tall = false, className }: { levels
 }
 
 function Line({ line, hearing = false, speakerLabels }: { line: LiveLine; hearing?: boolean; speakerLabels: boolean }) {
+  // A settled line split by who spoke: each turn under its own label, the
+  // line's time on the first. Without labels, the line as it was heard.
+  const turns = speakerLabels && line.turns && line.turns.length > 0 ? line.turns : null;
+  if (turns) {
+    return (
+      <li className="flex flex-col gap-3">
+        {turns.map((turn, index) => (
+          <div key={index} className="flex flex-col gap-0.5">
+            <p className="flex items-baseline gap-2 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{turn.speaker}</span>
+              {index === 0 ? <span className="tabular-nums">{clock(line.at)}</span> : null}
+            </p>
+            <p className="text-[14px] leading-relaxed text-foreground/90">{turn.text}</p>
+          </div>
+        ))}
+      </li>
+    );
+  }
   return (
     <li className="flex flex-col gap-0.5">
-      <p className="flex items-baseline gap-2 text-xs text-muted-foreground">
-        {speakerLabels && line.speaker ? <span className="font-medium text-foreground">{line.speaker}</span> : null}
-        <span className="tabular-nums">{clock(line.at)}</span>
-      </p>
+      <p className="text-xs tabular-nums text-muted-foreground">{clock(line.at)}</p>
       <p className={cn('text-[14px] leading-relaxed', hearing ? 'text-muted-foreground/60' : 'text-foreground/90')}>
         {line.text}
         {hearing ? <span aria-hidden className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[3px] bg-primary/70 motion-safe:animate-pulse" /> : null}
@@ -270,14 +285,29 @@ function SavedNote({ state }: { state: RecorderState }) {
   );
 }
 
-export function RecordingPanel({ state, recorder, title }: { state: RecorderState; recorder: RecorderController; title: string }) {
+export function RecordingPanel({
+  state,
+  recorder,
+  title,
+  inSpace = false,
+}: {
+  state: RecorderState;
+  recorder: RecorderController;
+  title: string;
+  /** Recording into a Space channel or thread: the results are posted there, not "in the chat". */
+  inSpace?: boolean;
+}) {
   const { phase } = state;
   if (phase !== 'live' && phase !== 'stopping' && phase !== 'finalising') return null;
   const finalising = phase === 'finalising';
-  const doneLine =
+  const doneLine = [
+    state.closedByServer ? 'Lawexa closed this recording because nothing reached it for 10 minutes. It is finishing what was saved.' : null,
     state.stage === 'done'
-      ? 'Done. The recording, its transcript and Lawexa’s summary are in the chat.'
-      : 'You can leave. The recording, its transcript and Lawexa’s summary appear in the chat when they’re ready.';
+      ? `Done. The recording, its transcript and Lawexa’s summary are ${inSpace ? 'posted here' : 'in the chat'}.`
+      : `You can leave. The recording, its transcript and Lawexa’s summary ${inSpace ? 'are posted here' : 'appear in the chat'} when they’re ready.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
   const header = finalising ? (
     <span className="flex items-center gap-2 text-[13px] font-medium text-foreground">
       {state.stage === 'done' ? (

@@ -67,6 +67,19 @@ export interface Recording {
   audio_url?: string | null;
 }
 
+/** `GET /recordings`: one page of the person's recordings, newest first. */
+export interface RecordingListPage {
+  success: boolean;
+  message: string;
+  data: Recording[];
+  pagination: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
 /** `users.{uuid}` → `.recording.updated`: a recording moved a stage after Stop. */
 export interface RecordingUpdatedEvent {
   uuid: string;

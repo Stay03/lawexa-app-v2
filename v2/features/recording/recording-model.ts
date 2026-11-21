@@ -88,9 +88,9 @@ export function finalSteps(
 /**
  * One line of the live transcript: a stretch of speech up to a pause. Speaker
  * labels when the server turns them on (`live.diarize`, on by default: Stay
- * chose labels on 21 November 2026). A label arrives only after its segment
- * settles, so the moving line never shows one; the saved transcript after Stop
- * names speakers again, more reliably.
+ * chose labels on 21 November 2026). Labels arrive only after a line settles,
+ * so the moving line never shows one; the saved transcript after Stop names
+ * speakers again, more reliably.
  */
 export interface LiveLine {
   /** Stable for a settled line; the line still being heard has id "hearing". */
@@ -98,16 +98,28 @@ export interface LiveLine {
   /** Seconds from the start of the recording. */
   at: number;
   text: string;
-  /** "Speaker 1", only when the server turned live labels on (`live.diarize`) and the service gave one. */
-  speaker?: string;
+  /**
+   * The line split by who spoke, in order, only when the server turned live
+   * labels on (`live.diarize`) and the service gave them. A line runs until a
+   * long enough pause, so two people answering each other quickly share one
+   * line (the e2e of 21 November 2026: one line held both speakers).
+   */
+  turns?: SpeakerTurn[];
+}
+
+/** One person's words inside a settled line. */
+export interface SpeakerTurn {
+  /** "Speaker 1". */
+  speaker: string;
+  text: string;
 }
 
 /** What a live transcriber reports, whichever service it is. */
 export type LiveEvent =
   | { kind: 'partial'; text: string; at: number }
   | { kind: 'committed'; text: string; at: number }
-  /** A label for a segment already settled (it arrives after the commit). */
-  | { kind: 'speaker'; lineIndex: number; speaker: string };
+  /** Who said what in a line already settled (it arrives after the commit). */
+  | { kind: 'speakers'; lineIndex: number; turns: SpeakerTurn[] };
 
 export interface LiveTranscript {
   lines: LiveLine[];
@@ -123,11 +135,11 @@ export const EMPTY_TRANSCRIPT: LiveTranscript = { lines: [], hearing: null };
  * it as its own line, after the speaker pauses.
  */
 export function applyLiveEvent(transcript: LiveTranscript, event: LiveEvent): LiveTranscript {
-  if (event.kind === 'speaker') {
+  if (event.kind === 'speakers') {
     const line = transcript.lines[event.lineIndex];
-    if (!line || line.speaker === event.speaker) return transcript;
+    if (!line || event.turns.length === 0) return transcript;
     const lines = transcript.lines.slice();
-    lines[event.lineIndex] = { ...line, speaker: event.speaker };
+    lines[event.lineIndex] = { ...line, turns: event.turns };
     return { ...transcript, lines };
   }
   const text = event.text.trim();

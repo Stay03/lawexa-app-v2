@@ -1,5 +1,5 @@
 import type { RecordingLiveConfig } from '@/types/recording';
-import type { LiveEvent } from './recording-model';
+import type { LiveEvent, SpeakerTurn } from './recording-model';
 
 /**
  * ElevenLabs Scribe Live, the recorder's live transcriber (thread ac47b1df).
@@ -17,7 +17,9 @@ import type { LiveEvent } from './recording-model';
  *   at a time, and silence while paused (the service closes after 15 seconds
  *   with no message);
  * - the service sends partial_transcript (about 7 a second, each whole) and
- *   committed_transcript once a speaker pauses (about 1.5 seconds);
+ *   committed_transcript once a speaker pauses (about 1.5 seconds), and with
+ *   labels on, diarized_transcript right after it: the same segment's words,
+ *   each with a speaker_id (one segment can hold several speakers);
  * - to end, an empty chunk with commit: true, then the last committed text,
  *   then close.
  */
@@ -60,6 +62,37 @@ export type LiveMessage =
   | { kind: 'error'; message: string }
   | { kind: 'ignore' };
 
+interface DiarizedWord {
+  text?: unknown;
+  type?: unknown;
+  speaker_id?: unknown;
+}
+
+/** "speaker_0" → "Speaker 1"; any other id is shown as it came. */
+function speakerName(id: string): string {
+  const digits = id.replace(/\D/g, '');
+  return digits === '' ? id : `Speaker ${Number(digits) + 1}`;
+}
+
+/**
+ * A diarized segment's words grouped into runs by speaker, in order. Spaces
+ * carry no speaker and join the run they sit in; a run left empty after
+ * trimming is dropped.
+ */
+export function speakerTurns(words: DiarizedWord[]): SpeakerTurn[] {
+  const runs: { id: string; text: string }[] = [];
+  for (const word of words) {
+    const text = typeof word.text === 'string' ? word.text : '';
+    const id = word.type !== 'spacing' && typeof word.speaker_id === 'string' ? word.speaker_id : null;
+    const last = runs.at(-1);
+    if (last && (id === null || id === last.id)) last.text += text;
+    else if (id !== null) runs.push({ id, text });
+  }
+  return runs
+    .map((run) => ({ speaker: speakerName(run.id), text: run.text.trim() }))
+    .filter((turn) => turn.text !== '');
+}
+
 /**
  * One message from the service. `at` is the recording's own clock in seconds
  * when the message arrived; `committedCount` numbers the next settled line, so
@@ -82,12 +115,9 @@ export function parseLiveMessage(raw: string, at: number, committedCount: number
     case 'committed_transcript':
       return { kind: 'event', event: { kind: 'committed', text, at } };
     case 'diarized_transcript': {
-      const words = Array.isArray(data.words) ? (data.words as { speaker_id?: unknown; type?: unknown }[]) : [];
-      const id = words.find((word) => word.type !== 'spacing' && typeof word.speaker_id === 'string')?.speaker_id;
-      if (typeof id !== 'string') return { kind: 'ignore' };
-      const number = Number(id.replace(/\D/g, ''));
-      const speaker = Number.isFinite(number) ? `Speaker ${number + 1}` : id;
-      return { kind: 'event', event: { kind: 'speaker', lineIndex: committedCount - 1, speaker } };
+      const turns = speakerTurns(Array.isArray(data.words) ? (data.words as DiarizedWord[]) : []);
+      if (turns.length === 0) return { kind: 'ignore' };
+      return { kind: 'event', event: { kind: 'speakers', lineIndex: committedCount - 1, turns } };
     }
     case 'session_time_limit_exceeded':
       return { kind: 'expired' };
