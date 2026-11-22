@@ -14,7 +14,7 @@ import {
   type Wrapped26StoryState,
 } from '@/lib/wrapped26/story';
 import { createWrapped26Tracker, type Wrapped26Progress } from '@/lib/wrapped26/progress';
-import { cardContent, FORMAT_FOR } from '@/lib/wrapped26/share-card';
+import { cardContent, FORMAT_FOR, PREVIEW_CARD_FOOTPRINT, previewCardScale } from '@/lib/wrapped26/share-card';
 import { wrapped26Link } from '@/lib/wrapped26/share-link';
 import type { Wrapped26Record, Wrapped26SlideId } from '@/lib/wrapped26/types';
 import { seesWrapped26Early, wrapped26Askable } from '@/lib/wrapped26/window';
@@ -218,4 +218,15 @@ test('the app holds no launch date: the preview and the landing page follow the 
   const page = readFileSync(join(process.cwd(), 'app', 'wrapped', 'page.tsx'), 'utf8');
   assert.match(page, /const Landing = open \? Wrapped26Landing : WrappedLanding;/);
   for (const file of ['window.ts', 'story.ts']) assert.doesNotMatch(readFileSync(join(process.cwd(), 'lib', 'wrapped26', file), 'utf8'), /2026-12-0/);
+});
+
+// Pictures of 22 Nov 2026: with a four-line forecast and the share list open, the card in the hand lay over the
+// headline and the WhatsApp and Instagram Stories buttons. It now shrinks to the space it has.
+test('the card in the hand shrinks to the space between the forecast and the share buttons, and never grows', () => {
+  assert.equal(previewCardScale(PREVIEW_CARD_FOOTPRINT), 1);
+  assert.equal(previewCardScale(900), 1);
+  assert.equal(previewCardScale(496), 496 / PREVIEW_CARD_FOOTPRINT);
+  // Before the first measure (or an element with no size yet) it stays at full size.
+  assert.equal(previewCardScale(0), 1);
+  assert.equal(previewCardScale(Number.NaN), 1);
 });

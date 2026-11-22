@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { canvasToFile, corsPhotoUrl, loadImage } from '@/lib/wrapped/share-image';
 import { EASE_BACK, EASE_IN_OUT, RISE, SlideMotion } from '@/lib/wrapped26/motion';
 import type { Wrapped26CardFormat, Wrapped26Platform } from '@/lib/wrapped26/progress';
-import { FORMAT_FOR, cardContent, drawWrapped26Card, type CardFonts } from '@/lib/wrapped26/share-card';
+import { FORMAT_FOR, cardContent, drawWrapped26Card, previewCardScale, type CardFonts } from '@/lib/wrapped26/share-card';
 import { wrapped26Link } from '@/lib/wrapped26/share-link';
 import { Avatar, accentVar, type SlideProps } from './slides';
 
@@ -63,6 +63,16 @@ export function ShareSlide({
   const root = useRef<HTMLDivElement>(null);
   const [sheet, setSheet] = useState(false);
   const [busy, setBusy] = useState(false);
+  // The card shrinks to the space left between the forecast and the buttons (previewCardScale).
+  const cardArea = useRef<HTMLDivElement>(null);
+  const [cardScale, setCardScale] = useState(1);
+  useEffect(() => {
+    const area = cardArea.current;
+    if (!area || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setCardScale(previewCardScale(entry.contentRect.height)));
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
   const accent = accentVar(character);
 
   useEffect(() => {
@@ -154,40 +164,42 @@ export function ShareSlide({
         <p data-a="forecast" className="w26-d" style={{ fontSize: 76, lineHeight: 1.02, letterSpacing: -2 }}>
           {record.forecast}
         </p>
-        <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 0 }}>
-          <div
-            data-a="card"
-            aria-hidden
-            style={{
-              width: 480,
-              height: 580,
-              background: 'var(--w26-ink)',
-              color: 'var(--w26-cream)',
-              border: '4px solid var(--w26-ink)',
-              padding: 40,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              boxShadow: `16px 16px 0 ${accent}`,
-              transform: 'rotate(3deg)',
-            }}
-          >
-            <div className="w26-eyebrow" style={{ fontSize: 18, letterSpacing: 6 }}>
-              {record.user.firstName}’s Wrapped 2026
+        <div ref={cardArea} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 0 }}>
+          <div style={{ transform: cardScale < 1 ? `scale(${cardScale})` : undefined }}>
+            <div
+              data-a="card"
+              aria-hidden
+              style={{
+                width: 480,
+                height: 580,
+                background: 'var(--w26-ink)',
+                color: 'var(--w26-cream)',
+                border: '4px solid var(--w26-ink)',
+                padding: 40,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                boxShadow: `16px 16px 0 ${accent}`,
+                transform: 'rotate(3deg)',
+              }}
+            >
+              <div className="w26-eyebrow" style={{ fontSize: 18, letterSpacing: 6 }}>
+                {record.user.firstName}’s Wrapped 2026
+              </div>
+              <div>
+                <Avatar record={record} character={character} size={150} />
+                <div className="w26-d" style={{ fontSize: 64, letterSpacing: -2, marginTop: 16 }}>
+                  {record.user.firstName}
+                </div>
+                <div className="w26-d" style={{ fontSize: 30, color: accent, marginTop: 14, letterSpacing: -1 }}>
+                  as {record.character.name}
+                </div>
+                <div className="w26-billing" style={{ fontSize: 16, marginTop: 14, color: 'var(--w26-ink300)' }}>
+                  {record.character.archetype}
+                </div>
+              </div>
+              <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: 2 }}>LAWEXA.COM/WRAPPED</div>
             </div>
-            <div>
-              <Avatar record={record} character={character} size={150} />
-              <div className="w26-d" style={{ fontSize: 64, letterSpacing: -2, marginTop: 16 }}>
-                {record.user.firstName}
-              </div>
-              <div className="w26-d" style={{ fontSize: 30, color: accent, marginTop: 14, letterSpacing: -1 }}>
-                as {record.character.name}
-              </div>
-              <div className="w26-billing" style={{ fontSize: 16, marginTop: 14, color: 'var(--w26-ink300)' }}>
-                {record.character.archetype}
-              </div>
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 18, letterSpacing: 2 }}>LAWEXA.COM/WRAPPED</div>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }} {...stop}>

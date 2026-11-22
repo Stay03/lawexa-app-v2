@@ -321,6 +321,20 @@ export function drawWrapped26Card(canvas: HTMLCanvasElement, format: Wrapped26Ca
  * WhatsApp Status, Instagram Stories and Save image, the square for X, the
  * landscape for LinkedIn.
  */
+/**
+ * The card held up on slide 10 is 480 x 580 on the 1080 x 1920 stage, turned
+ * 3 degrees with a 16 px shadow, so it needs about 620 px of height. When the
+ * forecast runs to four lines and the share list is open, the space between
+ * them is shorter than that, and a card at full size lies over the headline and
+ * the first row of share buttons. It shrinks to fit instead, never grows.
+ */
+export const PREVIEW_CARD_FOOTPRINT = 620;
+
+export function previewCardScale(areaHeight: number): number {
+  if (!(areaHeight > 0)) return 1;
+  return Math.min(1, areaHeight / PREVIEW_CARD_FOOTPRINT);
+}
+
 export const FORMAT_FOR: Record<'whatsapp' | 'instagram' | 'x' | 'linkedin' | 'save', Wrapped26CardFormat> = {
   whatsapp: 'story',
   instagram: 'story',
