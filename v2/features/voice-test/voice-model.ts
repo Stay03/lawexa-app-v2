@@ -186,11 +186,13 @@ export function delayRows(turns: BrowserTurn[], serverTurns: VoiceServerTurn[]):
  * call a pause 98 s into a several-minute answer let the next one in and cut
  * it. So an answer counts as finished only when 'listening' has held for
  * HELD_LISTENING_MS AND at least its expected spoken length has passed since
- * it started (its text at SPOKEN_CHARS_PER_SECOND, capped). A real
- * interruption (the client's interruption event; a sentence pause raises
- * none) ends the answer for good, since the voice never resumes a cut reply:
- * it then needs only the held quiet. Timeouts keep an answer from waiting
- * forever.
+ * it started (its text at SPOKEN_CHARS_PER_SECOND, capped at the longest
+ * result Backend sends). A real interruption (the client's interruption
+ * event; a sentence pause raises none) ends the answer for good, since the
+ * voice never resumes a cut reply: it then needs only the held quiet. Held
+ * quiet is required in every case, so no timer can let the next answer in at
+ * a pause; the caller moving on is covered by the interruption. Only the
+ * start has a timeout, for an answer the voice never begins.
  */
 export const CALLER_QUIET_MS = 900;
 /** The client's voice activity score at or above which the caller counts as talking. */
@@ -199,10 +201,10 @@ export const HELD_LISTENING_MS = 3000;
 /** A steady speaking pace, so a long answer is not counted done at a pause. */
 export const SPOKEN_CHARS_PER_SECOND = 14;
 export const START_TIMEOUT_MS = 8000;
-/** After the expected length, how long an answer may still hold the line. */
-export const AFTER_EXPECTED_MS = 120000;
-/** No answer is expected to take longer than this to say (Techlead's review). */
-export const MAX_EXPECTED_MS = 180000;
+/** The longest research answer Backend passes into a call (VoiceTurns::FRONT_RESULT_MAX_CHARS). */
+export const RESULT_MAX_CHARS = 6000;
+/** No answer is expected to take longer than the longest result takes to say (about 429 s). */
+export const MAX_EXPECTED_MS = (RESULT_MAX_CHARS / SPOKEN_CHARS_PER_SECOND) * 1000;
 
 /** The answer passed in and not yet read to the end. */
 export interface HandOff {
@@ -212,7 +214,7 @@ export interface HandOff {
   startedAt: number | null;
   /** The voice went quiet at this time and has stayed quiet; `null` while it speaks. */
   quietSince: number | null;
-  /** The length of the voice's longest reply since the answer went in; `null` until one arrives. */
+  /** The length of the voice's longest reply since the answer went in; `null` until one arrives after it. */
   answerChars: number | null;
   /** The voice was cut off while reading it: it will not resume. */
   interrupted: boolean;
@@ -223,15 +225,36 @@ export function expectedSpokenMs(chars: number | null): number {
   return chars === null ? 0 : Math.min(MAX_EXPECTED_MS, (chars / SPOKEN_CHARS_PER_SECOND) * 1000);
 }
 
-/** The answer in flight has been read to the end (or has waited long enough). */
+/** The answer in flight has been read to the end (or never started). */
 export function handOffFinished(inFlight: HandOff, now: number): boolean {
   if (inFlight.startedAt === null) return now - inFlight.sentAt >= START_TIMEOUT_MS;
   const heldQuiet = inFlight.quietSince !== null && now - inFlight.quietSince >= HELD_LISTENING_MS;
-  if (inFlight.interrupted) return heldQuiet;
-  const expected = expectedSpokenMs(inFlight.answerChars);
-  const spoken = now - inFlight.startedAt;
-  if (spoken >= expected + AFTER_EXPECTED_MS) return true;
-  return heldQuiet && spoken >= expected;
+  if (!heldQuiet) return false;
+  return inFlight.interrupted || now - inFlight.startedAt >= expectedSpokenMs(inFlight.answerChars);
+}
+
+/** The voice started or stopped speaking while the answer is in flight. */
+export function handOffOnMode(inFlight: HandOff, mode: VoiceCallMode, now: number): HandOff {
+  if (mode === 'speaking') return { ...inFlight, startedAt: inFlight.startedAt ?? now, quietSince: null };
+  return inFlight.startedAt === null ? inFlight : { ...inFlight, quietSince: now };
+}
+
+/**
+ * A reply from the voice after the answer went in. The longest one sizes how
+ * long the answer takes to say, so a short reply to the caller ("Sure, one
+ * moment") never stands in for the long answer.
+ */
+export function handOffOnReply(inFlight: HandOff, chars: number): HandOff {
+  return { ...inFlight, answerChars: Math.max(inFlight.answerChars ?? 0, chars) };
+}
+
+/**
+ * The caller cut the voice off. It counts against the answer only once a reply
+ * has arrived after the answer went in: before that the voice is still saying
+ * its own earlier reply, and cutting that does not end the answer.
+ */
+export function handOffOnInterruption(inFlight: HandOff): HandOff {
+  return inFlight.startedAt === null || inFlight.answerChars === null ? inFlight : { ...inFlight, interrupted: true };
 }
 
 export function mayPassResultIn(state: { now: number; live: boolean; speaking: boolean; callerVoiceAt: number | null; inFlight: HandOff | null }): boolean {

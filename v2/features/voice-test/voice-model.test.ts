@@ -1,7 +1,5 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { AxiosError } from 'axios';
 
 import type { VoiceServerTurn } from '@/types/voice-test';
@@ -14,7 +12,12 @@ import {
   isResearchMarker,
   expectedSpokenMs,
   handOffFinished,
+  handOffOnInterruption,
+  handOffOnMode,
+  handOffOnReply,
+  MAX_EXPECTED_MS,
   mayPassResultIn,
+  type HandOff,
   researchRows,
   secondsLabel,
   spokenText,
@@ -165,9 +168,19 @@ test('a research answer goes in only on a quiet line: not while the voice speaks
 test('a pause in a long answer does not count as finished, even after 3 s of quiet', () => {
   const started = 652_000;
   const answer = { turnUuid: 't1', sentAt: 651_000, startedAt: started, quietSince: 749_000, answerChars: 6_150, interrupted: false };
-  assert.equal(expectedSpokenMs(6_150), 180_000);
   assert.equal(handOffFinished(answer, 753_000), false);
   assert.equal(mayPassResultIn({ now: 753_000, live: true, speaking: false, callerVoiceAt: null, inFlight: answer }), false);
+});
+
+// Techlead's re-review: with a 3-minute cap and a timer that did not need quiet, the same answer was cut
+// at its first pause after 5 minutes.
+test('the same long answer still holds at a pause 5 minutes in', () => {
+  const started = 652_000;
+  const answer = { turnUuid: 't1', sentAt: 651_000, startedAt: started, quietSince: started + 300_000, answerChars: 6_150, interrupted: false };
+  assert.equal(handOffFinished(answer, started + 304_000), false);
+  assert.equal(mayPassResultIn({ now: started + 304_000, live: true, speaking: false, callerVoiceAt: null, inFlight: answer }), false);
+  // Read to the end: quiet for 3 s once the longest result's spoken length has passed.
+  assert.equal(handOffFinished({ ...answer, quietSince: started + 430_000 }, started + 433_000), true);
 });
 
 test('a real interruption ends the answer: the next waits only for 3 s of quiet, not the long answer', () => {
@@ -180,8 +193,10 @@ test('a real interruption ends the answer: the next waits only for 3 s of quiet,
   assert.equal(handOffFinished({ ...cut, interrupted: false }, 14_000), false);
 });
 
-test('no answer is expected to take more than 3 minutes to say', () => {
-  assert.equal(expectedSpokenMs(18_000), 180_000);
+test('no answer is expected to take longer than the longest result Backend sends takes to say', () => {
+  assert.equal(Math.round(MAX_EXPECTED_MS / 1000), 429);
+  assert.equal(expectedSpokenMs(18_000), MAX_EXPECTED_MS);
+  assert.equal(expectedSpokenMs(6_150), MAX_EXPECTED_MS);
   assert.equal(Math.round(expectedSpokenMs(1_400)), 100_000);
 });
 
@@ -193,14 +208,45 @@ test('a real finish: the expected length has passed and the voice has been quiet
   assert.equal(handOffFinished({ ...answer, quietSince: 20_000 }, 30_000), false);
   // The text never arrived: 3 s of quiet is enough.
   assert.equal(handOffFinished({ ...answer, answerChars: null, quietSince: 10_000 }, 13_000), true);
-  // Never quiet: the safety timeout lets the next in 2 minutes after the expected length.
-  assert.equal(handOffFinished({ ...answer, quietSince: null }, 1_000 + 43_000 + 120_000), true);
+  // Never quiet: no timer lets the next in, however long it runs.
+  assert.equal(handOffFinished({ ...answer, quietSince: null }, 3_600_000), false);
 });
 
+// The controller's steps, played as the call plays them: the answer goes in at t=0.
+const passedIn: HandOff = { turnUuid: 't1', sentAt: 0, startedAt: null, quietSince: null, answerChars: null, interrupted: false };
+
 test('the answer is sized by the longest reply since it went in, so a short reply to the caller cannot stand in for it', () => {
-  const source = readFileSync(join(process.cwd(), 'v2', 'features', 'voice-test', 'voice-controller.ts'), 'utf8');
-  assert.match(source, /answerChars: Math\.max\(this\.inFlight\.answerChars \?\? 0, message\.text\.length\)/);
-  // A 16-character "Sure, one moment" then the 6,000-character answer: sized by the answer.
-  const sized = Math.max(Math.max(0, 16), 6_000);
-  assert.equal(handOffFinished({ turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 60_000, answerChars: sized, interrupted: false }, 64_000), false);
+  let flight = handOffOnMode(passedIn, 'speaking', 1_000);
+  flight = handOffOnReply(flight, 6_000);
+  flight = handOffOnMode(flight, 'listening', 60_000);
+  // The caller asks something; the voice answers "Sure, one moment" (16 characters) mid-answer.
+  flight = handOffOnMode(flight, 'speaking', 61_000);
+  flight = handOffOnReply(flight, 16);
+  flight = handOffOnMode(flight, 'listening', 62_000);
+  assert.equal(flight.answerChars, 6_000);
+  assert.equal(handOffFinished(flight, 66_000), false);
+  // Read to the end of the 6,000 characters (about 429 s), then 3 s of quiet.
+  flight = handOffOnMode(handOffOnMode(flight, 'speaking', 63_000), 'listening', 430_000);
+  assert.equal(handOffFinished(flight, 433_000), true);
+});
+
+test("cutting off the voice's own earlier reply does not end the answer that has just gone in", () => {
+  // The voice is still finishing a short reply when the answer goes in; the caller cuts that reply.
+  let flight = handOffOnMode(passedIn, 'speaking', 500);
+  flight = handOffOnInterruption(flight);
+  assert.equal(flight.interrupted, false);
+  flight = handOffOnMode(flight, 'listening', 2_000);
+  assert.equal(handOffFinished(flight, 5_000), true, 'nothing of the answer has arrived yet, so 3 s of quiet frees the line as before');
+  // The answer's own reply arrives; cutting it now does end it.
+  flight = handOffOnReply(handOffOnMode(flight, 'speaking', 6_000), 6_000);
+  assert.equal(handOffFinished(handOffOnMode(flight, 'listening', 20_000), 23_000), false);
+  flight = handOffOnInterruption(flight);
+  assert.equal(flight.interrupted, true);
+  flight = handOffOnMode(flight, 'listening', 20_000);
+  assert.equal(handOffFinished(flight, 23_000), true);
+});
+
+test('an interruption before the voice starts the answer changes nothing', () => {
+  assert.deepEqual(handOffOnInterruption(passedIn), passedIn);
+  assert.deepEqual(handOffOnMode(passedIn, 'listening', 1_000), passedIn);
 });

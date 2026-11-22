@@ -4,7 +4,19 @@ import type { IBlockedReason } from '@/types/message-pack';
 import type { VoiceCallSaved, VoiceOption, VoiceResearchReadyEvent, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
 import { ElevenLabsVoiceSession } from './elevenlabs-voice-session';
 import { onVoiceResearchReady } from './voice-events';
-import { applyCallEvent, CALLER_SPEECH_SCORE, EMPTY_CALL_LOG, exhaustedBlock, mayPassResultIn, type CallEvent, type CallLog, type HandOff } from './voice-model';
+import {
+  applyCallEvent,
+  CALLER_SPEECH_SCORE,
+  EMPTY_CALL_LOG,
+  exhaustedBlock,
+  handOffOnInterruption,
+  handOffOnMode,
+  handOffOnReply,
+  mayPassResultIn,
+  type CallEvent,
+  type CallLog,
+  type HandOff,
+} from './voice-model';
 import type { VoiceSession } from './voice-session';
 
 /**
@@ -172,10 +184,7 @@ export class VoiceTestController {
             this.note({ kind: 'mode', mode });
             // The answer in flight: when the voice started it, and since when it has been quiet.
             // A pause or an interruption leaves it in flight (voice-model.ts handOffFinished).
-            if (this.inFlight && mode === 'speaking') {
-              this.inFlight = { ...this.inFlight, startedAt: this.inFlight.startedAt ?? performance.now(), quietSince: null };
-            }
-            if (this.inFlight?.startedAt != null && mode === 'listening') this.inFlight = { ...this.inFlight, quietSince: performance.now() };
+            if (this.inFlight) this.inFlight = handOffOnMode(this.inFlight, mode, performance.now());
             if (mode === 'listening') {
               this.passResultIn();
               void this.readServerTurns();
@@ -184,16 +193,12 @@ export class VoiceTestController {
           onMessage: (message) => {
             if (this.session !== session) return;
             if (message.source === 'user') this.callerVoiceAt = performance.now();
-            // The voice's replies while an answer is in flight: the longest sizes how long it takes to say,
-            // so a short reply to the caller ("Sure, one moment") never stands in for the long answer.
-            if (message.source === 'ai' && this.inFlight) {
-              this.inFlight = { ...this.inFlight, answerChars: Math.max(this.inFlight.answerChars ?? 0, message.text.length) };
-            }
+            if (message.source === 'ai' && this.inFlight) this.inFlight = handOffOnReply(this.inFlight, message.text.length);
             this.note({ kind: 'message', message });
           },
           onInterrupted: () => {
             // A cut reply is never resumed: the answer in flight ends once the line is quiet.
-            if (this.session === session && this.inFlight?.startedAt != null) this.inFlight = { ...this.inFlight, interrupted: true };
+            if (this.session === session && this.inFlight) this.inFlight = handOffOnInterruption(this.inFlight);
           },
           onVad: (score) => {
             if (this.session === session && score >= CALLER_SPEECH_SCORE) this.callerVoiceAt = performance.now();
