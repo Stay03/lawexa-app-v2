@@ -229,8 +229,10 @@ function CopyCsv({ rows, state }: { rows: DelayRow[]; state: VoiceTestState }) {
 }
 
 function DelayTable({ state }: { state: VoiceTestState }) {
-  const rows = delayRows(state.log.turns, state.serverTurns);
+  // Only a Lawexa thinks call's server turns are its questions, in order. A Lawexa
+  // voice call's are its researches, which have their own table.
   const serverColumns = state.mode === 'c';
+  const rows = delayRows(state.log.turns, serverColumns ? state.serverTurns : []);
   return (
     <section aria-labelledby="voice-delays" className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
