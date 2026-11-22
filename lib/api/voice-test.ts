@@ -1,11 +1,13 @@
 import { apiClient } from './client';
 import type { ApiResponse } from '@/types/api';
-import type { VoiceServerTurns, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
+import type { VoiceCallEnded, VoiceServerTurns, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
 
 /**
  * The staff live-voice test page (thread ac47b1df; Backend fe2736bd). Every
  * route answers 403 errors.reason no_access without `user.can_record`, and
- * 503 not_set_up before the voice agents exist.
+ * 503 not_set_up before the voice agents exist. Out of messages, a `b` call
+ * is refused at start with typed chat's own 403 (`errors.code`
+ * ai_messages_exhausted and its block).
  */
 export const voiceTestApi = {
   /** A call's session: the single-use token, the voices, and what to pass to the call. */
@@ -32,8 +34,8 @@ export const voiceTestApi = {
     sessionUuid: string,
     providerConversationId: string | null,
     { leaving = false }: { leaving?: boolean } = {},
-  ): Promise<ApiResponse<{ session_uuid: string; duration_seconds: number }>> => {
-    const response = await apiClient.post<ApiResponse<{ session_uuid: string; duration_seconds: number }>>(
+  ): Promise<ApiResponse<VoiceCallEnded>> => {
+    const response = await apiClient.post<ApiResponse<VoiceCallEnded>>(
       `/voice-test/sessions/${sessionUuid}/end`,
       providerConversationId ? { provider_conversation_id: providerConversationId } : {},
       leaving ? { adapter: 'fetch', fetchOptions: { keepalive: true } } : undefined,

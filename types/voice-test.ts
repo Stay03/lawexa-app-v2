@@ -59,8 +59,27 @@ export interface VoiceServerTurn {
   research_ms: number | null;
 }
 
-export interface VoiceServerTurns {
+/**
+ * The call as a chat, and what it cost (Backend c21b513c, 22 November 2026),
+ * on `POST .../end` and `GET .../turns`. A `c` call's chat exists from the
+ * start; a `b` call's is made 15 to 30 seconds after it ends, so
+ * `conversation_uuid` is null until then. Each answered question takes a
+ * message; once they run out the rest are recorded unpaid.
+ */
+export interface VoiceCallSaved {
+  conversation_uuid: string | null;
+  charged_questions: number;
+  unpaid_questions: number;
+  out_of_messages: boolean;
+}
+
+export interface VoiceServerTurns extends VoiceCallSaved {
   session_uuid: string;
   mode: VoiceTestMode;
   turns: VoiceServerTurn[];
+}
+
+export interface VoiceCallEnded extends VoiceCallSaved {
+  session_uuid: string;
+  duration_seconds: number;
 }

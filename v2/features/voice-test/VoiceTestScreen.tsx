@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Check, Copy, Loader2, Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
+import Link from 'next/link';
+import { ArrowRight, Check, Copy, Loader2, Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
 
 import { useV2Session } from '@/v2/runtime/session-context';
 import { cn } from '@/lib/utils';
 import type { VoiceTestMode } from '@/types/voice-test';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
+import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
 import { VoiceTestController, type VoiceTestState } from './voice-controller';
 import { callClock, delayCsv, delayRows, secondsLabel, type DelayRow } from './voice-model';
 
@@ -57,6 +59,34 @@ function Segmented<T extends string>({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * After the call: the call as a chat (Backend c21b513c). A `c` call's chat
+ * exists from the start; a `b` call's is saved 15 to 30 seconds after it
+ * ends, so the page says so until the link arrives. Questions that went
+ * unpaid show the same out-of-messages notice as typed chat.
+ */
+function SavedCall({ state }: { state: VoiceTestState }) {
+  if (state.phase !== 'ended') return null;
+  return (
+    <div className="flex flex-col gap-3">
+      {state.conversationUuid ? (
+        <Link
+          href={`/c/${state.conversationUuid}`}
+          className={cn('v2-interactive inline-flex w-fit items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-secondary', FOCUS_RING)}
+        >
+          Open this call as a chat <ArrowRight aria-hidden className="size-4" />
+        </Link>
+      ) : state.saving ? (
+        <p role="status" className="flex items-center gap-2 text-[13px] text-muted-foreground">
+          <Loader2 aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
+          Saving this call as a chat…
+        </p>
+      ) : null}
+      {state.outOfMessages ? <OutOfMessagesNotice tight /> : null}
     </div>
   );
 }
@@ -314,6 +344,8 @@ export function VoiceTestScreen() {
         </div>
         <CallBar state={state} controller={controller} />
         {state.problem ? <p className="text-[13px] text-destructive">{state.problem}</p> : null}
+        {state.blocked ? <OutOfMessagesNotice tight blocked={state.blocked} /> : null}
+        <SavedCall state={state} />
         <div className="border-t border-border/70 pt-4">
           <Transcript state={state} />
         </div>

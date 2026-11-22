@@ -1,5 +1,7 @@
 import type { VoiceServerTurn } from '@/types/voice-test';
 import type { VoiceCallMessage, VoiceCallMode } from './voice-session';
+import { extractApiError } from '@/lib/utils/api-error';
+import type { IBlockedReason } from '@/types/message-pack';
 
 /**
  * The voice test page's transcript and its delay table (thread ac47b1df).
@@ -177,4 +179,11 @@ export function delayCsv(rows: DelayRow[], mode: string, voice: string): string 
       .join(','),
   );
   return [header.join(','), ...lines].join('\n');
+}
+
+/** Out of messages at Call: the same 403 and block typed chat gets (Backend c21b513c), for the shared notice. */
+export function exhaustedBlock(error: unknown): IBlockedReason | null {
+  const { status, errors } = extractApiError(error);
+  const block = errors as Partial<IBlockedReason> | null;
+  return status === 403 && block?.code === 'ai_messages_exhausted' ? (block as IBlockedReason) : null;
 }

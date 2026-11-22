@@ -1,9 +1,10 @@
 import { voiceTestApi } from '@/lib/api/voice-test';
 import { extractApiError } from '@/lib/utils/api-error';
-import type { VoiceOption, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
+import type { IBlockedReason } from '@/types/message-pack';
+import type { VoiceCallSaved, VoiceOption, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
 import { ElevenLabsVoiceSession } from './elevenlabs-voice-session';
 import { onVoiceResearchReady } from './voice-events';
-import { applyCallEvent, EMPTY_CALL_LOG, type CallEvent, type CallLog } from './voice-model';
+import { applyCallEvent, EMPTY_CALL_LOG, exhaustedBlock, type CallEvent, type CallLog } from './voice-model';
 import type { VoiceSession } from './voice-session';
 
 /**
@@ -28,6 +29,14 @@ export interface VoiceTestState {
   sessionUuid: string | null;
   /** A sentence when the call could not start or failed. */
   problem: string | null;
+  /** Out of messages at Call: typed chat's own block, for the shared notice. */
+  blocked: IBlockedReason | null;
+  /** The call as a chat; a `b` call's arrives 15 to 30 seconds after it ends. */
+  conversationUuid: string | null;
+  /** Waiting for a `b` call's chat to be saved. */
+  saving: boolean;
+  /** Some questions in the call went unpaid: the notice shows after the call. */
+  outOfMessages: boolean;
 }
 
 /**
@@ -51,7 +60,16 @@ const INITIAL: VoiceTestState = {
   serverTurns: [],
   sessionUuid: null,
   problem: null,
+  blocked: null,
+  conversationUuid: null,
+  saving: false,
+  outOfMessages: false,
 };
+
+/** How often, and for how long, the page asks whether a `b` call's chat is saved (Backend: usually 15 to 30 s). */
+const SAVE_POLL_MS = 5000;
+const SAVE_POLL_TRIES = 36;
+
 
 /** The call itself: ElevenLabs' web client, behind the VoiceSession shape. */
 export function createVoiceSession(): VoiceSession {
@@ -102,18 +120,20 @@ export class VoiceTestController {
   start = async () => {
     if (this.busy()) return;
     const { mode, voiceId } = this.state;
-    this.set({ phase: 'starting', problem: null, log: EMPTY_CALL_LOG, serverTurns: [], elapsed: 0, muted: false, sessionUuid: null });
+    this.stopSavePoll();
+    this.set({ phase: 'starting', problem: null, blocked: null, conversationUuid: null, saving: false, outOfMessages: false, log: EMPTY_CALL_LOG, serverTurns: [], elapsed: 0, muted: false, sessionUuid: null });
     let started: VoiceTestSession;
     try {
       const answer = await voiceTestApi.start(mode, voiceId);
       if (!answer.data) throw new Error(answer.message);
       started = answer.data;
     } catch (error) {
-      this.set({ phase: 'problem', problem: startProblem(error) });
+      const blocked = exhaustedBlock(error);
+      this.set({ phase: 'problem', blocked, problem: blocked ? null : startProblem(error) });
       return;
     }
     const voices = started.voices.length > 0 ? started.voices : this.state.voices;
-    this.set({ sessionUuid: started.session_uuid, voices, voiceId: started.voice_id || voiceId });
+    this.set({ sessionUuid: started.session_uuid, voices, voiceId: started.voice_id || voiceId, conversationUuid: started.conversation_uuid ?? null });
 
     const session = createVoiceSession();
     this.session = session;
@@ -166,10 +186,12 @@ export class VoiceTestController {
     const providerId = session.conversationId();
     this.release();
     await session.end().catch(() => {});
-    if (uuid) await voiceTestApi.end(uuid, providerId, { leaving }).catch(() => {});
+    const ended = uuid ? await voiceTestApi.end(uuid, providerId, { leaving }).catch(() => null) : null;
     if (leaving) return;
+    if (ended?.data) this.applySaved(ended.data);
     await this.readServerTurns();
     this.set({ phase: 'ended' });
+    if (uuid && !this.state.conversationUuid) this.startSavePoll(uuid);
   };
 
   toggleMute = () => {
@@ -181,6 +203,7 @@ export class VoiceTestController {
 
   /** The page is going away: hang up, and tell the server even as the tab closes. */
   dispose = () => {
+    this.stopSavePoll();
     if (this.busy()) void this.end({ leaving: true });
   };
 
@@ -200,10 +223,48 @@ export class VoiceTestController {
     if (!uuid || this.state.mode !== 'c') return;
     try {
       const answer = await voiceTestApi.turns(uuid);
-      if (answer.data && uuid === this.state.sessionUuid) this.set({ serverTurns: answer.data.turns });
+      if (answer.data && uuid === this.state.sessionUuid) {
+        this.set({ serverTurns: answer.data.turns });
+        this.applySaved(answer.data);
+      }
     } catch {
       // A missed read: the next answer, or the end, reads again.
     }
+  }
+
+  /** The chat link and the charge, from `end` or `turns`. */
+  private applySaved(saved: Partial<VoiceCallSaved>) {
+    this.set({
+      conversationUuid: saved.conversation_uuid ?? this.state.conversationUuid,
+      outOfMessages: saved.out_of_messages === true || this.state.outOfMessages,
+    });
+  }
+
+  private savePoll: ReturnType<typeof setInterval> | null = null;
+
+  /** A `b` call's chat is made after the call: ask every 5 s until it has an id, for up to 3 minutes. */
+  private startSavePoll(uuid: string) {
+    this.stopSavePoll();
+    let tries = 0;
+    this.set({ saving: true });
+    this.savePoll = setInterval(() => {
+      tries += 1;
+      void voiceTestApi
+        .turns(uuid)
+        .then((answer) => {
+          if (uuid !== this.state.sessionUuid || !answer.data) return;
+          this.applySaved(answer.data);
+          if (answer.data.conversation_uuid) this.stopSavePoll();
+        })
+        .catch(() => {});
+      if (tries >= SAVE_POLL_TRIES) this.stopSavePoll();
+    }, SAVE_POLL_MS);
+  }
+
+  private stopSavePoll() {
+    if (this.savePoll) clearInterval(this.savePoll);
+    this.savePoll = null;
+    if (this.state.saving) this.set({ saving: false });
   }
 
   private release() {

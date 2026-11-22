@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { AxiosError } from 'axios';
 
 import type { VoiceServerTurn } from '@/types/voice-test';
 import {
@@ -7,6 +8,7 @@ import {
   delayCsv,
   delayRows,
   EMPTY_CALL_LOG,
+  exhaustedBlock,
   isResearchMarker,
   secondsLabel,
   spokenText,
@@ -93,4 +95,14 @@ test('the table copies as CSV, quoting what needs it', () => {
   const [header, row] = csv.split('\n');
   assert.equal(header, 'call,voice,turn,you said,lawexa said,first sound s,research,answer sound s,server first text s,server research s');
   assert.equal(row, 'c,Temitope,1,"TEST DATA. Is ""pasting"", valid?",,1.23,no,,,');
+});
+
+test('out of messages at Call is typed chat refusal: a 403 with ai_messages_exhausted gives its block, anything else none', () => {
+  const refusal = (status: number, errors: unknown) =>
+    new AxiosError('refused', 'ERR_BAD_REQUEST', undefined, undefined, { status, statusText: '', headers: {}, config: {} as never, data: { success: false, message: 'No messages left.', errors } });
+  const block = { code: 'ai_messages_exhausted', reason: 'plan_limit_reached', message: 'You have used all your messages.', resets_at: '2026-12-01T00:00:00Z' };
+  assert.deepEqual(exhaustedBlock(refusal(403, block)), block);
+  assert.equal(exhaustedBlock(refusal(403, { reason: 'no_access' })), null);
+  assert.equal(exhaustedBlock(refusal(503, block)), null);
+  assert.equal(exhaustedBlock(new Error('offline')), null);
 });
