@@ -233,6 +233,21 @@ test('after the id splits, a later version of the FIRST document keeps id:<id> (
   );
 });
 
+test('the same key strings as Backend’s DraftGroupKeys (af959e18), case by case', () => {
+  assert.deepEqual(
+    chatDraftKeys([
+      [{ title: 'A', id: 'x', version: 1 }],
+      [{ title: 'B', id: 'x', version: 1 }],
+      [{ title: 'A', id: 'x', version: 2 }],
+      [{ title: 'B', id: 'x', version: 2 }],
+      [{ title: 'C', id: 'x', version: 2 }],
+      [{ title: 'Lease', id: 'k1', version: 1 }, { title: 'LEASE', id: 'k1', version: 1 }],
+      [{ title: 'Lease' }],
+    ]),
+    [['id:x'], ['id:x|title:b'], ['id:x'], ['id:x|title:b'], ['id:x|title:c'], ['id:k1', 'id:k1'], ['title:lease']],
+  );
+});
+
 test('the guard is narrow: a same-title repeat stays grouped, distinct ids and drafts without an id are untouched', () => {
   assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1', version: 1 }, { title: 'LEASE', id: 'k1', version: 1 }]]), [['id:k1', 'id:k1']]);
   assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1' }, { title: 'Notice', id: 'k2' }]]), [['id:k1', 'id:k2']]);
