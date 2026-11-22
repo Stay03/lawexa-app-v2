@@ -15,8 +15,11 @@ import {
   handOffOnInterruption,
   handOffOnMode,
   handOffOnReply,
+  isActionOutcome,
   MAX_EXPECTED_MS,
   mayPassResultIn,
+  queueResult,
+  sentNoticeTurn,
   type HandOff,
   researchRows,
   secondsLabel,
@@ -249,4 +252,39 @@ test("cutting off the voice's own earlier reply does not end the answer that has
 test('an interruption before the voice starts the answer changes nothing', () => {
   assert.deepEqual(handOffOnInterruption(passedIn), passedIn);
   assert.deepEqual(handOffOnMode(passedIn, 'listening', 1_000), passedIn);
+});
+
+// The voice action hold (Techlead and Backend, 22 November 2026, branch voice-held-actions).
+const ready = (turn_uuid: string) => ({ session_uuid: 'TEST-session', turn_uuid, marker: `[[LAWEXA RESULT ${turn_uuid}]] TEST DATA` });
+
+test("an action's outcome is told apart from a research turn by its action- turn", () => {
+  assert.equal(isActionOutcome('action-K7Q2ZP'), true);
+  assert.equal(isActionOutcome('00000000-0000-4000-8000-000000000001'), false);
+});
+
+test('the server is told when a research result went in, and never for an action outcome', () => {
+  assert.equal(sentNoticeTurn('00000000-0000-4000-8000-000000000001'), '00000000-0000-4000-8000-000000000001');
+  assert.equal(sentNoticeTurn('action-K7Q2ZP'), null);
+});
+
+test('research results and action outcomes wait in one line, oldest first, and a repeated event is not read twice', () => {
+  let line = { waiting: [] as ReturnType<typeof ready>[], seen: new Set<string>() };
+  for (const turn of ['t-research-1', 'action-K7Q2ZP', 't-research-1', 't-research-2']) {
+    const queued = queueResult(line.waiting, line.seen, ready(turn));
+    line = { waiting: queued.waiting, seen: queued.seen };
+  }
+  assert.deepEqual(line.waiting.map((event) => event.turn_uuid), ['t-research-1', 'action-K7Q2ZP', 't-research-2']);
+  // Once passed in, the turn stays seen: the same event arriving later is dropped.
+  const later = queueResult(line.waiting.slice(1), line.seen, ready('t-research-1'));
+  assert.equal(later.accepted, false);
+  assert.deepEqual(later.waiting.map((event) => event.turn_uuid), ['action-K7Q2ZP', 't-research-2']);
+});
+
+test('an action outcome goes in by the same one-at-a-time rule: not while the read-back before it is still in flight', () => {
+  // The read-back went in at t=0 and the voice started it; it is mid-sentence-pause at 5 s.
+  const readBack: HandOff = { turnUuid: 't-research-1', sentAt: 0, startedAt: 500, quietSince: 5_000, answerChars: 300, interrupted: false };
+  assert.equal(mayPassResultIn({ now: 8_000, live: true, speaking: false, callerVoiceAt: null, inFlight: readBack }), false);
+  // Read to the end (300 characters, about 21 s) and quiet for 3 s: the outcome may go in.
+  const done = { ...readBack, quietSince: 22_000 };
+  assert.equal(mayPassResultIn({ now: 25_000, live: true, speaking: false, callerVoiceAt: null, inFlight: done }), true);
 });

@@ -26,6 +26,16 @@ export const voiceTestApi = {
   },
 
   /**
+   * A Lawexa voice call's research result went into the call: the server
+   * notes when the read-back started, and refuses a yes to a held action until
+   * it has had time to be said (Backend, branch voice-held-actions). Sent once
+   * per research turn; never for an `action-<code>` outcome.
+   */
+  resultSent: async (sessionUuid: string, turnUuid: string): Promise<void> => {
+    await apiClient.post(`/voice-test/sessions/${sessionUuid}/turns/${turnUuid}/sent`);
+  },
+
+  /**
    * The call ended; the server records its length and cost. `leaving`: the
    * tab is closing, so the request is sent with fetch's keepalive and outlives
    * the page.

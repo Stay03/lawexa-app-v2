@@ -264,6 +264,43 @@ export function mayPassResultIn(state: { now: number; live: boolean; speaking: b
   return !inFlight || handOffFinished(inFlight, now);
 }
 
+/**
+ * The outcome of an action the caller said yes to ("Reminder set for 9 am"),
+ * sent by the server as a result whose turn is `action-<code>` (Techlead and
+ * Backend, 22 November 2026, branch voice-held-actions). It goes into the call
+ * by the same quiet-line rule as a research answer, one at a time, but it is
+ * not a research turn: the server is not told when it went in.
+ */
+export const ACTION_OUTCOME_PREFIX = 'action-';
+
+export function isActionOutcome(turnUuid: string): boolean {
+  return turnUuid.startsWith(ACTION_OUTCOME_PREFIX);
+}
+
+/**
+ * The research turn the server is told about once its result goes into the
+ * call (`POST .../turns/{turn}/sent`), so it knows when the read-back started:
+ * a held action's yes is refused until the read-back has had time to be said.
+ * `null` for an action outcome, which has no turn.
+ */
+export function sentNoticeTurn(turnUuid: string): string | null {
+  return isActionOutcome(turnUuid) ? null : turnUuid;
+}
+
+/**
+ * Takes a result into the waiting line, oldest first, unless the same turn has
+ * already been queued or passed in on this call: a repeated event would
+ * otherwise have the voice read the same result twice.
+ */
+export function queueResult<T extends { turn_uuid: string }>(
+  waiting: readonly T[],
+  seen: ReadonlySet<string>,
+  event: T,
+): { waiting: T[]; seen: Set<string>; accepted: boolean } {
+  if (seen.has(event.turn_uuid)) return { waiting: [...waiting], seen: new Set(seen), accepted: false };
+  return { waiting: [...waiting, event], seen: new Set([...seen, event.turn_uuid]), accepted: true };
+}
+
 export interface ResearchRow {
   number: number;
   question: string;

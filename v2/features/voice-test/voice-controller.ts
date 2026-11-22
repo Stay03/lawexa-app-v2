@@ -13,6 +13,8 @@ import {
   handOffOnMode,
   handOffOnReply,
   mayPassResultIn,
+  queueResult,
+  sentNoticeTurn,
   type CallEvent,
   type CallLog,
   type HandOff,
@@ -156,9 +158,11 @@ export class VoiceTestController {
     this.stopListening = onVoiceResearchReady((event) => {
       if (event.session_uuid !== this.state.sessionUuid || this.session !== session) return;
       if (mode === 'a') {
-        // Lawexa voice: the answer waits for a quiet line, in arrival order.
-        this.waitingResults.push(event);
-        this.passResultIn();
+        // Lawexa voice: a research answer or an action's outcome waits for a quiet line, in arrival order.
+        const queued = queueResult(this.waitingResults, this.seenResults, event);
+        this.waitingResults = queued.waiting;
+        this.seenResults = queued.seen;
+        if (queued.accepted) this.passResultIn();
         return;
       }
       session.sendUserMessage(event.marker);
@@ -309,8 +313,10 @@ export class VoiceTestController {
     if (this.state.saving) this.set({ saving: false });
   }
 
-  /** An `a` call's research answers, oldest first, waiting for a quiet line. */
+  /** An `a` call's research answers and action outcomes, oldest first, waiting for a quiet line. */
   private waitingResults: VoiceResearchReadyEvent[] = [];
+  /** Every turn queued or passed in on this call, so a repeated event is not read twice. */
+  private seenResults: Set<string> = new Set();
   /** The answer passed in and not yet read to the end. */
   private inFlight: HandOff | null = null;
   /** The caller's last voice activity (or finished line). */
@@ -339,6 +345,26 @@ export class VoiceTestController {
     session.sendUserMessage(next.marker);
     this.inFlight = { turnUuid: next.turn_uuid, sentAt: now, startedAt: null, quietSince: null, answerChars: null, interrupted: false };
     this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
+    const turn = sentNoticeTurn(next.turn_uuid);
+    if (turn && this.state.sessionUuid) void this.tellResultSent(this.state.sessionUuid, turn);
+  }
+
+  /**
+   * Tells the server a research result went into the call (voice-model.ts
+   * sentNoticeTurn). One retry after a second: without the notice the server
+   * cannot time the read-back, and refuses the caller's yes to a held action.
+   */
+  private async tellResultSent(sessionUuid: string, turnUuid: string) {
+    for (const wait of [0, 1000]) {
+      if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+      if (this.state.sessionUuid !== sessionUuid) return;
+      try {
+        await voiceTestApi.resultSent(sessionUuid, turnUuid);
+        return;
+      } catch {
+        // Tried again once below; the call itself goes on either way.
+      }
+    }
   }
 
   private release() {
@@ -347,6 +373,7 @@ export class VoiceTestController {
     this.inFlight = null;
     this.callerVoiceAt = null;
     this.waitingResults = [];
+    this.seenResults = new Set();
     this.session = null;
     this.stopListening?.();
     this.stopListening = null;
