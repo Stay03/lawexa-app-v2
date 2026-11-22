@@ -275,7 +275,8 @@ test("an action's outcome is told apart from a research turn by its action- turn
   assert.equal(isActionOutcome('00000000-0000-4000-8000-000000000001'), false);
 });
 
-const nudge = (turn_uuid: string) => ({ session_uuid: 'TEST-session', turn_uuid, marker: '[[LAWEXA STILL WORKING]] TEST DATA' });
+// Backend's exact shape (API 1b04c6a3): the question, up to 300 characters, quotes and ] swapped, nothing after.
+const nudge = (turn_uuid: string) => ({ session_uuid: 'TEST-session', turn_uuid, marker: '[[LAWEXA STILL WORKING for "TEST DATA what does section 24 (2) of the NDPA say"]]' });
 type Ready = ReturnType<typeof ready>;
 /** Plays events into a line; returns the line, which were taken in, and the waiting order. */
 function playLine(events: Ready[], start: ResultLine<Ready> = emptyResultLine()) {
