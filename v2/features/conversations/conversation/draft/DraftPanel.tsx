@@ -17,7 +17,7 @@ import { locateDraft } from './draft-ordinals';
 import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
 import { DraftChangesView } from './DraftChangesView';
 import { DraftDocument } from './DraftCard';
-import { answerDraftKeys, draftGroupKey, draftVersionTitle } from './draft-versions';
+import { draftGroupKey, draftKeysByMessage, draftVersionTitle } from './draft-versions';
 import { newestFinished } from './draft-note-state';
 import { DraftVersionSwitch } from './DraftVersionSwitch';
 
@@ -29,12 +29,11 @@ import { DraftVersionSwitch } from './DraftVersionSwitch';
 let rememberedShowChanges = false;
 
 /** A saved draft by its place in the chat; `null` for one not (yet) saved. */
-/** Draft `ordinal`'s group as its answer judges it (answerDraftKeys); `null` when not in a saved answer. */
+/** Draft `ordinal`'s group in the chat's order (chatDraftKeys); `null` when not in a saved answer. */
 function draftKeyAt(messages: readonly EngineMessage[], ordinal: number): string | null {
   const place = locateDraft(messages, ordinal);
   if (!('messageId' in place)) return null;
-  const message = messages.find((candidate) => candidate.id === place.messageId);
-  return message ? (answerDraftKeys(draftsIn(message.content))[place.index] ?? null) : null;
+  return draftKeysByMessage(messages).get(place.messageId)?.[place.index] ?? null;
 }
 
 function draftAt(messages: readonly EngineMessage[], ordinal: number): DraftBlock | null {

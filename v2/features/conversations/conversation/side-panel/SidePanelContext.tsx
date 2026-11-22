@@ -10,7 +10,7 @@ import {
   sidePanelValue,
   type SidePanelTarget,
 } from './side-panel-value';
-import type { DraftVersion } from '../draft/draft-versions';
+import type { DraftVersion, KeyedDraft } from '../draft/draft-versions';
 
 /**
  * SidePanelContext — the chat's one side panel, shared by everything that
@@ -71,6 +71,10 @@ export type DraftTitleLookup = (key: string) => string | null;
 
 const NO_TITLES: DraftTitleLookup = () => null;
 
+/** One answer's draft groups in the chat's order (draft-versions.ts chatDraftKeys). */
+export type DraftKeysLookup = (messageId: string | null, drafts: readonly KeyedDraft[]) => string[];
+
+
 export interface SidePanelApi extends SidePanelUrlState {
   /** How many drafts come before an answer's own (0 for an answer not in the map). */
   draftOffset: (messageId: string) => number;
@@ -78,6 +82,8 @@ export interface SidePanelApi extends SidePanelUrlState {
   draftVersion: DraftVersionLookup;
   /** A draft group's newest title; `null` where the chat keeps no versions. */
   draftTitle: DraftTitleLookup;
+  /** One answer's draft groups, judged in the chat's order; `null` where the chat keeps no versions (each draft is then its own key). */
+  draftKeys: DraftKeysLookup | null;
   /** The chat's Space, where a draft's Save to folder files it; `null` outside one. */
   space: ConversationSpaceRef | null;
   frame: SidePanelFrame;
@@ -127,18 +133,20 @@ export function SidePanelProvider({
   offsets,
   versions,
   titles,
+  keys,
   space,
   children,
 }: {
   offsets: ReadonlyMap<string, number>;
   versions?: DraftVersionLookup;
   titles?: DraftTitleLookup;
+  keys?: DraftKeysLookup;
   space: ConversationSpaceRef | null;
   children: ReactNode;
 }) {
   const url = useSidePanelUrl();
   return (
-    <SidePanelValueProvider url={url} offsets={offsets} versions={versions} titles={titles} space={space} frame="beside">
+    <SidePanelValueProvider url={url} offsets={offsets} versions={versions} titles={titles} keys={keys} space={space} frame="beside">
       {children}
     </SidePanelValueProvider>
   );
@@ -150,6 +158,7 @@ export function SidePanelValueProvider({
   offsets,
   versions,
   titles,
+  keys,
   space,
   frame,
   children,
@@ -160,14 +169,16 @@ export function SidePanelValueProvider({
   versions?: DraftVersionLookup;
   /** The chat's draft groups' titles; absent where drafts have no versions. */
   titles?: DraftTitleLookup;
+  /** The chat's draft groups by answer; absent where drafts have no versions. */
+  keys?: DraftKeysLookup;
   space: ConversationSpaceRef | null;
   frame: SidePanelFrame;
   children: ReactNode;
 }) {
   const draftOffset = useCallback((messageId: string) => offsets.get(messageId) ?? 0, [offsets]);
   const api = useMemo<SidePanelApi>(
-    () => ({ ...url, draftOffset, draftVersion: versions ?? NO_VERSIONS, draftTitle: titles ?? NO_TITLES, space, frame }),
-    [url, draftOffset, versions, titles, space, frame],
+    () => ({ ...url, draftOffset, draftVersion: versions ?? NO_VERSIONS, draftTitle: titles ?? NO_TITLES, draftKeys: keys ?? null, space, frame }),
+    [url, draftOffset, versions, titles, keys, space, frame],
   );
   return <SidePanelContext.Provider value={api}>{children}</SidePanelContext.Provider>;
 }
