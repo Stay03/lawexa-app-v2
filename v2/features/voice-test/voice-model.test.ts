@@ -126,14 +126,19 @@ test('the voice reading a passed-in answer times it, oldest first; research rows
   log = applyCallEvent(log, { kind: 'mode', mode: 'listening' }, 5000);
   log = applyCallEvent(log, { kind: 'mode', mode: 'speaking' }, 5600);
   assert.deepEqual(log.deliveries.map((d) => d.spokenAt), [1800, 5600]);
-  const turn = (uuid: string, kind: 'research' | 'queued' | 'answer', ms: number | null) =>
+  const turn = (uuid: string, kind: VoiceServerTurn['kind'], ms: number | null) =>
     ({ uuid, user_text: `TEST DATA ${uuid}`, kind, answer_text: '', tags: [], received_at: null, first_text_at: null, filler_sent_at: null,
       research_started_at: null, research_done_at: null, research_spoken_at: null, first_text_ms: null, research_ms: ms }) satisfies VoiceServerTurn;
-  const rows = researchRows([turn('t1', 'research', 4200), turn('t2', 'research', 6100), turn('t3', 'queued', null), turn('x', 'answer', null)], log.deliveries);
-  assert.deepEqual(rows.map((r) => [r.question, r.queued, r.research, r.spokenAfter]), [
-    ['TEST DATA t1', false, 4.2, 0.8],
-    ['TEST DATA t2', false, 6.1, 4.1],
-    ['TEST DATA t3', true, null, null],
+  const rows = researchRows(
+    [turn('t1', 'research', 4200), turn('t2', 'research', 6100), turn('t3', 'queued', null), turn('t4', 'failed', null), turn('t5', 'dropped', null), turn('x', 'answer', null)],
+    log.deliveries,
+  );
+  assert.deepEqual(rows.map((r) => [r.question, r.status, r.research, r.spokenAfter]), [
+    ['TEST DATA t1', 'done', 4.2, 0.8],
+    ['TEST DATA t2', 'done', 6.1, 4.1],
+    ['TEST DATA t3', 'queued', null, null],
+    ['TEST DATA t4', 'failed', null, null],
+    ['TEST DATA t5', 'dropped', null, null],
   ]);
 });
 

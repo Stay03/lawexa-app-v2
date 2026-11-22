@@ -206,8 +206,8 @@ export function mayPassResultIn(state: { now: number; live: boolean; speaking: b
 export interface ResearchRow {
   number: number;
   question: string;
-  /** Still waiting behind another research. */
-  queued: boolean;
+  /** `done` ran; `queued` waits behind another; `failed` could not start; `dropped` was still waiting at the end. */
+  status: 'done' | 'queued' | 'failed' | 'dropped';
   /** The server's research time, in seconds. */
   research: number | null;
   /** Seconds from the page passing the answer in to the voice starting to read it. */
@@ -221,13 +221,13 @@ export interface ResearchRow {
  */
 export function researchRows(serverTurns: VoiceServerTurn[], deliveries: ResearchDelivery[]): ResearchRow[] {
   return serverTurns
-    .filter((turn) => turn.kind === 'research' || turn.kind === 'queued')
+    .filter((turn) => turn.kind !== 'answer')
     .map((turn, index) => {
       const delivery = deliveries.find((candidate) => candidate.turnUuid === turn.uuid);
       return {
         number: index + 1,
         question: turn.user_text,
-        queued: turn.kind === 'queued',
+        status: turn.kind === 'research' || turn.kind === 'answer' ? 'done' : turn.kind,
         research: fromMs(turn.research_ms),
         spokenAfter: delivery ? seconds(delivery.sentAt, delivery.spokenAt) : null,
       };

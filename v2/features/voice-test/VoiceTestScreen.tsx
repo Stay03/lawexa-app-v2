@@ -295,6 +295,13 @@ function DelayTable({ state }: { state: VoiceTestState }) {
   );
 }
 
+/** What a research that did not run in full says under its question. */
+const RESEARCH_STATUS = {
+  queued: 'Waiting behind another question',
+  failed: 'Couldn’t run. The caller was told why.',
+  dropped: 'Still waiting when the call ended',
+} as const;
+
 /**
  * A Lawexa voice call's research (Backend, 22 November 2026): one row per
  * research Lawexa ran in the background, its time on the server, and how soon
@@ -324,7 +331,7 @@ function ResearchTable({ state }: { state: VoiceTestState }) {
                 <tr key={row.number}>
                   <td className="max-w-[260px] px-3 py-2.5">
                     <span className="line-clamp-2 text-foreground">{row.question}</span>
-                    {row.queued ? <span className="mt-0.5 block text-xs text-muted-foreground">Waiting behind another question</span> : null}
+                    {row.status !== 'done' ? <span className="mt-0.5 block text-xs text-muted-foreground">{RESEARCH_STATUS[row.status]}</span> : null}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-foreground">{secondsLabel(row.research)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-foreground">{secondsLabel(row.spokenAfter)}</td>

@@ -50,8 +50,12 @@ export interface VoiceResearchReadyEvent {
 export interface VoiceServerTurn {
   uuid: string;
   user_text: string;
-  /** `queued`: an `a` call's research waiting behind another. */
-  kind: 'answer' | 'research' | 'queued';
+  /**
+   * An `a` call's research: `queued` waiting behind another; `failed` could
+   * not start (the caller hears one sentence why); `dropped` still waiting
+   * when the call ended (Backend 5bbb9f58).
+   */
+  kind: 'answer' | 'research' | 'queued' | 'failed' | 'dropped';
   /** The answer without its audio tags. */
   answer_text: string;
   tags: string[];
