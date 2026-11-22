@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { AxiosError } from 'axios';
 
 import type { VoiceServerTurn } from '@/types/voice-test';
@@ -153,7 +155,7 @@ test('a research answer goes in only on a quiet line: not while the voice speaks
   assert.equal(mayPassResultIn({ ...base, callerVoiceAt: 9_500 }), false);
   assert.equal(mayPassResultIn({ ...base, callerVoiceAt: 9_000 }), true);
   // Passed in but not started: wait, up to 8 s, then go on.
-  const sent = { turnUuid: 't1', sentAt: 9_000, startedAt: null, quietSince: null, answerChars: null };
+  const sent = { turnUuid: 't1', sentAt: 9_000, startedAt: null, quietSince: null, answerChars: null, interrupted: false };
   assert.equal(mayPassResultIn({ ...base, inFlight: sent }), false);
   assert.equal(mayPassResultIn({ ...base, now: 17_000, inFlight: sent }), true);
 });
@@ -162,20 +164,29 @@ test('a research answer goes in only on a quiet line: not while the voice speaks
 // t=652 s; a sentence pause at t=750 s read as 'listening' and answer 2 went in, cutting answer 1.
 test('a pause in a long answer does not count as finished, even after 3 s of quiet', () => {
   const started = 652_000;
-  const answer = { turnUuid: 't1', sentAt: 651_000, startedAt: started, quietSince: 749_000, answerChars: 6_150 };
-  assert.equal(expectedSpokenMs(6_150) > 400_000, true);
+  const answer = { turnUuid: 't1', sentAt: 651_000, startedAt: started, quietSince: 749_000, answerChars: 6_150, interrupted: false };
+  assert.equal(expectedSpokenMs(6_150), 180_000);
   assert.equal(handOffFinished(answer, 753_000), false);
   assert.equal(mayPassResultIn({ now: 753_000, live: true, speaking: false, callerVoiceAt: null, inFlight: answer }), false);
 });
 
-test('an interruption leaves the answer in flight: quiet for a moment is not finished', () => {
-  const answer = { turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 20_000, answerChars: 600 };
-  // 600 characters take about 43 s; at 21 s the voice was cut 1 s ago.
-  assert.equal(handOffFinished(answer, 21_000), false);
+test('a real interruption ends the answer: the next waits only for 3 s of quiet, not the long answer', () => {
+  // The caller cut a 6,000-character answer at 10 s ("stop, set a reminder instead").
+  const cut = { turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 11_000, answerChars: 6_000, interrupted: true };
+  assert.equal(handOffFinished(cut, 12_000), false);
+  assert.equal(handOffFinished(cut, 14_000), true);
+  assert.equal(mayPassResultIn({ now: 14_000, live: true, speaking: false, callerVoiceAt: null, inFlight: cut }), true);
+  // Not interrupted, the same moment is a pause: still in flight.
+  assert.equal(handOffFinished({ ...cut, interrupted: false }, 14_000), false);
+});
+
+test('no answer is expected to take more than 3 minutes to say', () => {
+  assert.equal(expectedSpokenMs(18_000), 180_000);
+  assert.equal(Math.round(expectedSpokenMs(1_400)), 100_000);
 });
 
 test('a real finish: the expected length has passed and the voice has been quiet for 3 s', () => {
-  const answer = { turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 45_000, answerChars: 600 };
+  const answer = { turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 45_000, answerChars: 600, interrupted: false };
   assert.equal(handOffFinished(answer, 47_000), false);
   assert.equal(handOffFinished(answer, 48_000), true);
   // Quiet for 3 s but not yet the expected length: not finished.
@@ -184,4 +195,12 @@ test('a real finish: the expected length has passed and the voice has been quiet
   assert.equal(handOffFinished({ ...answer, answerChars: null, quietSince: 10_000 }, 13_000), true);
   // Never quiet: the safety timeout lets the next in 2 minutes after the expected length.
   assert.equal(handOffFinished({ ...answer, quietSince: null }, 1_000 + 43_000 + 120_000), true);
+});
+
+test('the answer is sized by the longest reply since it went in, so a short reply to the caller cannot stand in for it', () => {
+  const source = readFileSync(join(process.cwd(), 'v2', 'features', 'voice-test', 'voice-controller.ts'), 'utf8');
+  assert.match(source, /answerChars: Math\.max\(this\.inFlight\.answerChars \?\? 0, message\.text\.length\)/);
+  // A 16-character "Sure, one moment" then the 6,000-character answer: sized by the answer.
+  const sized = Math.max(Math.max(0, 16), 6_000);
+  assert.equal(handOffFinished({ turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 60_000, answerChars: sized, interrupted: false }, 64_000), false);
 });

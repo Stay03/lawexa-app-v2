@@ -186,8 +186,11 @@ export function delayRows(turns: BrowserTurn[], serverTurns: VoiceServerTurn[]):
  * call a pause 98 s into a several-minute answer let the next one in and cut
  * it. So an answer counts as finished only when 'listening' has held for
  * HELD_LISTENING_MS AND at least its expected spoken length has passed since
- * it started (its text at SPOKEN_CHARS_PER_SECOND). An interruption leaves it
- * in flight the same way. Timeouts keep an answer from waiting forever.
+ * it started (its text at SPOKEN_CHARS_PER_SECOND, capped). A real
+ * interruption (the client's interruption event; a sentence pause raises
+ * none) ends the answer for good, since the voice never resumes a cut reply:
+ * it then needs only the held quiet. Timeouts keep an answer from waiting
+ * forever.
  */
 export const CALLER_QUIET_MS = 900;
 /** The client's voice activity score at or above which the caller counts as talking. */
@@ -198,6 +201,8 @@ export const SPOKEN_CHARS_PER_SECOND = 14;
 export const START_TIMEOUT_MS = 8000;
 /** After the expected length, how long an answer may still hold the line. */
 export const AFTER_EXPECTED_MS = 120000;
+/** No answer is expected to take longer than this to say (Techlead's review). */
+export const MAX_EXPECTED_MS = 180000;
 
 /** The answer passed in and not yet read to the end. */
 export interface HandOff {
@@ -207,22 +212,26 @@ export interface HandOff {
   startedAt: number | null;
   /** The voice went quiet at this time and has stayed quiet; `null` while it speaks. */
   quietSince: number | null;
-  /** The length of the voice's reply, from its text; `null` until the text arrives. */
+  /** The length of the voice's longest reply since the answer went in; `null` until one arrives. */
   answerChars: number | null;
+  /** The voice was cut off while reading it: it will not resume. */
+  interrupted: boolean;
 }
 
 /** How long a reply of `chars` characters takes to say. */
 export function expectedSpokenMs(chars: number | null): number {
-  return chars === null ? 0 : (chars / SPOKEN_CHARS_PER_SECOND) * 1000;
+  return chars === null ? 0 : Math.min(MAX_EXPECTED_MS, (chars / SPOKEN_CHARS_PER_SECOND) * 1000);
 }
 
 /** The answer in flight has been read to the end (or has waited long enough). */
 export function handOffFinished(inFlight: HandOff, now: number): boolean {
   if (inFlight.startedAt === null) return now - inFlight.sentAt >= START_TIMEOUT_MS;
+  const heldQuiet = inFlight.quietSince !== null && now - inFlight.quietSince >= HELD_LISTENING_MS;
+  if (inFlight.interrupted) return heldQuiet;
   const expected = expectedSpokenMs(inFlight.answerChars);
   const spoken = now - inFlight.startedAt;
   if (spoken >= expected + AFTER_EXPECTED_MS) return true;
-  return inFlight.quietSince !== null && now - inFlight.quietSince >= HELD_LISTENING_MS && spoken >= expected;
+  return heldQuiet && spoken >= expected;
 }
 
 export function mayPassResultIn(state: { now: number; live: boolean; speaking: boolean; callerVoiceAt: number | null; inFlight: HandOff | null }): boolean {

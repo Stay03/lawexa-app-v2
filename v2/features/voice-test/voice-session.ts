@@ -27,6 +27,8 @@ export interface VoiceCallHandlers {
   onError: (message: string) => void;
   /** How likely the caller is speaking right now, 0 to 1 (the client's voice activity score). */
   onVad?: (score: number) => void;
+  /** The caller (or a noise) cut the voice off mid-reply; the cut reply is never resumed. */
+  onInterrupted?: () => void;
 }
 
 export interface VoiceCallStart {

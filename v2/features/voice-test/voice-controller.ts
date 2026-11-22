@@ -184,11 +184,16 @@ export class VoiceTestController {
           onMessage: (message) => {
             if (this.session !== session) return;
             if (message.source === 'user') this.callerVoiceAt = performance.now();
-            // The voice's reply to the answer in flight: its length sizes how long it takes to say.
-            if (message.source === 'ai' && this.inFlight && this.inFlight.answerChars === null) {
-              this.inFlight = { ...this.inFlight, answerChars: message.text.length };
+            // The voice's replies while an answer is in flight: the longest sizes how long it takes to say,
+            // so a short reply to the caller ("Sure, one moment") never stands in for the long answer.
+            if (message.source === 'ai' && this.inFlight) {
+              this.inFlight = { ...this.inFlight, answerChars: Math.max(this.inFlight.answerChars ?? 0, message.text.length) };
             }
             this.note({ kind: 'message', message });
+          },
+          onInterrupted: () => {
+            // A cut reply is never resumed: the answer in flight ends once the line is quiet.
+            if (this.session === session && this.inFlight?.startedAt != null) this.inFlight = { ...this.inFlight, interrupted: true };
           },
           onVad: (score) => {
             if (this.session === session && score >= CALLER_SPEECH_SCORE) this.callerVoiceAt = performance.now();
@@ -327,7 +332,7 @@ export class VoiceTestController {
     const next = this.waitingResults.shift();
     if (!next) return;
     session.sendUserMessage(next.marker);
-    this.inFlight = { turnUuid: next.turn_uuid, sentAt: now, startedAt: null, quietSince: null, answerChars: null };
+    this.inFlight = { turnUuid: next.turn_uuid, sentAt: now, startedAt: null, quietSince: null, answerChars: null, interrupted: false };
     this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
   }
 
