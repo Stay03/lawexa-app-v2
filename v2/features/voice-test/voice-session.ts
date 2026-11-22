@@ -25,6 +25,8 @@ export interface VoiceCallHandlers {
   onMessage: (message: VoiceCallMessage) => void;
   /** The call failed or was refused; a sentence the page can show. */
   onError: (message: string) => void;
+  /** How likely the caller is speaking right now, 0 to 1 (the client's voice activity score). */
+  onVad?: (score: number) => void;
 }
 
 export interface VoiceCallStart {

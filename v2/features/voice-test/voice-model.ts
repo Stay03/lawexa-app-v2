@@ -174,6 +174,35 @@ export function delayRows(turns: BrowserTurn[], serverTurns: VoiceServerTurn[]):
   });
 }
 
+/**
+ * When the page may pass an `a` call's next research answer in (Techlead's
+ * review, 22 November 2026): never while the voice speaks or the caller is
+ * talking, and one at a time: the next waits until the voice has started
+ * and finished reading the one before. Timeouts keep an answer from waiting
+ * forever if the voice never starts or never stops.
+ */
+export const CALLER_QUIET_MS = 900;
+/** The client's voice activity score at or above which the caller counts as talking. */
+export const CALLER_SPEECH_SCORE = 0.5;
+export const START_TIMEOUT_MS = 8000;
+export const READ_TIMEOUT_MS = 120000;
+
+/** The answer passed in and not yet read to the end. */
+export interface HandOff {
+  turnUuid: string;
+  sentAt: number;
+  /** The voice started reading it; `null` until then. */
+  startedAt: number | null;
+}
+
+export function mayPassResultIn(state: { now: number; live: boolean; speaking: boolean; callerVoiceAt: number | null; inFlight: HandOff | null }): boolean {
+  const { now, live, speaking, callerVoiceAt, inFlight } = state;
+  if (!live || speaking) return false;
+  if (callerVoiceAt !== null && now - callerVoiceAt < CALLER_QUIET_MS) return false;
+  if (!inFlight) return true;
+  return inFlight.startedAt === null ? now - inFlight.sentAt >= START_TIMEOUT_MS : now - inFlight.startedAt >= READ_TIMEOUT_MS;
+}
+
 export interface ResearchRow {
   number: number;
   question: string;

@@ -10,6 +10,7 @@ import {
   EMPTY_CALL_LOG,
   exhaustedBlock,
   isResearchMarker,
+  mayPassResultIn,
   researchRows,
   secondsLabel,
   spokenText,
@@ -134,4 +135,20 @@ test('the voice reading a passed-in answer times it, oldest first; research rows
     ['TEST DATA t2', false, 6.1, 4.1],
     ['TEST DATA t3', true, null, null],
   ]);
+});
+
+test('a research answer goes in only on a quiet line: not while the voice speaks or the caller talks, and one at a time', () => {
+  const base = { now: 10_000, live: true, speaking: false, callerVoiceAt: null, inFlight: null };
+  assert.equal(mayPassResultIn(base), true);
+  assert.equal(mayPassResultIn({ ...base, live: false }), false);
+  assert.equal(mayPassResultIn({ ...base, speaking: true }), false);
+  // The caller talked 0.5 s ago: wait; 1 s ago: quiet enough.
+  assert.equal(mayPassResultIn({ ...base, callerVoiceAt: 9_500 }), false);
+  assert.equal(mayPassResultIn({ ...base, callerVoiceAt: 9_000 }), true);
+  // The answer before is passed in but not started: wait, up to 8 s, then go on.
+  assert.equal(mayPassResultIn({ ...base, inFlight: { turnUuid: 't1', sentAt: 9_000, startedAt: null } }), false);
+  assert.equal(mayPassResultIn({ ...base, now: 17_000, inFlight: { turnUuid: 't1', sentAt: 9_000, startedAt: null } }), true);
+  // Started and not finished: wait, up to 2 minutes.
+  assert.equal(mayPassResultIn({ ...base, inFlight: { turnUuid: 't1', sentAt: 5_000, startedAt: 6_000 } }), false);
+  assert.equal(mayPassResultIn({ ...base, now: 126_000, inFlight: { turnUuid: 't1', sentAt: 5_000, startedAt: 6_000 } }), true);
 });

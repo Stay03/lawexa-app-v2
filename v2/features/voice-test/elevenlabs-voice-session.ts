@@ -27,6 +27,7 @@ export class ElevenLabsVoiceSession implements VoiceSession {
       onModeChange: ({ mode }) => handlers.onMode(mode),
       onMessage: ({ message, role }) => handlers.onMessage({ source: role === 'user' ? 'user' : 'ai', text: message }),
       onError: (message) => handlers.onError(message || 'The call failed.'),
+      onVadScore: ({ vadScore }) => handlers.onVad?.(vadScore),
     });
     if (this.ended) {
       await conversation.endSession();

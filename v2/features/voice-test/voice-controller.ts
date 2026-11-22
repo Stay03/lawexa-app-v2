@@ -4,7 +4,7 @@ import type { IBlockedReason } from '@/types/message-pack';
 import type { VoiceCallSaved, VoiceOption, VoiceResearchReadyEvent, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
 import { ElevenLabsVoiceSession } from './elevenlabs-voice-session';
 import { onVoiceResearchReady } from './voice-events';
-import { applyCallEvent, EMPTY_CALL_LOG, exhaustedBlock, type CallEvent, type CallLog } from './voice-model';
+import { applyCallEvent, CALLER_SPEECH_SCORE, EMPTY_CALL_LOG, exhaustedBlock, mayPassResultIn, type CallEvent, type CallLog, type HandOff } from './voice-model';
 import type { VoiceSession } from './voice-session';
 
 /**
@@ -170,13 +170,21 @@ export class VoiceTestController {
           onMode: (mode) => {
             if (this.session !== session) return;
             this.note({ kind: 'mode', mode });
+            // The voice started, then finished, reading the answer in flight.
+            if (this.inFlight && mode === 'speaking' && this.inFlight.startedAt === null) this.inFlight = { ...this.inFlight, startedAt: performance.now() };
+            if (this.inFlight?.startedAt != null && mode === 'listening') this.inFlight = null;
             if (mode === 'listening') {
               this.passResultIn();
               void this.readServerTurns();
             }
           },
           onMessage: (message) => {
-            if (this.session === session) this.note({ kind: 'message', message });
+            if (this.session !== session) return;
+            if (message.source === 'user') this.callerVoiceAt = performance.now();
+            this.note({ kind: 'message', message });
+          },
+          onVad: (score) => {
+            if (this.session === session && score >= CALLER_SPEECH_SCORE) this.callerVoiceAt = performance.now();
           },
           onError: (message) => {
             if (this.session !== session) return;
@@ -286,22 +294,41 @@ export class VoiceTestController {
 
   /** An `a` call's research answers, oldest first, waiting for a quiet line. */
   private waitingResults: VoiceResearchReadyEvent[] = [];
+  /** The answer passed in and not yet read to the end. */
+  private inFlight: HandOff | null = null;
+  /** The caller's last voice activity (or finished line). */
+  private callerVoiceAt: number | null = null;
+  private retry: ReturnType<typeof setTimeout> | null = null;
 
   /**
-   * Passes the oldest waiting research answer into the call when neither
-   * side is speaking (Backend, 22 November 2026): the voice reads it, and the
-   * next waits until the line is quiet again.
+   * Passes the oldest waiting research answer into the call when the line is
+   * quiet: the voice not speaking, the caller not talking, and the answer
+   * before it read to the end (voice-model.ts mayPassResultIn). While one
+   * waits, it checks again shortly.
    */
   private passResultIn() {
+    if (this.retry) clearTimeout(this.retry);
+    this.retry = null;
     const session = this.session;
-    if (!session || this.state.phase !== 'live' || this.state.log.speaking) return;
+    if (!session || this.waitingResults.length === 0) return;
+    const now = performance.now();
+    const may = mayPassResultIn({ now, live: this.state.phase === 'live', speaking: this.state.log.speaking, callerVoiceAt: this.callerVoiceAt, inFlight: this.inFlight });
+    if (!may) {
+      if (this.state.phase === 'live') this.retry = setTimeout(() => this.passResultIn(), 400);
+      return;
+    }
     const next = this.waitingResults.shift();
     if (!next) return;
     session.sendUserMessage(next.marker);
+    this.inFlight = { turnUuid: next.turn_uuid, sentAt: now, startedAt: null };
     this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
   }
 
   private release() {
+    if (this.retry) clearTimeout(this.retry);
+    this.retry = null;
+    this.inFlight = null;
+    this.callerVoiceAt = null;
     this.waitingResults = [];
     this.session = null;
     this.stopListening?.();
