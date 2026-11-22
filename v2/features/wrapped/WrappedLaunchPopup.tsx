@@ -3,15 +3,13 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowRight, X } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 import { introSeenKey } from '@/v2/features/redesign-intro/model';
 import { useScreenHeld } from '@/v2/runtime/screen-hold';
 import { useV2Session } from '@/v2/runtime/session-context';
-import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import {
   launchFor,
   wrappedLaunchShouldOpen,
@@ -67,21 +65,9 @@ export function WrappedLaunchPopup({ introSeenOnServer }: { introSeenOnServer: b
         }}
         className="flex flex-col gap-0 overflow-hidden p-0 outline-none sm:max-w-xl"
       >
-        <div className="relative shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element -- a fixed 1200x630 picture in public/, loaded before the card opens. */}
-          <img src={launch.image.src} alt={launch.image.alt} width={1200} height={630} className="aspect-[1200/630] w-full object-cover" />
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Close"
-            className={cn(
-              'v2-interactive absolute top-3 right-3 flex size-8 items-center justify-center rounded-full bg-background/80 text-foreground backdrop-blur-sm transition-colors hover:bg-background',
-              FOCUS_RING,
-            )}
-          >
-            <X aria-hidden className="size-4" />
-          </button>
-        </div>
+        {/* No close button on the picture (Arthur, 22 November 2026): Close is below, and Escape or a tap outside also closes it. */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- a fixed 1200x630 picture in public/, loaded before the card opens. */}
+        <img src={launch.image.src} alt={launch.image.alt} width={1200} height={630} className="aspect-[1200/630] w-full shrink-0 object-cover" />
 
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-6">
           <div className="flex flex-col gap-2">

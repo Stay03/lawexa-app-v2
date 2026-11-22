@@ -8,8 +8,8 @@
  * Wrapped exists (`useHasWrapped`), until 31 December.
  *
  * ONCE. The ambassador pop-up keeps its close on the device, so this one does
- * too, keyed by the account id: every way out of it (the button, the ×,
- * Escape, a tap outside) counts as seen, and it does not come back on this
+ * too, keyed by the account id: every way out of it (See your Wrapped,
+ * Close, Escape, a tap outside) counts as seen, and it does not come back on this
  * device.
  *
  * NEVER STACKED. It waits while "Welcome to the new Lawexa" has not been seen,
