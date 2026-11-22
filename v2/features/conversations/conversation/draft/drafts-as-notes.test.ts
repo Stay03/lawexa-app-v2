@@ -45,7 +45,7 @@ test('the list is the server’s answer, never kept on the device, and is read a
 test('the panel finds its document by the draft’s group and knows the newest version on screen', () => {
   const panel = read(...DRAFT, 'DraftPanel.tsx');
   // The newest FINISHED version: a cut-off one never makes the finished one before it older.
-  assert.match(panel, /groupKey=\{draftGroupKey\(draft\)\}\s*latestOrdinal=\{newestFinished\(version\?\.ordinals \?\? \[ordinal\], \(at\) => draftAt\(messages, at\)\?\.complete === true, ordinal\)\}/);
+  assert.match(panel, /groupKey=\{groupKey\}\s*latestOrdinal=\{newestFinished\(version\?\.ordinals \?\? \[ordinal\], \(at\) => draftAt\(messages, at\)\?\.complete === true, ordinal\)\}/);
   const report = read('v2', 'features', 'radars', 'report', 'ReportDraftPanel.tsx');
   assert.match(report, /groupKey=\{draftGroupKey\(draft\)\}\s*latestOrdinal=\{target\.ordinal\}/);
   const editor = read(...DRAFT, 'DraftEditor.tsx');
@@ -129,7 +129,7 @@ test('the version history: newest first, who and when, the chosen one against no
 
 test('the newest version’s card says Edited once the reader changed it', () => {
   const card = read(...DRAFT, 'DraftCard.tsx');
-  assert.match(card, /useDraftEdited\(chat\?\.conversationId, draftGroupKey\(draft\), Boolean\(panel\) && draft\.complete && !older\)/);
+  assert.match(card, /useDraftEdited\(chat\?\.conversationId, key, Boolean\(panel\) && draft\.complete && !older\)/);
   assert.match(card, /\{edited \? ' · Edited' : null\}/);
   // The list is shared by the chat's cards: a card that does not ask never reads another's answer.
   const hook = read(...DRAFT, 'use-draft-notes.ts');
