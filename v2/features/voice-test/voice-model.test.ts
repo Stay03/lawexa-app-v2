@@ -10,6 +10,7 @@ import {
   EMPTY_CALL_LOG,
   exhaustedBlock,
   isResearchMarker,
+  researchRows,
   secondsLabel,
   spokenText,
   type CallEvent,
@@ -105,4 +106,32 @@ test('out of messages at Call is typed chat refusal: a 403 with ai_messages_exha
   assert.equal(exhaustedBlock(refusal(403, { reason: 'no_access' })), null);
   assert.equal(exhaustedBlock(refusal(503, block)), null);
   assert.equal(exhaustedBlock(new Error('offline')), null);
+});
+
+// ── Lawexa voice (mode a; Backend, 22 November 2026) ──────────────────────
+
+test('an a call’s research answer passed into the call is never shown as the caller’s words', () => {
+  const marker = '[[LAWEXA RESULT for "TEST DATA. Is a pasted quit notice valid?"]] TEST DATA. Usually not.';
+  assert.equal(isResearchMarker(marker), true);
+  const log = applyCallEvent(EMPTY_CALL_LOG, { kind: 'message', message: { source: 'user', text: marker } }, 100);
+  assert.deepEqual(log.lines, []);
+});
+
+test('the voice reading a passed-in answer times it, oldest first; research rows match by the turn', () => {
+  let log: CallLog = EMPTY_CALL_LOG;
+  log = applyCallEvent(log, { kind: 'delivered', turnUuid: 't1' }, 1000);
+  log = applyCallEvent(log, { kind: 'delivered', turnUuid: 't2' }, 1500);
+  log = applyCallEvent(log, { kind: 'mode', mode: 'speaking' }, 1800);
+  log = applyCallEvent(log, { kind: 'mode', mode: 'listening' }, 5000);
+  log = applyCallEvent(log, { kind: 'mode', mode: 'speaking' }, 5600);
+  assert.deepEqual(log.deliveries.map((d) => d.spokenAt), [1800, 5600]);
+  const turn = (uuid: string, kind: 'research' | 'queued' | 'answer', ms: number | null) =>
+    ({ uuid, user_text: `TEST DATA ${uuid}`, kind, answer_text: '', tags: [], received_at: null, first_text_at: null, filler_sent_at: null,
+      research_started_at: null, research_done_at: null, research_spoken_at: null, first_text_ms: null, research_ms: ms }) satisfies VoiceServerTurn;
+  const rows = researchRows([turn('t1', 'research', 4200), turn('t2', 'research', 6100), turn('t3', 'queued', null), turn('x', 'answer', null)], log.deliveries);
+  assert.deepEqual(rows.map((r) => [r.question, r.queued, r.research, r.spokenAfter]), [
+    ['TEST DATA t1', false, 4.2, 0.8],
+    ['TEST DATA t2', false, 6.1, 4.1],
+    ['TEST DATA t3', true, null, null],
+  ]);
 });

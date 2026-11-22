@@ -2,12 +2,15 @@
  * The staff live-voice test page (thread ac47b1df; Backend's server half
  * fe2736bd, shapes of 21 November 2026). Staff only (`user.can_record`).
  *
- * Two ways to answer, picked per call:
+ * Three ways to answer, picked per call:
+ * - `a`: Lawexa voice (Stay's option 1, 22 November 2026). A fast front voice
+ *   talks with the caller; Lawexa researches in the background and the page
+ *   passes each answer into the call when the line is quiet.
  * - `c`: Lawexa in the middle. ElevenLabs hears and speaks; Lawexa's own model
  *   writes every answer, and says a short line at once when it has to research.
  * - `b`: ElevenLabs' own model answers, with Lawexa's case search as its tool.
  */
-export type VoiceTestMode = 'c' | 'b';
+export type VoiceTestMode = 'a' | 'c' | 'b';
 
 export interface VoiceOption {
   id: string;
@@ -28,6 +31,8 @@ export interface VoiceTestSession {
   /** Passed to the call unchanged: it carries the session to Lawexa's server on every turn. */
   custom_llm_extra_body: { session_uuid: string };
   conversation_uuid: string | null;
+  /** `a` calls: passed to the call as its dynamic variables (session, caller's name, jurisdiction). */
+  dynamic_variables?: Record<string, string>;
 }
 
 /**
@@ -45,7 +50,8 @@ export interface VoiceResearchReadyEvent {
 export interface VoiceServerTurn {
   uuid: string;
   user_text: string;
-  kind: 'answer' | 'research';
+  /** `queued`: an `a` call's research waiting behind another. */
+  kind: 'answer' | 'research' | 'queued';
   /** The answer without its audio tags. */
   answer_text: string;
   tags: string[];

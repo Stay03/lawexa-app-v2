@@ -18,8 +18,13 @@ import type { IBlockedReason } from '@/types/message-pack';
 /** A `c` call's research marker, sent on the call as a user line; never shown (Backend, 21 November 2026). */
 export const RESEARCH_MARKER_PREFIX = '[[lawexa:research_ready:';
 
+/** An `a` call's research answer, passed into the call (Backend, 22 November 2026). */
+export const RESEARCH_RESULT_PREFIX = '[[LAWEXA RESULT';
+
+/** A line the page sent into the call, never the caller's words: kept out of the transcript. */
 export function isResearchMarker(text: string): boolean {
-  return text.trimStart().startsWith(RESEARCH_MARKER_PREFIX);
+  const start = text.trimStart();
+  return start.startsWith(RESEARCH_MARKER_PREFIX) || start.startsWith(RESEARCH_RESULT_PREFIX);
 }
 
 /**
@@ -61,18 +66,28 @@ export interface BrowserTurn {
   answerSoundAt: number | null;
 }
 
+/** An `a` call's research answer the page passed into the call, and when the voice began reading it. */
+export interface ResearchDelivery {
+  turnUuid: string;
+  sentAt: number;
+  spokenAt: number | null;
+}
+
 export interface CallLog {
   lines: TranscriptLine[];
   turns: BrowserTurn[];
   speaking: boolean;
+  deliveries: ResearchDelivery[];
 }
 
-export const EMPTY_CALL_LOG: CallLog = { lines: [], turns: [], speaking: false };
+export const EMPTY_CALL_LOG: CallLog = { lines: [], turns: [], speaking: false, deliveries: [] };
 
 export type CallEvent =
   | { kind: 'message'; message: VoiceCallMessage }
   | { kind: 'mode'; mode: VoiceCallMode }
-  | { kind: 'marker' };
+  | { kind: 'marker' }
+  /** An `a` call's research answer was passed into the call. */
+  | { kind: 'delivered'; turnUuid: string };
 
 function withLastTurn(log: CallLog, change: (turn: BrowserTurn) => BrowserTurn): BrowserTurn[] {
   const last = log.turns.at(-1);
@@ -84,14 +99,20 @@ export function applyCallEvent(log: CallLog, event: CallEvent, at: number): Call
   if (event.kind === 'marker') {
     return { ...log, turns: withLastTurn(log, (turn) => ({ ...turn, markerAt: at })) };
   }
+  if (event.kind === 'delivered') {
+    return { ...log, deliveries: [...log.deliveries, { turnUuid: event.turnUuid, sentAt: at, spokenAt: null }] };
+  }
   if (event.kind === 'mode') {
     if (event.mode === 'listening') return { ...log, speaking: false };
+    // The voice starts reading the oldest answer passed in and not yet read.
+    const waiting = log.deliveries.findIndex((delivery) => delivery.spokenAt === null);
+    const deliveries = waiting < 0 ? log.deliveries : log.deliveries.map((delivery, i) => (i === waiting ? { ...delivery, spokenAt: at } : delivery));
     const turns = withLastTurn(log, (turn) => {
       if (turn.firstSoundAt === null) return { ...turn, firstSoundAt: at };
       if (turn.markerAt !== null && turn.answerSoundAt === null) return { ...turn, answerSoundAt: at };
       return turn;
     });
-    return { ...log, speaking: true, turns };
+    return { ...log, speaking: true, turns, deliveries };
   }
   const { source } = event.message;
   if (source === 'user') {
@@ -151,6 +172,37 @@ export function delayRows(turns: BrowserTurn[], serverTurns: VoiceServerTurn[]):
       serverResearch: fromMs(server?.research_ms ?? null),
     };
   });
+}
+
+export interface ResearchRow {
+  number: number;
+  question: string;
+  /** Still waiting behind another research. */
+  queued: boolean;
+  /** The server's research time, in seconds. */
+  research: number | null;
+  /** Seconds from the page passing the answer in to the voice starting to read it. */
+  spokenAfter: number | null;
+}
+
+/**
+ * An `a` call's research table: one row per research the server ran, with its
+ * time, and how soon the voice read the answer once the page passed it in
+ * (the server cannot see that; Backend, 22 November 2026).
+ */
+export function researchRows(serverTurns: VoiceServerTurn[], deliveries: ResearchDelivery[]): ResearchRow[] {
+  return serverTurns
+    .filter((turn) => turn.kind === 'research' || turn.kind === 'queued')
+    .map((turn, index) => {
+      const delivery = deliveries.find((candidate) => candidate.turnUuid === turn.uuid);
+      return {
+        number: index + 1,
+        question: turn.user_text,
+        queued: turn.kind === 'queued',
+        research: fromMs(turn.research_ms),
+        spokenAfter: delivery ? seconds(delivery.sentAt, delivery.spokenAt) : null,
+      };
+    });
 }
 
 /** A call's length as m:ss. */

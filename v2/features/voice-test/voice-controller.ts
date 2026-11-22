@@ -1,7 +1,7 @@
 import { voiceTestApi } from '@/lib/api/voice-test';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
-import type { VoiceCallSaved, VoiceOption, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
+import type { VoiceCallSaved, VoiceOption, VoiceResearchReadyEvent, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
 import { ElevenLabsVoiceSession } from './elevenlabs-voice-session';
 import { onVoiceResearchReady } from './voice-events';
 import { applyCallEvent, EMPTY_CALL_LOG, exhaustedBlock, type CallEvent, type CallLog } from './voice-model';
@@ -53,7 +53,8 @@ export const DEFAULT_VOICES: VoiceOption[] = [
 
 const INITIAL: VoiceTestState = {
   phase: 'idle',
-  mode: 'c',
+  // Lawexa voice is the default (Stay, 22 November 2026); the other two stay for comparison.
+  mode: 'a',
   voiceId: DEFAULT_VOICES[0].id,
   voices: DEFAULT_VOICES,
   muted: false,
@@ -142,6 +143,12 @@ export class VoiceTestController {
     this.session = session;
     this.stopListening = onVoiceResearchReady((event) => {
       if (event.session_uuid !== this.state.sessionUuid || this.session !== session) return;
+      if (mode === 'a') {
+        // Lawexa voice: the answer waits for a quiet line, in arrival order.
+        this.waitingResults.push(event);
+        this.passResultIn();
+        return;
+      }
       session.sendUserMessage(event.marker);
       this.note({ kind: 'marker' });
     });
@@ -152,6 +159,7 @@ export class VoiceTestController {
           userId: started.user_id,
           customLlmExtraBody: started.custom_llm_extra_body,
           voiceId: started.voice_id || voiceId,
+          dynamicVariables: started.dynamic_variables,
         },
         {
           onStatus: (status) => {
@@ -162,7 +170,10 @@ export class VoiceTestController {
           onMode: (mode) => {
             if (this.session !== session) return;
             this.note({ kind: 'mode', mode });
-            if (mode === 'listening') void this.readServerTurns();
+            if (mode === 'listening') {
+              this.passResultIn();
+              void this.readServerTurns();
+            }
           },
           onMessage: (message) => {
             if (this.session === session) this.note({ kind: 'message', message });
@@ -223,7 +234,7 @@ export class VoiceTestController {
   /** The server's timings, `c` calls only (a `b` call is answered and timed by ElevenLabs). */
   private async readServerTurns() {
     const uuid = this.state.sessionUuid;
-    if (!uuid || this.state.mode !== 'c') return;
+    if (!uuid || this.state.mode === 'b') return;
     try {
       const answer = await voiceTestApi.turns(uuid);
       if (answer.data && uuid === this.state.sessionUuid) {
@@ -273,7 +284,25 @@ export class VoiceTestController {
     if (this.state.saving) this.set({ saving: false });
   }
 
+  /** An `a` call's research answers, oldest first, waiting for a quiet line. */
+  private waitingResults: VoiceResearchReadyEvent[] = [];
+
+  /**
+   * Passes the oldest waiting research answer into the call when neither
+   * side is speaking (Backend, 22 November 2026): the voice reads it, and the
+   * next waits until the line is quiet again.
+   */
+  private passResultIn() {
+    const session = this.session;
+    if (!session || this.state.phase !== 'live' || this.state.log.speaking) return;
+    const next = this.waitingResults.shift();
+    if (!next) return;
+    session.sendUserMessage(next.marker);
+    this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
+  }
+
   private release() {
+    this.waitingResults = [];
     this.session = null;
     this.stopListening?.();
     this.stopListening = null;

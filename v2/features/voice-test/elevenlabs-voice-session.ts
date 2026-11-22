@@ -20,6 +20,7 @@ export class ElevenLabsVoiceSession implements VoiceSession {
       userId: options.userId,
       customLlmExtraBody: options.customLlmExtraBody,
       overrides: { tts: { voiceId: options.voiceId } },
+      ...(options.dynamicVariables ? { dynamicVariables: options.dynamicVariables } : {}),
       onStatusChange: ({ status }) => {
         if (status === 'connected' || status === 'connecting' || status === 'disconnected') handlers.onStatus(status);
       },

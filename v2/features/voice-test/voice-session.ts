@@ -35,6 +35,8 @@ export interface VoiceCallStart {
   customLlmExtraBody: Record<string, string>;
   /** The voice, as an override on the agent's text-to-speech. */
   voiceId: string;
+  /** An `a` call's dynamic variables, passed to the agent as they are. */
+  dynamicVariables?: Record<string, string>;
 }
 
 export interface VoiceSession {

@@ -10,7 +10,7 @@ import type { VoiceTestMode } from '@/types/voice-test';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { OutOfMessagesNotice } from '@/v2/features/subscription/OutOfMessagesNotice';
 import { VoiceTestController, type VoiceTestState } from './voice-controller';
-import { callClock, delayCsv, delayRows, secondsLabel, type DelayRow } from './voice-model';
+import { callClock, delayCsv, delayRows, researchRows, secondsLabel, type DelayRow } from './voice-model';
 
 /**
  * `/labs/voice`: the staff live-voice test page (thread ac47b1df). Talk to
@@ -20,6 +20,7 @@ import { callClock, delayCsv, delayRows, secondsLabel, type DelayRow } from './v
  */
 
 const MODES: { mode: VoiceTestMode; label: string; detail: string }[] = [
+  { mode: 'a', label: 'Lawexa voice', detail: 'A quick voice talks with you while Lawexa researches in the background, then reads you Lawexa’s answer.' },
   { mode: 'c', label: 'Lawexa thinks', detail: 'Lawexa writes every answer. ElevenLabs only hears and speaks.' },
   { mode: 'b', label: 'ElevenLabs thinks', detail: 'ElevenLabs’ own model answers, using Lawexa’s case search.' },
 ];
@@ -242,7 +243,11 @@ function DelayTable({ state }: { state: VoiceTestState }) {
       </div>
       <p className="text-[13px] leading-relaxed text-muted-foreground">
         Timed in this browser, from the end of your question to Lawexa’s first sound.
-        {serverColumns ? ' The server columns show how much of that was Lawexa’s own thinking.' : ' ElevenLabs answers this kind of call, so there are no server columns.'}
+        {serverColumns
+          ? ' The server columns show how much of that was Lawexa’s own thinking.'
+          : state.mode === 'a'
+            ? ' The quick voice answers first; Lawexa’s research is timed in its own table below.'
+            : ' ElevenLabs answers this kind of call, so there are no server columns.'}
       </p>
       {rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
@@ -285,7 +290,51 @@ function DelayTable({ state }: { state: VoiceTestState }) {
           </table>
         </div>
       )}
+      {state.mode === 'a' ? <ResearchTable state={state} /> : null}
     </section>
+  );
+}
+
+/**
+ * A Lawexa voice call's research (Backend, 22 November 2026): one row per
+ * research Lawexa ran in the background, its time on the server, and how soon
+ * the voice read the answer once the page passed it in.
+ */
+function ResearchTable({ state }: { state: VoiceTestState }) {
+  const rows = researchRows(state.serverTurns, state.log.deliveries);
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className="text-[14px] font-semibold text-foreground">Lawexa’s research</h3>
+      {rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+          Each question Lawexa researches adds a row.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-border/70">
+          <table className="w-full min-w-[480px] text-left text-[13px]">
+            <thead className="bg-muted/50 text-xs text-muted-foreground">
+              <tr>
+                <th scope="col" className="px-3 py-2 font-medium">Question</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Research</th>
+                <th scope="col" className="px-3 py-2 text-right font-medium">Read out after</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {rows.map((row) => (
+                <tr key={row.number}>
+                  <td className="max-w-[260px] px-3 py-2.5">
+                    <span className="line-clamp-2 text-foreground">{row.question}</span>
+                    {row.queued ? <span className="mt-0.5 block text-xs text-muted-foreground">Waiting behind another question</span> : null}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground">{secondsLabel(row.research)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-foreground">{secondsLabel(row.spokenAfter)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
 
