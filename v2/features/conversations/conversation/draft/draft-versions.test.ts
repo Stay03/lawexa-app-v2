@@ -226,6 +226,13 @@ test('a renamed draft in the SAME answer, or under version 1, splits; once split
   assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1' }], [{ title: 'Notice', id: 'k1' }]]), [['id:k1'], ['id:k1|title:notice']]);
 });
 
+test('after the id splits, a later version of the FIRST document keeps id:<id> (Techlead’s review)', () => {
+  assert.deepEqual(
+    chatDraftKeys([[{ title: 'A', id: 'x', version: 1 }], [{ title: 'B', id: 'x', version: 1 }], [{ title: 'A', id: 'x', version: 2 }], [{ title: 'B', id: 'x', version: 2 }]]),
+    [['id:x'], ['id:x|title:b'], ['id:x'], ['id:x|title:b']],
+  );
+});
+
 test('the guard is narrow: a same-title repeat stays grouped, distinct ids and drafts without an id are untouched', () => {
   assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1', version: 1 }, { title: 'LEASE', id: 'k1', version: 1 }]]), [['id:k1', 'id:k1']]);
   assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1' }, { title: 'Notice', id: 'k2' }]]), [['id:k1', 'id:k2']]);

@@ -77,8 +77,9 @@ export interface KeyedDraft {
  * versions of one draft. Walking the drafts in chat order, per id, with the
  * titles of its group and whether it has split:
  * 1. an id not seen yet: `id:<id>`, and its title joins the id's titles;
- * 2. an id already split: `id:<id>|title:<title>`;
- * 3. a title already among the id's titles: `id:<id>` (a real version);
+ * 2. a title already among the id's titles: `id:<id>` (a real version of
+ *    the first document, even after the id split);
+ * 3. an id already split: `id:<id>|title:<title>`;
  * 4. a new title with version missing or 1, or with the id used earlier in the
  *    SAME answer (one answer never holds two versions of a document): the id
  *    splits, `id:<id>|title:<title>`;
@@ -104,8 +105,9 @@ export function chatDraftKeys(answers: readonly (readonly KeyedDraft[])[]): stri
         titles.set(id, new Set([title]));
         return `id:${id}`;
       }
-      if (split.has(id)) return own;
+      // The first document's own versions keep its key, even after the id split.
       if (known.has(title)) return `id:${id}`;
+      if (split.has(id)) return own;
       if ((draft.version ?? 0) <= 1 || earlierHere) {
         split.add(id);
         return own;
