@@ -170,9 +170,12 @@ export class VoiceTestController {
           onMode: (mode) => {
             if (this.session !== session) return;
             this.note({ kind: 'mode', mode });
-            // The voice started, then finished, reading the answer in flight.
-            if (this.inFlight && mode === 'speaking' && this.inFlight.startedAt === null) this.inFlight = { ...this.inFlight, startedAt: performance.now() };
-            if (this.inFlight?.startedAt != null && mode === 'listening') this.inFlight = null;
+            // The answer in flight: when the voice started it, and since when it has been quiet.
+            // A pause or an interruption leaves it in flight (voice-model.ts handOffFinished).
+            if (this.inFlight && mode === 'speaking') {
+              this.inFlight = { ...this.inFlight, startedAt: this.inFlight.startedAt ?? performance.now(), quietSince: null };
+            }
+            if (this.inFlight?.startedAt != null && mode === 'listening') this.inFlight = { ...this.inFlight, quietSince: performance.now() };
             if (mode === 'listening') {
               this.passResultIn();
               void this.readServerTurns();
@@ -181,6 +184,10 @@ export class VoiceTestController {
           onMessage: (message) => {
             if (this.session !== session) return;
             if (message.source === 'user') this.callerVoiceAt = performance.now();
+            // The voice's reply to the answer in flight: its length sizes how long it takes to say.
+            if (message.source === 'ai' && this.inFlight && this.inFlight.answerChars === null) {
+              this.inFlight = { ...this.inFlight, answerChars: message.text.length };
+            }
             this.note({ kind: 'message', message });
           },
           onVad: (score) => {
@@ -320,7 +327,7 @@ export class VoiceTestController {
     const next = this.waitingResults.shift();
     if (!next) return;
     session.sendUserMessage(next.marker);
-    this.inFlight = { turnUuid: next.turn_uuid, sentAt: now, startedAt: null };
+    this.inFlight = { turnUuid: next.turn_uuid, sentAt: now, startedAt: null, quietSince: null, answerChars: null };
     this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
   }
 

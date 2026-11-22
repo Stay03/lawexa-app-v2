@@ -10,6 +10,8 @@ import {
   EMPTY_CALL_LOG,
   exhaustedBlock,
   isResearchMarker,
+  expectedSpokenMs,
+  handOffFinished,
   mayPassResultIn,
   researchRows,
   secondsLabel,
@@ -142,7 +144,7 @@ test('the voice reading a passed-in answer times it, oldest first; research rows
   ]);
 });
 
-test('a research answer goes in only on a quiet line: not while the voice speaks or the caller talks, and one at a time', () => {
+test('a research answer goes in only on a quiet line: not while the voice speaks or the caller talks', () => {
   const base = { now: 10_000, live: true, speaking: false, callerVoiceAt: null, inFlight: null };
   assert.equal(mayPassResultIn(base), true);
   assert.equal(mayPassResultIn({ ...base, live: false }), false);
@@ -150,10 +152,36 @@ test('a research answer goes in only on a quiet line: not while the voice speaks
   // The caller talked 0.5 s ago: wait; 1 s ago: quiet enough.
   assert.equal(mayPassResultIn({ ...base, callerVoiceAt: 9_500 }), false);
   assert.equal(mayPassResultIn({ ...base, callerVoiceAt: 9_000 }), true);
-  // The answer before is passed in but not started: wait, up to 8 s, then go on.
-  assert.equal(mayPassResultIn({ ...base, inFlight: { turnUuid: 't1', sentAt: 9_000, startedAt: null } }), false);
-  assert.equal(mayPassResultIn({ ...base, now: 17_000, inFlight: { turnUuid: 't1', sentAt: 9_000, startedAt: null } }), true);
-  // Started and not finished: wait, up to 2 minutes.
-  assert.equal(mayPassResultIn({ ...base, inFlight: { turnUuid: 't1', sentAt: 5_000, startedAt: 6_000 } }), false);
-  assert.equal(mayPassResultIn({ ...base, now: 126_000, inFlight: { turnUuid: 't1', sentAt: 5_000, startedAt: 6_000 } }), true);
+  // Passed in but not started: wait, up to 8 s, then go on.
+  const sent = { turnUuid: 't1', sentAt: 9_000, startedAt: null, quietSince: null, answerChars: null };
+  assert.equal(mayPassResultIn({ ...base, inFlight: sent }), false);
+  assert.equal(mayPassResultIn({ ...base, now: 17_000, inFlight: sent }), true);
+});
+
+// Stay's call, 22 November 2026: answer 1 (about 6,150 characters, several minutes spoken) started at
+// t=652 s; a sentence pause at t=750 s read as 'listening' and answer 2 went in, cutting answer 1.
+test('a pause in a long answer does not count as finished, even after 3 s of quiet', () => {
+  const started = 652_000;
+  const answer = { turnUuid: 't1', sentAt: 651_000, startedAt: started, quietSince: 749_000, answerChars: 6_150 };
+  assert.equal(expectedSpokenMs(6_150) > 400_000, true);
+  assert.equal(handOffFinished(answer, 753_000), false);
+  assert.equal(mayPassResultIn({ now: 753_000, live: true, speaking: false, callerVoiceAt: null, inFlight: answer }), false);
+});
+
+test('an interruption leaves the answer in flight: quiet for a moment is not finished', () => {
+  const answer = { turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 20_000, answerChars: 600 };
+  // 600 characters take about 43 s; at 21 s the voice was cut 1 s ago.
+  assert.equal(handOffFinished(answer, 21_000), false);
+});
+
+test('a real finish: the expected length has passed and the voice has been quiet for 3 s', () => {
+  const answer = { turnUuid: 't1', sentAt: 0, startedAt: 1_000, quietSince: 45_000, answerChars: 600 };
+  assert.equal(handOffFinished(answer, 47_000), false);
+  assert.equal(handOffFinished(answer, 48_000), true);
+  // Quiet for 3 s but not yet the expected length: not finished.
+  assert.equal(handOffFinished({ ...answer, quietSince: 20_000 }, 30_000), false);
+  // The text never arrived: 3 s of quiet is enough.
+  assert.equal(handOffFinished({ ...answer, answerChars: null, quietSince: 10_000 }, 13_000), true);
+  // Never quiet: the safety timeout lets the next in 2 minutes after the expected length.
+  assert.equal(handOffFinished({ ...answer, quietSince: null }, 1_000 + 43_000 + 120_000), true);
 });

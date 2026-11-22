@@ -176,16 +176,28 @@ export function delayRows(turns: BrowserTurn[], serverTurns: VoiceServerTurn[]):
 
 /**
  * When the page may pass an `a` call's next research answer in (Techlead's
- * review, 22 November 2026): never while the voice speaks or the caller is
- * talking, and one at a time: the next waits until the voice has started
- * and finished reading the one before. Timeouts keep an answer from waiting
- * forever if the voice never starts or never stops.
+ * reviews, 22 November 2026). Never while the voice speaks or the caller is
+ * talking, and one at a time: the next waits until the voice has finished the
+ * one before.
+ *
+ * "Finished" cannot be the first 'listening'. On a WebRTC call the client's
+ * speaking/listening comes from the audio's voice activity (LiveKit's active
+ * speakers), so every pause between sentences reads as 'listening'; in Stay's
+ * call a pause 98 s into a several-minute answer let the next one in and cut
+ * it. So an answer counts as finished only when 'listening' has held for
+ * HELD_LISTENING_MS AND at least its expected spoken length has passed since
+ * it started (its text at SPOKEN_CHARS_PER_SECOND). An interruption leaves it
+ * in flight the same way. Timeouts keep an answer from waiting forever.
  */
 export const CALLER_QUIET_MS = 900;
 /** The client's voice activity score at or above which the caller counts as talking. */
 export const CALLER_SPEECH_SCORE = 0.5;
+export const HELD_LISTENING_MS = 3000;
+/** A steady speaking pace, so a long answer is not counted done at a pause. */
+export const SPOKEN_CHARS_PER_SECOND = 14;
 export const START_TIMEOUT_MS = 8000;
-export const READ_TIMEOUT_MS = 120000;
+/** After the expected length, how long an answer may still hold the line. */
+export const AFTER_EXPECTED_MS = 120000;
 
 /** The answer passed in and not yet read to the end. */
 export interface HandOff {
@@ -193,14 +205,31 @@ export interface HandOff {
   sentAt: number;
   /** The voice started reading it; `null` until then. */
   startedAt: number | null;
+  /** The voice went quiet at this time and has stayed quiet; `null` while it speaks. */
+  quietSince: number | null;
+  /** The length of the voice's reply, from its text; `null` until the text arrives. */
+  answerChars: number | null;
+}
+
+/** How long a reply of `chars` characters takes to say. */
+export function expectedSpokenMs(chars: number | null): number {
+  return chars === null ? 0 : (chars / SPOKEN_CHARS_PER_SECOND) * 1000;
+}
+
+/** The answer in flight has been read to the end (or has waited long enough). */
+export function handOffFinished(inFlight: HandOff, now: number): boolean {
+  if (inFlight.startedAt === null) return now - inFlight.sentAt >= START_TIMEOUT_MS;
+  const expected = expectedSpokenMs(inFlight.answerChars);
+  const spoken = now - inFlight.startedAt;
+  if (spoken >= expected + AFTER_EXPECTED_MS) return true;
+  return inFlight.quietSince !== null && now - inFlight.quietSince >= HELD_LISTENING_MS && spoken >= expected;
 }
 
 export function mayPassResultIn(state: { now: number; live: boolean; speaking: boolean; callerVoiceAt: number | null; inFlight: HandOff | null }): boolean {
   const { now, live, speaking, callerVoiceAt, inFlight } = state;
   if (!live || speaking) return false;
   if (callerVoiceAt !== null && now - callerVoiceAt < CALLER_QUIET_MS) return false;
-  if (!inFlight) return true;
-  return inFlight.startedAt === null ? now - inFlight.sentAt >= START_TIMEOUT_MS : now - inFlight.startedAt >= READ_TIMEOUT_MS;
+  return !inFlight || handOffFinished(inFlight, now);
 }
 
 export interface ResearchRow {
