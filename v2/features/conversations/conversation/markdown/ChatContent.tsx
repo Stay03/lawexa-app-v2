@@ -18,6 +18,7 @@ import { GeneratingIndicator } from '../cards/GeneratingIndicator';
 import { DraftCard } from '../draft/DraftCard';
 import { DraftEditCard } from '../draft/DraftEditCard';
 import { mayHoldDraft, splitDrafts } from '../draft/draft-blocks';
+import { answerDraftKeys } from '../draft/draft-versions';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 
 /**
@@ -97,12 +98,14 @@ export const ChatContent = memo(function ChatContent({
     const offset = messageId && panel ? panel.draftOffset(messageId) : 0;
     // Each draft part's place among this answer's drafts, counted up front.
     const ordinals = parts.map((_, index) => offset + parts.slice(0, index).filter((part) => part.kind === 'draft').length);
+    // Each draft's group, judged within this answer (draft-versions.ts answerDraftKeys).
+    const groupKeys = answerDraftKeys(parts.flatMap((part) => (part.kind === 'draft' ? [part.draft] : [])));
     const body = parts.flatMap<ReactNode>((part, index) => {
       if (part.kind === 'draft') {
         const ordinal = ordinals[index];
         return [
           <div key={`draft-${index}`} className="not-prose">
-            <DraftCard draft={part.draft} ordinal={ordinal} live={revealing} />
+            <DraftCard draft={part.draft} ordinal={ordinal} groupKey={groupKeys[ordinal - offset]} live={revealing} />
           </div>,
         ];
       }

@@ -54,10 +54,36 @@ export interface DraftVersion {
   superseded: boolean;
 }
 
+const normalTitle = (title: string) => title.trim().replace(/\s+/g, ' ').toLowerCase();
+
 /** Which drafts are one draft: the same fixed id, else the same title without case or extra spaces. */
 export function draftGroupKey(draft: { title: string; id?: string | null }): string {
   if (draft.id) return `id:${draft.id}`;
-  return `title:${draft.title.trim().replace(/\s+/g, ' ').toLowerCase()}`;
+  return `title:${normalTitle(draft.title)}`;
+}
+
+/**
+ * The group keys of one answer's drafts, in order (Arthur, 22 November 2026:
+ * four documents written in one answer were filed as versions 2 to 5 of one
+ * draft, because Lawexa gave them all one id). One answer never holds two
+ * versions of the same document, so a draft whose id an EARLIER draft of the
+ * same answer already used, under a different title, is a separate draft:
+ * `id:<id>|title:<title>`. The first keeps `id:<id>` and still joins the
+ * versions before it; a repeat under the same title stays grouped, as told.
+ * Backend's draft documents use the same keys.
+ */
+export function answerDraftKeys(drafts: readonly { title: string; id?: string | null }[]): string[] {
+  const firstTitle = new Map<string, string>();
+  return drafts.map((draft) => {
+    if (!draft.id) return draftGroupKey(draft);
+    const title = normalTitle(draft.title);
+    const earlier = firstTitle.get(draft.id);
+    if (earlier === undefined) {
+      firstTitle.set(draft.id, title);
+      return draftGroupKey(draft);
+    }
+    return earlier === title ? draftGroupKey(draft) : `id:${draft.id}|title:${title}`;
+  });
 }
 
 /**
@@ -71,10 +97,12 @@ export function draftVersionIndex(messages: readonly DraftSourceMessage[]): Draf
   let ordinal = 0;
   for (const message of messages) {
     if (message.role !== 'assistant') continue;
-    for (const draft of draftsIn(message.content)) {
-      entries.push({ ordinal, key: draftGroupKey(draft), title: draft.title, finished: draft.complete });
+    const drafts = draftsIn(message.content);
+    const keys = answerDraftKeys(drafts);
+    drafts.forEach((draft, i) => {
+      entries.push({ ordinal, key: keys[i], title: draft.title, finished: draft.complete });
       ordinal += 1;
-    }
+    });
   }
   return entries;
 }

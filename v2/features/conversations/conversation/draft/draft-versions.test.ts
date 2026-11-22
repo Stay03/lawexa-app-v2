@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import { draftOffsets } from './draft-ordinals';
 import {
+  answerDraftKeys,
   draftGroupKey,
   draftVersion,
   draftVersionIndex,
@@ -136,7 +137,7 @@ test('a draft with one version reads as today; with more, "Version N" and its ow
 
 test('the card labels its version and greys an older one', () => {
   const card = code(...DRAFT_DIR, 'DraftCard.tsx');
-  assert.match(card, /panel\?\.draftVersion\(ordinal, draftGroupKey\(draft\)\)/);
+  assert.match(card, /panel\?\.draftVersion\(ordinal, key\)/);
   // Greyed once a newer FINISHED version follows; a cut-off one does not grey it.
   assert.match(card, /const older = version !== null && version\.superseded;/);
   assert.match(card, /older \? 'bg-muted text-muted-foreground' : 'bg-primary\/15 text-primary'/);
@@ -174,4 +175,53 @@ test('both chat frames hand the panel the version index', () => {
   // draft code: the context takes the lookup, and imports only its type.
   const context = code('v2', 'features', 'conversations', 'conversation', 'side-panel', 'SidePanelContext.tsx');
   assert.match(context, /import type \{ DraftVersion \} from '\.\.\/draft\/draft-versions';/);
+});
+
+// ── Separate drafts in one answer (Arthur, 22 November 2026) ─────────────
+
+const tagged = (title: string, id: string, version: number, body = 'TEST DATA body.') =>
+  `<draft title="${title}" id="${id}" version="${version}">
+${body}
+</draft>`;
+
+test('four documents in one answer that share one id are four drafts, not versions 2 to 5', () => {
+  const messages = [
+    { id: 'u1', role: 'user', content: 'TEST DATA. Draft the scoring pack.' },
+    { id: 'a1', role: 'assistant', content: tagged('README', 'pack01', 1) },
+    { id: 'u2', role: 'user', content: 'TEST DATA. Now the references and the scoring sheet.' },
+    {
+      id: 'a2',
+      role: 'assistant',
+      content: [tagged('README', 'pack01', 2), tagged('Reference R5', 'pack01', 3), tagged('Reference R6', 'pack01', 4), tagged('Scoring Sheet', 'pack01', 5)].join('\n'),
+    },
+  ];
+  const index = draftVersionIndex(messages);
+  assert.deepEqual(
+    index.map((entry) => entry.key),
+    ['id:pack01', 'id:pack01', 'id:pack01|title:reference r5', 'id:pack01|title:reference r6', 'id:pack01|title:scoring sheet'],
+  );
+  // The README rewritten in the second answer is still version 2 of the first one.
+  assert.equal(draftVersion(index, 1, 'id:pack01').version, 2);
+  // Each new document stands alone: no "Version" label.
+  for (const ordinal of [2, 3, 4]) assert.equal(draftVersion(index, ordinal, index[ordinal].key).count, 1);
+});
+
+test('the guard is narrow: a same-id, same-title repeat in one answer stays grouped, and drafts without an id group by title as before', () => {
+  assert.deepEqual(answerDraftKeys([{ title: 'Lease', id: 'k1' }, { title: '  lease ', id: 'k1' }]), ['id:k1', 'id:k1']);
+  assert.deepEqual(answerDraftKeys([{ title: 'Lease' }, { title: 'Notice' }]), ['title:lease', 'title:notice']);
+  assert.deepEqual(answerDraftKeys([{ title: 'Lease', id: 'k1' }, { title: 'Notice', id: 'k2' }]), ['id:k1', 'id:k2']);
+});
+
+test('a version whose title changed in a LATER answer still joins its draft by id', () => {
+  const index = draftVersionIndex([
+    { id: 'a1', role: 'assistant', content: tagged('Tenancy Agreement', 'k3f9q2', 1) },
+    { id: 'a2', role: 'assistant', content: tagged('Residential Tenancy Agreement', 'k3f9q2', 2) },
+  ]);
+  assert.deepEqual(index.map((entry) => entry.key), ['id:k3f9q2', 'id:k3f9q2']);
+});
+
+test('the card, the panel and the index judge a draft’s group the same way', () => {
+  assert.match(code('v2', 'features', 'conversations', 'conversation', 'markdown', 'ChatContent.tsx'), /const groupKeys = answerDraftKeys\(/);
+  assert.match(code(...DRAFT_DIR, 'DraftCard.tsx'), /const key = groupKey \?\? draftGroupKey\(draft\);/);
+  assert.match(code(...DRAFT_DIR, 'DraftPanel.tsx'), /const groupKey = draftKeyAt\(messages, ordinal\) \?\? draftGroupKey\(draft\);/);
 });

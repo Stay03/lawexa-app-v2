@@ -17,7 +17,7 @@ import { locateDraft } from './draft-ordinals';
 import { DRAFT_DOCUMENT, DraftBar, DraftEditor } from './DraftEditor';
 import { DraftChangesView } from './DraftChangesView';
 import { DraftDocument } from './DraftCard';
-import { draftGroupKey, draftVersionTitle } from './draft-versions';
+import { answerDraftKeys, draftGroupKey, draftVersionTitle } from './draft-versions';
 import { newestFinished } from './draft-note-state';
 import { DraftVersionSwitch } from './DraftVersionSwitch';
 
@@ -29,6 +29,14 @@ import { DraftVersionSwitch } from './DraftVersionSwitch';
 let rememberedShowChanges = false;
 
 /** A saved draft by its place in the chat; `null` for one not (yet) saved. */
+/** Draft `ordinal`'s group as its answer judges it (answerDraftKeys); `null` when not in a saved answer. */
+function draftKeyAt(messages: readonly EngineMessage[], ordinal: number): string | null {
+  const place = locateDraft(messages, ordinal);
+  if (!('messageId' in place)) return null;
+  const message = messages.find((candidate) => candidate.id === place.messageId);
+  return message ? (answerDraftKeys(draftsIn(message.content))[place.index] ?? null) : null;
+}
+
 function draftAt(messages: readonly EngineMessage[], ordinal: number): DraftBlock | null {
   const place = locateDraft(messages, ordinal);
   if (!('messageId' in place)) return null;
@@ -122,7 +130,8 @@ export function DraftPanel({
     );
   }
 
-  const version = panel?.draftVersion(ordinal, draftGroupKey(draft)) ?? null;
+  const groupKey = draftKeyAt(messages, ordinal) ?? draftGroupKey(draft);
+  const version = panel?.draftVersion(ordinal, groupKey) ?? null;
   // SHOW CHANGES (Stay, 27 October 2026): version 2 and later, against the
   // version before, both as Lawexa wrote them and both finished.
   const previous =
@@ -179,7 +188,7 @@ export function DraftPanel({
               />
             ) : null
           }
-          groupKey={draftGroupKey(draft)}
+          groupKey={groupKey}
           latestOrdinal={newestFinished(version?.ordinals ?? [ordinal], (at) => draftAt(messages, at)?.complete === true, ordinal)}
           answerDone={answerDone}
         />
