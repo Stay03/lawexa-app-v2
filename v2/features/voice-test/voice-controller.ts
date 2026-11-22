@@ -35,6 +35,8 @@ export interface VoiceTestState {
   conversationUuid: string | null;
   /** Waiting for a `b` call's chat to be saved. */
   saving: boolean;
+  /** Three minutes passed without the chat's id: it is still saved (Backend's job and webhook keep going), just later. */
+  savingLate: boolean;
   /** Some questions in the call went unpaid: the notice shows after the call. */
   outOfMessages: boolean;
 }
@@ -63,6 +65,7 @@ const INITIAL: VoiceTestState = {
   blocked: null,
   conversationUuid: null,
   saving: false,
+  savingLate: false,
   outOfMessages: false,
 };
 
@@ -121,7 +124,7 @@ export class VoiceTestController {
     if (this.busy()) return;
     const { mode, voiceId } = this.state;
     this.stopSavePoll();
-    this.set({ phase: 'starting', problem: null, blocked: null, conversationUuid: null, saving: false, outOfMessages: false, log: EMPTY_CALL_LOG, serverTurns: [], elapsed: 0, muted: false, sessionUuid: null });
+    this.set({ phase: 'starting', problem: null, blocked: null, conversationUuid: null, saving: false, savingLate: false, outOfMessages: false, log: EMPTY_CALL_LOG, serverTurns: [], elapsed: 0, muted: false, sessionUuid: null });
     let started: VoiceTestSession;
     try {
       const answer = await voiceTestApi.start(mode, voiceId);
@@ -257,7 +260,10 @@ export class VoiceTestController {
           if (answer.data.conversation_uuid) this.stopSavePoll();
         })
         .catch(() => {});
-      if (tries >= SAVE_POLL_TRIES) this.stopSavePoll();
+      if (tries >= SAVE_POLL_TRIES) {
+        this.stopSavePoll();
+        if (!this.state.conversationUuid) this.set({ savingLate: true });
+      }
     }, SAVE_POLL_MS);
   }
 

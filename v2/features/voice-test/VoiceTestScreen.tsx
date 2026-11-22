@@ -85,6 +85,10 @@ function SavedCall({ state }: { state: VoiceTestState }) {
           <Loader2 aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
           Saving this call as a chat…
         </p>
+      ) : state.savingLate ? (
+        <p role="status" className="text-[13px] text-muted-foreground">
+          The chat will appear in your chats shortly.
+        </p>
       ) : null}
       {state.outOfMessages ? <OutOfMessagesNotice tight /> : null}
     </div>
