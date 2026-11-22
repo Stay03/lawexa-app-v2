@@ -42,7 +42,7 @@ import { clearRouteComposer, publishRouteComposer, stageRouteReply } from './rou
 import { draftOffsets } from './draft/draft-ordinals';
 import { applyDraftEditLine } from './draft/draft-edit-line';
 import type { DraftEditLineFields } from '@/v2/features/notes/types';
-import { draftGroupTitle, draftVersion, draftVersionIndex } from './draft/draft-versions';
+import { draftGroupTitle, draftKeysByMessage, draftKeysFor, draftVersion, draftVersionIndex, type KeyedDraft } from './draft/draft-versions';
 import { SidePanelProvider, SidePanelValueProvider } from './side-panel/SidePanelContext';
 import { useSidePanelHost } from './side-panel/side-panel-host';
 import { SidePanelSlot } from './side-panel/SidePanelSlot';
@@ -200,9 +200,16 @@ export function ConversationScreen({
   // does not change `messages`, so this does not run per word.
   const offsets = useMemo(() => draftOffsets(messages), [messages]);
   // The same drafts by group, so a card reads "Version 2" (draft-versions.ts).
-  const { draftVersions, draftTitles } = useMemo(() => {
+  const { draftVersions, draftTitles, draftKeys } = useMemo(() => {
     const index = draftVersionIndex(messages);
+    const savedKeys = draftKeysByMessage(messages);
     return {
+      // One answer's draft groups in the chat's order: a saved answer's from the
+      // transcript, one still arriving continuing after them (draft-versions.ts).
+      draftKeys: (messageId: string | null, drafts: readonly KeyedDraft[]) => {
+        const saved = messageId ? savedKeys.get(messageId) : undefined;
+        return saved && saved.length === drafts.length ? saved : draftKeysFor(messages, messageId, drafts);
+      },
       draftVersions: (ordinal: number, key: string) => draftVersion(index, ordinal, key),
       // A draft's newest title, so an edit's card names the draft it changes.
       draftTitles: (key: string) => draftGroupTitle(index, key),
@@ -590,6 +597,7 @@ export function ConversationScreen({
                   offsets={offsets}
                   versions={draftVersions}
                   titles={draftTitles}
+                  keys={draftKeys}
                   space={controller.space}
                   frame="card"
                 >
@@ -602,7 +610,7 @@ export function ConversationScreen({
                 transcript
               )
             ) : (
-              <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} space={controller.space}>
+              <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} keys={draftKeys} space={controller.space}>
                 <div className="flex h-full min-h-0">
                   {transcript}
                   <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import { draftOffsets } from './draft-ordinals';
 import {
+  chatDraftKeys,
   draftGroupKey,
   draftVersion,
   draftVersionIndex,
@@ -136,7 +137,7 @@ test('a draft with one version reads as today; with more, "Version N" and its ow
 
 test('the card labels its version and greys an older one', () => {
   const card = code(...DRAFT_DIR, 'DraftCard.tsx');
-  assert.match(card, /panel\?\.draftVersion\(ordinal, draftGroupKey\(draft\)\)/);
+  assert.match(card, /panel\?\.draftVersion\(ordinal, key\)/);
   // Greyed once a newer FINISHED version follows; a cut-off one does not grey it.
   assert.match(card, /const older = version !== null && version\.superseded;/);
   assert.match(card, /older \? 'bg-muted text-muted-foreground' : 'bg-primary\/15 text-primary'/);
@@ -165,13 +166,96 @@ test('both chat frames hand the panel the version index', () => {
   const screen = code('v2', 'features', 'conversations', 'conversation', 'ConversationScreen.tsx');
   assert.match(
     screen,
-    /const \{ draftVersions, draftTitles \} = useMemo\(\(\) => \{\s*const index = draftVersionIndex\(messages\);\s*return \{\s*draftVersions: \(ordinal: number, key: string\) => draftVersion\(index, ordinal, key\),[\s\S]*?draftTitles: \(key: string\) => draftGroupTitle\(index, key\),\s*\};\s*\}, \[messages\]\);/,
+    /const \{ draftVersions, draftTitles, draftKeys \} = useMemo\(\(\) => \{\s*const index = draftVersionIndex\(messages\);\s*const savedKeys = draftKeysByMessage\(messages\);\s*return \{[\s\S]*?draftVersions: \(ordinal: number, key: string\) => draftVersion\(index, ordinal, key\),[\s\S]*?draftTitles: \(key: string\) => draftGroupTitle\(index, key\),\s*\};\s*\}, \[messages\]\);/,
   );
   assert.equal(screen.match(/versions=\{draftVersions\}/g)?.length, 2);
   // And the titles, so an edit's card names the draft it changes (draft-edits.test.ts).
   assert.equal(screen.match(/titles=\{draftTitles\}/g)?.length, 2);
+  // And the draft groups in the chat's order (one id given to many documents, 22 November 2026).
+  assert.equal(screen.match(/keys=\{draftKeys\}/g)?.length, 2);
   // The case page loads the side panel's context before its chat opens, and no
   // draft code: the context takes the lookup, and imports only its type.
   const context = code('v2', 'features', 'conversations', 'conversation', 'side-panel', 'SidePanelContext.tsx');
-  assert.match(context, /import type \{ DraftVersion \} from '\.\.\/draft\/draft-versions';/);
+  assert.match(context, /import type \{ DraftVersion, KeyedDraft \} from '\.\.\/draft\/draft-versions';/);
+});
+
+// ── One id given to many documents (Arthur, 22 November 2026) ──────────
+
+const tagged = (title: string, id: string, version: number, body = 'TEST DATA body.') =>
+  `<draft title="${title}" id="${id}" version="${version}">\n${body}\n</draft>`;
+
+test('Arthur’s chat: documents across answers that share one id are separate drafts', () => {
+  // TEST DATA shaped like chat 22273: every draft carried one id.
+  const messages = [
+    { id: 'a1', role: 'assistant', content: [tagged('Reference Document 1', 'vh7k2m', 1), tagged('Reference Document 2', 'vh7k2m', 1)].join('\n') },
+    { id: 'a2', role: 'assistant', content: tagged('Criteria (Frozen)', 'vh7k2m', 1) },
+    {
+      id: 'a3',
+      role: 'assistant',
+      content: [tagged('00 — README and Folder Manifest', 'vh7k2m', 1), tagged('Reference R5', 'vh7k2m', 1), tagged('Reference R6', 'vh7k2m', 1), tagged('Scoring Sheet', 'vh7k2m', 1)].join('\n'),
+    },
+  ];
+  const index = draftVersionIndex(messages);
+  assert.deepEqual(index.map((entry) => entry.key), [
+    'id:vh7k2m',
+    'id:vh7k2m|title:reference document 2',
+    'id:vh7k2m|title:criteria (frozen)',
+    'id:vh7k2m|title:00 — readme and folder manifest',
+    'id:vh7k2m|title:reference r5',
+    'id:vh7k2m|title:reference r6',
+    'id:vh7k2m|title:scoring sheet',
+  ]);
+  // Seven drafts, none of them "Version 2".
+  for (const entry of index) assert.equal(draftVersion(index, entry.ordinal, entry.key).count, 1);
+});
+
+test('real versions stay grouped: the same title again, and a renamed version 2 in a later answer', () => {
+  assert.deepEqual(
+    chatDraftKeys([[{ title: 'Tenancy Agreement', id: 'k3', version: 1 }], [{ title: '  tenancy   agreement', id: 'k3', version: 2 }], [{ title: 'Residential Tenancy Agreement', id: 'k3', version: 3 }]]),
+    [['id:k3'], ['id:k3'], ['id:k3']],
+  );
+});
+
+test('a renamed draft in the SAME answer, or under version 1, splits; once split, the id stays split', () => {
+  assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1', version: 1 }, { title: 'Notice', id: 'k1', version: 2 }]]), [['id:k1', 'id:k1|title:notice']]);
+  assert.deepEqual(
+    chatDraftKeys([[{ title: 'Lease', id: 'k1', version: 1 }], [{ title: 'Notice', id: 'k1', version: 1 }], [{ title: 'Lease v2', id: 'k1', version: 2 }]]),
+    [['id:k1'], ['id:k1|title:notice'], ['id:k1|title:lease v2']],
+  );
+  // A version number missing counts as 1.
+  assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1' }], [{ title: 'Notice', id: 'k1' }]]), [['id:k1'], ['id:k1|title:notice']]);
+});
+
+test('after the id splits, a later version of the FIRST document keeps id:<id> (Techlead’s review)', () => {
+  assert.deepEqual(
+    chatDraftKeys([[{ title: 'A', id: 'x', version: 1 }], [{ title: 'B', id: 'x', version: 1 }], [{ title: 'A', id: 'x', version: 2 }], [{ title: 'B', id: 'x', version: 2 }]]),
+    [['id:x'], ['id:x|title:b'], ['id:x'], ['id:x|title:b']],
+  );
+});
+
+test('the same key strings as Backend’s DraftGroupKeys (af959e18), case by case', () => {
+  assert.deepEqual(
+    chatDraftKeys([
+      [{ title: 'A', id: 'x', version: 1 }],
+      [{ title: 'B', id: 'x', version: 1 }],
+      [{ title: 'A', id: 'x', version: 2 }],
+      [{ title: 'B', id: 'x', version: 2 }],
+      [{ title: 'C', id: 'x', version: 2 }],
+      [{ title: 'Lease', id: 'k1', version: 1 }, { title: 'LEASE', id: 'k1', version: 1 }],
+      [{ title: 'Lease' }],
+    ]),
+    [['id:x'], ['id:x|title:b'], ['id:x'], ['id:x|title:b'], ['id:x|title:c'], ['id:k1', 'id:k1'], ['title:lease']],
+  );
+});
+
+test('the guard is narrow: a same-title repeat stays grouped, distinct ids and drafts without an id are untouched', () => {
+  assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1', version: 1 }, { title: 'LEASE', id: 'k1', version: 1 }]]), [['id:k1', 'id:k1']]);
+  assert.deepEqual(chatDraftKeys([[{ title: 'Lease', id: 'k1' }, { title: 'Notice', id: 'k2' }]]), [['id:k1', 'id:k2']]);
+  assert.deepEqual(chatDraftKeys([[{ title: 'Lease' }], [{ title: 'lease' }]]), [['title:lease'], ['title:lease']]);
+});
+
+test('the card, the panel and the index judge a draft’s group the same way, in the chat’s order', () => {
+  assert.match(code('v2', 'features', 'conversations', 'conversation', 'markdown', 'ChatContent.tsx'), /panel\?\.draftKeys \? panel\.draftKeys\(messageId \?\? null, answerDrafts\) : answerDrafts\.map\(draftGroupKey\)/);
+  assert.match(code(...DRAFT_DIR, 'DraftCard.tsx'), /const key = groupKey \?\? draftGroupKey\(draft\);/);
+  assert.match(code(...DRAFT_DIR, 'DraftPanel.tsx'), /draftKeysByMessage\(messages\)\.get\(place\.messageId\)/);
 });

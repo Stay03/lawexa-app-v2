@@ -50,17 +50,21 @@ function readerIsTyping(): boolean {
 export function DraftCard({
   draft,
   ordinal,
+  groupKey,
   live,
 }: {
   draft: DraftBlock;
   ordinal: number;
+  /** The draft's group as its answer judges it (answerDraftKeys); its own key where none is given. */
+  groupKey?: string;
   /** The answer is still arriving: an open draft is being written, not cut short. */
   live: boolean;
 }) {
   const panel = useSidePanel();
   const showing = panel?.target?.kind === 'draft' && panel.target.ordinal === ordinal && !panel.closing;
   const status = draftStatus(draft, live);
-  const version = panel?.draftVersion(ordinal, draftGroupKey(draft)) ?? null;
+  const key = groupKey ?? draftGroupKey(draft);
+  const version = panel?.draftVersion(ordinal, key) ?? null;
   const versionLabel = draftVersionLabel(version);
   // Greyed only once a newer FINISHED version follows (a cut-off one does not count).
   const older = version !== null && version.superseded;
@@ -68,7 +72,7 @@ export function DraftCard({
   // its note, so Lawexa will work from their text.
   const chat = useV2ChatContext();
   const queryClient = useQueryClient();
-  const edited = useDraftEdited(chat?.conversationId, draftGroupKey(draft), Boolean(panel) && draft.complete && !older);
+  const edited = useDraftEdited(chat?.conversationId, key, Boolean(panel) && draft.complete && !older);
 
   // A DRAFT OPENS ITSELF WHEN LAWEXA FINISHES IT (Stay, 24 October 2026: "auto
   // open when its done"). The card saw it being written, and its closing tag
