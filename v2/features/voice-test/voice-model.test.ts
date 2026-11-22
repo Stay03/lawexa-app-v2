@@ -18,9 +18,12 @@ import {
   isActionOutcome,
   MAX_EXPECTED_MS,
   mayPassResultIn,
-  queueResult,
+  admitResult,
+  emptyResultLine,
+  isStillWorking,
   sentNoticeTurn,
   type HandOff,
+  type ResultLine,
   researchRows,
   secondsLabel,
   spokenText,
@@ -272,30 +275,54 @@ test("an action's outcome is told apart from a research turn by its action- turn
   assert.equal(isActionOutcome('00000000-0000-4000-8000-000000000001'), false);
 });
 
-test('the server is told when a research result went in, and never for an action outcome', () => {
-  assert.equal(sentNoticeTurn('00000000-0000-4000-8000-000000000001'), '00000000-0000-4000-8000-000000000001');
-  assert.equal(sentNoticeTurn('action-K7Q2ZP'), null);
+const nudge = (turn_uuid: string) => ({ session_uuid: 'TEST-session', turn_uuid, marker: '[[LAWEXA STILL WORKING]] TEST DATA' });
+type Ready = ReturnType<typeof ready>;
+/** Plays events into a line; returns the line, which were taken in, and the waiting order. */
+function playLine(events: Ready[], start: ResultLine<Ready> = emptyResultLine()) {
+  let line = start;
+  const accepted: boolean[] = [];
+  for (const event of events) {
+    const admitted = admitResult(line, event);
+    line = admitted.line;
+    accepted.push(admitted.accepted);
+  }
+  return { line, accepted, order: line.waiting.map((event) => `${isStillWorking(event.marker) ? 'nudge' : 'result'} ${event.turn_uuid}`) };
+}
+
+test('the server is told when a research result went in, never for an action outcome or a nudge', () => {
+  assert.equal(sentNoticeTurn(ready('00000000-0000-4000-8000-000000000001')), '00000000-0000-4000-8000-000000000001');
+  assert.equal(sentNoticeTurn(ready('action-K7Q2ZP')), null);
+  assert.equal(sentNoticeTurn(nudge('00000000-0000-4000-8000-000000000001')), null);
 });
 
 test('research results and action outcomes wait in one line, oldest first, and a repeated event is not read twice', () => {
-  let line = { waiting: [] as ReturnType<typeof ready>[], seen: new Set<string>() };
-  for (const turn of ['t-research-1', 'action-K7Q2ZP', 't-research-1', 't-research-2']) {
-    const queued = queueResult(line.waiting, line.seen, ready(turn));
-    line = { waiting: queued.waiting, seen: queued.seen };
-  }
-  assert.deepEqual(line.waiting.map((event) => event.turn_uuid), ['t-research-1', 'action-K7Q2ZP', 't-research-2']);
-  // Once passed in, the turn stays seen: the same event arriving later is dropped.
-  const later = queueResult(line.waiting.slice(1), line.seen, ready('t-research-1'));
-  assert.equal(later.accepted, false);
-  assert.deepEqual(later.waiting.map((event) => event.turn_uuid), ['action-K7Q2ZP', 't-research-2']);
+  const first = playLine(['t-research-1', 'action-K7Q2ZP', 't-research-1', 't-research-2'].map(ready));
+  assert.deepEqual(first.order, ['result t-research-1', 'result action-K7Q2ZP', 'result t-research-2']);
+  assert.deepEqual(first.accepted, [true, true, false, true]);
+  // Once passed in, the event stays seen: the same event arriving later is dropped.
+  const later = playLine([ready('t-research-1')], { ...first.line, waiting: first.line.waiting.slice(1) });
+  assert.deepEqual(later.accepted, [false]);
+  assert.deepEqual(later.order, ['result action-K7Q2ZP', 'result t-research-2']);
 });
 
-test("a different event for the same turn is not taken for a repeat (the coming nudge shares its turn's id)", () => {
-  const nudge = { ...ready('t-research-3'), marker: '[[LAWEXA STILL WORKING]] TEST DATA' };
-  const first = queueResult([], new Set<string>(), nudge);
-  const second = queueResult(first.waiting, first.seen, ready('t-research-3'));
-  assert.equal(second.accepted, true);
-  assert.deepEqual(second.waiting.map((event) => event.marker.slice(0, 22)), ['[[LAWEXA STILL WORKING', '[[LAWEXA RESULT t-rese']);
+test('a nudge waits its turn like any result, and is kept out of the transcript', () => {
+  assert.equal(isResearchMarker(nudge('t-research-3').marker), true);
+  assert.deepEqual(playLine([ready('t-research-1'), nudge('t-research-3')]).order, ['result t-research-1', 'nudge t-research-3']);
+});
+
+test("a nudge whose turn's result is waiting, in flight or read is never said", () => {
+  // Waiting: the result came first.
+  assert.deepEqual(playLine([ready('t-research-3'), nudge('t-research-3')]).accepted, [true, false]);
+  // In flight or read: the result has left the line, and its turn stays answered.
+  const answered = playLine([ready('t-research-3')]).line;
+  const afterPass = playLine([nudge('t-research-3')], { ...answered, waiting: [] });
+  assert.deepEqual(afterPass.accepted, [false]);
+  assert.deepEqual(afterPass.order, []);
+});
+
+test('a result takes out the nudge for its turn still waiting, so "still working" never comes just before the answer', () => {
+  const line = playLine([ready('t-research-1'), nudge('t-research-3'), nudge('t-research-4'), ready('t-research-3')]);
+  assert.deepEqual(line.order, ['result t-research-1', 'nudge t-research-4', 'result t-research-3']);
 });
 
 test('an action outcome goes in by the same one-at-a-time rule: not while the read-back before it is still in flight', () => {

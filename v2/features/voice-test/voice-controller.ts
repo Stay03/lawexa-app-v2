@@ -12,12 +12,15 @@ import {
   handOffOnInterruption,
   handOffOnMode,
   handOffOnReply,
+  admitResult,
+  emptyResultLine,
+  isStillWorking,
   mayPassResultIn,
-  queueResult,
   sentNoticeTurn,
   type CallEvent,
   type CallLog,
   type HandOff,
+  type ResultLine,
 } from './voice-model';
 import type { VoiceSession } from './voice-session';
 
@@ -158,11 +161,10 @@ export class VoiceTestController {
     this.stopListening = onVoiceResearchReady((event) => {
       if (event.session_uuid !== this.state.sessionUuid || this.session !== session) return;
       if (mode === 'a') {
-        // Lawexa voice: a research answer or an action's outcome waits for a quiet line, in arrival order.
-        const queued = queueResult(this.waitingResults, this.seenResults, event);
-        this.waitingResults = queued.waiting;
-        this.seenResults = queued.seen;
-        if (queued.accepted) this.passResultIn();
+        // Lawexa voice: a research answer, an action's outcome or a nudge waits for a quiet line, in arrival order.
+        const admitted = admitResult(this.results, event);
+        this.results = admitted.line;
+        if (admitted.accepted) this.passResultIn();
         return;
       }
       session.sendUserMessage(event.marker);
@@ -313,10 +315,8 @@ export class VoiceTestController {
     if (this.state.saving) this.set({ saving: false });
   }
 
-  /** An `a` call's research answers and action outcomes, oldest first, waiting for a quiet line. */
-  private waitingResults: VoiceResearchReadyEvent[] = [];
-  /** Every event (turn and text) queued or passed in on this call, so a repeated event is not read twice. */
-  private seenResults: Set<string> = new Set();
+  /** An `a` call's research answers, action outcomes and nudges waiting for a quiet line (voice-model.ts admitResult). */
+  private results: ResultLine<VoiceResearchReadyEvent> = emptyResultLine();
   /** The answer passed in and not yet read to the end. */
   private inFlight: HandOff | null = null;
   /** The caller's last voice activity (or finished line). */
@@ -333,19 +333,21 @@ export class VoiceTestController {
     if (this.retry) clearTimeout(this.retry);
     this.retry = null;
     const session = this.session;
-    if (!session || this.waitingResults.length === 0) return;
+    if (!session || this.results.waiting.length === 0) return;
     const now = performance.now();
     const may = mayPassResultIn({ now, live: this.state.phase === 'live', speaking: this.state.log.speaking, callerVoiceAt: this.callerVoiceAt, inFlight: this.inFlight });
     if (!may) {
       if (this.state.phase === 'live') this.retry = setTimeout(() => this.passResultIn(), 400);
       return;
     }
-    const next = this.waitingResults.shift();
+    const [next, ...rest] = this.results.waiting;
     if (!next) return;
+    this.results = { ...this.results, waiting: rest };
     session.sendUserMessage(next.marker);
     this.inFlight = { turnUuid: next.turn_uuid, sentAt: now, startedAt: null, quietSince: null, answerChars: null, interrupted: false };
-    this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
-    const turn = sentNoticeTurn(next.turn_uuid);
+    // The research table times the result itself, so a nudge is not counted as its delivery.
+    if (!isStillWorking(next.marker)) this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
+    const turn = sentNoticeTurn(next);
     if (turn && this.state.sessionUuid) void this.tellResultSent(this.state.sessionUuid, turn);
   }
 
@@ -372,8 +374,7 @@ export class VoiceTestController {
     this.retry = null;
     this.inFlight = null;
     this.callerVoiceAt = null;
-    this.waitingResults = [];
-    this.seenResults = new Set();
+    this.results = emptyResultLine();
     this.session = null;
     this.stopListening?.();
     this.stopListening = null;

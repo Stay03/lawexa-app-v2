@@ -21,10 +21,21 @@ export const RESEARCH_MARKER_PREFIX = '[[lawexa:research_ready:';
 /** An `a` call's research answer, passed into the call (Backend, 22 November 2026). */
 export const RESEARCH_RESULT_PREFIX = '[[LAWEXA RESULT';
 
+/**
+ * An `a` call's "still working" nudge (Backend, 22 November 2026): the server
+ * sends it for a research turn still running after Stay's 6 seconds, on the
+ * same event with the turn's own id, so the voice says one holding line.
+ */
+export const STILL_WORKING_PREFIX = '[[LAWEXA STILL WORKING';
+
+export function isStillWorking(marker: string): boolean {
+  return marker.trimStart().startsWith(STILL_WORKING_PREFIX);
+}
+
 /** A line the page sent into the call, never the caller's words: kept out of the transcript. */
 export function isResearchMarker(text: string): boolean {
   const start = text.trimStart();
-  return start.startsWith(RESEARCH_MARKER_PREFIX) || start.startsWith(RESEARCH_RESULT_PREFIX);
+  return start.startsWith(RESEARCH_MARKER_PREFIX) || start.startsWith(RESEARCH_RESULT_PREFIX) || start.startsWith(STILL_WORKING_PREFIX);
 }
 
 /**
@@ -281,27 +292,52 @@ export function isActionOutcome(turnUuid: string): boolean {
  * The research turn the server is told about once its result goes into the
  * call (`POST .../turns/{turn}/sent`), so it knows when the read-back started:
  * a held action's yes is refused until the read-back has had time to be said.
- * `null` for an action outcome, which has no turn.
+ * `null` for an action outcome, which has no turn, and for a nudge, which is
+ * not the result.
  */
-export function sentNoticeTurn(turnUuid: string): string | null {
-  return isActionOutcome(turnUuid) ? null : turnUuid;
+export function sentNoticeTurn(event: { turn_uuid: string; marker: string }): string | null {
+  return isActionOutcome(event.turn_uuid) || isStillWorking(event.marker) ? null : event.turn_uuid;
+}
+
+/** An `a` call's results, action outcomes and nudges waiting for a quiet line, oldest first. */
+export interface ResultLine<T> {
+  waiting: T[];
+  /** Every event (turn and text) taken in on this call, so a repeat is not read twice. */
+  seen: Set<string>;
+  /** Turns whose result is waiting, in flight or read: a nudge for them is never said. */
+  answered: Set<string>;
+}
+
+export function emptyResultLine<T>(): ResultLine<T> {
+  return { waiting: [], seen: new Set(), answered: new Set() };
 }
 
 /**
- * Takes a result into the waiting line, oldest first, unless the same event
- * (the same turn AND the same text) has already been queued or passed in on
- * this call: a repeated event would otherwise have the voice read it twice.
- * Keyed on both because one turn can carry more than one event: Backend's
- * coming "still working" nudge shares its turn's id with the result after it.
+ * Takes an event into the waiting line (Techlead and Backend, 22 November 2026).
+ *
+ * - A repeat of an event already taken in (the same turn AND the same text) is
+ *   dropped, so the voice never reads it twice. Keyed on both because a nudge
+ *   shares its turn's id with the result.
+ * - A "still working" nudge is dropped when its turn's result is already
+ *   waiting, in flight or read: the voice never says "still working" after
+ *   the answer, or just before it.
+ * - A result takes out any nudge for its turn still waiting, for the same
+ *   reason. A nudge already passed in stays: it is short, and the result
+ *   follows it by the one-at-a-time rule.
  */
-export function queueResult<T extends { turn_uuid: string; marker: string }>(
-  waiting: readonly T[],
-  seen: ReadonlySet<string>,
+export function admitResult<T extends { turn_uuid: string; marker: string }>(
+  line: ResultLine<T>,
   event: T,
-): { waiting: T[]; seen: Set<string>; accepted: boolean } {
+): { line: ResultLine<T>; accepted: boolean } {
   const key = `${event.turn_uuid}\n${event.marker}`;
-  if (seen.has(key)) return { waiting: [...waiting], seen: new Set(seen), accepted: false };
-  return { waiting: [...waiting, event], seen: new Set([...seen, key]), accepted: true };
+  if (line.seen.has(key)) return { line, accepted: false };
+  const seen = new Set([...line.seen, key]);
+  if (isStillWorking(event.marker)) {
+    if (line.answered.has(event.turn_uuid)) return { line: { ...line, seen }, accepted: false };
+    return { line: { ...line, seen, waiting: [...line.waiting, event] }, accepted: true };
+  }
+  const waiting = line.waiting.filter((queued) => !(queued.turn_uuid === event.turn_uuid && isStillWorking(queued.marker)));
+  return { line: { waiting: [...waiting, event], seen, answered: new Set([...line.answered, event.turn_uuid]) }, accepted: true };
 }
 
 export interface ResearchRow {
