@@ -288,17 +288,20 @@ export function sentNoticeTurn(turnUuid: string): string | null {
 }
 
 /**
- * Takes a result into the waiting line, oldest first, unless the same turn has
- * already been queued or passed in on this call: a repeated event would
- * otherwise have the voice read the same result twice.
+ * Takes a result into the waiting line, oldest first, unless the same event
+ * (the same turn AND the same text) has already been queued or passed in on
+ * this call: a repeated event would otherwise have the voice read it twice.
+ * Keyed on both because one turn can carry more than one event: Backend's
+ * coming "still working" nudge shares its turn's id with the result after it.
  */
-export function queueResult<T extends { turn_uuid: string }>(
+export function queueResult<T extends { turn_uuid: string; marker: string }>(
   waiting: readonly T[],
   seen: ReadonlySet<string>,
   event: T,
 ): { waiting: T[]; seen: Set<string>; accepted: boolean } {
-  if (seen.has(event.turn_uuid)) return { waiting: [...waiting], seen: new Set(seen), accepted: false };
-  return { waiting: [...waiting, event], seen: new Set([...seen, event.turn_uuid]), accepted: true };
+  const key = `${event.turn_uuid}\n${event.marker}`;
+  if (seen.has(key)) return { waiting: [...waiting], seen: new Set(seen), accepted: false };
+  return { waiting: [...waiting, event], seen: new Set([...seen, key]), accepted: true };
 }
 
 export interface ResearchRow {

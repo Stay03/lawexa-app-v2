@@ -315,7 +315,7 @@ export class VoiceTestController {
 
   /** An `a` call's research answers and action outcomes, oldest first, waiting for a quiet line. */
   private waitingResults: VoiceResearchReadyEvent[] = [];
-  /** Every turn queued or passed in on this call, so a repeated event is not read twice. */
+  /** Every event (turn and text) queued or passed in on this call, so a repeated event is not read twice. */
   private seenResults: Set<string> = new Set();
   /** The answer passed in and not yet read to the end. */
   private inFlight: HandOff | null = null;

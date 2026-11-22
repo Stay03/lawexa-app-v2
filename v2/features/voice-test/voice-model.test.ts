@@ -254,8 +254,18 @@ test('an interruption before the voice starts the answer changes nothing', () =>
   assert.deepEqual(handOffOnMode(passedIn, 'listening', 1_000), passedIn);
 });
 
-// The voice action hold (Techlead and Backend, 22 November 2026, branch voice-held-actions).
-const ready = (turn_uuid: string) => ({ session_uuid: 'TEST-session', turn_uuid, marker: `[[LAWEXA RESULT ${turn_uuid}]] TEST DATA` });
+// The voice action hold (Techlead and Backend, 22 November 2026, branch voice-held-actions; Backend's contract).
+const ready = (turn_uuid: string) => ({
+  session_uuid: 'TEST-session',
+  turn_uuid,
+  marker: turn_uuid.startsWith('action-')
+    ? `[[LAWEXA RESULT for "held action ${turn_uuid.slice(7)}"]] Done: TEST DATA reminder set for 9 am.`
+    : `[[LAWEXA RESULT ${turn_uuid}]] TEST DATA`,
+});
+
+test("an action outcome's marker is kept out of the transcript like any result", () => {
+  assert.equal(isResearchMarker(ready('action-K3F9Q2').marker), true);
+});
 
 test("an action's outcome is told apart from a research turn by its action- turn", () => {
   assert.equal(isActionOutcome('action-K7Q2ZP'), true);
@@ -278,6 +288,14 @@ test('research results and action outcomes wait in one line, oldest first, and a
   const later = queueResult(line.waiting.slice(1), line.seen, ready('t-research-1'));
   assert.equal(later.accepted, false);
   assert.deepEqual(later.waiting.map((event) => event.turn_uuid), ['action-K7Q2ZP', 't-research-2']);
+});
+
+test("a different event for the same turn is not taken for a repeat (the coming nudge shares its turn's id)", () => {
+  const nudge = { ...ready('t-research-3'), marker: '[[LAWEXA STILL WORKING]] TEST DATA' };
+  const first = queueResult([], new Set<string>(), nudge);
+  const second = queueResult(first.waiting, first.seen, ready('t-research-3'));
+  assert.equal(second.accepted, true);
+  assert.deepEqual(second.waiting.map((event) => event.marker.slice(0, 22)), ['[[LAWEXA STILL WORKING', '[[LAWEXA RESULT t-rese']);
 });
 
 test('an action outcome goes in by the same one-at-a-time rule: not while the read-back before it is still in flight', () => {
