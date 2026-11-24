@@ -74,6 +74,8 @@ export interface AgentRow {
   canStop: boolean;
   /** The start of the reply, as plain words, once it replied. */
   replyStart: string | null;
+  /** The reply message the row shows, so a reply line under it does not repeat the same start. */
+  replyMessageId: number | null;
 }
 
 /** A called entry's row. A turn is streamed only while the call is working and the turn still runs. */
@@ -88,6 +90,7 @@ export function agentRow(entry: AgentConversation & { latest_call: AgentLatestCa
     executionId,
     canStop: executionId !== null && entry.can_send,
     replyStart: preview ? plainPreview(preview) || preview : null,
+    replyMessageId: state === 'replied' ? (entry.latest_call.reply?.message_id ?? null) : null,
   };
 }
 

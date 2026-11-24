@@ -41,3 +41,14 @@ export function useAgentRowsOf(messageId: number | null): { conversationId: stri
   const rows = value.byMessage.get(messageId);
   return rows ? { conversationId: value.conversationId, rows } : null;
 }
+
+/** The reply messages the roster in view already shows, so a reply line under it does not repeat their start. */
+export function useRosterReplyIds(): ReadonlySet<number> {
+  const value = useContext(AgentRowsContext);
+  return useMemo(() => {
+    const ids = new Set<number>();
+    if (!value) return ids;
+    for (const rows of value.byMessage.values()) for (const row of rows) if (row.replyMessageId !== null) ids.add(row.replyMessageId);
+    return ids;
+  }, [value]);
+}

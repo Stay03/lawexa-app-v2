@@ -131,13 +131,16 @@ export function backgroundJobsByMessage(jobs: readonly BackgroundJob[]): Readonl
  * for several.
  */
 export function backgroundReturnLine(
-  outcomes: readonly (Pick<BackgroundJobOutcome, 'kind' | 'outcome'> & Partial<Pick<BackgroundJobOutcome, 'agent_reply'>>)[],
+  outcomes: readonly (Pick<BackgroundJobOutcome, 'kind' | 'outcome'> & Partial<Pick<BackgroundJobOutcome, 'agent_reply' | 'failure'>>)[],
 ): string {
   if (outcomes.length === 1) {
     const [only] = outcomes;
     // One agent's reply: named, as its preview row under the line names it (sub-agents contract, section 4).
+    // A Stop comes back "cancelled" (or, once the server names it, a failure "stopped"): never "replied".
     if (only.kind === 'agent_reply' && only.agent_reply) {
-      return `${only.agent_reply.agent.name} ${only.outcome === 'failed' ? 'could not reply' : 'replied'}. Lawexa is continuing.`;
+      const stopped = only.outcome === 'cancelled' || only.failure === 'stopped';
+      const words = only.outcome === 'succeeded' ? 'replied' : stopped ? 'was stopped' : 'could not reply';
+      return `${only.agent_reply.agent.name} ${words}. Lawexa is continuing.`;
     }
     const kind = capitalised(KIND_NAMES[only.kind] ?? 'background job');
     return `${kind} ${only.outcome === 'failed' ? 'failed' : 'finished'}. Lawexa is continuing.`;

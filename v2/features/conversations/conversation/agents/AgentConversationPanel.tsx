@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { Fragment, useCallback, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowUp, Bot, CircleAlert, Loader2, Square } from 'lucide-react';
+import { ArrowUp, Bot, CircleAlert, CircleX, Loader2, Square } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,12 +14,16 @@ import { extractApiError } from '@/lib/utils/api-error';
 import type { AgentConversation } from '@/types/agent-conversations';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2Session } from '@/v2/runtime/session-context';
+import { plainPreview } from '../../plain-preview';
 import { conversationsQueries } from '../../queries';
 import { clockTime } from '../day-label';
 import { MarkdownText } from '../markdown/MarkdownText';
 import { ChatSidePanel } from '../side-panel/ChatSidePanel';
+import { useSidePanel } from '../side-panel/SidePanelContext';
 import { formatToolMessage } from '../tools/ToolStepItem';
-import { agentConversationTopic, agentTranscriptRows, type AgentStepCall, type AgentTranscriptRow } from './agent-transcript';
+import { AgentRoster } from './AgentRoster';
+import { agentConversationTopic, agentTranscriptRows, subAgentPlaces, subAgentReplyView, type AgentStepCall, type AgentTranscriptRow } from './agent-transcript';
+import { AgentRowsProvider, useRosterReplyIds } from './context';
 import { agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
 import { sendsOnEnter } from '@/lib/utils/enter-key';
@@ -56,8 +60,12 @@ export function AgentConversationPanel({ conversationId }: { conversationId: str
     if (parentId) void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(parentId) });
   }, [queryClient, conversationId, parentId]);
 
+  // This agent's own sub-agents (depth 2): drawn where its turn called them, as the chat draws Lawexa's.
+  const subAgents = useQuery(agentConversationQueries.of({ parentId: conversationId, viewerId }));
+
   const running = entry?.status === 'running' && entry.execution_id ? entry.execution_id : null;
   const rows = conversation ? agentTranscriptRows(conversation.messages) : [];
+  const places = subAgentPlaces(rows);
 
   const title = conversation ? agentConversationTopic(conversation.title, agentName) : agentName ?? 'Agent conversation';
   const subtitle = agentName ? `${agentName} · ${running ? 'working' : 'agent conversation'}` : undefined;
@@ -84,9 +92,14 @@ export function AgentConversationPanel({ conversationId }: { conversationId: str
           </p>
         ) : (
           <>
-            {rows.map((row) => (
-              <TranscriptRow key={row.key} row={row} agentName={agentName} />
-            ))}
+            <AgentRowsProvider conversationId={conversationId} agentConversations={subAgents.data ?? NO_SUB_AGENTS}>
+              {rows.map((row, index) => (
+                <Fragment key={row.key}>
+                  <TranscriptRow row={row} agentName={agentName} />
+                  {places.has(index) ? <AgentRoster messageId={places.get(index) ?? null} askedBy={agentName ?? 'This agent'} /> : null}
+                </Fragment>
+              ))}
+            </AgentRowsProvider>
             {running ? <LiveTurn key={running} executionId={running} agentName={agentName} onEnd={refresh} /> : null}
             {rows.length === 0 && !running ? <p className="text-sm text-muted-foreground">Nothing has been said here yet.</p> : null}
           </>
@@ -105,6 +118,9 @@ function TranscriptSkeleton() {
     </div>
   );
 }
+
+/** A stable empty list while the sub-agents load, so the rows provider does not rebuild on every render. */
+const NO_SUB_AGENTS: readonly AgentConversation[] = [];
 
 /** A turn of the conversation, by who wrote it. */
 function TranscriptRow({ row, agentName }: { row: AgentTranscriptRow; agentName: string | null }) {
@@ -134,6 +150,8 @@ function TranscriptRow({ row, agentName }: { row: AgentTranscriptRow; agentName:
           <MarkdownText content={row.text} />
         </article>
       );
+    case 'reply':
+      return <SubAgentReply row={row} />;
     default:
       return (
         <p role="note" className="text-center text-xs text-muted-foreground">
@@ -141,6 +159,31 @@ function TranscriptRow({ row, agentName }: { row: AgentTranscriptRow; agentName:
         </p>
       );
   }
+}
+
+/** The agent's own sub-agent came back: who, how, the start of the reply when the roster above is not showing it, and its conversation to open. */
+function SubAgentReply({ row }: { row: Extract<AgentTranscriptRow, { kind: 'reply' }> }) {
+  const panel = useSidePanel();
+  const view = subAgentReplyView(row, useRosterReplyIds());
+  const preview = view.preview ? plainPreview(view.preview) || view.preview : null;
+  return (
+    <section aria-label={view.heading} className="flex flex-col gap-1 border-l-2 border-border pl-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+      <p className={cn('flex items-center gap-1.5 text-xs font-medium', view.outcome === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>
+        {view.outcome === 'failed' ? <CircleX aria-hidden className="size-3.5" /> : null}
+        {view.heading}
+      </p>
+      {preview ? <p className="line-clamp-3 text-[13px] leading-relaxed text-muted-foreground">{preview}</p> : null}
+      {panel ? (
+        <button
+          type="button"
+          onClick={() => panel.open({ kind: 'agent', id: view.openId })}
+          className={cn('v2-interactive self-start rounded text-xs font-medium text-primary underline-offset-4 hover:underline', FOCUS_RING)}
+        >
+          Open its conversation
+        </button>
+      ) : null}
+    </section>
+  );
 }
 
 /** The agent's steps, each named as the chat names it ("Searched cases for …"). */
