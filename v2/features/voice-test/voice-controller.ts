@@ -3,7 +3,7 @@ import { extractApiError } from '@/lib/utils/api-error';
 import type { IBlockedReason } from '@/types/message-pack';
 import type { VoiceCallSaved, VoiceOption, VoiceResearchReadyEvent, VoiceServerTurn, VoiceTestMode, VoiceTestSession } from '@/types/voice-test';
 import { ElevenLabsVoiceSession } from './elevenlabs-voice-session';
-import { reportCut } from './voice-cut';
+import { NO_CUT_WATCH, reportCut, watchOnPassIn, watchOnReply, type CutWatch } from './voice-cut';
 import { onVoiceResearchReady } from './voice-events';
 import {
   applyCallEvent,
@@ -201,6 +201,7 @@ export class VoiceTestController {
             if (this.session !== session) return;
             if (message.source === 'user') this.callerVoiceAt = performance.now();
             if (message.source === 'ai' && this.inFlight) this.inFlight = handOffOnReply(this.inFlight, message.text.length);
+            if (message.source === 'ai') this.cutWatch = watchOnReply(this.cutWatch, message.text);
             this.note({ kind: 'message', message });
           },
           onInterrupted: () => {
@@ -210,7 +211,7 @@ export class VoiceTestController {
           onCut: (cut) => {
             // Where the caller cut the voice off, so "carry on" reads the unread rest (voice-cut.ts).
             if (this.session !== session || mode !== 'a') return;
-            void reportCut({ sessionUuid: this.state.sessionUuid, lastSentTurn: this.lastSentTurn }, cut, voiceTestApi.cut);
+            void reportCut(this.state.sessionUuid, this.cutWatch, cut, voiceTestApi.cut);
           },
           onVad: (score) => {
             if (this.session === session && score >= CALLER_SPEECH_SCORE) this.callerVoiceAt = performance.now();
@@ -323,8 +324,8 @@ export class VoiceTestController {
 
   /** An `a` call's research answers, action outcomes and nudges waiting for a quiet line (voice-model.ts admitResult). */
   private results: ResultLine<VoiceResearchReadyEvent> = emptyResultLine();
-  /** The research turn whose result the page last sent into this call (`/sent`): a cut is told against it. */
-  private lastSentTurn: string | null = null;
+  /** The research result being read, and the voice's replies since it went in: only a cut of that reading is told (voice-cut.ts). */
+  private cutWatch: CutWatch = NO_CUT_WATCH;
   /** The answer passed in and not yet read to the end. */
   private inFlight: HandOff | null = null;
   /** The caller's last voice activity (or finished line). */
@@ -356,7 +357,8 @@ export class VoiceTestController {
     // The research table times the result itself, so a nudge is not counted as its delivery.
     if (!isStillWorking(next.marker)) this.note({ kind: 'delivered', turnUuid: next.turn_uuid });
     const turn = sentNoticeTurn(next);
-    if (turn) this.lastSentTurn = turn;
+    // A research result starts the cut watch on its turn; an outcome or a nudge ends it (voice-cut.ts).
+    this.cutWatch = watchOnPassIn(turn);
     if (turn && this.state.sessionUuid) void this.tellResultSent(this.state.sessionUuid, turn);
   }
 
@@ -384,7 +386,7 @@ export class VoiceTestController {
     this.inFlight = null;
     this.callerVoiceAt = null;
     this.results = emptyResultLine();
-    this.lastSentTurn = null;
+    this.cutWatch = NO_CUT_WATCH;
     this.session = null;
     this.stopListening?.();
     this.stopListening = null;
