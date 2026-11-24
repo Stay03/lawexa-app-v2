@@ -52,7 +52,7 @@ test('the step reads no layout and uses no Radix collapsible', () => {
   const region = source('step-collapse.tsx');
   const rules = source('step-collapse-rules.ts');
   assert.doesNotMatch(step, /components\/ui\/collapsible/);
-  assert.match(step, /<StepCollapse id=\{bodyId\} open=\{isExpanded\}>/);
+  assert.match(step, /<StepCollapse id=\{bodyId\} open=\{expandable && isExpanded\}>/);
   // Code only: the comments explain the Radix measure by name.
   const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   for (const s of [step, region, rules]) assert.doesNotMatch(code(s), /getBoundingClientRect|offsetHeight|scrollHeight/);
@@ -60,8 +60,10 @@ test('the step reads no layout and uses no Radix collapsible', () => {
 
 test('the step button keeps what the Radix trigger gave: state, target and toggle', () => {
   const step = source('ToolStepItem.tsx');
-  assert.match(step, /aria-expanded=\{isExpanded\}/);
-  assert.match(step, /aria-controls=\{bodyId\}/);
-  assert.match(step, /onClick=\{\(\) => isComplete && onToggle\(\)\}/);
-  assert.match(step, /disabled=\{!isComplete\}/);
+  assert.match(step, /aria-expanded=\{expandable \? isExpanded : undefined\}/);
+  assert.match(step, /aria-controls=\{expandable \? bodyId : undefined\}/);
+  assert.match(step, /onClick=\{\(\) => expandable && onToggle\(\)\}/);
+  // A finished step opens; a run_together step does not (its lookups show as sub-rows, tool-batch.ts).
+  assert.match(step, /const expandable = isComplete && !batch;/);
+  assert.match(step, /disabled=\{!expandable\}/);
 });

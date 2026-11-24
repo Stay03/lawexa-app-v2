@@ -46,7 +46,7 @@ test('a user Stop and a dropped connection keep the text they showed', () => {
   const source = engine();
   // Both stop paths, the cancelled event and the CANCELLED error, end the same way.
   const cancelled = source.slice(source.indexOf("es.addEventListener('cancelled'"));
-  assert.match(cancelled, /toolCalls\.clear\(\);\s*handovers\.clear\(\);\s*stopOpenPlaceholder\(\);/);
+  assert.match(cancelled, /toolCalls\.clear\(\);\s*batches\.clear\(\);\s*handovers\.clear\(\);\s*stopOpenPlaceholder\(\);/);
   assert.match(source, /if \(parsed\?\.error_code === 'CANCELLED'\) \{\s*stopOpenPlaceholder\(\);/);
   // A 401 mid-stream keeps what was streamed; the server decides later.
   const onerror = source.slice(source.indexOf('es.onerror = () => {'));
