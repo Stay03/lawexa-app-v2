@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { ApiMessage } from '@/types/chat';
-import { agentConversationTopic, agentTranscriptRows, subAgentPlaces } from './agent-transcript';
+import { agentConversationTopic, agentTranscriptRows, subAgentPlaces, subAgentReplyView } from './agent-transcript';
 
 /* An agent conversation in the side panel (sub-agents contract, 3.2, "How to
  * read the rows"). TEST DATA only. */
@@ -90,28 +90,22 @@ test('the panel watches the running turn, posts to the agent conversation route,
 
 // Depth 2 (24 November 2026): Expert > Issue Spotter (TEST) > Law Checker, shaped as the live test chat 8ef5ef02.
 const lawChecker = { id: 233, name: 'Law Checker', slug: 'law-checker' };
-const wake = (outcome: 'succeeded' | 'failed', id = 640788) =>
-  row({
-    id,
-    role: 'user',
-    content: 'Background work you started earlier in this chat has ended: TEST DATA (written for Lawexa, never shown)',
-    metadata: {
-      type: 'background_job_result',
-      background_jobs: [
-        {
-          job_id: 'TEST-job-1',
-          kind: 'agent_reply',
-          outcome,
-          agent_reply: {
-            agent_conversation_id: '893ed646-6712-4431-ada0-bb5dad39f55b',
-            agent: lawChecker,
-            reply_message_id: outcome === 'failed' ? null : 640787,
-            preview: outcome === 'failed' ? null : '**THE ISSUE LIST, CHECKED** 1. TEST DATA unlawful processing.',
-          },
-        },
-      ],
-    },
-  });
+const checkerConversation = '893ed646-6712-4431-ada0-bb5dad39f55b';
+type Job = NonNullable<NonNullable<ApiMessage['metadata']>['background_jobs']>[number];
+const agentJob = (outcome: 'succeeded' | 'failed' | 'cancelled', over: Partial<Job> = {}): Job => ({
+  job_id: `TEST-job-${outcome}`,
+  kind: 'agent_reply',
+  outcome,
+  agent_reply: {
+    agent_conversation_id: checkerConversation,
+    agent: lawChecker,
+    reply_message_id: outcome === 'succeeded' ? 640787 : null,
+    preview: outcome === 'succeeded' ? '**THE ISSUE LIST, CHECKED** 1. TEST DATA unlawful processing.' : null,
+  },
+  ...over,
+});
+const wake = (jobs: Job[], id = 640788) =>
+  row({ id, role: 'user', content: 'Background work you started earlier in this chat has ended: TEST DATA (written for Lawexa, never shown)', metadata: { type: 'background_job_result', background_jobs: jobs } });
 const spotterTurn = [
   row({ id: 640688, role: 'user', content: 'TEST DATA. Please analyse the following problem.', metadata: { type: 'agent_message', from_agent: { id: 235, name: 'Expert (TEST)', slug: 'expert-test' } } }),
   row({ id: 640713, role: 'assistant', content: "I need to wrap up. I'll send my report to the Law Checker now." }),
@@ -119,49 +113,88 @@ const spotterTurn = [
   row({ id: 640716, role: 'tool', content: '', metadata: { type: 'tool_result', tool_name: 'message_agent' } }),
   row({ id: 640717, role: 'assistant', content: "I've asked Law Checker; I'll answer when it replies." }),
 ];
+const finalAnswer = row({ id: 640789, role: 'assistant', content: '**Law checked** TEST DATA.' });
 
 test("the agent's own sub-agent coming back reads as that agent replying, with its reply's start and its conversation", () => {
-  const rows = agentTranscriptRows([...spotterTurn, wake('succeeded'), row({ id: 640789, role: 'assistant', content: '**Law checked** TEST DATA.' })]);
+  const rows = agentTranscriptRows([...spotterTurn, wake([agentJob('succeeded')]), finalAnswer]);
   const reply = rows.find((each) => each.kind === 'reply');
-  assert.deepEqual(reply && { ...reply, key: undefined, at: undefined }, {
-    kind: 'reply',
-    key: undefined,
-    agentName: 'Law Checker',
-    failed: false,
+  assert.ok(reply && reply.kind === 'reply');
+  assert.deepEqual(subAgentReplyView(reply, new Set()), {
+    heading: 'Law Checker replied',
+    outcome: 'replied',
     preview: '**THE ISSUE LIST, CHECKED** 1. TEST DATA unlawful processing.',
-    conversationId: '893ed646-6712-4431-ada0-bb5dad39f55b',
-    at: undefined,
+    openId: checkerConversation,
   });
-  // The wake's own words, written for Lawexa, are never shown.
+  // The wake's own words, written for Lawexa, are never shown, and no other line is added.
   assert.ok(!rows.some((each) => 'text' in each && each.text.includes('written for Lawexa')));
+  assert.equal(rows.filter((each) => each.kind === 'note').length, 0);
 });
 
-test('a sub-agent that could not reply says so, with no preview, and can still be opened', () => {
-  const reply = agentTranscriptRows([...spotterTurn, wake('failed')]).find((each) => each.kind === 'reply');
+test('a sub-agent that could not reply, or that a person stopped, says so, with no preview, and can still be opened', () => {
+  const failed = agentTranscriptRows([...spotterTurn, wake([agentJob('failed')])]).find((each) => each.kind === 'reply');
+  assert.ok(failed && failed.kind === 'reply');
+  assert.deepEqual(subAgentReplyView(failed, new Set()), { heading: 'Law Checker could not reply', outcome: 'failed', preview: null, openId: checkerConversation });
+  // A Stop: today the wake names it "cancelled"; a failure the server names "stopped" reads the same.
+  for (const job of [agentJob('cancelled'), agentJob('failed', { failure: 'stopped' })]) {
+    const stopped = agentTranscriptRows([...spotterTurn, wake([job])]).find((each) => each.kind === 'reply');
+    assert.ok(stopped && stopped.kind === 'reply');
+    assert.equal(subAgentReplyView(stopped, new Set()).heading, 'Law Checker was stopped');
+  }
+});
+
+test('a partial reply entry (no agent, no conversation) is left out, never opened as undefined', () => {
+  const full = agentJob('succeeded').agent_reply!;
+  const noConversation = agentJob('succeeded', { agent_reply: { ...full, agent_conversation_id: '' } });
+  const noAgent = agentJob('succeeded', { agent_reply: { ...full, agent: null as unknown as typeof lawChecker } });
+  const rows = agentTranscriptRows([...spotterTurn, wake([noConversation, noAgent])]);
+  assert.equal(rows.filter((each) => each.kind === 'reply').length, 0);
+});
+
+test("a wake with a sub-agent's reply and other background work keeps both: the reply line and the other work's line", () => {
+  const file: Job = { job_id: 'TEST-job-file', kind: 'file_transcription', outcome: 'succeeded' };
+  const rows = agentTranscriptRows([...spotterTurn, wake([agentJob('succeeded'), file])]);
+  assert.deepEqual(rows.slice(-2).map((each) => each.kind), ['reply', 'note']);
+});
+
+test("the start of a reply is shown once: not under a roster row showing that same reply, but kept for an earlier call's reply", () => {
+  const reply = agentTranscriptRows([...spotterTurn, wake([agentJob('succeeded')])]).find((each) => each.kind === 'reply');
   assert.ok(reply && reply.kind === 'reply');
-  assert.equal(reply.failed, true);
-  assert.equal(reply.preview, null);
-  assert.equal(reply.conversationId, '893ed646-6712-4431-ada0-bb5dad39f55b');
+  assert.equal(subAgentReplyView(reply, new Set([640787])).preview, null);
+  // The roster now shows a later call's reply (640900): this earlier line keeps its own start.
+  assert.ok(subAgentReplyView(reply, new Set([640900])).preview);
 });
 
 test("the agent's own sub-agents are drawn at the end of the turn that called them, before their return", () => {
   // Mid-chain: the Law Checker is still working, so the turn ends at "I've asked".
   const mid = agentTranscriptRows(spotterTurn);
   assert.deepEqual([...subAgentPlaces(mid)], [[mid.length - 1, 640688]]);
-  // After: the rows go just before the Law Checker's reply, not after the final answer.
-  const after = agentTranscriptRows([...spotterTurn, wake('succeeded'), row({ id: 640789, role: 'assistant', content: '**Law checked** TEST DATA.' })]);
+  // After: the rows go just before the Law Checker's reply.
+  const after = agentTranscriptRows([...spotterTurn, wake([agentJob('succeeded')]), finalAnswer]);
   const replyAt = after.findIndex((each) => each.kind === 'reply');
-  assert.deepEqual([...subAgentPlaces(after)], [[replyAt - 1, 640688]]);
-  // A second call starts its own turn.
-  const twice = agentTranscriptRows([...spotterTurn, wake('succeeded'), row({ id: 640800, role: 'user', content: 'TEST DATA. And the time limits?' }), row({ id: 640801, role: 'assistant', content: 'TEST DATA. Seventy-two hours.' })]);
-  assert.deepEqual([...subAgentPlaces(twice)].map(([, id]) => id), [640688, 640800]);
+  assert.equal(subAgentPlaces(after).get(replyAt - 1), 640688);
 });
 
-test("the panel draws its own sub-agents with the chat's roster, and their return with Open", () => {
-  const source = readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'agents', 'AgentConversationPanel.tsx'), 'utf8');
+test("a call made from the turn a wake starts gets its rows too, at the end of that turn, under the wake's id", () => {
+  // The woken Issue Spotter asks the Law Checker again: the server names the wake (640788) as that call's message.
+  const again = [
+    row({ id: 640790, role: 'assistant', content: '', metadata: { type: 'tool_call', tool_name: 'message_agent', tool_parameters: { agent: 'law-checker', message: 'TEST DATA' } } }),
+    row({ id: 640791, role: 'assistant', content: "I've asked Law Checker again; I'll answer when it replies." }),
+  ];
+  const rows = agentTranscriptRows([...spotterTurn, wake([agentJob('succeeded')]), ...again]);
+  const places = [...subAgentPlaces(rows)];
+  assert.deepEqual(places.map(([, id]) => id), [640688, 640788]);
+  assert.equal(places[1][0], rows.length - 1);
+  // Two replies in one wake do not split the woken turn.
+  const two = agentTranscriptRows([...spotterTurn, wake([agentJob('succeeded'), agentJob('succeeded', { job_id: 'TEST-job-2' })]), ...again]);
+  assert.deepEqual([...subAgentPlaces(two)].map(([, id]) => id), [640688, 640788]);
+});
+
+test("the panel draws its own sub-agents with the chat's roster, named for the agent, and their return with Open", () => {
+  const dir = join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'agents');
+  const source = readFileSync(join(dir, 'AgentConversationPanel.tsx'), 'utf8');
   assert.match(source, /agentConversationQueries\.of\(\{ parentId: conversationId, viewerId \}\)/);
-  assert.match(source, /<AgentRowsProvider conversationId=\{conversationId\}[\s\S]*?places\.has\(index\) \? <AgentRoster messageId=\{places\.get\(index\) \?\? null\} \/>/);
-  assert.match(source, /panel\.open\(\{ kind: 'agent', id: row\.conversationId \}\)[\s\S]*?Open its conversation/);
-  // The roster above already shows the start of the reply; the line repeats it only without a roster row.
-  assert.match(source, /const shownAbove = useHasAgentRow\(row\.conversationId\);\s*const preview = row\.preview && !shownAbove/);
+  assert.match(source, /places\.has\(index\) \? <AgentRoster messageId=\{places\.get\(index\) \?\? null\} askedBy=\{agentName \?\? 'This agent'\} \/>/);
+  assert.match(source, /subAgentReplyView\(row, useRosterReplyIds\(\)\)[\s\S]*?panel\.open\(\{ kind: 'agent', id: view\.openId \}\)[\s\S]*?Open its conversation/);
+  const roster = readFileSync(join(dir, 'AgentRoster.tsx'), 'utf8');
+  assert.match(roster, /aria-label=\{`Agents \$\{askedBy\} asked`\}/);
 });

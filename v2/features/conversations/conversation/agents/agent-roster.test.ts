@@ -106,6 +106,7 @@ test('a writing agent streams its turn, and Stop shows only to a reader the serv
     executionId: 'exec-1',
     canStop: true,
     replyStart: null,
+    replyMessageId: null,
   });
   // `can_send` false (a Space Viewer, a member the server does not let stop it): the words still stream, Stop does not show.
   const watcher = agentRow(entry({ can_send: false }));

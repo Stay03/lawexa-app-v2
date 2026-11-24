@@ -36,7 +36,7 @@ import { useAgentStream } from './use-agent-stream';
  * reader of the chat reads (agents/context.tsx), never from the reader's own
  * jobs: a Space member who did not ask sees them too.
  */
-export function AgentRoster({ messageId }: { messageId: number | null }) {
+export function AgentRoster({ messageId, askedBy = 'Lawexa' }: { messageId: number | null; askedBy?: string }) {
   const held = useAgentRowsOf(messageId);
   const parentId = held?.conversationId ?? null;
   const queryClient = useQueryClient();
@@ -50,7 +50,7 @@ export function AgentRoster({ messageId }: { messageId: number | null }) {
 
   if (!held) return null;
   return (
-    <ul aria-label="Agents Lawexa asked" className="flex flex-col gap-5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
+    <ul aria-label={`Agents ${askedBy} asked`} className="flex flex-col gap-5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
       {held.rows.map((row) => (
         <AgentRosterRow key={row.conversationId} row={row} onTurnEnd={onTurnEnd} />
       ))}

@@ -42,10 +42,13 @@ export function useAgentRowsOf(messageId: number | null): { conversationId: stri
   return rows ? { conversationId: value.conversationId, rows } : null;
 }
 
-/** Whether the roster in view already draws this agent conversation's row, with the start of its reply. */
-export function useHasAgentRow(conversationId: string): boolean {
+/** The reply messages the roster in view already shows, so a reply line under it does not repeat their start. */
+export function useRosterReplyIds(): ReadonlySet<number> {
   const value = useContext(AgentRowsContext);
-  if (!value) return false;
-  for (const rows of value.byMessage.values()) if (rows.some((row) => row.conversationId === conversationId)) return true;
-  return false;
+  return useMemo(() => {
+    const ids = new Set<number>();
+    if (!value) return ids;
+    for (const rows of value.byMessage.values()) for (const row of rows) if (row.replyMessageId !== null) ids.add(row.replyMessageId);
+    return ids;
+  }, [value]);
 }

@@ -109,7 +109,10 @@ export interface BackgroundJobResponse {
 export interface BackgroundJobOutcome {
   job_id: string;
   kind: BackgroundJobKind;
-  outcome: 'succeeded' | 'failed';
+  /** The job's status as the wake names it; a sub-agent a person stopped can come back `cancelled`. */
+  outcome: 'succeeded' | 'failed' | 'cancelled';
+  /** Why it failed, when the server names it ("stopped" is a person's Stop); absent on today's wakes. */
+  failure?: string | null;
   /** On an `agent_reply` job: who replied, and the start of the reply. */
   agent_reply?: AgentReplyOutcome;
 }
