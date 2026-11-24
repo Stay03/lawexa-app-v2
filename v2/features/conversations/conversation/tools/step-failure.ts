@@ -1,5 +1,8 @@
 import type { ToolMessage } from '@/types/chat';
+import { SOFTENED_LOOKUP_MISS, isSoftenedMiss } from '@/lib/utils/softened-miss';
 import { extractStepError } from './tool-content';
+
+export { SOFTENED_LOOKUP_MISS, isSoftenedMiss };
 
 /**
  * step-failure — what a step that didn't work says in an answer's list of
@@ -44,24 +47,6 @@ const LOOKED_FOR: Readonly<Record<string, string>> = {
 /** Error text that says the thing asked for is not there. */
 const NOT_FOUND =
   /\b(?:not found|no \w+(?: \w+)? match(?:es|ed)?|does(?: not|n't) exist|could(?: not|n't) find|no such|not exist)\b/i;
-
-/**
- * The server's own softening of a failed lookup (since d5045bf8, 22 October
- * 2026): a reader below researcher gets the step as a SUCCESS with this
- * sentence in place of the error, which drew a tick and "Read section 13" for
- * a read that found nothing. It is a lookup that found nothing.
- */
-export const SOFTENED_LOOKUP_MISS = 'That lookup found nothing, so Lawexa tried another way.';
-
-/** The softened miss, on a lazy row's `error` or in the fetched result's `message`. */
-function isSoftenedMiss(result: ToolMessage['toolResult']): boolean {
-  if (!result) return false;
-  if (result.error?.trim() === SOFTENED_LOOKUP_MISS) return true;
-  const { data } = result;
-  if (typeof data === 'string') return data.trim() === SOFTENED_LOOKUP_MISS;
-  const text = data && typeof data === 'object' ? (data as Record<string, unknown>).message : null;
-  return typeof text === 'string' && text.trim() === SOFTENED_LOOKUP_MISS;
-}
 
 /** A finished step that didn't work: marked failed, or the server's softened miss. */
 export function stepFailed(message: ToolMessage): boolean {

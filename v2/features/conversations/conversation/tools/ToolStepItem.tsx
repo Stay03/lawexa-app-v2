@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import { Brain, Check, ChevronDown, Loader2, X, type LucideIcon } from 'lucide-react';
+import { Brain, Check, ChevronDown, Loader2, Minus, X, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ToolCallDetails } from './ToolCallDetails';
@@ -26,7 +26,7 @@ import {
   isSearchLikeTool,
 } from './tool-content';
 import type { BatchCall, ToolMessage } from '@/types/chat';
-import { RUN_TOGETHER, batchGoal } from '@/lib/utils/tool-batch';
+import { RUN_TOGETHER, batchGoal, batchRowEnded } from '@/lib/utils/tool-batch';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 import { failedStepLine, stepFailed } from './step-failure';
 import { isBoxTool } from '@/v2/features/userbox/machine-model';
@@ -57,7 +57,8 @@ export function ToolStepMarker({
   icon: Icon,
   spin = true,
 }: {
-  status: 'loading' | 'success' | 'error';
+  /** `waiting` is a still dot; `halted` a dash, for a lookup that never finished or was stopped. */
+  status: 'loading' | 'success' | 'error' | 'waiting' | 'halted';
   icon?: LucideIcon;
   spin?: boolean;
 }) {
@@ -68,6 +69,10 @@ export function ToolStepMarker({
     >
       {status === 'error' ? (
         <X className="size-3" strokeWidth={2.5} />
+      ) : status === 'waiting' ? (
+        <span className="size-1.5 rounded-full bg-current opacity-60" />
+      ) : status === 'halted' ? (
+        <Minus className="size-3" strokeWidth={2.5} />
       ) : status === 'loading' ? (
         spin || !Icon ? (
           <Loader2 className="size-3 animate-spin motion-reduce:animate-none" />
@@ -482,27 +487,46 @@ export function ToolStepItem({
   );
 }
 
+/** Each lookup state's mark: a still dot waiting, a spinner working, a tick only when it worked. */
+const BATCH_ROW_MARK: Readonly<Record<BatchCall['state'], 'loading' | 'success' | 'error' | 'waiting' | 'halted'>> = {
+  waiting: 'waiting',
+  working: 'loading',
+  done: 'success',
+  failed: 'error',
+  unfinished: 'halted',
+  stopped: 'halted',
+};
+
+/** What follows a lookup that ended without working; a done one says nothing more. */
+const BATCH_ROW_OUTCOME: Partial<Record<BatchCall['state'], string>> = {
+  failed: 'did not work',
+  unfinished: 'did not finish',
+  stopped: 'stopped',
+};
+
 /**
  * A batch's lookups under its goal line (lib/utils/tool-batch.ts): each named
- * as a single step is named today ("Searched cases for …", "Read note …"),
- * each waiting, working, done or failed. A failed lookup keeps its grey mark,
- * as a failed step does (step-failure.ts), with "did not work" after its name.
+ * as a single step is named today ("Searched cases for …", "Read note …").
+ * A lookup that did not work keeps its grey mark, as a failed step does
+ * (step-failure.ts), with "did not work" after its name; one that never
+ * finished or was stopped gets a dash and says so.
  */
 function BatchRows({ calls }: { calls: readonly BatchCall[] }) {
   return (
     <ul aria-label="Lookups" className="ml-[9px] mt-1 flex flex-col gap-1 border-l border-border pb-1 pl-4">
       {calls.map((call, index) => {
-        const ended = call.state === 'done' || call.state === 'failed';
+        const ended = batchRowEnded(call);
         const { action, detail } = formatToolMessage(call.tool, call.arguments, ended, call.result, undefined, call.entityTitle);
+        const outcome = BATCH_ROW_OUTCOME[call.state];
         return (
           <li key={call.callId ?? index} className="flex min-w-0 items-center gap-2 text-[13px] leading-snug">
-            <ToolStepMarker status={call.state === 'failed' ? 'error' : ended ? 'success' : 'loading'} spin={call.state === 'working'} />
+            <ToolStepMarker status={BATCH_ROW_MARK[call.state]} />
             <span className="min-w-0 truncate">
               <span className="font-medium text-foreground">{action}</span>
               {detail ? <span className="text-muted-foreground"> {detail}</span> : null}
             </span>
-            {/* Outside the cut, so a long query never hides that the lookup failed (a phone cut it to "· di…"). */}
-            {call.state === 'failed' ? <span className="shrink-0 text-muted-foreground">· did not work</span> : null}
+            {/* Outside the cut, so a long query never hides how the lookup ended (a phone cut it to "· di…"). */}
+            {outcome ? <span className="shrink-0 text-muted-foreground">· {outcome}</span> : null}
           </li>
         );
       })}

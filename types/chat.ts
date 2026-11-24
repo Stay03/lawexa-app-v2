@@ -248,6 +248,8 @@ export interface ToolMessage extends ChatMessage {
   entityTitle?: string;
   /** A run_together step's lookups, each a sub-row under its goal line (tool-batch.ts). */
   batch?: BatchCall[];
+  /** A reloaded run_together step's own call id ("call_b"), so a followed turn's lookups find it. */
+  batchCallId?: string;
 }
 
 /** One lookup inside a run_together step (tool-batch.ts). */
@@ -255,7 +257,12 @@ export interface BatchCall {
   /** The lookup's tool ("search_cases", "get_note"). */
   tool: string;
   arguments: Record<string, unknown>;
-  state: 'waiting' | 'working' | 'done' | 'failed';
+  /**
+   * done and failed come from the lookup's own result; `unfinished` is a
+   * lookup the batch never said ended (it failed, or saved no result);
+   * `stopped` is one the reader's Stop cut off.
+   */
+  state: 'waiting' | 'working' | 'done' | 'failed' | 'unfinished' | 'stopped';
   /** Its id on the live stream ("call_b.1"); absent after a reload. */
   callId?: string;
   /** The live result, for the row's name (a read step names what it read). */
@@ -462,6 +469,8 @@ export interface ToolBatchCallingEvent {
   tool_call: ToolCall;
   tool_call_id: string;
   parent_tool_call_id: string;
+  /** The lookup's place in the batch, from 0, when the server sends it. */
+  i?: number;
   timestamp?: string;
   agent_slug?: string;
 }
@@ -474,6 +483,8 @@ export interface ToolBatchCompleteEvent {
   tool_call: ToolCall;
   tool_call_id: string;
   parent_tool_call_id: string;
+  /** The lookup's place in the batch, from 0, when the server sends it. */
+  i?: number;
   tool_result: ToolResult;
   latency_ms?: number;
   timestamp?: string;

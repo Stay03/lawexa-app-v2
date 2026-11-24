@@ -371,10 +371,18 @@ export function transformApiMessages(
         ...(toolResult?.metadata?.note_title || toolResult?.metadata?.case_title
           ? { entityTitle: toolResult.metadata.note_title || toolResult.metadata.case_title }
           : {}),
-        // A run_together step: its lookups from the saved call, each ended as batch_calls says
-        // (the inner events are never saved; lib/utils/tool-batch.ts).
+        // A run_together step: its lookups from the saved call, each ended as batch_calls
+        // or the saved result says, else unfinished (the inner events are never saved;
+        // lib/utils/tool-batch.ts). Its call id lets a followed running turn find it.
         ...(apiMsg.metadata.tool_name === RUN_TOGETHER
-          ? { batch: batchFromReload(apiMsg.metadata.tool_parameters || {}, toolResult?.metadata?.batch_calls ?? apiMsg.metadata.batch_calls) }
+          ? {
+              batch: batchFromReload(
+                apiMsg.metadata.tool_parameters || {},
+                toolResult?.metadata?.batch_calls ?? apiMsg.metadata.batch_calls,
+                parsedToolResult,
+              ),
+              ...(apiMsg.metadata.tool_call_id ? { batchCallId: apiMsg.metadata.tool_call_id } : {}),
+            }
           : {}),
       } as ToolMessage);
     }
