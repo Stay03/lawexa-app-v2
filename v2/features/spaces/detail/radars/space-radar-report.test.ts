@@ -13,10 +13,10 @@ const report = read('v2', 'features', 'radars', 'report', 'ScanReportScreen.tsx'
 
 test('the report page in a space wraps the same page in the space scope', () => {
   const screen = read('v2', 'features', 'spaces', 'detail', 'radars', 'SpaceRadarReportScreen.tsx');
-  assert.match(screen, /<RadarScopeProvider scope=\{\{ kind: 'space', spaceUuid \}\}>\s*<ScanReportScreen radarUuid=\{radarUuid\} scanUuid=\{scanUuid\} \/>/);
+  assert.match(screen, /<RadarScopeProvider scope=\{\{ kind: 'space', spaceUuid \}\}>\s*<ScanReportScreen radarUuid=\{radarUuid\} scanUuid=\{scanUuid\} initialSide=\{initialSide\} \/>/);
   assert.match(
     read('app', 'v2', '(collab)', 'spaces', '[spaceId]', 'radars', '[radarUuid]', 'scans', '[scanUuid]', 'page.tsx'),
-    /<SpaceRadarReportScreen\s+key=\{`\$\{spaceId\}:\$\{radarUuid\}:\$\{scanUuid\}`\}\s+spaceUuid=\{spaceId\}\s+radarUuid=\{radarUuid\}\s+scanUuid=\{scanUuid\}\s+\/>/,
+    /<SpaceRadarReportScreen\s+key=\{`\$\{spaceId\}:\$\{radarUuid\}:\$\{scanUuid\}`\}\s+spaceUuid=\{spaceId\}\s+radarUuid=\{radarUuid\}\s+scanUuid=\{scanUuid\}\s+initialSide=\{sidePanelSsrValue\(side\)\}\s+\/>/,
   );
 });
 

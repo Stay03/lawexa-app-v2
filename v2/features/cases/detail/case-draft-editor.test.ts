@@ -52,10 +52,10 @@ test('a case chat answer splits its draft into the main chat’s card', () => {
 test('the address is the main chat’s ?side=draft:N, owned by the case page, so Back closes it', () => {
   assert.deepEqual(parseSidePanelValue('draft:0'), { kind: 'draft', ordinal: 0 });
   const context = conversation('side-panel', 'SidePanelContext.tsx');
-  assert.match(context, /export function useSidePanelUrl\(\): SidePanelUrlState \{\s*const overlay = useUrlOverlay\(SIDE_PANEL_PARAM\);/);
+  assert.match(context, /export function useSidePanelUrl\(ssrValue: string \| null = null\): SidePanelUrlState \{\s*const overlay = useUrlOverlay\(SIDE_PANEL_PARAM, \{ ssrValue \}\);/);
   // One owner per param: the route's provider, or the host page; never both.
-  assert.match(context, /const url = useSidePanelUrl\(\);\s*return \(\s*<SidePanelValueProvider url=\{url\}[^>]*frame="beside">/);
-  assert.match(screen, /const draftUrl = useSidePanelUrl\(\);\s*const draftOpen = draftUrl\.target\?\.kind === 'draft';/);
+  assert.match(context, /const url = useSidePanelUrl\(initialSide\);\s*return \(\s*<SidePanelValueProvider url=\{url\}[^>]*frame="beside">/);
+  assert.match(screen, /const draftUrl = useSidePanelUrl\(initialSide\);\s*const draftOpen = draftUrl\.target\?\.kind === 'draft';/);
   assert.equal(embedded.match(/useSidePanelUrl\(/g), null);
   // The editor is drawn from the address alone, so Back (popstate) takes it away.
   assert.match(screen, /const editorShown = editorShownFor\(signedIn, desktop, draftOpen, showDocked, renderedChat\);/);
