@@ -329,3 +329,48 @@ test('a Stop mid-batch settles the open lookups to stopped; any other early end 
   assert.match(item, /const status = batchHalted \? 'halted' :/);
   assert.match(item, /failed: 'did not work',\s*unfinished: 'did not finish',\s*stopped: 'stopped',/);
 });
+
+test('a lookup the reader\'s Stop ended reads stopped, live and after a reload, never "did not work"', () => {
+  // Live: the server's own event for a stopped lookup carries stopped:true.
+  let live = batchFromParameters(parameters);
+  live = batchOnCalling(live, { callId: 'call_b.1', tool: 'search_cases' });
+  live = batchOnComplete(live, { callId: 'call_b.1', tool: 'search_cases', result: { success: false, data: null, error: 'TEST DATA stopped', stopped: true } });
+  assert.equal(live[0].state, 'stopped');
+  // Live, an event without the field first said "did not work"; the batch's end marks it stopped, and that wins.
+  let early = batchOnComplete(batchFromParameters(parameters), { callId: 'call_b.2', tool: 'search_notes', result: failed });
+  assert.equal(early[1].state, 'failed');
+  early = batchOnEnd(early, {
+    results: [
+      { i: 1, tool: 'search_cases', success: true },
+      { i: 2, tool: 'search_notes', success: false, error: 'TEST DATA stopped', stopped: true, ran: true },
+      { i: 3, tool: 'get_note', success: false, error: 'TEST DATA stopped', stopped: true, ran: false },
+      { i: 4, tool: 'search_statutes', success: false },
+    ],
+  });
+  assert.deepEqual(states(early), ['done', 'stopped', 'stopped', 'failed']);
+
+  // Reload: batch_calls carries stopped:true (cut off mid-run, or never started: both stopped).
+  const reloaded = savedBatch({ success: true, data: { results: [] }, error: null }, [
+    { i: 1, tool: 'search_cases', success: true, ran: true },
+    { i: 2, tool: 'search_notes', success: false, stopped: true, ran: true },
+    { i: 3, tool: 'get_note', success: false, stopped: true, ran: false },
+    { i: 4, tool: 'search_statutes', success: false, ran: true },
+  ]);
+  assert.deepEqual(states(reloaded.batch!), states(early));
+  // Only the saved results carry it (no batch_calls): the same.
+  const resultsOnly = savedBatch({
+    success: true,
+    data: {
+      results: [
+        { i: 1, tool: 'search_cases', success: true },
+        { i: 2, tool: 'search_notes', success: false, stopped: true },
+        { i: 3, tool: 'get_note', success: false, stopped: true },
+        { i: 4, tool: 'search_statutes', success: false },
+      ],
+    },
+    error: null,
+  });
+  assert.deepEqual(states(resultsOnly.batch!), ['done', 'stopped', 'stopped', 'failed']);
+  // The field means stopped only when true: false or missing reads as before.
+  assert.equal(batchFromReload(parameters, [{ i: 1, tool: 'search_cases', success: false, stopped: false }])[0].state, 'failed');
+});

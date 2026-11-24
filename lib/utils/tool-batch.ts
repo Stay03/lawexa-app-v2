@@ -6,7 +6,8 @@ export type { BatchCall };
 /**
  * run_together, the batch tool (Stay, thread 694678cf, 24 November 2026).
  * Lawexa sends one call with a goal ("Finding how courts treat SIM-swap
- * losses") and 2 to 8 lookups; the server runs them 4 at a time, in any order.
+ * losses") and 2 to 8 lookups; the server starts them together, and they end
+ * in any order.
  * The chat draws the goal as the step's line and each lookup as a sub-row
  * under it, named as a single step is named today. Pure, so a test pins it;
  * the engine and the reload feed it.
@@ -24,7 +25,11 @@ export type { BatchCall };
  * researcher ("That lookup found nothing, so Lawexa tried another way.",
  * success true) reads failed, as a single step does (step-failure.ts). A row
  * nothing settled reads `unfinished`, and one the reader's Stop cut off reads
- * `stopped`; neither is a tick (Techlead review, 24 November 2026).
+ * `stopped`; neither is a tick (Techlead review, 24 November 2026). The server
+ * marks a lookup its Stop ended with `stopped: true` (Backend, 24 November) on
+ * the end's results[] and the saved batch_calls, cut off or never started
+ * alike, so a reload says "stopped" as the live screen did; that field wins
+ * over its success:false.
  *
  * Every end and saved entry carries `i`, the lookup's place in
  * parameters.calls counted from 1 (Backend, tool_batch.py); a refused call
@@ -49,8 +54,12 @@ export function batchRowEnded(row: BatchCall): boolean {
   return row.state !== 'waiting' && row.state !== 'working';
 }
 
-/** A result's own words: done only when it worked and was not the server's softened miss. */
-function outcome(result: ToolResult): 'done' | 'failed' {
+/** The server's mark on a lookup the reader's Stop ended: `stopped: true`, present only when true. */
+const isStopped = (value: unknown): boolean => record(value).stopped === true;
+
+/** A result's own words: stopped when Stop ended it, done only when it worked and was not the softened miss. */
+function outcome(result: ToolResult): 'done' | 'failed' | 'stopped' {
+  if (isStopped(result)) return 'stopped';
   return result.success === true && !isSoftenedMiss(result) ? 'done' : 'failed';
 }
 
@@ -60,6 +69,7 @@ function entryResult(entry: Record<string, unknown>): ToolResult {
     success: entry.success === true,
     data: entry.result ?? null,
     error: typeof entry.error === 'string' ? entry.error : null,
+    ...(entry.stopped === true ? { stopped: true } : {}),
   };
 }
 
@@ -145,14 +155,17 @@ export function batchOnComplete(
 
 /**
  * tool_complete run_together: every lookup settles from the end's results.
- * A lookup its own result marked failed stays failed. One with no result
- * keeps the end its own event gave it, or reads unfinished.
+ * A lookup the end marks stopped reads stopped, even after its own event said
+ * it did not work. Otherwise one its own result marked failed stays failed,
+ * and one with no result keeps the end its own event gave it, or reads
+ * unfinished.
  */
 export function batchOnEnd(batch: readonly BatchCall[], data: unknown): BatchCall[] {
   const results = byRow(record(data).results, batch.length);
   return batch.map((row, index) => {
     const entry = results[index];
     if (!entry) return batchRowEnded(row) ? row : { ...row, state: 'unfinished' };
+    if (isStopped(entry)) return { ...row, state: 'stopped' };
     return { ...row, state: row.state === 'failed' ? 'failed' : outcome(entryResult(entry)) };
   });
 }
@@ -168,11 +181,23 @@ export function batchOnFollow(batch: readonly BatchCall[]): BatchCall[] {
 }
 
 /**
+ * One saved lookup's end: stopped when either record says Stop ended it;
+ * else batch_calls' real success flag (with the softened miss as failed);
+ * else the saved result's own entry; else unfinished.
+ */
+function savedState(call: Record<string, unknown> | undefined, entry: Record<string, unknown> | undefined, softened: boolean): BatchCallState {
+  if (isStopped(call) || isStopped(entry)) return 'stopped';
+  if (typeof call?.success === 'boolean') return call.success && !softened ? 'done' : 'failed';
+  return entry ? outcome(entryResult(entry)) : 'unfinished';
+}
+
+/**
  * A reloaded batch: its lookups from the saved call. Each ends as batch_calls
  * says (the real success flag, kept for every reader), or as the saved
  * result's own entry says, with the softened miss read as failed either way.
- * A lookup neither mentions, or one in a step with no saved result, reads
- * unfinished; the engine opens it again when it follows a turn still running.
+ * A lookup Stop ended reads stopped. A lookup neither mentions, or one in a
+ * step with no saved result, reads unfinished; the engine opens it again when
+ * it follows a turn still running.
  */
 export function batchFromReload(parameters: Record<string, unknown>, saved: unknown, result?: ToolResult): BatchCall[] {
   const rows = batchFromParameters(parameters);
@@ -183,15 +208,7 @@ export function batchFromReload(parameters: Record<string, unknown>, saved: unkn
     const entry = results[index];
     const softened = entry ? isSoftenedMiss(entryResult(entry)) : false;
     const title = call?.note_title ?? call?.case_title;
-    const state: BatchCallState =
-      typeof call?.success === 'boolean'
-        ? call.success && !softened
-          ? 'done'
-          : 'failed'
-        : entry
-          ? outcome(entryResult(entry))
-          : 'unfinished';
-    return { ...row, state, ...(typeof title === 'string' && title ? { entityTitle: title } : {}) };
+    return { ...row, state: savedState(call, entry, softened), ...(typeof title === 'string' && title ? { entityTitle: title } : {}) };
   });
 }
 

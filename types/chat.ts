@@ -425,6 +425,8 @@ export interface ToolResult {
   success: boolean;
   data: unknown;
   error: string | null;
+  /** A batch lookup the reader's Stop ended (run_together; present only when true). */
+  stopped?: boolean;
 }
 
 // Tool call display state
