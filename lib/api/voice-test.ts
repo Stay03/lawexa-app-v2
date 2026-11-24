@@ -36,6 +36,16 @@ export const voiceTestApi = {
   },
 
   /**
+   * The voice was cut off while reading a result: the reply in full and the
+   * part the caller heard, so the server keeps the unread rest and "carry on"
+   * reads exactly that (Stay's option B, 24 November 2026; Backend branch
+   * voice-cut-point). The turn is the one whose result the page last sent in.
+   */
+  cut: async (sessionUuid: string, turnUuid: string, cut: { full: string; spoken: string }): Promise<void> => {
+    await apiClient.post(`/voice-test/sessions/${sessionUuid}/turns/${turnUuid}/cut`, cut);
+  },
+
+  /**
    * The call ended; the server records its length and cost. `leaving`: the
    * tab is closing, so the request is sent with fetch's keepalive and outlives
    * the page.

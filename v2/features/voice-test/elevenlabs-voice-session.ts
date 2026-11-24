@@ -29,6 +29,8 @@ export class ElevenLabsVoiceSession implements VoiceSession {
       onError: (message) => handlers.onError(message || 'The call failed.'),
       onVadScore: ({ vadScore }) => handlers.onVad?.(vadScore),
       onInterruption: () => handlers.onInterrupted?.(),
+      onAgentResponseCorrection: ({ original_agent_response, corrected_agent_response }) =>
+        handlers.onCut?.({ full: original_agent_response, spoken: corrected_agent_response }),
     });
     if (this.ended) {
       await conversation.endSession();

@@ -29,6 +29,17 @@ export interface VoiceCallHandlers {
   onVad?: (score: number) => void;
   /** The caller (or a noise) cut the voice off mid-reply; the cut reply is never resumed. */
   onInterrupted?: () => void;
+  /**
+   * The voice was cut off: the reply it was saying in full, and the part the
+   * caller actually heard before the cut (ElevenLabs' agent_response_correction).
+   */
+  onCut?: (cut: VoiceCut) => void;
+}
+
+/** A reply cut off mid-way: all of it, and what was said before the cut. */
+export interface VoiceCut {
+  full: string;
+  spoken: string;
 }
 
 export interface VoiceCallStart {
