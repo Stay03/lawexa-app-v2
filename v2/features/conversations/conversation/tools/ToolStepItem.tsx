@@ -25,7 +25,8 @@ import {
   isMemoryTool,
   isSearchLikeTool,
 } from './tool-content';
-import type { ToolMessage } from '@/types/chat';
+import type { BatchCall, ToolMessage } from '@/types/chat';
+import { RUN_TOGETHER, batchGoal } from '@/lib/utils/tool-batch';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 import { failedStepLine, stepFailed } from './step-failure';
 import { isBoxTool } from '@/v2/features/userbox/machine-model';
@@ -108,6 +109,9 @@ export function formatToolMessage(
   const query = parameters.query as string | undefined;
 
   switch (toolName) {
+    // A batch's line is the goal Lawexa wrote; its lookups are sub-rows under it (BatchRows).
+    case RUN_TOGETHER:
+      return { action: batchGoal(parameters) ?? (isComplete ? 'Looked up several things together' : 'Looking up several things together') };
     case 'search_cases':
       return {
         action: isComplete ? 'Searched cases' : 'Searching cases',
@@ -402,6 +406,9 @@ export function ToolStepItem({
   const boxStep = isBoxTool(message.toolName);
   // Only in the chat's last answer: an older hand-over keeps the small button on its line.
   const handOver = message.toolName === HAND_OVER_TOOL && isComplete && inLastAnswer;
+  // A batch opens nothing: its lookups are the sub-rows under its line.
+  const batch = message.batch?.length ? message.batch : null;
+  const expandable = isComplete && !batch;
 
   return (
     <div className={cn('relative pb-1', className)}>
@@ -421,13 +428,13 @@ export function ToolStepItem({
         />
         <button
           type="button"
-          disabled={!isComplete}
-          aria-expanded={isExpanded}
-          aria-controls={bodyId}
-          onClick={() => isComplete && onToggle()}
+          disabled={!expandable}
+          aria-expanded={expandable ? isExpanded : undefined}
+          aria-controls={expandable ? bodyId : undefined}
+          onClick={() => expandable && onToggle()}
           className={cn(
             'flex min-h-6 flex-1 items-center gap-1.5 rounded-md py-0.5 pr-1 text-left transition-colors',
-            isComplete
+            expandable
               ? 'v2-interactive hover:bg-secondary/50 -mx-1.5 cursor-pointer px-1.5'
               : 'cursor-default',
           )}
@@ -447,7 +454,7 @@ export function ToolStepItem({
               {formatDuration(message.latencyMs)}
             </span>
           )}
-          {isComplete && (
+          {expandable && (
             <ChevronDown
               aria-hidden
               className={cn(
@@ -463,12 +470,41 @@ export function ToolStepItem({
       {/* Lawexa handed the machine over: its answer asks for Done, which is on the machine. */}
       {handOver ? <OpenMachineButton handOver /> : null}
 
-      <StepCollapse id={bodyId} open={isExpanded}>
+      {batch ? <BatchRows calls={batch} /> : null}
+
+      <StepCollapse id={bodyId} open={expandable && isExpanded}>
         <div className="border-border ml-[9px] mt-1.5 border-l pl-4">
           <LoadedToolStepBody result={loaded} showSearchResults={showSearchResults} />
         </div>
       </StepCollapse>
 
     </div>
+  );
+}
+
+/**
+ * A batch's lookups under its goal line (lib/utils/tool-batch.ts): each named
+ * as a single step is named today ("Searched cases for …", "Read note …"),
+ * each waiting, working, done or failed. A failed lookup keeps its grey mark,
+ * as a failed step does (step-failure.ts), with "did not work" after its name.
+ */
+function BatchRows({ calls }: { calls: readonly BatchCall[] }) {
+  return (
+    <ul aria-label="Lookups" className="ml-[9px] mt-1 flex flex-col gap-1 border-l border-border pb-1 pl-4">
+      {calls.map((call, index) => {
+        const ended = call.state === 'done' || call.state === 'failed';
+        const { action, detail } = formatToolMessage(call.tool, call.arguments, ended, call.result, undefined, call.entityTitle);
+        return (
+          <li key={call.callId ?? index} className="flex min-w-0 items-center gap-2 text-[13px] leading-snug">
+            <ToolStepMarker status={call.state === 'failed' ? 'error' : ended ? 'success' : 'loading'} spin={call.state === 'working'} />
+            <span className="min-w-0 truncate">
+              <span className="font-medium text-foreground">{action}</span>
+              {detail ? <span className="text-muted-foreground"> {detail}</span> : null}
+              {call.state === 'failed' ? <span className="text-muted-foreground"> · did not work</span> : null}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

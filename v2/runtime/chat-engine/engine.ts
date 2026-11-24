@@ -26,6 +26,7 @@ import { eventFromApi, transformApiMessages } from '@/lib/utils/transform-api-me
 import { applyJurisdiction } from '@/lib/utils/jurisdiction-payload';
 import { extractBlockedReason, extractUploadLimit } from '@/lib/utils/api-error';
 import { AuthedEventSource, CLOSED, CONNECTING } from '@/lib/stream/authed-event-source';
+import { RUN_TOGETHER, batchFromParameters, batchOnCalling, batchOnComplete, batchOnEnd } from '@/lib/utils/tool-batch';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import {
   isErrorMessage,
@@ -44,6 +45,9 @@ import {
   type CancelledEvent,
   type ToolCallingEvent,
   type ToolCompleteEvent,
+  type ToolBatchCallingEvent,
+  type ToolBatchCompleteEvent,
+  type BatchCall,
   type IterationEvent,
   type HandoverStartedEvent,
   type HandoverCompleteEvent,
@@ -513,6 +517,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   // agent) in the order the calls came.
   const toolCalls = createCallMatcher();
   const handovers = createCallMatcher();
+  /** A run_together step's message by its tool_call_id, so its lookups' events find it (lib/utils/tool-batch.ts). */
+  const batches = new Map<string, string>();
   // Ref-based cancel guard — immune to React batching / stale closures.
   let isCancelling = false;
   let disposed = false;
@@ -634,9 +640,20 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       toolParameters: toolCall.tool_call.parameters,
       toolStatus: 'calling',
       agentSlug: toolCall.agent_slug,
+      // A batch's lookups, waiting, as sub-rows under its goal line.
+      ...(toolCall.tool_call.name === RUN_TOGETHER ? { batch: batchFromParameters(toolCall.tool_call.parameters) } : {}),
     };
     setMessages((msgs) => [...msgs, toolMessage]);
     return id;
+  }
+
+  /** One lookup of a batch moved: the batch's step is found by its id, the row by the lookup's. */
+  function updateBatch(parentCallId: string, change: (batch: readonly BatchCall[]) => BatchCall[]) {
+    const msgId = batches.get(parentCallId);
+    if (!msgId) return;
+    setMessages((msgs) =>
+      msgs.map((msg) => (msg.id === msgId && (msg as ToolMessage).batch ? ({ ...msg, batch: change((msg as ToolMessage).batch!) } as ToolMessage) : msg)),
+    );
   }
 
   function addHandoverMessage(event: HandoverStartedEvent): string {
@@ -701,6 +718,8 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
               toolResult: event.tool_result,
               toolStatus: 'complete',
               latencyMs: event.latency_ms,
+              // A batch settles every lookup from its results, in input order.
+              ...((msg as ToolMessage).batch ? { batch: batchOnEnd((msg as ToolMessage).batch!, event.tool_result?.data) } : {}),
             } as ToolMessage)
           : msg,
       ),
@@ -838,6 +857,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     executionId = null;
     isCancelling = false;
     toolCalls.clear();
+    batches.clear();
     handovers.clear();
     resetStreamingBuffers();
     turnsAwaitingIds = 0;
@@ -1485,8 +1505,33 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (!event) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       if (event.tool_call.name === '_handover') return;
-      toolCalls.open(event.tool_call.name, addToolMessage(event), event.tool_call_id);
+      const msgId = addToolMessage(event);
+      toolCalls.open(event.tool_call.name, msgId, event.tool_call_id);
+      if (event.tool_call.name === RUN_TOGETHER && event.tool_call_id) batches.set(event.tool_call_id, msgId);
       handlers.onToolCalling?.(event);
+    });
+
+    // tool_batch_calling / tool_batch_complete — one lookup of a run_together
+    // batch started or ended. They run 4 at a time and end in any order, so each
+    // is matched by its own tool_call_id under its batch's (lib/utils/tool-batch.ts).
+    es.addEventListener('tool_batch_calling', (e) => {
+      lastEventTime = Date.now();
+      markDataEvent();
+      const event = parseEvent<ToolBatchCallingEvent>((e as MessageEvent).data);
+      if (!event?.parent_tool_call_id || !event.tool_call_id) return;
+      if (event.seq !== undefined && dedup.has(event.seq)) return;
+      updateBatch(event.parent_tool_call_id, (batch) => batchOnCalling(batch, { callId: event.tool_call_id, tool: event.tool_call.name }));
+    });
+
+    es.addEventListener('tool_batch_complete', (e) => {
+      lastEventTime = Date.now();
+      markDataEvent();
+      const event = parseEvent<ToolBatchCompleteEvent>((e as MessageEvent).data);
+      if (!event?.parent_tool_call_id || !event.tool_call_id) return;
+      if (event.seq !== undefined && dedup.has(event.seq)) return;
+      updateBatch(event.parent_tool_call_id, (batch) =>
+        batchOnComplete(batch, { callId: event.tool_call_id, tool: event.tool_call.name, result: event.tool_result, latencyMs: event.latency_ms }),
+      );
     });
 
     // tool_complete — close the row with this tool_call_id, else the oldest open
@@ -1839,6 +1884,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       executionId = null;
       isCancelling = false;
       toolCalls.clear();
+      batches.clear();
       handovers.clear();
 
       // CANCELLED: user-initiated stop — NOT an error. The placeholder's
@@ -1895,6 +1941,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       executionId = null;
       isCancelling = false;
       toolCalls.clear();
+      batches.clear();
       handovers.clear();
       stopOpenPlaceholder();
       resetStreamingBuffers();
@@ -1938,6 +1985,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       settledExecutions.add(execId);
       isCancelling = false;
       toolCalls.clear();
+      batches.clear();
       handovers.clear();
       const errorMsg = 'Stream timed out';
       const failedTurn = parseEvent<{ discard_partial?: boolean }>((e as MessageEvent).data)?.discard_partial === true;
@@ -2005,6 +2053,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         executionId = null;
         isCancelling = false;
         toolCalls.clear();
+        batches.clear();
         handovers.clear();
         resetStreamingBuffers();
         const error = 'Authentication required';
@@ -2180,6 +2229,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
   function closeFinishedTurn(): void {
     isCancelling = false;
     toolCalls.clear();
+    batches.clear();
     handovers.clear();
     const placeholderId = streamingMessageId;
     if (placeholderId) {
@@ -2271,6 +2321,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     streamingMessageId = null;
     currentIteration = null;
     toolCalls.clear();
+    batches.clear();
     handovers.clear();
     isCancelling = false;
     if (eventSource) {

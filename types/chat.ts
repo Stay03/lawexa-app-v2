@@ -246,6 +246,23 @@ export interface ToolMessage extends ChatMessage {
   /** The title of the note or case a read step opened, from the result's
    *  metadata, so a closed step can name it without loading the result. */
   entityTitle?: string;
+  /** A run_together step's lookups, each a sub-row under its goal line (tool-batch.ts). */
+  batch?: BatchCall[];
+}
+
+/** One lookup inside a run_together step (tool-batch.ts). */
+export interface BatchCall {
+  /** The lookup's tool ("search_cases", "get_note"). */
+  tool: string;
+  arguments: Record<string, unknown>;
+  state: 'waiting' | 'working' | 'done' | 'failed';
+  /** Its id on the live stream ("call_b.1"); absent after a reload. */
+  callId?: string;
+  /** The live result, for the row's name (a read step names what it read). */
+  result?: ToolResult;
+  /** The note or case a read lookup opened, from the saved batch_calls. */
+  entityTitle?: string;
+  latencyMs?: number;
 }
 
 // Handover message - when orchestrator delegates to a sub-agent
@@ -434,6 +451,32 @@ export interface ToolCallingEvent {
   tool_call_id?: string;
   timestamp: string;
   context?: 'handover';
+  agent_slug?: string;
+}
+
+/** One lookup of a run_together batch started (Backend, 24 November 2026); `parent_tool_call_id` is the batch's. */
+export interface ToolBatchCallingEvent {
+  seq?: number;
+  iteration?: number;
+  status?: 'tool_batch_calling';
+  tool_call: ToolCall;
+  tool_call_id: string;
+  parent_tool_call_id: string;
+  timestamp?: string;
+  agent_slug?: string;
+}
+
+/** One lookup of a run_together batch ended, in any order; matched by `tool_call_id`. */
+export interface ToolBatchCompleteEvent {
+  seq?: number;
+  iteration?: number;
+  status?: 'tool_batch_complete';
+  tool_call: ToolCall;
+  tool_call_id: string;
+  parent_tool_call_id: string;
+  tool_result: ToolResult;
+  latency_ms?: number;
+  timestamp?: string;
   agent_slug?: string;
 }
 
@@ -985,6 +1028,8 @@ export interface ApiMessage {
     // The note or case a read step opened, for its label (Stay's #13).
     note_title?: string;
     case_title?: string;
+    // A run_together result: how each lookup ended, in input order (the inner events are never saved).
+    batch_calls?: Array<{ i?: number; tool?: string; success?: boolean; note_title?: string; case_title?: string }>;
     error?: string;
     // Error message fields
     error_code?: string;
