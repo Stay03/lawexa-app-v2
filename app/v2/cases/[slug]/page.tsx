@@ -1,3 +1,4 @@
+import { sidePanelSsrValue } from '@/v2/features/conversations/conversation/side-panel/side-panel-value';
 import type { Metadata } from 'next';
 import { HydrationBoundary } from '@tanstack/react-query';
 
@@ -21,7 +22,8 @@ import { prefetchCaseDetailState } from '@/v2/features/cases/server';
  */
 interface CasePageProps {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ q?: string }>;
+  /** `?side=`: a panel beside the case's chat (a draft, a file), drawn by the server as the browser will. */
+  searchParams: Promise<{ q?: string; side?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: CasePageProps): Promise<Metadata> {
@@ -98,7 +100,8 @@ export default async function V2CasePage({ params, searchParams }: CasePageProps
   const { slug } = await params;
   // `?q=` is part of the case query's key (read attribution), read here so the
   // server fills the exact entry the screen reads.
-  const searchQuery = (await searchParams).q?.trim() || undefined;
+  const search = await searchParams;
+  const searchQuery = search.q?.trim() || undefined;
 
   // The case in the first HTML for a signed-in reader, fetched with their own
   // session, so it is theirs alone (bookmark state, view allowance). Absent
@@ -107,7 +110,7 @@ export default async function V2CasePage({ params, searchParams }: CasePageProps
 
   return (
     <HydrationBoundary state={state}>
-      <CaseScreen slug={slug} />
+      <CaseScreen slug={slug} initialSide={sidePanelSsrValue(search.side)} />
     </HydrationBoundary>
   );
 }

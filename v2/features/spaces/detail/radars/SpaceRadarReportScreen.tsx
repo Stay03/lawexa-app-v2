@@ -19,14 +19,17 @@ export function SpaceRadarReportScreen({
   spaceUuid,
   radarUuid,
   scanUuid,
+  initialSide = null,
 }: {
   spaceUuid: string;
   radarUuid: string;
   scanUuid: string;
+  /** The page's `?side=` (useSidePanelUrl). */
+  initialSide?: string | null;
 }) {
   return (
     <RadarScopeProvider scope={{ kind: 'space', spaceUuid }}>
-      <ScanReportScreen radarUuid={radarUuid} scanUuid={scanUuid} />
+      <ScanReportScreen radarUuid={radarUuid} scanUuid={scanUuid} initialSide={initialSide} />
     </RadarScopeProvider>
   );
 }

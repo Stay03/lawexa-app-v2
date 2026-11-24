@@ -1,3 +1,4 @@
+import { sidePanelSsrValue } from '@/v2/features/conversations/conversation/side-panel/side-panel-value';
 import type { Metadata } from 'next';
 import { fetchConversationForMetadata } from '@/lib/api/server';
 import { SEO, getAppUrl } from '@/lib/constants/seo';
@@ -31,7 +32,7 @@ interface ConversationPageProps {
   params: Promise<{ conversationId: string }>;
   /** `?m={id}`: a message to go to once the chat opens (jump-target.ts).
    *  `?game={uuid}`: a Space chat's live quiz to open over it (a notification). */
-  searchParams: Promise<{ m?: string | string[]; game?: string | string[] }>;
+  searchParams: Promise<{ m?: string | string[]; game?: string | string[]; side?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: ConversationPageProps): Promise<Metadata> {
@@ -122,13 +123,14 @@ export const unstable_dynamicStaleTime = 1800;
 export default async function V2ConversationPage({ params, searchParams }: ConversationPageProps) {
   // The only remaining awaits: the route params and the query, which cost no I/O.
   const { conversationId } = await params;
-  const { m, game } = await searchParams;
+  const { m, game, side } = await searchParams;
 
   return (
     <ConversationScreen
       conversationId={conversationId}
       jumpTo={jumpTarget(m)}
       initialGameUuid={typeof game === 'string' && game !== '' ? game : null}
+      initialSide={sidePanelSsrValue(side)}
     />
   );
 }

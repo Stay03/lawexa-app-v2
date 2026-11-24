@@ -1,3 +1,4 @@
+import { sidePanelSsrValue } from '@/v2/features/conversations/conversation/side-panel/side-panel-value';
 import type { Metadata } from 'next';
 
 import { SEO, getAppUrl } from '@/lib/constants/seo';
@@ -22,6 +23,8 @@ import { ScanReportScreen } from '@/v2/features/radars/report/ScanReportScreen';
  */
 interface ReportPageProps {
   params: Promise<{ radarUuid: string; scanUuid: string }>;
+  /** `?side=`: a draft beside the report's chat. */
+  searchParams: Promise<{ side?: string | string[] }>;
 }
 
 /**
@@ -103,7 +106,8 @@ export async function generateMetadata({
  */
 export const unstable_dynamicStaleTime = 300;
 
-export default async function V2ScanReportPage({ params }: ReportPageProps) {
+export default async function V2ScanReportPage({ params, searchParams }: ReportPageProps) {
   const { radarUuid, scanUuid } = await params;
-  return <ScanReportScreen radarUuid={radarUuid} scanUuid={scanUuid} />;
+  const { side } = await searchParams;
+  return <ScanReportScreen radarUuid={radarUuid} scanUuid={scanUuid} initialSide={sidePanelSsrValue(side)} />;
 }

@@ -78,9 +78,12 @@ function splitReport(report: string): string {
 export function ScanReportScreen({
   radarUuid,
   scanUuid,
+  initialSide = null,
 }: {
   radarUuid: string;
   scanUuid: string;
+  /** The page's `?side=` (useSidePanelUrl), so the server draws the panel the browser will. */
+  initialSide?: string | null;
 }) {
   const { signedIn, userId: viewerId, role } = useV2Session();
   // A personal report, or one in a space (`scope-context`): the same page.
@@ -138,7 +141,7 @@ export function ScanReportScreen({
   // report's own read, else the Radar's) and where this report's drafts start
   // among the chat's (`draft_offset`, report-drafts.ts). A reader without
   // either sees each draft's text in place (DraftCard with no panel).
-  const sideUrl = useSidePanelUrl();
+  const sideUrl = useSidePanelUrl(initialSide);
   const draftChatUuid = isOwner
     ? (ownerScan?.conversation_uuid ?? radarQuery.data?.data.conversation_uuid ?? null)
     : null;

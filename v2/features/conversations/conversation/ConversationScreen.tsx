@@ -98,6 +98,7 @@ export function ConversationScreen({
   embed,
   jumpTo = null,
   initialGameUuid = null,
+  initialSide = null,
 }: {
   conversationId: string;
   /** Present when this screen lives inside another route (the case page's
@@ -107,6 +108,8 @@ export function ConversationScreen({
   jumpTo?: number | null;
   /** A Space chat's live quiz to open over it once the chat has opened (`?game=`). */
   initialGameUuid?: string | null;
+  /** The page's `?side=` (a panel beside the chat), so the server draws it as the browser will. */
+  initialSide?: string | null;
 }) {
   const { userId: serverUserId } = useV2Session();
   const controller = useConversationController(conversationId, serverUserId, embed);
@@ -610,7 +613,7 @@ export function ConversationScreen({
                 transcript
               )
             ) : (
-              <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} keys={draftKeys} space={controller.space}>
+              <SidePanelProvider offsets={offsets} versions={draftVersions} titles={draftTitles} keys={draftKeys} space={controller.space} initialSide={initialSide}>
                 <div className="flex h-full min-h-0">
                   {transcript}
                   <SidePanelSlot messages={messages} streamingText={streamingText} onMachineResumed={onMachineResumed} />

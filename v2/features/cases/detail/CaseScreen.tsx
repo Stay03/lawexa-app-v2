@@ -69,12 +69,12 @@ const KeyboardDebugReadout = dynamic(
  * same mechanic as the home tabs' dock, and the same reachable-composer feel as
  * the conversation screen).
  */
-export function CaseScreen({ slug }: { slug: string }) {
+export function CaseScreen({ slug, initialSide = null }: { slug: string; /** The page's `?side=` (useSidePanelUrl). */ initialSide?: string | null }) {
   return (
     // `useSearchParams` (the `?q=` read-attribution parameter) requires a
     // boundary; the fallback is the document skeleton at the real geometry.
     <Suspense fallback={<CaseFallback />}>
-      <CaseBody slug={slug} />
+      <CaseBody slug={slug} initialSide={initialSide} />
     </Suspense>
   );
 }
@@ -90,7 +90,7 @@ function editorShownFor(
   return signedIn && desktop && draftOpen && showDocked && renderedChat !== 'new';
 }
 
-function CaseBody({ slug }: { slug: string }) {
+function CaseBody({ slug, initialSide }: { slug: string; initialSide: string | null }) {
   const { signedIn: sessionSignedIn, userId, role } = useV2Session();
   // The chat belongs to an account; a guest pass reads the case and meets the
   // chat as a visitor (v2/runtime/account.ts).
@@ -104,7 +104,7 @@ function CaseBody({ slug }: { slug: string }) {
   // `?side=draft:N`, the main chat's own address, so Back closes it. This page
   // owns the param (side-panel-host.tsx): on a computer the chat is docked
   // while it is open, and the editor covers the reading left of the chat.
-  const draftUrl = useSidePanelUrl();
+  const draftUrl = useSidePanelUrl(initialSide);
   const draftOpen = draftUrl.target?.kind === 'draft';
 
   // The chat this page hosts: open/close/switch, the presentation, and the

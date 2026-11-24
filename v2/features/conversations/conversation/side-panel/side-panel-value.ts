@@ -27,6 +27,16 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const SIDE_PANEL_PARAM = 'side';
 
+/**
+ * A page's `?side=` as its server render reads it (Next's `searchParams`: a
+ * string, several, or none), for `useSidePanelUrl`'s `ssrValue`: the first
+ * value, or null when there is none. The browser reads the live URL itself.
+ */
+export function sidePanelSsrValue(side: string | string[] | undefined): string | null {
+  const value = Array.isArray(side) ? side[0] : side;
+  return value ? value : null;
+}
+
 export function sidePanelValue(target: SidePanelTarget): string {
   switch (target.kind) {
     case 'draft':

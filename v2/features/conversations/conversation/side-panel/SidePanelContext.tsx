@@ -96,9 +96,16 @@ export function useSidePanel(): SidePanelApi | null {
   return useContext(SidePanelContext);
 }
 
-/** The `?side=` param as panel state. Call it once per page, in the param's owner. */
-export function useSidePanelUrl(): SidePanelUrlState {
-  const overlay = useUrlOverlay(SIDE_PANEL_PARAM);
+/**
+ * The `?side=` param as panel state. Call it once per page, in the param's owner.
+ *
+ * `ssrValue` is the page's own `?side=` (its `searchParams`), read on the server.
+ * Without it the server drew no panel while the browser's first render read the
+ * URL and drew one, so every `?side=` link opened by reload or a shared link threw
+ * away the server's HTML (React's hydration error; 24 November 2026).
+ */
+export function useSidePanelUrl(ssrValue: string | null = null): SidePanelUrlState {
+  const overlay = useUrlOverlay(SIDE_PANEL_PARAM, { ssrValue });
   const target = useMemo(() => parseSidePanelValue(overlay.value), [overlay.value]);
   // The value that started closing, so a new open in the meantime is not closed by it.
   const [closingValue, setClosingValue] = useState<string | null>(null);
@@ -135,6 +142,7 @@ export function SidePanelProvider({
   titles,
   keys,
   space,
+  initialSide = null,
   children,
 }: {
   offsets: ReadonlyMap<string, number>;
@@ -142,9 +150,11 @@ export function SidePanelProvider({
   titles?: DraftTitleLookup;
   keys?: DraftKeysLookup;
   space: ConversationSpaceRef | null;
+  /** The page's `?side=`, so the server draws the same panel the browser does (`useSidePanelUrl`). */
+  initialSide?: string | null;
   children: ReactNode;
 }) {
-  const url = useSidePanelUrl();
+  const url = useSidePanelUrl(initialSide);
   return (
     <SidePanelValueProvider url={url} offsets={offsets} versions={versions} titles={titles} keys={keys} space={space} frame="beside">
       {children}
