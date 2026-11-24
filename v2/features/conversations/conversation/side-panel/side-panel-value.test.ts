@@ -32,6 +32,18 @@ test('on the server, the side panel param reads the value the page passed, as th
   assert.equal(renderToString(createElement(Probe, { ssrValue: null })), '<p>closed</p>');
 });
 
+test('an empty ?side= opens nothing: not on the server, and not as a target', () => {
+  // `/c/{id}?side=` (the param present, no value): Next hands the page an empty string.
+  const ssrValue = sidePanelSsrValue('');
+  assert.equal(ssrValue, null);
+  function Probe() {
+    const overlay = useUrlOverlay(SIDE_PANEL_PARAM, { ssrValue });
+    return createElement('p', null, overlay.value ?? 'closed');
+  }
+  assert.equal(renderToString(createElement(Probe)), '<p>closed</p>');
+  assert.equal(parseSidePanelValue(''), null);
+});
+
 test('every page that hosts a side panel passes its own ?side= to the server render', () => {
   const read = (...path: string[]) => readFileSync(join(process.cwd(), ...path), 'utf8');
   const pages: Array<[string[], RegExp]> = [
