@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 
 import { useUrlOverlay } from '@/v2/runtime/use-url-overlay';
-import { SIDE_PANEL_PARAM, sidePanelSsrValue } from './side-panel-value';
+import { SIDE_PANEL_PARAM, parseSidePanelValue, sidePanelSsrValue } from './side-panel-value';
 
 /* A `?side=` link opened by reload or shared (24 November 2026): the server drew
  * no panel while the browser's first render read the URL and drew one, and React
