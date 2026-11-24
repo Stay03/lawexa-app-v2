@@ -500,8 +500,9 @@ function BatchRows({ calls }: { calls: readonly BatchCall[] }) {
             <span className="min-w-0 truncate">
               <span className="font-medium text-foreground">{action}</span>
               {detail ? <span className="text-muted-foreground"> {detail}</span> : null}
-              {call.state === 'failed' ? <span className="text-muted-foreground"> · did not work</span> : null}
             </span>
+            {/* Outside the cut, so a long query never hides that the lookup failed (a phone cut it to "· di…"). */}
+            {call.state === 'failed' ? <span className="shrink-0 text-muted-foreground">· did not work</span> : null}
           </li>
         );
       })}
