@@ -469,8 +469,6 @@ export interface ToolBatchCallingEvent {
   tool_call: ToolCall;
   tool_call_id: string;
   parent_tool_call_id: string;
-  /** The lookup's place in the batch, from 0, when the server sends it. */
-  i?: number;
   timestamp?: string;
   agent_slug?: string;
 }
@@ -483,8 +481,6 @@ export interface ToolBatchCompleteEvent {
   tool_call: ToolCall;
   tool_call_id: string;
   parent_tool_call_id: string;
-  /** The lookup's place in the batch, from 0, when the server sends it. */
-  i?: number;
   tool_result: ToolResult;
   latency_ms?: number;
   timestamp?: string;

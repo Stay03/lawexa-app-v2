@@ -26,8 +26,11 @@ export type { BatchCall };
  * nothing settled reads `unfinished`, and one the reader's Stop cut off reads
  * `stopped`; neither is a tick (Techlead review, 24 November 2026).
  *
- * Every saved and end entry carries `i`, the lookup's place from 0; a row is
- * found by it, and by its position when it is missing.
+ * Every end and saved entry carries `i`, the lookup's place in
+ * parameters.calls counted from 1 (Backend, tool_batch.py); a refused call
+ * keeps its place. A row is found by it, and by the entry's position when it
+ * is missing. The inner events carry no `i`: their id ends in the same place
+ * ("call_b.3" is i 3).
  */
 export const RUN_TOGETHER = 'run_together';
 
@@ -60,13 +63,14 @@ function entryResult(entry: Record<string, unknown>): ToolResult {
   };
 }
 
-/** Entries by row: each at its `i` when it has one in range, else at its position. */
+/** Entries by row: each at its `i` (from 1) when it has one in range, else at its position. */
 function byRow(entries: unknown, rows: number): Array<Record<string, unknown> | undefined> {
   const placed: Array<Record<string, unknown> | undefined> = new Array(rows).fill(undefined);
   if (!Array.isArray(entries)) return placed;
   entries.forEach((value, position) => {
     const entry = record(value);
-    const at = Number.isInteger(entry.i) && (entry.i as number) >= 0 && (entry.i as number) < rows ? (entry.i as number) : position;
+    const place = entry.i as number;
+    const at = Number.isInteger(place) && place >= 1 && place <= rows ? place - 1 : position;
     if (at < rows && !placed[at]) placed[at] = entry;
   });
   return placed;
@@ -78,33 +82,36 @@ export function batchGoal(parameters: Record<string, unknown>): string | null {
   return typeof goal === 'string' && goal.trim() ? goal.trim() : null;
 }
 
-/** The lookups, waiting, in the order Lawexa asked for them. */
+/**
+ * The lookups, waiting, in the order Lawexa asked for them. One row per call,
+ * a call with no tool name too (the server refuses it, and it keeps its
+ * place), so a row's place is the `i` the server counts.
+ */
 export function batchFromParameters(parameters: Record<string, unknown>): BatchCall[] {
   const calls = Array.isArray(parameters.calls) ? (parameters.calls as CallSpec[]) : [];
-  return calls
-    .filter((call) => typeof call?.tool === 'string' && call.tool)
-    .map((call) => ({ tool: call.tool as string, arguments: record(call.arguments), state: 'waiting' as const }));
+  return calls.map((call) => ({
+    tool: typeof call?.tool === 'string' && call.tool ? call.tool : 'unknown',
+    arguments: record(call?.arguments),
+    state: 'waiting' as const,
+  }));
 }
 
 interface InnerEvent {
   callId: string;
   tool: string;
-  /** The lookup's place from 0, when the event carries `i`. */
-  index?: number;
 }
 
 /**
  * The row an inner event belongs to. A row already given this id wins, so a
- * completion finds the row its start moved. Else the row at the event's `i`;
- * else the place its id ends in ("call_b.3" is the third lookup); either only
- * when the tool matches and the row has no id yet. Else the first waiting row
- * for that tool, so an id in another form still lands somewhere.
+ * completion finds the row its start moved. Else the place its id ends in
+ * ("call_b.3" is the third lookup), when the tool matches and the row has no
+ * id yet. Else the first waiting row for that tool, so an id in another form
+ * still lands somewhere.
  */
 function rowFor(batch: readonly BatchCall[], event: InnerEvent): number {
   const known = batch.findIndex((row) => row.callId === event.callId);
   if (known >= 0) return known;
   const free = (at: number) => batch[at]?.tool === event.tool && !batch[at].callId;
-  if (Number.isInteger(event.index) && free(event.index!)) return event.index!;
   const place = Number(event.callId.slice(event.callId.lastIndexOf('.') + 1));
   if (Number.isInteger(place) && place >= 1 && free(place - 1)) return place - 1;
   return batch.findIndex((row) => row.tool === event.tool && !row.callId && row.state === 'waiting');

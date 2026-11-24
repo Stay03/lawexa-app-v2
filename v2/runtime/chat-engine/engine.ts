@@ -1580,7 +1580,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       if (!event?.parent_tool_call_id || !event.tool_call_id) return;
       if (event.seq !== undefined && dedup.has(event.seq)) return;
       updateBatch(event.parent_tool_call_id, (batch) =>
-        batchOnCalling(batch, { callId: event.tool_call_id, tool: event.tool_call.name, index: event.i }),
+        batchOnCalling(batch, { callId: event.tool_call_id, tool: event.tool_call.name }),
       );
     });
 
@@ -1594,7 +1594,6 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
         batchOnComplete(batch, {
           callId: event.tool_call_id,
           tool: event.tool_call.name,
-          index: event.i,
           result: event.tool_result,
           latencyMs: event.latency_ms,
         }),

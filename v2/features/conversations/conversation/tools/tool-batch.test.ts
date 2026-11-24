@@ -80,10 +80,10 @@ test('a failed lookup reads failed, and the others go on', () => {
     done: 3,
     failed: 1,
     results: [
-      { i: 0, tool: 'search_cases', success: false, error: null },
-      { i: 1, tool: 'search_notes', success: true },
-      { i: 2, tool: 'get_note', success: true },
-      { i: 3, tool: 'search_statutes', success: true },
+      { i: 1, tool: 'search_cases', success: false, error: null },
+      { i: 2, tool: 'search_notes', success: true },
+      { i: 3, tool: 'get_note', success: true },
+      { i: 4, tool: 'search_statutes', success: true },
     ],
   });
   assert.deepEqual(states(batch), ['failed', 'done', 'done', 'done']);
@@ -102,10 +102,10 @@ test('after a reload: the same rows from the saved call and batch_calls, with th
       metadata: {
         type: 'tool_result', iteration: 1, tool_call_id: 'call_b', tool_name: RUN_TOGETHER,
         batch_calls: [
-          { i: 0, tool: 'search_cases', success: true },
-          { i: 1, tool: 'search_notes', success: false },
-          { i: 2, tool: 'get_note', success: true, note_title: 'TEST DATA SIM-swap liability note' },
-          { i: 3, tool: 'search_statutes', success: true },
+          { i: 1, tool: 'search_cases', success: true },
+          { i: 2, tool: 'search_notes', success: false },
+          { i: 3, tool: 'get_note', success: true, note_title: 'TEST DATA SIM-swap liability note' },
+          { i: 4, tool: 'search_statutes', success: true },
         ],
       },
     } as ApiMessage,
@@ -115,6 +115,15 @@ test('after a reload: the same rows from the saved call and batch_calls, with th
   assert.equal(step.toolStatus, 'complete');
   assert.deepEqual(states(step.batch!), ['done', 'failed', 'done', 'done']);
   assert.equal(step.batch![2].entityTitle, 'TEST DATA SIM-swap liability note');
+  // i counts from 1: batch_calls' first entry is the first lookup, never the second.
+  const first = batchFromReload(parameters, [{ i: 1, tool: 'search_cases', success: false }]);
+  assert.deepEqual(states(first), ['failed', 'unfinished', 'unfinished', 'unfinished']);
+  // A call the server refused (no tool) keeps its place, so the rows after it keep theirs.
+  const refused = batchFromReload({ calls: [{ arguments: {} }, { tool: 'get_note', arguments: { note_id: 1 } }] }, [
+    { i: 1, success: false },
+    { i: 2, tool: 'get_note', success: true },
+  ]);
+  assert.deepEqual(states(refused), ['failed', 'done']);
   // Saved without batch_calls or results: nothing says any lookup worked, so none is a tick.
   assert.deepEqual(states(batchFromReload(parameters, undefined)), ['unfinished', 'unfinished', 'unfinished', 'unfinished']);
 });
@@ -152,7 +161,7 @@ const savedBatch = (result: Record<string, unknown> | null, batchCalls?: unknown
   return transformApiMessages(rows).find((message) => message.role === 'tool') as ToolMessage;
 };
 
-test('two lookups with the same tool each land on their own row, by place or by i', () => {
+test('two lookups with the same tool each land on their own row, by their id or by i', () => {
   const twice = {
     goal: 'TEST DATA two case searches',
     calls: [
@@ -169,27 +178,19 @@ test('two lookups with the same tool each land on their own row, by place or by 
   assert.deepEqual([batch[0].callId, batch[1].callId], ['call_b.1', 'call_b.2']);
   batch = batchOnComplete(batch, { callId: 'call_b.1', tool: 'search_cases', result: ok() });
   assert.deepEqual(states(batch), ['done', 'failed', 'waiting']);
-  // An id that carries no place: the event's i (from 0) finds the row.
-  let byIndex = batchFromParameters(twice);
-  byIndex = batchOnComplete(byIndex, { callId: 'inner-x', tool: 'search_cases', index: 1, result: ok() });
-  assert.deepEqual(states(byIndex), ['waiting', 'done', 'waiting']);
-  // i wins over the id's place when both are there.
-  let both = batchFromParameters(twice);
-  both = batchOnCalling(both, { callId: 'call_b.1', tool: 'search_cases', index: 1 });
-  assert.deepEqual(states(both), ['waiting', 'working', 'waiting']);
-  // The end's results and batch_calls go by i too, whatever order they come in.
+  // The end's results and batch_calls go by i (from 1, as Backend counts), whatever order they come in.
   const ended = batchOnEnd(batchFromParameters(twice), {
     results: [
-      { i: 2, tool: 'get_note', success: true },
-      { i: 0, tool: 'search_cases', success: false },
-      { i: 1, tool: 'search_cases', success: true },
+      { i: 3, tool: 'get_note', success: true },
+      { i: 1, tool: 'search_cases', success: false },
+      { i: 2, tool: 'search_cases', success: true },
     ],
   });
   assert.deepEqual(states(ended), ['failed', 'done', 'done']);
   const reloaded = batchFromReload(twice, [
-    { i: 1, tool: 'search_cases', success: true },
-    { i: 0, tool: 'search_cases', success: false },
-    { i: 2, tool: 'get_note', success: true },
+    { i: 2, tool: 'search_cases', success: true },
+    { i: 1, tool: 'search_cases', success: false },
+    { i: 3, tool: 'get_note', success: true },
   ]);
   assert.deepEqual(states(reloaded), ['failed', 'done', 'done']);
 });
@@ -207,35 +208,35 @@ test('a masked failure (the softened miss a regular reader gets as success) read
   // The end says success for it too; it stays failed, and the others settle.
   live = batchOnEnd(live, {
     results: [
-      { i: 0, tool: 'search_cases', success: true },
-      { i: 1, tool: 'search_notes', success: true },
-      { i: 2, tool: 'get_note', success: true, result: { message: SOFTENED_LOOKUP_MISS } },
-      { i: 3, tool: 'search_statutes', success: true },
+      { i: 1, tool: 'search_cases', success: true },
+      { i: 2, tool: 'search_notes', success: true },
+      { i: 3, tool: 'get_note', success: true, result: { message: SOFTENED_LOOKUP_MISS } },
+      { i: 4, tool: 'search_statutes', success: true },
     ],
   });
   assert.deepEqual(states(live), ['done', 'done', 'failed', 'done']);
   // An end entry alone that carries the softened sentence reads failed.
   const endOnly = batchOnEnd(batchFromParameters(parameters), {
-    results: [{ i: 2, tool: 'get_note', success: true, result: { message: SOFTENED_LOOKUP_MISS } }],
+    results: [{ i: 3, tool: 'get_note', success: true, result: { message: SOFTENED_LOOKUP_MISS } }],
   });
   assert.equal(endOnly[2].state, 'failed');
 
   // Reload: batch_calls keeps the real flag (Backend), so the same row reads failed.
   const reloaded = savedBatch({ success: true, data: { goal: parameters.goal, done: 3, failed: 1, results: [] }, error: null }, [
-    { i: 0, tool: 'search_cases', success: true },
-    { i: 1, tool: 'search_notes', success: true },
-    { i: 2, tool: 'get_note', success: false },
-    { i: 3, tool: 'search_statutes', success: true },
+    { i: 1, tool: 'search_cases', success: true },
+    { i: 2, tool: 'search_notes', success: true },
+    { i: 3, tool: 'get_note', success: false },
+    { i: 4, tool: 'search_statutes', success: true },
   ]);
   assert.deepEqual(states(reloaded.batch!), states(live));
   // A batch_calls row saved as success with the softened result beside it: the fallback reads it failed.
   const fallback = savedBatch(
-    { success: true, data: { results: [{ i: 2, tool: 'get_note', success: true, result: { message: SOFTENED_LOOKUP_MISS } }] }, error: null },
+    { success: true, data: { results: [{ i: 3, tool: 'get_note', success: true, result: { message: SOFTENED_LOOKUP_MISS } }] }, error: null },
     [
-      { i: 0, tool: 'search_cases', success: true },
-      { i: 1, tool: 'search_notes', success: true },
-      { i: 2, tool: 'get_note', success: true },
-      { i: 3, tool: 'search_statutes', success: true },
+      { i: 1, tool: 'search_cases', success: true },
+      { i: 2, tool: 'search_notes', success: true },
+      { i: 3, tool: 'get_note', success: true },
+      { i: 4, tool: 'search_statutes', success: true },
     ],
   );
   assert.deepEqual(states(fallback.batch!), ['done', 'done', 'failed', 'done']);
@@ -244,10 +245,10 @@ test('a masked failure (the softened miss a regular reader gets as success) read
     success: true,
     data: {
       results: [
-        { i: 0, tool: 'search_cases', success: true },
-        { i: 1, tool: 'search_notes', success: true },
-        { i: 2, tool: 'get_note', success: true, error: SOFTENED_LOOKUP_MISS },
-        { i: 3, tool: 'search_statutes', success: true },
+        { i: 1, tool: 'search_cases', success: true },
+        { i: 2, tool: 'search_notes', success: true },
+        { i: 3, tool: 'get_note', success: true, error: SOFTENED_LOOKUP_MISS },
+        { i: 4, tool: 'search_statutes', success: true },
       ],
     },
     error: null,
@@ -268,8 +269,8 @@ test('a reload with no or part of batch_calls ticks only what something says wor
   assert.equal(noResult.batchCallId, 'call_b');
   // Part of batch_calls, out of order: the rows it names, by i; the rest unfinished.
   const partial = savedBatch({ success: true, data: null, error: null }, [
-    { i: 2, tool: 'get_note', success: true, note_title: 'TEST DATA note' },
-    { i: 0, tool: 'search_cases', success: false },
+    { i: 3, tool: 'get_note', success: true, note_title: 'TEST DATA note' },
+    { i: 1, tool: 'search_cases', success: false },
   ]);
   assert.deepEqual(states(partial.batch!), ['failed', 'unfinished', 'done', 'unfinished']);
   assert.equal(partial.batch![2].entityTitle, 'TEST DATA note');
@@ -286,10 +287,10 @@ test('a lookup event that arrives after the batch ended changes nothing', () => 
   batch = batchOnCalling(batch, { callId: 'call_b.1', tool: 'search_cases' });
   batch = batchOnEnd(batch, {
     results: [
-      { i: 0, tool: 'search_cases', success: true },
-      { i: 1, tool: 'search_notes', success: false },
-      { i: 2, tool: 'get_note', success: true },
-      { i: 3, tool: 'search_statutes', success: true },
+      { i: 1, tool: 'search_cases', success: true },
+      { i: 2, tool: 'search_notes', success: false },
+      { i: 3, tool: 'get_note', success: true },
+      { i: 4, tool: 'search_statutes', success: true },
     ],
   });
   assert.equal(batchSettled(batch), true);
