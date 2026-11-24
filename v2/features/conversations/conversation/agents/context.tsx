@@ -41,3 +41,11 @@ export function useAgentRowsOf(messageId: number | null): { conversationId: stri
   const rows = value.byMessage.get(messageId);
   return rows ? { conversationId: value.conversationId, rows } : null;
 }
+
+/** Whether the roster in view already draws this agent conversation's row, with the start of its reply. */
+export function useHasAgentRow(conversationId: string): boolean {
+  const value = useContext(AgentRowsContext);
+  if (!value) return false;
+  for (const rows of value.byMessage.values()) if (rows.some((row) => row.conversationId === conversationId)) return true;
+  return false;
+}

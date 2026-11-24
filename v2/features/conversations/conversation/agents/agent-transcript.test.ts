@@ -162,4 +162,6 @@ test("the panel draws its own sub-agents with the chat's roster, and their retur
   assert.match(source, /agentConversationQueries\.of\(\{ parentId: conversationId, viewerId \}\)/);
   assert.match(source, /<AgentRowsProvider conversationId=\{conversationId\}[\s\S]*?places\.has\(index\) \? <AgentRoster messageId=\{places\.get\(index\) \?\? null\} \/>/);
   assert.match(source, /panel\.open\(\{ kind: 'agent', id: row\.conversationId \}\)[\s\S]*?Open its conversation/);
+  // The roster above already shows the start of the reply; the line repeats it only without a roster row.
+  assert.match(source, /const shownAbove = useHasAgentRow\(row\.conversationId\);\s*const preview = row\.preview && !shownAbove/);
 });

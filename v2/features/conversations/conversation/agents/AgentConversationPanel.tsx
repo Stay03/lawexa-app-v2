@@ -23,7 +23,7 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
 import { formatToolMessage } from '../tools/ToolStepItem';
 import { AgentRoster } from './AgentRoster';
 import { agentConversationTopic, agentTranscriptRows, subAgentPlaces, type AgentStepCall, type AgentTranscriptRow } from './agent-transcript';
-import { AgentRowsProvider } from './context';
+import { AgentRowsProvider, useHasAgentRow } from './context';
 import { agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
 import { sendsOnEnter } from '@/lib/utils/enter-key';
@@ -164,7 +164,9 @@ function TranscriptRow({ row, agentName }: { row: AgentTranscriptRow; agentName:
 /** The agent's own sub-agent came back: who, whether it replied, the start of the reply, and its conversation to open. */
 function SubAgentReply({ row }: { row: Extract<AgentTranscriptRow, { kind: 'reply' }> }) {
   const panel = useSidePanel();
-  const preview = row.preview ? plainPreview(row.preview) || row.preview : null;
+  // The roster above already shows the start of the reply; the line repeats it only when the roster has no row for it.
+  const shownAbove = useHasAgentRow(row.conversationId);
+  const preview = row.preview && !shownAbove ? plainPreview(row.preview) || row.preview : null;
   return (
     <section aria-label={`${row.agentName} ${row.failed ? 'could not reply' : 'replied'}`} className="flex flex-col gap-1 border-l-2 border-border pl-3 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
       <p className={cn('flex items-center gap-1.5 text-xs font-medium', row.failed ? 'text-destructive' : 'text-muted-foreground')}>
