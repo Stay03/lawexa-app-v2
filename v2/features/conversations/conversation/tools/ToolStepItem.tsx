@@ -26,7 +26,7 @@ import {
   isSearchLikeTool,
 } from './tool-content';
 import type { BatchCall, ToolMessage } from '@/types/chat';
-import { RUN_TOGETHER, batchGoal, batchRowEnded } from '@/lib/utils/tool-batch';
+import { RUN_TOGETHER, batchGoal, batchRowEnded, batchSettled } from '@/lib/utils/tool-batch';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
 import { failedStepLine, stepFailed } from './step-failure';
 import { isBoxTool } from '@/v2/features/userbox/machine-model';
@@ -390,7 +390,10 @@ export function ToolStepItem({
     isQuizStep(message) &&
     (quizStepState(loaded.message)?.kind === 'failed' ||
       (message.toolName === EDIT_QUIZ_TOOL && editSavedNothing(loaded.message.toolResult ?? undefined)));
-  const status = !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
+  // A batch the turn ended under (Stop, an error) never gets its tool_complete,
+  // but every lookup has ended: its line stops spinning too (tool-batch.ts).
+  const batchHalted = !isComplete && !!message.batch?.length && batchSettled(message.batch);
+  const status = batchHalted ? 'halted' : !isComplete ? 'loading' : isSuccess && !quizRefused ? 'success' : 'error';
   const label = formatToolMessage(
     message.toolName,
     message.toolParameters,

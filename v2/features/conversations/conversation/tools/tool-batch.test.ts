@@ -323,5 +323,8 @@ test('a Stop mid-batch settles the open lookups to stopped; any other early end 
   // On screen: neither a tick nor a spinner, and the row says how it ended.
   const item = readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'tools', 'ToolStepItem.tsx'), 'utf8');
   assert.match(item, /unfinished: 'halted',\s*stopped: 'halted',/);
+  // The goal line stops spinning too, once every lookup has ended without the batch's end.
+  assert.match(item, /const batchHalted = !isComplete && !!message\.batch\?\.length && batchSettled\(message\.batch\);/);
+  assert.match(item, /const status = batchHalted \? 'halted' :/);
   assert.match(item, /failed: 'did not work',\s*unfinished: 'did not finish',\s*stopped: 'stopped',/);
 });
