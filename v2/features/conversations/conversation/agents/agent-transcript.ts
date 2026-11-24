@@ -10,8 +10,11 @@ import { withoutAttachmentMarks } from '../rows/attachment-markers';
  *   person   a user row with no type: a person typed it, drawn as their bubble
  *   steps    the agent's tool calls in a row, as one quiet list of steps
  *   answer   the agent's answer (an assistant row with no type)
- *   note     a line about the conversation: the agent's own sub-agent
- *            replying, or a turn that failed
+ *   reply    the agent's own sub-agent came back (a wake naming an
+ *            `agent_reply` job): who, whether it replied, the start of its
+ *            reply, and its conversation to open (depth 2, 24 Nov 2026)
+ *   note     a line about the conversation: other background work ending,
+ *            or a turn that failed
  *
  * Tool results are left out: their call carries the step. Pure, so a test
  * pins it.
@@ -28,7 +31,8 @@ export type AgentTranscriptRow =
   | { kind: 'person'; key: string; author: string | null; text: string; at: string }
   | { kind: 'steps'; key: string; calls: AgentStepCall[] }
   | { kind: 'answer'; key: string; text: string; at: string }
-  | { kind: 'note'; key: string; text: string; at: string };
+  | { kind: 'reply'; key: string; agentName: string; failed: boolean; preview: string | null; conversationId: string; at: string }
+  | { kind: 'note'; key: string; text: string; at: string; wake?: boolean };
 
 export function agentTranscriptRows(messages: readonly ApiMessage[]): AgentTranscriptRow[] {
   const rows: AgentTranscriptRow[] = [];
@@ -57,7 +61,21 @@ export function agentTranscriptRows(messages: readonly ApiMessage[]): AgentTrans
       continue;
     }
     if (type === 'background_job_result') {
-      rows.push({ kind: 'note', key, text: 'Background work this agent started has ended.', at });
+      // The agent's own sub-agents coming back, named; any other background work, as one line.
+      const replies = (message.metadata?.background_jobs ?? []).filter((job) => job.kind === 'agent_reply' && job.agent_reply);
+      for (const job of replies) {
+        const reply = job.agent_reply!;
+        rows.push({
+          kind: 'reply',
+          key: `${key}:${job.job_id}`,
+          agentName: reply.agent.name,
+          failed: job.outcome === 'failed',
+          preview: job.outcome === 'failed' ? null : reply.preview,
+          conversationId: reply.agent_conversation_id,
+          at,
+        });
+      }
+      if (replies.length === 0) rows.push({ kind: 'note', key, text: 'Background work this agent started has ended.', at, wake: true });
       continue;
     }
     if (type === 'error') {
@@ -69,6 +87,31 @@ export function agentTranscriptRows(messages: readonly ApiMessage[]): AgentTrans
     }
   }
   return rows;
+}
+
+/**
+ * Where the panel draws the agent's own sub-agents (depth 2): at the end of
+ * the turn that called them, as the chat does for Lawexa's agents. A turn
+ * starts at a call or a person's message, and the sub-agents' return (a reply
+ * row, or the wake note) starts the next part, so the rows go just before it.
+ * Keyed by the row index they follow; the value is the turn's first message
+ * id, the one the server names as `called_by_message_id`.
+ */
+export function subAgentPlaces(rows: readonly AgentTranscriptRow[]): ReadonlyMap<number, number> {
+  const places = new Map<number, number>();
+  let turn: number | null = null;
+  const close = (index: number) => {
+    if (turn !== null && index >= 0) places.set(index, turn);
+    turn = null;
+  };
+  rows.forEach((row, index) => {
+    const startsTurn = row.kind === 'call' || row.kind === 'person';
+    const returns = row.kind === 'reply' || (row.kind === 'note' && row.wake === true);
+    if (startsTurn || returns) close(index - 1);
+    if (startsTurn) turn = Number(row.key);
+  });
+  close(rows.length - 1);
+  return places;
 }
 
 /** A turn's words as shown, without the marks the server writes for its files. */
