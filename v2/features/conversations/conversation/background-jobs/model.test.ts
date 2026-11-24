@@ -97,6 +97,15 @@ test('Lawexa’s return reads from the jobs it names, never its content', () => 
   assert.equal(backgroundReturnLine([]), 'Background work ended. Lawexa is continuing.');
 });
 
+test("an agent's return says replied only when it replied: a stopped agent was stopped, a failed one could not reply", () => {
+  const issueSpotter = { agent_conversation_id: '16f8eb11-7399-4a5f-a903-ad570de6d744', agent: { id: 234, name: 'Issue Spotter', slug: 'issue-spotter' }, reply_message_id: null, preview: null };
+  assert.equal(backgroundReturnLine([{ kind: 'agent_reply', outcome: 'succeeded', agent_reply: { ...issueSpotter, reply_message_id: 640789, preview: 'TEST DATA' } }]), 'Issue Spotter replied. Lawexa is continuing.');
+  assert.equal(backgroundReturnLine([{ kind: 'agent_reply', outcome: 'failed', agent_reply: issueSpotter }]), 'Issue Spotter could not reply. Lawexa is continuing.');
+  // A Stop: "cancelled" today, or a failure the server names "stopped". It used to read "replied".
+  assert.equal(backgroundReturnLine([{ kind: 'agent_reply', outcome: 'cancelled', agent_reply: issueSpotter }]), 'Issue Spotter was stopped. Lawexa is continuing.');
+  assert.equal(backgroundReturnLine([{ kind: 'agent_reply', outcome: 'failed', failure: 'stopped', agent_reply: issueSpotter }]), 'Issue Spotter was stopped. Lawexa is continuing.');
+});
+
 test('a tool answer that started a background job is recognised, so the chat asks for its jobs at once', () => {
   // read_file's 202 on a file still being read, as the stream passes it on (the server's whole answer).
   const reading = {
