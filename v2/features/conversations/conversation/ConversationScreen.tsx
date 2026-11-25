@@ -22,7 +22,6 @@ import { MessageList } from './MessageList';
 import { ConfidentialBanner } from './ConfidentialBanner';
 import { BackgroundJobsProvider } from './background-jobs/context';
 import { AgentChainProvider } from './agents/context';
-import { AgentsWorkingBar } from './agents/AgentsWorkingBar';
 import { ConversationActions } from './ConversationActions';
 import { V2ChatProvider, type CardQuestions } from './chat-context';
 import { GameOverlay } from '@/v2/features/channels/quiz/GameOverlay';
@@ -567,8 +566,6 @@ export function ConversationScreen({
             jumpTo={jumpTo}
           />
         </DocumentExportScope>
-        {/* While the chat's agents work: what Lawexa waits for, with Stop (chain view, option C). */}
-        <AgentsWorkingBar />
 
       </div>
   );

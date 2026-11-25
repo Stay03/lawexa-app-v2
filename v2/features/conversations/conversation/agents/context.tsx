@@ -64,11 +64,6 @@ export function useAgentRowsOf(
   return rows ? { conversationId: value.conversationId, rows } : null;
 }
 
-/** The page's chain and the chat it hangs from; null outside a chat screen. */
-export function useAgentChain(): AgentChainValue | null {
-  return useContext(AgentChainContext);
-}
-
 /** One agent of the chain by its conversation's uuid (the side panel's own state); null when it is not in it. */
 export function useChainEntry(agentConversationId: string): AgentChainEntry | null {
   const value = useContext(AgentChainContext);

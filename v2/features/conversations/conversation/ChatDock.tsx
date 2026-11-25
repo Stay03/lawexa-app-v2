@@ -24,6 +24,7 @@ import { useCardBox } from './question-card/use-card-box';
 import { ComposerSkeleton } from './skeletons';
 import { TAG_ONLY_PLACEHOLDER, type SendRefused } from './space-turn';
 import { ViewOnlyPill } from './ViewOnlyPill';
+import { AgentsWorkingSlot } from './agents/AgentsWorkingSlot';
 
 /**
  * ChatDock — a chat's ONE message box, docked by the shell (message box B,
@@ -183,6 +184,8 @@ function ChatDockBox({ conversationId }: { conversationId: string }) {
         {!openCard && <ChatRatingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />}
         {/* After a paid plan runs out, once, about no chat (Arthur picked B). */}
         <PlanEndedSlot className="mb-2" />
+        {/* While the chat's agents work: what Lawexa waits for, with Stop (chain view, option C). */}
+        <AgentsWorkingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />
         {/* The card and the box as one stack: held at its height while the box answers, so the card's top
             never moves (useCardBox, card-height.ts; Fable's review). */}
         <div ref={cardStack} style={cardBox.stackStyle} className="flex flex-col">

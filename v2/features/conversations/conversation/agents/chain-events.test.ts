@@ -57,3 +57,13 @@ test('the spine listens for both events on the user channel and catches the chai
   const gapKeys = spine.slice(spine.indexOf('const COLLAB_GAP_KEYS'), spine.indexOf('];', spine.indexOf('const COLLAB_GAP_KEYS')));
   assert.match(gapKeys, /agentChainQueries\.all\(\),/);
 });
+
+test('the agents line sits in the dock above the message box, in both docks, never under the box', () => {
+  // TEST DATA pictures, 25 November 2026: drawn at the foot of the chat, the floating box covered it.
+  const here = (...parts: string[]) => readFileSync(join(process.cwd(), 'v2', ...parts), 'utf8');
+  const dock = here('features', 'conversations', 'conversation', 'ChatDock.tsx');
+  assert.match(dock, /<PlanEndedSlot className="mb-2" \/>\s*\{\/\*[^*]*\*\/\}\s*<AgentsWorkingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>/);
+  const caseDock = here('features', 'cases', 'detail', 'CaseChatCore.tsx');
+  assert.match(caseDock, /<AgentsWorkingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>/);
+  assert.doesNotMatch(here('features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /AgentsWorking/);
+});
