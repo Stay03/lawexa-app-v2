@@ -100,6 +100,15 @@ export function getV2Echo(): Echo<'reverb'> | null {
   return instance;
 }
 
+/**
+ * Whether pushed events can arrive now: an Echo exists and its socket says
+ * connected. A read that has a REST fallback beat runs it while this is false.
+ * Never creates the connection (the spine owns it).
+ */
+export function v2EchoConnected(): boolean {
+  return instance !== null && instance.connector.connectionStatus() === 'connected';
+}
+
 /** Tear the connection down — viewer change or v2 unmount (spine-only call). */
 export function disconnectV2Echo(): void {
   if (instance) {

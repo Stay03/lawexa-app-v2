@@ -40,9 +40,12 @@ export const EventLineRow = memo(function EventLineRow({ line }: { line: EventMe
  * come from the jobs it names, never its content, which is written for
  * Lawexa.
  */
+/** Stop with messages held (chain view): the agents ended, and Lawexa answers what was sent meanwhile. */
+const HELD_STOP_WORDS = 'The agents were stopped. Lawexa is answering your messages.';
+
 function BackgroundJobLine({ line }: { line: BackgroundJobEvent }) {
   const returned = line.eventType === 'background_job_result';
-  const words = returned ? backgroundReturnLine(line.jobs) : line.content;
+  const words = line.stoppedForHeld ? HELD_STOP_WORDS : returned ? backgroundReturnLine(line.jobs) : line.content;
   return (
     // One run of text, the icon and the time inline with it: the give-up
     // sentence is long, and as flex items its words, dot and time wrapped

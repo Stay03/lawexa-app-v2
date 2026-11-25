@@ -2,53 +2,59 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Check, CircleAlert, Loader2, Square } from 'lucide-react';
+import { Check, CircleAlert, Hourglass, Loader2, Square } from 'lucide-react';
 
 import { chatApi } from '@/lib/api/chat';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils';
+import type { AgentChainState } from '@/types/agent-chain';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { conversationsQueries } from '../../queries';
 import { useSidePanel } from '../side-panel/SidePanelContext';
 import { formatToolMessage } from '../tools/ToolStepItem';
-import { AGENT_ROW_WORDS, agentInitials, liveWindowText, type AgentRow, type AgentRowState } from './agent-roster';
-import { useAgentRowsOf } from './context';
-import { agentConversationQueries } from './queries';
-import { useAgentStream } from './use-agent-stream';
+import type { ChainNode } from './agent-chain';
+import { agentInitials, liveWindowText } from './agent-roster';
+import { useAgentRowsOf, type ChainParent } from './context';
+import { agentChainQueries, agentConversationQueries } from './queries';
+import { useAgentStream, type AgentLiveStep } from './use-agent-stream';
 
 /**
- * AgentRoster — the agents Lawexa messaged in a turn, one row each, after
- * that turn's answer (C1, Stay, 12 November 2026, 17:47Z). No box around
- * them: each row is the agent's initials, its name, its state, and Stop on
- * the right while it works. Two agents at once are two rows.
+ * AgentRoster — the agents a turn called, one row each, after that turn's
+ * answer (C1, Stay, 12 November 2026; live agent list, Stay, 25 November
+ * 2026, 03:43Z, thread 694678cf). No box around them: each row is the agent's
+ * initials, its name, its state, and Stop on the right while it works. Two
+ * agents at once are two rows. The agents an agent asked sit indented under
+ * it: the law checker under the Issue Spotter. The chat itself is never a row.
  *
- * While an agent writes, its words stream under its name in a short window,
- * the newest at the foot and the older fading out at the top, from the turn's
- * own stream (`GET /api/chat/stream/{execution_id}`, the reader the side panel
- * uses). Once it replied, the start of the reply stays with "Read the reply";
- * stopped, or unable to reply, the row says so with "Open its conversation".
+ * While an agent works, its lookups show as short lines ("Searched cases for
+ * …") and its words stream under them in a short window, from the turn's own
+ * stream (`GET /api/chat/stream/{execution_id}`). While it waits for an agent
+ * it asked, its row says so ("Waiting for Law Checker"). Once it replied, the
+ * start of the reply stays with "Read the reply"; stopped, or unable to
+ * reply, the row says so with "Open its conversation".
  *
- * Stop ends the agent's turn (`POST /api/chat/stream/{execution_id}/cancel`,
- * contract 2.4): the call settles as stopped and Lawexa is woken. It shows
- * only while the agent works, and only to a reader the server lets stop it.
+ * Stop ends the agent's turn (`POST /api/chat/stream/{execution_id}/cancel`):
+ * the call settles as stopped and the agent that asked is woken. It shows only
+ * while the agent works, and only to a reader the server lets stop it.
  *
- * The rows come from the chat's list of agent conversations, which every
- * reader of the chat reads (agents/context.tsx), never from the reader's own
- * jobs: a Space member who did not ask sees them too.
+ * The rows come from the chat's agent chain, which every reader of the chat
+ * reads and the server pushes changes of (agents/context.tsx).
  */
-export function AgentRoster({ messageId, askedBy = 'Lawexa' }: { messageId: number | null; askedBy?: string }) {
-  const held = useAgentRowsOf(messageId);
-  const parentId = held?.conversationId ?? null;
+export function AgentRoster({ messageId, parent }: { messageId: number | null; parent?: ChainParent }) {
+  const held = useAgentRowsOf(messageId, parent);
+  const chatId = held?.conversationId ?? null;
   const queryClient = useQueryClient();
 
-  // A streamed turn ended (replied, stopped, or failed): the list moves the row on, and the jobs move on too.
+  // A streamed turn ended (replied, stopped, or failed): the chain moves the row on, and the jobs move on too.
   const onTurnEnd = useCallback(() => {
-    if (!parentId) return;
-    void queryClient.invalidateQueries({ queryKey: [...agentConversationQueries.all(), parentId] });
-    void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(parentId) });
-  }, [queryClient, parentId]);
+    if (!chatId) return;
+    void queryClient.invalidateQueries({ queryKey: [...agentChainQueries.all(), chatId] });
+    void queryClient.invalidateQueries({ queryKey: [...agentConversationQueries.all(), chatId] });
+    void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(chatId) });
+  }, [queryClient, chatId]);
 
   if (!held) return null;
+  const askedBy = parent?.name ?? 'Lawexa';
   return (
     <ul aria-label={`Agents ${askedBy} asked`} className="flex flex-col gap-5 motion-safe:animate-in motion-safe:fade-in motion-safe:duration-300">
       {held.rows.map((row) => (
@@ -58,7 +64,7 @@ export function AgentRoster({ messageId, askedBy = 'Lawexa' }: { messageId: numb
   );
 }
 
-function AgentRosterRow({ row, onTurnEnd }: { row: AgentRow; onTurnEnd: () => void }) {
+function AgentRosterRow({ row, onTurnEnd }: { row: ChainNode; onTurnEnd: () => void }) {
   const panel = useSidePanel();
   const open = panel ? () => panel.open({ kind: 'agent', id: row.conversationId }) : null;
   return (
@@ -71,7 +77,7 @@ function AgentRosterRow({ row, onTurnEnd }: { row: AgentRow; onTurnEnd: () => vo
             <span className="font-semibold text-foreground">{row.name}</span>
             <StateMark state={row.state} />
             <span className={cn('truncate text-xs', row.state === 'failed' ? 'text-destructive' : 'text-muted-foreground')}>
-              {AGENT_ROW_WORDS[row.state]}
+              {row.words}
             </span>
           </p>
           {row.canStop && row.executionId ? <StopPill name={row.name} executionId={row.executionId} /> : null}
@@ -94,7 +100,7 @@ function AgentRosterRow({ row, onTurnEnd }: { row: AgentRow; onTurnEnd: () => vo
             ) : null}
           </>
         ) : null}
-        {row.state !== 'writing' && row.state !== 'replied' && open ? (
+        {(row.state === 'stopped' || row.state === 'failed') && open ? (
           <button
             type="button"
             onClick={open}
@@ -107,13 +113,20 @@ function AgentRosterRow({ row, onTurnEnd }: { row: AgentRow; onTurnEnd: () => vo
             Open its conversation
           </button>
         ) : null}
+        {row.children.length > 0 ? (
+          <ul aria-label={`Agents ${row.name} asked`} className="mt-3 flex flex-col gap-4 border-l border-border pl-4">
+            {row.children.map((child) => (
+              <AgentRosterRow key={child.conversationId} row={child} onTurnEnd={onTurnEnd} />
+            ))}
+          </ul>
+        ) : null}
       </div>
     </li>
   );
 }
 
-/** The agent's initials in a disc: gold while it works or replied, quiet once stopped, red when it could not reply. */
-function AgentFace({ initials, state }: { initials: string; state: AgentRowState }) {
+/** The agent's initials in a disc: gold while it works, waits or replied, quiet once stopped, red when it could not reply. */
+function AgentFace({ initials, state }: { initials: string; state: AgentChainState }) {
   return (
     <span
       aria-hidden
@@ -121,28 +134,30 @@ function AgentFace({ initials, state }: { initials: string; state: AgentRowState
         'relative flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
         state === 'failed'
           ? 'bg-destructive/15 text-destructive'
-          : state === 'stopped' || state === 'unfollowed'
+          : state === 'stopped'
             ? 'bg-muted text-muted-foreground'
             : 'bg-primary text-primary-foreground',
       )}
     >
       {initials}
-      {state === 'writing' ? (
+      {state === 'running' ? (
         <span className="absolute -inset-1 rounded-full border-2 border-primary/50 motion-safe:animate-pulse" />
       ) : null}
     </span>
   );
 }
 
-function StateMark({ state }: { state: AgentRowState }) {
+function StateMark({ state }: { state: AgentChainState }) {
   switch (state) {
     case 'replied':
       return <Check aria-hidden className="size-3.5 shrink-0 text-primary" />;
     case 'failed':
       return <CircleAlert aria-hidden className="size-3.5 shrink-0 text-destructive" />;
-    case 'writing':
+    case 'running':
       return <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary motion-safe:animate-pulse" />;
-    default:
+    case 'waiting':
+      return <Hourglass aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />;
+    case 'stopped':
       return <Square aria-hidden className="size-3 shrink-0 fill-muted-foreground/60 text-muted-foreground/60" />;
   }
 }
@@ -180,27 +195,48 @@ function StopPill({ name, executionId }: { name: string; executionId: string }) 
 /** Three lines of the newest words; the line height is the window's unit. */
 const WINDOW_LINES = 3;
 const LINE_EM = 1.625;
+/** The newest lookups shown as lines while an agent works. */
+const STEP_LINES = 3;
 
 /**
- * The agent's words as they stream: plain text in a window three lines high,
- * held to its foot so the newest words show, the oldest fading at the top.
- * Before its first words, the step it is taking; before that, nothing (the
- * row's "Writing" says it). A caret marks where the words grow; no dots.
+ * What the agent does as it streams: its newest lookups as short lines (done
+ * ones as "Searched …", the running one as "Searching …"), then its words in
+ * a window three lines high, held to its foot so the newest words show, the
+ * oldest fading at the top. A caret marks where the words grow; no dots.
  */
 function LiveWindow({ executionId, onEnd }: { executionId: string; onEnd: () => void }) {
   const live = useAgentStream(executionId, onEnd);
   const text = live.text ? liveWindowText(live.text) : '';
-  if (!text) {
-    if (!live.step) return null;
-    const words = formatToolMessage(live.step.name, live.step.parameters, false);
-    return (
-      <p className="mt-1 truncate text-xs text-muted-foreground">
+  const steps = live.steps.slice(-STEP_LINES);
+  return (
+    <>
+      {steps.length > 0 ? (
+        <ul aria-label="Its lookups" className="mt-1 flex flex-col gap-0.5">
+          {steps.map((step) => (
+            <StepLine key={step.key} step={step} />
+          ))}
+        </ul>
+      ) : null}
+      {text ? <LiveWords text={text} /> : null}
+    </>
+  );
+}
+
+function StepLine({ step }: { step: AgentLiveStep }) {
+  const words = formatToolMessage(step.name, step.parameters, step.done);
+  return (
+    <li className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+      {step.done ? (
+        <Check aria-hidden className="size-3 shrink-0" />
+      ) : (
+        <Loader2 aria-hidden className="size-3 shrink-0 motion-safe:animate-spin" />
+      )}
+      <span className="truncate">
         {words.action}
         {words.detail ? ` ${words.detail}` : ''}
-      </p>
-    );
-  }
-  return <LiveWords text={text} />;
+      </span>
+    </li>
+  );
 }
 
 /**

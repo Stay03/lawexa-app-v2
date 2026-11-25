@@ -39,7 +39,12 @@ import { resetAppBadge, setAppMentionBadge } from './app-badge';
 import { dispatchChannelUnread, type ResolvedChannelContext } from './dispatcher';
 import { privateItemsQueries } from '@/v2/features/private-items/queries';
 import { disconnectV2Echo, getV2Echo } from './echo';
+import { landAgentChainChanged, landHeldMessagesAnswered } from '@/v2/features/conversations/conversation/agents/chain-events';
+import { agentChainQueries } from '@/v2/features/conversations/conversation/agents/queries';
+import type { AgentChainChangedEvent, HeldMessagesAnsweredEvent } from '@/types/agent-chain';
 import {
+  EVT_AGENT_CHAIN_CHANGED,
+  EVT_HELD_MESSAGES_ANSWERED,
   EVT_CHANNEL_UNREAD,
   EVT_MY_TEMPLATE_UPDATED,
   EVT_VOICE_RESEARCH_READY,
@@ -116,6 +121,8 @@ const COLLAB_GAP_KEYS: readonly QueryKey[] = [
   channelsQueries.all,
   notificationsQueries.all,
   invitationsQueries.all,
+  // A chain that moved while the socket was away (chain view): its rows and held marks.
+  agentChainQueries.all(),
 ];
 
 /**
@@ -372,6 +379,16 @@ export function RealtimeSpine() {
     // done, so the open call sends its marker and Lawexa speaks the answer.
     channel.listen(EVT_VOICE_RESEARCH_READY, (payload: VoiceResearchReadyEvent) => {
       emitVoiceResearchReady(payload);
+    });
+
+    // The agents a chat called (chain view, thread 694678cf): one moved state,
+    // so the open chat's rows read the chain again; or the turn answering the
+    // messages held while they worked started, so the open chat attaches to it.
+    channel.listen(EVT_AGENT_CHAIN_CHANGED, (payload: AgentChainChangedEvent) => {
+      landAgentChainChanged(queryClient, payload);
+    });
+    channel.listen(EVT_HELD_MESSAGES_ANSWERED, (payload: HeldMessagesAnsweredEvent) => {
+      landHeldMessagesAnswered(queryClient, payload);
     });
 
     // Reconnect gap recovery: between drop and re-establish, every event was

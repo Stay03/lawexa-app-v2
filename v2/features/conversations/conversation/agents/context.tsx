@@ -2,53 +2,89 @@
 
 import { createContext, useContext, useMemo } from 'react';
 
-import type { AgentConversation } from '@/types/agent-conversations';
-import { agentRowsByMessage, type AgentRow } from './agent-roster';
+import type { AgentChain, AgentChainEntry } from '@/types/agent-chain';
+import { chainRowsByMessage, type ChainNode } from './agent-chain';
 
-interface AgentRowsValue {
-  /** The chat the agents were called in: its list is read again when an agent's turn ends. */
+interface AgentChainValue {
+  /** The chat the chain hangs from: read again when an agent's streamed turn ends. */
   conversationId: string;
-  byMessage: ReadonlyMap<number, readonly AgentRow[]>;
+  /** Null until read, and for a chat with no agents (confidential, refused). */
+  chain: AgentChain | null;
 }
 
-const AgentRowsContext = createContext<AgentRowsValue | null>(null);
+const AgentChainContext = createContext<AgentChainValue | null>(null);
 
 /**
- * The open chat's agents, for the rows after each turn that called one (C1).
- * The screen provides them from the controller's read; the roster deep in the
- * transcript finds a turn's rows by its question's saved id.
+ * The open chat's agent chain (chain view, thread 694678cf), read once for the
+ * page: the rows after each turn that called an agent, the rows inside an
+ * agent's side panel for the agents it called, the panel's own state, and the
+ * held marks. The screen provides it from the controller's read; the side
+ * panel renders inside it.
  */
-export function AgentRowsProvider({
+export function AgentChainProvider({
   conversationId,
-  agentConversations,
+  chain,
   children,
 }: {
   conversationId: string;
-  agentConversations: readonly AgentConversation[];
+  chain: AgentChain | null;
   children: React.ReactNode;
 }) {
-  const value = useMemo<AgentRowsValue>(
-    () => ({ conversationId, byMessage: agentRowsByMessage(agentConversations) }),
-    [conversationId, agentConversations],
-  );
-  return <AgentRowsContext.Provider value={value}>{children}</AgentRowsContext.Provider>;
+  const value = useMemo<AgentChainValue>(() => ({ conversationId, chain }), [conversationId, chain]);
+  return <AgentChainContext.Provider value={value}>{children}</AgentChainContext.Provider>;
 }
 
-/** The rows of the agents a question's turn called, and its chat; null when it called none. */
-export function useAgentRowsOf(messageId: number | null): { conversationId: string; rows: readonly AgentRow[] } | null {
-  const value = useContext(AgentRowsContext);
-  if (!value || messageId === null) return null;
-  const rows = value.byMessage.get(messageId);
+/** Who a set of rows hangs from: the chat (depth 0, "Lawexa") or an agent in its side panel. */
+export interface ChainParent {
+  id: string;
+  depth: number;
+  name: string;
+}
+
+/**
+ * The rows of the agents a turn called, nested, and the chat they hang from;
+ * null when the turn called none. `parent` is the conversation the turn is in:
+ * the chat itself unless given (an agent's side panel).
+ */
+export function useAgentRowsOf(
+  messageId: number | null,
+  parent?: ChainParent,
+): { conversationId: string; rows: readonly ChainNode[] } | null {
+  const value = useContext(AgentChainContext);
+  const chain = value?.chain ?? null;
+  const parentId = parent?.id ?? value?.conversationId ?? null;
+  const parentDepth = parent?.depth ?? 0;
+  const parentName = parent?.name ?? 'Lawexa';
+  const byMessage = useMemo(
+    () => (chain && parentId ? chainRowsByMessage(chain, parentId, { parentDepth, parentName }) : null),
+    [chain, parentId, parentDepth, parentName],
+  );
+  if (!value || messageId === null || !byMessage) return null;
+  const rows = byMessage.get(messageId);
   return rows ? { conversationId: value.conversationId, rows } : null;
 }
 
-/** The reply messages the roster in view already shows, so a reply line under it does not repeat their start. */
+/** The page's chain and the chat it hangs from; null outside a chat screen. */
+export function useAgentChain(): AgentChainValue | null {
+  return useContext(AgentChainContext);
+}
+
+/** One agent of the chain by its conversation's uuid (the side panel's own state); null when it is not in it. */
+export function useChainEntry(agentConversationId: string): AgentChainEntry | null {
+  const value = useContext(AgentChainContext);
+  return value?.chain?.agents.find((entry) => entry.id === agentConversationId) ?? null;
+}
+
+/** The reply messages the chain's rows already show, so a reply line under them does not repeat their start. */
 export function useRosterReplyIds(): ReadonlySet<number> {
-  const value = useContext(AgentRowsContext);
+  const value = useContext(AgentChainContext);
+  const chain = value?.chain ?? null;
   return useMemo(() => {
     const ids = new Set<number>();
-    if (!value) return ids;
-    for (const rows of value.byMessage.values()) for (const row of rows) if (row.replyMessageId !== null) ids.add(row.replyMessageId);
+    for (const entry of chain?.agents ?? []) {
+      const reply = entry.state === 'replied' ? entry.latest_call?.reply : null;
+      if (reply) ids.add(reply.message_id);
+    }
     return ids;
-  }, [value]);
+  }, [chain]);
 }

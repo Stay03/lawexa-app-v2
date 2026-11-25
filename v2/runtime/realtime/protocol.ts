@@ -123,3 +123,17 @@ export type SpaceTaskChangedEvent = SpaceTaskSnapshotEvent | SpaceTaskRefreshEve
 
 /** A staff voice test call's research is done (voice test page, thread ac47b1df), on `users.{uuid}`. */
 export const EVT_VOICE_RESEARCH_READY = '.voice.research_ready';
+
+/**
+ * An agent in a chat's chain changed state (chain view, Backend a779b3cc), on
+ * the chat owner's `users.{uuid}` and, for a Space chat, on `spaces.{uuid}`
+ * too: read the chain again. Payload: `AgentChainChangedEvent`.
+ */
+export const EVT_AGENT_CHAIN_CHANGED = '.agent_chain.changed';
+
+/**
+ * The turn answering the messages held while agents worked has started (the
+ * wake, or Stop's turn), on the same channels. Payload:
+ * `HeldMessagesAnsweredEvent`; the open chat attaches to its stream.
+ */
+export const EVT_HELD_MESSAGES_ANSWERED = '.held_messages.answered';

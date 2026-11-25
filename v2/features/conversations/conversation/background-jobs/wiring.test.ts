@@ -75,9 +75,10 @@ test('the same return read twice changes nothing', () => {
 test('the line draws the return’s words from its jobs, and the give-up notice as written', () => {
   const lines = here('rows', 'EventLineRow.tsx');
   assert.match(lines, /case 'background_job_result':\s*case 'background_job_unanswered':\s*return <BackgroundJobLine line=\{line\} \/>;/);
+  // Chain view (25 November 2026): Stop with messages held is a return with its own words.
   assert.match(
     lines,
-    /const returned = line\.eventType === 'background_job_result';\s*const words = returned \? backgroundReturnLine\(line\.jobs\) : line\.content;/,
+    /const returned = line\.eventType === 'background_job_result';\s*const words = line\.stoppedForHeld \? HELD_STOP_WORDS : returned \? backgroundReturnLine\(line\.jobs\) : line\.content;/,
   );
 });
 

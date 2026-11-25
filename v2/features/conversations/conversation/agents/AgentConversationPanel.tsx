@@ -12,6 +12,7 @@ import { useAuthStore } from '@/lib/stores/authStore';
 import { cn } from '@/lib/utils';
 import { extractApiError } from '@/lib/utils/api-error';
 import type { AgentConversation } from '@/types/agent-conversations';
+import type { AgentChain } from '@/types/agent-chain';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { plainPreview } from '../../plain-preview';
@@ -23,8 +24,8 @@ import { useSidePanel } from '../side-panel/SidePanelContext';
 import { formatToolMessage } from '../tools/ToolStepItem';
 import { AgentRoster } from './AgentRoster';
 import { agentConversationTopic, agentTranscriptRows, subAgentPlaces, subAgentReplyView, type AgentStepCall, type AgentTranscriptRow } from './agent-transcript';
-import { AgentRowsProvider, useRosterReplyIds } from './context';
-import { agentConversationQueries } from './queries';
+import { useChainEntry, useRosterReplyIds } from './context';
+import { agentChainQueries, agentConversationQueries } from './queries';
 import { useAgentStream } from './use-agent-stream';
 import { sendsOnEnter } from '@/lib/utils/enter-key';
 
@@ -36,9 +37,10 @@ import { sendsOnEnter } from '@/lib/utils/enter-key';
  * agent answers in this conversation; nobody else is woken) and stop a turn.
  *
  * Read like any chat (`GET /conversations/{uuid}`); whether it runs, the turn
- * to watch and whether the reader may type come from the chat's list of
- * agent conversations (3.1). Opened from "Open" on a waiting line and "Open
- * full" on a reply (`?side=agent:<uuid>`).
+ * to watch, whether the reader may type, and the agents it asked in turn come
+ * from the chat's agent chain, which the page reads once (agents/context.tsx).
+ * Opened from "Read the reply" and "Open its conversation" on an agent's row
+ * (`?side=agent:<uuid>`).
  */
 export function AgentConversationPanel({ conversationId }: { conversationId: string }) {
   const { userId: viewerId } = useV2Session();
@@ -46,22 +48,16 @@ export function AgentConversationPanel({ conversationId }: { conversationId: str
   const transcript = useQuery(conversationsQueries.detail({ conversationId, viewerId }));
   const conversation = transcript.data;
   const parentId = conversation?.parent_conversation?.id ?? null;
-  const siblings = useQuery({
-    ...agentConversationQueries.of({ parentId: parentId ?? '', viewerId }),
-    enabled: parentId !== null,
-  });
-  const entry: AgentConversation | null = siblings.data?.find((each) => each.id === conversationId) ?? null;
+  const entry = useChainEntry(conversationId);
   const agentName = entry?.agent.name ?? conversation?.agent?.name ?? null;
 
-  // A turn ended: read the transcript and the list again, and the parent's jobs (its waiting line moves on).
+  // A turn ended: read the transcript and the chain again, and the parent's jobs (its waiting line moves on).
   const refresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: [...conversationsQueries.details(), conversationId] });
+    void queryClient.invalidateQueries({ queryKey: agentChainQueries.all() });
     void queryClient.invalidateQueries({ queryKey: agentConversationQueries.all() });
     if (parentId) void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(parentId) });
   }, [queryClient, conversationId, parentId]);
-
-  // This agent's own sub-agents (depth 2): drawn where its turn called them, as the chat draws Lawexa's.
-  const subAgents = useQuery(agentConversationQueries.of({ parentId: conversationId, viewerId }));
 
   const running = entry?.status === 'running' && entry.execution_id ? entry.execution_id : null;
   const rows = conversation ? agentTranscriptRows(conversation.messages) : [];
@@ -92,14 +88,18 @@ export function AgentConversationPanel({ conversationId }: { conversationId: str
           </p>
         ) : (
           <>
-            <AgentRowsProvider conversationId={conversationId} agentConversations={subAgents.data ?? NO_SUB_AGENTS}>
-              {rows.map((row, index) => (
-                <Fragment key={row.key}>
-                  <TranscriptRow row={row} agentName={agentName} />
-                  {places.has(index) ? <AgentRoster messageId={places.get(index) ?? null} askedBy={agentName ?? 'This agent'} /> : null}
-                </Fragment>
-              ))}
-            </AgentRowsProvider>
+            {/* The agents this agent asked in turn, nested, after the turn that asked them, as the chat draws its own. */}
+            {rows.map((row, index) => (
+              <Fragment key={row.key}>
+                <TranscriptRow row={row} agentName={agentName} />
+                {places.has(index) ? (
+                  <AgentRoster
+                    messageId={places.get(index) ?? null}
+                    parent={{ id: conversationId, depth: entry?.depth ?? 1, name: agentName ?? 'This agent' }}
+                  />
+                ) : null}
+              </Fragment>
+            ))}
             {running ? <LiveTurn key={running} executionId={running} agentName={agentName} onEnd={refresh} /> : null}
             {rows.length === 0 && !running ? <p className="text-sm text-muted-foreground">Nothing has been said here yet.</p> : null}
           </>
@@ -118,9 +118,6 @@ function TranscriptSkeleton() {
     </div>
   );
 }
-
-/** A stable empty list while the sub-agents load, so the rows provider does not rebuild on every render. */
-const NO_SUB_AGENTS: readonly AgentConversation[] = [];
 
 /** A turn of the conversation, by who wrote it. */
 function TranscriptRow({ row, agentName }: { row: AgentTranscriptRow; agentName: string | null }) {
@@ -211,19 +208,20 @@ function StepList({ calls, live = false }: { calls: readonly AgentStepCall[]; li
   );
 }
 
-/** The turn the agent is taking now: its current step, then its answer as it streams. */
+/** The turn the agent is taking now: its lookups so far, the running one last, then its answer as it streams. */
 function LiveTurn({ executionId, agentName, onEnd }: { executionId: string; agentName: string | null; onEnd: () => void }) {
   const live = useAgentStream(executionId, onEnd);
+  const running = live.steps.length > 0 && !live.steps[live.steps.length - 1].done;
   return (
     <div aria-live="polite" className="flex flex-col gap-2">
-      {live.step ? (
-        <StepList calls={[{ name: live.step.name, parameters: live.step.parameters, success: undefined }]} live />
+      {live.steps.length > 0 ? (
+        <StepList calls={live.steps.map((step) => ({ name: step.name, parameters: step.parameters, success: undefined }))} live={running} />
       ) : null}
       {live.text ? (
         <article className="text-[14px] leading-relaxed text-foreground">
           <MarkdownText content={live.text} animate />
         </article>
-      ) : !live.step ? (
+      ) : live.steps.length === 0 ? (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Loader2 aria-hidden className="size-3 motion-safe:animate-spin" />
           {agentName ?? 'The agent'} is working…
@@ -249,9 +247,15 @@ function AgentComposer({ conversation, running, onSent }: { conversation: AgentC
     onSuccess: (response) => {
       setText('');
       setProblem(null);
-      // The list now says it runs, with the turn to watch: the panel attaches to it.
+      // The chain now says it runs, with the turn to watch: the panel attaches to it.
+      const sent = response.data.agent_conversation;
+      queryClient.setQueriesData<AgentChain>({ queryKey: agentChainQueries.all() }, (chain) =>
+        chain
+          ? { ...chain, agents: chain.agents.map((each) => (each.id === sent.id ? { ...each, ...sent, state: 'running', waiting_on: null } : each)) }
+          : chain,
+      );
       queryClient.setQueriesData<AgentConversation[]>({ queryKey: agentConversationQueries.all() }, (list) =>
-        list?.map((each) => (each.id === conversation.id ? response.data.agent_conversation : each)),
+        list?.map((each) => (each.id === sent.id ? sent : each)),
       );
       onSent();
     },

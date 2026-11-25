@@ -257,17 +257,18 @@ test('an agent Lawexa calls again from its return has a row after the woken turn
   assert.equal([...places.entries()].find(([, id]) => id === 3)?.[0], 3);
 });
 
-test('every reader of the chat sees the rows: they come from the chat’s list, never the reader’s own jobs', () => {
+test('every reader of the chat sees the rows: they come from the chat’s agent chain, never the reader’s own jobs', () => {
+  // Chain view (25 November 2026): the rows read the chat's agent chain, which every reader reads.
   const roster = here('agents', 'AgentRoster.tsx');
-  assert.match(roster, /const held = useAgentRowsOf\(messageId\);/);
+  assert.match(roster, /const held = useAgentRowsOf\(messageId, parent\);/);
   assert.doesNotMatch(roster, /useBackgroundJobsOf|background_jobs/);
   const controller = here('useConversationController.ts');
-  assert.match(controller, /const readsAgentConversations = detailData !== null && !isConfidential && !isGoneOnServer;/);
+  assert.match(controller, /const readsAgentChain = detailData !== null && !isConfidential && !isGoneOnServer;/);
   assert.match(
     controller,
-    /if \(ended && readsAgentConversations && !agentConversationsRefused\) \{\s*void queryClient\.invalidateQueries\(\{ queryKey: \[\.\.\.agentConversationQueries\.all\(\), conversationId\] \}\);/,
+    /if \(ended && readsAgentChain && !agentChainRefused\) \{\s*void queryClient\.invalidateQueries\(\{ queryKey: \[\.\.\.agentChainQueries\.all\(\), conversationId\] \}\);/,
   );
-  assert.match(here('ConversationScreen.tsx'), /<AgentRowsProvider conversationId=\{conversationId\} agentConversations=\{controller\.agentConversations\}>/);
+  assert.match(here('ConversationScreen.tsx'), /<AgentChainProvider conversationId=\{conversationId\} chain=\{controller\.agentChain\}>/);
 });
 
 test('Stop ends the agent’s turn, never just the chat’s waiting; the row streams from the turn’s own stream', () => {
@@ -278,8 +279,9 @@ test('Stop ends the agent’s turn, never just the chat’s waiting; the row str
   // One window per turn, from the reader the side panel uses; its end re-reads the list and the jobs.
   assert.match(roster, /<LiveWindow key=\{row\.executionId\} executionId=\{row\.executionId\} onEnd=\{onTurnEnd\} \/>/);
   assert.match(roster, /const live = useAgentStream\(executionId, onEnd\);/);
-  assert.match(roster, /queryKey: \[\.\.\.agentConversationQueries\.all\(\), parentId\]/);
-  assert.match(roster, /queryKey: conversationsQueries\.backgroundJobsOf\(parentId\)/);
+  assert.match(roster, /queryKey: \[\.\.\.agentChainQueries\.all\(\), chatId\]/);
+  assert.match(roster, /queryKey: \[\.\.\.agentConversationQueries\.all\(\), chatId\]/);
+  assert.match(roster, /queryKey: conversationsQueries\.backgroundJobsOf\(chatId\)/);
   // The window is held to its foot and fades at the top once full; no dots.
   assert.match(roster, /flex flex-col justify-end overflow-hidden/);
   assert.match(roster, /maskImage: full \? `linear-gradient\(to bottom, transparent, black \$\{LINE_EM\}em\)` : undefined,/);

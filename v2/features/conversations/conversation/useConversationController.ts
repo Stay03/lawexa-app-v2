@@ -48,8 +48,10 @@ import { rosterFromMembers, rosterFromRecord } from './record-roster';
 import { spaceMentionOptions } from './mention-options';
 import { awaitsBackgroundJob, toolResultNamesBackgroundJob } from './background-jobs/model';
 import type { BackgroundJob } from '@/types/background-jobs';
-import type { AgentConversation } from '@/types/agent-conversations';
-import { agentConversationQueries } from './agents/queries';
+import type { AgentChain } from '@/types/agent-chain';
+import { agentChainQueries, agentConversationQueries } from './agents/queries';
+import { useSpaceChainLive } from './agents/use-space-chain-live';
+import { onHeldMessagesAnswered } from './agents/chain-events';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { toast } from 'sonner';
 import type { MentionOptions } from '@/v2/features/channels/model';
@@ -124,7 +126,6 @@ import {
 const NO_REFERENCES: ConversationReference[] = [];
 /** Stable empty reference for a chat with no jobs read (yet). */
 const NO_BACKGROUND_JOBS: readonly BackgroundJob[] = [];
-const NO_AGENT_CONVERSATIONS: readonly AgentConversation[] = [];
 
 /**
  * Map a failed history load onto the sentinel strings the screen renders. Byte-identical
@@ -281,8 +282,12 @@ export interface ConversationController {
   isOwnerResolved: boolean;
   /** The reader's background jobs in this chat (Backend 063d9cc3), oldest first; empty until read. */
   backgroundJobs: readonly BackgroundJob[];
-  /** The agents Lawexa messaged in this chat (sub-agents contract 3.1), for their rows (C1); empty until read. */
-  agentConversations: readonly AgentConversation[];
+  /**
+   * The agents this chat's turns called, at every depth, the messages held
+   * while they work, and whether the chain is open (chain view); null until
+   * read, and for a chat that has none.
+   */
+  agentChain: AgentChain | null;
   /**
    * Whether the transcript is still being loaded and there is NOTHING to show yet.
    * The union of both history paths (the device-owned IndexedDB load and the server
@@ -555,7 +560,7 @@ export function useConversationController(
     onCancelled: () => setRefusedTurn(null),
   });
 
-  const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, followUntilAnswered, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle, turnOrigin } = stream;
+  const { connectToStream, adoptConversationHistory, loadConversationHistoryFromIDB, setConversationId, setError, recoverPendingState, followUntilAnswered, releaseHeld, send, cancelStream, disconnect, fetchConversationTitle, isStreaming, messages, conversationTitle, turnOrigin } = stream;
 
   // ── Jurisdiction slot: seed once per conversation, persist on change. ──
   useEffect(() => {
@@ -1011,20 +1016,28 @@ export function useConversationController(
   // flag to know that before the first read.
   const backgroundJobsRefused = stopsPolling(backgroundJobsQuery.error);
 
-  // ── The agents Lawexa messaged (sub-agents contract 3.1; C1) ──
-  // One row each after the turn that called them, for every reader of the
-  // chat, as Lawexa's answer is: the list carries each call's state, the turn
-  // to stream and whether this reader may stop it. Never on a confidential
+  // ── The agents this chat's turns called (chain view, thread 694678cf) ──
+  // Every agent at every depth, for every reader of the chat, as Lawexa's
+  // answer is: each one's state, the turn to stream, whether this reader may
+  // stop it, and the messages held while they work. Never on a confidential
   // chat, which has none; a chat the server keeps none for (404) is not asked
-  // again. Not polled: read again when a turn here ends (below) and when an
-  // agent's streamed turn ends (AgentRoster).
-  const readsAgentConversations = detailData !== null && !isConfidential && !isGoneOnServer;
-  const agentConversationsQuery = useQuery({
-    ...agentConversationQueries.of({ parentId: conversationId, viewerId: serverUserId }),
-    enabled: readsAgentConversations,
+  // again. The server pushes each change (the spine, the Space listener); it is
+  // also read again when a turn here ends (below) and when an agent's streamed
+  // turn ends (AgentRoster), and on a beat only while the socket is down.
+  const readsAgentChain = detailData !== null && !isConfidential && !isGoneOnServer;
+  const agentChainQuery = useQuery({
+    ...agentChainQueries.of({ conversationId, viewerId: serverUserId }),
+    enabled: readsAgentChain,
   });
-  const agentConversations = agentConversationsQuery.data ?? NO_AGENT_CONVERSATIONS;
-  const agentConversationsRefused = stopsPolling(agentConversationsQuery.error);
+  const agentChain = agentChainQuery.data ?? null;
+  const agentChainRefused = stopsPolling(agentChainQuery.error);
+  // A Space chat's members who did not ask get the chain's pushes on the
+  // Space's channel. Only a member may join it: a reader of a published chat
+  // who is not one keeps the fallback beat.
+  useSpaceChainLive(
+    conversationId,
+    readsAgentChain && !agentChainRefused && isSpaceMember ? (detailData?.space?.uuid ?? null) : null,
+  );
 
   // A turn on this screen just ended: it may have started a job, whose label
   // belongs under its question now rather than at the next beat, or messaged
@@ -1037,15 +1050,16 @@ export function useConversationController(
     if (ended && readsBackgroundJobs && !backgroundJobsRefused) {
       void queryClient.invalidateQueries({ queryKey: conversationsQueries.backgroundJobsOf(conversationId) });
     }
-    if (ended && readsAgentConversations && !agentConversationsRefused) {
+    if (ended && readsAgentChain && !agentChainRefused) {
+      void queryClient.invalidateQueries({ queryKey: [...agentChainQueries.all(), conversationId] });
       void queryClient.invalidateQueries({ queryKey: [...agentConversationQueries.all(), conversationId] });
     }
   }, [
     isStreaming,
     readsBackgroundJobs,
     backgroundJobsRefused,
-    readsAgentConversations,
-    agentConversationsRefused,
+    readsAgentChain,
+    agentChainRefused,
     queryClient,
     conversationId,
   ]);
@@ -1127,6 +1141,26 @@ export function useConversationController(
       void followTurn(executionId, () => liveRef.current === conversationId, true);
     },
     [followTurn, conversationId],
+  );
+
+  // The turn answering the messages sent while agents worked started (chain
+  // view, `held_messages.answered`, pushed to the owner and a Space's
+  // members): their rows lose the "Waiting for …" mark, and an idle screen
+  // follows the answer as it streams. A screen already following a turn
+  // leaves it; the status read attaches to the next one when that ends.
+  // Engine calls only, no setState.
+  const streamingNowRef = useRef(isStreaming);
+  useEffect(() => {
+    streamingNowRef.current = isStreaming;
+  }, [isStreaming]);
+  useEffect(
+    () =>
+      onHeldMessagesAnswered((event) => {
+        if (event.conversation_id !== conversationId) return;
+        releaseHeld(event.message_ids);
+        if (!streamingNowRef.current) followResumedTurn(event.execution_id);
+      }),
+    [conversationId, releaseHeld, followResumedTurn],
   );
 
   // React to each new status read, once. An engine action and query calls,
@@ -1387,7 +1421,7 @@ export function useConversationController(
     canStop,
     isOwnerResolved: ownerId !== null,
     backgroundJobs,
-    agentConversations,
+    agentChain,
     isLoadingHistory,
     showHistorySkeleton,
     isGoneOnServer,

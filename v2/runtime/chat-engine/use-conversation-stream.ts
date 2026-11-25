@@ -99,6 +99,7 @@ export interface UseConversationStreamResult {
   upsertEvent: ChatEngine['upsertEvent'];
   removeEvent: ChatEngine['removeEvent'];
   setSkillDraftStatus: ChatEngine['setSkillDraftStatus'];
+  releaseHeld: ChatEngine['releaseHeld'];
 }
 
 export function useConversationStream(
@@ -182,5 +183,6 @@ export function useConversationStream(
     upsertEvent: engine.upsertEvent,
     removeEvent: engine.removeEvent,
     setSkillDraftStatus: engine.setSkillDraftStatus,
+    releaseHeld: engine.releaseHeld,
   };
 }

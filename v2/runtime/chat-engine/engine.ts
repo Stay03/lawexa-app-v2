@@ -105,6 +105,7 @@ import { labelDocuments, withServerLabels } from './document-labels';
 import { largestSavedId, savedTurnId } from './saved-turn';
 import { STALL_CHECK_MS, hiddenDuring, quietCheckDue, stallVerdict, type StallVerdict } from './stall';
 import { createLiveSeqFilter } from './live-seq';
+import { heldMarkFromSend, withHeldReleased } from './held-messages';
 import { reportChatError } from '../chat-errors/report';
 import type { IBlockedReason } from '@/types/message-pack';
 import { createCallMatcher } from '@/lib/utils/tool-call-match';
@@ -2614,10 +2615,18 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
             }
           }
         }
+        // Sent while the chat's agents work (chain view, option C): saved, and
+        // answered later with their report. The row says what it waits for, and
+        // no turn starts here (the server sends `ai_reply: false` with it).
+        const held = heldMarkFromSend(response.data);
+        if (held) {
+          setMessages((msgs) => msgs.map((m) => (m.id === optimisticMsg.id ? { ...m, held } : m)));
+        }
         // No AI reply is coming (a Space where Lawexa answers only when tagged,
-        // and this message does not tag it): the message is saved and the turn
-        // ends here, with no thinking and nothing to wait for. A server before
-        // the switch sends no `ai_reply`, which reads as a reply coming.
+        // and this message does not tag it; or a held message): the message is
+        // saved and the turn ends here, with no thinking and nothing to wait
+        // for. A server before the switch sends no `ai_reply`, which reads as a
+        // reply coming.
         if (!expectsAiReply(response.data)) {
           setState((prev) => ({ ...prev, isStreaming: false, isCancelling: false }));
           return null;
@@ -2977,6 +2986,17 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     return true;
   }
 
+  /**
+   * The turn answering these held messages started (chain view,
+   * `held_messages.answered`): their rows lose the "Waiting for …" mark at
+   * once, before the transcript is read again.
+   */
+  function releaseHeld(savedIds: readonly number[]): boolean {
+    if (disposed || withHeldReleased(state.messages, savedIds) === state.messages) return false;
+    setState((prev) => ({ ...prev, messages: [...withHeldReleased(prev.messages, savedIds)] }));
+    return true;
+  }
+
   function followUntilAnswered(convId: string): boolean {
     if (disposed || eventSource || pollInterval || state.isStreaming) return false;
     const last = lastTurnRow(state.messages);
@@ -3058,6 +3078,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     upsertEvent,
     removeEvent,
     setSkillDraftStatus,
+    releaseHeld,
     updateHandlers(next) {
       handlers = next;
     },

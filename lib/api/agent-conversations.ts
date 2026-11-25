@@ -1,5 +1,6 @@
 import { apiClient } from './client';
 import type { AgentConversationListResponse, AgentConversationSendResponse } from '@/types/agent-conversations';
+import type { AgentChainResponse, AgentChainStopResponse } from '@/types/agent-chain';
 
 /**
  * Agent conversations REST client (sub-agents contract, section 3). The
@@ -29,6 +30,26 @@ export const agentConversationsApi = {
     const response = await apiClient.post<AgentConversationSendResponse>(`/agent-conversations/${agentConversationUuid}/messages`, {
       message,
     });
+    return response.data;
+  },
+
+  /**
+   * Every agent a chat's turns called, at every depth, flat (the page nests
+   * them), with the messages held while they work and whether the chain is
+   * open. Same readers as `list`.
+   */
+  chain: async (conversationUuid: string): Promise<AgentChainResponse> => {
+    const response = await apiClient.get<AgentChainResponse>(`/conversations/${conversationUuid}/agent-chain`);
+    return response.data;
+  },
+
+  /**
+   * Stop every agent in the chain. With messages held, a turn starts that
+   * answers them now, and its `execution_id` comes back (null when nothing
+   * was held). A second call while that turn runs returns the same one.
+   */
+  stopChain: async (conversationUuid: string): Promise<AgentChainStopResponse> => {
+    const response = await apiClient.post<AgentChainStopResponse>(`/conversations/${conversationUuid}/agent-chain/stop`);
     return response.data;
   },
 };

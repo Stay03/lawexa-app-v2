@@ -15,6 +15,7 @@ import { readCardAnswers, readQuestionCard } from './question-card';
 import { readSkillDraftCard } from './skill-draft';
 import type { UsedPrivateItem } from '@/types/private-items';
 import { isRedactionSummary } from './redaction-summary';
+import { heldMarkOf } from './held-mark';
 import { createResultPool } from './tool-call-match';
 import { compactedStep } from './context-compacted';
 
@@ -68,14 +69,18 @@ export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
   if (Number.isNaN(at.getTime())) return null;
   if (isBackgroundJobLine(apiMsg)) {
     const lineMeta = apiMsg.metadata;
+    // Stop with messages held (chain view): the turn that answers them starts
+    // here, as a return does, with its own words.
+    const stoppedForHeld = lineMeta.type === HELD_MESSAGES_ANSWER;
     return {
       id: `msg_${apiMsg.id}`,
       role: 'event',
-      eventType: lineMeta.type,
+      eventType: lineMeta.type === HELD_MESSAGES_ANSWER ? 'background_job_result' : lineMeta.type,
       serverId: apiMsg.id,
       content: apiMsg.content,
       timestamp: at,
       jobs: Array.isArray(lineMeta.background_jobs) ? lineMeta.background_jobs : [],
+      ...(stoppedForHeld && { stoppedForHeld: true as const }),
     };
   }
   if (apiMsg.role !== 'event') return null;
@@ -109,19 +114,29 @@ export function eventFromApi(apiMsg: ApiMessage): EventMessage | null {
 }
 
 /**
+ * The USER-role row the server writes when the person stops a chat's agents
+ * with messages held (chain view, Backend a779b3cc): its content is written
+ * for Lawexa, and the turn that answers the held messages follows it.
+ */
+const HELD_MESSAGES_ANSWER = 'held_messages_answer';
+
+/**
  * Whether a turn row is background work's line (Backend's shapes 063d9cc3):
  * Lawexa's return, which the server stores as a USER-role row, or its give-up
  * notice, an ASSISTANT-role row. v2 draws both as lines beside the turns; v1,
- * which does not ask for lines, keeps drawing them as it always has.
+ * which does not ask for lines, keeps drawing them as it always has. Stop's
+ * row for held messages is a return too.
  */
 export function isBackgroundJobLine(
   apiMsg: Pick<ApiMessage, 'role' | 'metadata'>,
 ): apiMsg is Pick<ApiMessage, 'role'> & {
-  metadata: NonNullable<ApiMessage['metadata']> & { type: 'background_job_result' | 'background_job_unanswered' };
+  metadata: NonNullable<ApiMessage['metadata']> & {
+    type: 'background_job_result' | 'background_job_unanswered' | typeof HELD_MESSAGES_ANSWER;
+  };
 } {
   const type = apiMsg.metadata?.type;
   return (
-    (apiMsg.role === 'user' && type === 'background_job_result') ||
+    (apiMsg.role === 'user' && (type === 'background_job_result' || type === HELD_MESSAGES_ANSWER)) ||
     (apiMsg.role === 'assistant' && type === 'background_job_unanswered')
   );
 }
@@ -274,6 +289,8 @@ export function transformApiMessages(
           apiMsg.unmatched_handles.length > 0 && { unmatchedHandles: apiMsg.unmatched_handles }),
         // What redaction hid, in a redacted chat (backend, 22 October 2026).
         ...(isRedactionSummary(apiMsg.metadata?.redaction) && { redaction: apiMsg.metadata.redaction }),
+        // Sent while agents worked and not yet answered (chain view): its row says what it waits for.
+        ...(heldMarkOf(apiMsg) && { held: heldMarkOf(apiMsg) }),
         // The turn that answered a question card: drawn as a bubble of its questions and answers.
         ...(cardAnswers && { cardAnswers }),
         // The owner's yes to an ask-first card (thread 9ae498ae): a quiet line, not a bubble.

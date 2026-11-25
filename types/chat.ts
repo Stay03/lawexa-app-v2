@@ -96,6 +96,13 @@ export interface ChatMessage {
   /** Handles the writer typed that matched nobody in the space: on their own rows only. */
   unmatchedHandles?: string[];
   /**
+   * Sent while agents worked (chain view, option C): saved, and waiting for
+   * the agents' report, which Lawexa answers it with. `waitingOn` is the
+   * agent's name, or null when the server could not name one. Absent once a
+   * turn has taken it, and on every other row.
+   */
+  held?: HeldMark;
+  /**
    * What redaction hid in this user turn, in a redacted chat: the POST's
    * `redaction`, or the stored `metadata.redaction` on a reload. Absent in other
    * chats and on redacted turns from before the server sent it.
@@ -371,6 +378,12 @@ export interface DraftEditEvent extends EventMessageBase {
 export interface BackgroundJobEvent extends EventMessageBase {
   eventType: 'background_job_result' | 'background_job_unanswered';
   jobs: import('@/types/background-jobs').BackgroundJobOutcome[];
+  /**
+   * The person stopped the chat's agents with messages held (chain view,
+   * `held_messages_answer`): Lawexa answers those messages now. Drawn as a
+   * return, with its own words.
+   */
+  stoppedForHeld?: true;
 }
 
 /**
@@ -879,6 +892,19 @@ export interface ChatStartResponse {
     /** Handles in this turn that matched nobody in the space (the writer's, space chats). */
     unmatched_handles?: string[];
     /**
+     * Sent while the chat's agents work (chain view, option C; HTTP 202 with
+     * `ai_reply: false`): saved and charged, answered with their report.
+     */
+    held?: boolean;
+    /** The held message as saved: what it waits on (null in a rare race). */
+    message?: {
+      id: number;
+      content: string;
+      created_at: string;
+      state: 'held';
+      waiting_on: import('@/types/agent-chain').AgentWaitingOn | null;
+    };
+    /**
      * A retry of a first send the server already answered (`client_request_id`):
      * only `conversation_id` comes with it, no execution, nothing charged. Open
      * that chat. If the reader deleted it since, it reads 404: not sent.
@@ -963,6 +989,8 @@ export interface ApiMessage {
       | 'draft_edit'
       | 'background_job_result'
       | 'background_job_unanswered'
+      // Stop with messages held (chain view): the USER-role row the answer to them starts from.
+      | 'held_messages_answer'
       // In an agent conversation: the calling agent's message (sub-agents contract, 1.4).
       | 'agent_message'
       | 'question_card'
@@ -1092,6 +1120,20 @@ export interface ApiMessage {
   failure_message?: string;
   /** Handles the writer typed that matched nobody in the space: on the writer's own rows only. */
   unmatched_handles?: string[];
+  /**
+   * A user message sent while the chat's agents worked (chain view): `held`
+   * until a turn takes it, then `answered`. Absent on every other row.
+   */
+  state?: 'held' | 'answered';
+  /** While held: the agent it waits on (null in a rare race). */
+  waiting_on?: import('@/types/agent-chain').AgentWaitingOn | null;
+  /** Once answered: the turn that answered it. */
+  answered_by_execution_id?: string | null;
+}
+
+/** A held message's mark on its row: the agent it waits on, by name, or null. */
+export interface HeldMark {
+  waitingOn: string | null;
 }
 
 // Document upload response (POST /api/files/documents)

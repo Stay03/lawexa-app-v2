@@ -1,10 +1,11 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { Hourglass, ShieldCheck } from 'lucide-react';
 import { cn, stripContextTags, parsePastedContent } from '@/lib/utils';
 import { formatMessageTimestamp } from '@/lib/utils/date';
-import type { ChatMessage, MessageReplyTo } from '@/types/chat';
+import type { ChatMessage, HeldMark, MessageReplyTo } from '@/types/chat';
+import { heldMarkWords } from '@/v2/runtime/chat-engine/held-messages';
 import type { MessageMetadata } from '@/types/collab';
 import { PastedContentCard } from '../PastedContentCard';
 import { CardAnswersBubble } from '../question-card/CardMarks';
@@ -237,6 +238,7 @@ export function UserMessageRow({
         {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
         {message.recording && <RecordingCard recording={message.recording} />}
         {unmatched && <p className="text-muted-foreground mt-1 text-xs">{unmatched}</p>}
+        {message.held && <HeldMarkLine mark={message.held} />}
         {showsRedaction && (
           <RedactionNote summary={message.redaction} align={turnSide(message, viewerId) === 'mine' ? 'end' : 'start'} hasFiles={hasFiles} />
         )}
@@ -293,6 +295,7 @@ export function UserMessageRow({
       {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
       {message.recording && <RecordingCard recording={message.recording} />}
       {showsRedaction && <RedactionNote summary={message.redaction} align="end" hasFiles={hasFiles} />}
+      {message.held && <HeldMarkLine mark={message.held} />}
 
       <div
         className={cn(
@@ -303,5 +306,19 @@ export function UserMessageRow({
         {formatMessageTimestamp(message.timestamp)}
       </div>
     </div>
+  );
+}
+
+/**
+ * A message sent while agents worked (chain view, option C): saved, and
+ * waiting for their report, which Lawexa answers it with. Read out once when
+ * it shows; it goes when the answer starts.
+ */
+function HeldMarkLine({ mark }: { mark: HeldMark }) {
+  return (
+    <p role="status" className="text-muted-foreground mt-1 flex items-center gap-1.5 text-xs motion-safe:animate-in motion-safe:fade-in motion-safe:duration-200">
+      <Hourglass aria-hidden className="size-3 shrink-0" />
+      {heldMarkWords(mark)}
+    </p>
   );
 }

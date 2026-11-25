@@ -70,9 +70,16 @@ export function adoptServerFields(
     // The answers a question card's reply sent: a row this client drew has them
     // from its own send; one it drew without them (the home handoff) takes them.
     if (copy.cardAnswers !== undefined && local.cardAnswers === undefined) fields.cardAnswers = copy.cardAnswers;
-    if (Object.keys(fields).length === 0) return row;
+    // A message sent while agents worked (chain view): the saved copy says
+    // whether it still waits. Held there and not here (a reload of a send this
+    // client drew), it takes the mark; answered there, the mark goes.
+    if (copy.held !== undefined && local.held === undefined) fields.held = copy.held;
+    const released = copy.held === undefined && local.held !== undefined;
+    if (Object.keys(fields).length === 0 && !released) return row;
     changed = true;
-    return { ...row, ...fields } as EngineMessage;
+    const next = { ...row, ...fields } as EngineMessage & ChatMessage;
+    if (released) delete next.held;
+    return next as EngineMessage;
   });
   return changed ? next : (rows as EngineMessage[]);
 }

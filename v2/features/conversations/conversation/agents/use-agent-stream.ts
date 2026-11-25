@@ -4,7 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 
 import { CLOSED, AuthedEventSource } from '@/lib/stream/authed-event-source';
 import { useAuthStore } from '@/lib/stores/authStore';
-import type { TextDeltaEvent, TextResetEvent, ToolCallingEvent } from '@/types/chat';
+import type { TextDeltaEvent, TextResetEvent, ToolCallingEvent, ToolCompleteEvent } from '@/types/chat';
+import { createLiveSeqFilter } from '@/v2/runtime/chat-engine/live-seq';
+import { stepsOnCalling, stepsOnComplete, type AgentLiveStep } from './agent-live-steps';
+
+export type { AgentLiveStep } from './agent-live-steps';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -16,6 +20,8 @@ export interface AgentLiveTurn {
   text: string;
   /** The step the agent is taking now (`tool_calling`), until its text resumes. */
   step: { name: string; parameters: Record<string, unknown> } | null;
+  /** Every lookup of the turn so far, oldest first, each marked done when it ends. */
+  steps: AgentLiveStep[];
 }
 
 function parse<T>(raw: string | undefined): T | null {
@@ -28,18 +34,21 @@ function parse<T>(raw: string | undefined): T | null {
 }
 
 /**
- * useAgentStream — watches one running turn of an agent conversation in the
- * side panel (sub-agents contract, 3.4): `GET /api/chat/stream/{execution_id}`
- * through the same authed reader the chat uses, so the login token never sits
- * in the address. The answer streams in as it is written; the step the agent
- * takes shows meanwhile. When the turn ends, `onEnd` runs once, and the panel
- * reads the saved transcript again.
+ * useAgentStream — watches one running turn of an agent conversation, for its
+ * row in the chat and its side panel (sub-agents contract, 3.4):
+ * `GET /api/chat/stream/{execution_id}` through the same authed reader the
+ * chat uses, so the login token never sits in the address. The answer streams
+ * in as it is written; its lookups are listed as they start and end. When the
+ * turn ends, `onEnd` runs once, and the caller reads the saved state again.
  *
- * One mount per turn: the panel keys its live row by the execution id, so a
- * new turn starts from nothing.
+ * An event relayed twice on the connection (same seq) is dropped before it is
+ * applied, as the chat's own stream does (live-seq.ts).
+ *
+ * One mount per turn: callers key the live view by the execution id, so a new
+ * turn starts from nothing.
  */
 export function useAgentStream(executionId: string, onEnd: () => void): AgentLiveTurn {
-  const [live, setLive] = useState<AgentLiveTurn>({ text: '', step: null });
+  const [live, setLive] = useState<AgentLiveTurn>({ text: '', step: null, steps: [] });
   // The latest onEnd, so a new callback each render does not reopen the stream.
   const onEndRef = useRef(onEnd);
   useEffect(() => {
@@ -50,6 +59,7 @@ export function useAgentStream(executionId: string, onEnd: () => void): AgentLiv
     const source = new AuthedEventSource(`${API_BASE_URL}/api/chat/stream/${executionId}`, {
       getToken: () => useAuthStore.getState().token,
     });
+    const repeated = createLiveSeqFilter();
     let iteration = -1;
     let ended = false;
     const end = () => {
@@ -58,26 +68,40 @@ export function useAgentStream(executionId: string, onEnd: () => void): AgentLiv
       source.close();
       onEndRef.current();
     };
+    const on = (type: string, handler: (event: MessageEvent) => void) =>
+      source.addEventListener(type, (event) => {
+        if (repeated(event.data)) return;
+        handler(event);
+      });
 
-    source.addEventListener('text_delta', (event) => {
+    on('text_delta', (event) => {
       const delta = parse<TextDeltaEvent>(event.data);
       if (!delta || delta.agent_slug) return;
       const fresh = delta.iteration !== iteration;
       iteration = delta.iteration;
-      setLive((held) => ({ text: (fresh ? '' : held.text) + delta.delta, step: null }));
+      setLive((held) => ({ ...held, text: (fresh ? '' : held.text) + delta.delta, step: null }));
     });
-    source.addEventListener('text_reset', (event) => {
+    on('text_reset', (event) => {
       const reset = parse<TextResetEvent>(event.data);
       if (!reset || reset.agent_slug) return;
       setLive((held) => ({ ...held, text: '' }));
     });
-    source.addEventListener('tool_calling', (event) => {
+    on('tool_calling', (event) => {
       const calling = parse<ToolCallingEvent>(event.data);
       if (!calling || calling.agent_slug) return;
-      setLive((held) => ({ ...held, step: { name: calling.tool_call.name, parameters: calling.tool_call.parameters ?? {} } }));
+      setLive((held) => ({
+        ...held,
+        step: { name: calling.tool_call.name, parameters: calling.tool_call.parameters ?? {} },
+        steps: stepsOnCalling(held.steps, calling),
+      }));
+    });
+    on('tool_complete', (event) => {
+      const complete = parse<ToolCompleteEvent>(event.data);
+      if (!complete || complete.agent_slug) return;
+      setLive((held) => ({ ...held, steps: stepsOnComplete(held.steps, complete) }));
     });
     for (const type of TERMINAL_EVENTS) {
-      source.addEventListener(type, (event) => {
+      on(type, (event) => {
         // A connection failure is an `error` with no data: the reader retries on its own.
         if (type === 'error' && !event.data) return;
         end();

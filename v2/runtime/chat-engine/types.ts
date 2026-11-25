@@ -409,6 +409,11 @@ export interface ChatEngine {
    * that draft. Applies while a stream is live. Returns whether rows changed.
    */
   setSkillDraftStatus(draft: string, status: SkillDraftStatus): boolean;
+  /**
+   * The turn answering these held messages (saved ids) started (chain view):
+   * their rows lose the "Waiting for …" mark at once. Returns whether rows changed.
+   */
+  releaseHeld(savedIds: readonly number[]): boolean;
 
   /**
    * Replace the live callbacks + mode resolvers on a long-lived engine. The React
