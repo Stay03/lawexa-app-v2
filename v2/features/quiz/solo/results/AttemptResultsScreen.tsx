@@ -34,6 +34,7 @@ import { CertificateOffer } from '@/v2/features/settings/certificates/Certificat
 import { AttemptResultsSkeleton, RESULTS_COLUMN } from './states';
 import { PodiumStage, podiumAlreadySeen, rememberPodiumSeen } from './PodiumStage';
 import { glideTop, opensOnPodium, quizHasBoard, resultsWaitForBoard, SCORE_GLIDE_MS } from './position-model';
+import { runKind } from '../retake-model';
 import '../solo-quiz.css';
 
 /**
@@ -210,7 +211,9 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
     );
   }
   const board = boardQuery.data?.data ?? null;
-  const podiumFirst = !podiumDone && board !== null && opensOnPodium(board, score.points);
+  // A retake is practice: it never moves the board, so it never opens on the podium.
+  const practice = runKind(attempt).kind === 'practice';
+  const podiumFirst = !podiumDone && board !== null && opensOnPodium(board, score.points, practice);
 
   const highlights = attemptHighlights(score, questions);
 
@@ -256,6 +259,7 @@ export function AttemptResultsScreen({ attemptUuid }: { attemptUuid: string }) {
         <FinishPosition
           quizUuid={attempt.quiz.uuid}
           runPoints={score.points}
+          practice={practice}
           publicQuiz={publicQuiz}
           viewerId={viewerId}
           podiumPlayed={podiumFirst || podiumDone}

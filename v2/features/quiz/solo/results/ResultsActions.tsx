@@ -7,6 +7,7 @@ import type { ChannelQuizVisibility } from '@/types/channel-quiz';
 import { EXPLORE_HREF } from '../model';
 import { RaisedButton } from '../ui';
 import { useChallengeFriend } from '../use-challenge-friend';
+import { RETAKE_LABEL } from '../retake-model';
 
 /**
  * ResultsActions — the two things worth doing next, at the bottom of the
@@ -86,7 +87,7 @@ export function ResultsActions({
           ) : (
             <RotateCcw aria-hidden className="size-4" />
           )}
-          Take it again
+          {RETAKE_LABEL}
         </RaisedButton>
         {friend.available && (
           <RaisedButton

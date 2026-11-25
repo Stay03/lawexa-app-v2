@@ -11,6 +11,7 @@ import {
   Loader2,
   Pencil,
   Play,
+  RotateCcw,
   SearchX,
   Share2,
   Swords,
@@ -48,6 +49,7 @@ import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
 import { bestLabel, scenarioCountLabel } from '../rows-model';
+import { RETAKE_LABEL, startLabel } from '../retake-model';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { START_LIVE, START_SOLO, challengeFromParam, frontChallengeText, offersHostLive } from './front-model';
 import {
@@ -321,6 +323,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
   const scenarios = scenarioCountLabel(quiz.scenario_count ?? quiz.scenarios?.length);
   const best = bestLabel(quiz.viewer_best_points);
+  // "Retake quiz" once the reader has finished an attempt (Arthur, 25 November 2026).
+  const startText = startLabel(quiz.viewer_attempts_count);
+  const StartIcon = startText === RETAKE_LABEL ? RotateCcw : Play;
   // After the topic, level, year and size: the scenarios, and who can find a
   // quiz that is not on the public list (its owner's reminder).
   const extraTags = [scenarios, quiz.visibility === 'public' ? null : visibilityFace(quiz.visibility)].filter(
@@ -442,9 +447,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                       {startAttempt.isPending ? (
                         <Loader2 aria-hidden className="size-4 animate-spin" />
                       ) : (
-                        <Play aria-hidden className="size-4" />
+                        <StartIcon aria-hidden className="size-4" />
                       )}
-                      Start quiz
+                      {startText}
                     </RaisedButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-72 p-1.5">
@@ -469,9 +474,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                   {startAttempt.isPending ? (
                     <Loader2 aria-hidden className="size-4 animate-spin" />
                   ) : (
-                    <Play aria-hidden className="size-4" />
+                    <StartIcon aria-hidden className="size-4" />
                   )}
-                  Start quiz
+                  {startText}
                 </RaisedButton>
               ) : (
                 <RaisedButton asChild className={cn(FRONT_BUTTON, 'max-md:basis-full')}>

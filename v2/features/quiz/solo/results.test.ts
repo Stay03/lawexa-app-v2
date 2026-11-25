@@ -58,7 +58,8 @@ test('the headline leads with the greeting and the points, then one row of three
   assert.match(summary, /<Stat value=\{`\$\{highlights\.correct\}\/\$\{highlights\.total\}`\} label="right" \/>/);
   assert.match(summary, /<Stat value=\{String\(highlights\.streak\)\} label="in a row" \/>/);
   assert.match(summary, /value=\{highlights\.fastestMs === null \? 'None' : secondsLabel\(highlights\.fastestMs\)\}\s*label="fastest"/);
-  assert.match(summary, /const line = comparisonLine\(attempt\.comparison, score\.points\);/);
+  // A retake's line is its practice line (Arthur, 25 November 2026); otherwise the comparison.
+  assert.match(summary, /const line = run\.kind === 'practice' \? run\.line : comparisonLine\(attempt\.comparison, score\.points\);/);
   assert.match(summary, /\{line && <p className="mt-4 text-sm text-muted-foreground">\{line\}<\/p>\}/);
   // No per-answer average, no chips, no ring: the points are the story.
   assert.doesNotMatch(summary, /ScoreRing|SummaryChip|speedLabel|avgResponseMs|SPEED_SCORING_NOTE/);

@@ -79,8 +79,10 @@ test('a rank reads with its field, and a score as a whole number', () => {
 });
 
 test('the board says how it ranks, and a player row shows only what was sent', () => {
-  assert.match(BOARD_RULES_NOTE, /best score/);
-  assert.match(BOARD_RULES_NOTE, /friendly benchmark/);
+  // Arthur, 25 November 2026: the first attempt ranks; retakes are practice.
+  assert.match(BOARD_RULES_NOTE, /first attempt/);
+  assert.match(BOARD_RULES_NOTE, /Retakes are practice and don’t change the board/);
+  assert.match(BOARD_RULES_NOTE, /Score to Beat/);
   assert.equal(playerDetailLabel({ institution: 'Lagos campus', level: 'Law School' }), 'Lagos campus · Law School');
   assert.equal(playerDetailLabel({ level: '300 Level' }), '300 Level');
   assert.equal(playerDetailLabel({}), null);
@@ -121,7 +123,9 @@ test('an Explore card is one link: the tile and title, quiet tags, the person to
   assert.doesNotMatch(explore, /useLeaderboardOverlay|Trophy/);
   const card = read('explore', 'ExploreQuizCard.tsx');
   assert.match(card, /after:absolute after:inset-0/);
-  assert.match(card, /\{leading \? 'You lead' : 'To beat'\}/);
+  // The Score to Beat when the server sends it (Arthur, 25 November 2026), else the board's first place.
+  assert.match(card, /const caption = toBeat \? 'Score to Beat' : leading \? 'You lead' : 'To beat';/);
+  assert.match(card, /\{caption\}/);
   assert.match(card, /Be the first to play/);
   // Colour on the tile only, and no play button (Arthur, 28 October 2026).
   assert.match(card, /<QuizTile uuid=\{quiz\.uuid\} title=\{quiz\.title\} size="md" \/>/);
@@ -186,11 +190,12 @@ test('the standing line is the share of the OTHER players behind the reader, fro
   assert.equal(standingLine(7, 16, 8), 'You’re doing better than 47% of other players.');
   assert.equal(standingLine(3, 16, 13), 'You’re doing better than 20% of other players.');
   assert.equal(standingLine(7, 11, 4), 'You’re doing better than 70% of other players.');
-  assert.equal(standingLine(0, 16, 16), 'Play again to climb the board.');
+  // A retake never moves the board (Arthur, 25 November 2026): no climbing line.
+  assert.equal(standingLine(0, 16, 16), null);
   // A 3- and a 2-player board.
   assert.equal(standingLine(1, 3, 2), 'You’re doing better than 50% of other players.');
   assert.equal(standingLine(1, 2, 1), 'You’re top of the board.');
-  assert.equal(standingLine(0, 2, 2), 'Play again to climb the board.');
+  assert.equal(standingLine(0, 2, 2), null);
 });
 
 test('a finished live game reports the finish, never "play again" (techlead review of 4a612ab6)', () => {
@@ -205,8 +210,8 @@ test('a finished live game reports the finish, never "play again" (techlead revi
   assert.equal(standingLine(0, 2, 1, true), 'You finished joint 1st of 2.');
   assert.equal(standingLine(13, 24, 11, true), 'You finished 11th of 24.');
   assert.equal(standingLine(1, 23, 22, true), 'You finished 22nd of 23.');
-  // The quiz's own page keeps its wording.
-  assert.equal(standingLine(0, 16, 16), 'Play again to climb the board.');
+  // The quiz's own page says nothing there: a retake cannot climb its board.
+  assert.equal(standingLine(0, 16, 16), null);
 });
 
 test('the standing line gives no percentage when there is no one to compare with', () => {
@@ -219,8 +224,8 @@ test('the standing line gives no percentage when there is no one to compare with
   assert.equal(standingLine(null, 16, 13), null);
   // Never "better than 100%" while someone is level or ahead.
   assert.equal(standingLine(298, 300, 2), 'You’re doing better than 99% of other players.');
-  // A share that rounds to 0 says climb, not "0%".
-  assert.equal(standingLine(1, 400, 399), 'Play again to climb the board.');
+  // A share that rounds to 0 says nothing, not "0%".
+  assert.equal(standingLine(1, 400, 399), null);
 });
 
 test('the tags are topic, level and year, or the size when there are none', () => {

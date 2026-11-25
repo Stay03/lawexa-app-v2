@@ -7,7 +7,9 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ChannelQuiz } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { scoreLabel } from '../home-model';
+import { scoreToBeatView } from '../retake-model';
 import { quizFrontHref } from '../model';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
@@ -31,8 +33,16 @@ import { QuizTile } from '../QuizTile';
 const CARD = 'v2-solo-lip relative flex min-w-0 flex-col gap-3 rounded-2xl border-2 border-border bg-card p-4';
 
 export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: ChannelQuiz }) {
-  const top = quiz.leaderboard?.top ?? null;
-  const leading = quiz.leaderboard?.viewer_rank === 1;
+  const { userUuid } = useV2Session();
+  // The Score to Beat (Arthur, 25 November 2026): the highest score ever, which
+  // a retake can take. An older server sends only the board's first place.
+  const toBeat = scoreToBeatView(quiz.leaderboard?.score_to_beat, userUuid);
+  const first = quiz.leaderboard?.top ?? null;
+  const top = toBeat
+    ? { name: toBeat.holder, avatar_url: toBeat.avatarUrl, points: quiz.leaderboard?.score_to_beat?.points ?? 0 }
+    : first;
+  const leading = toBeat ? toBeat.you : quiz.leaderboard?.viewer_rank === 1;
+  const caption = toBeat ? 'Score to Beat' : leading ? 'You lead' : 'To beat';
   const best = typeof quiz.viewer_best_points === 'number' ? quiz.viewer_best_points : null;
 
   return (
@@ -53,7 +63,7 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
         <div className="flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl bg-secondary/70 px-3">
           <MemberAvatar user={{ name: top.name, avatar_url: top.avatar_url }} size="sm" />
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="text-[11px] font-medium text-muted-foreground">{leading ? 'You lead' : 'To beat'}</span>
+            <span className="text-[11px] font-medium text-muted-foreground">{caption}</span>
             <span className="truncate text-sm font-semibold text-foreground">{leading ? 'You' : top.name}</span>
           </span>
           <span className="shrink-0 font-comfortaa text-base font-bold text-foreground tabular-nums">

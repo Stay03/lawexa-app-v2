@@ -50,7 +50,8 @@ test('second and third are on the podium too', () => {
   assert.equal(second.kind === 'ranked' && second.podiumPlace, 2);
   assert.equal(third.kind === 'ranked' && third.podiumPlace, 3);
   assert.equal(third.kind === 'ranked' && third.line, 'You’re #3 of 3 players');
-  assert.equal(third.kind === 'ranked' && third.standing, 'Play again to climb the board.');
+  // A retake cannot climb the board (Arthur, 25 November 2026): no climbing line.
+  assert.equal(third.kind === 'ranked' && third.standing, null);
 });
 
 test('ranked outside the top three: the place and the share, no podium', () => {
@@ -63,7 +64,7 @@ test('ranked outside the top three: the place and the share, no podium', () => {
   assert.deepEqual(finishPosition(board(16, { rank: 16, players_behind: 0, points: 120 }), 120), {
     kind: 'ranked',
     line: 'You’re #16 of 16 players',
-    standing: 'Play again to climb the board.',
+    standing: null,
     podiumPlace: null,
   });
 });
@@ -163,7 +164,9 @@ test('the podium plays first, full screen over the results, for a top-three fini
   assert.match(screen, /useState\(\(\) => prefersReducedMotion\(\) \|\| podiumAlreadySeen\(attemptUuid\)\)/);
   // Until the board says, the skeleton stays, so nothing swaps under the reader.
   assert.match(screen, /if \(resultsWaitForBoard\(\{ podiumDone, hasBoard: publicQuiz, boardSettled: boardQuery\.isFetched \}\)\) \{\s*return \(\s*<div className=\{RESULTS_COLUMN\}>\s*<AttemptResultsSkeleton \/>/);
-  assert.match(screen, /const podiumFirst = !podiumDone && board !== null && opensOnPodium\(board, score\.points\);/);
+  // A retake is practice, so it never opens on the podium (Arthur, 25 November 2026).
+  assert.match(screen, /const practice = runKind\(attempt\)\.kind === 'practice';/);
+  assert.match(screen, /const podiumFirst = !podiumDone && board !== null && opensOnPodium\(board, score\.points, practice\);/);
   // One layer over the results, which sit still and out of reach underneath.
   assert.match(screen, /\{podiumFirst && board \? \(\s*<PodiumStage/);
   assert.match(screen, /<div className=\{RESULTS_COLUMN\} inert=\{podiumFirst\}>/);
@@ -336,4 +339,10 @@ test('the results wait only for the board\'s first answer, so a failed board can
   assert.equal(resultsWaitForBoard({ podiumDone: false, hasBoard: null, boardSettled: false }), true);
   // The podium already played: never wait.
   assert.equal(resultsWaitForBoard({ podiumDone: true, hasBoard: null, boardSettled: false }), false);
+});
+
+test('a retake reads the board place it leaves alone: no climbing line, no podium', () => {
+  // Arthur, 25 November 2026: the first attempt sets the place; a retake is practice.
+  const practice = finishPosition(board(16, { rank: 2, players_behind: 14, points: 6000 }), 9000, { practice: true });
+  assert.deepEqual(practice, { kind: 'ranked', line: 'Your board place: #2 of 16 players', standing: null, podiumPlace: null });
 });

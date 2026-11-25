@@ -12,9 +12,12 @@ import { isViewerEntry, standingLine } from '../home-model';
  * after the finish (the finish writes the board row at once, Backend); the
  * app never works a rank out.
  *
- * THE RANK IS THE BEST RUN. The board ranks each player by their best score,
- * so when this run scored less than the best the line says "Your best: #4",
- * and the podium moment is kept for a run that put them there.
+ * THE RANK IS THE FIRST RUN (Arthur, 25 November 2026). The board ranks each
+ * player by their first finished attempt; a retake is practice and never
+ * moves it. On a retake (`practice`) the line says "Your board place: #4 of
+ * 23 players", with no climbing line and no podium moment. An older server
+ * that ranks by the best score still reads "Your best: #4" when this run
+ * scored less than the best.
  *
  * NO PLACE IS NOT AN ERROR. `viewer` is null when the reader wrote the quiz,
  * when their attempt began before its questions last changed, or when the
@@ -24,7 +27,7 @@ export type FinishPosition =
   | { kind: 'unranked'; line: string }
   | {
       kind: 'ranked';
-      /** "You're #4 of 23 players" or "Your best: #4 of 23 players". */
+      /** "You're #4 of 23 players", "Your board place: #4 of 23 players" (a retake) or "Your best: #4 of 23 players". */
       line: string;
       /** The "better than" line, or `null` when there is nothing to compare. */
       standing: string | null;
@@ -40,7 +43,7 @@ export const PRIVATE_UNRANKED_LINE = 'Only public quizzes have a leaderboard.';
 export function finishPosition(
   board: Pick<QuizLeaderboard, 'player_count' | 'viewer'>,
   runPoints: number,
-  { publicQuiz = true }: { publicQuiz?: boolean } = {},
+  { publicQuiz = true, practice = false }: { publicQuiz?: boolean; practice?: boolean } = {},
 ): FinishPosition {
   const viewer = board.viewer;
   if (!viewer) return { kind: 'unranked', line: publicQuiz ? UNRANKED_LINE : PRIVATE_UNRANKED_LINE };
@@ -50,6 +53,7 @@ export function finishPosition(
   const best = viewer.points > runPoints;
   const place = `#${NUMBER.format(viewer.rank)}`;
   const of = count > 1 ? ` of ${NUMBER.format(count)} players` : '';
+  if (practice) return { kind: 'ranked', line: `Your board place: ${place}${of}`, standing: null, podiumPlace: null };
   const line = best ? `Your best: ${place}${of}` : `You’re ${place}${of}`;
   const podiumPlace = !best && viewer.rank >= 1 && viewer.rank <= 3 ? (viewer.rank as 1 | 2 | 3) : null;
 
@@ -68,8 +72,8 @@ export function finishPosition(
  * three the podium shows (a reader tied for third can sort fourth). The
  * caller adds the rest: not under reduced motion, and once per attempt.
  */
-export function opensOnPodium(board: QuizLeaderboard, runPoints: number): boolean {
-  const position = finishPosition(board, runPoints);
+export function opensOnPodium(board: QuizLeaderboard, runPoints: number, practice = false): boolean {
+  const position = finishPosition(board, runPoints, { practice });
   if (position.kind !== 'ranked' || position.podiumPlace === null) return false;
   return board.entries.slice(0, 3).some((entry) => isViewerEntry(board.viewer, entry));
 }
