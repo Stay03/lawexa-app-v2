@@ -28,6 +28,8 @@ export interface ScoreToBeatView {
   points: string;
   /** The holder's name, or "You" when it is the reader. */
   holder: string;
+  /** The holder's own name, for their face (a face reads its initials from it, never from "You"). */
+  name: string;
   you: boolean;
   avatarUrl: string | null;
   /** "on 3 attempts": the attempt that reached it, or `null` when not sent. */
@@ -47,10 +49,12 @@ export function scoreToBeatView(
   if (!scoreToBeat) return null;
   const user = scoreToBeat.user;
   const you = Boolean(viewerUuid) && user !== null && user.uuid === viewerUuid;
+  // A holder whose account is gone keeps the score, unnamed (Backend ab338362).
+  const name = user?.name.trim() || 'A former player';
   return {
     points: pointsLabel(scoreToBeat.points),
-    // A holder whose account is gone keeps the score, unnamed (Backend ab338362).
-    holder: you ? 'You' : user?.name.trim() || 'A former player',
+    holder: you ? 'You' : name,
+    name,
     you,
     avatarUrl: user?.avatar_url ?? null,
     attempts: attemptsLabel(scoreToBeat.attempt_number),

@@ -15,13 +15,15 @@ test('Start reads Retake once the reader has finished an attempt', () => {
 });
 
 test('the Score to Beat names its holder, or You', () => {
-  assert.deepEqual(scoreToBeatView(STB, 'u-me'), { points: '9,400', holder: 'Ada Obi', you: false, avatarUrl: null, attempts: null });
+  assert.deepEqual(scoreToBeatView(STB, 'u-me'), { points: '9,400', holder: 'Ada Obi', name: 'Ada Obi', you: false, avatarUrl: null, attempts: null });
+  // The reader holding it reads "You", and their face keeps their own name (no "YO" initials).
+  assert.equal(scoreToBeatView(STB, 'u-ada')?.name, 'Ada Obi');
   assert.equal(scoreToBeatView({ ...STB, attempt_number: 3 }, 'u-me')?.attempts, 'on 3 attempts');
   assert.equal(scoreToBeatView(STB, 'u-ada')?.holder, 'You');
   assert.equal(scoreToBeatView(null, 'u-ada'), null);
   assert.equal(scoreToBeatView({ ...STB, user: { ...STB.user, name: '  ' } }, null)?.holder, 'A former player');
   // The holder's account is gone: the score stays, unnamed.
-  assert.deepEqual(scoreToBeatView({ ...STB, user: null }, 'u-ada'), { points: '9,400', holder: 'A former player', you: false, avatarUrl: null, attempts: null });
+  assert.deepEqual(scoreToBeatView({ ...STB, user: null }, 'u-ada'), { points: '9,400', holder: 'A former player', name: 'A former player', you: false, avatarUrl: null, attempts: null });
 });
 
 test('a retake is practice, with the board score that stays', () => {

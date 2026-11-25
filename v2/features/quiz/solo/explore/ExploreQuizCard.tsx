@@ -42,7 +42,8 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
   // One row either way, the card's own (Arthur, 17:52 to 18:00: compact, "To
   // beat", the attempts on the number's side).
   const row = toBeat
-    ? { name: toBeat.holder, avatar_url: toBeat.avatarUrl, points: quiz.leaderboard?.score_to_beat?.points ?? 0, leading: toBeat.you, attempts: toBeat.attempts }
+    ? // The face reads the holder's own name: "You" would draw "YO" (the row's label says You).
+      { name: toBeat.name, avatar_url: toBeat.avatarUrl, points: quiz.leaderboard?.score_to_beat?.points ?? 0, leading: toBeat.you, attempts: toBeat.attempts }
     : first
       ? { name: first.name, avatar_url: first.avatar_url, points: first.points, leading: quiz.leaderboard?.viewer_rank === 1, attempts: null }
       : null;
