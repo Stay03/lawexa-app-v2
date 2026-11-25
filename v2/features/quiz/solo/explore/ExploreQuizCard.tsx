@@ -7,7 +7,9 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ChannelQuiz } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
+import { useV2Session } from '@/v2/runtime/session-context';
 import { scoreLabel } from '../home-model';
+import { cardBest, ownScoreLabel, scoreToBeatView } from '../retake-model';
 import { quizFrontHref } from '../model';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
@@ -20,7 +22,8 @@ import { QuizTile } from '../QuizTile';
  *
  *   (T) Title, in its own weight         the quiz's letter tile, its colour
  *   [Land Law] [300 Level] [2025]        quiet tags
- *   ┌ (face) To beat Bola Ade   2,820 ┐  the person to beat, on a tray
+ *   ┌ (face) To beat          9,480 ┐  the Score to Beat: the highest score ever
+ *   └        Bola Ade  on 3 attempts ┘  (an older server: the board's first place)
  *   Your best 1,926                     once played
  *
  * Colour lives on the tile only, and no play button (Arthur, 28 October
@@ -31,9 +34,23 @@ import { QuizTile } from '../QuizTile';
 const CARD = 'v2-solo-lip relative flex min-w-0 flex-col gap-3 rounded-2xl border-2 border-border bg-card p-4';
 
 export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: ChannelQuiz }) {
-  const top = quiz.leaderboard?.top ?? null;
-  const leading = quiz.leaderboard?.viewer_rank === 1;
-  const best = typeof quiz.viewer_best_points === 'number' ? quiz.viewer_best_points : null;
+  const { userUuid } = useV2Session();
+  // The Score to Beat (Arthur, 25 November 2026): the highest score ever, which
+  // a retake can take. An older server sends only the board's first place.
+  const toBeat = scoreToBeatView(quiz.leaderboard?.score_to_beat, userUuid);
+  const first = quiz.leaderboard?.top ?? null;
+  // One row either way, the card's own (Arthur, 17:52 to 18:00: compact, "To
+  // beat", the attempts on the number's side).
+  const row = toBeat
+    ? // The face reads the holder's own name: "You" would draw "YO" (the row's label says You).
+      { name: toBeat.name, avatar_url: toBeat.avatarUrl, points: quiz.leaderboard?.score_to_beat?.points ?? 0, leading: toBeat.you, attempts: toBeat.attempts }
+    : first
+      ? { name: first.name, avatar_url: first.avatar_url, points: first.points, leading: quiz.leaderboard?.viewer_rank === 1, attempts: null }
+      : null;
+  // "To beat: You" would tell the reader to beat themselves: holding it reads "You lead".
+  const caption = row?.leading ? 'You lead' : 'To beat';
+  // The reader's best, retakes included: on the card only (Arthur, 17:58).
+  const best = cardBest(quiz);
 
   return (
     <li className={cn(CARD, 'has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring')}>
@@ -49,16 +66,21 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
 
       <QuizTags quiz={quiz} />
 
-      {top ? (
+      {row ? (
+        // The Score to Beat lives on the card only (Arthur, 25 November 2026,
+        // 17:21: "it distracts from the leaderboard"), in the card's own row.
         <div className="flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl bg-secondary/70 px-3">
-          <MemberAvatar user={{ name: top.name, avatar_url: top.avatar_url }} size="sm" />
+          <MemberAvatar user={{ name: row.name, avatar_url: row.avatar_url }} size="sm" />
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
-            <span className="text-[11px] font-medium text-muted-foreground">{leading ? 'You lead' : 'To beat'}</span>
-            <span className="truncate text-sm font-semibold text-foreground">{leading ? 'You' : top.name}</span>
+            <span className="text-[11px] font-medium text-muted-foreground">{caption}</span>
+            <span className="truncate text-sm font-semibold text-foreground">{row.leading ? 'You' : row.name}</span>
           </span>
-          <span className="shrink-0 font-comfortaa text-base font-bold text-foreground tabular-nums">
-            {scoreLabel(top.points)}
-            <span className="sr-only"> points</span>
+          <span className="flex shrink-0 flex-col items-end leading-tight">
+            <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">
+              {scoreLabel(row.points)}
+              <span className="sr-only"> points</span>
+            </span>
+            {row.attempts ? <span className="text-[11px] font-medium text-muted-foreground">{row.attempts}</span> : null}
           </span>
         </div>
       ) : (
@@ -69,7 +91,7 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
 
       {best !== null ? (
         <span className="mt-auto flex min-w-0 items-baseline gap-1.5">
-          <span className="text-xs text-muted-foreground">Your best</span>
+          <span className="text-xs text-muted-foreground">{ownScoreLabel('best')}</span>
           <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">{scoreLabel(best)}</span>
         </span>
       ) : null}

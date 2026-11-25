@@ -56,6 +56,23 @@ export function bestOrNotTaken(
   return null;
 }
 
+/**
+ * A row's bottom right for any quiz: on a listed one the board score
+ * ("Board 8,200"), never the best (Arthur, 25 November 2026: retakes are
+ * practice); "Not taken" before the reader's first finish; nothing while the
+ * server does not send the board score. An unlisted quiz keeps its best.
+ */
+export function scoreOrNotTaken(
+  quiz: { is_listed?: boolean; viewer_best_points?: number | null; viewer_board_points?: number | null },
+  signedIn: boolean,
+): { label: string; taken: boolean } | null {
+  if (!quiz.is_listed) return bestOrNotTaken(quiz.viewer_best_points, signedIn);
+  const board = quiz.viewer_board_points;
+  if (typeof board === 'number' && Number.isFinite(board)) return { label: `Board ${Math.round(board).toLocaleString('en-US')}`, taken: true };
+  if (quiz.viewer_best_points === null && signedIn) return { label: 'Not taken', taken: false };
+  return null;
+}
+
 /** The tile's four colours, one per quiz and stable across renders and devices. */
 export const QUIZ_TONES = ['blue', 'gold', 'coral', 'green'] as const;
 export type QuizTone = (typeof QUIZ_TONES)[number];

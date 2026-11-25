@@ -127,6 +127,7 @@ test('the quiz page says each thing once, in a few words', () => {
   assert.match(source, />\s*Create a free account\s*<\/Link>\{' '\}\s*to keep your score\./);
   assert.match(source, /\? 'Only you can open this quiz\.'\s*: 'Shared with the channels it has run in\.'/);
   assert.doesNotMatch(source, /Anyone can browse quizzes|Change who can find it to share it by link/);
-  // Kept: the reader's own best.
-  assert.match(source, /Your best/);
+  // Kept: the reader's own score: the board score on a listed quiz (Arthur, 25 November 2026), else the best.
+  assert.match(source, /const yourScore = ownScore\(quiz, board\?\.viewer\?\.points \?\? null\);/);
+  assert.match(source, /\{ownScoreLabel\(yourScore\.kind\)\}/);
 });

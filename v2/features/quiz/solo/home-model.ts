@@ -142,7 +142,7 @@ export function scoreLabel(points: number): string {
  * of knowledge").
  */
 export const BOARD_RULES_NOTE =
-  'Ranked by each player’s best score. Right answers score more the faster they come. Playing again can raise a best, so treat this as a friendly benchmark.';
+  'Ranked by each player’s first attempt. Right answers score more the faster they come. Retakes are practice and don’t change the board, but the highest score ever is the Score to Beat.';
 
 /** The board's empty sentence. */
 export const BOARD_EMPTY_NOTE = 'No one has finished this quiz yet. Be the first on the board.';
@@ -179,10 +179,11 @@ export function standingLine(
   if (typeof playersBehind !== 'number' || !Number.isFinite(playersBehind)) return null;
   const others = playerCount - 1;
   if (playersBehind >= others) return 'You’re top of the board.';
-  if (playersBehind <= 0) return rank === 1 ? 'You’re level at the top of the board.' : 'Play again to climb the board.';
+  // A retake never moves the board (Arthur, 25 November 2026): there is no climbing to suggest.
+  if (playersBehind <= 0) return rank === 1 ? 'You’re level at the top of the board.' : null;
   // Never "better than 100%" while someone is level with or ahead of them.
   const share = Math.min(99, Math.round((playersBehind / others) * 100));
-  return share > 0 ? `You’re doing better than ${share}% of other players.` : 'Play again to climb the board.';
+  return share > 0 ? `You’re doing better than ${share}% of other players.` : null;
 }
 
 /** A finished game's line for the reader: where they finished, of how many. */

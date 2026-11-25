@@ -1,5 +1,7 @@
 'use client';
 
+import { Target } from 'lucide-react';
+
 import type { QuizAttempt } from '@/types/channel-quiz';
 import {
   comparisonLine,
@@ -11,6 +13,7 @@ import {
   type AttemptScore,
 } from '../model';
 import { CountUp } from '../ui';
+import { HOLDER_MARK, pointsCaption, runKind } from '../retake-model';
 
 /**
  * AttemptSummary — the attempt's headline in design B1: the greeting, the
@@ -50,7 +53,11 @@ export function AttemptSummary({
   /** The session's display name; the greeting takes its first word. */
   viewerName: string | null;
 }) {
-  const line = comparisonLine(attempt.comparison, score.points);
+  // A retake is practice (Arthur, 25 November 2026): its points are marked so,
+  // and its line says the board score that stays, in place of the comparison.
+  const run = runKind(attempt);
+  const line = run.kind === 'practice' ? run.line : comparisonLine(attempt.comparison, score.points);
+  const holds = run.kind !== 'none' && run.holdsScoreToBeat;
 
   return (
     <section
@@ -76,8 +83,15 @@ export function AttemptSummary({
         <span className="sr-only">{pointsLabel(score.points)}</span>
       </p>
       <p className="mt-2 text-[13px] font-bold tracking-[0.16em] text-muted-foreground uppercase">
-        points
+        {pointsCaption(run)}
       </p>
+      {/* The highest score ever on the quiz is now this one, on a first attempt or a retake. */}
+      {holds ? (
+        <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-500">
+          <Target aria-hidden className="size-4" />
+          {HOLDER_MARK}
+        </p>
+      ) : null}
 
       {/* One row, three equal cells, number over label, thin dividers. */}
       <ul className="mt-8 flex w-full max-w-[330px] divide-x divide-border">

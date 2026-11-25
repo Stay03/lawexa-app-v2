@@ -41,6 +41,7 @@ import { finishPosition } from './position-model';
 export function FinishPosition({
   quizUuid,
   runPoints,
+  practice = false,
   publicQuiz,
   viewerId,
   podiumPlayed,
@@ -49,6 +50,8 @@ export function FinishPosition({
   quizUuid: string;
   /** This run's points, to tell a new place from an older best. */
   runPoints: number;
+  /** A retake: practice, which never moves the board (Arthur, 25 November 2026). */
+  practice?: boolean;
   /** Whether the quiz has a board (`quizHasBoard`): its `is_listed`, or the old
    *  public rule on a server without it; `null` while that is not known. */
   publicQuiz: boolean | null;
@@ -78,6 +81,7 @@ export function FinishPosition({
       board={boardQuery.data.data}
       quizUuid={quizUuid}
       runPoints={runPoints}
+      practice={practice}
       publicQuiz={publicQuiz}
       podiumPlayed={podiumPlayed}
       podiumCovered={podiumCovered}
@@ -89,6 +93,7 @@ function PositionBlock({
   board,
   quizUuid,
   runPoints,
+  practice,
   publicQuiz,
   podiumPlayed,
   podiumCovered,
@@ -96,11 +101,12 @@ function PositionBlock({
   board: QuizLeaderboard;
   quizUuid: string;
   runPoints: number;
+  practice: boolean;
   publicQuiz: boolean | null;
   podiumPlayed: boolean;
   podiumCovered: boolean;
 }) {
-  const position = finishPosition(board, runPoints, { publicQuiz: publicQuiz !== false });
+  const position = finishPosition(board, runPoints, { publicQuiz: publicQuiz !== false, practice });
   const viewer = board.viewer;
   const isYou = (entry: QuizLeaderboardEntry) => isViewerEntry(viewer, entry);
   const boardLink = publicQuiz !== false && board.player_count > 0;

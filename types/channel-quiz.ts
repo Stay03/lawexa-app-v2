@@ -259,10 +259,30 @@ export type QuizAuthor = Pick<SlimUser, 'uuid' | 'name' | 'avatar_url'> & {
  */
 export interface QuizLeaderboardBlock {
   player_count: number;
-  /** The score to beat; `null` before anyone has finished it. */
+  /** The board's first place; `null` before anyone has finished it. */
   top: { name: string; avatar_url: string | null; points: number } | null;
   /** The reader's place; `null` signed out or before their first finish. */
   viewer_rank: number | null;
+  /** The highest score ever on the quiz, retakes included (Arthur, 25 November 2026). Absent from an older server. */
+  score_to_beat?: QuizScoreToBeat | null;
+}
+
+/**
+ * The "Score to Beat" of a public quiz (Arthur, 25 November 2026, thread
+ * ab1802fe): the highest score anyone has reached on it, first attempt or
+ * retake, and who reached it first. A tie does not take it. `null` before
+ * anyone has finished it since its questions last changed.
+ */
+export interface QuizScoreToBeat {
+  points: number;
+  /** Who reached it; `null` once their account is gone (Backend ab338362). */
+  user: { uuid: string; name: string; avatar_url: string | null } | null;
+  achieved_at: string;
+  /**
+   * Which of the holder's attempts reached it ("on 3 attempts", Arthur, 25
+   * November 2026). `null` or absent when the server does not know.
+   */
+  attempt_number?: number | null;
 }
 
 /** One row of the full leaderboard (`GET /channel-quizzes/{quiz}/leaderboard`). */
@@ -280,10 +300,15 @@ export interface QuizLeaderboardEntry {
   points: number;
   correct_count: number;
   question_count: number;
+  /** When their FIRST attempt finished: that attempt sets their place. */
   achieved_at: string | null;
 }
 
-/** The full leaderboard of a quiz on the public list. Any other quiz is `404`. */
+/**
+ * The full leaderboard of a quiz on the public list. Any other quiz is `404`.
+ * Each player's FIRST finished attempt sets their points and place; retakes
+ * are practice and never move the board (Arthur, 25 November 2026).
+ */
 export interface QuizLeaderboard {
   player_count: number;
   entries: QuizLeaderboardEntry[];
@@ -300,6 +325,8 @@ export interface QuizLeaderboard {
      *  (Backend, 28 October 2026); absent from an older server. */
     user?: QuizLeaderboardEntry['user'];
   } | null;
+  /** The highest score ever on the quiz, and who holds it. Absent from an older server. */
+  score_to_beat?: QuizScoreToBeat | null;
 }
 
 /** What the quiz lists can be narrowed by, with how many quizzes use each
@@ -393,6 +420,13 @@ export interface ChannelQuiz {
   viewer_best_attempt_uuid?: string | null;
   /** Finished attempts by the viewer; `null` signed out. */
   viewer_attempts_count?: number | null;
+  /**
+   * On a listed quiz: the reader's board score, their first finished
+   * attempt's points (Arthur, 25 November 2026). A listed quiz shows this,
+   * never the best: retakes are practice. `null` before their first finish
+   * or on a quiz that is not listed. Absent from an older server.
+   */
+  viewer_board_points?: number | null;
   /** The sum of the questions' time limits, in seconds: the "about N min". */
   total_seconds?: number;
   /** A past paper's year, the level it is set for (`QUIZ_LEVELS`) and its
@@ -625,6 +659,20 @@ export interface QuizAttempt {
    *  one (certificates part 2): on the finish response and on the owner's read
    *  of the finished attempt (Techlead cb17912b), so it survives a refetch. */
   certificate?: CertificateOffer | null;
+  /**
+   * Whether this is the attempt the board shows: the player's first finished
+   * one on a listed quiz (Arthur, 25 November 2026). A later attempt is a
+   * retake: practice, which never moves the board. Absent from an older server.
+   */
+  is_board_attempt?: boolean;
+  /** 1 for the first finished attempt, 2 for the first retake…; `null` when the attempt cannot count (the author's, an unlisted quiz). */
+  attempt_number?: number | null;
+  /** On a retake: the player's board score (their first attempt's points). `null` on the board attempt itself and when it cannot count. */
+  board_points?: number | null;
+  /** Whether this attempt is the quiz's Score to Beat now. */
+  holds_score_to_beat?: boolean;
+  /** The quiz's Score to Beat as it stands now. */
+  score_to_beat?: QuizScoreToBeat | null;
 }
 
 /**

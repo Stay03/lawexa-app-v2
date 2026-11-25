@@ -11,6 +11,7 @@ import {
   Loader2,
   Pencil,
   Play,
+  RotateCcw,
   SearchX,
   Share2,
   Swords,
@@ -47,7 +48,9 @@ import { LIST_COLUMN } from '@/v2/shell/page-columns';
 import { FrontBoard, FrontBoardSkeleton } from '../board/FrontBoard';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
-import { bestLabel, scenarioCountLabel } from '../rows-model';
+import { scenarioCountLabel } from '../rows-model';
+import { scoreLabel } from '../home-model';
+import { RETAKE_LABEL, ownScore, ownScoreLabel, startLabel } from '../retake-model';
 import { collabAccessState } from '@/v2/features/collab/model';
 import { START_LIVE, START_SOLO, challengeFromParam, frontChallengeText, offersHostLive } from './front-model';
 import {
@@ -320,7 +323,11 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
 
   const shareable = quiz.visibility === 'link' || quiz.visibility === 'public';
   const scenarios = scenarioCountLabel(quiz.scenario_count ?? quiz.scenarios?.length);
-  const best = bestLabel(quiz.viewer_best_points);
+  // On a listed quiz the board score (the first attempt), from the board itself; else the best.
+  const yourScore = ownScore(quiz, board?.viewer?.points ?? null);
+  // "Retake quiz" once the reader has finished an attempt (Arthur, 25 November 2026).
+  const startText = startLabel(quiz.viewer_attempts_count);
+  const StartIcon = startText === RETAKE_LABEL ? RotateCcw : Play;
   // After the topic, level, year and size: the scenarios, and who can find a
   // quiz that is not on the public list (its owner's reminder).
   const extraTags = [scenarios, quiz.visibility === 'public' ? null : visibilityFace(quiz.visibility)].filter(
@@ -393,11 +400,11 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
             buttons move together to a second line, right-aligned, rather than
             squeeze or run past the edge (Arthur, 28 October 2026). */}
         <div className="flex min-w-0 flex-col gap-5 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-3 md:rounded-2xl md:border-2 md:border-border md:bg-card md:px-5 md:py-4">
-          {/* The best alone: the board says the place (Arthur, 28 October 2026: minimal). */}
-          {best ? (
+          {/* The reader's own score alone: the board says the place (Arthur, 28 October 2026: minimal). */}
+          {yourScore ? (
             <div className="flex items-baseline justify-between gap-3 rounded-2xl border-2 border-border bg-card p-4 md:shrink-0 md:justify-start md:border-0 md:bg-transparent md:p-0">
-              <span className="text-sm text-muted-foreground">Your best</span>
-              <span className="font-comfortaa text-xl font-bold text-foreground tabular-nums">{best.replace(/^Best /, '')}</span>
+              <span className="text-sm text-muted-foreground">{ownScoreLabel(yourScore.kind)}</span>
+              <span className="font-comfortaa text-xl font-bold text-foreground tabular-nums">{scoreLabel(yourScore.points)}</span>
             </div>
           ) : null}
 
@@ -442,9 +449,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                       {startAttempt.isPending ? (
                         <Loader2 aria-hidden className="size-4 animate-spin" />
                       ) : (
-                        <Play aria-hidden className="size-4" />
+                        <StartIcon aria-hidden className="size-4" />
                       )}
-                      Start quiz
+                      {startText}
                     </RaisedButton>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" side="top" sideOffset={8} className="w-72 p-1.5">
@@ -469,9 +476,9 @@ export function QuizFrontScreen({ quizUuid }: { quizUuid: string }) {
                   {startAttempt.isPending ? (
                     <Loader2 aria-hidden className="size-4 animate-spin" />
                   ) : (
-                    <Play aria-hidden className="size-4" />
+                    <StartIcon aria-hidden className="size-4" />
                   )}
-                  Start quiz
+                  {startText}
                 </RaisedButton>
               ) : (
                 <RaisedButton asChild className={cn(FRONT_BUTTON, 'max-md:basis-full')}>
