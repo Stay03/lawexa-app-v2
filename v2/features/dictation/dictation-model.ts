@@ -81,7 +81,7 @@ export function dictationHint(state: { phase: DictationPhase; atLimit: boolean; 
   if (state.liveDown && (state.phase === 'listening' || state.phase === 'paused')) {
     return 'The live words stopped. Pause to type them.';
   }
-  if (state.phase === 'listening') return 'Say “send” when you’re done';
+  // No line while listening (Stay, 25 November 2026: the "say send" hint "shouldnt be there").
   if (state.phase === 'paused') return 'Paused. Edit the words, or tap the mic to go on.';
   return null;
 }

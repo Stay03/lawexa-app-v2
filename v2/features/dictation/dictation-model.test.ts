@@ -43,7 +43,8 @@ test('a dictation that did not start says why, as dictation', () => {
 
 test('the line under the box follows the dictation', () => {
   const base = { atLimit: false, liveDown: false };
-  assert.equal(dictationHint({ ...base, phase: 'listening' }), 'Say “send” when you’re done');
+  // No "say send" line while listening (Stay, 25 November 2026).
+  assert.equal(dictationHint({ ...base, phase: 'listening' }), null);
   assert.equal(dictationHint({ ...base, phase: 'paused' }), 'Paused. Edit the words, or tap the mic to go on.');
   assert.equal(dictationHint({ ...base, phase: 'countdown' }), null);
   assert.equal(dictationHint({ ...base, phase: 'paused', atLimit: true }), '5 minutes is the longest. Send, or X to clear.');
