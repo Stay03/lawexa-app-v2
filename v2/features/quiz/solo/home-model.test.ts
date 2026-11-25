@@ -123,8 +123,12 @@ test('an Explore card is one link: the tile and title, quiet tags, the person to
   assert.doesNotMatch(explore, /useLeaderboardOverlay|Trophy/);
   const card = read('explore', 'ExploreQuizCard.tsx');
   assert.match(card, /after:absolute after:inset-0/);
-  // The Score to Beat when the server sends it (Arthur, 25 November 2026), else the board's first place.
-  assert.match(card, /const caption = toBeat \? 'Score to Beat' : leading \? 'You lead' : 'To beat';/);
+  // The Score to Beat when the server sends it, with the attempt that reached it (Arthur, 25 November 2026), else the board's first place.
+  assert.match(card, /\{toBeat \? \(/);
+  assert.match(card, /\{toBeat\.attempts \? <span[^>]*>\{toBeat\.attempts\}<\/span> : null\}/);
+  assert.match(card, /const caption = leading \? 'You lead' : 'To beat';/);
+  // …and only there: the board does not show it (Arthur, 17:21).
+  assert.doesNotMatch(read('board', 'FrontBoard.tsx'), /score_to_beat|ScoreToBeat/);
   assert.match(card, /\{caption\}/);
   assert.match(card, /Be the first to play/);
   // Colour on the tile only, and no play button (Arthur, 28 October 2026).

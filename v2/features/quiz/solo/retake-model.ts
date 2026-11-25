@@ -23,13 +23,21 @@ export function startLabel(finishedAttempts: number | null | undefined): string 
   return typeof finishedAttempts === 'number' && finishedAttempts > 0 ? RETAKE_LABEL : START_LABEL;
 }
 
-/** The Score to Beat as a board's head shows it, or `null` before anyone has finished. */
+/** The Score to Beat as a quiz card shows it, or `null` before anyone has finished. */
 export interface ScoreToBeatView {
   points: string;
   /** The holder's name, or "You" when it is the reader. */
   holder: string;
   you: boolean;
   avatarUrl: string | null;
+  /** "on 3 attempts": the attempt that reached it, or `null` when not sent. */
+  attempts: string | null;
+}
+
+/** "on 1 attempt", "on 3 attempts"; `null` for no number. */
+export function attemptsLabel(attemptNumber: number | null | undefined): string | null {
+  if (typeof attemptNumber !== 'number' || attemptNumber < 1) return null;
+  return attemptNumber === 1 ? 'on 1 attempt' : `on ${attemptNumber} attempts`;
 }
 
 export function scoreToBeatView(
@@ -45,6 +53,7 @@ export function scoreToBeatView(
     holder: you ? 'You' : user?.name.trim() || 'A former player',
     you,
     avatarUrl: user?.avatar_url ?? null,
+    attempts: attemptsLabel(scoreToBeat.attempt_number),
   };
 }
 

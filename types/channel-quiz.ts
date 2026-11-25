@@ -278,6 +278,11 @@ export interface QuizScoreToBeat {
   /** Who reached it; `null` once their account is gone (Backend ab338362). */
   user: { uuid: string; name: string; avatar_url: string | null } | null;
   achieved_at: string;
+  /**
+   * Which of the holder's attempts reached it ("on 3 attempts", Arthur, 25
+   * November 2026). `null` or absent when the server does not know.
+   */
+  attempt_number?: number | null;
 }
 
 /** One row of the full leaderboard (`GET /channel-quizzes/{quiz}/leaderboard`). */

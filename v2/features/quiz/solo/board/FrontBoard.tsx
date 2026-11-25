@@ -1,7 +1,7 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { Crown, Info, Star, Target, Trophy } from 'lucide-react';
+import { Crown, Info, Star, Trophy } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,7 +18,6 @@ import {
   scoreLabel,
   standingLine,
 } from '../home-model';
-import { scoreToBeatView } from '../retake-model';
 
 /** The board's length on the quiz page: the podium and the rest of the top ten. */
 const BOARD_TOP = 10;
@@ -131,9 +130,6 @@ export function FrontBoard({
         </h2>
         {players ? <span className="text-sm text-muted-foreground tabular-nums">{players}</span> : null}
       </div>
-
-      {/* The highest score ever and who holds it (Arthur, 25 November 2026): only on a public quiz's board. */}
-      <ScoreToBeat scoreToBeat={board.score_to_beat} viewerUuid={viewer?.user?.uuid ?? null} />
 
       {podium.length === 0 ? (
         <p className="rounded-2xl border-2 border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
@@ -368,33 +364,6 @@ function PlayerLine({
       </span>
       <span className="shrink-0 font-comfortaa text-sm font-bold text-foreground tabular-nums">
         {scoreLabel(points)}
-        <span className="sr-only"> points</span>
-      </span>
-    </div>
-  );
-}
-
-/**
- * The Score to Beat (Arthur, 25 November 2026): the highest score anyone has
- * reached on the quiz, first attempt or retake, and who holds it. A strip
- * under the board's heading, in the gold of a first place; nothing before
- * anyone has finished, and nothing on a board without it (a live game's).
- */
-function ScoreToBeat({ scoreToBeat, viewerUuid }: { scoreToBeat: QuizLeaderboard['score_to_beat']; viewerUuid: string | null }) {
-  const view = scoreToBeatView(scoreToBeat, viewerUuid);
-  if (!view) return null;
-  return (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-primary/25 bg-primary/8 px-4 py-3">
-      <Target aria-hidden className="size-5 shrink-0 text-primary" />
-      <span className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="text-xs font-semibold tracking-wide text-primary">Score to Beat</span>
-        <span className="flex min-w-0 items-center gap-1.5 text-sm text-foreground/80">
-          <MemberAvatar user={{ name: view.holder, avatar_url: view.avatarUrl }} size="sm" />
-          <span className="truncate">{view.you ? 'You hold it' : `Held by ${view.holder}`}</span>
-        </span>
-      </span>
-      <span className="shrink-0 font-comfortaa text-xl font-bold text-foreground tabular-nums">
-        {view.points}
         <span className="sr-only"> points</span>
       </span>
     </div>

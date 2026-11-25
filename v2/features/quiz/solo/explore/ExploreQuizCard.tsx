@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
+import { Target } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,7 +23,8 @@ import { QuizTile } from '../QuizTile';
  *
  *   (T) Title, in its own weight         the quiz's letter tile, its colour
  *   [Land Law] [300 Level] [2025]        quiet tags
- *   ┌ (face) To beat Bola Ade   2,820 ┐  the person to beat, on a tray
+ *   ┌ (o) Score to Beat       9,480 ┐  the highest score ever, on a gold tray
+ *   └ (face) Bola Ade  on 3 attempts ┘  (an older server: the board's first place)
  *   Your best 1,926                     once played
  *
  * Colour lives on the tile only, and no play button (Arthur, 28 October
@@ -37,12 +39,9 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
   // The Score to Beat (Arthur, 25 November 2026): the highest score ever, which
   // a retake can take. An older server sends only the board's first place.
   const toBeat = scoreToBeatView(quiz.leaderboard?.score_to_beat, userUuid);
-  const first = quiz.leaderboard?.top ?? null;
-  const top = toBeat
-    ? { name: toBeat.holder, avatar_url: toBeat.avatarUrl, points: quiz.leaderboard?.score_to_beat?.points ?? 0 }
-    : first;
-  const leading = toBeat ? toBeat.you : quiz.leaderboard?.viewer_rank === 1;
-  const caption = toBeat ? 'Score to Beat' : leading ? 'You lead' : 'To beat';
+  const top = quiz.leaderboard?.top ?? null;
+  const leading = quiz.leaderboard?.viewer_rank === 1;
+  const caption = leading ? 'You lead' : 'To beat';
   // The reader's board score: on a listed quiz the first attempt, never the best (retakes are practice).
   const own = ownScore(quiz);
 
@@ -60,7 +59,28 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
 
       <QuizTags quiz={quiz} />
 
-      {top ? (
+      {toBeat ? (
+        // The Score to Beat lives on the card only (Arthur, 25 November 2026,
+        // 17:21: "it distracts from the leaderboard ... it should only show in
+        // the quiz list"), with the attempt that reached it.
+        <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-primary/20 bg-primary/6 px-3 py-2.5">
+          <span className="flex min-w-0 items-center justify-between gap-2">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
+              <Target aria-hidden className="size-3.5" />
+              Score to Beat
+            </span>
+            <span className="shrink-0 font-comfortaa text-lg leading-none font-bold text-foreground tabular-nums">
+              {toBeat.points}
+              <span className="sr-only"> points</span>
+            </span>
+          </span>
+          <span className="flex min-w-0 items-center gap-2">
+            <MemberAvatar user={{ name: toBeat.holder, avatar_url: toBeat.avatarUrl }} size="sm" />
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{toBeat.you ? 'You hold it' : toBeat.holder}</span>
+            {toBeat.attempts ? <span className="shrink-0 text-xs text-muted-foreground">{toBeat.attempts}</span> : null}
+          </span>
+        </div>
+      ) : top ? (
         <div className="flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl bg-secondary/70 px-3">
           <MemberAvatar user={{ name: top.name, avatar_url: top.avatar_url }} size="sm" />
           <span className="flex min-w-0 flex-1 flex-col leading-tight">

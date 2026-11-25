@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ownScore, ownScoreLabel, pointsCaption, runKind, scoreToBeatView, startLabel } from './retake-model';
+import { attemptsLabel, ownScore, ownScoreLabel, pointsCaption, runKind, scoreToBeatView, startLabel } from './retake-model';
 import { scoreOrNotTaken } from './rows-model';
 
 /* Public quizzes as competitions: first attempt on the board, retakes as practice. TEST DATA. */
@@ -15,12 +15,13 @@ test('Start reads Retake once the reader has finished an attempt', () => {
 });
 
 test('the Score to Beat names its holder, or You', () => {
-  assert.deepEqual(scoreToBeatView(STB, 'u-me'), { points: '9,400', holder: 'Ada Obi', you: false, avatarUrl: null });
+  assert.deepEqual(scoreToBeatView(STB, 'u-me'), { points: '9,400', holder: 'Ada Obi', you: false, avatarUrl: null, attempts: null });
+  assert.equal(scoreToBeatView({ ...STB, attempt_number: 3 }, 'u-me')?.attempts, 'on 3 attempts');
   assert.equal(scoreToBeatView(STB, 'u-ada')?.holder, 'You');
   assert.equal(scoreToBeatView(null, 'u-ada'), null);
   assert.equal(scoreToBeatView({ ...STB, user: { ...STB.user, name: '  ' } }, null)?.holder, 'A former player');
   // The holder's account is gone: the score stays, unnamed.
-  assert.deepEqual(scoreToBeatView({ ...STB, user: null }, 'u-ada'), { points: '9,400', holder: 'A former player', you: false, avatarUrl: null });
+  assert.deepEqual(scoreToBeatView({ ...STB, user: null }, 'u-ada'), { points: '9,400', holder: 'A former player', you: false, avatarUrl: null, attempts: null });
 });
 
 test('a retake is practice, with the board score that stays', () => {
@@ -54,4 +55,12 @@ test('a listed quiz shows the board score, never the best; an unlisted one keeps
   assert.deepEqual(scoreOrNotTaken({ is_listed: true, viewer_best_points: null, viewer_board_points: null }, true), { label: 'Not taken', taken: false });
   assert.equal(scoreOrNotTaken({ is_listed: true, viewer_best_points: 9610 }, true), null);
   assert.deepEqual(scoreOrNotTaken({ is_listed: false, viewer_best_points: 2553 }, true), { label: 'Best 2,553', taken: true });
+});
+
+test('the Score to Beat says which attempt reached it', () => {
+  assert.equal(attemptsLabel(1), 'on 1 attempt');
+  assert.equal(attemptsLabel(3), 'on 3 attempts');
+  assert.equal(attemptsLabel(null), null);
+  assert.equal(attemptsLabel(undefined), null);
+  assert.equal(attemptsLabel(0), null);
 });
