@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
+import { isNotFoundError } from '@/lib/utils/api-error';
 import type { ChangeableRole } from '@/components/admin/change-role-model';
 import type {
   AdminConversationsParams,
@@ -97,14 +98,56 @@ export function useAdminConversations(params: AdminConversationsParams = {}) {
 }
 
 /**
- * Hook for fetching a single conversation with all messages
+ * One chat in the admin view (Backend aee2efb0). A snapshot: it is read when
+ * the page opens and again only on Refresh, never on focus or a timer
+ * (Stay, thread 085a980c).
  */
 export function useAdminConversation(uuid: string) {
   return useQuery({
     queryKey: adminKeys.conversationDetail(uuid),
     queryFn: () => adminApi.getConversation(uuid),
     enabled: !!uuid,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    retry: (count, error) => !isNotFoundError(error) && count < 1,
+  });
+}
+
+/** The agent conversations the chat opened; `[]` for a chat that takes none (404). Read with the chat. */
+export function useAdminConversationAgents(uuid: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...adminKeys.conversationDetail(uuid), 'agent-conversations'] as const,
+    queryFn: async () => {
+      try {
+        return (await adminApi.getConversationAgentConversations(uuid)).data.agent_conversations;
+      } catch (error) {
+        if (isNotFoundError(error)) return [];
+        throw error;
+      }
+    },
+    enabled: !!uuid && enabled,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    meta: { silentError: true },
+  });
+}
+
+/** The chat's background jobs; `[]` for a chat that takes none (404). Read with the chat. */
+export function useAdminConversationJobs(uuid: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...adminKeys.conversationDetail(uuid), 'background-jobs'] as const,
+    queryFn: async () => {
+      try {
+        return (await adminApi.getConversationBackgroundJobs(uuid)).data.background_jobs;
+      } catch (error) {
+        if (isNotFoundError(error)) return [];
+        throw error;
+      }
+    },
+    enabled: !!uuid && enabled,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    meta: { silentError: true },
   });
 }
 

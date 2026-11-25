@@ -47,6 +47,15 @@ export function isNotFoundError(error: unknown): boolean {
   return error instanceof AxiosError && error.response?.status === 404;
 }
 
+/**
+ * Is this "you may not open it" (403)? A Space's file inside a personal chat
+ * answers 403 to anyone outside the Space, staff in the admin view included
+ * (Backend, thread 085a980c): trying again cannot help.
+ */
+export function isForbiddenError(error: unknown): boolean {
+  return error instanceof AxiosError && error.response?.status === 403;
+}
+
 export function extractViewLimitError(error: unknown): CaseViewLimitError | null {
   if (error instanceof AxiosError && error.response?.status === 429) {
     const errors = error.response.data?.errors;

@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { myTemplatesApi } from '@/lib/api/private-items';
 import { filesApi } from '@/lib/api/files';
 import { cn } from '@/lib/utils';
-import { extractApiError, isNotFoundError } from '@/lib/utils/api-error';
+import { extractApiError, isForbiddenError, isNotFoundError } from '@/lib/utils/api-error';
 import { formatFileSize } from '@/lib/utils/format-bytes';
 import type { MessageAttachment } from '@/types/chat';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
@@ -84,6 +84,13 @@ import { isReading, readingAnnouncement, readingLine, readingPollDelay } from '.
  * channel feed's own answer to the same problem.
  */
 
+/**
+ * A Space's file inside a personal chat answers 403 to anyone outside the
+ * Space: staff in the admin view see this on its chip (Backend, thread
+ * 085a980c; the file rules are not widened for staff).
+ */
+const SPACE_ONLY = 'Opens for Space members only';
+
 /** The link is signed for an hour; a cached one is replaced well before. */
 const LINK_FRESH_MS = 45 * 60 * 1000;
 
@@ -102,8 +109,8 @@ function fileLinkQuery(fileId: number, enabled: boolean) {
     enabled,
     staleTime: LINK_FRESH_MS,
     gcTime: LINK_FRESH_MS,
-    // A 404 is an answer, not a hiccup: the file was deleted.
-    retry: (failureCount: number, error: Error) => !isNotFoundError(error) && failureCount < 1,
+    // A 404 is an answer, not a hiccup: the file was deleted. So is a 403.
+    retry: (failureCount: number, error: Error) => !isNotFoundError(error) && !isForbiddenError(error) && failureCount < 1,
     meta: { silentError: true },
   };
 }
@@ -187,7 +194,8 @@ export function SentAttachments({
                   picture={picture}
                   url={link?.data ?? null}
                   gone={link?.isError === true && isNotFoundError(link.error)}
-                  failed={link?.isError === true && !isNotFoundError(link.error)}
+                  refused={link?.isError === true && isForbiddenError(link.error)}
+                  failed={link?.isError === true && !isNotFoundError(link.error) && !isForbiddenError(link.error)}
                   single={pictures.length === 1}
                   onOpen={() => setTarget(formatImageTarget(SET_ID, picture.file_id))}
                   onRelink={async () => (await link?.refetch())?.data}
@@ -270,6 +278,7 @@ function PictureTile({
   picture,
   url,
   gone,
+  refused,
   failed,
   single,
   onOpen,
@@ -278,6 +287,8 @@ function PictureTile({
   picture: MessageAttachment;
   url: string | null;
   gone: boolean;
+  /** 403: a Space's file, and the reader is outside the Space (`SPACE_ONLY`). */
+  refused: boolean;
   failed: boolean;
   /** One picture gets a wider 4:3 tile; several share square ones. The box is
    *  fixed either way, so nothing moves when the bytes land. */
@@ -311,11 +322,11 @@ function PictureTile({
     single ? 'aspect-[4/3] w-60 max-w-full' : 'size-28',
   );
 
-  if (gone) {
+  if (gone || refused) {
     return (
       <div className={cn(box, 'flex-col items-center justify-center gap-1.5 px-3 text-center')}>
         <ImageOff aria-hidden className="size-5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">No longer available</span>
+        <span className="text-xs text-muted-foreground">{refused ? SPACE_ONLY : 'No longer available'}</span>
       </div>
     );
   }
@@ -453,12 +464,12 @@ function DocumentChip({
 }) {
   const openInTab = useOpenFileInNewTab();
 
-  if (openInTab.gone) {
+  if (openInTab.gone || openInTab.refused) {
     return (
       <div className="flex w-fit items-center gap-1.5 rounded-full bg-muted/60 px-3 py-1 text-xs text-muted-foreground">
         <FileText aria-hidden className="size-3" />
         <span className="max-w-[150px] truncate">{document.file_name}</span>
-        <span>No longer available</span>
+        <span>{openInTab.refused ? SPACE_ONLY : 'No longer available'}</span>
       </div>
     );
   }

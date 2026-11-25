@@ -29,6 +29,7 @@ export function BackgroundJobsLabel({ messageId }: { messageId: number | null })
   // A job that waits on another agent is that agent's row after the turn's answer (AgentRoster, C1).
   const jobs = held?.jobs.filter((job) => job.kind !== 'agent_reply') ?? [];
   if (!held || jobs.length === 0) return null;
+  const { cancel } = held;
   return (
     <ul className="mt-1.5 flex flex-col items-end gap-1 px-4">
       {jobs.map((job) => (
@@ -36,7 +37,7 @@ export function BackgroundJobsLabel({ messageId }: { messageId: number | null })
           key={job.id}
           job={job}
           cancelling={held.cancelling.has(job.id)}
-          onCancel={() => held.cancel(job.id)}
+          onCancel={cancel ? () => cancel(job.id) : null}
         />
       ))}
     </ul>
@@ -55,7 +56,7 @@ const STATE_ICON: Record<BackgroundJobState, typeof Check> = {
 const LINE_BUTTON =
   'v2-interactive ml-1 shrink-0 rounded-sm font-medium text-foreground/80 underline-offset-2 hover:text-foreground hover:underline disabled:opacity-60';
 
-function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling: boolean; onCancel: () => void }) {
+function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling: boolean; onCancel: (() => void) | null }) {
   const state = backgroundJobState(job);
   const Icon = STATE_ICON[state];
   const progress = state === 'running' ? backgroundJobProgress(job) : null;
@@ -75,7 +76,7 @@ function JobLine({ job, cancelling, onCancel }: { job: BackgroundJob; cancelling
         {backgroundJobLabel(job)}
       </span>
       {progress ? <span className="shrink-0 tabular-nums">· {progress}</span> : null}
-      {canCancelBackgroundJob(job) ? (
+      {onCancel && canCancelBackgroundJob(job) ? (
         <button
           type="button"
           onClick={onCancel}

@@ -115,10 +115,6 @@ export interface AdminConversationListItem {
   updated_at: string;
 }
 
-export interface AdminConversationDetail extends AdminConversationListItem {
-  messages: AdminMessage[];
-}
-
 // Query Parameters
 export interface AdminConversationsParams {
   status?: 'active' | 'archived';
@@ -159,12 +155,6 @@ export interface AdminConversationsListResponse {
   data: AdminConversationListItem[];
   pagination: AdminConversationsPagination;
   links: AdminConversationsLinks;
-}
-
-export interface AdminConversationDetailResponse {
-  success: boolean;
-  message: string;
-  data: AdminConversationDetail;
 }
 
 // ============================================
