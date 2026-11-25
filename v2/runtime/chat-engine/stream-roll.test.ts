@@ -17,7 +17,7 @@ const engine = () => readFileSync(join(process.cwd(), 'v2', 'runtime', 'chat-eng
 
 test('stream_paused marks the next drop as planned, and nothing else', () => {
   const source = engine();
-  const paused = source.slice(source.indexOf("es.addEventListener('stream_paused'"), source.indexOf("es.addEventListener('heartbeat'"));
+  const paused = source.slice(source.indexOf("    on('stream_paused'"), source.indexOf("    on('heartbeat'"));
   assert.match(paused, /lastEventTime = Date\.now\(\);\s*pausedRoll = true;/);
   // No close, no poll, no error: the transport reconnects by itself.
   assert.doesNotMatch(paused, /close\(|pollForCompletion|reportChatError|setState/);
@@ -30,7 +30,7 @@ test('the planned drop starts no stall clock; the server alone decides when the 
   // Backend's 6de74c55: `connected` carries `accumulated_text` only when the
   // server will not replay from Last-Event-ID, so the app seeds whenever it is
   // there, after a pause too, and a pause only ends on its reconnect.
-  const connected = source.slice(source.indexOf("es.addEventListener('connected'"), source.indexOf('handlers.onConnected?.();'));
+  const connected = source.slice(source.indexOf("    on('connected'"), source.indexOf('handlers.onConnected?.();'));
   assert.match(connected, /pausedRoll = false;\s*const data = parseEvent<ConnectedEvent>/);
   assert.match(connected, /if \(data\?\.accumulated_text\) \{/);
   assert.doesNotMatch(connected, /rolled/);
@@ -67,7 +67,7 @@ test('a planned drop never leaks into the next stream: the flag clears with ever
   const body = (name: string) => source.slice(source.indexOf(name), source.indexOf('\n  }\n', source.indexOf(name)));
   assert.match(body('function startWatchdog() {'), /reconnectingSince = 0;\s*pausedRoll = false;/);
   assert.match(body('function recoverFromStall('), /reconnectingSince = 0;\s*pausedRoll = false;/);
-  const ended = source.slice(source.indexOf("es.addEventListener('end'"), source.indexOf("es.addEventListener('timeout'"));
+  const ended = source.slice(source.indexOf("    on('end'"), source.indexOf("    on('timeout'"));
   assert.match(ended, /reconnectingSince = 0;\s*pausedRoll = false;\s*pollForCompletion\(convId\);/);
   assert.match(source, /lastProgressAt = 0;\s*reconnectingSince = 0;\s*pausedRoll = false;\s*dedupKeys = new Set\(\);/);
   // Every reset of the clock clears the flag: none is missed.

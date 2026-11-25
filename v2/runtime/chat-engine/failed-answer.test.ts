@@ -36,7 +36,7 @@ test('an error the server marks discard_partial withdraws the text and adds the 
 
 test('a timeout the server marks discard_partial withdraws too, with Try again; an older one keeps its text', () => {
   const source = engine();
-  const timeout = source.slice(source.indexOf("es.addEventListener('timeout'"), source.indexOf('es.onerror'));
+  const timeout = source.slice(source.indexOf("    on('timeout'"), source.indexOf('es.onerror'));
   assert.match(timeout, /parseEvent<\{ discard_partial\?: boolean \}>\(\(e as MessageEvent\)\.data\)\?\.discard_partial === true;/);
   assert.match(timeout, /if \(failedTurn\) \{\s*withdrawOpenPlaceholder\(\);\s*addErrorMessage\(errorMsg, 'TIMEOUT', true, null, null, true\);/);
   assert.match(timeout, /\.\.\.\(content \? \{ partial: \{ reason: 'timeout' as const \} \} : \{\}\),/);
@@ -45,7 +45,7 @@ test('a timeout the server marks discard_partial withdraws too, with Try again; 
 test('a user Stop and a dropped connection keep the text they showed', () => {
   const source = engine();
   // Both stop paths, the cancelled event and the CANCELLED error, end the same way.
-  const cancelled = source.slice(source.indexOf("es.addEventListener('cancelled'"));
+  const cancelled = source.slice(source.indexOf("    on('cancelled'"));
   // A batch's lookups still open read "stopped" (tool-batch.ts).
   assert.match(cancelled, /toolCalls\.clear\(\);\s*closeBatches\('stopped'\);\s*handovers\.clear\(\);\s*stopOpenPlaceholder\(\);/);
   assert.match(source, /if \(parsed\?\.error_code === 'CANCELLED'\) \{\s*stopOpenPlaceholder\(\);/);

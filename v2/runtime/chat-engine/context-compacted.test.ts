@@ -47,7 +47,7 @@ test('a reopened chat draws it where it happened, among the steps', () => {
 
 test('live: the event adds the step once, and the opened step says what happened', () => {
   const engine = read('v2', 'runtime', 'chat-engine', 'engine.ts');
-  assert.match(engine, /es\.addEventListener\('context_compacted', \(e\) => \{[\s\S]{0,400}if \(event\.seq !== undefined && dedup\.has\(event\.seq\)\) return;\s*const step = compactedStep\(generateId\(\), new Date\(\), event\.agent_slug\);\s*setMessages\(\(msgs\) => \[\.\.\.msgs, step\]\);/);
+  assert.match(engine, /\bon\('context_compacted', \(e\) => \{[\s\S]{0,400}if \(event\.seq !== undefined && dedup\.has\(event\.seq\)\) return;\s*const step = compactedStep\(generateId\(\), new Date\(\), event\.agent_slug\);\s*setMessages\(\(msgs\) => \[\.\.\.msgs, step\]\);/);
   const item = read('v2', 'features', 'conversations', 'conversation', 'tools', 'ToolStepItem.tsx');
   assert.match(item, /if \(message\.toolName === CONTEXT_COMPACTED_STEP\) \{\s*return <p className="text-muted-foreground text-sm leading-relaxed">\{COMPACTED_DETAIL\}<\/p>;/);
 });

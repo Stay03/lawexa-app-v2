@@ -28,12 +28,15 @@ import {
 import type { BatchCall, ToolMessage } from '@/types/chat';
 import { RUN_TOGETHER, batchGoal, batchRowEnded, batchSettled } from '@/lib/utils/tool-batch';
 import { EDIT_QUIZ_TOOL, editSavedNothing, isQuizStep, quizStepLabel, quizStepState } from './created-quiz';
+import { searchStatuteTextLabel } from './statute-text-label';
 import { failedStepLine, stepFailed } from './step-failure';
 import { isBoxTool } from '@/v2/features/userbox/machine-model';
 import { RECORD_START_TOOL, RECORD_STOP_TOOL, recordingStepAction } from '../files/chat-recording';
 import { HAND_OVER_TOOL, OpenMachineButton } from '@/v2/features/userbox/OpenMachineButton';
 import { MESSAGE_AGENT_TOOL, messageAgentStep } from '../agents/agent-model';
 import { COMPACTED_DETAIL, COMPACTED_LABEL, CONTEXT_COMPACTED_STEP } from '@/lib/utils/context-compacted';
+
+const SEARCH_STATUTE_TEXT = 'search_statute_text';
 
 /**
  * ToolStepItem + the tool-call taxonomy (`formatToolMessage`) — the module design
@@ -144,6 +147,8 @@ export function formatToolMessage(
         action: isComplete ? 'Searched statutes' : 'Searching statutes',
         detail: query ? `for "${query}"` : undefined,
       };
+    case SEARCH_STATUTE_TEXT:
+      return searchStatuteTextLabel(parameters, isComplete, getStatuteTitle(toolResult) || statuteTitle || null);
     case 'read_statute': {
       const mode = parameters.mode as string | undefined;
       const section = parameters.section as string | undefined;

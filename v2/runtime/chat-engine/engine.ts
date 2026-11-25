@@ -104,6 +104,7 @@ import { isRedactionSummary } from '@/lib/utils/redaction-summary';
 import { labelDocuments, withServerLabels } from './document-labels';
 import { largestSavedId, savedTurnId } from './saved-turn';
 import { STALL_CHECK_MS, hiddenDuring, quietCheckDue, stallVerdict, type StallVerdict } from './stall';
+import { createLiveSeqFilter } from './live-seq';
 import { reportChatError } from '../chat-errors/report';
 import type { IBlockedReason } from '@/types/message-pack';
 import { createCallMatcher } from '@/lib/utils/tool-call-match';
@@ -1468,6 +1469,15 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // Snapshot the dedup set built from history — skip SSE events already rendered.
     const dedup = dedupKeys;
+    // A live event relayed twice on this connection is dropped before any
+    // handler sees it, text included (live-seq.ts). Every listener below is
+    // registered through `on`.
+    const repeatedOnThisConnection = createLiveSeqFilter();
+    const on = (type: string, handler: (e: Event) => void) =>
+      es.addEventListener(type, (e) => {
+        if (repeatedOnThisConnection((e as MessageEvent).data)) return;
+        handler(e);
+      });
     // The rows on screen before this connection drew anything: a run whose
     // answer is among them had already ended (`completed` below).
     const heldAtConnect: ReadonlySet<string> = new Set(state.messages.map((m) => m.id));
@@ -1493,7 +1503,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // connected — on reconnect the backend may replay `accumulated_text` so the
     // user sees no gap after a refresh mid-stream.
-    es.addEventListener('connected', (e) => {
+    on('connected', (e) => {
       connects += 1;
       lastEventTime = Date.now();
       reconnectCount = 0; // reset on successful connection
@@ -1517,14 +1527,14 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       handlers.onConnected?.();
     });
 
-    es.addEventListener('iteration', (e) => {
+    on('iteration', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<IterationEvent>((e as MessageEvent).data);
       if (event) handlers.onIteration?.(event);
     });
 
-    es.addEventListener('handover_started', (e) => {
+    on('handover_started', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<HandoverStartedEvent>((e as MessageEvent).data);
@@ -1533,7 +1543,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       addHandoverMessage(event);
     });
 
-    es.addEventListener('handover_complete', (e) => {
+    on('handover_complete', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<HandoverCompleteEvent>((e as MessageEvent).data);
@@ -1544,7 +1554,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // context_compacted — a long reply's earlier reading was summarised: one
     // quiet step where it happened (context-compacted.ts).
-    es.addEventListener('context_compacted', (e) => {
+    on('context_compacted', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<ContextCompactedEvent>((e as MessageEvent).data);
@@ -1557,7 +1567,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // tool_calling — add a tool row and open it in `toolCalls`, so tool_complete
     // closes the right row when several calls are out at once. Internal
     // `_handover` tool calls are skipped (not user-visible).
-    es.addEventListener('tool_calling', (e) => {
+    on('tool_calling', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<ToolCallingEvent>((e as MessageEvent).data);
@@ -1573,7 +1583,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // tool_batch_calling / tool_batch_complete — one lookup of a run_together
     // batch started or ended. They run 4 at a time and end in any order, so each
     // is matched by its own tool_call_id under its batch's (lib/utils/tool-batch.ts).
-    es.addEventListener('tool_batch_calling', (e) => {
+    on('tool_batch_calling', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<ToolBatchCallingEvent>((e as MessageEvent).data);
@@ -1584,7 +1594,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
       );
     });
 
-    es.addEventListener('tool_batch_complete', (e) => {
+    on('tool_batch_complete', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<ToolBatchCompleteEvent>((e as MessageEvent).data);
@@ -1602,7 +1612,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // tool_complete — close the row with this tool_call_id, else the oldest open
     // row for this tool name.
-    es.addEventListener('tool_complete', (e) => {
+    on('tool_complete', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<ToolCompleteEvent>((e as MessageEvent).data);
@@ -1618,7 +1628,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // seq is a shared monotonic counter). agent_slug present ⇒ sub-agent text
     // (into the handover row's live store); else orchestrator text (into the
     // placeholder's live store). Both buffer + flush; no per-token setState.
-    es.addEventListener('text_delta', (e) => {
+    on('text_delta', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<TextDeltaEvent>((e as MessageEvent).data);
@@ -1638,7 +1648,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // text_done — text stream finished for this iteration. Stop the cursor but
     // keep content visible; `completed` will replace it with authoritative text.
-    es.addEventListener('text_done', (e) => {
+    on('text_done', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<TextDoneEvent>((e as MessageEvent).data);
@@ -1675,7 +1685,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // text_reset — the model retried this iteration's text. Clears the accumulator.
     // Carries the narration-vs-final heuristic (see below).
-    es.addEventListener('text_reset', (e) => {
+    on('text_reset', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const event = parseEvent<TextResetEvent>((e as MessageEvent).data);
@@ -1737,12 +1747,12 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // answer goes on (the 5-minute stream fix, 29 October 2026). The server
     // then ends the body without `end`, and the transport reconnects with
     // Last-Event-ID as for any drop. Here the drop is only marked as planned.
-    es.addEventListener('stream_paused', () => {
+    on('stream_paused', () => {
       lastEventTime = Date.now();
       pausedRoll = true;
     });
 
-    es.addEventListener('heartbeat', () => {
+    on('heartbeat', () => {
       lastEventTime = Date.now();
       /* Heartbeats keep `lastEventTime` fresh, so the 60s silence watchdog above
          can never fire while they flow — this is the only thing that catches a
@@ -1760,7 +1770,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // these; here they feed the per-message reasoning trace. The token field is
     // read defensively because the backend's thinking payload shape is still
     // firming up — whichever text field is present is captured; none ⇒ no-op.
-    es.addEventListener('thinking', (e) => {
+    on('thinking', (e) => {
       lastEventTime = Date.now();
       markDataEvent();
       const data = parseEvent<{
@@ -1786,7 +1796,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // completed — for v2_stream, replace the streaming placeholder with the
     // authoritative content; for legacy, append a new assistant message.
-    es.addEventListener('completed', (e) => {
+    on('completed', (e) => {
       lastEventTime = Date.now();
       const event = parseEvent<CompletedEvent>((e as MessageEvent).data);
       if (!event) return;
@@ -1922,7 +1932,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
 
     // error (WITH data) — real backend error OR a CANCELLED confirmation. Browser
     // connection errors fire this listener with NO data and are left to onerror.
-    es.addEventListener('error', (e) => {
+    on('error', (e) => {
       const data = (e as MessageEvent).data;
       if (!data) return; // connection error — handled by onerror
 
@@ -1999,7 +2009,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     });
 
     // cancelled — backend-confirmed user stop. Keep partial text, marked "Stopped".
-    es.addEventListener('cancelled', (e) => {
+    on('cancelled', (e) => {
       settleTurn(parseEvent<CancelledEvent>((e as MessageEvent).data)?.persisted_message_ids);
       stopWatchdog();
       es.close();
@@ -2015,7 +2025,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     });
 
     // end — terminal. Finalize any placeholder left open.
-    es.addEventListener('end', () => {
+    on('end', () => {
       stopWatchdog();
       es.close();
       eventSource = null;
@@ -2046,7 +2056,7 @@ export function createChatEngine(config: ChatEngineConfig): ChatEngine {
     // is withdrawn, as on an error, and the failed row says it was not
     // finished and not charged. A server before that change keeps the old
     // way: the text stays, marked as timed out.
-    es.addEventListener('timeout', (e) => {
+    on('timeout', (e) => {
       stopWatchdog();
       settledExecutions.add(execId);
       isCancelling = false;

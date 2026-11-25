@@ -58,7 +58,7 @@ test('what the replay drew goes; the history, the question and the lines stay', 
 test('completed checks for the saved answer before it draws one', () => {
   const engine = readFileSync(join(process.cwd(), 'v2/runtime/chat-engine/engine.ts'), 'utf8');
   assert.match(engine, /const heldAtConnect: ReadonlySet<string> = new Set\(state\.messages\.map\(\(m\) => m\.id\)\);/);
-  const completed = engine.slice(engine.indexOf("es.addEventListener('completed'"));
+  const completed = engine.slice(engine.indexOf("    on('completed'"));
   const check = completed.indexOf('if (answerAlreadyShown(state.messages, savedAnswerId, heldAtConnect)) {');
   assert.ok(check > 0);
   assert.ok(check < completed.indexOf('addAssistantMessage(finalText);'));

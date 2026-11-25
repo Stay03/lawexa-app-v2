@@ -130,8 +130,8 @@ test('after a reload: the same rows from the saved call and batch_calls, with th
 
 test('the chat listens for the batch events and draws the sub-rows under the goal line; a single step is unchanged', () => {
   const engine = readFileSync(join(process.cwd(), 'v2', 'runtime', 'chat-engine', 'engine.ts'), 'utf8');
-  assert.match(engine, /es\.addEventListener\('tool_batch_calling'[\s\S]*?updateBatch\(event\.parent_tool_call_id, \(batch\) =>\s*batchOnCalling\(/);
-  assert.match(engine, /es\.addEventListener\('tool_batch_complete'[\s\S]*?updateBatch\(event\.parent_tool_call_id, \(batch\) =>\s*batchOnComplete\(/);
+  assert.match(engine, /\bon\('tool_batch_calling'[\s\S]*?updateBatch\(event\.parent_tool_call_id, \(batch\) =>\s*batchOnCalling\(/);
+  assert.match(engine, /\bon\('tool_batch_complete'[\s\S]*?updateBatch\(event\.parent_tool_call_id, \(batch\) =>\s*batchOnComplete\(/);
   assert.match(engine, /if \(event\.tool_call\.name === RUN_TOGETHER && event\.tool_call_id\) batches\.set\(event\.tool_call_id, msgId\);/);
   const item = readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'tools', 'ToolStepItem.tsx'), 'utf8');
   assert.match(item, /case RUN_TOGETHER:\s*return \{ action: batchGoal\(parameters\)/);
@@ -316,10 +316,10 @@ test('a Stop mid-batch settles the open lookups to stopped; any other early end 
   assert.equal(batchSettled(batchOnHalt(batch, 'stopped')), true);
   const engine = engineSource();
   // Both Stop paths: the cancelled event and the CANCELLED error.
-  assert.match(engine, /es\.addEventListener\('cancelled'[\s\S]*?closeBatches\('stopped'\);/);
+  assert.match(engine, /\bon\('cancelled'[\s\S]*?closeBatches\('stopped'\);/);
   assert.match(engine, /closeBatches\(parsed\?\.error_code === 'CANCELLED' \? 'stopped' : 'unfinished'\);/);
   // A timeout, a lost login and a stream that ends without the batch's end.
-  assert.match(engine, /es\.addEventListener\('timeout'[\s\S]*?closeBatches\('unfinished'\);/);
+  assert.match(engine, /\bon\('timeout'[\s\S]*?closeBatches\('unfinished'\);/);
   assert.match(engine, /function closeFinishedTurn\(\): void \{[\s\S]*?closeBatches\('unfinished'\);/);
   // On screen: neither a tick nor a spinner, and the row says how it ended.
   const item = readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', 'tools', 'ToolStepItem.tsx'), 'utf8');
