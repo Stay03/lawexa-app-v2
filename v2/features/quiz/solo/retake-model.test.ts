@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { attemptsLabel, ownScore, ownScoreLabel, pointsCaption, runKind, scoreToBeatView, startLabel } from './retake-model';
+import { attemptsLabel, cardBest, ownScore, ownScoreLabel, pointsCaption, runKind, scoreToBeatView, startLabel } from './retake-model';
 import { scoreOrNotTaken } from './rows-model';
 
 /* Public quizzes as competitions: first attempt on the board, retakes as practice. TEST DATA. */
@@ -55,6 +55,12 @@ test('a listed quiz shows the board score, never the best; an unlisted one keeps
   assert.deepEqual(scoreOrNotTaken({ is_listed: true, viewer_best_points: null, viewer_board_points: null }, true), { label: 'Not taken', taken: false });
   assert.equal(scoreOrNotTaken({ is_listed: true, viewer_best_points: 9610 }, true), null);
   assert.deepEqual(scoreOrNotTaken({ is_listed: false, viewer_best_points: 2553 }, true), { label: 'Best 2,553', taken: true });
+});
+
+test('a quiz card shows the reader\'s best, retakes included', () => {
+  assert.equal(cardBest({ viewer_best_points: 9610, viewer_board_points: 8200 } as { viewer_best_points: number }), 9610);
+  assert.equal(cardBest({ viewer_best_points: null }), null);
+  assert.equal(cardBest({}), null);
 });
 
 test('the Score to Beat says which attempt reached it', () => {

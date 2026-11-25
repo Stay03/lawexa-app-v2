@@ -124,9 +124,14 @@ test('an Explore card is one link: the tile and title, quiet tags, the person to
   const card = read('explore', 'ExploreQuizCard.tsx');
   assert.match(card, /after:absolute after:inset-0/);
   // The Score to Beat when the server sends it, with the attempt that reached it (Arthur, 25 November 2026), else the board's first place.
-  assert.match(card, /\{toBeat \? \(/);
-  assert.match(card, /\{toBeat\.attempts \? <span[^>]*>\{toBeat\.attempts\}<\/span> : null\}/);
-  assert.match(card, /const caption = leading \? 'You lead' : 'To beat';/);
+  // Arthur, 17:52 to 18:00: compact, in the card's own row, "To beat", the attempts on the number's side.
+  assert.match(card, /const row = toBeat\s*\?/);
+  assert.match(card, /\{row\.attempts \? <span[^>]*>\{row\.attempts\}<\/span> : null\}/);
+  assert.match(card, /const caption = row\?\.leading \? 'You lead' : 'To beat';/);
+  assert.doesNotMatch(card, /Score to Beat<|bg-primary\/6/);
+  // The reader's best on the card (Arthur, 17:58), the board score elsewhere.
+  assert.match(card, /const best = cardBest\(quiz\);/);
+  assert.match(card, /\{ownScoreLabel\('best'\)\}/);
   // …and only there: the board does not show it (Arthur, 17:21).
   assert.doesNotMatch(read('board', 'FrontBoard.tsx'), /score_to_beat|ScoreToBeat/);
   assert.match(card, /\{caption\}/);
@@ -135,8 +140,8 @@ test('an Explore card is one link: the tile and title, quiet tags, the person to
   assert.match(card, /<QuizTile uuid=\{quiz\.uuid\} title=\{quiz\.title\} size="md" \/>/);
   assert.doesNotMatch(card, /<Play\b|QUIZ_TONE_PLAY/);
   assert.match(card, /<QuizTags quiz=\{quiz\} \/>/);
-  // The reader's own score in the plain colour (the board score on a listed quiz), and no rank on the card.
-  assert.match(card, /<span className="font-comfortaa text-base font-bold text-foreground tabular-nums">\{scoreLabel\(own\.points\)\}<\/span>/);
+  // The reader's best in the plain colour (Arthur, 17:58), and no rank on the card.
+  assert.match(card, /<span className="font-comfortaa text-base font-bold text-foreground tabular-nums">\{scoreLabel\(best\)\}<\/span>/);
   assert.doesNotMatch(card, /viewer_rank\s*\?\?|rankLabel|text-\[var\(--solo-gold-text\)\]/);
 });
 

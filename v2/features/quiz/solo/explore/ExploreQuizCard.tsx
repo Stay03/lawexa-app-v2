@@ -2,7 +2,6 @@
 
 import { memo } from 'react';
 import Link from 'next/link';
-import { Target } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -10,7 +9,7 @@ import type { ChannelQuiz } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { scoreLabel } from '../home-model';
-import { ownScore, ownScoreLabel, scoreToBeatView } from '../retake-model';
+import { cardBest, ownScoreLabel, scoreToBeatView } from '../retake-model';
 import { quizFrontHref } from '../model';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
@@ -23,8 +22,8 @@ import { QuizTile } from '../QuizTile';
  *
  *   (T) Title, in its own weight         the quiz's letter tile, its colour
  *   [Land Law] [300 Level] [2025]        quiet tags
- *   ┌ (o) Score to Beat       9,480 ┐  the highest score ever, on a gold tray
- *   └ (face) Bola Ade  on 3 attempts ┘  (an older server: the board's first place)
+ *   ┌ (face) To beat          9,480 ┐  the Score to Beat: the highest score ever
+ *   └        Bola Ade  on 3 attempts ┘  (an older server: the board's first place)
  *   Your best 1,926                     once played
  *
  * Colour lives on the tile only, and no play button (Arthur, 28 October
@@ -39,11 +38,18 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
   // The Score to Beat (Arthur, 25 November 2026): the highest score ever, which
   // a retake can take. An older server sends only the board's first place.
   const toBeat = scoreToBeatView(quiz.leaderboard?.score_to_beat, userUuid);
-  const top = quiz.leaderboard?.top ?? null;
-  const leading = quiz.leaderboard?.viewer_rank === 1;
-  const caption = leading ? 'You lead' : 'To beat';
-  // The reader's board score: on a listed quiz the first attempt, never the best (retakes are practice).
-  const own = ownScore(quiz);
+  const first = quiz.leaderboard?.top ?? null;
+  // One row either way, the card's own (Arthur, 17:52 to 18:00: compact, "To
+  // beat", the attempts on the number's side).
+  const row = toBeat
+    ? { name: toBeat.holder, avatar_url: toBeat.avatarUrl, points: quiz.leaderboard?.score_to_beat?.points ?? 0, leading: toBeat.you, attempts: toBeat.attempts }
+    : first
+      ? { name: first.name, avatar_url: first.avatar_url, points: first.points, leading: quiz.leaderboard?.viewer_rank === 1, attempts: null }
+      : null;
+  // "To beat: You" would tell the reader to beat themselves: holding it reads "You lead".
+  const caption = row?.leading ? 'You lead' : 'To beat';
+  // The reader's best, retakes included: on the card only (Arthur, 17:58).
+  const best = cardBest(quiz);
 
   return (
     <li className={cn(CARD, 'has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring')}>
@@ -59,37 +65,21 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
 
       <QuizTags quiz={quiz} />
 
-      {toBeat ? (
+      {row ? (
         // The Score to Beat lives on the card only (Arthur, 25 November 2026,
-        // 17:21: "it distracts from the leaderboard ... it should only show in
-        // the quiz list"), with the attempt that reached it.
-        <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-primary/20 bg-primary/6 px-3 py-2.5">
-          <span className="flex min-w-0 items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5 text-[11px] font-semibold text-primary">
-              <Target aria-hidden className="size-3.5" />
-              Score to Beat
-            </span>
-            <span className="shrink-0 font-comfortaa text-lg leading-none font-bold text-foreground tabular-nums">
-              {toBeat.points}
-              <span className="sr-only"> points</span>
-            </span>
-          </span>
-          <span className="flex min-w-0 items-center gap-2">
-            <MemberAvatar user={{ name: toBeat.holder, avatar_url: toBeat.avatarUrl }} size="sm" />
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{toBeat.you ? 'You hold it' : toBeat.holder}</span>
-            {toBeat.attempts ? <span className="shrink-0 text-xs text-muted-foreground">{toBeat.attempts}</span> : null}
-          </span>
-        </div>
-      ) : top ? (
+        // 17:21: "it distracts from the leaderboard"), in the card's own row.
         <div className="flex min-h-12 min-w-0 items-center gap-2.5 rounded-xl bg-secondary/70 px-3">
-          <MemberAvatar user={{ name: top.name, avatar_url: top.avatar_url }} size="sm" />
+          <MemberAvatar user={{ name: row.name, avatar_url: row.avatar_url }} size="sm" />
           <span className="flex min-w-0 flex-1 flex-col leading-tight">
             <span className="text-[11px] font-medium text-muted-foreground">{caption}</span>
-            <span className="truncate text-sm font-semibold text-foreground">{leading ? 'You' : top.name}</span>
+            <span className="truncate text-sm font-semibold text-foreground">{row.leading ? 'You' : row.name}</span>
           </span>
-          <span className="shrink-0 font-comfortaa text-base font-bold text-foreground tabular-nums">
-            {scoreLabel(top.points)}
-            <span className="sr-only"> points</span>
+          <span className="flex shrink-0 flex-col items-end leading-tight">
+            <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">
+              {scoreLabel(row.points)}
+              <span className="sr-only"> points</span>
+            </span>
+            {row.attempts ? <span className="text-[11px] font-medium text-muted-foreground">{row.attempts}</span> : null}
           </span>
         </div>
       ) : (
@@ -98,10 +88,10 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
         </div>
       )}
 
-      {own ? (
+      {best !== null ? (
         <span className="mt-auto flex min-w-0 items-baseline gap-1.5">
-          <span className="text-xs text-muted-foreground">{ownScoreLabel(own.kind)}</span>
-          <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">{scoreLabel(own.points)}</span>
+          <span className="text-xs text-muted-foreground">{ownScoreLabel('best')}</span>
+          <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">{scoreLabel(best)}</span>
         </span>
       ) : null}
     </li>

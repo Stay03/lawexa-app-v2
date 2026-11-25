@@ -102,6 +102,17 @@ export function ownScore(
   return typeof best === 'number' && Number.isFinite(best) ? { kind: 'best', points: best } : null;
 }
 
+/**
+ * The reader's best on a quiz card: the highest points of every finished
+ * attempt, retakes included (Arthur, 25 November 2026, 17:58: "its the users
+ * best score not board score that should show"). Only the card: the quiz page
+ * and the results keep the board score. `null` before a first finish.
+ */
+export function cardBest(quiz: { viewer_best_points?: number | null }): number | null {
+  const best = quiz.viewer_best_points;
+  return typeof best === 'number' && Number.isFinite(best) ? best : null;
+}
+
 /** The words before the reader's own score. */
 export function ownScoreLabel(kind: 'board' | 'best'): string {
   return kind === 'board' ? 'Your board score' : 'Your best';
