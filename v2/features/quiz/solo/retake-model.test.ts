@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pointsCaption, runKind, scoreToBeatView, startLabel } from './retake-model';
+import { ownScore, ownScoreLabel, pointsCaption, runKind, scoreToBeatView, startLabel } from './retake-model';
+import { scoreOrNotTaken } from './rows-model';
 
 /* Public quizzes as competitions: first attempt on the board, retakes as practice. TEST DATA. */
 
@@ -17,7 +18,9 @@ test('the Score to Beat names its holder, or You', () => {
   assert.deepEqual(scoreToBeatView(STB, 'u-me'), { points: '9,400', holder: 'Ada Obi', you: false, avatarUrl: null });
   assert.equal(scoreToBeatView(STB, 'u-ada')?.holder, 'You');
   assert.equal(scoreToBeatView(null, 'u-ada'), null);
-  assert.equal(scoreToBeatView({ ...STB, user: { ...STB.user, name: '  ' } }, null)?.holder, 'A player');
+  assert.equal(scoreToBeatView({ ...STB, user: { ...STB.user, name: '  ' } }, null)?.holder, 'A former player');
+  // The holder's account is gone: the score stays, unnamed.
+  assert.deepEqual(scoreToBeatView({ ...STB, user: null }, 'u-ada'), { points: '9,400', holder: 'A former player', you: false, avatarUrl: null });
 });
 
 test('a retake is practice, with the board score that stays', () => {
@@ -37,4 +40,18 @@ test('the first attempt is the board one; an older server reads as before; an in
   assert.deepEqual(runKind({}), { kind: 'board', holdsScoreToBeat: false });
   assert.deepEqual(runKind({ is_board_attempt: false, attempt_number: null, board_points: null, holds_score_to_beat: false }), { kind: 'none' });
   assert.equal(pointsCaption({ kind: 'board', holdsScoreToBeat: false }), 'points');
+});
+
+test('a listed quiz shows the board score, never the best; an unlisted one keeps its best', () => {
+  // Arthur, 25 November 2026: the first attempt is the board score; retakes are practice.
+  assert.deepEqual(ownScore({ is_listed: true, viewer_best_points: 9610, viewer_board_points: 8200 }), { kind: 'board', points: 8200 });
+  assert.deepEqual(ownScore({ is_listed: true, viewer_best_points: 9610 }, 8200), { kind: 'board', points: 8200 }, 'the board’s own read wins');
+  assert.equal(ownScore({ is_listed: true, viewer_best_points: 9610 }), null, 'no board score yet: nothing, never the best');
+  assert.deepEqual(ownScore({ is_listed: false, viewer_best_points: 9610 }), { kind: 'best', points: 9610 });
+  assert.equal(ownScoreLabel('board'), 'Your board score');
+  assert.equal(ownScoreLabel('best'), 'Your best');
+  assert.deepEqual(scoreOrNotTaken({ is_listed: true, viewer_best_points: 9610, viewer_board_points: 8200 }, true), { label: 'Board 8,200', taken: true });
+  assert.deepEqual(scoreOrNotTaken({ is_listed: true, viewer_best_points: null, viewer_board_points: null }, true), { label: 'Not taken', taken: false });
+  assert.equal(scoreOrNotTaken({ is_listed: true, viewer_best_points: 9610 }, true), null);
+  assert.deepEqual(scoreOrNotTaken({ is_listed: false, viewer_best_points: 2553 }, true), { label: 'Best 2,553', taken: true });
 });

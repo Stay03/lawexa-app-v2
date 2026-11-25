@@ -9,7 +9,7 @@ import type { ChannelQuiz } from '@/types/channel-quiz';
 import { MemberAvatar } from '@/v2/features/channels/ui/avatars';
 import { useV2Session } from '@/v2/runtime/session-context';
 import { scoreLabel } from '../home-model';
-import { scoreToBeatView } from '../retake-model';
+import { ownScore, ownScoreLabel, scoreToBeatView } from '../retake-model';
 import { quizFrontHref } from '../model';
 import { QuizTags } from '../QuizTags';
 import { QuizTile } from '../QuizTile';
@@ -43,7 +43,8 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
     : first;
   const leading = toBeat ? toBeat.you : quiz.leaderboard?.viewer_rank === 1;
   const caption = toBeat ? 'Score to Beat' : leading ? 'You lead' : 'To beat';
-  const best = typeof quiz.viewer_best_points === 'number' ? quiz.viewer_best_points : null;
+  // The reader's board score: on a listed quiz the first attempt, never the best (retakes are practice).
+  const own = ownScore(quiz);
 
   return (
     <li className={cn(CARD, 'has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring')}>
@@ -77,10 +78,10 @@ export const ExploreQuizCard = memo(function ExploreQuizCard({ quiz }: { quiz: C
         </div>
       )}
 
-      {best !== null ? (
+      {own ? (
         <span className="mt-auto flex min-w-0 items-baseline gap-1.5">
-          <span className="text-xs text-muted-foreground">Your best</span>
-          <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">{scoreLabel(best)}</span>
+          <span className="text-xs text-muted-foreground">{ownScoreLabel(own.kind)}</span>
+          <span className="font-comfortaa text-base font-bold text-foreground tabular-nums">{scoreLabel(own.points)}</span>
         </span>
       ) : null}
     </li>

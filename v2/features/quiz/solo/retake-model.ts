@@ -37,12 +37,14 @@ export function scoreToBeatView(
   viewerUuid: string | null | undefined,
 ): ScoreToBeatView | null {
   if (!scoreToBeat) return null;
-  const you = Boolean(viewerUuid) && scoreToBeat.user.uuid === viewerUuid;
+  const user = scoreToBeat.user;
+  const you = Boolean(viewerUuid) && user !== null && user.uuid === viewerUuid;
   return {
     points: pointsLabel(scoreToBeat.points),
-    holder: you ? 'You' : scoreToBeat.user.name.trim() || 'A player',
+    // A holder whose account is gone keeps the score, unnamed (Backend ab338362).
+    holder: you ? 'You' : user?.name.trim() || 'A former player',
     you,
-    avatarUrl: scoreToBeat.user.avatar_url,
+    avatarUrl: user?.avatar_url ?? null,
   };
 }
 
@@ -70,6 +72,30 @@ export function runKind(
   const stays =
     typeof attempt.board_points === 'number' ? `Your board score stays ${pointsLabel(attempt.board_points)}.` : 'Your board score stays as it is.';
   return { kind: 'practice', holdsScoreToBeat: holds, line: `Practice run. ${stays}` };
+}
+
+/**
+ * The reader's own score as a quiz's cards and page show it. On a listed quiz
+ * it is the board score (the first attempt), never the best: retakes are
+ * practice (Arthur, 25 November 2026). Until the server sends it, a listed
+ * quiz shows no score rather than a best. An unlisted quiz keeps its best.
+ * `boardPoints` is the board's own read of the reader, where the page has it.
+ */
+export function ownScore(
+  quiz: { is_listed?: boolean; viewer_best_points?: number | null; viewer_board_points?: number | null },
+  boardPoints?: number | null,
+): { kind: 'board' | 'best'; points: number } | null {
+  if (quiz.is_listed) {
+    const points = typeof boardPoints === 'number' ? boardPoints : quiz.viewer_board_points;
+    return typeof points === 'number' && Number.isFinite(points) ? { kind: 'board', points } : null;
+  }
+  const best = quiz.viewer_best_points;
+  return typeof best === 'number' && Number.isFinite(best) ? { kind: 'best', points: best } : null;
+}
+
+/** The words before the reader's own score. */
+export function ownScoreLabel(kind: 'board' | 'best'): string {
+  return kind === 'board' ? 'Your board score' : 'Your best';
 }
 
 /** The label under the points: "practice points" on a retake. */

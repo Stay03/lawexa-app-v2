@@ -48,7 +48,7 @@ import {
 import { canPublishPublicly, quizFrontHref } from '../model';
 import { QUIZ_CARD_GRID, QuizCard, QuizCardGridSkeleton } from '../QuizCard';
 import { soloQuizQueries } from '../queries';
-import { bestOrNotTaken } from '../rows-model';
+import { scoreOrNotTaken } from '../rows-model';
 
 /**
  * LibraryList — the Quiz home's My quizzes tab (`/quiz?tab=mine`), every
@@ -332,7 +332,7 @@ const LibraryCard = memo(function LibraryCard({
   );
 
   const Mark = VISIBILITY_MARKS[quiz.visibility];
-  const best = bestOrNotTaken(quiz.viewer_best_points, true);
+  const best = scoreOrNotTaken(quiz, true);
   const footer = (
     <span className="flex min-w-0 items-center justify-between gap-2 text-xs">
       <span className="inline-flex min-w-0 items-center gap-1 text-muted-foreground">

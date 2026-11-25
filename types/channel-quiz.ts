@@ -275,7 +275,8 @@ export interface QuizLeaderboardBlock {
  */
 export interface QuizScoreToBeat {
   points: number;
-  user: { uuid: string; name: string; avatar_url: string | null };
+  /** Who reached it; `null` once their account is gone (Backend ab338362). */
+  user: { uuid: string; name: string; avatar_url: string | null } | null;
   achieved_at: string;
 }
 
@@ -414,6 +415,13 @@ export interface ChannelQuiz {
   viewer_best_attempt_uuid?: string | null;
   /** Finished attempts by the viewer; `null` signed out. */
   viewer_attempts_count?: number | null;
+  /**
+   * On a listed quiz: the reader's board score, their first finished
+   * attempt's points (Arthur, 25 November 2026). A listed quiz shows this,
+   * never the best: retakes are practice. `null` before their first finish
+   * or on a quiz that is not listed. Absent from an older server.
+   */
+  viewer_board_points?: number | null;
   /** The sum of the questions' time limits, in seconds: the "about N min". */
   total_seconds?: number;
   /** A past paper's year, the level it is set for (`QUIZ_LEVELS`) and its

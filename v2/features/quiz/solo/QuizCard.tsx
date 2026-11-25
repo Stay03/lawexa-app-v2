@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { ChannelQuiz } from '@/types/channel-quiz';
 import { quizFrontHref } from './model';
 import { QuizTile } from './QuizTile';
-import { bestOrNotTaken, quizFactsLabel } from './rows-model';
+import { quizFactsLabel, scoreOrNotTaken } from './rows-model';
 
 /**
  * QuizCard — one quiz on the Quiz home, in the small-card grid Stay picked
@@ -65,7 +65,7 @@ export function QuizCard({
   children?: React.ReactNode;
 }) {
   const count = quiz.question_count ?? quiz.questions?.length ?? 0;
-  const best = bestOrNotTaken(quiz.viewer_best_points, signedIn);
+  const best = scoreOrNotTaken(quiz, signedIn);
 
   return (
     <li

@@ -131,8 +131,8 @@ test('an Explore card is one link: the tile and title, quiet tags, the person to
   assert.match(card, /<QuizTile uuid=\{quiz\.uuid\} title=\{quiz\.title\} size="md" \/>/);
   assert.doesNotMatch(card, /<Play\b|QUIZ_TONE_PLAY/);
   assert.match(card, /<QuizTags quiz=\{quiz\} \/>/);
-  // The best in the plain colour, and no rank on the card.
-  assert.match(card, /<span className="font-comfortaa text-base font-bold text-foreground tabular-nums">\{scoreLabel\(best\)\}<\/span>/);
+  // The reader's own score in the plain colour (the board score on a listed quiz), and no rank on the card.
+  assert.match(card, /<span className="font-comfortaa text-base font-bold text-foreground tabular-nums">\{scoreLabel\(own\.points\)\}<\/span>/);
   assert.doesNotMatch(card, /viewer_rank\s*\?\?|rankLabel|text-\[var\(--solo-gold-text\)\]/);
 });
 
