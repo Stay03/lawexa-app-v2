@@ -19,6 +19,7 @@ import { ReplyQuote } from './ReplyQuote';
 import { withoutAttachmentMarks } from './attachment-markers';
 import { SentAttachments } from './SentAttachments';
 import { RecordingCard } from '@/v2/features/recording/RecordingCard';
+import { VoiceClipLine } from '@/v2/features/dictation/VoiceClipLine';
 import { RedactionNote } from './RedactionNote';
 import { SpaceTurn } from './SpaceTurn';
 import { SwipeToReply } from './SwipeToReply';
@@ -236,6 +237,9 @@ export function UserMessageRow({
         )}
         {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
         {message.recording && <RecordingCard recording={message.recording} />}
+        {message.voiceClip && (
+          <VoiceClipLine clip={message.voiceClip} align={turnSide(message, viewerId) === 'mine' ? 'end' : 'start'} />
+        )}
         {unmatched && <p className="text-muted-foreground mt-1 text-xs">{unmatched}</p>}
         {showsRedaction && (
           <RedactionNote summary={message.redaction} align={turnSide(message, viewerId) === 'mine' ? 'end' : 'start'} hasFiles={hasFiles} />
@@ -292,6 +296,7 @@ export function UserMessageRow({
 
       {attachments.length > 0 && <SentAttachments attachments={attachments} keepable={turnSide(message, viewerId) === 'mine'} />}
       {message.recording && <RecordingCard recording={message.recording} />}
+      {message.voiceClip && <VoiceClipLine clip={message.voiceClip} align="end" />}
       {showsRedaction && <RedactionNote summary={message.redaction} align="end" hasFiles={hasFiles} />}
 
       <div

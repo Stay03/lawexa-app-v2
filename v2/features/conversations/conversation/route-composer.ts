@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import type { RedactionCategory } from '@/types/redaction';
 
 import type { MessageAttachment, MessageReplyTo } from '@/types/chat';
+import type { VoiceClip } from '@/types/dictation';
 import type { QuestionCardAnswer } from '@/types/chat';
 import type { OpenCard } from './question-card/open-card';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
@@ -75,6 +76,8 @@ export interface RouteComposerSurface {
     message: string,
     attachments: MessageAttachment[],
     replyTo: MessageReplyTo | null,
+    questionAnswers?: null,
+    voiceClip?: VoiceClip | null,
   ) => Promise<SendRefused | undefined>;
   stop: () => void;
   /**

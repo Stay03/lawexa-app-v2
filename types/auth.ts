@@ -85,6 +85,8 @@ export interface User {
   is_verified_author?: boolean;
   /** May record meetings (staff first; recorder, thread ac47b1df). Absent from older servers: no. */
   can_record?: boolean;
+  /** May dictate messages (staff first; Arthur 25 November 2026, Backend card 2b83c2ed). Absent from older servers: no. */
+  can_dictate?: boolean;
   auth_provider: AuthProvider;
   avatar_url: string | null;
   profile: UserProfile | null;

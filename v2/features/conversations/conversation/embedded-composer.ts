@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { RedactionCategory } from '@/types/redaction';
 import type { MessageAttachment } from '@/types/chat';
+import type { VoiceClip } from '@/types/dictation';
 import type { JurisdictionChoice } from '@/types/jurisdiction';
 import type { QuestionCardAnswer } from '@/types/chat';
 import type { OpenCard } from './question-card/open-card';
@@ -61,7 +62,13 @@ export interface EmbeddedComposerSurface {
   canStop: boolean;
   /** False while ownership is still resolving — the host disables sending. */
   isOwnerResolved: boolean;
-  submit: (message: string, attachments: MessageAttachment[]) => Promise<SendRefused | undefined>;
+  submit: (
+    message: string,
+    attachments: MessageAttachment[],
+    replyTo?: null,
+    questionAnswers?: null,
+    voiceClip?: VoiceClip | null,
+  ) => Promise<SendRefused | undefined>;
   stop: () => void;
   /**
    * The chat's open question card, whose questions Lawexa's answer asks; null

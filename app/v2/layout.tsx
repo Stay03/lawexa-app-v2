@@ -291,6 +291,8 @@ export default async function V2Layout({
           canAccessTeamChannels={user?.can_access_team_channels ?? false}
           // Whether the recorder shows (the server's flag, fresh each load, not the sign-in copy).
           canRecord={user?.can_record ?? false}
+          // Whether the message box offers dictation (the server's flag, fresh each load).
+          canDictate={user?.can_dictate ?? false}
           // Whether the quiz form offers "Public" (a verified author only).
           isVerifiedAuthor={user?.is_verified_author ?? false}
           // Whether the Wrapped entry points ask for one (fresh each load, not the sign-in copy).
