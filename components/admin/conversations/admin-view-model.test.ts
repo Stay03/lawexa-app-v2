@@ -89,6 +89,7 @@ test('funding names the plan and the sponsor, and keeps a kind it does not know'
 test('the plan line says the subscription state, or the plan alone', () => {
   assert.equal(planLine({ plan: { slug: 'pro', name: 'Pro' }, subscription_status: 'past_due' }), 'Pro, payment overdue');
   assert.equal(planLine({ plan: { slug: 'free', name: 'Free' }, subscription_status: null }), 'Free');
+  assert.equal(planLine({ plan: null, subscription_status: null }), 'No plan');
 });
 
 test('cut tool results are found by their mark', () => {

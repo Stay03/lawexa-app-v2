@@ -54,7 +54,8 @@ export interface AdminConversationOwner {
   email: string;
   /** Set when the account was deleted. */
   deleted_at: string | null;
-  plan: { slug: string; name: string };
+  /** The plan the person's chats are billed by (their own, or an organisation seat); null when the plan row is gone. */
+  plan: { slug: string; name: string } | null;
   subscription_status: string | null;
 }
 

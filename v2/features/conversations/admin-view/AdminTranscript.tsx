@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 
 import { transformApiMessages } from '@/lib/utils/transform-api-messages';
 import type { AgentConversation } from '@/types/agent-conversations';
 import type { AdminConversationView } from '@/types/admin-conversation-view';
 import type { BackgroundJob } from '@/types/background-jobs';
 import type { EngineMessage, StreamingSource } from '@/v2/runtime/chat-engine';
+import { makeQueryClient } from '@/v2/runtime/query';
 import { V2SessionProvider } from '@/v2/runtime/session-context';
 import { AgentRowsProvider } from '../conversation/agents/context';
 import { BackgroundJobsProvider } from '../conversation/background-jobs/context';
@@ -17,7 +19,15 @@ import '@/v2/shell/shell.css';
 /**
  * The admin conversation view's transcript (Stay, thread 085a980c, 25
  * November 2026): the chat drawn with the owner's own rows, from the owner's
- * own message data (Backend aee2efb0), so staff see what the person saw.
+ * own message data (Backend da675ba5), so staff see what the person saw.
+ *
+ * SELF-CONTAINED. It is the one v2 module the v1 admin shell may import (the
+ * sanctioned crossing in eslint.config.mjs; Techlead, 25 November 2026), so it
+ * mounts everything the v2 rows need itself: a v2 query client, the session,
+ * the jobs and agents, and the shell's styles. Nothing depends on the admin
+ * shell carrying v2 context. Its query client keeps nothing on the device:
+ * staff reading another person's chat must not leave it in the browser's
+ * cache.
  *
  * READ ONLY. A snapshot: nothing streams, and the page reads it again only on
  * Refresh. No chat context is provided, so nothing in a row can send, answer
@@ -59,58 +69,62 @@ export function AdminTranscript({
   );
   const references = useMemo(() => view.references ?? [], [view.references]);
   const owner = view.owner;
+  // One client for the page's life, with v2's defaults and no persister.
+  const [queryClient] = useState(() => makeQueryClient());
 
   return (
-    <V2SessionProvider
-      signedIn
-      userId={view.user_id}
-      userUuid={owner?.uuid ?? view.user_uuid}
-      name={owner?.name ?? null}
-      email={null}
-      avatarUrl={null}
-      username={null}
-      role={null}
-      isVerified
-      authProvider={null}
-      canSetPrice={false}
-      isAmbassador={false}
-      profileCountryName={null}
-      profileCountryCode={null}
-      isLawyer={false}
-      canAccessTeamChannels={false}
-      canRecord={false}
-      isVerifiedAuthor={false}
-      mayHaveWrapped={false}
-      wrappedHidden
-    >
-      <BackgroundJobsProvider conversationId={view.id} jobs={jobs} readOnly>
-        <AgentRowsProvider conversationId={view.id} agentConversations={readerAgents}>
-          <TurnFooterProvider render={turnFooter}>
-            <div data-admin-transcript="" className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
-              <MessageList
-                messages={messages}
-                streamingText={STILL}
-                reasoning={STILL}
-                isStreaming={false}
-                isLoadingHistory={false}
-                error={null}
-                narration={null}
-                references={references}
-                canRegenerate={false}
-                onRegenerate={NO_OP}
-                onRetry={NO_OP}
-                showAuthors={false}
-                viewerId={view.user_id}
-                viewerUuid={owner?.uuid ?? view.user_uuid}
-                redacted={view.is_redacted === true}
-                masthead={null}
-                underBar={false}
-                onReply={null}
-              />
-            </div>
-          </TurnFooterProvider>
-        </AgentRowsProvider>
-      </BackgroundJobsProvider>
-    </V2SessionProvider>
+    <QueryClientProvider client={queryClient}>
+      <V2SessionProvider
+        signedIn
+        userId={view.user_id}
+        userUuid={owner?.uuid ?? view.user_uuid}
+        name={owner?.name ?? null}
+        email={null}
+        avatarUrl={null}
+        username={null}
+        role={null}
+        isVerified
+        authProvider={null}
+        canSetPrice={false}
+        isAmbassador={false}
+        profileCountryName={null}
+        profileCountryCode={null}
+        isLawyer={false}
+        canAccessTeamChannels={false}
+        canRecord={false}
+        isVerifiedAuthor={false}
+        mayHaveWrapped={false}
+        wrappedHidden
+      >
+        <BackgroundJobsProvider conversationId={view.id} jobs={jobs} readOnly>
+          <AgentRowsProvider conversationId={view.id} agentConversations={readerAgents}>
+            <TurnFooterProvider render={turnFooter}>
+              <div data-admin-transcript="" className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
+                <MessageList
+                  messages={messages}
+                  streamingText={STILL}
+                  reasoning={STILL}
+                  isStreaming={false}
+                  isLoadingHistory={false}
+                  error={null}
+                  narration={null}
+                  references={references}
+                  canRegenerate={false}
+                  onRegenerate={NO_OP}
+                  onRetry={NO_OP}
+                  showAuthors={false}
+                  viewerId={view.user_id}
+                  viewerUuid={owner?.uuid ?? view.user_uuid}
+                  redacted={view.is_redacted === true}
+                  masthead={null}
+                  underBar={false}
+                  onReply={null}
+                />
+              </div>
+            </TurnFooterProvider>
+          </AgentRowsProvider>
+        </BackgroundJobsProvider>
+      </V2SessionProvider>
+    </QueryClientProvider>
   );
 }

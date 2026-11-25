@@ -137,6 +137,15 @@ const eslintConfig = defineConfig([
               // and nothing else at all — no v2 type, no v2 runtime, no
               // transitive edge into the v2 tree — so adding it to the v1
               // settings card cannot pull the v2 bundle behind it.
+              //
+              // `features/conversations/admin-view/AdminTranscript.tsx` is the
+              // one crossing that DOES carry v2 runtime, on purpose: the admin
+              // conversation view draws a chat with the owner's own v2 rows
+              // (Stay, thread 085a980c; Techlead's yes, 25 November 2026). It
+              // is the single entry file, it mounts every v2 provider and style
+              // the rows need itself, and only the admin conversation page
+              // imports it, so the v2 rows load on that route alone. Any other
+              // v1 import of v2 still fails here.
               except: [
                 "cookie.ts",
                 "routes.manifest.ts",
@@ -144,9 +153,10 @@ const eslintConfig = defineConfig([
                 "search-position.ts",
                 "bar-tuning.ts",
                 "bar-colour-test.ts",
+                "features/conversations/admin-view/AdminTranscript.tsx",
               ],
               message:
-                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style, @/v2/search-position, @/v2/bar-tuning, @/v2/bar-colour-test and @/v2/routes.manifest are sanctioned crossings).",
+                "v1 code must not import from v2 (only @/v2/cookie, @/v2/stream-style, @/v2/search-position, @/v2/bar-tuning, @/v2/bar-colour-test, @/v2/routes.manifest and the admin conversation view's AdminTranscript are sanctioned crossings).",
             },
           ],
         },

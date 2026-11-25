@@ -115,10 +115,11 @@ const STATUS_WORDS: Record<string, string> = {
   expired: 'expired',
 };
 
-/** "Pro, active"; "Free" when there is no subscription. */
+/** "Pro, active"; "Free" when there is no subscription; "No plan" when the server names none. */
 export function planLine(owner: Pick<AdminConversationOwner, 'plan' | 'subscription_status'>): string {
   const status = owner.subscription_status ? STATUS_WORDS[owner.subscription_status] ?? owner.subscription_status : null;
-  return status ? `${owner.plan.name}, ${status}` : owner.plan.name;
+  const name = owner.plan?.name ?? 'No plan';
+  return status ? `${name}, ${status}` : name;
 }
 
 /** The ids of tool rows the view cut at 200 kB, whose full result has its own route. */
