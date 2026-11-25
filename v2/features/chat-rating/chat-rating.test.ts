@@ -122,13 +122,13 @@ test('the moments are hooked where they happen, and only inside an answer', () =
 
 test('the banner sits above every chat’s box, and the home box has none', () => {
   const dock = read('v2', 'features', 'conversations', 'conversation', 'ChatDock.tsx');
-  // The moment banner, then the plan-ended slot (Arthur's B), then the agents line while the chat's agents work
-  // (chain view, 25 November 2026), then the box; while Lawexa's questions wait, their card docks between the
+  // The moment banner, then the plan-ended slot (Arthur's B), then the box; nothing about the chat's agents
+  // (their deck, with Stop, sits in the transcript: round 9, 25 November 2026); while Lawexa's questions wait, their card docks between the
   // slots and the box (question cards, design A), and the banner stays away.
   assert.match(
     dock,
     // (The box waits folded under an open card until "Type my own answer", 14 November 2026.)
-    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*\{\/\*[^*]*\*\/\}\s*<AgentsWorkingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\s*\{\/\*[^*]*\*\/\}\s*<div ref=\{cardStack\}[^>]*>\s*\{openCard && \(\s*<QuestionDock[\s\S]*?\/>\s*\)\}\s*\{\/\*[^*]*\*\/\}\s*<CardBoxFold folded=\{openCard !== null && cardBox\.answering === null\}>\s*<ConversationComposer/,
+    /\{!openCard && <ChatRatingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>\}\s*\{\/\*[^*]*\*\/\}\s*<PlanEndedSlot className="mb-2" \/>\s*\{\/\*[^*]*\*\/\}\s*<div ref=\{cardStack\}[^>]*>\s*\{openCard && \(\s*<QuestionDock[\s\S]*?\/>\s*\)\}\s*\{\/\*[^*]*\*\/\}\s*<CardBoxFold folded=\{openCard !== null && cardBox\.answering === null\}>\s*<ConversationComposer/,
   );
   // The home box carries only the plan-ended slot, never the moment banner.
   assert.doesNotMatch(read('v2', 'shell', 'designs', 'HomeComposer.tsx'), /ChatRatingSlot|ChatRatingBanner/);

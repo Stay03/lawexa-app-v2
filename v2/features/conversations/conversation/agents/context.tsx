@@ -83,3 +83,16 @@ export function useRosterReplyIds(): ReadonlySet<number> {
     return ids;
   }, [chain]);
 }
+
+/**
+ * The chain's open state and its held messages, for Lawexa's line over the
+ * deck ("… · 1 message queued") and its Stop. Empty outside a chat with a chain.
+ */
+export function useChainHeld(): { open: boolean; heldIds: readonly number[] } {
+  const value = useContext(AgentChainContext);
+  const chain = value?.chain ?? null;
+  return useMemo(
+    () => ({ open: chain?.chain_open === true, heldIds: chain?.held_messages.map((held) => held.id) ?? [] }),
+    [chain],
+  );
+}

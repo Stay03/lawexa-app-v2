@@ -64,8 +64,8 @@ test('an agent conversation opens in the chat’s side panel by its uuid', () =>
   for (const bad of ['agent:', 'agent:issue-spotter-1', 'agent:123', 'agent:../x']) assert.equal(parseSidePanelValue(bad), null, bad);
 
   const read = (...parts: string[]) => readFileSync(join(process.cwd(), 'v2', 'features', 'conversations', 'conversation', ...parts), 'utf8');
-  // Each agent's row opens its conversation ("Read the reply", "Open its conversation").
-  assert.match(read('agents', 'AgentRoster.tsx'), /const open = panel \? \(\) => panel\.open\(\{ kind: 'agent', id: row\.conversationId \}\) : null;/);
+  // Each agent's card opens its conversation from its popover ("Open its conversation"; round 9, version 1).
+  assert.match(read('agents', 'AgentRoster.tsx'), /panel\.open\(\{ kind: 'agent', id: node\.conversationId \}\);/);
 });
 
 // Review finding 1 (12 November 2026): in a Space, the root chat's owner and

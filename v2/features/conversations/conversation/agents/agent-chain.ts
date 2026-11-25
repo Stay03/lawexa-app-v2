@@ -36,6 +36,12 @@ export interface ChainNode {
   /** The start of this call's reply, as plain words, once it replied. */
   replyStart: string | null;
   replyMessageId: number | null;
+  /** The reply in a few words for its card, once it replied; null when the server sends none. */
+  replySummary: string | null;
+  /** While it waits: the agent it waits for, by name. */
+  waitingFor: string | null;
+  /** When this call was made, for the time the deck has been working. */
+  calledAt: string | null;
   children: ChainNode[];
 }
 
@@ -72,6 +78,9 @@ function node(entry: AgentChainEntry, askedBy: string, children: ChainNode[]): C
     canStop: executionId !== null && entry.can_send,
     replyStart: reply ? plainPreview(reply.preview) || reply.preview : null,
     replyMessageId: reply?.message_id ?? null,
+    replySummary: reply?.summary?.trim() || null,
+    waitingFor: entry.state === 'waiting' ? (entry.waiting_on?.agent.name ?? null) : null,
+    calledAt: entry.latest_call?.called_at ?? null,
     children,
   };
 }

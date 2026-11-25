@@ -15,7 +15,6 @@ import type { JurisdictionChoice } from '@/types/jurisdiction';
 import { FOCUS_RING } from '@/v2/shell/designs/modules';
 import { formatRelativeTime } from '@/v2/shell/designs/modules/meta';
 import { ViewOnlyPill } from '@/v2/features/conversations/conversation/ViewOnlyPill';
-import { AgentsWorkingSlot } from '@/v2/features/conversations/conversation/agents/AgentsWorkingSlot';
 import { lastActivityAt } from '@/v2/features/conversations/activity';
 import {
   ConversationComposer,
@@ -604,10 +603,6 @@ export function CaseChatComposerDock({
         )}
       >
         <div className="min-h-0 overflow-hidden">
-          {/* While the chat's agents work: what Lawexa waits for, with Stop (chain view, option C; as in ChatDock). */}
-          {conversationId && surface?.isOwnerResolved && surface.canSend ? (
-            <AgentsWorkingSlot conversationId={conversationId} isStreaming={surface.isStreaming} />
-          ) : null}
           {/* The card and the box as one stack: held at its height while the box answers, so the card's top
               never moves (useCardBox, card-height.ts; Fable's review). */}
           <div ref={cardStack} style={cardBox.stackStyle} className="flex flex-col">

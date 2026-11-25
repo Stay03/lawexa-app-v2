@@ -22,7 +22,17 @@ export interface AgentLatestCall {
   called_by_message_id: number | null;
   called_at: string;
   /** This call's own reply; null until it replies, and when it failed or was cancelled. */
-  reply: { message_id: number; preview: string; created_at: string } | null;
+  reply: {
+    message_id: number;
+    preview: string;
+    created_at: string;
+    /**
+     * The reply in a few words for the agent's card (Backend, 25 November
+     * 2026): its first heading or first sentence, at most about 40
+     * characters, no ellipsis; null when empty; absent on an older server.
+     */
+    summary?: string | null;
+  } | null;
 }
 
 /** `AgentConversationResource`: one agent conversation, as the list (3.1) and a send (3.3) return it. */

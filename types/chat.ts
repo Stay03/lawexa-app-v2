@@ -510,6 +510,13 @@ export interface ToolCompleteEvent {
   /** Same value on a call and its result (Backend tool-call-ids); absent on older streams. */
   tool_call_id?: string;
   tool_result: ToolResult;
+  /**
+   * How many things came back, when the result is a list (its top-level list,
+   * or its results/items/cases array); null otherwise; absent on an older
+   * stream (Backend, 25 November 2026). An agent's card says "Searched cases:
+   * 3 results" with it.
+   */
+  result_count?: number | null;
   latency_ms: number;
   timestamp: string;
   context?: 'handover';

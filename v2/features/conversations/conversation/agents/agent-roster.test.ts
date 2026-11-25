@@ -169,7 +169,11 @@ test('the live window shows the words, never a tool call the model writes as tex
   assert.equal(liveWindowText('**Issue 1.** The notice <'), 'Issue 1. The notice');
   // A comparison sign in the words stays.
   assert.equal(liveWindowText('Rent < 2 years is periodic'), 'Rent < 2 years is periodic');
-  assert.match(here('agents', 'AgentRoster.tsx'), /const text = live\.text \? liveWindowText\(live\.text\) : '';/);
+  // Round 9, version 1 (Stay, 25 November 2026): the deck shows a status line, never the agent's words; it only
+  // asks whether they have started.
+  const deck = here('agents', 'AgentRoster.tsx');
+  assert.match(deck, /writing: live\.text\.length > 0/);
+  assert.doesNotMatch(deck, /\{live\.text\}|liveWindowText/);
 });
 
 test('the list is read again on a beat only while an agent works, for a reader who did not ask', () => {
@@ -273,21 +277,19 @@ test('every reader of the chat sees the rows: they come from the chat’s agent 
 
 test('Stop ends the agent’s turn, never just the chat’s waiting; the row streams from the turn’s own stream', () => {
   const roster = here('agents', 'AgentRoster.tsx');
-  assert.match(roster, /\{row\.canStop && row\.executionId \? <StopPill name=\{row\.name\} executionId=\{row\.executionId\} \/> : null\}/);
+  assert.match(roster, /\{node\.canStop && node\.executionId \? <StopAgent name=\{node\.name\} executionId=\{node\.executionId\} \/> : null\}/);
   assert.match(roster, /void chatApi\.cancelStream\(executionId, token\);/);
   assert.doesNotMatch(roster, /cancelBackgroundJob|backgroundJobsApi|\.cancel\(job/);
-  // One window per turn, from the reader the side panel uses; its end re-reads the list and the jobs.
-  assert.match(roster, /<LiveWindow key=\{row\.executionId\} executionId=\{row\.executionId\} onEnd=\{onTurnEnd\} \/>/);
-  assert.match(roster, /const live = useAgentStream\(executionId, onEnd\);/);
+  // One stream per running turn, from the reader the side panel uses; its end re-reads the list and the jobs.
+  assert.match(roster, /<LiveStatus key=\{node\.executionId\} node=\{node\} executionId=\{node\.executionId\} onTurnEnd=\{onTurnEnd\}>/);
+  assert.match(roster, /const live = useAgentStream\(executionId, onTurnEnd\);/);
   assert.match(roster, /queryKey: \[\.\.\.agentChainQueries\.all\(\), chatId\]/);
   assert.match(roster, /queryKey: \[\.\.\.agentConversationQueries\.all\(\), chatId\]/);
   assert.match(roster, /queryKey: conversationsQueries\.backgroundJobsOf\(chatId\)/);
-  // The window is held to its foot and fades at the top once full; no dots.
-  assert.match(roster, /flex flex-col justify-end overflow-hidden/);
-  assert.match(roster, /maskImage: full \? `linear-gradient\(to bottom, transparent, black \$\{LINE_EM\}em\)` : undefined,/);
+  // No dots and no "is typing": a card's line is a status, and it changes in place.
   assert.doesNotMatch(roster, /is writing|typing|…<|\.\.\.</);
-  // Replied reads the reply; stopped and couldn't-reply open the conversation.
-  assert.match(roster, /Read the reply/);
+  // A replied agent's popover shows the start of its reply; every popover opens the conversation.
+  assert.match(roster, /\{node\.state === 'replied' && node\.replyStart \? \(/);
   assert.match(roster, /Open its conversation/);
 
   // The return line no longer carries preview cards: the rows show the replies.

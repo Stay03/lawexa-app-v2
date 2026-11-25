@@ -58,12 +58,14 @@ test('the spine listens for both events on the user channel and catches the chai
   assert.match(gapKeys, /agentChainQueries\.all\(\),/);
 });
 
-test('the agents line sits in the dock above the message box, in both docks, never under the box', () => {
-  // TEST DATA pictures, 25 November 2026: drawn at the foot of the chat, the floating box covered it.
+test('nothing about the agents sits above the message box: Stop and the queued count are on Lawexa’s line in the deck', () => {
+  // Round 9, version 1 (Stay, 25 November 2026, 22:48Z): the box stays open for held messages (option C), so the
+  // agents' Stop lives on Lawexa's line over the deck, in the transcript, and neither dock carries an agents line.
   const here = (...parts: string[]) => readFileSync(join(process.cwd(), 'v2', ...parts), 'utf8');
-  const dock = here('features', 'conversations', 'conversation', 'ChatDock.tsx');
-  assert.match(dock, /<PlanEndedSlot className="mb-2" \/>\s*\{\/\*[^*]*\*\/\}\s*<AgentsWorkingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>/);
-  const caseDock = here('features', 'cases', 'detail', 'CaseChatCore.tsx');
-  assert.match(caseDock, /<AgentsWorkingSlot conversationId=\{conversationId\} isStreaming=\{surface\.isStreaming\} \/>/);
-  assert.doesNotMatch(here('features', 'conversations', 'conversation', 'ConversationScreen.tsx'), /AgentsWorking/);
+  assert.doesNotMatch(here('features', 'conversations', 'conversation', 'ChatDock.tsx'), /AgentsWorking/);
+  assert.doesNotMatch(here('features', 'cases', 'detail', 'CaseChatCore.tsx'), /AgentsWorking/);
+  const deck = here('features', 'conversations', 'conversation', 'agents', 'AgentRoster.tsx');
+  assert.match(deck, /const \{ stop, stopping, problem \} = useStopChain\(conversationId, heldIds\);/);
+  assert.match(deck, /\{problem \?\? deckLine\(rows, heldIds\.length\)\}/);
+  assert.match(deck, /\{open && canSend \? \(/);
 });
